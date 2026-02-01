@@ -1,5 +1,4 @@
 /// Enemy sprite templates for 3D rendering
-
 pub struct EnemySprite {
     pub base_art: &'static str,
     #[allow(dead_code)]
