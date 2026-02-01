@@ -1,9 +1,8 @@
-/// Scales ASCII art sprites vertically while preserving aspect ratio
+/// Scales a sprite to the target height.
 ///
+/// Scales ASCII art sprites vertically while preserving aspect ratio.
 /// Takes a multi-line ASCII sprite and scales it to a target height.
 /// Uses sampling to maintain visual appearance at different sizes.
-
-/// Scales a sprite to the target height
 pub fn scale_sprite(sprite: &str, target_height: usize) -> Vec<String> {
     let lines: Vec<&str> = sprite.lines().collect();
     if lines.is_empty() {
