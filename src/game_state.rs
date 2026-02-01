@@ -48,6 +48,25 @@ impl Stat {
     }
 }
 
+/// Represents the current combat state
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CombatState {
+    pub enemy_spawn_timer: f64,
+    pub attack_animation_timer: f64,
+    pub current_enemy: Option<String>,
+}
+
+impl CombatState {
+    /// Creates a new combat state with default values
+    pub fn new() -> Self {
+        Self {
+            enemy_spawn_timer: 0.0,
+            attack_animation_timer: 0.0,
+            current_enemy: None,
+        }
+    }
+}
+
 /// Main game state containing all player progress
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameState {
@@ -56,6 +75,7 @@ pub struct GameState {
     pub total_prestige_count: u64,
     pub last_save_time: i64,
     pub play_time_seconds: u64,
+    pub combat_state: CombatState,
 }
 
 impl GameState {
@@ -67,6 +87,7 @@ impl GameState {
             total_prestige_count: 0,
             last_save_time: current_time,
             play_time_seconds: 0,
+            combat_state: CombatState::new(),
         }
     }
 

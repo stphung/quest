@@ -3,17 +3,21 @@ mod game_logic;
 mod game_state;
 mod prestige;
 mod save_manager;
+mod ui;
 
 use chrono::Utc;
 use constants::*;
 use crossterm::event::{self, Event, KeyCode};
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen};
+use crossterm::ExecutableCommand;
 use game_logic::*;
 use game_state::*;
 use prestige::*;
+use ratatui::{backend::CrosstermBackend, Terminal};
 use save_manager::SaveManager;
 use std::io;
 use std::time::{Duration, Instant};
+use ui::{draw_ui, spawn_enemy, update_combat_state};
 
 fn main() -> io::Result<()> {
     // Initialize SaveManager
@@ -46,14 +50,19 @@ fn main() -> io::Result<()> {
         }
     }
 
-    // Enable raw terminal mode
+    // Setup terminal
     enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    stdout.execute(EnterAlternateScreen)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
 
     // Run game loop
-    let result = run_game_loop(&mut game_state, &save_manager);
+    let result = run_game_loop(&mut game_state, &save_manager, &mut terminal);
 
-    // Cleanup and save on exit
+    // Cleanup terminal
     disable_raw_mode()?;
+    terminal.backend_mut().execute(LeaveAlternateScreen)?;
 
     // Save before exiting
     println!("\nSaving game...");
@@ -64,15 +73,21 @@ fn main() -> io::Result<()> {
 }
 
 /// Main game loop that handles input, ticking, and autosaving
-fn run_game_loop(game_state: &mut GameState, save_manager: &SaveManager) -> io::Result<()> {
+fn run_game_loop(
+    game_state: &mut GameState,
+    save_manager: &SaveManager,
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+) -> io::Result<()> {
     let mut last_tick = Instant::now();
     let mut last_autosave = Instant::now();
     let mut tick_counter: u32 = 0;
 
-    println!("Idle RPG - Coming Soon");
-    println!("Press 'q' to quit, 'p' to prestige");
-
     loop {
+        // Draw UI
+        terminal.draw(|frame| {
+            draw_ui(frame, game_state);
+        })?;
+
         // Poll for input (50ms non-blocking)
         if event::poll(Duration::from_millis(50))? {
             if let Event::Key(key_event) = event::read()? {
@@ -85,10 +100,6 @@ fn run_game_loop(game_state: &mut GameState, save_manager: &SaveManager) -> io::
                     KeyCode::Char('p') | KeyCode::Char('P') => {
                         if can_prestige(game_state) {
                             perform_prestige(game_state);
-                            println!("\nPrestige successful! Now at rank {}", game_state.prestige_rank);
-                        } else {
-                            let next_tier = get_next_prestige_tier(game_state.prestige_rank);
-                            println!("\nCannot prestige yet. All stats must reach level {}", next_tier.required_level);
                         }
                     }
                     _ => {}
@@ -119,6 +130,12 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
     for stat in &mut game_state.stats {
         apply_tick_xp(stat, xp_per_tick);
     }
+
+    // Update combat state
+    // Each tick is 100ms = 0.1 seconds
+    let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
+    update_combat_state(game_state, delta_time);
+    spawn_enemy(game_state);
 
     // Update play_time_seconds
     // Each tick is 100ms (TICK_INTERVAL_MS), so 10 ticks = 1 second

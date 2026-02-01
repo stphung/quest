@@ -1,4 +1,31 @@
+mod combat_scene;
 mod stats_panel;
 pub mod zones;
 
-pub use stats_panel::draw_stats_panel;
+use crate::game_state::GameState;
+use ratatui::{
+    layout::{Constraint, Direction, Layout},
+    Frame,
+};
+
+pub use combat_scene::{spawn_enemy, update_combat_state};
+
+/// Main UI drawing function that creates the layout and draws all components
+pub fn draw_ui(frame: &mut Frame, game_state: &GameState) {
+    let size = frame.area();
+
+    // Split into two main areas: stats panel (left) and combat scene (right)
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(50), // Stats panel
+            Constraint::Percentage(50), // Combat scene
+        ])
+        .split(size);
+
+    // Draw stats panel on the left
+    stats_panel::draw_stats_panel(frame, chunks[0], game_state);
+
+    // Draw combat scene on the right
+    combat_scene::draw_combat_scene(frame, chunks[1], game_state);
+}
