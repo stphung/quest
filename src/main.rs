@@ -1,8 +1,8 @@
 mod attributes;
 mod combat;
 mod combat_logic;
-mod derived_stats;
 mod constants;
+mod derived_stats;
 mod game_logic;
 mod game_state;
 mod prestige;
@@ -12,7 +12,9 @@ mod ui;
 use chrono::Utc;
 use constants::*;
 use crossterm::event::{self, Event, KeyCode};
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen};
+use crossterm::terminal::{
+    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+};
 use crossterm::ExecutableCommand;
 use game_logic::*;
 use game_state::*;
@@ -181,7 +183,10 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
 
     // Update visual effects
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
-    game_state.combat_state.visual_effects.retain_mut(|effect| effect.update(delta_time));
+    game_state
+        .combat_state
+        .visual_effects
+        .retain_mut(|effect| effect.update(delta_time));
 
     // Spawn enemy if needed
     spawn_enemy_if_needed(game_state);

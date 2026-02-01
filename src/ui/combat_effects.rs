@@ -99,7 +99,13 @@ mod tests {
 
     #[test]
     fn test_effect_creation() {
-        let effect = VisualEffect::new(EffectType::DamageNumber { value: 50, is_crit: false }, 1.0);
+        let effect = VisualEffect::new(
+            EffectType::DamageNumber {
+                value: 50,
+                is_crit: false,
+            },
+            1.0,
+        );
         assert!(effect.is_active());
         assert_eq!(effect.lifetime, 0.0);
     }
@@ -114,7 +120,13 @@ mod tests {
 
     #[test]
     fn test_damage_number_render() {
-        let effect = VisualEffect::new(EffectType::DamageNumber { value: 42, is_crit: false }, 1.0);
+        let effect = VisualEffect::new(
+            EffectType::DamageNumber {
+                value: 42,
+                is_crit: false,
+            },
+            1.0,
+        );
         let rendered = effect.render();
         assert!(rendered.is_some());
     }

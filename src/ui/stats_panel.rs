@@ -85,9 +85,7 @@ fn draw_header(frame: &mut Frame, area: Rect, game_state: &GameState) {
 
 /// Draws all 6 attributes with their values and caps
 fn draw_attributes(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    let attrs_block = Block::default()
-        .borders(Borders::ALL)
-        .title("Attributes");
+    let attrs_block = Block::default().borders(Borders::ALL).title("Attributes");
 
     let inner = attrs_block.inner(area);
     frame.render_widget(attrs_block, area);
@@ -153,7 +151,10 @@ fn draw_attribute_row(
             Style::default().fg(color).add_modifier(Modifier::BOLD),
         ),
         Span::raw(format!(" ({:>3}) ", mod_str)),
-        Span::styled(format!("[Cap: {}]", cap), Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            format!("[Cap: {}]", cap),
+            Style::default().fg(Color::DarkGray),
+        ),
     ])];
 
     let paragraph = Paragraph::new(text);
@@ -234,16 +235,15 @@ fn draw_derived_stats(frame: &mut Frame, area: Rect, game_state: &GameState) {
 
 /// Draws prestige information with CHA bonus
 fn draw_prestige_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    let prestige_block = Block::default()
-        .borders(Borders::ALL)
-        .title("Prestige");
+    let prestige_block = Block::default().borders(Borders::ALL).title("Prestige");
 
     let inner = prestige_block.inner(area);
     frame.render_widget(prestige_block, area);
 
     let tier = get_prestige_tier(game_state.prestige_rank);
     let cha_mod = game_state.attributes.modifier(AttributeType::Charisma);
-    let effective_multiplier = DerivedStats::prestige_multiplier(tier.multiplier, &game_state.attributes);
+    let effective_multiplier =
+        DerivedStats::prestige_multiplier(tier.multiplier, &game_state.attributes);
 
     let prestige_text = vec![
         Line::from(vec![
@@ -306,24 +306,16 @@ fn draw_footer(frame: &mut Frame, area: Rect, game_state: &GameState) {
     } else {
         let next_tier = get_prestige_tier(game_state.prestige_rank + 1);
         Span::styled(
-            format!(
-                "P = Prestige (Need Lv.{})",
-                next_tier.required_level
-            ),
+            format!("P = Prestige (Need Lv.{})", next_tier.required_level),
             Style::default().fg(Color::DarkGray),
         )
     };
 
     let footer_text = vec![Line::from(vec![
-        Span::styled(
-            "Controls: ",
-            Style::default().add_modifier(Modifier::BOLD),
-        ),
+        Span::styled("Controls: ", Style::default().add_modifier(Modifier::BOLD)),
         Span::styled(
             "Q",
-            Style::default()
-                .fg(Color::Red)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
         ),
         Span::raw(" = Quit | "),
         prestige_text,

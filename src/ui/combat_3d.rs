@@ -34,15 +34,18 @@ pub fn render_combat_3d(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let combat_block = Block::default()
         .borders(Borders::ALL)
         .title("⚔ COMBAT ⚔")
-        .title_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
+        .title_style(
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        );
 
     let inner = combat_block.inner(area);
     frame.render_widget(combat_block, area);
 
     if inner.height < 10 || inner.width < 30 {
         // Too small to render 3D view
-        let msg = Paragraph::new("Area too small for 3D view")
-            .alignment(Alignment::Center);
+        let msg = Paragraph::new("Area too small for 3D view").alignment(Alignment::Center);
         frame.render_widget(msg, inner);
         return;
     }
@@ -91,7 +94,8 @@ pub fn render_combat_3d(frame: &mut Frame, area: Rect, game_state: &GameState) {
                 let sprite_line = &shaded_sprite[i - enemy_offset];
                 let center_padding = (inner.width as usize)
                     .saturating_sub(left_walls[i].len() * 2)
-                    .saturating_sub(sprite_line.len()) / 2;
+                    .saturating_sub(sprite_line.len())
+                    / 2;
 
                 line_spans.push(Span::raw(" ".repeat(center_padding)));
                 line_spans.push(Span::styled(

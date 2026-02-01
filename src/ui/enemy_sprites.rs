@@ -20,7 +20,7 @@ impl EnemySprite {
 // Sprite templates (10 lines tall base)
 
 pub const SPRITE_ORC: EnemySprite = EnemySprite::new(
-r"      ╱╲
+    r"      ╱╲
      ╱██╲
     │████│
    ╱██████╲
@@ -35,7 +35,7 @@ r"      ╱╲
 );
 
 pub const SPRITE_TROLL: EnemySprite = EnemySprite::new(
-r"     ╱██╲
+    r"     ╱██╲
     ╱████╲
    ╱██████╲
   ╱████████╲
@@ -50,7 +50,7 @@ r"     ╱██╲
 );
 
 pub const SPRITE_DRAKE: EnemySprite = EnemySprite::new(
-r"   ╱╲    ╱╲
+    r"   ╱╲    ╱╲
   ╱  ╲  ╱  ╲
  ╱   ████   ╲
 ╱   ██████   ╲
@@ -65,7 +65,7 @@ r"   ╱╲    ╱╲
 );
 
 pub const SPRITE_BEAST: EnemySprite = EnemySprite::new(
-r"   ╱╲  ╱╲
+    r"   ╱╲  ╱╲
   ╱  ╲╱  ╲
  ╱  ████  ╲
 ╱  ██████  ╲
@@ -80,7 +80,7 @@ r"   ╱╲  ╱╲
 );
 
 pub const SPRITE_HORROR: EnemySprite = EnemySprite::new(
-r"     ╱██╲
+    r"     ╱██╲
     ╱ ██ ╲
    ╱ ████ ╲
   │  ●  ●  │
@@ -95,7 +95,7 @@ r"     ╱██╲
 );
 
 pub const SPRITE_CRUSHER: EnemySprite = EnemySprite::new(
-r"   ═══════
+    r"   ═══════
     ╱█████╲
    ╱███████╲
   │ ●     ● │
@@ -123,7 +123,10 @@ pub fn get_sprite_for_enemy(enemy_name: &str) -> &'static EnemySprite {
         &SPRITE_BEAST
     } else if name_lower.contains("horror") || name_lower.contains("terror") {
         &SPRITE_HORROR
-    } else if name_lower.contains("crusher") || name_lower.contains("render") || name_lower.contains("maw") {
+    } else if name_lower.contains("crusher")
+        || name_lower.contains("render")
+        || name_lower.contains("maw")
+    {
         &SPRITE_CRUSHER
     } else {
         // Default to generic beast

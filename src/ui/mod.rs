@@ -1,11 +1,11 @@
-mod combat_scene;
-mod stats_panel;
-pub mod zones;
 mod ascii_scaler;
-mod enemy_sprites;
-mod perspective;
 mod combat_3d;
 pub mod combat_effects;
+mod combat_scene;
+mod enemy_sprites;
+mod perspective;
+mod stats_panel;
+pub mod zones;
 
 use crate::game_state::GameState;
 use ratatui::{

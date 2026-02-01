@@ -65,14 +65,14 @@ pub fn update_combat(state: &mut GameState, delta_time: f64) -> Vec<CombatEvent>
 
             // Check if enemy died
             if !enemy.is_alive() {
-                let wis_mod = state.attributes.modifier(crate::attributes::AttributeType::Wisdom);
-                let cha_mod = state.attributes.modifier(crate::attributes::AttributeType::Charisma);
+                let wis_mod = state
+                    .attributes
+                    .modifier(crate::attributes::AttributeType::Wisdom);
+                let cha_mod = state
+                    .attributes
+                    .modifier(crate::attributes::AttributeType::Charisma);
                 let xp_gained = crate::game_logic::combat_kill_xp(
-                    crate::game_logic::xp_gain_per_tick(
-                        state.prestige_rank,
-                        wis_mod,
-                        cha_mod,
-                    ),
+                    crate::game_logic::xp_gain_per_tick(state.prestige_rank, wis_mod, cha_mod),
                 );
 
                 events.push(CombatEvent::EnemyDied { xp_gained });
@@ -89,8 +89,10 @@ pub fn update_combat(state: &mut GameState, delta_time: f64) -> Vec<CombatEvent>
         // Enemy attacks back
         if let Some(enemy) = state.combat_state.current_enemy.as_ref() {
             let enemy_damage = enemy.damage.saturating_sub(derived.defense);
-            state.combat_state.player_current_hp =
-                state.combat_state.player_current_hp.saturating_sub(enemy_damage);
+            state.combat_state.player_current_hp = state
+                .combat_state
+                .player_current_hp
+                .saturating_sub(enemy_damage);
 
             events.push(CombatEvent::EnemyAttack {
                 damage: enemy_damage,
@@ -174,7 +176,9 @@ mod tests {
         let events = update_combat(&mut state, 0.1);
 
         // Should have enemy died event
-        let died = events.iter().any(|e| matches!(e, CombatEvent::EnemyDied { .. }));
+        let died = events
+            .iter()
+            .any(|e| matches!(e, CombatEvent::EnemyDied { .. }));
         assert!(died);
 
         // Should be regenerating

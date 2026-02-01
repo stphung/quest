@@ -1,5 +1,5 @@
-use ratatui::text::{Line, Span};
 use ratatui::style::{Color, Style};
+use ratatui::text::{Line, Span};
 
 /// Renders the dungeon ceiling with gradient
 pub fn render_ceiling(width: usize, height: usize) -> Vec<Line<'static>> {

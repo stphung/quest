@@ -16,10 +16,10 @@ pub fn draw_combat_scene(frame: &mut Frame, area: Rect, game_state: &GameState) 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // Player HP
-            Constraint::Min(10),    // 3D Combat View
-            Constraint::Length(3),  // Enemy HP
-            Constraint::Length(3),  // Status
+            Constraint::Length(3), // Player HP
+            Constraint::Min(10),   // 3D Combat View
+            Constraint::Length(3), // Enemy HP
+            Constraint::Length(3), // Status
         ])
         .split(area);
 
@@ -82,12 +82,16 @@ fn draw_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
         let text = if game_state.combat_state.is_regenerating {
             vec![Line::from(Span::styled(
                 "Regenerating...",
-                Style::default().fg(Color::Green).add_modifier(Modifier::ITALIC),
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::ITALIC),
             ))]
         } else {
             vec![Line::from(Span::styled(
                 "Spawning enemy...",
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::ITALIC),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::ITALIC),
             ))]
         };
 
@@ -128,10 +132,7 @@ fn draw_combat_status(frame: &mut Frame, area: Rect, game_state: &GameState) {
     } else {
         vec![Line::from(vec![
             Span::styled("Status: ", Style::default().add_modifier(Modifier::BOLD)),
-            Span::styled(
-                "Waiting for enemy...",
-                Style::default().fg(Color::Yellow),
-            ),
+            Span::styled("Waiting for enemy...", Style::default().fg(Color::Yellow)),
         ])]
     };
 
