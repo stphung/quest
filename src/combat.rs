@@ -52,7 +52,7 @@ pub fn generate_enemy_name() -> String {
     format!("{}{} {}", prefix, root, suffix)
 }
 
-pub fn generate_enemy(player_max_hp: u32, player_damage: u32) -> Enemy {
+pub fn generate_enemy(player_max_hp: u32, _player_damage: u32) -> Enemy {
     let mut rng = rand::thread_rng();
 
     let name = generate_enemy_name();

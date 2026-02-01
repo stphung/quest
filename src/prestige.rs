@@ -3,6 +3,7 @@ use crate::game_state::GameState;
 /// Represents a prestige tier with its properties
 #[derive(Debug, Clone)]
 pub struct PrestigeTier {
+    #[allow(dead_code)]
     pub rank: u32,
     pub name: &'static str,
     pub required_level: u32,

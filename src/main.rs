@@ -136,7 +136,7 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
     let xp_per_tick = xp_gain_per_tick(game_state.prestige_rank, wis_mod, cha_mod);
 
     // Apply XP to character and handle level-ups
-    let (level_ups, _) = apply_tick_xp(game_state, xp_per_tick);
+    let (_level_ups, _) = apply_tick_xp(game_state, xp_per_tick);
 
     // Update combat state
     // Each tick is 100ms = 0.1 seconds

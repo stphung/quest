@@ -8,7 +8,7 @@ use rand::Rng;
 
 /// Calculates the XP required to reach the next level
 pub fn xp_for_next_level(level: u32) -> u64 {
-    (XP_CURVE_BASE * f64::powi(level as f64, XP_CURVE_EXPONENT as i32)) as u64
+    (XP_CURVE_BASE * f64::powf(level as f64, XP_CURVE_EXPONENT)) as u64
 }
 
 /// Calculates the prestige multiplier for XP gains including CHA bonus

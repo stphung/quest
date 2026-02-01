@@ -2,6 +2,7 @@ use crate::game_state::GameState;
 use rand::Rng;
 
 /// Represents a zone in the game world
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct Zone {
     pub name: &'static str,
@@ -12,6 +13,7 @@ pub struct Zone {
 }
 
 /// Returns all zones in the game
+#[allow(dead_code)]
 fn get_all_zones() -> Vec<Zone> {
     vec![
         Zone {
@@ -59,6 +61,7 @@ fn get_all_zones() -> Vec<Zone> {
 ///
 /// # Returns
 /// The Zone that matches the player's character level
+#[allow(dead_code)]
 pub fn get_current_zone(state: &GameState) -> Zone {
     let player_level = state.character_level;
     let zones = get_all_zones();
@@ -81,6 +84,7 @@ pub fn get_current_zone(state: &GameState) -> Zone {
 ///
 /// # Returns
 /// A random environment emoji string
+#[allow(dead_code)]
 pub fn get_random_environment(zone: &Zone) -> &'static str {
     let mut rng = rand::thread_rng();
     let index = rng.gen_range(0..zone.environment.len());
@@ -94,6 +98,7 @@ pub fn get_random_environment(zone: &Zone) -> &'static str {
 ///
 /// # Returns
 /// A random enemy name string
+#[allow(dead_code)]
 pub fn get_random_enemy(zone: &Zone) -> &'static str {
     let mut rng = rand::thread_rng();
     let index = rng.gen_range(0..zone.enemies.len());

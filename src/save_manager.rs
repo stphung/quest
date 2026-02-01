@@ -10,7 +10,7 @@ use std::fs;
 use std::io::{self, Read, Write};
 use std::path::PathBuf;
 
-const SAVE_VERSION: u32 = 2;
+const _SAVE_VERSION: u32 = 2;
 
 /// Old stat structure from version 1
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -205,9 +205,9 @@ impl SaveManager {
 
         // Calculate approximate XP based on average level
         let character_level = avg_level.max(1);
-        let mut total_xp = 0u64;
+        let mut _total_xp = 0u64;
         for level in 1..character_level {
-            total_xp += crate::game_logic::xp_for_next_level(level);
+            _total_xp += crate::game_logic::xp_for_next_level(level);
         }
 
         // Add partial XP from current level (average of old stats' current_xp)

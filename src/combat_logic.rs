@@ -3,6 +3,7 @@ use crate::derived_stats::DerivedStats;
 use crate::game_state::GameState;
 use rand::Rng;
 
+#[allow(dead_code)]
 pub enum CombatEvent {
     PlayerAttack { damage: u32, was_crit: bool },
     EnemyAttack { damage: u32 },
