@@ -98,35 +98,30 @@ pub fn get_next_prestige_tier(current_rank: u32) -> PrestigeTier {
 /// * `state` - The current game state
 ///
 /// # Returns
-/// true if all stats meet the required level for next prestige tier
+/// true if character level meets the required level for next prestige tier
 pub fn can_prestige(state: &GameState) -> bool {
     let next_tier = get_next_prestige_tier(state.prestige_rank);
-
-    // Check if all stats are at or above the required level
-    for stat in &state.stats {
-        if stat.level < next_tier.required_level {
-            return false;
-        }
-    }
-
-    true
+    state.character_level >= next_tier.required_level
 }
 
-/// Performs a prestige, resetting stats and incrementing prestige rank
+/// Performs a prestige, resetting character progress and incrementing prestige rank
 ///
 /// # Arguments
 /// * `state` - The game state to modify
 pub fn perform_prestige(state: &mut GameState) {
+    use crate::attributes::Attributes;
+
     // Only prestige if eligible
     if !can_prestige(state) {
         return;
     }
 
-    // Reset all stats to level 1, XP 0
-    for stat in &mut state.stats {
-        stat.level = 1;
-        stat.current_xp = 0;
-    }
+    // Reset character to level 1, XP 0
+    state.character_level = 1;
+    state.character_xp = 0;
+
+    // Reset attributes to base 10
+    state.attributes = Attributes::new();
 
     // Increment prestige rank and total prestige count
     state.prestige_rank += 1;
@@ -154,6 +149,7 @@ pub fn get_adventurer_rank(avg_level: u32) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::attributes::AttributeType;
 
     #[test]
     fn test_get_prestige_tier() {
@@ -196,16 +192,9 @@ mod tests {
 
     #[test]
     fn test_can_prestige_not_ready() {
-        let mut state = GameState::new(0);
+        let state = GameState::new(0);
 
-        // All stats start at level 1, need level 10 for first prestige
-        assert!(!can_prestige(&state));
-
-        // Even if some stats are high enough, all must be
-        state.stats[0].level = 10;
-        state.stats[1].level = 10;
-        state.stats[2].level = 10;
-        state.stats[3].level = 9; // One stat below requirement
+        // Character starts at level 1, need level 10 for first prestige
         assert!(!can_prestige(&state));
     }
 
@@ -213,18 +202,12 @@ mod tests {
     fn test_can_prestige_ready() {
         let mut state = GameState::new(0);
 
-        // Set all stats to level 10 (requirement for first prestige)
-        for stat in &mut state.stats {
-            stat.level = 10;
-        }
-
+        // Set character level to 10 (requirement for first prestige)
+        state.character_level = 10;
         assert!(can_prestige(&state));
 
-        // Should also work if levels are higher
-        for stat in &mut state.stats {
-            stat.level = 15;
-        }
-
+        // Should also work if level is higher
+        state.character_level = 15;
         assert!(can_prestige(&state));
     }
 
@@ -232,11 +215,13 @@ mod tests {
     fn test_perform_prestige() {
         let mut state = GameState::new(0);
 
-        // Set all stats to level 10 and some XP
-        for stat in &mut state.stats {
-            stat.level = 10;
-            stat.current_xp = 500;
-        }
+        // Set character level to 10 and some XP
+        state.character_level = 10;
+        state.character_xp = 5000;
+
+        // Increase some attributes
+        state.attributes.set(AttributeType::Strength, 15);
+        state.attributes.set(AttributeType::Wisdom, 12);
 
         // Prestige should succeed
         perform_prestige(&mut state);
@@ -245,10 +230,13 @@ mod tests {
         assert_eq!(state.prestige_rank, 1);
         assert_eq!(state.total_prestige_count, 1);
 
-        // Verify all stats reset to level 1, XP 0
-        for stat in &state.stats {
-            assert_eq!(stat.level, 1);
-            assert_eq!(stat.current_xp, 0);
+        // Verify character reset to level 1, XP 0
+        assert_eq!(state.character_level, 1);
+        assert_eq!(state.character_xp, 0);
+
+        // Verify all attributes reset to 10
+        for attr in AttributeType::all() {
+            assert_eq!(state.attributes.get(attr), 10);
         }
 
         // Try to prestige again when not ready
