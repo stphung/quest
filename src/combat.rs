@@ -78,6 +78,8 @@ pub struct CombatState {
     pub attack_timer: f64,
     pub regen_timer: f64,
     pub is_regenerating: bool,
+    #[serde(skip)]
+    pub visual_effects: Vec<crate::ui::combat_effects::VisualEffect>,
 }
 
 impl CombatState {
@@ -89,6 +91,7 @@ impl CombatState {
             attack_timer: 0.0,
             regen_timer: 0.0,
             is_regenerating: false,
+            visual_effects: Vec::new(),
         }
     }
 
