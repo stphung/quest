@@ -18,22 +18,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
-      - name: Check formatting
-        run: cargo fmt --check
-
-      - name: Lint with Clippy
-        run: cargo clippy --all-targets -- -D warnings
-
-      - name: Run tests
-        run: cargo test
-
-      - name: Build all targets
-        run: cargo build --all-targets
-
-      - name: Security audit
-        run: |
-          cargo install cargo-audit
-          cargo audit --deny yanked
+      - name: Run CI checks
+        run: ./scripts/ci-checks.sh
 
   build:
     name: Build ${{ matrix.target }}

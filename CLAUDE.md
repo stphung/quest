@@ -7,9 +7,41 @@ A terminal-based idle RPG written in Rust. Your hero automatically battles enemi
 ```bash
 cargo build            # Build
 cargo run              # Run the game
-cargo test             # Run tests
-cargo clippy           # Lint
+make check             # Run all CI checks locally
+make fmt               # Auto-fix formatting
 ```
+
+## Development Workflow
+
+**Before pushing code, run:**
+```bash
+make check             # Runs scripts/ci-checks.sh (same as CI)
+```
+
+This runs all PR quality checks:
+1. Format checking (`cargo fmt --check`)
+2. Clippy linting (`cargo clippy --all-targets -- -D warnings`)
+3. All tests (`cargo test`)
+4. Build verification (`cargo build --all-targets`)
+5. Security audit (`cargo audit --deny yanked`)
+
+**Auto-fix formatting:**
+```bash
+make fmt               # Applies rustfmt to all code
+```
+
+## CI/CD Pipeline
+
+**On every PR:**
+- Runs `scripts/ci-checks.sh` (format, lint, test, build, audit)
+- Must pass to merge (if branch protection enabled)
+
+**On push to main:**
+- Runs all checks
+- Builds release binaries for 4 platforms (Linux, macOS x86/ARM, Windows)
+- Creates GitHub release with downloadable binaries
+
+**Key insight:** Local `make check` runs the **exact same script** as CI, ensuring consistency.
 
 ## Architecture
 
@@ -46,6 +78,23 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 - HP regen after kill: 2.5s
 - Autosave: every 30s
 - Offline XP: 50% rate, max 7 days
+
+## Project Structure
+
+```
+quest/
+├── src/              # Rust source code
+├── .github/
+│   └── workflows/
+│       └── ci.yml    # CI/CD pipeline (calls scripts/ci-checks.sh)
+├── scripts/
+│   ├── ci-checks.sh  # Single source of truth for all quality checks
+│   └── README.md     # Scripts documentation
+├── docs/
+│   └── plans/        # Design documents and implementation plans
+├── Makefile          # Development helpers (make check, make fmt, etc.)
+└── CLAUDE.md         # This file
+```
 
 ## Dependencies
 
