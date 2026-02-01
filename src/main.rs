@@ -1,5 +1,6 @@
 mod attributes;
 mod combat;
+mod combat_logic;
 mod derived_stats;
 mod constants;
 mod game_logic;

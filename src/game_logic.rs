@@ -70,7 +70,7 @@ pub fn apply_tick_xp(state: &mut GameState, xp_gain: f64) -> (u32, Vec<Attribute
             all_increased.extend(increased);
 
             // Update combat state max HP after level up
-            let derived = DerivedStats::from_attributes(&state.attributes, 1.0);
+            let derived = DerivedStats::from_attributes(&state.attributes);
             state.combat_state.update_max_hp(derived.max_hp);
         } else {
             break;
@@ -134,7 +134,7 @@ pub fn process_offline_progression(state: &mut GameState) -> OfflineReport {
 /// Spawns a new enemy if none exists
 pub fn spawn_enemy_if_needed(state: &mut GameState) {
     if state.combat_state.current_enemy.is_none() && !state.combat_state.is_regenerating {
-        let derived = DerivedStats::from_attributes(&state.attributes, 1.0);
+        let derived = DerivedStats::from_attributes(&state.attributes);
         let total_damage = derived.total_damage();
         let enemy = generate_enemy(derived.max_hp, total_damage);
         state.combat_state.current_enemy = Some(enemy);
