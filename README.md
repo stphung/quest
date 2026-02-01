@@ -94,7 +94,7 @@ Your character has **one unified level** and **six core attributes** that increa
 - **Dexterity (DEX)**: Increases defense and critical hit chance
 - **Constitution (CON)**: Increases maximum HP
 - **Intelligence (INT)**: Increases magic damage in combat
-- **Wisdom (WIS)**: Increases passive XP gain rate
+- **Wisdom (WIS)**: Increases XP gained from monster kills
 - **Charisma (CHA)**: Boosts prestige XP multiplier
 
 Each attribute has a **modifier** calculated as `(value - 10) / 2`. At base (10), modifier is +0. At 16, modifier is +3.
@@ -117,9 +117,12 @@ For complete stat system documentation, see [docs/STAT_SYSTEM.md](docs/STAT_SYST
 
 ### XP Gain
 
-- Base XP: 1.0 XP per tick (10 ticks per second)
+- **Only from defeating monsters** - no passive XP over time
+- Base XP per kill: 200-400 XP (random)
+- WIS modifier: +5% XP per kill per point
 - Prestige multiplier: 1.5^(prestige rank)
-- Offline progression: 50% of online rate (capped at 7 days)
+- CHA modifier: +10% prestige multiplier per point
+- Offline progression: Simulates monster kills at 50% rate (capped at 7 days)
 
 ### Prestige Tiers
 
@@ -146,7 +149,7 @@ Your current zone is determined by your average level:
 - **Dynamic Scaling**: Enemy stats scale with your power (80-120% of your HP)
 - **Critical Hits**: Based on DEX, critical hits deal 2× damage
 - **Defense**: Your DEX-based defense reduces incoming damage
-- **XP Rewards**: Killing enemies grants bonus XP (50-100 ticks worth)
+- **XP Rewards**: Killing enemies is the ONLY way to gain XP (200-400 XP per kill, boosted by WIS/prestige)
 - **HP Regeneration**: After killing an enemy, your HP regenerates over 2.5 seconds
 - **Death Penalty**: Dying resets you to full HP but you lose all prestige ranks
 - **Enemy Names**: Dynamically generated with procedural combinations

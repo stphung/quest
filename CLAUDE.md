@@ -77,7 +77,8 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 - Attack interval: 1.5s
 - HP regen after kill: 2.5s
 - Autosave: every 30s
-- Offline XP: 50% rate, max 7 days
+- XP gain: Only from defeating enemies (200-400 XP per kill)
+- Offline XP: 50% rate, max 7 days (simulates kills)
 
 ## Project Structure
 

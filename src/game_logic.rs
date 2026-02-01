@@ -95,6 +95,7 @@ pub struct OfflineReport {
 }
 
 /// Calculates the XP gained during offline time
+/// Now based on simulated monster kills instead of passive time
 pub fn calculate_offline_xp(
     elapsed_seconds: i64,
     prestige_rank: u32,
@@ -102,9 +103,16 @@ pub fn calculate_offline_xp(
     cha_modifier: i32,
 ) -> f64 {
     let capped_seconds = elapsed_seconds.min(MAX_OFFLINE_SECONDS);
-    let ticks = (capped_seconds as f64) * (1000.0 / TICK_INTERVAL_MS as f64);
-    let xp_per_tick = xp_gain_per_tick(prestige_rank, wis_modifier, cha_modifier);
-    ticks * xp_per_tick * OFFLINE_MULTIPLIER
+
+    // Estimate kills: average 1 kill every 5 seconds (includes combat + regen time)
+    let estimated_kills = (capped_seconds as f64 / 5.0) * OFFLINE_MULTIPLIER;
+
+    // Average XP per kill
+    let xp_per_tick_rate = xp_gain_per_tick(prestige_rank, wis_modifier, cha_modifier);
+    let avg_xp_per_kill = (COMBAT_XP_MIN_TICKS + COMBAT_XP_MAX_TICKS) as f64 / 2.0;
+    let xp_per_kill = xp_per_tick_rate * avg_xp_per_kill;
+
+    estimated_kills * xp_per_kill
 }
 
 /// Processes offline progression and updates game state
@@ -233,7 +241,7 @@ mod tests {
     #[test]
     fn test_combat_kill_xp() {
         let xp = combat_kill_xp(1.0);
-        assert!((50..=100).contains(&xp));
+        assert!((200..=400).contains(&xp));
     }
 
     #[test]

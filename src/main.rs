@@ -127,20 +127,11 @@ fn run_game_loop(
     }
 }
 
-/// Processes a single game tick, updating XP and stats
+/// Processes a single game tick, updating combat and stats
 fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
-    use attributes::AttributeType;
     use combat_logic::update_combat;
 
-    // Calculate XP per tick with WIS and CHA modifiers
-    let wis_mod = game_state.attributes.modifier(AttributeType::Wisdom);
-    let cha_mod = game_state.attributes.modifier(AttributeType::Charisma);
-    let xp_per_tick = xp_gain_per_tick(game_state.prestige_rank, wis_mod, cha_mod);
-
-    // Apply XP to character and handle level-ups
-    let (_level_ups, _) = apply_tick_xp(game_state, xp_per_tick);
-
-    // Update combat state
+    // Update combat state (XP only gained from kills, not passively)
     // Each tick is 100ms = 0.1 seconds
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
     let combat_events = update_combat(game_state, delta_time);
