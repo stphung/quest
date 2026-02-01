@@ -233,7 +233,7 @@ mod tests {
     #[test]
     fn test_combat_kill_xp() {
         let xp = combat_kill_xp(1.0);
-        assert!(xp >= 50 && xp <= 100);
+        assert!((50..=100).contains(&xp));
     }
 
     #[test]

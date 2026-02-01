@@ -2,7 +2,6 @@ use crate::attributes::Attributes;
 use crate::combat::CombatState;
 use crate::constants::SAVE_VERSION_MAGIC;
 use crate::game_state::GameState;
-use bincode;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -87,8 +86,8 @@ impl SaveManager {
 
         // Compute checksum over version + length + data
         let mut hasher = Sha256::new();
-        hasher.update(&SAVE_VERSION_MAGIC.to_le_bytes());
-        hasher.update(&data_len.to_le_bytes());
+        hasher.update(SAVE_VERSION_MAGIC.to_le_bytes());
+        hasher.update(data_len.to_le_bytes());
         hasher.update(&data);
         let checksum = hasher.finalize();
 
@@ -142,8 +141,8 @@ impl SaveManager {
 
         // Verify checksum
         let mut hasher = Sha256::new();
-        hasher.update(&version_bytes);
-        hasher.update(&length_bytes);
+        hasher.update(version_bytes);
+        hasher.update(length_bytes);
         hasher.update(&data);
         let computed_checksum = hasher.finalize();
 
