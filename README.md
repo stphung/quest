@@ -1,32 +1,82 @@
 # quest
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-blue.svg)](https://github.com/stphung/quest/releases/latest)
+
 A terminal-based idle RPG game written in Rust. Watch your hero grow stronger automatically as they battle enemies across different zones!
 
 > **Why "quest"?** Because that's exactly what it is. Simple, memorable, and to the point.
 
-## Features
+## 🚀 Quick Start
 
-- **Automatic Progression**: Your character gains XP and levels up automatically
-- **6 Attributes**: STR, DEX, CON, INT, WIS, CHA form the foundation of your character
-- **Derived Combat Stats**: HP, damage, defense, and crit chance calculated from attributes
-- **Dynamic Combat**: Real-time battles with enemies that scale to your power
-- **Prestige System**: Reset your progress for permanent XP multipliers and higher attribute caps
-- **5 Unique Zones**: Travel from Meadow to Volcanic Wastes as you level up
-- **Offline Progress**: Continue gaining XP even when the game is closed (at 50% rate)
-- **Auto-Save**: Your progress is automatically saved every 30 seconds
+**Install and play with one command:**
+
+<table>
+<tr>
+<td><b>macOS / Linux</b></td>
+<td>
+<code>curl -sSf https://raw.githubusercontent.com/stphung/quest/main/install.sh | sh</code>
+</td>
+</tr>
+<tr>
+<td><b>Windows</b></td>
+<td>
+<code>irm https://raw.githubusercontent.com/stphung/quest/main/install.ps1 | iex</code>
+</td>
+</tr>
+</table>
+
+Then run `quest` to start your adventure!
+
+## ✨ Features
+
+- ⚡ **Automatic Progression** - Your character gains XP and levels up automatically
+- 💪 **6 Attributes** - STR, DEX, CON, INT, WIS, CHA form the foundation of your character
+- 📊 **Derived Combat Stats** - HP, damage, defense, and crit chance calculated from attributes
+- ⚔️ **Dynamic Combat** - Real-time battles with enemies that scale to your power
+- 🔄 **Prestige System** - Reset your progress for permanent XP multipliers and higher attribute caps
+- 🗺️ **5 Unique Zones** - Travel from Meadow to Volcanic Wastes as you level up
+- 💤 **Offline Progress** - Continue gaining XP even when the game is closed (at 50% rate)
+- 💾 **Auto-Save** - Your progress is automatically saved every 30 seconds
 
 ## Installation
 
-### Prerequisites
+### Quick Install (Recommended)
 
-- Rust 1.70 or higher
-- Cargo (comes with Rust)
+**macOS / Linux:**
+```bash
+curl -sSf https://raw.githubusercontent.com/stphung/quest/main/install.sh | sh
+```
+
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/stphung/quest/main/install.ps1 | iex
+```
+
+The installer will:
+- Download the latest release for your platform
+- Install to `~/.local/bin/quest` (or `%USERPROFILE%\.local\bin\quest.exe` on Windows)
+- Provide instructions to add to PATH if needed
+
+### Manual Download
+
+Download the latest release for your platform from the [releases page](https://github.com/stphung/quest/releases/latest).
+
+**Supported platforms:**
+- Linux (x86_64)
+- macOS (Intel x86_64 and Apple Silicon ARM64)
+- Windows (x86_64)
 
 ### Building from Source
 
+**Prerequisites:**
+- Rust 1.70 or higher
+- Cargo (comes with Rust)
+
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/stphung/quest.git
 cd quest
 
 # Build and run
