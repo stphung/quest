@@ -12,20 +12,15 @@ A terminal-based idle RPG game written in Rust. Watch your hero grow stronger au
 
 **Install and play with one command:**
 
-<table>
-<tr>
-<td><b>macOS / Linux</b></td>
-<td>
-<code>curl -sSf https://raw.githubusercontent.com/stphung/quest/main/install.sh | sh</code>
-</td>
-</tr>
-<tr>
-<td><b>Windows</b></td>
-<td>
-<code>irm https://raw.githubusercontent.com/stphung/quest/main/install.ps1 | iex</code>
-</td>
-</tr>
-</table>
+**macOS / Linux:**
+```bash
+curl -sSf https://raw.githubusercontent.com/stphung/quest/main/install.sh | sh
+```
+
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/stphung/quest/main/install.ps1 | iex
+```
 
 Then run `quest` to start your adventure!
 
