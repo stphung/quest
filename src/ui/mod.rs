@@ -1,6 +1,7 @@
 mod combat_scene;
 mod stats_panel;
 pub mod zones;
+mod ascii_scaler;
 
 use crate::game_state::GameState;
 use ratatui::{
