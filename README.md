@@ -1,6 +1,8 @@
-# Idle RPG
+# shell.rpg
 
 A terminal-based idle RPG game written in Rust. Watch your hero grow stronger automatically as they battle enemies across different zones!
+
+> **Why "shell.rpg"?** Because it runs in your shell (terminal) and it's an RPG. Simple, clean, and perfectly nerdy.
 
 ## Features
 
@@ -24,7 +26,7 @@ A terminal-based idle RPG game written in Rust. Watch your hero grow stronger au
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd idle-rpg
+cd shell-rpg
 
 # Build and run
 cargo run --release
