@@ -21,7 +21,7 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use save_manager::SaveManager;
 use std::io;
 use std::time::{Duration, Instant};
-use ui::{draw_ui, spawn_enemy, update_combat_state};
+use ui::draw_ui;
 
 fn main() -> io::Result<()> {
     // Initialize SaveManager
@@ -127,19 +127,31 @@ fn run_game_loop(
 
 /// Processes a single game tick, updating XP and stats
 fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
-    // Calculate XP per tick
-    let xp_per_tick = xp_gain_per_tick(game_state.prestige_rank);
+    use attributes::AttributeType;
+    use combat_logic::update_combat;
 
-    // Apply XP to all stats
-    for stat in &mut game_state.stats {
-        apply_tick_xp(stat, xp_per_tick);
-    }
+    // Calculate XP per tick with WIS and CHA modifiers
+    let wis_mod = game_state.attributes.modifier(AttributeType::Wisdom);
+    let cha_mod = game_state.attributes.modifier(AttributeType::Charisma);
+    let xp_per_tick = xp_gain_per_tick(game_state.prestige_rank, wis_mod, cha_mod);
+
+    // Apply XP to character and handle level-ups
+    let (level_ups, _) = apply_tick_xp(game_state, xp_per_tick);
 
     // Update combat state
     // Each tick is 100ms = 0.1 seconds
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
-    update_combat_state(game_state, delta_time);
-    spawn_enemy(game_state);
+    let combat_events = update_combat(game_state, delta_time);
+
+    // Process combat events for XP rewards
+    for event in combat_events {
+        if let combat_logic::CombatEvent::EnemyDied { xp_gained } = event {
+            apply_tick_xp(game_state, xp_gained as f64);
+        }
+    }
+
+    // Spawn enemy if needed
+    spawn_enemy_if_needed(game_state);
 
     // Update play_time_seconds
     // Each tick is 100ms (TICK_INTERVAL_MS), so 10 ticks = 1 second
