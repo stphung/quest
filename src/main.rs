@@ -1,4 +1,5 @@
 mod attributes;
+mod derived_stats;
 mod constants;
 mod game_logic;
 mod game_state;
