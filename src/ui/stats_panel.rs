@@ -1,5 +1,6 @@
-use crate::game_logic::xp_for_next_level;
+use crate::game_logic::{xp_for_next_level, xp_gain_per_tick};
 use crate::game_state::{GameState, StatType};
+use crate::ui::zones::get_current_zone;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -27,13 +28,20 @@ pub fn draw_stats_panel(frame: &mut Frame, area: Rect, game_state: &GameState) {
     draw_stats(frame, chunks[1], game_state);
 
     // Draw footer with controls
-    draw_footer(frame, chunks[2]);
+    draw_footer(frame, chunks[2], game_state);
 }
 
 /// Draws the header with game title and prestige rank
 fn draw_header(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    let zone = get_current_zone(game_state);
+
     let header_text = vec![Line::from(vec![
         Span::styled("Idle RPG", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+        Span::raw(" | "),
+        Span::styled(
+            format!("Zone: {}", zone.name),
+            Style::default().fg(Color::Magenta),
+        ),
         Span::raw(" | "),
         Span::styled(
             format!("Prestige Rank: {}", game_state.prestige_rank),
@@ -78,7 +86,7 @@ fn draw_stats(frame: &mut Frame, area: Rect, game_state: &GameState) {
     for (i, stat_type) in stat_types.iter().enumerate() {
         if i < stat_chunks.len() {
             let stat = game_state.get_stat(*stat_type);
-            draw_stat_row(frame, stat_chunks[i], stat, stat_type);
+            draw_stat_row(frame, stat_chunks[i], stat, stat_type, game_state);
         }
     }
 }
@@ -89,6 +97,7 @@ fn draw_stat_row(
     area: Rect,
     stat: &crate::game_state::Stat,
     stat_type: &StatType,
+    game_state: &GameState,
 ) {
     let xp_needed = xp_for_next_level(stat.level);
 
@@ -98,6 +107,10 @@ fn draw_stat_row(
     } else {
         0.0
     };
+
+    // Calculate XP per second (10 ticks per second)
+    let xp_per_tick = xp_gain_per_tick(game_state.prestige_rank);
+    let xp_per_second = xp_per_tick * 10.0;
 
     // Choose color based on stat type
     let color = match stat_type {
@@ -115,10 +128,11 @@ fn draw_stat_row(
         StatType::Vitality => "Vitality",
     };
 
-    // Create label with stat info
+    // Create label with stat info including XP/s and percentage
+    let percentage = (progress * 100.0) as u32;
     let label = format!(
-        "{} Lv.{} ({}/{})",
-        stat_name, stat.level, stat.current_xp, xp_needed
+        "{} Lv.{} ({}/{} | {}% | {:.1} XP/s)",
+        stat_name, stat.level, stat.current_xp, xp_needed, percentage, xp_per_second
     );
 
     let gauge = Gauge::default()
@@ -131,7 +145,7 @@ fn draw_stat_row(
 }
 
 /// Draws the footer with control instructions
-fn draw_footer(frame: &mut Frame, area: Rect) {
+fn draw_footer(frame: &mut Frame, area: Rect, _game_state: &GameState) {
     let footer_text = vec![Line::from(vec![
         Span::styled("Controls: ", Style::default().add_modifier(Modifier::BOLD)),
         Span::styled("Q", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
