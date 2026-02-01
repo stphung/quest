@@ -3,6 +3,7 @@ mod combat;
 mod combat_logic;
 mod constants;
 mod derived_stats;
+mod equipment;
 mod game_logic;
 mod game_state;
 mod items;
