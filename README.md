@@ -7,10 +7,11 @@ A terminal-based idle RPG game written in Rust. Watch your hero grow stronger au
 ## Features
 
 - **Automatic Progression**: Your character gains XP and levels up automatically
-- **4 Core Stats**: Strength, Magic, Wisdom, and Vitality all level up independently
-- **Prestige System**: Reset your progress for permanent XP multipliers
+- **6 Attributes**: STR, DEX, CON, INT, WIS, CHA form the foundation of your character
+- **Derived Combat Stats**: HP, damage, defense, and crit chance calculated from attributes
+- **Dynamic Combat**: Real-time battles with enemies that scale to your power
+- **Prestige System**: Reset your progress for permanent XP multipliers and higher attribute caps
 - **5 Unique Zones**: Travel from Meadow to Volcanic Wastes as you level up
-- **Combat System**: Watch your hero battle enemies with visual animations
 - **Offline Progress**: Continue gaining XP even when the game is closed (at 50% rate)
 - **Auto-Save**: Your progress is automatically saved every 30 seconds
 
@@ -39,15 +40,35 @@ cargo run --release
 
 ## Game Mechanics
 
-### Stats
+### Stat System
 
-Each stat levels up independently based on XP gain:
-- **Strength**: Physical power
-- **Magic**: Magical ability
-- **Wisdom**: Knowledge and insight
-- **Vitality**: Health and endurance
+Your character has **one unified level** and **six core attributes** that increase randomly on level-up:
 
-XP required for next level follows the formula: `100 × level^1.5`
+**Attributes**:
+- **Strength (STR)**: Increases physical damage in combat
+- **Dexterity (DEX)**: Increases defense and critical hit chance
+- **Constitution (CON)**: Increases maximum HP
+- **Intelligence (INT)**: Increases magic damage in combat
+- **Wisdom (WIS)**: Increases passive XP gain rate
+- **Charisma (CHA)**: Boosts prestige XP multiplier
+
+Each attribute has a **modifier** calculated as `(value - 10) / 2`. At base (10), modifier is +0. At 16, modifier is +3.
+
+**Derived Stats**:
+- **Max HP**: 50 + (CON modifier × 10)
+- **Physical Damage**: 5 + (STR modifier × 2)
+- **Magic Damage**: 5 + (INT modifier × 2)
+- **Defense**: DEX modifier (reduces incoming damage)
+- **Crit Chance**: 5% + (DEX modifier × 1%) - crits deal 2× damage
+- **XP Multiplier**: 1.0 + (WIS modifier × 0.05)
+
+**Attribute Caps**: Attributes are capped at `10 + (prestige_rank × 5)`. Prestiging increases your caps!
+
+**Level-Up**: Gain 3 random attribute points (distributed among non-capped attributes)
+
+XP required for next level: `100 × level^1.5`
+
+For complete stat system documentation, see [docs/STAT_SYSTEM.md](docs/STAT_SYSTEM.md)
 
 ### XP Gain
 
@@ -76,10 +97,14 @@ Your current zone is determined by your average level:
 
 ### Combat
 
-- Enemies spawn every 2.5 seconds
-- Each spawn triggers an attack animation
-- Enemy type is randomly selected from the current zone
-- Combat is purely visual - progression is automatic
+- **Turn-Based**: Combat rounds occur every 1.5 seconds
+- **Dynamic Scaling**: Enemy stats scale with your power (80-120% of your HP)
+- **Critical Hits**: Based on DEX, critical hits deal 2× damage
+- **Defense**: Your DEX-based defense reduces incoming damage
+- **XP Rewards**: Killing enemies grants bonus XP (50-100 ticks worth)
+- **HP Regeneration**: After killing an enemy, your HP regenerates over 2.5 seconds
+- **Death Penalty**: Dying resets you to full HP but you lose all prestige ranks
+- **Enemy Names**: Dynamically generated with procedural combinations
 
 ## Save System
 
