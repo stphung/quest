@@ -11,13 +11,16 @@ pub struct DerivedStats {
 }
 
 impl DerivedStats {
-    pub fn from_attributes(attrs: &Attributes, base_prestige_mult: f64) -> Self {
+    /// Creates derived stats from attributes.
+    ///
+    /// Note: Prestige multiplier is calculated separately using the
+    /// `prestige_multiplier()` static method, not in this constructor.
+    pub fn from_attributes(attrs: &Attributes) -> Self {
         let str_mod = attrs.modifier(AttributeType::Strength);
         let dex_mod = attrs.modifier(AttributeType::Dexterity);
         let con_mod = attrs.modifier(AttributeType::Constitution);
         let int_mod = attrs.modifier(AttributeType::Intelligence);
         let wis_mod = attrs.modifier(AttributeType::Wisdom);
-        let cha_mod = attrs.modifier(AttributeType::Charisma);
 
         // Max HP = 50 + (CON_mod × 10)
         let max_hp = (50 + con_mod * 10).max(1) as u32;
@@ -64,7 +67,7 @@ mod tests {
     #[test]
     fn test_derived_stats_base() {
         let attrs = Attributes::new();
-        let stats = DerivedStats::from_attributes(&attrs, 1.0);
+        let stats = DerivedStats::from_attributes(&attrs);
 
         // All attributes at 10 (modifier = 0)
         assert_eq!(stats.max_hp, 50);
@@ -85,7 +88,7 @@ mod tests {
         attrs.set(AttributeType::Intelligence, 12); // +1 mod
         attrs.set(AttributeType::Wisdom, 20); // +5 mod
 
-        let stats = DerivedStats::from_attributes(&attrs, 1.0);
+        let stats = DerivedStats::from_attributes(&attrs);
 
         assert_eq!(stats.max_hp, 70); // 50 + (2 * 10)
         assert_eq!(stats.physical_damage, 11); // 5 + (3 * 2)
@@ -111,7 +114,7 @@ mod tests {
         attrs.set(AttributeType::Strength, 8); // -1 mod
         attrs.set(AttributeType::Constitution, 8); // -1 mod
 
-        let stats = DerivedStats::from_attributes(&attrs, 1.0);
+        let stats = DerivedStats::from_attributes(&attrs);
 
         // Should never go below 1 for damage/hp
         assert_eq!(stats.max_hp, 40); // 50 + (-1 * 10)
