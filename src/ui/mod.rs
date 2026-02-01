@@ -2,6 +2,7 @@ mod combat_scene;
 mod stats_panel;
 pub mod zones;
 mod ascii_scaler;
+mod enemy_sprites;
 
 use crate::game_state::GameState;
 use ratatui::{
