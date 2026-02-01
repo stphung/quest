@@ -42,6 +42,7 @@ impl VisualEffect {
         self.lifetime <= self.max_lifetime
     }
 
+    #[allow(dead_code)]
     pub fn render(&self) -> Option<Line<'static>> {
         match &self.effect_type {
             EffectType::DamageNumber { value, is_crit } => {

@@ -1,9 +1,7 @@
-mod ascii_scaler;
 mod combat_3d;
 pub mod combat_effects;
 mod combat_scene;
 mod enemy_sprites;
-mod perspective;
 mod stats_panel;
 pub mod zones;
 
