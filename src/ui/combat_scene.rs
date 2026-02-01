@@ -8,31 +8,26 @@ use ratatui::{
     Frame,
 };
 
-/// Draws the combat scene showing player and enemy HP bars, combat status
+use super::combat_3d::render_combat_3d;
+
+/// Draws the combat scene with 3D first-person view
 pub fn draw_combat_scene(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    let combat_block = Block::default()
-        .borders(Borders::ALL)
-        .title("Combat Arena");
-
-    let inner = combat_block.inner(area);
-    frame.render_widget(combat_block, area);
-
-    // Split into sections
+    // Split into 3D view and status bars
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(4), // Player HP bar
-            Constraint::Min(5),     // Combat area
-            Constraint::Length(4), // Enemy HP bar
-            Constraint::Length(3), // Combat status
+            Constraint::Length(3),  // Player HP
+            Constraint::Min(10),    // 3D Combat View
+            Constraint::Length(3),  // Enemy HP
+            Constraint::Length(3),  // Status
         ])
-        .split(inner);
+        .split(area);
 
     // Draw player HP bar
     draw_player_hp(frame, chunks[0], game_state);
 
-    // Draw combat area with visual representation
-    draw_combat_area(frame, chunks[1], game_state);
+    // Draw 3D combat scene
+    render_combat_3d(frame, chunks[1], game_state);
 
     // Draw enemy HP bar
     draw_enemy_hp(frame, chunks[2], game_state);
@@ -68,48 +63,6 @@ fn draw_player_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
     frame.render_widget(gauge, area);
 }
 
-/// Draws the main combat area with player and enemy sprites
-fn draw_combat_area(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    let player_sprite = "🧙";
-    let enemy_sprite = if game_state.combat_state.current_enemy.is_some() {
-        "👹"
-    } else {
-        ""
-    };
-
-    // Show attack indicator during attack timer
-    let attack_indicator = if game_state.combat_state.attack_timer < 0.3 {
-        "⚔️"
-    } else {
-        " "
-    };
-
-    let combat_text = vec![
-        Line::from(""),
-        Line::from(vec![
-            Span::raw("     "),
-            Span::styled(
-                player_sprite,
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-            ),
-            Span::raw("   "),
-            Span::styled(
-                attack_indicator,
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
-            ),
-            Span::raw("   "),
-            Span::styled(
-                enemy_sprite,
-                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-            ),
-        ]),
-        Line::from(""),
-    ];
-
-    let combat_paragraph = Paragraph::new(combat_text).alignment(Alignment::Center);
-    frame.render_widget(combat_paragraph, area);
-}
-
 /// Draws the enemy HP bar
 fn draw_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
     if let Some(enemy) = &game_state.combat_state.current_enemy {
@@ -125,11 +78,7 @@ fn draw_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
 
         frame.render_widget(gauge, area);
     } else {
-        // No enemy present
-        let empty_block = Block::default()
-            .borders(Borders::ALL)
-            .title("Enemy");
-
+        let empty_block = Block::default().borders(Borders::ALL).title("Enemy");
         let text = if game_state.combat_state.is_regenerating {
             vec![Line::from(Span::styled(
                 "Regenerating...",
