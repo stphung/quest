@@ -5,6 +5,7 @@ mod constants;
 mod derived_stats;
 mod game_logic;
 mod game_state;
+mod items;
 mod prestige;
 mod save_manager;
 mod ui;
