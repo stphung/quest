@@ -4,6 +4,9 @@ pub mod zones;
 mod ascii_scaler;
 mod enemy_sprites;
 mod perspective;
+mod combat_3d;
+
+pub use combat_3d::render_combat_3d;
 
 use crate::game_state::GameState;
 use ratatui::{
