@@ -141,6 +141,16 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
         use combat_logic::CombatEvent;
         match event {
             CombatEvent::PlayerAttack { damage, was_crit } => {
+                // Add to combat log
+                let message = if was_crit {
+                    format!("💥 CRITICAL HIT for {} damage!", damage)
+                } else {
+                    format!("⚔ You hit for {} damage", damage)
+                };
+                game_state
+                    .combat_state
+                    .add_log_entry(message, was_crit, true);
+
                 // Spawn damage number effect
                 let damage_effect = ui::combat_effects::VisualEffect::new(
                     ui::combat_effects::EffectType::DamageNumber {
@@ -165,8 +175,28 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
                 );
                 game_state.combat_state.visual_effects.push(impact_effect);
             }
+            CombatEvent::EnemyAttack { damage } => {
+                // Add enemy attack to combat log
+                if let Some(enemy) = &game_state.combat_state.current_enemy {
+                    let message = format!("🛡 {} hits you for {} damage", enemy.name, damage);
+                    game_state.combat_state.add_log_entry(message, false, false);
+                }
+            }
             CombatEvent::EnemyDied { xp_gained } => {
+                // Add to combat log
+                if let Some(enemy) = &game_state.combat_state.current_enemy {
+                    let message = format!("✨ {} defeated! +{} XP", enemy.name, xp_gained);
+                    game_state.combat_state.add_log_entry(message, false, true);
+                }
                 apply_tick_xp(game_state, xp_gained as f64);
+            }
+            CombatEvent::PlayerDied => {
+                // Add to combat log
+                game_state.combat_state.add_log_entry(
+                    "💀 You died! Prestige ranks lost...".to_string(),
+                    false,
+                    false,
+                );
             }
             _ => {}
         }

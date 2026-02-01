@@ -1,5 +1,6 @@
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Enemy {
@@ -71,6 +72,13 @@ pub fn generate_enemy(player_max_hp: u32, _player_damage: u32) -> Enemy {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CombatLogEntry {
+    pub message: String,
+    pub is_crit: bool,
+    pub is_player_action: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CombatState {
     pub current_enemy: Option<Enemy>,
     pub player_current_hp: u32,
@@ -80,6 +88,8 @@ pub struct CombatState {
     pub is_regenerating: bool,
     #[serde(skip)]
     pub visual_effects: Vec<crate::ui::combat_effects::VisualEffect>,
+    #[serde(skip)]
+    pub combat_log: VecDeque<CombatLogEntry>,
 }
 
 impl CombatState {
@@ -92,7 +102,20 @@ impl CombatState {
             regen_timer: 0.0,
             is_regenerating: false,
             visual_effects: Vec::new(),
+            combat_log: VecDeque::with_capacity(10),
         }
+    }
+
+    pub fn add_log_entry(&mut self, message: String, is_crit: bool, is_player_action: bool) {
+        // Keep only the last 10 entries
+        if self.combat_log.len() >= 10 {
+            self.combat_log.pop_front();
+        }
+        self.combat_log.push_back(CombatLogEntry {
+            message,
+            is_crit,
+            is_player_action,
+        });
     }
 
     pub fn update_max_hp(&mut self, new_max_hp: u32) {

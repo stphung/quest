@@ -33,8 +33,8 @@ pub fn render_combat_3d(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Min(5),    // Sprite area
-            Constraint::Length(4), // Combat log
+            Constraint::Min(5),     // Sprite area
+            Constraint::Length(12), // Combat log (expanded)
         ])
         .split(inner);
 
@@ -115,54 +115,51 @@ fn render_simple_sprite(frame: &mut Frame, area: Rect, game_state: &GameState) {
 fn render_combat_log(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let mut log_lines: Vec<Line> = Vec::new();
 
-    // Check for visual effects and recent combat events
-    let has_effects = !game_state.combat_state.visual_effects.is_empty();
+    // Add title
+    log_lines.push(Line::from(vec![Span::styled(
+        "─── Combat Log ───",
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    )]));
 
-    if let Some(_enemy) = &game_state.combat_state.current_enemy {
-        // Show attack status
-        if has_effects {
-            // Find the most recent effect type
-            if let Some(latest_effect) = game_state.combat_state.visual_effects.last() {
-                match &latest_effect.effect_type {
-                    super::combat_effects::EffectType::DamageNumber { value, is_crit } => {
-                        if *is_crit {
-                            log_lines.push(Line::from(vec![
-                                Span::styled(
-                                    "💥 CRITICAL HIT! ",
-                                    Style::default()
-                                        .fg(Color::Yellow)
-                                        .add_modifier(Modifier::BOLD),
-                                ),
-                                Span::styled(
-                                    format!("{} damage", value),
-                                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-                                ),
-                            ]));
-                        } else {
-                            log_lines.push(Line::from(vec![
-                                Span::styled(
-                                    "⚔ You attack for ",
-                                    Style::default().fg(Color::Green),
-                                ),
-                                Span::styled(
-                                    format!("{} damage", value),
-                                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-                                ),
-                            ]));
-                        }
-                    }
-                    super::combat_effects::EffectType::AttackFlash => {
-                        log_lines.push(Line::from(vec![Span::styled(
-                            "⚔ Attacking...",
-                            Style::default().fg(Color::Green),
-                        )]));
-                    }
-                    _ => {}
-                }
+    // Show recent combat events from history (newest first, up to 8 entries)
+    let max_entries = (area.height as usize).saturating_sub(3); // Leave room for title and status
+    let history_entries = game_state
+        .combat_state
+        .combat_log
+        .iter()
+        .rev()
+        .take(max_entries.saturating_sub(2));
+
+    for entry in history_entries {
+        let color = if entry.is_player_action {
+            if entry.is_crit {
+                Color::Yellow
+            } else {
+                Color::Green
             }
-        }
+        } else {
+            Color::Red
+        };
 
-        // Show status
+        let modifier = if entry.is_crit {
+            Modifier::BOLD
+        } else {
+            Modifier::empty()
+        };
+
+        log_lines.push(Line::from(vec![Span::styled(
+            entry.message.clone(),
+            Style::default().fg(color).add_modifier(modifier),
+        )]));
+    }
+
+    // Add separator
+    log_lines.push(Line::from(""));
+
+    // Show current status
+    if let Some(_enemy) = &game_state.combat_state.current_enemy {
         if game_state.combat_state.attack_timer > 0.0 {
             let next_attack =
                 crate::constants::ATTACK_INTERVAL_SECONDS - game_state.combat_state.attack_timer;
