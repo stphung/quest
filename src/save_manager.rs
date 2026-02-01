@@ -59,14 +59,32 @@ impl SaveManager {
     /// Sets up the save directory at the appropriate location for the platform
     /// using the `directories` crate.
     pub fn new() -> io::Result<Self> {
-        let project_dirs = ProjectDirs::from("", "", "idle-rpg")
-            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Could not determine config directory"))?;
+        let project_dirs = ProjectDirs::from("", "", "idle-rpg").ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::NotFound,
+                "Could not determine config directory",
+            )
+        })?;
 
         let config_dir = project_dirs.config_dir();
         fs::create_dir_all(config_dir)?;
 
         let save_path = config_dir.join("save.dat");
 
+        Ok(Self { save_path })
+    }
+
+    /// Creates a SaveManager for testing with a unique temporary directory
+    #[cfg(test)]
+    fn new_for_test() -> io::Result<Self> {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static TEST_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+        let test_id = TEST_COUNTER.fetch_add(1, Ordering::SeqCst);
+        let temp_dir = std::env::temp_dir().join(format!("quest-test-{}", test_id));
+        fs::create_dir_all(&temp_dir)?;
+
+        let save_path = temp_dir.join("save.dat");
         Ok(Self { save_path })
     }
 
@@ -79,8 +97,8 @@ impl SaveManager {
     /// - SHA256 checksum (32 bytes)
     pub fn save(&self, state: &GameState) -> io::Result<()> {
         // Serialize the game state
-        let data = bincode::serialize(state)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let data =
+            bincode::serialize(state).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
         let data_len = data.len() as u32;
 
@@ -122,7 +140,10 @@ impl SaveManager {
         if version != SAVE_VERSION_MAGIC {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Invalid save version: expected 0x{:016X}, got 0x{:016X}", SAVE_VERSION_MAGIC, version)
+                format!(
+                    "Invalid save version: expected 0x{:016X}, got 0x{:016X}",
+                    SAVE_VERSION_MAGIC, version
+                ),
             ));
         }
 
@@ -149,7 +170,7 @@ impl SaveManager {
         if stored_checksum != computed_checksum.as_slice() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                "Checksum verification failed"
+                "Checksum verification failed",
             ));
         }
 
@@ -158,9 +179,12 @@ impl SaveManager {
             Ok(state) => Ok(state),
             Err(_) => {
                 // Fall back to old format (version 1) and migrate
-                let old_state = bincode::deserialize::<OldGameState>(&data)
-                    .map_err(|e| io::Error::new(io::ErrorKind::InvalidData,
-                        format!("Failed to deserialize as both new and old formats: {}", e)))?;
+                let old_state = bincode::deserialize::<OldGameState>(&data).map_err(|e| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        format!("Failed to deserialize as both new and old formats: {}", e),
+                    )
+                })?;
 
                 Ok(self.migrate_old_save(old_state))
             }
@@ -239,7 +263,7 @@ mod tests {
 
     #[test]
     fn test_save_and_load() {
-        let manager = SaveManager::new().expect("Failed to create SaveManager");
+        let manager = SaveManager::new_for_test().expect("Failed to create SaveManager");
 
         // Clean up any existing save file
         if manager.save_exists() {
@@ -256,7 +280,9 @@ mod tests {
         original_state.attributes.set(AttributeType::Strength, 15);
 
         // Save the state
-        manager.save(&original_state).expect("Failed to save game state");
+        manager
+            .save(&original_state)
+            .expect("Failed to save game state");
 
         // Verify the file exists
         assert!(manager.save_exists());
@@ -266,9 +292,15 @@ mod tests {
 
         // Verify the loaded state matches the original
         assert_eq!(loaded_state.prestige_rank, original_state.prestige_rank);
-        assert_eq!(loaded_state.total_prestige_count, original_state.total_prestige_count);
+        assert_eq!(
+            loaded_state.total_prestige_count,
+            original_state.total_prestige_count
+        );
         assert_eq!(loaded_state.last_save_time, original_state.last_save_time);
-        assert_eq!(loaded_state.play_time_seconds, original_state.play_time_seconds);
+        assert_eq!(
+            loaded_state.play_time_seconds,
+            original_state.play_time_seconds
+        );
         assert_eq!(loaded_state.character_level, original_state.character_level);
         assert_eq!(loaded_state.character_xp, original_state.character_xp);
         assert_eq!(
@@ -282,7 +314,7 @@ mod tests {
 
     #[test]
     fn test_load_nonexistent() {
-        let manager = SaveManager::new().expect("Failed to create SaveManager");
+        let manager = SaveManager::new_for_test().expect("Failed to create SaveManager");
 
         // Ensure no save file exists
         if manager.save_exists() {
@@ -297,7 +329,7 @@ mod tests {
 
     #[test]
     fn test_migrate_old_save() {
-        let manager = SaveManager::new().expect("Failed to create SaveManager");
+        let manager = SaveManager::new_for_test().expect("Failed to create SaveManager");
 
         // Create an old-format game state
         let old_state = OldGameState {
