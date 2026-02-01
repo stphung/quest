@@ -32,11 +32,7 @@ pub fn xp_gain_per_tick(prestige_rank: u32) -> f64 {
 /// # Returns
 /// The multiplier (1.0 for rank 0, 1.5^rank otherwise)
 pub fn prestige_multiplier(rank: u32) -> f64 {
-    if rank == 0 {
-        1.0
-    } else {
-        1.5_f64.powi(rank as i32)
-    }
+    crate::prestige::get_prestige_tier(rank).multiplier
 }
 
 /// Applies XP gain to a stat and processes any level-ups
