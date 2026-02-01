@@ -143,12 +143,45 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
     let combat_events = update_combat(game_state, delta_time);
 
-    // Process combat events for XP rewards
+    // Process combat events
     for event in combat_events {
-        if let combat_logic::CombatEvent::EnemyDied { xp_gained } = event {
-            apply_tick_xp(game_state, xp_gained as f64);
+        use combat_logic::CombatEvent;
+        match event {
+            CombatEvent::PlayerAttack { damage, was_crit } => {
+                // Spawn damage number effect
+                let damage_effect = ui::combat_effects::VisualEffect::new(
+                    ui::combat_effects::EffectType::DamageNumber {
+                        value: damage,
+                        is_crit: was_crit,
+                    },
+                    0.8,
+                );
+                game_state.combat_state.visual_effects.push(damage_effect);
+
+                // Spawn attack flash
+                let flash_effect = ui::combat_effects::VisualEffect::new(
+                    ui::combat_effects::EffectType::AttackFlash,
+                    0.2,
+                );
+                game_state.combat_state.visual_effects.push(flash_effect);
+
+                // Spawn impact effect
+                let impact_effect = ui::combat_effects::VisualEffect::new(
+                    ui::combat_effects::EffectType::HitImpact,
+                    0.3,
+                );
+                game_state.combat_state.visual_effects.push(impact_effect);
+            }
+            CombatEvent::EnemyDied { xp_gained } => {
+                apply_tick_xp(game_state, xp_gained as f64);
+            }
+            _ => {}
         }
     }
+
+    // Update visual effects
+    let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
+    game_state.combat_state.visual_effects.retain_mut(|effect| effect.update(delta_time));
 
     // Spawn enemy if needed
     spawn_enemy_if_needed(game_state);
