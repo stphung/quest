@@ -1,4 +1,4 @@
-use crate::game_state::{GameState, StatType};
+use crate::game_state::GameState;
 use rand::Rng;
 
 /// Represents a zone in the game world
