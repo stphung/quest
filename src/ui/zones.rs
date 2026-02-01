@@ -52,23 +52,20 @@ fn get_all_zones() -> Vec<Zone> {
     ]
 }
 
-/// Gets the current zone based on the player's average level
+/// Gets the current zone based on the player's character level
 ///
 /// # Arguments
-/// * `state` - The game state containing player stats
+/// * `state` - The game state containing player level
 ///
 /// # Returns
-/// The Zone that matches the player's average level
+/// The Zone that matches the player's character level
 pub fn get_current_zone(state: &GameState) -> Zone {
-    // Calculate average level across all stats
-    let total_level: u32 = state.stats.iter().map(|s| s.level).sum();
-    let avg_level = total_level / state.stats.len() as u32;
-
+    let player_level = state.character_level;
     let zones = get_all_zones();
 
-    // Find the zone that contains the average level
+    // Find the zone that contains the character level
     for zone in zones.iter() {
-        if avg_level >= zone.min_level && avg_level < zone.max_level {
+        if player_level >= zone.min_level && player_level < zone.max_level {
             return zone.clone();
         }
     }
@@ -110,11 +107,7 @@ mod tests {
     #[test]
     fn test_get_current_zone_meadow() {
         let mut state = GameState::new(0);
-
-        // Set all stats to level 5 (average 5, should be Meadow 0-10)
-        for stat in &mut state.stats {
-            stat.level = 5;
-        }
+        state.character_level = 5;
 
         let zone = get_current_zone(&state);
         assert_eq!(zone.name, "Meadow");
@@ -125,11 +118,7 @@ mod tests {
     #[test]
     fn test_get_current_zone_forest() {
         let mut state = GameState::new(0);
-
-        // Set all stats to level 15 (average 15, should be Dark Forest 10-25)
-        for stat in &mut state.stats {
-            stat.level = 15;
-        }
+        state.character_level = 15;
 
         let zone = get_current_zone(&state);
         assert_eq!(zone.name, "Dark Forest");
@@ -140,11 +129,7 @@ mod tests {
     #[test]
     fn test_get_current_zone_volcanic() {
         let mut state = GameState::new(0);
-
-        // Set all stats to level 90 (average 90, should be Volcanic Wastes 75-100)
-        for stat in &mut state.stats {
-            stat.level = 90;
-        }
+        state.character_level = 90;
 
         let zone = get_current_zone(&state);
         assert_eq!(zone.name, "Volcanic Wastes");

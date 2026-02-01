@@ -1,15 +1,14 @@
-use crate::constants::ENEMY_RESPAWN_SECONDS;
+use crate::constants::{ATTACK_INTERVAL_SECONDS, HP_REGEN_DURATION_SECONDS};
 use crate::game_state::GameState;
-use crate::ui::zones::{get_current_zone, get_random_enemy, get_random_environment};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Gauge, Paragraph},
     Frame,
 };
 
-/// Draws the combat scene with hero, enemy, and environment
+/// Draws the combat scene showing player and enemy HP bars, combat status
 pub fn draw_combat_scene(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let combat_block = Block::default()
         .borders(Borders::ALL)
@@ -18,92 +17,69 @@ pub fn draw_combat_scene(frame: &mut Frame, area: Rect, game_state: &GameState) 
     let inner = combat_block.inner(area);
     frame.render_widget(combat_block, area);
 
-    // Split into three sections: environment, combat area, info
+    // Split into sections
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(2), // Environment
+            Constraint::Length(4), // Player HP bar
             Constraint::Min(5),     // Combat area
-            Constraint::Length(2), // Info
+            Constraint::Length(4), // Enemy HP bar
+            Constraint::Length(3), // Combat status
         ])
         .split(inner);
 
-    // Draw environment
-    draw_environment(frame, chunks[0], game_state);
+    // Draw player HP bar
+    draw_player_hp(frame, chunks[0], game_state);
 
-    // Draw combat area with hero and enemy
+    // Draw combat area with visual representation
     draw_combat_area(frame, chunks[1], game_state);
 
-    // Draw combat info
-    draw_combat_info(frame, chunks[2], game_state);
+    // Draw enemy HP bar
+    draw_enemy_hp(frame, chunks[2], game_state);
+
+    // Draw combat status
+    draw_combat_status(frame, chunks[3], game_state);
 }
 
-/// Draws the environment decoration
-fn draw_environment(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    let zone = get_current_zone(game_state);
+/// Draws the player HP bar
+fn draw_player_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    let hp_ratio = game_state.combat_state.player_current_hp as f64
+        / game_state.combat_state.player_max_hp as f64;
 
-    // Generate a line of environment emojis
-    let mut env_line = String::new();
-    for _ in 0..10 {
-        env_line.push_str(get_random_environment(&zone));
-        env_line.push(' ');
-    }
+    let hp_color = if hp_ratio > 0.66 {
+        Color::Green
+    } else if hp_ratio > 0.33 {
+        Color::Yellow
+    } else {
+        Color::Red
+    };
 
-    let env_text = vec![Line::from(Span::raw(env_line))];
-    let env_paragraph = Paragraph::new(env_text).alignment(Alignment::Center);
+    let label = format!(
+        "Player HP: {}/{}",
+        game_state.combat_state.player_current_hp, game_state.combat_state.player_max_hp
+    );
 
-    frame.render_widget(env_paragraph, area);
+    let gauge = Gauge::default()
+        .block(Block::default().borders(Borders::ALL).title("Player"))
+        .gauge_style(Style::default().fg(hp_color).add_modifier(Modifier::BOLD))
+        .label(label)
+        .ratio(hp_ratio);
+
+    frame.render_widget(gauge, area);
 }
 
-/// Draws the combat area with hero and enemy
+/// Draws the main combat area with player and enemy sprites
 fn draw_combat_area(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    // Calculate average level for hero display
-    let total_level: u32 = game_state.stats.iter().map(|s| s.level).sum();
-    let avg_level = total_level / game_state.stats.len() as u32;
+    let player_sprite = "🧙";
+    let enemy_sprite = if game_state.combat_state.current_enemy.is_some() {
+        "👹"
+    } else {
+        ""
+    };
 
-    let hero_emoji = if avg_level < 25 {
-        "🧙"
-    } else if avg_level < 50 {
+    // Show attack indicator during attack timer
+    let attack_indicator = if game_state.combat_state.attack_timer < 0.3 {
         "⚔️"
-    } else if avg_level < 75 {
-        "🛡️"
-    } else {
-        "👑"
-    };
-
-    // Determine enemy emoji based on enemy name
-    let enemy_display = if let Some(ref enemy_name) = game_state.combat_state.current_enemy {
-        let enemy_emoji = match enemy_name.as_str() {
-            "Slime" => "🟢",
-            "Rabbit" => "🐰",
-            "Ladybug" => "🐞",
-            "Butterfly" => "🦋",
-            "Wolf" => "🐺",
-            "Spider" => "🕷️",
-            "Dark Elf" => "🧝",
-            "Bat" => "🦇",
-            "Golem" => "🗿",
-            "Yeti" => "❄️",
-            "Mountain Lion" => "🦁",
-            "Eagle" => "🦅",
-            "Skeleton" => "💀",
-            "Ghost" => "👻",
-            "Ancient Guardian" => "🗿",
-            "Wraith" => "👤",
-            "Fire Elemental" => "🔥",
-            "Lava Beast" => "🌋",
-            "Phoenix" => "🐦",
-            "Dragon" => "🐉",
-            _ => "👹",
-        };
-        format!("{} {}", enemy_emoji, enemy_name)
-    } else {
-        "... waiting ...".to_string()
-    };
-
-    // Show attack animation if timer is active
-    let attack_indicator = if game_state.combat_state.attack_animation_timer > 0.0 {
-        "💥"
     } else {
         " "
     };
@@ -113,78 +89,103 @@ fn draw_combat_area(frame: &mut Frame, area: Rect, game_state: &GameState) {
         Line::from(vec![
             Span::raw("     "),
             Span::styled(
-                format!("{} Hero", hero_emoji),
+                player_sprite,
                 Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
             ),
             Span::raw("   "),
-            Span::styled(attack_indicator, Style::default().fg(Color::Yellow)),
+            Span::styled(
+                attack_indicator,
+                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            ),
             Span::raw("   "),
             Span::styled(
-                enemy_display,
+                enemy_sprite,
                 Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
             ),
         ]),
-        Line::from(vec![Span::styled(
-            format!("     Lv.{}", avg_level),
-            Style::default().fg(Color::Green),
-        )]),
+        Line::from(""),
     ];
 
     let combat_paragraph = Paragraph::new(combat_text).alignment(Alignment::Center);
-
     frame.render_widget(combat_paragraph, area);
 }
 
-/// Draws combat info
-fn draw_combat_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    let zone = get_current_zone(game_state);
+/// Draws the enemy HP bar
+fn draw_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    if let Some(enemy) = &game_state.combat_state.current_enemy {
+        let hp_ratio = enemy.current_hp as f64 / enemy.max_hp as f64;
 
-    let info_text = vec![Line::from(vec![
-        Span::styled("Zone: ", Style::default().add_modifier(Modifier::BOLD)),
-        Span::styled(zone.name, Style::default().fg(Color::Yellow)),
-        Span::raw(" | "),
-        Span::styled("Next spawn: ", Style::default().add_modifier(Modifier::BOLD)),
-        Span::raw(format!(
-            "{:.1}s",
-            (ENEMY_RESPAWN_SECONDS - game_state.combat_state.enemy_spawn_timer).max(0.0)
-        )),
-    ])];
+        let label = format!("{}: {}/{}", enemy.name, enemy.current_hp, enemy.max_hp);
 
-    let info_paragraph = Paragraph::new(info_text).alignment(Alignment::Center);
+        let gauge = Gauge::default()
+            .block(Block::default().borders(Borders::ALL).title("Enemy"))
+            .gauge_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
+            .label(label)
+            .ratio(hp_ratio);
 
-    frame.render_widget(info_paragraph, area);
-}
+        frame.render_widget(gauge, area);
+    } else {
+        // No enemy present
+        let empty_block = Block::default()
+            .borders(Borders::ALL)
+            .title("Enemy");
 
-/// Updates the combat state timers
-///
-/// # Arguments
-/// * `state` - The game state to update
-/// * `delta_time` - Time elapsed since last update in seconds
-pub fn update_combat_state(state: &mut GameState, delta_time: f64) {
-    // Update enemy spawn timer
-    state.combat_state.enemy_spawn_timer += delta_time;
+        let text = if game_state.combat_state.is_regenerating {
+            vec![Line::from(Span::styled(
+                "Regenerating...",
+                Style::default().fg(Color::Green).add_modifier(Modifier::ITALIC),
+            ))]
+        } else {
+            vec![Line::from(Span::styled(
+                "Spawning enemy...",
+                Style::default().fg(Color::Yellow).add_modifier(Modifier::ITALIC),
+            ))]
+        };
 
-    // Update attack animation timer (decreases over time)
-    if state.combat_state.attack_animation_timer > 0.0 {
-        state.combat_state.attack_animation_timer -= delta_time;
-        if state.combat_state.attack_animation_timer < 0.0 {
-            state.combat_state.attack_animation_timer = 0.0;
-        }
+        let paragraph = Paragraph::new(text)
+            .block(empty_block)
+            .alignment(Alignment::Center);
+
+        frame.render_widget(paragraph, area);
     }
 }
 
-/// Spawns a new enemy from the current zone
-///
-/// # Arguments
-/// * `state` - The game state to update
-pub fn spawn_enemy(state: &mut GameState) {
-    // Check if it's time to spawn a new enemy
-    if state.combat_state.enemy_spawn_timer >= ENEMY_RESPAWN_SECONDS {
-        let zone = get_current_zone(state);
-        let enemy = get_random_enemy(&zone);
+/// Draws the combat status information
+fn draw_combat_status(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    let status_text = if game_state.combat_state.is_regenerating {
+        let regen_progress = game_state.combat_state.regen_timer / HP_REGEN_DURATION_SECONDS;
+        let remaining = HP_REGEN_DURATION_SECONDS - game_state.combat_state.regen_timer;
+        vec![Line::from(vec![
+            Span::styled("Status: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::styled(
+                format!(
+                    "Regenerating HP... {:.1}s ({:.0}%)",
+                    remaining,
+                    regen_progress * 100.0
+                ),
+                Style::default().fg(Color::Green),
+            ),
+        ])]
+    } else if game_state.combat_state.current_enemy.is_some() {
+        let next_attack = ATTACK_INTERVAL_SECONDS - game_state.combat_state.attack_timer;
+        vec![Line::from(vec![
+            Span::styled("Status: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "In Combat",
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(format!(" | Next attack: {:.1}s", next_attack.max(0.0))),
+        ])]
+    } else {
+        vec![Line::from(vec![
+            Span::styled("Status: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "Waiting for enemy...",
+                Style::default().fg(Color::Yellow),
+            ),
+        ])]
+    };
 
-        state.combat_state.current_enemy = Some(enemy.to_string());
-        state.combat_state.enemy_spawn_timer = 0.0;
-        state.combat_state.attack_animation_timer = 0.3; // Show attack animation for 0.3s
-    }
+    let status_paragraph = Paragraph::new(status_text).alignment(Alignment::Center);
+    frame.render_widget(status_paragraph, area);
 }

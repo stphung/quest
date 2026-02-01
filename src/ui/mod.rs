@@ -8,8 +8,6 @@ use ratatui::{
     Frame,
 };
 
-pub use combat_scene::{spawn_enemy, update_combat_state};
-
 /// Main UI drawing function that creates the layout and draws all components
 pub fn draw_ui(frame: &mut Frame, game_state: &GameState) {
     let size = frame.size();
