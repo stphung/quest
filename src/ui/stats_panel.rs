@@ -1,50 +1,72 @@
-use crate::game_logic::{xp_for_next_level, xp_gain_per_tick};
-use crate::game_state::{GameState, StatType};
-use crate::ui::zones::get_current_zone;
+use crate::attributes::AttributeType;
+use crate::derived_stats::DerivedStats;
+use crate::game_logic::xp_for_next_level;
+use crate::game_state::GameState;
+use crate::prestige::{get_adventurer_rank, get_prestige_tier};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Gauge, Paragraph},
+    widgets::{Block, Borders, Paragraph},
     Frame,
 };
 
-/// Draws the stats panel showing player stats with progress bars
+/// Draws the stats panel showing player attributes and derived stats
 pub fn draw_stats_panel(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    // Main vertical layout: header, stats, footer
+    // Main vertical layout: header, attributes, derived stats, prestige, footer
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3), // Header
-            Constraint::Min(0),     // Stats area
-            Constraint::Length(3), // Footer
+            Constraint::Length(3),  // Header
+            Constraint::Length(14), // Attributes (6 attributes + borders)
+            Constraint::Length(9),  // Derived stats
+            Constraint::Length(5),  // Prestige info
+            Constraint::Length(3),  // Footer
         ])
         .split(area);
 
-    // Draw header
+    // Draw header with character info
     draw_header(frame, chunks[0], game_state);
 
-    // Draw stats with progress bars
-    draw_stats(frame, chunks[1], game_state);
+    // Draw attributes with progress bars
+    draw_attributes(frame, chunks[1], game_state);
+
+    // Draw derived stats
+    draw_derived_stats(frame, chunks[2], game_state);
+
+    // Draw prestige info
+    draw_prestige_info(frame, chunks[3], game_state);
 
     // Draw footer with controls
-    draw_footer(frame, chunks[2], game_state);
+    draw_footer(frame, chunks[4], game_state);
 }
 
-/// Draws the header with game title and prestige rank
+/// Draws the header with character level and XP
 fn draw_header(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    let zone = get_current_zone(game_state);
+    let xp_needed = xp_for_next_level(game_state.character_level);
+    let xp_progress = if xp_needed > 0 {
+        game_state.character_xp as f64 / xp_needed as f64
+    } else {
+        0.0
+    };
+
+    let rank = get_adventurer_rank(game_state.character_level);
 
     let header_text = vec![Line::from(vec![
-        Span::styled("Idle RPG", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-        Span::raw(" | "),
         Span::styled(
-            format!("Zone: {}", zone.name),
-            Style::default().fg(Color::Magenta),
+            format!("Level {} {}", game_state.character_level, rank),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
         ),
         Span::raw(" | "),
         Span::styled(
-            format!("Prestige Rank: {}", game_state.prestige_rank),
+            format!(
+                "XP: {}/{} ({:.1}%)",
+                game_state.character_xp,
+                xp_needed,
+                xp_progress * 100.0
+            ),
             Style::default().fg(Color::Yellow),
         ),
         Span::raw(" | "),
@@ -55,103 +77,256 @@ fn draw_header(frame: &mut Frame, area: Rect, game_state: &GameState) {
     ])];
 
     let header = Paragraph::new(header_text)
-        .block(Block::default().borders(Borders::ALL).title("Game Info"))
+        .block(Block::default().borders(Borders::ALL).title("Character"))
         .alignment(Alignment::Center);
 
     frame.render_widget(header, area);
 }
 
-/// Draws the stats section with 4 progress bars
-fn draw_stats(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    let stats_block = Block::default()
+/// Draws all 6 attributes with their values and caps
+fn draw_attributes(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    let attrs_block = Block::default()
         .borders(Borders::ALL)
-        .title("Character Stats");
+        .title("Attributes");
 
-    let inner = stats_block.inner(area);
-    frame.render_widget(stats_block, area);
+    let inner = attrs_block.inner(area);
+    frame.render_widget(attrs_block, area);
 
-    // Layout for 4 stat rows
-    let stat_chunks = Layout::default()
+    // Layout for 6 attribute rows
+    let attr_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3), // Strength
-            Constraint::Length(3), // Agility
-            Constraint::Length(3), // Intelligence
-            Constraint::Length(3), // Vitality
+            Constraint::Length(2), // STR
+            Constraint::Length(2), // DEX
+            Constraint::Length(2), // CON
+            Constraint::Length(2), // INT
+            Constraint::Length(2), // WIS
+            Constraint::Length(2), // CHA
         ])
         .split(inner);
 
-    // Draw each stat with progress bar
-    let stat_types = StatType::all();
-    for (i, stat_type) in stat_types.iter().enumerate() {
-        if i < stat_chunks.len() {
-            let stat = game_state.get_stat(*stat_type);
-            draw_stat_row(frame, stat_chunks[i], stat, stat_type, game_state);
+    let cap = game_state.get_attribute_cap();
+
+    // Draw each attribute
+    for (i, attr_type) in AttributeType::all().iter().enumerate() {
+        if i < attr_chunks.len() {
+            draw_attribute_row(frame, attr_chunks[i], game_state, *attr_type, cap);
         }
     }
 }
 
-/// Draws a single stat row with name, level, and progress bar
-fn draw_stat_row(
+/// Draws a single attribute row
+fn draw_attribute_row(
     frame: &mut Frame,
     area: Rect,
-    stat: &crate::game_state::Stat,
-    stat_type: &StatType,
     game_state: &GameState,
+    attr_type: AttributeType,
+    cap: u32,
 ) {
-    let xp_needed = xp_for_next_level(stat.level);
+    let value = game_state.attributes.get(attr_type);
+    let modifier = game_state.attributes.modifier(attr_type);
 
-    // Calculate progress percentage (0.0 to 1.0)
-    let progress = if xp_needed > 0 {
-        stat.current_xp as f64 / xp_needed as f64
+    // Choose color based on attribute type
+    let color = match attr_type {
+        AttributeType::Strength => Color::Red,
+        AttributeType::Dexterity => Color::Green,
+        AttributeType::Constitution => Color::Magenta,
+        AttributeType::Intelligence => Color::Blue,
+        AttributeType::Wisdom => Color::Cyan,
+        AttributeType::Charisma => Color::Yellow,
+    };
+
+    // Format modifier with sign
+    let mod_str = if modifier >= 0 {
+        format!("+{}", modifier)
     } else {
-        0.0
+        format!("{}", modifier)
     };
 
-    // Calculate XP per second (10 ticks per second)
-    let xp_per_tick = xp_gain_per_tick(game_state.prestige_rank);
-    let xp_per_second = xp_per_tick * 10.0;
+    let text = vec![Line::from(vec![
+        Span::styled(
+            format!("{}: ", attr_type.abbrev()),
+            Style::default().add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!("{:2}", value),
+            Style::default().fg(color).add_modifier(Modifier::BOLD),
+        ),
+        Span::raw(format!(" ({:>3}) ", mod_str)),
+        Span::styled(format!("[Cap: {}]", cap), Style::default().fg(Color::DarkGray)),
+    ])];
 
-    // Choose color based on stat type
-    let color = match stat_type {
-        StatType::Strength => Color::Red,
-        StatType::Magic => Color::Blue,
-        StatType::Wisdom => Color::Cyan,
-        StatType::Vitality => Color::Magenta,
-    };
+    let paragraph = Paragraph::new(text);
+    frame.render_widget(paragraph, area);
+}
 
-    // Get full stat name
-    let stat_name = match stat_type {
-        StatType::Strength => "Strength",
-        StatType::Magic => "Magic",
-        StatType::Wisdom => "Wisdom",
-        StatType::Vitality => "Vitality",
-    };
+/// Draws derived stats calculated from attributes
+fn draw_derived_stats(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    let derived = DerivedStats::from_attributes(&game_state.attributes);
 
-    // Create label with stat info including XP/s and percentage
-    let percentage = (progress * 100.0) as u32;
-    let label = format!(
-        "{} Lv.{} ({}/{} | {}% | {:.1} XP/s)",
-        stat_name, stat.level, stat.current_xp, xp_needed, percentage, xp_per_second
-    );
+    let stats_block = Block::default()
+        .borders(Borders::ALL)
+        .title("Derived Stats");
 
-    let gauge = Gauge::default()
-        .block(Block::default())
-        .gauge_style(Style::default().fg(color).add_modifier(Modifier::BOLD))
-        .label(label)
-        .ratio(progress);
+    let inner = stats_block.inner(area);
+    frame.render_widget(stats_block, area);
 
-    frame.render_widget(gauge, area);
+    let stats_text = vec![
+        Line::from(vec![
+            Span::styled("Max HP: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::styled(
+                format!("{}", derived.max_hp),
+                Style::default().fg(Color::Green),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "Physical Damage: ",
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!("{}", derived.physical_damage),
+                Style::default().fg(Color::Red),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "Magic Damage: ",
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!("{}", derived.magic_damage),
+                Style::default().fg(Color::Blue),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("Defense: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::styled(
+                format!("{}", derived.defense),
+                Style::default().fg(Color::Yellow),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "Crit Chance: ",
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!("{}%", derived.crit_chance_percent),
+                Style::default().fg(Color::Cyan),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "XP Multiplier: ",
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!("{:.2}x", derived.xp_multiplier),
+                Style::default().fg(Color::Magenta),
+            ),
+        ]),
+    ];
+
+    let stats_paragraph = Paragraph::new(stats_text);
+    frame.render_widget(stats_paragraph, inner);
+}
+
+/// Draws prestige information with CHA bonus
+fn draw_prestige_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    let prestige_block = Block::default()
+        .borders(Borders::ALL)
+        .title("Prestige");
+
+    let inner = prestige_block.inner(area);
+    frame.render_widget(prestige_block, area);
+
+    let tier = get_prestige_tier(game_state.prestige_rank);
+    let cha_mod = game_state.attributes.modifier(AttributeType::Charisma);
+    let effective_multiplier = DerivedStats::prestige_multiplier(tier.multiplier, &game_state.attributes);
+
+    let prestige_text = vec![
+        Line::from(vec![
+            Span::styled("Rank: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::styled(
+                format!("{} ({})", game_state.prestige_rank, tier.name),
+                Style::default().fg(Color::Yellow),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "Multiplier: ",
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!("{:.2}x", tier.multiplier),
+                Style::default().fg(Color::Cyan),
+            ),
+            Span::raw(" + "),
+            Span::styled(
+                format!("{:.2}x (CHA)", cha_mod as f64 * 0.1),
+                Style::default().fg(Color::Yellow),
+            ),
+            Span::raw(" = "),
+            Span::styled(
+                format!("{:.2}x", effective_multiplier),
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "Total Prestiges: ",
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!("{}", game_state.total_prestige_count),
+                Style::default().fg(Color::Magenta),
+            ),
+        ]),
+    ];
+
+    let prestige_paragraph = Paragraph::new(prestige_text);
+    frame.render_widget(prestige_paragraph, inner);
 }
 
 /// Draws the footer with control instructions
-fn draw_footer(frame: &mut Frame, area: Rect, _game_state: &GameState) {
+fn draw_footer(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    use crate::prestige::can_prestige;
+
+    let can_prestige_now = can_prestige(game_state);
+    let prestige_text = if can_prestige_now {
+        Span::styled(
+            "P = Prestige (AVAILABLE!)",
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD | Modifier::SLOW_BLINK),
+        )
+    } else {
+        let next_tier = get_prestige_tier(game_state.prestige_rank + 1);
+        Span::styled(
+            format!(
+                "P = Prestige (Need Lv.{})",
+                next_tier.required_level
+            ),
+            Style::default().fg(Color::DarkGray),
+        )
+    };
+
     let footer_text = vec![Line::from(vec![
-        Span::styled("Controls: ", Style::default().add_modifier(Modifier::BOLD)),
-        Span::styled("Q", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "Controls: ",
+            Style::default().add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            "Q",
+            Style::default()
+                .fg(Color::Red)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::raw(" = Quit | "),
-        Span::styled("P", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-        Span::raw(" = Prestige"),
+        prestige_text,
     ])];
 
     let footer = Paragraph::new(footer_text)
