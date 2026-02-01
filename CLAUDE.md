@@ -38,35 +38,10 @@ make fmt               # Applies rustfmt to all code
 
 **On push to main:**
 - Runs all checks
-- Release Please analyzes commits using Conventional Commits
-- Creates "Release PR" when commits warrant a new version
-
-**On merging Release PR:**
-- Tag created automatically (e.g., `v0.2.0`)
 - Builds release binaries for 4 platforms (Linux, macOS x86/ARM, Windows)
-- Creates GitHub release with downloadable binaries and auto-generated notes
+- Creates GitHub release with downloadable binaries
 
-**Key insights:**
-- Local `make check` runs the **exact same script** as CI, ensuring consistency
-- No manual tag management - versions determined by commit messages
-- See `CONTRIBUTING.md` for conventional commit format
-
-## Release Process
-
-**Automatic semantic versioning** based on commit messages:
-
-```bash
-# New feature → minor version bump (0.X.0)
-git commit -m "feat: add new enemy type"
-
-# Bug fix → patch version bump (0.0.X)
-git commit -m "fix: health bar rendering"
-
-# Breaking change → major version bump (X.0.0)
-git commit -m "feat!: redesign combat system"
-```
-
-Push to main → Release Please creates PR → Merge PR → Release created automatically!
+**Key insight:** Local `make check` runs the **exact same script** as CI, ensuring consistency.
 
 ## Architecture
 

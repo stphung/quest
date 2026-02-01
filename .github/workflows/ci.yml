@@ -3,8 +3,6 @@ name: CI
 on:
   push:
     branches: [main]
-    tags:
-      - 'v*'
   pull_request:
     branches: [main]
 
@@ -26,7 +24,7 @@ jobs:
   build:
     name: Build ${{ matrix.target }}
     needs: check
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -93,5 +91,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: build-${{ github.sha }}
+          name: Build ${{ github.ref_name }}@${{ github.sha }}
+          body: "Automated build from commit ${{ github.sha }}"
           files: artifacts/*
-          generate_release_notes: true
