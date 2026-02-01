@@ -50,6 +50,12 @@ pub struct Attributes {
     values: [u32; 6],
 }
 
+impl Default for Attributes {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Attributes {
     pub fn new() -> Self {
         Self { values: [10; 6] }
@@ -64,7 +70,7 @@ impl Attributes {
     }
 
     pub fn increment(&mut self, attr: AttributeType) {
-        self.values[attr.index()] += 1;
+        self.values[attr.index()] = self.values[attr.index()].saturating_add(1);
     }
 
     pub fn modifier(&self, attr: AttributeType) -> i32 {
