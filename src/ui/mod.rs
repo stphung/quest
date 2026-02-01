@@ -7,8 +7,6 @@ mod perspective;
 mod combat_3d;
 pub mod combat_effects;
 
-pub use combat_3d::render_combat_3d;
-
 use crate::game_state::GameState;
 use ratatui::{
     layout::{Constraint, Direction, Layout},

@@ -2,7 +2,9 @@
 
 pub struct EnemySprite {
     pub base_art: &'static str,
+    #[allow(dead_code)]
     pub width: usize,
+    #[allow(dead_code)]
     pub height: usize,
 }
 

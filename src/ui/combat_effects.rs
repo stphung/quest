@@ -5,6 +5,7 @@ use ratatui::{
 
 #[derive(Debug, Clone)]
 pub struct VisualEffect {
+    #[allow(dead_code)]
     pub effect_type: EffectType,
     pub lifetime: f64,
     pub max_lifetime: f64,
@@ -12,7 +13,12 @@ pub struct VisualEffect {
 
 #[derive(Debug, Clone)]
 pub enum EffectType {
-    DamageNumber { value: u32, is_crit: bool },
+    DamageNumber {
+        #[allow(dead_code)]
+        value: u32,
+        #[allow(dead_code)]
+        is_crit: bool,
+    },
     AttackFlash,
     HitImpact,
 }
@@ -31,6 +37,7 @@ impl VisualEffect {
         self.lifetime <= self.max_lifetime
     }
 
+    #[allow(dead_code)]
     pub fn is_active(&self) -> bool {
         self.lifetime <= self.max_lifetime
     }

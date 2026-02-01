@@ -143,6 +143,21 @@ pub fn render_combat_3d(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let floor = render_floor(inner.width as usize, floor_height as usize);
     scene_lines.extend(floor);
 
+    // 4. Overlay visual effects on top of the scene
+    if !game_state.combat_state.visual_effects.is_empty() {
+        // Render effects in the middle section where the enemy is
+        let effect_line_idx = ceiling_height as usize + (middle_height as usize / 3);
+
+        for effect in &game_state.combat_state.visual_effects {
+            if let Some(effect_line) = effect.render() {
+                // Replace the line at effect position with the effect
+                if effect_line_idx < scene_lines.len() {
+                    scene_lines[effect_line_idx] = effect_line;
+                }
+            }
+        }
+    }
+
     // Render the composed scene
     let scene = Paragraph::new(scene_lines);
     frame.render_widget(scene, inner);
