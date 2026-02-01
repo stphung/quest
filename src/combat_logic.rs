@@ -65,11 +65,13 @@ pub fn update_combat(state: &mut GameState, delta_time: f64) -> Vec<CombatEvent>
 
             // Check if enemy died
             if !enemy.is_alive() {
+                let wis_mod = state.attributes.modifier(crate::attributes::AttributeType::Wisdom);
+                let cha_mod = state.attributes.modifier(crate::attributes::AttributeType::Charisma);
                 let xp_gained = crate::game_logic::combat_kill_xp(
                     crate::game_logic::xp_gain_per_tick(
                         state.prestige_rank,
-                        derived.xp_multiplier as i32,
-                        state.attributes.modifier(crate::attributes::AttributeType::Charisma),
+                        wis_mod,
+                        cha_mod,
                     ),
                 );
 
