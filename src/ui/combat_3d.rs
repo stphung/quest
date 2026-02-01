@@ -86,10 +86,12 @@ pub fn render_combat_3d(frame: &mut Frame, area: Rect, game_state: &GameState) {
             }
 
             // Center area with enemy
-            let enemy_offset = (middle_height as usize - target_height) / 2;
+            let enemy_offset = (middle_height as usize).saturating_sub(target_height) / 2;
             if i >= enemy_offset && i < enemy_offset + shaded_sprite.len() {
                 let sprite_line = &shaded_sprite[i - enemy_offset];
-                let center_padding = (inner.width as usize - left_walls[i].len() * 2 - sprite_line.len()) / 2;
+                let center_padding = (inner.width as usize)
+                    .saturating_sub(left_walls[i].len() * 2)
+                    .saturating_sub(sprite_line.len()) / 2;
 
                 line_spans.push(Span::raw(" ".repeat(center_padding)));
                 line_spans.push(Span::styled(
@@ -99,7 +101,7 @@ pub fn render_combat_3d(frame: &mut Frame, area: Rect, game_state: &GameState) {
                 line_spans.push(Span::raw(" ".repeat(center_padding)));
             } else {
                 // Empty center
-                let center_width = inner.width as usize - left_walls[i].len() * 2;
+                let center_width = (inner.width as usize).saturating_sub(left_walls[i].len() * 2);
                 line_spans.push(Span::raw(" ".repeat(center_width)));
             }
 
@@ -125,7 +127,7 @@ pub fn render_combat_3d(frame: &mut Frame, area: Rect, game_state: &GameState) {
                 ));
             }
 
-            let center_width = inner.width as usize - left_walls[i].len() * 2;
+            let center_width = (inner.width as usize).saturating_sub(left_walls[i].len() * 2);
             line_spans.push(Span::raw(" ".repeat(center_width)));
 
             if i < right_walls.len() {
