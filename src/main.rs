@@ -87,6 +87,9 @@ fn main() -> io::Result<()> {
         }
     }
 
+    // Check for updates in background (non-blocking notification)
+    let update_available = std::thread::spawn(|| updater::quick_update_check());
+
     // Initialize CharacterManager
     let character_manager = CharacterManager::new()?;
 
@@ -132,6 +135,41 @@ fn main() -> io::Result<()> {
     stdout.execute(EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
+
+    // Show update notification if available
+    if let Ok(Some((date, commit))) = update_available.join() {
+        // Draw notification
+        terminal.draw(|frame| {
+            let area = frame.size();
+            let block = ratatui::widgets::Block::default()
+                .borders(ratatui::widgets::Borders::ALL)
+                .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Yellow))
+                .title(" Update Available ");
+
+            let inner = block.inner(area);
+            frame.render_widget(block, area);
+
+            let text = vec![
+                ratatui::text::Line::from(""),
+                ratatui::text::Line::from(format!("  New version: {} ({})", date, commit)),
+                ratatui::text::Line::from(""),
+                ratatui::text::Line::from("  Run 'quest update' to install."),
+                ratatui::text::Line::from(""),
+                ratatui::text::Line::from("  Press any key to continue..."),
+            ];
+
+            let paragraph = ratatui::widgets::Paragraph::new(text)
+                .alignment(ratatui::layout::Alignment::Left);
+
+            frame.render_widget(paragraph, inner);
+        })?;
+
+        // Wait for keypress (max 5 seconds)
+        let _ = event::poll(Duration::from_secs(5));
+        if event::poll(Duration::from_millis(0))? {
+            let _ = event::read()?;
+        }
+    }
 
     // Main loop
     loop {

@@ -318,6 +318,19 @@ pub fn replace_binary(new_binary: &Path) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// Quick check for update availability (for startup notification).
+/// Returns Some((date, commit)) if update available, None otherwise.
+pub fn quick_update_check() -> Option<(String, String)> {
+    use crate::build_info::{BUILD_COMMIT, BUILD_DATE};
+
+    match check_for_updates(BUILD_COMMIT, BUILD_DATE) {
+        UpdateCheck::UpdateAvailable { latest, .. } => {
+            Some((latest.date, latest.commit))
+        }
+        _ => None,
+    }
+}
+
 /// Run the update command (quest update).
 /// Returns Ok(true) if updated, Ok(false) if already up to date.
 pub fn run_update_command() -> Result<bool, Box<dyn Error>> {
