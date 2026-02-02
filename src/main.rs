@@ -360,8 +360,57 @@ fn main() -> io::Result<()> {
             }
 
             Screen::Game => {
-                // Placeholder - will be implemented in Task 13
-                break;
+                // Take game state (it should always be Some when we're in Game screen)
+                let mut state = game_state
+                    .take()
+                    .expect("Game state should be initialized when entering Game screen");
+
+                // Run the game loop
+                let mut last_tick = Instant::now();
+                let mut last_autosave = Instant::now();
+                let mut tick_counter: u32 = 0;
+
+                loop {
+                    // Draw UI
+                    terminal.draw(|frame| {
+                        draw_ui(frame, &state);
+                    })?;
+
+                    // Poll for input (50ms non-blocking)
+                    if event::poll(Duration::from_millis(50))? {
+                        if let Event::Key(key_event) = event::read()? {
+                            match key_event.code {
+                                // Handle 'q'/'Q' to quit
+                                KeyCode::Char('q') | KeyCode::Char('Q') => {
+                                    // Save character before returning to select
+                                    character_manager.save_character(&state)?;
+                                    game_state = None;
+                                    current_screen = Screen::CharacterSelect;
+                                    break;
+                                }
+                                // Handle 'p'/'P' to prestige
+                                KeyCode::Char('p') | KeyCode::Char('P') => {
+                                    if can_prestige(&state) {
+                                        perform_prestige(&mut state);
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+
+                    // Game tick every 100ms
+                    if last_tick.elapsed() >= Duration::from_millis(TICK_INTERVAL_MS) {
+                        game_tick(&mut state, &mut tick_counter);
+                        last_tick = Instant::now();
+                    }
+
+                    // Auto-save every 30 seconds
+                    if last_autosave.elapsed() >= Duration::from_secs(AUTOSAVE_INTERVAL_SECONDS) {
+                        character_manager.save_character(&state)?;
+                        last_autosave = Instant::now();
+                    }
+                }
             }
         }
     }
