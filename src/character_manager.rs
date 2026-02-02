@@ -337,9 +337,14 @@ mod tests {
 
         let manager = CharacterManager::new().unwrap();
 
-        // Cleanup any existing test files before starting
-        fs::remove_file(manager.quest_dir.join("listtest1.json")).ok();
-        fs::remove_file(manager.quest_dir.join("listtest2.json")).ok();
+        // Clean up any existing test files first (isolation)
+        for entry in fs::read_dir(&manager.quest_dir).unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("json") {
+                fs::remove_file(path).ok();
+            }
+        }
 
         // Create test characters with unique names to avoid conflicts with other tests
         let char1 = GameState {
@@ -373,13 +378,17 @@ mod tests {
         manager.save_character(&char1).unwrap();
         manager.save_character(&char2).unwrap();
 
-        // List characters
+        // List characters and filter to only our test characters (for parallel test isolation)
         let list = manager.list_characters().expect("Failed to list");
-        assert_eq!(list.len(), 2);
+        let test_chars: Vec<_> = list
+            .iter()
+            .filter(|c| c.character_name == "ListTest1" || c.character_name == "ListTest2")
+            .collect();
+        assert_eq!(test_chars.len(), 2);
 
         // Verify sorted by last_played (most recent first)
-        assert_eq!(list[0].character_name, "ListTest2"); // last_save_time = 2000
-        assert_eq!(list[1].character_name, "ListTest1"); // last_save_time = 1000
+        assert_eq!(test_chars[0].character_name, "ListTest2"); // last_save_time = 2000
+        assert_eq!(test_chars[1].character_name, "ListTest1"); // last_save_time = 1000
 
         // Cleanup
         fs::remove_file(manager.quest_dir.join("listtest1.json")).ok();
