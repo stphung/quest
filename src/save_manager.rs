@@ -391,7 +391,10 @@ mod tests {
 
         let save_mgr = SaveManager::new_for_test().unwrap();
 
-        let mut game_state = crate::game_state::GameState::new("Test Hero".to_string(), chrono::Utc::now().timestamp());
+        let mut game_state = crate::game_state::GameState::new(
+            "Test Hero".to_string(),
+            chrono::Utc::now().timestamp(),
+        );
 
         // Equip items
         let weapon = Item {

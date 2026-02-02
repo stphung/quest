@@ -1,4 +1,5 @@
 mod attributes;
+mod character_manager;
 mod combat;
 mod combat_logic;
 mod constants;
@@ -13,7 +14,6 @@ mod item_scoring;
 mod items;
 mod prestige;
 mod save_manager;
-mod character_manager;
 mod ui;
 
 use chrono::Utc;

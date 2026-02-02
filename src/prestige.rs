@@ -274,7 +274,8 @@ mod tests {
         use crate::items::{AttributeBonuses, EquipmentSlot, Item, Rarity};
         use chrono::Utc;
 
-        let mut game_state = crate::game_state::GameState::new("Test Hero".to_string(), Utc::now().timestamp());
+        let mut game_state =
+            crate::game_state::GameState::new("Test Hero".to_string(), Utc::now().timestamp());
 
         // Equip an item
         let weapon = Item {
