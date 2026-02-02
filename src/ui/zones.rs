@@ -111,7 +111,7 @@ mod tests {
 
     #[test]
     fn test_get_current_zone_meadow() {
-        let mut state = GameState::new(0);
+        let mut state = GameState::new("Test Hero".to_string(), 0);
         state.character_level = 5;
 
         let zone = get_current_zone(&state);
@@ -122,7 +122,7 @@ mod tests {
 
     #[test]
     fn test_get_current_zone_forest() {
-        let mut state = GameState::new(0);
+        let mut state = GameState::new("Test Hero".to_string(), 0);
         state.character_level = 15;
 
         let zone = get_current_zone(&state);
@@ -133,7 +133,7 @@ mod tests {
 
     #[test]
     fn test_get_current_zone_volcanic() {
-        let mut state = GameState::new(0);
+        let mut state = GameState::new("Test Hero".to_string(), 0);
         state.character_level = 90;
 
         let zone = get_current_zone(&state);

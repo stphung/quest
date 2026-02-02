@@ -185,7 +185,7 @@ mod tests {
 
     #[test]
     fn test_distribute_level_up_points() {
-        let mut state = GameState::new(0);
+        let mut state = GameState::new("Test Hero".to_string(), 0);
         let increased = distribute_level_up_points(&mut state);
 
         // Should distribute 3 points
@@ -201,7 +201,7 @@ mod tests {
 
     #[test]
     fn test_distribute_respects_caps() {
-        let mut state = GameState::new(0);
+        let mut state = GameState::new("Test Hero".to_string(), 0);
 
         // Set all attributes to cap - 1 (prestige 0 = cap 20)
         for attr in AttributeType::all() {
@@ -219,7 +219,7 @@ mod tests {
 
     #[test]
     fn test_apply_tick_xp_no_levelup() {
-        let mut state = GameState::new(0);
+        let mut state = GameState::new("Test Hero".to_string(), 0);
         let (levelups, increased) = apply_tick_xp(&mut state, 50.0);
 
         assert_eq!(levelups, 0);
@@ -230,7 +230,7 @@ mod tests {
 
     #[test]
     fn test_apply_tick_xp_single_levelup() {
-        let mut state = GameState::new(0);
+        let mut state = GameState::new("Test Hero".to_string(), 0);
         let (levelups, increased) = apply_tick_xp(&mut state, 100.0);
 
         assert_eq!(levelups, 1);
@@ -247,7 +247,7 @@ mod tests {
 
     #[test]
     fn test_spawn_enemy_if_needed() {
-        let mut state = GameState::new(0);
+        let mut state = GameState::new("Test Hero".to_string(), 0);
         assert!(state.combat_state.current_enemy.is_none());
 
         spawn_enemy_if_needed(&mut state);

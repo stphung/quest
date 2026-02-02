@@ -193,7 +193,7 @@ mod tests {
 
     #[test]
     fn test_can_prestige_not_ready() {
-        let state = GameState::new(0);
+        let state = GameState::new("Test Hero".to_string(), 0);
 
         // Character starts at level 1, need level 10 for first prestige
         assert!(!can_prestige(&state));
@@ -201,7 +201,7 @@ mod tests {
 
     #[test]
     fn test_can_prestige_ready() {
-        let mut state = GameState::new(0);
+        let mut state = GameState::new("Test Hero".to_string(), 0);
 
         // Set character level to 10 (requirement for first prestige)
         state.character_level = 10;
@@ -214,7 +214,7 @@ mod tests {
 
     #[test]
     fn test_perform_prestige() {
-        let mut state = GameState::new(0);
+        let mut state = GameState::new("Test Hero".to_string(), 0);
 
         // Set character level to 10 and some XP
         state.character_level = 10;
@@ -274,7 +274,7 @@ mod tests {
         use crate::items::{AttributeBonuses, EquipmentSlot, Item, Rarity};
         use chrono::Utc;
 
-        let mut game_state = crate::game_state::GameState::new(Utc::now().timestamp());
+        let mut game_state = crate::game_state::GameState::new("Test Hero".to_string(), Utc::now().timestamp());
 
         // Equip an item
         let weapon = Item {

@@ -244,6 +244,8 @@ impl SaveManager {
         let combat_state = CombatState::new(derived.max_hp);
 
         GameState {
+            character_id: uuid::Uuid::new_v4().to_string(),
+            character_name: "Imported Character".to_string(),
             character_level,
             character_xp: avg_xp,
             attributes,
@@ -273,7 +275,7 @@ mod tests {
         }
 
         // Create a game state with some non-default values
-        let mut original_state = GameState::new(1234567890);
+        let mut original_state = GameState::new("Test Hero".to_string(), 1234567890);
         original_state.prestige_rank = 5;
         original_state.total_prestige_count = 10;
         original_state.play_time_seconds = 3600;
@@ -389,7 +391,7 @@ mod tests {
 
         let save_mgr = SaveManager::new_for_test().unwrap();
 
-        let mut game_state = crate::game_state::GameState::new(chrono::Utc::now().timestamp());
+        let mut game_state = crate::game_state::GameState::new("Test Hero".to_string(), chrono::Utc::now().timestamp());
 
         // Equip items
         let weapon = Item {

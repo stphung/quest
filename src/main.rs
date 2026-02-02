@@ -43,7 +43,7 @@ fn main() -> io::Result<()> {
         state
     } else {
         println!("Starting new game...");
-        GameState::new(Utc::now().timestamp())
+        GameState::new("New Character".to_string(), Utc::now().timestamp())
     };
 
     // Process offline progression if > 60 seconds elapsed

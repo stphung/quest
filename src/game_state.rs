@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 /// Main game state containing all player progress
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameState {
+    pub character_id: String,
+    pub character_name: String,
     pub character_level: u32,
     pub character_xp: u64,
     pub attributes: Attributes,
@@ -19,12 +21,16 @@ pub struct GameState {
 
 impl GameState {
     /// Creates a new game state with default values
-    pub fn new(current_time: i64) -> Self {
+    pub fn new(character_name: String, current_time: i64) -> Self {
+        use uuid::Uuid;
+
         let attributes = Attributes::new();
         let combat_state = CombatState::new(50); // Base HP
         let equipment = Equipment::new();
 
         Self {
+            character_id: Uuid::new_v4().to_string(),
+            character_name,
             character_level: 1,
             character_xp: 0,
             attributes,
@@ -50,7 +56,7 @@ mod tests {
     #[test]
     fn test_new_game_state() {
         let current_time = 1234567890;
-        let game_state = GameState::new(current_time);
+        let game_state = GameState::new("Test Hero".to_string(), current_time);
 
         assert_eq!(game_state.character_level, 1);
         assert_eq!(game_state.character_xp, 0);
@@ -67,7 +73,7 @@ mod tests {
 
     #[test]
     fn test_attribute_cap() {
-        let mut game_state = GameState::new(0);
+        let mut game_state = GameState::new("Test Hero".to_string(), 0);
 
         // Prestige 0: cap 20
         assert_eq!(game_state.get_attribute_cap(), 20);
