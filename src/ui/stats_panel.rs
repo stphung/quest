@@ -292,9 +292,16 @@ fn draw_prestige_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
             ),
         ]),
         Line::from(vec![
-            Span::styled("🎣 Fishing: ", Style::default().add_modifier(Modifier::BOLD)),
             Span::styled(
-                format!("{} ({})", game_state.fishing.rank_name(), game_state.fishing.rank),
+                "🎣 Fishing: ",
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!(
+                    "{} ({})",
+                    game_state.fishing.rank_name(),
+                    game_state.fishing.rank
+                ),
                 Style::default().fg(Color::Cyan),
             ),
         ]),

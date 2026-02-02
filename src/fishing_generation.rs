@@ -148,12 +148,12 @@ pub fn generate_fish(rarity: FishRarity, rng: &mut impl Rng) -> CaughtFish {
 }
 
 /// Phase timing constants (at 100ms tick rate)
-pub const CASTING_TICKS_MIN: u32 = 5;     // 0.5s minimum cast
-pub const CASTING_TICKS_MAX: u32 = 15;    // 1.5s maximum cast
-pub const WAITING_TICKS_MIN: u32 = 10;    // 1.0s minimum wait (quick bite!)
-pub const WAITING_TICKS_MAX: u32 = 80;    // 8.0s maximum wait (patient fishing)
-pub const REELING_TICKS_MIN: u32 = 5;     // 0.5s minimum reel (easy catch)
-pub const REELING_TICKS_MAX: u32 = 30;    // 3.0s maximum reel (fighter!)
+pub const CASTING_TICKS_MIN: u32 = 5; // 0.5s minimum cast
+pub const CASTING_TICKS_MAX: u32 = 15; // 1.5s maximum cast
+pub const WAITING_TICKS_MIN: u32 = 10; // 1.0s minimum wait (quick bite!)
+pub const WAITING_TICKS_MAX: u32 = 80; // 8.0s maximum wait (patient fishing)
+pub const REELING_TICKS_MIN: u32 = 5; // 0.5s minimum reel (easy catch)
+pub const REELING_TICKS_MAX: u32 = 30; // 3.0s maximum reel (fighter!)
 
 /// Generates a new fishing session with a random spot and fish count.
 ///

@@ -312,7 +312,11 @@ mod tests {
                 && session.ticks_remaining <= fishing_generation::CASTING_TICKS_MAX,
             "Timer should be reset to casting ticks range"
         );
-        assert_eq!(session.phase, FishingPhase::Casting, "Should be back to casting");
+        assert_eq!(
+            session.phase,
+            FishingPhase::Casting,
+            "Should be back to casting"
+        );
     }
 
     #[test]

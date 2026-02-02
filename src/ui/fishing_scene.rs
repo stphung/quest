@@ -194,12 +194,12 @@ fn draw_catch_progress(frame: &mut Frame, area: Rect, session: &FishingSession) 
             ),
             Span::raw(" fish"),
         ]),
-        Line::from(vec![
-            Span::styled(
-                phase_text,
-                Style::default().fg(phase_color).add_modifier(Modifier::BOLD),
-            ),
-        ]),
+        Line::from(vec![Span::styled(
+            phase_text,
+            Style::default()
+                .fg(phase_color)
+                .add_modifier(Modifier::BOLD),
+        )]),
     ];
 
     let progress_block = Block::default().borders(Borders::ALL).title(" Status ");
