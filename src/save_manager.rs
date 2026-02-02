@@ -251,6 +251,7 @@ impl SaveManager {
             last_save_time: old_state.last_save_time,
             play_time_seconds: old_state.play_time_seconds,
             combat_state,
+            equipment: crate::equipment::Equipment::new(),
         }
     }
 }

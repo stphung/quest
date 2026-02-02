@@ -9,6 +9,7 @@ mod game_state;
 mod item_drops;
 mod item_generation;
 mod item_names;
+mod item_scoring;
 mod items;
 mod prestige;
 mod save_manager;
