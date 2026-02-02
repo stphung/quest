@@ -151,7 +151,7 @@ mod tests {
 
     #[test]
     fn test_try_drop_item_respects_prestige() {
-        let mut game_state = GameState::new(Utc::now().timestamp());
+        let mut game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
 
         // With prestige 0, should get some drops
         let mut drops = 0;

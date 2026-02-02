@@ -56,7 +56,8 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 - `combat_logic.rs` — Turn-based combat mechanics, damage calculation, event emission
 - `game_logic.rs` — XP curve (`100 × level^1.5`), leveling (+3 random attribute points), enemy spawning, offline progression
 - `prestige.rs` — Prestige ranks (Bronze→Celestial) with XP multipliers and attribute cap increases
-- `save_manager.rs` — Binary save/load with SHA256 checksums, autosave, backward-compatible migration
+- `save_manager.rs` — Legacy binary save/load (deprecated, used for migration only)
+- `character_manager.rs` — JSON save/load in ~/.quest/ directory
 - `constants.rs` — Game balance constants (tick rate, attack interval, XP rates)
 
 ### Item System
@@ -67,6 +68,14 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 - `item_drops.rs` — Prestige-scaled drop system (30% base + 5% per prestige rank, tier-based rarity distribution)
 - `item_names.rs` — Procedural name generation with prefixes/suffixes
 - `item_scoring.rs` — Smart weighted auto-equip scoring (attribute specialization bonus, affix type weights)
+
+### Character System
+
+- `character_manager.rs` — Character CRUD operations (create, delete, rename), JSON save/load with SHA256 checksums, name validation and sanitization
+- `ui/character_select.rs` — Character selection screen with detailed preview panel
+- `ui/character_creation.rs` — Character creation with real-time name validation
+- `ui/character_delete.rs` — Delete confirmation requiring exact name typing
+- `ui/character_rename.rs` — Character renaming with validation
 
 ### UI (`src/ui/`)
 

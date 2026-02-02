@@ -121,14 +121,14 @@ mod tests {
 
     #[test]
     fn test_update_combat_no_enemy() {
-        let mut state = GameState::new(0);
+        let mut state = GameState::new("Test Hero".to_string(), 0);
         let events = update_combat(&mut state, 0.1);
         assert_eq!(events.len(), 0);
     }
 
     #[test]
     fn test_update_combat_attack_interval() {
-        let mut state = GameState::new(0);
+        let mut state = GameState::new("Test Hero".to_string(), 0);
         state.combat_state.current_enemy = Some(Enemy::new("Test".to_string(), 100, 5));
 
         // Not enough time passed
@@ -142,7 +142,7 @@ mod tests {
 
     #[test]
     fn test_player_died_resets() {
-        let mut state = GameState::new(0);
+        let mut state = GameState::new("Test Hero".to_string(), 0);
         state.combat_state.player_current_hp = 1;
         state.combat_state.current_enemy = Some(Enemy::new("Test".to_string(), 100, 50));
 
@@ -167,7 +167,7 @@ mod tests {
 
     #[test]
     fn test_regeneration_after_kill() {
-        let mut state = GameState::new(0);
+        let mut state = GameState::new("Test Hero".to_string(), 0);
         state.combat_state.player_current_hp = 10;
         state.combat_state.current_enemy = Some(Enemy::new("Test".to_string(), 1, 5));
 

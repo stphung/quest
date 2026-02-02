@@ -105,7 +105,7 @@ mod tests {
 
     #[test]
     fn test_score_item_with_attributes() {
-        let game_state = GameState::new(Utc::now().timestamp());
+        let game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
         let item = create_test_item(EquipmentSlot::Weapon, Rarity::Common, 5);
 
         let score = score_item(&item, &game_state);
@@ -114,7 +114,7 @@ mod tests {
 
     #[test]
     fn test_score_item_with_affixes() {
-        let game_state = GameState::new(Utc::now().timestamp());
+        let game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
         let item = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Magic,
@@ -134,7 +134,7 @@ mod tests {
 
     #[test]
     fn test_auto_equip_empty_slot() {
-        let mut game_state = GameState::new(Utc::now().timestamp());
+        let mut game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
         let item = create_test_item(EquipmentSlot::Weapon, Rarity::Common, 2);
 
         let equipped = auto_equip_if_better(item, &mut game_state);
@@ -144,7 +144,7 @@ mod tests {
 
     #[test]
     fn test_auto_equip_better_item() {
-        let mut game_state = GameState::new(Utc::now().timestamp());
+        let mut game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
 
         // Equip weak item
         let weak = create_test_item(EquipmentSlot::Weapon, Rarity::Common, 1);
@@ -169,7 +169,7 @@ mod tests {
 
     #[test]
     fn test_auto_equip_rejects_worse_item() {
-        let mut game_state = GameState::new(Utc::now().timestamp());
+        let mut game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
 
         // Equip strong item
         let strong = create_test_item(EquipmentSlot::Weapon, Rarity::Rare, 10);
