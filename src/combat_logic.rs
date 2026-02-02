@@ -46,7 +46,7 @@ pub fn update_combat(state: &mut GameState, delta_time: f64) -> Vec<CombatEvent>
     if state.combat_state.attack_timer >= ATTACK_INTERVAL_SECONDS {
         state.combat_state.attack_timer = 0.0;
 
-        let derived = DerivedStats::from_attributes(&state.attributes);
+        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
 
         // Player attacks
         let mut damage = derived.total_damage();

@@ -59,10 +59,19 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 - `save_manager.rs` — Binary save/load with SHA256 checksums, autosave, backward-compatible migration
 - `constants.rs` — Game balance constants (tick rate, attack interval, XP rates)
 
+### Item System
+
+- `items.rs` — Core item data structures (7 equipment slots, 5 rarity tiers, 12 affix types)
+- `equipment.rs` — Equipment container with slot management and iteration
+- `item_generation.rs` — Rarity-based attribute/affix generation (Common: +1-2 attrs, Legendary: +8-15 attrs + 4-5 affixes)
+- `item_drops.rs` — Prestige-scaled drop system (30% base + 5% per prestige rank, tier-based rarity distribution)
+- `item_names.rs` — Procedural name generation with prefixes/suffixes
+- `item_scoring.rs` — Smart weighted auto-equip scoring (attribute specialization bonus, affix type weights)
+
 ### UI (`src/ui/`)
 
 - `mod.rs` — Layout coordinator (stats panel left 50%, combat scene right 50%)
-- `stats_panel.rs` — Character stats, attributes, derived stats, prestige info
+- `stats_panel.rs` — Character stats, attributes, derived stats, equipment display, prestige info
 - `combat_scene.rs` — Combat view orchestration with HP bars
 - `combat_3d.rs` — 3D ASCII first-person dungeon renderer
 - `combat_effects.rs` — Visual effects (damage numbers, attack flashes, hit impacts)
@@ -79,6 +88,7 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 - Autosave: every 30s
 - XP gain: Only from defeating enemies (200-400 XP per kill)
 - Offline XP: 50% rate, max 7 days (simulates kills)
+- Item drop rate: 30% base + 5% per prestige rank
 
 ## Project Structure
 

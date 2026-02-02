@@ -239,7 +239,8 @@ impl SaveManager {
 
         // Create new combat state with proper HP
         use crate::derived_stats::DerivedStats;
-        let derived = DerivedStats::from_attributes(&attributes);
+        use crate::equipment::Equipment;
+        let derived = DerivedStats::calculate_derived_stats(&attributes, &Equipment::new());
         let combat_state = CombatState::new(derived.max_hp);
 
         GameState {
@@ -251,6 +252,7 @@ impl SaveManager {
             last_save_time: old_state.last_save_time,
             play_time_seconds: old_state.play_time_seconds,
             combat_state,
+            equipment: crate::equipment::Equipment::new(),
         }
     }
 }
@@ -379,5 +381,48 @@ mod tests {
         assert!(new_state.attributes.get(AttributeType::Intelligence) >= 10);
         assert!(new_state.attributes.get(AttributeType::Wisdom) >= 10);
         assert!(new_state.attributes.get(AttributeType::Constitution) >= 10);
+    }
+
+    #[test]
+    fn test_save_load_with_equipment() {
+        use crate::items::{AttributeBonuses, EquipmentSlot, Item, Rarity};
+
+        let save_mgr = SaveManager::new_for_test().unwrap();
+
+        let mut game_state = crate::game_state::GameState::new(chrono::Utc::now().timestamp());
+
+        // Equip items
+        let weapon = Item {
+            slot: EquipmentSlot::Weapon,
+            rarity: Rarity::Legendary,
+            base_name: "Greatsword".to_string(),
+            display_name: "Flaming Greatsword".to_string(),
+            attributes: AttributeBonuses {
+                str: 12,
+                dex: 5,
+                ..AttributeBonuses::new()
+            },
+            affixes: vec![],
+        };
+        game_state
+            .equipment
+            .set(EquipmentSlot::Weapon, Some(weapon));
+
+        // Save
+        save_mgr.save(&game_state).unwrap();
+
+        // Load
+        let loaded = save_mgr.load().unwrap();
+
+        // Verify equipment loaded correctly
+        assert!(loaded.equipment.get(EquipmentSlot::Weapon).is_some());
+        let loaded_weapon = loaded
+            .equipment
+            .get(EquipmentSlot::Weapon)
+            .as_ref()
+            .unwrap();
+        assert_eq!(loaded_weapon.display_name, "Flaming Greatsword");
+        assert_eq!(loaded_weapon.attributes.str, 12);
+        assert_eq!(loaded_weapon.rarity, Rarity::Legendary);
     }
 }

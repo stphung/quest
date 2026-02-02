@@ -3,8 +3,14 @@ mod combat;
 mod combat_logic;
 mod constants;
 mod derived_stats;
+mod equipment;
 mod game_logic;
 mod game_state;
+mod item_drops;
+mod item_generation;
+mod item_names;
+mod item_scoring;
+mod items;
 mod prestige;
 mod save_manager;
 mod ui;
@@ -189,6 +195,33 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
                     game_state.combat_state.add_log_entry(message, false, true);
                 }
                 apply_tick_xp(game_state, xp_gained as f64);
+
+                // Try to drop item
+                use item_drops::try_drop_item;
+                use item_scoring::auto_equip_if_better;
+
+                if let Some(item) = try_drop_item(game_state) {
+                    let item_name = item.display_name.clone();
+                    let rarity = item.rarity;
+                    let equipped = auto_equip_if_better(item, game_state);
+
+                    let rarity_name = match rarity {
+                        items::Rarity::Common => "Common",
+                        items::Rarity::Magic => "Magic",
+                        items::Rarity::Rare => "Rare",
+                        items::Rarity::Epic => "Epic",
+                        items::Rarity::Legendary => "Legendary",
+                    };
+
+                    let stars = "⭐".repeat(rarity as usize + 1);
+                    let equipped_text = if equipped { " (equipped!)" } else { "" };
+
+                    let message = format!(
+                        "🎁 Found: {} [{}] {}{}",
+                        item_name, rarity_name, stars, equipped_text
+                    );
+                    game_state.combat_state.add_log_entry(message, false, true);
+                }
             }
             CombatEvent::PlayerDied => {
                 // Add to combat log

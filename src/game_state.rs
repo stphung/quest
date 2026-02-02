@@ -1,5 +1,6 @@
 use crate::attributes::Attributes;
 use crate::combat::CombatState;
+use crate::equipment::Equipment;
 use serde::{Deserialize, Serialize};
 
 /// Main game state containing all player progress
@@ -13,6 +14,7 @@ pub struct GameState {
     pub last_save_time: i64,
     pub play_time_seconds: u64,
     pub combat_state: CombatState,
+    pub equipment: Equipment,
 }
 
 impl GameState {
@@ -20,6 +22,7 @@ impl GameState {
     pub fn new(current_time: i64) -> Self {
         let attributes = Attributes::new();
         let combat_state = CombatState::new(50); // Base HP
+        let equipment = Equipment::new();
 
         Self {
             character_level: 1,
@@ -30,6 +33,7 @@ impl GameState {
             last_save_time: current_time,
             play_time_seconds: 0,
             combat_state,
+            equipment,
         }
     }
 

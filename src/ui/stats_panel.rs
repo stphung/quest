@@ -2,6 +2,7 @@ use crate::attributes::AttributeType;
 use crate::derived_stats::DerivedStats;
 use crate::game_logic::xp_for_next_level;
 use crate::game_state::GameState;
+use crate::items::{AffixType, Rarity};
 use crate::prestige::{get_adventurer_rank, get_prestige_tier};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -13,14 +14,15 @@ use ratatui::{
 
 /// Draws the stats panel showing player attributes and derived stats
 pub fn draw_stats_panel(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    // Main vertical layout: header, attributes, derived stats, prestige, footer
+    // Main vertical layout: header, attributes, derived stats, equipment, prestige, footer
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3),  // Header
             Constraint::Length(14), // Attributes (6 attributes + borders)
-            Constraint::Length(9),  // Derived stats
-            Constraint::Length(5),  // Prestige info
+            Constraint::Length(7),  // Derived stats (condensed)
+            Constraint::Length(9),  // Equipment section
+            Constraint::Length(4),  // Prestige info (condensed)
             Constraint::Length(3),  // Footer
         ])
         .split(area);
@@ -34,11 +36,14 @@ pub fn draw_stats_panel(frame: &mut Frame, area: Rect, game_state: &GameState) {
     // Draw derived stats
     draw_derived_stats(frame, chunks[2], game_state);
 
+    // Draw equipment section
+    draw_equipment_section(frame, chunks[3], game_state);
+
     // Draw prestige info
-    draw_prestige_info(frame, chunks[3], game_state);
+    draw_prestige_info(frame, chunks[4], game_state);
 
     // Draw footer with controls
-    draw_footer(frame, chunks[4], game_state);
+    draw_footer(frame, chunks[5], game_state);
 }
 
 /// Draws the header with character level and XP
@@ -163,7 +168,8 @@ fn draw_attribute_row(
 
 /// Draws derived stats calculated from attributes
 fn draw_derived_stats(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    let derived = DerivedStats::from_attributes(&game_state.attributes);
+    let derived =
+        DerivedStats::calculate_derived_stats(&game_state.attributes, &game_state.equipment);
 
     let stats_block = Block::default()
         .borders(Borders::ALL)
@@ -289,6 +295,118 @@ fn draw_prestige_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
 
     let prestige_paragraph = Paragraph::new(prestige_text);
     frame.render_widget(prestige_paragraph, inner);
+}
+
+/// Draws equipment section with all 7 equipment slots
+fn draw_equipment_section(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    let equipment_block = Block::default().borders(Borders::ALL).title("Equipment");
+
+    let inner = equipment_block.inner(area);
+    frame.render_widget(equipment_block, area);
+
+    let mut lines = Vec::new();
+
+    // Draw each equipment slot
+    let slots = vec![
+        (game_state.equipment.weapon.as_ref(), "⚔️ Weapon"),
+        (game_state.equipment.armor.as_ref(), "🛡 Armor"),
+        (game_state.equipment.helmet.as_ref(), "🪖 Helmet"),
+        (game_state.equipment.gloves.as_ref(), "🧤 Gloves"),
+        (game_state.equipment.boots.as_ref(), "👢 Boots"),
+        (game_state.equipment.amulet.as_ref(), "📿 Amulet"),
+        (game_state.equipment.ring.as_ref(), "💍 Ring"),
+    ];
+
+    for (item, slot_label) in slots {
+        if let Some(item) = item {
+            // Get rarity color and name
+            let (rarity_color, rarity_name) = match item.rarity {
+                Rarity::Common => (Color::White, "Common"),
+                Rarity::Magic => (Color::Blue, "Magic"),
+                Rarity::Rare => (Color::Yellow, "Rare"),
+                Rarity::Epic => (Color::Magenta, "Epic"),
+                Rarity::Legendary => (Color::LightRed, "Legendary"),
+            };
+
+            // First line: icon, slot, name, rarity, stars
+            let stars = "⭐".repeat(item.rarity as usize + 1);
+            let item_name = if item.display_name.len() > 25 {
+                format!("{}...", &item.display_name[..22])
+            } else {
+                item.display_name.clone()
+            };
+
+            lines.push(Line::from(vec![
+                Span::raw(format!("{} ", slot_label)),
+                Span::styled(item_name, Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(" "),
+                Span::styled(
+                    format!("[{}]", rarity_name),
+                    Style::default().fg(rarity_color),
+                ),
+                Span::raw(format!(" {}", stars)),
+            ]));
+
+            // Second line: attribute bonuses and affixes (indented)
+            let mut bonuses = Vec::new();
+
+            // Add attribute bonuses
+            if item.attributes.str > 0 {
+                bonuses.push(format!("+{}STR", item.attributes.str));
+            }
+            if item.attributes.dex > 0 {
+                bonuses.push(format!("+{}DEX", item.attributes.dex));
+            }
+            if item.attributes.con > 0 {
+                bonuses.push(format!("+{}CON", item.attributes.con));
+            }
+            if item.attributes.int > 0 {
+                bonuses.push(format!("+{}INT", item.attributes.int));
+            }
+            if item.attributes.wis > 0 {
+                bonuses.push(format!("+{}WIS", item.attributes.wis));
+            }
+            if item.attributes.cha > 0 {
+                bonuses.push(format!("+{}CHA", item.attributes.cha));
+            }
+
+            // Add affixes
+            for affix in &item.affixes {
+                let affix_str = match affix.affix_type {
+                    AffixType::DamagePercent => format!("+{:.0}% DMG", affix.value),
+                    AffixType::CritChance => format!("+{:.0}% CRIT", affix.value),
+                    AffixType::CritMultiplier => format!("+{:.0}% CritMult", affix.value),
+                    AffixType::AttackSpeed => format!("+{:.0}% Speed", affix.value),
+                    AffixType::HPBonus => format!("+{:.0} HP", affix.value),
+                    AffixType::DamageReduction => format!("+{:.0}% DR", affix.value),
+                    AffixType::HPRegen => format!("+{:.0}% Regen", affix.value),
+                    AffixType::DamageReflection => format!("+{:.0}% Reflect", affix.value),
+                    AffixType::XPGain => format!("+{:.0}% XP", affix.value),
+                    AffixType::DropRate => format!("+{:.0}% Drops", affix.value),
+                    AffixType::PrestigeBonus => format!("+{:.0}% Prestige", affix.value),
+                    AffixType::OfflineRate => format!("+{:.0}% Offline", affix.value),
+                };
+                bonuses.push(affix_str);
+            }
+
+            if !bonuses.is_empty() {
+                lines.push(Line::from(vec![
+                    Span::raw("             "),
+                    Span::styled(bonuses.join(", "), Style::default().fg(Color::Gray)),
+                ]));
+            }
+        } else {
+            // Empty slot
+            lines.push(Line::from(vec![
+                Span::raw(slot_label),
+                Span::raw(" "),
+                Span::styled("[Empty]", Style::default().fg(Color::DarkGray)),
+            ]));
+        }
+    }
+
+    let equipment_paragraph = Paragraph::new(lines);
+    frame.render_widget(equipment_paragraph, inner);
 }
 
 /// Draws the footer with control instructions
