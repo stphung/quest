@@ -1,3 +1,29 @@
+use std::fs;
+use std::io;
+use std::path::PathBuf;
+
+#[allow(dead_code)]
+pub struct CharacterManager {
+    quest_dir: PathBuf,
+}
+
+#[allow(dead_code)]
+impl CharacterManager {
+    pub fn new() -> io::Result<Self> {
+        let home_dir = dirs::home_dir().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::NotFound,
+                "Could not determine home directory",
+            )
+        })?;
+
+        let quest_dir = home_dir.join(".quest");
+        fs::create_dir_all(&quest_dir)?;
+
+        Ok(Self { quest_dir })
+    }
+}
+
 #[allow(dead_code)]
 pub fn validate_name(name: &str) -> Result<(), String> {
     let trimmed = name.trim();
@@ -70,5 +96,12 @@ mod tests {
         assert_eq!(sanitize_name("Test!!!"), "test");
         assert_eq!(sanitize_name("   Spaces   "), "spaces");
         assert_eq!(sanitize_name("MixedCase"), "mixedcase");
+    }
+
+    #[test]
+    fn test_character_manager_new() {
+        let manager = CharacterManager::new().expect("Failed to create CharacterManager");
+        assert!(manager.quest_dir.ends_with(".quest"));
+        assert!(manager.quest_dir.exists());
     }
 }
