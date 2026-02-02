@@ -27,6 +27,17 @@ pub struct CaughtFish {
     pub xp_reward: u32,
 }
 
+/// Current phase of the fishing process.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FishingPhase {
+    /// Casting the line (1s delay)
+    Casting,
+    /// Waiting for a bite (2-4s random)
+    Waiting,
+    /// Fish is biting, reeling in (1-2s)
+    Reeling,
+}
+
 /// Represents an active fishing session at a particular spot.
 #[derive(Debug, Clone)]
 pub struct FishingSession {
@@ -34,8 +45,10 @@ pub struct FishingSession {
     pub total_fish: u32,
     pub fish_caught: Vec<CaughtFish>,
     pub items_found: Vec<Item>,
-    /// Ticks remaining until next catch (15 ticks = 1.5s at 100ms tick rate)
-    pub ticks_until_catch: u32,
+    /// Ticks remaining in current phase
+    pub ticks_remaining: u32,
+    /// Current fishing phase
+    pub phase: FishingPhase,
 }
 
 /// Persistent fishing state that is saved with the character.
@@ -291,12 +304,14 @@ mod tests {
                 },
             ],
             items_found: vec![],
-            ticks_until_catch: 15,
+            ticks_remaining: 15,
+            phase: FishingPhase::Waiting,
         };
         assert_eq!(session.spot_name, "Moonlit Lake");
         assert_eq!(session.total_fish, 5);
         assert_eq!(session.fish_caught.len(), 2);
         assert!(session.items_found.is_empty());
-        assert_eq!(session.ticks_until_catch, 15);
+        assert_eq!(session.ticks_remaining, 15);
+        assert_eq!(session.phase, FishingPhase::Waiting);
     }
 }

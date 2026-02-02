@@ -4,7 +4,7 @@
 
 #![allow(dead_code)]
 
-use crate::fishing::{CaughtFish, FishRarity, FishingSession};
+use crate::fishing::{CaughtFish, FishRarity, FishingPhase, FishingSession};
 use crate::items::Item;
 use rand::Rng;
 
@@ -147,15 +147,20 @@ pub fn generate_fish(rarity: FishRarity, rng: &mut impl Rng) -> CaughtFish {
     }
 }
 
-/// Initial ticks until first catch (15 ticks = 1.5s at 100ms tick rate)
-pub const INITIAL_CATCH_TICKS: u32 = 15;
+/// Phase timing constants (at 100ms tick rate)
+pub const CASTING_TICKS_MIN: u32 = 5;     // 0.5s minimum cast
+pub const CASTING_TICKS_MAX: u32 = 15;    // 1.5s maximum cast
+pub const WAITING_TICKS_MIN: u32 = 10;    // 1.0s minimum wait (quick bite!)
+pub const WAITING_TICKS_MAX: u32 = 80;    // 8.0s maximum wait (patient fishing)
+pub const REELING_TICKS_MIN: u32 = 5;     // 0.5s minimum reel (easy catch)
+pub const REELING_TICKS_MAX: u32 = 30;    // 3.0s maximum reel (fighter!)
 
 /// Generates a new fishing session with a random spot and fish count.
 ///
 /// - Random spot name from SPOT_NAMES
 /// - Random total_fish count: 3-8
 /// - fish_caught and items_found start empty
-/// - ticks_until_catch starts at 15 (1.5s)
+/// - Starts in Casting phase
 pub fn generate_fishing_session(rng: &mut impl Rng) -> FishingSession {
     let spot_name = SPOT_NAMES[rng.gen_range(0..SPOT_NAMES.len())].to_string();
     let total_fish = rng.gen_range(3..=8);
@@ -165,8 +170,24 @@ pub fn generate_fishing_session(rng: &mut impl Rng) -> FishingSession {
         total_fish,
         fish_caught: Vec::new(),
         items_found: Vec::<Item>::new(),
-        ticks_until_catch: INITIAL_CATCH_TICKS,
+        ticks_remaining: rng.gen_range(CASTING_TICKS_MIN..=CASTING_TICKS_MAX),
+        phase: FishingPhase::Casting,
     }
+}
+
+/// Returns random ticks for the casting phase.
+pub fn roll_casting_ticks(rng: &mut impl Rng) -> u32 {
+    rng.gen_range(CASTING_TICKS_MIN..=CASTING_TICKS_MAX)
+}
+
+/// Returns random ticks for the waiting (bite) phase.
+pub fn roll_waiting_ticks(rng: &mut impl Rng) -> u32 {
+    rng.gen_range(WAITING_TICKS_MIN..=WAITING_TICKS_MAX)
+}
+
+/// Returns random ticks for the reeling phase.
+pub fn roll_reeling_ticks(rng: &mut impl Rng) -> u32 {
+    rng.gen_range(REELING_TICKS_MIN..=REELING_TICKS_MAX)
 }
 
 #[cfg(test)]

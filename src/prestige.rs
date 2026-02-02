@@ -400,7 +400,7 @@ mod tests {
 
     #[test]
     fn test_fishing_preserved_on_prestige() {
-        use crate::fishing::{CaughtFish, FishRarity, FishingSession};
+        use crate::fishing::{CaughtFish, FishRarity, FishingPhase, FishingSession};
         use chrono::Utc;
 
         let mut state =
@@ -422,7 +422,8 @@ mod tests {
                 xp_reward: 10,
             }],
             items_found: vec![],
-            ticks_until_catch: 15,
+            ticks_remaining: 15,
+            phase: FishingPhase::Waiting,
         });
 
         // Level up enough to prestige

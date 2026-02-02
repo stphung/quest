@@ -5,8 +5,8 @@
 
 #![allow(dead_code)]
 
-use crate::fishing::{FishRarity, FishingState};
-use crate::fishing_generation::{self, INITIAL_CATCH_TICKS};
+use crate::fishing::{FishRarity, FishingPhase, FishingState};
+use crate::fishing_generation;
 use crate::game_state::GameState;
 use crate::item_generation;
 use crate::items::{EquipmentSlot, Rarity};
@@ -23,21 +23,12 @@ const DROP_CHANCE_RARE: f64 = 0.15; // 15%
 const DROP_CHANCE_EPIC: f64 = 0.35; // 35%
 const DROP_CHANCE_LEGENDARY: f64 = 0.75; // 75%
 
-/// Processes a fishing session tick.
+/// Processes a fishing session tick with phase-based timing.
 ///
-/// Returns a vector of messages to display (catch notifications, session end).
-///
-/// # Processing Flow
-/// 1. Decrements ticks_until_catch counter
-/// 2. When counter reaches 0:
-///    - Rolls fish rarity based on fishing rank
-///    - Generates fish with name and XP reward
-///    - Awards character XP (with prestige multiplier)
-///    - Awards fishing rank progress
-///    - Checks for item drop based on fish rarity
-///    - Tracks legendary catches
-///    - Resets catch timer
-/// 3. Ends session when all fish are caught
+/// # Fishing Phases (average ~5s per fish)
+/// 1. **Casting** (1s) - Line is being cast
+/// 2. **Waiting** (2-4s) - Waiting for a bite
+/// 3. **Reeling** (1-2s) - Fish is biting, reeling in
 pub fn tick_fishing(state: &mut GameState, rng: &mut impl Rng) -> Vec<String> {
     let mut messages = Vec::new();
 
@@ -47,71 +38,86 @@ pub fn tick_fishing(state: &mut GameState, rng: &mut impl Rng) -> Vec<String> {
         None => return messages,
     };
 
-    // Create mutable copy to modify
     let mut session = session;
 
     // Decrement tick counter
-    if session.ticks_until_catch > 0 {
-        session.ticks_until_catch -= 1;
+    if session.ticks_remaining > 0 {
+        session.ticks_remaining -= 1;
     }
 
-    // Check if it's time to catch a fish
-    if session.ticks_until_catch == 0 {
-        // Roll rarity and generate fish
-        let rarity = fishing_generation::roll_fish_rarity(state.fishing.rank, rng);
-        let fish = fishing_generation::generate_fish(rarity, rng);
+    // Process phase transitions when timer reaches 0
+    if session.ticks_remaining == 0 {
+        match session.phase {
+            FishingPhase::Casting => {
+                // Casting complete, start waiting for bite
+                session.phase = FishingPhase::Waiting;
+                session.ticks_remaining = fishing_generation::roll_waiting_ticks(rng);
+                messages.push("Line cast... waiting for a bite...".to_string());
+            }
+            FishingPhase::Waiting => {
+                // Got a bite! Start reeling
+                session.phase = FishingPhase::Reeling;
+                session.ticks_remaining = fishing_generation::roll_reeling_ticks(rng);
+                messages.push("🐟 Got a bite! Reeling in...".to_string());
+            }
+            FishingPhase::Reeling => {
+                // Catch the fish!
+                let rarity = fishing_generation::roll_fish_rarity(state.fishing.rank, rng);
+                let fish = fishing_generation::generate_fish(rarity, rng);
 
-        // Calculate XP with prestige multiplier
-        let prestige_multiplier = get_prestige_tier(state.prestige_rank).multiplier;
-        let xp_gained = (fish.xp_reward as f64 * prestige_multiplier) as u64;
+                // Calculate XP with prestige multiplier
+                let prestige_multiplier = get_prestige_tier(state.prestige_rank).multiplier;
+                let xp_gained = (fish.xp_reward as f64 * prestige_multiplier) as u64;
 
-        // Award character XP
-        state.character_xp += xp_gained;
+                // Award character XP
+                state.character_xp += xp_gained;
 
-        // Award fishing rank progress
-        state.fishing.fish_toward_next_rank += 1;
-        state.fishing.total_fish_caught += 1;
+                // Award fishing rank progress
+                state.fishing.fish_toward_next_rank += 1;
+                state.fishing.total_fish_caught += 1;
 
-        // Track legendary catches
-        if rarity == FishRarity::Legendary {
-            state.fishing.legendary_catches += 1;
-        }
+                // Track legendary catches
+                if rarity == FishRarity::Legendary {
+                    state.fishing.legendary_catches += 1;
+                }
 
-        // Generate catch message
-        let rarity_name = match rarity {
-            FishRarity::Common => "Common",
-            FishRarity::Uncommon => "Uncommon",
-            FishRarity::Rare => "Rare",
-            FishRarity::Epic => "Epic",
-            FishRarity::Legendary => "Legendary",
-        };
-        messages.push(format!(
-            "Caught {} [{}]! +{} XP",
-            fish.name, rarity_name, xp_gained
-        ));
+                // Generate catch message
+                let rarity_name = match rarity {
+                    FishRarity::Common => "Common",
+                    FishRarity::Uncommon => "Uncommon",
+                    FishRarity::Rare => "Rare",
+                    FishRarity::Epic => "Epic",
+                    FishRarity::Legendary => "Legendary",
+                };
+                messages.push(format!(
+                    "🎣 Caught {} [{}]! +{} XP",
+                    fish.name, rarity_name, xp_gained
+                ));
 
-        // Check for item drop
-        if let Some(item) = try_fishing_item_drop(rarity, state.character_level, rng) {
-            messages.push(format!("Found item: {}!", item.display_name));
-            session.items_found.push(item);
-        }
+                // Check for item drop
+                if let Some(item) = try_fishing_item_drop(rarity, state.character_level, rng) {
+                    messages.push(format!("📦 Found item: {}!", item.display_name));
+                    session.items_found.push(item);
+                }
 
-        // Add fish to session
-        session.fish_caught.push(fish);
+                // Add fish to session
+                session.fish_caught.push(fish);
 
-        // Reset catch timer or end session
-        if session.fish_caught.len() >= session.total_fish as usize {
-            // Session complete
-            messages.push(format!(
-                "Fishing session at {} complete! Caught {} fish.",
-                session.spot_name,
-                session.fish_caught.len()
-            ));
-            // Don't put session back - it ends
-            return messages;
-        } else {
-            // Reset timer for next catch
-            session.ticks_until_catch = INITIAL_CATCH_TICKS;
+                // Check if session is complete
+                if session.fish_caught.len() >= session.total_fish as usize {
+                    messages.push(format!(
+                        "Fishing spot depleted! Caught {} fish at {}.",
+                        session.fish_caught.len(),
+                        session.spot_name
+                    ));
+                    // Don't put session back - it ends
+                    return messages;
+                }
+
+                // Start casting again for next fish
+                session.phase = FishingPhase::Casting;
+                session.ticks_remaining = fishing_generation::roll_casting_ticks(rng);
+            }
         }
     }
 
@@ -251,13 +257,14 @@ mod tests {
         let mut rng = create_test_rng();
         let mut state = create_test_game_state();
 
-        // Create a fishing session with 1 tick remaining
+        // Create a fishing session in Reeling phase with 1 tick remaining
         let session = FishingSession {
             spot_name: "Test Lake".to_string(),
             total_fish: 5,
             fish_caught: Vec::new(),
             items_found: Vec::new(),
-            ticks_until_catch: 1,
+            ticks_remaining: 1,
+            phase: FishingPhase::Reeling,
         };
         state.active_fishing = Some(session);
 
@@ -300,10 +307,12 @@ mod tests {
         );
         let session = state.active_fishing.as_ref().unwrap();
         assert_eq!(session.fish_caught.len(), 1, "Should have 1 fish caught");
-        assert_eq!(
-            session.ticks_until_catch, INITIAL_CATCH_TICKS,
-            "Timer should be reset"
+        assert!(
+            session.ticks_remaining >= fishing_generation::CASTING_TICKS_MIN
+                && session.ticks_remaining <= fishing_generation::CASTING_TICKS_MAX,
+            "Timer should be reset to casting ticks range"
         );
+        assert_eq!(session.phase, FishingPhase::Casting, "Should be back to casting");
     }
 
     #[test]
@@ -311,19 +320,20 @@ mod tests {
         let mut rng = create_test_rng();
         let mut state = create_test_game_state();
 
-        // Create a fishing session with multiple ticks remaining
+        // Create a fishing session in Waiting phase with multiple ticks remaining
         let session = FishingSession {
             spot_name: "Test Lake".to_string(),
             total_fish: 5,
             fish_caught: Vec::new(),
             items_found: Vec::new(),
-            ticks_until_catch: 10,
+            ticks_remaining: 10,
+            phase: FishingPhase::Waiting,
         };
         state.active_fishing = Some(session);
 
         let messages = tick_fishing(&mut state, &mut rng);
 
-        // No catch yet
+        // No catch yet - still waiting
         assert!(
             messages.is_empty(),
             "Should not have messages when timer > 0"
@@ -331,7 +341,7 @@ mod tests {
 
         // Timer should have decremented
         let session = state.active_fishing.as_ref().unwrap();
-        assert_eq!(session.ticks_until_catch, 9, "Timer should decrement by 1");
+        assert_eq!(session.ticks_remaining, 9, "Timer should decrement by 1");
     }
 
     #[test]
@@ -339,13 +349,14 @@ mod tests {
         let mut rng = create_test_rng();
         let mut state = create_test_game_state();
 
-        // Create a session with 1 fish total and 1 tick remaining
+        // Create a session with 1 fish total in Reeling phase
         let session = FishingSession {
             spot_name: "Small Pond".to_string(),
             total_fish: 1,
             fish_caught: Vec::new(),
             items_found: Vec::new(),
-            ticks_until_catch: 1,
+            ticks_remaining: 1,
+            phase: FishingPhase::Reeling,
         };
         state.active_fishing = Some(session);
 
@@ -357,7 +368,7 @@ mod tests {
             "Should have catch and completion messages"
         );
         assert!(
-            messages.iter().any(|m| m.contains("complete")),
+            messages.iter().any(|m| m.contains("depleted")),
             "Should have completion message"
         );
 
@@ -379,7 +390,8 @@ mod tests {
             total_fish: 5,
             fish_caught: Vec::new(),
             items_found: Vec::new(),
-            ticks_until_catch: 15,
+            ticks_remaining: 15,
+            phase: FishingPhase::Waiting,
         });
 
         // Try many times - should never discover when already fishing
@@ -508,7 +520,8 @@ mod tests {
                 total_fish: 100,
                 fish_caught: Vec::new(),
                 items_found: Vec::new(),
-                ticks_until_catch: 1,
+                ticks_remaining: 1,
+                phase: FishingPhase::Reeling,
             };
             state.active_fishing = Some(session);
 
@@ -537,7 +550,8 @@ mod tests {
             total_fish: 5,
             fish_caught: Vec::new(),
             items_found: Vec::new(),
-            ticks_until_catch: 1,
+            ticks_remaining: 1,
+            phase: FishingPhase::Reeling,
         };
         state.active_fishing = Some(session);
         state.prestige_rank = 0;
@@ -555,7 +569,8 @@ mod tests {
             total_fish: 5,
             fish_caught: Vec::new(),
             items_found: Vec::new(),
-            ticks_until_catch: 1,
+            ticks_remaining: 1,
+            phase: FishingPhase::Reeling,
         };
         state2.active_fishing = Some(session2);
         state2.prestige_rank = 2;

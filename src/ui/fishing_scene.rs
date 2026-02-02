@@ -48,7 +48,7 @@ pub fn render_fishing_scene(
         .constraints([
             Constraint::Length(3), // Header with spot name
             Constraint::Length(6), // Water animation area
-            Constraint::Length(3), // Catch progress
+            Constraint::Length(4), // Catch progress + phase status
             Constraint::Length(9), // Caught fish list (last 5 + borders)
             Constraint::Length(5), // Rank info and progress bar
             Constraint::Min(0),    // Remaining space
@@ -91,12 +91,14 @@ fn draw_header(frame: &mut Frame, area: Rect, session: &FishingSession) {
 
 /// Draws the ASCII water scene with bobber.
 fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
-    // Calculate bobber animation based on ticks (simple oscillation)
-    let bobber_depth = if session.ticks_until_catch < 5 {
+    use crate::fishing::FishingPhase;
+
+    // Calculate bobber animation based on phase
+    let bobber_depth = if session.phase == FishingPhase::Reeling {
         // Fish is biting - bobber dips
         2
     } else {
-        // Normal floating
+        // Normal floating (Casting or Waiting)
         1
     };
 
@@ -167,23 +169,40 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
     frame.render_widget(water_paragraph, area);
 }
 
-/// Draws the catch progress indicator.
+/// Draws the catch progress indicator with current phase.
 fn draw_catch_progress(frame: &mut Frame, area: Rect, session: &FishingSession) {
+    use crate::fishing::FishingPhase;
+
     let caught = session.fish_caught.len() as u32;
     let total = session.total_fish;
 
-    let progress_text = vec![Line::from(vec![
-        Span::styled("Caught: ", Style::default().add_modifier(Modifier::BOLD)),
-        Span::styled(
-            format!("{}/{}", caught, total),
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(" fish"),
-    ])];
+    // Get phase text and color
+    let (phase_text, phase_color) = match session.phase {
+        FishingPhase::Casting => ("🎣 Casting line...", Color::White),
+        FishingPhase::Waiting => ("🌊 Waiting for bite...", Color::Cyan),
+        FishingPhase::Reeling => ("🐟 FISH ON! Reeling in!", Color::Yellow),
+    };
 
-    let progress_block = Block::default().borders(Borders::ALL).title(" Progress ");
+    let progress_text = vec![
+        Line::from(vec![
+            Span::styled("Caught: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::styled(
+                format!("{}/{}", caught, total),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(" fish"),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                phase_text,
+                Style::default().fg(phase_color).add_modifier(Modifier::BOLD),
+            ),
+        ]),
+    ];
+
+    let progress_block = Block::default().borders(Borders::ALL).title(" Status ");
 
     let progress_paragraph = Paragraph::new(progress_text)
         .block(progress_block)
