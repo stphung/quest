@@ -337,14 +337,9 @@ mod tests {
 
         let manager = CharacterManager::new().unwrap();
 
-        // Clean up any existing test files first (isolation)
-        for entry in fs::read_dir(&manager.quest_dir).unwrap() {
-            let entry = entry.unwrap();
-            let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("json") {
-                fs::remove_file(path).ok();
-            }
-        }
+        // Clean up only our test files (isolation)
+        fs::remove_file(manager.quest_dir.join("listtest1.json")).ok();
+        fs::remove_file(manager.quest_dir.join("listtest2.json")).ok();
 
         // Create test characters with unique names to avoid conflicts with other tests
         let char1 = GameState {
