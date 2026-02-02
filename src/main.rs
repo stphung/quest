@@ -443,55 +443,6 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-/// Main game loop that handles input, ticking, and autosaving
-fn run_game_loop(
-    game_state: &mut GameState,
-    save_manager: &SaveManager,
-    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-) -> io::Result<()> {
-    let mut last_tick = Instant::now();
-    let mut last_autosave = Instant::now();
-    let mut tick_counter: u32 = 0;
-
-    loop {
-        // Draw UI
-        terminal.draw(|frame| {
-            draw_ui(frame, game_state);
-        })?;
-
-        // Poll for input (50ms non-blocking)
-        if event::poll(Duration::from_millis(50))? {
-            if let Event::Key(key_event) = event::read()? {
-                match key_event.code {
-                    // Handle 'q'/'Q' to quit
-                    KeyCode::Char('q') | KeyCode::Char('Q') => {
-                        return Ok(());
-                    }
-                    // Handle 'p'/'P' to prestige
-                    KeyCode::Char('p') | KeyCode::Char('P') => {
-                        if can_prestige(game_state) {
-                            perform_prestige(game_state);
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        // Game tick every 100ms
-        if last_tick.elapsed() >= Duration::from_millis(TICK_INTERVAL_MS) {
-            game_tick(game_state, &mut tick_counter);
-            last_tick = Instant::now();
-        }
-
-        // Auto-save every 30 seconds
-        if last_autosave.elapsed() >= Duration::from_secs(AUTOSAVE_INTERVAL_SECONDS) {
-            save_manager.save(game_state)?;
-            last_autosave = Instant::now();
-        }
-    }
-}
-
 /// Processes a single game tick, updating combat and stats
 fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
     use combat_logic::update_combat;
