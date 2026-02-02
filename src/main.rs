@@ -539,6 +539,7 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
     use dungeon_logic::{
         on_boss_defeated, on_elite_defeated, on_treasure_room_entered, update_dungeon,
     };
+    use fishing_logic::tick_fishing;
 
     // Each tick is 100ms = 0.1 seconds
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
@@ -607,6 +608,30 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
                 _ => {}
             }
         }
+    }
+
+    // Update fishing if active (mutually exclusive with combat)
+    if game_state.active_fishing.is_some() {
+        let mut rng = rand::thread_rng();
+        let fishing_messages = tick_fishing(game_state, &mut rng);
+        for message in fishing_messages {
+            game_state.combat_state.add_log_entry(format!("🎣 {}", message), false, true);
+        }
+
+        // Check for fishing rank up
+        if let Some(rank_msg) = fishing_logic::check_rank_up(&mut game_state.fishing) {
+            game_state.combat_state.add_log_entry(format!("🎣 {}", rank_msg), false, true);
+        }
+
+        // Update play_time_seconds and last_save_time (still needed while fishing)
+        *tick_counter += 1;
+        if *tick_counter >= 10 {
+            game_state.play_time_seconds += 1;
+            *tick_counter = 0;
+        }
+        game_state.last_save_time = Utc::now().timestamp();
+
+        return; // Skip combat processing while fishing
     }
 
     // Update combat state
@@ -700,12 +725,21 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
                 }
 
                 // Try to discover dungeon (only when not in a dungeon)
-                if game_state.active_dungeon.is_none() && try_discover_dungeon(game_state) {
+                let discovered_dungeon = game_state.active_dungeon.is_none() && try_discover_dungeon(game_state);
+                if discovered_dungeon {
                     game_state.combat_state.add_log_entry(
                         "🌀 You notice a dark passage leading underground...".to_string(),
                         false,
                         true,
                     );
+                }
+
+                // Try to discover fishing spot (only when not in dungeon and not already fishing)
+                if !discovered_dungeon && game_state.active_dungeon.is_none() && game_state.active_fishing.is_none() {
+                    let mut rng = rand::thread_rng();
+                    if let Some(message) = fishing_logic::try_discover_fishing(game_state, &mut rng) {
+                        game_state.combat_state.add_log_entry(format!("🎣 {}", message), false, true);
+                    }
                 }
             }
             CombatEvent::EliteDefeated { xp_gained } => {

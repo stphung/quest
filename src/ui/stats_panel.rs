@@ -22,7 +22,7 @@ pub fn draw_stats_panel(frame: &mut Frame, area: Rect, game_state: &GameState) {
             Constraint::Length(14), // Attributes (6 attributes + borders)
             Constraint::Length(7),  // Derived stats (condensed)
             Constraint::Length(9),  // Equipment section
-            Constraint::Length(4),  // Prestige info (condensed)
+            Constraint::Length(5),  // Prestige info (condensed) + fishing rank
             Constraint::Length(3),  // Footer
         ])
         .split(area);
@@ -289,6 +289,13 @@ fn draw_prestige_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
             Span::styled(
                 format!("{}", game_state.total_prestige_count),
                 Style::default().fg(Color::Magenta),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("Fishing: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::styled(
+                format!("{} ({})", game_state.fishing.rank_name(), game_state.fishing.rank),
+                Style::default().fg(Color::Cyan),
             ),
         ]),
     ];
