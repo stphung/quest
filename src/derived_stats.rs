@@ -105,8 +105,8 @@ impl DerivedStats {
         max_hp = ((max_hp as f64 + hp_bonus) as u32).max(1);
         physical_damage = ((physical_damage as f64 * damage_mult) as u32).max(1);
         magic_damage = ((magic_damage as f64 * damage_mult) as u32).max(1);
-        defense = ((defense as f64 * defense_mult) as u32).max(0);
-        crit_chance_percent = ((crit_chance_percent as f64 + crit_bonus) as u32).max(0);
+        defense = (defense as f64 * defense_mult) as u32;
+        crit_chance_percent = (crit_chance_percent as f64 + crit_bonus) as u32;
         xp_multiplier *= xp_mult;
 
         Self {
