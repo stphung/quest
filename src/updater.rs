@@ -170,12 +170,18 @@ pub fn check_for_updates(current_commit: &str, current_date: &str) -> UpdateChec
         None => return UpdateCheck::CheckFailed("Invalid release tag format".to_string()),
     };
 
-    // Check if we're already up to date
+    // Check if we're already up to date (same commit)
     if latest_commit == current_commit {
         return UpdateCheck::UpToDate;
     }
 
     let latest_date = parse_release_date(&release.published_at);
+
+    // Check if we're on a newer dev build (current date > release date)
+    // This prevents "updating" to an older release
+    if current_date > latest_date.as_str() {
+        return UpdateCheck::UpToDate;
+    }
 
     // Find download URL for current platform
     let asset_name = get_platform_asset_name();
@@ -353,8 +359,9 @@ pub fn run_update_command() -> Result<bool, Box<dyn Error>> {
 
     match check {
         UpdateCheck::UpToDate => {
-            println!("You're up to date.");
-            println!("  Current: {} ({})", BUILD_DATE, BUILD_COMMIT);
+            println!("No updates available.\n");
+            println!("  Current version: {} ({})", BUILD_DATE, BUILD_COMMIT);
+            println!("\nYou're running the latest version!");
             Ok(false)
         }
         UpdateCheck::CheckFailed(err) => {
