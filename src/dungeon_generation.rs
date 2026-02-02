@@ -299,20 +299,31 @@ fn place_special_rooms(dungeon: &mut Dungeon) {
         .cloned()
         .collect();
 
+    // Minimum squared distance from entrance (2 = not adjacent, not diagonal)
+    let min_elite_distance = 2;
+
     let elite_pos = if !viable_dead_ends.is_empty() {
         // Pick the furthest viable dead end from entrance
         viable_dead_ends[0]
     } else if !dead_ends.is_empty() {
-        // Fallback: any dead end
-        dead_ends[0]
+        // Fallback: pick dead end furthest from entrance that meets minimum distance
+        dead_ends
+            .iter()
+            .find(|&&pos| distance_squared(pos, entrance_pos) > min_elite_distance)
+            .cloned()
+            .unwrap_or(dead_ends[0])
     } else {
-        // Fallback: furthest room from entrance
+        // Fallback: furthest room from entrance that meets minimum distance
         room_positions.sort_by(|a, b| {
             let dist_a = distance_squared(*a, entrance_pos);
             let dist_b = distance_squared(*b, entrance_pos);
             dist_b.cmp(&dist_a)
         });
-        room_positions[0]
+        room_positions
+            .iter()
+            .find(|&&pos| distance_squared(pos, entrance_pos) > min_elite_distance)
+            .cloned()
+            .unwrap_or(room_positions[0])
     };
 
     if let Some(room) = dungeon.get_room_mut(elite_pos.0, elite_pos.1) {
