@@ -106,8 +106,14 @@ mod tests {
     #[test]
     fn test_iter_equipped() {
         let mut eq = Equipment::new();
-        eq.set(EquipmentSlot::Weapon, Some(create_test_item(EquipmentSlot::Weapon)));
-        eq.set(EquipmentSlot::Armor, Some(create_test_item(EquipmentSlot::Armor)));
+        eq.set(
+            EquipmentSlot::Weapon,
+            Some(create_test_item(EquipmentSlot::Weapon)),
+        );
+        eq.set(
+            EquipmentSlot::Armor,
+            Some(create_test_item(EquipmentSlot::Armor)),
+        );
 
         assert_eq!(eq.iter_equipped().count(), 2);
     }
