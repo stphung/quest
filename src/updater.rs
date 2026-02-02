@@ -4,6 +4,9 @@
 
 use serde::Deserialize;
 use std::error::Error;
+use std::fs::{self, File};
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
 
 /// Repository owner and name for GitHub API
 const GITHUB_OWNER: &str = "stphung";
@@ -184,6 +187,135 @@ pub fn check_for_updates(current_commit: &str, current_date: &str) -> UpdateChec
         },
         changelog,
     }
+}
+
+/// Get the Quest data directory (~/.quest)
+fn get_quest_dir() -> Option<PathBuf> {
+    dirs::home_dir().map(|h| h.join(".quest"))
+}
+
+/// Backup all character saves to a timestamped directory.
+/// Returns the backup path on success, or None if no saves exist.
+pub fn backup_saves() -> Result<Option<PathBuf>, Box<dyn Error>> {
+    let quest_dir = get_quest_dir().ok_or("Could not find home directory")?;
+
+    if !quest_dir.exists() {
+        return Ok(None); // No saves to backup
+    }
+
+    // Find all JSON files (character saves)
+    let saves: Vec<_> = fs::read_dir(&quest_dir)?
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().map(|x| x == "json").unwrap_or(false))
+        .collect();
+
+    if saves.is_empty() {
+        return Ok(None); // No saves to backup
+    }
+
+    // Create backup directory with timestamp
+    let timestamp = chrono::Local::now().format("%Y-%m-%d_%H%M%S");
+    let backup_dir = quest_dir.join("backups").join(timestamp.to_string());
+    fs::create_dir_all(&backup_dir)?;
+
+    // Copy each save file
+    for entry in saves {
+        let src = entry.path();
+        let dst = backup_dir.join(entry.file_name());
+        fs::copy(&src, &dst)?;
+    }
+
+    Ok(Some(backup_dir))
+}
+
+/// Download a file from URL to the specified path, showing progress.
+pub fn download_file(url: &str, dest: &Path, progress_callback: impl Fn(u64, u64)) -> Result<(), Box<dyn Error>> {
+    let response = ureq::get(url)
+        .set("User-Agent", "quest-updater")
+        .call()?;
+
+    let total_size: u64 = response
+        .header("Content-Length")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
+
+    let mut reader = response.into_reader();
+    let mut file = File::create(dest)?;
+    let mut downloaded: u64 = 0;
+    let mut buffer = [0u8; 8192];
+
+    loop {
+        let bytes_read = reader.read(&mut buffer)?;
+        if bytes_read == 0 {
+            break;
+        }
+        file.write_all(&buffer[..bytes_read])?;
+        downloaded += bytes_read as u64;
+        progress_callback(downloaded, total_size);
+    }
+
+    Ok(())
+}
+
+/// Extract a tar.gz archive to a directory.
+#[cfg(not(target_os = "windows"))]
+pub fn extract_archive(archive_path: &Path, dest_dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
+    use flate2::read::GzDecoder;
+    use tar::Archive;
+
+    let file = File::open(archive_path)?;
+    let decoder = GzDecoder::new(file);
+    let mut archive = Archive::new(decoder);
+
+    archive.unpack(dest_dir)?;
+
+    // Return path to extracted binary
+    Ok(dest_dir.join("quest"))
+}
+
+/// Extract a zip archive to a directory.
+#[cfg(target_os = "windows")]
+pub fn extract_archive(archive_path: &Path, dest_dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
+    use std::io::BufReader;
+    use zip::ZipArchive;
+
+    let file = File::open(archive_path)?;
+    let reader = BufReader::new(file);
+    let mut archive = ZipArchive::new(reader)?;
+
+    archive.extract(dest_dir)?;
+
+    // Return path to extracted binary
+    Ok(dest_dir.join("quest.exe"))
+}
+
+/// Replace the current binary with a new one.
+pub fn replace_binary(new_binary: &Path) -> Result<(), Box<dyn Error>> {
+    let current_exe = std::env::current_exe()?;
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        // On Unix, we can just overwrite the file
+        fs::copy(new_binary, &current_exe)?;
+
+        // Make executable
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&current_exe)?.permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&current_exe, perms)?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // On Windows, rename current to .old, then move new into place
+        let old_exe = current_exe.with_extension("exe.old");
+        fs::rename(&current_exe, &old_exe)?;
+        fs::rename(new_binary, &current_exe)?;
+        // Try to delete old, ignore errors (may be locked)
+        let _ = fs::remove_file(&old_exe);
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
