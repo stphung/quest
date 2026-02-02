@@ -135,6 +135,11 @@ pub fn perform_prestige(state: &mut GameState) {
     // Reset active dungeon
     state.active_dungeon = None;
 
+    // Clear active fishing session (transient state)
+    // Note: Fishing rank and progression (total_fish_caught, legendary_catches, etc.)
+    // are intentionally preserved across prestige as a separate progression track
+    state.active_fishing = None;
+
     // Reset combat state with base HP (50 for fresh attributes)
     state.combat_state = CombatState::new(50);
 
@@ -391,5 +396,49 @@ mod tests {
         assert_eq!(game_state.combat_state.player_max_hp, 50);
         assert!(!game_state.combat_state.is_regenerating);
         assert!(game_state.combat_state.current_enemy.is_none());
+    }
+
+    #[test]
+    fn test_fishing_preserved_on_prestige() {
+        use crate::fishing::{CaughtFish, FishRarity, FishingPhase, FishingSession};
+        use chrono::Utc;
+
+        let mut state =
+            crate::game_state::GameState::new("Test Hero".to_string(), Utc::now().timestamp());
+
+        // Set up fishing progress
+        state.fishing.rank = 10;
+        state.fishing.total_fish_caught = 500;
+        state.fishing.fish_toward_next_rank = 50;
+        state.fishing.legendary_catches = 5;
+
+        // Set up an active fishing session
+        state.active_fishing = Some(FishingSession {
+            spot_name: "Test Lake".to_string(),
+            total_fish: 10,
+            fish_caught: vec![CaughtFish {
+                name: "Test Fish".to_string(),
+                rarity: FishRarity::Common,
+                xp_reward: 10,
+            }],
+            items_found: vec![],
+            ticks_remaining: 15,
+            phase: FishingPhase::Waiting,
+        });
+
+        // Level up enough to prestige
+        state.character_level = 10;
+
+        // Perform prestige
+        perform_prestige(&mut state);
+
+        // Fishing rank and progression should be preserved
+        assert_eq!(state.fishing.rank, 10);
+        assert_eq!(state.fishing.total_fish_caught, 500);
+        assert_eq!(state.fishing.fish_toward_next_rank, 50);
+        assert_eq!(state.fishing.legendary_catches, 5);
+
+        // Active fishing session should be cleared (transient state)
+        assert!(state.active_fishing.is_none());
     }
 }

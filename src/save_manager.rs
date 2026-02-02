@@ -257,6 +257,8 @@ impl SaveManager {
             combat_state,
             equipment: crate::equipment::Equipment::new(),
             active_dungeon: None,
+            fishing: crate::fishing::FishingState::default(),
+            active_fishing: None,
         }
     }
 }
