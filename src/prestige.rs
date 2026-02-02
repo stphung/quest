@@ -268,4 +268,45 @@ mod tests {
         assert_eq!(get_adventurer_rank(100), "Mythic");
         assert_eq!(get_adventurer_rank(150), "Mythic");
     }
+
+    #[test]
+    fn test_equipment_survives_prestige() {
+        use crate::items::{AttributeBonuses, EquipmentSlot, Item, Rarity};
+        use chrono::Utc;
+
+        let mut game_state = crate::game_state::GameState::new(Utc::now().timestamp());
+
+        // Equip an item
+        let weapon = Item {
+            slot: EquipmentSlot::Weapon,
+            rarity: Rarity::Rare,
+            base_name: "Sword".to_string(),
+            display_name: "Test Sword".to_string(),
+            attributes: AttributeBonuses {
+                str: 10,
+                ..AttributeBonuses::new()
+            },
+            affixes: vec![],
+        };
+        game_state.equipment.set(EquipmentSlot::Weapon, Some(weapon.clone()));
+
+        // Level up enough to prestige
+        game_state.character_level = 10;
+
+        // Perform prestige
+        perform_prestige(&mut game_state);
+
+        // Equipment should still be there
+        assert!(game_state.equipment.get(EquipmentSlot::Weapon).is_some());
+        assert_eq!(
+            game_state
+                .equipment
+                .get(EquipmentSlot::Weapon)
+                .as_ref()
+                .unwrap()
+                .attributes
+                .str,
+            10
+        );
+    }
 }
