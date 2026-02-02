@@ -2,6 +2,7 @@ use crate::attributes::Attributes;
 use crate::combat::CombatState;
 use crate::dungeon::Dungeon;
 use crate::equipment::Equipment;
+use crate::fishing::{FishingSession, FishingState};
 use serde::{Deserialize, Serialize};
 
 /// Main game state containing all player progress
@@ -21,6 +22,13 @@ pub struct GameState {
     /// Active dungeon exploration (None when not in a dungeon)
     #[serde(default)]
     pub active_dungeon: Option<Dungeon>,
+    /// Persistent fishing progression state
+    #[serde(default)]
+    pub fishing: FishingState,
+    /// Active fishing session (transient, not saved)
+    #[serde(skip)]
+    #[allow(dead_code)]
+    pub active_fishing: Option<FishingSession>,
 }
 
 impl GameState {
@@ -45,6 +53,8 @@ impl GameState {
             combat_state,
             equipment,
             active_dungeon: None,
+            fishing: FishingState::default(),
+            active_fishing: None,
         }
     }
 

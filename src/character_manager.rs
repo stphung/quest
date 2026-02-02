@@ -21,6 +21,8 @@ struct CharacterSaveData {
     equipment: crate::equipment::Equipment,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     active_dungeon: Option<crate::dungeon::Dungeon>,
+    #[serde(default)]
+    fishing: crate::fishing::FishingState,
     // Legacy field - kept for backward compatibility with old saves
     #[serde(default, skip_serializing_if = "String::is_empty")]
     checksum: String,
@@ -77,6 +79,7 @@ impl CharacterManager {
             combat_state: state.combat_state.clone(),
             equipment: state.equipment.clone(),
             active_dungeon: state.active_dungeon.clone(),
+            fishing: state.fishing.clone(),
             checksum: String::new(), // Legacy field, no longer used
         };
 
@@ -110,6 +113,8 @@ impl CharacterManager {
             combat_state: save_data.combat_state,
             equipment: save_data.equipment,
             active_dungeon: save_data.active_dungeon,
+            fishing: save_data.fishing,
+            active_fishing: None,
         })
     }
 
@@ -305,6 +310,8 @@ mod tests {
             combat_state: CombatState::new(100),
             equipment: Equipment::new(),
             active_dungeon: None,
+            fishing: crate::fishing::FishingState::default(),
+            active_fishing: None,
         };
 
         // Save character
@@ -351,6 +358,8 @@ mod tests {
             combat_state: CombatState::new(100),
             equipment: Equipment::new(),
             active_dungeon: None,
+            fishing: crate::fishing::FishingState::default(),
+            active_fishing: None,
         };
 
         let char2 = GameState {
@@ -366,6 +375,8 @@ mod tests {
             combat_state: CombatState::new(100),
             equipment: Equipment::new(),
             active_dungeon: None,
+            fishing: crate::fishing::FishingState::default(),
+            active_fishing: None,
         };
 
         manager.save_character(&char1).unwrap();
@@ -411,6 +422,8 @@ mod tests {
             combat_state: CombatState::new(50),
             equipment: Equipment::new(),
             active_dungeon: None,
+            fishing: crate::fishing::FishingState::default(),
+            active_fishing: None,
         };
 
         manager.save_character(&state).unwrap();
@@ -445,6 +458,8 @@ mod tests {
             combat_state: CombatState::new(75),
             equipment: Equipment::new(),
             active_dungeon: None,
+            fishing: crate::fishing::FishingState::default(),
+            active_fishing: None,
         };
 
         manager.save_character(&state).unwrap();
