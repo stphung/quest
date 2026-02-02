@@ -112,14 +112,20 @@ impl CharacterCreationScreen {
     }
 
     pub fn handle_char_input(&mut self, c: char) {
-        self.name_input.insert(self.cursor_position, c);
+        let chars: Vec<char> = self.name_input.chars().collect();
+        let before: String = chars[..self.cursor_position].iter().collect();
+        let after: String = chars[self.cursor_position..].iter().collect();
+        self.name_input = format!("{}{}{}", before, c, after);
         self.cursor_position += 1;
         self.validate();
     }
 
     pub fn handle_backspace(&mut self) {
         if self.cursor_position > 0 {
-            self.name_input.remove(self.cursor_position - 1);
+            let chars: Vec<char> = self.name_input.chars().collect();
+            let before: String = chars[..self.cursor_position - 1].iter().collect();
+            let after: String = chars[self.cursor_position..].iter().collect();
+            self.name_input = format!("{}{}", before, after);
             self.cursor_position -= 1;
             self.validate();
         }
