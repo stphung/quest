@@ -256,6 +256,7 @@ impl SaveManager {
             play_time_seconds: old_state.play_time_seconds,
             combat_state,
             equipment: crate::equipment::Equipment::new(),
+            active_dungeon: None,
         }
     }
 }

@@ -5,13 +5,16 @@ pub mod character_select;
 mod combat_3d;
 pub mod combat_effects;
 mod combat_scene;
+pub mod dungeon_map;
 mod enemy_sprites;
 mod stats_panel;
 pub mod zones;
 
 use crate::game_state::GameState;
 use ratatui::{
-    layout::{Constraint, Direction, Layout},
+    layout::{Constraint, Direction, Layout, Rect},
+    style::{Color, Style},
+    widgets::{Block, Borders},
     Frame,
 };
 
@@ -19,18 +22,84 @@ use ratatui::{
 pub fn draw_ui(frame: &mut Frame, game_state: &GameState) {
     let size = frame.size();
 
-    // Split into two main areas: stats panel (left) and combat scene (right)
+    // Split into two main areas: stats panel (left) and combat/dungeon (right)
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
             Constraint::Percentage(50), // Stats panel
-            Constraint::Percentage(50), // Combat scene
+            Constraint::Percentage(50), // Combat scene or dungeon
         ])
         .split(size);
 
     // Draw stats panel on the left
     stats_panel::draw_stats_panel(frame, chunks[0], game_state);
 
-    // Draw combat scene on the right
+    // Draw right panel based on dungeon state
+    if let Some(dungeon) = &game_state.active_dungeon {
+        draw_dungeon_view(frame, chunks[1], game_state, dungeon);
+    } else {
+        // Normal combat scene
+        combat_scene::draw_combat_scene(frame, chunks[1], game_state);
+    }
+}
+
+/// Draws the dungeon view with map and combat
+fn draw_dungeon_view(
+    frame: &mut Frame,
+    area: Rect,
+    game_state: &GameState,
+    dungeon: &crate::dungeon::Dungeon,
+) {
+    // Split into dungeon map (top) and combat (bottom)
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage(40), // Dungeon map
+            Constraint::Percentage(60), // Combat scene
+        ])
+        .split(area);
+
+    // Draw dungeon map
+    draw_dungeon_panel(frame, chunks[0], dungeon);
+
+    // Draw combat scene
     combat_scene::draw_combat_scene(frame, chunks[1], game_state);
+}
+
+/// Draws the dungeon map panel
+fn draw_dungeon_panel(frame: &mut Frame, area: Rect, dungeon: &crate::dungeon::Dungeon) {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    // Create border
+    let block = Block::default()
+        .title(" Dungeon ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Magenta));
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    // Split inner area for status and map
+    let inner_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1), // Status line
+            Constraint::Min(0),    // Map
+        ])
+        .split(inner);
+
+    // Draw status
+    let status_widget = dungeon_map::DungeonStatusWidget::new(dungeon);
+    frame.render_widget(status_widget, inner_chunks[0]);
+
+    // Calculate blink phase (0.5 second cycle)
+    let millis = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    let blink_phase = (millis % 500) as f64 / 500.0;
+
+    // Draw map
+    let map_widget = dungeon_map::DungeonMapWidget::new(dungeon, blink_phase);
+    frame.render_widget(map_widget, inner_chunks[1]);
 }
