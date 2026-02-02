@@ -6,6 +6,7 @@ mod derived_stats;
 mod equipment;
 mod game_logic;
 mod game_state;
+mod item_drops;
 mod item_generation;
 mod item_names;
 mod items;
