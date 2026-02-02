@@ -204,6 +204,32 @@ impl CharacterManager {
 
         Ok(characters)
     }
+
+    pub fn delete_character(&self, filename: &str) -> io::Result<()> {
+        let filepath = self.quest_dir.join(filename);
+        fs::remove_file(filepath)?;
+        Ok(())
+    }
+
+    pub fn rename_character(&self, old_filename: &str, new_name: String) -> io::Result<()> {
+        // Validate new name
+        validate_name(&new_name).map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
+
+        // Load existing character
+        let mut state = self.load_character(old_filename)?;
+
+        // Update character name
+        state.character_name = new_name.clone();
+
+        // Save with new name
+        self.save_character(&state)?;
+
+        // Delete old file
+        let old_filepath = self.quest_dir.join(old_filename);
+        fs::remove_file(old_filepath)?;
+
+        Ok(())
+    }
 }
 
 #[allow(dead_code)]
@@ -388,5 +414,82 @@ mod tests {
         // Cleanup
         fs::remove_file(manager.quest_dir.join("listtest1.json")).ok();
         fs::remove_file(manager.quest_dir.join("listtest2.json")).ok();
+    }
+
+    #[test]
+    fn test_delete_character() {
+        use crate::attributes::Attributes;
+        use crate::combat::CombatState;
+        use crate::equipment::Equipment;
+        use crate::game_state::GameState;
+        use chrono::Utc;
+
+        let manager = CharacterManager::new().unwrap();
+
+        let state = GameState {
+            character_id: "test-id".to_string(),
+            character_name: "ToDelete".to_string(),
+            character_level: 5,
+            character_xp: 1000,
+            attributes: Attributes::new(),
+            prestige_rank: 0,
+            total_prestige_count: 0,
+            last_save_time: Utc::now().timestamp(),
+            play_time_seconds: 100,
+            combat_state: CombatState::new(50),
+            equipment: Equipment::new(),
+        };
+
+        manager.save_character(&state).unwrap();
+
+        let filename = "todelete.json";
+        assert!(manager.quest_dir.join(filename).exists());
+
+        manager.delete_character(filename).expect("Delete failed");
+        assert!(!manager.quest_dir.join(filename).exists());
+    }
+
+    #[test]
+    fn test_rename_character() {
+        use crate::attributes::Attributes;
+        use crate::combat::CombatState;
+        use crate::equipment::Equipment;
+        use crate::game_state::GameState;
+        use chrono::Utc;
+
+        let manager = CharacterManager::new().unwrap();
+
+        let state = GameState {
+            character_id: "test-id".to_string(),
+            character_name: "OldName".to_string(),
+            character_level: 8,
+            character_xp: 3000,
+            attributes: Attributes::new(),
+            prestige_rank: 1,
+            total_prestige_count: 1,
+            last_save_time: Utc::now().timestamp(),
+            play_time_seconds: 500,
+            combat_state: CombatState::new(75),
+            equipment: Equipment::new(),
+        };
+
+        manager.save_character(&state).unwrap();
+
+        manager
+            .rename_character("oldname.json", "NewName".to_string())
+            .expect("Rename failed");
+
+        // Old file should not exist
+        assert!(!manager.quest_dir.join("oldname.json").exists());
+
+        // New file should exist
+        assert!(manager.quest_dir.join("newname.json").exists());
+
+        // Load and verify name updated
+        let loaded = manager.load_character("newname.json").unwrap();
+        assert_eq!(loaded.character_name, "NewName");
+
+        // Cleanup
+        fs::remove_file(manager.quest_dir.join("newname.json")).ok();
     }
 }
