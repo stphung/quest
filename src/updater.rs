@@ -434,49 +434,69 @@ pub fn run_update_command() -> Result<bool, Box<dyn Error>> {
                 return Ok(false);
             }
 
+            // Get current executable path for display
+            let current_exe = std::env::current_exe()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|_| "quest".to_string());
+
+            println!("Starting update process...\n");
+
             // Backup saves
-            print!("Backing up saves... ");
-            io::stdout().flush()?;
+            println!("[1/4] Backing up saves");
             match backup_saves() {
-                Ok(Some(path)) => println!("done ({})", path.display()),
-                Ok(None) => println!("skipped (no saves)"),
+                Ok(Some(path)) => {
+                    println!("      Saves backed up to: {}", path.display());
+                }
+                Ok(None) => {
+                    println!("      No saves found, skipping backup");
+                }
                 Err(e) => {
-                    println!("failed");
-                    eprintln!("Backup failed: {}", e);
+                    eprintln!("      Backup failed: {}", e);
                     return Err(e);
                 }
             }
+            println!();
 
             // Download update
             let temp_dir = std::env::temp_dir().join("quest-update");
             fs::create_dir_all(&temp_dir)?;
             let archive_path = temp_dir.join("update.archive");
 
-            print!("Downloading update... ");
+            println!("[2/4] Downloading update");
+            println!("      From: {}", download_url);
+            println!("      To:   {}", archive_path.display());
+            print!("      Progress: ");
             io::stdout().flush()?;
             download_file(download_url, &archive_path, |downloaded, total| {
                 if total > 0 {
                     let percent = (downloaded * 100) / total;
-                    print!("\rDownloading update... {}%", percent);
+                    print!("\r      Progress: {}%", percent);
                     let _ = io::stdout().flush();
                 }
             })?;
-            println!("\rDownloading update... done");
+            println!("\r      Progress: 100% - complete");
+            println!();
 
             // Extract archive
-            print!("Installing... ");
-            io::stdout().flush()?;
+            println!("[3/4] Extracting archive");
+            println!("      Archive: {}", archive_path.display());
             let new_binary = extract_archive(&archive_path, &temp_dir)?;
+            println!("      Extracted: {}", new_binary.display());
+            println!();
 
             // Replace binary
+            println!("[4/4] Replacing binary");
+            println!("      Target: {}", current_exe);
             replace_binary(&new_binary)?;
-            println!("done");
+            println!("      Binary replaced successfully");
+            println!();
 
             // Cleanup
+            println!("Cleaning up temporary files...");
             let _ = fs::remove_dir_all(&temp_dir);
 
             println!();
-            println!("Updated successfully! Run 'quest' to play.");
+            println!("✓ Update complete! Run 'quest' to play.");
 
             Ok(true)
         }
