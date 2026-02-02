@@ -423,8 +423,9 @@ fn draw_equipment_section(frame: &mut Frame, area: Rect, game_state: &GameState)
     frame.render_widget(equipment_paragraph, inner);
 }
 
-/// Draws the footer with control instructions
+/// Draws the footer with control instructions and version info
 fn draw_footer(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    use crate::build_info::{BUILD_COMMIT, BUILD_DATE};
     use crate::prestige::can_prestige;
 
     let can_prestige_now = can_prestige(game_state);
@@ -453,8 +454,11 @@ fn draw_footer(frame: &mut Frame, area: Rect, game_state: &GameState) {
         prestige_text,
     ])];
 
+    // Build version string for the title
+    let version_title = format!("v{} ({}) ", BUILD_DATE, BUILD_COMMIT);
+
     let footer = Paragraph::new(footer_text)
-        .block(Block::default().borders(Borders::ALL).title("Help"))
+        .block(Block::default().borders(Borders::ALL).title(version_title))
         .alignment(Alignment::Center);
 
     frame.render_widget(footer, area);
