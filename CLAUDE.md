@@ -30,6 +30,49 @@ This runs all PR quality checks:
 make fmt               # Applies rustfmt to all code
 ```
 
+## Pull Request Workflow
+
+**IMPORTANT: When creating PRs, always validate CI status and fix any issues before marking as ready.**
+
+1. **Create feature branch:**
+   ```bash
+   git checkout -b fix/description-of-fix
+   # or
+   git checkout -b feat/description-of-feature
+   ```
+
+2. **Make changes and commit:**
+   ```bash
+   git add <files>
+   git commit -m "type: description"
+   ```
+
+3. **Push and create PR:**
+   ```bash
+   git push -u origin <branch-name>
+   gh pr create --title "type: description" --body "..."
+   ```
+
+4. **Validate CI passes:**
+   ```bash
+   gh pr checks <pr-number>
+   ```
+
+5. **If CI fails, fix the issues:**
+   - **Format failures:** Run `cargo fmt` and commit
+   - **Clippy warnings:** Fix the warnings and commit
+   - **Test failures:** Fix tests and commit
+   - **Build failures:** Fix compilation errors and commit
+
+6. **Push fixes and re-validate:**
+   ```bash
+   git push
+   # Wait for CI to complete
+   gh pr checks <pr-number>
+   ```
+
+7. **Confirm all checks pass** before requesting review or merging.
+
 ## CI/CD Pipeline
 
 **On every PR:**
