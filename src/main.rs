@@ -19,6 +19,7 @@ mod prestige;
 mod save_manager;
 mod ui;
 mod build_info;
+mod updater;
 
 use character_manager::CharacterManager;
 use chrono::Utc;
