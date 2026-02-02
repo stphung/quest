@@ -61,15 +61,16 @@ impl CharacterCreationScreen {
             height: 1,
         };
 
-        let input_text = if self.cursor_position < self.name_input.len() {
-            format!(
-                "{}{}{}",
-                &self.name_input[..self.cursor_position],
-                "_",
-                &self.name_input[self.cursor_position..]
-            )
-        } else {
-            format!("{}_", self.name_input)
+        let input_text = {
+            let char_count = self.name_input.chars().count();
+            if self.cursor_position < char_count {
+                let chars: Vec<char> = self.name_input.chars().collect();
+                let before: String = chars[..self.cursor_position].iter().collect();
+                let after: String = chars[self.cursor_position..].iter().collect();
+                format!("{}{}{}", before, "_", after)
+            } else {
+                format!("{}_", self.name_input)
+            }
         };
 
         let input_widget = Paragraph::new(input_text)
