@@ -150,6 +150,7 @@ fn fetch_changelog(from: &str, to: &str) -> Result<Vec<ChangelogEntry>, Box<dyn 
     let entries: Vec<ChangelogEntry> = response
         .commits
         .into_iter()
+        .rev() // Reverse to show newest commits first
         .map(|c| {
             // Take first line of commit message
             let message = c.commit.message.lines().next().unwrap_or("").to_string();
