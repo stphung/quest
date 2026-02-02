@@ -63,7 +63,7 @@ impl CharacterManager {
         };
 
         // Serialize without checksum to compute hash
-        let json_without_checksum = serde_json::to_string_pretty(&save_data)
+        let json_without_checksum = serde_json::to_string(&save_data)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
         // Compute checksum
@@ -98,7 +98,7 @@ impl CharacterManager {
         save_data_for_check.checksum = String::new();
 
         // Recompute checksum
-        let json_without_checksum = serde_json::to_string_pretty(&save_data_for_check)
+        let json_without_checksum = serde_json::to_string(&save_data_for_check)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
         let mut hasher = Sha256::new();
