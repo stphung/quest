@@ -36,8 +36,11 @@ pub fn draw_ui(frame: &mut Frame, game_state: &GameState) {
     // Draw stats panel on the left
     stats_panel::draw_stats_panel(frame, chunks[0], game_state);
 
-    // Draw right panel based on dungeon state
-    if let Some(dungeon) = &game_state.active_dungeon {
+    // Draw right panel based on current activity
+    if let Some(ref session) = game_state.active_fishing {
+        // Fishing takes priority - show fishing scene
+        fishing_scene::render_fishing_scene(frame, chunks[1], session, &game_state.fishing);
+    } else if let Some(dungeon) = &game_state.active_dungeon {
         draw_dungeon_view(frame, chunks[1], game_state, dungeon);
     } else {
         // Normal combat scene

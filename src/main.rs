@@ -272,7 +272,9 @@ fn main() -> io::Result<()> {
                                             if let Some(enemy) = &state.combat_state.current_enemy {
                                                 // Max possible enemy HP is 2.4x player HP (boss with max variance)
                                                 // If enemy HP is > 2.5x, it's stale from before a stat reset
-                                                if enemy.max_hp > (derived.max_hp as f64 * 2.5) as u32 {
+                                                if enemy.max_hp
+                                                    > (derived.max_hp as f64 * 2.5) as u32
+                                                {
                                                     state.combat_state.current_enemy = None;
                                                 }
                                             }
@@ -615,12 +617,16 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
         let mut rng = rand::thread_rng();
         let fishing_messages = tick_fishing(game_state, &mut rng);
         for message in fishing_messages {
-            game_state.combat_state.add_log_entry(format!("🎣 {}", message), false, true);
+            game_state
+                .combat_state
+                .add_log_entry(format!("🎣 {}", message), false, true);
         }
 
         // Check for fishing rank up
         if let Some(rank_msg) = fishing_logic::check_rank_up(&mut game_state.fishing) {
-            game_state.combat_state.add_log_entry(format!("🎣 {}", rank_msg), false, true);
+            game_state
+                .combat_state
+                .add_log_entry(format!("🎣 {}", rank_msg), false, true);
         }
 
         // Update play_time_seconds and last_save_time (still needed while fishing)
@@ -725,7 +731,8 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
                 }
 
                 // Try to discover dungeon (only when not in a dungeon)
-                let discovered_dungeon = game_state.active_dungeon.is_none() && try_discover_dungeon(game_state);
+                let discovered_dungeon =
+                    game_state.active_dungeon.is_none() && try_discover_dungeon(game_state);
                 if discovered_dungeon {
                     game_state.combat_state.add_log_entry(
                         "🌀 You notice a dark passage leading underground...".to_string(),
@@ -735,10 +742,18 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
                 }
 
                 // Try to discover fishing spot (only when not in dungeon and not already fishing)
-                if !discovered_dungeon && game_state.active_dungeon.is_none() && game_state.active_fishing.is_none() {
+                if !discovered_dungeon
+                    && game_state.active_dungeon.is_none()
+                    && game_state.active_fishing.is_none()
+                {
                     let mut rng = rand::thread_rng();
-                    if let Some(message) = fishing_logic::try_discover_fishing(game_state, &mut rng) {
-                        game_state.combat_state.add_log_entry(format!("🎣 {}", message), false, true);
+                    if let Some(message) = fishing_logic::try_discover_fishing(game_state, &mut rng)
+                    {
+                        game_state.combat_state.add_log_entry(
+                            format!("🎣 {}", message),
+                            false,
+                            true,
+                        );
                     }
                 }
             }

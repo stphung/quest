@@ -46,12 +46,12 @@ pub fn render_fishing_scene(
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // Header with spot name
-            Constraint::Length(6),  // Water animation area
-            Constraint::Length(3),  // Catch progress
-            Constraint::Length(9),  // Caught fish list (last 5 + borders)
-            Constraint::Length(5),  // Rank info and progress bar
-            Constraint::Min(0),     // Remaining space
+            Constraint::Length(3), // Header with spot name
+            Constraint::Length(6), // Water animation area
+            Constraint::Length(3), // Catch progress
+            Constraint::Length(9), // Caught fish list (last 5 + borders)
+            Constraint::Length(5), // Rank info and progress bar
+            Constraint::Min(0),    // Remaining space
         ])
         .split(area);
 
@@ -111,7 +111,10 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
                 Span::styled("      ~~~", Style::default().fg(Color::Blue)),
                 Span::styled("~", Style::default().fg(Color::LightBlue)),
                 Span::styled("~", Style::default().fg(Color::Blue)),
-                Span::styled(" O ", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    " O ",
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                ),
                 Span::styled("~", Style::default().fg(Color::Blue)),
                 Span::styled("~", Style::default().fg(Color::LightBlue)),
                 Span::styled("~~~", Style::default().fg(Color::Blue)),
@@ -135,7 +138,12 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
             )),
             Line::from(vec![
                 Span::styled("      ~~~~~~", Style::default().fg(Color::Blue)),
-                Span::styled(" O ", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    " O ",
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled("~~~~~~", Style::default().fg(Color::Blue)),
             ]),
             Line::from(vec![
@@ -175,9 +183,7 @@ fn draw_catch_progress(frame: &mut Frame, area: Rect, session: &FishingSession) 
         Span::raw(" fish"),
     ])];
 
-    let progress_block = Block::default()
-        .borders(Borders::ALL)
-        .title(" Progress ");
+    let progress_block = Block::default().borders(Borders::ALL).title(" Progress ");
 
     let progress_paragraph = Paragraph::new(progress_text)
         .block(progress_block)
@@ -196,12 +202,7 @@ fn draw_fish_list(frame: &mut Frame, area: Rect, session: &FishingSession) {
     frame.render_widget(fish_block, area);
 
     // Get the last 5 caught fish (most recent first)
-    let recent_fish: Vec<_> = session
-        .fish_caught
-        .iter()
-        .rev()
-        .take(5)
-        .collect();
+    let recent_fish: Vec<_> = session.fish_caught.iter().rev().take(5).collect();
 
     if recent_fish.is_empty() {
         let empty_text = vec![Line::from(Span::styled(
