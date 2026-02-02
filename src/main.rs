@@ -260,6 +260,20 @@ fn main() -> io::Result<()> {
                                 if !selected.is_corrupted {
                                     match character_manager.load_character(&selected.filename) {
                                         Ok(mut state) => {
+                                            // Sanity check: clear stale enemy if HP is impossibly high
+                                            // (can happen if save was from before prestige reset)
+                                            let derived = derived_stats::DerivedStats::calculate_derived_stats(
+                                                &state.attributes,
+                                                &state.equipment,
+                                            );
+                                            if let Some(enemy) = &state.combat_state.current_enemy {
+                                                // Max possible enemy HP is 2.4x player HP (boss with max variance)
+                                                // If enemy HP is > 2.5x, it's stale from before a stat reset
+                                                if enemy.max_hp > (derived.max_hp as f64 * 2.5) as u32 {
+                                                    state.combat_state.current_enemy = None;
+                                                }
+                                            }
+
                                             // Process offline progression
                                             let current_time = Utc::now().timestamp();
                                             let elapsed_seconds =
@@ -452,6 +466,8 @@ fn main() -> io::Result<()> {
                                     KeyCode::Char('y') | KeyCode::Char('Y') => {
                                         perform_prestige(&mut state);
                                         showing_prestige_confirm = false;
+                                        // Save immediately after prestige to prevent stale enemy on reload
+                                        let _ = character_manager.save_character(&state);
                                         state.combat_state.add_log_entry(
                                             format!(
                                                 "Prestiged to {}!",
