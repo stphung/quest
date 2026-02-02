@@ -1,4 +1,5 @@
 mod attributes;
+mod build_info;
 mod character_manager;
 mod combat;
 mod combat_logic;
@@ -18,6 +19,7 @@ mod items;
 mod prestige;
 mod save_manager;
 mod ui;
+mod updater;
 
 use character_manager::CharacterManager;
 use chrono::Utc;
@@ -49,6 +51,43 @@ enum Screen {
 }
 
 fn main() -> io::Result<()> {
+    // Handle CLI arguments
+    let args: Vec<String> = std::env::args().collect();
+
+    if args.len() > 1 {
+        match args[1].as_str() {
+            "update" => match updater::run_update_command() {
+                Ok(_) => std::process::exit(0),
+                Err(_) => std::process::exit(1),
+            },
+            "--version" | "-v" => {
+                println!(
+                    "quest {} ({})",
+                    build_info::BUILD_DATE,
+                    build_info::BUILD_COMMIT
+                );
+                std::process::exit(0);
+            }
+            "--help" | "-h" => {
+                println!("Quest - Terminal-Based Idle RPG\n");
+                println!("Usage: quest [command]\n");
+                println!("Commands:");
+                println!("  update     Check for and install updates");
+                println!("  --version  Show version information");
+                println!("  --help     Show this help message");
+                std::process::exit(0);
+            }
+            other => {
+                eprintln!("Unknown command: {}", other);
+                eprintln!("Run 'quest --help' for usage.");
+                std::process::exit(1);
+            }
+        }
+    }
+
+    // Check for updates in background (non-blocking notification)
+    let update_available = std::thread::spawn(updater::quick_update_check);
+
     // Initialize CharacterManager
     let character_manager = CharacterManager::new()?;
 
@@ -94,6 +133,41 @@ fn main() -> io::Result<()> {
     stdout.execute(EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
+
+    // Show update notification if available
+    if let Ok(Some((date, commit))) = update_available.join() {
+        // Draw notification
+        terminal.draw(|frame| {
+            let area = frame.size();
+            let block = ratatui::widgets::Block::default()
+                .borders(ratatui::widgets::Borders::ALL)
+                .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Yellow))
+                .title(" Update Available ");
+
+            let inner = block.inner(area);
+            frame.render_widget(block, area);
+
+            let text = vec![
+                ratatui::text::Line::from(""),
+                ratatui::text::Line::from(format!("  New version: {} ({})", date, commit)),
+                ratatui::text::Line::from(""),
+                ratatui::text::Line::from("  Run 'quest update' to install."),
+                ratatui::text::Line::from(""),
+                ratatui::text::Line::from("  Press any key to continue..."),
+            ];
+
+            let paragraph =
+                ratatui::widgets::Paragraph::new(text).alignment(ratatui::layout::Alignment::Left);
+
+            frame.render_widget(paragraph, inner);
+        })?;
+
+        // Wait for keypress (max 5 seconds)
+        let _ = event::poll(Duration::from_secs(5));
+        if event::poll(Duration::from_millis(0))? {
+            let _ = event::read()?;
+        }
+    }
 
     // Main loop
     loop {
@@ -357,16 +431,44 @@ fn main() -> io::Result<()> {
                 let mut last_tick = Instant::now();
                 let mut last_autosave = Instant::now();
                 let mut tick_counter: u32 = 0;
+                let mut showing_prestige_confirm = false;
 
                 loop {
                     // Draw UI
                     terminal.draw(|frame| {
                         draw_ui(frame, &state);
+                        // Draw prestige confirmation overlay if active
+                        if showing_prestige_confirm {
+                            ui::prestige_confirm::draw_prestige_confirm(frame, &state);
+                        }
                     })?;
 
                     // Poll for input (50ms non-blocking)
                     if event::poll(Duration::from_millis(50))? {
                         if let Event::Key(key_event) = event::read()? {
+                            // Handle prestige confirmation dialog
+                            if showing_prestige_confirm {
+                                match key_event.code {
+                                    KeyCode::Char('y') | KeyCode::Char('Y') => {
+                                        perform_prestige(&mut state);
+                                        showing_prestige_confirm = false;
+                                        state.combat_state.add_log_entry(
+                                            format!(
+                                                "Prestiged to {}!",
+                                                get_prestige_tier(state.prestige_rank).name
+                                            ),
+                                            false,
+                                            true,
+                                        );
+                                    }
+                                    KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                                        showing_prestige_confirm = false;
+                                    }
+                                    _ => {}
+                                }
+                                continue;
+                            }
+
                             match key_event.code {
                                 // Handle 'q'/'Q' to quit
                                 KeyCode::Char('q') | KeyCode::Char('Q') => {
@@ -376,10 +478,10 @@ fn main() -> io::Result<()> {
                                     current_screen = Screen::CharacterSelect;
                                     break;
                                 }
-                                // Handle 'p'/'P' to prestige
+                                // Handle 'p'/'P' to show prestige confirmation
                                 KeyCode::Char('p') | KeyCode::Char('P') => {
                                     if can_prestige(&state) {
-                                        perform_prestige(&mut state);
+                                        showing_prestige_confirm = true;
                                     }
                                 }
                                 _ => {}

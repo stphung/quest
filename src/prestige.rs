@@ -111,6 +111,8 @@ pub fn can_prestige(state: &GameState) -> bool {
 /// * `state` - The game state to modify
 pub fn perform_prestige(state: &mut GameState) {
     use crate::attributes::Attributes;
+    use crate::combat::CombatState;
+    use crate::equipment::Equipment;
 
     // Only prestige if eligible
     if !can_prestige(state) {
@@ -123,6 +125,15 @@ pub fn perform_prestige(state: &mut GameState) {
 
     // Reset attributes to base 10
     state.attributes = Attributes::new();
+
+    // Reset equipment (complete wipe)
+    state.equipment = Equipment::new();
+
+    // Reset active dungeon
+    state.active_dungeon = None;
+
+    // Reset combat state with base HP (50 for fresh attributes)
+    state.combat_state = CombatState::new(50);
 
     // Increment prestige rank and total prestige count
     state.prestige_rank += 1;
@@ -270,7 +281,7 @@ mod tests {
     }
 
     #[test]
-    fn test_equipment_survives_prestige() {
+    fn test_equipment_cleared_on_prestige() {
         use crate::items::{AttributeBonuses, EquipmentSlot, Item, Rarity};
         use chrono::Utc;
 
@@ -299,17 +310,58 @@ mod tests {
         // Perform prestige
         perform_prestige(&mut game_state);
 
-        // Equipment should still be there
-        assert!(game_state.equipment.get(EquipmentSlot::Weapon).is_some());
-        assert_eq!(
-            game_state
-                .equipment
-                .get(EquipmentSlot::Weapon)
-                .as_ref()
-                .unwrap()
-                .attributes
-                .str,
-            10
-        );
+        // Equipment should be cleared
+        assert!(game_state.equipment.get(EquipmentSlot::Weapon).is_none());
+        assert!(game_state.equipment.get(EquipmentSlot::Armor).is_none());
+        assert!(game_state.equipment.get(EquipmentSlot::Helmet).is_none());
+        assert!(game_state.equipment.get(EquipmentSlot::Gloves).is_none());
+        assert!(game_state.equipment.get(EquipmentSlot::Boots).is_none());
+        assert!(game_state.equipment.get(EquipmentSlot::Amulet).is_none());
+        assert!(game_state.equipment.get(EquipmentSlot::Ring).is_none());
+    }
+
+    #[test]
+    fn test_dungeon_cleared_on_prestige() {
+        use crate::dungeon::{Dungeon, DungeonSize};
+        use chrono::Utc;
+
+        let mut game_state =
+            crate::game_state::GameState::new("Test Hero".to_string(), Utc::now().timestamp());
+
+        // Set up an active dungeon
+        game_state.active_dungeon = Some(Dungeon::new(DungeonSize::Small));
+
+        // Level up enough to prestige
+        game_state.character_level = 10;
+
+        // Perform prestige
+        perform_prestige(&mut game_state);
+
+        // Dungeon should be cleared
+        assert!(game_state.active_dungeon.is_none());
+    }
+
+    #[test]
+    fn test_combat_state_reset_on_prestige() {
+        use chrono::Utc;
+
+        let mut game_state =
+            crate::game_state::GameState::new("Test Hero".to_string(), Utc::now().timestamp());
+
+        // Modify combat state
+        game_state.combat_state.player_current_hp = 10; // Damaged
+        game_state.combat_state.is_regenerating = true;
+
+        // Level up enough to prestige
+        game_state.character_level = 10;
+
+        // Perform prestige
+        perform_prestige(&mut game_state);
+
+        // Combat state should be fresh
+        assert_eq!(game_state.combat_state.player_current_hp, 50); // Base HP
+        assert_eq!(game_state.combat_state.player_max_hp, 50);
+        assert!(!game_state.combat_state.is_regenerating);
+        assert!(game_state.combat_state.current_enemy.is_none());
     }
 }
