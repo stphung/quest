@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::items::{EquipmentSlot, Item};
 use serde::{Deserialize, Serialize};
 
