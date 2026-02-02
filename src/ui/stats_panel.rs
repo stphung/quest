@@ -163,7 +163,8 @@ fn draw_attribute_row(
 
 /// Draws derived stats calculated from attributes
 fn draw_derived_stats(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    let derived = DerivedStats::calculate_derived_stats(&game_state.attributes, &game_state.equipment);
+    let derived =
+        DerivedStats::calculate_derived_stats(&game_state.attributes, &game_state.equipment);
 
     let stats_block = Block::default()
         .borders(Borders::ALL)

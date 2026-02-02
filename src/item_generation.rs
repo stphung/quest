@@ -1,6 +1,6 @@
 #![allow(dead_code)]
-use crate::items::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
 use crate::item_names::generate_display_name;
+use crate::items::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
 use rand::Rng;
 
 pub fn generate_item(slot: EquipmentSlot, rarity: Rarity, _player_level: u32) -> Item {
