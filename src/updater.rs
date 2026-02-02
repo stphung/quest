@@ -439,61 +439,66 @@ pub fn run_update_command() -> Result<bool, Box<dyn Error>> {
                 .map(|p| p.display().to_string())
                 .unwrap_or_else(|_| "quest".to_string());
 
-            println!("Starting update process...\n");
+            // Set up paths
+            let temp_dir = std::env::temp_dir().join("quest-update");
+            let archive_path = temp_dir.join("update.archive");
 
-            // Backup saves
-            println!("[1/4] Backing up saves");
+            // Show the plan
+            println!("Update plan:");
+            println!("  1. Backup saves to ~/.quest/backups/");
+            println!(
+                "  2. Download {} to {}",
+                download_url,
+                archive_path.display()
+            );
+            println!("  3. Extract archive to {}", temp_dir.display());
+            println!("  4. Replace {}", current_exe);
+            println!();
+
+            // Step 1: Backup saves
+            println!("[1/4] Backing up saves...");
             match backup_saves() {
                 Ok(Some(path)) => {
-                    println!("      Saves backed up to: {}", path.display());
+                    println!("       ✓ Saved to: {}", path.display());
                 }
                 Ok(None) => {
-                    println!("      No saves found, skipping backup");
+                    println!("       ✓ Skipped (no saves found)");
                 }
                 Err(e) => {
-                    eprintln!("      Backup failed: {}", e);
+                    println!("       ✗ Failed: {}", e);
                     return Err(e);
                 }
             }
-            println!();
 
-            // Download update
-            let temp_dir = std::env::temp_dir().join("quest-update");
+            // Step 2: Download update
+            println!("[2/4] Downloading update...");
             fs::create_dir_all(&temp_dir)?;
-            let archive_path = temp_dir.join("update.archive");
-
-            println!("[2/4] Downloading update");
-            println!("      From: {}", download_url);
-            println!("      To:   {}", archive_path.display());
-            print!("      Progress: ");
+            print!("       ");
             io::stdout().flush()?;
             download_file(download_url, &archive_path, |downloaded, total| {
                 if total > 0 {
                     let percent = (downloaded * 100) / total;
-                    print!("\r      Progress: {}%", percent);
+                    print!("\r       {}%", percent);
                     let _ = io::stdout().flush();
                 }
             })?;
-            println!("\r      Progress: 100% - complete");
-            println!();
+            println!("\r       ✓ Downloaded");
 
-            // Extract archive
-            println!("[3/4] Extracting archive");
-            println!("      Archive: {}", archive_path.display());
+            // Step 3: Extract archive
+            println!("[3/4] Extracting archive...");
             let new_binary = extract_archive(&archive_path, &temp_dir)?;
-            println!("      Extracted: {}", new_binary.display());
-            println!();
+            println!("       ✓ Extracted to: {}", new_binary.display());
 
-            // Replace binary
-            println!("[4/4] Replacing binary");
-            println!("      Target: {}", current_exe);
+            // Step 4: Replace binary
+            println!("[4/4] Replacing binary...");
             replace_binary(&new_binary)?;
-            println!("      Binary replaced successfully");
-            println!();
+            println!("       ✓ Replaced: {}", current_exe);
 
             // Cleanup
+            println!();
             println!("Cleaning up temporary files...");
             let _ = fs::remove_dir_all(&temp_dir);
+            println!("       ✓ Done");
 
             println!();
             println!("✓ Update complete! Run 'quest' to play.");
