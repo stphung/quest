@@ -288,7 +288,9 @@ mod tests {
             },
             affixes: vec![],
         };
-        game_state.equipment.set(EquipmentSlot::Weapon, Some(weapon.clone()));
+        game_state
+            .equipment
+            .set(EquipmentSlot::Weapon, Some(weapon.clone()));
 
         // Level up enough to prestige
         game_state.character_level = 10;

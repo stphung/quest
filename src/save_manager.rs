@@ -404,7 +404,9 @@ mod tests {
             },
             affixes: vec![],
         };
-        game_state.equipment.set(EquipmentSlot::Weapon, Some(weapon));
+        game_state
+            .equipment
+            .set(EquipmentSlot::Weapon, Some(weapon));
 
         // Save
         save_mgr.save(&game_state).unwrap();
@@ -414,7 +416,11 @@ mod tests {
 
         // Verify equipment loaded correctly
         assert!(loaded.equipment.get(EquipmentSlot::Weapon).is_some());
-        let loaded_weapon = loaded.equipment.get(EquipmentSlot::Weapon).as_ref().unwrap();
+        let loaded_weapon = loaded
+            .equipment
+            .get(EquipmentSlot::Weapon)
+            .as_ref()
+            .unwrap();
         assert_eq!(loaded_weapon.display_name, "Flaming Greatsword");
         assert_eq!(loaded_weapon.attributes.str, 12);
         assert_eq!(loaded_weapon.rarity, Rarity::Legendary);
