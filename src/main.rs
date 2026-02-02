@@ -482,8 +482,7 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
                             } else {
                                 "Kept current gear"
                             };
-                            let message =
-                                format!("💎 Found: {} [{}]", item.display_name, status);
+                            let message = format!("💎 Found: {} [{}]", item.display_name, status);
                             game_state.combat_state.add_log_entry(message, false, true);
                         }
                     }

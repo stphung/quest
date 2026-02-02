@@ -354,7 +354,10 @@ mod tests {
         assert_eq!(DungeonSize::from_progression(10, 8), DungeonSize::Legendary);
 
         // High level + high prestige = Legendary
-        assert_eq!(DungeonSize::from_progression(100, 4), DungeonSize::Legendary);
+        assert_eq!(
+            DungeonSize::from_progression(100, 4),
+            DungeonSize::Legendary
+        );
     }
 
     #[test]

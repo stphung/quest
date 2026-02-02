@@ -19,8 +19,8 @@ mod symbols {
     pub const ELITE: &str = "🗝️";
     pub const BOSS: &str = "👹";
     pub const CLEARED: &str = "✓ ";
-    pub const HIDDEN: &str = "  ";       // Not visible at all
-    pub const UNEXPLORED: &str = "❓";   // Revealed but not entered
+    pub const HIDDEN: &str = "  "; // Not visible at all
+    pub const UNEXPLORED: &str = "❓"; // Revealed but not entered
     pub const H_CORRIDOR: &str = "──";
     pub const V_CORRIDOR: &str = "│ ";
 }
