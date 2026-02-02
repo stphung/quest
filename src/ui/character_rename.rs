@@ -34,7 +34,7 @@ impl CharacterRenameScreen {
                 Constraint::Length(1), // Spacer
                 Constraint::Min(0),    // Character details
                 Constraint::Length(1), // Spacer
-                Constraint::Length(3), // Input label + field
+                Constraint::Length(4), // Input label + field
                 Constraint::Length(1), // Spacer
                 Constraint::Length(4), // Rules
                 Constraint::Length(2), // Validation
@@ -69,7 +69,7 @@ impl CharacterRenameScreen {
             x: chunks[4].x + (chunks[4].width.saturating_sub(50)) / 2,
             y: chunks[4].y + 1,
             width: 50.min(chunks[4].width),
-            height: 1,
+            height: 3,
         };
 
         let input_text = {
