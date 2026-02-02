@@ -239,7 +239,8 @@ impl SaveManager {
 
         // Create new combat state with proper HP
         use crate::derived_stats::DerivedStats;
-        let derived = DerivedStats::from_attributes(&attributes);
+        use crate::equipment::Equipment;
+        let derived = DerivedStats::calculate_derived_stats(&attributes, &Equipment::new());
         let combat_state = CombatState::new(derived.max_hp);
 
         GameState {
