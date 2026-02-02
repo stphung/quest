@@ -34,6 +34,8 @@ pub struct FishingSession {
     pub total_fish: u32,
     pub fish_caught: Vec<CaughtFish>,
     pub items_found: Vec<Item>,
+    /// Ticks remaining until next catch (15 ticks = 1.5s at 100ms tick rate)
+    pub ticks_until_catch: u32,
 }
 
 /// Persistent fishing state that is saved with the character.
@@ -289,10 +291,12 @@ mod tests {
                 },
             ],
             items_found: vec![],
+            ticks_until_catch: 15,
         };
         assert_eq!(session.spot_name, "Moonlit Lake");
         assert_eq!(session.total_fish, 5);
         assert_eq!(session.fish_caught.len(), 2);
         assert!(session.items_found.is_empty());
+        assert_eq!(session.ticks_until_catch, 15);
     }
 }

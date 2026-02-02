@@ -147,11 +147,15 @@ pub fn generate_fish(rarity: FishRarity, rng: &mut impl Rng) -> CaughtFish {
     }
 }
 
+/// Initial ticks until first catch (15 ticks = 1.5s at 100ms tick rate)
+pub const INITIAL_CATCH_TICKS: u32 = 15;
+
 /// Generates a new fishing session with a random spot and fish count.
 ///
 /// - Random spot name from SPOT_NAMES
 /// - Random total_fish count: 3-8
 /// - fish_caught and items_found start empty
+/// - ticks_until_catch starts at 15 (1.5s)
 pub fn generate_fishing_session(rng: &mut impl Rng) -> FishingSession {
     let spot_name = SPOT_NAMES[rng.gen_range(0..SPOT_NAMES.len())].to_string();
     let total_fish = rng.gen_range(3..=8);
@@ -161,6 +165,7 @@ pub fn generate_fishing_session(rng: &mut impl Rng) -> FishingSession {
         total_fish,
         fish_caught: Vec::new(),
         items_found: Vec::<Item>::new(),
+        ticks_until_catch: INITIAL_CATCH_TICKS,
     }
 }
 

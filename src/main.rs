@@ -11,6 +11,7 @@ mod dungeon_logic;
 mod equipment;
 mod fishing;
 mod fishing_generation;
+mod fishing_logic;
 mod game_logic;
 mod game_state;
 mod item_drops;
