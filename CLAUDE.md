@@ -59,7 +59,7 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 - `save_manager.rs` — Binary save/load with SHA256 checksums, autosave, backward-compatible migration
 - `constants.rs` — Game balance constants (tick rate, attack interval, XP rates)
 
-### Item System (`src/items/`)
+### Item System
 
 - `items.rs` — Core item data structures (7 equipment slots, 5 rarity tiers, 12 affix types)
 - `equipment.rs` — Equipment container with slot management and iteration
@@ -71,7 +71,7 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 ### UI (`src/ui/`)
 
 - `mod.rs` — Layout coordinator (stats panel left 50%, combat scene right 50%)
-- `stats_panel.rs` — Character stats, attributes, derived stats, prestige info
+- `stats_panel.rs` — Character stats, attributes, derived stats, equipment display, prestige info
 - `combat_scene.rs` — Combat view orchestration with HP bars
 - `combat_3d.rs` — 3D ASCII first-person dungeon renderer
 - `combat_effects.rs` — Visual effects (damage numbers, attack flashes, hit impacts)
