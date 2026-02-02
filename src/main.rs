@@ -51,6 +51,42 @@ enum Screen {
 }
 
 fn main() -> io::Result<()> {
+    // Handle CLI arguments
+    let args: Vec<String> = std::env::args().collect();
+
+    if args.len() > 1 {
+        match args[1].as_str() {
+            "update" => {
+                match updater::run_update_command() {
+                    Ok(_) => std::process::exit(0),
+                    Err(_) => std::process::exit(1),
+                }
+            }
+            "--version" | "-v" => {
+                println!(
+                    "quest {} ({})",
+                    build_info::BUILD_DATE,
+                    build_info::BUILD_COMMIT
+                );
+                std::process::exit(0);
+            }
+            "--help" | "-h" => {
+                println!("Quest - Terminal-Based Idle RPG\n");
+                println!("Usage: quest [command]\n");
+                println!("Commands:");
+                println!("  update     Check for and install updates");
+                println!("  --version  Show version information");
+                println!("  --help     Show this help message");
+                std::process::exit(0);
+            }
+            other => {
+                eprintln!("Unknown command: {}", other);
+                eprintln!("Run 'quest --help' for usage.");
+                std::process::exit(1);
+            }
+        }
+    }
+
     // Initialize CharacterManager
     let character_manager = CharacterManager::new()?;
 
