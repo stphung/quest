@@ -1,5 +1,6 @@
 use crate::attributes::Attributes;
 use crate::combat::CombatState;
+use crate::dungeon::Dungeon;
 use crate::equipment::Equipment;
 use serde::{Deserialize, Serialize};
 
@@ -17,6 +18,9 @@ pub struct GameState {
     pub play_time_seconds: u64,
     pub combat_state: CombatState,
     pub equipment: Equipment,
+    /// Active dungeon exploration (None when not in a dungeon)
+    #[serde(default)]
+    pub active_dungeon: Option<Dungeon>,
 }
 
 impl GameState {
@@ -40,7 +44,14 @@ impl GameState {
             play_time_seconds: 0,
             combat_state,
             equipment,
+            active_dungeon: None,
         }
+    }
+
+    /// Returns true if the player is currently in a dungeon
+    #[allow(dead_code)]
+    pub fn is_in_dungeon(&self) -> bool {
+        self.active_dungeon.is_some()
     }
 
     pub fn get_attribute_cap(&self) -> u32 {

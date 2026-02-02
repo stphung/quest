@@ -4,6 +4,9 @@ mod combat;
 mod combat_logic;
 mod constants;
 mod derived_stats;
+mod dungeon;
+mod dungeon_generation;
+mod dungeon_logic;
 mod equipment;
 mod game_logic;
 mod game_state;
@@ -412,10 +415,73 @@ fn main() -> io::Result<()> {
 /// Processes a single game tick, updating combat and stats
 fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
     use combat_logic::update_combat;
+    use dungeon_logic::{
+        on_boss_defeated, on_elite_defeated, on_treasure_room_entered, update_dungeon,
+    };
 
-    // Update combat state (XP only gained from kills, not passively)
     // Each tick is 100ms = 0.1 seconds
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
+
+    // Update dungeon exploration if in a dungeon
+    if game_state.active_dungeon.is_some() {
+        let dungeon_events = update_dungeon(game_state, delta_time);
+        for event in dungeon_events {
+            use dungeon_logic::DungeonEvent;
+            match event {
+                DungeonEvent::EnteredRoom { room_type, .. } => {
+                    let message = format!("🚪 Entered {:?} room", room_type);
+                    game_state.combat_state.add_log_entry(message, false, true);
+
+                    // Handle treasure room
+                    if room_type == crate::dungeon::RoomType::Treasure {
+                        if let Some((item, equipped)) = on_treasure_room_entered(game_state) {
+                            let status = if equipped {
+                                "Equipped!"
+                            } else {
+                                "Kept current gear"
+                            };
+                            let message = format!("💎 Found: {} [{}]", item.display_name, status);
+                            game_state.combat_state.add_log_entry(message, false, true);
+                        }
+                    }
+                }
+                DungeonEvent::FoundKey => {
+                    game_state.combat_state.add_log_entry(
+                        "🗝️ Found the dungeon key!".to_string(),
+                        false,
+                        true,
+                    );
+                }
+                DungeonEvent::BossUnlocked => {
+                    game_state.combat_state.add_log_entry(
+                        "👹 The boss room is now unlocked!".to_string(),
+                        false,
+                        true,
+                    );
+                }
+                DungeonEvent::DungeonComplete {
+                    xp_earned,
+                    items_collected,
+                } => {
+                    let message = format!(
+                        "🏆 Dungeon Complete! +{} XP, {} items found",
+                        xp_earned, items_collected
+                    );
+                    game_state.combat_state.add_log_entry(message, false, true);
+                }
+                DungeonEvent::DungeonFailed => {
+                    game_state.combat_state.add_log_entry(
+                        "💀 Escaped the dungeon... (no prestige lost)".to_string(),
+                        false,
+                        false,
+                    );
+                }
+                _ => {}
+            }
+        }
+    }
+
+    // Update combat state
     let combat_events = update_combat(game_state, delta_time);
 
     // Process combat events
@@ -472,6 +538,12 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
                 }
                 apply_tick_xp(game_state, xp_gained as f64);
 
+                // Track XP in dungeon if active and mark room cleared
+                dungeon_logic::add_dungeon_xp(game_state, xp_gained);
+                if let Some(dungeon) = &mut game_state.active_dungeon {
+                    dungeon_logic::on_room_enemy_defeated(dungeon);
+                }
+
                 // Try to drop item
                 use item_drops::try_drop_item;
                 use item_scoring::auto_equip_if_better;
@@ -498,6 +570,76 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
                     );
                     game_state.combat_state.add_log_entry(message, false, true);
                 }
+
+                // Try to discover dungeon (only when not in a dungeon)
+                if game_state.active_dungeon.is_none() && try_discover_dungeon(game_state) {
+                    game_state.combat_state.add_log_entry(
+                        "🌀 You notice a dark passage leading underground...".to_string(),
+                        false,
+                        true,
+                    );
+                }
+            }
+            CombatEvent::EliteDefeated { xp_gained } => {
+                // Elite defeated - give key
+                if let Some(enemy) = &game_state.combat_state.current_enemy {
+                    let message = format!("⚔️ {} defeated! +{} XP", enemy.name, xp_gained);
+                    game_state.combat_state.add_log_entry(message, false, true);
+                }
+                apply_tick_xp(game_state, xp_gained as f64);
+                dungeon_logic::add_dungeon_xp(game_state, xp_gained);
+
+                // Give key
+                if let Some(dungeon) = &mut game_state.active_dungeon {
+                    let events = on_elite_defeated(dungeon);
+                    for event in events {
+                        if matches!(event, dungeon_logic::DungeonEvent::FoundKey) {
+                            game_state.combat_state.add_log_entry(
+                                "🗝️ Found the dungeon key!".to_string(),
+                                false,
+                                true,
+                            );
+                        }
+                    }
+                }
+            }
+            CombatEvent::BossDefeated { xp_gained } => {
+                // Boss defeated - complete dungeon
+                if let Some(enemy) = &game_state.combat_state.current_enemy {
+                    let message = format!("👑 {} vanquished! +{} XP", enemy.name, xp_gained);
+                    game_state.combat_state.add_log_entry(message, false, true);
+                }
+                apply_tick_xp(game_state, xp_gained as f64);
+
+                // Calculate boss bonus XP (copy values before mutable borrow)
+                let (bonus_xp, total_xp, items) = if let Some(dungeon) = &game_state.active_dungeon
+                {
+                    let bonus = dungeon_logic::calculate_boss_xp_reward(dungeon.size);
+                    let total = dungeon.xp_earned + xp_gained + bonus;
+                    let item_count = dungeon.collected_items.len();
+                    (bonus, total, item_count)
+                } else {
+                    (0, xp_gained, 0)
+                };
+
+                apply_tick_xp(game_state, bonus_xp as f64);
+
+                let message = format!(
+                    "🏆 Dungeon Complete! +{} bonus XP ({} total, {} items)",
+                    bonus_xp, total_xp, items
+                );
+                game_state.combat_state.add_log_entry(message, false, true);
+
+                // Clear dungeon
+                let _events = on_boss_defeated(game_state);
+            }
+            CombatEvent::PlayerDiedInDungeon => {
+                // Died in dungeon - exit without prestige loss
+                game_state.combat_state.add_log_entry(
+                    "💀 You fell in the dungeon... (escaped without prestige loss)".to_string(),
+                    false,
+                    false,
+                );
             }
             CombatEvent::PlayerDied => {
                 // Add to combat log

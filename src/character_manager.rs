@@ -3,7 +3,6 @@ use std::io;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 
 #[derive(Clone, Serialize, Deserialize)]
 #[allow(dead_code)]
@@ -20,6 +19,10 @@ struct CharacterSaveData {
     play_time_seconds: u64,
     combat_state: crate::combat::CombatState,
     equipment: crate::equipment::Equipment,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    active_dungeon: Option<crate::dungeon::Dungeon>,
+    // Legacy field - kept for backward compatibility with old saves
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     checksum: String,
 }
 
@@ -60,8 +63,7 @@ impl CharacterManager {
     }
 
     pub fn save_character(&self, state: &crate::game_state::GameState) -> io::Result<()> {
-        // Create save data without checksum
-        let mut save_data = CharacterSaveData {
+        let save_data = CharacterSaveData {
             version: 2,
             character_id: state.character_id.clone(),
             character_name: state.character_name.clone(),
@@ -74,27 +76,16 @@ impl CharacterManager {
             play_time_seconds: state.play_time_seconds,
             combat_state: state.combat_state.clone(),
             equipment: state.equipment.clone(),
-            checksum: String::new(),
+            active_dungeon: state.active_dungeon.clone(),
+            checksum: String::new(), // Legacy field, no longer used
         };
 
-        // Serialize without checksum to compute hash
-        let json_without_checksum = serde_json::to_string(&save_data)
+        let json = serde_json::to_string_pretty(&save_data)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
-        // Compute checksum
-        let mut hasher = Sha256::new();
-        hasher.update(json_without_checksum.as_bytes());
-        let checksum = format!("{:x}", hasher.finalize());
-
-        // Add checksum and serialize final version
-        save_data.checksum = checksum;
-        let json_with_checksum = serde_json::to_string_pretty(&save_data)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-
-        // Write to file
         let filename = format!("{}.json", sanitize_name(&state.character_name));
         let filepath = self.quest_dir.join(filename);
-        fs::write(filepath, json_with_checksum)?;
+        fs::write(filepath, json)?;
 
         Ok(())
     }
@@ -103,32 +94,9 @@ impl CharacterManager {
         let filepath = self.quest_dir.join(filename);
         let json_content = fs::read_to_string(filepath)?;
 
-        // Parse JSON
         let save_data: CharacterSaveData = serde_json::from_str(&json_content)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
-        // Store checksum, then zero it out for verification
-        let stored_checksum = save_data.checksum.clone();
-        let mut save_data_for_check = save_data.clone();
-        save_data_for_check.checksum = String::new();
-
-        // Recompute checksum
-        let json_without_checksum = serde_json::to_string(&save_data_for_check)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-
-        let mut hasher = Sha256::new();
-        hasher.update(json_without_checksum.as_bytes());
-        let computed_checksum = format!("{:x}", hasher.finalize());
-
-        // Verify checksum
-        if stored_checksum != computed_checksum {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Checksum verification failed - file may be corrupted or tampered",
-            ));
-        }
-
-        // Convert to GameState
         Ok(crate::game_state::GameState {
             character_id: save_data.character_id,
             character_name: save_data.character_name,
@@ -141,6 +109,7 @@ impl CharacterManager {
             play_time_seconds: save_data.play_time_seconds,
             combat_state: save_data.combat_state,
             equipment: save_data.equipment,
+            active_dungeon: save_data.active_dungeon,
         })
     }
 
@@ -335,6 +304,7 @@ mod tests {
             play_time_seconds: 3600,
             combat_state: CombatState::new(100),
             equipment: Equipment::new(),
+            active_dungeon: None,
         };
 
         // Save character
@@ -380,6 +350,7 @@ mod tests {
             play_time_seconds: 3600,
             combat_state: CombatState::new(100),
             equipment: Equipment::new(),
+            active_dungeon: None,
         };
 
         let char2 = GameState {
@@ -394,6 +365,7 @@ mod tests {
             play_time_seconds: 7200,
             combat_state: CombatState::new(100),
             equipment: Equipment::new(),
+            active_dungeon: None,
         };
 
         manager.save_character(&char1).unwrap();
@@ -438,6 +410,7 @@ mod tests {
             play_time_seconds: 100,
             combat_state: CombatState::new(50),
             equipment: Equipment::new(),
+            active_dungeon: None,
         };
 
         manager.save_character(&state).unwrap();
@@ -471,6 +444,7 @@ mod tests {
             play_time_seconds: 500,
             combat_state: CombatState::new(75),
             equipment: Equipment::new(),
+            active_dungeon: None,
         };
 
         manager.save_character(&state).unwrap();

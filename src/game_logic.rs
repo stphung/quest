@@ -1,7 +1,8 @@
 use crate::attributes::AttributeType;
-use crate::combat::generate_enemy;
+use crate::combat::{generate_boss_enemy, generate_elite_enemy, generate_enemy};
 use crate::constants::*;
 use crate::derived_stats::DerivedStats;
+use crate::dungeon::RoomType;
 use crate::game_state::GameState;
 use chrono::Utc;
 use rand::Rng;
@@ -144,12 +145,79 @@ pub fn process_offline_progression(state: &mut GameState) -> OfflineReport {
 /// Spawns a new enemy if none exists
 pub fn spawn_enemy_if_needed(state: &mut GameState) {
     if state.combat_state.current_enemy.is_none() && !state.combat_state.is_regenerating {
-        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
-        let total_damage = derived.total_damage();
-        let enemy = generate_enemy(derived.max_hp, total_damage);
-        state.combat_state.current_enemy = Some(enemy);
-        state.combat_state.attack_timer = 0.0;
+        // Check if we're in a dungeon
+        if let Some(dungeon) = &state.active_dungeon {
+            // Don't spawn if room combat is already complete
+            if dungeon.current_room_cleared {
+                return;
+            }
+
+            if let Some(room) = dungeon.current_room() {
+                // Only spawn in combat rooms
+                match room.room_type {
+                    RoomType::Combat | RoomType::Elite | RoomType::Boss => {
+                        spawn_dungeon_enemy(state);
+                    }
+                    _ => {} // No enemies in entrance/treasure rooms
+                }
+            }
+        } else {
+            // Normal overworld combat
+            let derived =
+                DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+            let total_damage = derived.total_damage();
+            let enemy = generate_enemy(derived.max_hp, total_damage);
+            state.combat_state.current_enemy = Some(enemy);
+            state.combat_state.attack_timer = 0.0;
+        }
     }
+}
+
+/// Spawns a dungeon enemy based on the current room type
+fn spawn_dungeon_enemy(state: &mut GameState) {
+    let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+    let total_damage = derived.total_damage();
+
+    let room_type = state
+        .active_dungeon
+        .as_ref()
+        .and_then(|d| d.current_room())
+        .map(|r| r.room_type);
+
+    let enemy = match room_type {
+        Some(RoomType::Elite) => generate_elite_enemy(derived.max_hp, total_damage),
+        Some(RoomType::Boss) => generate_boss_enemy(derived.max_hp, total_damage),
+        _ => generate_enemy(derived.max_hp, total_damage),
+    };
+
+    state.combat_state.current_enemy = Some(enemy);
+    state.combat_state.attack_timer = 0.0;
+}
+
+/// Flat chance to discover a dungeon after killing an enemy (5%)
+const DUNGEON_DISCOVERY_CHANCE: f64 = 0.05;
+
+/// Attempts to discover a dungeon after killing an enemy
+/// Returns true if a dungeon was discovered and entered
+pub fn try_discover_dungeon(state: &mut GameState) -> bool {
+    // Don't discover if already in a dungeon
+    if state.active_dungeon.is_some() {
+        return false;
+    }
+
+    let mut rng = rand::thread_rng();
+
+    if rng.gen::<f64>() >= DUNGEON_DISCOVERY_CHANCE {
+        return false;
+    }
+
+    // Discover dungeon!
+    // Prestige affects dungeon quality (size, rewards), not discovery rate
+    let dungeon =
+        crate::dungeon_generation::generate_dungeon(state.character_level, state.prestige_rank);
+    state.active_dungeon = Some(dungeon);
+
+    true
 }
 
 #[cfg(test)]

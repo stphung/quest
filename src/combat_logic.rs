@@ -1,14 +1,32 @@
 use crate::constants::*;
 use crate::derived_stats::DerivedStats;
+use crate::dungeon::RoomType;
 use crate::game_state::GameState;
 use rand::Rng;
 
 #[allow(dead_code)]
 pub enum CombatEvent {
-    PlayerAttack { damage: u32, was_crit: bool },
-    EnemyAttack { damage: u32 },
+    PlayerAttack {
+        damage: u32,
+        was_crit: bool,
+    },
+    EnemyAttack {
+        damage: u32,
+    },
     PlayerDied,
-    EnemyDied { xp_gained: u64 },
+    /// Player died while in a dungeon (no prestige loss)
+    PlayerDiedInDungeon,
+    EnemyDied {
+        xp_gained: u64,
+    },
+    /// Elite enemy defeated in dungeon (player gets key)
+    EliteDefeated {
+        xp_gained: u64,
+    },
+    /// Boss enemy defeated in dungeon (dungeon complete)
+    BossDefeated {
+        xp_gained: u64,
+    },
     None,
 }
 
@@ -75,7 +93,24 @@ pub fn update_combat(state: &mut GameState, delta_time: f64) -> Vec<CombatEvent>
                     crate::game_logic::xp_gain_per_tick(state.prestige_rank, wis_mod, cha_mod),
                 );
 
-                events.push(CombatEvent::EnemyDied { xp_gained });
+                // Check if we're in a dungeon and what type of room
+                let dungeon_room_type = state
+                    .active_dungeon
+                    .as_ref()
+                    .and_then(|d| d.current_room())
+                    .map(|r| r.room_type);
+
+                match dungeon_room_type {
+                    Some(RoomType::Elite) => {
+                        events.push(CombatEvent::EliteDefeated { xp_gained });
+                    }
+                    Some(RoomType::Boss) => {
+                        events.push(CombatEvent::BossDefeated { xp_gained });
+                    }
+                    _ => {
+                        events.push(CombatEvent::EnemyDied { xp_gained });
+                    }
+                }
 
                 // Remove enemy and start regeneration
                 state.combat_state.current_enemy = None;
@@ -100,12 +135,29 @@ pub fn update_combat(state: &mut GameState, delta_time: f64) -> Vec<CombatEvent>
 
             // Check if player died
             if !state.combat_state.is_player_alive() {
-                events.push(CombatEvent::PlayerDied);
+                // Check if we're in a dungeon
+                let in_dungeon = state.active_dungeon.is_some();
 
-                // Reset both to full HP
+                if in_dungeon {
+                    events.push(CombatEvent::PlayerDiedInDungeon);
+
+                    // Exit dungeon - no prestige loss
+                    state.active_dungeon = None;
+                } else {
+                    events.push(CombatEvent::PlayerDied);
+                }
+
+                // Reset player HP (in dungeon or not)
                 state.combat_state.player_current_hp = state.combat_state.player_max_hp;
-                if let Some(enemy) = state.combat_state.current_enemy.as_mut() {
-                    enemy.reset_hp();
+
+                // Reset enemy HP if we're not in dungeon (normal combat continues)
+                if !in_dungeon {
+                    if let Some(enemy) = state.combat_state.current_enemy.as_mut() {
+                        enemy.reset_hp();
+                    }
+                } else {
+                    // In dungeon, clear the enemy since we're exiting
+                    state.combat_state.current_enemy = None;
                 }
             }
         }

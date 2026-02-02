@@ -54,21 +54,42 @@ pub fn generate_enemy_name() -> String {
 }
 
 pub fn generate_enemy(player_max_hp: u32, _player_damage: u32) -> Enemy {
+    generate_enemy_with_multiplier(player_max_hp, _player_damage, 1.0)
+}
+
+/// Generates an enemy with a stat multiplier (for dungeon elites/bosses)
+pub fn generate_enemy_with_multiplier(
+    player_max_hp: u32,
+    _player_damage: u32,
+    stat_multiplier: f64,
+) -> Enemy {
     let mut rng = rand::thread_rng();
 
     let name = generate_enemy_name();
 
-    // Enemy HP: 80-120% of player HP
+    // Enemy HP: 80-120% of player HP, scaled by multiplier
     let hp_variance = rng.gen_range(0.8..1.2);
-    let max_hp = ((player_max_hp as f64 * hp_variance) as u32).max(10);
+    let max_hp = ((player_max_hp as f64 * hp_variance * stat_multiplier) as u32).max(10);
 
-    // Enemy damage calculated for 5-10 second fights
-    // Assuming 1.5s attack interval = ~3-7 attacks
-    // Want player to take max_hp / 6-8 hits to die
+    // Enemy damage calculated for 5-10 second fights, scaled by multiplier
     let damage_variance = rng.gen_range(0.8..1.2);
-    let damage = ((player_max_hp as f64 / 7.0 * damage_variance) as u32).max(1);
+    let damage = ((player_max_hp as f64 / 7.0 * damage_variance * stat_multiplier) as u32).max(1);
 
     Enemy::new(name, max_hp, damage)
+}
+
+/// Generates a dungeon elite enemy (150% stats, guards the key)
+pub fn generate_elite_enemy(player_max_hp: u32, player_damage: u32) -> Enemy {
+    let mut enemy = generate_enemy_with_multiplier(player_max_hp, player_damage, 1.5);
+    enemy.name = format!("Elite {}", enemy.name);
+    enemy
+}
+
+/// Generates a dungeon boss enemy (200% stats)
+pub fn generate_boss_enemy(player_max_hp: u32, player_damage: u32) -> Enemy {
+    let mut enemy = generate_enemy_with_multiplier(player_max_hp, player_damage, 2.0);
+    enemy.name = format!("Boss {}", enemy.name);
+    enemy
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -210,5 +231,21 @@ mod tests {
         combat.player_current_hp = 80;
         combat.update_max_hp(60);
         assert_eq!(combat.player_current_hp, 60);
+    }
+
+    #[test]
+    fn test_generate_elite_enemy() {
+        let enemy = generate_elite_enemy(100, 20);
+        assert!(enemy.name.starts_with("Elite "));
+        // Elite should have ~150% HP (with variance)
+        assert!(enemy.max_hp >= 100); // At least base HP
+    }
+
+    #[test]
+    fn test_generate_boss_enemy() {
+        let enemy = generate_boss_enemy(100, 20);
+        assert!(enemy.name.starts_with("Boss "));
+        // Boss should have ~200% HP (with variance)
+        assert!(enemy.max_hp >= 120); // At least 1.2x base HP
     }
 }

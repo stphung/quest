@@ -24,7 +24,7 @@ pub fn try_drop_item(game_state: &GameState) -> Option<Item> {
     Some(generate_item(slot, rarity, game_state.character_level))
 }
 
-fn roll_rarity(prestige_rank: u32, rng: &mut impl Rng) -> Rarity {
+pub fn roll_rarity(prestige_rank: u32, rng: &mut impl Rng) -> Rarity {
     let roll = rng.gen::<f64>();
 
     match prestige_rank {
@@ -81,7 +81,7 @@ fn roll_rarity(prestige_rank: u32, rng: &mut impl Rng) -> Rarity {
     }
 }
 
-fn roll_random_slot(rng: &mut impl Rng) -> EquipmentSlot {
+pub fn roll_random_slot(rng: &mut impl Rng) -> EquipmentSlot {
     match rng.gen_range(0..7) {
         0 => EquipmentSlot::Weapon,
         1 => EquipmentSlot::Armor,
