@@ -1,3 +1,4 @@
+pub mod character_creation;
 mod combat_3d;
 pub mod combat_effects;
 mod combat_scene;
