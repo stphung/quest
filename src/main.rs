@@ -18,6 +18,7 @@ mod items;
 mod prestige;
 mod save_manager;
 mod ui;
+mod build_info;
 
 use character_manager::CharacterManager;
 use chrono::Utc;
