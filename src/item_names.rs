@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::items::{AffixType, EquipmentSlot, Item, Rarity};
 use rand::Rng;
 
