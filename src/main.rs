@@ -116,12 +116,9 @@ fn main() -> io::Result<()> {
                                 // Validate and create character
                                 if creation_screen.is_valid() {
                                     let new_name = creation_screen.get_name();
-                                    let new_state = GameState::new(
-                                        new_name,
-                                        Utc::now().timestamp(),
-                                    );
-                                    if let Err(e) = character_manager.save_character(&new_state)
-                                    {
+                                    let new_state =
+                                        GameState::new(new_name, Utc::now().timestamp());
+                                    if let Err(e) = character_manager.save_character(&new_state) {
                                         creation_screen.validation_error =
                                             Some(format!("Save failed: {}", e));
                                     } else {
@@ -325,10 +322,9 @@ fn main() -> io::Result<()> {
                                 // Validate and rename
                                 if rename_screen.is_valid() {
                                     let new_name = rename_screen.get_name();
-                                    if let Err(e) = character_manager.rename_character(
-                                        &selected_character.filename,
-                                        new_name,
-                                    ) {
+                                    if let Err(e) = character_manager
+                                        .rename_character(&selected_character.filename, new_name)
+                                    {
                                         rename_screen.validation_error =
                                             Some(format!("Rename failed: {}", e));
                                     } else {
