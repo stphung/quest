@@ -23,6 +23,21 @@ struct CharacterSaveData {
     checksum: String,
 }
 
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct CharacterInfo {
+    pub character_id: String,
+    pub character_name: String,
+    pub filename: String,
+    pub character_level: u32,
+    pub prestige_rank: u32,
+    pub play_time_seconds: u64,
+    pub last_save_time: i64,
+    pub attributes: crate::attributes::Attributes,
+    pub equipment: crate::equipment::Equipment,
+    pub is_corrupted: bool,
+}
+
 #[allow(dead_code)]
 pub struct CharacterManager {
     quest_dir: PathBuf,
@@ -127,6 +142,67 @@ impl CharacterManager {
             combat_state: save_data.combat_state,
             equipment: save_data.equipment,
         })
+    }
+
+    pub fn list_characters(&self) -> io::Result<Vec<CharacterInfo>> {
+        let mut characters = Vec::new();
+
+        // Read directory entries
+        let entries = fs::read_dir(&self.quest_dir)?;
+
+        for entry in entries {
+            let entry = entry?;
+            let path = entry.path();
+
+            // Only process .json files
+            if path.extension().and_then(|s| s.to_str()) != Some("json") {
+                continue;
+            }
+
+            let filename = path
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .to_string();
+
+            // Try to load character
+            match self.load_character(&filename) {
+                Ok(state) => {
+                    characters.push(CharacterInfo {
+                        character_id: state.character_id,
+                        character_name: state.character_name,
+                        filename,
+                        character_level: state.character_level,
+                        prestige_rank: state.prestige_rank,
+                        play_time_seconds: state.play_time_seconds,
+                        last_save_time: state.last_save_time,
+                        attributes: state.attributes,
+                        equipment: state.equipment,
+                        is_corrupted: false,
+                    });
+                }
+                Err(_) => {
+                    // Mark as corrupted but include in list
+                    characters.push(CharacterInfo {
+                        character_id: String::new(),
+                        character_name: "[CORRUPTED]".to_string(),
+                        filename,
+                        character_level: 0,
+                        prestige_rank: 0,
+                        play_time_seconds: 0,
+                        last_save_time: 0,
+                        attributes: crate::attributes::Attributes::new(),
+                        equipment: crate::equipment::Equipment::new(),
+                        is_corrupted: true,
+                    });
+                }
+            }
+        }
+
+        // Sort by last_save_time (most recent first)
+        characters.sort_by(|a, b| b.last_save_time.cmp(&a.last_save_time));
+
+        Ok(characters)
     }
 }
 
@@ -250,5 +326,63 @@ mod tests {
 
         // Cleanup
         fs::remove_file(filepath).ok();
+    }
+
+    #[test]
+    fn test_list_characters() {
+        use crate::attributes::Attributes;
+        use crate::combat::CombatState;
+        use crate::equipment::Equipment;
+        use crate::game_state::GameState;
+
+        let manager = CharacterManager::new().unwrap();
+
+        // Cleanup any existing test files before starting
+        fs::remove_file(manager.quest_dir.join("listtest1.json")).ok();
+        fs::remove_file(manager.quest_dir.join("listtest2.json")).ok();
+
+        // Create test characters with unique names to avoid conflicts with other tests
+        let char1 = GameState {
+            character_id: "id1".to_string(),
+            character_name: "ListTest1".to_string(),
+            character_level: 10,
+            character_xp: 5000,
+            attributes: Attributes::new(),
+            prestige_rank: 2,
+            total_prestige_count: 2,
+            last_save_time: 1000,
+            play_time_seconds: 3600,
+            combat_state: CombatState::new(100),
+            equipment: Equipment::new(),
+        };
+
+        let char2 = GameState {
+            character_id: "id2".to_string(),
+            character_name: "ListTest2".to_string(),
+            character_level: 15,
+            character_xp: 8000,
+            attributes: Attributes::new(),
+            prestige_rank: 3,
+            total_prestige_count: 3,
+            last_save_time: 2000,
+            play_time_seconds: 7200,
+            combat_state: CombatState::new(100),
+            equipment: Equipment::new(),
+        };
+
+        manager.save_character(&char1).unwrap();
+        manager.save_character(&char2).unwrap();
+
+        // List characters
+        let list = manager.list_characters().expect("Failed to list");
+        assert_eq!(list.len(), 2);
+
+        // Verify sorted by last_played (most recent first)
+        assert_eq!(list[0].character_name, "ListTest2"); // last_save_time = 2000
+        assert_eq!(list[1].character_name, "ListTest1"); // last_save_time = 1000
+
+        // Cleanup
+        fs::remove_file(manager.quest_dir.join("listtest1.json")).ok();
+        fs::remove_file(manager.quest_dir.join("listtest2.json")).ok();
     }
 }
