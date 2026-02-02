@@ -169,21 +169,27 @@ pub fn check_for_updates(current_commit: &str, current_date: &str) -> UpdateChec
     };
 
     // Parse release info
-    let latest_commit = match parse_release_tag(&release.tag_name) {
+    let latest_commit_full = match parse_release_tag(&release.tag_name) {
         Some(c) => c,
         None => return UpdateCheck::CheckFailed("Invalid release tag format".to_string()),
     };
 
+    // Compare short commits (7 chars) to handle both local builds (7 char)
+    // and release builds (full hash in tag, 7 char in binary)
+    let latest_commit_short = short_commit(&latest_commit_full);
+    let current_commit_short = short_commit(current_commit);
+
     // Check if we're already up to date (same commit)
-    if latest_commit == current_commit {
+    if latest_commit_short == current_commit_short {
         return UpdateCheck::UpToDate;
     }
 
     let latest_date = parse_release_date(&release.published_at);
 
-    // Check if we're on a newer dev build (current date > release date)
-    // This prevents "updating" to an older release
-    if current_date > latest_date.as_str() {
+    // Only skip update if we're on a NEWER commit (different commit + newer date)
+    // This prevents "updating" to an older release when on a dev build
+    // But allows updating when commits differ, even if dates are the same
+    if current_commit_short != latest_commit_short && current_date > latest_date.as_str() {
         return UpdateCheck::UpToDate;
     }
 
@@ -195,14 +201,14 @@ pub fn check_for_updates(current_commit: &str, current_date: &str) -> UpdateChec
         .find(|a| a.name == asset_name)
         .map(|a| a.browser_download_url.clone());
 
-    // Fetch changelog
-    let changelog = fetch_changelog(current_commit, &latest_commit).unwrap_or_default();
+    // Fetch changelog using full commit hashes for GitHub API
+    let changelog = fetch_changelog(current_commit, &latest_commit_full).unwrap_or_default();
 
     UpdateCheck::UpdateAvailable {
         current_commit: current_commit.to_string(),
         current_date: current_date.to_string(),
         latest: ReleaseInfo {
-            commit: latest_commit,
+            commit: latest_commit_full,
             date: latest_date,
             download_url,
         },
