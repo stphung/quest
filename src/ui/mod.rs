@@ -1,4 +1,5 @@
 pub mod character_creation;
+pub mod character_delete;
 pub mod character_select;
 mod combat_3d;
 pub mod combat_effects;
