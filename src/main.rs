@@ -357,16 +357,44 @@ fn main() -> io::Result<()> {
                 let mut last_tick = Instant::now();
                 let mut last_autosave = Instant::now();
                 let mut tick_counter: u32 = 0;
+                let mut showing_prestige_confirm = false;
 
                 loop {
                     // Draw UI
                     terminal.draw(|frame| {
                         draw_ui(frame, &state);
+                        // Draw prestige confirmation overlay if active
+                        if showing_prestige_confirm {
+                            ui::prestige_confirm::draw_prestige_confirm(frame, &state);
+                        }
                     })?;
 
                     // Poll for input (50ms non-blocking)
                     if event::poll(Duration::from_millis(50))? {
                         if let Event::Key(key_event) = event::read()? {
+                            // Handle prestige confirmation dialog
+                            if showing_prestige_confirm {
+                                match key_event.code {
+                                    KeyCode::Char('y') | KeyCode::Char('Y') => {
+                                        perform_prestige(&mut state);
+                                        showing_prestige_confirm = false;
+                                        state.combat_state.add_log_entry(
+                                            format!(
+                                                "Prestiged to {}!",
+                                                get_prestige_tier(state.prestige_rank).name
+                                            ),
+                                            false,
+                                            true,
+                                        );
+                                    }
+                                    KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                                        showing_prestige_confirm = false;
+                                    }
+                                    _ => {}
+                                }
+                                continue;
+                            }
+
                             match key_event.code {
                                 // Handle 'q'/'Q' to quit
                                 KeyCode::Char('q') | KeyCode::Char('Q') => {
@@ -376,10 +404,10 @@ fn main() -> io::Result<()> {
                                     current_screen = Screen::CharacterSelect;
                                     break;
                                 }
-                                // Handle 'p'/'P' to prestige
+                                // Handle 'p'/'P' to show prestige confirmation
                                 KeyCode::Char('p') | KeyCode::Char('P') => {
                                     if can_prestige(&state) {
-                                        perform_prestige(&mut state);
+                                        showing_prestige_confirm = true;
                                     }
                                 }
                                 _ => {}
