@@ -34,6 +34,8 @@ make fmt               # Applies rustfmt to all code
 
 **IMPORTANT: When creating PRs, always validate CI status and fix any issues before marking as ready.**
 
+**Recommended:** Use the `pr-validation` skill (`.claude/skills/pr-validation.md`) to automate PR creation with CI validation loop.
+
 1. **Create feature branch:**
    ```bash
    git checkout -b fix/description-of-fix
