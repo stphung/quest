@@ -49,6 +49,25 @@ fn main() -> io::Result<()> {
     // Initialize CharacterManager
     let character_manager = CharacterManager::new()?;
 
+    // Check for old save file to migrate
+    let old_save_manager = SaveManager::new()?;
+    if old_save_manager.save_exists() {
+        println!("Old save file detected. Importing as 'Imported Character'...");
+
+        match old_save_manager.load() {
+            Ok(old_state) => {
+                // Save as new character
+                character_manager.save_character(&old_state)?;
+                println!("Import successful! Character available in character select.");
+                println!("Old save file left at original location (you can delete it manually).");
+            }
+            Err(e) => {
+                println!("Warning: Could not import old save: {}", e);
+                println!("You can still create new characters.");
+            }
+        }
+    }
+
     // List existing characters
     let characters = character_manager.list_characters()?;
 
