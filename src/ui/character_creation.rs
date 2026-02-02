@@ -30,7 +30,7 @@ impl CharacterCreationScreen {
             .constraints([
                 Constraint::Length(3), // Title
                 Constraint::Length(1), // Spacer
-                Constraint::Length(3), // Input label + field
+                Constraint::Length(4), // Input label + field
                 Constraint::Length(1), // Spacer
                 Constraint::Length(4), // Rules
                 Constraint::Length(2), // Validation
@@ -58,7 +58,7 @@ impl CharacterCreationScreen {
             x: chunks[2].x,
             y: chunks[2].y + 1,
             width: chunks[2].width,
-            height: 1,
+            height: 3,
         };
 
         let input_text = {

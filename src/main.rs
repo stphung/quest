@@ -107,42 +107,25 @@ fn main() -> io::Result<()> {
                     if let Event::Key(key_event) = event::read()? {
                         match key_event.code {
                             KeyCode::Char(c) => {
-                                if creation_screen.name_input.len() < 16 {
-                                    creation_screen.name_input.push(c);
-                                    creation_screen.cursor_position += 1;
-                                    creation_screen.validation_error = None;
-                                }
+                                creation_screen.handle_char_input(c);
                             }
                             KeyCode::Backspace => {
-                                if !creation_screen.name_input.is_empty() {
-                                    creation_screen.name_input.pop();
-                                    creation_screen.cursor_position =
-                                        creation_screen.cursor_position.saturating_sub(1);
-                                    creation_screen.validation_error = None;
-                                }
+                                creation_screen.handle_backspace();
                             }
                             KeyCode::Enter => {
                                 // Validate and create character
-                                match character_manager::validate_name(&creation_screen.name_input)
-                                {
-                                    Ok(_) => {
-                                        let new_state = GameState::new(
-                                            creation_screen.name_input.clone(),
-                                            Utc::now().timestamp(),
-                                        );
-                                        if let Err(e) = character_manager.save_character(&new_state)
-                                        {
-                                            creation_screen.validation_error =
-                                                Some(format!("Save failed: {}", e));
-                                        } else {
-                                            // Reset creation screen and go to select
-                                            creation_screen = CharacterCreationScreen::new();
-                                            select_screen = CharacterSelectScreen::new();
-                                            current_screen = Screen::CharacterSelect;
-                                        }
-                                    }
-                                    Err(e) => {
-                                        creation_screen.validation_error = Some(e);
+                                if creation_screen.is_valid() {
+                                    let new_name = creation_screen.get_name();
+                                    let new_state =
+                                        GameState::new(new_name, Utc::now().timestamp());
+                                    if let Err(e) = character_manager.save_character(&new_state) {
+                                        creation_screen.validation_error =
+                                            Some(format!("Save failed: {}", e));
+                                    } else {
+                                        // Reset creation screen and go to select
+                                        creation_screen = CharacterCreationScreen::new();
+                                        select_screen = CharacterSelectScreen::new();
+                                        current_screen = Screen::CharacterSelect;
                                     }
                                 }
                             }
@@ -281,23 +264,14 @@ fn main() -> io::Result<()> {
                     if let Event::Key(key_event) = event::read()? {
                         match key_event.code {
                             KeyCode::Char(c) => {
-                                if delete_screen.confirmation_input.len() < 16 {
-                                    delete_screen.confirmation_input.push(c);
-                                    delete_screen.cursor_position += 1;
-                                }
+                                delete_screen.handle_char_input(c);
                             }
                             KeyCode::Backspace => {
-                                if !delete_screen.confirmation_input.is_empty() {
-                                    delete_screen.confirmation_input.pop();
-                                    delete_screen.cursor_position =
-                                        delete_screen.cursor_position.saturating_sub(1);
-                                }
+                                delete_screen.handle_backspace();
                             }
                             KeyCode::Enter => {
                                 // Check if confirmation matches
-                                if delete_screen.confirmation_input
-                                    == selected_character.character_name
-                                {
+                                if delete_screen.is_confirmed(&selected_character.character_name) {
                                     if let Err(e) = character_manager
                                         .delete_character(&selected_character.filename)
                                     {
@@ -339,39 +313,23 @@ fn main() -> io::Result<()> {
                     if let Event::Key(key_event) = event::read()? {
                         match key_event.code {
                             KeyCode::Char(c) => {
-                                if rename_screen.new_name_input.len() < 16 {
-                                    rename_screen.new_name_input.push(c);
-                                    rename_screen.cursor_position += 1;
-                                    rename_screen.validation_error = None;
-                                }
+                                rename_screen.handle_char_input(c);
                             }
                             KeyCode::Backspace => {
-                                if !rename_screen.new_name_input.is_empty() {
-                                    rename_screen.new_name_input.pop();
-                                    rename_screen.cursor_position =
-                                        rename_screen.cursor_position.saturating_sub(1);
-                                    rename_screen.validation_error = None;
-                                }
+                                rename_screen.handle_backspace();
                             }
                             KeyCode::Enter => {
                                 // Validate and rename
-                                match character_manager::validate_name(
-                                    &rename_screen.new_name_input,
-                                ) {
-                                    Ok(_) => {
-                                        if let Err(e) = character_manager.rename_character(
-                                            &selected_character.filename,
-                                            rename_screen.new_name_input.clone(),
-                                        ) {
-                                            rename_screen.validation_error =
-                                                Some(format!("Rename failed: {}", e));
-                                        } else {
-                                            rename_screen = CharacterRenameScreen::new();
-                                            current_screen = Screen::CharacterSelect;
-                                        }
-                                    }
-                                    Err(e) => {
-                                        rename_screen.validation_error = Some(e);
+                                if rename_screen.is_valid() {
+                                    let new_name = rename_screen.get_name();
+                                    if let Err(e) = character_manager
+                                        .rename_character(&selected_character.filename, new_name)
+                                    {
+                                        rename_screen.validation_error =
+                                            Some(format!("Rename failed: {}", e));
+                                    } else {
+                                        rename_screen = CharacterRenameScreen::new();
+                                        current_screen = Screen::CharacterSelect;
                                     }
                                 }
                             }

@@ -30,6 +30,18 @@ This runs all PR quality checks:
 make fmt               # Applies rustfmt to all code
 ```
 
+## Pull Request Workflow
+
+**Use the `pr-validation` skill** (`.claude/skills/pr-validation.md`) for automated PR creation with CI validation.
+
+The skill handles:
+- Creating PRs with proper formatting
+- Monitoring CI status until completion
+- Detecting and fixing common failures (format/clippy/test/build)
+- Validation loops until all checks pass
+
+**Manual workflow:** See `.claude/skills/pr-validation.md` for detailed steps.
+
 ## CI/CD Pipeline
 
 **On every PR:**

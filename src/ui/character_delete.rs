@@ -34,7 +34,7 @@ impl CharacterDeleteScreen {
                 Constraint::Length(1), // Spacer
                 Constraint::Length(5), // Warning box
                 Constraint::Length(1), // Spacer
-                Constraint::Length(3), // Input label + field
+                Constraint::Length(4), // Input label + field
                 Constraint::Length(1), // Spacer
                 Constraint::Length(3), // Controls
             ])
@@ -81,7 +81,7 @@ impl CharacterDeleteScreen {
             x: chunks[6].x + (chunks[6].width.saturating_sub(50)) / 2,
             y: chunks[6].y + 1,
             width: 50.min(chunks[6].width),
-            height: 1,
+            height: 3,
         };
 
         let input_text = {
