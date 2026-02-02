@@ -5,7 +5,7 @@
 use serde::Deserialize;
 use std::error::Error;
 use std::fs::{self, File};
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 
 /// Repository owner and name for GitHub API
@@ -316,6 +316,112 @@ pub fn replace_binary(new_binary: &Path) -> Result<(), Box<dyn Error>> {
     }
 
     Ok(())
+}
+
+/// Run the update command (quest update).
+/// Returns Ok(true) if updated, Ok(false) if already up to date.
+pub fn run_update_command() -> Result<bool, Box<dyn Error>> {
+    use crate::build_info::{BUILD_COMMIT, BUILD_DATE};
+
+    println!("Checking for updates...\n");
+
+    let check = check_for_updates(BUILD_COMMIT, BUILD_DATE);
+
+    match check {
+        UpdateCheck::UpToDate => {
+            println!("You're up to date.");
+            println!("  Current: {} ({})", BUILD_DATE, BUILD_COMMIT);
+            Ok(false)
+        }
+        UpdateCheck::CheckFailed(err) => {
+            eprintln!("Failed to check for updates: {}", err);
+            Err(err.into())
+        }
+        UpdateCheck::UpdateAvailable {
+            current_commit,
+            current_date,
+            latest,
+            changelog,
+        } => {
+            println!("Update available!");
+            println!("  Your build:  {} ({})", current_date, current_commit);
+            println!("  Latest:      {} ({})", latest.date, latest.commit);
+            println!();
+
+            // Show changelog (max 10 entries)
+            if !changelog.is_empty() {
+                println!("What's new:");
+                for entry in changelog.iter().take(10) {
+                    // Truncate long messages
+                    let msg = if entry.message.len() > 50 {
+                        format!("{}...", &entry.message[..47])
+                    } else {
+                        entry.message.clone()
+                    };
+                    println!("  • {}", msg);
+                }
+                if changelog.len() > 10 {
+                    println!("  ...and {} more", changelog.len() - 10);
+                }
+                println!();
+            }
+
+            // Check for download URL
+            let download_url = match &latest.download_url {
+                Some(url) => url,
+                None => {
+                    eprintln!("No download available for your platform.");
+                    return Err("Unsupported platform".into());
+                }
+            };
+
+            // Backup saves
+            print!("Backing up saves... ");
+            io::stdout().flush()?;
+            match backup_saves() {
+                Ok(Some(path)) => println!("done ({})", path.display()),
+                Ok(None) => println!("skipped (no saves)"),
+                Err(e) => {
+                    println!("failed");
+                    eprintln!("Backup failed: {}", e);
+                    return Err(e);
+                }
+            }
+
+            // Download update
+            let temp_dir = std::env::temp_dir().join("quest-update");
+            fs::create_dir_all(&temp_dir)?;
+            let archive_path = temp_dir.join("update.archive");
+
+            print!("Downloading update... ");
+            io::stdout().flush()?;
+            download_file(download_url, &archive_path, |downloaded, total| {
+                if total > 0 {
+                    let percent = (downloaded * 100) / total;
+                    print!("\rDownloading update... {}%", percent);
+                    let _ = io::stdout().flush();
+                }
+            })?;
+            println!("\rDownloading update... done");
+
+            // Extract archive
+            print!("Installing... ");
+            io::stdout().flush()?;
+            let new_binary = extract_archive(&archive_path, &temp_dir)?;
+
+            // Replace binary
+            replace_binary(&new_binary)?;
+            println!("done");
+
+            // Cleanup
+            let _ = fs::remove_dir_all(&temp_dir);
+
+            println!();
+            println!("Updated successfully! Run 'quest' to play.");
+
+            Ok(true)
+        }
+    }
 }
 
 #[cfg(test)]
