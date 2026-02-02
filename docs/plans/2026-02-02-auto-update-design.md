@@ -9,7 +9,9 @@ On every startup, Quest checks GitHub for a newer release. If found, it shows a 
 ```
 Launch game
     ↓
-Check GitHub API for latest release (async, ~1 sec)
+[Pending update exists?] → Apply update (swap binary + re-exec) → New binary takes over
+    ↓
+Check GitHub API for latest release (~1 sec)
     ↓
 Compare commit hash with compiled-in build hash
     ↓
@@ -18,8 +20,6 @@ Compare commit hash with compiled-in build hash
     ↓
 [User chooses Update] → Backup saves → Download binary → Store pending → Exit with message
 [User chooses Skip] → Continue to character select
-    ↓
-[Next launch with pending update] → Swap binary → Clear pending → Continue normally
 ```
 
 Network failures are handled gracefully — if the API call fails, silently continue to the game.
@@ -52,7 +52,9 @@ CI sets these via environment variables during release builds.
 On next launch, if `pending_update/` exists:
 1. Replace current binary with the downloaded one
 2. Delete `pending_update/` folder
-3. Continue startup normally
+3. Re-exec: replace current process with new binary (user sees seamless transition)
+
+The re-exec ensures the user immediately runs the new version without needing a third launch.
 
 ## GitHub API Integration
 
@@ -153,6 +155,39 @@ Manual — user copies files back from backup folder if needed.
 - Backup folder creation fails → Abort update, show error, continue to game
 - Copy fails mid-backup → Delete partial backup folder, abort update
 
+## Binary Swap Mechanism
+
+A running binary cannot overwrite itself. The solution uses two launches:
+
+**Launch 1 (download):**
+1. User presses `U` to update
+2. Download new binary to `~/.quest/pending_update/quest`
+3. Game exits with "Restart to apply update"
+
+**Launch 2 (swap + re-exec):**
+1. Old binary starts, detects `pending_update/` exists
+2. Old binary replaces itself on disk with new binary
+3. Old binary re-execs into new binary (process replacement)
+4. New binary starts fresh, deletes `pending_update/`, continues normally
+
+### Platform-Specific Re-exec
+
+**Unix (Linux/macOS):**
+```rust
+use std::os::unix::process::CommandExt;
+std::process::Command::new(&new_binary_path)
+    .args(std::env::args().skip(1))
+    .exec(); // Replaces current process, never returns
+```
+
+**Windows:**
+Windows doesn't have `exec()`. Instead:
+1. Rename current binary to `quest.old`
+2. Move new binary to `quest.exe`
+3. Spawn new binary as child process
+4. Exit current process
+5. New binary deletes `quest.old` on startup
+
 ## Implementation
 
 ### New Files
@@ -184,6 +219,6 @@ Pass environment variables during release builds:
 | Skip behavior | Always ask again next startup |
 | Backup | Timestamped folder copy before download |
 | API | GitHub Releases + Compare API (no auth needed) |
-| Binary swap | Download to pending folder, swap on next launch |
+| Binary swap | Download to pending folder, swap + re-exec on next launch |
 | HTTP client | `ureq` (simple, blocking) |
 | Network failure | Silent continue to game |
