@@ -95,6 +95,7 @@ impl SaveManager {
     /// - Data length (4 bytes)
     /// - Serialized game state (variable length)
     /// - SHA256 checksum (32 bytes)
+    #[allow(dead_code)]
     pub fn save(&self, state: &GameState) -> io::Result<()> {
         // Serialize the game state
         let data =

@@ -89,6 +89,7 @@ pub fn combat_kill_xp(passive_xp_rate: f64) -> u64 {
 
 /// Report of offline progression results
 #[derive(Debug, Default)]
+#[allow(dead_code)]
 pub struct OfflineReport {
     pub elapsed_seconds: i64,
     pub total_level_ups: u32,
