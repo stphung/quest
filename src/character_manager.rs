@@ -23,6 +23,16 @@ pub fn validate_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
+#[allow(dead_code)]
+pub fn sanitize_name(name: &str) -> String {
+    name.trim()
+        .to_lowercase()
+        .replace(' ', "_")
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -50,5 +60,15 @@ mod tests {
     fn test_validate_name_invalid_chars() {
         assert!(validate_name("test@123").is_err());
         assert!(validate_name("hello!world").is_err());
+    }
+
+    #[test]
+    fn test_sanitize_name() {
+        assert_eq!(sanitize_name("Hero"), "hero");
+        assert_eq!(sanitize_name("Mage the Great"), "mage_the_great");
+        assert_eq!(sanitize_name("Warrior-2"), "warrior-2");
+        assert_eq!(sanitize_name("Test!!!"), "test");
+        assert_eq!(sanitize_name("   Spaces   "), "spaces");
+        assert_eq!(sanitize_name("MixedCase"), "mixedcase");
     }
 }
