@@ -70,11 +70,15 @@ struct GitHubCommitDetail {
     message: String,
 }
 
-/// Parse release tag to extract commit hash.
-/// Format: "build-4993005923a4924e5c338655f872ea9ebc9efe10" -> "4993005"
+/// Parse release tag to extract full commit hash.
+/// Format: "build-4993005923a4924e5c338655f872ea9ebc9efe10" -> full hash
 fn parse_release_tag(tag: &str) -> Option<String> {
-    tag.strip_prefix("build-")
-        .map(|s| s.chars().take(7).collect())
+    tag.strip_prefix("build-").map(|s| s.to_string())
+}
+
+/// Shorten a commit hash for display (7 chars).
+fn short_commit(hash: &str) -> String {
+    hash.chars().take(7).collect()
 }
 
 /// Parse published_at timestamp to extract date.
@@ -343,7 +347,9 @@ pub fn quick_update_check() -> Option<(String, String)> {
     use crate::build_info::{BUILD_COMMIT, BUILD_DATE};
 
     match check_for_updates(BUILD_COMMIT, BUILD_DATE) {
-        UpdateCheck::UpdateAvailable { latest, .. } => Some((latest.date, latest.commit)),
+        UpdateCheck::UpdateAvailable { latest, .. } => {
+            Some((latest.date, short_commit(&latest.commit)))
+        }
         _ => None,
     }
 }
@@ -376,7 +382,7 @@ pub fn run_update_command() -> Result<bool, Box<dyn Error>> {
         } => {
             println!("Update available!");
             println!("  Your build:  {} ({})", current_date, current_commit);
-            println!("  Latest:      {} ({})", latest.date, latest.commit);
+            println!("  Latest:      {} ({})", latest.date, short_commit(&latest.commit));
             println!();
 
             // Show changelog (max 10 entries)
@@ -405,6 +411,17 @@ pub fn run_update_command() -> Result<bool, Box<dyn Error>> {
                     return Err("Unsupported platform".into());
                 }
             };
+
+            // Ask user to confirm
+            print!("Install update? [Y/n] ");
+            io::stdout().flush()?;
+            let mut input = String::new();
+            io::stdin().read_line(&mut input)?;
+            let input = input.trim().to_lowercase();
+            if input == "n" || input == "no" {
+                println!("Update cancelled.");
+                return Ok(false);
+            }
 
             // Backup saves
             print!("Backing up saves... ");
@@ -463,10 +480,16 @@ mod tests {
     fn test_parse_release_tag() {
         assert_eq!(
             parse_release_tag("build-4993005923a4924e5c338655f872ea9ebc9efe10"),
-            Some("4993005".to_string())
+            Some("4993005923a4924e5c338655f872ea9ebc9efe10".to_string())
         );
         assert_eq!(parse_release_tag("v1.0.0"), None);
         assert_eq!(parse_release_tag("build-abc"), Some("abc".to_string()));
+    }
+
+    #[test]
+    fn test_short_commit() {
+        assert_eq!(short_commit("4993005923a4924e5c338655f872ea9ebc9efe10"), "4993005");
+        assert_eq!(short_commit("abc"), "abc");
     }
 
     #[test]
