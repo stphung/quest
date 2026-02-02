@@ -382,7 +382,11 @@ pub fn run_update_command() -> Result<bool, Box<dyn Error>> {
         } => {
             println!("Update available!");
             println!("  Your build:  {} ({})", current_date, current_commit);
-            println!("  Latest:      {} ({})", latest.date, short_commit(&latest.commit));
+            println!(
+                "  Latest:      {} ({})",
+                latest.date,
+                short_commit(&latest.commit)
+            );
             println!();
 
             // Show changelog (max 10 entries)
@@ -488,7 +492,10 @@ mod tests {
 
     #[test]
     fn test_short_commit() {
-        assert_eq!(short_commit("4993005923a4924e5c338655f872ea9ebc9efe10"), "4993005");
+        assert_eq!(
+            short_commit("4993005923a4924e5c338655f872ea9ebc9efe10"),
+            "4993005"
+        );
         assert_eq!(short_commit("abc"), "abc");
     }
 

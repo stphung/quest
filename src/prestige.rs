@@ -10,6 +10,38 @@ pub struct PrestigeTier {
     pub multiplier: f64,
 }
 
+/// Gets the name for a prestige rank
+fn get_prestige_name(rank: u32) -> &'static str {
+    match rank {
+        0 => "None",
+        // Metals (1-4)
+        1 => "Bronze",
+        2 => "Silver",
+        3 => "Gold",
+        4 => "Platinum",
+        // Gems (5-9)
+        5 => "Diamond",
+        6 => "Emerald",
+        7 => "Sapphire",
+        8 => "Ruby",
+        9 => "Obsidian",
+        // Cosmic (10-14)
+        10 => "Celestial",
+        11 => "Astral",
+        12 => "Cosmic",
+        13 => "Stellar",
+        14 => "Galactic",
+        // Divine (15-19)
+        15 => "Transcendent",
+        16 => "Divine",
+        17 => "Exalted",
+        18 => "Mythic",
+        19 => "Legendary",
+        // Eternal (20+)
+        _ => "Eternal",
+    }
+}
+
 /// Gets the prestige tier for a given rank
 ///
 /// # Arguments
@@ -18,67 +50,38 @@ pub struct PrestigeTier {
 /// # Returns
 /// The PrestigeTier with name, required level, and multiplier
 pub fn get_prestige_tier(rank: u32) -> PrestigeTier {
-    match rank {
-        0 => PrestigeTier {
-            rank: 0,
-            name: "None",
-            required_level: 0,
-            multiplier: 1.0,
-        },
-        1 => PrestigeTier {
-            rank: 1,
-            name: "Bronze",
-            required_level: 10,
-            multiplier: 1.5,
-        },
-        2 => PrestigeTier {
-            rank: 2,
-            name: "Silver",
-            required_level: 25,
-            multiplier: 2.25,
-        },
-        3 => PrestigeTier {
-            rank: 3,
-            name: "Gold",
-            required_level: 50,
-            multiplier: 3.375,
-        },
-        5 => PrestigeTier {
-            rank: 5,
-            name: "Platinum",
-            required_level: 75,
-            multiplier: 7.59375,
-        },
-        10 => PrestigeTier {
-            rank: 10,
-            name: "Diamond",
-            required_level: 100,
-            multiplier: 57.665039,
-        },
-        15 => PrestigeTier {
-            rank: 15,
-            name: "Celestial",
-            required_level: 150,
-            multiplier: 437.893677,
-        },
-        _ => {
-            // For other ranks, interpolate based on the pattern
-            let multiplier = 1.5_f64.powi(rank as i32);
-            let required_level = if rank < 3 {
-                10 + (rank - 1) * 15
-            } else if rank < 10 {
-                50 + (rank - 3) * 10
-            } else {
-                100 + (rank - 10) * 25
-            };
+    let multiplier = 1.5_f64.powi(rank as i32);
 
-            PrestigeTier {
-                rank,
-                name: "Custom",
-                required_level,
-                multiplier,
-            }
-        }
+    let required_level = match rank {
+        0 => 0,
+        1 => 10,
+        2 => 25,
+        3 => 50,
+        4 => 65,
+        5 => 80,
+        6 => 90,
+        7 => 100,
+        8 => 110,
+        9 => 120,
+        10 => 130,
+        11 => 140,
+        12 => 150,
+        13 => 160,
+        14 => 170,
+        15 => 180,
+        16 => 190,
+        17 => 200,
+        18 => 210,
+        19 => 220,
+        // 20+: continues at +15 per rank
+        _ => 220 + (rank - 19) * 15,
+    };
+
+    PrestigeTier {
+        rank,
+        name: get_prestige_name(rank),
+        required_level,
+        multiplier,
     }
 }
 
@@ -165,41 +168,66 @@ mod tests {
 
     #[test]
     fn test_get_prestige_tier() {
-        // Test defined tiers
+        // Test rank 0 (None)
         let tier0 = get_prestige_tier(0);
         assert_eq!(tier0.rank, 0);
         assert_eq!(tier0.name, "None");
         assert_eq!(tier0.required_level, 0);
         assert_eq!(tier0.multiplier, 1.0);
 
+        // Test metals tier (1-4)
         let tier1 = get_prestige_tier(1);
-        assert_eq!(tier1.rank, 1);
         assert_eq!(tier1.name, "Bronze");
         assert_eq!(tier1.required_level, 10);
-        assert_eq!(tier1.multiplier, 1.5);
 
         let tier2 = get_prestige_tier(2);
-        assert_eq!(tier2.rank, 2);
         assert_eq!(tier2.name, "Silver");
         assert_eq!(tier2.required_level, 25);
-        assert_eq!(tier2.multiplier, 2.25);
 
         let tier3 = get_prestige_tier(3);
-        assert_eq!(tier3.rank, 3);
         assert_eq!(tier3.name, "Gold");
         assert_eq!(tier3.required_level, 50);
-        assert_eq!(tier3.multiplier, 3.375);
 
-        let tier10 = get_prestige_tier(10);
-        assert_eq!(tier10.rank, 10);
-        assert_eq!(tier10.name, "Diamond");
-        assert_eq!(tier10.required_level, 100);
-
-        // Test interpolated tier
         let tier4 = get_prestige_tier(4);
-        assert_eq!(tier4.rank, 4);
-        assert_eq!(tier4.name, "Custom");
-        assert_eq!(tier4.multiplier, 1.5_f64.powi(4));
+        assert_eq!(tier4.name, "Platinum");
+        assert_eq!(tier4.required_level, 65);
+
+        // Test gems tier (5-9)
+        let tier5 = get_prestige_tier(5);
+        assert_eq!(tier5.name, "Diamond");
+        assert_eq!(tier5.required_level, 80);
+
+        let tier6 = get_prestige_tier(6);
+        assert_eq!(tier6.name, "Emerald");
+
+        let tier9 = get_prestige_tier(9);
+        assert_eq!(tier9.name, "Obsidian");
+
+        // Test cosmic tier (10-14)
+        let tier10 = get_prestige_tier(10);
+        assert_eq!(tier10.name, "Celestial");
+        assert_eq!(tier10.required_level, 130);
+
+        let tier14 = get_prestige_tier(14);
+        assert_eq!(tier14.name, "Galactic");
+
+        // Test divine tier (15-19)
+        let tier15 = get_prestige_tier(15);
+        assert_eq!(tier15.name, "Transcendent");
+
+        let tier19 = get_prestige_tier(19);
+        assert_eq!(tier19.name, "Legendary");
+
+        // Test eternal tier (20+)
+        let tier20 = get_prestige_tier(20);
+        assert_eq!(tier20.name, "Eternal");
+
+        let tier100 = get_prestige_tier(100);
+        assert_eq!(tier100.name, "Eternal");
+
+        // Verify multiplier formula: 1.5^rank
+        assert_eq!(get_prestige_tier(4).multiplier, 1.5_f64.powi(4));
+        assert_eq!(get_prestige_tier(10).multiplier, 1.5_f64.powi(10));
     }
 
     #[test]

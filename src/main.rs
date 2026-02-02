@@ -524,6 +524,13 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
     // Each tick is 100ms = 0.1 seconds
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
 
+    // Sync player max HP with derived stats (ensures equipment changes are reflected)
+    let derived = derived_stats::DerivedStats::calculate_derived_stats(
+        &game_state.attributes,
+        &game_state.equipment,
+    );
+    game_state.combat_state.update_max_hp(derived.max_hp);
+
     // Update dungeon exploration if in a dungeon
     if game_state.active_dungeon.is_some() {
         let dungeon_events = update_dungeon(game_state, delta_time);
