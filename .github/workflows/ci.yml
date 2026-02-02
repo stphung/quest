@@ -55,7 +55,15 @@ jobs:
           key: ${{ matrix.target }}
 
       - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+        env:
+          BUILD_COMMIT: ${{ github.sha }}
+          BUILD_DATE: ${{ github.event.head_commit.timestamp }}
+        run: |
+          # Extract short commit (7 chars)
+          export BUILD_COMMIT="${BUILD_COMMIT:0:7}"
+          # Extract date from timestamp (YYYY-MM-DD)
+          export BUILD_DATE="${BUILD_DATE:0:10}"
+          cargo build --release --target ${{ matrix.target }}
 
       - name: Package (Unix)
         if: runner.os != 'Windows'
