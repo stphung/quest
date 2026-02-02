@@ -1,4 +1,5 @@
 mod attributes;
+mod build_info;
 mod character_manager;
 mod combat;
 mod combat_logic;
@@ -18,7 +19,6 @@ mod items;
 mod prestige;
 mod save_manager;
 mod ui;
-mod build_info;
 mod updater;
 
 use character_manager::CharacterManager;
@@ -56,12 +56,10 @@ fn main() -> io::Result<()> {
 
     if args.len() > 1 {
         match args[1].as_str() {
-            "update" => {
-                match updater::run_update_command() {
-                    Ok(_) => std::process::exit(0),
-                    Err(_) => std::process::exit(1),
-                }
-            }
+            "update" => match updater::run_update_command() {
+                Ok(_) => std::process::exit(0),
+                Err(_) => std::process::exit(1),
+            },
             "--version" | "-v" => {
                 println!(
                     "quest {} ({})",
@@ -88,7 +86,7 @@ fn main() -> io::Result<()> {
     }
 
     // Check for updates in background (non-blocking notification)
-    let update_available = std::thread::spawn(|| updater::quick_update_check());
+    let update_available = std::thread::spawn(updater::quick_update_check);
 
     // Initialize CharacterManager
     let character_manager = CharacterManager::new()?;
@@ -158,8 +156,8 @@ fn main() -> io::Result<()> {
                 ratatui::text::Line::from("  Press any key to continue..."),
             ];
 
-            let paragraph = ratatui::widgets::Paragraph::new(text)
-                .alignment(ratatui::layout::Alignment::Left);
+            let paragraph =
+                ratatui::widgets::Paragraph::new(text).alignment(ratatui::layout::Alignment::Left);
 
             frame.render_widget(paragraph, inner);
         })?;

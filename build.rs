@@ -18,9 +18,8 @@ fn main() {
     });
 
     // Get date from env var (CI) or current date (local dev)
-    let date = env::var("BUILD_DATE").unwrap_or_else(|_| {
-        chrono::Utc::now().format("%Y-%m-%d").to_string()
-    });
+    let date = env::var("BUILD_DATE")
+        .unwrap_or_else(|_| chrono::Utc::now().format("%Y-%m-%d").to_string());
 
     // Write to OUT_DIR for inclusion
     let out_dir = env::var("OUT_DIR").unwrap();

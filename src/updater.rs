@@ -73,7 +73,8 @@ struct GitHubCommitDetail {
 /// Parse release tag to extract commit hash.
 /// Format: "build-4993005923a4924e5c338655f872ea9ebc9efe10" -> "4993005"
 fn parse_release_tag(tag: &str) -> Option<String> {
-    tag.strip_prefix("build-").map(|s| s.chars().take(7).collect())
+    tag.strip_prefix("build-")
+        .map(|s| s.chars().take(7).collect())
 }
 
 /// Parse published_at timestamp to extract date.
@@ -85,16 +86,24 @@ fn parse_release_date(timestamp: &str) -> String {
 /// Get the asset name for the current platform.
 fn get_platform_asset_name() -> &'static str {
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    { "quest-x86_64-unknown-linux-gnu.tar.gz" }
+    {
+        "quest-x86_64-unknown-linux-gnu.tar.gz"
+    }
 
     #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-    { "quest-x86_64-apple-darwin.tar.gz" }
+    {
+        "quest-x86_64-apple-darwin.tar.gz"
+    }
 
     #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-    { "quest-aarch64-apple-darwin.tar.gz" }
+    {
+        "quest-aarch64-apple-darwin.tar.gz"
+    }
 
     #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
-    { "quest-x86_64-pc-windows-msvc.zip" }
+    {
+        "quest-x86_64-pc-windows-msvc.zip"
+    }
 
     #[cfg(not(any(
         all(target_os = "linux", target_arch = "x86_64"),
@@ -102,7 +111,9 @@ fn get_platform_asset_name() -> &'static str {
         all(target_os = "macos", target_arch = "aarch64"),
         all(target_os = "windows", target_arch = "x86_64"),
     )))]
-    { "unsupported-platform" }
+    {
+        "unsupported-platform"
+    }
 }
 
 /// Fetch the latest release from GitHub.
@@ -229,10 +240,12 @@ pub fn backup_saves() -> Result<Option<PathBuf>, Box<dyn Error>> {
 }
 
 /// Download a file from URL to the specified path, showing progress.
-pub fn download_file(url: &str, dest: &Path, progress_callback: impl Fn(u64, u64)) -> Result<(), Box<dyn Error>> {
-    let response = ureq::get(url)
-        .set("User-Agent", "quest-updater")
-        .call()?;
+pub fn download_file(
+    url: &str,
+    dest: &Path,
+    progress_callback: impl Fn(u64, u64),
+) -> Result<(), Box<dyn Error>> {
+    let response = ureq::get(url).set("User-Agent", "quest-updater").call()?;
 
     let total_size: u64 = response
         .header("Content-Length")
@@ -324,9 +337,7 @@ pub fn quick_update_check() -> Option<(String, String)> {
     use crate::build_info::{BUILD_COMMIT, BUILD_DATE};
 
     match check_for_updates(BUILD_COMMIT, BUILD_DATE) {
-        UpdateCheck::UpdateAvailable { latest, .. } => {
-            Some((latest.date, latest.commit))
-        }
+        UpdateCheck::UpdateAvailable { latest, .. } => Some((latest.date, latest.commit)),
         _ => None,
     }
 }
