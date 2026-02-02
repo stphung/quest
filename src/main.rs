@@ -123,7 +123,8 @@ fn main() -> io::Result<()> {
                             }
                             KeyCode::Enter => {
                                 // Validate and create character
-                                match character_manager::validate_name(&creation_screen.name_input) {
+                                match character_manager::validate_name(&creation_screen.name_input)
+                                {
                                     Ok(_) => {
                                         let new_state = GameState::new(
                                             creation_screen.name_input.clone(),
@@ -201,17 +202,21 @@ fn main() -> io::Result<()> {
                                         Ok(mut state) => {
                                             // Process offline progression
                                             let current_time = Utc::now().timestamp();
-                                            let elapsed_seconds = current_time - state.last_save_time;
+                                            let elapsed_seconds =
+                                                current_time - state.last_save_time;
 
                                             if elapsed_seconds > 60 {
-                                                let report = process_offline_progression(&mut state);
+                                                let report =
+                                                    process_offline_progression(&mut state);
                                                 // Store report in combat log
                                                 if report.total_level_ups > 0 {
                                                     let message = format!(
                                                         "Offline: +{} XP, +{} levels",
                                                         report.xp_gained, report.total_level_ups
                                                     );
-                                                    state.combat_state.add_log_entry(message, false, true);
+                                                    state
+                                                        .combat_state
+                                                        .add_log_entry(message, false, true);
                                                 }
                                             }
 
@@ -290,7 +295,8 @@ fn main() -> io::Result<()> {
                             }
                             KeyCode::Enter => {
                                 // Check if confirmation matches
-                                if delete_screen.confirmation_input == selected_character.character_name
+                                if delete_screen.confirmation_input
+                                    == selected_character.character_name
                                 {
                                     if let Err(e) = character_manager
                                         .delete_character(&selected_character.filename)
@@ -349,7 +355,9 @@ fn main() -> io::Result<()> {
                             }
                             KeyCode::Enter => {
                                 // Validate and rename
-                                match character_manager::validate_name(&rename_screen.new_name_input) {
+                                match character_manager::validate_name(
+                                    &rename_screen.new_name_input,
+                                ) {
                                     Ok(_) => {
                                         if let Err(e) = character_manager.rename_character(
                                             &selected_character.filename,
