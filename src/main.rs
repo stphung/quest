@@ -2,6 +2,7 @@ mod attributes;
 mod build_info;
 mod challenge_menu;
 mod chess;
+mod chess_logic;
 mod character_manager;
 mod combat;
 mod combat_logic;
