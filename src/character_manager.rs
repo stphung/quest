@@ -490,4 +490,178 @@ mod tests {
         // Cleanup
         fs::remove_file(manager.quest_dir.join("newname.json")).ok();
     }
+
+    #[test]
+    fn test_load_nonexistent_character() {
+        let manager = CharacterManager::new().unwrap();
+
+        let result = manager.load_character("nonexistent_character_12345.json");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_delete_nonexistent_character() {
+        let manager = CharacterManager::new().unwrap();
+
+        let result = manager.delete_character("nonexistent_delete_test.json");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_rename_with_invalid_name() {
+        use crate::attributes::Attributes;
+        use crate::combat::CombatState;
+        use crate::equipment::Equipment;
+        use crate::game_state::GameState;
+        use chrono::Utc;
+
+        let manager = CharacterManager::new().unwrap();
+
+        let state = GameState {
+            character_id: "test-id".to_string(),
+            character_name: "RenameTest".to_string(),
+            character_level: 1,
+            character_xp: 0,
+            attributes: Attributes::new(),
+            prestige_rank: 0,
+            total_prestige_count: 0,
+            last_save_time: Utc::now().timestamp(),
+            play_time_seconds: 0,
+            combat_state: CombatState::new(50),
+            equipment: Equipment::new(),
+            active_dungeon: None,
+            fishing: crate::fishing::FishingState::default(),
+            active_fishing: None,
+            zone_progression: crate::zones::ZoneProgression::default(),
+        };
+
+        manager.save_character(&state).unwrap();
+
+        // Try to rename with invalid characters
+        let result = manager.rename_character("renametest.json", "Invalid@Name!".to_string());
+        assert!(result.is_err());
+
+        // Try to rename with empty name
+        let result = manager.rename_character("renametest.json", "".to_string());
+        assert!(result.is_err());
+
+        // Try to rename with too long name
+        let result = manager.rename_character(
+            "renametest.json",
+            "ThisNameIsWayTooLongForTheLimit".to_string(),
+        );
+        assert!(result.is_err());
+
+        // Cleanup
+        fs::remove_file(manager.quest_dir.join("renametest.json")).ok();
+    }
+
+    #[test]
+    fn test_corrupted_file_handling() {
+        let manager = CharacterManager::new().unwrap();
+
+        // Write invalid JSON to a file
+        let filepath = manager.quest_dir.join("corrupted_test.json");
+        fs::write(&filepath, "{ invalid json }").unwrap();
+
+        // Load should fail
+        let result = manager.load_character("corrupted_test.json");
+        assert!(result.is_err());
+
+        // List should show as corrupted
+        let list = manager.list_characters().unwrap();
+        let corrupted = list.iter().find(|c| c.filename == "corrupted_test.json");
+        assert!(corrupted.is_some());
+        assert!(corrupted.unwrap().is_corrupted);
+
+        // Cleanup
+        fs::remove_file(filepath).ok();
+    }
+
+    #[test]
+    fn test_sanitize_name_special_cases() {
+        // Unicode alphanumeric characters are preserved
+        assert_eq!(sanitize_name("Hérö"), "hérö");
+
+        // Multiple spaces become underscores
+        assert_eq!(sanitize_name("My   Hero"), "my___hero");
+
+        // Empty after sanitization (only special chars)
+        assert_eq!(sanitize_name("!!!"), "");
+
+        // Numbers preserved
+        assert_eq!(sanitize_name("Hero123"), "hero123");
+    }
+
+    #[test]
+    fn test_validate_name_boundary_lengths() {
+        // Exactly 16 characters should be valid
+        assert!(validate_name("1234567890123456").is_ok());
+
+        // 17 characters should fail
+        assert!(validate_name("12345678901234567").is_err());
+
+        // 1 character should be valid
+        assert!(validate_name("A").is_ok());
+    }
+
+    #[test]
+    fn test_character_data_integrity() {
+        use crate::attributes::{AttributeType, Attributes};
+        use crate::combat::CombatState;
+        use crate::equipment::Equipment;
+        use crate::game_state::GameState;
+        use chrono::Utc;
+
+        let manager = CharacterManager::new().unwrap();
+
+        // Create a character with specific values
+        let mut attributes = Attributes::new();
+        attributes.set(AttributeType::Strength, 15);
+        attributes.set(AttributeType::Dexterity, 18);
+
+        let state = GameState {
+            character_id: "integrity-test-id".to_string(),
+            character_name: "IntegrityTest".to_string(),
+            character_level: 25,
+            character_xp: 12345,
+            attributes,
+            prestige_rank: 3,
+            total_prestige_count: 5,
+            last_save_time: Utc::now().timestamp(),
+            play_time_seconds: 9999,
+            combat_state: CombatState::new(100),
+            equipment: Equipment::new(),
+            active_dungeon: None,
+            fishing: crate::fishing::FishingState::default(),
+            active_fishing: None,
+            zone_progression: crate::zones::ZoneProgression::default(),
+        };
+
+        manager.save_character(&state).unwrap();
+
+        // Load and verify all values preserved
+        let loaded = manager.load_character("integritytest.json").unwrap();
+
+        assert_eq!(loaded.character_id, "integrity-test-id");
+        assert_eq!(loaded.character_name, "IntegrityTest");
+        assert_eq!(loaded.character_level, 25);
+        assert_eq!(loaded.character_xp, 12345);
+        assert_eq!(loaded.prestige_rank, 3);
+        assert_eq!(loaded.total_prestige_count, 5);
+        assert_eq!(loaded.play_time_seconds, 9999);
+        assert_eq!(loaded.attributes.get(AttributeType::Strength), 15);
+        assert_eq!(loaded.attributes.get(AttributeType::Dexterity), 18);
+
+        // Cleanup
+        fs::remove_file(manager.quest_dir.join("integritytest.json")).ok();
+    }
+
+    #[test]
+    fn test_rename_nonexistent_character() {
+        let manager = CharacterManager::new().unwrap();
+
+        let result = manager.rename_character("does_not_exist.json", "NewName".to_string());
+        assert!(result.is_err());
+    }
 }

@@ -112,4 +112,90 @@ mod tests {
         game_state.prestige_rank = 2;
         assert_eq!(game_state.get_attribute_cap(), 30);
     }
+
+    #[test]
+    fn test_character_id_uniqueness() {
+        let state1 = GameState::new("Hero1".to_string(), 0);
+        let state2 = GameState::new("Hero2".to_string(), 0);
+
+        // Each character should have a unique ID
+        assert_ne!(state1.character_id, state2.character_id);
+        // IDs should be valid UUIDs (36 chars with hyphens)
+        assert_eq!(state1.character_id.len(), 36);
+        assert_eq!(state2.character_id.len(), 36);
+    }
+
+    #[test]
+    fn test_is_in_dungeon() {
+        let mut game_state = GameState::new("Test Hero".to_string(), 0);
+
+        // Initially not in a dungeon
+        assert!(!game_state.is_in_dungeon());
+
+        // Set an active dungeon
+        game_state.active_dungeon = Some(crate::dungeon_generation::generate_dungeon(1, 0));
+
+        assert!(game_state.is_in_dungeon());
+    }
+
+    #[test]
+    fn test_character_name_stored() {
+        let game_state = GameState::new("My Hero Name".to_string(), 0);
+        assert_eq!(game_state.character_name, "My Hero Name");
+    }
+
+    #[test]
+    fn test_combat_state_initialized() {
+        let game_state = GameState::new("Test Hero".to_string(), 0);
+
+        // Combat state should be initialized with base HP
+        assert_eq!(game_state.combat_state.player_max_hp, 50);
+        assert_eq!(game_state.combat_state.player_current_hp, 50);
+        assert!(game_state.combat_state.current_enemy.is_none());
+        assert!(!game_state.combat_state.is_regenerating);
+    }
+
+    #[test]
+    fn test_equipment_starts_empty() {
+        let game_state = GameState::new("Test Hero".to_string(), 0);
+
+        assert!(game_state.equipment.weapon.is_none());
+        assert!(game_state.equipment.armor.is_none());
+        assert!(game_state.equipment.helmet.is_none());
+        assert!(game_state.equipment.gloves.is_none());
+        assert!(game_state.equipment.boots.is_none());
+        assert!(game_state.equipment.amulet.is_none());
+        assert!(game_state.equipment.ring.is_none());
+    }
+
+    #[test]
+    fn test_zone_progression_starts_at_zone_1() {
+        let game_state = GameState::new("Test Hero".to_string(), 0);
+
+        assert_eq!(game_state.zone_progression.current_zone_id, 1);
+        assert_eq!(game_state.zone_progression.current_subzone_id, 1);
+        assert!(!game_state.zone_progression.fighting_boss);
+    }
+
+    #[test]
+    fn test_fishing_state_initialized() {
+        let game_state = GameState::new("Test Hero".to_string(), 0);
+
+        assert_eq!(game_state.fishing.rank, 1); // Fishing starts at rank 1
+        assert_eq!(game_state.fishing.total_fish_caught, 0);
+        assert!(game_state.active_fishing.is_none());
+    }
+
+    #[test]
+    fn test_attribute_cap_high_prestige() {
+        let mut game_state = GameState::new("Test Hero".to_string(), 0);
+
+        // Prestige 10: cap should be 20 + (10 * 5) = 70
+        game_state.prestige_rank = 10;
+        assert_eq!(game_state.get_attribute_cap(), 70);
+
+        // Prestige 20: cap should be 20 + (20 * 5) = 120
+        game_state.prestige_rank = 20;
+        assert_eq!(game_state.get_attribute_cap(), 120);
+    }
 }
