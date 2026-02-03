@@ -65,14 +65,25 @@ Esc         → Deselect piece (if selected) / offer forfeit (if no piece select
 
 ### AI Opponent
 
-**Engine**: Built-in minimax with alpha-beta pruning. No external chess engine dependency.
+**Engine**: The `chess-engine` crate (https://crates.io/crates/chess-engine) — a dependency-free Rust library with built-in minimax + alpha-beta pruning. This eliminates ~400–600 lines of hand-rolled move generation and search code, and gives us correct handling of castling, en passant, promotion, and draw rules for free.
 
-**Implementation scope** (~400–600 lines):
-- Legal move generation for all piece types including castling, en passant, promotion
-- Board representation (array-based, not bitboard — simplicity over performance)
-- Minimax search with alpha-beta pruning
-- Simple evaluation function: material count + piece-square tables + basic positional heuristics
-- Search depth scales with difficulty
+**Key API surface:**
+```rust
+use chess_engine::*;
+
+let board = Board::default();                    // Standard starting position
+let legal_moves = board.get_legal_moves();       // All valid board states
+let best_move = board.get_best_next_move(4);     // AI move at depth 4
+let result = board.play_move(best_move);         // Returns GameResult enum
+
+// GameResult variants:
+// - Continuing(Board) — game continues
+// - Victory(Color)    — checkmate
+// - IllegalMove(Board) — invalid move attempted
+// - Stalemate         — draw
+```
+
+The `get_best_next_move(depth)` parameter maps directly to difficulty tiers. The crate's `Board` type is the canonical board representation — we wrap it rather than reimplement it.
 
 **Difficulty tiers** (based on prestige rank at time of discovery):
 
@@ -154,60 +165,34 @@ pub struct ChessChallenge {
 
 /// Active chess game session
 pub struct ChessGame {
-    pub board: Board,
+    pub board: chess_engine::Board,    // Board state from chess-engine crate
     pub difficulty: ChessDifficulty,
     pub reward_prestige: u32,
-    pub player_color: Color,        // Always White (plays first)
-    pub cursor: (u8, u8),           // Board cursor position
-    pub selected_piece: Option<(u8, u8)>,  // Currently selected piece
-    pub legal_moves: Vec<(u8, u8)>,        // Legal destinations for selected piece
-    pub game_status: ChessGameStatus,      // Playing, Checkmate, Stalemate, Forfeit
-    pub move_history: Vec<ChessMove>,
-    pub ai_thinking: bool,          // True while AI is computing
-    pub ai_think_ticks: u32,        // Cosmetic delay counter
-    pub captured_by_player: Vec<Piece>,
-    pub captured_by_ai: Vec<Piece>,
+    pub cursor: (u8, u8),              // Board cursor position (file, rank)
+    pub selected_square: Option<(u8, u8)>,  // Currently selected square
+    pub legal_targets: Vec<chess_engine::Board>,  // Legal board states from selected piece
+    pub game_over: bool,               // True when game has ended
+    pub forfeit_pending: bool,         // True after first Esc press (confirm with second)
+    pub ai_thinking: bool,             // True while AI cosmetic delay is active
+    pub ai_think_ticks: u32,           // Cosmetic delay counter
 }
 
 pub enum ChessDifficulty { Apprentice, Journeyman, Master }
-pub enum ChessGameStatus { Playing, Checkmate(Color), Stalemate, Forfeit }
 ```
 
-### Board Representation
-
-```rust
-pub struct Board {
-    pub squares: [[Option<Piece>; 8]; 8],
-    pub turn: Color,
-    pub castling_rights: CastlingRights,
-    pub en_passant_target: Option<(u8, u8)>,
-    pub halfmove_clock: u32,        // For 50-move draw rule
-}
-
-pub struct Piece {
-    pub kind: PieceKind,
-    pub color: Color,
-}
-
-pub enum PieceKind { Pawn, Knight, Bishop, Rook, Queen, King }
-pub enum Color { White, Black }
-```
+**Note on the `chess-engine` crate's design**: The crate uses a copy-on-make model where `get_legal_moves()` returns `Vec<Board>` (all legal resulting board states) rather than a list of move coordinates. To map cursor-based input to legal moves, we filter `get_legal_moves()` to boards where the selected square's piece has moved. This is a different mental model from coordinate-based move selection but works well — see the Input Handling section for details.
 
 ## File Structure
 
 ```
 src/
-├── chess/
-│   ├── mod.rs              # Module exports, ChessState, ChessChallenge types
-│   ├── board.rs            # Board struct, piece types, move application
-│   ├── moves.rs            # Legal move generation (all piece types)
-│   ├── engine.rs           # Minimax + alpha-beta, evaluation function
-│   └── logic.rs            # Game session management, discovery, tick processing
+├── chess.rs                # ChessState, ChessChallenge, ChessGame, ChessDifficulty types
+├── chess_logic.rs          # Discovery, session lifecycle, move application, AI turn, reward logic
 ├── ui/
 │   └── chess_scene.rs      # Board rendering, cursor, highlights, captured pieces
 ```
 
-This uses a subdirectory rather than flat files because the chess implementation is substantially more complex than fishing (which is 3 files). Move generation alone warrants its own module.
+With the `chess-engine` crate handling board representation, move generation, and AI search, a flat 2-file layout (matching the fishing pattern) is sufficient. No subdirectory needed — the complexity that would have required `board.rs`, `moves.rs`, and `engine.rs` is now in the crate.
 
 ## Integration Points
 
@@ -222,10 +207,11 @@ if let Some(ref mut chess) = game_state.active_chess {
     if chess.ai_thinking {
         chess.ai_think_ticks += 1;
         if chess.ai_think_ticks >= AI_THINK_DELAY_TICKS {
-            let ai_move = engine::find_best_move(&chess.board, chess.difficulty);
-            chess.board.apply_move(ai_move);
+            let depth = chess.difficulty.search_depth();
+            let ai_board = chess.board.get_best_next_move(depth);
+            chess.board = ai_board;
             chess.ai_thinking = false;
-            // Check for checkmate/stalemate after AI move
+            // Check game result via get_legal_moves() — empty = checkmate or stalemate
         }
     }
     // Update timers, skip combat
@@ -267,16 +253,29 @@ if let Some(ref challenge) = game_state.pending_chess_challenge {
 
 // Active chess game input
 if let Some(ref mut chess) = game_state.active_chess {
-    if !chess.ai_thinking {
+    if !chess.ai_thinking && !chess.game_over {
         match key.code {
-            KeyCode::Up => chess.move_cursor(0, -1),
-            KeyCode::Down => chess.move_cursor(0, 1),
+            KeyCode::Up => chess.move_cursor(0, 1),
+            KeyCode::Down => chess.move_cursor(0, -1),
             KeyCode::Left => chess.move_cursor(-1, 0),
             KeyCode::Right => chess.move_cursor(1, 0),
-            KeyCode::Enter => chess.select_or_move(),  // Select piece or confirm move
-            KeyCode::Esc => chess.deselect_or_forfeit(),
+            KeyCode::Enter => {
+                // Two-phase selection using the crate's copy-on-make model:
+                // Phase 1 (no piece selected): Select the piece at cursor.
+                //   Filter board.get_legal_moves() to only boards where the
+                //   piece at cursor has moved. Store filtered list in legal_targets.
+                // Phase 2 (piece selected): Player picks a destination square.
+                //   Find the board in legal_targets where the piece now occupies
+                //   the cursor square. Apply that board via play_move().
+                //   Then trigger AI thinking delay.
+                chess.select_or_move();
+            }
+            KeyCode::Esc => chess.deselect_or_forfeit(),  // First Esc = deselect/warn, second = forfeit
             _ => {}
         }
+    } else if chess.game_over {
+        // Any key dismisses the result and applies rewards/returns to combat
+        chess_logic::end_game(game_state);
     }
     // Don't fall through to combat/prestige input
 }
@@ -331,42 +330,50 @@ Status: Your move (select a piece)
 - **Player quits game during chess**: Session is `#[serde(skip)]`, so it's lost. This is intentional — chess requires commitment. The pending challenge is also lost.
 - **Prestige during pending challenge**: If player manually prestiges while a challenge is pending, the challenge is cleared (transient state).
 - **AI computation time**: With 4-ply minimax + alpha-beta on a standard board, worst case is ~50ms. No risk of blocking the game loop.
-- **Draw by repetition / 50-move rule**: Track with halfmove clock. Threefold repetition can be skipped for v1 (rare in short games against simple AI).
-- **Pawn promotion**: Auto-promote to queen for v1. Player choice can be added later.
+- **Draw by repetition / 50-move rule**: The `chess-engine` crate handles stalemate detection via `GameResult::Stalemate`. Threefold repetition is not tracked by the crate — acceptable for v1 (rare in short games against simple AI).
+- **Pawn promotion**: Handled by the crate — `get_legal_moves()` returns separate board states for each promotion piece. For v1, auto-select queen promotion by filtering legal targets. Player choice can be added later.
+- **Mapping cursor moves to crate API**: The crate returns `Vec<Board>` from `get_legal_moves()`, not move coordinates. To determine which square a piece moved to, diff the current board against each legal board to find the piece that changed position. This is O(64 × num_legal_moves) per selection — negligible cost.
+
+## Dependencies
+
+Add to `Cargo.toml`:
+```toml
+chess-engine = "0.1"
+```
+
+The crate has zero transitive dependencies, so it adds no dependency tree bloat.
 
 ## Implementation Phases
 
-**Phase 1: Chess engine core**
-- Board representation, piece types
-- Legal move generation (all pieces including castling, en passant)
-- Minimax + alpha-beta search
-- Evaluation function
-- Comprehensive tests for move generation and search
+**Phase 1: Types and state integration**
+- Add `chess-engine` to Cargo.toml
+- Define ChessState, ChessChallenge, ChessGame, ChessDifficulty in `chess.rs`
+- Add fields to GameState with serde attributes
+- Board-to-grid helper: extract piece positions from `chess_engine::Board` for rendering and input mapping
 
-**Phase 2: Game session and state integration**
-- ChessState, ChessChallenge, ChessGame structs
-- Integration into GameState with serde attributes
-- Discovery logic and difficulty determination
-- Session lifecycle (create, play, end with reward/no-reward)
-- Prestige reward application
+**Phase 2: Game session logic**
+- Discovery logic and difficulty determination in `chess_logic.rs`
+- Session lifecycle (create game from challenge, AI turn via `get_best_next_move`, game end detection)
+- Move selection logic: filtering `get_legal_moves()` by source/destination square
+- Prestige reward application on win
+- Forfeit flow
 
 **Phase 3: Input handling**
-- Challenge acceptance/decline
-- Cursor movement and piece selection
-- Move confirmation
-- Forfeit flow (double-Esc confirmation)
+- Challenge acceptance/decline key routing in main.rs
+- Cursor movement and two-phase piece selection
+- Forfeit confirmation (double-Esc)
+- Game-over dismissal
 
 **Phase 4: UI rendering**
-- Chess board with Unicode pieces
-- Square coloring (light/dark)
+- Chess board with Unicode pieces in `chess_scene.rs`
+- Square coloring (light/dark) via Ratatui styled spans
 - Cursor and selection highlighting
-- Legal move indicators
-- Captured pieces display
-- Game status messages
-- Pending challenge banner
+- Legal move indicators (highlight destination squares from filtered legal_targets)
+- Captured pieces display (diff starting material vs current board)
+- Game status messages (your move, AI thinking, check, checkmate, stalemate)
+- Pending challenge banner overlay on combat scene
 
 **Phase 5: Polish**
-- AI "thinking" animation
-- Move history display (algebraic notation)
-- Sound/visual feedback on check
+- AI "thinking" animation (dots or spinner)
 - Stats display (games played/won in stats panel)
+- Move history sidebar (algebraic notation, derived from board diffs)
