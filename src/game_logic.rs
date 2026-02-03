@@ -470,10 +470,10 @@ mod tests {
         // 1 hour offline, rank 0, no modifiers
         let xp = calculate_offline_xp(3600, 0, 0, 0);
 
-        // 3600 seconds / 5 = 720 estimated kills * 0.5 offline multiplier = 360 kills
+        // 3600 seconds / 5 = 720 estimated kills * 0.25 offline multiplier = 180 kills
         // XP per kill at rank 0 = 1.0 * 300 (avg) = 300
-        // Total = 360 * 300 = 108,000 (roughly)
-        assert!(xp > 50000.0 && xp < 200000.0);
+        // Total = 180 * 300 = 54,000 (roughly)
+        assert!(xp > 25000.0 && xp < 100000.0);
     }
 
     #[test]
