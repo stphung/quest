@@ -299,31 +299,36 @@ fn place_special_rooms(dungeon: &mut Dungeon) {
         .cloned()
         .collect();
 
-    // Minimum squared distance from entrance (2 = not adjacent, not diagonal)
-    let min_elite_distance = 2;
+    // Minimum squared distance from entrance (2 = not orthogonally adjacent)
+    // distance_squared: 1 = orthogonal, 2 = diagonal, 4 = 2 steps
+    let min_elite_distance = 1;
+
+    // Helper to find best position: furthest from entrance that meets minimum distance
+    let find_best_pos = |positions: &[(usize, usize)]| -> Option<(usize, usize)> {
+        positions
+            .iter()
+            .filter(|&&pos| distance_squared(pos, entrance_pos) > min_elite_distance)
+            .max_by_key(|&&pos| distance_squared(pos, entrance_pos))
+            .cloned()
+    };
 
     let elite_pos = if !viable_dead_ends.is_empty() {
         // Pick the furthest viable dead end from entrance
         viable_dead_ends[0]
-    } else if !dead_ends.is_empty() {
+    } else if let Some(pos) = find_best_pos(&dead_ends) {
         // Fallback: pick dead end furthest from entrance that meets minimum distance
-        dead_ends
-            .iter()
-            .find(|&&pos| distance_squared(pos, entrance_pos) > min_elite_distance)
-            .cloned()
-            .unwrap_or(dead_ends[0])
-    } else {
+        pos
+    } else if let Some(pos) = find_best_pos(&room_positions) {
         // Fallback: furthest room from entrance that meets minimum distance
+        pos
+    } else {
+        // Last resort: pick furthest room regardless of distance (shouldn't happen)
         room_positions.sort_by(|a, b| {
             let dist_a = distance_squared(*a, entrance_pos);
             let dist_b = distance_squared(*b, entrance_pos);
             dist_b.cmp(&dist_a)
         });
-        room_positions
-            .iter()
-            .find(|&&pos| distance_squared(pos, entrance_pos) > min_elite_distance)
-            .cloned()
-            .unwrap_or(room_positions[0])
+        room_positions[0]
     };
 
     if let Some(room) = dungeon.get_room_mut(elite_pos.0, elite_pos.1) {

@@ -712,6 +712,7 @@ mod tests {
         // Clear path to boss by marking all rooms EXCEPT boss as Cleared
         // Boss must be Revealed (visible but not defeated) for pathfinding to target it
         let boss_pos = dungeon.boss_position;
+        let player_pos = dungeon.player_position;
         let grid_size = dungeon.size.grid_size();
         for y in 0..grid_size {
             for x in 0..grid_size {
@@ -719,12 +720,20 @@ mod tests {
                     if (x, y) == boss_pos {
                         // Boss is revealed but not cleared (we want to go there)
                         room.state = RoomState::Revealed;
+                    } else if (x, y) == player_pos {
+                        // Player position stays as Current
+                        room.state = RoomState::Current;
                     } else {
                         // All other rooms are cleared (passable)
                         room.state = RoomState::Cleared;
                     }
                 }
             }
+        }
+
+        // Edge case: player already at boss - nothing to test
+        if player_pos == boss_pos {
+            return;
         }
 
         // Verify that following find_next_room eventually reaches the boss

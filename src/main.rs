@@ -1,6 +1,9 @@
 mod attributes;
 mod build_info;
+mod challenge_menu;
 mod character_manager;
+mod chess;
+mod chess_logic;
 mod combat;
 mod combat_logic;
 mod constants;
@@ -25,7 +28,10 @@ mod ui;
 mod updater;
 mod zones;
 
+use challenge_menu::ChallengeType;
 use character_manager::CharacterManager;
+use chess::ChessDifficulty;
+use chess_logic::{apply_game_result, process_ai_thinking, start_chess_game, try_discover_chess};
 use chrono::Utc;
 use constants::*;
 use crossterm::event::{self, Event, KeyCode};
@@ -543,6 +549,154 @@ fn main() -> io::Result<()> {
                                 continue;
                             }
 
+                            // Handle active chess game input (highest priority)
+                            if let Some(ref mut chess_game) = state.active_chess {
+                                if chess_game.game_result.is_some() {
+                                    // Any key dismisses result and adds combat log message
+                                    let old_prestige = state.prestige_rank;
+                                    if let Some((result, prestige_gained)) =
+                                        apply_game_result(&mut state)
+                                    {
+                                        use chess::ChessResult;
+                                        match result {
+                                            ChessResult::Win => {
+                                                let new_prestige = old_prestige + prestige_gained;
+                                                state.combat_state.add_log_entry(
+                                                    "♟ Checkmate! You defeated the mysterious figure.".to_string(),
+                                                    false,
+                                                    true,
+                                                );
+                                                state.combat_state.add_log_entry(
+                                                    format!(
+                                                        "♟ +{} Prestige Ranks (P{} → P{})",
+                                                        prestige_gained, old_prestige, new_prestige
+                                                    ),
+                                                    false,
+                                                    true,
+                                                );
+                                            }
+                                            ChessResult::Loss => {
+                                                state.combat_state.add_log_entry(
+                                                    "♟ The mysterious figure nods respectfully and vanishes.".to_string(),
+                                                    false,
+                                                    true,
+                                                );
+                                            }
+                                            ChessResult::Draw => {
+                                                state.combat_state.add_log_entry(
+                                                    "♟ The figure smiles knowingly and fades away."
+                                                        .to_string(),
+                                                    false,
+                                                    true,
+                                                );
+                                            }
+                                            ChessResult::Forfeit => {
+                                                state.combat_state.add_log_entry(
+                                                    "♟ You concede the game. The figure disappears without a word.".to_string(),
+                                                    false,
+                                                    true,
+                                                );
+                                            }
+                                        }
+                                    }
+                                    continue;
+                                }
+                                if !chess_game.ai_thinking {
+                                    match key_event.code {
+                                        KeyCode::Up => chess_game.move_cursor(0, 1),
+                                        KeyCode::Down => chess_game.move_cursor(0, -1),
+                                        KeyCode::Left => chess_game.move_cursor(-1, 0),
+                                        KeyCode::Right => chess_game.move_cursor(1, 0),
+                                        KeyCode::Enter => {
+                                            // If a piece is selected, try to move to cursor
+                                            if chess_game.selected_square.is_some() {
+                                                // Check if cursor is on a legal destination
+                                                if chess_game
+                                                    .legal_move_destinations
+                                                    .contains(&chess_game.cursor)
+                                                {
+                                                    chess_game.try_move_to_cursor();
+                                                } else if chess_game.cursor_on_player_piece() {
+                                                    // Cursor on another player piece - select it instead
+                                                    chess_game.select_piece_at_cursor();
+                                                } else {
+                                                    // Invalid destination - clear selection
+                                                    chess_game.clear_selection();
+                                                }
+                                            } else {
+                                                // No piece selected - try to select piece at cursor
+                                                chess_game.select_piece_at_cursor();
+                                            }
+                                        }
+                                        KeyCode::Esc => {
+                                            if chess_game.forfeit_pending {
+                                                chess_game.game_result =
+                                                    Some(chess::ChessResult::Forfeit);
+                                            } else if chess_game.selected_square.is_some() {
+                                                chess_game.clear_selection();
+                                                chess_game.forfeit_pending = false;
+                                            } else {
+                                                chess_game.forfeit_pending = true;
+                                            }
+                                        }
+                                        _ => {
+                                            chess_game.forfeit_pending = false;
+                                        }
+                                    }
+                                }
+                                continue;
+                            }
+
+                            // Handle challenge menu input
+                            if state.challenge_menu.is_open {
+                                let menu = &mut state.challenge_menu;
+                                if menu.viewing_detail {
+                                    match key_event.code {
+                                        KeyCode::Up => menu.navigate_up(),
+                                        KeyCode::Down => menu.navigate_down(4),
+                                        KeyCode::Enter => {
+                                            let difficulty = ChessDifficulty::from_index(
+                                                menu.selected_difficulty,
+                                            );
+                                            if let Some(challenge) = menu.take_selected() {
+                                                if matches!(
+                                                    challenge.challenge_type,
+                                                    ChallengeType::Chess
+                                                ) {
+                                                    start_chess_game(&mut state, difficulty);
+                                                }
+                                            }
+                                        }
+                                        KeyCode::Char('d') | KeyCode::Char('D') => {
+                                            menu.take_selected();
+                                            menu.close_detail();
+                                            if menu.challenges.is_empty() {
+                                                menu.close();
+                                            }
+                                        }
+                                        KeyCode::Esc => menu.close_detail(),
+                                        _ => {}
+                                    }
+                                } else {
+                                    match key_event.code {
+                                        KeyCode::Up => menu.navigate_up(),
+                                        KeyCode::Down => menu.navigate_down(4),
+                                        KeyCode::Enter => menu.open_detail(),
+                                        KeyCode::Tab | KeyCode::Esc => menu.close(),
+                                        _ => {}
+                                    }
+                                }
+                                continue;
+                            }
+
+                            // Tab to open challenge menu
+                            if key_event.code == KeyCode::Tab
+                                && !state.challenge_menu.challenges.is_empty()
+                            {
+                                state.challenge_menu.open();
+                                continue;
+                            }
+
                             match key_event.code {
                                 // Handle 'q'/'Q' to quit
                                 KeyCode::Char('q') | KeyCode::Char('Q') => {
@@ -610,6 +764,32 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
 
     // Each tick is 100ms = 0.1 seconds
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
+
+    // Process chess AI thinking
+    if let Some(ref mut chess_game) = game_state.active_chess {
+        let mut rng = rand::thread_rng();
+        process_ai_thinking(chess_game, &mut rng);
+    }
+
+    // Try chess discovery during normal combat (not in dungeon, fishing, or chess)
+    if game_state.active_chess.is_none()
+        && game_state.active_dungeon.is_none()
+        && game_state.active_fishing.is_none()
+    {
+        let mut rng = rand::thread_rng();
+        if try_discover_chess(game_state, &mut rng) {
+            game_state.combat_state.add_log_entry(
+                "♟ A mysterious figure steps from the shadows...".to_string(),
+                false,
+                true,
+            );
+            game_state.combat_state.add_log_entry(
+                "♟ Press [Tab] to view pending challenges".to_string(),
+                false,
+                true,
+            );
+        }
+    }
 
     // Sync player max HP with derived stats (ensures equipment changes are reflected)
     let derived = derived_stats::DerivedStats::calculate_derived_stats(

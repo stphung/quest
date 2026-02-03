@@ -1,4 +1,6 @@
 use crate::attributes::Attributes;
+use crate::challenge_menu::ChallengeMenu;
+use crate::chess::{ChessGame, ChessStats};
 use crate::combat::CombatState;
 use crate::dungeon::Dungeon;
 use crate::equipment::Equipment;
@@ -33,6 +35,15 @@ pub struct GameState {
     /// Zone progression state
     #[serde(default)]
     pub zone_progression: ZoneProgression,
+    /// Generic challenge menu (transient, not saved)
+    #[serde(skip)]
+    pub challenge_menu: ChallengeMenu,
+    /// Persistent chess stats (survives prestige, saved to disk)
+    #[serde(default)]
+    pub chess_stats: ChessStats,
+    /// Active chess game (transient, not saved)
+    #[serde(skip)]
+    pub active_chess: Option<ChessGame>,
 }
 
 impl GameState {
@@ -60,6 +71,9 @@ impl GameState {
             fishing: FishingState::default(),
             active_fishing: None,
             zone_progression: ZoneProgression::new(),
+            challenge_menu: ChallengeMenu::new(),
+            chess_stats: ChessStats::default(),
+            active_chess: None,
         }
     }
 

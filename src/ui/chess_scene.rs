@@ -1,0 +1,432 @@
+//! Chess board UI rendering.
+
+use crate::chess::{ChessGame, ChessResult};
+use ratatui::{
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    style::{Color, Modifier, Style},
+    text::{Line, Span},
+    widgets::{Block, Borders, Clear, Paragraph},
+    Frame,
+};
+
+/// Render the chess game scene
+pub fn render_chess_scene(frame: &mut Frame, area: Rect, game: &ChessGame) {
+    frame.render_widget(Clear, area);
+
+    // Check for game over overlay
+    if let Some(result) = game.game_result {
+        render_game_over_overlay(frame, area, result, game.difficulty.reward_prestige());
+        return;
+    }
+
+    let block = Block::default()
+        .title(" Chess ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Cyan));
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    // Vertical layout: move history on top, board in middle, status at bottom
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1), // Move history (single line)
+            Constraint::Min(18),   // Board (8 rows * 2 + 2 borders)
+            Constraint::Length(2), // Status
+        ])
+        .split(inner);
+
+    render_move_history(frame, chunks[0], game);
+    render_board(frame, chunks[1], game);
+    render_status(frame, chunks[2], game);
+}
+
+fn render_board(frame: &mut Frame, area: Rect, game: &ChessGame) {
+    // Clean grid style: 5 chars per square + borders + rank label
+    let cell_width: u16 = 5;
+    let board_width: u16 = 3 + (cell_width * 8) + 1; // rank label + 8 cells + right border
+    let board_height: u16 = 18; // 8 rows + 9 horizontal lines + file labels
+
+    let x_offset = area.x + (area.width.saturating_sub(board_width)) / 2;
+    let y_offset = area.y + (area.height.saturating_sub(board_height)) / 2;
+
+    let border_color = Color::Rgb(80, 80, 80); // Dark gray border
+    let from_move_color = Color::Rgb(180, 140, 80); // Dim orange for source square
+    let to_move_color = Color::Rgb(255, 255, 100); // Bright yellow for destination square
+
+    // Helper to get the highlight color for a square based on last move
+    let get_highlight_color = |file: u8, rank: u8| -> Option<Color> {
+        let (from, to) = game.last_move?;
+        if (file, rank) == from {
+            Some(from_move_color)
+        } else if (file, rank) == to {
+            Some(to_move_color)
+        } else {
+            None
+        }
+    };
+
+    // Top border: ┌────┬────┬...┐
+    let mut top_border = String::from("  ┌");
+    for i in 0..8 {
+        top_border.push_str("────");
+        if i < 7 {
+            top_border.push('┬');
+        }
+    }
+    top_border.push('┐');
+    let top = Paragraph::new(top_border).style(Style::default().fg(border_color));
+    frame.render_widget(top, Rect::new(x_offset, y_offset, board_width, 1));
+
+    // Render each rank (8 down to 1) with horizontal separators
+    for rank in (0..8).rev() {
+        let row_index = 7 - rank;
+        let y = y_offset + 1 + (row_index as u16 * 2); // Each rank takes 2 rows (content + separator)
+        let rank_label = format!("{} ", rank + 1);
+
+        // Rank label
+        let label = Paragraph::new(rank_label).style(Style::default().fg(Color::DarkGray));
+        frame.render_widget(label, Rect::new(x_offset, y, 2, 1));
+
+        // Left border
+        let left_border = Paragraph::new("│").style(Style::default().fg(border_color));
+        frame.render_widget(left_border, Rect::new(x_offset + 2, y, 1, 1));
+
+        // Squares
+        for file in 0..8u8 {
+            let x = x_offset + 3 + (file as u16 * cell_width);
+
+            let is_cursor = game.cursor == (file, rank);
+            let is_selected = game.selected_square == Some((file, rank));
+            let is_legal_destination = game.legal_move_destinations.contains(&(file, rank));
+            let highlight_color = get_highlight_color(file, rank);
+            let is_from_square = highlight_color == Some(from_move_color);
+            let is_last_move = highlight_color.is_some();
+
+            let piece_char = get_piece_at(&game.board, file, rank);
+
+            // Build square content
+            let (content, fg_color) = if is_cursor {
+                // Cursor: show piece or brackets, preserve last-move color
+                let color = if is_last_move {
+                    if is_from_square {
+                        from_move_color
+                    } else {
+                        to_move_color
+                    }
+                } else {
+                    piece_char
+                        .map(piece_color)
+                        .unwrap_or(Color::Rgb(100, 100, 100))
+                };
+                match piece_char {
+                    Some(c) => (format!("[{}]", c), color),
+                    None if is_legal_destination => (" ◆  ".to_string(), Color::Rgb(200, 100, 200)),
+                    None => (" □  ".to_string(), color),
+                }
+            } else if is_selected {
+                // Selected piece: highlight green
+                match piece_char {
+                    Some(c) => (format!("<{}>", c), Color::Rgb(100, 200, 100)),
+                    None => ("    ".to_string(), Color::Reset),
+                }
+            } else if is_legal_destination {
+                // Legal move indicator: pink dot or piece
+                match piece_char {
+                    Some(c) => (format!(" {}  ", c), piece_color(c)),
+                    None => (" ·  ".to_string(), Color::Rgb(200, 100, 200)),
+                }
+            } else if is_last_move {
+                // Last move square: highlight with from/to colors
+                let move_color = if is_from_square {
+                    from_move_color
+                } else {
+                    to_move_color
+                };
+                match piece_char {
+                    Some(c) => (format!(" {}  ", c), move_color),
+                    None if is_from_square => (" ·  ".to_string(), from_move_color),
+                    None => ("    ".to_string(), Color::Reset),
+                }
+            } else {
+                // Normal square
+                match piece_char {
+                    Some(c) => (format!(" {}  ", c), piece_color(c)),
+                    None => ("    ".to_string(), Color::Reset),
+                }
+            };
+
+            let style = Style::default().fg(fg_color);
+            let square = Paragraph::new(content).style(style);
+            frame.render_widget(square, Rect::new(x, y, 4, 1));
+
+            // Cell separator (vertical)
+            let sep = Paragraph::new("│").style(Style::default().fg(border_color));
+            frame.render_widget(sep, Rect::new(x + 4, y, 1, 1));
+        }
+
+        // Horizontal separator after each row (except last)
+        if rank > 0 {
+            let mut sep_line = String::from("  ├");
+            for file in 0..8 {
+                sep_line.push_str("────");
+                if file < 7 {
+                    sep_line.push('┼');
+                }
+            }
+            sep_line.push('┤');
+            let sep = Paragraph::new(sep_line).style(Style::default().fg(border_color));
+            frame.render_widget(sep, Rect::new(x_offset, y + 1, board_width, 1));
+        }
+    }
+
+    // Bottom border: └────┴────┴...┘
+    let mut bottom_border = String::from("  └");
+    for i in 0..8 {
+        bottom_border.push_str("────");
+        if i < 7 {
+            bottom_border.push('┴');
+        }
+    }
+    bottom_border.push('┘');
+    let bottom = Paragraph::new(bottom_border).style(Style::default().fg(border_color));
+    frame.render_widget(bottom, Rect::new(x_offset, y_offset + 16, board_width, 1));
+
+    // File labels (A-H)
+    let files = "   A    B    C    D    E    F    G    H";
+    let file_labels = Paragraph::new(files).style(Style::default().fg(Color::DarkGray));
+    frame.render_widget(
+        file_labels,
+        Rect::new(x_offset, y_offset + 17, board_width, 1),
+    );
+}
+
+fn render_status(frame: &mut Frame, area: Rect, game: &ChessGame) {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    // Line 1: Status message
+    let (status_text, status_style) = if game.ai_thinking {
+        // Braille spinner animation (100ms per frame)
+        const SPINNER: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+        let millis = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis();
+        let frame_idx = ((millis / 100) % 10) as usize;
+        let spinner = SPINNER[frame_idx];
+
+        (
+            format!("{} Opponent is thinking...", spinner),
+            Style::default().fg(Color::Yellow),
+        )
+    } else if game.forfeit_pending {
+        ("Forfeit game?".to_string(), Style::default().fg(Color::Red))
+    } else if game.selected_square.is_some() {
+        (
+            "Select destination".to_string(),
+            Style::default().fg(Color::Cyan),
+        )
+    } else {
+        ("Your move".to_string(), Style::default().fg(Color::White))
+    };
+
+    // Line 2: Controls hint
+    let controls_text = if game.ai_thinking {
+        ""
+    } else if game.forfeit_pending {
+        "[Esc] Confirm forfeit  [Any] Cancel"
+    } else if game.selected_square.is_some() {
+        "[Arrows] Move  [Enter] Confirm  [Esc] Cancel"
+    } else {
+        "[Arrows] Move  [Enter] Select piece  [Esc] Forfeit"
+    };
+
+    let status = Paragraph::new(status_text)
+        .style(status_style)
+        .alignment(Alignment::Center);
+    frame.render_widget(status, Rect { height: 1, ..area });
+
+    if !controls_text.is_empty() {
+        let controls = Paragraph::new(controls_text)
+            .style(Style::default().fg(Color::DarkGray))
+            .alignment(Alignment::Center);
+        frame.render_widget(
+            controls,
+            Rect {
+                y: area.y + 1,
+                height: 1,
+                ..area
+            },
+        );
+    }
+}
+
+fn render_move_history(frame: &mut Frame, area: Rect, game: &ChessGame) {
+    if game.move_history.is_empty() {
+        let text = Paragraph::new("Moves: -")
+            .style(Style::default().fg(Color::DarkGray))
+            .alignment(Alignment::Center);
+        frame.render_widget(text, area);
+        return;
+    }
+
+    // Build horizontal move list: "Moves: 4.Ba4 Nf6  3.Bb5 a6  2.Nf3 Nc6  1.e4 e5"
+    let moves = &game.move_history;
+    let last_move_idx = moves.len() - 1;
+
+    // Style for highlighting the most recent move (matches board highlight)
+    let highlight_style = Style::default()
+        .fg(Color::Rgb(255, 255, 100))
+        .add_modifier(Modifier::BOLD);
+
+    let mut spans: Vec<Span> = vec![Span::styled(
+        "Moves: ",
+        Style::default().fg(Color::DarkGray),
+    )];
+
+    // Build move pairs in reverse order (most recent first)
+    let num_pairs = moves.len().div_ceil(2);
+    for i in (0..num_pairs).rev() {
+        let white_idx = i * 2;
+        let black_idx = i * 2 + 1;
+
+        // Move number
+        spans.push(Span::styled(
+            format!("{}.", i + 1),
+            Style::default().fg(Color::DarkGray),
+        ));
+
+        // White's move
+        let white_style = if white_idx == last_move_idx {
+            highlight_style
+        } else {
+            Style::default().fg(Color::White)
+        };
+        spans.push(Span::styled(moves[white_idx].clone(), white_style));
+
+        // Black's move (if exists)
+        if let Some(black_move) = moves.get(black_idx) {
+            spans.push(Span::styled(" ", Style::default()));
+            let black_style = if black_idx == last_move_idx {
+                highlight_style
+            } else {
+                Style::default().fg(Color::Gray)
+            };
+            spans.push(Span::styled(black_move.clone(), black_style));
+        }
+
+        // Separator between move pairs
+        if i > 0 {
+            spans.push(Span::styled("  ", Style::default()));
+        }
+    }
+
+    let text = Paragraph::new(Line::from(spans)).alignment(Alignment::Center);
+    frame.render_widget(text, area);
+}
+
+fn render_game_over_overlay(frame: &mut Frame, area: Rect, result: ChessResult, prestige: u32) {
+    frame.render_widget(Clear, area);
+
+    let (title, message, reward) = match result {
+        ChessResult::Win => (
+            ":: VICTORY! ::",
+            "You checkmated the mysterious figure!",
+            format!("+{} Prestige Ranks", prestige),
+        ),
+        ChessResult::Loss => (
+            "DEFEAT",
+            "The mysterious figure has checkmated you.",
+            "No penalty incurred.".to_string(),
+        ),
+        ChessResult::Draw => (
+            "DRAW",
+            "The game ends in stalemate.",
+            "+5000 XP".to_string(),
+        ),
+        ChessResult::Forfeit => (
+            "FORFEIT",
+            "You conceded the game.",
+            "No penalty incurred.".to_string(),
+        ),
+    };
+
+    let title_color = match result {
+        ChessResult::Win => Color::Green,
+        ChessResult::Loss => Color::Red,
+        ChessResult::Draw => Color::Yellow,
+        ChessResult::Forfeit => Color::Gray,
+    };
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(title_color));
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let content_height: u16 = 7;
+    let y_offset = inner.y + (inner.height.saturating_sub(content_height)) / 2;
+
+    let lines = vec![
+        Line::from(Span::styled(
+            title,
+            Style::default()
+                .fg(title_color)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(message, Style::default().fg(Color::White))),
+        Line::from(""),
+        Line::from(Span::styled(reward, Style::default().fg(Color::Cyan))),
+        Line::from(""),
+        Line::from(Span::styled(
+            "[Press any key]",
+            Style::default().fg(Color::DarkGray),
+        )),
+    ];
+
+    let text = Paragraph::new(lines).alignment(Alignment::Center);
+    frame.render_widget(
+        text,
+        Rect::new(inner.x, y_offset, inner.width, content_height),
+    );
+}
+
+/// Get color for a piece character (white pieces are bright, black pieces are dim)
+fn piece_color(c: char) -> Color {
+    // chess-engine swaps Unicode symbols: Black symbols (hollow) are used for White pieces
+    if matches!(c, '\u{265A}'..='\u{265F}') {
+        Color::White
+    } else {
+        Color::Rgb(140, 140, 140)
+    }
+}
+
+/// Get the piece character at a specific square from the chess-engine Board
+fn get_piece_at(board: &chess_engine::Board, file: u8, rank: u8) -> Option<char> {
+    use chess_engine::{Color as ChessColor, Piece, Position};
+
+    let position = Position::new(rank as i32, file as i32);
+
+    board.get_piece(position).map(|piece| {
+        // Note: chess-engine swaps Unicode symbols:
+        // - Color::White pieces display with filled symbols (normally black in Unicode)
+        // - Color::Black pieces display with hollow symbols (normally white in Unicode)
+        match piece {
+            Piece::King(ChessColor::White, _) => '\u{265A}', // Black king symbol for white
+            Piece::Queen(ChessColor::White, _) => '\u{265B}', // Black queen symbol for white
+            Piece::Rook(ChessColor::White, _) => '\u{265C}', // Black rook symbol for white
+            Piece::Bishop(ChessColor::White, _) => '\u{265D}', // Black bishop symbol for white
+            Piece::Knight(ChessColor::White, _) => '\u{265E}', // Black knight symbol for white
+            Piece::Pawn(ChessColor::White, _) => '\u{265F}', // Black pawn symbol for white
+            Piece::King(ChessColor::Black, _) => '\u{2654}', // White king symbol for black
+            Piece::Queen(ChessColor::Black, _) => '\u{2655}', // White queen symbol for black
+            Piece::Rook(ChessColor::Black, _) => '\u{2656}', // White rook symbol for black
+            Piece::Bishop(ChessColor::Black, _) => '\u{2657}', // White bishop symbol for black
+            Piece::Knight(ChessColor::Black, _) => '\u{2658}', // White knight symbol for black
+            Piece::Pawn(ChessColor::Black, _) => '\u{2659}', // White pawn symbol for black
+        }
+    })
+}

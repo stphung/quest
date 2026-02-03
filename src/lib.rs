@@ -7,7 +7,10 @@
 
 pub mod attributes;
 pub mod build_info;
+pub mod challenge_menu;
 pub mod character_manager;
+pub mod chess;
+pub mod chess_logic;
 pub mod combat;
 pub mod combat_logic;
 pub mod constants;

@@ -630,6 +630,23 @@ fn draw_footer(
         Span::styled(" | 🔄 Checking...", Style::default().fg(Color::DarkGray))
     };
 
+    // Build challenge notification text
+    let challenge_count = game_state.challenge_menu.challenges.len();
+    let challenge_text = if challenge_count > 0 {
+        Span::styled(
+            format!(
+                " | {} challenge{} pending - [Tab] to view",
+                challenge_count,
+                if challenge_count == 1 { "" } else { "s" }
+            ),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )
+    } else {
+        Span::raw("")
+    };
+
     let footer_text = vec![Line::from(vec![
         Span::styled("Controls: ", Style::default().add_modifier(Modifier::BOLD)),
         Span::styled(
@@ -639,6 +656,7 @@ fn draw_footer(
         Span::raw(" = Quit | "),
         prestige_text,
         update_status_text,
+        challenge_text,
     ])];
 
     // Build version string for the title

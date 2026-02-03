@@ -260,6 +260,9 @@ impl SaveManager {
             fishing: crate::fishing::FishingState::default(),
             active_fishing: None,
             zone_progression: crate::zones::ZoneProgression::default(),
+            challenge_menu: crate::challenge_menu::ChallengeMenu::new(),
+            chess_stats: crate::chess::ChessStats::default(),
+            active_chess: None,
         }
     }
 }
