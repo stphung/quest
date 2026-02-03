@@ -56,7 +56,7 @@ pub fn draw_stats_panel_with_update(
             Constraint::Length(6),          // Derived stats (condensed)
             Constraint::Min(10),            // Equipment section (reduced min when update shown)
             Constraint::Length(6),          // Prestige info + fishing rank
-            Constraint::Length(3),          // Footer
+            Constraint::Length(4),          // Footer (2 lines + borders)
             Constraint::Min(update_height), // Update panel (can shrink if needed)
         ]
     } else {
@@ -67,7 +67,7 @@ pub fn draw_stats_panel_with_update(
             Constraint::Length(6),  // Derived stats (condensed)
             Constraint::Min(16),    // Equipment section (grows to fit)
             Constraint::Length(6),  // Prestige info + fishing rank
-            Constraint::Length(3),  // Footer
+            Constraint::Length(4),  // Footer (2 lines + borders)
         ]
     };
 
@@ -545,6 +545,24 @@ fn draw_equipment_section(frame: &mut Frame, area: Rect, game_state: &GameState)
     frame.render_widget(equipment_paragraph, inner);
 }
 
+/// Formats play time as "Xd Xh Xm Xs"
+fn format_play_time(total_seconds: u64) -> String {
+    let days = total_seconds / 86400;
+    let hours = (total_seconds % 86400) / 3600;
+    let minutes = (total_seconds % 3600) / 60;
+    let seconds = total_seconds % 60;
+
+    if days > 0 {
+        format!("{}d {}h {}m {}s", days, hours, minutes, seconds)
+    } else if hours > 0 {
+        format!("{}h {}m {}s", hours, minutes, seconds)
+    } else if minutes > 0 {
+        format!("{}m {}s", minutes, seconds)
+    } else {
+        format!("{}s", seconds)
+    }
+}
+
 /// Draws the footer with control instructions and version info
 fn draw_footer(
     frame: &mut Frame,
@@ -571,19 +589,19 @@ fn draw_footer(
         )
     };
 
-    // Build update check countdown text
+    // Build update check countdown text (minutes only)
     let update_check_text = if let Some(secs) = next_update_check_secs {
-        let mins = secs / 60;
-        let secs = secs % 60;
-        Span::styled(
-            format!(" | Update check: {:02}:{:02}", mins, secs),
-            Style::default().fg(Color::DarkGray),
-        )
+        let mins = secs.div_ceil(60); // Round up to nearest minute
+        format!(" | Update: {}m", mins)
     } else {
-        Span::raw("")
+        String::new()
     };
 
-    let footer_text = vec![Line::from(vec![
+    // Build play time text
+    let play_time_text = format_play_time(game_state.play_time_seconds);
+
+    // Line 1: Controls
+    let controls_line = Line::from(vec![
         Span::styled("Controls: ", Style::default().add_modifier(Modifier::BOLD)),
         Span::styled(
             "Q",
@@ -591,8 +609,16 @@ fn draw_footer(
         ),
         Span::raw(" = Quit | "),
         prestige_text,
-        update_check_text,
-    ])];
+    ]);
+
+    // Line 2: Play time and update check
+    let stats_line = Line::from(vec![
+        Span::styled("⏱️ ", Style::default().fg(Color::Cyan)),
+        Span::styled(play_time_text, Style::default().fg(Color::Cyan)),
+        Span::styled(update_check_text, Style::default().fg(Color::DarkGray)),
+    ]);
+
+    let footer_text = vec![controls_line, stats_line];
 
     // Build version string for the title
     let version_title = format!("v{} ({}) ", BUILD_DATE, BUILD_COMMIT);
