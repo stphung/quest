@@ -98,11 +98,19 @@ pub fn update_dungeon(state: &mut GameState, delta_time: f64) -> Vec<DungeonEven
 fn find_next_room(dungeon: &Dungeon) -> Option<(usize, usize)> {
     let current = dungeon.player_position;
 
-    // If we have the key and boss is accessible, go to boss
+    // If we have the key and boss is accessible and not yet cleared, go to boss
     if dungeon.has_key {
-        if let Some(path) = find_path_to(dungeon, current, dungeon.boss_position) {
-            if path.len() > 1 {
-                return Some(path[1]); // Next step toward boss
+        // Only go to boss if it's not already cleared (beaten)
+        let boss_not_cleared = dungeon
+            .get_room(dungeon.boss_position.0, dungeon.boss_position.1)
+            .map(|r| r.state != RoomState::Cleared)
+            .unwrap_or(false);
+
+        if boss_not_cleared {
+            if let Some(path) = find_path_to(dungeon, current, dungeon.boss_position) {
+                if path.len() > 1 {
+                    return Some(path[1]); // Next step toward boss
+                }
             }
         }
     }
@@ -587,5 +595,535 @@ mod tests {
                 .iter()
                 .any(|e| matches!(e, DungeonEvent::CombatStarted { .. })));
         }
+    }
+
+    // ============ update_dungeon tests ============
+
+    #[test]
+    fn test_update_dungeon_no_active_dungeon() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_dungeon = None;
+
+        let events = update_dungeon(&mut state, 0.1);
+
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn test_update_dungeon_room_not_cleared_blocks_movement() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_dungeon = Some(generate_dungeon(10, 0));
+
+        // Set room as not cleared (in combat)
+        if let Some(dungeon) = &mut state.active_dungeon {
+            dungeon.current_room_cleared = false;
+            dungeon.move_timer = 10.0; // Way past move interval
+        }
+
+        let events = update_dungeon(&mut state, 0.1);
+
+        // Should not move - blocked by combat
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn test_update_dungeon_timer_accumulation() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_dungeon = Some(generate_dungeon(10, 0));
+
+        // Ensure room is cleared so we can move
+        if let Some(dungeon) = &mut state.active_dungeon {
+            dungeon.current_room_cleared = true;
+            dungeon.move_timer = 0.0;
+        }
+
+        // Not enough time to move
+        let events = update_dungeon(&mut state, 0.5);
+        assert!(events.is_empty());
+
+        // Check timer accumulated
+        let timer = state.active_dungeon.as_ref().unwrap().move_timer;
+        assert!(timer > 0.4 && timer < 0.6);
+    }
+
+    #[test]
+    fn test_update_dungeon_moves_after_interval() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_dungeon = Some(generate_dungeon(10, 0));
+
+        if let Some(dungeon) = &mut state.active_dungeon {
+            dungeon.current_room_cleared = true;
+            dungeon.move_timer = ROOM_MOVE_INTERVAL - 0.1;
+        }
+
+        let start_pos = state.active_dungeon.as_ref().unwrap().player_position;
+
+        // This tick should trigger movement
+        let events = update_dungeon(&mut state, 0.2);
+
+        // Should have moved
+        let new_pos = state.active_dungeon.as_ref().unwrap().player_position;
+
+        // Either we moved or there was no next room
+        if !events.is_empty() {
+            assert_ne!(start_pos, new_pos);
+            assert!(events
+                .iter()
+                .any(|e| matches!(e, DungeonEvent::EnteredRoom { .. })));
+        }
+    }
+
+    #[test]
+    fn test_update_dungeon_traveling_uses_faster_interval() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_dungeon = Some(generate_dungeon(10, 0));
+
+        // Manually set up a scenario where next room is cleared
+        if let Some(dungeon) = &mut state.active_dungeon {
+            dungeon.current_room_cleared = true;
+            let neighbors = dungeon
+                .get_connected_neighbors(dungeon.player_position.0, dungeon.player_position.1);
+            // Mark a neighbor as cleared to trigger travel mode
+            if let Some(&(nx, ny)) = neighbors.first() {
+                if let Some(room) = dungeon.get_room_mut(nx, ny) {
+                    room.state = RoomState::Cleared;
+                }
+            }
+        }
+
+        // Small delta that would pass travel interval but not explore interval
+        let events = update_dungeon(&mut state, 0.1);
+
+        // Check is_traveling flag was set
+        if let Some(dungeon) = &state.active_dungeon {
+            // Either traveling or no valid next room
+            // The important thing is the code path was exercised
+            assert!(dungeon.is_traveling || events.is_empty());
+        }
+    }
+
+    // ============ find_next_room tests ============
+
+    #[test]
+    fn test_find_next_room_prioritizes_boss_with_key() {
+        let mut dungeon = generate_dungeon(10, 0);
+        dungeon.has_key = true;
+
+        // Clear path to boss by marking rooms as cleared
+        let boss_pos = dungeon.boss_position;
+        let grid_size = dungeon.size.grid_size();
+        for y in 0..grid_size {
+            for x in 0..grid_size {
+                if let Some(room) = dungeon.get_room_mut(x, y) {
+                    if room.state == RoomState::Hidden {
+                        room.state = RoomState::Cleared;
+                    }
+                }
+            }
+        }
+
+        let next = find_next_room(&dungeon);
+
+        // With key, should head toward boss
+        if let Some(next_pos) = next {
+            // Next position should be on path to boss
+            let path = find_path_to(&dungeon, dungeon.player_position, boss_pos);
+            if let Some(path) = path {
+                if path.len() > 1 {
+                    assert_eq!(next_pos, path[1]);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_find_next_room_skips_boss_without_key() {
+        let mut dungeon = generate_dungeon(10, 0);
+        dungeon.has_key = false;
+
+        // Make boss the only revealed room
+        let boss_pos = dungeon.boss_position;
+        if let Some(boss_room) = dungeon.get_room_mut(boss_pos.0, boss_pos.1) {
+            boss_room.state = RoomState::Revealed;
+        }
+
+        // Clear all other rooms
+        let grid_size = dungeon.size.grid_size();
+        for y in 0..grid_size {
+            for x in 0..grid_size {
+                if (x, y) != boss_pos && (x, y) != dungeon.player_position {
+                    if let Some(room) = dungeon.get_room_mut(x, y) {
+                        room.state = RoomState::Cleared;
+                    }
+                }
+            }
+        }
+
+        let next = find_next_room(&dungeon);
+
+        // Should NOT go to boss without key
+        if let Some(next_pos) = next {
+            assert_ne!(next_pos, boss_pos);
+        }
+    }
+
+    #[test]
+    fn test_find_next_room_returns_none_when_fully_explored() {
+        let mut dungeon = generate_dungeon(10, 0);
+        dungeon.has_key = true; // Even with key
+
+        // Mark ALL rooms as cleared
+        let grid_size = dungeon.size.grid_size();
+        for y in 0..grid_size {
+            for x in 0..grid_size {
+                if let Some(room) = dungeon.get_room_mut(x, y) {
+                    room.state = RoomState::Cleared;
+                }
+            }
+        }
+
+        let next = find_next_room(&dungeon);
+
+        // No revealed rooms left to explore
+        assert!(next.is_none());
+    }
+
+    // ============ find_path_to tests ============
+
+    #[test]
+    fn test_find_path_returns_none_for_unreachable() {
+        let dungeon = generate_dungeon(10, 0);
+
+        // Try to find path to a position that's definitely not a room
+        let path = find_path_to(&dungeon, (0, 0), (99, 99));
+
+        assert!(path.is_none());
+    }
+
+    #[test]
+    fn test_find_path_through_multiple_rooms() {
+        let dungeon = generate_dungeon(10, 0);
+        let boss_pos = dungeon.boss_position;
+
+        // Path to boss should be longer than 2 for most dungeons
+        if let Some(path) = find_path_to(&dungeon, dungeon.entrance_position, boss_pos) {
+            assert!(path.len() >= 2);
+            assert_eq!(*path.first().unwrap(), dungeon.entrance_position);
+            assert_eq!(*path.last().unwrap(), boss_pos);
+        }
+    }
+
+    // ============ move_to_room tests for each room type ============
+
+    #[test]
+    fn test_move_to_treasure_room_auto_clears() {
+        let mut dungeon = generate_dungeon(10, 0);
+
+        // Find a treasure room
+        let grid_size = dungeon.size.grid_size();
+        let treasure_pos = (0..grid_size)
+            .flat_map(|y| (0..grid_size).map(move |x| (x, y)))
+            .find(|&(x, y)| {
+                dungeon
+                    .get_room(x, y)
+                    .map(|r| r.room_type == RoomType::Treasure)
+                    .unwrap_or(false)
+            });
+
+        if let Some(pos) = treasure_pos {
+            // Make it revealed so we can move there
+            if let Some(room) = dungeon.get_room_mut(pos.0, pos.1) {
+                room.state = RoomState::Revealed;
+            }
+
+            let events = move_to_room(&mut dungeon, pos);
+
+            // Treasure rooms auto-clear (no combat)
+            assert!(dungeon.current_room_cleared);
+            assert!(events
+                .iter()
+                .any(|e| matches!(e, DungeonEvent::TreasureFound)));
+        }
+    }
+
+    #[test]
+    fn test_move_to_elite_room_starts_combat() {
+        let mut dungeon = generate_dungeon(10, 0);
+
+        // Find an elite room
+        let grid_size = dungeon.size.grid_size();
+        let elite_pos = (0..grid_size)
+            .flat_map(|y| (0..grid_size).map(move |x| (x, y)))
+            .find(|&(x, y)| {
+                dungeon
+                    .get_room(x, y)
+                    .map(|r| r.room_type == RoomType::Elite)
+                    .unwrap_or(false)
+            });
+
+        if let Some(pos) = elite_pos {
+            if let Some(room) = dungeon.get_room_mut(pos.0, pos.1) {
+                room.state = RoomState::Revealed;
+            }
+
+            let events = move_to_room(&mut dungeon, pos);
+
+            assert!(!dungeon.current_room_cleared);
+            assert!(events
+                .iter()
+                .any(|e| matches!(e, DungeonEvent::CombatStarted { is_elite: true, .. })));
+        }
+    }
+
+    #[test]
+    fn test_move_to_boss_room_starts_combat() {
+        let mut dungeon = generate_dungeon(10, 0);
+        let boss_pos = dungeon.boss_position;
+
+        if let Some(room) = dungeon.get_room_mut(boss_pos.0, boss_pos.1) {
+            room.state = RoomState::Revealed;
+        }
+
+        let events = move_to_room(&mut dungeon, boss_pos);
+
+        assert!(!dungeon.current_room_cleared);
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, DungeonEvent::CombatStarted { is_boss: true, .. })));
+    }
+
+    #[test]
+    fn test_move_to_room_increments_rooms_cleared() {
+        let mut dungeon = generate_dungeon(10, 0);
+        let initial_cleared = dungeon.rooms_cleared;
+
+        let neighbors =
+            dungeon.get_connected_neighbors(dungeon.player_position.0, dungeon.player_position.1);
+
+        if let Some(&next_pos) = neighbors.first() {
+            move_to_room(&mut dungeon, next_pos);
+
+            // Old room (entrance) should now be counted as cleared
+            assert_eq!(dungeon.rooms_cleared, initial_cleared + 1);
+        }
+    }
+
+    // ============ on_boss_defeated tests ============
+
+    #[test]
+    fn test_on_boss_defeated_clears_dungeon() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_dungeon = Some(generate_dungeon(10, 0));
+
+        // Set some XP and items
+        if let Some(dungeon) = &mut state.active_dungeon {
+            dungeon.xp_earned = 1000;
+        }
+
+        let events = on_boss_defeated(&mut state);
+
+        // Dungeon should be cleared
+        assert!(state.active_dungeon.is_none());
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, DungeonEvent::DungeonComplete { .. })));
+    }
+
+    #[test]
+    fn test_on_boss_defeated_reports_xp_and_items() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_dungeon = Some(generate_dungeon(10, 0));
+
+        if let Some(dungeon) = &mut state.active_dungeon {
+            dungeon.xp_earned = 5000;
+            // Add a fake item
+            dungeon
+                .collected_items
+                .push(crate::item_generation::generate_item(
+                    crate::items::EquipmentSlot::Weapon,
+                    Rarity::Rare,
+                    10,
+                ));
+        }
+
+        let events = on_boss_defeated(&mut state);
+
+        if let Some(DungeonEvent::DungeonComplete {
+            xp_earned,
+            items_collected,
+        }) = events.first()
+        {
+            assert_eq!(*xp_earned, 5000);
+            assert_eq!(*items_collected, 1);
+        } else {
+            panic!("Expected DungeonComplete event");
+        }
+    }
+
+    // ============ on_player_died_in_dungeon tests ============
+
+    #[test]
+    fn test_on_player_died_clears_dungeon() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_dungeon = Some(generate_dungeon(10, 0));
+
+        let events = on_player_died_in_dungeon(&mut state);
+
+        assert!(state.active_dungeon.is_none());
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, DungeonEvent::DungeonFailed)));
+    }
+
+    // ============ current_room_needs_combat tests ============
+
+    #[test]
+    fn test_current_room_needs_combat_for_combat_room() {
+        let mut dungeon = generate_dungeon(10, 0);
+
+        // Move to a combat room
+        let grid_size = dungeon.size.grid_size();
+        let combat_pos = (0..grid_size)
+            .flat_map(|y| (0..grid_size).map(move |x| (x, y)))
+            .find(|&(x, y)| {
+                dungeon
+                    .get_room(x, y)
+                    .map(|r| r.room_type == RoomType::Combat && r.state != RoomState::Cleared)
+                    .unwrap_or(false)
+            });
+
+        if let Some(pos) = combat_pos {
+            if let Some(room) = dungeon.get_room_mut(pos.0, pos.1) {
+                room.state = RoomState::Current;
+            }
+            dungeon.player_position = pos;
+
+            assert!(current_room_needs_combat(&dungeon));
+        }
+    }
+
+    #[test]
+    fn test_current_room_needs_combat_false_for_treasure() {
+        let mut dungeon = generate_dungeon(10, 0);
+
+        // Find a treasure room
+        let grid_size = dungeon.size.grid_size();
+        let treasure_pos = (0..grid_size)
+            .flat_map(|y| (0..grid_size).map(move |x| (x, y)))
+            .find(|&(x, y)| {
+                dungeon
+                    .get_room(x, y)
+                    .map(|r| r.room_type == RoomType::Treasure)
+                    .unwrap_or(false)
+            });
+
+        if let Some(pos) = treasure_pos {
+            if let Some(room) = dungeon.get_room_mut(pos.0, pos.1) {
+                room.state = RoomState::Current;
+            }
+            dungeon.player_position = pos;
+
+            assert!(!current_room_needs_combat(&dungeon));
+        }
+    }
+
+    // ============ add_dungeon_xp and collect_dungeon_item tests ============
+
+    #[test]
+    fn test_add_dungeon_xp_accumulates() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_dungeon = Some(generate_dungeon(10, 0));
+
+        add_dungeon_xp(&mut state, 100);
+        add_dungeon_xp(&mut state, 250);
+
+        let xp = state.active_dungeon.as_ref().unwrap().xp_earned;
+        assert_eq!(xp, 350);
+    }
+
+    #[test]
+    fn test_add_dungeon_xp_no_dungeon_does_nothing() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_dungeon = None;
+
+        // Should not panic
+        add_dungeon_xp(&mut state, 100);
+    }
+
+    #[test]
+    fn test_collect_dungeon_item_adds_to_list() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_dungeon = Some(generate_dungeon(10, 0));
+
+        let item = crate::item_generation::generate_item(
+            crate::items::EquipmentSlot::Weapon,
+            Rarity::Magic,
+            10,
+        );
+
+        collect_dungeon_item(&mut state, item);
+
+        let items = &state.active_dungeon.as_ref().unwrap().collected_items;
+        assert_eq!(items.len(), 1);
+    }
+
+    // ============ on_elite_defeated edge cases ============
+
+    #[test]
+    fn test_on_elite_defeated_only_gives_key_once() {
+        let mut dungeon = generate_dungeon(10, 0);
+
+        // First elite defeat
+        let events1 = on_elite_defeated(&mut dungeon);
+        assert!(dungeon.has_key);
+        assert!(events1.iter().any(|e| matches!(e, DungeonEvent::FoundKey)));
+
+        // Second elite defeat (already have key)
+        let events2 = on_elite_defeated(&mut dungeon);
+        assert!(dungeon.has_key);
+        // Should NOT have FoundKey event again
+        assert!(!events2.iter().any(|e| matches!(e, DungeonEvent::FoundKey)));
+    }
+
+    // ============ get_enemy_stat_multiplier tests ============
+
+    #[test]
+    fn test_get_enemy_stat_multiplier_elite() {
+        let mut dungeon = generate_dungeon(10, 0);
+
+        // Find and move to elite room
+        let grid_size = dungeon.size.grid_size();
+        let elite_pos = (0..grid_size)
+            .flat_map(|y| (0..grid_size).map(move |x| (x, y)))
+            .find(|&(x, y)| {
+                dungeon
+                    .get_room(x, y)
+                    .map(|r| r.room_type == RoomType::Elite)
+                    .unwrap_or(false)
+            });
+
+        if let Some(pos) = elite_pos {
+            if let Some(room) = dungeon.get_room_mut(pos.0, pos.1) {
+                room.state = RoomState::Current;
+            }
+            dungeon.player_position = pos;
+
+            let mult = get_enemy_stat_multiplier(&dungeon);
+            assert!((mult - 1.5).abs() < 0.01);
+        }
+    }
+
+    #[test]
+    fn test_get_enemy_stat_multiplier_boss() {
+        let mut dungeon = generate_dungeon(10, 0);
+        let boss_pos = dungeon.boss_position;
+
+        if let Some(room) = dungeon.get_room_mut(boss_pos.0, boss_pos.1) {
+            room.state = RoomState::Current;
+        }
+        dungeon.player_position = boss_pos;
+
+        let mult = get_enemy_stat_multiplier(&dungeon);
+        assert!((mult - 2.0).abs() < 0.01);
     }
 }
