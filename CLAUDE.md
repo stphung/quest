@@ -97,7 +97,7 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 
 ### Character System
 
-- `character_manager.rs` — Character CRUD operations (create, delete, rename), JSON save/load in ~/.quest/, SHA256 checksums, name validation
+- `character_manager.rs` — Character CRUD operations (create, delete, rename), JSON save/load in ~/.quest/, name validation
 - `save_manager.rs` — Legacy binary save/load (deprecated, used for migration only)
 
 ### UI (`src/ui/`)

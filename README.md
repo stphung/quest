@@ -170,7 +170,6 @@ Separate progression track with 30 ranks across 6 tiers:
 
 - **Location**: `~/.quest/` directory (JSON format)
 - **Multi-character**: Each character saved separately
-- **Checksums**: SHA-256 validation prevents corruption
 - **Auto-save**: Every 30 seconds
 - **Offline Progress**: Simulates kills at 50% rate (max 7 days)
 
@@ -178,7 +177,7 @@ Separate progression track with 30 ranks across 6 tiers:
 
 - Built with [Ratatui](https://github.com/ratatui-org/ratatui) for terminal UI
 - Uses [Crossterm](https://github.com/crossterm-rs/crossterm) for cross-platform terminal handling
-- Save files use JSON with SHA-256 checksums
+- Save files use JSON format
 - 100ms game tick (10 ticks/sec)
 
 ## License
