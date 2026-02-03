@@ -2,7 +2,7 @@
 
 ## Overview
 
-A chess minigame where the player plays a full game of chess against an AI opponent for massive rewards (1–3 prestige ranks). This is the first player-controlled interactive element in the game — everything else is idle/automated.
+A chess minigame where the player plays a full game of chess against an AI opponent for massive rewards (1–5 prestige ranks based on chosen difficulty). This is the first player-controlled interactive element in the game — everything else is idle/automated.
 
 ## Motivation
 
@@ -34,7 +34,7 @@ Unlike fishing (auto-enters) and dungeons (auto-enters), chess presents a **pend
 **Menu states**: The menu has two views — list and detail:
 
 ```
-LIST VIEW                              DETAIL VIEW
+LIST VIEW                              DETAIL VIEW (with difficulty selection)
 ┌──────────────────────────┐           ┌──────────────────────────┐
 │   Pending Challenges     │           │   Chess Challenge        │
 │                          │           │                          │
@@ -42,11 +42,13 @@ LIST VIEW                              DETAIL VIEW
 │                          │           │   challenges you to a    │
 │                          │           │   game of chess.         │
 │                          │           │                          │
-│                          │           │   Difficulty: Journeyman │
-│                          │           │   AI Depth:   3 ply      │
-│                          │           │   Reward:     +2 Prestige│
+│                          │           │   Select difficulty:     │
 │                          │           │                          │
-│                          │           │   Win: +2 prestige ranks │
+│                          │           │   Novice     ~800  +1P   │
+│                          │           │ > Apprentice ~1100 +2P   │
+│                          │           │   Journeyman ~1350 +3P   │
+│                          │           │   Master     ~1550 +5P   │
+│                          │           │                          │
 │                          │           │   Lose: No penalty       │
 │                          │           │   Draw: Bonus XP         │
 │                          │           │                          │
@@ -62,7 +64,8 @@ LIST VIEW                              DETAIL VIEW
 - `Tab` or `Esc` — Close menu, return to combat
 
 **Input in detail view:**
-- `Enter` — Accept challenge (starts the minigame)
+- `Up/Down` — Navigate difficulty options (for challenges with selectable difficulty)
+- `Enter` — Accept challenge with selected difficulty (starts the minigame)
 - `D` — Decline challenge (removes it from the list)
 - `Esc` — Back to list view
 
@@ -121,22 +124,23 @@ let result = board.play_move(best_move);         // Returns GameResult enum
 
 The `get_best_next_move(depth)` parameter maps directly to difficulty tiers. The crate's `Board` type is the canonical board representation — we wrap it rather than reimplement it.
 
-**Difficulty tiers** (based on prestige rank at time of discovery):
+**Difficulty tiers** (player chooses when accepting challenge):
 
-| Prestige Range | Difficulty | Search Depth | Reward    |
-|---------------|------------|--------------|-----------|
-| 1–4           | Apprentice | 2 ply       | 1 prestige |
-| 5–9           | Journeyman | 3 ply       | 2 prestige |
-| 10+           | Master     | 4 ply       | 3 prestige |
+| Difficulty | Search Depth | Est. ELO | Reward |
+|------------|--------------|----------|--------|
+| Novice | 1 ply | ~800 | +1 prestige |
+| Apprentice | 2 ply | ~1100 | +2 prestige |
+| Journeyman | 3 ply | ~1350 | +3 prestige |
+| Master | 4 ply | ~1550 | +5 prestige |
 
-Higher difficulty = deeper search = stronger play = bigger reward. The AI should be beatable but require thought — this isn't meant to be a grandmaster-level engine.
+Higher difficulty = deeper search = stronger play = bigger reward. The AI should be beatable but require thought — this isn't meant to be a grandmaster-level engine. Players choose their difficulty when accepting a challenge, allowing them to pick a level appropriate for their chess skill.
 
 **Thinking budget**: AI move computation must complete within ~200ms to avoid blocking the game tick. At 4-ply with alpha-beta pruning on an 8×8 board, this is comfortably achievable.
 
 ### Reward Structure
 
 **On win (checkmate the AI)**:
-- Prestige rank increases by 1–3 (based on difficulty tier)
+- Prestige rank increases by 1–5 (based on chosen difficulty: Novice +1, Apprentice +2, Journeyman +3, Master +5)
 - Prestige reset is performed (same as normal prestige: level, XP, attributes, equipment, zones all reset)
 - Fishing rank is preserved (same as normal prestige)
 - Victory message displayed in combat log
@@ -157,7 +161,7 @@ Higher difficulty = deeper search = stronger play = bigger reward. The AI should
 
 ### Why Prestige as Reward?
 
-Prestige is the highest-value currency in the game. Granting 1–3 ranks for a chess win:
+Prestige is the highest-value currency in the game. Granting 1–5 ranks for a chess win:
 
 - Creates a genuine incentive for the player to engage with the interactive element
 - Provides a meaningful shortcut in the prestige grind for skilled players
@@ -203,9 +207,9 @@ pub enum ChallengeType {
 }
 
 /// Chess-specific challenge data (carried inside ChallengeType::Chess)
+/// Note: difficulty is NOT preset — player selects it in the detail view
 pub struct ChessChallenge {
-    pub difficulty: ChessDifficulty,
-    pub reward_prestige: u32,       // 1, 2, or 3
+    // No fields needed — chess challenges are all identical until player picks difficulty
 }
 
 /// Menu state for navigation
@@ -214,6 +218,7 @@ pub struct ChallengeMenu {
     pub is_open: bool,              // Whether the menu overlay is visible
     pub selected_index: usize,      // Cursor position in list view
     pub viewing_detail: bool,       // true = detail view, false = list view
+    pub selected_difficulty: usize, // Cursor position in difficulty selector (0-3 for chess)
 }
 ```
 
@@ -243,7 +248,36 @@ pub struct ChessGame {
     pub ai_think_ticks: u32,           // Cosmetic delay counter
 }
 
-pub enum ChessDifficulty { Apprentice, Journeyman, Master }
+pub enum ChessDifficulty { Novice, Apprentice, Journeyman, Master }
+
+impl ChessDifficulty {
+    pub fn search_depth(&self) -> i32 {
+        match self {
+            Self::Novice => 1,
+            Self::Apprentice => 2,
+            Self::Journeyman => 3,
+            Self::Master => 4,
+        }
+    }
+
+    pub fn reward_prestige(&self) -> u32 {
+        match self {
+            Self::Novice => 1,
+            Self::Apprentice => 2,
+            Self::Journeyman => 3,
+            Self::Master => 5,
+        }
+    }
+
+    pub fn estimated_elo(&self) -> u32 {
+        match self {
+            Self::Novice => 800,
+            Self::Apprentice => 1100,
+            Self::Journeyman => 1350,
+            Self::Master => 1550,
+        }
+    }
+}
 ```
 
 **Note on the `chess-engine` crate's design**: The crate uses a copy-on-make model where `get_legal_moves()` returns `Vec<Board>` (all legal resulting board states) rather than a list of move coordinates. To map cursor-based input to legal moves, we filter `get_legal_moves()` to boards where the selected square's piece has moved. This is a different mental model from coordinate-based move selection but works well — see the Input Handling section for details.
@@ -345,16 +379,30 @@ if game_state.challenge_menu.is_open {
     let menu = &mut game_state.challenge_menu;
 
     if menu.viewing_detail {
-        // Detail view
+        // Detail view with difficulty selection
         match key.code {
+            KeyCode::Up => {
+                // Navigate difficulty options
+                if menu.selected_difficulty > 0 {
+                    menu.selected_difficulty -= 1;
+                }
+            }
+            KeyCode::Down => {
+                // Navigate difficulty options (4 choices: 0-3)
+                if menu.selected_difficulty < 3 {
+                    menu.selected_difficulty += 1;
+                }
+            }
             KeyCode::Enter => {
-                // Accept: remove challenge from list, start the minigame
+                // Accept: remove challenge from list, start with selected difficulty
                 let challenge = menu.challenges.remove(menu.selected_index);
+                let difficulty = ChessDifficulty::from_index(menu.selected_difficulty);
                 menu.is_open = false;
                 menu.viewing_detail = false;
-                challenge_menu::accept_challenge(game_state, challenge);
+                menu.selected_difficulty = 0; // Reset for next time
+                challenge_menu::accept_challenge(game_state, challenge, difficulty);
                 // accept_challenge() dispatches by ChallengeType:
-                //   Chess → game_state.active_chess = Some(ChessGame::new(...))
+                //   Chess → game_state.active_chess = Some(ChessGame::new(difficulty))
             }
             KeyCode::Char('d') | KeyCode::Char('D') => {
                 // Decline: remove from list, stay in menu
@@ -363,6 +411,7 @@ if game_state.challenge_menu.is_open {
                     menu.challenges.len().saturating_sub(1)
                 );
                 menu.viewing_detail = false;
+                menu.selected_difficulty = 0; // Reset
                 if menu.challenges.is_empty() {
                     menu.is_open = false;
                 }
@@ -370,6 +419,7 @@ if game_state.challenge_menu.is_open {
             KeyCode::Esc => {
                 // Back to list view
                 menu.viewing_detail = false;
+                menu.selected_difficulty = 0; // Reset
             }
             _ => {}
         }
