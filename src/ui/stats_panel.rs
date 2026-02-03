@@ -104,7 +104,11 @@ fn draw_header(frame: &mut Frame, area: Rect, game_state: &GameState) {
     ])];
 
     let header = Paragraph::new(header_text)
-        .block(Block::default().borders(Borders::ALL).title("Character"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(game_state.character_name.as_str()),
+        )
         .alignment(Alignment::Center);
 
     frame.render_widget(header, area);
