@@ -6,8 +6,9 @@ use crate::game_state::GameState;
 use chess_engine::Evaluate;
 use rand::Rng;
 
-/// Chance per tick to discover a chess challenge (0.5% = ~30-60 min)
-pub const CHESS_DISCOVERY_CHANCE: f64 = 0.005;
+/// Chance per tick to discover a chess challenge (~2 hour average)
+/// At 10 ticks/sec, 0.000014 chance/tick ≈ 71,429 ticks ≈ 2 hours average
+pub const CHESS_DISCOVERY_CHANCE: f64 = 0.000014;
 
 /// Create a chess challenge for the challenge menu
 pub fn create_chess_challenge() -> PendingChallenge {
@@ -356,9 +357,10 @@ mod tests {
         use rand::SeedableRng;
         let mut rng = rand::rngs::StdRng::seed_from_u64(12345);
 
-        // Try many times - eventually should discover (0.5% chance per try)
+        // Try many times - eventually should discover (~0.0014% chance per try)
+        // With 500k attempts, probability of never discovering = (1-0.000014)^500000 ≈ 0.0009
         let mut discovered = false;
-        for _ in 0..10000 {
+        for _ in 0..500_000 {
             if try_discover_chess(&mut state, &mut rng) {
                 discovered = true;
                 break;
