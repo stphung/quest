@@ -545,14 +545,29 @@ fn draw_equipment_section(frame: &mut Frame, area: Rect, game_state: &GameState)
     frame.render_widget(equipment_paragraph, inner);
 }
 
-/// Formats play time as "Xd Xh Xm Xs"
+/// Formats play time as "Xmo Xw Xd Xh Xm Xs"
 fn format_play_time(total_seconds: u64) -> String {
-    let days = total_seconds / 86400;
-    let hours = (total_seconds % 86400) / 3600;
-    let minutes = (total_seconds % 3600) / 60;
-    let seconds = total_seconds % 60;
+    const SECONDS_PER_MINUTE: u64 = 60;
+    const SECONDS_PER_HOUR: u64 = 3600;
+    const SECONDS_PER_DAY: u64 = 86400;
+    const SECONDS_PER_WEEK: u64 = 604800;
+    const SECONDS_PER_MONTH: u64 = 2592000; // 30 days
 
-    if days > 0 {
+    let months = total_seconds / SECONDS_PER_MONTH;
+    let weeks = (total_seconds % SECONDS_PER_MONTH) / SECONDS_PER_WEEK;
+    let days = (total_seconds % SECONDS_PER_WEEK) / SECONDS_PER_DAY;
+    let hours = (total_seconds % SECONDS_PER_DAY) / SECONDS_PER_HOUR;
+    let minutes = (total_seconds % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE;
+    let seconds = total_seconds % SECONDS_PER_MINUTE;
+
+    if months > 0 {
+        format!(
+            "{}mo {}w {}d {}h {}m {}s",
+            months, weeks, days, hours, minutes, seconds
+        )
+    } else if weeks > 0 {
+        format!("{}w {}d {}h {}m {}s", weeks, days, hours, minutes, seconds)
+    } else if days > 0 {
         format!("{}d {}h {}m {}s", days, hours, minutes, seconds)
     } else if hours > 0 {
         format!("{}h {}m {}s", hours, minutes, seconds)
