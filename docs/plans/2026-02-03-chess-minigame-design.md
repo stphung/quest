@@ -44,10 +44,10 @@ LIST VIEW                              DETAIL VIEW (with difficulty selection)
 │                          │           │                          │
 │                          │           │   Select difficulty:     │
 │                          │           │                          │
-│                          │           │   Novice     ~800  +1P   │
-│                          │           │ > Apprentice ~1100 +2P   │
-│                          │           │   Journeyman ~1350 +3P   │
-│                          │           │   Master     ~1550 +5P   │
+│                          │           │   Novice     ~500  +1P   │
+│                          │           │ > Apprentice ~800  +2P   │
+│                          │           │   Journeyman ~1100 +3P   │
+│                          │           │   Master     ~1350 +5P   │
 │                          │           │                          │
 │                          │           │   Lose: No penalty       │
 │                          │           │   Draw: Bonus XP         │
@@ -126,14 +126,14 @@ The `get_best_next_move(depth)` parameter maps directly to difficulty tiers. The
 
 **Difficulty tiers** (player chooses when accepting challenge):
 
-| Difficulty | Search Depth | Est. ELO | Reward |
-|------------|--------------|----------|--------|
-| Novice | 1 ply | ~800 | +1 prestige |
-| Apprentice | 2 ply | ~1100 | +2 prestige |
-| Journeyman | 3 ply | ~1350 | +3 prestige |
-| Master | 4 ply | ~1550 | +5 prestige |
+| Difficulty | Technique | Est. ELO | Reward |
+|------------|-----------|----------|--------|
+| Novice | 50% random moves | ~500 | +1 prestige |
+| Apprentice | 1-ply search | ~800 | +2 prestige |
+| Journeyman | 2-ply search | ~1100 | +3 prestige |
+| Master | 3-ply search | ~1350 | +5 prestige |
 
-Higher difficulty = deeper search = stronger play = bigger reward. The AI should be beatable but require thought — this isn't meant to be a grandmaster-level engine. Players choose their difficulty when accepting a challenge, allowing them to pick a level appropriate for their chess skill.
+The AI ranges from very accessible (Novice makes random blunders half the time) to moderately challenging (Master looks 3 moves ahead). Players choose their difficulty when accepting a challenge, allowing them to pick a level appropriate for their chess skill.
 
 **Thinking budget**: AI move computation must complete within ~200ms to avoid blocking the game tick. At 4-ply with alpha-beta pruning on an 8×8 board, this is comfortably achievable.
 
@@ -312,10 +312,19 @@ pub enum ChessDifficulty { Novice, Apprentice, Journeyman, Master }
 impl ChessDifficulty {
     pub fn search_depth(&self) -> i32 {
         match self {
-            Self::Novice => 1,
-            Self::Apprentice => 2,
-            Self::Journeyman => 3,
-            Self::Master => 4,
+            Self::Novice => 1,      // Uses random mixing, depth only for non-random moves
+            Self::Apprentice => 1,
+            Self::Journeyman => 2,
+            Self::Master => 3,
+        }
+    }
+
+    pub fn random_move_chance(&self) -> f64 {
+        match self {
+            Self::Novice => 0.5,    // 50% random moves - very weak
+            Self::Apprentice => 0.0,
+            Self::Journeyman => 0.0,
+            Self::Master => 0.0,
         }
     }
 
@@ -330,12 +339,25 @@ impl ChessDifficulty {
 
     pub fn estimated_elo(&self) -> u32 {
         match self {
-            Self::Novice => 800,
-            Self::Apprentice => 1100,
-            Self::Journeyman => 1350,
-            Self::Master => 1550,
+            Self::Novice => 500,
+            Self::Apprentice => 800,
+            Self::Journeyman => 1100,
+            Self::Master => 1350,
         }
     }
+}
+
+/// AI move selection with difficulty-based weakening
+fn get_ai_move(board: &Board, difficulty: ChessDifficulty, rng: &mut impl Rng) -> Board {
+    let dominated = board.get_legal_moves();
+
+    // Check for random move (Novice difficulty)
+    if rng.gen::<f64>() < difficulty.random_move_chance() {
+        return legal_moves.choose(rng).unwrap().clone();
+    }
+
+    // Otherwise use search
+    board.get_best_next_move(difficulty.search_depth())
 }
 ```
 
