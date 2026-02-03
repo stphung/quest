@@ -28,7 +28,10 @@ mod ui;
 mod updater;
 mod zones;
 
+use challenge_menu::ChallengeType;
 use character_manager::CharacterManager;
+use chess::ChessDifficulty;
+use chess_logic::{apply_game_result, process_ai_thinking, start_chess_game, try_discover_chess};
 use chrono::Utc;
 use constants::*;
 use crossterm::event::{self, Event, KeyCode};
@@ -525,6 +528,90 @@ fn main() -> io::Result<()> {
                                 continue;
                             }
 
+                            // Handle active chess game input (highest priority)
+                            if let Some(ref mut chess_game) = state.active_chess {
+                                if chess_game.game_result.is_some() {
+                                    // Any key dismisses result
+                                    apply_game_result(&mut state);
+                                    continue;
+                                }
+                                if !chess_game.ai_thinking {
+                                    match key_event.code {
+                                        KeyCode::Up => chess_game.move_cursor(0, 1),
+                                        KeyCode::Down => chess_game.move_cursor(0, -1),
+                                        KeyCode::Left => chess_game.move_cursor(-1, 0),
+                                        KeyCode::Right => chess_game.move_cursor(1, 0),
+                                        KeyCode::Enter => {
+                                            // TODO: piece selection and move - will implement in Task 11
+                                        }
+                                        KeyCode::Esc => {
+                                            if chess_game.forfeit_pending {
+                                                chess_game.game_result =
+                                                    Some(chess::ChessResult::Forfeit);
+                                            } else if chess_game.selected_square.is_some() {
+                                                chess_game.selected_square = None;
+                                                chess_game.forfeit_pending = false;
+                                            } else {
+                                                chess_game.forfeit_pending = true;
+                                            }
+                                        }
+                                        _ => {
+                                            chess_game.forfeit_pending = false;
+                                        }
+                                    }
+                                }
+                                continue;
+                            }
+
+                            // Handle challenge menu input
+                            if state.challenge_menu.is_open {
+                                let menu = &mut state.challenge_menu;
+                                if menu.viewing_detail {
+                                    match key_event.code {
+                                        KeyCode::Up => menu.navigate_up(),
+                                        KeyCode::Down => menu.navigate_down(4),
+                                        KeyCode::Enter => {
+                                            let difficulty =
+                                                ChessDifficulty::from_index(menu.selected_difficulty);
+                                            if let Some(challenge) = menu.take_selected() {
+                                                if matches!(
+                                                    challenge.challenge_type,
+                                                    ChallengeType::Chess
+                                                ) {
+                                                    start_chess_game(&mut state, difficulty);
+                                                }
+                                            }
+                                        }
+                                        KeyCode::Char('d') | KeyCode::Char('D') => {
+                                            menu.take_selected();
+                                            menu.close_detail();
+                                            if menu.challenges.is_empty() {
+                                                menu.close();
+                                            }
+                                        }
+                                        KeyCode::Esc => menu.close_detail(),
+                                        _ => {}
+                                    }
+                                } else {
+                                    match key_event.code {
+                                        KeyCode::Up => menu.navigate_up(),
+                                        KeyCode::Down => menu.navigate_down(4),
+                                        KeyCode::Enter => menu.open_detail(),
+                                        KeyCode::Tab | KeyCode::Esc => menu.close(),
+                                        _ => {}
+                                    }
+                                }
+                                continue;
+                            }
+
+                            // Tab to open challenge menu
+                            if key_event.code == KeyCode::Tab
+                                && !state.challenge_menu.challenges.is_empty()
+                            {
+                                state.challenge_menu.open();
+                                continue;
+                            }
+
                             match key_event.code {
                                 // Handle 'q'/'Q' to quit
                                 KeyCode::Char('q') | KeyCode::Char('Q') => {
@@ -592,6 +679,21 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
 
     // Each tick is 100ms = 0.1 seconds
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
+
+    // Process chess AI thinking
+    if let Some(ref mut chess_game) = game_state.active_chess {
+        let mut rng = rand::thread_rng();
+        process_ai_thinking(chess_game, &mut rng);
+    }
+
+    // Try chess discovery during normal combat (not in dungeon, fishing, or chess)
+    if game_state.active_chess.is_none()
+        && game_state.active_dungeon.is_none()
+        && game_state.active_fishing.is_none()
+    {
+        let mut rng = rand::thread_rng();
+        try_discover_chess(game_state, &mut rng);
+    }
 
     // Sync player max HP with derived stats (ensures equipment changes are reflected)
     let derived = derived_stats::DerivedStats::calculate_derived_stats(
