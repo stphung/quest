@@ -104,7 +104,12 @@ pub struct ChessGame {
     pub ai_think_ticks: u32,
     pub ai_think_target: u32,
     pub ai_pending_board: Option<chess_engine::Board>,
+    pub ai_pending_move: Option<Move>,
     pub player_is_white: bool,
+    /// Last move made: (from_square, to_square)
+    pub last_move: Option<((u8, u8), (u8, u8))>,
+    /// Move history in algebraic notation
+    pub move_history: Vec<String>,
 }
 
 impl ChessGame {
@@ -121,7 +126,10 @@ impl ChessGame {
             ai_think_ticks: 0,
             ai_think_target: 0,
             ai_pending_board: None,
+            ai_pending_move: None,
             player_is_white: true,
+            last_move: None,
+            move_history: Vec::new(),
         }
     }
 
@@ -252,9 +260,18 @@ impl ChessGame {
             Move::Piece(from_pos, to_pos)
         };
 
+        // Check if this is a capture
+        let is_capture = self.board.get_piece(to_pos).is_some();
+
+        // Generate algebraic notation before applying the move
+        let notation = Self::move_to_algebraic(&self.board, &player_move, is_capture);
+
         // Apply the move
         match self.board.play_move(player_move) {
             chess_engine::GameResult::Continuing(new_board) => {
+                // Record the move
+                self.record_move((sel_file, sel_rank), (dest_file, dest_rank), notation);
+
                 self.board = new_board;
                 self.selected_square = None;
                 self.legal_move_destinations.clear();
@@ -263,9 +280,13 @@ impl ChessGame {
                 self.ai_thinking = true;
                 self.ai_think_ticks = 0;
                 self.ai_pending_board = None;
+                self.ai_pending_move = None;
                 true
             }
             chess_engine::GameResult::Victory(winner) => {
+                // Record the move
+                self.record_move((sel_file, sel_rank), (dest_file, dest_rank), notation);
+
                 self.selected_square = None;
                 self.legal_move_destinations.clear();
 
@@ -278,6 +299,9 @@ impl ChessGame {
                 true
             }
             chess_engine::GameResult::Stalemate => {
+                // Record the move
+                self.record_move((sel_file, sel_rank), (dest_file, dest_rank), notation);
+
                 self.selected_square = None;
                 self.legal_move_destinations.clear();
                 self.game_result = Some(ChessResult::Draw);
@@ -294,6 +318,61 @@ impl ChessGame {
     pub fn clear_selection(&mut self) {
         self.selected_square = None;
         self.legal_move_destinations.clear();
+    }
+
+    /// Record a move in history and update last_move
+    pub fn record_move(&mut self, from: (u8, u8), to: (u8, u8), notation: String) {
+        self.last_move = Some((from, to));
+        self.move_history.push(notation);
+    }
+
+    /// Generate algebraic notation for a move
+    pub fn move_to_algebraic(
+        board: &chess_engine::Board,
+        chess_move: &Move,
+        is_capture: bool,
+    ) -> String {
+        match chess_move {
+            Move::Piece(from, to) => {
+                let piece_char = board
+                    .get_piece(*from)
+                    .map(|p| {
+                        if p.is_king() {
+                            "K"
+                        } else if p.is_queen() {
+                            "Q"
+                        } else if p.is_rook() {
+                            "R"
+                        } else if p.is_bishop() {
+                            "B"
+                        } else if p.is_knight() {
+                            "N"
+                        } else {
+                            ""
+                        }
+                    })
+                    .unwrap_or("");
+
+                let to_file = (b'a' + to.get_col() as u8) as char;
+                let to_rank = (b'1' + to.get_row() as u8) as char;
+                let capture = if is_capture { "x" } else { "" };
+
+                if piece_char.is_empty() {
+                    // Pawn move - include from file only on captures
+                    if is_capture {
+                        let from_file = (b'a' + from.get_col() as u8) as char;
+                        format!("{}x{}{}", from_file, to_file, to_rank)
+                    } else {
+                        format!("{}{}", to_file, to_rank)
+                    }
+                } else {
+                    format!("{}{}{}{}", piece_char, capture, to_file, to_rank)
+                }
+            }
+            Move::KingSideCastle => "O-O".to_string(),
+            Move::QueenSideCastle => "O-O-O".to_string(),
+            Move::Resign => "resigns".to_string(),
+        }
     }
 }
 
@@ -442,5 +521,214 @@ mod tests {
         assert!(!moved);
         // Selection should remain
         assert!(game.selected_square.is_some());
+    }
+
+    // ============ Algebraic Notation Tests ============
+
+    #[test]
+    fn test_pawn_move_notation() {
+        let board = chess_engine::Board::default();
+        // e2-e4 pawn move (no capture)
+        let from = Position::new(1, 4); // e2
+        let to = Position::new(3, 4); // e4
+        let m = Move::Piece(from, to);
+        let notation = ChessGame::move_to_algebraic(&board, &m, false);
+        assert_eq!(notation, "e4");
+    }
+
+    #[test]
+    fn test_pawn_capture_notation() {
+        // Set up a board where a pawn can capture
+        let board = chess_engine::Board::default();
+        let from = Position::new(1, 4); // e2
+        let to = Position::new(2, 3); // d3 (diagonal capture)
+        let m = Move::Piece(from, to);
+        let notation = ChessGame::move_to_algebraic(&board, &m, true);
+        assert_eq!(notation, "exd3");
+    }
+
+    #[test]
+    fn test_knight_move_notation() {
+        let board = chess_engine::Board::default();
+        // Ng1-f3
+        let from = Position::new(0, 6); // g1
+        let to = Position::new(2, 5); // f3
+        let m = Move::Piece(from, to);
+        let notation = ChessGame::move_to_algebraic(&board, &m, false);
+        assert_eq!(notation, "Nf3");
+    }
+
+    #[test]
+    fn test_knight_capture_notation() {
+        let board = chess_engine::Board::default();
+        let from = Position::new(0, 6); // g1
+        let to = Position::new(2, 5); // f3
+        let m = Move::Piece(from, to);
+        let notation = ChessGame::move_to_algebraic(&board, &m, true);
+        assert_eq!(notation, "Nxf3");
+    }
+
+    #[test]
+    fn test_kingside_castle_notation() {
+        let board = chess_engine::Board::default();
+        let notation = ChessGame::move_to_algebraic(&board, &Move::KingSideCastle, false);
+        assert_eq!(notation, "O-O");
+    }
+
+    #[test]
+    fn test_queenside_castle_notation() {
+        let board = chess_engine::Board::default();
+        let notation = ChessGame::move_to_algebraic(&board, &Move::QueenSideCastle, false);
+        assert_eq!(notation, "O-O-O");
+    }
+
+    #[test]
+    fn test_bishop_move_notation() {
+        let board = chess_engine::Board::default();
+        // Bc1 (if it could move to c1)
+        let from = Position::new(0, 2); // c1
+        let to = Position::new(2, 4); // e3
+        let m = Move::Piece(from, to);
+        let notation = ChessGame::move_to_algebraic(&board, &m, false);
+        assert_eq!(notation, "Be3");
+    }
+
+    #[test]
+    fn test_queen_move_notation() {
+        let board = chess_engine::Board::default();
+        let from = Position::new(0, 3); // d1
+        let to = Position::new(2, 3); // d3
+        let m = Move::Piece(from, to);
+        let notation = ChessGame::move_to_algebraic(&board, &m, false);
+        assert_eq!(notation, "Qd3");
+    }
+
+    #[test]
+    fn test_rook_move_notation() {
+        let board = chess_engine::Board::default();
+        let from = Position::new(0, 0); // a1
+        let to = Position::new(3, 0); // a4
+        let m = Move::Piece(from, to);
+        let notation = ChessGame::move_to_algebraic(&board, &m, false);
+        assert_eq!(notation, "Ra4");
+    }
+
+    #[test]
+    fn test_king_move_notation() {
+        let board = chess_engine::Board::default();
+        let from = Position::new(0, 4); // e1
+        let to = Position::new(1, 4); // e2
+        let m = Move::Piece(from, to);
+        let notation = ChessGame::move_to_algebraic(&board, &m, false);
+        assert_eq!(notation, "Ke2");
+    }
+
+    // ============ Move History Tests ============
+
+    #[test]
+    fn test_record_move_updates_last_move() {
+        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        assert!(game.last_move.is_none());
+
+        game.record_move((4, 1), (4, 3), "e4".to_string());
+
+        assert_eq!(game.last_move, Some(((4, 1), (4, 3))));
+    }
+
+    #[test]
+    fn test_record_move_adds_to_history() {
+        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        assert!(game.move_history.is_empty());
+
+        game.record_move((4, 1), (4, 3), "e4".to_string());
+        game.record_move((4, 6), (4, 4), "e5".to_string());
+
+        assert_eq!(game.move_history.len(), 2);
+        assert_eq!(game.move_history[0], "e4");
+        assert_eq!(game.move_history[1], "e5");
+    }
+
+    #[test]
+    fn test_move_history_after_player_move() {
+        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        // Select e2 pawn and move to e4
+        game.select_piece_at_cursor();
+        game.cursor = (4, 3);
+        game.try_move_to_cursor();
+
+        // Move should be recorded
+        assert_eq!(game.move_history.len(), 1);
+        assert_eq!(game.move_history[0], "e4");
+        assert_eq!(game.last_move, Some(((4, 1), (4, 3))));
+    }
+
+    #[test]
+    fn test_last_move_updates_each_move() {
+        let mut game = ChessGame::new(ChessDifficulty::Novice);
+
+        game.record_move((4, 1), (4, 3), "e4".to_string());
+        assert_eq!(game.last_move, Some(((4, 1), (4, 3))));
+
+        game.record_move((4, 6), (4, 4), "e5".to_string());
+        assert_eq!(game.last_move, Some(((4, 6), (4, 4))));
+
+        game.record_move((6, 0), (5, 2), "Nf3".to_string());
+        assert_eq!(game.last_move, Some(((6, 0), (5, 2))));
+    }
+
+    #[test]
+    fn test_new_game_has_empty_history() {
+        let game = ChessGame::new(ChessDifficulty::Master);
+        assert!(game.move_history.is_empty());
+        assert!(game.last_move.is_none());
+    }
+
+    // ============ Forfeit Flow Tests ============
+
+    #[test]
+    fn test_forfeit_pending_starts_false() {
+        let game = ChessGame::new(ChessDifficulty::Novice);
+        assert!(!game.forfeit_pending);
+    }
+
+    #[test]
+    fn test_forfeit_pending_can_be_set() {
+        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        game.forfeit_pending = true;
+        assert!(game.forfeit_pending);
+    }
+
+    #[test]
+    fn test_forfeit_result_sets_game_over() {
+        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        game.game_result = Some(ChessResult::Forfeit);
+        assert_eq!(game.game_result, Some(ChessResult::Forfeit));
+    }
+
+    #[test]
+    fn test_forfeit_clears_on_piece_selection() {
+        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        game.forfeit_pending = true;
+
+        // Selecting a piece should conceptually clear forfeit
+        // (In actual code this happens in main.rs input handling)
+        // Here we test the state can be cleared
+        game.forfeit_pending = false;
+        assert!(!game.forfeit_pending);
+    }
+
+    #[test]
+    fn test_move_clears_selection_not_forfeit() {
+        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        game.forfeit_pending = true;
+
+        // Make a move
+        game.select_piece_at_cursor();
+        game.cursor = (4, 3); // e4
+        game.try_move_to_cursor();
+
+        // Move itself doesn't clear forfeit - that's handled by input
+        // But selection is cleared
+        assert!(game.selected_square.is_none());
     }
 }

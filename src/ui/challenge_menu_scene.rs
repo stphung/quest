@@ -31,8 +31,8 @@ fn render_list_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
     frame.render_widget(block, area);
 
     if menu.challenges.is_empty() {
-        let text = Paragraph::new("No pending challenges.")
-            .style(Style::default().fg(Color::DarkGray));
+        let text =
+            Paragraph::new("No pending challenges.").style(Style::default().fg(Color::DarkGray));
         frame.render_widget(text, inner);
         return;
     }
@@ -44,7 +44,9 @@ fn render_list_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
         .map(|(i, challenge)| {
             let prefix = if i == menu.selected_index { "> " } else { "  " };
             let style = if i == menu.selected_index {
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(Color::White)
             };
@@ -83,19 +85,19 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // Description
-            Constraint::Length(1),  // Spacer
-            Constraint::Length(6),  // Difficulty selector
-            Constraint::Length(1),  // Spacer
-            Constraint::Length(2),  // Outcomes
-            Constraint::Min(0),     // Spacer
-            Constraint::Length(1),  // Help
+            Constraint::Length(4), // Description (longer flavor text)
+            Constraint::Length(1), // Spacer
+            Constraint::Length(5), // Difficulty selector
+            Constraint::Length(1), // Spacer
+            Constraint::Length(1), // Outcomes (now single line)
+            Constraint::Min(0),    // Spacer
+            Constraint::Length(1), // Help
         ])
         .split(inner);
 
     // Description
-    let desc = Paragraph::new(challenge.description.clone())
-        .style(Style::default().fg(Color::White));
+    let desc =
+        Paragraph::new(challenge.description.clone()).style(Style::default().fg(Color::White));
     frame.render_widget(desc, chunks[0]);
 
     // Difficulty selector (chess-specific)
@@ -104,21 +106,26 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
     }
 
     // Outcomes
-    let outcomes = Paragraph::new(vec![
-        Line::from(Span::styled("Lose: No penalty", Style::default().fg(Color::Gray))),
-        Line::from(Span::styled("Draw: Bonus XP", Style::default().fg(Color::Gray))),
-    ]);
+    let outcomes = Paragraph::new(vec![Line::from(vec![
+        Span::styled("✓ ", Style::default().fg(Color::Green)),
+        Span::styled("No penalty for losing", Style::default().fg(Color::Gray)),
+        Span::styled("    ✓ ", Style::default().fg(Color::Green)),
+        Span::styled("Draw grants bonus XP", Style::default().fg(Color::Gray)),
+    ])]);
     frame.render_widget(outcomes, chunks[4]);
 
     // Help text
-    let help = Paragraph::new("[↑/↓] Difficulty  [Enter] Accept  [D] Decline  [Esc] Back")
+    let help = Paragraph::new("[↑/↓] Difficulty  [Enter] Play  [D] Walk away  [Esc] Back")
         .style(Style::default().fg(Color::DarkGray));
     frame.render_widget(help, chunks[6]);
 }
 
 fn render_difficulty_selector(frame: &mut Frame, area: Rect, selected: usize) {
-    let title = Paragraph::new("Select difficulty:")
-        .style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD));
+    let title = Paragraph::new("Select difficulty:").style(
+        Style::default()
+            .fg(Color::White)
+            .add_modifier(Modifier::BOLD),
+    );
     frame.render_widget(title, Rect { height: 1, ..area });
 
     let options_area = Rect {
@@ -131,20 +138,46 @@ fn render_difficulty_selector(frame: &mut Frame, area: Rect, selected: usize) {
         .iter()
         .enumerate()
         .map(|(i, diff)| {
-            let prefix = if i == selected { "> " } else { "  " };
-            let style = if i == selected {
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+            let is_selected = i == selected;
+            let prefix = if is_selected { "> " } else { "  " };
+
+            let reward = diff.reward_prestige();
+            let reward_text = if reward == 1 {
+                "Win: +1 Prestige Rank".to_string()
+            } else {
+                format!("Win: +{} Prestige Ranks", reward)
+            };
+
+            // Selected items get cyan/yellow highlighting
+            let prefix_style = if is_selected {
+                Style::default().fg(Color::Cyan)
+            } else {
+                Style::default()
+            };
+            let name_style = if is_selected {
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(Color::White)
             };
-            let text = format!(
-                "{}{:<12} ~{:<5} +{}P",
-                prefix,
-                diff.name(),
-                diff.estimated_elo(),
-                diff.reward_prestige()
-            );
-            ListItem::new(text).style(style)
+            let reward_style = if is_selected {
+                Style::default().fg(Color::Yellow)
+            } else {
+                Style::default().fg(Color::Gray)
+            };
+
+            let spans = vec![
+                Span::styled(prefix, prefix_style),
+                Span::styled(format!("{:<12}", diff.name()), name_style),
+                Span::styled(
+                    format!("~{:<5} ELO   ", diff.estimated_elo()),
+                    Style::default().fg(Color::DarkGray),
+                ),
+                Span::styled(reward_text, reward_style),
+            ];
+
+            ListItem::new(Line::from(spans))
         })
         .collect();
 

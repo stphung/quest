@@ -95,7 +95,7 @@ pub fn update_dungeon(state: &mut GameState, delta_time: f64) -> Vec<DungeonEven
 
 /// Finds the next room to explore using BFS
 /// Prioritizes: unexplored rooms, then boss (if has key)
-fn find_next_room(dungeon: &Dungeon) -> Option<(usize, usize)> {
+pub fn find_next_room(dungeon: &Dungeon) -> Option<(usize, usize)> {
     let current = dungeon.player_position;
 
     // If we have the key and boss is accessible and not yet cleared, go to boss
@@ -154,7 +154,7 @@ fn find_next_room(dungeon: &Dungeon) -> Option<(usize, usize)> {
 }
 
 /// BFS pathfinding between two positions
-fn find_path_to(
+pub fn find_path_to(
     dungeon: &Dungeon,
     from: (usize, usize),
     to: (usize, usize),
@@ -709,17 +709,30 @@ mod tests {
         let mut dungeon = generate_dungeon(10, 0);
         dungeon.has_key = true;
 
-        // Clear path to boss by marking rooms as cleared
+        // Clear path to boss by marking rooms as cleared, but keep boss as Revealed
         let boss_pos = dungeon.boss_position;
+        let player_pos = dungeon.player_position;
         let grid_size = dungeon.size.grid_size();
         for y in 0..grid_size {
             for x in 0..grid_size {
                 if let Some(room) = dungeon.get_room_mut(x, y) {
-                    if room.state == RoomState::Hidden {
+                    if (x, y) == boss_pos {
+                        // Boss room must be Revealed (not Cleared) for pathfinding to target it
+                        room.state = RoomState::Revealed;
+                    } else if (x, y) == player_pos {
+                        // Player position stays as Current
+                        room.state = RoomState::Current;
+                    } else {
+                        // All other rooms cleared to allow pathfinding through them
                         room.state = RoomState::Cleared;
                     }
                 }
             }
+        }
+
+        // Edge case: player already at boss - nothing to test
+        if player_pos == boss_pos {
+            return;
         }
 
         let next = find_next_room(&dungeon);
@@ -727,7 +740,6 @@ mod tests {
         // With key, should head toward boss
         if let Some(next_pos) = next {
             // The next position should bring us closer to the boss
-            // (there may be multiple shortest paths, so we verify progress, not exact path)
             let current_distance =
                 find_path_to(&dungeon, dungeon.player_position, boss_pos).map(|p| p.len());
             let next_distance = find_path_to(&dungeon, next_pos, boss_pos).map(|p| p.len());
@@ -735,9 +747,13 @@ mod tests {
             if let (Some(curr_dist), Some(next_dist)) = (current_distance, next_distance) {
                 assert!(
                     next_dist < curr_dist,
-                    "Next position {:?} should be closer to boss than current {:?}",
+                    "Next position {:?} should be closer to boss than current {:?}. \
+                     curr_dist={}, next_dist={}, boss_pos={:?}",
                     next_pos,
-                    dungeon.player_position
+                    dungeon.player_position,
+                    curr_dist,
+                    next_dist,
+                    boss_pos
                 );
             }
         }

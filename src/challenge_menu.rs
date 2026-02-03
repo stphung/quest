@@ -34,7 +34,9 @@ impl ChallengeMenu {
     }
 
     pub fn has_chess_challenge(&self) -> bool {
-        self.challenges.iter().any(|c| matches!(c.challenge_type, ChallengeType::Chess))
+        self.challenges
+            .iter()
+            .any(|c| matches!(c.challenge_type, ChallengeType::Chess))
     }
 
     pub fn add_challenge(&mut self, challenge: PendingChallenge) {
@@ -46,7 +48,9 @@ impl ChallengeMenu {
             return None;
         }
         let challenge = self.challenges.remove(self.selected_index);
-        self.selected_index = self.selected_index.min(self.challenges.len().saturating_sub(1));
+        self.selected_index = self
+            .selected_index
+            .min(self.challenges.len().saturating_sub(1));
         Some(challenge)
     }
 
