@@ -1,5 +1,6 @@
 pub mod challenge_menu_scene;
 pub mod character_creation;
+pub mod chess_scene;
 pub mod character_delete;
 pub mod character_rename;
 pub mod character_select;
