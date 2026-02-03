@@ -446,4 +446,137 @@ mod tests {
         // Active fishing session should be cleared (transient state)
         assert!(state.active_fishing.is_none());
     }
+
+    #[test]
+    fn test_zone_progression_reset_on_prestige() {
+        use chrono::Utc;
+
+        let mut state =
+            crate::game_state::GameState::new("Test Hero".to_string(), Utc::now().timestamp());
+
+        // Advance zone progression
+        state.zone_progression.current_zone_id = 3;
+        state.zone_progression.current_subzone_id = 2;
+        state.zone_progression.defeat_boss(1, 1);
+        state.zone_progression.defeat_boss(2, 1);
+
+        // Level up enough to prestige
+        state.character_level = 10;
+
+        // Perform prestige
+        perform_prestige(&mut state);
+
+        // Zone progression should be reset to start
+        assert_eq!(state.zone_progression.current_zone_id, 1);
+        assert_eq!(state.zone_progression.current_subzone_id, 1);
+
+        // Defeated bosses should be cleared
+        assert!(!state.zone_progression.is_boss_defeated(1, 1));
+        assert!(!state.zone_progression.is_boss_defeated(2, 1));
+    }
+
+    #[test]
+    fn test_multiple_prestiges() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // First prestige at level 10
+        state.character_level = 10;
+        perform_prestige(&mut state);
+        assert_eq!(state.prestige_rank, 1);
+        assert_eq!(state.total_prestige_count, 1);
+
+        // Second prestige requires level 25
+        state.character_level = 25;
+        perform_prestige(&mut state);
+        assert_eq!(state.prestige_rank, 2);
+        assert_eq!(state.total_prestige_count, 2);
+
+        // Third prestige requires level 50
+        state.character_level = 50;
+        perform_prestige(&mut state);
+        assert_eq!(state.prestige_rank, 3);
+        assert_eq!(state.total_prestige_count, 3);
+
+        // Character should be reset each time
+        assert_eq!(state.character_level, 1);
+        assert_eq!(state.character_xp, 0);
+    }
+
+    #[test]
+    fn test_attribute_cap_increases_with_prestige() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // Base cap is 20
+        assert_eq!(state.get_attribute_cap(), 20);
+
+        // Prestige increases cap by 5
+        state.character_level = 10;
+        perform_prestige(&mut state);
+        assert_eq!(state.get_attribute_cap(), 25);
+
+        state.character_level = 25;
+        perform_prestige(&mut state);
+        assert_eq!(state.get_attribute_cap(), 30);
+    }
+
+    #[test]
+    fn test_get_next_prestige_tier() {
+        // From rank 0, next is rank 1 (Bronze)
+        let next = get_next_prestige_tier(0);
+        assert_eq!(next.rank, 1);
+        assert_eq!(next.name, "Bronze");
+        assert_eq!(next.required_level, 10);
+
+        // From rank 4, next is rank 5 (Diamond)
+        let next = get_next_prestige_tier(4);
+        assert_eq!(next.rank, 5);
+        assert_eq!(next.name, "Diamond");
+        assert_eq!(next.required_level, 80);
+    }
+
+    #[test]
+    fn test_high_prestige_ranks() {
+        // Test rank 20+ (Eternal tier)
+        let tier20 = get_prestige_tier(20);
+        assert_eq!(tier20.name, "Eternal");
+        assert_eq!(tier20.required_level, 235); // 220 + (20-19)*15
+
+        let tier25 = get_prestige_tier(25);
+        assert_eq!(tier25.name, "Eternal");
+        assert_eq!(tier25.required_level, 310); // 220 + (25-19)*15
+
+        // Multiplier should continue scaling
+        assert!(tier25.multiplier > tier20.multiplier);
+    }
+
+    #[test]
+    fn test_prestige_not_possible_when_ineligible() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // At rank 1, need level 25 for next prestige
+        state.prestige_rank = 1;
+        state.character_level = 20; // Not enough
+
+        assert!(!can_prestige(&state));
+
+        // Try to prestige anyway
+        perform_prestige(&mut state);
+
+        // Should not have changed
+        assert_eq!(state.prestige_rank, 1);
+    }
+
+    #[test]
+    fn test_prestige_exactly_at_required_level() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // Exactly at required level for first prestige
+        state.character_level = 10;
+        assert!(can_prestige(&state));
+
+        // Prestige to rank 1, now need exactly level 25
+        perform_prestige(&mut state);
+        state.character_level = 25;
+        assert!(can_prestige(&state));
+    }
 }

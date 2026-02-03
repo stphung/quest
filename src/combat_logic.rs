@@ -281,4 +281,259 @@ mod tests {
         );
         assert!(!state.combat_state.is_regenerating);
     }
+
+    #[test]
+    fn test_player_died_in_dungeon() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        state.combat_state.player_current_hp = 1;
+        state.combat_state.current_enemy = Some(Enemy::new("Test".to_string(), 100, 50));
+
+        // Put player in a dungeon
+        state.active_dungeon = Some(crate::dungeon_generation::generate_dungeon(1, 0));
+        assert!(state.active_dungeon.is_some());
+
+        // Force an attack that kills player
+        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        let events = update_combat(&mut state, 0.1);
+
+        // Should have PlayerDiedInDungeon event (not PlayerDied)
+        let died_in_dungeon = events
+            .iter()
+            .any(|e| matches!(e, CombatEvent::PlayerDiedInDungeon));
+        let died_normal = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
+        assert!(died_in_dungeon);
+        assert!(!died_normal);
+
+        // Dungeon should be cleared
+        assert!(state.active_dungeon.is_none());
+
+        // Player HP should be reset
+        assert_eq!(
+            state.combat_state.player_current_hp,
+            state.combat_state.player_max_hp
+        );
+
+        // Enemy should be cleared (not reset like in overworld)
+        assert!(state.combat_state.current_enemy.is_none());
+    }
+
+    #[test]
+    fn test_weapon_blocked_boss_no_damage() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // Set up Zone 10 boss fight without Stormbreaker
+        state.zone_progression.current_zone_id = 10;
+        state.zone_progression.current_subzone_id = 4; // Zone 10 has 4 subzones, this is the zone boss
+        state.zone_progression.fighting_boss = true;
+        state.zone_progression.has_stormbreaker = false;
+
+        let enemy_hp = 100;
+        state.combat_state.current_enemy =
+            Some(Enemy::new("Eternal Storm".to_string(), enemy_hp, 10));
+
+        // Force an attack
+        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        let events = update_combat(&mut state, 0.1);
+
+        // Should have PlayerAttackBlocked event
+        let blocked = events
+            .iter()
+            .any(|e| matches!(e, CombatEvent::PlayerAttackBlocked { .. }));
+        assert!(blocked);
+
+        // Enemy should NOT have taken damage
+        let enemy = state.combat_state.current_enemy.as_ref().unwrap();
+        assert_eq!(enemy.current_hp, enemy_hp);
+    }
+
+    #[test]
+    fn test_weapon_blocked_boss_still_attacks_back() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // Set up Zone 10 boss fight without Stormbreaker
+        state.zone_progression.current_zone_id = 10;
+        state.zone_progression.current_subzone_id = 4;
+        state.zone_progression.fighting_boss = true;
+        state.zone_progression.has_stormbreaker = false;
+
+        let player_hp = state.combat_state.player_current_hp;
+        state.combat_state.current_enemy = Some(Enemy::new("Eternal Storm".to_string(), 100, 10));
+
+        // Force an attack
+        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        let events = update_combat(&mut state, 0.1);
+
+        // Should have EnemyAttack event
+        let enemy_attacked = events
+            .iter()
+            .any(|e| matches!(e, CombatEvent::EnemyAttack { .. }));
+        assert!(enemy_attacked);
+
+        // Player should have taken damage
+        assert!(state.combat_state.player_current_hp < player_hp);
+    }
+
+    #[test]
+    fn test_death_to_weapon_blocked_boss_resets_encounter() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // Set up Zone 10 boss fight without Stormbreaker
+        state.zone_progression.current_zone_id = 10;
+        state.zone_progression.current_subzone_id = 4;
+        state.zone_progression.fighting_boss = true;
+        state.zone_progression.kills_in_subzone = 10;
+        state.zone_progression.has_stormbreaker = false;
+
+        // Low HP so player dies
+        state.combat_state.player_current_hp = 1;
+        state.combat_state.current_enemy = Some(Enemy::new("Eternal Storm".to_string(), 100, 50));
+
+        // Force an attack
+        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        let events = update_combat(&mut state, 0.1);
+
+        // Should have PlayerDied event
+        let died = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
+        assert!(died);
+
+        // Boss encounter should be reset
+        assert!(!state.zone_progression.fighting_boss);
+        assert_eq!(state.zone_progression.kills_in_subzone, 0);
+
+        // Enemy should be cleared (not reset)
+        assert!(state.combat_state.current_enemy.is_none());
+    }
+
+    #[test]
+    fn test_defense_reduces_enemy_damage() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // Increase DEX for more defense (defense = DEX modifier)
+        state
+            .attributes
+            .set(crate::attributes::AttributeType::Dexterity, 20); // +5 modifier = 5 defense
+
+        let initial_hp = state.combat_state.player_current_hp;
+        let enemy_base_damage = 15;
+        state.combat_state.current_enemy =
+            Some(Enemy::new("Test".to_string(), 100, enemy_base_damage));
+
+        // Force an attack
+        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        update_combat(&mut state, 0.1);
+
+        // Calculate expected damage reduction
+        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+        let expected_damage = enemy_base_damage.saturating_sub(derived.defense);
+        let actual_damage = initial_hp - state.combat_state.player_current_hp;
+
+        assert_eq!(actual_damage, expected_damage);
+    }
+
+    #[test]
+    fn test_defense_can_reduce_damage_to_zero() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // High DEX for high defense (defense = DEX modifier)
+        state
+            .attributes
+            .set(crate::attributes::AttributeType::Dexterity, 30); // +10 modifier = 10 defense
+
+        let initial_hp = state.combat_state.player_current_hp;
+        // Enemy damage lower than defense (5 < 10)
+        state.combat_state.current_enemy = Some(Enemy::new("Weak".to_string(), 100, 5));
+
+        // Force an attack
+        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        update_combat(&mut state, 0.1);
+
+        // Player should take no damage (5 - 10 = 0 via saturating_sub)
+        assert_eq!(state.combat_state.player_current_hp, initial_hp);
+    }
+
+    #[test]
+    fn test_subzone_boss_defeat() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // Set up a subzone boss fight (not Zone 10)
+        state.zone_progression.current_zone_id = 1;
+        state.zone_progression.current_subzone_id = 1;
+        state.zone_progression.fighting_boss = true;
+
+        // Weak enemy that will die in one hit
+        state.combat_state.current_enemy = Some(Enemy::new("Boss".to_string(), 1, 5));
+
+        // Force an attack
+        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        let events = update_combat(&mut state, 0.1);
+
+        // Should have SubzoneBossDefeated event
+        let boss_defeated = events
+            .iter()
+            .any(|e| matches!(e, CombatEvent::SubzoneBossDefeated { .. }));
+        assert!(boss_defeated);
+
+        // Boss fight should be over
+        assert!(!state.zone_progression.fighting_boss);
+    }
+
+    #[test]
+    fn test_regular_kill_records_progress() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        let initial_kills = state.zone_progression.kills_in_subzone;
+
+        // Weak enemy
+        state.combat_state.current_enemy = Some(Enemy::new("Mob".to_string(), 1, 5));
+
+        // Force an attack to kill
+        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        let events = update_combat(&mut state, 0.1);
+
+        // Should have EnemyDied event
+        let enemy_died = events
+            .iter()
+            .any(|e| matches!(e, CombatEvent::EnemyDied { .. }));
+        assert!(enemy_died);
+
+        // Kill should be recorded
+        assert!(state.zone_progression.kills_in_subzone > initial_kills);
+    }
+
+    #[test]
+    fn test_regeneration_skips_combat() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        state.combat_state.is_regenerating = true;
+        state.combat_state.regen_timer = 0.0;
+        state.combat_state.player_current_hp = 10;
+        state.combat_state.current_enemy = Some(Enemy::new("Test".to_string(), 100, 50));
+
+        // Even with attack timer ready, should not attack while regenerating
+        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        let events = update_combat(&mut state, 0.1);
+
+        // No combat events during regen
+        assert!(events.is_empty());
+
+        // Enemy should not have taken damage
+        let enemy = state.combat_state.current_enemy.as_ref().unwrap();
+        assert_eq!(enemy.current_hp, 100);
+    }
+
+    #[test]
+    fn test_gradual_regeneration() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        state.combat_state.is_regenerating = true;
+        state.combat_state.regen_timer = 0.0;
+        state.combat_state.player_current_hp = 10;
+        state.combat_state.player_max_hp = 100;
+
+        // Partial regen (half duration)
+        update_combat(&mut state, HP_REGEN_DURATION_SECONDS / 2.0);
+
+        // HP should be partially restored (roughly halfway)
+        assert!(state.combat_state.player_current_hp > 10);
+        assert!(state.combat_state.player_current_hp < 100);
+        assert!(state.combat_state.is_regenerating);
+    }
 }
