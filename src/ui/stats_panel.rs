@@ -4,6 +4,7 @@ use crate::game_logic::xp_for_next_level;
 use crate::game_state::GameState;
 use crate::items::{Affix, AffixType, Rarity};
 use crate::prestige::{get_adventurer_rank, get_prestige_tier};
+use crate::updater::UpdateInfo;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -30,12 +31,34 @@ fn format_affix(affix: &Affix) -> String {
     }
 }
 
-/// Draws the stats panel showing player attributes and derived stats
-pub fn draw_stats_panel(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    // Main vertical layout: header, zone, attributes, derived stats, equipment, prestige, footer
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
+/// Draws the stats panel with optional update notification
+pub fn draw_stats_panel_with_update(
+    frame: &mut Frame,
+    area: Rect,
+    game_state: &GameState,
+    update_info: Option<&UpdateInfo>,
+) {
+    // Calculate update panel height: 4 base + changelog lines (max 5)
+    let update_height = if let Some(info) = update_info {
+        4 + info.changelog.len().min(5) as u16
+    } else {
+        0
+    };
+
+    // Main vertical layout: header, zone, attributes, derived stats, equipment, prestige, footer, [update]
+    let constraints = if update_info.is_some() {
+        vec![
+            Constraint::Length(3),             // Header
+            Constraint::Length(3),             // Zone info
+            Constraint::Length(14),            // Attributes (6 attributes + borders)
+            Constraint::Length(6),             // Derived stats (condensed)
+            Constraint::Min(16),               // Equipment section (grows to fit)
+            Constraint::Length(6),             // Prestige info + fishing rank
+            Constraint::Length(3),             // Footer
+            Constraint::Length(update_height), // Update panel
+        ]
+    } else {
+        vec![
             Constraint::Length(3),  // Header
             Constraint::Length(3),  // Zone info
             Constraint::Length(14), // Attributes (6 attributes + borders)
@@ -43,7 +66,12 @@ pub fn draw_stats_panel(frame: &mut Frame, area: Rect, game_state: &GameState) {
             Constraint::Min(16),    // Equipment section (grows to fit)
             Constraint::Length(6),  // Prestige info + fishing rank
             Constraint::Length(3),  // Footer
-        ])
+        ]
+    };
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(constraints)
         .split(area);
 
     // Draw header with character info
@@ -66,6 +94,11 @@ pub fn draw_stats_panel(frame: &mut Frame, area: Rect, game_state: &GameState) {
 
     // Draw footer with controls
     draw_footer(frame, chunks[6], game_state);
+
+    // Draw update panel if available
+    if let Some(info) = update_info {
+        draw_update_panel(frame, chunks[7], info);
+    }
 }
 
 /// Draws the header with character level and XP
@@ -549,4 +582,51 @@ fn draw_footer(frame: &mut Frame, area: Rect, game_state: &GameState) {
         .alignment(Alignment::Center);
 
     frame.render_widget(footer, area);
+}
+
+/// Draws the update notification panel
+fn draw_update_panel(frame: &mut Frame, area: Rect, update_info: &UpdateInfo) {
+    let mut lines = vec![
+        Line::from(vec![
+            Span::styled("New version: ", Style::default().fg(Color::White)),
+            Span::styled(
+                format!("{} ({})", update_info.new_version, update_info.new_commit),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(""),
+    ];
+
+    // Add changelog entries
+    if !update_info.changelog.is_empty() {
+        for entry in &update_info.changelog {
+            lines.push(Line::from(vec![
+                Span::styled(" • ", Style::default().fg(Color::DarkGray)),
+                Span::styled(entry.as_str(), Style::default().fg(Color::White)),
+            ]));
+        }
+    }
+
+    // Add install instruction
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![Span::styled(
+        "Run 'quest update' to install",
+        Style::default().fg(Color::DarkGray),
+    )]));
+
+    let update_panel = Paragraph::new(lines).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Yellow))
+            .title(Span::styled(
+                " 🆕 Update Available ",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )),
+    );
+
+    frame.render_widget(update_panel, area);
 }

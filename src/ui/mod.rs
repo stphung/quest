@@ -12,6 +12,7 @@ pub mod prestige_confirm;
 mod stats_panel;
 
 use crate::game_state::GameState;
+use crate::updater::UpdateInfo;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style},
@@ -19,8 +20,12 @@ use ratatui::{
     Frame,
 };
 
-/// Main UI drawing function that creates the layout and draws all components
-pub fn draw_ui(frame: &mut Frame, game_state: &GameState) {
+/// Main UI drawing function with optional update notification
+pub fn draw_ui_with_update(
+    frame: &mut Frame,
+    game_state: &GameState,
+    update_info: Option<&UpdateInfo>,
+) {
     let size = frame.size();
 
     // Split into two main areas: stats panel (left) and combat/dungeon (right)
@@ -32,8 +37,8 @@ pub fn draw_ui(frame: &mut Frame, game_state: &GameState) {
         ])
         .split(size);
 
-    // Draw stats panel on the left
-    stats_panel::draw_stats_panel(frame, chunks[0], game_state);
+    // Draw stats panel on the left (with optional update info)
+    stats_panel::draw_stats_panel_with_update(frame, chunks[0], game_state, update_info);
 
     // Draw right panel based on current activity
     if let Some(ref session) = game_state.active_fishing {

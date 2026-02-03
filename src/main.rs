@@ -44,7 +44,8 @@ use ui::character_creation::CharacterCreationScreen;
 use ui::character_delete::CharacterDeleteScreen;
 use ui::character_rename::CharacterRenameScreen;
 use ui::character_select::CharacterSelectScreen;
-use ui::draw_ui;
+use ui::draw_ui_with_update;
+use updater::UpdateInfo;
 
 enum Screen {
     CharacterSelect,
@@ -450,13 +451,31 @@ fn main() -> io::Result<()> {
                 // Run the game loop
                 let mut last_tick = Instant::now();
                 let mut last_autosave = Instant::now();
+                let mut last_update_check = Instant::now();
                 let mut tick_counter: u32 = 0;
                 let mut showing_prestige_confirm = false;
 
+                // Update check state - start initial background check immediately
+                let mut update_info: Option<UpdateInfo> = None;
+                let mut update_check_handle: Option<std::thread::JoinHandle<Option<UpdateInfo>>> =
+                    Some(std::thread::spawn(updater::check_update_info));
+
                 loop {
+                    // Check if background update check completed
+                    if let Some(handle) = update_check_handle.take() {
+                        if handle.is_finished() {
+                            if let Ok(info) = handle.join() {
+                                update_info = info;
+                            }
+                        } else {
+                            // Not finished yet, put it back
+                            update_check_handle = Some(handle);
+                        }
+                    }
+
                     // Draw UI
                     terminal.draw(|frame| {
-                        draw_ui(frame, &state);
+                        draw_ui_with_update(frame, &state, update_info.as_ref());
                         // Draw prestige confirmation overlay if active
                         if showing_prestige_confirm {
                             ui::prestige_confirm::draw_prestige_confirm(frame, &state);
@@ -521,6 +540,17 @@ fn main() -> io::Result<()> {
                     if last_autosave.elapsed() >= Duration::from_secs(AUTOSAVE_INTERVAL_SECONDS) {
                         character_manager.save_character(&state)?;
                         last_autosave = Instant::now();
+                    }
+
+                    // Periodic update check (every 30 minutes)
+                    // Only start a new check if we don't have one running and haven't found an update
+                    if update_info.is_none()
+                        && update_check_handle.is_none()
+                        && last_update_check.elapsed()
+                            >= Duration::from_secs(UPDATE_CHECK_INTERVAL_SECONDS)
+                    {
+                        update_check_handle = Some(std::thread::spawn(updater::check_update_info));
+                        last_update_check = Instant::now();
                     }
                 }
             }
