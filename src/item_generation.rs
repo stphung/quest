@@ -156,4 +156,206 @@ mod tests {
         let item = generate_item(EquipmentSlot::Weapon, Rarity::Magic, 5);
         assert!(!item.display_name.is_empty());
     }
+
+    #[test]
+    fn test_generate_epic_item_affixes() {
+        let item = generate_item(EquipmentSlot::Boots, Rarity::Epic, 15);
+        assert_eq!(item.rarity, Rarity::Epic);
+        assert!(item.affixes.len() >= 3 && item.affixes.len() <= 4);
+        assert!(item.attributes.total() >= 5);
+    }
+
+    #[test]
+    fn test_common_attribute_bounds() {
+        // Common items: 1-2 per attribute, 1-3 attributes boosted
+        // So total should be between 1 and 6 (3 attrs * 2 max)
+        for _ in 0..50 {
+            let item = generate_item(EquipmentSlot::Weapon, Rarity::Common, 1);
+            assert!(item.attributes.total() >= 1, "Common total too low");
+            assert!(
+                item.attributes.total() <= 6,
+                "Common total too high: {}",
+                item.attributes.total()
+            );
+        }
+    }
+
+    #[test]
+    fn test_legendary_attribute_bounds() {
+        // Legendary items: 8-15 per attribute, 1-3 attributes boosted
+        // So total should be between 8 and 45 (3 attrs * 15 max)
+        for _ in 0..50 {
+            let item = generate_item(EquipmentSlot::Weapon, Rarity::Legendary, 20);
+            assert!(
+                item.attributes.total() >= 8,
+                "Legendary total too low: {}",
+                item.attributes.total()
+            );
+            assert!(
+                item.attributes.total() <= 45,
+                "Legendary total too high: {}",
+                item.attributes.total()
+            );
+        }
+    }
+
+    #[test]
+    fn test_magic_attribute_bounds() {
+        for _ in 0..50 {
+            let item = generate_item(EquipmentSlot::Armor, Rarity::Magic, 5);
+            assert!(item.attributes.total() >= 2, "Magic total too low");
+            assert!(
+                item.attributes.total() <= 12,
+                "Magic total too high: {}",
+                item.attributes.total()
+            );
+        }
+    }
+
+    #[test]
+    fn test_rare_attribute_bounds() {
+        for _ in 0..50 {
+            let item = generate_item(EquipmentSlot::Helmet, Rarity::Rare, 10);
+            assert!(item.attributes.total() >= 3, "Rare total too low");
+            assert!(
+                item.attributes.total() <= 18,
+                "Rare total too high: {}",
+                item.attributes.total()
+            );
+        }
+    }
+
+    #[test]
+    fn test_epic_attribute_bounds() {
+        for _ in 0..50 {
+            let item = generate_item(EquipmentSlot::Ring, Rarity::Epic, 15);
+            assert!(item.attributes.total() >= 5, "Epic total too low");
+            assert!(
+                item.attributes.total() <= 30,
+                "Epic total too high: {}",
+                item.attributes.total()
+            );
+        }
+    }
+
+    #[test]
+    fn test_affix_values_within_magic_range() {
+        for _ in 0..50 {
+            let item = generate_item(EquipmentSlot::Weapon, Rarity::Magic, 5);
+            for affix in &item.affixes {
+                match affix.affix_type {
+                    AffixType::HPBonus => {
+                        assert!(
+                            affix.value >= 10.0 && affix.value <= 30.0,
+                            "Magic HPBonus out of range: {}",
+                            affix.value
+                        );
+                    }
+                    _ => {
+                        assert!(
+                            affix.value >= 5.0 && affix.value <= 10.0,
+                            "Magic affix {:?} out of range: {}",
+                            affix.affix_type,
+                            affix.value
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_affix_values_within_legendary_range() {
+        for _ in 0..50 {
+            let item = generate_item(EquipmentSlot::Weapon, Rarity::Legendary, 20);
+            for affix in &item.affixes {
+                match affix.affix_type {
+                    AffixType::HPBonus => {
+                        assert!(
+                            affix.value >= 80.0 && affix.value <= 150.0,
+                            "Legendary HPBonus out of range: {}",
+                            affix.value
+                        );
+                    }
+                    _ => {
+                        assert!(
+                            affix.value >= 25.0 && affix.value <= 50.0,
+                            "Legendary affix {:?} out of range: {}",
+                            affix.affix_type,
+                            affix.value
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_common_items_never_have_affixes() {
+        for _ in 0..100 {
+            let item = generate_item(EquipmentSlot::Gloves, Rarity::Common, 1);
+            assert_eq!(
+                item.affixes.len(),
+                0,
+                "Common items should never have affixes"
+            );
+        }
+    }
+
+    #[test]
+    fn test_generate_item_all_slots() {
+        let slots = [
+            EquipmentSlot::Weapon,
+            EquipmentSlot::Armor,
+            EquipmentSlot::Helmet,
+            EquipmentSlot::Gloves,
+            EquipmentSlot::Boots,
+            EquipmentSlot::Amulet,
+            EquipmentSlot::Ring,
+        ];
+        for slot in slots {
+            let item = generate_item(slot, Rarity::Rare, 10);
+            assert_eq!(item.slot, slot);
+            assert!(item.attributes.total() > 0);
+            assert!(!item.display_name.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_rarity_ordering_implies_stronger_attributes() {
+        // Over many samples, higher rarity should produce higher average totals
+        let sample = |rarity: Rarity| -> f64 {
+            let sum: u32 = (0..100)
+                .map(|_| {
+                    generate_item(EquipmentSlot::Weapon, rarity, 10)
+                        .attributes
+                        .total()
+                })
+                .sum();
+            sum as f64 / 100.0
+        };
+
+        let common_avg = sample(Rarity::Common);
+        let magic_avg = sample(Rarity::Magic);
+        let rare_avg = sample(Rarity::Rare);
+        let epic_avg = sample(Rarity::Epic);
+        let legendary_avg = sample(Rarity::Legendary);
+
+        assert!(
+            common_avg < magic_avg,
+            "Common ({common_avg}) should be < Magic ({magic_avg})"
+        );
+        assert!(
+            magic_avg < rare_avg,
+            "Magic ({magic_avg}) should be < Rare ({rare_avg})"
+        );
+        assert!(
+            rare_avg < epic_avg,
+            "Rare ({rare_avg}) should be < Epic ({epic_avg})"
+        );
+        assert!(
+            epic_avg < legendary_avg,
+            "Epic ({epic_avg}) should be < Legendary ({legendary_avg})"
+        );
+    }
 }

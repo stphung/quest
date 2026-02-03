@@ -187,4 +187,189 @@ mod tests {
             10
         );
     }
+
+    #[test]
+    fn test_attribute_weights_favor_specialization() {
+        // A character with high STR should weight STR items higher
+        let mut game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
+        use crate::attributes::AttributeType;
+        game_state.attributes.set(AttributeType::Strength, 30);
+        game_state.attributes.set(AttributeType::Dexterity, 10);
+        game_state.attributes.set(AttributeType::Constitution, 10);
+        game_state.attributes.set(AttributeType::Intelligence, 10);
+        game_state.attributes.set(AttributeType::Wisdom, 10);
+        game_state.attributes.set(AttributeType::Charisma, 10);
+
+        let str_item = Item {
+            slot: EquipmentSlot::Weapon,
+            rarity: Rarity::Common,
+            base_name: "Test".to_string(),
+            display_name: "Test".to_string(),
+            attributes: AttributeBonuses {
+                str: 5,
+                ..AttributeBonuses::new()
+            },
+            affixes: vec![],
+        };
+        let dex_item = Item {
+            slot: EquipmentSlot::Weapon,
+            rarity: Rarity::Common,
+            base_name: "Test".to_string(),
+            display_name: "Test".to_string(),
+            attributes: AttributeBonuses {
+                dex: 5,
+                ..AttributeBonuses::new()
+            },
+            affixes: vec![],
+        };
+
+        let str_score = score_item(&str_item, &game_state);
+        let dex_score = score_item(&dex_item, &game_state);
+
+        assert!(str_score > dex_score,
+            "STR item ({str_score}) should score higher than DEX item ({dex_score}) for STR-focused character");
+    }
+
+    #[test]
+    fn test_score_item_zero_attributes() {
+        let game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
+        let item = Item {
+            slot: EquipmentSlot::Weapon,
+            rarity: Rarity::Common,
+            base_name: "Test".to_string(),
+            display_name: "Test".to_string(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![],
+        };
+
+        let score = score_item(&item, &game_state);
+        assert_eq!(
+            score, 0.0,
+            "Item with no attributes or affixes should score 0"
+        );
+    }
+
+    #[test]
+    fn test_affix_type_weights() {
+        let game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
+
+        let make_affix_item = |affix_type: AffixType| -> Item {
+            Item {
+                slot: EquipmentSlot::Weapon,
+                rarity: Rarity::Magic,
+                base_name: "Test".to_string(),
+                display_name: "Test".to_string(),
+                attributes: AttributeBonuses::new(),
+                affixes: vec![Affix {
+                    affix_type,
+                    value: 10.0,
+                }],
+            }
+        };
+
+        // DamagePercent (2.0) should outscore DropRate (0.5)
+        let dmg_score = score_item(&make_affix_item(AffixType::DamagePercent), &game_state);
+        let drop_score = score_item(&make_affix_item(AffixType::DropRate), &game_state);
+        assert!(
+            dmg_score > drop_score,
+            "DamagePercent ({dmg_score}) should outscore DropRate ({drop_score})"
+        );
+
+        // Verify specific multipliers: DamagePercent = 10 * 2.0 = 20
+        assert!((dmg_score - 20.0).abs() < f64::EPSILON);
+        // DropRate = 10 * 0.5 = 5
+        assert!((drop_score - 5.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_score_combines_attributes_and_affixes() {
+        let game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
+
+        let attr_only = Item {
+            slot: EquipmentSlot::Weapon,
+            rarity: Rarity::Common,
+            base_name: "Test".to_string(),
+            display_name: "Test".to_string(),
+            attributes: AttributeBonuses {
+                str: 5,
+                ..AttributeBonuses::new()
+            },
+            affixes: vec![],
+        };
+        let combined = Item {
+            slot: EquipmentSlot::Weapon,
+            rarity: Rarity::Magic,
+            base_name: "Test".to_string(),
+            display_name: "Test".to_string(),
+            attributes: AttributeBonuses {
+                str: 5,
+                ..AttributeBonuses::new()
+            },
+            affixes: vec![Affix {
+                affix_type: AffixType::DamagePercent,
+                value: 10.0,
+            }],
+        };
+
+        let attr_score = score_item(&attr_only, &game_state);
+        let combined_score = score_item(&combined, &game_state);
+
+        assert!(combined_score > attr_score,
+            "Item with attributes + affixes ({combined_score}) should outscore attributes alone ({attr_score})");
+    }
+
+    #[test]
+    fn test_auto_equip_different_slots_independent() {
+        let mut game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
+
+        let weapon = create_test_item(EquipmentSlot::Weapon, Rarity::Common, 3);
+        let armor = Item {
+            slot: EquipmentSlot::Armor,
+            rarity: Rarity::Common,
+            base_name: "Test".to_string(),
+            display_name: "Test".to_string(),
+            attributes: AttributeBonuses {
+                con: 4,
+                ..AttributeBonuses::new()
+            },
+            affixes: vec![],
+        };
+
+        assert!(auto_equip_if_better(weapon, &mut game_state));
+        assert!(auto_equip_if_better(armor, &mut game_state));
+
+        assert!(game_state.equipment.get(EquipmentSlot::Weapon).is_some());
+        assert!(game_state.equipment.get(EquipmentSlot::Armor).is_some());
+    }
+
+    #[test]
+    fn test_auto_equip_affix_item_beats_attribute_item() {
+        let mut game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
+
+        // Equip a small attribute-only item
+        let weak = create_test_item(EquipmentSlot::Weapon, Rarity::Common, 1);
+        auto_equip_if_better(weak, &mut game_state);
+
+        // An item with good affixes should replace it even with same attributes
+        let affix_item = Item {
+            slot: EquipmentSlot::Weapon,
+            rarity: Rarity::Magic,
+            base_name: "Test".to_string(),
+            display_name: "Test".to_string(),
+            attributes: AttributeBonuses {
+                str: 1,
+                ..AttributeBonuses::new()
+            },
+            affixes: vec![Affix {
+                affix_type: AffixType::DamagePercent,
+                value: 20.0,
+            }],
+        };
+
+        let equipped = auto_equip_if_better(affix_item, &mut game_state);
+        assert!(
+            equipped,
+            "Item with strong affix should replace weak attribute-only item"
+        );
+    }
 }

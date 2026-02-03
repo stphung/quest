@@ -118,4 +118,129 @@ mod tests {
 
         assert_eq!(eq.iter_equipped().count(), 2);
     }
+
+    #[test]
+    fn test_equip_all_seven_slots() {
+        let mut eq = Equipment::new();
+        let slots = [
+            EquipmentSlot::Weapon,
+            EquipmentSlot::Armor,
+            EquipmentSlot::Helmet,
+            EquipmentSlot::Gloves,
+            EquipmentSlot::Boots,
+            EquipmentSlot::Amulet,
+            EquipmentSlot::Ring,
+        ];
+
+        for slot in slots {
+            eq.set(slot, Some(create_test_item(slot)));
+        }
+
+        assert_eq!(eq.iter_equipped().count(), 7);
+        for slot in slots {
+            assert!(eq.get(slot).is_some(), "Slot {:?} should be equipped", slot);
+        }
+    }
+
+    #[test]
+    fn test_equipment_replacement() {
+        let mut eq = Equipment::new();
+
+        let item1 = Item {
+            slot: EquipmentSlot::Weapon,
+            rarity: Rarity::Common,
+            base_name: "Old Sword".to_string(),
+            display_name: "Old Sword".to_string(),
+            attributes: AttributeBonuses {
+                str: 1,
+                ..AttributeBonuses::new()
+            },
+            affixes: vec![],
+        };
+        let item2 = Item {
+            slot: EquipmentSlot::Weapon,
+            rarity: Rarity::Rare,
+            base_name: "New Sword".to_string(),
+            display_name: "New Sword".to_string(),
+            attributes: AttributeBonuses {
+                str: 10,
+                ..AttributeBonuses::new()
+            },
+            affixes: vec![],
+        };
+
+        eq.set(EquipmentSlot::Weapon, Some(item1));
+        assert_eq!(
+            eq.get(EquipmentSlot::Weapon)
+                .as_ref()
+                .unwrap()
+                .attributes
+                .str,
+            1
+        );
+
+        eq.set(EquipmentSlot::Weapon, Some(item2));
+        assert_eq!(
+            eq.get(EquipmentSlot::Weapon)
+                .as_ref()
+                .unwrap()
+                .attributes
+                .str,
+            10
+        );
+        assert_eq!(eq.iter_equipped().count(), 1);
+    }
+
+    #[test]
+    fn test_unequip_slot() {
+        let mut eq = Equipment::new();
+        eq.set(
+            EquipmentSlot::Weapon,
+            Some(create_test_item(EquipmentSlot::Weapon)),
+        );
+        assert!(eq.get(EquipmentSlot::Weapon).is_some());
+
+        eq.set(EquipmentSlot::Weapon, None);
+        assert!(eq.get(EquipmentSlot::Weapon).is_none());
+        assert_eq!(eq.iter_equipped().count(), 0);
+    }
+
+    #[test]
+    fn test_iter_equipped_returns_correct_items() {
+        let mut eq = Equipment::new();
+
+        let weapon = Item {
+            slot: EquipmentSlot::Weapon,
+            rarity: Rarity::Common,
+            base_name: "Sword".to_string(),
+            display_name: "Sword".to_string(),
+            attributes: AttributeBonuses {
+                str: 5,
+                ..AttributeBonuses::new()
+            },
+            affixes: vec![],
+        };
+        let armor = Item {
+            slot: EquipmentSlot::Armor,
+            rarity: Rarity::Rare,
+            base_name: "Plate".to_string(),
+            display_name: "Plate".to_string(),
+            attributes: AttributeBonuses {
+                con: 8,
+                ..AttributeBonuses::new()
+            },
+            affixes: vec![],
+        };
+
+        eq.set(EquipmentSlot::Weapon, Some(weapon));
+        eq.set(EquipmentSlot::Armor, Some(armor));
+
+        let items: Vec<&Item> = eq.iter_equipped().collect();
+        assert_eq!(items.len(), 2);
+
+        let total_str: u32 = items.iter().map(|i| i.attributes.str).sum();
+        let total_con: u32 = items.iter().map(|i| i.attributes.con).sum();
+        assert_eq!(total_str, 5);
+        assert_eq!(total_con, 8);
+    }
 }

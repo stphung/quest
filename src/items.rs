@@ -151,4 +151,75 @@ mod tests {
         assert_eq!(item.rarity, Rarity::Common);
         assert_eq!(item.attributes.str, 2);
     }
+
+    #[test]
+    fn test_attribute_bonuses_default_is_zero() {
+        let attrs = AttributeBonuses::new();
+        assert_eq!(attrs.total(), 0);
+        assert_eq!(attrs.str, 0);
+        assert_eq!(attrs.dex, 0);
+        assert_eq!(attrs.con, 0);
+        assert_eq!(attrs.int, 0);
+        assert_eq!(attrs.wis, 0);
+        assert_eq!(attrs.cha, 0);
+    }
+
+    #[test]
+    fn test_attribute_bonuses_default_trait() {
+        let attrs = AttributeBonuses::default();
+        assert_eq!(attrs.total(), 0);
+    }
+
+    #[test]
+    fn test_rarity_name() {
+        assert_eq!(Rarity::Common.name(), "Common");
+        assert_eq!(Rarity::Magic.name(), "Magic");
+        assert_eq!(Rarity::Rare.name(), "Rare");
+        assert_eq!(Rarity::Epic.name(), "Epic");
+        assert_eq!(Rarity::Legendary.name(), "Legendary");
+    }
+
+    #[test]
+    fn test_attribute_bonuses_to_attributes() {
+        let bonuses = AttributeBonuses {
+            str: 5,
+            dex: 3,
+            con: 0,
+            int: 0,
+            wis: 0,
+            cha: 0,
+        };
+        let attrs = bonuses.to_attributes();
+        assert_eq!(attrs.get(crate::attributes::AttributeType::Strength), 5);
+        assert_eq!(attrs.get(crate::attributes::AttributeType::Dexterity), 3);
+        assert_eq!(attrs.get(crate::attributes::AttributeType::Constitution), 0);
+    }
+
+    #[test]
+    fn test_item_with_multiple_affixes() {
+        let item = Item {
+            slot: EquipmentSlot::Ring,
+            rarity: Rarity::Epic,
+            base_name: "Ring".to_string(),
+            display_name: "Ring of Power".to_string(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![
+                Affix {
+                    affix_type: AffixType::DamagePercent,
+                    value: 15.0,
+                },
+                Affix {
+                    affix_type: AffixType::CritChance,
+                    value: 10.0,
+                },
+                Affix {
+                    affix_type: AffixType::HPBonus,
+                    value: 50.0,
+                },
+            ],
+        };
+        assert_eq!(item.affixes.len(), 3);
+        assert_eq!(item.affixes[0].affix_type, AffixType::DamagePercent);
+        assert!((item.affixes[0].value - 15.0).abs() < f64::EPSILON);
+    }
 }
