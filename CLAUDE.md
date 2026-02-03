@@ -38,7 +38,7 @@ make fmt               # Applies rustfmt to all code
 
 **On push to main:**
 - Runs all checks
-- Builds release binaries for 4 platforms (Linux, macOS x86/ARM, Windows)
+- Builds release binaries for 3 platforms (Linux, macOS x86/ARM)
 - Signs macOS binaries with ad-hoc signature (prevents Gatekeeper blocking)
 - Creates GitHub release with downloadable binaries
 

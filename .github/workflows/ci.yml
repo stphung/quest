@@ -43,9 +43,6 @@ jobs:
           - target: aarch64-apple-darwin
             os: macos-latest
             artifact: quest
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
-            artifact: quest.exe
 
     steps:
       - uses: actions/checkout@v4
@@ -75,17 +72,10 @@ jobs:
         run: |
           codesign -s - -f target/${{ matrix.target }}/release/${{ matrix.artifact }}
 
-      - name: Package (Unix)
-        if: runner.os != 'Windows'
+      - name: Package
         run: |
           cd target/${{ matrix.target }}/release
           tar czf ../../../quest-${{ matrix.target }}.tar.gz ${{ matrix.artifact }}
-
-      - name: Package (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          cd target/${{ matrix.target }}/release
-          7z a ../../../quest-${{ matrix.target }}.zip ${{ matrix.artifact }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
