@@ -134,12 +134,6 @@ fn draw_header(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let inner = header_block.inner(area);
     frame.render_widget(header_block, area);
 
-    // Split inner area: header text + XP bar
-    let inner_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Length(1), Constraint::Length(1)])
-        .split(inner);
-
     // Header text line
     let header_text = vec![Line::from(vec![
         Span::styled(
@@ -152,9 +146,6 @@ fn draw_header(frame: &mut Frame, area: Rect, game_state: &GameState) {
         Span::styled("⏱️ ", Style::default().fg(Color::Cyan)),
         Span::styled(play_time, Style::default().fg(Color::Cyan)),
     ])];
-
-    let header_paragraph = Paragraph::new(header_text).alignment(Alignment::Center);
-    frame.render_widget(header_paragraph, inner_chunks[0]);
 
     // XP progress bar
     let xp_label = format!(
@@ -173,7 +164,21 @@ fn draw_header(frame: &mut Frame, area: Rect, game_state: &GameState) {
         .label(xp_label)
         .ratio(xp_ratio);
 
-    frame.render_widget(xp_gauge, inner_chunks[1]);
+    // Render based on available height
+    if inner.height >= 2 {
+        // Split inner area: header text + XP bar
+        let inner_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(1), Constraint::Length(1)])
+            .split(inner);
+
+        let header_paragraph = Paragraph::new(header_text).alignment(Alignment::Center);
+        frame.render_widget(header_paragraph, inner_chunks[0]);
+        frame.render_widget(xp_gauge, inner_chunks[1]);
+    } else if inner.height == 1 {
+        // Only room for XP bar - prioritize progress visibility
+        frame.render_widget(xp_gauge, inner);
+    }
 }
 
 /// Draws the current zone and subzone info
@@ -406,12 +411,6 @@ fn draw_prestige_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let inner = prestige_block.inner(area);
     frame.render_widget(prestige_block, area);
 
-    // Split inner area: text lines + fishing progress bar
-    let inner_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Length(4), Constraint::Length(1)])
-        .split(inner);
-
     let tier = get_prestige_tier(game_state.prestige_rank);
     let cha_mod = game_state.attributes.modifier(AttributeType::Charisma);
     let effective_multiplier =
@@ -467,9 +466,6 @@ fn draw_prestige_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
         ]),
     ];
 
-    let prestige_paragraph = Paragraph::new(prestige_text);
-    frame.render_widget(prestige_paragraph, inner_chunks[0]);
-
     // Fishing progress bar
     let fish_required = FishingState::fish_required_for_rank(game_state.fishing.rank);
     let fish_progress = game_state.fishing.fish_toward_next_rank;
@@ -490,7 +486,21 @@ fn draw_prestige_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
         .label(fish_label)
         .ratio(fish_ratio);
 
-    frame.render_widget(fish_gauge, inner_chunks[1]);
+    // Render based on available height
+    if inner.height >= 5 {
+        // Full layout: 4 lines of text + 1 line for progress bar
+        let inner_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(4), Constraint::Length(1)])
+            .split(inner);
+
+        let prestige_paragraph = Paragraph::new(prestige_text);
+        frame.render_widget(prestige_paragraph, inner_chunks[0]);
+        frame.render_widget(fish_gauge, inner_chunks[1]);
+    } else if inner.height >= 1 {
+        // Limited space: show fishing bar only
+        frame.render_widget(fish_gauge, inner);
+    }
 }
 
 /// Draws equipment section with all 7 equipment slots
