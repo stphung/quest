@@ -50,13 +50,16 @@ pub fn draw_ui_with_update(
     );
 
     // Draw right panel based on current activity
-    if let Some(ref session) = game_state.active_fishing {
-        // Fishing takes priority - show fishing scene
+    // Priority: chess > challenge menu > fishing > dungeon > combat
+    if let Some(ref game) = game_state.active_chess {
+        chess_scene::render_chess_scene(frame, chunks[1], game);
+    } else if game_state.challenge_menu.is_open {
+        challenge_menu_scene::render_challenge_menu(frame, chunks[1], &game_state.challenge_menu);
+    } else if let Some(ref session) = game_state.active_fishing {
         fishing_scene::render_fishing_scene(frame, chunks[1], session, &game_state.fishing);
     } else if let Some(dungeon) = &game_state.active_dungeon {
         draw_dungeon_view(frame, chunks[1], game_state, dungeon);
     } else {
-        // Normal combat scene
         combat_scene::draw_combat_scene(frame, chunks[1], game_state);
     }
 }
