@@ -91,7 +91,7 @@ fn main() -> io::Result<()> {
     }
 
     // Check for updates in background (non-blocking notification)
-    let update_available = std::thread::spawn(updater::quick_update_check);
+    let update_available = std::thread::spawn(updater::check_update_info);
 
     // Initialize CharacterManager
     let character_manager = CharacterManager::new()?;
@@ -140,8 +140,8 @@ fn main() -> io::Result<()> {
     let mut terminal = Terminal::new(backend)?;
 
     // Show update notification if available
-    if let Ok(Some((date, commit))) = update_available.join() {
-        // Draw notification
+    if let Ok(Some(update_info)) = update_available.join() {
+        // Draw notification with changelog
         terminal.draw(|frame| {
             let area = frame.size();
             let block = ratatui::widgets::Block::default()
@@ -152,14 +152,29 @@ fn main() -> io::Result<()> {
             let inner = block.inner(area);
             frame.render_widget(block, area);
 
-            let text = vec![
+            let mut text = vec![
                 ratatui::text::Line::from(""),
-                ratatui::text::Line::from(format!("  New version: {} ({})", date, commit)),
+                ratatui::text::Line::from(format!(
+                    "  New version: {} ({})",
+                    update_info.new_version, update_info.new_commit
+                )),
                 ratatui::text::Line::from(""),
-                ratatui::text::Line::from("  Run 'quest update' to install."),
-                ratatui::text::Line::from(""),
-                ratatui::text::Line::from("  Press any key to continue..."),
             ];
+
+            // Add changelog if available
+            if !update_info.changelog.is_empty() {
+                text.push(ratatui::text::Line::from("  What's new:"));
+                for entry in update_info.changelog.iter().take(5) {
+                    text.push(ratatui::text::Line::from(format!("    • {}", entry)));
+                }
+                text.push(ratatui::text::Line::from(""));
+            }
+
+            text.push(ratatui::text::Line::from(
+                "  Run 'quest update' to install.",
+            ));
+            text.push(ratatui::text::Line::from(""));
+            text.push(ratatui::text::Line::from("  Press any key to continue..."));
 
             let paragraph =
                 ratatui::widgets::Paragraph::new(text).alignment(ratatui::layout::Alignment::Left);

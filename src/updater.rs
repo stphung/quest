@@ -348,19 +348,6 @@ pub fn replace_binary(new_binary: &Path) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// Quick check for update availability (for startup notification).
-/// Returns Some((date, commit)) if update available, None otherwise.
-pub fn quick_update_check() -> Option<(String, String)> {
-    use crate::build_info::{BUILD_COMMIT, BUILD_DATE};
-
-    match check_for_updates(BUILD_COMMIT, BUILD_DATE) {
-        UpdateCheck::UpdateAvailable { latest, .. } => {
-            Some((latest.date, short_commit(&latest.commit)))
-        }
-        _ => None,
-    }
-}
-
 /// Full update information for in-game display
 #[derive(Debug, Clone)]
 pub struct UpdateInfo {
