@@ -473,9 +473,22 @@ fn main() -> io::Result<()> {
                         }
                     }
 
+                    // Calculate seconds until next update check (only if no update found yet)
+                    let next_update_check_secs = if update_info.is_none() {
+                        let elapsed = last_update_check.elapsed().as_secs();
+                        Some(UPDATE_CHECK_INTERVAL_SECONDS.saturating_sub(elapsed))
+                    } else {
+                        None // Don't show countdown once update is found
+                    };
+
                     // Draw UI
                     terminal.draw(|frame| {
-                        draw_ui_with_update(frame, &state, update_info.as_ref());
+                        draw_ui_with_update(
+                            frame,
+                            &state,
+                            update_info.as_ref(),
+                            next_update_check_secs,
+                        );
                         // Draw prestige confirmation overlay if active
                         if showing_prestige_confirm {
                             ui::prestige_confirm::draw_prestige_confirm(frame, &state);

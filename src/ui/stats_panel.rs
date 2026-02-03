@@ -37,6 +37,7 @@ pub fn draw_stats_panel_with_update(
     area: Rect,
     game_state: &GameState,
     update_info: Option<&UpdateInfo>,
+    next_update_check_secs: Option<u64>,
 ) {
     // Calculate update panel height: 4 base + changelog lines (max 5)
     let update_height = if let Some(info) = update_info {
@@ -93,8 +94,8 @@ pub fn draw_stats_panel_with_update(
     // Draw prestige info
     draw_prestige_info(frame, chunks[5], game_state);
 
-    // Draw footer with controls
-    draw_footer(frame, chunks[6], game_state);
+    // Draw footer with controls and update check countdown
+    draw_footer(frame, chunks[6], game_state, next_update_check_secs);
 
     // Draw update panel if available
     if let Some(info) = update_info {
@@ -545,7 +546,12 @@ fn draw_equipment_section(frame: &mut Frame, area: Rect, game_state: &GameState)
 }
 
 /// Draws the footer with control instructions and version info
-fn draw_footer(frame: &mut Frame, area: Rect, game_state: &GameState) {
+fn draw_footer(
+    frame: &mut Frame,
+    area: Rect,
+    game_state: &GameState,
+    next_update_check_secs: Option<u64>,
+) {
     use crate::build_info::{BUILD_COMMIT, BUILD_DATE};
     use crate::prestige::can_prestige;
 
@@ -565,6 +571,18 @@ fn draw_footer(frame: &mut Frame, area: Rect, game_state: &GameState) {
         )
     };
 
+    // Build update check countdown text
+    let update_check_text = if let Some(secs) = next_update_check_secs {
+        let mins = secs / 60;
+        let secs = secs % 60;
+        Span::styled(
+            format!(" | Update check: {:02}:{:02}", mins, secs),
+            Style::default().fg(Color::DarkGray),
+        )
+    } else {
+        Span::raw("")
+    };
+
     let footer_text = vec![Line::from(vec![
         Span::styled("Controls: ", Style::default().add_modifier(Modifier::BOLD)),
         Span::styled(
@@ -573,6 +591,7 @@ fn draw_footer(frame: &mut Frame, area: Rect, game_state: &GameState) {
         ),
         Span::raw(" = Quit | "),
         prestige_text,
+        update_check_text,
     ])];
 
     // Build version string for the title

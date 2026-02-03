@@ -25,6 +25,7 @@ pub fn draw_ui_with_update(
     frame: &mut Frame,
     game_state: &GameState,
     update_info: Option<&UpdateInfo>,
+    next_update_check_secs: Option<u64>,
 ) {
     let size = frame.size();
 
@@ -38,7 +39,13 @@ pub fn draw_ui_with_update(
         .split(size);
 
     // Draw stats panel on the left (with optional update info)
-    stats_panel::draw_stats_panel_with_update(frame, chunks[0], game_state, update_info);
+    stats_panel::draw_stats_panel_with_update(
+        frame,
+        chunks[0],
+        game_state,
+        update_info,
+        next_update_check_secs,
+    );
 
     // Draw right panel based on current activity
     if let Some(ref session) = game_state.active_fishing {
