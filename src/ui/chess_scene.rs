@@ -69,6 +69,7 @@ fn render_board(frame: &mut Frame, area: Rect, game: &ChessGame) {
             let is_selected = game.selected_square == Some((file, rank));
             let is_legal_destination = game.legal_move_destinations.contains(&(file, rank));
 
+            // Background color for highlighted states
             let bg_color = if is_cursor {
                 if is_legal_destination {
                     Color::Rgb(200, 200, 50) // Yellow-green for cursor on legal move
@@ -79,25 +80,38 @@ fn render_board(frame: &mut Frame, area: Rect, game: &ChessGame) {
                 Color::Green
             } else if is_legal_destination {
                 Color::Rgb(144, 238, 144) // Light green for legal moves
-            } else if is_light {
-                Color::Rgb(200, 200, 180)
             } else {
-                Color::Rgb(120, 80, 50)
+                Color::Reset // Use default terminal background
             };
 
             let piece_char = get_piece_at(&game.board, file, rank);
-            let piece_str = piece_char
-                .map(|c| c.to_string())
-                .unwrap_or_else(|| " ".to_string());
 
+            // Piece foreground color (white pieces = white, black pieces = dark gray)
             let fg_color = if piece_char.map(is_white_piece).unwrap_or(false) {
                 Color::White
+            } else if piece_char.is_some() {
+                Color::Rgb(60, 60, 60) // Dark gray for black pieces
             } else {
-                Color::Black
+                Color::DarkGray // Fill character color
+            };
+
+            // Build square content: dark squares use ▓, light squares use spaces
+            let square_str = if is_light {
+                // Light square: spaces around piece
+                match piece_char {
+                    Some(c) => format!(" {}  ", c),
+                    None => "    ".to_string(),
+                }
+            } else {
+                // Dark square: ▓ fill pattern
+                match piece_char {
+                    Some(c) => format!("▓{}▓▓", c),
+                    None => "▓▓▓▓".to_string(),
+                }
             };
 
             let style = Style::default().fg(fg_color).bg(bg_color);
-            let square = Paragraph::new(format!(" {}  ", piece_str)).style(style);
+            let square = Paragraph::new(square_str).style(style);
             frame.render_widget(square, Rect::new(x, y, 4, 1));
         }
 
