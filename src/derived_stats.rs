@@ -30,30 +30,7 @@ impl DerivedStats {
         // Sum equipment attribute bonuses
         let mut total_attrs = *attrs;
         for item in equipment.iter_equipped() {
-            total_attrs.set(
-                AttributeType::Strength,
-                total_attrs.get(AttributeType::Strength) + item.attributes.str,
-            );
-            total_attrs.set(
-                AttributeType::Dexterity,
-                total_attrs.get(AttributeType::Dexterity) + item.attributes.dex,
-            );
-            total_attrs.set(
-                AttributeType::Constitution,
-                total_attrs.get(AttributeType::Constitution) + item.attributes.con,
-            );
-            total_attrs.set(
-                AttributeType::Intelligence,
-                total_attrs.get(AttributeType::Intelligence) + item.attributes.int,
-            );
-            total_attrs.set(
-                AttributeType::Wisdom,
-                total_attrs.get(AttributeType::Wisdom) + item.attributes.wis,
-            );
-            total_attrs.set(
-                AttributeType::Charisma,
-                total_attrs.get(AttributeType::Charisma) + item.attributes.cha,
-            );
+            total_attrs.add(&item.attributes.to_attributes());
         }
 
         let str_mod = total_attrs.modifier(AttributeType::Strength);
@@ -131,15 +108,15 @@ impl DerivedStats {
         equipment: &Equipment,
     ) -> f64 {
         // Sum equipment charisma bonuses
-        let mut total_cha = attrs.get(AttributeType::Charisma);
-        for item in equipment.iter_equipped() {
-            total_cha += item.attributes.cha;
-        }
+        let total_cha: u32 = attrs.get(AttributeType::Charisma)
+            + equipment
+                .iter_equipped()
+                .map(|i| i.attributes.cha)
+                .sum::<u32>();
 
         let mut temp_attrs = *attrs;
         temp_attrs.set(AttributeType::Charisma, total_cha);
-        let cha_mod = temp_attrs.modifier(AttributeType::Charisma);
-        base_multiplier + (cha_mod as f64 * 0.1)
+        Self::prestige_multiplier(base_multiplier, &temp_attrs)
     }
 
     pub fn prestige_multiplier(base_multiplier: f64, attrs: &Attributes) -> f64 {

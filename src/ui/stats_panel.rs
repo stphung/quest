@@ -2,7 +2,7 @@ use crate::attributes::AttributeType;
 use crate::derived_stats::DerivedStats;
 use crate::game_logic::xp_for_next_level;
 use crate::game_state::GameState;
-use crate::items::{AffixType, Rarity};
+use crate::items::{Affix, AffixType, Rarity};
 use crate::prestige::{get_adventurer_rank, get_prestige_tier};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -11,6 +11,24 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
     Frame,
 };
+
+/// Formats an affix for display in the equipment panel.
+fn format_affix(affix: &Affix) -> String {
+    match affix.affix_type {
+        AffixType::DamagePercent => format!("+{:.0}% DMG", affix.value),
+        AffixType::CritChance => format!("+{:.0}% CRIT", affix.value),
+        AffixType::CritMultiplier => format!("+{:.0}% CritMult", affix.value),
+        AffixType::AttackSpeed => format!("+{:.0}% Speed", affix.value),
+        AffixType::HPBonus => format!("+{:.0} HP", affix.value),
+        AffixType::DamageReduction => format!("+{:.0}% DR", affix.value),
+        AffixType::HPRegen => format!("+{:.0}% Regen", affix.value),
+        AffixType::DamageReflection => format!("+{:.0}% Reflect", affix.value),
+        AffixType::XPGain => format!("+{:.0}% XP", affix.value),
+        AffixType::DropRate => format!("+{:.0}% Drops", affix.value),
+        AffixType::PrestigeBonus => format!("+{:.0}% Prestige", affix.value),
+        AffixType::OfflineRate => format!("+{:.0}% Offline", affix.value),
+    }
+}
 
 /// Draws the stats panel showing player attributes and derived stats
 pub fn draw_stats_panel(frame: &mut Frame, area: Rect, game_state: &GameState) {
@@ -23,7 +41,7 @@ pub fn draw_stats_panel(frame: &mut Frame, area: Rect, game_state: &GameState) {
             Constraint::Length(14), // Attributes (6 attributes + borders)
             Constraint::Length(6),  // Derived stats (condensed)
             Constraint::Length(8),  // Equipment section
-            Constraint::Length(5),  // Prestige info + fishing rank
+            Constraint::Length(6),  // Prestige info + fishing rank
             Constraint::Length(3),  // Footer
         ])
         .split(area);
@@ -412,13 +430,13 @@ fn draw_equipment_section(frame: &mut Frame, area: Rect, game_state: &GameState)
 
     for (item, slot_label) in slots {
         if let Some(item) = item {
-            // Get rarity color and name
-            let (rarity_color, rarity_name) = match item.rarity {
-                Rarity::Common => (Color::White, "Common"),
-                Rarity::Magic => (Color::Blue, "Magic"),
-                Rarity::Rare => (Color::Yellow, "Rare"),
-                Rarity::Epic => (Color::Magenta, "Epic"),
-                Rarity::Legendary => (Color::LightRed, "Legendary"),
+            // Get rarity color
+            let rarity_color = match item.rarity {
+                Rarity::Common => Color::White,
+                Rarity::Magic => Color::Blue,
+                Rarity::Rare => Color::Yellow,
+                Rarity::Epic => Color::Magenta,
+                Rarity::Legendary => Color::LightRed,
             };
 
             // First line: icon, slot, name, rarity, stars
@@ -434,7 +452,7 @@ fn draw_equipment_section(frame: &mut Frame, area: Rect, game_state: &GameState)
                 Span::styled(item_name, Style::default().add_modifier(Modifier::BOLD)),
                 Span::raw(" "),
                 Span::styled(
-                    format!("[{}]", rarity_name),
+                    format!("[{}]", item.rarity.name()),
                     Style::default().fg(rarity_color),
                 ),
                 Span::raw(format!(" {}", stars)),
@@ -444,42 +462,23 @@ fn draw_equipment_section(frame: &mut Frame, area: Rect, game_state: &GameState)
             let mut bonuses = Vec::new();
 
             // Add attribute bonuses
-            if item.attributes.str > 0 {
-                bonuses.push(format!("+{}STR", item.attributes.str));
-            }
-            if item.attributes.dex > 0 {
-                bonuses.push(format!("+{}DEX", item.attributes.dex));
-            }
-            if item.attributes.con > 0 {
-                bonuses.push(format!("+{}CON", item.attributes.con));
-            }
-            if item.attributes.int > 0 {
-                bonuses.push(format!("+{}INT", item.attributes.int));
-            }
-            if item.attributes.wis > 0 {
-                bonuses.push(format!("+{}WIS", item.attributes.wis));
-            }
-            if item.attributes.cha > 0 {
-                bonuses.push(format!("+{}CHA", item.attributes.cha));
+            let attr_bonuses = [
+                (item.attributes.str, "STR"),
+                (item.attributes.dex, "DEX"),
+                (item.attributes.con, "CON"),
+                (item.attributes.int, "INT"),
+                (item.attributes.wis, "WIS"),
+                (item.attributes.cha, "CHA"),
+            ];
+            for (value, name) in attr_bonuses {
+                if value > 0 {
+                    bonuses.push(format!("+{}{}", value, name));
+                }
             }
 
             // Add affixes
             for affix in &item.affixes {
-                let affix_str = match affix.affix_type {
-                    AffixType::DamagePercent => format!("+{:.0}% DMG", affix.value),
-                    AffixType::CritChance => format!("+{:.0}% CRIT", affix.value),
-                    AffixType::CritMultiplier => format!("+{:.0}% CritMult", affix.value),
-                    AffixType::AttackSpeed => format!("+{:.0}% Speed", affix.value),
-                    AffixType::HPBonus => format!("+{:.0} HP", affix.value),
-                    AffixType::DamageReduction => format!("+{:.0}% DR", affix.value),
-                    AffixType::HPRegen => format!("+{:.0}% Regen", affix.value),
-                    AffixType::DamageReflection => format!("+{:.0}% Reflect", affix.value),
-                    AffixType::XPGain => format!("+{:.0}% XP", affix.value),
-                    AffixType::DropRate => format!("+{:.0}% Drops", affix.value),
-                    AffixType::PrestigeBonus => format!("+{:.0}% Prestige", affix.value),
-                    AffixType::OfflineRate => format!("+{:.0}% Offline", affix.value),
-                };
-                bonuses.push(affix_str);
+                bonuses.push(format_affix(affix));
             }
 
             if !bonuses.is_empty() {
