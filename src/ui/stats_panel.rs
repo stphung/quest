@@ -46,16 +46,17 @@ pub fn draw_stats_panel_with_update(
     };
 
     // Main vertical layout: header, zone, attributes, derived stats, equipment, prestige, footer, [update]
+    // When update panel is present, equipment gets smaller minimum to ensure update panel fits
     let constraints = if update_info.is_some() {
         vec![
-            Constraint::Length(3),             // Header
-            Constraint::Length(3),             // Zone info
-            Constraint::Length(14),            // Attributes (6 attributes + borders)
-            Constraint::Length(6),             // Derived stats (condensed)
-            Constraint::Min(16),               // Equipment section (grows to fit)
-            Constraint::Length(6),             // Prestige info + fishing rank
-            Constraint::Length(3),             // Footer
-            Constraint::Length(update_height), // Update panel
+            Constraint::Length(3),          // Header
+            Constraint::Length(3),          // Zone info
+            Constraint::Length(14),         // Attributes (6 attributes + borders)
+            Constraint::Length(6),          // Derived stats (condensed)
+            Constraint::Min(10),            // Equipment section (reduced min when update shown)
+            Constraint::Length(6),          // Prestige info + fishing rank
+            Constraint::Length(3),          // Footer
+            Constraint::Min(update_height), // Update panel (can shrink if needed)
         ]
     } else {
         vec![
