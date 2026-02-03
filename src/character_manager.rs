@@ -687,4 +687,640 @@ mod tests {
         let result = manager.rename_character("does_not_exist.json", "NewName".to_string());
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_load_json_with_extra_fields_backward_compat() {
+        // Simulate loading a save from a NEWER version with extra fields
+        // This should succeed - extra fields should be ignored
+        let manager = CharacterManager::new().unwrap();
+
+        let json_with_extra = r#"{
+            "version": 2,
+            "character_id": "test-id",
+            "character_name": "BackwardCompat",
+            "character_level": 10,
+            "character_xp": 5000,
+            "attributes": {"values": [10, 10, 10, 10, 10, 10]},
+            "prestige_rank": 0,
+            "total_prestige_count": 0,
+            "last_save_time": 1234567890,
+            "play_time_seconds": 100,
+            "combat_state": {
+                "current_enemy": null,
+                "player_current_hp": 50,
+                "player_max_hp": 50,
+                "attack_timer": 0.0,
+                "regen_timer": 0.0,
+                "is_regenerating": false
+            },
+            "equipment": {
+                "weapon": null,
+                "armor": null,
+                "helmet": null,
+                "gloves": null,
+                "boots": null,
+                "amulet": null,
+                "ring": null
+            },
+            "fishing": {
+                "rank": 1,
+                "total_fish_caught": 0,
+                "fish_toward_next_rank": 0,
+                "legendary_catches": 0
+            },
+            "zone_progression": {
+                "current_zone_id": 1,
+                "current_subzone_id": 1,
+                "defeated_bosses": [],
+                "unlocked_zones": [1, 2]
+            },
+            "future_field_that_doesnt_exist": "should be ignored",
+            "another_future_field": 12345
+        }"#;
+
+        let filepath = manager.quest_dir.join("backward_compat_test.json");
+        fs::write(&filepath, json_with_extra).unwrap();
+
+        // Should load successfully, ignoring extra fields
+        let result = manager.load_character("backward_compat_test.json");
+        assert!(
+            result.is_ok(),
+            "Should ignore extra fields: {:?}",
+            result.err()
+        );
+
+        let loaded = result.unwrap();
+        assert_eq!(loaded.character_name, "BackwardCompat");
+        assert_eq!(loaded.character_level, 10);
+
+        // Cleanup
+        fs::remove_file(filepath).ok();
+    }
+
+    #[test]
+    fn test_load_json_missing_optional_fields_forward_compat() {
+        // Simulate loading a save from an OLDER version missing newer optional fields
+        // This tests forward compatibility - old saves should still load
+        let manager = CharacterManager::new().unwrap();
+
+        // Minimal save without fishing, zone_progression, active_dungeon
+        let minimal_json = r#"{
+            "version": 2,
+            "character_id": "old-save-id",
+            "character_name": "OldSave",
+            "character_level": 5,
+            "character_xp": 1000,
+            "attributes": {"values": [12, 10, 10, 10, 10, 10]},
+            "prestige_rank": 1,
+            "total_prestige_count": 1,
+            "last_save_time": 1000000000,
+            "play_time_seconds": 500,
+            "combat_state": {
+                "current_enemy": null,
+                "player_current_hp": 60,
+                "player_max_hp": 60,
+                "attack_timer": 0.0,
+                "regen_timer": 0.0,
+                "is_regenerating": false
+            },
+            "equipment": {
+                "weapon": null,
+                "armor": null,
+                "helmet": null,
+                "gloves": null,
+                "boots": null,
+                "amulet": null,
+                "ring": null
+            }
+        }"#;
+
+        let filepath = manager.quest_dir.join("forward_compat_test.json");
+        fs::write(&filepath, minimal_json).unwrap();
+
+        // Should load with defaults for missing fields
+        let result = manager.load_character("forward_compat_test.json");
+        assert!(
+            result.is_ok(),
+            "Should use defaults for missing optional fields: {:?}",
+            result.err()
+        );
+
+        let loaded = result.unwrap();
+        assert_eq!(loaded.character_name, "OldSave");
+        assert_eq!(loaded.character_level, 5);
+        // Optional fields should have defaults
+        assert_eq!(loaded.fishing.rank, 1); // Default
+        assert_eq!(loaded.zone_progression.current_zone_id, 1); // Default
+
+        // Cleanup
+        fs::remove_file(filepath).ok();
+    }
+
+    #[test]
+    fn test_load_json_missing_nested_optional_fields() {
+        // Test that nested structs also handle missing fields gracefully
+        let manager = CharacterManager::new().unwrap();
+
+        // Save with zone_progression missing some fields that have #[serde(default)]
+        let json = r#"{
+            "version": 2,
+            "character_id": "nested-test",
+            "character_name": "NestedTest",
+            "character_level": 1,
+            "character_xp": 0,
+            "attributes": {"values": [10, 10, 10, 10, 10, 10]},
+            "prestige_rank": 0,
+            "total_prestige_count": 0,
+            "last_save_time": 0,
+            "play_time_seconds": 0,
+            "combat_state": {
+                "current_enemy": null,
+                "player_current_hp": 50,
+                "player_max_hp": 50,
+                "attack_timer": 0.0,
+                "regen_timer": 0.0,
+                "is_regenerating": false
+            },
+            "equipment": {
+                "weapon": null,
+                "armor": null,
+                "helmet": null,
+                "gloves": null,
+                "boots": null,
+                "amulet": null,
+                "ring": null
+            },
+            "zone_progression": {
+                "current_zone_id": 3,
+                "current_subzone_id": 2,
+                "defeated_bosses": [[1,1], [1,2]],
+                "unlocked_zones": [1, 2, 3]
+            }
+        }"#;
+
+        let filepath = manager.quest_dir.join("nested_compat_test.json");
+        fs::write(&filepath, json).unwrap();
+
+        let result = manager.load_character("nested_compat_test.json");
+        assert!(
+            result.is_ok(),
+            "Should handle missing nested optional fields: {:?}",
+            result.err()
+        );
+
+        let loaded = result.unwrap();
+        // Zone progression fields that have defaults should be set
+        assert_eq!(loaded.zone_progression.current_zone_id, 3);
+        assert_eq!(loaded.zone_progression.kills_in_subzone, 0); // Default
+        assert!(!loaded.zone_progression.fighting_boss); // Default
+        assert!(!loaded.zone_progression.has_stormbreaker); // Default
+
+        // Cleanup
+        fs::remove_file(filepath).ok();
+    }
+
+    /// IMPORTANT: This test uses a "frozen" minimal JSON that represents the oldest
+    /// supported save format. If this test fails after adding a new field, you MUST
+    /// add #[serde(default)] to that field to maintain backward compatibility.
+    ///
+    /// DO NOT update this JSON to add new fields - that defeats the purpose!
+    #[test]
+    fn test_minimal_v2_save_still_loads() {
+        let manager = CharacterManager::new().unwrap();
+
+        // This is the MINIMAL valid v2 save - DO NOT ADD FIELDS HERE
+        // If this fails, you broke backward compatibility!
+        let minimal_v2_json = r#"{
+            "version": 2,
+            "character_id": "minimal-v2",
+            "character_name": "MinimalV2",
+            "character_level": 1,
+            "character_xp": 0,
+            "attributes": {"values": [10, 10, 10, 10, 10, 10]},
+            "prestige_rank": 0,
+            "total_prestige_count": 0,
+            "last_save_time": 0,
+            "play_time_seconds": 0,
+            "combat_state": {
+                "current_enemy": null,
+                "player_current_hp": 50,
+                "player_max_hp": 50,
+                "attack_timer": 0.0,
+                "regen_timer": 0.0,
+                "is_regenerating": false
+            },
+            "equipment": {
+                "weapon": null,
+                "armor": null,
+                "helmet": null,
+                "gloves": null,
+                "boots": null,
+                "amulet": null,
+                "ring": null
+            }
+        }"#;
+
+        let filepath = manager.quest_dir.join("minimal_v2_test.json");
+        fs::write(&filepath, minimal_v2_json).unwrap();
+
+        let result = manager.load_character("minimal_v2_test.json");
+        assert!(
+            result.is_ok(),
+            "BACKWARD COMPATIBILITY BROKEN! Minimal v2 save failed to load. \
+             If you added a new field, add #[serde(default)] to it. Error: {:?}",
+            result.err()
+        );
+
+        // Cleanup
+        fs::remove_file(filepath).ok();
+    }
+
+    /// Test that Default impls exist and work for key structs.
+    /// This ensures we can use #[serde(default)] on these types.
+    #[test]
+    fn test_default_impls_exist_for_save_structs() {
+        use crate::combat::CombatState;
+        use crate::equipment::Equipment;
+        use crate::fishing::FishingState;
+        use crate::zones::ZoneProgression;
+
+        // These should all compile and produce valid defaults
+        let combat = CombatState::default();
+        assert_eq!(combat.player_max_hp, 50);
+        assert!(combat.current_enemy.is_none());
+
+        let equipment = Equipment::default();
+        assert!(equipment.weapon.is_none());
+
+        let fishing = FishingState::default();
+        assert_eq!(fishing.rank, 1);
+
+        let zones = ZoneProgression::default();
+        assert_eq!(zones.current_zone_id, 1);
+    }
+
+    // =========================================================================
+    // SAVE STRUCT COMPATIBILITY REGISTRY
+    // =========================================================================
+    //
+    // This section contains exhaustive tests for ALL structs that are serialized
+    // to save files. Each struct has:
+    //   1. A minimal JSON test (frozen format - DO NOT ADD FIELDS)
+    //   2. A roundtrip test (serialize -> deserialize)
+    //
+    // When adding a new serializable struct:
+    //   1. Add it to the registry below
+    //   2. Add a minimal JSON test
+    //   3. Add it to test_save_struct_registry
+    // =========================================================================
+
+    /// Minimal JSON for CombatState - DO NOT ADD FIELDS
+    /// Tests that old saves without newer fields still load
+    #[test]
+    fn test_combat_state_minimal_json() {
+        use crate::combat::CombatState;
+
+        let minimal_json = r#"{
+            "current_enemy": null,
+            "player_current_hp": 50,
+            "player_max_hp": 50,
+            "attack_timer": 0.0,
+            "regen_timer": 0.0,
+            "is_regenerating": false
+        }"#;
+
+        let result: Result<CombatState, _> = serde_json::from_str(minimal_json);
+        assert!(
+            result.is_ok(),
+            "CombatState minimal JSON failed to deserialize. \
+             If you added a new field, add #[serde(default)] or #[serde(skip)]. Error: {:?}",
+            result.err()
+        );
+    }
+
+    /// Minimal JSON for Equipment - DO NOT ADD FIELDS
+    #[test]
+    fn test_equipment_minimal_json() {
+        use crate::equipment::Equipment;
+
+        let minimal_json = r#"{
+            "weapon": null,
+            "armor": null,
+            "helmet": null,
+            "gloves": null,
+            "boots": null,
+            "amulet": null,
+            "ring": null
+        }"#;
+
+        let result: Result<Equipment, _> = serde_json::from_str(minimal_json);
+        assert!(
+            result.is_ok(),
+            "Equipment minimal JSON failed to deserialize. \
+             If you added a new slot, add #[serde(default)]. Error: {:?}",
+            result.err()
+        );
+    }
+
+    /// Minimal JSON for Attributes - DO NOT ADD FIELDS
+    #[test]
+    fn test_attributes_minimal_json() {
+        use crate::attributes::Attributes;
+
+        let minimal_json = r#"{"values": [10, 10, 10, 10, 10, 10]}"#;
+
+        let result: Result<Attributes, _> = serde_json::from_str(minimal_json);
+        assert!(
+            result.is_ok(),
+            "Attributes minimal JSON failed to deserialize. Error: {:?}",
+            result.err()
+        );
+    }
+
+    /// Minimal JSON for FishingState - DO NOT ADD FIELDS
+    #[test]
+    fn test_fishing_state_minimal_json() {
+        use crate::fishing::FishingState;
+
+        let minimal_json = r#"{
+            "rank": 1,
+            "total_fish_caught": 0,
+            "fish_toward_next_rank": 0,
+            "legendary_catches": 0
+        }"#;
+
+        let result: Result<FishingState, _> = serde_json::from_str(minimal_json);
+        assert!(
+            result.is_ok(),
+            "FishingState minimal JSON failed to deserialize. \
+             If you added a new field, add #[serde(default)]. Error: {:?}",
+            result.err()
+        );
+    }
+
+    /// Minimal JSON for ZoneProgression - DO NOT ADD FIELDS
+    /// Note: kills_in_subzone, fighting_boss, has_stormbreaker were added later
+    /// and have #[serde(default)]
+    #[test]
+    fn test_zone_progression_minimal_json() {
+        use crate::zones::ZoneProgression;
+
+        // This is the ORIGINAL format before newer fields were added
+        let minimal_json = r#"{
+            "current_zone_id": 1,
+            "current_subzone_id": 1,
+            "defeated_bosses": [],
+            "unlocked_zones": [1]
+        }"#;
+
+        let result: Result<ZoneProgression, _> = serde_json::from_str(minimal_json);
+        assert!(
+            result.is_ok(),
+            "ZoneProgression minimal JSON failed to deserialize. \
+             If you added a new field, add #[serde(default)]. Error: {:?}",
+            result.err()
+        );
+
+        // Verify defaults are applied for missing fields
+        let zones = result.unwrap();
+        assert_eq!(
+            zones.kills_in_subzone, 0,
+            "kills_in_subzone should default to 0"
+        );
+        assert!(
+            !zones.fighting_boss,
+            "fighting_boss should default to false"
+        );
+        assert!(
+            !zones.has_stormbreaker,
+            "has_stormbreaker should default to false"
+        );
+    }
+
+    /// Minimal JSON for Enemy - DO NOT ADD FIELDS
+    #[test]
+    fn test_enemy_minimal_json() {
+        use crate::combat::Enemy;
+
+        let minimal_json = r#"{
+            "name": "Test Enemy",
+            "max_hp": 100,
+            "current_hp": 100,
+            "damage": 10
+        }"#;
+
+        let result: Result<Enemy, _> = serde_json::from_str(minimal_json);
+        assert!(
+            result.is_ok(),
+            "Enemy minimal JSON failed to deserialize. \
+             If you added a new field, add #[serde(default)]. Error: {:?}",
+            result.err()
+        );
+    }
+
+    /// Minimal JSON for Item - DO NOT ADD FIELDS
+    #[test]
+    fn test_item_minimal_json() {
+        use crate::items::Item;
+
+        let minimal_json = r#"{
+            "slot": "Weapon",
+            "rarity": "Common",
+            "base_name": "Sword",
+            "display_name": "Iron Sword",
+            "attributes": {"str": 1, "dex": 0, "con": 0, "int": 0, "wis": 0, "cha": 0},
+            "affixes": []
+        }"#;
+
+        let result: Result<Item, _> = serde_json::from_str(minimal_json);
+        assert!(
+            result.is_ok(),
+            "Item minimal JSON failed to deserialize. \
+             If you added a new field, add #[serde(default)]. Error: {:?}",
+            result.err()
+        );
+    }
+
+    /// Minimal JSON for Dungeon - DO NOT ADD FIELDS
+    /// Note: current_room_cleared was added later and has #[serde(default)]
+    #[test]
+    fn test_dungeon_minimal_json() {
+        use crate::dungeon::Dungeon;
+
+        // Minimal dungeon with a simple 1x1 grid
+        // connections is [bool; 4] for [up, right, down, left]
+        let minimal_json = r#"{
+            "size": "Small",
+            "grid": [[{
+                "room_type": "Entrance",
+                "state": "Cleared",
+                "position": [0, 0],
+                "connections": [false, false, false, false]
+            }]],
+            "player_position": [0, 0],
+            "entrance_position": [0, 0],
+            "boss_position": [0, 0],
+            "has_key": false,
+            "move_timer": 0.0,
+            "collected_items": [],
+            "xp_earned": 0,
+            "rooms_cleared": 0
+        }"#;
+
+        let result: Result<Dungeon, _> = serde_json::from_str(minimal_json);
+        assert!(
+            result.is_ok(),
+            "Dungeon minimal JSON failed to deserialize. \
+             If you added a new field, add #[serde(default)] or #[serde(skip)]. Error: {:?}",
+            result.err()
+        );
+
+        // Verify defaults are applied
+        let dungeon = result.unwrap();
+        assert!(
+            !dungeon.current_room_cleared,
+            "current_room_cleared should default to false"
+        );
+    }
+
+    /// EXHAUSTIVE REGISTRY TEST
+    ///
+    /// This test verifies ALL save structs can:
+    /// 1. Be created with Default (where applicable)
+    /// 2. Roundtrip through JSON serialization
+    ///
+    /// If you add a new serializable struct, ADD IT HERE.
+    #[test]
+    fn test_save_struct_registry_roundtrip() {
+        use crate::attributes::Attributes;
+        use crate::combat::{CombatState, Enemy};
+        use crate::equipment::Equipment;
+        use crate::fishing::FishingState;
+        use crate::items::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
+        use crate::zones::ZoneProgression;
+
+        // === Structs with Default impls ===
+
+        // Attributes
+        let attrs = Attributes::default();
+        let json = serde_json::to_string(&attrs).expect("Attributes should serialize");
+        let _: Attributes = serde_json::from_str(&json).expect("Attributes should roundtrip");
+
+        // CombatState
+        let combat = CombatState::default();
+        let json = serde_json::to_string(&combat).expect("CombatState should serialize");
+        let _: CombatState = serde_json::from_str(&json).expect("CombatState should roundtrip");
+
+        // Equipment
+        let equipment = Equipment::default();
+        let json = serde_json::to_string(&equipment).expect("Equipment should serialize");
+        let _: Equipment = serde_json::from_str(&json).expect("Equipment should roundtrip");
+
+        // FishingState
+        let fishing = FishingState::default();
+        let json = serde_json::to_string(&fishing).expect("FishingState should serialize");
+        let _: FishingState = serde_json::from_str(&json).expect("FishingState should roundtrip");
+
+        // ZoneProgression
+        let zones = ZoneProgression::default();
+        let json = serde_json::to_string(&zones).expect("ZoneProgression should serialize");
+        let _: ZoneProgression =
+            serde_json::from_str(&json).expect("ZoneProgression should roundtrip");
+
+        // === Structs without Default (created manually) ===
+
+        // Enemy
+        let enemy = Enemy::new("Test".to_string(), 100, 10);
+        let json = serde_json::to_string(&enemy).expect("Enemy should serialize");
+        let _: Enemy = serde_json::from_str(&json).expect("Enemy should roundtrip");
+
+        // Item
+        let item = Item {
+            slot: EquipmentSlot::Weapon,
+            rarity: Rarity::Common,
+            base_name: "Sword".to_string(),
+            display_name: "Test Sword".to_string(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![Affix {
+                affix_type: AffixType::DamagePercent,
+                value: 5.0,
+            }],
+        };
+        let json = serde_json::to_string(&item).expect("Item should serialize");
+        let _: Item = serde_json::from_str(&json).expect("Item should roundtrip");
+
+        // AttributeBonuses
+        let bonuses = AttributeBonuses {
+            str: 5,
+            dex: 3,
+            con: 2,
+            int: 1,
+            wis: 0,
+            cha: 0,
+        };
+        let json = serde_json::to_string(&bonuses).expect("AttributeBonuses should serialize");
+        let _: AttributeBonuses =
+            serde_json::from_str(&json).expect("AttributeBonuses should roundtrip");
+
+        // Affix
+        let affix = Affix {
+            affix_type: AffixType::CritChance,
+            value: 10.0,
+        };
+        let json = serde_json::to_string(&affix).expect("Affix should serialize");
+        let _: Affix = serde_json::from_str(&json).expect("Affix should roundtrip");
+
+        // Note: Dungeon is tested separately due to complexity (test_dungeon_minimal_json)
+    }
+
+    // =========================================================================
+    // CHARACTER NAME VALIDATION - EXTENDED EDGE CASES
+    // =========================================================================
+
+    #[test]
+    fn test_validate_name_boundary_length_16_chars() {
+        // Exactly 16 characters should be valid
+        assert!(validate_name("1234567890123456").is_ok());
+        // 17 characters should fail
+        assert!(validate_name("12345678901234567").is_err());
+    }
+
+    #[test]
+    fn test_validate_name_single_char() {
+        // Single character should be valid
+        assert!(validate_name("A").is_ok());
+        assert!(validate_name("1").is_ok());
+    }
+
+    #[test]
+    fn test_validate_name_extended_invalid_chars() {
+        // Various special characters that should be rejected
+        assert!(validate_name("Name#1").is_err());
+        assert!(validate_name("Hero$").is_err());
+        assert!(validate_name("Test%").is_err());
+        assert!(validate_name("Name&Name").is_err());
+        assert!(validate_name("Hero*").is_err());
+        assert!(validate_name("<script>").is_err());
+        assert!(validate_name("Name\nNewline").is_err());
+        assert!(validate_name("Name\tTab").is_err());
+        assert!(validate_name("test;drop").is_err());
+        assert!(validate_name("name'quote").is_err());
+        assert!(validate_name("name\"quote").is_err());
+    }
+
+    #[test]
+    fn test_validate_name_trims_whitespace() {
+        // Leading/trailing whitespace should be trimmed, then validated
+        assert!(validate_name("  Hero  ").is_ok());
+        assert!(validate_name("\tHero\t").is_ok());
+    }
+
+    #[test]
+    fn test_validate_name_unicode_letters() {
+        // Unicode letters should work (alphanumeric includes unicode)
+        assert!(validate_name("Héro").is_ok());
+        assert!(validate_name("日本語").is_ok()); // Japanese
+        assert!(validate_name("Müller").is_ok()); // German umlaut
+        assert!(validate_name("Ωmega").is_ok()); // Greek
+    }
 }

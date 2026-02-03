@@ -1,4 +1,10 @@
-// Library crate for integration tests and external access
+//! Quest - Terminal-Based Idle RPG Library
+//!
+//! This module exposes the game logic for testing and external use.
+
+// Allow dead code in library - some functions are only used by the binary
+#![allow(dead_code)]
+
 pub mod attributes;
 pub mod build_info;
 pub mod challenge_menu;
@@ -25,6 +31,8 @@ pub mod item_scoring;
 pub mod items;
 pub mod prestige;
 pub mod save_manager;
-pub mod ui;
 pub mod updater;
 pub mod zones;
+
+// UI module is not exposed as it's tightly coupled to the terminal
+mod ui;

@@ -348,25 +348,13 @@ pub fn replace_binary(new_binary: &Path) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// Quick check for update availability (for startup notification).
-/// Returns Some((date, commit)) if update available, None otherwise.
-pub fn quick_update_check() -> Option<(String, String)> {
-    use crate::build_info::{BUILD_COMMIT, BUILD_DATE};
-
-    match check_for_updates(BUILD_COMMIT, BUILD_DATE) {
-        UpdateCheck::UpdateAvailable { latest, .. } => {
-            Some((latest.date, short_commit(&latest.commit)))
-        }
-        _ => None,
-    }
-}
-
 /// Full update information for in-game display
 #[derive(Debug, Clone)]
 pub struct UpdateInfo {
     pub new_version: String,
     pub new_commit: String,
     pub changelog: Vec<String>,
+    pub changelog_total: usize,
 }
 
 /// Check for updates and return full info including changelog.
@@ -377,23 +365,27 @@ pub fn check_update_info() -> Option<UpdateInfo> {
     match check_for_updates(BUILD_COMMIT, BUILD_DATE) {
         UpdateCheck::UpdateAvailable {
             latest, changelog, ..
-        } => Some(UpdateInfo {
-            new_version: latest.date,
-            new_commit: short_commit(&latest.commit),
-            changelog: changelog
-                .into_iter()
-                .take(5) // Limit to 5 entries for display
-                .map(|e| {
-                    // Truncate long messages and take first line only
-                    let msg = e.message.lines().next().unwrap_or(&e.message);
-                    if msg.len() > 45 {
-                        format!("{}...", &msg[..42])
-                    } else {
-                        msg.to_string()
-                    }
-                })
-                .collect(),
-        }),
+        } => {
+            let total = changelog.len();
+            Some(UpdateInfo {
+                new_version: latest.date,
+                new_commit: short_commit(&latest.commit),
+                changelog: changelog
+                    .into_iter()
+                    .take(5) // Limit to 5 entries for in-game display
+                    .map(|e| {
+                        // Truncate long messages and take first line only
+                        let msg = e.message.lines().next().unwrap_or(&e.message);
+                        if msg.len() > 45 {
+                            format!("{}...", &msg[..42])
+                        } else {
+                            msg.to_string()
+                        }
+                    })
+                    .collect(),
+                changelog_total: total,
+            })
+        }
         _ => None,
     }
 }
@@ -433,20 +425,20 @@ pub fn run_update_command() -> Result<bool, Box<dyn Error>> {
             );
             println!();
 
-            // Show changelog (max 10 entries)
+            // Show changelog (max 15 entries)
             if !changelog.is_empty() {
                 println!("What's new:");
-                for entry in changelog.iter().take(10) {
+                for entry in changelog.iter().take(15) {
                     // Truncate long messages
-                    let msg = if entry.message.len() > 50 {
-                        format!("{}...", &entry.message[..47])
+                    let msg = if entry.message.len() > 60 {
+                        format!("{}...", &entry.message[..57])
                     } else {
                         entry.message.clone()
                     };
                     println!("  • {}", msg);
                 }
-                if changelog.len() > 10 {
-                    println!("  ...and {} more", changelog.len() - 10);
+                if changelog.len() > 15 {
+                    println!("  ...and {} more", changelog.len() - 15);
                 }
                 println!();
             }

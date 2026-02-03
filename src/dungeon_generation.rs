@@ -554,4 +554,151 @@ mod tests {
             }
         }
     }
+
+    // =========================================================================
+    // DUNGEON REACHABILITY TESTS
+    // =========================================================================
+
+    /// BFS to find all reachable rooms from a starting position
+    fn find_reachable_rooms(dungeon: &Dungeon, start: (usize, usize)) -> Vec<(usize, usize)> {
+        use std::collections::{HashSet, VecDeque};
+
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+        let mut reachable = Vec::new();
+
+        queue.push_back(start);
+        visited.insert(start);
+
+        while let Some(pos) = queue.pop_front() {
+            reachable.push(pos);
+
+            // Get connected neighbors
+            let neighbors = dungeon.get_connected_neighbors(pos.0, pos.1);
+            for neighbor in neighbors {
+                if !visited.contains(&neighbor) {
+                    visited.insert(neighbor);
+                    queue.push_back(neighbor);
+                }
+            }
+        }
+
+        reachable
+    }
+
+    #[test]
+    fn test_all_rooms_reachable_from_entrance() {
+        // Test multiple dungeons of various sizes
+        for _ in 0..20 {
+            let dungeon = generate_dungeon(50, 0);
+
+            // Count total rooms
+            let grid_size = dungeon.size.grid_size();
+            let mut total_rooms = 0;
+            for y in 0..grid_size {
+                for x in 0..grid_size {
+                    if dungeon.get_room(x, y).is_some() {
+                        total_rooms += 1;
+                    }
+                }
+            }
+
+            // Find all reachable rooms from entrance
+            let reachable = find_reachable_rooms(&dungeon, dungeon.entrance_position);
+
+            assert_eq!(
+                reachable.len(),
+                total_rooms,
+                "All {} rooms should be reachable from entrance, but only {} are reachable",
+                total_rooms,
+                reachable.len()
+            );
+        }
+    }
+
+    #[test]
+    fn test_boss_reachable_from_entrance() {
+        for _ in 0..20 {
+            let dungeon = generate_dungeon(50, 0);
+            let reachable = find_reachable_rooms(&dungeon, dungeon.entrance_position);
+
+            assert!(
+                reachable.contains(&dungeon.boss_position),
+                "Boss room at {:?} should be reachable from entrance at {:?}",
+                dungeon.boss_position,
+                dungeon.entrance_position
+            );
+        }
+    }
+
+    #[test]
+    fn test_elite_reachable_from_entrance() {
+        for _ in 0..20 {
+            let dungeon = generate_dungeon(50, 0);
+
+            // Find elite room
+            let grid_size = dungeon.size.grid_size();
+            let mut elite_pos = None;
+            for y in 0..grid_size {
+                for x in 0..grid_size {
+                    if let Some(room) = dungeon.get_room(x, y) {
+                        if room.room_type == RoomType::Elite {
+                            elite_pos = Some((x, y));
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if let Some(elite) = elite_pos {
+                let reachable = find_reachable_rooms(&dungeon, dungeon.entrance_position);
+                assert!(
+                    reachable.contains(&elite),
+                    "Elite room (key guardian) at {:?} should be reachable from entrance",
+                    elite
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_all_dungeon_sizes_produce_valid_dungeons() {
+        // Test each dungeon size explicitly
+        let test_cases = [
+            (10, 0),  // Should produce Small
+            (30, 0),  // Should produce Small/Medium
+            (50, 0),  // Should produce Medium
+            (75, 0),  // Should produce Medium/Large
+            (100, 0), // Should produce Large
+            (50, 5),  // With prestige - could produce larger
+        ];
+
+        for (level, prestige) in test_cases {
+            for _ in 0..5 {
+                let dungeon = generate_dungeon(level, prestige);
+
+                // Verify basic structure
+                assert!(
+                    dungeon.room_count() >= 6,
+                    "Dungeon should have at least 6 rooms"
+                );
+
+                // Verify all rooms reachable
+                let reachable = find_reachable_rooms(&dungeon, dungeon.entrance_position);
+                assert_eq!(
+                    reachable.len(),
+                    dungeon.room_count(),
+                    "Level {}, Prestige {}: All rooms should be reachable",
+                    level,
+                    prestige
+                );
+
+                // Verify special rooms exist and are reachable
+                assert!(
+                    reachable.contains(&dungeon.boss_position),
+                    "Boss should be reachable"
+                );
+            }
+        }
+    }
 }

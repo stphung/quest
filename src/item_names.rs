@@ -305,4 +305,133 @@ mod tests {
         assert_eq!(get_quality_prefix(Rarity::Epic), "");
         assert_eq!(get_quality_prefix(Rarity::Legendary), "");
     }
+
+    // =========================================================================
+    // BULK GENERATION TESTS
+    // =========================================================================
+
+    #[test]
+    fn test_generate_display_name_never_empty() {
+        // Generate 100 items of each rarity and slot, verify names are never empty
+        let slots = [
+            EquipmentSlot::Weapon,
+            EquipmentSlot::Armor,
+            EquipmentSlot::Helmet,
+            EquipmentSlot::Gloves,
+            EquipmentSlot::Boots,
+            EquipmentSlot::Amulet,
+            EquipmentSlot::Ring,
+        ];
+        let rarities = [
+            Rarity::Common,
+            Rarity::Magic,
+            Rarity::Rare,
+            Rarity::Epic,
+            Rarity::Legendary,
+        ];
+
+        for slot in &slots {
+            for rarity in &rarities {
+                for _ in 0..100 {
+                    let item = Item {
+                        slot: *slot,
+                        rarity: *rarity,
+                        base_name: String::new(),
+                        display_name: String::new(),
+                        attributes: AttributeBonuses::new(),
+                        affixes: if *rarity >= Rarity::Rare {
+                            vec![Affix {
+                                affix_type: AffixType::DamagePercent,
+                                value: 10.0,
+                            }]
+                        } else {
+                            vec![]
+                        },
+                    };
+
+                    let name = generate_display_name(&item);
+                    assert!(
+                        !name.is_empty(),
+                        "Generated name should never be empty for {:?} {:?}",
+                        rarity,
+                        slot
+                    );
+                    assert!(
+                        !name.trim().is_empty(),
+                        "Generated name should not be only whitespace for {:?} {:?}",
+                        rarity,
+                        slot
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_generate_display_name_no_double_spaces() {
+        // Verify names don't have double spaces or leading/trailing spaces
+        let slots = [
+            EquipmentSlot::Weapon,
+            EquipmentSlot::Armor,
+            EquipmentSlot::Helmet,
+        ];
+
+        for slot in &slots {
+            for _ in 0..50 {
+                let item = Item {
+                    slot: *slot,
+                    rarity: Rarity::Magic,
+                    base_name: String::new(),
+                    display_name: String::new(),
+                    attributes: AttributeBonuses::new(),
+                    affixes: vec![],
+                };
+
+                let name = generate_display_name(&item);
+                assert!(
+                    !name.contains("  "),
+                    "Name '{}' should not have double spaces",
+                    name
+                );
+                assert_eq!(
+                    name,
+                    name.trim(),
+                    "Name '{}' should not have leading/trailing whitespace",
+                    name
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_all_slots_produce_different_base_names() {
+        // Verify each slot has unique base names (no shared names between slots)
+        use std::collections::HashSet;
+
+        let slots = [
+            EquipmentSlot::Weapon,
+            EquipmentSlot::Armor,
+            EquipmentSlot::Helmet,
+            EquipmentSlot::Gloves,
+            EquipmentSlot::Boots,
+            EquipmentSlot::Amulet,
+            EquipmentSlot::Ring,
+        ];
+
+        for i in 0..slots.len() {
+            for j in (i + 1)..slots.len() {
+                let names_i: HashSet<_> = get_base_name(slots[i]).into_iter().collect();
+                let names_j: HashSet<_> = get_base_name(slots[j]).into_iter().collect();
+
+                let overlap: Vec<_> = names_i.intersection(&names_j).collect();
+                assert!(
+                    overlap.is_empty(),
+                    "Slots {:?} and {:?} should not share base names, but share: {:?}",
+                    slots[i],
+                    slots[j],
+                    overlap
+                );
+            }
+        }
+    }
 }

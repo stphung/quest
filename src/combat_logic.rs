@@ -1175,9 +1175,13 @@ mod tests {
 
     #[test]
     fn test_damage_reflection_hurts_attacker() {
+        use crate::attributes::AttributeType;
         use crate::items::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
 
         let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // Set DEX to 0 to eliminate crit chance (base 5% + dex_mod, with DEX=0 gives 0%)
+        state.attributes.set(AttributeType::Dexterity, 0);
 
         // Add armor with 50% damage reflection
         let armor = Item {
