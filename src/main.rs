@@ -161,11 +161,17 @@ fn main() -> io::Result<()> {
                 ratatui::text::Line::from(""),
             ];
 
-            // Add changelog if available
+            // Add changelog if available (max 15 entries)
             if !update_info.changelog.is_empty() {
                 text.push(ratatui::text::Line::from("  What's new:"));
-                for entry in update_info.changelog.iter().take(5) {
+                for entry in update_info.changelog.iter().take(15) {
                     text.push(ratatui::text::Line::from(format!("    • {}", entry)));
+                }
+                if update_info.changelog.len() > 15 {
+                    text.push(ratatui::text::Line::from(format!(
+                        "    ...and {} more",
+                        update_info.changelog.len() - 15
+                    )));
                 }
                 text.push(ratatui::text::Line::from(""));
             }
