@@ -26,6 +26,9 @@ pub struct ZoneProgression {
     /// Whether currently fighting a subzone boss
     #[serde(default)]
     pub fighting_boss: bool,
+    /// Whether player has forged Stormbreaker (required to defeat Zone 10 boss)
+    #[serde(default)]
+    pub has_stormbreaker: bool,
 }
 
 impl Default for ZoneProgression {
@@ -44,6 +47,7 @@ impl ZoneProgression {
             unlocked_zones: vec![1, 2], // Start with zones 1-2 unlocked (P0 zones)
             kills_in_subzone: 0,
             fighting_boss: false,
+            has_stormbreaker: false, // Must be forged to defeat Zone 10 boss
         }
     }
 
@@ -132,11 +136,27 @@ impl ZoneProgression {
         let zone_id = self.current_zone_id;
         let subzone_id = self.current_subzone_id;
 
+        // Check if this was the zone's final boss
+        let zones = get_all_zones();
+        let zone = zones.iter().find(|z| z.id == zone_id);
+
+        // Check for Zone 10 final boss weapon requirement
+        if let Some(zone) = zone {
+            let is_zone_boss = subzone_id == zone.subzones.len() as u32;
+            if zone.requires_weapon && is_zone_boss && !self.has_stormbreaker {
+                // Can't defeat this boss without the weapon - boss survives!
+                // Reset fighting state so player can try again (after getting weapon)
+                self.fighting_boss = false;
+                self.kills_in_subzone = 0;
+                return BossDefeatResult::WeaponRequired {
+                    weapon_name: zone.weapon_name.unwrap_or("legendary weapon").to_string(),
+                };
+            }
+        }
+
         // Record the defeat
         self.defeat_boss(zone_id, subzone_id);
 
-        // Check if this was the zone's final boss
-        let zones = get_all_zones();
         let zone = zones.iter().find(|z| z.id == zone_id);
 
         if let Some(zone) = zone {
@@ -288,6 +308,8 @@ pub enum BossDefeatResult {
     },
     /// Completed the final zone (Zone 10)
     GameComplete,
+    /// Boss requires a legendary weapon to defeat (Zone 10)
+    WeaponRequired { weapon_name: String },
 }
 
 #[cfg(test)]
@@ -685,5 +707,43 @@ mod tests {
                 assert_eq!(prog.current_zone_id, 2);
             }
         }
+    }
+
+    #[test]
+    fn test_zone_10_boss_requires_stormbreaker() {
+        let mut prog = ZoneProgression::new();
+
+        // Simulate being at Zone 10, final subzone (4), fighting boss
+        prog.current_zone_id = 10;
+        prog.current_subzone_id = 4;
+        prog.unlock_zone(10);
+        prog.fighting_boss = true;
+
+        // Try to defeat boss without Stormbreaker
+        assert!(!prog.has_stormbreaker);
+        let result = prog.on_boss_defeated(20);
+
+        match result {
+            BossDefeatResult::WeaponRequired { weapon_name } => {
+                assert_eq!(weapon_name, "Stormbreaker");
+            }
+            _ => panic!("Expected WeaponRequired, got {:?}", result),
+        }
+
+        // Boss should NOT be defeated
+        assert!(!prog.is_boss_defeated(10, 4));
+        // Should be reset to fight again
+        assert!(!prog.fighting_boss);
+        assert_eq!(prog.kills_in_subzone, 0);
+
+        // Now get Stormbreaker and try again
+        prog.has_stormbreaker = true;
+        prog.fighting_boss = true;
+
+        let result = prog.on_boss_defeated(20);
+
+        // Should complete the game
+        assert!(matches!(result, BossDefeatResult::GameComplete));
+        assert!(prog.is_boss_defeated(10, 4));
     }
 }
