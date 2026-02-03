@@ -268,14 +268,16 @@ mod tests {
 
     #[test]
     fn test_prestige_multiplier() {
+        // New formula: base = 1 + 0.5 * rank^0.7, then add CHA bonus
+
         // Rank 0, CHA 10 (+0): 1.0 + 0 = 1.0
         assert_eq!(prestige_multiplier(0, 0), 1.0);
 
-        // Rank 1, CHA 10 (+0): 1.2 + 0 = 1.2 (using 1.2^rank formula)
-        assert_eq!(prestige_multiplier(1, 0), 1.2);
+        // Rank 1, CHA 10 (+0): 1.5 + 0 = 1.5 (using 1 + 0.5*rank^0.7 formula)
+        assert_eq!(prestige_multiplier(1, 0), 1.5);
 
-        // Rank 1, CHA 16 (+3): 1.2 + 0.3 = 1.5
-        assert_eq!(prestige_multiplier(1, 3), 1.5);
+        // Rank 1, CHA 16 (+3): 1.5 + 0.3 = 1.8
+        assert_eq!(prestige_multiplier(1, 3), 1.8);
     }
 
     #[test]
@@ -283,8 +285,8 @@ mod tests {
         // Rank 0, WIS 10 (+0), CHA 10 (+0): 1.0 * 1.0 * 1.0 = 1.0
         assert_eq!(xp_gain_per_tick(0, 0, 0), 1.0);
 
-        // Rank 1, WIS 20 (+5), CHA 16 (+3): 1.5 * 1.25 = 1.875
-        assert_eq!(xp_gain_per_tick(1, 5, 3), 1.875);
+        // Rank 1, WIS 20 (+5), CHA 16 (+3): 1.8 * 1.25 = 2.25
+        assert_eq!(xp_gain_per_tick(1, 5, 3), 2.25);
     }
 
     #[test]
@@ -494,10 +496,10 @@ mod tests {
         let base_xp = calculate_offline_xp(3600, 0, 0, 0);
         let prestige_xp = calculate_offline_xp(3600, 1, 0, 0);
 
-        // Prestige 1 has 1.2x multiplier
+        // Prestige 1 has 1.5x multiplier (using 1 + 0.5*rank^0.7 formula)
         assert!(prestige_xp > base_xp);
         let ratio = prestige_xp / base_xp;
-        assert!((ratio - 1.2).abs() < 0.01);
+        assert!((ratio - 1.5).abs() < 0.01);
     }
 
     #[test]
@@ -541,8 +543,8 @@ mod tests {
     fn test_prestige_multiplier_negative_charisma() {
         // CHA below 10 gives negative modifier
         let mult = prestige_multiplier(1, -2); // CHA 6 = -2 modifier
-                                               // 1.2 + (-0.2) = 1.0
-        assert_eq!(mult, 1.0);
+                                               // 1.5 + (-0.2) = 1.3
+        assert_eq!(mult, 1.3);
     }
 
     #[test]

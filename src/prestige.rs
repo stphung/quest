@@ -49,8 +49,20 @@ fn get_prestige_name(rank: u32) -> &'static str {
 ///
 /// # Returns
 /// The PrestigeTier with name, required level, and multiplier
+///
+/// # Multiplier Formula
+/// Uses diminishing returns: `1 + 0.5 * rank^0.7`
+///
+/// This provides:
+/// - Strong early boost (+50% at P1)
+/// - Tapering gains to prevent late-game trivialization
+/// - Cycles get progressively longer, creating the "wall" feeling
+///
+/// See docs/plans/2026-02-03-prestige-multiplier-rebalance.md for details.
 pub fn get_prestige_tier(rank: u32) -> PrestigeTier {
-    let multiplier = 1.2_f64.powi(rank as i32);
+    // Diminishing returns formula: 1 + 0.5 * rank^0.7
+    // P1: 1.5x, P5: 2.5x, P10: 3.5x, P20: 5.1x, P30: 6.4x
+    let multiplier = 1.0 + 0.5 * (rank as f64).powf(0.7);
 
     let required_level = match rank {
         0 => 0,
@@ -235,9 +247,76 @@ mod tests {
         let tier100 = get_prestige_tier(100);
         assert_eq!(tier100.name, "Eternal");
 
-        // Verify multiplier formula: 1.2^rank (reduced for gentler scaling)
-        assert_eq!(get_prestige_tier(4).multiplier, 1.2_f64.powi(4));
-        assert_eq!(get_prestige_tier(10).multiplier, 1.2_f64.powi(10));
+        // Verify multiplier formula: 1 + 0.5 * rank^0.7 (diminishing returns)
+        let expected_p4 = 1.0 + 0.5 * 4.0_f64.powf(0.7);
+        let expected_p10 = 1.0 + 0.5 * 10.0_f64.powf(0.7);
+        assert!((get_prestige_tier(4).multiplier - expected_p4).abs() < 0.001);
+        assert!((get_prestige_tier(10).multiplier - expected_p10).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_multiplier_diminishing_returns() {
+        // Verify multiplier grows with diminishing returns
+        // Each subsequent prestige should give less % gain than the previous
+
+        let mut prev_mult = get_prestige_tier(0).multiplier;
+        let mut prev_gain = f64::MAX;
+
+        for rank in 1..=30 {
+            let mult = get_prestige_tier(rank).multiplier;
+            let gain = mult - prev_mult;
+
+            // Multiplier should always increase
+            assert!(
+                mult > prev_mult,
+                "Multiplier should increase: P{} ({}) > P{} ({})",
+                rank,
+                mult,
+                rank - 1,
+                prev_mult
+            );
+
+            // Gain should decrease (diminishing returns) after P1
+            if rank > 1 {
+                assert!(
+                    gain < prev_gain,
+                    "Gain should diminish: P{} gain ({:.3}) < P{} gain ({:.3})",
+                    rank,
+                    gain,
+                    rank - 1,
+                    prev_gain
+                );
+            }
+
+            prev_mult = mult;
+            prev_gain = gain;
+        }
+    }
+
+    #[test]
+    fn test_multiplier_expected_values() {
+        // Verify key multiplier values match design doc
+        // Formula: 1 + 0.5 * rank^0.7
+
+        let cases = [
+            (0, 1.0),   // No prestige
+            (1, 1.5),   // +50% at P1
+            (5, 2.54),  // ~2.5x at P5
+            (10, 3.51), // ~3.5x at P10
+            (20, 5.07), // ~5x at P20
+            (30, 6.41), // ~6.4x at P30
+        ];
+
+        for (rank, expected) in cases {
+            let actual = get_prestige_tier(rank).multiplier;
+            assert!(
+                (actual - expected).abs() < 0.1,
+                "P{}: expected ~{}, got {}",
+                rank,
+                expected,
+                actual
+            );
+        }
     }
 
     #[test]
