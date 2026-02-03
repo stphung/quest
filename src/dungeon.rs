@@ -241,6 +241,9 @@ pub struct Dungeon {
     /// Whether the current room's combat has been completed
     #[serde(default)]
     pub current_room_cleared: bool,
+    /// Whether currently traveling through cleared rooms (for UI display)
+    #[serde(skip)]
+    pub is_traveling: bool,
 }
 
 impl Dungeon {
@@ -258,6 +261,7 @@ impl Dungeon {
             xp_earned: 0,
             rooms_cleared: 0,
             current_room_cleared: true, // Entrance starts cleared
+            is_traveling: false,
         }
     }
 

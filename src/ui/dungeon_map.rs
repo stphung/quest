@@ -13,6 +13,7 @@ use ratatui::{
 /// Symbols used for dungeon map rendering (emojis are 2 cells wide)
 mod symbols {
     pub const PLAYER: &str = "🧙";
+    pub const PLAYER_TRAVEL: &str = "🏃"; // Traveling through cleared rooms
     pub const ENTRANCE: &str = "🚪";
     pub const COMBAT: &str = "💀";
     pub const TREASURE: &str = "💎";
@@ -51,11 +52,20 @@ impl<'a> DungeonMapWidget<'a> {
         let blink_visible = self.blink_phase < 0.5;
 
         if is_current && blink_visible {
+            // Show running symbol when traveling, wizard when exploring/fighting
+            let symbol = if self.dungeon.is_traveling {
+                symbols::PLAYER_TRAVEL
+            } else {
+                symbols::PLAYER
+            };
+            let color = if self.dungeon.is_traveling {
+                Color::Cyan // Different color for traveling
+            } else {
+                Color::Yellow
+            };
             return (
-                symbols::PLAYER,
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
+                symbol,
+                Style::default().fg(color).add_modifier(Modifier::BOLD),
             );
         }
 

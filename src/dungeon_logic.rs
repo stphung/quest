@@ -14,6 +14,9 @@ use std::collections::{HashSet, VecDeque};
 /// Time between room movements during auto-exploration (seconds)
 pub const ROOM_MOVE_INTERVAL: f64 = 2.5;
 
+/// Faster movement when traveling through already-cleared rooms (seconds)
+pub const ROOM_TRAVEL_INTERVAL: f64 = 0.8;
+
 /// Events that can occur during dungeon exploration
 #[derive(Debug, Clone)]
 pub enum DungeonEvent {
@@ -57,16 +60,34 @@ pub fn update_dungeon(state: &mut GameState, delta_time: f64) -> Vec<DungeonEven
     // Update move timer
     dungeon.move_timer += delta_time;
 
-    // Check if it's time to move
-    if dungeon.move_timer >= ROOM_MOVE_INTERVAL {
-        dungeon.move_timer = 0.0;
+    // Find next room to explore
+    if let Some(next_pos) = find_next_room(dungeon) {
+        // Check if next room is already cleared (traveling) or new (exploring)
+        let is_traveling = dungeon
+            .get_room(next_pos.0, next_pos.1)
+            .map(|r| r.state == RoomState::Cleared)
+            .unwrap_or(false);
 
-        // Find next room to explore
-        if let Some(next_pos) = find_next_room(dungeon) {
+        // Use faster interval when traveling through cleared rooms
+        let move_interval = if is_traveling {
+            ROOM_TRAVEL_INTERVAL
+        } else {
+            ROOM_MOVE_INTERVAL
+        };
+
+        // Update traveling state for UI
+        dungeon.is_traveling = is_traveling;
+
+        // Check if it's time to move
+        if dungeon.move_timer >= move_interval {
+            dungeon.move_timer = 0.0;
+
             // Move to the next room
             let move_events = move_to_room(dungeon, next_pos);
             events.extend(move_events);
         }
+    } else {
+        dungeon.is_traveling = false;
     }
 
     events
