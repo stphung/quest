@@ -11,6 +11,10 @@ pub struct Zone {
     pub prestige_requirement: u32,
     pub min_level: u32,
     pub max_level: u32,
+    /// If true, completing this zone requires forging a legendary weapon (see issue #20)
+    pub requires_weapon: bool,
+    /// Name of the legendary weapon for this zone (if requires_weapon is true)
+    pub weapon_name: Option<&'static str>,
 }
 
 /// Represents a subzone within a zone.
@@ -39,6 +43,8 @@ pub fn get_all_zones() -> Vec<Zone> {
             prestige_requirement: 0,
             min_level: 1,
             max_level: 10,
+            requires_weapon: false,
+            weapon_name: None,
             subzones: vec![
                 Subzone {
                     id: 1,
@@ -75,6 +81,8 @@ pub fn get_all_zones() -> Vec<Zone> {
             prestige_requirement: 0,
             min_level: 10,
             max_level: 25,
+            requires_weapon: false,
+            weapon_name: None,
             subzones: vec![
                 Subzone {
                     id: 1,
@@ -112,6 +120,8 @@ pub fn get_all_zones() -> Vec<Zone> {
             prestige_requirement: 5,
             min_level: 25,
             max_level: 40,
+            requires_weapon: false,
+            weapon_name: None,
             subzones: vec![
                 Subzone {
                     id: 1,
@@ -148,6 +158,8 @@ pub fn get_all_zones() -> Vec<Zone> {
             prestige_requirement: 5,
             min_level: 40,
             max_level: 55,
+            requires_weapon: false,
+            weapon_name: None,
             subzones: vec![
                 Subzone {
                     id: 1,
@@ -185,6 +197,8 @@ pub fn get_all_zones() -> Vec<Zone> {
             prestige_requirement: 10,
             min_level: 55,
             max_level: 70,
+            requires_weapon: false,
+            weapon_name: None,
             subzones: vec![
                 Subzone {
                     id: 1,
@@ -230,6 +244,8 @@ pub fn get_all_zones() -> Vec<Zone> {
             prestige_requirement: 10,
             min_level: 70,
             max_level: 85,
+            requires_weapon: false,
+            weapon_name: None,
             subzones: vec![
                 Subzone {
                     id: 1,
@@ -276,6 +292,8 @@ pub fn get_all_zones() -> Vec<Zone> {
             prestige_requirement: 15,
             min_level: 85,
             max_level: 100,
+            requires_weapon: false,
+            weapon_name: None,
             subzones: vec![
                 Subzone {
                     id: 1,
@@ -321,6 +339,8 @@ pub fn get_all_zones() -> Vec<Zone> {
             prestige_requirement: 15,
             min_level: 100,
             max_level: 115,
+            requires_weapon: false,
+            weapon_name: None,
             subzones: vec![
                 Subzone {
                     id: 1,
@@ -367,6 +387,8 @@ pub fn get_all_zones() -> Vec<Zone> {
             prestige_requirement: 20,
             min_level: 115,
             max_level: 130,
+            requires_weapon: false,
+            weapon_name: None,
             subzones: vec![
                 Subzone {
                     id: 1,
@@ -412,6 +434,8 @@ pub fn get_all_zones() -> Vec<Zone> {
             prestige_requirement: 20,
             min_level: 130,
             max_level: 150,
+            requires_weapon: true,
+            weapon_name: Some("Stormbreaker"),
             subzones: vec![
                 Subzone {
                     id: 1,
@@ -580,5 +604,25 @@ mod tests {
         assert!(get_subzone(11, 1).is_none());
         // Invalid subzone
         assert!(get_subzone(1, 5).is_none());
+    }
+
+    #[test]
+    fn test_weapon_zones() {
+        let zones = get_all_zones();
+
+        // Zones 1-9 don't require weapons
+        for zone in &zones[0..9] {
+            assert!(
+                !zone.requires_weapon,
+                "Zone {} should not require weapon",
+                zone.name
+            );
+            assert!(zone.weapon_name.is_none());
+        }
+
+        // Zone 10 requires the Stormbreaker weapon
+        let zone10 = &zones[9];
+        assert!(zone10.requires_weapon, "Zone 10 should require weapon");
+        assert_eq!(zone10.weapon_name, Some("Stormbreaker"));
     }
 }
