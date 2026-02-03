@@ -75,7 +75,10 @@ pub fn get_ai_move<R: Rng>(
 }
 
 /// Apply a move to the board and return the resulting board state (if game continues)
-pub fn apply_move_to_board(board: &chess_engine::Board, m: chess_engine::Move) -> Option<chess_engine::Board> {
+pub fn apply_move_to_board(
+    board: &chess_engine::Board,
+    m: chess_engine::Move,
+) -> Option<chess_engine::Board> {
     match board.play_move(m) {
         chess_engine::GameResult::Continuing(new_board) => Some(new_board),
         _ => None,
@@ -114,16 +117,23 @@ pub fn process_ai_thinking<R: Rng>(game: &mut ChessGame, rng: &mut R) -> bool {
     false
 }
 
-/// Check if the game is over (no legal moves = checkmate or stalemate)
+/// Check if the game is over (checkmate or stalemate)
 pub fn check_game_over(game: &mut ChessGame) {
-    let legal_moves = game.board.get_legal_moves();
-    if legal_moves.is_empty() && game.game_result.is_none() {
-        // Simplified: no legal moves means loss for current side
-        game.game_result = Some(if game.player_is_white {
+    if game.game_result.is_some() {
+        return;
+    }
+
+    // Use the chess-engine's built-in checkmate/stalemate detection
+    if game.board.is_checkmate() {
+        // Current player (whose turn it is) is in checkmate
+        let loser = game.board.get_turn_color();
+        game.game_result = Some(if loser == game.player_color() {
             ChessResult::Loss
         } else {
             ChessResult::Win
         });
+    } else if game.board.is_stalemate() {
+        game.game_result = Some(ChessResult::Draw);
     }
 }
 

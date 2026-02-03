@@ -1,5 +1,6 @@
 //! Chess minigame data structures and state management.
 
+use chess_engine::{Color as ChessColor, Evaluate, Move, Position};
 use serde::{Deserialize, Serialize};
 
 /// AI difficulty levels
@@ -20,7 +21,10 @@ impl ChessDifficulty {
     ];
 
     pub fn from_index(index: usize) -> Self {
-        Self::ALL.get(index).copied().unwrap_or(ChessDifficulty::Novice)
+        Self::ALL
+            .get(index)
+            .copied()
+            .unwrap_or(ChessDifficulty::Novice)
     }
 
     pub fn search_depth(&self) -> i32 {
@@ -93,6 +97,7 @@ pub struct ChessGame {
     pub difficulty: ChessDifficulty,
     pub cursor: (u8, u8),
     pub selected_square: Option<(u8, u8)>,
+    pub legal_move_destinations: Vec<(u8, u8)>,
     pub game_result: Option<ChessResult>,
     pub forfeit_pending: bool,
     pub ai_thinking: bool,
@@ -109,6 +114,7 @@ impl ChessGame {
             difficulty,
             cursor: (4, 1), // e2
             selected_square: None,
+            legal_move_destinations: Vec::new(),
             game_result: None,
             forfeit_pending: false,
             ai_thinking: false,
@@ -123,6 +129,171 @@ impl ChessGame {
         let new_x = (self.cursor.0 as i8 + dx).clamp(0, 7) as u8;
         let new_y = (self.cursor.1 as i8 + dy).clamp(0, 7) as u8;
         self.cursor = (new_x, new_y);
+    }
+
+    /// Get the player's color
+    pub fn player_color(&self) -> ChessColor {
+        if self.player_is_white {
+            ChessColor::White
+        } else {
+            ChessColor::Black
+        }
+    }
+
+    /// Check if it's the player's turn
+    pub fn is_player_turn(&self) -> bool {
+        self.board.get_turn_color() == self.player_color()
+    }
+
+    /// Check if the cursor is on a player's piece
+    pub fn cursor_on_player_piece(&self) -> bool {
+        let pos = Position::new(self.cursor.1 as i32, self.cursor.0 as i32);
+        if let Some(piece) = self.board.get_piece(pos) {
+            piece.get_color() == self.player_color()
+        } else {
+            false
+        }
+    }
+
+    /// Select the piece at the cursor and compute legal moves for it
+    pub fn select_piece_at_cursor(&mut self) -> bool {
+        if !self.is_player_turn() || self.ai_thinking {
+            return false;
+        }
+
+        let (file, rank) = self.cursor;
+        let pos = Position::new(rank as i32, file as i32);
+
+        // Check if there's a player piece at cursor
+        if let Some(piece) = self.board.get_piece(pos) {
+            if piece.get_color() != self.player_color() {
+                return false;
+            }
+
+            // Find all legal moves from this position
+            let all_moves = self.board.get_legal_moves();
+            let mut destinations = Vec::new();
+
+            for m in all_moves {
+                match m {
+                    Move::Piece(from, to) => {
+                        if from == pos {
+                            destinations.push((to.get_col() as u8, to.get_row() as u8));
+                        }
+                    }
+                    Move::KingSideCastle => {
+                        // Castling is from king position
+                        if piece.is_king() {
+                            let king_dest = if self.player_is_white { (6, 0) } else { (6, 7) };
+                            destinations.push(king_dest);
+                        }
+                    }
+                    Move::QueenSideCastle => {
+                        if piece.is_king() {
+                            let king_dest = if self.player_is_white { (2, 0) } else { (2, 7) };
+                            destinations.push(king_dest);
+                        }
+                    }
+                    Move::Resign => {}
+                }
+            }
+
+            if !destinations.is_empty() {
+                self.selected_square = Some((file, rank));
+                self.legal_move_destinations = destinations;
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Try to move the selected piece to the cursor position
+    /// Returns true if a move was made
+    pub fn try_move_to_cursor(&mut self) -> bool {
+        if !self.is_player_turn() || self.ai_thinking {
+            return false;
+        }
+
+        let Some((sel_file, sel_rank)) = self.selected_square else {
+            return false;
+        };
+
+        let (dest_file, dest_rank) = self.cursor;
+
+        // Check if destination is in legal moves
+        if !self
+            .legal_move_destinations
+            .contains(&(dest_file, dest_rank))
+        {
+            return false;
+        }
+
+        // Determine the move to make
+        let from_pos = Position::new(sel_rank as i32, sel_file as i32);
+        let to_pos = Position::new(dest_rank as i32, dest_file as i32);
+
+        // Check for castling moves
+        let player_move = if let Some(piece) = self.board.get_piece(from_pos) {
+            if piece.is_king() {
+                // Check for kingside castle (king moves 2 squares right)
+                if dest_file == sel_file + 2 {
+                    Move::KingSideCastle
+                // Check for queenside castle (king moves 2 squares left)
+                } else if sel_file >= 2 && dest_file == sel_file - 2 {
+                    Move::QueenSideCastle
+                } else {
+                    Move::Piece(from_pos, to_pos)
+                }
+            } else {
+                Move::Piece(from_pos, to_pos)
+            }
+        } else {
+            Move::Piece(from_pos, to_pos)
+        };
+
+        // Apply the move
+        match self.board.play_move(player_move) {
+            chess_engine::GameResult::Continuing(new_board) => {
+                self.board = new_board;
+                self.selected_square = None;
+                self.legal_move_destinations.clear();
+
+                // Start AI thinking
+                self.ai_thinking = true;
+                self.ai_think_ticks = 0;
+                self.ai_pending_board = None;
+                true
+            }
+            chess_engine::GameResult::Victory(winner) => {
+                self.selected_square = None;
+                self.legal_move_destinations.clear();
+
+                // Determine winner
+                self.game_result = Some(if winner == self.player_color() {
+                    ChessResult::Win
+                } else {
+                    ChessResult::Loss
+                });
+                true
+            }
+            chess_engine::GameResult::Stalemate => {
+                self.selected_square = None;
+                self.legal_move_destinations.clear();
+                self.game_result = Some(ChessResult::Draw);
+                true
+            }
+            chess_engine::GameResult::IllegalMove(_) => {
+                // Should not happen since we're using legal moves
+                false
+            }
+        }
+    }
+
+    /// Clear selection
+    pub fn clear_selection(&mut self) {
+        self.selected_square = None;
+        self.legal_move_destinations.clear();
     }
 }
 
@@ -188,5 +359,88 @@ mod tests {
         assert_eq!(stats.games_played, 0);
         assert_eq!(stats.games_won, 0);
         assert_eq!(stats.prestige_earned, 0);
+    }
+
+    #[test]
+    fn test_player_color() {
+        let game = ChessGame::new(ChessDifficulty::Novice);
+        assert!(game.player_is_white);
+        assert_eq!(game.player_color(), ChessColor::White);
+        assert!(game.is_player_turn());
+    }
+
+    #[test]
+    fn test_cursor_on_player_piece() {
+        let game = ChessGame::new(ChessDifficulty::Novice);
+        // Cursor starts at e2 which has a white pawn
+        assert!(game.cursor_on_player_piece());
+    }
+
+    #[test]
+    fn test_select_piece_at_cursor() {
+        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        // Cursor at e2 (white pawn)
+        let selected = game.select_piece_at_cursor();
+        assert!(selected);
+        assert_eq!(game.selected_square, Some((4, 1)));
+        // e2 pawn can move to e3 and e4
+        assert!(game.legal_move_destinations.contains(&(4, 2))); // e3
+        assert!(game.legal_move_destinations.contains(&(4, 3))); // e4
+    }
+
+    #[test]
+    fn test_select_empty_square() {
+        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        game.cursor = (4, 4); // e5 - empty square
+        let selected = game.select_piece_at_cursor();
+        assert!(!selected);
+        assert!(game.selected_square.is_none());
+    }
+
+    #[test]
+    fn test_select_enemy_piece() {
+        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        game.cursor = (4, 6); // e7 - black pawn
+        let selected = game.select_piece_at_cursor();
+        assert!(!selected);
+        assert!(game.selected_square.is_none());
+    }
+
+    #[test]
+    fn test_clear_selection() {
+        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        game.select_piece_at_cursor();
+        assert!(game.selected_square.is_some());
+        game.clear_selection();
+        assert!(game.selected_square.is_none());
+        assert!(game.legal_move_destinations.is_empty());
+    }
+
+    #[test]
+    fn test_try_move_to_cursor() {
+        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        // Select e2 pawn
+        game.select_piece_at_cursor();
+        // Move cursor to e4
+        game.cursor = (4, 3);
+        let moved = game.try_move_to_cursor();
+        assert!(moved);
+        // Selection should be cleared
+        assert!(game.selected_square.is_none());
+        // AI should be thinking
+        assert!(game.ai_thinking);
+    }
+
+    #[test]
+    fn test_try_invalid_move() {
+        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        // Select e2 pawn
+        game.select_piece_at_cursor();
+        // Move cursor to e5 (not a legal move for pawn)
+        game.cursor = (4, 4);
+        let moved = game.try_move_to_cursor();
+        assert!(!moved);
+        // Selection should remain
+        assert!(game.selected_square.is_some());
     }
 }

@@ -1,9 +1,9 @@
 mod attributes;
 mod build_info;
 mod challenge_menu;
+mod character_manager;
 mod chess;
 mod chess_logic;
-mod character_manager;
 mod combat;
 mod combat_logic;
 mod constants;
@@ -542,14 +542,32 @@ fn main() -> io::Result<()> {
                                         KeyCode::Left => chess_game.move_cursor(-1, 0),
                                         KeyCode::Right => chess_game.move_cursor(1, 0),
                                         KeyCode::Enter => {
-                                            // TODO: piece selection and move - will implement in Task 11
+                                            // If a piece is selected, try to move to cursor
+                                            if chess_game.selected_square.is_some() {
+                                                // Check if cursor is on a legal destination
+                                                if chess_game
+                                                    .legal_move_destinations
+                                                    .contains(&chess_game.cursor)
+                                                {
+                                                    chess_game.try_move_to_cursor();
+                                                } else if chess_game.cursor_on_player_piece() {
+                                                    // Cursor on another player piece - select it instead
+                                                    chess_game.select_piece_at_cursor();
+                                                } else {
+                                                    // Invalid destination - clear selection
+                                                    chess_game.clear_selection();
+                                                }
+                                            } else {
+                                                // No piece selected - try to select piece at cursor
+                                                chess_game.select_piece_at_cursor();
+                                            }
                                         }
                                         KeyCode::Esc => {
                                             if chess_game.forfeit_pending {
                                                 chess_game.game_result =
                                                     Some(chess::ChessResult::Forfeit);
                                             } else if chess_game.selected_square.is_some() {
-                                                chess_game.selected_square = None;
+                                                chess_game.clear_selection();
                                                 chess_game.forfeit_pending = false;
                                             } else {
                                                 chess_game.forfeit_pending = true;
@@ -571,8 +589,9 @@ fn main() -> io::Result<()> {
                                         KeyCode::Up => menu.navigate_up(),
                                         KeyCode::Down => menu.navigate_down(4),
                                         KeyCode::Enter => {
-                                            let difficulty =
-                                                ChessDifficulty::from_index(menu.selected_difficulty);
+                                            let difficulty = ChessDifficulty::from_index(
+                                                menu.selected_difficulty,
+                                            );
                                             if let Some(challenge) = menu.take_selected() {
                                                 if matches!(
                                                     challenge.challenge_type,

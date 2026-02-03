@@ -67,11 +67,18 @@ fn render_board(frame: &mut Frame, area: Rect, game: &ChessGame) {
             let is_light = (file + rank) % 2 == 1;
             let is_cursor = game.cursor == (file, rank);
             let is_selected = game.selected_square == Some((file, rank));
+            let is_legal_destination = game.legal_move_destinations.contains(&(file, rank));
 
             let bg_color = if is_cursor {
-                Color::Yellow
+                if is_legal_destination {
+                    Color::Rgb(200, 200, 50) // Yellow-green for cursor on legal move
+                } else {
+                    Color::Yellow
+                }
             } else if is_selected {
                 Color::Green
+            } else if is_legal_destination {
+                Color::Rgb(144, 238, 144) // Light green for legal moves
             } else if is_light {
                 Color::Rgb(200, 200, 180)
             } else {
@@ -83,10 +90,7 @@ fn render_board(frame: &mut Frame, area: Rect, game: &ChessGame) {
                 .map(|c| c.to_string())
                 .unwrap_or_else(|| " ".to_string());
 
-            let fg_color = if piece_char
-                .map(|c| is_white_piece(c))
-                .unwrap_or(false)
-            {
+            let fg_color = if piece_char.map(is_white_piece).unwrap_or(false) {
                 Color::White
             } else {
                 Color::Black
@@ -221,18 +225,18 @@ fn get_piece_at(board: &chess_engine::Board, file: u8, rank: u8) -> Option<char>
         // - Color::White pieces display with filled symbols (normally black in Unicode)
         // - Color::Black pieces display with hollow symbols (normally white in Unicode)
         match piece {
-            Piece::King(ChessColor::White, _) => '\u{265A}',   // Black king symbol for white
-            Piece::Queen(ChessColor::White, _) => '\u{265B}',  // Black queen symbol for white
-            Piece::Rook(ChessColor::White, _) => '\u{265C}',   // Black rook symbol for white
+            Piece::King(ChessColor::White, _) => '\u{265A}', // Black king symbol for white
+            Piece::Queen(ChessColor::White, _) => '\u{265B}', // Black queen symbol for white
+            Piece::Rook(ChessColor::White, _) => '\u{265C}', // Black rook symbol for white
             Piece::Bishop(ChessColor::White, _) => '\u{265D}', // Black bishop symbol for white
             Piece::Knight(ChessColor::White, _) => '\u{265E}', // Black knight symbol for white
-            Piece::Pawn(ChessColor::White, _) => '\u{265F}',   // Black pawn symbol for white
-            Piece::King(ChessColor::Black, _) => '\u{2654}',   // White king symbol for black
-            Piece::Queen(ChessColor::Black, _) => '\u{2655}',  // White queen symbol for black
-            Piece::Rook(ChessColor::Black, _) => '\u{2656}',   // White rook symbol for black
+            Piece::Pawn(ChessColor::White, _) => '\u{265F}', // Black pawn symbol for white
+            Piece::King(ChessColor::Black, _) => '\u{2654}', // White king symbol for black
+            Piece::Queen(ChessColor::Black, _) => '\u{2655}', // White queen symbol for black
+            Piece::Rook(ChessColor::Black, _) => '\u{2656}', // White rook symbol for black
             Piece::Bishop(ChessColor::Black, _) => '\u{2657}', // White bishop symbol for black
             Piece::Knight(ChessColor::Black, _) => '\u{2658}', // White knight symbol for black
-            Piece::Pawn(ChessColor::Black, _) => '\u{2659}',   // White pawn symbol for black
+            Piece::Pawn(ChessColor::Black, _) => '\u{2659}', // White pawn symbol for black
         }
     })
 }
