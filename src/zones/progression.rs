@@ -366,4 +366,83 @@ mod tests {
         assert_eq!(zone, "Meadow");
         assert_eq!(subzone, "Sunny Fields");
     }
+
+    #[test]
+    fn test_full_progression_flow() {
+        let mut prog = ZoneProgression::new();
+        let _zones = get_all_zones(); // Used to verify zone data is available
+
+        // === ZONE 1: Meadow (3 subzones) ===
+        assert_eq!(prog.current_zone_id, 1);
+        assert_eq!(prog.current_subzone_id, 1);
+
+        // Clear all subzones in Zone 1
+        for subzone_id in 1..=3 {
+            assert!(prog.can_enter_subzone(1, subzone_id) || subzone_id == 1);
+            prog.defeat_boss(1, subzone_id);
+            if subzone_id < 3 {
+                assert!(prog.advance_to_next_subzone());
+            }
+        }
+        assert_eq!(prog.current_subzone_id, 3);
+
+        // Advance to Zone 2 (no prestige required)
+        assert!(prog.advance_to_next_zone(0));
+        assert_eq!(prog.current_zone_id, 2);
+        assert_eq!(prog.current_subzone_id, 1);
+
+        // === ZONE 2: Dark Forest (3 subzones) ===
+        for subzone_id in 1..=3 {
+            prog.defeat_boss(2, subzone_id);
+            if subzone_id < 3 {
+                prog.advance_to_next_subzone();
+            }
+        }
+
+        // Try to advance to Zone 3 - BLOCKED by P5 requirement
+        assert!(!prog.advance_to_next_zone(0));
+        assert!(!prog.advance_to_next_zone(4));
+        assert_eq!(prog.current_zone_id, 2);
+
+        // With P5, can advance to Zone 3
+        assert!(prog.advance_to_next_zone(5));
+        assert_eq!(prog.current_zone_id, 3);
+
+        // === Simulate Prestige ===
+        prog.reset_for_prestige(6); // Prestige to rank 6
+
+        // Should be back at Zone 1, Subzone 1
+        assert_eq!(prog.current_zone_id, 1);
+        assert_eq!(prog.current_subzone_id, 1);
+
+        // Bosses are reset
+        assert!(!prog.is_boss_defeated(1, 1));
+        assert!(!prog.is_boss_defeated(2, 3));
+
+        // But zones 1-6 should be unlocked (P0 + P5 + P10 partial)
+        assert!(prog.is_zone_unlocked(1));
+        assert!(prog.is_zone_unlocked(2));
+        assert!(prog.is_zone_unlocked(3));
+        assert!(prog.is_zone_unlocked(4));
+        // P10 zones not unlocked yet (need P10)
+        assert!(!prog.is_zone_unlocked(5));
+        assert!(!prog.is_zone_unlocked(6));
+
+        // Can immediately travel to Zone 4 (P5 requirement met, zone unlocked)
+        assert!(prog.travel_to(4, 1));
+        assert_eq!(prog.current_zone_id, 4);
+    }
+
+    #[test]
+    fn test_zone_10_is_endgame() {
+        let zones = get_all_zones();
+        let zone10 = &zones[9];
+
+        // Zone 10 is the endgame zone requiring a weapon
+        assert_eq!(zone10.id, 10);
+        assert_eq!(zone10.name, "Storm Citadel");
+        assert!(zone10.requires_weapon);
+        assert_eq!(zone10.weapon_name, Some("Stormbreaker"));
+        assert_eq!(zone10.prestige_requirement, 20);
+    }
 }
