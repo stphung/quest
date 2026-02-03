@@ -1,5 +1,7 @@
 use crate::attributes::AttributeType;
-use crate::combat::{generate_boss_enemy, generate_elite_enemy, generate_enemy};
+use crate::combat::{
+    generate_boss_enemy, generate_elite_enemy, generate_enemy, generate_enemy_for_current_zone,
+};
 use crate::constants::*;
 use crate::derived_stats::DerivedStats;
 use crate::dungeon::RoomType;
@@ -162,11 +164,17 @@ pub fn spawn_enemy_if_needed(state: &mut GameState) {
                 }
             }
         } else {
-            // Normal overworld combat
+            // Normal overworld combat - use zone-based enemy generation
             let derived =
                 DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
             let total_damage = derived.total_damage();
-            let enemy = generate_enemy(derived.max_hp, total_damage);
+
+            let enemy = generate_enemy_for_current_zone(
+                state.zone_progression.current_zone_id,
+                state.zone_progression.current_subzone_id,
+                derived.max_hp,
+                total_damage,
+            );
             state.combat_state.current_enemy = Some(enemy);
             state.combat_state.attack_timer = 0.0;
         }
