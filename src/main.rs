@@ -691,6 +691,21 @@ fn main() -> io::Result<()> {
                                         showing_prestige_confirm = true;
                                     }
                                 }
+                                // Debug: 'c'/'C' to add a chess challenge
+                                KeyCode::Char('c') | KeyCode::Char('C') => {
+                                    if !state.challenge_menu.has_chess_challenge()
+                                        && state.active_chess.is_none()
+                                    {
+                                        state
+                                            .challenge_menu
+                                            .add_challenge(chess_logic::create_chess_challenge());
+                                        state.combat_state.add_log_entry(
+                                            "♟ [DEBUG] Chess challenge added".to_string(),
+                                            false,
+                                            true,
+                                        );
+                                    }
+                                }
                                 _ => {}
                             }
                         }

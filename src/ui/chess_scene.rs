@@ -40,14 +40,14 @@ pub fn render_chess_scene(frame: &mut Frame, area: Rect, game: &ChessGame) {
 }
 
 fn render_board(frame: &mut Frame, area: Rect, game: &ChessGame) {
-    let board_width: u16 = 26;
+    let board_width: u16 = 34; // 2 (rank labels) + 8*4 (squares)
     let board_height: u16 = 10;
 
     let x_offset = area.x + (area.width.saturating_sub(board_width)) / 2;
     let y_offset = area.y + (area.height.saturating_sub(board_height)) / 2;
 
-    // File labels
-    let files = "  a  b  c  d  e  f  g  h";
+    // File labels (4-char spacing)
+    let files = "   a   b   c   d   e   f   g   h";
     let top_labels = Paragraph::new(files).style(Style::default().fg(Color::DarkGray));
     frame.render_widget(top_labels, Rect::new(x_offset, y_offset, board_width, 1));
 
@@ -60,9 +60,9 @@ fn render_board(frame: &mut Frame, area: Rect, game: &ChessGame) {
         let label = Paragraph::new(rank_label.clone()).style(Style::default().fg(Color::DarkGray));
         frame.render_widget(label, Rect::new(x_offset, y, 1, 1));
 
-        // Squares
+        // Squares (4 chars each)
         for file in 0..8u8 {
-            let x = x_offset + 2 + (file as u16 * 3);
+            let x = x_offset + 2 + (file as u16 * 4);
 
             let is_light = (file + rank) % 2 == 1;
             let is_cursor = game.cursor == (file, rank);
@@ -97,13 +97,13 @@ fn render_board(frame: &mut Frame, area: Rect, game: &ChessGame) {
             };
 
             let style = Style::default().fg(fg_color).bg(bg_color);
-            let square = Paragraph::new(format!(" {} ", piece_str)).style(style);
-            frame.render_widget(square, Rect::new(x, y, 3, 1));
+            let square = Paragraph::new(format!(" {}  ", piece_str)).style(style);
+            frame.render_widget(square, Rect::new(x, y, 4, 1));
         }
 
         // Right rank label
         let label_r = Paragraph::new(rank_label).style(Style::default().fg(Color::DarkGray));
-        frame.render_widget(label_r, Rect::new(x_offset + 26, y, 1, 1));
+        frame.render_widget(label_r, Rect::new(x_offset + 34, y, 1, 1));
     }
 
     // Bottom file labels
