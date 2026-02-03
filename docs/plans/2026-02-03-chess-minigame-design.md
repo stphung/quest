@@ -92,7 +92,7 @@ Esc         → Deselect piece (if selected) / offer forfeit (if no piece select
 2. Player navigates to a piece and presses Enter to select it
 3. Legal destination squares are highlighted
 4. Player navigates to a destination and presses Enter to confirm
-5. AI responds after a brief delay (0.5–1s, animated "thinking")
+5. AI responds after a variable delay (0.3–2.5s, feels more human)
 6. Repeat until checkmate, stalemate, or forfeit
 
 **Visual feedback:**
@@ -137,14 +137,22 @@ Higher difficulty = deeper search = stronger play = bigger reward. The AI should
 
 **Thinking budget**: AI move computation must complete within ~200ms to avoid blocking the game tick. At 4-ply with alpha-beta pruning on an 8×8 board, this is comfortably achievable.
 
+**Variable thinking delay**: To feel more human, the AI adds a cosmetic delay after computing its move:
+- Base delay: 0.3–1.0s (random)
+- Position complexity bonus: +0.0–1.0s (based on number of legal moves available)
+- Capture/check response: +0.2–0.5s (AI "considers" the threat)
+- Total range: ~0.3–2.5s depending on board state
+
+This makes the AI feel like it's actually thinking rather than responding instantly.
+
 ### Reward Structure
 
 **On win (checkmate the AI)**:
 - Prestige rank increases by 1–5 (based on chosen difficulty: Novice +1, Apprentice +2, Journeyman +3, Master +5)
-- Prestige reset is performed (same as normal prestige: level, XP, attributes, equipment, zones all reset)
-- Fishing rank is preserved (same as normal prestige)
+- **No reset** — prestige is added immediately, player keeps current level, XP, attributes, equipment, zones
 - Victory message displayed in combat log
-- The prestige confirmation dialog is NOT shown — the reward is applied directly since the player already committed by playing the full game
+- Return to normal combat immediately
+- This makes chess wins extremely valuable — pure prestige advancement without the typical reset cost
 
 **On loss (AI checkmates the player)**:
 - No penalty — just return to normal combat
@@ -161,14 +169,15 @@ Higher difficulty = deeper search = stronger play = bigger reward. The AI should
 
 ### Why Prestige as Reward?
 
-Prestige is the highest-value currency in the game. Granting 1–5 ranks for a chess win:
+Prestige is the highest-value currency in the game. Granting 1–5 ranks for a chess win **without the typical reset**:
 
 - Creates a genuine incentive for the player to engage with the interactive element
 - Provides a meaningful shortcut in the prestige grind for skilled players
 - Makes discovery feel exciting rather than ignorable
-- The reset that comes with prestige prevents it from being pure power inflation — you still restart
+- The skill requirement (actually winning at chess) balances the power of reset-free prestige
+- Rewards player agency in an otherwise idle game
 
-The reward should feel like "I just saved hours of grinding" not "I broke the game."
+The reward should feel like "I earned this through skill" — a chess master can accelerate their progression significantly.
 
 ## State Model
 
@@ -245,7 +254,9 @@ pub struct ChessGame {
     pub game_over: bool,               // True when game has ended
     pub forfeit_pending: bool,         // True after first Esc press (confirm with second)
     pub ai_thinking: bool,             // True while AI cosmetic delay is active
-    pub ai_think_ticks: u32,           // Cosmetic delay counter
+    pub ai_think_ticks: u32,           // Current tick counter
+    pub ai_think_target: u32,          // Target ticks for this think (variable per move)
+    pub ai_pending_board: Option<chess_engine::Board>,  // Pre-computed AI move, waiting for delay
 }
 
 pub enum ChessDifficulty { Novice, Apprentice, Journeyman, Master }
@@ -308,11 +319,24 @@ src/
 if let Some(ref mut chess) = game_state.active_chess {
     if chess.ai_thinking {
         chess.ai_think_ticks += 1;
-        if chess.ai_think_ticks >= AI_THINK_DELAY_TICKS {
+
+        // Compute AI move on first tick (instant), then wait for cosmetic delay
+        if chess.ai_pending_board.is_none() {
             let depth = chess.difficulty.search_depth();
-            let ai_board = chess.board.get_best_next_move(depth);
-            chess.board = ai_board;
+            chess.ai_pending_board = Some(chess.board.get_best_next_move(depth));
+
+            // Calculate variable delay based on position complexity
+            let base_ticks = rng.gen_range(3..10);        // 0.3-1.0s base
+            let complexity_bonus = (chess.board.get_legal_moves().len() / 10) as u32;  // More moves = longer think
+            let threat_bonus = if /* last move was capture or check */ { rng.gen_range(2..5) } else { 0 };
+            chess.ai_think_target = base_ticks + complexity_bonus + threat_bonus;  // 0.3-2.5s total
+        }
+
+        // Apply move after variable delay
+        if chess.ai_think_ticks >= chess.ai_think_target {
+            chess.board = chess.ai_pending_board.take().unwrap();
             chess.ai_thinking = false;
+            chess.ai_think_ticks = 0;
             // Check game result via get_legal_moves() — empty = checkmate or stalemate
         }
     }
