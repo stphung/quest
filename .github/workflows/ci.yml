@@ -70,6 +70,11 @@ jobs:
           export BUILD_DATE="${BUILD_DATE:0:10}"
           cargo build --release --target ${{ matrix.target }}
 
+      - name: Sign binary (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          codesign -s - -f target/${{ matrix.target }}/release/${{ matrix.artifact }}
+
       - name: Package (Unix)
         if: runner.os != 'Windows'
         run: |
