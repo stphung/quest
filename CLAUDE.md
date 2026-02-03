@@ -1,6 +1,6 @@
 # Quest - Terminal-Based Idle RPG
 
-A terminal-based idle RPG written in Rust. Your hero automatically battles enemies, gains XP, levels up, and prestiges.
+A terminal-based idle RPG written in Rust. Your hero automatically battles enemies, gains XP, levels up, explores dungeons, and prestiges.
 
 ## Build & Run
 
@@ -30,27 +30,16 @@ This runs all PR quality checks:
 make fmt               # Applies rustfmt to all code
 ```
 
-## Pull Request Workflow
-
-**Use the `pr-validation` skill** (`.claude/skills/pr-validation.md`) for automated PR creation with CI validation.
-
-The skill handles:
-- Creating PRs with proper formatting
-- Monitoring CI status until completion
-- Detecting and fixing common failures (format/clippy/test/build)
-- Validation loops until all checks pass
-
-**Manual workflow:** See `.claude/skills/pr-validation.md` for detailed steps.
-
 ## CI/CD Pipeline
 
 **On every PR:**
 - Runs `scripts/ci-checks.sh` (format, lint, test, build, audit)
-- Must pass to merge (if branch protection enabled)
+- Must pass to merge
 
 **On push to main:**
 - Runs all checks
 - Builds release binaries for 4 platforms (Linux, macOS x86/ARM, Windows)
+- Signs macOS binaries with ad-hoc signature (prevents Gatekeeper blocking)
 - Creates GitHub release with downloadable binaries
 
 **Key insight:** Local `make check` runs the **exact same script** as CI, ensuring consistency.
@@ -61,16 +50,41 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 
 ### Core Modules
 
-- `game_state.rs` — Main character state struct (level, XP, prestige, combat state)
+- `game_state.rs` — Main character state struct (level, XP, prestige, combat state, equipment)
 - `attributes.rs` — 6 RPG attributes (STR, DEX, CON, INT, WIS, CHA), modifier = `(value - 10) / 2`
 - `derived_stats.rs` — Combat stats calculated from attributes (HP, damage, defense, crit, XP mult)
 - `combat.rs` — Enemy generation and combat state machine
 - `combat_logic.rs` — Turn-based combat mechanics, damage calculation, event emission
 - `game_logic.rs` — XP curve (`100 × level^1.5`), leveling (+3 random attribute points), enemy spawning, offline progression
-- `prestige.rs` — Prestige ranks (Bronze→Celestial) with XP multipliers and attribute cap increases
-- `save_manager.rs` — Legacy binary save/load (deprecated, used for migration only)
-- `character_manager.rs` — JSON save/load in ~/.quest/ directory
+- `prestige.rs` — Prestige tiers (Bronze→Eternal) with XP multipliers (1.5× compounding) and attribute cap increases
 - `constants.rs` — Game balance constants (tick rate, attack interval, XP rates)
+
+### Zone System (`src/zones/`)
+
+- `mod.rs` — Zone module exports and boss defeat result types
+- `data.rs` — 10 zones with 3-4 subzones each, prestige requirements, boss definitions
+- `progression.rs` — Zone/subzone progression state, kill tracking (10 kills → boss spawn), weapon gates
+
+**Zone Tiers:**
+- P0: Meadow, Dark Forest (3 subzones each)
+- P5: Mountain Pass, Ancient Ruins (3 subzones each)
+- P10: Volcanic Wastes, Frozen Tundra (4 subzones each)
+- P15: Crystal Caverns, Sunken Kingdom (4 subzones each)
+- P20: Floating Isles, Storm Citadel (4 subzones each, Zone 10 requires Stormbreaker)
+
+### Dungeon System
+
+- `dungeon.rs` — Room types (Entrance, Combat, Treasure, Elite, Boss), room state (Hidden, Revealed, Current, Cleared), dungeon sizes
+- `dungeon_generation.rs` — Procedural dungeon generation with connected rooms
+- `dungeon_logic.rs` — Dungeon navigation, room clearing, key system, safe death (no prestige loss)
+
+**Dungeon Sizes:** Small 5×5, Medium 7×7, Large 9×9, Epic 11×11 (based on prestige)
+
+### Fishing System
+
+- `fishing.rs` — Fish rarities (Common→Legendary), fishing phases (Casting, Waiting, Reeling), 30 ranks across 6 tiers
+- `fishing_generation.rs` — Fish name generation and rarity rolling
+- `fishing_logic.rs` — Fishing session tick processing
 
 ### Item System
 
@@ -83,23 +97,30 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 
 ### Character System
 
-- `character_manager.rs` — Character CRUD operations (create, delete, rename), JSON save/load with SHA256 checksums, name validation and sanitization
-- `ui/character_select.rs` — Character selection screen with detailed preview panel
-- `ui/character_creation.rs` — Character creation with real-time name validation
-- `ui/character_delete.rs` — Delete confirmation requiring exact name typing
-- `ui/character_rename.rs` — Character renaming with validation
+- `character_manager.rs` — Character CRUD operations (create, delete, rename), JSON save/load in ~/.quest/, SHA256 checksums, name validation
+- `save_manager.rs` — Legacy binary save/load (deprecated, used for migration only)
 
 ### UI (`src/ui/`)
 
 - `mod.rs` — Layout coordinator (stats panel left 50%, combat scene right 50%)
-- `stats_panel.rs` — Character stats, attributes, derived stats, equipment display, prestige info
+- `stats_panel.rs` — Character name header, stats, attributes, derived stats, equipment display, prestige info, fishing rank
 - `combat_scene.rs` — Combat view orchestration with HP bars
 - `combat_3d.rs` — 3D ASCII first-person dungeon renderer
 - `combat_effects.rs` — Visual effects (damage numbers, attack flashes, hit impacts)
 - `enemy_sprites.rs` — ASCII enemy sprite templates
-- `ascii_scaler.rs` — Sprite scaling algorithm
 - `perspective.rs` — Wall/floor perspective rendering
-- `zones.rs` — Zone progression display
+- `dungeon_map.rs` — Top-down dungeon minimap
+- `fishing_scene.rs` — Fishing UI with phase display
+- `prestige_confirm.rs` — Prestige confirmation dialog
+- `character_select.rs` — Character selection screen with detailed preview panel
+- `character_creation.rs` — Character creation with real-time name validation
+- `character_delete.rs` — Delete confirmation requiring exact name typing
+- `character_rename.rs` — Character renaming with validation
+
+### Utilities
+
+- `build_info.rs` — Build metadata (commit, date) embedded at compile time
+- `updater.rs` — Self-update functionality
 
 ## Key Constants
 
@@ -110,24 +131,68 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 - XP gain: Only from defeating enemies (200-400 XP per kill)
 - Offline XP: 50% rate, max 7 days (simulates kills)
 - Item drop rate: 30% base + 5% per prestige rank
+- Boss spawn: After 10 kills in subzone
+
+## Combat Mechanics
+
+- **Death to Boss**: Resets encounter (fighting_boss=false, kills_in_subzone=0) but preserves prestige
+- **Death in Dungeon**: Exits dungeon, no prestige loss
+- **Weapon Gates**: Zone 10 final boss requires Stormbreaker weapon
 
 ## Project Structure
 
 ```
 quest/
-├── src/              # Rust source code
-├── .github/
-│   └── workflows/
-│       └── ci.yml    # CI/CD pipeline (calls scripts/ci-checks.sh)
-├── scripts/
-│   ├── ci-checks.sh  # Single source of truth for all quality checks
-│   └── README.md     # Scripts documentation
-├── docs/
-│   └── plans/        # Design documents and implementation plans
-├── Makefile          # Development helpers (make check, make fmt, etc.)
-└── CLAUDE.md         # This file
+├── src/
+│   ├── main.rs           # Entry point, game loop, input handling
+│   ├── game_state.rs     # Core game state
+│   ├── game_logic.rs     # XP, leveling, spawning
+│   ├── combat.rs         # Enemy struct, combat state
+│   ├── combat_logic.rs   # Combat resolution
+│   ├── attributes.rs     # 6 RPG attributes
+│   ├── derived_stats.rs  # Stats from attributes
+│   ├── prestige.rs       # Prestige system
+│   ├── constants.rs      # Game constants
+│   ├── zones/            # Zone system
+│   │   ├── mod.rs
+│   │   ├── data.rs       # Zone definitions
+│   │   └── progression.rs
+│   ├── dungeon.rs        # Dungeon types
+│   ├── dungeon_generation.rs
+│   ├── dungeon_logic.rs
+│   ├── fishing.rs        # Fishing types
+│   ├── fishing_generation.rs
+│   ├── fishing_logic.rs
+│   ├── items.rs          # Item types
+│   ├── equipment.rs
+│   ├── item_generation.rs
+│   ├── item_drops.rs
+│   ├── item_names.rs
+│   ├── item_scoring.rs
+│   ├── character_manager.rs  # JSON saves
+│   ├── save_manager.rs       # Legacy saves
+│   └── ui/               # UI components
+│       ├── mod.rs
+│       ├── stats_panel.rs
+│       ├── combat_scene.rs
+│       ├── combat_3d.rs
+│       ├── combat_effects.rs
+│       ├── enemy_sprites.rs
+│       ├── perspective.rs
+│       ├── dungeon_map.rs
+│       ├── fishing_scene.rs
+│       ├── prestige_confirm.rs
+│       ├── character_select.rs
+│       ├── character_creation.rs
+│       ├── character_delete.rs
+│       └── character_rename.rs
+├── .github/workflows/ci.yml  # CI/CD pipeline
+├── scripts/ci-checks.sh      # Quality checks
+├── docs/plans/               # Design documents
+├── Makefile                  # Dev helpers
+└── CLAUDE.md                 # This file
 ```
 
 ## Dependencies
 
-Ratatui 0.26, Crossterm 0.27, Serde/Bincode, SHA2, Rand, Chrono, Directories
+Ratatui 0.26, Crossterm 0.27, Serde (JSON), SHA2, Rand, Chrono, Directories
