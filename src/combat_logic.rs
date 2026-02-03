@@ -182,8 +182,8 @@ pub fn update_combat(state: &mut GameState, delta_time: f64) -> Vec<CombatEvent>
 
                 // Reset enemy HP if we're not in dungeon (normal combat continues)
                 if !in_dungeon {
-                    // Check if we died to a weapon-blocked boss
-                    if state.zone_progression.boss_weapon_blocked().is_some() {
+                    // Check if we died to a boss
+                    if state.zone_progression.fighting_boss {
                         // Reset boss encounter - go back to fighting regular enemies
                         state.zone_progression.fighting_boss = false;
                         state.zone_progression.kills_in_subzone = 0;
@@ -535,5 +535,62 @@ mod tests {
         assert!(state.combat_state.player_current_hp > 10);
         assert!(state.combat_state.player_current_hp < 100);
         assert!(state.combat_state.is_regenerating);
+    }
+
+    #[test]
+    fn test_death_to_any_boss_resets_encounter() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // Set up a normal boss fight (not weapon-blocked)
+        state.zone_progression.current_zone_id = 5;
+        state.zone_progression.current_subzone_id = 2;
+        state.zone_progression.fighting_boss = true;
+        state.zone_progression.kills_in_subzone = 10;
+
+        // Low HP so player dies
+        state.combat_state.player_current_hp = 1;
+        state.combat_state.current_enemy = Some(Enemy::new("Regular Boss".to_string(), 100, 50));
+
+        // Force an attack
+        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        let events = update_combat(&mut state, 0.1);
+
+        // Should have PlayerDied event
+        let died = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
+        assert!(died);
+
+        // Boss encounter should be reset
+        assert!(!state.zone_progression.fighting_boss);
+        assert_eq!(state.zone_progression.kills_in_subzone, 0);
+
+        // Enemy should be cleared
+        assert!(state.combat_state.current_enemy.is_none());
+    }
+
+    #[test]
+    fn test_prestige_rank_preserved_on_death() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // Set a prestige rank (3 = Gold)
+        state.prestige_rank = 3;
+        let original_rank = state.prestige_rank;
+
+        // Set up boss fight
+        state.zone_progression.fighting_boss = true;
+
+        // Low HP so player dies
+        state.combat_state.player_current_hp = 1;
+        state.combat_state.current_enemy = Some(Enemy::new("Boss".to_string(), 100, 50));
+
+        // Force an attack
+        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        let events = update_combat(&mut state, 0.1);
+
+        // Verify player died
+        let died = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
+        assert!(died);
+
+        // Prestige rank should NOT be changed
+        assert_eq!(state.prestige_rank, original_rank);
     }
 }

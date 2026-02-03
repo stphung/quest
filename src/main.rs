@@ -820,7 +820,7 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
             CombatEvent::PlayerDied => {
                 // Add to combat log
                 game_state.combat_state.add_log_entry(
-                    "💀 You died! Prestige ranks lost...".to_string(),
+                    "💀 You died! Boss encounter reset.".to_string(),
                     false,
                     false,
                 );
