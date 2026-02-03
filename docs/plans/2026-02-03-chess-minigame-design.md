@@ -150,22 +150,70 @@ This ensures the player sees the AI "thinking" and makes the game feel more deli
 **On win (checkmate the AI)**:
 - Prestige rank increases by 1–5 (based on chosen difficulty: Novice +1, Apprentice +2, Journeyman +3, Master +5)
 - **No reset** — prestige is added immediately, player keeps current level, XP, attributes, equipment, zones
-- Victory message displayed in combat log
-- Return to normal combat immediately
+- **Victory overlay** displayed showing prestige gained (see Victory Screen below)
+- After dismissing overlay, combat log also shows the victory message
 - This makes chess wins extremely valuable — pure prestige advancement without the typical reset cost
+
+**Victory Screen** (displayed after checkmate, before returning to combat):
+```
+┌──────────────────────────┐
+│                          │
+│      ♔ VICTORY! ♔        │
+│                          │
+│   You checkmated the     │
+│   mysterious figure!     │
+│                          │
+│   +3 Prestige Ranks      │
+│   (P5 → P8)              │
+│                          │
+│   [Press any key]        │
+└──────────────────────────┘
+```
+After pressing any key, player returns to combat and sees in the log:
+```
+♟ Checkmate! You defeated the mysterious figure.
+♟ +3 Prestige Ranks (P5 → P8)
+```
 
 **On loss (AI checkmates the player)**:
 - No penalty — just return to normal combat
-- A message in the combat log: "The mysterious figure nods respectfully and vanishes"
-- No prestige loss, no death, nothing negative
+- **Defeat overlay** shown briefly, then combat log message
+```
+┌──────────────────────────┐
+│                          │
+│        DEFEAT            │
+│                          │
+│   The mysterious figure  │
+│   has checkmated you.    │
+│                          │
+│   No penalty incurred.   │
+│                          │
+│   [Press any key]        │
+└──────────────────────────┘
+```
+Combat log: "♟ The mysterious figure nods respectfully and vanishes."
 
 **On stalemate/draw**:
 - Small consolation reward: bonus XP equivalent to ~50 kills
-- "The figure smiles knowingly and fades away"
+- **Draw overlay** shown, then combat log message
+```
+┌──────────────────────────┐
+│                          │
+│         DRAW             │
+│                          │
+│   The game ends in       │
+│   stalemate.             │
+│                          │
+│   +5000 XP               │
+│                          │
+│   [Press any key]        │
+└──────────────────────────┘
+```
+Combat log: "♟ The figure smiles knowingly and fades away. (+5000 XP)"
 
 **On forfeit (player presses Esc twice to confirm)**:
-- Same as loss — no penalty
-- "You concede the game. The figure disappears without a word"
+- Same as loss — no penalty, no overlay
+- Combat log: "♟ You concede the game. The figure disappears without a word."
 
 ### Why Prestige as Reward?
 
