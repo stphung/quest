@@ -230,14 +230,14 @@ fn draw_attribute_row(
     let value = game_state.attributes.get(attr_type);
     let modifier = game_state.attributes.modifier(attr_type);
 
-    // Choose color based on attribute type
-    let color = match attr_type {
-        AttributeType::Strength => Color::Red,
-        AttributeType::Dexterity => Color::Green,
-        AttributeType::Constitution => Color::Magenta,
-        AttributeType::Intelligence => Color::Blue,
-        AttributeType::Wisdom => Color::Cyan,
-        AttributeType::Charisma => Color::Yellow,
+    // Choose color and emoji based on attribute type
+    let (color, emoji) = match attr_type {
+        AttributeType::Strength => (Color::Red, "💪"),
+        AttributeType::Dexterity => (Color::Green, "🏃"),
+        AttributeType::Constitution => (Color::Magenta, "❤️"),
+        AttributeType::Intelligence => (Color::Blue, "🧠"),
+        AttributeType::Wisdom => (Color::Cyan, "👁️"),
+        AttributeType::Charisma => (Color::Yellow, "✨"),
     };
 
     // Format modifier with sign
@@ -249,7 +249,7 @@ fn draw_attribute_row(
 
     let text = vec![Line::from(vec![
         Span::styled(
-            format!("{}: ", attr_type.abbrev()),
+            format!("{} {}: ", emoji, attr_type.abbrev()),
             Style::default().add_modifier(Modifier::BOLD),
         ),
         Span::styled(
@@ -281,7 +281,7 @@ fn draw_derived_stats(frame: &mut Frame, area: Rect, game_state: &GameState) {
 
     let stats_text = vec![
         Line::from(vec![
-            Span::styled("Max HP: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::styled("💚 Max HP: ", Style::default().add_modifier(Modifier::BOLD)),
             Span::styled(
                 format!("{}", derived.max_hp),
                 Style::default().fg(Color::Green),
@@ -289,7 +289,7 @@ fn draw_derived_stats(frame: &mut Frame, area: Rect, game_state: &GameState) {
         ]),
         Line::from(vec![
             Span::styled(
-                "Physical Damage: ",
+                "⚔️ Physical: ",
                 Style::default().add_modifier(Modifier::BOLD),
             ),
             Span::styled(
@@ -298,27 +298,24 @@ fn draw_derived_stats(frame: &mut Frame, area: Rect, game_state: &GameState) {
             ),
         ]),
         Line::from(vec![
-            Span::styled(
-                "Magic Damage: ",
-                Style::default().add_modifier(Modifier::BOLD),
-            ),
+            Span::styled("🔮 Magic: ", Style::default().add_modifier(Modifier::BOLD)),
             Span::styled(
                 format!("{}", derived.magic_damage),
                 Style::default().fg(Color::Blue),
             ),
         ]),
         Line::from(vec![
-            Span::styled("Defense: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "🛡️ Defense: ",
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
             Span::styled(
                 format!("{}", derived.defense),
                 Style::default().fg(Color::Yellow),
             ),
         ]),
         Line::from(vec![
-            Span::styled(
-                "Crit Chance: ",
-                Style::default().add_modifier(Modifier::BOLD),
-            ),
+            Span::styled("💥 Crit: ", Style::default().add_modifier(Modifier::BOLD)),
             Span::styled(
                 format!("{}%", derived.crit_chance_percent),
                 Style::default().fg(Color::Cyan),
@@ -326,7 +323,7 @@ fn draw_derived_stats(frame: &mut Frame, area: Rect, game_state: &GameState) {
         ]),
         Line::from(vec![
             Span::styled(
-                "XP Multiplier: ",
+                "📈 XP Mult: ",
                 Style::default().add_modifier(Modifier::BOLD),
             ),
             Span::styled(
@@ -354,17 +351,14 @@ fn draw_prestige_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
 
     let prestige_text = vec![
         Line::from(vec![
-            Span::styled("Rank: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::styled("🏆 Rank: ", Style::default().add_modifier(Modifier::BOLD)),
             Span::styled(
                 format!("{} ({})", game_state.prestige_rank, tier.name),
                 Style::default().fg(Color::Yellow),
             ),
         ]),
         Line::from(vec![
-            Span::styled(
-                "Multiplier: ",
-                Style::default().add_modifier(Modifier::BOLD),
-            ),
+            Span::styled("⚡ Mult: ", Style::default().add_modifier(Modifier::BOLD)),
             Span::styled(
                 format!("{:.2}x", tier.multiplier),
                 Style::default().fg(Color::Cyan),
@@ -383,10 +377,7 @@ fn draw_prestige_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
             ),
         ]),
         Line::from(vec![
-            Span::styled(
-                "Total Prestiges: ",
-                Style::default().add_modifier(Modifier::BOLD),
-            ),
+            Span::styled("🔄 Total: ", Style::default().add_modifier(Modifier::BOLD)),
             Span::styled(
                 format!("{}", game_state.total_prestige_count),
                 Style::default().fg(Color::Magenta),
