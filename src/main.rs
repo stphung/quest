@@ -23,6 +23,7 @@ mod prestige;
 mod save_manager;
 mod ui;
 mod updater;
+mod zones;
 
 use character_manager::CharacterManager;
 use chrono::Utc;
