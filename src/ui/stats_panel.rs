@@ -56,7 +56,7 @@ pub fn draw_stats_panel_with_update(
             Constraint::Length(6),          // Derived stats (condensed)
             Constraint::Min(10),            // Equipment section (reduced min when update shown)
             Constraint::Length(6),          // Prestige info + fishing rank
-            Constraint::Length(4),          // Footer (2 lines + borders)
+            Constraint::Length(3),          // Footer
             Constraint::Min(update_height), // Update panel (can shrink if needed)
         ]
     } else {
@@ -67,7 +67,7 @@ pub fn draw_stats_panel_with_update(
             Constraint::Length(6),  // Derived stats (condensed)
             Constraint::Min(16),    // Equipment section (grows to fit)
             Constraint::Length(6),  // Prestige info + fishing rank
-            Constraint::Length(4),  // Footer (2 lines + borders)
+            Constraint::Length(3),  // Footer
         ]
     };
 
@@ -120,6 +120,8 @@ fn draw_header(frame: &mut Frame, area: Rect, game_state: &GameState) {
 
     let rank = get_adventurer_rank(game_state.character_level);
 
+    let play_time = format_play_time(game_state.play_time_seconds);
+
     let header_text = vec![Line::from(vec![
         Span::styled(
             format!("Level {} {}", game_state.character_level, rank),
@@ -138,10 +140,8 @@ fn draw_header(frame: &mut Frame, area: Rect, game_state: &GameState) {
             Style::default().fg(Color::Yellow),
         ),
         Span::raw(" | "),
-        Span::styled(
-            format!("Play Time: {}s", game_state.play_time_seconds),
-            Style::default().fg(Color::Green),
-        ),
+        Span::styled("⏱️ ", Style::default().fg(Color::Cyan)),
+        Span::styled(play_time, Style::default().fg(Color::Cyan)),
     ])];
 
     let header = Paragraph::new(header_text)
@@ -625,11 +625,7 @@ fn draw_footer(
         Span::styled(" | Checking...", Style::default().fg(Color::DarkGray))
     };
 
-    // Build play time text
-    let play_time_text = format_play_time(game_state.play_time_seconds);
-
-    // Line 1: Controls
-    let controls_line = Line::from(vec![
+    let footer_text = vec![Line::from(vec![
         Span::styled("Controls: ", Style::default().add_modifier(Modifier::BOLD)),
         Span::styled(
             "Q",
@@ -637,16 +633,8 @@ fn draw_footer(
         ),
         Span::raw(" = Quit | "),
         prestige_text,
-    ]);
-
-    // Line 2: Play time and update status
-    let stats_line = Line::from(vec![
-        Span::styled("⏱️ ", Style::default().fg(Color::Cyan)),
-        Span::styled(play_time_text, Style::default().fg(Color::Cyan)),
         update_status_text,
-    ]);
-
-    let footer_text = vec![controls_line, stats_line];
+    ])];
 
     // Build version string for the title
     let version_title = format!("v{} ({}) ", BUILD_DATE, BUILD_COMMIT);
