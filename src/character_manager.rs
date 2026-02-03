@@ -660,4 +660,251 @@ mod tests {
         let result = manager.rename_character("does_not_exist.json", "NewName".to_string());
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_load_json_with_extra_fields_backward_compat() {
+        // Simulate loading a save from a NEWER version with extra fields
+        // This should succeed - extra fields should be ignored
+        let manager = CharacterManager::new().unwrap();
+
+        let json_with_extra = r#"{
+            "version": 2,
+            "character_id": "test-id",
+            "character_name": "BackwardCompat",
+            "character_level": 10,
+            "character_xp": 5000,
+            "attributes": {"values": [10, 10, 10, 10, 10, 10]},
+            "prestige_rank": 0,
+            "total_prestige_count": 0,
+            "last_save_time": 1234567890,
+            "play_time_seconds": 100,
+            "combat_state": {
+                "current_enemy": null,
+                "player_current_hp": 50,
+                "player_max_hp": 50,
+                "attack_timer": 0.0,
+                "regen_timer": 0.0,
+                "is_regenerating": false
+            },
+            "equipment": {
+                "weapon": null,
+                "armor": null,
+                "helmet": null,
+                "gloves": null,
+                "boots": null,
+                "amulet": null,
+                "ring": null
+            },
+            "fishing": {
+                "rank": 1,
+                "total_fish_caught": 0,
+                "fish_toward_next_rank": 0,
+                "legendary_catches": 0
+            },
+            "zone_progression": {
+                "current_zone_id": 1,
+                "current_subzone_id": 1,
+                "defeated_bosses": [],
+                "unlocked_zones": [1, 2]
+            },
+            "future_field_that_doesnt_exist": "should be ignored",
+            "another_future_field": 12345
+        }"#;
+
+        let filepath = manager.quest_dir.join("backward_compat_test.json");
+        fs::write(&filepath, json_with_extra).unwrap();
+
+        // Should load successfully, ignoring extra fields
+        let result = manager.load_character("backward_compat_test.json");
+        assert!(
+            result.is_ok(),
+            "Should ignore extra fields: {:?}",
+            result.err()
+        );
+
+        let loaded = result.unwrap();
+        assert_eq!(loaded.character_name, "BackwardCompat");
+        assert_eq!(loaded.character_level, 10);
+
+        // Cleanup
+        fs::remove_file(filepath).ok();
+    }
+
+    #[test]
+    fn test_load_json_missing_optional_fields_forward_compat() {
+        // Simulate loading a save from an OLDER version missing newer optional fields
+        // This tests forward compatibility - old saves should still load
+        let manager = CharacterManager::new().unwrap();
+
+        // Minimal save without fishing, zone_progression, active_dungeon
+        let minimal_json = r#"{
+            "version": 2,
+            "character_id": "old-save-id",
+            "character_name": "OldSave",
+            "character_level": 5,
+            "character_xp": 1000,
+            "attributes": {"values": [12, 10, 10, 10, 10, 10]},
+            "prestige_rank": 1,
+            "total_prestige_count": 1,
+            "last_save_time": 1000000000,
+            "play_time_seconds": 500,
+            "combat_state": {
+                "current_enemy": null,
+                "player_current_hp": 60,
+                "player_max_hp": 60,
+                "attack_timer": 0.0,
+                "regen_timer": 0.0,
+                "is_regenerating": false
+            },
+            "equipment": {
+                "weapon": null,
+                "armor": null,
+                "helmet": null,
+                "gloves": null,
+                "boots": null,
+                "amulet": null,
+                "ring": null
+            }
+        }"#;
+
+        let filepath = manager.quest_dir.join("forward_compat_test.json");
+        fs::write(&filepath, minimal_json).unwrap();
+
+        // Should load with defaults for missing fields
+        let result = manager.load_character("forward_compat_test.json");
+        assert!(
+            result.is_ok(),
+            "Should use defaults for missing optional fields: {:?}",
+            result.err()
+        );
+
+        let loaded = result.unwrap();
+        assert_eq!(loaded.character_name, "OldSave");
+        assert_eq!(loaded.character_level, 5);
+        // Optional fields should have defaults
+        assert_eq!(loaded.fishing.rank, 1); // Default
+        assert_eq!(loaded.zone_progression.current_zone_id, 1); // Default
+
+        // Cleanup
+        fs::remove_file(filepath).ok();
+    }
+
+    #[test]
+    fn test_load_json_missing_nested_optional_fields() {
+        // Test that nested structs also handle missing fields gracefully
+        let manager = CharacterManager::new().unwrap();
+
+        // Save with zone_progression missing some fields that have #[serde(default)]
+        let json = r#"{
+            "version": 2,
+            "character_id": "nested-test",
+            "character_name": "NestedTest",
+            "character_level": 1,
+            "character_xp": 0,
+            "attributes": {"values": [10, 10, 10, 10, 10, 10]},
+            "prestige_rank": 0,
+            "total_prestige_count": 0,
+            "last_save_time": 0,
+            "play_time_seconds": 0,
+            "combat_state": {
+                "current_enemy": null,
+                "player_current_hp": 50,
+                "player_max_hp": 50,
+                "attack_timer": 0.0,
+                "regen_timer": 0.0,
+                "is_regenerating": false
+            },
+            "equipment": {
+                "weapon": null,
+                "armor": null,
+                "helmet": null,
+                "gloves": null,
+                "boots": null,
+                "amulet": null,
+                "ring": null
+            },
+            "zone_progression": {
+                "current_zone_id": 3,
+                "current_subzone_id": 2,
+                "defeated_bosses": [[1,1], [1,2]],
+                "unlocked_zones": [1, 2, 3]
+            }
+        }"#;
+
+        let filepath = manager.quest_dir.join("nested_compat_test.json");
+        fs::write(&filepath, json).unwrap();
+
+        let result = manager.load_character("nested_compat_test.json");
+        assert!(
+            result.is_ok(),
+            "Should handle missing nested optional fields: {:?}",
+            result.err()
+        );
+
+        let loaded = result.unwrap();
+        // Zone progression fields that have defaults should be set
+        assert_eq!(loaded.zone_progression.current_zone_id, 3);
+        assert_eq!(loaded.zone_progression.kills_in_subzone, 0); // Default
+        assert!(!loaded.zone_progression.fighting_boss); // Default
+        assert!(!loaded.zone_progression.has_stormbreaker); // Default
+
+        // Cleanup
+        fs::remove_file(filepath).ok();
+    }
+
+    /// IMPORTANT: This test uses a "frozen" minimal JSON that represents the oldest
+    /// supported save format. If this test fails after adding a new field, you MUST
+    /// add #[serde(default)] to that field to maintain backward compatibility.
+    ///
+    /// DO NOT update this JSON to add new fields - that defeats the purpose!
+    #[test]
+    fn test_minimal_v2_save_still_loads() {
+        let manager = CharacterManager::new().unwrap();
+
+        // This is the MINIMAL valid v2 save - DO NOT ADD FIELDS HERE
+        // If this fails, you broke backward compatibility!
+        let minimal_v2_json = r#"{
+            "version": 2,
+            "character_id": "minimal-v2",
+            "character_name": "MinimalV2",
+            "character_level": 1,
+            "character_xp": 0,
+            "attributes": {"values": [10, 10, 10, 10, 10, 10]},
+            "prestige_rank": 0,
+            "total_prestige_count": 0,
+            "last_save_time": 0,
+            "play_time_seconds": 0,
+            "combat_state": {
+                "current_enemy": null,
+                "player_current_hp": 50,
+                "player_max_hp": 50,
+                "attack_timer": 0.0,
+                "regen_timer": 0.0,
+                "is_regenerating": false
+            },
+            "equipment": {
+                "weapon": null,
+                "armor": null,
+                "helmet": null,
+                "gloves": null,
+                "boots": null,
+                "amulet": null,
+                "ring": null
+            }
+        }"#;
+
+        let filepath = manager.quest_dir.join("minimal_v2_test.json");
+        fs::write(&filepath, minimal_v2_json).unwrap();
+
+        let result = manager.load_character("minimal_v2_test.json");
+        assert!(
+            result.is_ok(),
+            "BACKWARD COMPATIBILITY BROKEN! Minimal v2 save failed to load. \
+             If you added a new field, add #[serde(default)] to it. Error: {:?}",
+            result.err()
+        );
+
+        // Cleanup
+        fs::remove_file(filepath).ok();
+    }
 }
