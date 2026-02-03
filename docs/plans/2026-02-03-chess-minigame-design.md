@@ -92,7 +92,7 @@ Esc         → Deselect piece (if selected) / offer forfeit (if no piece select
 2. Player navigates to a piece and presses Enter to select it
 3. Legal destination squares are highlighted
 4. Player navigates to a destination and presses Enter to confirm
-5. AI responds after a variable delay (0.3–2.5s, feels more human)
+5. AI responds after a variable delay (1.5–5s, feels more deliberate)
 6. Repeat until checkmate, stalemate, or forfeit
 
 **Visual feedback:**
@@ -138,12 +138,12 @@ Higher difficulty = deeper search = stronger play = bigger reward. The AI should
 **Thinking budget**: AI move computation must complete within ~200ms to avoid blocking the game tick. At 4-ply with alpha-beta pruning on an 8×8 board, this is comfortably achievable.
 
 **Variable thinking delay**: To feel more human, the AI adds a cosmetic delay after computing its move:
-- Base delay: 0.3–1.0s (random)
-- Position complexity bonus: +0.0–1.0s (based on number of legal moves available)
-- Capture/check response: +0.2–0.5s (AI "considers" the threat)
-- Total range: ~0.3–2.5s depending on board state
+- Base delay: 1.5–3.0s (random)
+- Position complexity bonus: +0.0–1.5s (based on number of legal moves available)
+- Capture/check response: +0.3–0.5s (AI "considers" the threat)
+- Total range: ~1.5–5.0s depending on board state
 
-This makes the AI feel like it's actually thinking rather than responding instantly.
+This ensures the player sees the AI "thinking" and makes the game feel more deliberate.
 
 ### Reward Structure
 
@@ -326,10 +326,10 @@ if let Some(ref mut chess) = game_state.active_chess {
             chess.ai_pending_board = Some(chess.board.get_best_next_move(depth));
 
             // Calculate variable delay based on position complexity
-            let base_ticks = rng.gen_range(3..10);        // 0.3-1.0s base
-            let complexity_bonus = (chess.board.get_legal_moves().len() / 10) as u32;  // More moves = longer think
-            let threat_bonus = if /* last move was capture or check */ { rng.gen_range(2..5) } else { 0 };
-            chess.ai_think_target = base_ticks + complexity_bonus + threat_bonus;  // 0.3-2.5s total
+            let base_ticks = rng.gen_range(15..30);       // 1.5-3.0s base
+            let complexity_bonus = (chess.board.get_legal_moves().len() / 5) as u32;  // More moves = longer think
+            let threat_bonus = if /* last move was capture or check */ { rng.gen_range(3..5) } else { 0 };
+            chess.ai_think_target = base_ticks + complexity_bonus + threat_bonus;  // 1.5-5.0s total
         }
 
         // Apply move after variable delay
