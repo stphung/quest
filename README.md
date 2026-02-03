@@ -44,6 +44,15 @@ The installer will:
 - Install to `~/.local/bin/quest`
 - Provide instructions to add to PATH if needed
 
+### Updating
+
+To update to the latest version, run:
+```bash
+quest update
+```
+
+The binary will self-update with the latest build.
+
 ### Manual Download
 
 Download the latest release for your platform from the [releases page](https://github.com/stphung/quest/releases/latest).
