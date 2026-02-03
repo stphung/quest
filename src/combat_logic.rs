@@ -4,6 +4,8 @@ use crate::dungeon::RoomType;
 use crate::game_state::GameState;
 use rand::Rng;
 
+use crate::zones::BossDefeatResult;
+
 #[allow(dead_code)]
 pub enum CombatEvent {
     PlayerAttack {
@@ -26,6 +28,11 @@ pub enum CombatEvent {
     /// Boss enemy defeated in dungeon (dungeon complete)
     BossDefeated {
         xp_gained: u64,
+    },
+    /// Subzone boss defeated (zone progression)
+    SubzoneBossDefeated {
+        xp_gained: u64,
+        result: BossDefeatResult,
     },
     None,
 }
@@ -108,7 +115,21 @@ pub fn update_combat(state: &mut GameState, delta_time: f64) -> Vec<CombatEvent>
                         events.push(CombatEvent::BossDefeated { xp_gained });
                     }
                     _ => {
-                        events.push(CombatEvent::EnemyDied { xp_gained });
+                        // Check if this was a subzone boss (overworld)
+                        if state.zone_progression.fighting_boss {
+                            let result =
+                                state.zone_progression.on_boss_defeated(state.prestige_rank);
+                            events.push(CombatEvent::SubzoneBossDefeated { xp_gained, result });
+                        } else {
+                            // Record the kill for boss spawn tracking
+                            let boss_spawns = state.zone_progression.record_kill();
+                            events.push(CombatEvent::EnemyDied { xp_gained });
+
+                            // If boss should spawn, it will be handled by spawn_enemy_if_needed
+                            if boss_spawns {
+                                // Boss flag is now set, next spawn will be the boss
+                            }
+                        }
                     }
                 }
 

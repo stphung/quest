@@ -99,18 +99,18 @@ fn draw_zone_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let zones = get_all_zones();
     let prog = &game_state.zone_progression;
 
-    // Get current zone and subzone names
-    let (zone_name, subzone_name) =
+    // Get current zone and subzone info
+    let (zone_name, subzone_name, boss_name) =
         if let Some(zone) = zones.iter().find(|z| z.id == prog.current_zone_id) {
-            let subzone_name = zone
+            let subzone = zone
                 .subzones
                 .iter()
-                .find(|s| s.id == prog.current_subzone_id)
-                .map(|s| s.name)
-                .unwrap_or("Unknown");
-            (zone.name, subzone_name)
+                .find(|s| s.id == prog.current_subzone_id);
+            let subzone_name = subzone.map(|s| s.name).unwrap_or("Unknown");
+            let boss_name = subzone.map(|s| s.boss.name).unwrap_or("Unknown Boss");
+            (zone.name, subzone_name, boss_name)
         } else {
-            ("Unknown", "Unknown")
+            ("Unknown", "Unknown", "Unknown Boss")
         };
 
     // Get subzone progress (e.g., "2/3" or "3/4")
@@ -130,6 +130,22 @@ fn draw_zone_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
         _ => Color::White,
     };
 
+    // Build the boss progress display
+    let boss_progress = if prog.fighting_boss {
+        Span::styled(
+            format!(" ⚔️ BOSS: {} ", boss_name),
+            Style::default()
+                .fg(Color::Red)
+                .add_modifier(Modifier::BOLD | Modifier::SLOW_BLINK),
+        )
+    } else {
+        let kills_left = prog.kills_until_boss();
+        Span::styled(
+            format!(" [Boss in {} kills]", kills_left),
+            Style::default().fg(Color::DarkGray),
+        )
+    };
+
     let zone_text = vec![Line::from(vec![
         Span::styled(
             format!("Zone {}: ", prog.current_zone_id),
@@ -145,6 +161,7 @@ fn draw_zone_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
             format!(" ({}/{})", prog.current_subzone_id, total_subzones),
             Style::default().fg(Color::DarkGray),
         ),
+        boss_progress,
     ])];
 
     let zone_widget = Paragraph::new(zone_text)

@@ -1,11 +1,13 @@
 use crate::attributes::AttributeType;
 use crate::combat::{
     generate_boss_enemy, generate_elite_enemy, generate_enemy, generate_enemy_for_current_zone,
+    generate_subzone_boss,
 };
 use crate::constants::*;
 use crate::derived_stats::DerivedStats;
 use crate::dungeon::RoomType;
 use crate::game_state::GameState;
+use crate::zones::get_zone;
 use chrono::Utc;
 use rand::Rng;
 
@@ -169,16 +171,41 @@ pub fn spawn_enemy_if_needed(state: &mut GameState) {
                 DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
             let total_damage = derived.total_damage();
 
-            let enemy = generate_enemy_for_current_zone(
-                state.zone_progression.current_zone_id,
-                state.zone_progression.current_subzone_id,
-                derived.max_hp,
-                total_damage,
-            );
+            let enemy = if state.zone_progression.fighting_boss {
+                // Spawn the subzone boss
+                spawn_subzone_boss(state, derived.max_hp, total_damage)
+            } else {
+                // Spawn regular zone enemy
+                generate_enemy_for_current_zone(
+                    state.zone_progression.current_zone_id,
+                    state.zone_progression.current_subzone_id,
+                    derived.max_hp,
+                    total_damage,
+                )
+            };
             state.combat_state.current_enemy = Some(enemy);
             state.combat_state.attack_timer = 0.0;
         }
     }
+}
+
+/// Spawns the current subzone's boss
+fn spawn_subzone_boss(
+    state: &GameState,
+    player_max_hp: u32,
+    player_damage: u32,
+) -> crate::combat::Enemy {
+    let zone_id = state.zone_progression.current_zone_id;
+    let subzone_id = state.zone_progression.current_subzone_id;
+
+    if let Some(zone) = get_zone(zone_id) {
+        if let Some(subzone) = zone.subzones.iter().find(|s| s.id == subzone_id) {
+            return generate_subzone_boss(&zone, subzone, player_max_hp, player_damage);
+        }
+    }
+
+    // Fallback - shouldn't happen
+    generate_boss_enemy(player_max_hp, player_damage)
 }
 
 /// Spawns a dungeon enemy based on the current room type

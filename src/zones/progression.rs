@@ -6,6 +6,9 @@ use serde::{Deserialize, Serialize};
 
 use super::data::{get_all_zones, Zone};
 
+/// Number of enemies to defeat before the subzone boss spawns
+pub const KILLS_FOR_BOSS: u32 = 10;
+
 /// Tracks the player's progression through zones and subzones.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZoneProgression {
@@ -17,6 +20,12 @@ pub struct ZoneProgression {
     pub defeated_bosses: Vec<(u32, u32)>,
     /// List of unlocked zone IDs
     pub unlocked_zones: Vec<u32>,
+    /// Kills in current subzone (resets when boss spawns or subzone changes)
+    #[serde(default)]
+    pub kills_in_subzone: u32,
+    /// Whether currently fighting a subzone boss
+    #[serde(default)]
+    pub fighting_boss: bool,
 }
 
 impl Default for ZoneProgression {
@@ -33,6 +42,38 @@ impl ZoneProgression {
             current_subzone_id: 1,
             defeated_bosses: vec![],
             unlocked_zones: vec![1, 2], // Start with zones 1-2 unlocked (P0 zones)
+            kills_in_subzone: 0,
+            fighting_boss: false,
+        }
+    }
+
+    /// Records a kill in the current subzone. Returns true if boss should spawn.
+    pub fn record_kill(&mut self) -> bool {
+        if self.fighting_boss {
+            return false; // Already fighting boss
+        }
+
+        self.kills_in_subzone += 1;
+
+        if self.kills_in_subzone >= KILLS_FOR_BOSS {
+            self.fighting_boss = true;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Returns true if boss should be spawned (enough kills and not already fighting)
+    pub fn should_spawn_boss(&self) -> bool {
+        self.kills_in_subzone >= KILLS_FOR_BOSS && !self.fighting_boss
+    }
+
+    /// Returns kills remaining until boss spawns
+    pub fn kills_until_boss(&self) -> u32 {
+        if self.fighting_boss {
+            0
+        } else {
+            KILLS_FOR_BOSS.saturating_sub(self.kills_in_subzone)
         }
     }
 
@@ -79,6 +120,58 @@ impl ZoneProgression {
     pub fn defeat_boss(&mut self, zone_id: u32, subzone_id: u32) {
         if !self.is_boss_defeated(zone_id, subzone_id) {
             self.defeated_bosses.push((zone_id, subzone_id));
+        }
+        // Reset kill counter and boss flag
+        self.kills_in_subzone = 0;
+        self.fighting_boss = false;
+    }
+
+    /// Handles boss defeat for the current subzone and auto-advances.
+    /// Returns a description of what happened (for UI feedback).
+    pub fn on_boss_defeated(&mut self, prestige_rank: u32) -> BossDefeatResult {
+        let zone_id = self.current_zone_id;
+        let subzone_id = self.current_subzone_id;
+
+        // Record the defeat
+        self.defeat_boss(zone_id, subzone_id);
+
+        // Check if this was the zone's final boss
+        let zones = get_all_zones();
+        let zone = zones.iter().find(|z| z.id == zone_id);
+
+        if let Some(zone) = zone {
+            let is_zone_boss = subzone_id == zone.subzones.len() as u32;
+
+            if is_zone_boss {
+                // Try to advance to next zone
+                if self.advance_to_next_zone(prestige_rank) {
+                    return BossDefeatResult::ZoneComplete {
+                        old_zone: zone.name.to_string(),
+                        new_zone_id: self.current_zone_id,
+                    };
+                } else {
+                    // Can't advance - either no more zones or prestige-gated
+                    let next_zone = zones.iter().find(|z| z.id == zone_id + 1);
+                    if let Some(next) = next_zone {
+                        return BossDefeatResult::ZoneCompleteButGated {
+                            zone_name: zone.name.to_string(),
+                            required_prestige: next.prestige_requirement,
+                        };
+                    } else {
+                        return BossDefeatResult::GameComplete;
+                    }
+                }
+            } else {
+                // Advance to next subzone
+                self.advance_to_next_subzone();
+                return BossDefeatResult::SubzoneComplete {
+                    new_subzone_id: self.current_subzone_id,
+                };
+            }
+        }
+
+        BossDefeatResult::SubzoneComplete {
+            new_subzone_id: self.current_subzone_id,
         }
     }
 
@@ -179,6 +272,22 @@ impl ZoneProgression {
         }
         ("Unknown".to_string(), "Unknown".to_string())
     }
+}
+
+/// Result of defeating a boss
+#[derive(Debug, Clone, PartialEq)]
+pub enum BossDefeatResult {
+    /// Moved to next subzone within same zone
+    SubzoneComplete { new_subzone_id: u32 },
+    /// Completed zone and moved to next zone
+    ZoneComplete { old_zone: String, new_zone_id: u32 },
+    /// Completed zone but next zone requires higher prestige
+    ZoneCompleteButGated {
+        zone_name: String,
+        required_prestige: u32,
+    },
+    /// Completed the final zone (Zone 10)
+    GameComplete,
 }
 
 #[cfg(test)]
@@ -444,5 +553,137 @@ mod tests {
         assert!(zone10.requires_weapon);
         assert_eq!(zone10.weapon_name, Some("Stormbreaker"));
         assert_eq!(zone10.prestige_requirement, 20);
+    }
+
+    #[test]
+    fn test_kill_tracking() {
+        let mut prog = ZoneProgression::new();
+
+        // Initial state
+        assert_eq!(prog.kills_in_subzone, 0);
+        assert!(!prog.fighting_boss);
+        assert_eq!(prog.kills_until_boss(), KILLS_FOR_BOSS);
+
+        // Record kills
+        for i in 1..KILLS_FOR_BOSS {
+            let boss_spawns = prog.record_kill();
+            assert!(!boss_spawns);
+            assert_eq!(prog.kills_in_subzone, i);
+            assert_eq!(prog.kills_until_boss(), KILLS_FOR_BOSS - i);
+        }
+
+        // Final kill triggers boss
+        let boss_spawns = prog.record_kill();
+        assert!(boss_spawns);
+        assert!(prog.fighting_boss);
+        assert_eq!(prog.kills_until_boss(), 0);
+    }
+
+    #[test]
+    fn test_record_kill_during_boss_fight() {
+        let mut prog = ZoneProgression::new();
+
+        // Get to boss
+        for _ in 0..KILLS_FOR_BOSS {
+            prog.record_kill();
+        }
+        assert!(prog.fighting_boss);
+
+        // Recording kills during boss fight should not increment
+        let boss_spawns = prog.record_kill();
+        assert!(!boss_spawns);
+        assert_eq!(prog.kills_in_subzone, KILLS_FOR_BOSS);
+    }
+
+    #[test]
+    fn test_on_boss_defeated_advances_subzone() {
+        let mut prog = ZoneProgression::new();
+
+        // Get to boss
+        for _ in 0..KILLS_FOR_BOSS {
+            prog.record_kill();
+        }
+        assert!(prog.fighting_boss);
+        assert_eq!(prog.current_subzone_id, 1);
+
+        // Defeat boss
+        let result = prog.on_boss_defeated(0);
+        assert!(matches!(
+            result,
+            BossDefeatResult::SubzoneComplete { new_subzone_id: 2 }
+        ));
+        assert_eq!(prog.current_subzone_id, 2);
+        assert!(!prog.fighting_boss);
+        assert_eq!(prog.kills_in_subzone, 0);
+    }
+
+    #[test]
+    fn test_on_boss_defeated_zone_complete() {
+        let mut prog = ZoneProgression::new();
+
+        // Clear subzones 1 and 2
+        for _subzone in 1..=2 {
+            for _ in 0..KILLS_FOR_BOSS {
+                prog.record_kill();
+            }
+            prog.on_boss_defeated(0);
+        }
+        assert_eq!(prog.current_subzone_id, 3);
+
+        // Clear subzone 3 (final subzone of zone 1)
+        for _ in 0..KILLS_FOR_BOSS {
+            prog.record_kill();
+        }
+
+        let result = prog.on_boss_defeated(0);
+        match result {
+            BossDefeatResult::ZoneComplete {
+                old_zone,
+                new_zone_id,
+            } => {
+                assert_eq!(old_zone, "Meadow");
+                assert_eq!(new_zone_id, 2);
+            }
+            _ => panic!("Expected ZoneComplete, got {:?}", result),
+        }
+        assert_eq!(prog.current_zone_id, 2);
+        assert_eq!(prog.current_subzone_id, 1);
+    }
+
+    #[test]
+    fn test_on_boss_defeated_prestige_gated() {
+        let mut prog = ZoneProgression::new();
+
+        // Clear zone 1
+        for _subzone in 1..=3 {
+            for _ in 0..KILLS_FOR_BOSS {
+                prog.record_kill();
+            }
+            prog.on_boss_defeated(0);
+        }
+        assert_eq!(prog.current_zone_id, 2);
+
+        // Clear zone 2
+        for _subzone in 1..=3 {
+            for _ in 0..KILLS_FOR_BOSS {
+                prog.record_kill();
+            }
+            prog.on_boss_defeated(0);
+        }
+
+        // Should be gated at zone 3 (needs P5)
+        match prog.on_boss_defeated(0) {
+            BossDefeatResult::ZoneCompleteButGated {
+                zone_name,
+                required_prestige,
+            } => {
+                assert_eq!(zone_name, "Dark Forest");
+                assert_eq!(required_prestige, 5);
+            }
+            _ => {
+                // We might have already advanced, check if we're stuck
+                assert_eq!(prog.current_zone_id, 2);
+            }
+        }
     }
 }

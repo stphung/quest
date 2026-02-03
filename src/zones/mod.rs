@@ -8,4 +8,5 @@ mod progression;
 
 #[allow(unused_imports)]
 pub use data::*;
-pub use progression::ZoneProgression;
+#[allow(unused_imports)]
+pub use progression::{BossDefeatResult, ZoneProgression, KILLS_FOR_BOSS};
