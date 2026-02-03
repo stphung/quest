@@ -6,7 +6,5 @@
 mod data;
 mod progression;
 
-#[allow(unused_imports)]
-pub use data::*;
-#[allow(unused_imports)]
-pub use progression::{BossDefeatResult, ZoneProgression, KILLS_FOR_BOSS};
+pub use data::{get_all_zones, get_zone, Subzone, Zone};
+pub use progression::{BossDefeatResult, ZoneProgression};
