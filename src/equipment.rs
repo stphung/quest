@@ -2,6 +2,10 @@
 use crate::items::{EquipmentSlot, Item};
 use serde::{Deserialize, Serialize};
 
+/// Player equipment slots.
+///
+/// IMPORTANT: When adding new slots, use `#[serde(default)]` to maintain
+/// backward compatibility with old save files. See test_minimal_v2_save_still_loads.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Equipment {
     pub weapon: Option<Item>,

@@ -907,4 +907,28 @@ mod tests {
         // Cleanup
         fs::remove_file(filepath).ok();
     }
+
+    /// Test that Default impls exist and work for key structs.
+    /// This ensures we can use #[serde(default)] on these types.
+    #[test]
+    fn test_default_impls_exist_for_save_structs() {
+        use crate::combat::CombatState;
+        use crate::equipment::Equipment;
+        use crate::fishing::FishingState;
+        use crate::zones::ZoneProgression;
+
+        // These should all compile and produce valid defaults
+        let combat = CombatState::default();
+        assert_eq!(combat.player_max_hp, 50);
+        assert!(combat.current_enemy.is_none());
+
+        let equipment = Equipment::default();
+        assert!(equipment.weapon.is_none());
+
+        let fishing = FishingState::default();
+        assert_eq!(fishing.rank, 1);
+
+        let zones = ZoneProgression::default();
+        assert_eq!(zones.current_zone_id, 1);
+    }
 }

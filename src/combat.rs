@@ -218,6 +218,10 @@ pub struct CombatLogEntry {
     pub is_player_action: bool,
 }
 
+/// Combat state for the player.
+///
+/// IMPORTANT: When adding new fields, use `#[serde(default)]` to maintain
+/// backward compatibility with old save files. See test_minimal_v2_save_still_loads.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CombatState {
     pub current_enemy: Option<Enemy>,
@@ -230,6 +234,12 @@ pub struct CombatState {
     pub visual_effects: Vec<crate::ui::combat_effects::VisualEffect>,
     #[serde(skip)]
     pub combat_log: VecDeque<CombatLogEntry>,
+}
+
+impl Default for CombatState {
+    fn default() -> Self {
+        Self::new(50) // Base HP for fresh character
+    }
 }
 
 impl CombatState {
