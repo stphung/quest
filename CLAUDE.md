@@ -50,7 +50,7 @@ The skill handles:
 
 **On push to main:**
 - Runs all checks
-- Builds release binaries for 4 platforms (Linux, macOS x86/ARM, Windows)
+- Builds release binaries for 3 platforms (Linux, macOS x86/ARM)
 - Creates GitHub release with downloadable binaries
 
 **Key insight:** Local `make check` runs the **exact same script** as CI, ensuring consistency.
