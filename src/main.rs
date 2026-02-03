@@ -531,8 +531,53 @@ fn main() -> io::Result<()> {
                             // Handle active chess game input (highest priority)
                             if let Some(ref mut chess_game) = state.active_chess {
                                 if chess_game.game_result.is_some() {
-                                    // Any key dismisses result
-                                    apply_game_result(&mut state);
+                                    // Any key dismisses result and adds combat log message
+                                    let old_prestige = state.prestige_rank;
+                                    if let Some((result, prestige_gained)) =
+                                        apply_game_result(&mut state)
+                                    {
+                                        use chess::ChessResult;
+                                        match result {
+                                            ChessResult::Win => {
+                                                let new_prestige = old_prestige + prestige_gained;
+                                                state.combat_state.add_log_entry(
+                                                    "♟ Checkmate! You defeated the mysterious figure.".to_string(),
+                                                    false,
+                                                    true,
+                                                );
+                                                state.combat_state.add_log_entry(
+                                                    format!(
+                                                        "♟ +{} Prestige Ranks (P{} → P{})",
+                                                        prestige_gained, old_prestige, new_prestige
+                                                    ),
+                                                    false,
+                                                    true,
+                                                );
+                                            }
+                                            ChessResult::Loss => {
+                                                state.combat_state.add_log_entry(
+                                                    "♟ The mysterious figure nods respectfully and vanishes.".to_string(),
+                                                    false,
+                                                    true,
+                                                );
+                                            }
+                                            ChessResult::Draw => {
+                                                state.combat_state.add_log_entry(
+                                                    "♟ The figure smiles knowingly and fades away."
+                                                        .to_string(),
+                                                    false,
+                                                    true,
+                                                );
+                                            }
+                                            ChessResult::Forfeit => {
+                                                state.combat_state.add_log_entry(
+                                                    "♟ You concede the game. The figure disappears without a word.".to_string(),
+                                                    false,
+                                                    true,
+                                                );
+                                            }
+                                        }
+                                    }
                                     continue;
                                 }
                                 if !chess_game.ai_thinking {
@@ -711,7 +756,18 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
         && game_state.active_fishing.is_none()
     {
         let mut rng = rand::thread_rng();
-        try_discover_chess(game_state, &mut rng);
+        if try_discover_chess(game_state, &mut rng) {
+            game_state.combat_state.add_log_entry(
+                "♟ A mysterious figure steps from the shadows...".to_string(),
+                false,
+                true,
+            );
+            game_state.combat_state.add_log_entry(
+                "♟ Press [Tab] to view pending challenges".to_string(),
+                false,
+                true,
+            );
+        }
     }
 
     // Sync player max HP with derived stats (ensures equipment changes are reflected)
