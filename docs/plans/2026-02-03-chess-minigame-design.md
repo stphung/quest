@@ -19,23 +19,59 @@ A chess challenge is discovered randomly while the player is in normal combat (n
 - **State requirement**: Not in dungeon, not fishing, not already in a chess challenge
 - **Discovery message**: A mysterious figure appears in the combat log offering a chess challenge
 
-### Challenge Acceptance
+### Challenge Menu
 
-Unlike fishing (auto-enters) and dungeons (auto-enters), chess presents a **pending challenge** that the player must accept or decline. This is critical because:
+Unlike fishing (auto-enters) and dungeons (auto-enters), chess presents a **pending challenge** that the player reviews through a navigable menu. This is critical because:
 
 1. Chess requires active attention — entering automatically would be hostile
 2. The reward is so large that accidental entry/exit must be prevented
-3. It establishes the pattern for future player-controlled minigames
+3. It establishes a generic menu pattern for future player-controlled minigames
 
-**Flow:**
+**Menu architecture**: The challenge menu is a generic system — not chess-specific. It holds a list of `PendingChallenge` items that any minigame system can push into. Chess is the first producer, but future minigames (gambling, crafting, etc.) will add their own challenge types to the same menu.
+
+**Opening the menu**: When one or more challenges are pending, a notification appears in the stats panel: `"1 challenge available — [Tab] to view"`. Pressing `Tab` opens the challenge menu as a full overlay on the right panel (replacing the combat scene). Combat continues in the background while browsing.
+
+**Menu states**: The menu has two views — list and detail:
+
 ```
-Discovery → Pending challenge state → Player presses 'C' to accept / 'Esc' to decline
+LIST VIEW                              DETAIL VIEW
+┌──────────────────────────┐           ┌──────────────────────────┐
+│   Pending Challenges     │           │   Chess Challenge        │
+│                          │           │                          │
+│ > ♟ Chess Challenge      │  Enter →  │   A mysterious figure    │
+│                          │           │   challenges you to a    │
+│                          │           │   game of chess.         │
+│                          │           │                          │
+│                          │           │   Difficulty: Journeyman │
+│                          │           │   AI Depth:   3 ply      │
+│                          │           │   Reward:     +2 Prestige│
+│                          │           │                          │
+│                          │           │   Win: +2 prestige ranks │
+│                          │           │   Lose: No penalty       │
+│                          │           │   Draw: Bonus XP         │
+│                          │           │                          │
+│                          │  ← Esc    │   [Enter] Accept         │
+│                          │           │   [D]     Decline        │
+│   [Tab/Esc] Close        │           │   [Esc]   Back           │
+└──────────────────────────┘           └──────────────────────────┘
 ```
 
+**Input in list view:**
+- `Up/Down` — Navigate between challenges
+- `Enter` — Open detail view for selected challenge
+- `Tab` or `Esc` — Close menu, return to combat
+
+**Input in detail view:**
+- `Enter` — Accept challenge (starts the minigame)
+- `D` — Decline challenge (removes it from the list)
+- `Esc` — Back to list view
+
+**Behavior:**
 - Pending challenges persist until accepted or declined (no timeout)
-- While a challenge is pending, combat continues normally
-- A visual indicator appears in the stats panel showing the pending challenge
+- While browsing the menu, combat continues in the background (ticks still fire)
 - Declining a challenge removes it; a new one must be discovered naturally
+- Accepting a challenge closes the menu and enters the minigame immediately
+- Multiple challenges can queue up (e.g., a chess challenge arrives while another is already pending). Each is a separate list entry
 
 ### Chess Gameplay
 
@@ -135,17 +171,53 @@ The reward should feel like "I just saved hours of grinding" not "I broke the ga
 ### New fields on GameState
 
 ```rust
+/// Generic challenge menu (transient, not saved)
+pub challenge_menu: ChallengeMenu,              // #[serde(skip)]
+
 /// Persistent chess stats (survives prestige, saved to disk)
 pub chess: ChessState,                          // #[serde(default)]
 
 /// Active chess game (transient, not saved)
 pub active_chess: Option<ChessGame>,            // #[serde(skip)]
-
-/// Pending chess challenge (not yet accepted)
-pub pending_chess_challenge: Option<ChessChallenge>,  // #[serde(skip)]
 ```
 
-### Data Structures
+### Challenge Menu (Generic)
+
+The challenge menu is minigame-agnostic. Each minigame defines its own `ChallengeType` variant and detail text. The menu handles navigation, display, and accept/decline flow uniformly.
+
+```rust
+/// A single pending challenge in the menu
+pub struct PendingChallenge {
+    pub challenge_type: ChallengeType,
+    pub title: String,              // e.g. "Chess Challenge"
+    pub icon: &'static str,        // e.g. "♟"
+    pub description: String,       // Multi-line flavor text for detail view
+    pub details: Vec<(String, String)>,  // Key-value pairs: ("Difficulty", "Journeyman")
+    pub reward_summary: String,    // e.g. "+2 Prestige Ranks"
+}
+
+/// Extensible enum — future minigames add variants here
+pub enum ChallengeType {
+    Chess(ChessChallenge),
+    // Future: Gambling(GamblingChallenge), Crafting(CraftingChallenge), etc.
+}
+
+/// Chess-specific challenge data (carried inside ChallengeType::Chess)
+pub struct ChessChallenge {
+    pub difficulty: ChessDifficulty,
+    pub reward_prestige: u32,       // 1, 2, or 3
+}
+
+/// Menu state for navigation
+pub struct ChallengeMenu {
+    pub challenges: Vec<PendingChallenge>,
+    pub is_open: bool,              // Whether the menu overlay is visible
+    pub selected_index: usize,      // Cursor position in list view
+    pub viewing_detail: bool,       // true = detail view, false = list view
+}
+```
+
+### Chess-Specific Types
 
 ```rust
 /// Persistent stats across all chess games
@@ -155,12 +227,6 @@ pub struct ChessState {
     pub games_lost: u32,
     pub games_drawn: u32,
     pub prestige_earned: u32,       // Total prestige ranks earned from chess
-}
-
-/// A pending challenge waiting for player acceptance
-pub struct ChessChallenge {
-    pub difficulty: ChessDifficulty,
-    pub reward_prestige: u32,       // 1, 2, or 3
 }
 
 /// Active chess game session
@@ -186,13 +252,15 @@ pub enum ChessDifficulty { Apprentice, Journeyman, Master }
 
 ```
 src/
+├── challenge_menu.rs       # PendingChallenge, ChallengeType, ChallengeMenu (generic)
 ├── chess.rs                # ChessState, ChessChallenge, ChessGame, ChessDifficulty types
 ├── chess_logic.rs          # Discovery, session lifecycle, move application, AI turn, reward logic
 ├── ui/
-│   └── chess_scene.rs      # Board rendering, cursor, highlights, captured pieces
+│   ├── challenge_menu_scene.rs  # Challenge menu list + detail rendering (generic)
+│   └── chess_scene.rs           # Chess board rendering, cursor, highlights
 ```
 
-With the `chess-engine` crate handling board representation, move generation, and AI search, a flat 2-file layout (matching the fishing pattern) is sufficient. No subdirectory needed — the complexity that would have required `board.rs`, `moves.rs`, and `engine.rs` is now in the crate.
+`challenge_menu.rs` and `challenge_menu_scene.rs` are minigame-agnostic — they render challenges from any source. When a new minigame is added, it only needs to push a `PendingChallenge` with its own `ChallengeType` variant; the menu UI works unchanged.
 
 ## Integration Points
 
@@ -219,39 +287,30 @@ if let Some(ref mut chess) = game_state.active_chess {
 }
 
 // 2. Discovery check (during normal combat ticks)
-if game_state.pending_chess_challenge.is_none()
-    && game_state.active_chess.is_none()
+//    Chess pushes into the generic challenge menu
+if game_state.active_chess.is_none()
     && game_state.prestige_rank >= 1
+    && !game_state.challenge_menu.has_challenge_of_type(ChallengeType::Chess)
 {
     if rng.gen::<f64>() < CHESS_DISCOVERY_CHANCE {
-        let difficulty = determine_difficulty(game_state.prestige_rank);
-        game_state.pending_chess_challenge = Some(ChessChallenge { ... });
-        game_state.combat_state.add_log_entry("A mysterious figure appears...", false, true);
+        let challenge = chess_logic::create_challenge(game_state.prestige_rank);
+        game_state.challenge_menu.challenges.push(challenge);
+        game_state.combat_state.add_log_entry(
+            "♟ A mysterious figure steps from the shadows...", false, true
+        );
+        game_state.combat_state.add_log_entry(
+            "♟ Press [Tab] to view pending challenges", false, true
+        );
     }
 }
 ```
 
 ### Input Handling (main.rs)
 
+Input priority: active chess > challenge menu open > Tab to open menu > normal game keys.
+
 ```rust
-// In Game screen input handling, before existing key checks:
-
-// Pending challenge: C to accept, Esc to decline
-if let Some(ref challenge) = game_state.pending_chess_challenge {
-    match key.code {
-        KeyCode::Char('c') | KeyCode::Char('C') => {
-            let challenge = game_state.pending_chess_challenge.take().unwrap();
-            game_state.active_chess = Some(ChessGame::new(challenge));
-        }
-        KeyCode::Esc => {
-            game_state.pending_chess_challenge = None;
-        }
-        _ => {}
-    }
-    // Don't fall through to other input handlers while challenge is pending
-}
-
-// Active chess game input
+// PRIORITY 1: Active chess game (highest — full input capture)
 if let Some(ref mut chess) = game_state.active_chess {
     if !chess.ai_thinking && !chess.game_over {
         match key.code {
@@ -270,32 +329,119 @@ if let Some(ref mut chess) = game_state.active_chess {
                 //   Then trigger AI thinking delay.
                 chess.select_or_move();
             }
-            KeyCode::Esc => chess.deselect_or_forfeit(),  // First Esc = deselect/warn, second = forfeit
+            KeyCode::Esc => chess.deselect_or_forfeit(),
             _ => {}
         }
     } else if chess.game_over {
         // Any key dismisses the result and applies rewards/returns to combat
         chess_logic::end_game(game_state);
     }
-    // Don't fall through to combat/prestige input
+    // Don't fall through — chess captures all input
+    return;
 }
+
+// PRIORITY 2: Challenge menu is open (overlay on combat scene)
+if game_state.challenge_menu.is_open {
+    let menu = &mut game_state.challenge_menu;
+
+    if menu.viewing_detail {
+        // Detail view
+        match key.code {
+            KeyCode::Enter => {
+                // Accept: remove challenge from list, start the minigame
+                let challenge = menu.challenges.remove(menu.selected_index);
+                menu.is_open = false;
+                menu.viewing_detail = false;
+                challenge_menu::accept_challenge(game_state, challenge);
+                // accept_challenge() dispatches by ChallengeType:
+                //   Chess → game_state.active_chess = Some(ChessGame::new(...))
+            }
+            KeyCode::Char('d') | KeyCode::Char('D') => {
+                // Decline: remove from list, stay in menu
+                menu.challenges.remove(menu.selected_index);
+                menu.selected_index = menu.selected_index.min(
+                    menu.challenges.len().saturating_sub(1)
+                );
+                menu.viewing_detail = false;
+                if menu.challenges.is_empty() {
+                    menu.is_open = false;
+                }
+            }
+            KeyCode::Esc => {
+                // Back to list view
+                menu.viewing_detail = false;
+            }
+            _ => {}
+        }
+    } else {
+        // List view
+        match key.code {
+            KeyCode::Up => {
+                if menu.selected_index > 0 {
+                    menu.selected_index -= 1;
+                }
+            }
+            KeyCode::Down => {
+                if menu.selected_index + 1 < menu.challenges.len() {
+                    menu.selected_index += 1;
+                }
+            }
+            KeyCode::Enter => {
+                if !menu.challenges.is_empty() {
+                    menu.viewing_detail = true;
+                }
+            }
+            KeyCode::Tab | KeyCode::Esc => {
+                menu.is_open = false;
+            }
+            _ => {}
+        }
+    }
+    // Don't fall through — menu captures input while open
+    return;
+}
+
+// PRIORITY 3: Tab to open challenge menu (only when challenges exist)
+if key.code == KeyCode::Tab && !game_state.challenge_menu.challenges.is_empty() {
+    game_state.challenge_menu.is_open = true;
+    game_state.challenge_menu.selected_index = 0;
+    game_state.challenge_menu.viewing_detail = false;
+    return;
+}
+
+// PRIORITY 4: Normal game keys (P for prestige, Q for quit, etc.)
+// ... existing input handling ...
 ```
 
 ### UI Dispatch (ui/mod.rs)
 
-Chess takes highest rendering priority (above fishing):
+Rendering priority: active chess > challenge menu overlay > fishing > dungeon > combat.
 
 ```rust
 if let Some(ref chess) = game_state.active_chess {
+    // Full chess board (replaces combat scene entirely)
     chess_scene::render_chess_scene(frame, chunks[1], chess);
-} else if game_state.pending_chess_challenge.is_some() {
-    // Show challenge banner overlaid on normal combat scene
-    combat_scene::draw_combat_scene(frame, chunks[1], game_state);
-    // Render challenge prompt overlay
+} else if game_state.challenge_menu.is_open {
+    // Challenge menu overlay (replaces combat scene while open)
+    challenge_menu_scene::render_challenge_menu(frame, chunks[1], &game_state.challenge_menu);
 } else if let Some(ref session) = game_state.active_fishing {
-    // ... existing
+    // ... existing fishing
+} else if let Some(dungeon) = &game_state.active_dungeon {
+    // ... existing dungeon
+} else {
+    // Default combat
+    combat_scene::draw_combat_scene(frame, chunks[1], game_state);
 }
 ```
+
+**Stats panel notification**: When `challenge_menu.challenges` is non-empty and the menu is not open, the stats panel shows a persistent notification:
+```
+┌─────────────────────────┐
+│ 1 challenge pending     │
+│ Press [Tab] to view     │
+└─────────────────────────┘
+```
+This is rendered in `stats_panel.rs` by checking `game_state.challenge_menu.challenges.len()`. It provides passive awareness without interrupting the idle flow.
 
 ## Terminal Rendering
 
@@ -328,7 +474,8 @@ Status: Your move (select a piece)
 ## Edge Cases
 
 - **Player quits game during chess**: Session is `#[serde(skip)]`, so it's lost. This is intentional — chess requires commitment. The pending challenge is also lost.
-- **Prestige during pending challenge**: If player manually prestiges while a challenge is pending, the challenge is cleared (transient state).
+- **Prestige during pending challenge**: If player manually prestiges while challenges are in the menu, they are cleared (challenge_menu is transient/`#[serde(skip)]`).
+- **Menu open during fishing/dungeon**: Tab only opens the menu when challenges exist. If a fishing session or dungeon starts while the menu is open, the menu closes automatically (active minigame takes rendering priority).
 - **AI computation time**: With 4-ply minimax + alpha-beta on a standard board, worst case is ~50ms. No risk of blocking the game loop.
 - **Draw by repetition / 50-move rule**: The `chess-engine` crate handles stalemate detection via `GameResult::Stalemate`. Threefold repetition is not tracked by the crate — acceptable for v1 (rare in short games against simple AI).
 - **Pawn promotion**: Handled by the crate — `get_legal_moves()` returns separate board states for each promotion piece. For v1, auto-select queen promotion by filtering legal targets. Player choice can be added later.
@@ -345,35 +492,43 @@ The crate has zero transitive dependencies, so it adds no dependency tree bloat.
 
 ## Implementation Phases
 
-**Phase 1: Types and state integration**
+**Phase 1: Challenge menu system (generic, no chess yet)**
+- Define PendingChallenge, ChallengeType, ChallengeMenu in `challenge_menu.rs`
+- Add `challenge_menu: ChallengeMenu` to GameState with `#[serde(skip)]`
+- Implement `challenge_menu_scene.rs`: list view and detail view rendering
+- Input routing in main.rs: Tab to open, arrow keys to navigate, Enter/D/Esc for actions
+- Stats panel notification when challenges are pending
+- `accept_challenge()` dispatch function (match on ChallengeType)
+
+**Phase 2: Chess types and state integration**
 - Add `chess-engine` to Cargo.toml
 - Define ChessState, ChessChallenge, ChessGame, ChessDifficulty in `chess.rs`
-- Add fields to GameState with serde attributes
+- Add `chess: ChessState` and `active_chess: Option<ChessGame>` to GameState
 - Board-to-grid helper: extract piece positions from `chess_engine::Board` for rendering and input mapping
+- Wire ChallengeType::Chess into `accept_challenge()` dispatch
 
-**Phase 2: Game session logic**
+**Phase 3: Chess game session logic**
 - Discovery logic and difficulty determination in `chess_logic.rs`
+- `create_challenge()` — builds a PendingChallenge with chess-specific details
 - Session lifecycle (create game from challenge, AI turn via `get_best_next_move`, game end detection)
 - Move selection logic: filtering `get_legal_moves()` by source/destination square
 - Prestige reward application on win
 - Forfeit flow
 
-**Phase 3: Input handling**
-- Challenge acceptance/decline key routing in main.rs
-- Cursor movement and two-phase piece selection
+**Phase 4: Chess input handling**
+- Chess game input routing in main.rs (cursor movement, two-phase piece selection)
 - Forfeit confirmation (double-Esc)
 - Game-over dismissal
 
-**Phase 4: UI rendering**
+**Phase 5: Chess UI rendering**
 - Chess board with Unicode pieces in `chess_scene.rs`
 - Square coloring (light/dark) via Ratatui styled spans
 - Cursor and selection highlighting
 - Legal move indicators (highlight destination squares from filtered legal_targets)
 - Captured pieces display (diff starting material vs current board)
 - Game status messages (your move, AI thinking, check, checkmate, stalemate)
-- Pending challenge banner overlay on combat scene
 
-**Phase 5: Polish**
+**Phase 6: Polish**
 - AI "thinking" animation (dots or spinner)
 - Stats display (games played/won in stats panel)
 - Move history sidebar (algebraic notation, derived from board diffs)
