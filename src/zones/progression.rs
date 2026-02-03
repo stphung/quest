@@ -1,5 +1,7 @@
 //! Zone progression state and logic.
 
+#![allow(dead_code)]
+
 use serde::{Deserialize, Serialize};
 
 use super::data::{get_all_zones, Zone};
@@ -167,7 +169,11 @@ impl ZoneProgression {
     pub fn current_location_names(&self) -> (String, String) {
         let zones = get_all_zones();
         if let Some(zone) = zones.iter().find(|z| z.id == self.current_zone_id) {
-            if let Some(subzone) = zone.subzones.iter().find(|s| s.id == self.current_subzone_id) {
+            if let Some(subzone) = zone
+                .subzones
+                .iter()
+                .find(|s| s.id == self.current_subzone_id)
+            {
                 return (zone.name.to_string(), subzone.name.to_string());
             }
         }
@@ -200,7 +206,10 @@ mod tests {
         // Defeating same boss again should not duplicate
         prog.defeat_boss(1, 1);
         assert_eq!(
-            prog.defeated_bosses.iter().filter(|&&b| b == (1, 1)).count(),
+            prog.defeated_bosses
+                .iter()
+                .filter(|&&b| b == (1, 1))
+                .count(),
             1
         );
     }

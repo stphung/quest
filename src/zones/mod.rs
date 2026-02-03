@@ -6,5 +6,6 @@
 mod data;
 mod progression;
 
+#[allow(unused_imports)]
 pub use data::*;
-pub use progression::*;
+pub use progression::ZoneProgression;

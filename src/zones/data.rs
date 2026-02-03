@@ -1,5 +1,7 @@
 //! Zone and subzone data definitions.
 
+#![allow(dead_code)]
+
 /// Represents a zone in the game world.
 #[derive(Debug, Clone)]
 pub struct Zone {
@@ -42,19 +44,28 @@ pub fn get_all_zones() -> Vec<Zone> {
                     id: 1,
                     name: "Sunny Fields",
                     depth: 1,
-                    boss: SubzoneBoss { name: "Field Guardian", is_zone_boss: false },
+                    boss: SubzoneBoss {
+                        name: "Field Guardian",
+                        is_zone_boss: false,
+                    },
                 },
                 Subzone {
                     id: 2,
                     name: "Overgrown Thicket",
                     depth: 2,
-                    boss: SubzoneBoss { name: "Thicket Horror", is_zone_boss: false },
+                    boss: SubzoneBoss {
+                        name: "Thicket Horror",
+                        is_zone_boss: false,
+                    },
                 },
                 Subzone {
                     id: 3,
                     name: "Mushroom Caves",
                     depth: 3,
-                    boss: SubzoneBoss { name: "Sporeling Queen", is_zone_boss: true },
+                    boss: SubzoneBoss {
+                        name: "Sporeling Queen",
+                        is_zone_boss: true,
+                    },
                 },
             ],
         },
@@ -69,19 +80,28 @@ pub fn get_all_zones() -> Vec<Zone> {
                     id: 1,
                     name: "Forest Edge",
                     depth: 1,
-                    boss: SubzoneBoss { name: "Alpha Wolf", is_zone_boss: false },
+                    boss: SubzoneBoss {
+                        name: "Alpha Wolf",
+                        is_zone_boss: false,
+                    },
                 },
                 Subzone {
                     id: 2,
                     name: "Twisted Woods",
                     depth: 2,
-                    boss: SubzoneBoss { name: "Corrupted Treant", is_zone_boss: false },
+                    boss: SubzoneBoss {
+                        name: "Corrupted Treant",
+                        is_zone_boss: false,
+                    },
                 },
                 Subzone {
                     id: 3,
                     name: "Spider's Hollow",
                     depth: 3,
-                    boss: SubzoneBoss { name: "Broodmother Arachne", is_zone_boss: true },
+                    boss: SubzoneBoss {
+                        name: "Broodmother Arachne",
+                        is_zone_boss: true,
+                    },
                 },
             ],
         },
@@ -97,19 +117,28 @@ pub fn get_all_zones() -> Vec<Zone> {
                     id: 1,
                     name: "Rocky Foothills",
                     depth: 1,
-                    boss: SubzoneBoss { name: "Bandit King", is_zone_boss: false },
+                    boss: SubzoneBoss {
+                        name: "Bandit King",
+                        is_zone_boss: false,
+                    },
                 },
                 Subzone {
                     id: 2,
                     name: "Frozen Peaks",
                     depth: 2,
-                    boss: SubzoneBoss { name: "Ice Giant", is_zone_boss: false },
+                    boss: SubzoneBoss {
+                        name: "Ice Giant",
+                        is_zone_boss: false,
+                    },
                 },
                 Subzone {
                     id: 3,
                     name: "Dragon's Perch",
                     depth: 3,
-                    boss: SubzoneBoss { name: "Frost Wyrm", is_zone_boss: true },
+                    boss: SubzoneBoss {
+                        name: "Frost Wyrm",
+                        is_zone_boss: true,
+                    },
                 },
             ],
         },
@@ -124,19 +153,28 @@ pub fn get_all_zones() -> Vec<Zone> {
                     id: 1,
                     name: "Outer Sanctum",
                     depth: 1,
-                    boss: SubzoneBoss { name: "Skeleton Lord", is_zone_boss: false },
+                    boss: SubzoneBoss {
+                        name: "Skeleton Lord",
+                        is_zone_boss: false,
+                    },
                 },
                 Subzone {
                     id: 2,
                     name: "Sunken Temple",
                     depth: 2,
-                    boss: SubzoneBoss { name: "Spectral Guardian", is_zone_boss: false },
+                    boss: SubzoneBoss {
+                        name: "Spectral Guardian",
+                        is_zone_boss: false,
+                    },
                 },
                 Subzone {
                     id: 3,
                     name: "Sealed Catacombs",
                     depth: 3,
-                    boss: SubzoneBoss { name: "Lich King's Shade", is_zone_boss: true },
+                    boss: SubzoneBoss {
+                        name: "Lich King's Shade",
+                        is_zone_boss: true,
+                    },
                 },
             ],
         },
@@ -152,25 +190,37 @@ pub fn get_all_zones() -> Vec<Zone> {
                     id: 1,
                     name: "Scorched Badlands",
                     depth: 1,
-                    boss: SubzoneBoss { name: "Ash Walker Chief", is_zone_boss: false },
+                    boss: SubzoneBoss {
+                        name: "Ash Walker Chief",
+                        is_zone_boss: false,
+                    },
                 },
                 Subzone {
                     id: 2,
                     name: "Lava Rivers",
                     depth: 2,
-                    boss: SubzoneBoss { name: "Magma Serpent", is_zone_boss: false },
+                    boss: SubzoneBoss {
+                        name: "Magma Serpent",
+                        is_zone_boss: false,
+                    },
                 },
                 Subzone {
                     id: 3,
                     name: "Obsidian Fortress",
                     depth: 3,
-                    boss: SubzoneBoss { name: "Fire Giant Warlord", is_zone_boss: false },
+                    boss: SubzoneBoss {
+                        name: "Fire Giant Warlord",
+                        is_zone_boss: false,
+                    },
                 },
                 Subzone {
                     id: 4,
                     name: "Magma Core",
                     depth: 4,
-                    boss: SubzoneBoss { name: "Infernal Titan", is_zone_boss: true },
+                    boss: SubzoneBoss {
+                        name: "Infernal Titan",
+                        is_zone_boss: true,
+                    },
                 },
             ],
         },
@@ -185,25 +235,37 @@ pub fn get_all_zones() -> Vec<Zone> {
                     id: 1,
                     name: "Snowbound Plains",
                     depth: 1,
-                    boss: SubzoneBoss { name: "Dire Wolf Alpha", is_zone_boss: false },
+                    boss: SubzoneBoss {
+                        name: "Dire Wolf Alpha",
+                        is_zone_boss: false,
+                    },
                 },
                 Subzone {
                     id: 2,
                     name: "Glacier Maze",
                     depth: 2,
-                    boss: SubzoneBoss { name: "Ice Wraith Lord", is_zone_boss: false },
+                    boss: SubzoneBoss {
+                        name: "Ice Wraith Lord",
+                        is_zone_boss: false,
+                    },
                 },
                 Subzone {
                     id: 3,
                     name: "Frozen Lake",
                     depth: 3,
-                    boss: SubzoneBoss { name: "Lake Horror", is_zone_boss: false },
+                    boss: SubzoneBoss {
+                        name: "Lake Horror",
+                        is_zone_boss: false,
+                    },
                 },
                 Subzone {
                     id: 4,
                     name: "Permafrost Tomb",
                     depth: 4,
-                    boss: SubzoneBoss { name: "The Frozen One", is_zone_boss: true },
+                    boss: SubzoneBoss {
+                        name: "The Frozen One",
+                        is_zone_boss: true,
+                    },
                 },
             ],
         },
@@ -219,25 +281,37 @@ pub fn get_all_zones() -> Vec<Zone> {
                     id: 1,
                     name: "Glittering Tunnels",
                     depth: 1,
-                    boss: SubzoneBoss { name: "Gem Golem", is_zone_boss: false },
+                    boss: SubzoneBoss {
+                        name: "Gem Golem",
+                        is_zone_boss: false,
+                    },
                 },
                 Subzone {
                     id: 2,
                     name: "Prismatic Halls",
                     depth: 2,
-                    boss: SubzoneBoss { name: "Prism Elemental", is_zone_boss: false },
+                    boss: SubzoneBoss {
+                        name: "Prism Elemental",
+                        is_zone_boss: false,
+                    },
                 },
                 Subzone {
                     id: 3,
                     name: "Resonance Depths",
                     depth: 3,
-                    boss: SubzoneBoss { name: "Echo Wraith", is_zone_boss: false },
+                    boss: SubzoneBoss {
+                        name: "Echo Wraith",
+                        is_zone_boss: false,
+                    },
                 },
                 Subzone {
                     id: 4,
                     name: "Heart Crystal",
                     depth: 4,
-                    boss: SubzoneBoss { name: "Crystal Colossus", is_zone_boss: true },
+                    boss: SubzoneBoss {
+                        name: "Crystal Colossus",
+                        is_zone_boss: true,
+                    },
                 },
             ],
         },
@@ -252,25 +326,37 @@ pub fn get_all_zones() -> Vec<Zone> {
                     id: 1,
                     name: "Coral Gardens",
                     depth: 1,
-                    boss: SubzoneBoss { name: "Merfolk Warlord", is_zone_boss: false },
+                    boss: SubzoneBoss {
+                        name: "Merfolk Warlord",
+                        is_zone_boss: false,
+                    },
                 },
                 Subzone {
                     id: 2,
                     name: "Drowned Streets",
                     depth: 2,
-                    boss: SubzoneBoss { name: "Drowned Admiral", is_zone_boss: false },
+                    boss: SubzoneBoss {
+                        name: "Drowned Admiral",
+                        is_zone_boss: false,
+                    },
                 },
                 Subzone {
                     id: 3,
                     name: "Abyssal Palace",
                     depth: 3,
-                    boss: SubzoneBoss { name: "Pressure Beast", is_zone_boss: false },
+                    boss: SubzoneBoss {
+                        name: "Pressure Beast",
+                        is_zone_boss: false,
+                    },
                 },
                 Subzone {
                     id: 4,
                     name: "Throne of Tides",
                     depth: 4,
-                    boss: SubzoneBoss { name: "The Drowned King", is_zone_boss: true },
+                    boss: SubzoneBoss {
+                        name: "The Drowned King",
+                        is_zone_boss: true,
+                    },
                 },
             ],
         },
@@ -286,25 +372,37 @@ pub fn get_all_zones() -> Vec<Zone> {
                     id: 1,
                     name: "Cloud Docks",
                     depth: 1,
-                    boss: SubzoneBoss { name: "Harpy Matriarch", is_zone_boss: false },
+                    boss: SubzoneBoss {
+                        name: "Harpy Matriarch",
+                        is_zone_boss: false,
+                    },
                 },
                 Subzone {
                     id: 2,
                     name: "Sky Bridges",
                     depth: 2,
-                    boss: SubzoneBoss { name: "Wind Elemental Lord", is_zone_boss: false },
+                    boss: SubzoneBoss {
+                        name: "Wind Elemental Lord",
+                        is_zone_boss: false,
+                    },
                 },
                 Subzone {
                     id: 3,
                     name: "Stormfront",
                     depth: 3,
-                    boss: SubzoneBoss { name: "Storm Drake", is_zone_boss: false },
+                    boss: SubzoneBoss {
+                        name: "Storm Drake",
+                        is_zone_boss: false,
+                    },
                 },
                 Subzone {
                     id: 4,
                     name: "Eye of the Storm",
                     depth: 4,
-                    boss: SubzoneBoss { name: "Tempest Lord", is_zone_boss: true },
+                    boss: SubzoneBoss {
+                        name: "Tempest Lord",
+                        is_zone_boss: true,
+                    },
                 },
             ],
         },
@@ -319,25 +417,37 @@ pub fn get_all_zones() -> Vec<Zone> {
                     id: 1,
                     name: "Lightning Fields",
                     depth: 1,
-                    boss: SubzoneBoss { name: "Spark Colossus", is_zone_boss: false },
+                    boss: SubzoneBoss {
+                        name: "Spark Colossus",
+                        is_zone_boss: false,
+                    },
                 },
                 Subzone {
                     id: 2,
                     name: "Thunder Halls",
                     depth: 2,
-                    boss: SubzoneBoss { name: "Storm Knight Commander", is_zone_boss: false },
+                    boss: SubzoneBoss {
+                        name: "Storm Knight Commander",
+                        is_zone_boss: false,
+                    },
                 },
                 Subzone {
                     id: 3,
                     name: "Generator Core",
                     depth: 3,
-                    boss: SubzoneBoss { name: "Core Warden", is_zone_boss: false },
+                    boss: SubzoneBoss {
+                        name: "Core Warden",
+                        is_zone_boss: false,
+                    },
                 },
                 Subzone {
                     id: 4,
                     name: "Apex Spire",
                     depth: 4,
-                    boss: SubzoneBoss { name: "The Undying Storm", is_zone_boss: true },
+                    boss: SubzoneBoss {
+                        name: "The Undying Storm",
+                        is_zone_boss: true,
+                    },
                 },
             ],
         },
@@ -436,8 +546,7 @@ mod tests {
                 assert!(
                     !subzone.boss.is_zone_boss,
                     "Zone {} subzone {} should not be zone boss",
-                    zone.name,
-                    subzone.name
+                    zone.name, subzone.name
                 );
             }
         }

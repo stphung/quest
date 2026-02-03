@@ -146,6 +146,11 @@ pub fn perform_prestige(state: &mut GameState) {
     // Increment prestige rank and total prestige count
     state.prestige_rank += 1;
     state.total_prestige_count += 1;
+
+    // Reset zone progression but keep unlocks based on new prestige rank
+    state
+        .zone_progression
+        .reset_for_prestige(state.prestige_rank);
 }
 
 /// Gets the adventurer rank based on average level

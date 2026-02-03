@@ -259,6 +259,7 @@ impl SaveManager {
             active_dungeon: None,
             fishing: crate::fishing::FishingState::default(),
             active_fishing: None,
+            zone_progression: crate::zones::ZoneProgression::default(),
         }
     }
 }

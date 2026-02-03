@@ -3,6 +3,7 @@ use crate::combat::CombatState;
 use crate::dungeon::Dungeon;
 use crate::equipment::Equipment;
 use crate::fishing::{FishingSession, FishingState};
+use crate::zones::ZoneProgression;
 use serde::{Deserialize, Serialize};
 
 /// Main game state containing all player progress
@@ -29,6 +30,9 @@ pub struct GameState {
     #[serde(skip)]
     #[allow(dead_code)]
     pub active_fishing: Option<FishingSession>,
+    /// Zone progression state
+    #[serde(default)]
+    pub zone_progression: ZoneProgression,
 }
 
 impl GameState {
@@ -55,6 +59,7 @@ impl GameState {
             active_dungeon: None,
             fishing: FishingState::default(),
             active_fishing: None,
+            zone_progression: ZoneProgression::new(),
         }
     }
 
