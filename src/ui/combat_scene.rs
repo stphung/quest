@@ -105,35 +105,32 @@ fn draw_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
 
 /// Draws the combat status information
 fn draw_combat_status(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    use super::throbber::{spinner_char, waiting_message};
+
+    let spinner = spinner_char();
+
     let status_text = if game_state.combat_state.is_regenerating {
-        let regen_progress = game_state.combat_state.regen_timer / HP_REGEN_DURATION_SECONDS;
         let remaining = HP_REGEN_DURATION_SECONDS - game_state.combat_state.regen_timer;
-        vec![Line::from(vec![
-            Span::styled("Status: ", Style::default().add_modifier(Modifier::BOLD)),
-            Span::styled(
-                format!(
-                    "Regenerating HP... {:.1}s ({:.0}%)",
-                    remaining,
-                    regen_progress * 100.0
-                ),
-                Style::default().fg(Color::Green),
-            ),
-        ])]
+        vec![Line::from(vec![Span::styled(
+            format!("{} Regenerating HP... {:.1}s", spinner, remaining),
+            Style::default().fg(Color::Green),
+        )])]
     } else if game_state.combat_state.current_enemy.is_some() {
         let next_attack = ATTACK_INTERVAL_SECONDS - game_state.combat_state.attack_timer;
         vec![Line::from(vec![
-            Span::styled("Status: ", Style::default().add_modifier(Modifier::BOLD)),
             Span::styled(
-                "In Combat",
+                format!("{} In Combat", spinner),
                 Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
             ),
             Span::raw(format!(" | Next attack: {:.1}s", next_attack.max(0.0))),
         ])]
     } else {
-        vec![Line::from(vec![
-            Span::styled("Status: ", Style::default().add_modifier(Modifier::BOLD)),
-            Span::styled("Waiting for enemy...", Style::default().fg(Color::Yellow)),
-        ])]
+        let message = waiting_message(game_state.character_xp);
+
+        vec![Line::from(vec![Span::styled(
+            format!("{} {}", spinner, message),
+            Style::default().fg(Color::Yellow),
+        )])]
     };
 
     let status_paragraph = Paragraph::new(status_text).alignment(Alignment::Center);
