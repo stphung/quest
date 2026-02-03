@@ -14,15 +14,16 @@ use ratatui::{
 
 /// Draws the stats panel showing player attributes and derived stats
 pub fn draw_stats_panel(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    // Main vertical layout: header, attributes, derived stats, equipment, prestige, footer
+    // Main vertical layout: header, zone, attributes, derived stats, equipment, prestige, footer
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3),  // Header
+            Constraint::Length(3),  // Zone info
             Constraint::Length(14), // Attributes (6 attributes + borders)
-            Constraint::Length(7),  // Derived stats (condensed)
-            Constraint::Length(9),  // Equipment section
-            Constraint::Length(6),  // Prestige info + fishing rank
+            Constraint::Length(6),  // Derived stats (condensed)
+            Constraint::Length(8),  // Equipment section
+            Constraint::Length(5),  // Prestige info + fishing rank
             Constraint::Length(3),  // Footer
         ])
         .split(area);
@@ -30,20 +31,23 @@ pub fn draw_stats_panel(frame: &mut Frame, area: Rect, game_state: &GameState) {
     // Draw header with character info
     draw_header(frame, chunks[0], game_state);
 
+    // Draw zone info
+    draw_zone_info(frame, chunks[1], game_state);
+
     // Draw attributes with progress bars
-    draw_attributes(frame, chunks[1], game_state);
+    draw_attributes(frame, chunks[2], game_state);
 
     // Draw derived stats
-    draw_derived_stats(frame, chunks[2], game_state);
+    draw_derived_stats(frame, chunks[3], game_state);
 
     // Draw equipment section
-    draw_equipment_section(frame, chunks[3], game_state);
+    draw_equipment_section(frame, chunks[4], game_state);
 
     // Draw prestige info
-    draw_prestige_info(frame, chunks[4], game_state);
+    draw_prestige_info(frame, chunks[5], game_state);
 
     // Draw footer with controls
-    draw_footer(frame, chunks[5], game_state);
+    draw_footer(frame, chunks[6], game_state);
 }
 
 /// Draws the header with character level and XP
@@ -86,6 +90,68 @@ fn draw_header(frame: &mut Frame, area: Rect, game_state: &GameState) {
         .alignment(Alignment::Center);
 
     frame.render_widget(header, area);
+}
+
+/// Draws the current zone and subzone info
+fn draw_zone_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    use crate::zones::get_all_zones;
+
+    let zones = get_all_zones();
+    let prog = &game_state.zone_progression;
+
+    // Get current zone and subzone names
+    let (zone_name, subzone_name) =
+        if let Some(zone) = zones.iter().find(|z| z.id == prog.current_zone_id) {
+            let subzone_name = zone
+                .subzones
+                .iter()
+                .find(|s| s.id == prog.current_subzone_id)
+                .map(|s| s.name)
+                .unwrap_or("Unknown");
+            (zone.name, subzone_name)
+        } else {
+            ("Unknown", "Unknown")
+        };
+
+    // Get subzone progress (e.g., "2/3" or "3/4")
+    let total_subzones = zones
+        .iter()
+        .find(|z| z.id == prog.current_zone_id)
+        .map(|z| z.subzones.len())
+        .unwrap_or(0);
+
+    // Color based on zone tier
+    let zone_color = match prog.current_zone_id {
+        1..=2 => Color::Green,   // Tier 1
+        3..=4 => Color::Yellow,  // Tier 2
+        5..=6 => Color::Red,     // Tier 3
+        7..=8 => Color::Magenta, // Tier 4
+        9..=10 => Color::Cyan,   // Tier 5
+        _ => Color::White,
+    };
+
+    let zone_text = vec![Line::from(vec![
+        Span::styled(
+            format!("Zone {}: ", prog.current_zone_id),
+            Style::default().add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            zone_name,
+            Style::default().fg(zone_color).add_modifier(Modifier::BOLD),
+        ),
+        Span::raw(" | "),
+        Span::styled(subzone_name, Style::default().fg(Color::White)),
+        Span::styled(
+            format!(" ({}/{})", prog.current_subzone_id, total_subzones),
+            Style::default().fg(Color::DarkGray),
+        ),
+    ])];
+
+    let zone_widget = Paragraph::new(zone_text)
+        .block(Block::default().borders(Borders::ALL).title("Location"))
+        .alignment(Alignment::Center);
+
+    frame.render_widget(zone_widget, area);
 }
 
 /// Draws all 6 attributes with their values and caps
