@@ -91,7 +91,7 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 - `items.rs` — Core item data structures (7 equipment slots, 5 rarity tiers, 12 affix types)
 - `equipment.rs` — Equipment container with slot management and iteration
 - `item_generation.rs` — Rarity-based attribute/affix generation (Common: +1-2 attrs, Legendary: +8-15 attrs + 4-5 affixes)
-- `item_drops.rs` — Prestige-scaled drop system (30% base + 5% per prestige rank, tier-based rarity distribution)
+- `item_drops.rs` — Drop system (15% base + 1% per prestige rank capped at 25%, continuous rarity distribution)
 - `item_names.rs` — Procedural name generation with prefixes/suffixes
 - `item_scoring.rs` — Smart weighted auto-equip scoring (attribute specialization bonus, affix type weights)
 
@@ -130,7 +130,7 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 - Autosave: every 30s
 - XP gain: Only from defeating enemies (200-400 XP per kill)
 - Offline XP: 50% rate, max 7 days (simulates kills)
-- Item drop rate: 30% base + 5% per prestige rank
+- Item drop rate: 15% base + 1% per prestige rank (capped at 25%)
 - Boss spawn: After 10 kills in subzone
 
 ## Combat Mechanics
