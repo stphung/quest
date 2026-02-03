@@ -568,6 +568,424 @@ mod tests {
     }
 
     #[test]
+    fn test_crit_doubles_damage() {
+        // Verify that when a crit occurs, damage is exactly 2x base total_damage
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // Set high DEX for 100% crit chance (need crit_chance_percent >= 100)
+        // crit_chance_percent = 5 + DEX_mod; DEX 210 gives mod 100 => 105%
+        state
+            .attributes
+            .set(crate::attributes::AttributeType::Dexterity, 210);
+
+        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+        assert!(derived.crit_chance_percent >= 100);
+        let expected_crit_damage = derived.total_damage() * 2;
+
+        // Give enemy enough HP to survive
+        state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
+        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        let events = update_combat(&mut state, 0.1);
+
+        // Find the PlayerAttack event
+        let attack_event = events
+            .iter()
+            .find(|e| matches!(e, CombatEvent::PlayerAttack { .. }));
+        assert!(attack_event.is_some());
+
+        if let Some(CombatEvent::PlayerAttack { damage, was_crit }) = attack_event {
+            assert!(was_crit, "Should always crit with 100%+ crit chance");
+            assert_eq!(*damage, expected_crit_damage);
+        }
+    }
+
+    #[test]
+    fn test_zero_crit_chance_never_crits() {
+        // With base attributes (DEX 10, mod 0), crit_chance = 5%.
+        // Set DEX very low so crit_chance_percent = 0.
+        // crit_chance_percent = (5 + dex_mod).max(0); need dex_mod <= -5 => DEX <= 0
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        state
+            .attributes
+            .set(crate::attributes::AttributeType::Dexterity, 0);
+
+        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+        assert_eq!(derived.crit_chance_percent, 0);
+
+        // Run many attacks to confirm no crits
+        let mut crit_count = 0;
+        for _ in 0..100 {
+            let mut s = GameState::new("Test Hero".to_string(), 0);
+            s.attributes
+                .set(crate::attributes::AttributeType::Dexterity, 0);
+            s.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 100000, 0));
+            s.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+            let events = update_combat(&mut s, 0.1);
+
+            for e in &events {
+                if let CombatEvent::PlayerAttack { was_crit, .. } = e {
+                    if *was_crit {
+                        crit_count += 1;
+                    }
+                }
+            }
+        }
+        assert_eq!(crit_count, 0, "Should never crit with 0% crit chance");
+    }
+
+    #[test]
+    fn test_player_total_damage_matches_derived_stats() {
+        // With no crit (low DEX), verify damage equals derived total_damage
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        state
+            .attributes
+            .set(crate::attributes::AttributeType::Dexterity, 0); // 0% crit
+        state
+            .attributes
+            .set(crate::attributes::AttributeType::Strength, 20); // +5 mod => phys 15
+        state
+            .attributes
+            .set(crate::attributes::AttributeType::Intelligence, 16); // +3 mod => magic 11
+
+        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+        let expected_damage = derived.total_damage(); // 15 + 11 = 26
+
+        state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
+        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        let events = update_combat(&mut state, 0.1);
+
+        let attack_event = events
+            .iter()
+            .find(|e| matches!(e, CombatEvent::PlayerAttack { .. }));
+        if let Some(CombatEvent::PlayerAttack { damage, was_crit }) = attack_event {
+            assert!(!was_crit);
+            assert_eq!(*damage, expected_damage);
+        } else {
+            panic!("Expected PlayerAttack event");
+        }
+    }
+
+    #[test]
+    fn test_enemy_damage_exactly_reduced_by_defense() {
+        // Verify enemy_damage = enemy.damage.saturating_sub(defense) precisely
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        state
+            .attributes
+            .set(crate::attributes::AttributeType::Dexterity, 16); // mod +3 => defense 3
+
+        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+        assert_eq!(derived.defense, 3);
+
+        let enemy_base_damage = 20;
+        state.combat_state.current_enemy =
+            Some(Enemy::new("Attacker".to_string(), 10000, enemy_base_damage));
+        let initial_hp = state.combat_state.player_current_hp;
+
+        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        update_combat(&mut state, 0.1);
+
+        let hp_lost = initial_hp - state.combat_state.player_current_hp;
+        assert_eq!(hp_lost, enemy_base_damage - derived.defense);
+    }
+
+    #[test]
+    fn test_multi_turn_combat_kills_enemy() {
+        // Run combat over multiple turns until the enemy dies
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        // High STR for high damage, low DEX so no crits
+        state
+            .attributes
+            .set(crate::attributes::AttributeType::Strength, 30);
+        state
+            .attributes
+            .set(crate::attributes::AttributeType::Dexterity, 0);
+        state
+            .attributes
+            .set(crate::attributes::AttributeType::Constitution, 30);
+
+        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+        state.combat_state.player_max_hp = derived.max_hp;
+        state.combat_state.player_current_hp = derived.max_hp;
+
+        // Enemy with 50 HP and low damage
+        state.combat_state.current_enemy = Some(Enemy::new("Weakling".to_string(), 50, 1));
+
+        let mut enemy_died = false;
+        let mut total_player_damage = 0u32;
+        let mut turns = 0;
+
+        // Simulate up to 20 attack cycles
+        for _ in 0..20 {
+            state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+            let events = update_combat(&mut state, 0.1);
+            turns += 1;
+
+            for e in &events {
+                match e {
+                    CombatEvent::PlayerAttack { damage, .. } => {
+                        total_player_damage += damage;
+                    }
+                    CombatEvent::EnemyDied { .. } => {
+                        enemy_died = true;
+                    }
+                    _ => {}
+                }
+            }
+
+            if enemy_died {
+                break;
+            }
+
+            // If regenerating, complete regen before next turn
+            if state.combat_state.is_regenerating {
+                update_combat(&mut state, HP_REGEN_DURATION_SECONDS);
+            }
+        }
+
+        assert!(enemy_died, "Enemy should have died within 20 turns");
+        assert!(
+            total_player_damage >= 50,
+            "Total damage must be at least enemy HP"
+        );
+        assert!(turns <= 20, "Should finish within turn limit");
+        assert!(state.combat_state.current_enemy.is_none());
+        assert!(state.combat_state.is_regenerating);
+    }
+
+    #[test]
+    fn test_elite_enemy_has_150_percent_stats() {
+        // Run multiple generations and verify elite stats are roughly 1.5x base
+        let player_hp = 200;
+        let player_dmg = 50;
+
+        let mut base_hp_sum: f64 = 0.0;
+        let mut elite_hp_sum: f64 = 0.0;
+        let samples = 500;
+
+        for _ in 0..samples {
+            let base = crate::combat::generate_enemy(player_hp, player_dmg);
+            let elite = crate::combat::generate_elite_enemy(player_hp, player_dmg);
+            base_hp_sum += base.max_hp as f64;
+            elite_hp_sum += elite.max_hp as f64;
+        }
+
+        let avg_base = base_hp_sum / samples as f64;
+        let avg_elite = elite_hp_sum / samples as f64;
+        let ratio = avg_elite / avg_base;
+
+        // Should be approximately 1.5x (allow 20% tolerance for random variance)
+        assert!(
+            (1.2..=1.8).contains(&ratio),
+            "Elite HP ratio should be ~1.5x, got {:.2}x",
+            ratio
+        );
+    }
+
+    #[test]
+    fn test_boss_enemy_has_200_percent_stats() {
+        let player_hp = 200;
+        let player_dmg = 50;
+
+        let mut base_hp_sum: f64 = 0.0;
+        let mut boss_hp_sum: f64 = 0.0;
+        let samples = 500;
+
+        for _ in 0..samples {
+            let base = crate::combat::generate_enemy(player_hp, player_dmg);
+            let boss = crate::combat::generate_boss_enemy(player_hp, player_dmg);
+            base_hp_sum += base.max_hp as f64;
+            boss_hp_sum += boss.max_hp as f64;
+        }
+
+        let avg_base = base_hp_sum / samples as f64;
+        let avg_boss = boss_hp_sum / samples as f64;
+        let ratio = avg_boss / avg_base;
+
+        // Should be approximately 2.0x (allow 20% tolerance)
+        assert!(
+            (1.6..=2.4).contains(&ratio),
+            "Boss HP ratio should be ~2.0x, got {:.2}x",
+            ratio
+        );
+    }
+
+    #[test]
+    fn test_zone_scaling_increases_enemy_stats() {
+        use crate::zones::get_all_zones;
+        let zones = get_all_zones();
+        let player_hp = 200;
+        let player_dmg = 50;
+        let samples = 300;
+
+        // Zone 1 average HP
+        let zone1 = &zones[0];
+        let mut z1_hp: f64 = 0.0;
+        for _ in 0..samples {
+            let e = crate::combat::generate_zone_enemy(
+                zone1,
+                &zone1.subzones[0],
+                player_hp,
+                player_dmg,
+            );
+            z1_hp += e.max_hp as f64;
+        }
+
+        // Zone 10 average HP
+        let zone10 = &zones[9];
+        let mut z10_hp: f64 = 0.0;
+        for _ in 0..samples {
+            let e = crate::combat::generate_zone_enemy(
+                zone10,
+                &zone10.subzones[0],
+                player_hp,
+                player_dmg,
+            );
+            z10_hp += e.max_hp as f64;
+        }
+
+        let avg_z1 = z1_hp / samples as f64;
+        let avg_z10 = z10_hp / samples as f64;
+
+        // Zone 10 multiplier: 1.0 + (10-1)*0.1 = 1.9x
+        assert!(
+            avg_z10 > avg_z1 * 1.4,
+            "Zone 10 enemies should be significantly stronger than zone 1 (z1={:.0}, z10={:.0})",
+            avg_z1,
+            avg_z10
+        );
+    }
+
+    #[test]
+    fn test_combat_kill_xp_within_expected_range() {
+        // combat_kill_xp returns xp_per_tick * random(200..400)
+        let xp_per_tick = crate::game_logic::xp_gain_per_tick(0, 0, 0);
+        let min_expected = xp_per_tick * COMBAT_XP_MIN_TICKS as f64;
+        let max_expected = xp_per_tick * COMBAT_XP_MAX_TICKS as f64;
+
+        for _ in 0..100 {
+            let xp = crate::game_logic::combat_kill_xp(xp_per_tick);
+            assert!(
+                xp >= min_expected as u64 && xp <= max_expected as u64,
+                "XP {} should be in range [{}, {}]",
+                xp,
+                min_expected as u64,
+                max_expected as u64
+            );
+        }
+    }
+
+    #[test]
+    fn test_xp_gained_on_enemy_death() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        let initial_xp = state.character_xp;
+
+        // Weak enemy that dies in one hit
+        state.combat_state.current_enemy = Some(Enemy::new("Weak".to_string(), 1, 0));
+        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        let events = update_combat(&mut state, 0.1);
+
+        let xp_event = events.iter().find_map(|e| match e {
+            CombatEvent::EnemyDied { xp_gained } => Some(*xp_gained),
+            _ => None,
+        });
+
+        assert!(xp_event.is_some(), "Should emit EnemyDied with XP");
+        let xp_gained = xp_event.unwrap();
+        assert!(xp_gained > 0, "XP gained should be positive");
+
+        // XP should be in the combat kill range
+        let xp_per_tick = crate::game_logic::xp_gain_per_tick(0, 0, 0);
+        let min_xp = (xp_per_tick * COMBAT_XP_MIN_TICKS as f64) as u64;
+        let max_xp = (xp_per_tick * COMBAT_XP_MAX_TICKS as f64) as u64;
+        assert!(
+            xp_gained >= min_xp && xp_gained <= max_xp,
+            "XP {} not in expected range [{}, {}]",
+            xp_gained,
+            min_xp,
+            max_xp
+        );
+
+        // Note: XP is not applied to state in combat_logic, it's just reported
+        assert_eq!(
+            state.character_xp, initial_xp,
+            "combat_logic should not apply XP directly"
+        );
+    }
+
+    #[test]
+    fn test_combat_log_add_entry() {
+        let mut combat = crate::combat::CombatState::new(100);
+        assert!(combat.combat_log.is_empty());
+
+        combat.add_log_entry("Hit for 10".to_string(), false, true);
+        assert_eq!(combat.combat_log.len(), 1);
+        assert_eq!(combat.combat_log[0].message, "Hit for 10");
+        assert!(!combat.combat_log[0].is_crit);
+        assert!(combat.combat_log[0].is_player_action);
+
+        combat.add_log_entry("Critical hit for 20".to_string(), true, true);
+        assert_eq!(combat.combat_log.len(), 2);
+        assert!(combat.combat_log[1].is_crit);
+    }
+
+    #[test]
+    fn test_combat_log_caps_at_10_entries() {
+        let mut combat = crate::combat::CombatState::new(100);
+
+        for i in 0..15 {
+            combat.add_log_entry(format!("Entry {}", i), false, true);
+        }
+
+        assert_eq!(combat.combat_log.len(), 10);
+        // First entry should be "Entry 5" (entries 0-4 were evicted)
+        assert_eq!(combat.combat_log[0].message, "Entry 5");
+        assert_eq!(combat.combat_log[9].message, "Entry 14");
+    }
+
+    #[test]
+    fn test_enemy_zero_damage_with_high_defense() {
+        // When defense >= enemy damage, player takes 0 damage
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        state
+            .attributes
+            .set(crate::attributes::AttributeType::Dexterity, 40); // mod 15 => defense 15
+
+        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+        assert!(derived.defense >= 15);
+
+        let initial_hp = state.combat_state.player_current_hp;
+        // Enemy with damage less than defense
+        state.combat_state.current_enemy = Some(Enemy::new("Weak".to_string(), 10000, 5));
+        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        update_combat(&mut state, 0.1);
+
+        // Player should take zero damage from the enemy
+        assert_eq!(state.combat_state.player_current_hp, initial_hp);
+    }
+
+    #[test]
+    fn test_death_to_regular_enemy_resets_enemy_hp() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        state.zone_progression.fighting_boss = false;
+        state.combat_state.player_current_hp = 1;
+
+        let enemy_max_hp = 100;
+        let mut enemy = Enemy::new("Regular".to_string(), enemy_max_hp, 50);
+        enemy.take_damage(30); // Reduce to 70 HP
+        state.combat_state.current_enemy = Some(enemy);
+
+        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        let events = update_combat(&mut state, 0.1);
+
+        let died = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
+        assert!(died);
+
+        // Regular enemy should have HP reset (not removed)
+        let enemy = state.combat_state.current_enemy.as_ref().unwrap();
+        assert_eq!(enemy.current_hp, enemy.max_hp);
+    }
+
+    #[test]
     fn test_prestige_rank_preserved_on_death() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
 
