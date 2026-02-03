@@ -100,25 +100,13 @@ fn draw_zone_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let prog = &game_state.zone_progression;
 
     // Get current zone and subzone info
-    let (zone_name, subzone_name, boss_name) =
-        if let Some(zone) = zones.iter().find(|z| z.id == prog.current_zone_id) {
-            let subzone = zone
-                .subzones
-                .iter()
-                .find(|s| s.id == prog.current_subzone_id);
-            let subzone_name = subzone.map(|s| s.name).unwrap_or("Unknown");
-            let boss_name = subzone.map(|s| s.boss.name).unwrap_or("Unknown Boss");
-            (zone.name, subzone_name, boss_name)
-        } else {
-            ("Unknown", "Unknown", "Unknown Boss")
-        };
+    let zone = zones.iter().find(|z| z.id == prog.current_zone_id);
+    let subzone = zone.and_then(|z| z.subzones.iter().find(|s| s.id == prog.current_subzone_id));
 
-    // Get subzone progress (e.g., "2/3" or "3/4")
-    let total_subzones = zones
-        .iter()
-        .find(|z| z.id == prog.current_zone_id)
-        .map(|z| z.subzones.len())
-        .unwrap_or(0);
+    let zone_name = zone.map(|z| z.name).unwrap_or("Unknown");
+    let subzone_name = subzone.map(|s| s.name).unwrap_or("Unknown");
+    let boss_name = subzone.map(|s| s.boss.name).unwrap_or("Unknown Boss");
+    let total_subzones = zone.map(|z| z.subzones.len()).unwrap_or(0);
 
     // Color based on zone tier
     let zone_color = match prog.current_zone_id {
