@@ -354,6 +354,7 @@ pub struct UpdateInfo {
     pub new_version: String,
     pub new_commit: String,
     pub changelog: Vec<String>,
+    pub changelog_total: usize,
 }
 
 /// Check for updates and return full info including changelog.
@@ -364,23 +365,27 @@ pub fn check_update_info() -> Option<UpdateInfo> {
     match check_for_updates(BUILD_COMMIT, BUILD_DATE) {
         UpdateCheck::UpdateAvailable {
             latest, changelog, ..
-        } => Some(UpdateInfo {
-            new_version: latest.date,
-            new_commit: short_commit(&latest.commit),
-            changelog: changelog
-                .into_iter()
-                .take(5) // Limit to 5 entries for display
-                .map(|e| {
-                    // Truncate long messages and take first line only
-                    let msg = e.message.lines().next().unwrap_or(&e.message);
-                    if msg.len() > 45 {
-                        format!("{}...", &msg[..42])
-                    } else {
-                        msg.to_string()
-                    }
-                })
-                .collect(),
-        }),
+        } => {
+            let total = changelog.len();
+            Some(UpdateInfo {
+                new_version: latest.date,
+                new_commit: short_commit(&latest.commit),
+                changelog: changelog
+                    .into_iter()
+                    .take(5) // Limit to 5 entries for in-game display
+                    .map(|e| {
+                        // Truncate long messages and take first line only
+                        let msg = e.message.lines().next().unwrap_or(&e.message);
+                        if msg.len() > 45 {
+                            format!("{}...", &msg[..42])
+                        } else {
+                            msg.to_string()
+                        }
+                    })
+                    .collect(),
+                changelog_total: total,
+            })
+        }
         _ => None,
     }
 }

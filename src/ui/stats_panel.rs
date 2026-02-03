@@ -39,9 +39,14 @@ pub fn draw_stats_panel_with_update(
     update_info: Option<&UpdateInfo>,
     update_check_completed: bool,
 ) {
-    // Calculate update panel height: 4 base + changelog lines (max 5)
+    // Calculate update panel height: 4 base + changelog lines (max 5) + overflow indicator
     let update_height = if let Some(info) = update_info {
-        4 + info.changelog.len().min(5) as u16
+        let overflow_line = if info.changelog_total > info.changelog.len() {
+            1
+        } else {
+            0
+        };
+        4 + info.changelog.len().min(5) as u16 + overflow_line
     } else {
         0
     };
@@ -668,6 +673,14 @@ fn draw_update_panel(frame: &mut Frame, area: Rect, update_info: &UpdateInfo) {
                 Span::styled(" • ", Style::default().fg(Color::DarkGray)),
                 Span::styled(entry.as_str(), Style::default().fg(Color::White)),
             ]));
+        }
+        // Show overflow indicator if there are more entries
+        if update_info.changelog_total > update_info.changelog.len() {
+            let remaining = update_info.changelog_total - update_info.changelog.len();
+            lines.push(Line::from(vec![Span::styled(
+                format!(" ...and {} more", remaining),
+                Style::default().fg(Color::DarkGray),
+            )]));
         }
     }
 
