@@ -931,4 +931,318 @@ mod tests {
         let zones = ZoneProgression::default();
         assert_eq!(zones.current_zone_id, 1);
     }
+
+    // =========================================================================
+    // SAVE STRUCT COMPATIBILITY REGISTRY
+    // =========================================================================
+    //
+    // This section contains exhaustive tests for ALL structs that are serialized
+    // to save files. Each struct has:
+    //   1. A minimal JSON test (frozen format - DO NOT ADD FIELDS)
+    //   2. A roundtrip test (serialize -> deserialize)
+    //
+    // When adding a new serializable struct:
+    //   1. Add it to the registry below
+    //   2. Add a minimal JSON test
+    //   3. Add it to test_save_struct_registry
+    // =========================================================================
+
+    /// Minimal JSON for CombatState - DO NOT ADD FIELDS
+    /// Tests that old saves without newer fields still load
+    #[test]
+    fn test_combat_state_minimal_json() {
+        use crate::combat::CombatState;
+
+        let minimal_json = r#"{
+            "current_enemy": null,
+            "player_current_hp": 50,
+            "player_max_hp": 50,
+            "attack_timer": 0.0,
+            "regen_timer": 0.0,
+            "is_regenerating": false
+        }"#;
+
+        let result: Result<CombatState, _> = serde_json::from_str(minimal_json);
+        assert!(
+            result.is_ok(),
+            "CombatState minimal JSON failed to deserialize. \
+             If you added a new field, add #[serde(default)] or #[serde(skip)]. Error: {:?}",
+            result.err()
+        );
+    }
+
+    /// Minimal JSON for Equipment - DO NOT ADD FIELDS
+    #[test]
+    fn test_equipment_minimal_json() {
+        use crate::equipment::Equipment;
+
+        let minimal_json = r#"{
+            "weapon": null,
+            "armor": null,
+            "helmet": null,
+            "gloves": null,
+            "boots": null,
+            "amulet": null,
+            "ring": null
+        }"#;
+
+        let result: Result<Equipment, _> = serde_json::from_str(minimal_json);
+        assert!(
+            result.is_ok(),
+            "Equipment minimal JSON failed to deserialize. \
+             If you added a new slot, add #[serde(default)]. Error: {:?}",
+            result.err()
+        );
+    }
+
+    /// Minimal JSON for Attributes - DO NOT ADD FIELDS
+    #[test]
+    fn test_attributes_minimal_json() {
+        use crate::attributes::Attributes;
+
+        let minimal_json = r#"{"values": [10, 10, 10, 10, 10, 10]}"#;
+
+        let result: Result<Attributes, _> = serde_json::from_str(minimal_json);
+        assert!(
+            result.is_ok(),
+            "Attributes minimal JSON failed to deserialize. Error: {:?}",
+            result.err()
+        );
+    }
+
+    /// Minimal JSON for FishingState - DO NOT ADD FIELDS
+    #[test]
+    fn test_fishing_state_minimal_json() {
+        use crate::fishing::FishingState;
+
+        let minimal_json = r#"{
+            "rank": 1,
+            "total_fish_caught": 0,
+            "fish_toward_next_rank": 0,
+            "legendary_catches": 0
+        }"#;
+
+        let result: Result<FishingState, _> = serde_json::from_str(minimal_json);
+        assert!(
+            result.is_ok(),
+            "FishingState minimal JSON failed to deserialize. \
+             If you added a new field, add #[serde(default)]. Error: {:?}",
+            result.err()
+        );
+    }
+
+    /// Minimal JSON for ZoneProgression - DO NOT ADD FIELDS
+    /// Note: kills_in_subzone, fighting_boss, has_stormbreaker were added later
+    /// and have #[serde(default)]
+    #[test]
+    fn test_zone_progression_minimal_json() {
+        use crate::zones::ZoneProgression;
+
+        // This is the ORIGINAL format before newer fields were added
+        let minimal_json = r#"{
+            "current_zone_id": 1,
+            "current_subzone_id": 1,
+            "defeated_bosses": [],
+            "unlocked_zones": [1]
+        }"#;
+
+        let result: Result<ZoneProgression, _> = serde_json::from_str(minimal_json);
+        assert!(
+            result.is_ok(),
+            "ZoneProgression minimal JSON failed to deserialize. \
+             If you added a new field, add #[serde(default)]. Error: {:?}",
+            result.err()
+        );
+
+        // Verify defaults are applied for missing fields
+        let zones = result.unwrap();
+        assert_eq!(
+            zones.kills_in_subzone, 0,
+            "kills_in_subzone should default to 0"
+        );
+        assert!(
+            !zones.fighting_boss,
+            "fighting_boss should default to false"
+        );
+        assert!(
+            !zones.has_stormbreaker,
+            "has_stormbreaker should default to false"
+        );
+    }
+
+    /// Minimal JSON for Enemy - DO NOT ADD FIELDS
+    #[test]
+    fn test_enemy_minimal_json() {
+        use crate::combat::Enemy;
+
+        let minimal_json = r#"{
+            "name": "Test Enemy",
+            "max_hp": 100,
+            "current_hp": 100,
+            "damage": 10
+        }"#;
+
+        let result: Result<Enemy, _> = serde_json::from_str(minimal_json);
+        assert!(
+            result.is_ok(),
+            "Enemy minimal JSON failed to deserialize. \
+             If you added a new field, add #[serde(default)]. Error: {:?}",
+            result.err()
+        );
+    }
+
+    /// Minimal JSON for Item - DO NOT ADD FIELDS
+    #[test]
+    fn test_item_minimal_json() {
+        use crate::items::Item;
+
+        let minimal_json = r#"{
+            "slot": "Weapon",
+            "rarity": "Common",
+            "base_name": "Sword",
+            "display_name": "Iron Sword",
+            "attributes": {"str": 1, "dex": 0, "con": 0, "int": 0, "wis": 0, "cha": 0},
+            "affixes": []
+        }"#;
+
+        let result: Result<Item, _> = serde_json::from_str(minimal_json);
+        assert!(
+            result.is_ok(),
+            "Item minimal JSON failed to deserialize. \
+             If you added a new field, add #[serde(default)]. Error: {:?}",
+            result.err()
+        );
+    }
+
+    /// Minimal JSON for Dungeon - DO NOT ADD FIELDS
+    /// Note: current_room_cleared was added later and has #[serde(default)]
+    #[test]
+    fn test_dungeon_minimal_json() {
+        use crate::dungeon::Dungeon;
+
+        // Minimal dungeon with a simple 1x1 grid
+        // connections is [bool; 4] for [up, right, down, left]
+        let minimal_json = r#"{
+            "size": "Small",
+            "grid": [[{
+                "room_type": "Entrance",
+                "state": "Cleared",
+                "position": [0, 0],
+                "connections": [false, false, false, false]
+            }]],
+            "player_position": [0, 0],
+            "entrance_position": [0, 0],
+            "boss_position": [0, 0],
+            "has_key": false,
+            "move_timer": 0.0,
+            "collected_items": [],
+            "xp_earned": 0,
+            "rooms_cleared": 0
+        }"#;
+
+        let result: Result<Dungeon, _> = serde_json::from_str(minimal_json);
+        assert!(
+            result.is_ok(),
+            "Dungeon minimal JSON failed to deserialize. \
+             If you added a new field, add #[serde(default)] or #[serde(skip)]. Error: {:?}",
+            result.err()
+        );
+
+        // Verify defaults are applied
+        let dungeon = result.unwrap();
+        assert!(
+            !dungeon.current_room_cleared,
+            "current_room_cleared should default to false"
+        );
+    }
+
+    /// EXHAUSTIVE REGISTRY TEST
+    ///
+    /// This test verifies ALL save structs can:
+    /// 1. Be created with Default (where applicable)
+    /// 2. Roundtrip through JSON serialization
+    ///
+    /// If you add a new serializable struct, ADD IT HERE.
+    #[test]
+    fn test_save_struct_registry_roundtrip() {
+        use crate::attributes::Attributes;
+        use crate::combat::{CombatState, Enemy};
+        use crate::equipment::Equipment;
+        use crate::fishing::FishingState;
+        use crate::items::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
+        use crate::zones::ZoneProgression;
+
+        // === Structs with Default impls ===
+
+        // Attributes
+        let attrs = Attributes::default();
+        let json = serde_json::to_string(&attrs).expect("Attributes should serialize");
+        let _: Attributes = serde_json::from_str(&json).expect("Attributes should roundtrip");
+
+        // CombatState
+        let combat = CombatState::default();
+        let json = serde_json::to_string(&combat).expect("CombatState should serialize");
+        let _: CombatState = serde_json::from_str(&json).expect("CombatState should roundtrip");
+
+        // Equipment
+        let equipment = Equipment::default();
+        let json = serde_json::to_string(&equipment).expect("Equipment should serialize");
+        let _: Equipment = serde_json::from_str(&json).expect("Equipment should roundtrip");
+
+        // FishingState
+        let fishing = FishingState::default();
+        let json = serde_json::to_string(&fishing).expect("FishingState should serialize");
+        let _: FishingState = serde_json::from_str(&json).expect("FishingState should roundtrip");
+
+        // ZoneProgression
+        let zones = ZoneProgression::default();
+        let json = serde_json::to_string(&zones).expect("ZoneProgression should serialize");
+        let _: ZoneProgression =
+            serde_json::from_str(&json).expect("ZoneProgression should roundtrip");
+
+        // === Structs without Default (created manually) ===
+
+        // Enemy
+        let enemy = Enemy::new("Test".to_string(), 100, 10);
+        let json = serde_json::to_string(&enemy).expect("Enemy should serialize");
+        let _: Enemy = serde_json::from_str(&json).expect("Enemy should roundtrip");
+
+        // Item
+        let item = Item {
+            slot: EquipmentSlot::Weapon,
+            rarity: Rarity::Common,
+            base_name: "Sword".to_string(),
+            display_name: "Test Sword".to_string(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![Affix {
+                affix_type: AffixType::DamagePercent,
+                value: 5.0,
+            }],
+        };
+        let json = serde_json::to_string(&item).expect("Item should serialize");
+        let _: Item = serde_json::from_str(&json).expect("Item should roundtrip");
+
+        // AttributeBonuses
+        let bonuses = AttributeBonuses {
+            str: 5,
+            dex: 3,
+            con: 2,
+            int: 1,
+            wis: 0,
+            cha: 0,
+        };
+        let json = serde_json::to_string(&bonuses).expect("AttributeBonuses should serialize");
+        let _: AttributeBonuses =
+            serde_json::from_str(&json).expect("AttributeBonuses should roundtrip");
+
+        // Affix
+        let affix = Affix {
+            affix_type: AffixType::CritChance,
+            value: 10.0,
+        };
+        let json = serde_json::to_string(&affix).expect("Affix should serialize");
+        let _: Affix = serde_json::from_str(&json).expect("Affix should roundtrip");
+
+        // Note: Dungeon is tested separately due to complexity (test_dungeon_minimal_json)
+    }
 }

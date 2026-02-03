@@ -709,38 +709,55 @@ mod tests {
         let mut dungeon = generate_dungeon(10, 0);
         dungeon.has_key = true;
 
-        // Clear path to boss by marking rooms as cleared
+        // Clear path to boss by marking all rooms EXCEPT boss as Cleared
+        // Boss must be Revealed (visible but not defeated) for pathfinding to target it
         let boss_pos = dungeon.boss_position;
         let grid_size = dungeon.size.grid_size();
         for y in 0..grid_size {
             for x in 0..grid_size {
                 if let Some(room) = dungeon.get_room_mut(x, y) {
-                    if room.state == RoomState::Hidden {
+                    if (x, y) == boss_pos {
+                        // Boss is revealed but not cleared (we want to go there)
+                        room.state = RoomState::Revealed;
+                    } else {
+                        // All other rooms are cleared (passable)
                         room.state = RoomState::Cleared;
                     }
                 }
             }
         }
 
-        let next = find_next_room(&dungeon);
+        // Verify that following find_next_room eventually reaches the boss
+        // This is more robust than checking single-step distance because
+        // BFS can return different paths of equal length
+        let mut pos = dungeon.player_position;
+        let mut steps = 0;
+        let max_steps = grid_size * grid_size; // Upper bound
 
-        // With key, should head toward boss
-        if let Some(next_pos) = next {
-            // The next position should bring us closer to the boss
-            // (there may be multiple shortest paths, so we verify progress, not exact path)
-            let current_distance =
-                find_path_to(&dungeon, dungeon.player_position, boss_pos).map(|p| p.len());
-            let next_distance = find_path_to(&dungeon, next_pos, boss_pos).map(|p| p.len());
-
-            if let (Some(curr_dist), Some(next_dist)) = (current_distance, next_distance) {
+        while pos != boss_pos && steps < max_steps {
+            dungeon.player_position = pos;
+            if let Some(next_pos) = find_next_room(&dungeon) {
+                // Verify the suggested position is adjacent (manhattan distance 1)
+                let dx = (next_pos.0 as i32 - pos.0 as i32).abs();
+                let dy = (next_pos.1 as i32 - pos.1 as i32).abs();
                 assert!(
-                    next_dist < curr_dist,
-                    "Next position {:?} should be closer to boss than current {:?}",
+                    dx + dy == 1,
+                    "Next position {:?} should be adjacent to current {:?}",
                     next_pos,
-                    dungeon.player_position
+                    pos
                 );
+                pos = next_pos;
+                steps += 1;
+            } else {
+                break;
             }
         }
+
+        assert_eq!(
+            pos, boss_pos,
+            "With key, should eventually reach boss. Got stuck at {:?} after {} steps",
+            pos, steps
+        );
     }
 
     #[test]
