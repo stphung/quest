@@ -95,7 +95,7 @@ pub fn update_dungeon(state: &mut GameState, delta_time: f64) -> Vec<DungeonEven
 
 /// Finds the next room to explore using BFS
 /// Prioritizes: unexplored rooms, then boss (if has key)
-fn find_next_room(dungeon: &Dungeon) -> Option<(usize, usize)> {
+pub fn find_next_room(dungeon: &Dungeon) -> Option<(usize, usize)> {
     let current = dungeon.player_position;
 
     // If we have the key and boss is accessible and not yet cleared, go to boss
@@ -154,7 +154,7 @@ fn find_next_room(dungeon: &Dungeon) -> Option<(usize, usize)> {
 }
 
 /// BFS pathfinding between two positions
-fn find_path_to(
+pub fn find_path_to(
     dungeon: &Dungeon,
     from: (usize, usize),
     to: (usize, usize),
