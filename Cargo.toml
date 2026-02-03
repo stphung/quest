@@ -28,4 +28,3 @@ chrono = "0.4"
 
 [lints.rust]
 unused_imports = "deny"
-unused_variables = "deny"
