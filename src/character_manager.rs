@@ -23,6 +23,8 @@ struct CharacterSaveData {
     active_dungeon: Option<crate::dungeon::Dungeon>,
     #[serde(default)]
     fishing: crate::fishing::FishingState,
+    #[serde(default)]
+    zone_progression: crate::zones::ZoneProgression,
     // Legacy field - kept for backward compatibility with old saves
     #[serde(default, skip_serializing_if = "String::is_empty")]
     checksum: String,
@@ -80,6 +82,7 @@ impl CharacterManager {
             equipment: state.equipment.clone(),
             active_dungeon: state.active_dungeon.clone(),
             fishing: state.fishing.clone(),
+            zone_progression: state.zone_progression.clone(),
             checksum: String::new(), // Legacy field, no longer used
         };
 
@@ -115,6 +118,7 @@ impl CharacterManager {
             active_dungeon: save_data.active_dungeon,
             fishing: save_data.fishing,
             active_fishing: None,
+            zone_progression: save_data.zone_progression,
         })
     }
 
@@ -312,6 +316,7 @@ mod tests {
             active_dungeon: None,
             fishing: crate::fishing::FishingState::default(),
             active_fishing: None,
+            zone_progression: crate::zones::ZoneProgression::default(),
         };
 
         // Save character
@@ -360,6 +365,7 @@ mod tests {
             active_dungeon: None,
             fishing: crate::fishing::FishingState::default(),
             active_fishing: None,
+            zone_progression: crate::zones::ZoneProgression::default(),
         };
 
         let char2 = GameState {
@@ -377,6 +383,7 @@ mod tests {
             active_dungeon: None,
             fishing: crate::fishing::FishingState::default(),
             active_fishing: None,
+            zone_progression: crate::zones::ZoneProgression::default(),
         };
 
         manager.save_character(&char1).unwrap();
@@ -424,6 +431,7 @@ mod tests {
             active_dungeon: None,
             fishing: crate::fishing::FishingState::default(),
             active_fishing: None,
+            zone_progression: crate::zones::ZoneProgression::default(),
         };
 
         manager.save_character(&state).unwrap();
@@ -460,6 +468,7 @@ mod tests {
             active_dungeon: None,
             fishing: crate::fishing::FishingState::default(),
             active_fishing: None,
+            zone_progression: crate::zones::ZoneProgression::default(),
         };
 
         manager.save_character(&state).unwrap();

@@ -23,6 +23,7 @@ mod prestige;
 mod save_manager;
 mod ui;
 mod updater;
+mod zones;
 
 use character_manager::CharacterManager;
 use chrono::Utc;
@@ -647,6 +648,11 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
     for event in combat_events {
         use combat_logic::CombatEvent;
         match event {
+            CombatEvent::PlayerAttackBlocked { weapon_needed } => {
+                // Attack blocked - boss requires legendary weapon
+                let message = format!("🚫 {} required to damage this foe!", weapon_needed);
+                game_state.combat_state.add_log_entry(message, false, true);
+            }
             CombatEvent::PlayerAttack { damage, was_crit } => {
                 // Add to combat log
                 let message = if was_crit {

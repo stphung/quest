@@ -10,7 +10,6 @@ mod enemy_sprites;
 pub mod fishing_scene;
 pub mod prestige_confirm;
 mod stats_panel;
-pub mod zones;
 
 use crate::game_state::GameState;
 use ratatui::{

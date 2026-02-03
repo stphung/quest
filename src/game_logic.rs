@@ -1,9 +1,13 @@
 use crate::attributes::AttributeType;
-use crate::combat::{generate_boss_enemy, generate_elite_enemy, generate_enemy};
+use crate::combat::{
+    generate_boss_enemy, generate_elite_enemy, generate_enemy, generate_enemy_for_current_zone,
+    generate_subzone_boss,
+};
 use crate::constants::*;
 use crate::derived_stats::DerivedStats;
 use crate::dungeon::RoomType;
 use crate::game_state::GameState;
+use crate::zones::get_zone;
 use chrono::Utc;
 use rand::Rng;
 
@@ -162,15 +166,46 @@ pub fn spawn_enemy_if_needed(state: &mut GameState) {
                 }
             }
         } else {
-            // Normal overworld combat
+            // Normal overworld combat - use zone-based enemy generation
             let derived =
                 DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
             let total_damage = derived.total_damage();
-            let enemy = generate_enemy(derived.max_hp, total_damage);
+
+            let enemy = if state.zone_progression.fighting_boss {
+                // Spawn the subzone boss
+                spawn_subzone_boss(state, derived.max_hp, total_damage)
+            } else {
+                // Spawn regular zone enemy
+                generate_enemy_for_current_zone(
+                    state.zone_progression.current_zone_id,
+                    state.zone_progression.current_subzone_id,
+                    derived.max_hp,
+                    total_damage,
+                )
+            };
             state.combat_state.current_enemy = Some(enemy);
             state.combat_state.attack_timer = 0.0;
         }
     }
+}
+
+/// Spawns the current subzone's boss
+fn spawn_subzone_boss(
+    state: &GameState,
+    player_max_hp: u32,
+    player_damage: u32,
+) -> crate::combat::Enemy {
+    let zone_id = state.zone_progression.current_zone_id;
+    let subzone_id = state.zone_progression.current_subzone_id;
+
+    if let Some(zone) = get_zone(zone_id) {
+        if let Some(subzone) = zone.subzones.iter().find(|s| s.id == subzone_id) {
+            return generate_subzone_boss(&zone, subzone, player_max_hp, player_damage);
+        }
+    }
+
+    // Fallback - shouldn't happen
+    generate_boss_enemy(player_max_hp, player_damage)
 }
 
 /// Spawns a dungeon enemy based on the current room type
@@ -236,11 +271,11 @@ mod tests {
         // Rank 0, CHA 10 (+0): 1.0 + 0 = 1.0
         assert_eq!(prestige_multiplier(0, 0), 1.0);
 
-        // Rank 1, CHA 10 (+0): 1.5 + 0 = 1.5
-        assert_eq!(prestige_multiplier(1, 0), 1.5);
+        // Rank 1, CHA 10 (+0): 1.2 + 0 = 1.2 (using 1.2^rank formula)
+        assert_eq!(prestige_multiplier(1, 0), 1.2);
 
-        // Rank 1, CHA 16 (+3): 1.5 + 0.3 = 1.8
-        assert_eq!(prestige_multiplier(1, 3), 1.8);
+        // Rank 1, CHA 16 (+3): 1.2 + 0.3 = 1.5
+        assert_eq!(prestige_multiplier(1, 3), 1.5);
     }
 
     #[test]
@@ -248,8 +283,8 @@ mod tests {
         // Rank 0, WIS 10 (+0), CHA 10 (+0): 1.0 * 1.0 * 1.0 = 1.0
         assert_eq!(xp_gain_per_tick(0, 0, 0), 1.0);
 
-        // Rank 1, WIS 20 (+5), CHA 16 (+3): 1.8 * 1.25 = 2.25
-        assert_eq!(xp_gain_per_tick(1, 5, 3), 2.25);
+        // Rank 1, WIS 20 (+5), CHA 16 (+3): 1.5 * 1.25 = 1.875
+        assert_eq!(xp_gain_per_tick(1, 5, 3), 1.875);
     }
 
     #[test]
