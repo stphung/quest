@@ -187,7 +187,13 @@ pub fn update_combat(state: &mut GameState, delta_time: f64) -> Vec<CombatEvent>
 
                 // Reset enemy HP if we're not in dungeon (normal combat continues)
                 if !in_dungeon {
-                    if let Some(enemy) = state.combat_state.current_enemy.as_mut() {
+                    // Check if we died to a weapon-blocked boss
+                    if state.zone_progression.boss_weapon_blocked().is_some() {
+                        // Reset boss encounter - go back to fighting regular enemies
+                        state.zone_progression.fighting_boss = false;
+                        state.zone_progression.kills_in_subzone = 0;
+                        state.combat_state.current_enemy = None;
+                    } else if let Some(enemy) = state.combat_state.current_enemy.as_mut() {
                         enemy.reset_hp();
                     }
                 } else {
