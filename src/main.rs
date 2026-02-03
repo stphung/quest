@@ -289,12 +289,17 @@ fn main() -> io::Result<()> {
                                             if elapsed_seconds > 60 {
                                                 let report =
                                                     process_offline_progression(&mut state);
-                                                // Store report in combat log
-                                                if report.total_level_ups > 0 {
-                                                    let message = format!(
-                                                        "Offline: +{} XP, +{} levels",
-                                                        report.xp_gained, report.total_level_ups
-                                                    );
+                                                // Always show offline progress in combat log
+                                                if report.xp_gained > 0 {
+                                                    let message = if report.total_level_ups > 0 {
+                                                        format!(
+                                                            "Offline: +{} XP, +{} levels",
+                                                            report.xp_gained,
+                                                            report.total_level_ups
+                                                        )
+                                                    } else {
+                                                        format!("Offline: +{} XP", report.xp_gained)
+                                                    };
                                                     state
                                                         .combat_state
                                                         .add_log_entry(message, false, true);
