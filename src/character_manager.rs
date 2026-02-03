@@ -1245,4 +1245,55 @@ mod tests {
 
         // Note: Dungeon is tested separately due to complexity (test_dungeon_minimal_json)
     }
+
+    // =========================================================================
+    // CHARACTER NAME VALIDATION - EXTENDED EDGE CASES
+    // =========================================================================
+
+    #[test]
+    fn test_validate_name_boundary_length_16_chars() {
+        // Exactly 16 characters should be valid
+        assert!(validate_name("1234567890123456").is_ok());
+        // 17 characters should fail
+        assert!(validate_name("12345678901234567").is_err());
+    }
+
+    #[test]
+    fn test_validate_name_single_char() {
+        // Single character should be valid
+        assert!(validate_name("A").is_ok());
+        assert!(validate_name("1").is_ok());
+    }
+
+    #[test]
+    fn test_validate_name_extended_invalid_chars() {
+        // Various special characters that should be rejected
+        assert!(validate_name("Name#1").is_err());
+        assert!(validate_name("Hero$").is_err());
+        assert!(validate_name("Test%").is_err());
+        assert!(validate_name("Name&Name").is_err());
+        assert!(validate_name("Hero*").is_err());
+        assert!(validate_name("<script>").is_err());
+        assert!(validate_name("Name\nNewline").is_err());
+        assert!(validate_name("Name\tTab").is_err());
+        assert!(validate_name("test;drop").is_err());
+        assert!(validate_name("name'quote").is_err());
+        assert!(validate_name("name\"quote").is_err());
+    }
+
+    #[test]
+    fn test_validate_name_trims_whitespace() {
+        // Leading/trailing whitespace should be trimmed, then validated
+        assert!(validate_name("  Hero  ").is_ok());
+        assert!(validate_name("\tHero\t").is_ok());
+    }
+
+    #[test]
+    fn test_validate_name_unicode_letters() {
+        // Unicode letters should work (alphanumeric includes unicode)
+        assert!(validate_name("Héro").is_ok());
+        assert!(validate_name("日本語").is_ok()); // Japanese
+        assert!(validate_name("Müller").is_ok()); // German umlaut
+        assert!(validate_name("Ωmega").is_ok()); // Greek
+    }
 }

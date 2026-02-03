@@ -608,4 +608,171 @@ mod tests {
             "Should remain with no session"
         );
     }
+
+    // =========================================================================
+    // PHASE TRANSITION STATE MACHINE TESTS
+    // =========================================================================
+
+    #[test]
+    fn test_phase_transitions_casting_to_waiting() {
+        let mut rng = create_test_rng();
+        let mut state = create_test_game_state();
+
+        // Start in Casting phase with 1 tick remaining
+        let session = FishingSession {
+            spot_name: "Test Lake".to_string(),
+            total_fish: 5,
+            fish_caught: Vec::new(),
+            items_found: Vec::new(),
+            ticks_remaining: 1,
+            phase: FishingPhase::Casting,
+        };
+        state.active_fishing = Some(session);
+
+        let messages = tick_fishing(&mut state, &mut rng);
+
+        // Should transition to Waiting
+        let session = state.active_fishing.as_ref().unwrap();
+        assert_eq!(
+            session.phase,
+            FishingPhase::Waiting,
+            "Should transition from Casting to Waiting"
+        );
+        assert!(
+            messages.iter().any(|m| m.contains("waiting")),
+            "Should have waiting message"
+        );
+    }
+
+    #[test]
+    fn test_phase_transitions_waiting_to_reeling() {
+        let mut rng = create_test_rng();
+        let mut state = create_test_game_state();
+
+        // Start in Waiting phase with 1 tick remaining
+        let session = FishingSession {
+            spot_name: "Test Lake".to_string(),
+            total_fish: 5,
+            fish_caught: Vec::new(),
+            items_found: Vec::new(),
+            ticks_remaining: 1,
+            phase: FishingPhase::Waiting,
+        };
+        state.active_fishing = Some(session);
+
+        let messages = tick_fishing(&mut state, &mut rng);
+
+        // Should transition to Reeling
+        let session = state.active_fishing.as_ref().unwrap();
+        assert_eq!(
+            session.phase,
+            FishingPhase::Reeling,
+            "Should transition from Waiting to Reeling"
+        );
+        assert!(
+            messages
+                .iter()
+                .any(|m| m.contains("bite") || m.contains("Reeling")),
+            "Should have bite/reeling message"
+        );
+    }
+
+    #[test]
+    fn test_phase_transitions_reeling_to_casting() {
+        let mut rng = create_test_rng();
+        let mut state = create_test_game_state();
+
+        // Start in Reeling phase with 1 tick remaining (fish still to catch)
+        let session = FishingSession {
+            spot_name: "Test Lake".to_string(),
+            total_fish: 5, // More fish to catch
+            fish_caught: Vec::new(),
+            items_found: Vec::new(),
+            ticks_remaining: 1,
+            phase: FishingPhase::Reeling,
+        };
+        state.active_fishing = Some(session);
+
+        let messages = tick_fishing(&mut state, &mut rng);
+
+        // Should catch fish and transition back to Casting
+        let session = state.active_fishing.as_ref().unwrap();
+        assert_eq!(
+            session.phase,
+            FishingPhase::Casting,
+            "Should transition from Reeling back to Casting after catch"
+        );
+        assert_eq!(session.fish_caught.len(), 1, "Should have caught 1 fish");
+        assert!(
+            messages.iter().any(|m| m.contains("Caught")),
+            "Should have catch message"
+        );
+    }
+
+    #[test]
+    fn test_full_fishing_cycle_casting_waiting_reeling_catch() {
+        let mut rng = create_test_rng();
+        let mut state = create_test_game_state();
+
+        // Start fresh session in Casting
+        let session = FishingSession {
+            spot_name: "Test Lake".to_string(),
+            total_fish: 3,
+            fish_caught: Vec::new(),
+            items_found: Vec::new(),
+            ticks_remaining: 1,
+            phase: FishingPhase::Casting,
+        };
+        state.active_fishing = Some(session);
+
+        // Phase 1: Casting → Waiting
+        tick_fishing(&mut state, &mut rng);
+        assert_eq!(
+            state.active_fishing.as_ref().unwrap().phase,
+            FishingPhase::Waiting
+        );
+
+        // Drain the waiting timer
+        loop {
+            let session = state.active_fishing.as_ref().unwrap();
+            if session.ticks_remaining == 1 {
+                break;
+            }
+            tick_fishing(&mut state, &mut rng);
+        }
+
+        // Phase 2: Waiting → Reeling
+        tick_fishing(&mut state, &mut rng);
+        assert_eq!(
+            state.active_fishing.as_ref().unwrap().phase,
+            FishingPhase::Reeling
+        );
+
+        // Drain the reeling timer
+        loop {
+            let session = state.active_fishing.as_ref().unwrap();
+            if session.ticks_remaining == 1 {
+                break;
+            }
+            tick_fishing(&mut state, &mut rng);
+        }
+
+        // Phase 3: Reeling → Catch → Casting
+        let fish_before = state.fishing.total_fish_caught;
+        tick_fishing(&mut state, &mut rng);
+
+        // Verify fish was caught
+        assert_eq!(
+            state.fishing.total_fish_caught,
+            fish_before + 1,
+            "Should have caught a fish"
+        );
+
+        // Should be back to Casting for next fish
+        assert_eq!(
+            state.active_fishing.as_ref().unwrap().phase,
+            FishingPhase::Casting,
+            "Should return to Casting after catch"
+        );
+    }
 }
