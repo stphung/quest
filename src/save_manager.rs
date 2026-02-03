@@ -435,4 +435,282 @@ mod tests {
         assert_eq!(loaded_weapon.attributes.str, 12);
         assert_eq!(loaded_weapon.rarity, Rarity::Legendary);
     }
+
+    #[test]
+    fn test_load_corrupted_file_random_bytes() {
+        let manager = SaveManager::new_for_test().expect("Failed to create SaveManager");
+
+        // Write random garbage to the save file
+        fs::write(&manager.save_path, b"random garbage data that is not valid").unwrap();
+
+        // Attempt to load should fail with InvalidData
+        let result = manager.load();
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn test_load_truncated_file() {
+        let manager = SaveManager::new_for_test().expect("Failed to create SaveManager");
+
+        // Write just the version magic (incomplete file)
+        fs::write(&manager.save_path, SAVE_VERSION_MAGIC.to_le_bytes()).unwrap();
+
+        // Attempt to load should fail (can't read length)
+        let result = manager.load();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_load_wrong_version_magic() {
+        let manager = SaveManager::new_for_test().expect("Failed to create SaveManager");
+
+        // Write a file with wrong version magic
+        let wrong_magic: u64 = 0xDEADBEEF;
+        let mut data = Vec::new();
+        data.extend_from_slice(&wrong_magic.to_le_bytes());
+        data.extend_from_slice(&[0u8; 100]); // Pad with zeros
+        fs::write(&manager.save_path, &data).unwrap();
+
+        // Attempt to load should fail with InvalidData mentioning version
+        let result = manager.load();
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+        assert!(err.to_string().contains("version"));
+    }
+
+    #[test]
+    fn test_load_bad_checksum() {
+        let manager = SaveManager::new_for_test().expect("Failed to create SaveManager");
+
+        // First save a valid state
+        let state = GameState::new("Test".to_string(), 0);
+        manager.save(&state).unwrap();
+
+        // Read the file and corrupt the checksum (last 32 bytes)
+        let mut data = fs::read(&manager.save_path).unwrap();
+        let len = data.len();
+        // Flip some bits in the checksum
+        data[len - 1] ^= 0xFF;
+        data[len - 2] ^= 0xFF;
+        fs::write(&manager.save_path, &data).unwrap();
+
+        // Attempt to load should fail with checksum error
+        let result = manager.load();
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+        assert!(err.to_string().contains("Checksum"));
+    }
+
+    #[test]
+    fn test_load_bad_checksum_corrupted_data() {
+        let manager = SaveManager::new_for_test().expect("Failed to create SaveManager");
+
+        // Save a valid state
+        let state = GameState::new("Test".to_string(), 0);
+        manager.save(&state).unwrap();
+
+        // Read the file and corrupt the data (not the checksum)
+        let mut data = fs::read(&manager.save_path).unwrap();
+        // Corrupt byte in the middle of the data (after header: 8 + 4 = 12 bytes)
+        if data.len() > 20 {
+            data[15] ^= 0xFF;
+            data[16] ^= 0xFF;
+        }
+        fs::write(&manager.save_path, &data).unwrap();
+
+        // Attempt to load should fail with checksum error
+        let result = manager.load();
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn test_save_load_with_deprecated_affixes() {
+        use crate::items::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
+
+        let manager = SaveManager::new_for_test().unwrap();
+
+        let mut state = GameState::new("Test".to_string(), 0);
+
+        // Create item with deprecated affixes (these no longer drop but should still load)
+        let item_with_deprecated = Item {
+            slot: EquipmentSlot::Ring,
+            rarity: Rarity::Epic,
+            base_name: "Ring".to_string(),
+            display_name: "Legacy Ring".to_string(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![
+                Affix {
+                    affix_type: AffixType::DropRate,
+                    value: 25.0,
+                },
+                Affix {
+                    affix_type: AffixType::PrestigeBonus,
+                    value: 30.0,
+                },
+                Affix {
+                    affix_type: AffixType::OfflineRate,
+                    value: 20.0,
+                },
+            ],
+        };
+
+        state
+            .equipment
+            .set(EquipmentSlot::Ring, Some(item_with_deprecated));
+
+        // Save and load
+        manager.save(&state).unwrap();
+        let loaded = manager.load().unwrap();
+
+        // Verify deprecated affixes are preserved
+        let ring = loaded.equipment.get(EquipmentSlot::Ring).as_ref().unwrap();
+        assert_eq!(ring.affixes.len(), 3);
+        assert!(ring
+            .affixes
+            .iter()
+            .any(|a| a.affix_type == AffixType::DropRate));
+        assert!(ring
+            .affixes
+            .iter()
+            .any(|a| a.affix_type == AffixType::PrestigeBonus));
+        assert!(ring
+            .affixes
+            .iter()
+            .any(|a| a.affix_type == AffixType::OfflineRate));
+    }
+
+    #[test]
+    fn test_save_load_with_new_affixes() {
+        use crate::items::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
+
+        let manager = SaveManager::new_for_test().unwrap();
+
+        let mut state = GameState::new("Test".to_string(), 0);
+
+        // Create item with the newly implemented affixes
+        let item = Item {
+            slot: EquipmentSlot::Weapon,
+            rarity: Rarity::Legendary,
+            base_name: "Sword".to_string(),
+            display_name: "Epic Sword".to_string(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![
+                Affix {
+                    affix_type: AffixType::CritMultiplier,
+                    value: 50.0,
+                },
+                Affix {
+                    affix_type: AffixType::AttackSpeed,
+                    value: 25.0,
+                },
+                Affix {
+                    affix_type: AffixType::HPRegen,
+                    value: 40.0,
+                },
+                Affix {
+                    affix_type: AffixType::DamageReflection,
+                    value: 15.0,
+                },
+            ],
+        };
+
+        state.equipment.set(EquipmentSlot::Weapon, Some(item));
+
+        // Save and load
+        manager.save(&state).unwrap();
+        let loaded = manager.load().unwrap();
+
+        // Verify all affixes loaded with correct values
+        let weapon = loaded
+            .equipment
+            .get(EquipmentSlot::Weapon)
+            .as_ref()
+            .unwrap();
+        assert_eq!(weapon.affixes.len(), 4);
+
+        let crit_mult = weapon
+            .affixes
+            .iter()
+            .find(|a| a.affix_type == AffixType::CritMultiplier)
+            .unwrap();
+        assert!((crit_mult.value - 50.0).abs() < f64::EPSILON);
+
+        let attack_speed = weapon
+            .affixes
+            .iter()
+            .find(|a| a.affix_type == AffixType::AttackSpeed)
+            .unwrap();
+        assert!((attack_speed.value - 25.0).abs() < f64::EPSILON);
+
+        let hp_regen = weapon
+            .affixes
+            .iter()
+            .find(|a| a.affix_type == AffixType::HPRegen)
+            .unwrap();
+        assert!((hp_regen.value - 40.0).abs() < f64::EPSILON);
+
+        let reflect = weapon
+            .affixes
+            .iter()
+            .find(|a| a.affix_type == AffixType::DamageReflection)
+            .unwrap();
+        assert!((reflect.value - 15.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_save_exists_false_initially() {
+        let manager = SaveManager::new_for_test().expect("Failed to create SaveManager");
+
+        // Clean up any existing file
+        if manager.save_exists() {
+            fs::remove_file(&manager.save_path).unwrap();
+        }
+
+        assert!(!manager.save_exists());
+    }
+
+    #[test]
+    fn test_save_creates_file() {
+        let manager = SaveManager::new_for_test().expect("Failed to create SaveManager");
+
+        // Clean up any existing file
+        if manager.save_exists() {
+            fs::remove_file(&manager.save_path).unwrap();
+        }
+
+        let state = GameState::new("Test".to_string(), 0);
+        manager.save(&state).unwrap();
+
+        assert!(manager.save_exists());
+
+        // Clean up
+        fs::remove_file(&manager.save_path).unwrap();
+    }
+
+    #[test]
+    fn test_save_overwrites_existing() {
+        let manager = SaveManager::new_for_test().expect("Failed to create SaveManager");
+
+        // Save first state
+        let mut state1 = GameState::new("Hero1".to_string(), 0);
+        state1.character_level = 10;
+        manager.save(&state1).unwrap();
+
+        // Save second state (should overwrite)
+        let mut state2 = GameState::new("Hero2".to_string(), 0);
+        state2.character_level = 50;
+        manager.save(&state2).unwrap();
+
+        // Load should return second state
+        let loaded = manager.load().unwrap();
+        assert_eq!(loaded.character_name, "Hero2");
+        assert_eq!(loaded.character_level, 50);
+
+        // Clean up
+        fs::remove_file(&manager.save_path).unwrap();
+    }
 }

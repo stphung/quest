@@ -1029,4 +1029,272 @@ mod tests {
         // Prestige rank should NOT be changed
         assert_eq!(state.prestige_rank, original_rank);
     }
+
+    #[test]
+    fn test_crit_multiplier_from_equipment() {
+        use crate::items::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
+
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // Set 100% crit chance
+        state
+            .attributes
+            .set(crate::attributes::AttributeType::Dexterity, 210);
+
+        // Add weapon with +100% crit multiplier (2.0 -> 3.0x)
+        let weapon = Item {
+            slot: EquipmentSlot::Weapon,
+            rarity: Rarity::Legendary,
+            base_name: "Sword".to_string(),
+            display_name: "Sword".to_string(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![Affix {
+                affix_type: AffixType::CritMultiplier,
+                value: 100.0,
+            }],
+        };
+        state.equipment.set(EquipmentSlot::Weapon, Some(weapon));
+
+        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+        let base_damage = derived.total_damage();
+        let expected_crit_damage = (base_damage as f64 * 3.0) as u32; // 3x with +100%
+
+        state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
+        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        let events = update_combat(&mut state, 0.1);
+
+        let attack = events
+            .iter()
+            .find_map(|e| match e {
+                CombatEvent::PlayerAttack { damage, was_crit } => Some((*damage, *was_crit)),
+                _ => None,
+            })
+            .expect("Should have attack event");
+
+        assert!(attack.1, "Should always crit with 100%+ crit chance");
+        assert_eq!(attack.0, expected_crit_damage);
+    }
+
+    #[test]
+    fn test_attack_speed_reduces_interval() {
+        use crate::items::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
+
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // Add gloves with +50% attack speed
+        let gloves = Item {
+            slot: EquipmentSlot::Gloves,
+            rarity: Rarity::Rare,
+            base_name: "Gloves".to_string(),
+            display_name: "Gloves".to_string(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![Affix {
+                affix_type: AffixType::AttackSpeed,
+                value: 50.0,
+            }],
+        };
+        state.equipment.set(EquipmentSlot::Gloves, Some(gloves));
+
+        state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
+
+        // With 50% attack speed, effective interval is 1.5 / 1.5 = 1.0 seconds
+        // So attack should trigger at 1.0 seconds instead of 1.5
+        state.combat_state.attack_timer = 1.0;
+        let events = update_combat(&mut state, 0.1);
+
+        let attacked = events
+            .iter()
+            .any(|e| matches!(e, CombatEvent::PlayerAttack { .. }));
+        assert!(attacked, "Should attack with reduced interval");
+    }
+
+    #[test]
+    fn test_attack_speed_normal_interval_without_affix() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
+
+        // Without attack speed bonus, 1.0 seconds is not enough (need 1.5)
+        state.combat_state.attack_timer = 1.0;
+        let events = update_combat(&mut state, 0.1);
+
+        let attacked = events
+            .iter()
+            .any(|e| matches!(e, CombatEvent::PlayerAttack { .. }));
+        assert!(!attacked, "Should NOT attack before full interval");
+    }
+
+    #[test]
+    fn test_hp_regen_speed_with_affix() {
+        use crate::items::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
+
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // Add armor with +100% HP regen (2x speed = half duration)
+        let armor = Item {
+            slot: EquipmentSlot::Armor,
+            rarity: Rarity::Rare,
+            base_name: "Armor".to_string(),
+            display_name: "Armor".to_string(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![Affix {
+                affix_type: AffixType::HPRegen,
+                value: 100.0,
+            }],
+        };
+        state.equipment.set(EquipmentSlot::Armor, Some(armor));
+
+        state.combat_state.is_regenerating = true;
+        state.combat_state.regen_timer = 0.0;
+        state.combat_state.player_current_hp = 10;
+        state.combat_state.player_max_hp = 100;
+
+        // With +100% regen (2x multiplier), duration is 2.5 / 2 = 1.25 seconds
+        // After 1.25 seconds, should be fully healed
+        update_combat(&mut state, 1.25);
+
+        assert_eq!(state.combat_state.player_current_hp, 100);
+        assert!(!state.combat_state.is_regenerating);
+    }
+
+    #[test]
+    fn test_hp_regen_normal_duration_without_affix() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        state.combat_state.is_regenerating = true;
+        state.combat_state.regen_timer = 0.0;
+        state.combat_state.player_current_hp = 10;
+        state.combat_state.player_max_hp = 100;
+
+        // Without regen bonus, 1.25 seconds is not enough (need 2.5)
+        update_combat(&mut state, 1.25);
+
+        // Should still be regenerating, not fully healed
+        assert!(state.combat_state.is_regenerating);
+        assert!(state.combat_state.player_current_hp < 100);
+    }
+
+    #[test]
+    fn test_damage_reflection_hurts_attacker() {
+        use crate::items::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
+
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // Add armor with 50% damage reflection
+        let armor = Item {
+            slot: EquipmentSlot::Armor,
+            rarity: Rarity::Rare,
+            base_name: "Armor".to_string(),
+            display_name: "Armor".to_string(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![Affix {
+                affix_type: AffixType::DamageReflection,
+                value: 50.0,
+            }],
+        };
+        state.equipment.set(EquipmentSlot::Armor, Some(armor));
+
+        let enemy_damage = 20;
+        let enemy_max_hp = 100;
+        state.combat_state.current_enemy = Some(Enemy::new(
+            "Attacker".to_string(),
+            enemy_max_hp,
+            enemy_damage,
+        ));
+        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+
+        update_combat(&mut state, 0.1);
+
+        // Enemy should have taken reflected damage: 20 * 50% = 10
+        let enemy = state.combat_state.current_enemy.as_ref().unwrap();
+        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+        let player_damage = derived.total_damage();
+        let reflected_damage = (enemy_damage as f64 * 0.5) as u32; // 50% reflection
+
+        // Enemy HP = max - player_attack - reflected
+        let expected_hp = enemy_max_hp - player_damage - reflected_damage;
+        assert_eq!(
+            enemy.current_hp, expected_hp,
+            "Enemy should take player damage ({}) plus reflection ({})",
+            player_damage, reflected_damage
+        );
+    }
+
+    #[test]
+    fn test_damage_reflection_can_kill_enemy() {
+        use crate::items::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
+
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // High damage reflection
+        let armor = Item {
+            slot: EquipmentSlot::Armor,
+            rarity: Rarity::Legendary,
+            base_name: "Armor".to_string(),
+            display_name: "Armor".to_string(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![Affix {
+                affix_type: AffixType::DamageReflection,
+                value: 1000.0, // 1000% reflection
+            }],
+        };
+        state.equipment.set(EquipmentSlot::Armor, Some(armor));
+
+        // Weak enemy with high damage (will kill itself via reflection)
+        state.combat_state.current_enemy = Some(Enemy::new("Suicidal".to_string(), 5, 100));
+        state.combat_state.player_current_hp = 1000; // Survive the hit
+        state.combat_state.player_max_hp = 1000;
+        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+
+        let events = update_combat(&mut state, 0.1);
+
+        // Enemy should have died from combined player attack + reflection
+        let enemy_died = events
+            .iter()
+            .any(|e| matches!(e, CombatEvent::EnemyDied { .. }));
+        assert!(enemy_died, "Enemy should die from reflection damage");
+    }
+
+    #[test]
+    fn test_damage_reflection_zero_when_no_damage_taken() {
+        use crate::items::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
+
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // Set DEX to 0 to guarantee 0% crit chance
+        state
+            .attributes
+            .set(crate::attributes::AttributeType::Dexterity, 0);
+
+        // Add damage reflection
+        let armor = Item {
+            slot: EquipmentSlot::Armor,
+            rarity: Rarity::Rare,
+            base_name: "Armor".to_string(),
+            display_name: "Armor".to_string(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![Affix {
+                affix_type: AffixType::DamageReflection,
+                value: 100.0,
+            }],
+        };
+        state.equipment.set(EquipmentSlot::Armor, Some(armor));
+
+        let enemy_max_hp = 1000;
+        // Enemy deals 0 damage, so player takes 0 damage, so 0 is reflected
+        state.combat_state.current_enemy =
+            Some(Enemy::new("Pacifist".to_string(), enemy_max_hp, 0));
+        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+
+        let initial_player_hp = state.combat_state.player_current_hp;
+        update_combat(&mut state, 0.1);
+
+        // Player took no damage
+        assert_eq!(state.combat_state.player_current_hp, initial_player_hp);
+
+        // Enemy should only take player attack damage, no reflection (0 damage = 0 reflected)
+        let enemy = state.combat_state.current_enemy.as_ref().unwrap();
+        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+        let expected_hp = enemy_max_hp - derived.total_damage();
+        assert_eq!(enemy.current_hp, expected_hp);
+    }
 }

@@ -436,4 +436,194 @@ mod tests {
         // With +50% multiplier: 1.0 * 1.5 = 1.5
         assert_eq!(stats.xp_multiplier, 1.5);
     }
+
+    #[test]
+    fn test_crit_multiplier_affix() {
+        let attrs = Attributes::new();
+        let mut equipment = Equipment::new();
+
+        // Create weapon with +50% crit multiplier affix
+        let weapon = Item {
+            slot: EquipmentSlot::Weapon,
+            rarity: Rarity::Rare,
+            base_name: "Sword".to_string(),
+            display_name: "Vicious Sword".to_string(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![Affix {
+                affix_type: AffixType::CritMultiplier,
+                value: 50.0,
+            }],
+        };
+
+        equipment.set(EquipmentSlot::Weapon, Some(weapon));
+
+        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment);
+
+        // Base crit multiplier: 2.0
+        // With +50%: 2.0 + 0.5 = 2.5
+        assert!((stats.crit_multiplier - 2.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_crit_multiplier_stacks_from_multiple_items() {
+        let attrs = Attributes::new();
+        let mut equipment = Equipment::new();
+
+        let weapon = Item {
+            slot: EquipmentSlot::Weapon,
+            rarity: Rarity::Rare,
+            base_name: "Sword".to_string(),
+            display_name: "Sword".to_string(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![Affix {
+                affix_type: AffixType::CritMultiplier,
+                value: 25.0,
+            }],
+        };
+
+        let ring = Item {
+            slot: EquipmentSlot::Ring,
+            rarity: Rarity::Rare,
+            base_name: "Ring".to_string(),
+            display_name: "Ring".to_string(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![Affix {
+                affix_type: AffixType::CritMultiplier,
+                value: 25.0,
+            }],
+        };
+
+        equipment.set(EquipmentSlot::Weapon, Some(weapon));
+        equipment.set(EquipmentSlot::Ring, Some(ring));
+
+        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment);
+
+        // Base: 2.0, +25% + 25% = 2.5
+        assert!((stats.crit_multiplier - 2.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_attack_speed_affix() {
+        let attrs = Attributes::new();
+        let mut equipment = Equipment::new();
+
+        let gloves = Item {
+            slot: EquipmentSlot::Gloves,
+            rarity: Rarity::Rare,
+            base_name: "Gloves".to_string(),
+            display_name: "Swift Gloves".to_string(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![Affix {
+                affix_type: AffixType::AttackSpeed,
+                value: 25.0,
+            }],
+        };
+
+        equipment.set(EquipmentSlot::Gloves, Some(gloves));
+
+        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment);
+
+        // Base: 1.0, +25% = 1.25
+        assert!((stats.attack_speed_multiplier - 1.25).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_hp_regen_affix() {
+        let attrs = Attributes::new();
+        let mut equipment = Equipment::new();
+
+        let armor = Item {
+            slot: EquipmentSlot::Armor,
+            rarity: Rarity::Rare,
+            base_name: "Armor".to_string(),
+            display_name: "Regenerating Armor".to_string(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![Affix {
+                affix_type: AffixType::HPRegen,
+                value: 50.0,
+            }],
+        };
+
+        equipment.set(EquipmentSlot::Armor, Some(armor));
+
+        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment);
+
+        // Base: 1.0, +50% = 1.5
+        assert!((stats.hp_regen_multiplier - 1.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_damage_reflection_affix() {
+        let attrs = Attributes::new();
+        let mut equipment = Equipment::new();
+
+        let armor = Item {
+            slot: EquipmentSlot::Armor,
+            rarity: Rarity::Rare,
+            base_name: "Armor".to_string(),
+            display_name: "Thorned Armor".to_string(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![Affix {
+                affix_type: AffixType::DamageReflection,
+                value: 30.0,
+            }],
+        };
+
+        equipment.set(EquipmentSlot::Armor, Some(armor));
+
+        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment);
+
+        // Direct percentage: 30%
+        assert!((stats.damage_reflection_percent - 30.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_damage_reflection_stacks() {
+        let attrs = Attributes::new();
+        let mut equipment = Equipment::new();
+
+        let armor = Item {
+            slot: EquipmentSlot::Armor,
+            rarity: Rarity::Rare,
+            base_name: "Armor".to_string(),
+            display_name: "Armor".to_string(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![Affix {
+                affix_type: AffixType::DamageReflection,
+                value: 20.0,
+            }],
+        };
+
+        let helmet = Item {
+            slot: EquipmentSlot::Helmet,
+            rarity: Rarity::Rare,
+            base_name: "Helmet".to_string(),
+            display_name: "Helmet".to_string(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![Affix {
+                affix_type: AffixType::DamageReflection,
+                value: 15.0,
+            }],
+        };
+
+        equipment.set(EquipmentSlot::Armor, Some(armor));
+        equipment.set(EquipmentSlot::Helmet, Some(helmet));
+
+        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment);
+
+        // 20% + 15% = 35%
+        assert!((stats.damage_reflection_percent - 35.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_base_values_without_equipment() {
+        let attrs = Attributes::new();
+        let stats = DerivedStats::from_attributes(&attrs);
+
+        // Verify base values for new stats
+        assert!((stats.crit_multiplier - 2.0).abs() < f64::EPSILON);
+        assert!((stats.attack_speed_multiplier - 1.0).abs() < f64::EPSILON);
+        assert!((stats.hp_regen_multiplier - 1.0).abs() < f64::EPSILON);
+        assert!((stats.damage_reflection_percent - 0.0).abs() < f64::EPSILON);
+    }
 }
