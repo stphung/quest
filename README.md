@@ -4,11 +4,11 @@
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-blue.svg)](https://github.com/stphung/quest/releases/latest)
 
-A terminal-based idle RPG game written in Rust. Watch your hero grow stronger automatically as they battle enemies across different zones!
+A terminal-based idle RPG game written in Rust. Watch your hero grow stronger automatically as they battle through 10 zones, explore procedural dungeons, and fish for legendary catches!
 
 > **Why "quest"?** Because that's exactly what it is. Simple, memorable, and to the point.
 
-## 🚀 Quick Start
+## Quick Start
 
 **Install and play with one command:**
 
@@ -19,16 +19,18 @@ curl -sSf https://raw.githubusercontent.com/stphung/quest/main/install.sh | sh
 
 Then run `quest` to start your adventure!
 
-## ✨ Features
+## Features
 
-- ⚡ **Automatic Progression** - Your character gains XP and levels up automatically
-- 💪 **6 Attributes** - STR, DEX, CON, INT, WIS, CHA form the foundation of your character
-- 📊 **Derived Combat Stats** - HP, damage, defense, and crit chance calculated from attributes
-- ⚔️ **Dynamic Combat** - Real-time battles with enemies that scale to your power
-- 🔄 **Prestige System** - Reset your progress for permanent XP multipliers and higher attribute caps
-- 🗺️ **5 Unique Zones** - Travel from Meadow to Volcanic Wastes as you level up
-- 💤 **Offline Progress** - Continue gaining XP even when the game is closed (at 50% rate)
-- 💾 **Auto-Save** - Your progress is automatically saved every 30 seconds
+- **Automatic Combat** - Your character fights enemies automatically with turn-based combat
+- **10 Zones** - Progress through 10 unique zones from Meadow to Storm Citadel, each with 3-4 subzones and bosses
+- **6 Attributes** - STR, DEX, CON, INT, WIS, CHA form the foundation of your character
+- **Prestige System** - Reset for permanent XP multipliers (1.5× per rank) and unlock higher zones
+- **Procedural Dungeons** - Explore grid-based dungeons with fog of war, treasure rooms, elite guardians, and bosses
+- **Fishing** - Separate progression track with 30 ranks and 5 fish rarities
+- **Diablo-style Items** - 7 equipment slots, 5 rarity tiers, procedural names, and smart auto-equip
+- **Multi-Character** - Create and manage multiple characters with JSON saves
+- **Offline Progress** - Continue gaining XP even when closed (50% rate, max 7 days)
+- **3D ASCII Combat** - First-person dungeon view with visual effects
 
 ## Installation
 
@@ -68,103 +70,116 @@ Download the latest release for your platform from the [releases page](https://g
 - Cargo (comes with Rust)
 
 ```bash
-# Clone the repository
 git clone https://github.com/stphung/quest.git
 cd quest
-
-# Build and run
 cargo run --release
 ```
 
 ## Controls
 
+### Character Select
+- **Arrow Keys**: Navigate character list
+- **Enter**: Select character
+- **N**: Create new character
+- **D**: Delete character
+- **R**: Rename character
+- **Q**: Quit
+
+### Gameplay
 - **Q**: Quit the game
-- **P**: Prestige (resets stats for an XP multiplier, requires all stats at minimum level)
+- **P**: Prestige (reset for XP multiplier, requires meeting level threshold)
 
-## Game Mechanics
+## Game Systems
 
-### Stat System
+### Zones & Progression
 
-Your character has **one unified level** and **six core attributes** that increase randomly on level-up:
+Progress through 10 zones, each with 3-4 subzones and unique bosses:
 
-**Attributes**:
-- **Strength (STR)**: Increases physical damage in combat
-- **Dexterity (DEX)**: Increases defense and critical hit chance
-- **Constitution (CON)**: Increases maximum HP
-- **Intelligence (INT)**: Increases magic damage in combat
-- **Wisdom (WIS)**: Increases XP gained from monster kills
-- **Charisma (CHA)**: Boosts prestige XP multiplier
+| Tier | Zones | Prestige Required | Levels |
+|------|-------|-------------------|--------|
+| Nature's Edge | Meadow, Dark Forest | P0 | 1-25 |
+| Civilization's Remnants | Mountain Pass, Ancient Ruins | P5 | 25-55 |
+| Elemental Forces | Volcanic Wastes, Frozen Tundra | P10 | 55-85 |
+| Hidden Depths | Crystal Caverns, Sunken Kingdom | P15 | 85-115 |
+| Ascending | Floating Isles, Storm Citadel | P20 | 115-150 |
 
-Each attribute has a **modifier** calculated as `(value - 10) / 2`. At base (10), modifier is +0. At 16, modifier is +3.
+- Defeat 10 enemies in a subzone to spawn the boss
+- Defeat subzone bosses to advance
+- Zone 10's final boss requires forging **Stormbreaker**
 
-**Derived Stats**:
-- **Max HP**: 50 + (CON modifier × 10)
-- **Physical Damage**: 5 + (STR modifier × 2)
-- **Magic Damage**: 5 + (INT modifier × 2)
-- **Defense**: DEX modifier (reduces incoming damage)
-- **Crit Chance**: 5% + (DEX modifier × 1%) - crits deal 2× damage
-- **XP Multiplier**: 1.0 + (WIS modifier × 0.05)
+### Attributes & Combat
 
-**Attribute Caps**: Attributes are capped at `10 + (prestige_rank × 5)`. Prestiging increases your caps!
+**Six Core Attributes** (modifier = `(value - 10) / 2`):
+- **Strength (STR)**: Physical damage (+2 per modifier)
+- **Dexterity (DEX)**: Defense and crit chance (+1% crit per modifier)
+- **Constitution (CON)**: Maximum HP (+10 per modifier)
+- **Intelligence (INT)**: Magic damage (+2 per modifier)
+- **Wisdom (WIS)**: XP gain (+5% per modifier)
+- **Charisma (CHA)**: Prestige multiplier bonus (+10% per modifier)
 
-**Level-Up**: Gain 3 random attribute points (distributed among non-capped attributes)
+**Combat Mechanics:**
+- Turn-based rounds every 1.5 seconds
+- Critical hits deal 2× damage
+- HP regenerates over 2.5s after killing an enemy
+- Dying to a boss resets the encounter (prestige is preserved)
 
-XP required for next level: `100 × level^1.5`
+### Prestige System
 
-For complete stat system documentation, see [docs/STAT_SYSTEM.md](docs/STAT_SYSTEM.md)
+Prestige resets your level for permanent benefits:
+- **XP Multiplier**: 1.5× per prestige rank (compounding)
+- **Attribute Caps**: Base 10 + (5 × prestige rank)
+- **Zone Unlocks**: Higher zones require prestige ranks
+- **Better Item Drops**: +5% drop rate per prestige rank
 
-### XP Gain
+Example progression: Bronze (1.5×) → Silver (2.25×) → Gold (3.375×) → Platinum → Diamond → Celestial...
 
-- **Only from defeating monsters** - no passive XP over time
-- Base XP per kill: 200-400 XP (random)
-- WIS modifier: +5% XP per kill per point
-- Prestige multiplier: 1.5^(prestige rank)
-- CHA modifier: +10% prestige multiplier per point
-- Offline progression: Simulates monster kills at 50% rate (capped at 7 days)
+### Dungeons
 
-### Prestige Tiers
+Procedural grid-based exploration:
+- **Sizes**: Small (5×5), Medium (7×7), Large (9×9), Epic (11×11) based on prestige
+- **Room Types**: Combat, Treasure (guaranteed item), Elite (key guardian), Boss
+- **Key System**: Defeat Elite guardian to get key for Boss room
+- **Fog of War**: Rooms revealed as you explore
+- **Safe Death**: No prestige loss when dying in dungeons
 
-- **Bronze** (Rank 1): Level 10 required, 1.5× XP multiplier
-- **Silver** (Rank 2): Level 25 required, 2.25× XP multiplier
-- **Gold** (Rank 3): Level 50 required, 3.375× XP multiplier
-- **Platinum** (Rank 5): Level 75 required, 7.59× XP multiplier
-- **Diamond** (Rank 10): Level 100 required, 57.67× XP multiplier
-- **Celestial** (Rank 15): Level 150 required, 437.89× XP multiplier
+### Fishing
 
-### Zones
+Separate progression track with 30 ranks across 6 tiers:
+- Novice → Apprentice → Journeyman → Expert → Master → Grandmaster
+- Fish rarities: Common, Uncommon, Rare, Epic, Legendary
+- Higher ranks improve catch quality
 
-Your current zone is determined by your average level:
+### Items & Equipment
 
-1. **Meadow** (Levels 0-10): Fight Slimes, Rabbits, Ladybugs, and Butterflies
-2. **Dark Forest** (Levels 10-25): Battle Wolves, Spiders, Dark Elves, and Bats
-3. **Mountain Pass** (Levels 25-50): Face Golems, Yetis, Mountain Lions, and Eagles
-4. **Ancient Ruins** (Levels 50-75): Confront Skeletons, Ghosts, Ancient Guardians, and Wraiths
-5. **Volcanic Wastes** (Levels 75-100): Challenge Fire Elementals, Lava Beasts, Phoenixes, and Dragons
+**7 Equipment Slots**: Weapon, Armor, Helmet, Gloves, Boots, Amulet, Ring
 
-### Combat
+**5 Rarity Tiers**:
+| Rarity | Attributes | Affixes |
+|--------|-----------|---------|
+| Common | +1-2 | 0 |
+| Magic | +2-4 | 1 |
+| Rare | +4-7 | 2 |
+| Epic | +6-10 | 3 |
+| Legendary | +8-15 | 4-5 |
 
-- **Turn-Based**: Combat rounds occur every 1.5 seconds
-- **Dynamic Scaling**: Enemy stats scale with your power (80-120% of your HP)
-- **Critical Hits**: Based on DEX, critical hits deal 2× damage
-- **Defense**: Your DEX-based defense reduces incoming damage
-- **XP Rewards**: Killing enemies is the ONLY way to gain XP (200-400 XP per kill, boosted by WIS/prestige)
-- **HP Regeneration**: After killing an enemy, your HP regenerates over 2.5 seconds
-- **Death Penalty**: Dying resets you to full HP but you lose all prestige ranks
-- **Enemy Names**: Dynamically generated with procedural combinations
+- Procedural name generation with prefixes/suffixes
+- Smart auto-equip based on weighted scoring
+- Drop rate: 30% base + 5% per prestige rank
 
 ## Save System
 
-- Save file location: `~/.local/share/idle-rpg/save.dat`
-- Saves are checksummed to prevent corruption
-- Auto-saves every 30 seconds
-- Manual save on exit
+- **Location**: `~/.quest/` directory (JSON format)
+- **Multi-character**: Each character saved separately
+- **Checksums**: SHA-256 validation prevents corruption
+- **Auto-save**: Every 30 seconds
+- **Offline Progress**: Simulates kills at 50% rate (max 7 days)
 
 ## Technical Details
 
 - Built with [Ratatui](https://github.com/ratatui-org/ratatui) for terminal UI
 - Uses [Crossterm](https://github.com/crossterm-rs/crossterm) for cross-platform terminal handling
-- Save files use [Bincode](https://github.com/bincode-org/bincode) serialization
-- Checksums via [SHA-256](https://github.com/RustCrypto/hashes)
+- Save files use JSON with SHA-256 checksums
+- 100ms game tick (10 ticks/sec)
 
 ## License
 
