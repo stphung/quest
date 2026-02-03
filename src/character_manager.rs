@@ -25,9 +25,6 @@ struct CharacterSaveData {
     fishing: crate::fishing::FishingState,
     #[serde(default)]
     zone_progression: crate::zones::ZoneProgression,
-    // Legacy field - kept for backward compatibility with old saves
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    checksum: String,
 }
 
 #[derive(Debug, Clone)]
@@ -83,7 +80,6 @@ impl CharacterManager {
             active_dungeon: state.active_dungeon.clone(),
             fishing: state.fishing.clone(),
             zone_progression: state.zone_progression.clone(),
-            checksum: String::new(), // Legacy field, no longer used
         };
 
         let json = serde_json::to_string_pretty(&save_data)
