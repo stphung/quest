@@ -1,5 +1,6 @@
 use crate::attributes::AttributeType;
 use crate::derived_stats::DerivedStats;
+use crate::fishing::FishingState;
 use crate::game_logic::xp_for_next_level;
 use crate::game_state::GameState;
 use crate::items::{Affix, AffixType, Rarity};
@@ -9,7 +10,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Gauge, Paragraph},
     Frame,
 };
 
@@ -55,23 +56,23 @@ pub fn draw_stats_panel_with_update(
     // When update panel is present, equipment gets smaller minimum to ensure update panel fits
     let constraints = if update_info.is_some() {
         vec![
-            Constraint::Length(3),          // Header
+            Constraint::Length(4),          // Header + XP bar
             Constraint::Length(3),          // Zone info
             Constraint::Length(14),         // Attributes (6 attributes + borders)
             Constraint::Length(6),          // Derived stats (condensed)
             Constraint::Min(10),            // Equipment section (reduced min when update shown)
-            Constraint::Length(6),          // Prestige info + fishing rank
+            Constraint::Length(7),          // Prestige info + fishing rank + fishing bar
             Constraint::Length(3),          // Footer
             Constraint::Min(update_height), // Update panel (can shrink if needed)
         ]
     } else {
         vec![
-            Constraint::Length(3),  // Header
+            Constraint::Length(4),  // Header + XP bar
             Constraint::Length(3),  // Zone info
             Constraint::Length(14), // Attributes (6 attributes + borders)
             Constraint::Length(6),  // Derived stats (condensed)
             Constraint::Min(16),    // Equipment section (grows to fit)
-            Constraint::Length(6),  // Prestige info + fishing rank
+            Constraint::Length(7),  // Prestige info + fishing rank + fishing bar
             Constraint::Length(3),  // Footer
         ]
     };
@@ -114,19 +115,32 @@ pub fn draw_stats_panel_with_update(
     }
 }
 
-/// Draws the header with character level and XP
+/// Draws the header with character level, XP bar, and play time
 fn draw_header(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let xp_needed = xp_for_next_level(game_state.character_level);
-    let xp_progress = if xp_needed > 0 {
-        game_state.character_xp as f64 / xp_needed as f64
+    let xp_ratio = if xp_needed > 0 {
+        (game_state.character_xp as f64 / xp_needed as f64).min(1.0)
     } else {
         0.0
     };
 
     let rank = get_adventurer_rank(game_state.character_level);
-
     let play_time = format_play_time(game_state.play_time_seconds);
 
+    // Create block and get inner area
+    let header_block = Block::default()
+        .borders(Borders::ALL)
+        .title(game_state.character_name.as_str());
+    let inner = header_block.inner(area);
+    frame.render_widget(header_block, area);
+
+    // Split inner area: header text + XP bar
+    let inner_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1), Constraint::Length(1)])
+        .split(inner);
+
+    // Header text line
     let header_text = vec![Line::from(vec![
         Span::styled(
             format!("Level {} {}", game_state.character_level, rank),
@@ -135,29 +149,31 @@ fn draw_header(frame: &mut Frame, area: Rect, game_state: &GameState) {
                 .add_modifier(Modifier::BOLD),
         ),
         Span::raw(" | "),
-        Span::styled(
-            format!(
-                "XP: {}/{} ({:.1}%)",
-                game_state.character_xp,
-                xp_needed,
-                xp_progress * 100.0
-            ),
-            Style::default().fg(Color::Yellow),
-        ),
-        Span::raw(" | "),
         Span::styled("⏱️ ", Style::default().fg(Color::Cyan)),
         Span::styled(play_time, Style::default().fg(Color::Cyan)),
     ])];
 
-    let header = Paragraph::new(header_text)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(game_state.character_name.as_str()),
-        )
-        .alignment(Alignment::Center);
+    let header_paragraph = Paragraph::new(header_text).alignment(Alignment::Center);
+    frame.render_widget(header_paragraph, inner_chunks[0]);
 
-    frame.render_widget(header, area);
+    // XP progress bar
+    let xp_label = format!(
+        "XP: {}/{} ({:.1}%)",
+        game_state.character_xp,
+        xp_needed,
+        xp_ratio * 100.0
+    );
+
+    let xp_gauge = Gauge::default()
+        .gauge_style(
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )
+        .label(xp_label)
+        .ratio(xp_ratio);
+
+    frame.render_widget(xp_gauge, inner_chunks[1]);
 }
 
 /// Draws the current zone and subzone info
@@ -390,6 +406,12 @@ fn draw_prestige_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let inner = prestige_block.inner(area);
     frame.render_widget(prestige_block, area);
 
+    // Split inner area: text lines + fishing progress bar
+    let inner_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(4), Constraint::Length(1)])
+        .split(inner);
+
     let tier = get_prestige_tier(game_state.prestige_rank);
     let cha_mod = game_state.attributes.modifier(AttributeType::Charisma);
     let effective_multiplier =
@@ -446,7 +468,29 @@ fn draw_prestige_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
     ];
 
     let prestige_paragraph = Paragraph::new(prestige_text);
-    frame.render_widget(prestige_paragraph, inner);
+    frame.render_widget(prestige_paragraph, inner_chunks[0]);
+
+    // Fishing progress bar
+    let fish_required = FishingState::fish_required_for_rank(game_state.fishing.rank);
+    let fish_progress = game_state.fishing.fish_toward_next_rank;
+    let fish_ratio = if fish_required > 0 {
+        (fish_progress as f64 / fish_required as f64).min(1.0)
+    } else {
+        0.0
+    };
+
+    let fish_label = format!("{}/{}", fish_progress, fish_required);
+
+    let fish_gauge = Gauge::default()
+        .gauge_style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )
+        .label(fish_label)
+        .ratio(fish_ratio);
+
+    frame.render_widget(fish_gauge, inner_chunks[1]);
 }
 
 /// Draws equipment section with all 7 equipment slots
