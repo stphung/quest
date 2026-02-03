@@ -1,14 +1,19 @@
 #![allow(dead_code)]
+use crate::constants::{ITEM_DROP_BASE_CHANCE, ITEM_DROP_MAX_CHANCE, ITEM_DROP_PRESTIGE_BONUS};
 use crate::game_state::GameState;
 use crate::item_generation::generate_item;
 use crate::items::{EquipmentSlot, Item, Rarity};
 use rand::Rng;
 
+pub fn drop_chance_for_prestige(prestige_rank: u32) -> f64 {
+    let chance = ITEM_DROP_BASE_CHANCE + (prestige_rank as f64 * ITEM_DROP_PRESTIGE_BONUS);
+    chance.min(ITEM_DROP_MAX_CHANCE)
+}
+
 pub fn try_drop_item(game_state: &GameState) -> Option<Item> {
     let mut rng = rand::thread_rng();
 
-    // Calculate drop chance: 30% base + 5% per prestige rank
-    let drop_chance = 0.30 + (game_state.prestige_rank as f64 * 0.05);
+    let drop_chance = drop_chance_for_prestige(game_state.prestige_rank);
 
     if rng.gen::<f64>() > drop_chance {
         return None;
@@ -27,57 +32,28 @@ pub fn try_drop_item(game_state: &GameState) -> Option<Item> {
 pub fn roll_rarity(prestige_rank: u32, rng: &mut impl Rng) -> Rarity {
     let roll = rng.gen::<f64>();
 
-    match prestige_rank {
-        0..=1 => {
-            // Bronze: 60% Common, 30% Magic, 10% Rare
-            if roll < 0.60 {
-                Rarity::Common
-            } else if roll < 0.90 {
-                Rarity::Magic
-            } else {
-                Rarity::Rare
-            }
-        }
-        2..=3 => {
-            // Silver: 30% Common, 40% Magic, 25% Rare, 5% Epic
-            if roll < 0.30 {
-                Rarity::Common
-            } else if roll < 0.70 {
-                Rarity::Magic
-            } else if roll < 0.95 {
-                Rarity::Rare
-            } else {
-                Rarity::Epic
-            }
-        }
-        4..=5 => {
-            // Gold: 15% Common, 30% Magic, 40% Rare, 13% Epic, 2% Legendary
-            if roll < 0.15 {
-                Rarity::Common
-            } else if roll < 0.45 {
-                Rarity::Magic
-            } else if roll < 0.85 {
-                Rarity::Rare
-            } else if roll < 0.98 {
-                Rarity::Epic
-            } else {
-                Rarity::Legendary
-            }
-        }
-        _ => {
-            // Platinum+: 10% Common, 20% Magic, 35% Rare, 25% Epic, 10% Legendary
-            if roll < 0.10 {
-                Rarity::Common
-            } else if roll < 0.30 {
-                Rarity::Magic
-            } else if roll < 0.65 {
-                Rarity::Rare
-            } else if roll < 0.90 {
-                Rarity::Epic
-            } else {
-                Rarity::Legendary
-            }
-        }
+    // Prestige gives a small bonus (1% per rank, max 10%) that shifts
+    // weight from Common toward higher rarities.
+    let prestige_bonus = (prestige_rank as f64 * 0.01).min(0.10);
+
+    // Base distribution: 55% Common, 30% Magic, 12% Rare, 2.5% Epic, 0.5% Legendary
+    // Prestige shifts Common down and spreads the bonus across higher tiers.
+    let common_threshold = 0.55 - prestige_bonus;
+    let magic_threshold = common_threshold + 0.30;
+    let rare_threshold = magic_threshold + 0.12 + prestige_bonus * 0.4;
+    let epic_threshold = rare_threshold + 0.025 + prestige_bonus * 0.4;
+    // Legendary is the remainder: 0.5% base + 20% of prestige bonus
+
+    if roll < common_threshold {
+        Rarity::Common
+    } else if roll < magic_threshold {
+        Rarity::Magic
+    } else if roll < rare_threshold {
+        Rarity::Rare
+    } else if roll < epic_threshold {
+        Rarity::Epic
+    } else {
+        Rarity::Legendary
     }
 }
 
@@ -100,40 +76,49 @@ mod tests {
     use chrono::Utc;
 
     #[test]
-    fn test_roll_rarity_bronze_prestige() {
-        // Test Bronze prestige (0-1) distribution
+    fn test_roll_rarity_base_distribution() {
+        // At prestige 0: ~55% Common, 30% Magic, 12% Rare, 2.5% Epic, 0.5% Legendary
         let mut common = 0;
         let mut magic = 0;
         let mut rare = 0;
+        let mut epic = 0;
+        let mut legendary = 0;
 
-        for _ in 0..1000 {
+        for _ in 0..10000 {
             let mut rng = rand::thread_rng();
             match roll_rarity(0, &mut rng) {
                 Rarity::Common => common += 1,
                 Rarity::Magic => magic += 1,
                 Rarity::Rare => rare += 1,
-                _ => {}
+                Rarity::Epic => epic += 1,
+                Rarity::Legendary => legendary += 1,
             }
         }
 
-        // Rough distribution check (should be ~60%, 30%, 10%)
-        assert!(common > 500); // At least 50%
-        assert!(magic > 200); // At least 20%
-        assert!(rare > 0); // Some rares
+        // Common should be the majority
+        assert!(common > 4500, "Common should be ~55%, got {common}");
+        assert!(magic > 2500, "Magic should be ~30%, got {magic}");
+        assert!(rare > 800, "Rare should be ~12%, got {rare}");
+        assert!(epic > 50, "Epic should be ~2.5%, got {epic}");
+        // Legendary is rare but should appear in 10k rolls
+        assert!(legendary > 0, "Legendary should appear, got {legendary}");
     }
 
     #[test]
-    fn test_roll_rarity_platinum_can_drop_legendary() {
-        // Test Platinum+ can drop legendary
+    fn test_roll_rarity_all_prestiges_can_drop_legendary() {
+        // Even at prestige 0, legendary is possible (0.5% chance)
         let mut found_legendary = false;
-        for _ in 0..1000 {
+        for _ in 0..5000 {
             let mut rng = rand::thread_rng();
-            if roll_rarity(6, &mut rng) == Rarity::Legendary {
+            if roll_rarity(0, &mut rng) == Rarity::Legendary {
                 found_legendary = true;
                 break;
             }
         }
-        assert!(found_legendary);
+        assert!(
+            found_legendary,
+            "Legendary should be possible at prestige 0"
+        );
     }
 
     #[test]
@@ -153,83 +138,52 @@ mod tests {
     fn test_try_drop_item_respects_prestige() {
         let mut game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
 
-        // With prestige 0, should get some drops
+        // With prestige 0, should get some drops (~15% rate)
         let mut drops = 0;
-        for _ in 0..100 {
+        for _ in 0..200 {
             if try_drop_item(&game_state).is_some() {
                 drops += 1;
             }
         }
-        // ~30% drop rate, so expect 20-40 drops
-        assert!(drops > 15 && drops < 50);
+        assert!(drops > 10 && drops < 55, "Expected ~15% drops, got {drops}");
 
-        // Higher prestige should increase drops
-        game_state.prestige_rank = 4; // 30% + 20% = 50% drop rate
+        // Higher prestige gives a modest increase (+1% per rank)
+        game_state.prestige_rank = 10; // 15% + 10% = 25% (cap)
         let mut high_prestige_drops = 0;
-        for _ in 0..100 {
+        for _ in 0..200 {
             if try_drop_item(&game_state).is_some() {
                 high_prestige_drops += 1;
             }
         }
-        assert!(high_prestige_drops > drops); // Should be noticeably higher
-    }
-
-    #[test]
-    fn test_roll_rarity_silver_prestige() {
-        let mut rng = rand::thread_rng();
-        let mut counts = std::collections::HashMap::new();
-
-        for _ in 0..1000 {
-            let rarity = roll_rarity(2, &mut rng);
-            *counts.entry(format!("{:?}", rarity)).or_insert(0) += 1;
-        }
-
-        // Silver (prestige 2-3): 30% Common, 40% Magic, 25% Rare, 5% Epic
-        assert!(counts.get("Common").copied().unwrap_or(0) > 200);
-        assert!(counts.get("Magic").copied().unwrap_or(0) > 300);
-        assert!(counts.get("Rare").copied().unwrap_or(0) > 150);
-        // Epic should appear but be uncommon
-        assert!(counts.get("Epic").copied().unwrap_or(0) > 0);
-        // No legendary at silver tier
-        assert_eq!(counts.get("Legendary").copied().unwrap_or(0), 0);
-    }
-
-    #[test]
-    fn test_roll_rarity_gold_prestige() {
-        let mut rng = rand::thread_rng();
-        let mut found_legendary = false;
-        let mut found_epic = false;
-
-        for _ in 0..2000 {
-            let rarity = roll_rarity(4, &mut rng);
-            if rarity == Rarity::Legendary {
-                found_legendary = true;
-            }
-            if rarity == Rarity::Epic {
-                found_epic = true;
-            }
-        }
-
-        // Gold (prestige 4-5): 2% legendary, 13% epic
-        assert!(found_epic, "Gold prestige should produce epic items");
         assert!(
-            found_legendary,
-            "Gold prestige should produce legendary items"
+            high_prestige_drops > drops,
+            "Higher prestige should increase drops slightly"
         );
     }
 
     #[test]
-    fn test_roll_rarity_bronze_no_epic_or_legendary() {
+    fn test_roll_rarity_prestige_shifts_distribution() {
         let mut rng = rand::thread_rng();
 
-        for _ in 0..1000 {
-            let rarity = roll_rarity(0, &mut rng);
-            assert!(
-                rarity == Rarity::Common || rarity == Rarity::Magic || rarity == Rarity::Rare,
-                "Bronze prestige should not produce {:?}",
-                rarity
-            );
+        // At high prestige, Common % should decrease compared to prestige 0
+        let mut common_p0 = 0;
+        let mut common_p10 = 0;
+        let trials = 10000;
+
+        for _ in 0..trials {
+            if roll_rarity(0, &mut rng) == Rarity::Common {
+                common_p0 += 1;
+            }
+            if roll_rarity(10, &mut rng) == Rarity::Common {
+                common_p10 += 1;
+            }
         }
+
+        // Prestige 10 should have noticeably fewer commons (45% vs 55%)
+        assert!(
+            common_p10 < common_p0,
+            "High prestige should reduce common rate: p0={common_p0}, p10={common_p10}"
+        );
     }
 
     #[test]
@@ -271,18 +225,26 @@ mod tests {
     }
 
     #[test]
-    fn test_very_high_prestige_drop_rate_capped_behavior() {
-        // At prestige 14+: drop_chance = 0.30 + 14*0.05 = 1.0 (100%)
-        let mut game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
-        game_state.prestige_rank = 14;
+    fn test_drop_chance_capped_at_max() {
+        // Very high prestige should be capped at ITEM_DROP_MAX_CHANCE (50%)
+        let chance = drop_chance_for_prestige(100);
+        assert!(
+            (chance - ITEM_DROP_MAX_CHANCE).abs() < f64::EPSILON,
+            "Drop chance should cap at {}%, got {}%",
+            ITEM_DROP_MAX_CHANCE * 100.0,
+            chance * 100.0,
+        );
+    }
 
-        let mut drops = 0;
-        for _ in 0..50 {
-            if try_drop_item(&game_state).is_some() {
-                drops += 1;
-            }
-        }
-        // At 100% drop rate, all should drop
-        assert_eq!(drops, 50, "Prestige 14 should give 100% drop rate");
+    #[test]
+    fn test_drop_chance_for_prestige_values() {
+        // Prestige 0: 15% base
+        assert!((drop_chance_for_prestige(0) - 0.15).abs() < f64::EPSILON);
+        // Prestige 5: 15% + 5% = 20%
+        assert!((drop_chance_for_prestige(5) - 0.20).abs() < f64::EPSILON);
+        // Prestige 10: 15% + 10% = 25% (cap)
+        assert!((drop_chance_for_prestige(10) - 0.25).abs() < f64::EPSILON);
+        // Prestige 20: still capped at 25%
+        assert!((drop_chance_for_prestige(20) - 0.25).abs() < f64::EPSILON);
     }
 }
