@@ -25,6 +25,8 @@ struct CharacterSaveData {
     fishing: crate::fishing::FishingState,
     #[serde(default)]
     zone_progression: crate::zones::ZoneProgression,
+    #[serde(default)]
+    chess_stats: crate::chess::ChessStats,
 }
 
 #[derive(Debug, Clone)]
@@ -80,6 +82,7 @@ impl CharacterManager {
             active_dungeon: state.active_dungeon.clone(),
             fishing: state.fishing.clone(),
             zone_progression: state.zone_progression.clone(),
+            chess_stats: state.chess_stats.clone(),
         };
 
         let json = serde_json::to_string_pretty(&save_data)
@@ -115,6 +118,9 @@ impl CharacterManager {
             fishing: save_data.fishing,
             active_fishing: None,
             zone_progression: save_data.zone_progression,
+            challenge_menu: crate::challenge_menu::ChallengeMenu::new(),
+            chess_stats: save_data.chess_stats,
+            active_chess: None,
         })
     }
 
@@ -313,6 +319,9 @@ mod tests {
             fishing: crate::fishing::FishingState::default(),
             active_fishing: None,
             zone_progression: crate::zones::ZoneProgression::default(),
+            challenge_menu: crate::challenge_menu::ChallengeMenu::new(),
+            chess_stats: crate::chess::ChessStats::default(),
+            active_chess: None,
         };
 
         // Save character
@@ -362,6 +371,9 @@ mod tests {
             fishing: crate::fishing::FishingState::default(),
             active_fishing: None,
             zone_progression: crate::zones::ZoneProgression::default(),
+            challenge_menu: crate::challenge_menu::ChallengeMenu::new(),
+            chess_stats: crate::chess::ChessStats::default(),
+            active_chess: None,
         };
 
         let char2 = GameState {
@@ -380,6 +392,9 @@ mod tests {
             fishing: crate::fishing::FishingState::default(),
             active_fishing: None,
             zone_progression: crate::zones::ZoneProgression::default(),
+            challenge_menu: crate::challenge_menu::ChallengeMenu::new(),
+            chess_stats: crate::chess::ChessStats::default(),
+            active_chess: None,
         };
 
         manager.save_character(&char1).unwrap();
@@ -428,6 +443,9 @@ mod tests {
             fishing: crate::fishing::FishingState::default(),
             active_fishing: None,
             zone_progression: crate::zones::ZoneProgression::default(),
+            challenge_menu: crate::challenge_menu::ChallengeMenu::new(),
+            chess_stats: crate::chess::ChessStats::default(),
+            active_chess: None,
         };
 
         manager.save_character(&state).unwrap();
@@ -465,6 +483,9 @@ mod tests {
             fishing: crate::fishing::FishingState::default(),
             active_fishing: None,
             zone_progression: crate::zones::ZoneProgression::default(),
+            challenge_menu: crate::challenge_menu::ChallengeMenu::new(),
+            chess_stats: crate::chess::ChessStats::default(),
+            active_chess: None,
         };
 
         manager.save_character(&state).unwrap();
@@ -529,6 +550,9 @@ mod tests {
             fishing: crate::fishing::FishingState::default(),
             active_fishing: None,
             zone_progression: crate::zones::ZoneProgression::default(),
+            challenge_menu: crate::challenge_menu::ChallengeMenu::new(),
+            chess_stats: crate::chess::ChessStats::default(),
+            active_chess: None,
         };
 
         manager.save_character(&state).unwrap();
@@ -632,6 +656,9 @@ mod tests {
             fishing: crate::fishing::FishingState::default(),
             active_fishing: None,
             zone_progression: crate::zones::ZoneProgression::default(),
+            challenge_menu: crate::challenge_menu::ChallengeMenu::new(),
+            chess_stats: crate::chess::ChessStats::default(),
+            active_chess: None,
         };
 
         manager.save_character(&state).unwrap();
