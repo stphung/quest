@@ -50,7 +50,7 @@ fn get_prestige_name(rank: u32) -> &'static str {
 /// # Returns
 /// The PrestigeTier with name, required level, and multiplier
 pub fn get_prestige_tier(rank: u32) -> PrestigeTier {
-    let multiplier = 1.5_f64.powi(rank as i32);
+    let multiplier = 1.2_f64.powi(rank as i32);
 
     let required_level = match rank {
         0 => 0,
@@ -230,9 +230,9 @@ mod tests {
         let tier100 = get_prestige_tier(100);
         assert_eq!(tier100.name, "Eternal");
 
-        // Verify multiplier formula: 1.5^rank
-        assert_eq!(get_prestige_tier(4).multiplier, 1.5_f64.powi(4));
-        assert_eq!(get_prestige_tier(10).multiplier, 1.5_f64.powi(10));
+        // Verify multiplier formula: 1.2^rank (reduced for gentler scaling)
+        assert_eq!(get_prestige_tier(4).multiplier, 1.2_f64.powi(4));
+        assert_eq!(get_prestige_tier(10).multiplier, 1.2_f64.powi(10));
     }
 
     #[test]

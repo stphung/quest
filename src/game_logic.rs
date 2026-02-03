@@ -236,11 +236,11 @@ mod tests {
         // Rank 0, CHA 10 (+0): 1.0 + 0 = 1.0
         assert_eq!(prestige_multiplier(0, 0), 1.0);
 
-        // Rank 1, CHA 10 (+0): 1.5 + 0 = 1.5
-        assert_eq!(prestige_multiplier(1, 0), 1.5);
+        // Rank 1, CHA 10 (+0): 1.2 + 0 = 1.2 (using 1.2^rank formula)
+        assert_eq!(prestige_multiplier(1, 0), 1.2);
 
-        // Rank 1, CHA 16 (+3): 1.5 + 0.3 = 1.8
-        assert_eq!(prestige_multiplier(1, 3), 1.8);
+        // Rank 1, CHA 16 (+3): 1.2 + 0.3 = 1.5
+        assert_eq!(prestige_multiplier(1, 3), 1.5);
     }
 
     #[test]
@@ -248,8 +248,8 @@ mod tests {
         // Rank 0, WIS 10 (+0), CHA 10 (+0): 1.0 * 1.0 * 1.0 = 1.0
         assert_eq!(xp_gain_per_tick(0, 0, 0), 1.0);
 
-        // Rank 1, WIS 20 (+5), CHA 16 (+3): 1.8 * 1.25 = 2.25
-        assert_eq!(xp_gain_per_tick(1, 5, 3), 2.25);
+        // Rank 1, WIS 20 (+5), CHA 16 (+3): 1.5 * 1.25 = 1.875
+        assert_eq!(xp_gain_per_tick(1, 5, 3), 1.875);
     }
 
     #[test]
