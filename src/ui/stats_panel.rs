@@ -37,7 +37,7 @@ pub fn draw_stats_panel_with_update(
     area: Rect,
     game_state: &GameState,
     update_info: Option<&UpdateInfo>,
-    next_update_check_secs: Option<u64>,
+    update_check_completed: bool,
 ) {
     // Calculate update panel height: 4 base + changelog lines (max 5)
     let update_height = if let Some(info) = update_info {
@@ -94,8 +94,14 @@ pub fn draw_stats_panel_with_update(
     // Draw prestige info
     draw_prestige_info(frame, chunks[5], game_state);
 
-    // Draw footer with controls and update check countdown
-    draw_footer(frame, chunks[6], game_state, next_update_check_secs);
+    // Draw footer with controls and update status
+    draw_footer(
+        frame,
+        chunks[6],
+        game_state,
+        update_info.is_some(),
+        update_check_completed,
+    );
 
     // Draw update panel if available
     if let Some(info) = update_info {
@@ -583,7 +589,8 @@ fn draw_footer(
     frame: &mut Frame,
     area: Rect,
     game_state: &GameState,
-    next_update_check_secs: Option<u64>,
+    update_available: bool,
+    update_check_completed: bool,
 ) {
     use crate::build_info::{BUILD_COMMIT, BUILD_DATE};
     use crate::prestige::can_prestige;
@@ -604,12 +611,18 @@ fn draw_footer(
         )
     };
 
-    // Build update check countdown text (minutes only)
-    let update_check_text = if let Some(secs) = next_update_check_secs {
-        let mins = secs.div_ceil(60); // Round up to nearest minute
-        format!(" | Update: {}m", mins)
+    // Build update status text
+    let update_status_text = if update_available {
+        Span::styled(
+            " | 🆕 Update available",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )
+    } else if update_check_completed {
+        Span::styled(" | ✓ Up to date", Style::default().fg(Color::Green))
     } else {
-        String::new()
+        Span::styled(" | Checking...", Style::default().fg(Color::DarkGray))
     };
 
     // Build play time text
@@ -626,11 +639,11 @@ fn draw_footer(
         prestige_text,
     ]);
 
-    // Line 2: Play time and update check
+    // Line 2: Play time and update status
     let stats_line = Line::from(vec![
         Span::styled("⏱️ ", Style::default().fg(Color::Cyan)),
         Span::styled(play_time_text, Style::default().fg(Color::Cyan)),
-        Span::styled(update_check_text, Style::default().fg(Color::DarkGray)),
+        update_status_text,
     ]);
 
     let footer_text = vec![controls_line, stats_line];

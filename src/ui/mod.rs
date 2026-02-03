@@ -25,7 +25,7 @@ pub fn draw_ui_with_update(
     frame: &mut Frame,
     game_state: &GameState,
     update_info: Option<&UpdateInfo>,
-    next_update_check_secs: Option<u64>,
+    update_check_completed: bool,
 ) {
     let size = frame.size();
 
@@ -44,7 +44,7 @@ pub fn draw_ui_with_update(
         chunks[0],
         game_state,
         update_info,
-        next_update_check_secs,
+        update_check_completed,
     );
 
     // Draw right panel based on current activity

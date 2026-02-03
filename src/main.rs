@@ -457,6 +457,7 @@ fn main() -> io::Result<()> {
 
                 // Update check state - start initial background check immediately
                 let mut update_info: Option<UpdateInfo> = None;
+                let mut update_check_completed = false;
                 let mut update_check_handle: Option<std::thread::JoinHandle<Option<UpdateInfo>>> =
                     Some(std::thread::spawn(updater::check_update_info));
 
@@ -467,19 +468,12 @@ fn main() -> io::Result<()> {
                             if let Ok(info) = handle.join() {
                                 update_info = info;
                             }
+                            update_check_completed = true;
                         } else {
                             // Not finished yet, put it back
                             update_check_handle = Some(handle);
                         }
                     }
-
-                    // Calculate seconds until next update check (only if no update found yet)
-                    let next_update_check_secs = if update_info.is_none() {
-                        let elapsed = last_update_check.elapsed().as_secs();
-                        Some(UPDATE_CHECK_INTERVAL_SECONDS.saturating_sub(elapsed))
-                    } else {
-                        None // Don't show countdown once update is found
-                    };
 
                     // Draw UI
                     terminal.draw(|frame| {
@@ -487,7 +481,7 @@ fn main() -> io::Result<()> {
                             frame,
                             &state,
                             update_info.as_ref(),
-                            next_update_check_secs,
+                            update_check_completed,
                         );
                         // Draw prestige confirmation overlay if active
                         if showing_prestige_confirm {
@@ -563,6 +557,7 @@ fn main() -> io::Result<()> {
                             >= Duration::from_secs(UPDATE_CHECK_INTERVAL_SECONDS)
                     {
                         update_check_handle = Some(std::thread::spawn(updater::check_update_info));
+                        update_check_completed = false; // Reset to show "Checking..." again
                         last_update_check = Instant::now();
                     }
                 }
