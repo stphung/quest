@@ -66,6 +66,8 @@ fn generate_affixes(rarity: Rarity, rng: &mut impl Rng) -> Vec<Affix> {
     };
 
     let mut affixes = Vec::new();
+    // Note: DropRate, PrestigeBonus, OfflineRate are kept in the enum for
+    // save compatibility but no longer drop on new items (they were no-ops)
     let all_affix_types = [
         AffixType::DamagePercent,
         AffixType::CritChance,
@@ -76,9 +78,6 @@ fn generate_affixes(rarity: Rarity, rng: &mut impl Rng) -> Vec<Affix> {
         AffixType::HPRegen,
         AffixType::DamageReflection,
         AffixType::XPGain,
-        AffixType::DropRate,
-        AffixType::PrestigeBonus,
-        AffixType::OfflineRate,
     ];
 
     for _ in 0..count {

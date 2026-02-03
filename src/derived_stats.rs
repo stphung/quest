@@ -8,6 +8,10 @@ pub struct DerivedStats {
     pub magic_damage: u32,
     pub defense: u32,
     pub crit_chance_percent: u32,
+    pub crit_multiplier: f64,
+    pub attack_speed_multiplier: f64,
+    pub hp_regen_multiplier: f64,
+    pub damage_reflection_percent: f64,
     pub xp_multiplier: f64,
 }
 
@@ -62,6 +66,10 @@ impl DerivedStats {
         let mut damage_mult: f64 = 1.0;
         let mut defense_mult: f64 = 1.0;
         let mut crit_bonus: f64 = 0.0;
+        let mut crit_mult_bonus: f64 = 0.0;
+        let mut attack_speed_bonus: f64 = 0.0;
+        let mut hp_regen_bonus: f64 = 0.0;
+        let mut damage_reflection: f64 = 0.0;
         let mut xp_mult: f64 = 1.0;
 
         for item in equipment.iter_equipped() {
@@ -70,10 +78,14 @@ impl DerivedStats {
                 match affix.affix_type {
                     AffixType::DamagePercent => damage_mult *= 1.0 + (affix.value / 100.0),
                     AffixType::CritChance => crit_bonus += affix.value,
+                    AffixType::CritMultiplier => crit_mult_bonus += affix.value,
+                    AffixType::AttackSpeed => attack_speed_bonus += affix.value,
                     AffixType::HPBonus => hp_bonus += affix.value,
                     AffixType::DamageReduction => defense_mult *= 1.0 + (affix.value / 100.0),
+                    AffixType::HPRegen => hp_regen_bonus += affix.value,
+                    AffixType::DamageReflection => damage_reflection += affix.value,
                     AffixType::XPGain => xp_mult *= 1.0 + (affix.value / 100.0),
-                    _ => {} // Other affixes don't affect derived stats directly
+                    _ => {} // DropRate, PrestigeBonus, OfflineRate are no-ops
                 }
             }
         }
@@ -86,12 +98,28 @@ impl DerivedStats {
         crit_chance_percent = (crit_chance_percent as f64 + crit_bonus) as u32;
         xp_multiplier *= xp_mult;
 
+        // Base crit multiplier is 2.0x, affix adds percentage (e.g., +50% means 2.5x)
+        let crit_multiplier = 2.0 + (crit_mult_bonus / 100.0);
+
+        // Attack speed: higher = faster attacks (1.0 = normal, 1.25 = 25% faster)
+        let attack_speed_multiplier = 1.0 + (attack_speed_bonus / 100.0);
+
+        // HP regen: higher = faster regen (1.0 = normal, 1.5 = 50% faster)
+        let hp_regen_multiplier = 1.0 + (hp_regen_bonus / 100.0);
+
+        // Damage reflection: percentage of damage taken reflected back to attacker
+        let damage_reflection_percent = damage_reflection;
+
         Self {
             max_hp,
             physical_damage,
             magic_damage,
             defense,
             crit_chance_percent,
+            crit_multiplier,
+            attack_speed_multiplier,
+            hp_regen_multiplier,
+            damage_reflection_percent,
             xp_multiplier,
         }
     }

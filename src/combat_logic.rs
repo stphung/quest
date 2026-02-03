@@ -47,15 +47,21 @@ pub fn update_combat(state: &mut GameState, delta_time: f64) -> Vec<CombatEvent>
 
     // Handle regeneration after enemy death
     if state.combat_state.is_regenerating {
+        // HP regen multiplier: higher = faster regen
+        let regen_derived =
+            DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+        let effective_regen_duration =
+            HP_REGEN_DURATION_SECONDS / regen_derived.hp_regen_multiplier;
+
         state.combat_state.regen_timer += delta_time;
 
-        if state.combat_state.regen_timer >= HP_REGEN_DURATION_SECONDS {
+        if state.combat_state.regen_timer >= effective_regen_duration {
             state.combat_state.player_current_hp = state.combat_state.player_max_hp;
             state.combat_state.is_regenerating = false;
             state.combat_state.regen_timer = 0.0;
         } else {
             // Gradual regen
-            let regen_progress = state.combat_state.regen_timer / HP_REGEN_DURATION_SECONDS;
+            let regen_progress = state.combat_state.regen_timer / effective_regen_duration;
             let start_hp = state.combat_state.player_current_hp;
             let target_hp = state.combat_state.player_max_hp;
             state.combat_state.player_current_hp =
@@ -72,10 +78,13 @@ pub fn update_combat(state: &mut GameState, delta_time: f64) -> Vec<CombatEvent>
     // Update attack timer
     state.combat_state.attack_timer += delta_time;
 
-    if state.combat_state.attack_timer >= ATTACK_INTERVAL_SECONDS {
-        state.combat_state.attack_timer = 0.0;
+    let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
 
-        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+    // Attack speed multiplier: higher = faster attacks
+    let effective_attack_interval = ATTACK_INTERVAL_SECONDS / derived.attack_speed_multiplier;
+
+    if state.combat_state.attack_timer >= effective_attack_interval {
+        state.combat_state.attack_timer = 0.0;
 
         // Check if boss requires a weapon we don't have
         if let Some(weapon_name) = state.zone_progression.boss_weapon_blocked() {
@@ -93,7 +102,7 @@ pub fn update_combat(state: &mut GameState, delta_time: f64) -> Vec<CombatEvent>
             // Roll for crit
             let crit_roll = rand::thread_rng().gen_range(0..100);
             if crit_roll < derived.crit_chance_percent {
-                damage *= 2;
+                damage = (damage as f64 * derived.crit_multiplier) as u32;
                 was_crit = true;
             }
 
@@ -152,7 +161,7 @@ pub fn update_combat(state: &mut GameState, delta_time: f64) -> Vec<CombatEvent>
         }
 
         // Enemy attacks back
-        if let Some(enemy) = state.combat_state.current_enemy.as_ref() {
+        if let Some(enemy) = state.combat_state.current_enemy.as_mut() {
             let enemy_damage = enemy.damage.saturating_sub(derived.defense);
             state.combat_state.player_current_hp = state
                 .combat_state
@@ -162,6 +171,15 @@ pub fn update_combat(state: &mut GameState, delta_time: f64) -> Vec<CombatEvent>
             events.push(CombatEvent::EnemyAttack {
                 damage: enemy_damage,
             });
+
+            // Damage reflection: reflect percentage of damage taken back to attacker
+            if derived.damage_reflection_percent > 0.0 && enemy_damage > 0 {
+                let reflected =
+                    (enemy_damage as f64 * derived.damage_reflection_percent / 100.0) as u32;
+                if reflected > 0 {
+                    enemy.take_damage(reflected);
+                }
+            }
 
             // Check if player died
             if !state.combat_state.is_player_alive() {
