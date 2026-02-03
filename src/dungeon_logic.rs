@@ -192,11 +192,11 @@ fn move_to_room(dungeon: &mut Dungeon, new_pos: (usize, usize)) -> Vec<DungeonEv
     // Move to new room
     dungeon.player_position = new_pos;
 
-    // Get room type before mutating
-    let room_type = dungeon
+    // Get room type and previous state before mutating
+    let (room_type, was_already_cleared) = dungeon
         .get_room(new_pos.0, new_pos.1)
-        .map(|r| r.room_type)
-        .unwrap_or(RoomType::Combat);
+        .map(|r| (r.room_type, r.state == RoomState::Cleared))
+        .unwrap_or((RoomType::Combat, false));
 
     // Mark new room as current
     if let Some(new_room) = dungeon.get_room_mut(new_pos.0, new_pos.1) {
@@ -207,8 +207,9 @@ fn move_to_room(dungeon: &mut Dungeon, new_pos: (usize, usize)) -> Vec<DungeonEv
     reveal_adjacent_rooms(dungeon, new_pos.0, new_pos.1);
 
     // Set current_room_cleared based on room type
-    // Combat rooms need enemy defeated before moving on
-    dungeon.current_room_cleared = matches!(room_type, RoomType::Entrance | RoomType::Treasure);
+    // Combat rooms need enemy defeated before moving on, unless already cleared
+    dungeon.current_room_cleared =
+        matches!(room_type, RoomType::Entrance | RoomType::Treasure) || was_already_cleared;
 
     // Emit entered room event
     events.push(DungeonEvent::EnteredRoom {
@@ -216,31 +217,33 @@ fn move_to_room(dungeon: &mut Dungeon, new_pos: (usize, usize)) -> Vec<DungeonEv
         position: new_pos,
     });
 
-    // Handle room-specific events
-    match room_type {
-        RoomType::Elite => {
-            events.push(DungeonEvent::CombatStarted {
-                is_elite: true,
-                is_boss: false,
-            });
-        }
-        RoomType::Boss => {
-            events.push(DungeonEvent::CombatStarted {
-                is_elite: false,
-                is_boss: true,
-            });
-        }
-        RoomType::Combat => {
-            events.push(DungeonEvent::CombatStarted {
-                is_elite: false,
-                is_boss: false,
-            });
-        }
-        RoomType::Treasure => {
-            events.push(DungeonEvent::TreasureFound);
-        }
-        RoomType::Entrance => {
-            // No special event for entrance
+    // Handle room-specific events (only if room wasn't already cleared)
+    if !was_already_cleared {
+        match room_type {
+            RoomType::Elite => {
+                events.push(DungeonEvent::CombatStarted {
+                    is_elite: true,
+                    is_boss: false,
+                });
+            }
+            RoomType::Boss => {
+                events.push(DungeonEvent::CombatStarted {
+                    is_elite: false,
+                    is_boss: true,
+                });
+            }
+            RoomType::Combat => {
+                events.push(DungeonEvent::CombatStarted {
+                    is_elite: false,
+                    is_boss: false,
+                });
+            }
+            RoomType::Treasure => {
+                events.push(DungeonEvent::TreasureFound);
+            }
+            RoomType::Entrance => {
+                // No special event for entrance
+            }
         }
     }
 
@@ -515,5 +518,53 @@ mod tests {
 
         // Cap at Legendary
         assert_eq!(boost_rarity(Rarity::Legendary, 3), Rarity::Legendary);
+    }
+
+    #[test]
+    fn test_cleared_room_no_combat_on_reentry() {
+        let mut dungeon = generate_dungeon(10, 0);
+        let start_pos = dungeon.player_position;
+
+        // Find an adjacent combat room
+        let neighbors = dungeon.get_connected_neighbors(start_pos.0, start_pos.1);
+        let combat_room_pos = neighbors
+            .iter()
+            .find(|&&(x, y)| {
+                dungeon
+                    .get_room(x, y)
+                    .map(|r| r.room_type == RoomType::Combat)
+                    .unwrap_or(false)
+            })
+            .copied();
+
+        if let Some(combat_pos) = combat_room_pos {
+            // Move to the combat room (first time - should start combat)
+            let events1 = move_to_room(&mut dungeon, combat_pos);
+            assert!(!dungeon.current_room_cleared);
+            assert!(events1
+                .iter()
+                .any(|e| matches!(e, DungeonEvent::CombatStarted { .. })));
+
+            // Simulate clearing the room
+            on_room_enemy_defeated(&mut dungeon);
+            assert!(dungeon.current_room_cleared);
+
+            // Mark room as cleared and move back to entrance
+            if let Some(room) = dungeon.get_room_mut(combat_pos.0, combat_pos.1) {
+                room.state = RoomState::Cleared;
+            }
+            dungeon.player_position = start_pos;
+
+            // Re-enter the cleared combat room (should NOT start combat)
+            let events2 = move_to_room(&mut dungeon, combat_pos);
+
+            // Should be immediately cleared (no combat needed)
+            assert!(dungeon.current_room_cleared);
+
+            // Should NOT have CombatStarted event
+            assert!(!events2
+                .iter()
+                .any(|e| matches!(e, DungeonEvent::CombatStarted { .. })));
+        }
     }
 }
