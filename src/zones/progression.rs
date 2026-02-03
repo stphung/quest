@@ -81,6 +81,26 @@ impl ZoneProgression {
         }
     }
 
+    /// Checks if the current boss requires a weapon the player doesn't have.
+    /// Returns Some(weapon_name) if blocked, None if can proceed.
+    pub fn boss_weapon_blocked(&self) -> Option<&'static str> {
+        if !self.fighting_boss {
+            return None;
+        }
+
+        let zones = get_all_zones();
+        let zone = zones.iter().find(|z| z.id == self.current_zone_id)?;
+
+        // Only the zone's final boss requires the weapon
+        let is_zone_boss = self.current_subzone_id == zone.subzones.len() as u32;
+
+        if zone.requires_weapon && is_zone_boss && !self.has_stormbreaker {
+            zone.weapon_name
+        } else {
+            None
+        }
+    }
+
     /// Checks if a boss has been defeated.
     pub fn is_boss_defeated(&self, zone_id: u32, subzone_id: u32) -> bool {
         self.defeated_bosses.contains(&(zone_id, subzone_id))

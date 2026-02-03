@@ -12,6 +12,10 @@ pub enum CombatEvent {
         damage: u32,
         was_crit: bool,
     },
+    /// Player's attack was blocked because boss requires a weapon
+    PlayerAttackBlocked {
+        weapon_needed: String,
+    },
     EnemyAttack {
         damage: u32,
     },
@@ -73,72 +77,82 @@ pub fn update_combat(state: &mut GameState, delta_time: f64) -> Vec<CombatEvent>
 
         let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
 
-        // Player attacks
-        let mut damage = derived.total_damage();
-        let mut was_crit = false;
+        // Check if boss requires a weapon we don't have
+        if let Some(weapon_name) = state.zone_progression.boss_weapon_blocked() {
+            // Attack is blocked - no damage dealt
+            events.push(CombatEvent::PlayerAttackBlocked {
+                weapon_needed: weapon_name.to_string(),
+            });
 
-        // Roll for crit
-        let crit_roll = rand::thread_rng().gen_range(0..100);
-        if crit_roll < derived.crit_chance_percent {
-            damage *= 2;
-            was_crit = true;
-        }
+            // Enemy still attacks back (see below)
+        } else {
+            // Player attacks normally
+            let mut damage = derived.total_damage();
+            let mut was_crit = false;
 
-        if let Some(enemy) = state.combat_state.current_enemy.as_mut() {
-            enemy.take_damage(damage);
-            events.push(CombatEvent::PlayerAttack { damage, was_crit });
+            // Roll for crit
+            let crit_roll = rand::thread_rng().gen_range(0..100);
+            if crit_roll < derived.crit_chance_percent {
+                damage *= 2;
+                was_crit = true;
+            }
 
-            // Check if enemy died
-            if !enemy.is_alive() {
-                let wis_mod = state
-                    .attributes
-                    .modifier(crate::attributes::AttributeType::Wisdom);
-                let cha_mod = state
-                    .attributes
-                    .modifier(crate::attributes::AttributeType::Charisma);
-                let xp_gained = crate::game_logic::combat_kill_xp(
-                    crate::game_logic::xp_gain_per_tick(state.prestige_rank, wis_mod, cha_mod),
-                );
+            if let Some(enemy) = state.combat_state.current_enemy.as_mut() {
+                enemy.take_damage(damage);
+                events.push(CombatEvent::PlayerAttack { damage, was_crit });
 
-                // Check if we're in a dungeon and what type of room
-                let dungeon_room_type = state
-                    .active_dungeon
-                    .as_ref()
-                    .and_then(|d| d.current_room())
-                    .map(|r| r.room_type);
+                // Check if enemy died
+                if !enemy.is_alive() {
+                    let wis_mod = state
+                        .attributes
+                        .modifier(crate::attributes::AttributeType::Wisdom);
+                    let cha_mod = state
+                        .attributes
+                        .modifier(crate::attributes::AttributeType::Charisma);
+                    let xp_gained = crate::game_logic::combat_kill_xp(
+                        crate::game_logic::xp_gain_per_tick(state.prestige_rank, wis_mod, cha_mod),
+                    );
 
-                match dungeon_room_type {
-                    Some(RoomType::Elite) => {
-                        events.push(CombatEvent::EliteDefeated { xp_gained });
-                    }
-                    Some(RoomType::Boss) => {
-                        events.push(CombatEvent::BossDefeated { xp_gained });
-                    }
-                    _ => {
-                        // Check if this was a subzone boss (overworld)
-                        if state.zone_progression.fighting_boss {
-                            let result =
-                                state.zone_progression.on_boss_defeated(state.prestige_rank);
-                            events.push(CombatEvent::SubzoneBossDefeated { xp_gained, result });
-                        } else {
-                            // Record the kill for boss spawn tracking
-                            let boss_spawns = state.zone_progression.record_kill();
-                            events.push(CombatEvent::EnemyDied { xp_gained });
+                    // Check if we're in a dungeon and what type of room
+                    let dungeon_room_type = state
+                        .active_dungeon
+                        .as_ref()
+                        .and_then(|d| d.current_room())
+                        .map(|r| r.room_type);
 
-                            // If boss should spawn, it will be handled by spawn_enemy_if_needed
-                            if boss_spawns {
-                                // Boss flag is now set, next spawn will be the boss
+                    match dungeon_room_type {
+                        Some(RoomType::Elite) => {
+                            events.push(CombatEvent::EliteDefeated { xp_gained });
+                        }
+                        Some(RoomType::Boss) => {
+                            events.push(CombatEvent::BossDefeated { xp_gained });
+                        }
+                        _ => {
+                            // Check if this was a subzone boss (overworld)
+                            if state.zone_progression.fighting_boss {
+                                let result =
+                                    state.zone_progression.on_boss_defeated(state.prestige_rank);
+                                events.push(CombatEvent::SubzoneBossDefeated { xp_gained, result });
+                            } else {
+                                // Record the kill for boss spawn tracking
+                                let boss_spawns = state.zone_progression.record_kill();
+                                events.push(CombatEvent::EnemyDied { xp_gained });
+
+                                // If boss should spawn, it will be handled by spawn_enemy_if_needed
+                                if boss_spawns {
+                                    // Boss flag is now set, next spawn will be the boss
+                                }
                             }
                         }
                     }
+
+                    // Remove enemy and start regeneration
+                    state.combat_state.current_enemy = None;
+                    state.combat_state.is_regenerating = true;
+                    state.combat_state.regen_timer = 0.0;
+
+                    return events;
                 }
-
-                // Remove enemy and start regeneration
-                state.combat_state.current_enemy = None;
-                state.combat_state.is_regenerating = true;
-                state.combat_state.regen_timer = 0.0;
-
-                return events;
             }
         }
 

@@ -131,7 +131,15 @@ fn draw_zone_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
     };
 
     // Build the boss progress display
-    let boss_progress = if prog.fighting_boss {
+    let boss_progress = if let Some(weapon) = prog.boss_weapon_blocked() {
+        // Fighting boss that requires weapon we don't have
+        Span::styled(
+            format!(" ⚔️ BOSS: {} [Need {}!] ", boss_name, weapon),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD | Modifier::SLOW_BLINK),
+        )
+    } else if prog.fighting_boss {
         Span::styled(
             format!(" ⚔️ BOSS: {} ", boss_name),
             Style::default()
