@@ -173,14 +173,18 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
 fn draw_catch_progress(frame: &mut Frame, area: Rect, session: &FishingSession) {
     use crate::fishing::FishingPhase;
 
+    use super::throbber::spinner_char;
+
+    let spinner = spinner_char();
+
     let caught = session.fish_caught.len() as u32;
     let total = session.total_fish;
 
     // Get phase text and color
     let (phase_text, phase_color) = match session.phase {
-        FishingPhase::Casting => ("🎣 Casting line...", Color::White),
-        FishingPhase::Waiting => ("🌊 Waiting for bite...", Color::Cyan),
-        FishingPhase::Reeling => ("🐟 FISH ON! Reeling in!", Color::Yellow),
+        FishingPhase::Casting => (format!("{} Casting line...", spinner), Color::White),
+        FishingPhase::Waiting => (format!("{} Waiting for bite...", spinner), Color::Cyan),
+        FishingPhase::Reeling => ("🐟 FISH ON! Reeling in!".to_string(), Color::Yellow),
     };
 
     let progress_text = vec![

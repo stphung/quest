@@ -88,13 +88,18 @@ fn render_simple_sprite(frame: &mut Frame, area: Rect, game_state: &GameState) {
             .alignment(Alignment::Center),
         );
     } else {
-        // No enemy - show waiting message
+        // No enemy - show waiting message with spinner and rotating messages
+        use super::throbber::{spinner_char, waiting_message};
+
+        let spinner = spinner_char();
+        let message = waiting_message(game_state.character_xp);
+
         let msg_line = (area.height / 2) as usize;
         for i in 0..area.height as usize {
             if i == msg_line {
                 sprite_lines.push(
                     Line::from(vec![Span::styled(
-                        "Waiting for enemy...",
+                        format!("{} {}", spinner, message),
                         Style::default()
                             .fg(Color::DarkGray)
                             .add_modifier(Modifier::ITALIC),
