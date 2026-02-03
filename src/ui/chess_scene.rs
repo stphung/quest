@@ -40,92 +40,131 @@ pub fn render_chess_scene(frame: &mut Frame, area: Rect, game: &ChessGame) {
 }
 
 fn render_board(frame: &mut Frame, area: Rect, game: &ChessGame) {
-    let board_width: u16 = 34; // 2 (rank labels) + 8*4 (squares)
-    let board_height: u16 = 10;
+    // Clean grid style: 5 chars per square + borders + rank label
+    let cell_width: u16 = 5;
+    let board_width: u16 = 3 + (cell_width * 8) + 1; // rank label + 8 cells + right border
+    let board_height: u16 = 11; // 8 rows + top border + bottom border + file labels
 
     let x_offset = area.x + (area.width.saturating_sub(board_width)) / 2;
     let y_offset = area.y + (area.height.saturating_sub(board_height)) / 2;
 
-    // File labels (4-char spacing)
-    let files = "   a   b   c   d   e   f   g   h";
-    let top_labels = Paragraph::new(files).style(Style::default().fg(Color::DarkGray));
-    frame.render_widget(top_labels, Rect::new(x_offset, y_offset, board_width, 1));
+    let border_color = Color::Rgb(80, 80, 80); // Dark gray border
+
+    // Top border: ┌────┬────┬...┐
+    let mut top_border = String::from("  ┌");
+    for i in 0..8 {
+        top_border.push_str("────");
+        if i < 7 {
+            top_border.push('┬');
+        }
+    }
+    top_border.push('┐');
+    let top = Paragraph::new(top_border).style(Style::default().fg(border_color));
+    frame.render_widget(top, Rect::new(x_offset, y_offset, board_width, 1));
 
     // Render each rank (8 down to 1)
     for rank in (0..8).rev() {
         let y = y_offset + 1 + (7 - rank) as u16;
-        let rank_label = format!("{}", rank + 1);
+        let rank_label = format!("{} ", rank + 1);
 
-        // Left rank label
-        let label = Paragraph::new(rank_label.clone()).style(Style::default().fg(Color::DarkGray));
-        frame.render_widget(label, Rect::new(x_offset, y, 1, 1));
+        // Rank label
+        let label = Paragraph::new(rank_label).style(Style::default().fg(Color::DarkGray));
+        frame.render_widget(label, Rect::new(x_offset, y, 2, 1));
 
-        // Squares (4 chars each)
+        // Left border
+        let left_border = Paragraph::new("│").style(Style::default().fg(border_color));
+        frame.render_widget(left_border, Rect::new(x_offset + 2, y, 1, 1));
+
+        // Squares
         for file in 0..8u8 {
-            let x = x_offset + 2 + (file as u16 * 4);
+            let x = x_offset + 3 + (file as u16 * cell_width);
 
-            let is_light = (file + rank) % 2 == 1;
             let is_cursor = game.cursor == (file, rank);
             let is_selected = game.selected_square == Some((file, rank));
             let is_legal_destination = game.legal_move_destinations.contains(&(file, rank));
 
-            // Background color for highlighted states
-            let bg_color = if is_cursor {
-                if is_legal_destination {
-                    Color::Rgb(200, 200, 50) // Yellow-green for cursor on legal move
-                } else {
-                    Color::Yellow
-                }
-            } else if is_selected {
-                Color::Green
-            } else if is_legal_destination {
-                Color::Rgb(144, 238, 144) // Light green for legal moves
-            } else {
-                Color::Reset // Use default terminal background
-            };
-
             let piece_char = get_piece_at(&game.board, file, rank);
 
-            // Piece foreground color (white pieces = white, black pieces = dark gray)
-            let fg_color = if piece_char.map(is_white_piece).unwrap_or(false) {
-                Color::White
-            } else if piece_char.is_some() {
-                Color::Rgb(60, 60, 60) // Dark gray for black pieces
-            } else {
-                Color::DarkGray // Fill character color
-            };
-
-            // Build square content: dark squares use ▓, light squares use spaces
-            let square_str = if is_light {
-                // Light square: spaces around piece
+            // Build square content
+            let (content, fg_color) = if is_cursor {
+                // Cursor: show piece or brackets
                 match piece_char {
-                    Some(c) => format!(" {}  ", c),
-                    None => "    ".to_string(),
+                    Some(c) => {
+                        let color = if is_white_piece(c) {
+                            Color::White
+                        } else {
+                            Color::Rgb(140, 140, 140)
+                        };
+                        (format!("[{}]", c), color)
+                    }
+                    None => {
+                        if is_legal_destination {
+                            (" ◆  ".to_string(), Color::Rgb(200, 100, 200)) // Pink diamond for legal move under cursor
+                        } else {
+                            (" □  ".to_string(), Color::Rgb(100, 100, 100)) // Empty cursor
+                        }
+                    }
+                }
+            } else if is_selected {
+                // Selected piece: highlight
+                match piece_char {
+                    Some(c) => (format!("<{}>", c), Color::Rgb(100, 200, 100)),
+                    None => ("    ".to_string(), Color::Reset),
+                }
+            } else if is_legal_destination {
+                // Legal move indicator: pink dot
+                match piece_char {
+                    Some(c) => {
+                        let color = if is_white_piece(c) {
+                            Color::White
+                        } else {
+                            Color::Rgb(140, 140, 140)
+                        };
+                        (format!(" {}  ", c), color)
+                    }
+                    None => (" ·  ".to_string(), Color::Rgb(200, 100, 200)), // Pink dot
                 }
             } else {
-                // Dark square: ▓ fill pattern
+                // Normal square
                 match piece_char {
-                    Some(c) => format!("▓{}▓▓", c),
-                    None => "▓▓▓▓".to_string(),
+                    Some(c) => {
+                        let color = if is_white_piece(c) {
+                            Color::White
+                        } else {
+                            Color::Rgb(140, 140, 140)
+                        };
+                        (format!(" {}  ", c), color)
+                    }
+                    None => ("    ".to_string(), Color::Reset),
                 }
             };
 
-            let style = Style::default().fg(fg_color).bg(bg_color);
-            let square = Paragraph::new(square_str).style(style);
+            let style = Style::default().fg(fg_color);
+            let square = Paragraph::new(content).style(style);
             frame.render_widget(square, Rect::new(x, y, 4, 1));
-        }
 
-        // Right rank label
-        let label_r = Paragraph::new(rank_label).style(Style::default().fg(Color::DarkGray));
-        frame.render_widget(label_r, Rect::new(x_offset + 34, y, 1, 1));
+            // Cell separator
+            let sep = Paragraph::new("│").style(Style::default().fg(border_color));
+            frame.render_widget(sep, Rect::new(x + 4, y, 1, 1));
+        }
     }
 
-    // Bottom file labels
-    let bottom_labels = Paragraph::new(files).style(Style::default().fg(Color::DarkGray));
-    frame.render_widget(
-        bottom_labels,
-        Rect::new(x_offset, y_offset + 9, board_width, 1),
-    );
+    // Bottom border: └────┴────┴...┘
+    let mut bottom_border = String::from("  └");
+    for i in 0..8 {
+        bottom_border.push_str("────");
+        if i < 7 {
+            bottom_border.push('┴');
+        }
+    }
+    bottom_border.push('┘');
+    let bottom = Paragraph::new(bottom_border).style(Style::default().fg(border_color));
+    frame.render_widget(bottom, Rect::new(x_offset, y_offset + 9, board_width, 1));
+
+    // File labels (A-H)
+    let files = "   A    B    C    D    E    F    G    H";
+    let file_labels = Paragraph::new(files).style(Style::default().fg(Color::DarkGray));
+    frame.render_widget(file_labels, Rect::new(x_offset, y_offset + 10, board_width, 1));
 }
 
 fn render_status(frame: &mut Frame, area: Rect, game: &ChessGame) {
