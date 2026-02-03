@@ -726,12 +726,19 @@ mod tests {
 
         // With key, should head toward boss
         if let Some(next_pos) = next {
-            // Next position should be on path to boss
-            let path = find_path_to(&dungeon, dungeon.player_position, boss_pos);
-            if let Some(path) = path {
-                if path.len() > 1 {
-                    assert_eq!(next_pos, path[1]);
-                }
+            // The next position should bring us closer to the boss
+            // (there may be multiple shortest paths, so we verify progress, not exact path)
+            let current_distance =
+                find_path_to(&dungeon, dungeon.player_position, boss_pos).map(|p| p.len());
+            let next_distance = find_path_to(&dungeon, next_pos, boss_pos).map(|p| p.len());
+
+            if let (Some(curr_dist), Some(next_dist)) = (current_distance, next_distance) {
+                assert!(
+                    next_dist < curr_dist,
+                    "Next position {:?} should be closer to boss than current {:?}",
+                    next_pos,
+                    dungeon.player_position
+                );
             }
         }
     }
