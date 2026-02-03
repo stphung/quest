@@ -227,9 +227,11 @@ fn move_to_room(dungeon: &mut Dungeon, new_pos: (usize, usize)) -> Vec<DungeonEv
         .map(|r| (r.room_type, r.state == RoomState::Cleared))
         .unwrap_or((RoomType::Combat, false));
 
-    // Mark new room as current
+    // Mark new room as current (unless already cleared - don't re-count on backtrack)
     if let Some(new_room) = dungeon.get_room_mut(new_pos.0, new_pos.1) {
-        new_room.state = RoomState::Current;
+        if new_room.state != RoomState::Cleared {
+            new_room.state = RoomState::Current;
+        }
     }
 
     // Reveal adjacent rooms
@@ -939,6 +941,55 @@ mod tests {
             // Old room (entrance) should now be counted as cleared
             assert_eq!(dungeon.rooms_cleared, initial_cleared + 1);
         }
+    }
+
+    #[test]
+    fn test_backtracking_does_not_double_count_rooms() {
+        let mut dungeon = generate_dungeon(10, 0);
+        let start_pos = dungeon.player_position;
+
+        let neighbors = dungeon.get_connected_neighbors(start_pos.0, start_pos.1);
+        if neighbors.is_empty() {
+            return; // Skip if no neighbors (shouldn't happen)
+        }
+
+        let next_pos = neighbors[0];
+
+        // Move to adjacent room (clears entrance)
+        move_to_room(&mut dungeon, next_pos);
+        let cleared_after_first_move = dungeon.rooms_cleared;
+        assert_eq!(cleared_after_first_move, 1, "Should have cleared entrance");
+
+        // Mark current room as cleared so we can leave it
+        dungeon.current_room_cleared = true;
+
+        // Backtrack to entrance (already cleared)
+        move_to_room(&mut dungeon, start_pos);
+        let cleared_after_backtrack = dungeon.rooms_cleared;
+
+        // Should have cleared the second room, but NOT re-counted the entrance
+        assert_eq!(
+            cleared_after_backtrack, 2,
+            "Backtracking should clear the room we left, but not re-count the cleared room we entered"
+        );
+
+        // Move forward again through the cleared entrance
+        dungeon.current_room_cleared = true;
+        move_to_room(&mut dungeon, next_pos);
+
+        // Should NOT increment again - both rooms already cleared
+        assert_eq!(
+            dungeon.rooms_cleared, 2,
+            "Moving through already-cleared rooms should not increment count"
+        );
+
+        // Verify we never exceed total room count
+        assert!(
+            (dungeon.rooms_cleared as usize) <= dungeon.room_count(),
+            "rooms_cleared ({}) should never exceed room_count ({})",
+            dungeon.rooms_cleared,
+            dungeon.room_count()
+        );
     }
 
     // ============ on_boss_defeated tests ============
