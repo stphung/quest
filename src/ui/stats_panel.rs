@@ -423,7 +423,7 @@ fn draw_prestige_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
             ),
         ]),
         Line::from(vec![
-            Span::styled("🔄 Total: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::styled("🔄 Resets: ", Style::default().add_modifier(Modifier::BOLD)),
             Span::styled(
                 format!("{}", game_state.total_prestige_count),
                 Style::default().fg(Color::Magenta),
