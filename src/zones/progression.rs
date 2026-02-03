@@ -93,8 +93,9 @@ impl ZoneProgression {
 
         // Only the zone's final boss requires the weapon
         let is_zone_boss = self.current_subzone_id == zone.subzones.len() as u32;
+        let needs_weapon = zone.requires_weapon && is_zone_boss && !self.has_stormbreaker;
 
-        if zone.requires_weapon && is_zone_boss && !self.has_stormbreaker {
+        if needs_weapon {
             zone.weapon_name
         } else {
             None
@@ -156,60 +157,51 @@ impl ZoneProgression {
         let zone_id = self.current_zone_id;
         let subzone_id = self.current_subzone_id;
 
-        // Check if this was the zone's final boss
         let zones = get_all_zones();
-        let zone = zones.iter().find(|z| z.id == zone_id);
+        let Some(zone) = zones.iter().find(|z| z.id == zone_id) else {
+            return BossDefeatResult::SubzoneComplete {
+                new_subzone_id: self.current_subzone_id,
+            };
+        };
+
+        let is_zone_boss = subzone_id == zone.subzones.len() as u32;
 
         // Check for Zone 10 final boss weapon requirement
-        if let Some(zone) = zone {
-            let is_zone_boss = subzone_id == zone.subzones.len() as u32;
-            if zone.requires_weapon && is_zone_boss && !self.has_stormbreaker {
-                // Can't defeat this boss without the weapon - boss survives!
-                // Reset fighting state so player can try again (after getting weapon)
-                self.fighting_boss = false;
-                self.kills_in_subzone = 0;
-                return BossDefeatResult::WeaponRequired {
-                    weapon_name: zone.weapon_name.unwrap_or("legendary weapon").to_string(),
-                };
-            }
+        if zone.requires_weapon && is_zone_boss && !self.has_stormbreaker {
+            // Can't defeat this boss without the weapon - boss survives!
+            // Reset fighting state so player can try again (after getting weapon)
+            self.fighting_boss = false;
+            self.kills_in_subzone = 0;
+            return BossDefeatResult::WeaponRequired {
+                weapon_name: zone.weapon_name.unwrap_or("legendary weapon").to_string(),
+            };
         }
 
         // Record the defeat
         self.defeat_boss(zone_id, subzone_id);
 
-        let zone = zones.iter().find(|z| z.id == zone_id);
-
-        if let Some(zone) = zone {
-            let is_zone_boss = subzone_id == zone.subzones.len() as u32;
-
-            if is_zone_boss {
-                // Try to advance to next zone
-                if self.advance_to_next_zone(prestige_rank) {
-                    return BossDefeatResult::ZoneComplete {
-                        old_zone: zone.name.to_string(),
-                        new_zone_id: self.current_zone_id,
-                    };
-                } else {
-                    // Can't advance - either no more zones or prestige-gated
-                    let next_zone = zones.iter().find(|z| z.id == zone_id + 1);
-                    if let Some(next) = next_zone {
-                        return BossDefeatResult::ZoneCompleteButGated {
-                            zone_name: zone.name.to_string(),
-                            required_prestige: next.prestige_requirement,
-                        };
-                    } else {
-                        return BossDefeatResult::GameComplete;
-                    }
-                }
-            } else {
-                // Advance to next subzone
-                self.advance_to_next_subzone();
-                return BossDefeatResult::SubzoneComplete {
-                    new_subzone_id: self.current_subzone_id,
+        if is_zone_boss {
+            // Try to advance to next zone
+            if self.advance_to_next_zone(prestige_rank) {
+                return BossDefeatResult::ZoneComplete {
+                    old_zone: zone.name.to_string(),
+                    new_zone_id: self.current_zone_id,
                 };
             }
+
+            // Can't advance - either no more zones or prestige-gated
+            let next_zone = zones.iter().find(|z| z.id == zone_id + 1);
+            if let Some(next) = next_zone {
+                return BossDefeatResult::ZoneCompleteButGated {
+                    zone_name: zone.name.to_string(),
+                    required_prestige: next.prestige_requirement,
+                };
+            }
+            return BossDefeatResult::GameComplete;
         }
 
+        // Advance to next subzone
+        self.advance_to_next_subzone();
         BossDefeatResult::SubzoneComplete {
             new_subzone_id: self.current_subzone_id,
         }

@@ -717,21 +717,14 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
                     let item_name = item.display_name.clone();
                     let rarity = item.rarity;
                     let equipped = auto_equip_if_better(item, game_state);
-
-                    let rarity_name = match rarity {
-                        items::Rarity::Common => "Common",
-                        items::Rarity::Magic => "Magic",
-                        items::Rarity::Rare => "Rare",
-                        items::Rarity::Epic => "Epic",
-                        items::Rarity::Legendary => "Legendary",
-                    };
-
                     let stars = "⭐".repeat(rarity as usize + 1);
                     let equipped_text = if equipped { " (equipped!)" } else { "" };
-
                     let message = format!(
                         "🎁 Found: {} [{}] {}{}",
-                        item_name, rarity_name, stars, equipped_text
+                        item_name,
+                        rarity.name(),
+                        stars,
+                        equipped_text
                     );
                     game_state.combat_state.add_log_entry(message, false, true);
                 }

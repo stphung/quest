@@ -44,23 +44,19 @@ fn calculate_attribute_weights(game_state: &GameState) -> AttributeBonuses {
     use crate::attributes::AttributeType;
 
     let attrs = &game_state.attributes;
-
-    let str_val = attrs.get(AttributeType::Strength);
-    let dex_val = attrs.get(AttributeType::Dexterity);
-    let con_val = attrs.get(AttributeType::Constitution);
-    let int_val = attrs.get(AttributeType::Intelligence);
-    let wis_val = attrs.get(AttributeType::Wisdom);
-    let cha_val = attrs.get(AttributeType::Charisma);
-
-    let total = (str_val + dex_val + con_val + int_val + wis_val + cha_val).max(1);
+    let attr_values: Vec<u32> = AttributeType::all()
+        .iter()
+        .map(|&attr| attrs.get(attr))
+        .collect();
+    let total = attr_values.iter().sum::<u32>().max(1);
 
     AttributeBonuses {
-        str: 1 + (str_val * 100 / total),
-        dex: 1 + (dex_val * 100 / total),
-        con: 1 + (con_val * 100 / total),
-        int: 1 + (int_val * 100 / total),
-        wis: 1 + (wis_val * 100 / total),
-        cha: 1 + (cha_val * 100 / total),
+        str: 1 + (attr_values[0] * 100 / total),
+        dex: 1 + (attr_values[1] * 100 / total),
+        con: 1 + (attr_values[2] * 100 / total),
+        int: 1 + (attr_values[3] * 100 / total),
+        wis: 1 + (attr_values[4] * 100 / total),
+        cha: 1 + (attr_values[5] * 100 / total),
     }
 }
 

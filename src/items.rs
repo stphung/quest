@@ -21,6 +21,19 @@ pub enum Rarity {
     Legendary = 4,
 }
 
+impl Rarity {
+    /// Returns the display name for this rarity tier.
+    pub fn name(&self) -> &'static str {
+        match self {
+            Rarity::Common => "Common",
+            Rarity::Magic => "Magic",
+            Rarity::Rare => "Rare",
+            Rarity::Epic => "Epic",
+            Rarity::Legendary => "Legendary",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AttributeBonuses {
     pub str: u32,
@@ -45,6 +58,13 @@ impl AttributeBonuses {
 
     pub fn total(&self) -> u32 {
         self.str + self.dex + self.con + self.int + self.wis + self.cha
+    }
+
+    /// Converts to an Attributes struct with base 0 values plus these bonuses.
+    pub fn to_attributes(&self) -> crate::attributes::Attributes {
+        crate::attributes::Attributes::from_bonuses(
+            self.str, self.dex, self.con, self.int, self.wis, self.cha,
+        )
     }
 }
 

@@ -77,6 +77,25 @@ impl Attributes {
         let value = self.get(attr) as i32;
         (value - 10) / 2
     }
+
+    /// Adds another Attributes' values to this one (for equipment bonuses).
+    pub fn add(&mut self, other: &Attributes) {
+        for attr in AttributeType::all() {
+            self.values[attr.index()] += other.get(attr);
+        }
+    }
+
+    /// Creates Attributes from individual attribute bonuses.
+    pub fn from_bonuses(str: u32, dex: u32, con: u32, int: u32, wis: u32, cha: u32) -> Self {
+        let mut attrs = Self::new();
+        attrs.values[0] = str;
+        attrs.values[1] = dex;
+        attrs.values[2] = con;
+        attrs.values[3] = int;
+        attrs.values[4] = wis;
+        attrs.values[5] = cha;
+        attrs
+    }
 }
 
 #[cfg(test)]

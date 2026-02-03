@@ -134,14 +134,9 @@ pub fn update_combat(state: &mut GameState, delta_time: f64) -> Vec<CombatEvent>
                                     state.zone_progression.on_boss_defeated(state.prestige_rank);
                                 events.push(CombatEvent::SubzoneBossDefeated { xp_gained, result });
                             } else {
-                                // Record the kill for boss spawn tracking
-                                let boss_spawns = state.zone_progression.record_kill();
+                                // Record the kill for boss spawn tracking (boss flag set if threshold reached)
+                                state.zone_progression.record_kill();
                                 events.push(CombatEvent::EnemyDied { xp_gained });
-
-                                // If boss should spawn, it will be handled by spawn_enemy_if_needed
-                                if boss_spawns {
-                                    // Boss flag is now set, next spawn will be the boss
-                                }
                             }
                         }
                     }
