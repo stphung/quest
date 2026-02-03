@@ -154,4 +154,155 @@ mod tests {
             assert!(!names.is_empty());
         }
     }
+
+    #[test]
+    fn test_all_affix_types_have_prefix() {
+        let affix_types = [
+            AffixType::DamagePercent,
+            AffixType::CritChance,
+            AffixType::CritMultiplier,
+            AffixType::AttackSpeed,
+            AffixType::HPBonus,
+            AffixType::DamageReduction,
+            AffixType::HPRegen,
+            AffixType::DamageReflection,
+            AffixType::XPGain,
+            AffixType::DropRate,
+            AffixType::PrestigeBonus,
+            AffixType::OfflineRate,
+        ];
+        for affix_type in affix_types {
+            let prefix = get_affix_prefix(affix_type);
+            assert!(
+                !prefix.is_empty(),
+                "Affix {:?} should have a prefix",
+                affix_type
+            );
+        }
+    }
+
+    #[test]
+    fn test_all_affix_types_have_suffix() {
+        let affix_types = [
+            AffixType::DamagePercent,
+            AffixType::CritChance,
+            AffixType::CritMultiplier,
+            AffixType::AttackSpeed,
+            AffixType::HPBonus,
+            AffixType::DamageReduction,
+            AffixType::HPRegen,
+            AffixType::DamageReflection,
+            AffixType::XPGain,
+            AffixType::DropRate,
+            AffixType::PrestigeBonus,
+            AffixType::OfflineRate,
+        ];
+        for affix_type in affix_types {
+            let suffix = get_affix_suffix(affix_type);
+            assert!(
+                !suffix.is_empty(),
+                "Affix {:?} should have a suffix",
+                affix_type
+            );
+            assert!(
+                suffix.starts_with("of "),
+                "Suffix for {:?} should start with 'of '",
+                affix_type
+            );
+        }
+    }
+
+    #[test]
+    fn test_epic_item_name_with_affix() {
+        let item = Item {
+            slot: EquipmentSlot::Armor,
+            rarity: Rarity::Epic,
+            base_name: String::new(),
+            display_name: String::new(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![Affix {
+                affix_type: AffixType::HPBonus,
+                value: 50.0,
+            }],
+        };
+        let name = generate_display_name(&item);
+        // Should use affix prefix "Sturdy" or suffix "of Vitality"
+        assert!(
+            name.contains("Sturdy") || name.contains("of Vitality"),
+            "Epic item name '{}' should contain affix-derived prefix or suffix",
+            name
+        );
+    }
+
+    #[test]
+    fn test_legendary_item_name_with_affix() {
+        let item = Item {
+            slot: EquipmentSlot::Weapon,
+            rarity: Rarity::Legendary,
+            base_name: String::new(),
+            display_name: String::new(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![Affix {
+                affix_type: AffixType::CritChance,
+                value: 30.0,
+            }],
+        };
+        let name = generate_display_name(&item);
+        assert!(
+            name.contains("Deadly") || name.contains("of Precision"),
+            "Legendary item name '{}' should reference CritChance affix",
+            name
+        );
+    }
+
+    #[test]
+    fn test_rare_item_without_affixes_uses_base_name() {
+        let item = Item {
+            slot: EquipmentSlot::Ring,
+            rarity: Rarity::Rare,
+            base_name: String::new(),
+            display_name: String::new(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![],
+        };
+        let name = generate_display_name(&item);
+        // Should be a plain base name since there are no affixes
+        let ring_names = get_base_name(EquipmentSlot::Ring);
+        assert!(
+            ring_names.iter().any(|&n| name == n),
+            "Rare item with no affixes should use plain base name, got '{}'",
+            name
+        );
+    }
+
+    #[test]
+    fn test_common_name_is_base_name_only() {
+        // Run multiple times since base name is randomly chosen
+        for _ in 0..20 {
+            let item = Item {
+                slot: EquipmentSlot::Boots,
+                rarity: Rarity::Common,
+                base_name: String::new(),
+                display_name: String::new(),
+                attributes: AttributeBonuses::new(),
+                affixes: vec![],
+            };
+            let name = generate_display_name(&item);
+            let base_names = get_base_name(EquipmentSlot::Boots);
+            assert!(
+                base_names.iter().any(|&n| name == n),
+                "Common item name '{}' should be one of the base names",
+                name
+            );
+        }
+    }
+
+    #[test]
+    fn test_quality_prefix_only_for_magic() {
+        assert_eq!(get_quality_prefix(Rarity::Common), "");
+        assert_eq!(get_quality_prefix(Rarity::Magic), "Fine");
+        assert_eq!(get_quality_prefix(Rarity::Rare), "");
+        assert_eq!(get_quality_prefix(Rarity::Epic), "");
+        assert_eq!(get_quality_prefix(Rarity::Legendary), "");
+    }
 }
