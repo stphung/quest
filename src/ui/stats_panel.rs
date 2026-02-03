@@ -40,7 +40,7 @@ pub fn draw_stats_panel(frame: &mut Frame, area: Rect, game_state: &GameState) {
             Constraint::Length(3),  // Zone info
             Constraint::Length(14), // Attributes (6 attributes + borders)
             Constraint::Length(6),  // Derived stats (condensed)
-            Constraint::Length(8),  // Equipment section
+            Constraint::Min(16),    // Equipment section (grows to fit)
             Constraint::Length(6),  // Prestige info + fishing rank
             Constraint::Length(3),  // Footer
         ])
@@ -434,10 +434,10 @@ fn draw_equipment_section(frame: &mut Frame, area: Rect, game_state: &GameState)
                 Rarity::Legendary => Color::LightRed,
             };
 
-            // First line: icon, slot, name, rarity, stars
+            // Line 1: icon, name, rarity, stars
             let stars = "⭐".repeat(item.rarity as usize + 1);
-            let item_name = if item.display_name.len() > 25 {
-                format!("{}...", &item.display_name[..22])
+            let item_name = if item.display_name.len() > 28 {
+                format!("{}...", &item.display_name[..25])
             } else {
                 item.display_name.clone()
             };
@@ -453,34 +453,48 @@ fn draw_equipment_section(frame: &mut Frame, area: Rect, game_state: &GameState)
                 Span::raw(format!(" {}", stars)),
             ]));
 
-            // Second line: attribute bonuses and affixes (indented)
-            let mut bonuses = Vec::new();
-
-            // Add attribute bonuses
+            // Line 2: attribute bonuses with colored emojis
             let attr_bonuses = [
-                (item.attributes.str, "STR"),
-                (item.attributes.dex, "DEX"),
-                (item.attributes.con, "CON"),
-                (item.attributes.int, "INT"),
-                (item.attributes.wis, "WIS"),
-                (item.attributes.cha, "CHA"),
+                (item.attributes.str, "💪", Color::Red),
+                (item.attributes.dex, "🏃", Color::Green),
+                (item.attributes.con, "❤️", Color::Magenta),
+                (item.attributes.int, "🧠", Color::Blue),
+                (item.attributes.wis, "👁️", Color::Cyan),
+                (item.attributes.cha, "✨", Color::Yellow),
             ];
-            for (value, name) in attr_bonuses {
+
+            let mut attr_spans: Vec<Span> = vec![Span::raw("   ")];
+            let mut has_attrs = false;
+            for (value, emoji, color) in attr_bonuses {
                 if value > 0 {
-                    bonuses.push(format!("+{}{}", value, name));
+                    if has_attrs {
+                        attr_spans.push(Span::raw(" "));
+                    }
+                    attr_spans.push(Span::styled(
+                        format!("{}+{}", emoji, value),
+                        Style::default().fg(color),
+                    ));
+                    has_attrs = true;
                 }
             }
 
-            // Add affixes
-            for affix in &item.affixes {
-                bonuses.push(format_affix(affix));
+            if has_attrs {
+                lines.push(Line::from(attr_spans));
             }
 
-            if !bonuses.is_empty() {
-                lines.push(Line::from(vec![
-                    Span::raw("             "),
-                    Span::styled(bonuses.join(", "), Style::default().fg(Color::Gray)),
-                ]));
+            // Line 3: affixes (if any)
+            if !item.affixes.is_empty() {
+                let mut affix_spans: Vec<Span> = vec![Span::raw("   ")];
+                for (i, affix) in item.affixes.iter().enumerate() {
+                    if i > 0 {
+                        affix_spans.push(Span::styled(" ", Style::default()));
+                    }
+                    affix_spans.push(Span::styled(
+                        format_affix(affix),
+                        Style::default().fg(Color::Gray),
+                    ));
+                }
+                lines.push(Line::from(affix_spans));
             }
         } else {
             // Empty slot
