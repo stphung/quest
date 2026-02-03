@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
-[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-blue.svg)](https://github.com/stphung/quest/releases/latest)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-blue.svg)](https://github.com/stphung/quest/releases/latest)
 
 A terminal-based idle RPG game written in Rust. Watch your hero grow stronger automatically as they battle enemies across different zones!
 
@@ -15,11 +15,6 @@ A terminal-based idle RPG game written in Rust. Watch your hero grow stronger au
 **macOS / Linux:**
 ```bash
 curl -sSf https://raw.githubusercontent.com/stphung/quest/main/install.sh | sh
-```
-
-**Windows (PowerShell):**
-```powershell
-irm https://raw.githubusercontent.com/stphung/quest/main/install.ps1 | iex
 ```
 
 Then run `quest` to start your adventure!
@@ -44,14 +39,9 @@ Then run `quest` to start your adventure!
 curl -sSf https://raw.githubusercontent.com/stphung/quest/main/install.sh | sh
 ```
 
-**Windows (PowerShell):**
-```powershell
-irm https://raw.githubusercontent.com/stphung/quest/main/install.ps1 | iex
-```
-
 The installer will:
 - Download the latest release for your platform
-- Install to `~/.local/bin/quest` (or `%USERPROFILE%\.local\bin\quest.exe` on Windows)
+- Install to `~/.local/bin/quest`
 - Provide instructions to add to PATH if needed
 
 ### Manual Download
@@ -61,7 +51,6 @@ Download the latest release for your platform from the [releases page](https://g
 **Supported platforms:**
 - Linux (x86_64)
 - macOS (Intel x86_64 and Apple Silicon ARM64)
-- Windows (x86_64)
 
 ### Building from Source
 
@@ -156,7 +145,7 @@ Your current zone is determined by your average level:
 
 ## Save System
 
-- Save file location: `~/.local/share/idle-rpg/save.dat` (Linux/macOS) or `%APPDATA%\idle-rpg\save.dat` (Windows)
+- Save file location: `~/.local/share/idle-rpg/save.dat`
 - Saves are checksummed to prevent corruption
 - Auto-saves every 30 seconds
 - Manual save on exit
