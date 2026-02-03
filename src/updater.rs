@@ -420,20 +420,20 @@ pub fn run_update_command() -> Result<bool, Box<dyn Error>> {
             );
             println!();
 
-            // Show changelog (max 10 entries)
+            // Show changelog (max 20 entries)
             if !changelog.is_empty() {
                 println!("What's new:");
-                for entry in changelog.iter().take(10) {
+                for entry in changelog.iter().take(20) {
                     // Truncate long messages
-                    let msg = if entry.message.len() > 50 {
-                        format!("{}...", &entry.message[..47])
+                    let msg = if entry.message.len() > 60 {
+                        format!("{}...", &entry.message[..57])
                     } else {
                         entry.message.clone()
                     };
                     println!("  • {}", msg);
                 }
-                if changelog.len() > 10 {
-                    println!("  ...and {} more", changelog.len() - 10);
+                if changelog.len() > 20 {
+                    println!("  ...and {} more", changelog.len() - 20);
                 }
                 println!();
             }
