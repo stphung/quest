@@ -229,8 +229,8 @@ fn spawn_dungeon_enemy(state: &mut GameState) {
     state.combat_state.attack_timer = 0.0;
 }
 
-/// Flat chance to discover a dungeon after killing an enemy (5%)
-const DUNGEON_DISCOVERY_CHANCE: f64 = 0.05;
+/// Flat chance to discover a dungeon after killing an enemy (2%)
+const DUNGEON_DISCOVERY_CHANCE: f64 = 0.02;
 
 /// Attempts to discover a dungeon after killing an enemy
 /// Returns true if a dungeon was discovered and entered
