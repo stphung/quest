@@ -1,7 +1,34 @@
 //! Generic challenge menu system for player-controlled minigames.
 //!
 //! The challenge menu holds pending challenges that players can accept or decline.
-//! Chess is the first producer, but future minigames can add their own challenge types.
+//! Challenge discovery uses a single roll per tick. On success, a weighted distribution
+//! table determines which challenge type appears.
+
+use crate::game_state::GameState;
+use rand::Rng;
+
+/// Chance per tick to discover any challenge (~2 hour average)
+/// At 10 ticks/sec, 0.000014 chance/tick ≈ 71,429 ticks ≈ 2 hours average
+pub const CHALLENGE_DISCOVERY_CHANCE: f64 = 0.000014;
+
+/// Entry in the challenge distribution table
+struct ChallengeWeight {
+    challenge_type: ChallengeType,
+    weight: u32,
+}
+
+/// Weighted distribution table for challenge types.
+/// Higher weight = more likely to appear when a challenge is discovered.
+const CHALLENGE_TABLE: &[ChallengeWeight] = &[
+    ChallengeWeight {
+        challenge_type: ChallengeType::Chess,
+        weight: 50,
+    },
+    ChallengeWeight {
+        challenge_type: ChallengeType::Morris,
+        weight: 50,
+    },
+];
 
 /// A single pending challenge in the menu
 #[derive(Debug, Clone)]
@@ -13,7 +40,7 @@ pub struct PendingChallenge {
 }
 
 /// Extensible enum for different minigame challenges
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ChallengeType {
     Chess,
     Morris,
@@ -34,16 +61,8 @@ impl ChallengeMenu {
         Self::default()
     }
 
-    pub fn has_chess_challenge(&self) -> bool {
-        self.challenges
-            .iter()
-            .any(|c| matches!(c.challenge_type, ChallengeType::Chess))
-    }
-
-    pub fn has_morris_challenge(&self) -> bool {
-        self.challenges
-            .iter()
-            .any(|c| matches!(c.challenge_type, ChallengeType::Morris))
+    pub fn has_challenge(&self, ct: &ChallengeType) -> bool {
+        self.challenges.iter().any(|c| c.challenge_type == *ct)
     }
 
     pub fn add_challenge(&mut self, challenge: PendingChallenge) {
@@ -106,6 +125,72 @@ impl ChallengeMenu {
     }
 }
 
+/// Check if challenge discovery conditions are met, roll once, and pick from weighted table.
+/// Returns the discovered ChallengeType if one was added to the menu, or None.
+pub fn try_discover_challenge<R: Rng>(state: &mut GameState, rng: &mut R) -> Option<ChallengeType> {
+    // Requirements: P1+, not in dungeon, not fishing, not in active minigame
+    if state.prestige_rank < 1
+        || state.active_dungeon.is_some()
+        || state.active_fishing.is_some()
+        || state.active_chess.is_some()
+        || state.active_morris.is_some()
+    {
+        return None;
+    }
+
+    // Single roll for any challenge
+    if rng.gen::<f64>() >= CHALLENGE_DISCOVERY_CHANCE {
+        return None;
+    }
+
+    // Build eligible entries: exclude types already pending in the menu
+    let eligible: Vec<&ChallengeWeight> = CHALLENGE_TABLE
+        .iter()
+        .filter(|entry| !state.challenge_menu.has_challenge(&entry.challenge_type))
+        .collect();
+
+    if eligible.is_empty() {
+        return None;
+    }
+
+    let total_weight: u32 = eligible.iter().map(|e| e.weight).sum();
+    let mut roll = rng.gen_range(0..total_weight);
+
+    for entry in &eligible {
+        if roll < entry.weight {
+            let challenge = create_challenge(&entry.challenge_type);
+            let ct = entry.challenge_type.clone();
+            state.challenge_menu.add_challenge(challenge);
+            return Some(ct);
+        }
+        roll -= entry.weight;
+    }
+
+    None
+}
+
+/// Create a PendingChallenge from a ChallengeType
+fn create_challenge(ct: &ChallengeType) -> PendingChallenge {
+    match ct {
+        ChallengeType::Chess => PendingChallenge {
+            challenge_type: ChallengeType::Chess,
+            title: "Chess Challenge".to_string(),
+            icon: "♟",
+            description: "A hooded figure sits alone at a stone table, chess pieces \
+                gleaming in the firelight. \"Care for a game?\" they ask."
+                .to_string(),
+        },
+        ChallengeType::Morris => PendingChallenge {
+            challenge_type: ChallengeType::Morris,
+            title: "Nine Men's Morris".to_string(),
+            icon: "\u{25CB}",
+            description: "An elderly sage arranges nine white stones on a weathered board. \
+                \"The game of mills,\" they say. \"Three in a row captures. Shall we play?\""
+                .to_string(),
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -130,9 +215,9 @@ mod tests {
     #[test]
     fn test_add_and_check_challenge() {
         let mut menu = ChallengeMenu::new();
-        assert!(!menu.has_chess_challenge());
+        assert!(!menu.has_challenge(&ChallengeType::Chess));
         menu.add_challenge(make_chess_challenge());
-        assert!(menu.has_chess_challenge());
+        assert!(menu.has_challenge(&ChallengeType::Chess));
         assert_eq!(menu.challenges.len(), 1);
     }
 

@@ -1,50 +1,10 @@
-//! Nine Men's Morris game logic: discovery, AI moves, and game resolution.
+//! Nine Men's Morris game logic: AI moves, and game resolution.
 
-use crate::challenge_menu::{ChallengeType, PendingChallenge};
 use crate::game_state::GameState;
 use crate::morris::{
     MorrisDifficulty, MorrisGame, MorrisMove, MorrisPhase, MorrisResult, Player, ADJACENCIES, MILLS,
 };
 use rand::Rng;
-
-/// Chance per tick to discover a morris challenge (~2 hour average)
-/// At 10 ticks/sec, 0.000014 chance/tick = 71,429 ticks = 2 hours average
-pub const MORRIS_DISCOVERY_CHANCE: f64 = 0.000014;
-
-/// Create a morris challenge for the challenge menu
-pub fn create_morris_challenge() -> PendingChallenge {
-    PendingChallenge {
-        challenge_type: ChallengeType::Morris,
-        title: "Nine Men's Morris".to_string(),
-        icon: "\u{25CB}", // White circle
-        description: "An elderly sage arranges nine white stones on a weathered board. \
-            \"The game of mills,\" they say. \"Three in a row captures. Shall we play?\""
-            .to_string(),
-    }
-}
-
-/// Check if morris discovery conditions are met and roll for discovery
-pub fn try_discover_morris<R: Rng>(state: &mut GameState, rng: &mut R) -> bool {
-    // Requirements: P1+, not in dungeon, not fishing, not in chess, not in morris, no pending morris
-    if state.prestige_rank < 1
-        || state.active_dungeon.is_some()
-        || state.active_fishing.is_some()
-        || state.active_chess.is_some()
-        || state.active_morris.is_some()
-        || state.challenge_menu.has_morris_challenge()
-    {
-        return false;
-    }
-
-    if rng.gen::<f64>() < MORRIS_DISCOVERY_CHANCE {
-        state
-            .challenge_menu
-            .add_challenge(create_morris_challenge());
-        true
-    } else {
-        false
-    }
-}
 
 /// Start a morris game with the selected difficulty
 pub fn start_morris_game(state: &mut GameState, difficulty: MorrisDifficulty) {
@@ -483,38 +443,41 @@ fn count_mobility(game: &MorrisGame, player: Player) -> i32 {
     moves
 }
 
-/// Apply game result: grant prestige on win
-pub fn apply_game_result(state: &mut GameState) -> Option<(MorrisResult, u32)> {
+/// Apply game result: grant XP on win (scaled to current level).
+/// Returns (result, xp_gained, fishing_rank_up).
+pub fn apply_game_result(state: &mut GameState) -> Option<(MorrisResult, u64, bool)> {
     let game = state.active_morris.as_ref()?;
     let result = game.game_result?;
     let difficulty = game.difficulty;
 
-    let prestige_gained = match result {
+    let mut fishing_rank_up = false;
+    let xp_gained = match result {
         MorrisResult::Win => {
-            let reward = difficulty.reward_prestige();
-            state.prestige_rank += reward;
+            let xp_for_level = crate::game_logic::xp_for_next_level(state.character_level.max(1));
+            let reward =
+                (xp_for_level as f64 * difficulty.reward_xp_percent() as f64 / 100.0) as u64;
+            let reward = reward.max(100); // Floor of 100 XP
+            state.character_xp += reward;
+
+            // Master difficulty grants +1 fishing rank (capped at 30)
+            if difficulty == MorrisDifficulty::Master && state.fishing.rank < 30 {
+                state.fishing.rank += 1;
+                state.fishing.fish_toward_next_rank = 0;
+                fishing_rank_up = true;
+            }
+
             reward
         }
         MorrisResult::Loss | MorrisResult::Forfeit => 0,
     };
 
     state.active_morris = None;
-    Some((result, prestige_gained))
+    Some((result, xp_gained, fishing_rank_up))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // ============ Challenge Creation Tests ============
-
-    #[test]
-    fn test_create_challenge() {
-        let challenge = create_morris_challenge();
-        assert_eq!(challenge.title, "Nine Men's Morris");
-        assert_eq!(challenge.icon, "\u{25CB}");
-        assert!(matches!(challenge.challenge_type, ChallengeType::Morris));
-    }
 
     // ============ Placing Moves Tests ============
 
@@ -903,7 +866,51 @@ mod tests {
     #[test]
     fn test_apply_win_result() {
         let mut state = GameState::new("Test".to_string(), 0);
-        state.prestige_rank = 5;
+        state.character_level = 10;
+
+        let mut game = MorrisGame::new(MorrisDifficulty::Master);
+        game.game_result = Some(MorrisResult::Win);
+        state.active_morris = Some(game);
+
+        let old_xp = state.character_xp;
+        let old_fishing_rank = state.fishing.rank;
+        let result = apply_game_result(&mut state);
+
+        assert!(result.is_some());
+        let (morris_result, xp_gained, fishing_rank_up) = result.unwrap();
+        assert_eq!(morris_result, MorrisResult::Win);
+        // Master = 200% of xp_for_next_level(10) = 6324
+        assert_eq!(xp_gained, 6324);
+        assert_eq!(state.character_xp, old_xp + 6324);
+        // Master grants +1 fishing rank
+        assert!(fishing_rank_up);
+        assert_eq!(state.fishing.rank, old_fishing_rank + 1);
+        assert_eq!(state.fishing.fish_toward_next_rank, 0);
+        assert!(state.active_morris.is_none());
+    }
+
+    #[test]
+    fn test_apply_win_novice_no_fishing_rank() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.character_level = 5;
+
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        game.game_result = Some(MorrisResult::Win);
+        state.active_morris = Some(game);
+
+        let old_fishing_rank = state.fishing.rank;
+        let result = apply_game_result(&mut state);
+
+        let (_, _, fishing_rank_up) = result.unwrap();
+        assert!(!fishing_rank_up);
+        assert_eq!(state.fishing.rank, old_fishing_rank);
+    }
+
+    #[test]
+    fn test_apply_win_master_fishing_rank_capped_at_30() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.character_level = 10;
+        state.fishing.rank = 30; // Already max
 
         let mut game = MorrisGame::new(MorrisDifficulty::Master);
         game.game_result = Some(MorrisResult::Win);
@@ -911,46 +918,46 @@ mod tests {
 
         let result = apply_game_result(&mut state);
 
-        assert!(result.is_some());
-        let (morris_result, prestige) = result.unwrap();
-        assert_eq!(morris_result, MorrisResult::Win);
-        assert_eq!(prestige, 5); // Master reward
-        assert_eq!(state.prestige_rank, 10);
-        assert!(state.active_morris.is_none());
+        let (_, _, fishing_rank_up) = result.unwrap();
+        assert!(!fishing_rank_up);
+        assert_eq!(state.fishing.rank, 30);
     }
 
     #[test]
     fn test_apply_loss_result() {
         let mut state = GameState::new("Test".to_string(), 0);
-        state.prestige_rank = 5;
 
         let mut game = MorrisGame::new(MorrisDifficulty::Novice);
         game.game_result = Some(MorrisResult::Loss);
         state.active_morris = Some(game);
 
+        let old_xp = state.character_xp;
         let result = apply_game_result(&mut state);
 
-        let (morris_result, prestige) = result.unwrap();
+        let (morris_result, xp_gained, fishing_rank_up) = result.unwrap();
         assert_eq!(morris_result, MorrisResult::Loss);
-        assert_eq!(prestige, 0);
-        assert_eq!(state.prestige_rank, 5); // Unchanged
+        assert_eq!(xp_gained, 0);
+        assert!(!fishing_rank_up);
+        assert_eq!(state.character_xp, old_xp); // Unchanged
         assert!(state.active_morris.is_none());
     }
 
     #[test]
     fn test_apply_forfeit_result() {
         let mut state = GameState::new("Test".to_string(), 0);
-        state.prestige_rank = 5;
 
         let mut game = MorrisGame::new(MorrisDifficulty::Novice);
         game.game_result = Some(MorrisResult::Forfeit);
         state.active_morris = Some(game);
 
+        let old_xp = state.character_xp;
         let result = apply_game_result(&mut state);
 
-        let (morris_result, prestige) = result.unwrap();
+        let (morris_result, xp_gained, fishing_rank_up) = result.unwrap();
         assert_eq!(morris_result, MorrisResult::Forfeit);
-        assert_eq!(prestige, 0);
+        assert_eq!(xp_gained, 0);
+        assert!(!fishing_rank_up);
+        assert_eq!(state.character_xp, old_xp); // Unchanged
         assert!(state.active_morris.is_none());
     }
 

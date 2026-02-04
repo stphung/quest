@@ -144,12 +144,14 @@ impl MorrisDifficulty {
         }
     }
 
-    pub fn reward_prestige(&self) -> u32 {
+    /// XP reward as a percentage of XP needed for current level.
+    /// e.g. 25 means 25% of `xp_for_next_level(current_level)`.
+    pub fn reward_xp_percent(&self) -> u32 {
         match self {
-            Self::Novice => 1,
-            Self::Apprentice => 2,
-            Self::Journeyman => 3,
-            Self::Master => 5,
+            Self::Novice => 50,
+            Self::Apprentice => 100,
+            Self::Journeyman => 150,
+            Self::Master => 200,
         }
     }
 
@@ -443,11 +445,11 @@ mod tests {
         assert_eq!(MorrisDifficulty::Journeyman.random_move_chance(), 0.0);
         assert_eq!(MorrisDifficulty::Master.random_move_chance(), 0.0);
 
-        // Prestige rewards
-        assert_eq!(MorrisDifficulty::Novice.reward_prestige(), 1);
-        assert_eq!(MorrisDifficulty::Apprentice.reward_prestige(), 2);
-        assert_eq!(MorrisDifficulty::Journeyman.reward_prestige(), 3);
-        assert_eq!(MorrisDifficulty::Master.reward_prestige(), 5);
+        // XP reward percentages
+        assert_eq!(MorrisDifficulty::Novice.reward_xp_percent(), 50);
+        assert_eq!(MorrisDifficulty::Apprentice.reward_xp_percent(), 100);
+        assert_eq!(MorrisDifficulty::Journeyman.reward_xp_percent(), 150);
+        assert_eq!(MorrisDifficulty::Master.reward_xp_percent(), 200);
 
         // Names
         assert_eq!(MorrisDifficulty::Novice.name(), "Novice");
