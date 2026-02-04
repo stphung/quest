@@ -37,6 +37,8 @@ pub mod minesweeper_logic;
 pub mod morris;
 pub mod morris_logic;
 pub mod prestige;
+pub mod rune;
+pub mod rune_logic;
 pub mod save_manager;
 pub mod updater;
 pub mod zones;
