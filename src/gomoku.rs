@@ -73,6 +73,17 @@ impl GomokuDifficulty {
             Self::Master => 5,
         }
     }
+
+    /// XP reward as a percentage of XP needed for current level.
+    /// e.g. 50 means 50% of `xp_for_next_level(current_level)`.
+    pub fn reward_xp_percent(&self) -> u32 {
+        match self {
+            Self::Novice => 50,
+            Self::Apprentice => 100,
+            Self::Journeyman => 150,
+            Self::Master => 200,
+        }
+    }
 }
 
 /// Game result

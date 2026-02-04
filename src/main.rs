@@ -46,6 +46,8 @@ use crossterm::terminal::{
 use crossterm::ExecutableCommand;
 use game_logic::*;
 use game_state::*;
+use gomoku::GomokuDifficulty;
+use gomoku_logic::start_gomoku_game;
 use morris::{
     CursorDirection as MorrisCursorDirection, MorrisDifficulty, MorrisMove, MorrisResult,
 };
@@ -873,6 +875,13 @@ fn main() -> io::Result<()> {
                                                             );
                                                         start_morris_game(&mut state, difficulty);
                                                     }
+                                                    ChallengeType::Gomoku => {
+                                                        let difficulty =
+                                                            GomokuDifficulty::from_index(
+                                                                menu.selected_difficulty,
+                                                            );
+                                                        start_gomoku_game(&mut state, difficulty);
+                                                    }
                                                 }
                                             }
                                         }
@@ -995,6 +1004,10 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
                 ChallengeType::Morris => (
                     "\u{25CB}",
                     "A cloaked stranger approaches with a weathered board...",
+                ),
+                ChallengeType::Gomoku => (
+                    "◎",
+                    "A wandering strategist places a worn board before you...",
                 ),
             };
             game_state

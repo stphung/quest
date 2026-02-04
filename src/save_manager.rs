@@ -264,6 +264,7 @@ impl SaveManager {
             chess_stats: crate::chess::ChessStats::default(),
             active_chess: None,
             active_morris: None,
+            active_gomoku: None,
         }
     }
 }

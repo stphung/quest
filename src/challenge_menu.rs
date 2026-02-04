@@ -22,11 +22,15 @@ struct ChallengeWeight {
 const CHALLENGE_TABLE: &[ChallengeWeight] = &[
     ChallengeWeight {
         challenge_type: ChallengeType::Chess,
-        weight: 50,
+        weight: 33,
     },
     ChallengeWeight {
         challenge_type: ChallengeType::Morris,
-        weight: 50,
+        weight: 33,
+    },
+    ChallengeWeight {
+        challenge_type: ChallengeType::Gomoku,
+        weight: 34,
     },
 ];
 
@@ -44,6 +48,7 @@ pub struct PendingChallenge {
 pub enum ChallengeType {
     Chess,
     Morris,
+    Gomoku,
 }
 
 /// Menu state for navigation
@@ -134,6 +139,7 @@ pub fn try_discover_challenge<R: Rng>(state: &mut GameState, rng: &mut R) -> Opt
         || state.active_fishing.is_some()
         || state.active_chess.is_some()
         || state.active_morris.is_some()
+        || state.active_gomoku.is_some()
     {
         return None;
     }
@@ -186,6 +192,14 @@ fn create_challenge(ct: &ChallengeType) -> PendingChallenge {
             icon: "\u{25CB}",
             description: "An elderly sage arranges nine white stones on a weathered board. \
                 \"The game of mills,\" they say. \"Three in a row captures. Shall we play?\""
+                .to_string(),
+        },
+        ChallengeType::Gomoku => PendingChallenge {
+            challenge_type: ChallengeType::Gomoku,
+            title: "Gomoku".to_string(),
+            icon: "◎",
+            description: "A wandering strategist places a worn board before you. \
+                \"Five stones in a row,\" they explain. \"Simple rules, deep tactics.\""
                 .to_string(),
         },
     }

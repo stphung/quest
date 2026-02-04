@@ -1,8 +1,15 @@
 //! Gomoku game logic and AI.
 
-use crate::gomoku::{GomokuGame, GomokuResult, Player, BOARD_SIZE};
+use crate::game_state::GameState;
+use crate::gomoku::{GomokuDifficulty, GomokuGame, GomokuResult, Player, BOARD_SIZE};
 use rand::seq::SliceRandom;
 use rand::Rng;
+
+/// Start a gomoku game with the selected difficulty
+pub fn start_gomoku_game(state: &mut GameState, difficulty: GomokuDifficulty) {
+    state.active_gomoku = Some(GomokuGame::new(difficulty));
+    state.challenge_menu.close();
+}
 
 /// Directions to check for lines: (row_delta, col_delta)
 const DIRECTIONS: [(i32, i32); 4] = [
