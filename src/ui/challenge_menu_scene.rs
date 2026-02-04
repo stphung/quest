@@ -97,9 +97,10 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
         ])
         .split(inner);
 
-    // Description
-    let desc =
-        Paragraph::new(challenge.description.clone()).style(Style::default().fg(Color::White));
+    // Description (with text wrapping)
+    let desc = Paragraph::new(challenge.description.clone())
+        .style(Style::default().fg(Color::White))
+        .wrap(ratatui::widgets::Wrap { trim: true });
     frame.render_widget(desc, chunks[0]);
 
     // Difficulty selector
