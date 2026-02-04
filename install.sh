@@ -35,7 +35,7 @@ detect_platform() {
             esac
             ;;
         *)
-            error "Unsupported OS: $OS. Use install.ps1 for Windows."
+            error "Unsupported OS: $OS. Only macOS and Linux are supported."
             ;;
     esac
 
