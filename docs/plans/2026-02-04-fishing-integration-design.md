@@ -27,7 +27,15 @@ Permanent passive combat bonuses at each tier boundary, calculated in `derived_s
 | 25 | Master | +5% XP multiplier |
 | 30 | Grandmaster | +10% all damage |
 
-Bonuses are cumulative. A rank 30 fisher has all six. Displayed as a "Fishing Mastery" line in the stats panel when the player has at least one milestone. Bonuses are derived from the already-persisted `fishing.rank` — no additional serialization needed.
+Bonuses are cumulative. A rank 30 fisher has all six. Bonuses are baked directly into `derived_stats.rs` calculations (like equipment bonuses) so the Derived Stats numbers already reflect them. The Prestige section displays which mastery bonuses are active as a compact line:
+
+```
+🎣 Fishing: Kraken Caller (25)
+🐟 +2%Crit +5%Regen +3%DMG +5%Def +5%XP
+████████░░░░░ 1200/1500
+```
+
+The mastery line only appears at rank 5+. If bonuses fit on one line, use one line; wrap to a second if needed. The Prestige section height adjusts dynamically.
 
 **Files:** `derived_stats.rs`, `fishing.rs`, `ui/stats_panel.rs`
 
@@ -51,10 +59,12 @@ When a fishing session completes, the player receives a "Well-Fed" buff granting
 - Timer ticks down continuously (during combat, dungeons, idle)
 
 **UI:**
-- Stats panel shows "Well-Fed: +X% XP (Mm Ss remaining)" when active
+- When Well-Fed is active, the XP Mult line in Derived Stats is replaced:
+  `📈 XP Mult: 1.50x (+25% Well-Fed 2m30s)`
+  When inactive, shows normally: `📈 XP Mult: 1.50x`
 - Combat kill XP messages include bonus: "+300 XP (+25% Well-Fed)"
 
-**Files:** `game_state.rs`, `main.rs`, `combat_logic.rs`, `ui/stats_panel.rs`, `ui/combat_scene.rs`
+**Files:** `game_state.rs`, `main.rs`, `combat_logic.rs`, `ui/stats_panel.rs`
 
 ## Pacing Analysis
 
