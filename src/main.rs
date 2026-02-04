@@ -25,6 +25,8 @@ mod item_generation;
 mod item_names;
 mod item_scoring;
 mod items;
+mod minesweeper;
+mod minesweeper_logic;
 mod morris;
 mod morris_logic;
 mod prestige;
@@ -993,6 +995,9 @@ fn main() -> io::Result<()> {
                                                             );
                                                         start_gomoku_game(&mut state, difficulty);
                                                     }
+                                                    ChallengeType::Minesweeper => {
+                                                        // TODO: Wire up minesweeper game start
+                                                    }
                                                 }
                                             }
                                         }
@@ -1131,6 +1136,10 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
                 ChallengeType::Gomoku => (
                     "◎",
                     "A wandering strategist places a worn board before you...",
+                ),
+                ChallengeType::Minesweeper => (
+                    "\u{26A0}",
+                    "A weathered scout beckons you toward a ruined corridor...",
                 ),
             };
             game_state
