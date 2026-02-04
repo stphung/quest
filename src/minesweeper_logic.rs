@@ -466,7 +466,10 @@ mod tests {
         let result = reveal_cell(&mut game, 1, 1);
         assert!(result, "Should return true when revealing safe cell");
         assert!(game.grid[1][1].revealed, "Cell should be revealed");
-        assert!(game.game_result.is_none(), "Game should still be in progress");
+        assert!(
+            game.game_result.is_none(),
+            "Game should still be in progress"
+        );
     }
 
     #[test]
@@ -617,7 +620,10 @@ mod tests {
         handle_first_click(&mut game, 4, 4, &mut rng);
 
         assert!(game.first_click_done, "first_click_done should be set");
-        assert!(game.grid[4][4].revealed, "First click cell should be revealed");
+        assert!(
+            game.grid[4][4].revealed,
+            "First click cell should be revealed"
+        );
         assert!(
             !game.grid[4][4].has_mine,
             "First click cell should not have a mine"

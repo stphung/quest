@@ -125,7 +125,10 @@ fn trigger_gomoku_challenge(state: &mut GameState) -> &'static str {
 }
 
 fn trigger_minesweeper_challenge(state: &mut GameState) -> &'static str {
-    if state.challenge_menu.has_challenge(&ChallengeType::Minesweeper) {
+    if state
+        .challenge_menu
+        .has_challenge(&ChallengeType::Minesweeper)
+    {
         return "Minesweeper challenge already pending!";
     }
     state

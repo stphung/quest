@@ -39,8 +39,6 @@ use challenge_menu::{try_discover_challenge, ChallengeType, DifficultyInfo};
 use character_manager::CharacterManager;
 use chess::ChessDifficulty;
 use chess_logic::{apply_game_result, process_ai_thinking, start_chess_game};
-use minesweeper::{MinesweeperDifficulty, MinesweeperGame, MinesweeperResult};
-use minesweeper_logic::{handle_first_click, reveal_cell, toggle_flag};
 use chrono::{Local, Utc};
 use constants::*;
 use crossterm::event::{self, Event, KeyCode};
@@ -55,6 +53,8 @@ use gomoku_logic::{
     apply_game_result as apply_gomoku_result, process_ai_thinking as process_gomoku_ai,
     process_human_move as process_gomoku_move, start_gomoku_game,
 };
+use minesweeper::{MinesweeperDifficulty, MinesweeperGame, MinesweeperResult};
+use minesweeper_logic::{handle_first_click, reveal_cell, toggle_flag};
 use morris::{
     CursorDirection as MorrisCursorDirection, MorrisDifficulty, MorrisMove, MorrisResult,
 };
@@ -694,9 +694,8 @@ fn main() -> io::Result<()> {
 
                             // Handle active minesweeper game input
                             if let Some(ref mut minesweeper_game) = state.active_minesweeper {
-                                if minesweeper_game.game_result.is_some() {
+                                if let Some(result) = minesweeper_game.game_result {
                                     // Any key dismisses result and applies rewards
-                                    let result = minesweeper_game.game_result.unwrap();
                                     if result == MinesweeperResult::Win {
                                         let reward = minesweeper_game.difficulty.reward();
                                         if reward.xp_percent > 0 {

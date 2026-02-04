@@ -158,7 +158,10 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &MinesweeperGame) {
     };
     lines.push(Line::from(vec![
         Span::styled("Remaining: ", Style::default().fg(Color::DarkGray)),
-        Span::styled(format!("{}", remaining), Style::default().fg(remaining_color)),
+        Span::styled(
+            format!("{}", remaining),
+            Style::default().fg(remaining_color),
+        ),
     ]));
 
     lines.push(Line::from(""));
