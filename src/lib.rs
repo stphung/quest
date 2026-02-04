@@ -29,6 +29,8 @@ pub mod item_generation;
 pub mod item_names;
 pub mod item_scoring;
 pub mod items;
+pub mod morris;
+pub mod morris_logic;
 pub mod prestige;
 pub mod save_manager;
 pub mod updater;

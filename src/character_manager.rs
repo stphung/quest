@@ -121,6 +121,7 @@ impl CharacterManager {
             challenge_menu: crate::challenge_menu::ChallengeMenu::new(),
             chess_stats: save_data.chess_stats,
             active_chess: None,
+            active_morris: None,
         })
     }
 
@@ -322,6 +323,7 @@ mod tests {
             challenge_menu: crate::challenge_menu::ChallengeMenu::new(),
             chess_stats: crate::chess::ChessStats::default(),
             active_chess: None,
+            active_morris: None,
         };
 
         // Save character
@@ -374,6 +376,7 @@ mod tests {
             challenge_menu: crate::challenge_menu::ChallengeMenu::new(),
             chess_stats: crate::chess::ChessStats::default(),
             active_chess: None,
+            active_morris: None,
         };
 
         let char2 = GameState {
@@ -395,6 +398,7 @@ mod tests {
             challenge_menu: crate::challenge_menu::ChallengeMenu::new(),
             chess_stats: crate::chess::ChessStats::default(),
             active_chess: None,
+            active_morris: None,
         };
 
         manager.save_character(&char1).unwrap();
@@ -446,6 +450,7 @@ mod tests {
             challenge_menu: crate::challenge_menu::ChallengeMenu::new(),
             chess_stats: crate::chess::ChessStats::default(),
             active_chess: None,
+            active_morris: None,
         };
 
         manager.save_character(&state).unwrap();
@@ -486,6 +491,7 @@ mod tests {
             challenge_menu: crate::challenge_menu::ChallengeMenu::new(),
             chess_stats: crate::chess::ChessStats::default(),
             active_chess: None,
+            active_morris: None,
         };
 
         manager.save_character(&state).unwrap();
@@ -553,6 +559,7 @@ mod tests {
             challenge_menu: crate::challenge_menu::ChallengeMenu::new(),
             chess_stats: crate::chess::ChessStats::default(),
             active_chess: None,
+            active_morris: None,
         };
 
         manager.save_character(&state).unwrap();
@@ -659,6 +666,7 @@ mod tests {
             challenge_menu: crate::challenge_menu::ChallengeMenu::new(),
             chess_stats: crate::chess::ChessStats::default(),
             active_chess: None,
+            active_morris: None,
         };
 
         manager.save_character(&state).unwrap();

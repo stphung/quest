@@ -263,6 +263,7 @@ impl SaveManager {
             challenge_menu: crate::challenge_menu::ChallengeMenu::new(),
             chess_stats: crate::chess::ChessStats::default(),
             active_chess: None,
+            active_morris: None,
         }
     }
 }
