@@ -139,25 +139,29 @@ mod tests {
         let mut game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
 
         // With prestige 0, should get some drops (~15% rate)
+        let trials = 2000;
         let mut drops = 0;
-        for _ in 0..200 {
+        for _ in 0..trials {
             if try_drop_item(&game_state).is_some() {
                 drops += 1;
             }
         }
-        assert!(drops > 10 && drops < 55, "Expected ~15% drops, got {drops}");
+        assert!(
+            drops > 200 && drops < 450,
+            "Expected ~15% drops, got {drops}/{trials}"
+        );
 
         // Higher prestige gives a modest increase (+1% per rank)
         game_state.prestige_rank = 10; // 15% + 10% = 25% (cap)
         let mut high_prestige_drops = 0;
-        for _ in 0..200 {
+        for _ in 0..trials {
             if try_drop_item(&game_state).is_some() {
                 high_prestige_drops += 1;
             }
         }
         assert!(
             high_prestige_drops > drops,
-            "Higher prestige should increase drops slightly"
+            "Higher prestige should increase drops: p0={drops}, p10={high_prestige_drops}"
         );
     }
 
