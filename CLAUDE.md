@@ -95,6 +95,14 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 - `item_names.rs` — Procedural name generation with prefixes/suffixes
 - `item_scoring.rs` — Smart weighted auto-equip scoring (attribute specialization bonus, affix type weights)
 
+### Challenge Minigames
+
+- `challenge_menu.rs` — Generic challenge menu system (pending challenges, extensible challenge types)
+- `chess.rs` — Chess minigame data structures (4 difficulty levels: Novice→Master, ~500-1350 ELO)
+- `chess_logic.rs` — Chess AI moves, discovery rolls (~2hr avg), game resolution, requires P1+
+- `morris.rs` — Nine Men's Morris minigame data structures (board layout, mill detection, phases)
+- `morris_logic.rs` — Morris AI moves, discovery rolls (~2hr avg), game resolution, requires P1+
+
 ### Character System
 
 - `character_manager.rs` — Character CRUD operations (create, delete, rename), JSON save/load in ~/.quest/, name validation
@@ -108,10 +116,13 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 - `combat_3d.rs` — 3D ASCII first-person dungeon renderer
 - `combat_effects.rs` — Visual effects (damage numbers, attack flashes, hit impacts)
 - `enemy_sprites.rs` — ASCII enemy sprite templates
-- `perspective.rs` — Wall/floor perspective rendering
 - `dungeon_map.rs` — Top-down dungeon minimap
 - `fishing_scene.rs` — Fishing UI with phase display
 - `prestige_confirm.rs` — Prestige confirmation dialog
+- `challenge_menu_scene.rs` — Challenge menu list/detail view rendering
+- `chess_scene.rs` — Chess board UI with move history and game-over overlay
+- `morris_scene.rs` — Nine Men's Morris board UI with help panel
+- `throbber.rs` — Shared spinner/throbber animations and atmospheric waiting messages
 - `character_select.rs` — Character selection screen with detailed preview panel
 - `character_creation.rs` — Character creation with real-time name validation
 - `character_delete.rs` — Delete confirmation requiring exact name typing
@@ -119,6 +130,7 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 
 ### Utilities
 
+- `lib.rs` — Library crate exposing game logic modules for testing
 - `build_info.rs` — Build metadata (commit, date) embedded at compile time
 - `updater.rs` — Self-update functionality
 
@@ -132,6 +144,7 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 - Offline XP: 50% rate, max 7 days (simulates kills)
 - Item drop rate: 15% base + 1% per prestige rank (capped at 25%)
 - Boss spawn: After 10 kills in subzone
+- Minigame discovery: ~2hr avg per challenge (0.000014 chance/tick), requires P1+
 
 ## Combat Mechanics
 
@@ -145,6 +158,7 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 quest/
 ├── src/
 │   ├── main.rs           # Entry point, game loop, input handling
+│   ├── lib.rs            # Library crate for testing
 │   ├── game_state.rs     # Core game state
 │   ├── game_logic.rs     # XP, leveling, spawning
 │   ├── combat.rs         # Enemy struct, combat state
@@ -169,6 +183,11 @@ quest/
 │   ├── item_drops.rs
 │   ├── item_names.rs
 │   ├── item_scoring.rs
+│   ├── challenge_menu.rs    # Challenge menu system
+│   ├── chess.rs             # Chess minigame
+│   ├── chess_logic.rs
+│   ├── morris.rs            # Nine Men's Morris minigame
+│   ├── morris_logic.rs
 │   ├── character_manager.rs  # JSON saves
 │   ├── save_manager.rs       # Legacy saves
 │   └── ui/               # UI components
@@ -178,10 +197,13 @@ quest/
 │       ├── combat_3d.rs
 │       ├── combat_effects.rs
 │       ├── enemy_sprites.rs
-│       ├── perspective.rs
 │       ├── dungeon_map.rs
 │       ├── fishing_scene.rs
 │       ├── prestige_confirm.rs
+│       ├── challenge_menu_scene.rs
+│       ├── chess_scene.rs
+│       ├── morris_scene.rs
+│       ├── throbber.rs
 │       ├── character_select.rs
 │       ├── character_creation.rs
 │       ├── character_delete.rs
@@ -195,4 +217,4 @@ quest/
 
 ## Dependencies
 
-Ratatui 0.26, Crossterm 0.27, Serde (JSON), SHA2, Rand, Chrono, Directories
+Ratatui 0.26, Crossterm 0.27, Serde (JSON), SHA2, Rand, Chrono, Directories, Chess-engine 0.1

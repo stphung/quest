@@ -30,7 +30,9 @@ Then run `quest` to start your adventure!
 - **Diablo-style Items** - 7 equipment slots, 5 rarity tiers, procedural names, and smart auto-equip
 - **Multi-Character** - Create and manage multiple characters with JSON saves
 - **Offline Progress** - Continue gaining XP even when closed (50% rate, max 7 days)
+- **Challenge Minigames** - Discover and play Chess and Nine Men's Morris against AI opponents (requires P1+)
 - **3D ASCII Combat** - First-person dungeon view with visual effects
+- **Animated UI** - Throbber animations and progress bars for XP and fishing rank
 
 ## Installation
 
@@ -148,6 +150,16 @@ Separate progression track with 30 ranks across 6 tiers:
 - Novice → Apprentice → Journeyman → Expert → Master → Grandmaster
 - Fish rarities: Common, Uncommon, Rare, Epic, Legendary
 - Higher ranks improve catch quality
+
+### Challenge Minigames
+
+Discover challenge minigames while adventuring (requires Prestige 1+):
+
+- **Chess** - Play against AI with 4 difficulty levels (Novice ~500 ELO to Master ~1350 ELO)
+- **Nine Men's Morris** - Classic strategy board game against AI opponents
+- Challenges appear randomly (~2 hour average discovery time)
+- Accept or decline from the challenge menu
+- Winning rewards prestige points based on difficulty
 
 ### Items & Equipment
 
