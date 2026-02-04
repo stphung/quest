@@ -1,4 +1,4 @@
-use crate::constants::{ATTACK_INTERVAL_SECONDS, HP_REGEN_DURATION_SECONDS};
+use crate::constants::ATTACK_INTERVAL_SECONDS;
 use crate::game_state::GameState;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -102,10 +102,10 @@ fn draw_combat_status(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let spinner = spinner_char();
 
     let status_text = if game_state.combat_state.is_regenerating {
-        let remaining = HP_REGEN_DURATION_SECONDS - game_state.combat_state.regen_timer;
+        let message = waiting_message(game_state.character_xp);
         vec![Line::from(vec![Span::styled(
-            format!("{} Regenerating HP... {:.1}s", spinner, remaining),
-            Style::default().fg(Color::Green),
+            format!("{} {}", spinner, message),
+            Style::default().fg(Color::Yellow),
         )])]
     } else if game_state.combat_state.current_enemy.is_some() {
         let next_attack = ATTACK_INTERVAL_SECONDS - game_state.combat_state.attack_timer;
