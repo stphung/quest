@@ -162,22 +162,6 @@ impl GomokuGame {
         let new_col = (self.cursor.1 as i32 + d_col).clamp(0, BOARD_SIZE as i32 - 1) as usize;
         self.cursor = (new_row, new_col);
     }
-
-    /// Count stones on board
-    pub fn stone_count(&self) -> (u32, u32) {
-        let mut human = 0;
-        let mut ai = 0;
-        for row in &self.board {
-            for cell in row {
-                match cell {
-                    Some(Player::Human) => human += 1,
-                    Some(Player::Ai) => ai += 1,
-                    None => {}
-                }
-            }
-        }
-        (human, ai)
-    }
 }
 
 #[cfg(test)]
