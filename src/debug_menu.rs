@@ -13,6 +13,7 @@ pub const DEBUG_OPTIONS: &[&str] = &[
     "Trigger Fishing",
     "Trigger Chess Challenge",
     "Trigger Morris Challenge",
+    "Trigger Gomoku Challenge",
 ];
 
 /// Debug menu state
@@ -63,6 +64,7 @@ impl DebugMenu {
             1 => trigger_fishing(state),
             2 => trigger_chess_challenge(state),
             3 => trigger_morris_challenge(state),
+            4 => trigger_gomoku_challenge(state),
             _ => "Unknown option",
         };
         self.close();
@@ -120,6 +122,21 @@ fn trigger_morris_challenge(state: &mut GameState) -> &'static str {
     "Morris challenge added!"
 }
 
+fn trigger_gomoku_challenge(state: &mut GameState) -> &'static str {
+    if state.challenge_menu.has_challenge(&ChallengeType::Gomoku) {
+        return "Gomoku challenge already pending!";
+    }
+    state.challenge_menu.add_challenge(PendingChallenge {
+        challenge_type: ChallengeType::Gomoku,
+        title: "Gomoku".to_string(),
+        icon: "◎",
+        description: "A wandering strategist places a worn board before you. \
+            \"Five stones in a row,\" they explain. \"Simple rules, deep tactics.\""
+            .to_string(),
+    });
+    "Gomoku challenge added!"
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -135,16 +152,18 @@ mod tests {
 
         menu.navigate_down();
         menu.navigate_down();
-        assert_eq!(menu.selected_index, 3);
+        menu.navigate_down();
+        assert_eq!(menu.selected_index, 4);
 
         // Can't go past end
         menu.navigate_down();
-        assert_eq!(menu.selected_index, 3);
+        assert_eq!(menu.selected_index, 4);
 
         menu.navigate_up();
-        assert_eq!(menu.selected_index, 2);
+        assert_eq!(menu.selected_index, 3);
 
         // Can't go before start
+        menu.navigate_up();
         menu.navigate_up();
         menu.navigate_up();
         menu.navigate_up();
@@ -209,5 +228,17 @@ mod tests {
         // Can't add duplicate
         let msg = trigger_morris_challenge(&mut state);
         assert_eq!(msg, "Morris challenge already pending!");
+    }
+
+    #[test]
+    fn test_trigger_gomoku_challenge() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let msg = trigger_gomoku_challenge(&mut state);
+        assert_eq!(msg, "Gomoku challenge added!");
+        assert!(state.challenge_menu.has_challenge(&ChallengeType::Gomoku));
+
+        // Can't add duplicate
+        let msg = trigger_gomoku_challenge(&mut state);
+        assert_eq!(msg, "Gomoku challenge already pending!");
     }
 }
