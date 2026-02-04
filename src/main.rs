@@ -7,6 +7,7 @@ mod chess_logic;
 mod combat;
 mod combat_logic;
 mod constants;
+mod debug_menu;
 mod derived_stats;
 mod dungeon;
 mod dungeon_generation;
@@ -131,6 +132,7 @@ fn handle_morris_enter(state: &mut GameState) {
 fn main() -> io::Result<()> {
     // Handle CLI arguments
     let args: Vec<String> = std::env::args().collect();
+    let mut debug_mode = false;
 
     if args.len() > 1 {
         match args[1].as_str() {
@@ -151,9 +153,13 @@ fn main() -> io::Result<()> {
                 println!("Usage: quest [command]\n");
                 println!("Commands:");
                 println!("  update     Check for and install updates");
+                println!("  --debug    Enable debug menu (press ` to toggle)");
                 println!("  --version  Show version information");
                 println!("  --help     Show this help message");
                 std::process::exit(0);
+            }
+            "--debug" => {
+                debug_mode = true;
             }
             other => {
                 eprintln!("Unknown command: {}", other);
@@ -553,6 +559,7 @@ fn main() -> io::Result<()> {
                 let mut last_update_check = Instant::now();
                 let mut tick_counter: u32 = 0;
                 let mut showing_prestige_confirm = false;
+                let mut debug_menu = debug_menu::DebugMenu::new();
 
                 // Update check state - start initial background check immediately
                 let mut update_info: Option<UpdateInfo> = None;
@@ -586,6 +593,17 @@ fn main() -> io::Result<()> {
                         if showing_prestige_confirm {
                             ui::prestige_confirm::draw_prestige_confirm(frame, &state);
                         }
+                        // Draw debug indicator and menu if in debug mode
+                        if debug_mode {
+                            ui::debug_menu_scene::render_debug_indicator(frame, frame.size());
+                            if debug_menu.is_open {
+                                ui::debug_menu_scene::render_debug_menu(
+                                    frame,
+                                    frame.size(),
+                                    &debug_menu,
+                                );
+                            }
+                        }
                     })?;
 
                     // Poll for input (50ms non-blocking)
@@ -614,6 +632,34 @@ fn main() -> io::Result<()> {
                                     _ => {}
                                 }
                                 continue;
+                            }
+
+                            // Handle debug menu (if debug mode enabled)
+                            if debug_mode {
+                                // Backtick toggles debug menu
+                                if key_event.code == KeyCode::Char('`') {
+                                    debug_menu.toggle();
+                                    continue;
+                                }
+
+                                // Handle debug menu navigation when open
+                                if debug_menu.is_open {
+                                    match key_event.code {
+                                        KeyCode::Up => debug_menu.navigate_up(),
+                                        KeyCode::Down => debug_menu.navigate_down(),
+                                        KeyCode::Enter => {
+                                            let msg = debug_menu.trigger_selected(&mut state);
+                                            state.combat_state.add_log_entry(
+                                                format!("[DEBUG] {}", msg),
+                                                false,
+                                                true,
+                                            );
+                                        }
+                                        KeyCode::Esc => debug_menu.close(),
+                                        _ => {}
+                                    }
+                                    continue;
+                                }
                             }
 
                             // Handle active chess game input (highest priority)

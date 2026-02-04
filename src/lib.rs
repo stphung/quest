@@ -14,6 +14,7 @@ pub mod chess_logic;
 pub mod combat;
 pub mod combat_logic;
 pub mod constants;
+pub mod debug_menu;
 pub mod derived_stats;
 pub mod dungeon;
 pub mod dungeon_generation;

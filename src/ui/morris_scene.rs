@@ -103,7 +103,7 @@ fn render_board(frame: &mut Frame, area: Rect, game: &MorrisGame) {
     // Colors
     let line_color = Color::Rgb(80, 80, 80); // Dark gray for lines
     let player_color = Color::White;
-    let ai_color = Color::Rgb(100, 100, 100); // Dim gray for AI
+    let ai_color = Color::LightRed;
     let cursor_color = Color::Yellow;
     let selected_color = Color::Rgb(100, 200, 100); // Green for selected
     let legal_dest_color = Color::Rgb(200, 100, 200); // Pink/magenta for legal destinations
@@ -117,17 +117,17 @@ fn render_board(frame: &mut Frame, area: Rect, game: &MorrisGame) {
     let board_lines = [
         // Outer square
         "\u{250C}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{252C}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2510}", // 0
-        "\u{2502}            \u{2502}            \u{2502}", // 1
+        "\u{2502}           \u{2502}           \u{2502}", // 1
         "\u{2502}   \u{250C}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{253C}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2510}   \u{2502}", // 2 (middle ring top)
-        "\u{2502}   \u{2502}        \u{2502}        \u{2502}   \u{2502}", // 3
+        "\u{2502}   \u{2502}       \u{2502}       \u{2502}   \u{2502}", // 3
         "\u{2502}   \u{2502}   \u{250C}\u{2500}\u{2500}\u{2500}\u{253C}\u{2500}\u{2500}\u{2500}\u{2510}   \u{2502}   \u{2502}", // 4 (inner ring top)
         "\u{2502}   \u{2502}   \u{2502}       \u{2502}   \u{2502}   \u{2502}", // 5
         "\u{251C}\u{2500}\u{2500}\u{2500}\u{253C}\u{2500}\u{2500}\u{2500}\u{253C}       \u{253C}\u{2500}\u{2500}\u{2500}\u{253C}\u{2500}\u{2500}\u{2500}\u{2524}", // 6 (middle horizontal)
         "\u{2502}   \u{2502}   \u{2502}       \u{2502}   \u{2502}   \u{2502}", // 7
         "\u{2502}   \u{2502}   \u{2514}\u{2500}\u{2500}\u{2500}\u{253C}\u{2500}\u{2500}\u{2500}\u{2518}   \u{2502}   \u{2502}", // 8 (inner ring bottom)
-        "\u{2502}   \u{2502}        \u{2502}        \u{2502}   \u{2502}", // 9
+        "\u{2502}   \u{2502}       \u{2502}       \u{2502}   \u{2502}", // 9
         "\u{2502}   \u{2514}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{253C}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2518}   \u{2502}", // 10 (middle ring bottom)
-        "\u{2502}            \u{2502}            \u{2502}", // 11
+        "\u{2502}           \u{2502}           \u{2502}", // 11
         "\u{2514}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2534}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2518}", // 12 (outer square bottom)
     ];
 
@@ -160,7 +160,7 @@ fn render_board(frame: &mut Frame, area: Rect, game: &MorrisGame) {
                         .add_modifier(Modifier::BOLD),
                 ),
                 Some(Player::Ai) => (
-                    "[\u{25CB}]", // [○]
+                    "[\u{25CF}]", // [●]
                     Style::default().fg(if is_capturable {
                         capturable_color
                     } else {
@@ -204,14 +204,14 @@ fn render_board(frame: &mut Frame, area: Rect, game: &MorrisGame) {
                         .add_modifier(Modifier::BOLD),
                 ),
                 Some(Player::Ai) => (
-                    " \u{25CB} ", // ○
+                    " \u{25CF} ", // ●
                     Style::default().fg(ai_color),
                 ),
             }
         } else if is_capturable {
             // Capturable AI piece (highlighted in red)
             (
-                " \u{25CB} ", // ○
+                " \u{25CF} ", // ●
                 Style::default().fg(capturable_color),
             )
         } else {
@@ -224,7 +224,7 @@ fn render_board(frame: &mut Frame, area: Rect, game: &MorrisGame) {
                         .add_modifier(Modifier::BOLD),
                 ),
                 Some(Player::Ai) => (
-                    " \u{25CB} ", // ○
+                    " \u{25CF} ", // ●
                     Style::default().fg(ai_color),
                 ),
                 None => (
@@ -334,7 +334,10 @@ fn render_status(frame: &mut Frame, area: Rect, game: &MorrisGame) {
             Style::default().fg(Color::Yellow),
         )
     } else if game.forfeit_pending {
-        ("Forfeit game?".to_string(), Style::default().fg(Color::Red))
+        (
+            "Forfeit game?".to_string(),
+            Style::default().fg(Color::LightRed),
+        )
     } else if game.must_capture {
         (
             "MILL! Select a piece to capture".to_string(),
@@ -405,27 +408,75 @@ fn render_help_panel(frame: &mut Frame, area: Rect, game: &MorrisGame) {
     let human_on_board = game.pieces_on_board.0;
     let ai_on_board = game.pieces_on_board.1;
 
-    // Rules summary and piece counts (always shown)
+    // Rules summary
     let mut lines: Vec<Line> = vec![
+        // Mills rule (always applies)
         Line::from(Span::styled(
-            "Rules:",
+            "MILLS",
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         )),
         Line::from(Span::styled(
-            " 3 in a row = Mill",
+            "3 in a row = capture 1",
             Style::default().fg(Color::Gray),
         )),
         Line::from(Span::styled(
-            " Mill = Capture foe",
+            "foe piece not in mill.",
             Style::default().fg(Color::Gray),
         )),
         Line::from(Span::styled(
-            " <3 pieces = Defeat",
+            "Can break/remake mills.",
             Style::default().fg(Color::Gray),
         )),
         Line::from(""),
+        // Phase 1: Placing
+        Line::from(Span::styled(
+            "PHASE 1: PLACING",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(Span::styled(
+            "Place on empty points.",
+            Style::default().fg(Color::Gray),
+        )),
+        Line::from(""),
+        // Phase 2: Sliding
+        Line::from(Span::styled(
+            "PHASE 2: SLIDING",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(Span::styled(
+            "Move to adjacent point.",
+            Style::default().fg(Color::Gray),
+        )),
+        Line::from(""),
+        // Phase 3: Flying
+        Line::from(Span::styled(
+            "PHASE 3: FLYING",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(Span::styled(
+            "At 3 pieces, move to",
+            Style::default().fg(Color::Gray),
+        )),
+        Line::from(Span::styled(
+            "ANY empty point.",
+            Style::default().fg(Color::Gray),
+        )),
+        Line::from(""),
+        // Win condition
+        Line::from(Span::styled(
+            "WIN: \u{2264}2 or no moves",
+            Style::default().fg(Color::Green),
+        )),
+        Line::from(""),
+        // Piece counts
         Line::from(vec![
             Span::styled("You: ", Style::default().fg(Color::White)),
             Span::styled(
@@ -438,8 +489,8 @@ fn render_help_panel(frame: &mut Frame, area: Rect, game: &MorrisGame) {
         Line::from(vec![
             Span::styled("Foe: ", Style::default().fg(Color::Gray)),
             Span::styled(
-                format!("\u{25CB} x {}", ai_on_board),
-                Style::default().fg(Color::Rgb(100, 100, 100)),
+                format!("\u{25CF} x {}", ai_on_board),
+                Style::default().fg(Color::LightRed),
             ),
         ]),
     ];
@@ -462,7 +513,7 @@ fn render_help_panel(frame: &mut Frame, area: Rect, game: &MorrisGame) {
             Span::styled(" Foe: ", Style::default().fg(Color::Gray)),
             Span::styled(
                 format!("{}", game.pieces_to_place.1),
-                Style::default().fg(Color::Rgb(100, 100, 100)),
+                Style::default().fg(Color::LightRed),
             ),
         ]));
     }
