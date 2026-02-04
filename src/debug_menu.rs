@@ -2,7 +2,7 @@
 //!
 //! Activated with `--debug` flag. Press backtick to toggle menu.
 
-use crate::challenge_menu::{ChallengeType, PendingChallenge};
+use crate::challenge_menu::{create_challenge, ChallengeType};
 use crate::dungeon_generation::generate_dungeon;
 use crate::fishing_generation::generate_fishing_session;
 use crate::game_state::GameState;
@@ -96,14 +96,7 @@ fn trigger_chess_challenge(state: &mut GameState) -> &'static str {
     if state.challenge_menu.has_challenge(&ChallengeType::Chess) {
         return "Chess challenge already pending!";
     }
-    state.challenge_menu.add_challenge(PendingChallenge {
-        challenge_type: ChallengeType::Chess,
-        title: "Chess Challenge".to_string(),
-        icon: "♟",
-        description: "A hooded figure sits alone at a stone table, chess pieces \
-            gleaming in the firelight. \"Care for a game?\" they ask."
-            .to_string(),
-    });
+    state.challenge_menu.add_challenge(create_challenge(&ChallengeType::Chess));
     "Chess challenge added!"
 }
 
@@ -111,14 +104,7 @@ fn trigger_morris_challenge(state: &mut GameState) -> &'static str {
     if state.challenge_menu.has_challenge(&ChallengeType::Morris) {
         return "Morris challenge already pending!";
     }
-    state.challenge_menu.add_challenge(PendingChallenge {
-        challenge_type: ChallengeType::Morris,
-        title: "Nine Men's Morris".to_string(),
-        icon: "\u{25CB}",
-        description: "An elderly sage arranges nine white stones on a weathered board. \
-            \"The game of mills,\" they say. \"Three in a row captures. Shall we play?\""
-            .to_string(),
-    });
+    state.challenge_menu.add_challenge(create_challenge(&ChallengeType::Morris));
     "Morris challenge added!"
 }
 
@@ -126,14 +112,7 @@ fn trigger_gomoku_challenge(state: &mut GameState) -> &'static str {
     if state.challenge_menu.has_challenge(&ChallengeType::Gomoku) {
         return "Gomoku challenge already pending!";
     }
-    state.challenge_menu.add_challenge(PendingChallenge {
-        challenge_type: ChallengeType::Gomoku,
-        title: "Gomoku".to_string(),
-        icon: "◎",
-        description: "A wandering strategist places a worn board before you. \
-            \"Five stones in a row,\" they explain. \"Simple rules, deep tactics.\""
-            .to_string(),
-    });
+    state.challenge_menu.add_challenge(create_challenge(&ChallengeType::Gomoku));
     "Gomoku challenge added!"
 }
 

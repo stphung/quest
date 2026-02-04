@@ -295,7 +295,7 @@ pub fn try_discover_challenge<R: Rng>(state: &mut GameState, rng: &mut R) -> Opt
 }
 
 /// Create a PendingChallenge from a ChallengeType
-fn create_challenge(ct: &ChallengeType) -> PendingChallenge {
+pub fn create_challenge(ct: &ChallengeType) -> PendingChallenge {
     match ct {
         ChallengeType::Chess => PendingChallenge {
             challenge_type: ChallengeType::Chess,
