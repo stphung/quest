@@ -745,16 +745,15 @@ fn main() -> io::Result<()> {
                                     continue;
                                 }
 
-                                // Handle forfeit confirmation
+                                // Handle forfeit confirmation (double-Esc to confirm, any other key cancels)
                                 if gomoku_game.forfeit_pending {
                                     match key_event.code {
-                                        KeyCode::Char('y') | KeyCode::Char('Y') => {
+                                        KeyCode::Esc => {
                                             gomoku_game.game_result = Some(GomokuResult::Loss);
                                         }
-                                        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                                        _ => {
                                             gomoku_game.forfeit_pending = false;
                                         }
-                                        _ => {}
                                     }
                                     continue;
                                 }

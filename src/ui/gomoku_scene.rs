@@ -148,7 +148,7 @@ fn render_help_panel(frame: &mut Frame, area: Rect, game: &GomokuGame) {
     let status = if game.ai_thinking {
         Span::styled("AI thinking...", Style::default().fg(Color::Yellow))
     } else if game.forfeit_pending {
-        Span::styled("Forfeit? (Y/N)", Style::default().fg(Color::LightRed))
+        Span::styled("Forfeit game?", Style::default().fg(Color::LightRed))
     } else if game.current_player == Player::Human {
         Span::styled("Your turn", Style::default().fg(Color::Green))
     } else {
@@ -158,18 +158,29 @@ fn render_help_panel(frame: &mut Frame, area: Rect, game: &GomokuGame) {
     lines.push(Line::from(""));
 
     // Controls
-    lines.push(Line::from(Span::styled(
-        "[Arrows] Move",
-        Style::default().fg(Color::DarkGray),
-    )));
-    lines.push(Line::from(Span::styled(
-        "[Enter] Place",
-        Style::default().fg(Color::DarkGray),
-    )));
-    lines.push(Line::from(Span::styled(
-        "[Esc] Forfeit",
-        Style::default().fg(Color::DarkGray),
-    )));
+    if game.forfeit_pending {
+        lines.push(Line::from(Span::styled(
+            "[Esc] Confirm forfeit",
+            Style::default().fg(Color::DarkGray),
+        )));
+        lines.push(Line::from(Span::styled(
+            "[Any] Cancel",
+            Style::default().fg(Color::DarkGray),
+        )));
+    } else {
+        lines.push(Line::from(Span::styled(
+            "[Arrows] Move",
+            Style::default().fg(Color::DarkGray),
+        )));
+        lines.push(Line::from(Span::styled(
+            "[Enter] Place",
+            Style::default().fg(Color::DarkGray),
+        )));
+        lines.push(Line::from(Span::styled(
+            "[Esc] Forfeit",
+            Style::default().fg(Color::DarkGray),
+        )));
+    }
 
     let text = Paragraph::new(lines);
     frame.render_widget(text, inner);
