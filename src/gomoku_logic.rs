@@ -494,6 +494,39 @@ pub fn find_best_move<R: Rng>(game: &GomokuGame, rng: &mut R) -> Option<(usize, 
     best_moves.choose(rng).copied()
 }
 
+/// Apply game result: update stats and grant rewards on win.
+/// Returns (result, xp_gained, prestige_gained).
+pub fn apply_game_result(state: &mut GameState) -> Option<(GomokuResult, u64, u32)> {
+    use crate::challenge_menu::DifficultyInfo;
+
+    let game = state.active_gomoku.as_ref()?;
+    let result = game.game_result?;
+    let reward = game.difficulty.reward();
+
+    let (xp_gained, prestige_gained) = match result {
+        GomokuResult::Win => {
+            // XP reward
+            let xp = if reward.xp_percent > 0 {
+                let xp_for_level =
+                    crate::game_logic::xp_for_next_level(state.character_level.max(1));
+                (xp_for_level * reward.xp_percent as u64) / 100
+            } else {
+                0
+            };
+            state.character_xp += xp;
+
+            // Prestige reward
+            state.prestige_rank += reward.prestige_ranks;
+
+            (xp, reward.prestige_ranks)
+        }
+        GomokuResult::Loss | GomokuResult::Draw => (0, 0),
+    };
+
+    state.active_gomoku = None;
+    Some((result, xp_gained, prestige_gained))
+}
+
 /// Process AI thinking (called each tick).
 pub fn process_ai_thinking<R: Rng>(game: &mut GomokuGame, rng: &mut R) {
     if !game.ai_thinking || game.game_result.is_some() {

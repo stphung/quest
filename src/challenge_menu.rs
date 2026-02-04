@@ -4,8 +4,127 @@
 //! Challenge discovery uses a single roll per tick. On success, a weighted distribution
 //! table determines which challenge type appears.
 
+use crate::chess::ChessDifficulty;
 use crate::game_state::GameState;
+use crate::gomoku::GomokuDifficulty;
+use crate::morris::MorrisDifficulty;
 use rand::Rng;
+
+/// Structured reward for challenge victories - single source of truth
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ChallengeReward {
+    pub prestige_ranks: u32,
+    pub xp_percent: u32,
+    pub fishing_ranks: u32,
+}
+
+impl ChallengeReward {
+    /// Generate display text from structured data
+    /// Order: Prestige -> Fishing -> XP
+    pub fn description(&self) -> String {
+        let mut parts = Vec::new();
+
+        if self.prestige_ranks == 1 {
+            parts.push("+1 Prestige Rank".to_string());
+        } else if self.prestige_ranks > 1 {
+            parts.push(format!("+{} Prestige Ranks", self.prestige_ranks));
+        }
+
+        if self.fishing_ranks == 1 {
+            parts.push("+1 Fish Rank".to_string());
+        } else if self.fishing_ranks > 1 {
+            parts.push(format!("+{} Fish Ranks", self.fishing_ranks));
+        }
+
+        if self.xp_percent > 0 {
+            parts.push(format!("+{}% level XP", self.xp_percent));
+        }
+
+        if parts.is_empty() {
+            "No reward".to_string()
+        } else {
+            format!("Win: {}", parts.join(", "))
+        }
+    }
+}
+
+/// Trait for difficulty levels that can be displayed in the challenge menu
+pub trait DifficultyInfo {
+    /// Display name (e.g., "Novice", "Master")
+    fn name(&self) -> &'static str;
+
+    /// Structured reward for winning at this difficulty
+    fn reward(&self) -> ChallengeReward;
+
+    /// Optional extra info shown between name and reward (e.g., "~500 ELO")
+    fn extra_info(&self) -> Option<String> {
+        None
+    }
+}
+
+impl DifficultyInfo for ChessDifficulty {
+    fn name(&self) -> &'static str {
+        ChessDifficulty::name(self)
+    }
+
+    fn reward(&self) -> ChallengeReward {
+        ChallengeReward {
+            prestige_ranks: self.reward_prestige(),
+            ..Default::default()
+        }
+    }
+
+    fn extra_info(&self) -> Option<String> {
+        Some(format!("~{} ELO", self.estimated_elo()))
+    }
+}
+
+impl DifficultyInfo for MorrisDifficulty {
+    fn name(&self) -> &'static str {
+        MorrisDifficulty::name(self)
+    }
+
+    fn reward(&self) -> ChallengeReward {
+        ChallengeReward {
+            xp_percent: self.reward_xp_percent(),
+            fishing_ranks: if *self == MorrisDifficulty::Master {
+                1
+            } else {
+                0
+            },
+            ..Default::default()
+        }
+    }
+}
+
+impl DifficultyInfo for GomokuDifficulty {
+    fn name(&self) -> &'static str {
+        GomokuDifficulty::name(self)
+    }
+
+    fn reward(&self) -> ChallengeReward {
+        match self {
+            GomokuDifficulty::Novice => ChallengeReward {
+                xp_percent: 75,
+                ..Default::default()
+            },
+            GomokuDifficulty::Apprentice => ChallengeReward {
+                xp_percent: 100,
+                ..Default::default()
+            },
+            GomokuDifficulty::Journeyman => ChallengeReward {
+                prestige_ranks: 1,
+                xp_percent: 50,
+                ..Default::default()
+            },
+            GomokuDifficulty::Master => ChallengeReward {
+                prestige_ranks: 2,
+                xp_percent: 100,
+                ..Default::default()
+            },
+        }
+    }
+}
 
 /// Chance per tick to discover any challenge (~2 hour average)
 /// At 10 ticks/sec, 0.000014 chance/tick ≈ 71,429 ticks ≈ 2 hours average
@@ -293,5 +412,74 @@ mod tests {
         menu.close();
         assert!(!menu.is_open);
         assert!(!menu.viewing_detail);
+    }
+
+    // ============ ChallengeReward Description Tests ============
+
+    #[test]
+    fn test_reward_description_prestige_only() {
+        let reward = ChallengeReward {
+            prestige_ranks: 1,
+            ..Default::default()
+        };
+        assert_eq!(reward.description(), "Win: +1 Prestige Rank");
+
+        let reward = ChallengeReward {
+            prestige_ranks: 5,
+            ..Default::default()
+        };
+        assert_eq!(reward.description(), "Win: +5 Prestige Ranks");
+    }
+
+    #[test]
+    fn test_reward_description_xp_only() {
+        let reward = ChallengeReward {
+            xp_percent: 75,
+            ..Default::default()
+        };
+        assert_eq!(reward.description(), "Win: +75% level XP");
+    }
+
+    #[test]
+    fn test_reward_description_fishing_only() {
+        let reward = ChallengeReward {
+            fishing_ranks: 1,
+            ..Default::default()
+        };
+        assert_eq!(reward.description(), "Win: +1 Fish Rank");
+
+        let reward = ChallengeReward {
+            fishing_ranks: 2,
+            ..Default::default()
+        };
+        assert_eq!(reward.description(), "Win: +2 Fish Ranks");
+    }
+
+    #[test]
+    fn test_reward_description_mixed() {
+        // Prestige + XP
+        let reward = ChallengeReward {
+            prestige_ranks: 1,
+            xp_percent: 50,
+            ..Default::default()
+        };
+        assert_eq!(reward.description(), "Win: +1 Prestige Rank, +50% level XP");
+
+        // All three (order: prestige -> fishing -> XP)
+        let reward = ChallengeReward {
+            prestige_ranks: 2,
+            fishing_ranks: 1,
+            xp_percent: 100,
+        };
+        assert_eq!(
+            reward.description(),
+            "Win: +2 Prestige Ranks, +1 Fish Rank, +100% level XP"
+        );
+    }
+
+    #[test]
+    fn test_reward_description_empty() {
+        let reward = ChallengeReward::default();
+        assert_eq!(reward.description(), "No reward");
     }
 }

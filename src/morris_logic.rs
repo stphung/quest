@@ -443,30 +443,34 @@ fn count_mobility(game: &MorrisGame, player: Player) -> i32 {
     moves
 }
 
-/// Apply game result: grant XP on win (scaled to current level).
+/// Apply game result: grant rewards on win (XP scaled to current level, fishing ranks).
 /// Returns (result, xp_gained, fishing_rank_up).
 pub fn apply_game_result(state: &mut GameState) -> Option<(MorrisResult, u64, bool)> {
+    use crate::challenge_menu::DifficultyInfo;
+
     let game = state.active_morris.as_ref()?;
     let result = game.game_result?;
-    let difficulty = game.difficulty;
+    let reward = game.difficulty.reward();
 
     let mut fishing_rank_up = false;
     let xp_gained = match result {
         MorrisResult::Win => {
+            // XP reward
             let xp_for_level = crate::game_logic::xp_for_next_level(state.character_level.max(1));
-            let reward =
-                (xp_for_level as f64 * difficulty.reward_xp_percent() as f64 / 100.0) as u64;
-            let reward = reward.max(100); // Floor of 100 XP
-            state.character_xp += reward;
+            let xp = (xp_for_level as f64 * reward.xp_percent as f64 / 100.0) as u64;
+            let xp = xp.max(100); // Floor of 100 XP
+            state.character_xp += xp;
 
-            // Master difficulty grants +1 fishing rank (capped at 30)
-            if difficulty == MorrisDifficulty::Master && state.fishing.rank < 30 {
-                state.fishing.rank += 1;
-                state.fishing.fish_toward_next_rank = 0;
+            // Fishing rank reward (capped at 30, preserves fish progress)
+            if reward.fishing_ranks > 0 && state.fishing.rank < 30 {
+                state.fishing.rank = (state.fishing.rank + reward.fishing_ranks).min(30);
                 fishing_rank_up = true;
             }
 
-            reward
+            // Prestige reward (if any)
+            state.prestige_rank += reward.prestige_ranks;
+
+            xp
         }
         MorrisResult::Loss | MorrisResult::Forfeit => 0,
     };

@@ -64,15 +64,6 @@ impl GomokuDifficulty {
             Self::Master => "Master",
         }
     }
-
-    pub fn reward_prestige(&self) -> u32 {
-        match self {
-            Self::Novice => 1,
-            Self::Apprentice => 2,
-            Self::Journeyman => 3,
-            Self::Master => 5,
-        }
-    }
 }
 
 /// Game result
@@ -183,10 +174,25 @@ mod tests {
 
     #[test]
     fn test_difficulty_rewards() {
-        assert_eq!(GomokuDifficulty::Novice.reward_prestige(), 1);
-        assert_eq!(GomokuDifficulty::Apprentice.reward_prestige(), 2);
-        assert_eq!(GomokuDifficulty::Journeyman.reward_prestige(), 3);
-        assert_eq!(GomokuDifficulty::Master.reward_prestige(), 5);
+        use crate::challenge_menu::DifficultyInfo;
+
+        // Novice/Apprentice: XP only
+        let novice = GomokuDifficulty::Novice.reward();
+        assert_eq!(novice.xp_percent, 75);
+        assert_eq!(novice.prestige_ranks, 0);
+
+        let apprentice = GomokuDifficulty::Apprentice.reward();
+        assert_eq!(apprentice.xp_percent, 100);
+        assert_eq!(apprentice.prestige_ranks, 0);
+
+        // Journeyman/Master: XP + Prestige
+        let journeyman = GomokuDifficulty::Journeyman.reward();
+        assert_eq!(journeyman.xp_percent, 50);
+        assert_eq!(journeyman.prestige_ranks, 1);
+
+        let master = GomokuDifficulty::Master.reward();
+        assert_eq!(master.xp_percent, 100);
+        assert_eq!(master.prestige_ranks, 2);
     }
 
     #[test]

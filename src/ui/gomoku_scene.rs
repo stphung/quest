@@ -176,6 +176,8 @@ fn render_help_panel(frame: &mut Frame, area: Rect, game: &GomokuGame) {
 }
 
 fn render_game_over_overlay(frame: &mut Frame, area: Rect, game: &GomokuGame) {
+    use crate::challenge_menu::DifficultyInfo;
+
     let result = game.game_result.as_ref().unwrap();
     let (title, color) = match result {
         crate::gomoku::GomokuResult::Win => ("Victory!", Color::Green),
@@ -185,7 +187,8 @@ fn render_game_over_overlay(frame: &mut Frame, area: Rect, game: &GomokuGame) {
 
     let reward_text = match result {
         crate::gomoku::GomokuResult::Win => {
-            format!("+{} Prestige Ranks", game.difficulty.reward_prestige())
+            // Strip "Win: " prefix since title already shows victory
+            game.difficulty.reward().description().replace("Win: ", "")
         }
         _ => "No reward".to_string(),
     };

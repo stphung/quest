@@ -48,8 +48,8 @@ use game_logic::*;
 use game_state::*;
 use gomoku::{GomokuDifficulty, GomokuResult};
 use gomoku_logic::{
-    process_ai_thinking as process_gomoku_ai, process_human_move as process_gomoku_move,
-    start_gomoku_game,
+    apply_game_result as apply_gomoku_result, process_ai_thinking as process_gomoku_ai,
+    process_human_move as process_gomoku_move, start_gomoku_game,
 };
 use morris::{
     CursorDirection as MorrisCursorDirection, MorrisDifficulty, MorrisMove, MorrisResult,
@@ -672,38 +672,57 @@ fn main() -> io::Result<()> {
                             // Handle active Gomoku game input
                             if let Some(ref mut gomoku_game) = state.active_gomoku {
                                 if gomoku_game.game_result.is_some() {
-                                    // Any key dismisses result
+                                    // Any key dismisses result and applies rewards
                                     let old_prestige = state.prestige_rank;
-                                    if let Some(result) = &gomoku_game.game_result {
+                                    if let Some((result, xp_gained, prestige_gained)) =
+                                        apply_gomoku_result(&mut state)
+                                    {
                                         match result {
                                             GomokuResult::Win => {
-                                                let gained =
-                                                    gomoku_game.difficulty.reward_prestige();
-                                                state.prestige_rank += gained;
                                                 state.combat_state.add_log_entry(
-                                                    format!(
-                                                        "◎ Victory! +{} Prestige Ranks (P{} → P{})",
-                                                        gained, old_prestige, state.prestige_rank
-                                                    ),
+                                                    "◎ Victory! The strategist bows in defeat."
+                                                        .to_string(),
+                                                    false,
+                                                    true,
+                                                );
+                                                if prestige_gained > 0 {
+                                                    state.combat_state.add_log_entry(
+                                                        format!(
+                                                            "◎ +{} Prestige Ranks (P{} → P{})",
+                                                            prestige_gained,
+                                                            old_prestige,
+                                                            state.prestige_rank
+                                                        ),
+                                                        false,
+                                                        false,
+                                                    );
+                                                }
+                                                if xp_gained > 0 {
+                                                    state.combat_state.add_log_entry(
+                                                        format!("◎ +{} XP", xp_gained),
+                                                        false,
+                                                        false,
+                                                    );
+                                                }
+                                            }
+                                            GomokuResult::Loss => {
+                                                state.combat_state.add_log_entry(
+                                                    "◎ The strategist nods respectfully and departs."
+                                                        .to_string(),
                                                     false,
                                                     true,
                                                 );
                                             }
-                                            GomokuResult::Loss => {
-                                                state.combat_state.add_log_entry(
-                                                    "◎ The strategist nods respectfully and departs.".to_string(),
-                                                    false, true,
-                                                );
-                                            }
                                             GomokuResult::Draw => {
                                                 state.combat_state.add_log_entry(
-                                                    "◎ A rare draw. The strategist seems impressed.".to_string(),
-                                                    false, true,
+                                                    "◎ A rare draw. The strategist seems impressed."
+                                                        .to_string(),
+                                                    false,
+                                                    true,
                                                 );
                                             }
                                         }
                                     }
-                                    state.active_gomoku = None;
                                     continue;
                                 }
 
