@@ -382,6 +382,7 @@ mod tests {
             active_chess: None,
             active_morris: None,
             active_gomoku: None,
+            active_minesweeper: None,
         };
 
         let char2 = GameState {
