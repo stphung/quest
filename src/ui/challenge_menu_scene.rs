@@ -276,11 +276,11 @@ fn render_gomoku_difficulty_selector(frame: &mut Frame, area: Rect, selected: us
             let is_selected = i == selected;
             let prefix = if is_selected { "> " } else { "  " };
 
-            let pct = diff.reward_xp_percent();
-            let reward_text = if *diff == GomokuDifficulty::Master {
-                format!("Win: +{}% level XP, +1 Fish Rank", pct)
+            let reward = diff.reward_prestige();
+            let reward_text = if reward == 1 {
+                "Win: +1 Prestige Rank".to_string()
             } else {
-                format!("Win: +{}% level XP", pct)
+                format!("Win: +{} Prestige Ranks", reward)
             };
 
             let prefix_style = if is_selected {
