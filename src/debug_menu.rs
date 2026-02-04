@@ -96,7 +96,9 @@ fn trigger_chess_challenge(state: &mut GameState) -> &'static str {
     if state.challenge_menu.has_challenge(&ChallengeType::Chess) {
         return "Chess challenge already pending!";
     }
-    state.challenge_menu.add_challenge(create_challenge(&ChallengeType::Chess));
+    state
+        .challenge_menu
+        .add_challenge(create_challenge(&ChallengeType::Chess));
     "Chess challenge added!"
 }
 
@@ -104,7 +106,9 @@ fn trigger_morris_challenge(state: &mut GameState) -> &'static str {
     if state.challenge_menu.has_challenge(&ChallengeType::Morris) {
         return "Morris challenge already pending!";
     }
-    state.challenge_menu.add_challenge(create_challenge(&ChallengeType::Morris));
+    state
+        .challenge_menu
+        .add_challenge(create_challenge(&ChallengeType::Morris));
     "Morris challenge added!"
 }
 
@@ -112,7 +116,9 @@ fn trigger_gomoku_challenge(state: &mut GameState) -> &'static str {
     if state.challenge_menu.has_challenge(&ChallengeType::Gomoku) {
         return "Gomoku challenge already pending!";
     }
-    state.challenge_menu.add_challenge(create_challenge(&ChallengeType::Gomoku));
+    state
+        .challenge_menu
+        .add_challenge(create_challenge(&ChallengeType::Gomoku));
     "Gomoku challenge added!"
 }
 
