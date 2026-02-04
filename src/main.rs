@@ -46,8 +46,11 @@ use crossterm::terminal::{
 use crossterm::ExecutableCommand;
 use game_logic::*;
 use game_state::*;
-use gomoku::GomokuDifficulty;
-use gomoku_logic::start_gomoku_game;
+use gomoku::{GomokuDifficulty, GomokuResult};
+use gomoku_logic::{
+    process_ai_thinking as process_gomoku_ai, process_human_move as process_gomoku_move,
+    start_gomoku_game,
+};
 use morris::{
     CursorDirection as MorrisCursorDirection, MorrisDifficulty, MorrisMove, MorrisResult,
 };
@@ -666,6 +669,77 @@ fn main() -> io::Result<()> {
                                 }
                             }
 
+                            // Handle active Gomoku game input
+                            if let Some(ref mut gomoku_game) = state.active_gomoku {
+                                if gomoku_game.game_result.is_some() {
+                                    // Any key dismisses result
+                                    let old_prestige = state.prestige_rank;
+                                    if let Some(result) = &gomoku_game.game_result {
+                                        match result {
+                                            GomokuResult::Win => {
+                                                let gained =
+                                                    gomoku_game.difficulty.reward_prestige();
+                                                state.prestige_rank += gained;
+                                                state.combat_state.add_log_entry(
+                                                    format!(
+                                                        "◎ Victory! +{} Prestige Ranks (P{} → P{})",
+                                                        gained, old_prestige, state.prestige_rank
+                                                    ),
+                                                    false,
+                                                    true,
+                                                );
+                                            }
+                                            GomokuResult::Loss => {
+                                                state.combat_state.add_log_entry(
+                                                    "◎ The strategist nods respectfully and departs.".to_string(),
+                                                    false, true,
+                                                );
+                                            }
+                                            GomokuResult::Draw => {
+                                                state.combat_state.add_log_entry(
+                                                    "◎ A rare draw. The strategist seems impressed.".to_string(),
+                                                    false, true,
+                                                );
+                                            }
+                                        }
+                                    }
+                                    state.active_gomoku = None;
+                                    continue;
+                                }
+
+                                // Handle forfeit confirmation
+                                if gomoku_game.forfeit_pending {
+                                    match key_event.code {
+                                        KeyCode::Char('y') | KeyCode::Char('Y') => {
+                                            gomoku_game.game_result = Some(GomokuResult::Loss);
+                                        }
+                                        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                                            gomoku_game.forfeit_pending = false;
+                                        }
+                                        _ => {}
+                                    }
+                                    continue;
+                                }
+
+                                // Normal game input
+                                if !gomoku_game.ai_thinking {
+                                    match key_event.code {
+                                        KeyCode::Up => gomoku_game.move_cursor(-1, 0),
+                                        KeyCode::Down => gomoku_game.move_cursor(1, 0),
+                                        KeyCode::Left => gomoku_game.move_cursor(0, -1),
+                                        KeyCode::Right => gomoku_game.move_cursor(0, 1),
+                                        KeyCode::Enter => {
+                                            process_gomoku_move(gomoku_game);
+                                        }
+                                        KeyCode::Esc => {
+                                            gomoku_game.forfeit_pending = true;
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                                continue;
+                            }
+
                             // Handle active chess game input (highest priority)
                             if let Some(ref mut chess_game) = state.active_chess {
                                 if chess_game.game_result.is_some() {
@@ -993,6 +1067,12 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
     if let Some(ref mut morris_game) = game_state.active_morris {
         let mut rng = rand::thread_rng();
         process_morris_ai(morris_game, &mut rng);
+    }
+
+    // Process Gomoku AI thinking
+    if let Some(ref mut gomoku_game) = game_state.active_gomoku {
+        let mut rng = rand::thread_rng();
+        process_gomoku_ai(gomoku_game, &mut rng);
     }
 
     // Try challenge discovery (single roll, weighted table picks which type)

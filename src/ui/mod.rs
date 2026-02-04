@@ -40,7 +40,8 @@ pub fn draw_ui_with_update(
     let show_challenge_banner = !game_state.challenge_menu.challenges.is_empty()
         && !game_state.challenge_menu.is_open
         && game_state.active_chess.is_none()
-        && game_state.active_morris.is_none();
+        && game_state.active_morris.is_none()
+        && game_state.active_gomoku.is_none();
 
     // Split vertically: optional banner at top, main content below
     let main_area = if show_challenge_banner {
@@ -77,8 +78,10 @@ pub fn draw_ui_with_update(
     );
 
     // Draw right panel based on current activity
-    // Priority: morris > chess > challenge menu > fishing > dungeon > combat
-    if let Some(ref game) = game_state.active_morris {
+    // Priority: gomoku > morris > chess > challenge menu > fishing > dungeon > combat
+    if let Some(ref game) = game_state.active_gomoku {
+        gomoku_scene::render_gomoku_scene(frame, chunks[1], game);
+    } else if let Some(ref game) = game_state.active_morris {
         morris_scene::render_morris_scene(frame, chunks[1], game, game_state.character_level);
     } else if let Some(ref game) = game_state.active_chess {
         chess_scene::render_chess_scene(frame, chunks[1], game);
