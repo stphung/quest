@@ -16,6 +16,7 @@ pub struct PendingChallenge {
 #[derive(Debug, Clone)]
 pub enum ChallengeType {
     Chess,
+    Morris,
 }
 
 /// Menu state for navigation
@@ -37,6 +38,12 @@ impl ChallengeMenu {
         self.challenges
             .iter()
             .any(|c| matches!(c.challenge_type, ChallengeType::Chess))
+    }
+
+    pub fn has_morris_challenge(&self) -> bool {
+        self.challenges
+            .iter()
+            .any(|c| matches!(c.challenge_type, ChallengeType::Morris))
     }
 
     pub fn add_challenge(&mut self, challenge: PendingChallenge) {
