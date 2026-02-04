@@ -22,6 +22,8 @@ mod item_generation;
 mod item_names;
 mod item_scoring;
 mod items;
+mod morris;
+mod morris_logic;
 mod prestige;
 mod save_manager;
 mod ui;

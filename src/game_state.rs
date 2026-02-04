@@ -5,6 +5,7 @@ use crate::combat::CombatState;
 use crate::dungeon::Dungeon;
 use crate::equipment::Equipment;
 use crate::fishing::{FishingSession, FishingState};
+use crate::morris::MorrisGame;
 use crate::zones::ZoneProgression;
 use serde::{Deserialize, Serialize};
 
@@ -44,6 +45,9 @@ pub struct GameState {
     /// Active chess game (transient, not saved)
     #[serde(skip)]
     pub active_chess: Option<ChessGame>,
+    /// Active morris game (transient, not saved)
+    #[serde(skip)]
+    pub active_morris: Option<MorrisGame>,
 }
 
 impl GameState {
@@ -74,6 +78,7 @@ impl GameState {
             challenge_menu: ChallengeMenu::new(),
             chess_stats: ChessStats::default(),
             active_chess: None,
+            active_morris: None,
         }
     }
 

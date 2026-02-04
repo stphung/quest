@@ -477,26 +477,19 @@ fn count_mobility(game: &MorrisGame, player: Player) -> i32 {
     moves
 }
 
-/// Apply game result: update stats and grant prestige on win
+/// Apply game result: grant prestige on win
 pub fn apply_game_result(state: &mut GameState) -> Option<(MorrisResult, u32)> {
     let game = state.active_morris.as_ref()?;
     let result = game.game_result?;
     let difficulty = game.difficulty;
 
-    state.morris_stats.games_played += 1;
-
     let prestige_gained = match result {
         MorrisResult::Win => {
-            state.morris_stats.games_won += 1;
             let reward = difficulty.reward_prestige();
             state.prestige_rank += reward;
-            state.morris_stats.prestige_earned += reward;
             reward
         }
-        MorrisResult::Loss | MorrisResult::Forfeit => {
-            state.morris_stats.games_lost += 1;
-            0
-        }
+        MorrisResult::Loss | MorrisResult::Forfeit => 0,
     };
 
     state.active_morris = None;
@@ -852,17 +845,31 @@ mod tests {
         game.pieces_to_place = (1, 0);
         game.pieces_on_board = (8, 9);
 
-        // Fill the board appropriately
-        for i in 0..17 {
-            game.board[i] = if i % 2 == 0 {
-                Some(Player::Human)
-            } else {
-                Some(Player::Ai)
-            };
-        }
+        // Place pieces in a pattern that doesn't form a mill when placing at position 23
+        // Position 23 is only in mills [21, 22, 23] and [2, 14, 23]
+        // So we avoid placing human pieces at (21, 22) and (2, 14)
+        game.board[0] = Some(Player::Human);
+        game.board[1] = Some(Player::Ai);
+        game.board[3] = Some(Player::Human);
+        game.board[4] = Some(Player::Ai);
+        game.board[5] = Some(Player::Human);
+        game.board[6] = Some(Player::Ai);
+        game.board[7] = Some(Player::Human);
+        game.board[8] = Some(Player::Ai);
+        game.board[9] = Some(Player::Human);
+        game.board[10] = Some(Player::Ai);
+        game.board[11] = Some(Player::Human);
+        game.board[12] = Some(Player::Ai);
+        game.board[13] = Some(Player::Human);
+        game.board[15] = Some(Player::Ai);
+        game.board[16] = Some(Player::Ai);
+        game.board[17] = Some(Player::Ai);
+        game.board[18] = Some(Player::Ai);
+        // Position 23 will be placed, it connects to 14 and 22 in mills
+        // We leave 14, 21, 22, 2 empty or non-Human to avoid mill
 
-        // Last placement
-        apply_move(&mut game, MorrisMove::Place(17));
+        // Last placement at position 23 (doesn't form a mill since 21, 22 aren't Human)
+        apply_move(&mut game, MorrisMove::Place(23));
 
         // Should transition to Moving phase
         assert_eq!(game.phase, MorrisPhase::Moving);
@@ -903,8 +910,6 @@ mod tests {
         assert_eq!(morris_result, MorrisResult::Win);
         assert_eq!(prestige, 5); // Master reward
         assert_eq!(state.prestige_rank, 10);
-        assert_eq!(state.morris_stats.games_won, 1);
-        assert_eq!(state.morris_stats.games_played, 1);
         assert!(state.active_morris.is_none());
     }
 
@@ -923,7 +928,7 @@ mod tests {
         assert_eq!(morris_result, MorrisResult::Loss);
         assert_eq!(prestige, 0);
         assert_eq!(state.prestige_rank, 5); // Unchanged
-        assert_eq!(state.morris_stats.games_lost, 1);
+        assert!(state.active_morris.is_none());
     }
 
     #[test]
@@ -940,7 +945,7 @@ mod tests {
         let (morris_result, prestige) = result.unwrap();
         assert_eq!(morris_result, MorrisResult::Forfeit);
         assert_eq!(prestige, 0);
-        assert_eq!(state.morris_stats.games_lost, 1);
+        assert!(state.active_morris.is_none());
     }
 
     // ============ Evaluation Tests ============
