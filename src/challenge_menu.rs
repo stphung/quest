@@ -299,26 +299,35 @@ fn create_challenge(ct: &ChallengeType) -> PendingChallenge {
     match ct {
         ChallengeType::Chess => PendingChallenge {
             challenge_type: ChallengeType::Chess,
-            title: "Chess Challenge".to_string(),
+            title: "Chess: The Hooded Challenger".to_string(),
             icon: "♟",
-            description: "A hooded figure sits alone at a stone table, chess pieces \
-                gleaming in the firelight. \"Care for a game?\" they ask."
+            description: "In the corner of a dimly lit tavern, a hooded figure sits \
+                motionless before a chess board. The pieces seem to shimmer with an \
+                otherworldly glow. As you approach, they speak without looking up: \
+                \"I've been waiting for a worthy opponent. The stakes? Your wit against \
+                mine. Do you dare?\""
                 .to_string(),
         },
         ChallengeType::Morris => PendingChallenge {
             challenge_type: ChallengeType::Morris,
-            title: "Nine Men's Morris".to_string(),
+            title: "Morris: The Millkeeper's Game".to_string(),
             icon: "\u{25CB}",
-            description: "An elderly sage arranges nine white stones on a weathered board. \
-                \"The game of mills,\" they say. \"Three in a row captures. Shall we play?\""
+            description: "An ancient sage materializes from the morning mist, carrying a \
+                weathered board etched with concentric squares. \"The game of mills,\" \
+                they whisper, placing nine polished stones before you. \"Form three in \
+                a row to capture. Reduce me to two pieces, and victory is yours. But \
+                beware—I've played this game for centuries.\""
                 .to_string(),
         },
         ChallengeType::Gomoku => PendingChallenge {
             challenge_type: ChallengeType::Gomoku,
-            title: "Gomoku".to_string(),
+            title: "Gomoku: Five Stones".to_string(),
             icon: "◎",
-            description: "A wandering strategist places a worn board before you. \
-                \"Five stones in a row,\" they explain. \"Simple rules, deep tactics.\""
+            description: "A wandering strategist blocks your path, unfurling a grid-lined \
+                cloth upon a flat stone. \"They call this the hand-talk game,\" she says, \
+                placing black and white stones in her palms. \"First to align five stones \
+                claims victory. The rules are simple, but mastery takes a lifetime. Shall \
+                we test your strategic mind?\""
                 .to_string(),
         },
     }
