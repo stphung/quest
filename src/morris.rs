@@ -148,10 +148,10 @@ impl MorrisDifficulty {
     /// e.g. 25 means 25% of `xp_for_next_level(current_level)`.
     pub fn reward_xp_percent(&self) -> u32 {
         match self {
-            Self::Novice => 25,
-            Self::Apprentice => 50,
-            Self::Journeyman => 75,
-            Self::Master => 100,
+            Self::Novice => 50,
+            Self::Apprentice => 100,
+            Self::Journeyman => 150,
+            Self::Master => 200,
         }
     }
 
@@ -446,10 +446,10 @@ mod tests {
         assert_eq!(MorrisDifficulty::Master.random_move_chance(), 0.0);
 
         // XP reward percentages
-        assert_eq!(MorrisDifficulty::Novice.reward_xp_percent(), 25);
-        assert_eq!(MorrisDifficulty::Apprentice.reward_xp_percent(), 50);
-        assert_eq!(MorrisDifficulty::Journeyman.reward_xp_percent(), 75);
-        assert_eq!(MorrisDifficulty::Master.reward_xp_percent(), 100);
+        assert_eq!(MorrisDifficulty::Novice.reward_xp_percent(), 50);
+        assert_eq!(MorrisDifficulty::Apprentice.reward_xp_percent(), 100);
+        assert_eq!(MorrisDifficulty::Journeyman.reward_xp_percent(), 150);
+        assert_eq!(MorrisDifficulty::Master.reward_xp_percent(), 200);
 
         // Names
         assert_eq!(MorrisDifficulty::Novice.name(), "Novice");

@@ -868,9 +868,9 @@ mod tests {
         assert!(result.is_some());
         let (morris_result, xp_gained) = result.unwrap();
         assert_eq!(morris_result, MorrisResult::Win);
-        // Master = 100% of xp_for_next_level(10) = 3162
-        assert_eq!(xp_gained, 3162);
-        assert_eq!(state.character_xp, old_xp + 3162);
+        // Master = 200% of xp_for_next_level(10) = 6324
+        assert_eq!(xp_gained, 6324);
+        assert_eq!(state.character_xp, old_xp + 6324);
         assert!(state.active_morris.is_none());
     }
 
