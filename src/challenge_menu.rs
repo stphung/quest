@@ -298,6 +298,7 @@ pub fn try_discover_challenge<R: Rng>(state: &mut GameState, rng: &mut R) -> Opt
         || state.active_chess.is_some()
         || state.active_morris.is_some()
         || state.active_gomoku.is_some()
+        || state.active_minesweeper.is_some()
     {
         return None;
     }
