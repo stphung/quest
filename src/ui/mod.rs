@@ -37,7 +37,8 @@ pub fn draw_ui_with_update(
     // Check if we should show the challenge notification banner
     let show_challenge_banner = !game_state.challenge_menu.challenges.is_empty()
         && !game_state.challenge_menu.is_open
-        && game_state.active_chess.is_none();
+        && game_state.active_chess.is_none()
+        && game_state.active_morris.is_none();
 
     // Split vertically: optional banner at top, main content below
     let main_area = if show_challenge_banner {
@@ -74,8 +75,10 @@ pub fn draw_ui_with_update(
     );
 
     // Draw right panel based on current activity
-    // Priority: chess > challenge menu > fishing > dungeon > combat
-    if let Some(ref game) = game_state.active_chess {
+    // Priority: morris > chess > challenge menu > fishing > dungeon > combat
+    if let Some(ref game) = game_state.active_morris {
+        morris_scene::render_morris_scene(frame, chunks[1], game);
+    } else if let Some(ref game) = game_state.active_chess {
         chess_scene::render_chess_scene(frame, chunks[1], game);
     } else if game_state.challenge_menu.is_open {
         challenge_menu_scene::render_challenge_menu(frame, chunks[1], &game_state.challenge_menu);

@@ -34,6 +34,11 @@ use challenge_menu::ChallengeType;
 use character_manager::CharacterManager;
 use chess::ChessDifficulty;
 use chess_logic::{apply_game_result, process_ai_thinking, start_chess_game, try_discover_chess};
+use morris::{CursorDirection as MorrisCursorDirection, MorrisDifficulty, MorrisMove, MorrisResult};
+use morris_logic::{
+    apply_game_result as apply_morris_result, get_legal_moves as get_morris_legal_moves,
+    process_ai_thinking as process_morris_ai, start_morris_game, try_discover_morris,
+};
 use chrono::Utc;
 use constants::*;
 use crossterm::event::{self, Event, KeyCode};
@@ -61,6 +66,64 @@ enum Screen {
     CharacterDelete,
     CharacterRename,
     Game,
+}
+
+/// Handle Enter key press during Morris game
+fn handle_morris_enter(state: &mut GameState) {
+    let morris_game = match state.active_morris.as_mut() {
+        Some(game) => game,
+        None => return,
+    };
+
+    let cursor = morris_game.cursor;
+
+    // If must capture, try to capture at cursor
+    if morris_game.must_capture {
+        let capture_moves = get_morris_legal_moves(morris_game);
+        if capture_moves
+            .iter()
+            .any(|m| matches!(m, MorrisMove::Capture(pos) if *pos == cursor))
+        {
+            morris_logic::apply_move(morris_game, MorrisMove::Capture(cursor));
+        }
+        return;
+    }
+
+    // During placing phase, place at cursor if empty
+    if morris_game.phase == morris::MorrisPhase::Placing {
+        if morris_game.board[cursor].is_none() {
+            morris_logic::apply_move(morris_game, MorrisMove::Place(cursor));
+        }
+        return;
+    }
+
+    // During moving/flying phase
+    if let Some(selected) = morris_game.selected_position {
+        // Already selected a piece - try to move to cursor
+        let legal_moves = get_morris_legal_moves(morris_game);
+        if legal_moves.iter().any(|m| {
+            matches!(m, MorrisMove::Move { from, to } if *from == selected && *to == cursor)
+        }) {
+            morris_logic::apply_move(
+                morris_game,
+                MorrisMove::Move {
+                    from: selected,
+                    to: cursor,
+                },
+            );
+        } else if morris_game.board[cursor] == Some(morris::Player::Human) {
+            // Clicked on another human piece - select it instead
+            morris_game.selected_position = Some(cursor);
+        } else {
+            // Invalid move - clear selection
+            morris_game.clear_selection();
+        }
+    } else {
+        // No piece selected - try to select piece at cursor
+        if morris_game.board[cursor] == Some(morris::Player::Human) {
+            morris_game.selected_position = Some(cursor);
+        }
+    }
 }
 
 fn main() -> io::Result<()> {
@@ -649,6 +712,85 @@ fn main() -> io::Result<()> {
                                 continue;
                             }
 
+                            // Handle active Morris game input
+                            if let Some(ref mut morris_game) = state.active_morris {
+                                if morris_game.game_result.is_some() {
+                                    // Any key dismisses result and adds combat log message
+                                    let old_prestige = state.prestige_rank;
+                                    if let Some((result, prestige_gained)) =
+                                        apply_morris_result(&mut state)
+                                    {
+                                        match result {
+                                            MorrisResult::Win => {
+                                                let new_prestige = old_prestige + prestige_gained;
+                                                state.combat_state.add_log_entry(
+                                                    "\u{25CB} Victory! The sage bows with respect.".to_string(),
+                                                    false,
+                                                    true,
+                                                );
+                                                state.combat_state.add_log_entry(
+                                                    format!(
+                                                        "\u{25CB} +{} Prestige Ranks (P{} -> P{})",
+                                                        prestige_gained, old_prestige, new_prestige
+                                                    ),
+                                                    false,
+                                                    true,
+                                                );
+                                            }
+                                            MorrisResult::Loss => {
+                                                state.combat_state.add_log_entry(
+                                                    "\u{25CB} The sage nods knowingly and departs.".to_string(),
+                                                    false,
+                                                    true,
+                                                );
+                                            }
+                                            MorrisResult::Forfeit => {
+                                                state.combat_state.add_log_entry(
+                                                    "\u{25CB} You concede. The sage gathers their stones quietly.".to_string(),
+                                                    false,
+                                                    true,
+                                                );
+                                            }
+                                        }
+                                    }
+                                    continue;
+                                }
+                                if !morris_game.ai_thinking {
+                                    match key_event.code {
+                                        KeyCode::Up => {
+                                            morris_game.move_cursor(MorrisCursorDirection::Up)
+                                        }
+                                        KeyCode::Down => {
+                                            morris_game.move_cursor(MorrisCursorDirection::Down)
+                                        }
+                                        KeyCode::Left => {
+                                            morris_game.move_cursor(MorrisCursorDirection::Left)
+                                        }
+                                        KeyCode::Right => {
+                                            morris_game.move_cursor(MorrisCursorDirection::Right)
+                                        }
+                                        KeyCode::Enter => {
+                                            handle_morris_enter(&mut state);
+                                        }
+                                        KeyCode::Esc => {
+                                            if morris_game.forfeit_pending {
+                                                morris_game.game_result =
+                                                    Some(MorrisResult::Forfeit);
+                                            } else if morris_game.selected_position.is_some() {
+                                                morris_game.clear_selection();
+                                                morris_game.forfeit_pending = false;
+                                            } else {
+                                                morris_game.forfeit_pending = true;
+                                            }
+                                        }
+                                        _ => {
+                                            morris_game.forfeit_pending = false;
+                                        }
+                                    }
+                                }
+                                continue;
+                            }
+
                             // Handle challenge menu input
                             if state.challenge_menu.is_open {
                                 let menu = &mut state.challenge_menu;
@@ -657,15 +799,20 @@ fn main() -> io::Result<()> {
                                         KeyCode::Up => menu.navigate_up(),
                                         KeyCode::Down => menu.navigate_down(4),
                                         KeyCode::Enter => {
-                                            let difficulty = ChessDifficulty::from_index(
-                                                menu.selected_difficulty,
-                                            );
                                             if let Some(challenge) = menu.take_selected() {
-                                                if matches!(
-                                                    challenge.challenge_type,
-                                                    ChallengeType::Chess
-                                                ) {
-                                                    start_chess_game(&mut state, difficulty);
+                                                match challenge.challenge_type {
+                                                    ChallengeType::Chess => {
+                                                        let difficulty = ChessDifficulty::from_index(
+                                                            menu.selected_difficulty,
+                                                        );
+                                                        start_chess_game(&mut state, difficulty);
+                                                    }
+                                                    ChallengeType::Morris => {
+                                                        let difficulty = MorrisDifficulty::from_index(
+                                                            menu.selected_difficulty,
+                                                        );
+                                                        start_morris_game(&mut state, difficulty);
+                                                    }
                                                 }
                                             }
                                         }
@@ -773,8 +920,15 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
         process_ai_thinking(chess_game, &mut rng);
     }
 
-    // Try chess discovery during normal combat (not in dungeon, fishing, or chess)
+    // Process Morris AI thinking
+    if let Some(ref mut morris_game) = game_state.active_morris {
+        let mut rng = rand::thread_rng();
+        process_morris_ai(morris_game, &mut rng);
+    }
+
+    // Try chess discovery during normal combat (not in dungeon, fishing, chess, or morris)
     if game_state.active_chess.is_none()
+        && game_state.active_morris.is_none()
         && game_state.active_dungeon.is_none()
         && game_state.active_fishing.is_none()
     {
@@ -787,6 +941,27 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
             );
             game_state.combat_state.add_log_entry(
                 "♟ Press [Tab] to view pending challenges".to_string(),
+                false,
+                true,
+            );
+        }
+    }
+
+    // Try Morris discovery during normal combat (not in dungeon, fishing, chess, or morris)
+    if game_state.active_morris.is_none()
+        && game_state.active_chess.is_none()
+        && game_state.active_dungeon.is_none()
+        && game_state.active_fishing.is_none()
+    {
+        let mut rng = rand::thread_rng();
+        if try_discover_morris(game_state, &mut rng) {
+            game_state.combat_state.add_log_entry(
+                "\u{25CB} A cloaked stranger approaches with a weathered board...".to_string(),
+                false,
+                true,
+            );
+            game_state.combat_state.add_log_entry(
+                "\u{25CB} Press [Tab] to view pending challenges".to_string(),
                 false,
                 true,
             );
