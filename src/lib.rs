@@ -25,6 +25,7 @@ pub mod fishing_generation;
 pub mod fishing_logic;
 pub mod game_logic;
 pub mod game_state;
+pub mod gomoku;
 pub mod item_drops;
 pub mod item_generation;
 pub mod item_names;
