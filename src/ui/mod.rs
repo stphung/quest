@@ -7,6 +7,7 @@ pub mod chess_scene;
 mod combat_3d;
 pub mod combat_effects;
 mod combat_scene;
+pub mod debug_menu_scene;
 pub mod dungeon_map;
 mod enemy_sprites;
 pub mod fishing_scene;
