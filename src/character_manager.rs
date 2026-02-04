@@ -122,6 +122,7 @@ impl CharacterManager {
             chess_stats: save_data.chess_stats,
             active_chess: None,
             active_morris: None,
+            active_gomoku: None,
         })
     }
 
@@ -324,6 +325,7 @@ mod tests {
             chess_stats: crate::chess::ChessStats::default(),
             active_chess: None,
             active_morris: None,
+            active_gomoku: None,
         };
 
         // Save character
@@ -377,6 +379,7 @@ mod tests {
             chess_stats: crate::chess::ChessStats::default(),
             active_chess: None,
             active_morris: None,
+            active_gomoku: None,
         };
 
         let char2 = GameState {
@@ -399,6 +402,7 @@ mod tests {
             chess_stats: crate::chess::ChessStats::default(),
             active_chess: None,
             active_morris: None,
+            active_gomoku: None,
         };
 
         manager.save_character(&char1).unwrap();
@@ -451,6 +455,7 @@ mod tests {
             chess_stats: crate::chess::ChessStats::default(),
             active_chess: None,
             active_morris: None,
+            active_gomoku: None,
         };
 
         manager.save_character(&state).unwrap();
@@ -492,6 +497,7 @@ mod tests {
             chess_stats: crate::chess::ChessStats::default(),
             active_chess: None,
             active_morris: None,
+            active_gomoku: None,
         };
 
         manager.save_character(&state).unwrap();
@@ -560,6 +566,7 @@ mod tests {
             chess_stats: crate::chess::ChessStats::default(),
             active_chess: None,
             active_morris: None,
+            active_gomoku: None,
         };
 
         manager.save_character(&state).unwrap();
@@ -667,6 +674,7 @@ mod tests {
             chess_stats: crate::chess::ChessStats::default(),
             active_chess: None,
             active_morris: None,
+            active_gomoku: None,
         };
 
         manager.save_character(&state).unwrap();

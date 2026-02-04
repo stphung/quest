@@ -146,21 +146,22 @@ pub fn check_game_over(game: &mut ChessGame) {
     }
 }
 
-/// Apply game result: update stats and grant prestige on win
+/// Apply game result: update stats and grant rewards on win
 pub fn apply_game_result(state: &mut GameState) -> Option<(ChessResult, u32)> {
+    use crate::challenge_menu::DifficultyInfo;
+
     let game = state.active_chess.as_ref()?;
     let result = game.game_result?;
-    let difficulty = game.difficulty;
+    let reward = game.difficulty.reward();
 
     state.chess_stats.games_played += 1;
 
     let prestige_gained = match result {
         ChessResult::Win => {
             state.chess_stats.games_won += 1;
-            let reward = difficulty.reward_prestige();
-            state.prestige_rank += reward;
-            state.chess_stats.prestige_earned += reward;
-            reward
+            state.prestige_rank += reward.prestige_ranks;
+            state.chess_stats.prestige_earned += reward.prestige_ranks;
+            reward.prestige_ranks
         }
         ChessResult::Loss | ChessResult::Forfeit => {
             state.chess_stats.games_lost += 1;

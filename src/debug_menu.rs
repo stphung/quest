@@ -2,7 +2,7 @@
 //!
 //! Activated with `--debug` flag. Press backtick to toggle menu.
 
-use crate::challenge_menu::{ChallengeType, PendingChallenge};
+use crate::challenge_menu::{create_challenge, ChallengeType};
 use crate::dungeon_generation::generate_dungeon;
 use crate::fishing_generation::generate_fishing_session;
 use crate::game_state::GameState;
@@ -13,6 +13,7 @@ pub const DEBUG_OPTIONS: &[&str] = &[
     "Trigger Fishing",
     "Trigger Chess Challenge",
     "Trigger Morris Challenge",
+    "Trigger Gomoku Challenge",
 ];
 
 /// Debug menu state
@@ -63,6 +64,7 @@ impl DebugMenu {
             1 => trigger_fishing(state),
             2 => trigger_chess_challenge(state),
             3 => trigger_morris_challenge(state),
+            4 => trigger_gomoku_challenge(state),
             _ => "Unknown option",
         };
         self.close();
@@ -94,14 +96,9 @@ fn trigger_chess_challenge(state: &mut GameState) -> &'static str {
     if state.challenge_menu.has_challenge(&ChallengeType::Chess) {
         return "Chess challenge already pending!";
     }
-    state.challenge_menu.add_challenge(PendingChallenge {
-        challenge_type: ChallengeType::Chess,
-        title: "Chess Challenge".to_string(),
-        icon: "♟",
-        description: "A hooded figure sits alone at a stone table, chess pieces \
-            gleaming in the firelight. \"Care for a game?\" they ask."
-            .to_string(),
-    });
+    state
+        .challenge_menu
+        .add_challenge(create_challenge(&ChallengeType::Chess));
     "Chess challenge added!"
 }
 
@@ -109,15 +106,20 @@ fn trigger_morris_challenge(state: &mut GameState) -> &'static str {
     if state.challenge_menu.has_challenge(&ChallengeType::Morris) {
         return "Morris challenge already pending!";
     }
-    state.challenge_menu.add_challenge(PendingChallenge {
-        challenge_type: ChallengeType::Morris,
-        title: "Nine Men's Morris".to_string(),
-        icon: "\u{25CB}",
-        description: "An elderly sage arranges nine white stones on a weathered board. \
-            \"The game of mills,\" they say. \"Three in a row captures. Shall we play?\""
-            .to_string(),
-    });
+    state
+        .challenge_menu
+        .add_challenge(create_challenge(&ChallengeType::Morris));
     "Morris challenge added!"
+}
+
+fn trigger_gomoku_challenge(state: &mut GameState) -> &'static str {
+    if state.challenge_menu.has_challenge(&ChallengeType::Gomoku) {
+        return "Gomoku challenge already pending!";
+    }
+    state
+        .challenge_menu
+        .add_challenge(create_challenge(&ChallengeType::Gomoku));
+    "Gomoku challenge added!"
 }
 
 #[cfg(test)]
@@ -135,16 +137,18 @@ mod tests {
 
         menu.navigate_down();
         menu.navigate_down();
-        assert_eq!(menu.selected_index, 3);
+        menu.navigate_down();
+        assert_eq!(menu.selected_index, 4);
 
         // Can't go past end
         menu.navigate_down();
-        assert_eq!(menu.selected_index, 3);
+        assert_eq!(menu.selected_index, 4);
 
         menu.navigate_up();
-        assert_eq!(menu.selected_index, 2);
+        assert_eq!(menu.selected_index, 3);
 
         // Can't go before start
+        menu.navigate_up();
         menu.navigate_up();
         menu.navigate_up();
         menu.navigate_up();
@@ -209,5 +213,17 @@ mod tests {
         // Can't add duplicate
         let msg = trigger_morris_challenge(&mut state);
         assert_eq!(msg, "Morris challenge already pending!");
+    }
+
+    #[test]
+    fn test_trigger_gomoku_challenge() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let msg = trigger_gomoku_challenge(&mut state);
+        assert_eq!(msg, "Gomoku challenge added!");
+        assert!(state.challenge_menu.has_challenge(&ChallengeType::Gomoku));
+
+        // Can't add duplicate
+        let msg = trigger_gomoku_challenge(&mut state);
+        assert_eq!(msg, "Gomoku challenge already pending!");
     }
 }

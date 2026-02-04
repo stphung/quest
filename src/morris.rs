@@ -459,6 +459,30 @@ mod tests {
     }
 
     #[test]
+    fn test_difficulty_rewards_via_trait() {
+        use crate::challenge_menu::DifficultyInfo;
+
+        // Morris rewards XP, with fishing rank at Master
+        let novice = MorrisDifficulty::Novice.reward();
+        assert_eq!(novice.xp_percent, 50);
+        assert_eq!(novice.prestige_ranks, 0);
+        assert_eq!(novice.fishing_ranks, 0);
+
+        let apprentice = MorrisDifficulty::Apprentice.reward();
+        assert_eq!(apprentice.xp_percent, 100);
+        assert_eq!(apprentice.fishing_ranks, 0);
+
+        let journeyman = MorrisDifficulty::Journeyman.reward();
+        assert_eq!(journeyman.xp_percent, 150);
+        assert_eq!(journeyman.fishing_ranks, 0);
+
+        let master = MorrisDifficulty::Master.reward();
+        assert_eq!(master.xp_percent, 200);
+        assert_eq!(master.fishing_ranks, 1);
+        assert_eq!(master.prestige_ranks, 0);
+    }
+
+    #[test]
     fn test_new_game() {
         let game = MorrisGame::new(MorrisDifficulty::Journeyman);
 

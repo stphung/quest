@@ -1,7 +1,8 @@
 //! Challenge menu UI rendering.
 
-use crate::challenge_menu::{ChallengeMenu, ChallengeType};
+use crate::challenge_menu::{ChallengeMenu, ChallengeType, DifficultyInfo};
 use crate::chess::ChessDifficulty;
+use crate::gomoku::GomokuDifficulty;
 use crate::morris::MorrisDifficulty;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -96,18 +97,37 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
         ])
         .split(inner);
 
-    // Description
-    let desc =
-        Paragraph::new(challenge.description.clone()).style(Style::default().fg(Color::White));
+    // Description (with text wrapping)
+    let desc = Paragraph::new(challenge.description.clone())
+        .style(Style::default().fg(Color::White))
+        .wrap(ratatui::widgets::Wrap { trim: true });
     frame.render_widget(desc, chunks[0]);
 
     // Difficulty selector
     match challenge.challenge_type {
         ChallengeType::Chess => {
-            render_chess_difficulty_selector(frame, chunks[2], menu.selected_difficulty);
+            render_difficulty_selector(
+                frame,
+                chunks[2],
+                &ChessDifficulty::ALL,
+                menu.selected_difficulty,
+            );
         }
         ChallengeType::Morris => {
-            render_morris_difficulty_selector(frame, chunks[2], menu.selected_difficulty);
+            render_difficulty_selector(
+                frame,
+                chunks[2],
+                &MorrisDifficulty::ALL,
+                menu.selected_difficulty,
+            );
+        }
+        ChallengeType::Gomoku => {
+            render_difficulty_selector(
+                frame,
+                chunks[2],
+                &GomokuDifficulty::ALL,
+                menu.selected_difficulty,
+            );
         }
     }
 
@@ -126,7 +146,13 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
     frame.render_widget(help, chunks[6]);
 }
 
-fn render_chess_difficulty_selector(frame: &mut Frame, area: Rect, selected: usize) {
+/// Generic difficulty selector that works with any type implementing DifficultyInfo
+fn render_difficulty_selector<D: DifficultyInfo>(
+    frame: &mut Frame,
+    area: Rect,
+    options: &[D],
+    selected: usize,
+) {
     let title = Paragraph::new("Select difficulty:").style(
         Style::default()
             .fg(Color::White)
@@ -140,21 +166,13 @@ fn render_chess_difficulty_selector(frame: &mut Frame, area: Rect, selected: usi
         ..area
     };
 
-    let items: Vec<ListItem> = ChessDifficulty::ALL
+    let items: Vec<ListItem> = options
         .iter()
         .enumerate()
         .map(|(i, diff)| {
             let is_selected = i == selected;
             let prefix = if is_selected { "> " } else { "  " };
 
-            let reward = diff.reward_prestige();
-            let reward_text = if reward == 1 {
-                "Win: +1 Prestige Rank".to_string()
-            } else {
-                format!("Win: +{} Prestige Ranks", reward)
-            };
-
-            // Selected items get cyan/yellow highlighting
             let prefix_style = if is_selected {
                 Style::default().fg(Color::Cyan)
             } else {
@@ -173,75 +191,20 @@ fn render_chess_difficulty_selector(frame: &mut Frame, area: Rect, selected: usi
                 Style::default().fg(Color::Gray)
             };
 
-            let spans = vec![
+            let mut spans = vec![
                 Span::styled(prefix, prefix_style),
                 Span::styled(format!("{:<12}", diff.name()), name_style),
-                Span::styled(
-                    format!("~{:<5} ELO   ", diff.estimated_elo()),
+            ];
+
+            // Add extra info if present (e.g., ELO for chess)
+            if let Some(extra) = diff.extra_info() {
+                spans.push(Span::styled(
+                    format!("{:<14}", extra),
                     Style::default().fg(Color::DarkGray),
-                ),
-                Span::styled(reward_text, reward_style),
-            ];
+                ));
+            }
 
-            ListItem::new(Line::from(spans))
-        })
-        .collect();
-
-    let list = List::new(items);
-    frame.render_widget(list, options_area);
-}
-
-fn render_morris_difficulty_selector(frame: &mut Frame, area: Rect, selected: usize) {
-    let title = Paragraph::new("Select difficulty:").style(
-        Style::default()
-            .fg(Color::White)
-            .add_modifier(Modifier::BOLD),
-    );
-    frame.render_widget(title, Rect { height: 1, ..area });
-
-    let options_area = Rect {
-        y: area.y + 1,
-        height: area.height.saturating_sub(1),
-        ..area
-    };
-
-    let items: Vec<ListItem> = MorrisDifficulty::ALL
-        .iter()
-        .enumerate()
-        .map(|(i, diff)| {
-            let is_selected = i == selected;
-            let prefix = if is_selected { "> " } else { "  " };
-
-            let pct = diff.reward_xp_percent();
-            let reward_text = if *diff == MorrisDifficulty::Master {
-                format!("Win: +{}% level XP, +1 Fish Rank", pct)
-            } else {
-                format!("Win: +{}% level XP", pct)
-            };
-
-            let prefix_style = if is_selected {
-                Style::default().fg(Color::Cyan)
-            } else {
-                Style::default()
-            };
-            let name_style = if is_selected {
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD)
-            } else {
-                Style::default().fg(Color::White)
-            };
-            let reward_style = if is_selected {
-                Style::default().fg(Color::Yellow)
-            } else {
-                Style::default().fg(Color::Gray)
-            };
-
-            let spans = vec![
-                Span::styled(prefix, prefix_style),
-                Span::styled(format!("{:<12}", diff.name()), name_style),
-                Span::styled(reward_text, reward_style),
-            ];
+            spans.push(Span::styled(diff.reward().description(), reward_style));
 
             ListItem::new(Line::from(spans))
         })

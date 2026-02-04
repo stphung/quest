@@ -400,6 +400,28 @@ mod tests {
     }
 
     #[test]
+    fn test_difficulty_rewards_via_trait() {
+        use crate::challenge_menu::DifficultyInfo;
+
+        // Chess rewards prestige only
+        let novice = ChessDifficulty::Novice.reward();
+        assert_eq!(novice.prestige_ranks, 1);
+        assert_eq!(novice.xp_percent, 0);
+        assert_eq!(novice.fishing_ranks, 0);
+
+        let apprentice = ChessDifficulty::Apprentice.reward();
+        assert_eq!(apprentice.prestige_ranks, 2);
+
+        let journeyman = ChessDifficulty::Journeyman.reward();
+        assert_eq!(journeyman.prestige_ranks, 3);
+
+        let master = ChessDifficulty::Master.reward();
+        assert_eq!(master.prestige_ranks, 5);
+        assert_eq!(master.xp_percent, 0);
+        assert_eq!(master.fishing_ranks, 0);
+    }
+
+    #[test]
     fn test_chess_game_new() {
         let game = ChessGame::new(ChessDifficulty::Journeyman);
         assert_eq!(game.difficulty, ChessDifficulty::Journeyman);

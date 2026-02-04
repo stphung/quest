@@ -18,6 +18,8 @@ mod fishing_generation;
 mod fishing_logic;
 mod game_logic;
 mod game_state;
+mod gomoku;
+mod gomoku_logic;
 mod item_drops;
 mod item_generation;
 mod item_names;
@@ -35,7 +37,7 @@ use challenge_menu::{try_discover_challenge, ChallengeType};
 use character_manager::CharacterManager;
 use chess::ChessDifficulty;
 use chess_logic::{apply_game_result, process_ai_thinking, start_chess_game};
-use chrono::Utc;
+use chrono::{Local, Utc};
 use constants::*;
 use crossterm::event::{self, Event, KeyCode};
 use crossterm::terminal::{
@@ -44,6 +46,11 @@ use crossterm::terminal::{
 use crossterm::ExecutableCommand;
 use game_logic::*;
 use game_state::*;
+use gomoku::{GomokuDifficulty, GomokuResult};
+use gomoku_logic::{
+    apply_game_result as apply_gomoku_result, process_ai_thinking as process_gomoku_ai,
+    process_human_move as process_gomoku_move, start_gomoku_game,
+};
 use morris::{
     CursorDirection as MorrisCursorDirection, MorrisDifficulty, MorrisMove, MorrisResult,
 };
@@ -561,6 +568,10 @@ fn main() -> io::Result<()> {
                 let mut showing_prestige_confirm = false;
                 let mut debug_menu = debug_menu::DebugMenu::new();
 
+                // Save indicator state (for non-debug mode)
+                let mut last_save_instant: Option<Instant> = None;
+                let mut last_save_time: Option<chrono::DateTime<chrono::Local>> = None;
+
                 // Update check state - start initial background check immediately
                 let mut update_info: Option<UpdateInfo> = None;
                 let mut update_check_completed = false;
@@ -593,7 +604,7 @@ fn main() -> io::Result<()> {
                         if showing_prestige_confirm {
                             ui::prestige_confirm::draw_prestige_confirm(frame, &state);
                         }
-                        // Draw debug indicator and menu if in debug mode
+                        // Draw debug indicator and menu if in debug mode, otherwise save indicator
                         if debug_mode {
                             ui::debug_menu_scene::render_debug_indicator(frame, frame.size());
                             if debug_menu.is_open {
@@ -603,6 +614,17 @@ fn main() -> io::Result<()> {
                                     &debug_menu,
                                 );
                             }
+                        } else {
+                            // Show save indicator (spinner for 1s after save, then timestamp)
+                            let is_saving = last_save_instant
+                                .map(|t| t.elapsed() < Duration::from_secs(1))
+                                .unwrap_or(false);
+                            ui::debug_menu_scene::render_save_indicator(
+                                frame,
+                                frame.size(),
+                                is_saving,
+                                last_save_time,
+                            );
                         }
                     })?;
 
@@ -616,7 +638,11 @@ fn main() -> io::Result<()> {
                                         perform_prestige(&mut state);
                                         showing_prestige_confirm = false;
                                         // Save immediately after prestige to prevent stale enemy on reload
-                                        let _ = character_manager.save_character(&state);
+                                        if !debug_mode {
+                                            let _ = character_manager.save_character(&state);
+                                            last_save_instant = Some(Instant::now());
+                                            last_save_time = Some(Local::now());
+                                        }
                                         state.combat_state.add_log_entry(
                                             format!(
                                                 "Prestiged to {}!",
@@ -660,6 +686,95 @@ fn main() -> io::Result<()> {
                                     }
                                     continue;
                                 }
+                            }
+
+                            // Handle active Gomoku game input
+                            if let Some(ref mut gomoku_game) = state.active_gomoku {
+                                if gomoku_game.game_result.is_some() {
+                                    // Any key dismisses result and applies rewards
+                                    let old_prestige = state.prestige_rank;
+                                    if let Some((result, xp_gained, prestige_gained)) =
+                                        apply_gomoku_result(&mut state)
+                                    {
+                                        match result {
+                                            GomokuResult::Win => {
+                                                state.combat_state.add_log_entry(
+                                                    "◎ Victory! The strategist bows in defeat."
+                                                        .to_string(),
+                                                    false,
+                                                    true,
+                                                );
+                                                if prestige_gained > 0 {
+                                                    state.combat_state.add_log_entry(
+                                                        format!(
+                                                            "◎ +{} Prestige Ranks (P{} → P{})",
+                                                            prestige_gained,
+                                                            old_prestige,
+                                                            state.prestige_rank
+                                                        ),
+                                                        false,
+                                                        false,
+                                                    );
+                                                }
+                                                if xp_gained > 0 {
+                                                    state.combat_state.add_log_entry(
+                                                        format!("◎ +{} XP", xp_gained),
+                                                        false,
+                                                        false,
+                                                    );
+                                                }
+                                            }
+                                            GomokuResult::Loss => {
+                                                state.combat_state.add_log_entry(
+                                                    "◎ The strategist nods respectfully and departs."
+                                                        .to_string(),
+                                                    false,
+                                                    true,
+                                                );
+                                            }
+                                            GomokuResult::Draw => {
+                                                state.combat_state.add_log_entry(
+                                                    "◎ A rare draw. The strategist seems impressed."
+                                                        .to_string(),
+                                                    false,
+                                                    true,
+                                                );
+                                            }
+                                        }
+                                    }
+                                    continue;
+                                }
+
+                                // Handle forfeit confirmation (double-Esc to confirm, any other key cancels)
+                                if gomoku_game.forfeit_pending {
+                                    match key_event.code {
+                                        KeyCode::Esc => {
+                                            gomoku_game.game_result = Some(GomokuResult::Loss);
+                                        }
+                                        _ => {
+                                            gomoku_game.forfeit_pending = false;
+                                        }
+                                    }
+                                    continue;
+                                }
+
+                                // Normal game input
+                                if !gomoku_game.ai_thinking {
+                                    match key_event.code {
+                                        KeyCode::Up => gomoku_game.move_cursor(-1, 0),
+                                        KeyCode::Down => gomoku_game.move_cursor(1, 0),
+                                        KeyCode::Left => gomoku_game.move_cursor(0, -1),
+                                        KeyCode::Right => gomoku_game.move_cursor(0, 1),
+                                        KeyCode::Enter => {
+                                            process_gomoku_move(gomoku_game);
+                                        }
+                                        KeyCode::Esc => {
+                                            gomoku_game.forfeit_pending = true;
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                                continue;
                             }
 
                             // Handle active chess game input (highest priority)
@@ -871,6 +986,13 @@ fn main() -> io::Result<()> {
                                                             );
                                                         start_morris_game(&mut state, difficulty);
                                                     }
+                                                    ChallengeType::Gomoku => {
+                                                        let difficulty =
+                                                            GomokuDifficulty::from_index(
+                                                                menu.selected_difficulty,
+                                                            );
+                                                        start_gomoku_game(&mut state, difficulty);
+                                                    }
                                                 }
                                             }
                                         }
@@ -907,8 +1029,10 @@ fn main() -> io::Result<()> {
                             match key_event.code {
                                 // Handle 'q'/'Q' to quit
                                 KeyCode::Char('q') | KeyCode::Char('Q') => {
-                                    // Save character before returning to select
-                                    character_manager.save_character(&state)?;
+                                    // Save character before returning to select (skip in debug mode)
+                                    if !debug_mode {
+                                        character_manager.save_character(&state)?;
+                                    }
                                     game_state = None;
                                     current_screen = Screen::CharacterSelect;
                                     break;
@@ -930,10 +1054,14 @@ fn main() -> io::Result<()> {
                         last_tick = Instant::now();
                     }
 
-                    // Auto-save every 30 seconds
-                    if last_autosave.elapsed() >= Duration::from_secs(AUTOSAVE_INTERVAL_SECONDS) {
+                    // Auto-save every 30 seconds (skip in debug mode)
+                    if !debug_mode
+                        && last_autosave.elapsed() >= Duration::from_secs(AUTOSAVE_INTERVAL_SECONDS)
+                    {
                         character_manager.save_character(&state)?;
                         last_autosave = Instant::now();
+                        last_save_instant = Some(Instant::now());
+                        last_save_time = Some(Local::now());
                     }
 
                     // Periodic update check (every 30 minutes)
@@ -984,6 +1112,12 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
         process_morris_ai(morris_game, &mut rng);
     }
 
+    // Process Gomoku AI thinking
+    if let Some(ref mut gomoku_game) = game_state.active_gomoku {
+        let mut rng = rand::thread_rng();
+        process_gomoku_ai(gomoku_game, &mut rng);
+    }
+
     // Try challenge discovery (single roll, weighted table picks which type)
     {
         let mut rng = rand::thread_rng();
@@ -993,6 +1127,10 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
                 ChallengeType::Morris => (
                     "\u{25CB}",
                     "A cloaked stranger approaches with a weathered board...",
+                ),
+                ChallengeType::Gomoku => (
+                    "◎",
+                    "A wandering strategist places a worn board before you...",
                 ),
             };
             game_state
