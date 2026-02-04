@@ -266,6 +266,7 @@ impl SaveManager {
             active_morris: None,
             active_gomoku: None,
             active_minesweeper: None,
+            active_rune: None,
         }
     }
 }

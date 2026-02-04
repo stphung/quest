@@ -9,6 +9,7 @@ use crate::game_state::GameState;
 use crate::gomoku::GomokuDifficulty;
 use crate::minesweeper::MinesweeperDifficulty;
 use crate::morris::MorrisDifficulty;
+use crate::rune::RuneDifficulty;
 use rand::Rng;
 
 /// Structured reward for challenge victories - single source of truth
@@ -160,6 +161,49 @@ impl DifficultyInfo for MinesweeperDifficulty {
     }
 }
 
+impl DifficultyInfo for RuneDifficulty {
+    fn name(&self) -> &'static str {
+        RuneDifficulty::name(self)
+    }
+
+    fn reward(&self) -> ChallengeReward {
+        match self {
+            RuneDifficulty::Novice => ChallengeReward {
+                xp_percent: 25,
+                ..Default::default()
+            },
+            RuneDifficulty::Apprentice => ChallengeReward {
+                xp_percent: 50,
+                ..Default::default()
+            },
+            RuneDifficulty::Journeyman => ChallengeReward {
+                fishing_ranks: 1,
+                xp_percent: 75,
+                ..Default::default()
+            },
+            RuneDifficulty::Master => ChallengeReward {
+                prestige_ranks: 1,
+                fishing_ranks: 2,
+                ..Default::default()
+            },
+        }
+    }
+
+    fn extra_info(&self) -> Option<String> {
+        let dupes = if self.allow_duplicates() {
+            ", dupes"
+        } else {
+            ""
+        };
+        Some(format!(
+            "{} runes, {} slots{}",
+            self.num_runes(),
+            self.num_slots(),
+            dupes
+        ))
+    }
+}
+
 /// Chance per tick to discover any challenge (~2 hour average)
 /// At 10 ticks/sec, 0.000014 chance/tick ≈ 71,429 ticks ≈ 2 hours average
 pub const CHALLENGE_DISCOVERY_CHANCE: f64 = 0.000014;
@@ -189,6 +233,10 @@ const CHALLENGE_TABLE: &[ChallengeWeight] = &[
         challenge_type: ChallengeType::Minesweeper,
         weight: 25,
     },
+    ChallengeWeight {
+        challenge_type: ChallengeType::Rune,
+        weight: 25,
+    },
 ];
 
 /// A single pending challenge in the menu
@@ -207,6 +255,7 @@ pub enum ChallengeType {
     Morris,
     Gomoku,
     Minesweeper,
+    Rune,
 }
 
 /// Menu state for navigation
@@ -299,6 +348,7 @@ pub fn try_discover_challenge<R: Rng>(state: &mut GameState, rng: &mut R) -> Opt
         || state.active_morris.is_some()
         || state.active_gomoku.is_some()
         || state.active_minesweeper.is_some()
+        || state.active_rune.is_some()
     {
         return None;
     }
@@ -379,6 +429,16 @@ pub fn create_challenge(ct: &ChallengeType) -> PendingChallenge {
                 worn map. 'One wrong step and...' She makes an explosive gesture. \
                 'Help me chart the safe path. Probe carefully—the numbers tell you \
                 how many traps lurk nearby.'"
+                .to_string(),
+        },
+        ChallengeType::Rune => PendingChallenge {
+            challenge_type: ChallengeType::Rune,
+            title: "Rune Deciphering: Ancient Tablet".to_string(),
+            icon: "ᚱ",
+            description: "You stumble upon a stone tablet covered in glowing runes. \
+                A spectral voice echoes: 'Decipher the hidden sequence, mortal. \
+                Each attempt reveals clues\u{2014}exact matches, misplaced symbols, or \
+                false leads. Prove your logic worthy of ancient knowledge.'"
                 .to_string(),
         },
     }

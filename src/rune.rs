@@ -323,4 +323,26 @@ mod tests {
         let game = RuneGame::new(RuneDifficulty::Novice);
         assert_eq!(game.guesses_remaining(), 10);
     }
+
+    #[test]
+    fn test_reward_structure() {
+        use crate::challenge_menu::DifficultyInfo;
+
+        let novice = RuneDifficulty::Novice.reward();
+        assert_eq!(novice.xp_percent, 25);
+        assert_eq!(novice.prestige_ranks, 0);
+        assert_eq!(novice.fishing_ranks, 0);
+
+        let apprentice = RuneDifficulty::Apprentice.reward();
+        assert_eq!(apprentice.xp_percent, 50);
+
+        let journeyman = RuneDifficulty::Journeyman.reward();
+        assert_eq!(journeyman.fishing_ranks, 1);
+        assert_eq!(journeyman.xp_percent, 75);
+
+        let master = RuneDifficulty::Master.reward();
+        assert_eq!(master.prestige_ranks, 1);
+        assert_eq!(master.fishing_ranks, 2);
+        assert_eq!(master.xp_percent, 0);
+    }
 }

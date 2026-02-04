@@ -8,6 +8,7 @@ use crate::fishing::{FishingSession, FishingState};
 use crate::gomoku::GomokuGame;
 use crate::minesweeper::MinesweeperGame;
 use crate::morris::MorrisGame;
+use crate::rune::RuneGame;
 use crate::zones::ZoneProgression;
 use serde::{Deserialize, Serialize};
 
@@ -56,6 +57,9 @@ pub struct GameState {
     /// Active minesweeper game (transient, not saved)
     #[serde(skip)]
     pub active_minesweeper: Option<MinesweeperGame>,
+    /// Active rune game (transient, not saved)
+    #[serde(skip)]
+    pub active_rune: Option<RuneGame>,
 }
 
 impl GameState {
@@ -89,6 +93,7 @@ impl GameState {
             active_morris: None,
             active_gomoku: None,
             active_minesweeper: None,
+            active_rune: None,
         }
     }
 
