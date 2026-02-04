@@ -33,6 +33,7 @@ pub mod item_names;
 pub mod item_scoring;
 pub mod items;
 pub mod minesweeper;
+pub mod minesweeper_logic;
 pub mod morris;
 pub mod morris_logic;
 pub mod prestige;
