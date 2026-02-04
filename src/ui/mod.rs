@@ -77,7 +77,7 @@ pub fn draw_ui_with_update(
     // Draw right panel based on current activity
     // Priority: morris > chess > challenge menu > fishing > dungeon > combat
     if let Some(ref game) = game_state.active_morris {
-        morris_scene::render_morris_scene(frame, chunks[1], game);
+        morris_scene::render_morris_scene(frame, chunks[1], game, game_state.character_level);
     } else if let Some(ref game) = game_state.active_chess {
         chess_scene::render_chess_scene(frame, chunks[1], game);
     } else if game_state.challenge_menu.is_open {

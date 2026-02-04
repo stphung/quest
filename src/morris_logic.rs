@@ -443,23 +443,26 @@ fn count_mobility(game: &MorrisGame, player: Player) -> i32 {
     moves
 }
 
-/// Apply game result: grant prestige on win
-pub fn apply_game_result(state: &mut GameState) -> Option<(MorrisResult, u32)> {
+/// Apply game result: grant XP on win (scaled to current level)
+pub fn apply_game_result(state: &mut GameState) -> Option<(MorrisResult, u64)> {
     let game = state.active_morris.as_ref()?;
     let result = game.game_result?;
     let difficulty = game.difficulty;
 
-    let prestige_gained = match result {
+    let xp_gained = match result {
         MorrisResult::Win => {
-            let reward = difficulty.reward_prestige();
-            state.prestige_rank += reward;
+            let xp_for_level = crate::game_logic::xp_for_next_level(state.character_level.max(1));
+            let reward =
+                (xp_for_level as f64 * difficulty.reward_xp_percent() as f64 / 100.0) as u64;
+            let reward = reward.max(100); // Floor of 100 XP
+            state.character_xp += reward;
             reward
         }
         MorrisResult::Loss | MorrisResult::Forfeit => 0,
     };
 
     state.active_morris = None;
-    Some((result, prestige_gained))
+    Some((result, xp_gained))
 }
 
 #[cfg(test)]
@@ -853,54 +856,57 @@ mod tests {
     #[test]
     fn test_apply_win_result() {
         let mut state = GameState::new("Test".to_string(), 0);
-        state.prestige_rank = 5;
+        state.character_level = 10;
 
         let mut game = MorrisGame::new(MorrisDifficulty::Master);
         game.game_result = Some(MorrisResult::Win);
         state.active_morris = Some(game);
 
+        let old_xp = state.character_xp;
         let result = apply_game_result(&mut state);
 
         assert!(result.is_some());
-        let (morris_result, prestige) = result.unwrap();
+        let (morris_result, xp_gained) = result.unwrap();
         assert_eq!(morris_result, MorrisResult::Win);
-        assert_eq!(prestige, 5); // Master reward
-        assert_eq!(state.prestige_rank, 10);
+        // Master = 100% of xp_for_next_level(10) = 3162
+        assert_eq!(xp_gained, 3162);
+        assert_eq!(state.character_xp, old_xp + 3162);
         assert!(state.active_morris.is_none());
     }
 
     #[test]
     fn test_apply_loss_result() {
         let mut state = GameState::new("Test".to_string(), 0);
-        state.prestige_rank = 5;
 
         let mut game = MorrisGame::new(MorrisDifficulty::Novice);
         game.game_result = Some(MorrisResult::Loss);
         state.active_morris = Some(game);
 
+        let old_xp = state.character_xp;
         let result = apply_game_result(&mut state);
 
-        let (morris_result, prestige) = result.unwrap();
+        let (morris_result, xp_gained) = result.unwrap();
         assert_eq!(morris_result, MorrisResult::Loss);
-        assert_eq!(prestige, 0);
-        assert_eq!(state.prestige_rank, 5); // Unchanged
+        assert_eq!(xp_gained, 0);
+        assert_eq!(state.character_xp, old_xp); // Unchanged
         assert!(state.active_morris.is_none());
     }
 
     #[test]
     fn test_apply_forfeit_result() {
         let mut state = GameState::new("Test".to_string(), 0);
-        state.prestige_rank = 5;
 
         let mut game = MorrisGame::new(MorrisDifficulty::Novice);
         game.game_result = Some(MorrisResult::Forfeit);
         state.active_morris = Some(game);
 
+        let old_xp = state.character_xp;
         let result = apply_game_result(&mut state);
 
-        let (morris_result, prestige) = result.unwrap();
+        let (morris_result, xp_gained) = result.unwrap();
         assert_eq!(morris_result, MorrisResult::Forfeit);
-        assert_eq!(prestige, 0);
+        assert_eq!(xp_gained, 0);
+        assert_eq!(state.character_xp, old_xp); // Unchanged
         assert!(state.active_morris.is_none());
     }
 

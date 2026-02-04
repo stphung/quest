@@ -718,13 +718,11 @@ fn main() -> io::Result<()> {
                             if let Some(ref mut morris_game) = state.active_morris {
                                 if morris_game.game_result.is_some() {
                                     // Any key dismisses result and adds combat log message
-                                    let old_prestige = state.prestige_rank;
-                                    if let Some((result, prestige_gained)) =
+                                    if let Some((result, xp_gained)) =
                                         apply_morris_result(&mut state)
                                     {
                                         match result {
                                             MorrisResult::Win => {
-                                                let new_prestige = old_prestige + prestige_gained;
                                                 state.combat_state.add_log_entry(
                                                     "\u{25CB} Victory! The sage bows with respect."
                                                         .to_string(),
@@ -732,10 +730,7 @@ fn main() -> io::Result<()> {
                                                     true,
                                                 );
                                                 state.combat_state.add_log_entry(
-                                                    format!(
-                                                        "\u{25CB} +{} Prestige Ranks (P{} -> P{})",
-                                                        prestige_gained, old_prestige, new_prestige
-                                                    ),
+                                                    format!("\u{25CB} +{} XP", xp_gained),
                                                     false,
                                                     true,
                                                 );

@@ -10,12 +10,16 @@ use ratatui::{
 };
 
 /// Render the Nine Men's Morris game scene
-pub fn render_morris_scene(frame: &mut Frame, area: Rect, game: &MorrisGame) {
+pub fn render_morris_scene(frame: &mut Frame, area: Rect, game: &MorrisGame, character_level: u32) {
     frame.render_widget(Clear, area);
 
     // Check for game over overlay
     if let Some(result) = game.game_result {
-        render_game_over_overlay(frame, area, result, game.difficulty.reward_prestige());
+        let xp_for_level = crate::game_logic::xp_for_next_level(character_level.max(1));
+        let xp_reward =
+            (xp_for_level as f64 * game.difficulty.reward_xp_percent() as f64 / 100.0) as u64;
+        let xp_reward = xp_reward.max(100);
+        render_game_over_overlay(frame, area, result, xp_reward);
         return;
     }
 
@@ -484,14 +488,14 @@ fn render_help_panel(frame: &mut Frame, area: Rect, game: &MorrisGame) {
     frame.render_widget(text, inner);
 }
 
-fn render_game_over_overlay(frame: &mut Frame, area: Rect, result: MorrisResult, prestige: u32) {
+fn render_game_over_overlay(frame: &mut Frame, area: Rect, result: MorrisResult, xp_reward: u64) {
     frame.render_widget(Clear, area);
 
     let (title, message, reward) = match result {
         MorrisResult::Win => (
             ":: VICTORY! ::",
             "You outwitted the sage at the game of mills!",
-            format!("+{} Prestige Ranks", prestige),
+            format!("+{} XP", xp_reward),
         ),
         MorrisResult::Loss => (
             "DEFEAT",
