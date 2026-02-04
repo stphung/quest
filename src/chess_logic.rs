@@ -1,46 +1,9 @@
-//! Chess game logic: discovery, AI moves, and game resolution.
+//! Chess game logic: AI moves, and game resolution.
 
-use crate::challenge_menu::{ChallengeType, PendingChallenge};
 use crate::chess::{ChessDifficulty, ChessGame, ChessResult};
 use crate::game_state::GameState;
 use chess_engine::Evaluate;
 use rand::Rng;
-
-/// Chance per tick to discover a chess challenge (~2 hour average)
-/// At 10 ticks/sec, 0.000014 chance/tick ≈ 71,429 ticks ≈ 2 hours average
-pub const CHESS_DISCOVERY_CHANCE: f64 = 0.000014;
-
-/// Create a chess challenge for the challenge menu
-pub fn create_chess_challenge() -> PendingChallenge {
-    PendingChallenge {
-        challenge_type: ChallengeType::Chess,
-        title: "Chess Challenge".to_string(),
-        icon: "♟",
-        description: "A hooded figure sits alone at a stone table, chess pieces \
-            gleaming in the firelight. \"Care for a game?\" they ask."
-            .to_string(),
-    }
-}
-
-/// Check if chess discovery conditions are met and roll for discovery
-pub fn try_discover_chess<R: Rng>(state: &mut GameState, rng: &mut R) -> bool {
-    // Requirements: P1+, not in dungeon, not fishing, not in chess, no pending chess
-    if state.prestige_rank < 1
-        || state.active_dungeon.is_some()
-        || state.active_fishing.is_some()
-        || state.active_chess.is_some()
-        || state.challenge_menu.has_chess_challenge()
-    {
-        return false;
-    }
-
-    if rng.gen::<f64>() < CHESS_DISCOVERY_CHANCE {
-        state.challenge_menu.add_challenge(create_chess_challenge());
-        true
-    } else {
-        false
-    }
-}
 
 /// Start a chess game with the selected difficulty
 pub fn start_chess_game(state: &mut GameState, difficulty: ChessDifficulty) {
@@ -216,13 +179,15 @@ pub fn apply_game_result(state: &mut GameState) -> Option<(ChessResult, u32)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::challenge_menu::{ChallengeType, PendingChallenge};
 
-    #[test]
-    fn test_create_challenge() {
-        let challenge = create_chess_challenge();
-        assert_eq!(challenge.title, "Chess Challenge");
-        assert_eq!(challenge.icon, "♟");
-        assert!(matches!(challenge.challenge_type, ChallengeType::Chess));
+    fn make_chess_challenge() -> PendingChallenge {
+        PendingChallenge {
+            challenge_type: ChallengeType::Chess,
+            title: "Chess Challenge".to_string(),
+            icon: "♟",
+            description: "Test".to_string(),
+        }
     }
 
     #[test]
@@ -266,112 +231,6 @@ mod tests {
         assert_eq!(prestige, 0);
         assert_eq!(state.prestige_rank, 5);
         assert_eq!(state.chess_stats.games_lost, 1);
-    }
-
-    // ============ Discovery Requirement Tests ============
-
-    #[test]
-    fn test_discovery_requires_prestige_1() {
-        let mut state = GameState::new("Test".to_string(), 0);
-        state.prestige_rank = 0; // No prestige
-
-        let mut rng = rand::thread_rng();
-        // Try many times - should never discover at P0
-        for _ in 0..1000 {
-            let discovered = try_discover_chess(&mut state, &mut rng);
-            assert!(!discovered, "Should not discover chess at P0");
-        }
-
-        // Now with P1
-        state.prestige_rank = 1;
-        // Note: This might still not discover due to low chance, but at least it's allowed
-        // We're testing the requirement, not the random chance
-    }
-
-    #[test]
-    fn test_no_discovery_during_dungeon() {
-        let mut state = GameState::new("Test".to_string(), 0);
-        state.prestige_rank = 5;
-        state.active_dungeon = Some(crate::dungeon_generation::generate_dungeon(1, 0));
-
-        let mut rng = rand::thread_rng();
-        for _ in 0..1000 {
-            let discovered = try_discover_chess(&mut state, &mut rng);
-            assert!(!discovered, "Should not discover chess during dungeon");
-        }
-    }
-
-    #[test]
-    fn test_no_discovery_during_fishing() {
-        let mut state = GameState::new("Test".to_string(), 0);
-        state.prestige_rank = 5;
-        state.active_fishing = Some(crate::fishing::FishingSession {
-            spot_name: "Test Lake".to_string(),
-            total_fish: 5,
-            fish_caught: vec![],
-            items_found: vec![],
-            ticks_remaining: 10,
-            phase: crate::fishing::FishingPhase::Casting,
-        });
-
-        let mut rng = rand::thread_rng();
-        for _ in 0..1000 {
-            let discovered = try_discover_chess(&mut state, &mut rng);
-            assert!(!discovered, "Should not discover chess while fishing");
-        }
-    }
-
-    #[test]
-    fn test_no_discovery_during_active_chess() {
-        let mut state = GameState::new("Test".to_string(), 0);
-        state.prestige_rank = 5;
-        state.active_chess = Some(ChessGame::new(ChessDifficulty::Novice));
-
-        let mut rng = rand::thread_rng();
-        for _ in 0..1000 {
-            let discovered = try_discover_chess(&mut state, &mut rng);
-            assert!(!discovered, "Should not discover chess during active game");
-        }
-    }
-
-    #[test]
-    fn test_no_duplicate_challenge() {
-        let mut state = GameState::new("Test".to_string(), 0);
-        state.prestige_rank = 5;
-        state.challenge_menu.add_challenge(create_chess_challenge());
-
-        let mut rng = rand::thread_rng();
-        for _ in 0..1000 {
-            let discovered = try_discover_chess(&mut state, &mut rng);
-            assert!(!discovered, "Should not discover duplicate chess challenge");
-        }
-    }
-
-    #[test]
-    fn test_discovery_allowed_when_conditions_met() {
-        let mut state = GameState::new("Test".to_string(), 0);
-        state.prestige_rank = 1;
-        // No dungeon, no fishing, no active chess, no pending challenge
-
-        // Use a seeded RNG that will trigger discovery
-        use rand::SeedableRng;
-        let mut rng = rand::rngs::StdRng::seed_from_u64(12345);
-
-        // Try many times - eventually should discover (~0.0014% chance per try)
-        // With 500k attempts, probability of never discovering = (1-0.000014)^500000 ≈ 0.0009
-        let mut discovered = false;
-        for _ in 0..500_000 {
-            if try_discover_chess(&mut state, &mut rng) {
-                discovered = true;
-                break;
-            }
-            // Reset challenge menu for next attempt
-            state.challenge_menu.challenges.clear();
-        }
-        assert!(
-            discovered,
-            "Should eventually discover chess when conditions are met"
-        );
     }
 
     // ============ AI Move Tests ============
@@ -438,10 +297,10 @@ mod tests {
     #[test]
     fn test_accepting_challenge_starts_game() {
         let mut state = GameState::new("Test".to_string(), 0);
-        state.challenge_menu.add_challenge(create_chess_challenge());
+        state.challenge_menu.add_challenge(make_chess_challenge());
         state.challenge_menu.open();
 
-        assert!(state.challenge_menu.has_chess_challenge());
+        assert!(state.challenge_menu.has_challenge(&ChallengeType::Chess));
         assert!(state.active_chess.is_none());
 
         // Start game (simulating accept)
@@ -454,7 +313,7 @@ mod tests {
     #[test]
     fn test_accepting_challenge_removes_from_menu() {
         let mut state = GameState::new("Test".to_string(), 0);
-        state.challenge_menu.add_challenge(create_chess_challenge());
+        state.challenge_menu.add_challenge(make_chess_challenge());
 
         assert_eq!(state.challenge_menu.challenges.len(), 1);
 
@@ -462,13 +321,13 @@ mod tests {
         let taken = state.challenge_menu.take_selected();
         assert!(taken.is_some());
         assert_eq!(state.challenge_menu.challenges.len(), 0);
-        assert!(!state.challenge_menu.has_chess_challenge());
+        assert!(!state.challenge_menu.has_challenge(&ChallengeType::Chess));
     }
 
     #[test]
     fn test_declining_challenge_removes_it() {
         let mut state = GameState::new("Test".to_string(), 0);
-        state.challenge_menu.add_challenge(create_chess_challenge());
+        state.challenge_menu.add_challenge(make_chess_challenge());
 
         assert_eq!(state.challenge_menu.challenges.len(), 1);
 
@@ -484,7 +343,7 @@ mod tests {
         let mut state = GameState::new("Test".to_string(), 0);
 
         // Add multiple challenges
-        state.challenge_menu.add_challenge(create_chess_challenge());
+        state.challenge_menu.add_challenge(make_chess_challenge());
         state.challenge_menu.add_challenge(PendingChallenge {
             challenge_type: ChallengeType::Chess,
             title: "Chess Challenge 2".to_string(),
@@ -506,7 +365,7 @@ mod tests {
     #[test]
     fn test_challenge_menu_navigation_with_multiple() {
         let mut state = GameState::new("Test".to_string(), 0);
-        state.challenge_menu.add_challenge(create_chess_challenge());
+        state.challenge_menu.add_challenge(make_chess_challenge());
         state.challenge_menu.add_challenge(PendingChallenge {
             challenge_type: ChallengeType::Chess,
             title: "Second Challenge".to_string(),

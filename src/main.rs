@@ -30,10 +30,10 @@ mod ui;
 mod updater;
 mod zones;
 
-use challenge_menu::ChallengeType;
+use challenge_menu::{try_discover_challenge, ChallengeType};
 use character_manager::CharacterManager;
 use chess::ChessDifficulty;
-use chess_logic::{apply_game_result, process_ai_thinking, start_chess_game, try_discover_chess};
+use chess_logic::{apply_game_result, process_ai_thinking, start_chess_game};
 use chrono::Utc;
 use constants::*;
 use crossterm::event::{self, Event, KeyCode};
@@ -48,7 +48,7 @@ use morris::{
 };
 use morris_logic::{
     apply_game_result as apply_morris_result, get_legal_moves as get_morris_legal_moves,
-    process_ai_thinking as process_morris_ai, start_morris_game, try_discover_morris,
+    process_ai_thinking as process_morris_ai, start_morris_game,
 };
 use prestige::*;
 use ratatui::{backend::CrosstermBackend, Terminal};
@@ -932,42 +932,22 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
         process_morris_ai(morris_game, &mut rng);
     }
 
-    // Try chess discovery during normal combat (not in dungeon, fishing, chess, or morris)
-    if game_state.active_chess.is_none()
-        && game_state.active_morris.is_none()
-        && game_state.active_dungeon.is_none()
-        && game_state.active_fishing.is_none()
+    // Try challenge discovery (single roll, weighted table picks which type)
     {
         let mut rng = rand::thread_rng();
-        if try_discover_chess(game_state, &mut rng) {
+        if let Some(challenge_type) = try_discover_challenge(game_state, &mut rng) {
+            let (icon, flavor) = match challenge_type {
+                ChallengeType::Chess => ("♟", "A mysterious figure steps from the shadows..."),
+                ChallengeType::Morris => (
+                    "\u{25CB}",
+                    "A cloaked stranger approaches with a weathered board...",
+                ),
+            };
+            game_state
+                .combat_state
+                .add_log_entry(format!("{} {}", icon, flavor), false, true);
             game_state.combat_state.add_log_entry(
-                "♟ A mysterious figure steps from the shadows...".to_string(),
-                false,
-                true,
-            );
-            game_state.combat_state.add_log_entry(
-                "♟ Press [Tab] to view pending challenges".to_string(),
-                false,
-                true,
-            );
-        }
-    }
-
-    // Try Morris discovery during normal combat (not in dungeon, fishing, chess, or morris)
-    if game_state.active_morris.is_none()
-        && game_state.active_chess.is_none()
-        && game_state.active_dungeon.is_none()
-        && game_state.active_fishing.is_none()
-    {
-        let mut rng = rand::thread_rng();
-        if try_discover_morris(game_state, &mut rng) {
-            game_state.combat_state.add_log_entry(
-                "\u{25CB} A cloaked stranger approaches with a weathered board...".to_string(),
-                false,
-                true,
-            );
-            game_state.combat_state.add_log_entry(
-                "\u{25CB} Press [Tab] to view pending challenges".to_string(),
+                format!("{} Press [Tab] to view pending challenges", icon),
                 false,
                 true,
             );
