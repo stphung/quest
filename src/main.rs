@@ -18,6 +18,8 @@ mod fishing_generation;
 mod fishing_logic;
 mod game_logic;
 mod game_state;
+mod gomoku;
+mod gomoku_logic;
 mod item_drops;
 mod item_generation;
 mod item_names;
