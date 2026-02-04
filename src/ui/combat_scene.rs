@@ -41,14 +41,6 @@ fn draw_player_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let hp_ratio = game_state.combat_state.player_current_hp as f64
         / game_state.combat_state.player_max_hp as f64;
 
-    let hp_color = if hp_ratio > 0.66 {
-        Color::Green
-    } else if hp_ratio > 0.33 {
-        Color::Yellow
-    } else {
-        Color::Red
-    };
-
     let label = format!(
         "Player HP: {}/{}",
         game_state.combat_state.player_current_hp, game_state.combat_state.player_max_hp
@@ -56,7 +48,7 @@ fn draw_player_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
 
     let gauge = Gauge::default()
         .block(Block::default().borders(Borders::ALL).title("Player"))
-        .gauge_style(Style::default().fg(hp_color).add_modifier(Modifier::BOLD))
+        .gauge_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
         .label(label)
         .ratio(hp_ratio);
 
