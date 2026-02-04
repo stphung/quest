@@ -102,6 +102,11 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 - `chess_logic.rs` — Chess AI moves, discovery rolls (~2hr avg), game resolution, requires P1+
 - `morris.rs` — Nine Men's Morris minigame data structures (board layout, mill detection, phases)
 - `morris_logic.rs` — Morris AI moves, discovery rolls (~2hr avg), game resolution, requires P1+
+- `gomoku.rs` — Gomoku (Five in a Row) on 15×15 board, 4 AI difficulty levels
+- `gomoku_logic.rs` — Gomoku AI with minimax algorithm (depth 2-5), move validation, win detection
+- `minesweeper.rs` — Minesweeper (Trap Detection) data structures, 4 difficulties (9×9 to 20×16)
+- `minesweeper_logic.rs` — Mine placement, cell revelation, flood fill, flag system
+- `debug_menu.rs` — Debug menu for testing discoveries (activate with `--debug` flag, toggle with backtick)
 
 ### Character System
 
@@ -122,6 +127,9 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 - `challenge_menu_scene.rs` — Challenge menu list/detail view rendering
 - `chess_scene.rs` — Chess board UI with move history and game-over overlay
 - `morris_scene.rs` — Nine Men's Morris board UI with help panel
+- `gomoku_scene.rs` — Gomoku board UI with cursor navigation
+- `minesweeper_scene.rs` — Minesweeper grid UI with game-over overlay
+- `debug_menu_scene.rs` — Debug menu overlay rendering
 - `throbber.rs` — Shared spinner/throbber animations and atmospheric waiting messages
 - `character_select.rs` — Character selection screen with detailed preview panel
 - `character_creation.rs` — Character creation with real-time name validation
@@ -188,6 +196,11 @@ quest/
 │   ├── chess_logic.rs
 │   ├── morris.rs            # Nine Men's Morris minigame
 │   ├── morris_logic.rs
+│   ├── gomoku.rs            # Gomoku minigame
+│   ├── gomoku_logic.rs
+│   ├── minesweeper.rs       # Minesweeper minigame
+│   ├── minesweeper_logic.rs
+│   ├── debug_menu.rs        # Debug menu (--debug flag)
 │   ├── character_manager.rs  # JSON saves
 │   ├── save_manager.rs       # Legacy saves
 │   └── ui/               # UI components
@@ -203,6 +216,9 @@ quest/
 │       ├── challenge_menu_scene.rs
 │       ├── chess_scene.rs
 │       ├── morris_scene.rs
+│       ├── gomoku_scene.rs
+│       ├── minesweeper_scene.rs
+│       ├── debug_menu_scene.rs
 │       ├── throbber.rs
 │       ├── character_select.rs
 │       ├── character_creation.rs

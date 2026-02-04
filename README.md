@@ -30,7 +30,7 @@ Then run `quest` to start your adventure!
 - **Diablo-style Items** - 7 equipment slots, 5 rarity tiers, procedural names, and smart auto-equip
 - **Multi-Character** - Create and manage multiple characters with JSON saves
 - **Offline Progress** - Continue gaining XP even when closed (50% rate, max 7 days)
-- **Challenge Minigames** - Discover and play Chess and Nine Men's Morris against AI opponents (requires P1+)
+- **Challenge Minigames** - Discover and play Chess, Nine Men's Morris, Gomoku, and Minesweeper (requires P1+)
 - **3D ASCII Combat** - First-person dungeon view with visual effects
 - **Animated UI** - Throbber animations and progress bars for XP and fishing rank
 
@@ -157,6 +157,8 @@ Discover challenge minigames while adventuring (requires Prestige 1+):
 
 - **Chess** - Play against AI with 4 difficulty levels (Novice ~500 ELO to Master ~1350 ELO)
 - **Nine Men's Morris** - Classic strategy board game against AI opponents
+- **Gomoku** - Five-in-a-row on a 15×15 board with minimax AI (4 difficulty levels)
+- **Minesweeper (Trap Detection)** - Clear minefields across 4 difficulty levels (9×9 to 20×16)
 - Challenges appear randomly (~2 hour average discovery time)
 - Accept or decline from the challenge menu
 - Winning rewards prestige points based on difficulty
