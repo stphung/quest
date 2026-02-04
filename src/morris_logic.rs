@@ -443,12 +443,14 @@ fn count_mobility(game: &MorrisGame, player: Player) -> i32 {
     moves
 }
 
-/// Apply game result: grant XP on win (scaled to current level)
-pub fn apply_game_result(state: &mut GameState) -> Option<(MorrisResult, u64)> {
+/// Apply game result: grant XP on win (scaled to current level).
+/// Returns (result, xp_gained, fishing_rank_up).
+pub fn apply_game_result(state: &mut GameState) -> Option<(MorrisResult, u64, bool)> {
     let game = state.active_morris.as_ref()?;
     let result = game.game_result?;
     let difficulty = game.difficulty;
 
+    let mut fishing_rank_up = false;
     let xp_gained = match result {
         MorrisResult::Win => {
             let xp_for_level = crate::game_logic::xp_for_next_level(state.character_level.max(1));
@@ -456,13 +458,21 @@ pub fn apply_game_result(state: &mut GameState) -> Option<(MorrisResult, u64)> {
                 (xp_for_level as f64 * difficulty.reward_xp_percent() as f64 / 100.0) as u64;
             let reward = reward.max(100); // Floor of 100 XP
             state.character_xp += reward;
+
+            // Master difficulty grants +1 fishing rank (capped at 30)
+            if difficulty == MorrisDifficulty::Master && state.fishing.rank < 30 {
+                state.fishing.rank += 1;
+                state.fishing.fish_toward_next_rank = 0;
+                fishing_rank_up = true;
+            }
+
             reward
         }
         MorrisResult::Loss | MorrisResult::Forfeit => 0,
     };
 
     state.active_morris = None;
-    Some((result, xp_gained))
+    Some((result, xp_gained, fishing_rank_up))
 }
 
 #[cfg(test)]
@@ -863,15 +873,54 @@ mod tests {
         state.active_morris = Some(game);
 
         let old_xp = state.character_xp;
+        let old_fishing_rank = state.fishing.rank;
         let result = apply_game_result(&mut state);
 
         assert!(result.is_some());
-        let (morris_result, xp_gained) = result.unwrap();
+        let (morris_result, xp_gained, fishing_rank_up) = result.unwrap();
         assert_eq!(morris_result, MorrisResult::Win);
         // Master = 200% of xp_for_next_level(10) = 6324
         assert_eq!(xp_gained, 6324);
         assert_eq!(state.character_xp, old_xp + 6324);
+        // Master grants +1 fishing rank
+        assert!(fishing_rank_up);
+        assert_eq!(state.fishing.rank, old_fishing_rank + 1);
+        assert_eq!(state.fishing.fish_toward_next_rank, 0);
         assert!(state.active_morris.is_none());
+    }
+
+    #[test]
+    fn test_apply_win_novice_no_fishing_rank() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.character_level = 5;
+
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        game.game_result = Some(MorrisResult::Win);
+        state.active_morris = Some(game);
+
+        let old_fishing_rank = state.fishing.rank;
+        let result = apply_game_result(&mut state);
+
+        let (_, _, fishing_rank_up) = result.unwrap();
+        assert!(!fishing_rank_up);
+        assert_eq!(state.fishing.rank, old_fishing_rank);
+    }
+
+    #[test]
+    fn test_apply_win_master_fishing_rank_capped_at_30() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.character_level = 10;
+        state.fishing.rank = 30; // Already max
+
+        let mut game = MorrisGame::new(MorrisDifficulty::Master);
+        game.game_result = Some(MorrisResult::Win);
+        state.active_morris = Some(game);
+
+        let result = apply_game_result(&mut state);
+
+        let (_, _, fishing_rank_up) = result.unwrap();
+        assert!(!fishing_rank_up);
+        assert_eq!(state.fishing.rank, 30);
     }
 
     #[test]
@@ -885,9 +934,10 @@ mod tests {
         let old_xp = state.character_xp;
         let result = apply_game_result(&mut state);
 
-        let (morris_result, xp_gained) = result.unwrap();
+        let (morris_result, xp_gained, fishing_rank_up) = result.unwrap();
         assert_eq!(morris_result, MorrisResult::Loss);
         assert_eq!(xp_gained, 0);
+        assert!(!fishing_rank_up);
         assert_eq!(state.character_xp, old_xp); // Unchanged
         assert!(state.active_morris.is_none());
     }
@@ -903,9 +953,10 @@ mod tests {
         let old_xp = state.character_xp;
         let result = apply_game_result(&mut state);
 
-        let (morris_result, xp_gained) = result.unwrap();
+        let (morris_result, xp_gained, fishing_rank_up) = result.unwrap();
         assert_eq!(morris_result, MorrisResult::Forfeit);
         assert_eq!(xp_gained, 0);
+        assert!(!fishing_rank_up);
         assert_eq!(state.character_xp, old_xp); // Unchanged
         assert!(state.active_morris.is_none());
     }

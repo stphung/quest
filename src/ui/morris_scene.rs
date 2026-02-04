@@ -19,7 +19,8 @@ pub fn render_morris_scene(frame: &mut Frame, area: Rect, game: &MorrisGame, cha
         let xp_reward =
             (xp_for_level as f64 * game.difficulty.reward_xp_percent() as f64 / 100.0) as u64;
         let xp_reward = xp_reward.max(100);
-        render_game_over_overlay(frame, area, result, xp_reward);
+        let is_master = game.difficulty == crate::morris::MorrisDifficulty::Master;
+        render_game_over_overlay(frame, area, result, xp_reward, is_master);
         return;
     }
 
@@ -488,15 +489,28 @@ fn render_help_panel(frame: &mut Frame, area: Rect, game: &MorrisGame) {
     frame.render_widget(text, inner);
 }
 
-fn render_game_over_overlay(frame: &mut Frame, area: Rect, result: MorrisResult, xp_reward: u64) {
+fn render_game_over_overlay(
+    frame: &mut Frame,
+    area: Rect,
+    result: MorrisResult,
+    xp_reward: u64,
+    is_master: bool,
+) {
     frame.render_widget(Clear, area);
 
     let (title, message, reward) = match result {
-        MorrisResult::Win => (
-            ":: VICTORY! ::",
-            "You outwitted the sage at the game of mills!",
-            format!("+{} XP", xp_reward),
-        ),
+        MorrisResult::Win => {
+            let reward_text = if is_master {
+                format!("+{} XP, +1 Fishing Rank", xp_reward)
+            } else {
+                format!("+{} XP", xp_reward)
+            };
+            (
+                ":: VICTORY! ::",
+                "You outwitted the sage at the game of mills!",
+                reward_text,
+            )
+        }
         MorrisResult::Loss => (
             "DEFEAT",
             "The sage has bested you at the game of mills.",

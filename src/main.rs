@@ -718,7 +718,7 @@ fn main() -> io::Result<()> {
                             if let Some(ref mut morris_game) = state.active_morris {
                                 if morris_game.game_result.is_some() {
                                     // Any key dismisses result and adds combat log message
-                                    if let Some((result, xp_gained)) =
+                                    if let Some((result, xp_gained, fishing_rank_up)) =
                                         apply_morris_result(&mut state)
                                     {
                                         match result {
@@ -734,6 +734,17 @@ fn main() -> io::Result<()> {
                                                     false,
                                                     true,
                                                 );
+                                                if fishing_rank_up {
+                                                    state.combat_state.add_log_entry(
+                                                        format!(
+                                                            "\u{25CB} Fishing rank up! Now rank {}: {}",
+                                                            state.fishing.rank,
+                                                            state.fishing.rank_name()
+                                                        ),
+                                                        false,
+                                                        true,
+                                                    );
+                                                }
                                             }
                                             MorrisResult::Loss => {
                                                 state.combat_state.add_log_entry(

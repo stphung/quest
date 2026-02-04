@@ -213,7 +213,11 @@ fn render_morris_difficulty_selector(frame: &mut Frame, area: Rect, selected: us
             let prefix = if is_selected { "> " } else { "  " };
 
             let pct = diff.reward_xp_percent();
-            let reward_text = format!("Win: +{}% level XP", pct);
+            let reward_text = if *diff == MorrisDifficulty::Master {
+                format!("Win: +{}% level XP, +1 Fish Rank", pct)
+            } else {
+                format!("Win: +{}% level XP", pct)
+            };
 
             let prefix_style = if is_selected {
                 Style::default().fg(Color::Cyan)
