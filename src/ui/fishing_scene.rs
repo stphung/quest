@@ -346,7 +346,7 @@ fn draw_rank_info(frame: &mut Frame, area: Rect, fishing_state: &FishingState) {
     let gauge = Gauge::default()
         .gauge_style(
             Style::default()
-                .fg(Color::Cyan)
+                .fg(Color::Blue)
                 .add_modifier(Modifier::BOLD),
         )
         .label(progress_label)

@@ -480,7 +480,7 @@ fn draw_prestige_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let fish_gauge = Gauge::default()
         .gauge_style(
             Style::default()
-                .fg(Color::Cyan)
+                .fg(Color::Blue)
                 .add_modifier(Modifier::BOLD),
         )
         .label(fish_label)
