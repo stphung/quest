@@ -69,20 +69,61 @@ pub fn render_debug_menu(frame: &mut Frame, area: Rect, menu: &DebugMenu) {
     }
 }
 
-/// Render the debug mode indicator
+/// Render the debug mode indicator (shows saves are disabled)
 pub fn render_debug_indicator(frame: &mut Frame, area: Rect) {
-    let indicator = Paragraph::new(Line::from("[DEBUG]")).style(
+    let text = "[DEBUG] Saves disabled";
+    let indicator = Paragraph::new(Line::from(text)).style(
         Style::default()
             .fg(Color::Yellow)
             .add_modifier(Modifier::BOLD),
     );
 
     // Position in top-right corner
-    let x = area.x + area.width.saturating_sub(9);
+    let width = text.len() as u16 + 1;
+    let x = area.x + area.width.saturating_sub(width);
     let indicator_area = Rect {
         x,
         y: area.y,
-        width: 9,
+        width,
+        height: 1,
+    };
+
+    frame.render_widget(indicator, indicator_area);
+}
+
+/// Render the save indicator (spinner while saving, timestamp after)
+/// `is_saving` should be true for ~1 second after a save completes
+pub fn render_save_indicator(
+    frame: &mut Frame,
+    area: Rect,
+    is_saving: bool,
+    last_save_time: Option<chrono::DateTime<chrono::Local>>,
+) {
+    use super::throbber::spinner_char;
+
+    let text = if is_saving {
+        format!("{} Saving...", spinner_char())
+    } else if let Some(time) = last_save_time {
+        format!("Saved {}", time.format("%-I:%M %p"))
+    } else {
+        return; // No save yet, don't show anything
+    };
+
+    let color = if is_saving {
+        Color::Yellow
+    } else {
+        Color::DarkGray
+    };
+
+    let indicator = Paragraph::new(Line::from(text.clone())).style(Style::default().fg(color));
+
+    // Position in top-right corner
+    let width = text.len() as u16 + 1;
+    let x = area.x + area.width.saturating_sub(width);
+    let indicator_area = Rect {
+        x,
+        y: area.y,
+        width,
         height: 1,
     };
 

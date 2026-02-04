@@ -37,7 +37,7 @@ use challenge_menu::{try_discover_challenge, ChallengeType};
 use character_manager::CharacterManager;
 use chess::ChessDifficulty;
 use chess_logic::{apply_game_result, process_ai_thinking, start_chess_game};
-use chrono::Utc;
+use chrono::{Local, Utc};
 use constants::*;
 use crossterm::event::{self, Event, KeyCode};
 use crossterm::terminal::{
@@ -568,6 +568,10 @@ fn main() -> io::Result<()> {
                 let mut showing_prestige_confirm = false;
                 let mut debug_menu = debug_menu::DebugMenu::new();
 
+                // Save indicator state (for non-debug mode)
+                let mut last_save_instant: Option<Instant> = None;
+                let mut last_save_time: Option<chrono::DateTime<chrono::Local>> = None;
+
                 // Update check state - start initial background check immediately
                 let mut update_info: Option<UpdateInfo> = None;
                 let mut update_check_completed = false;
@@ -600,7 +604,7 @@ fn main() -> io::Result<()> {
                         if showing_prestige_confirm {
                             ui::prestige_confirm::draw_prestige_confirm(frame, &state);
                         }
-                        // Draw debug indicator and menu if in debug mode
+                        // Draw debug indicator and menu if in debug mode, otherwise save indicator
                         if debug_mode {
                             ui::debug_menu_scene::render_debug_indicator(frame, frame.size());
                             if debug_menu.is_open {
@@ -610,6 +614,17 @@ fn main() -> io::Result<()> {
                                     &debug_menu,
                                 );
                             }
+                        } else {
+                            // Show save indicator (spinner for 1s after save, then timestamp)
+                            let is_saving = last_save_instant
+                                .map(|t| t.elapsed() < Duration::from_secs(1))
+                                .unwrap_or(false);
+                            ui::debug_menu_scene::render_save_indicator(
+                                frame,
+                                frame.size(),
+                                is_saving,
+                                last_save_time,
+                            );
                         }
                     })?;
 
@@ -623,7 +638,11 @@ fn main() -> io::Result<()> {
                                         perform_prestige(&mut state);
                                         showing_prestige_confirm = false;
                                         // Save immediately after prestige to prevent stale enemy on reload
-                                        let _ = character_manager.save_character(&state);
+                                        if !debug_mode {
+                                            let _ = character_manager.save_character(&state);
+                                            last_save_instant = Some(Instant::now());
+                                            last_save_time = Some(Local::now());
+                                        }
                                         state.combat_state.add_log_entry(
                                             format!(
                                                 "Prestiged to {}!",
@@ -1011,8 +1030,10 @@ fn main() -> io::Result<()> {
                             match key_event.code {
                                 // Handle 'q'/'Q' to quit
                                 KeyCode::Char('q') | KeyCode::Char('Q') => {
-                                    // Save character before returning to select
-                                    character_manager.save_character(&state)?;
+                                    // Save character before returning to select (skip in debug mode)
+                                    if !debug_mode {
+                                        character_manager.save_character(&state)?;
+                                    }
                                     game_state = None;
                                     current_screen = Screen::CharacterSelect;
                                     break;
@@ -1034,10 +1055,14 @@ fn main() -> io::Result<()> {
                         last_tick = Instant::now();
                     }
 
-                    // Auto-save every 30 seconds
-                    if last_autosave.elapsed() >= Duration::from_secs(AUTOSAVE_INTERVAL_SECONDS) {
+                    // Auto-save every 30 seconds (skip in debug mode)
+                    if !debug_mode
+                        && last_autosave.elapsed() >= Duration::from_secs(AUTOSAVE_INTERVAL_SECONDS)
+                    {
                         character_manager.save_character(&state)?;
                         last_autosave = Instant::now();
+                        last_save_instant = Some(Instant::now());
+                        last_save_time = Some(Local::now());
                     }
 
                     // Periodic update check (every 30 minutes)
