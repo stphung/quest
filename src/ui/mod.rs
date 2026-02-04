@@ -14,8 +14,8 @@ pub mod fishing_scene;
 pub mod gomoku_scene;
 pub mod minesweeper_scene;
 pub mod morris_scene;
-pub mod rune_scene;
 pub mod prestige_confirm;
+pub mod rune_scene;
 mod stats_panel;
 mod throbber;
 

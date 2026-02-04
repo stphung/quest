@@ -65,7 +65,10 @@ fn render_grid(frame: &mut Frame, area: Rect, game: &RuneGame) {
                 FeedbackMark::Misplaced => ("\u{25CB}", Color::Yellow),
                 FeedbackMark::Wrong => ("\u{00B7}", Color::DarkGray),
             };
-            spans.push(Span::styled(format!("{} ", sym), Style::default().fg(color)));
+            spans.push(Span::styled(
+                format!("{} ", sym),
+                Style::default().fg(color),
+            ));
         }
 
         let line = Paragraph::new(Line::from(spans));

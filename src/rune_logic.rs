@@ -148,7 +148,11 @@ mod tests {
         let feedback = calculate_feedback(&[0, 1, 2], &[0, 1, 2]);
         assert_eq!(
             feedback,
-            vec![FeedbackMark::Exact, FeedbackMark::Exact, FeedbackMark::Exact]
+            vec![
+                FeedbackMark::Exact,
+                FeedbackMark::Exact,
+                FeedbackMark::Exact
+            ]
         );
     }
 
@@ -157,7 +161,11 @@ mod tests {
         let feedback = calculate_feedback(&[0, 1, 2], &[3, 4, 5]);
         assert_eq!(
             feedback,
-            vec![FeedbackMark::Wrong, FeedbackMark::Wrong, FeedbackMark::Wrong]
+            vec![
+                FeedbackMark::Wrong,
+                FeedbackMark::Wrong,
+                FeedbackMark::Wrong
+            ]
         );
     }
 

@@ -28,10 +28,10 @@ mod items;
 mod minesweeper;
 mod minesweeper_logic;
 mod morris;
-mod rune;
-mod rune_logic;
 mod morris_logic;
 mod prestige;
+mod rune;
+mod rune_logic;
 mod save_manager;
 mod ui;
 mod updater;
@@ -57,8 +57,6 @@ use gomoku_logic::{
 };
 use minesweeper::{MinesweeperDifficulty, MinesweeperGame, MinesweeperResult};
 use minesweeper_logic::{handle_first_click, reveal_cell, toggle_flag};
-use rune::{RuneDifficulty, RuneGame, RuneResult};
-use rune_logic::submit_guess;
 use morris::{
     CursorDirection as MorrisCursorDirection, MorrisDifficulty, MorrisMove, MorrisResult,
 };
@@ -68,6 +66,8 @@ use morris_logic::{
 };
 use prestige::*;
 use ratatui::{backend::CrosstermBackend, Terminal};
+use rune::{RuneDifficulty, RuneGame, RuneResult};
+use rune_logic::submit_guess;
 use save_manager::SaveManager;
 use std::io;
 use std::time::{Duration, Instant};
@@ -1140,10 +1140,9 @@ fn main() -> io::Result<()> {
                                                             Some(MinesweeperGame::new(difficulty));
                                                     }
                                                     ChallengeType::Rune => {
-                                                        let difficulty =
-                                                            RuneDifficulty::from_index(
-                                                                menu.selected_difficulty,
-                                                            );
+                                                        let difficulty = RuneDifficulty::from_index(
+                                                            menu.selected_difficulty,
+                                                        );
                                                         state.active_rune =
                                                             Some(RuneGame::new(difficulty));
                                                     }
@@ -1290,10 +1289,7 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
                     "\u{26A0}",
                     "A weathered scout beckons you toward a ruined corridor...",
                 ),
-                ChallengeType::Rune => (
-                    "ᚱ",
-                    "A glowing stone tablet materializes before you...",
-                ),
+                ChallengeType::Rune => ("ᚱ", "A glowing stone tablet materializes before you..."),
             };
             game_state
                 .combat_state
