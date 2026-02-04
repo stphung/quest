@@ -37,7 +37,9 @@ pub fn try_discover_morris<R: Rng>(state: &mut GameState, rng: &mut R) -> bool {
     }
 
     if rng.gen::<f64>() < MORRIS_DISCOVERY_CHANCE {
-        state.challenge_menu.add_challenge(create_morris_challenge());
+        state
+            .challenge_menu
+            .add_challenge(create_morris_challenge());
         true
     } else {
         false
@@ -62,9 +64,7 @@ pub fn get_legal_moves(game: &MorrisGame) -> Vec<MorrisMove> {
 
     match game.phase {
         MorrisPhase::Placing => get_placing_moves(game),
-        MorrisPhase::Moving | MorrisPhase::Flying => {
-            get_movement_moves(game, game.current_player)
-        }
+        MorrisPhase::Moving | MorrisPhase::Flying => get_movement_moves(game, game.current_player),
     }
 }
 
@@ -442,8 +442,14 @@ fn count_mills(game: &MorrisGame, player: Player) -> i32 {
 fn count_potential_mills(game: &MorrisGame, player: Player) -> i32 {
     let mut count = 0;
     for mill in MILLS.iter() {
-        let player_count = mill.iter().filter(|&&pos| game.board[pos] == Some(player)).count();
-        let empty_count = mill.iter().filter(|&&pos| game.board[pos].is_none()).count();
+        let player_count = mill
+            .iter()
+            .filter(|&&pos| game.board[pos] == Some(player))
+            .count();
+        let empty_count = mill
+            .iter()
+            .filter(|&&pos| game.board[pos].is_none())
+            .count();
         if player_count == 2 && empty_count == 1 {
             count += 1;
         }

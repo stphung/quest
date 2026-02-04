@@ -40,7 +40,7 @@ pub fn render_morris_scene(frame: &mut Frame, area: Rect, game: &MorrisGame) {
     let board_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Min(13), // Board (13 lines)
+            Constraint::Min(13),   // Board (13 lines)
             Constraint::Length(2), // Status (2 lines)
         ])
         .split(chunks[0]);
@@ -54,29 +54,29 @@ pub fn render_morris_scene(frame: &mut Frame, area: Rect, game: &MorrisGame) {
 /// Maps position index (0-23) to (x, y) coordinates in the visual representation
 const POSITION_COORDS: [(u16, u16); 24] = [
     // Row 0 (y=0): outer ring top
-    (0, 0),   // 0
-    (12, 0),  // 1
-    (24, 0),  // 2
+    (0, 0),  // 0
+    (12, 0), // 1
+    (24, 0), // 2
     // Row 1 (y=2): middle ring top
-    (4, 2),   // 3
-    (12, 2),  // 4
-    (20, 2),  // 5
+    (4, 2),  // 3
+    (12, 2), // 4
+    (20, 2), // 5
     // Row 2 (y=4): inner ring top
-    (8, 4),   // 6
-    (12, 4),  // 7
-    (16, 4),  // 8
+    (8, 4),  // 6
+    (12, 4), // 7
+    (16, 4), // 8
     // Row 3 (y=6): middle horizontal - left side
-    (0, 6),   // 9
-    (4, 6),   // 10
-    (8, 6),   // 11
+    (0, 6), // 9
+    (4, 6), // 10
+    (8, 6), // 11
     // Row 3 (y=6): middle horizontal - right side
-    (16, 6),  // 12
-    (20, 6),  // 13
-    (24, 6),  // 14
+    (16, 6), // 12
+    (20, 6), // 13
+    (24, 6), // 14
     // Row 4 (y=8): inner ring bottom
-    (8, 8),   // 15
-    (12, 8),  // 16
-    (16, 8),  // 17
+    (8, 8),  // 15
+    (12, 8), // 16
+    (16, 8), // 17
     // Row 5 (y=10): middle ring bottom
     (4, 10),  // 18
     (12, 10), // 19
@@ -150,11 +150,17 @@ fn render_board(frame: &mut Frame, area: Rect, game: &MorrisGame) {
             match game.board[pos] {
                 Some(Player::Human) => (
                     "[\u{25CF}]", // [●]
-                    Style::default().fg(player_color).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(player_color)
+                        .add_modifier(Modifier::BOLD),
                 ),
                 Some(Player::Ai) => (
                     "[\u{25CB}]", // [○]
-                    Style::default().fg(if is_capturable { capturable_color } else { ai_color }),
+                    Style::default().fg(if is_capturable {
+                        capturable_color
+                    } else {
+                        ai_color
+                    }),
                 ),
                 None if is_legal_dest => (
                     "[\u{25C6}]", // [◆]
@@ -170,7 +176,9 @@ fn render_board(frame: &mut Frame, area: Rect, game: &MorrisGame) {
             match game.board[pos] {
                 Some(Player::Human) => (
                     "<\u{25CF}>", // <●>
-                    Style::default().fg(selected_color).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(selected_color)
+                        .add_modifier(Modifier::BOLD),
                 ),
                 _ => (
                     " \u{00B7} ", // Should not happen, but fallback
@@ -186,7 +194,9 @@ fn render_board(frame: &mut Frame, area: Rect, game: &MorrisGame) {
                 ),
                 Some(Player::Human) => (
                     " \u{25CF} ", // ●
-                    Style::default().fg(player_color).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(player_color)
+                        .add_modifier(Modifier::BOLD),
                 ),
                 Some(Player::Ai) => (
                     " \u{25CB} ", // ○
@@ -204,7 +214,9 @@ fn render_board(frame: &mut Frame, area: Rect, game: &MorrisGame) {
             match game.board[pos] {
                 Some(Player::Human) => (
                     " \u{25CF} ", // ●
-                    Style::default().fg(player_color).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(player_color)
+                        .add_modifier(Modifier::BOLD),
                 ),
                 Some(Player::Ai) => (
                     " \u{25CB} ", // ○
@@ -301,7 +313,10 @@ fn render_status(frame: &mut Frame, area: Rect, game: &MorrisGame) {
     // Line 1: Status message
     let (status_text, status_style) = if game.ai_thinking {
         // Braille spinner animation (100ms per frame)
-        const SPINNER: [char; 10] = ['\u{280B}', '\u{2819}', '\u{2839}', '\u{2838}', '\u{283C}', '\u{2834}', '\u{2826}', '\u{2827}', '\u{2807}', '\u{280F}'];
+        const SPINNER: [char; 10] = [
+            '\u{280B}', '\u{2819}', '\u{2839}', '\u{2838}', '\u{283C}', '\u{2834}', '\u{2826}',
+            '\u{2827}', '\u{2807}', '\u{280F}',
+        ];
         let millis = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
@@ -318,7 +333,9 @@ fn render_status(frame: &mut Frame, area: Rect, game: &MorrisGame) {
     } else if game.must_capture {
         (
             "MILL! Select a piece to capture".to_string(),
-            Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
         )
     } else if game.selected_position.is_some() {
         (
@@ -387,7 +404,9 @@ fn render_help_panel(frame: &mut Frame, area: Rect, game: &MorrisGame) {
     let mut lines: Vec<Line> = vec![
         Line::from(Span::styled(
             "Rules:",
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
         )),
         Line::from(Span::styled(
             " 3 in a row = Mill",
@@ -406,7 +425,9 @@ fn render_help_panel(frame: &mut Frame, area: Rect, game: &MorrisGame) {
             Span::styled("You: ", Style::default().fg(Color::White)),
             Span::styled(
                 format!("\u{25CF} x {}", human_on_board),
-                Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
             ),
         ]),
         Line::from(vec![
@@ -446,7 +467,9 @@ fn render_help_panel(frame: &mut Frame, area: Rect, game: &MorrisGame) {
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
             "You can fly!",
-            Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Magenta)
+                .add_modifier(Modifier::BOLD),
         )));
     }
 
@@ -454,10 +477,7 @@ fn render_help_panel(frame: &mut Frame, area: Rect, game: &MorrisGame) {
     lines.push(Line::from(""));
     lines.push(Line::from(vec![
         Span::styled("Difficulty: ", Style::default().fg(Color::DarkGray)),
-        Span::styled(
-            game.difficulty.name(),
-            Style::default().fg(Color::Cyan),
-        ),
+        Span::styled(game.difficulty.name(), Style::default().fg(Color::Cyan)),
     ]));
 
     let text = Paragraph::new(lines);

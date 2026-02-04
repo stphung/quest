@@ -202,15 +202,6 @@ pub enum CursorDirection {
     Right,
 }
 
-/// Persistent Morris stats (saved to disk)
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct MorrisStats {
-    pub games_played: u32,
-    pub games_won: u32,
-    pub games_lost: u32,
-    pub prestige_earned: u32,
-}
-
 /// Active Nine Men's Morris game session (transient, not saved)
 #[derive(Debug, Clone)]
 pub struct MorrisGame {
@@ -332,11 +323,6 @@ impl MorrisGame {
             }
         }
         false
-    }
-
-    /// Count pieces on the board for a player
-    pub fn count_pieces(&self, player: Player) -> u8 {
-        self.board.iter().filter(|&&p| p == Some(player)).count() as u8
     }
 
     /// Get pieces left to place for a player
@@ -591,21 +577,6 @@ mod tests {
     }
 
     #[test]
-    fn test_count_pieces() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
-
-        assert_eq!(game.count_pieces(Player::Human), 0);
-        assert_eq!(game.count_pieces(Player::Ai), 0);
-
-        game.board[0] = Some(Player::Human);
-        game.board[5] = Some(Player::Human);
-        game.board[10] = Some(Player::Ai);
-
-        assert_eq!(game.count_pieces(Player::Human), 2);
-        assert_eq!(game.count_pieces(Player::Ai), 1);
-    }
-
-    #[test]
     fn test_can_fly() {
         let mut game = MorrisGame::new(MorrisDifficulty::Novice);
 
@@ -691,15 +662,6 @@ mod tests {
         game.cursor = 23;
         game.move_cursor(CursorDirection::Right);
         assert_eq!(game.cursor, 23);
-    }
-
-    #[test]
-    fn test_morris_stats_default() {
-        let stats = MorrisStats::default();
-        assert_eq!(stats.games_played, 0);
-        assert_eq!(stats.games_won, 0);
-        assert_eq!(stats.games_lost, 0);
-        assert_eq!(stats.prestige_earned, 0);
     }
 
     #[test]

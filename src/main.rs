@@ -34,11 +34,6 @@ use challenge_menu::ChallengeType;
 use character_manager::CharacterManager;
 use chess::ChessDifficulty;
 use chess_logic::{apply_game_result, process_ai_thinking, start_chess_game, try_discover_chess};
-use morris::{CursorDirection as MorrisCursorDirection, MorrisDifficulty, MorrisMove, MorrisResult};
-use morris_logic::{
-    apply_game_result as apply_morris_result, get_legal_moves as get_morris_legal_moves,
-    process_ai_thinking as process_morris_ai, start_morris_game, try_discover_morris,
-};
 use chrono::Utc;
 use constants::*;
 use crossterm::event::{self, Event, KeyCode};
@@ -48,6 +43,13 @@ use crossterm::terminal::{
 use crossterm::ExecutableCommand;
 use game_logic::*;
 use game_state::*;
+use morris::{
+    CursorDirection as MorrisCursorDirection, MorrisDifficulty, MorrisMove, MorrisResult,
+};
+use morris_logic::{
+    apply_game_result as apply_morris_result, get_legal_moves as get_morris_legal_moves,
+    process_ai_thinking as process_morris_ai, start_morris_game, try_discover_morris,
+};
 use prestige::*;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use save_manager::SaveManager;
@@ -101,9 +103,9 @@ fn handle_morris_enter(state: &mut GameState) {
     if let Some(selected) = morris_game.selected_position {
         // Already selected a piece - try to move to cursor
         let legal_moves = get_morris_legal_moves(morris_game);
-        if legal_moves.iter().any(|m| {
-            matches!(m, MorrisMove::Move { from, to } if *from == selected && *to == cursor)
-        }) {
+        if legal_moves.iter().any(
+            |m| matches!(m, MorrisMove::Move { from, to } if *from == selected && *to == cursor),
+        ) {
             morris_logic::apply_move(
                 morris_game,
                 MorrisMove::Move {
@@ -724,7 +726,8 @@ fn main() -> io::Result<()> {
                                             MorrisResult::Win => {
                                                 let new_prestige = old_prestige + prestige_gained;
                                                 state.combat_state.add_log_entry(
-                                                    "\u{25CB} Victory! The sage bows with respect.".to_string(),
+                                                    "\u{25CB} Victory! The sage bows with respect."
+                                                        .to_string(),
                                                     false,
                                                     true,
                                                 );
@@ -739,7 +742,8 @@ fn main() -> io::Result<()> {
                                             }
                                             MorrisResult::Loss => {
                                                 state.combat_state.add_log_entry(
-                                                    "\u{25CB} The sage nods knowingly and departs.".to_string(),
+                                                    "\u{25CB} The sage nods knowingly and departs."
+                                                        .to_string(),
                                                     false,
                                                     true,
                                                 );
@@ -802,15 +806,17 @@ fn main() -> io::Result<()> {
                                             if let Some(challenge) = menu.take_selected() {
                                                 match challenge.challenge_type {
                                                     ChallengeType::Chess => {
-                                                        let difficulty = ChessDifficulty::from_index(
-                                                            menu.selected_difficulty,
-                                                        );
+                                                        let difficulty =
+                                                            ChessDifficulty::from_index(
+                                                                menu.selected_difficulty,
+                                                            );
                                                         start_chess_game(&mut state, difficulty);
                                                     }
                                                     ChallengeType::Morris => {
-                                                        let difficulty = MorrisDifficulty::from_index(
-                                                            menu.selected_difficulty,
-                                                        );
+                                                        let difficulty =
+                                                            MorrisDifficulty::from_index(
+                                                                menu.selected_difficulty,
+                                                            );
                                                         start_morris_game(&mut state, difficulty);
                                                     }
                                                 }
