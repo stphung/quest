@@ -10,6 +10,7 @@ mod combat_scene;
 pub mod dungeon_map;
 mod enemy_sprites;
 pub mod fishing_scene;
+pub mod morris_scene;
 pub mod prestige_confirm;
 mod stats_panel;
 mod throbber;
