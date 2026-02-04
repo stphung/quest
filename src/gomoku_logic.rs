@@ -172,3 +172,161 @@ mod tests {
         assert!(!is_board_full(&game.board));
     }
 }
+
+// === AI Evaluation ===
+
+/// Score values for different patterns
+const SCORE_FIVE: i32 = 100_000;
+#[allow(dead_code)]
+const SCORE_OPEN_FOUR: i32 = 10_000;
+const SCORE_CLOSED_FOUR: i32 = 1_000;
+const SCORE_OPEN_THREE: i32 = 500;
+#[allow(dead_code)]
+const SCORE_CLOSED_THREE: i32 = 100;
+const SCORE_OPEN_TWO: i32 = 50;
+const SCORE_CENTER_BONUS: i32 = 5;
+
+/// Evaluate the board from AI's perspective.
+/// Positive = good for AI, negative = good for Human.
+pub fn evaluate_board(board: &[[Option<Player>; BOARD_SIZE]; BOARD_SIZE]) -> i32 {
+    let mut score = 0;
+
+    // Evaluate all lines on the board
+    score += evaluate_all_lines(board, Player::Ai);
+    score -= evaluate_all_lines(board, Player::Human);
+
+    // Small bonus for center control
+    let center = BOARD_SIZE / 2;
+    let start = center.saturating_sub(2);
+    let end = (center + 2).min(BOARD_SIZE - 1);
+    for row in board.iter().take(end + 1).skip(start) {
+        for cell in row.iter().take(end + 1).skip(start) {
+            if *cell == Some(Player::Ai) {
+                score += SCORE_CENTER_BONUS;
+            } else if *cell == Some(Player::Human) {
+                score -= SCORE_CENTER_BONUS;
+            }
+        }
+    }
+
+    score
+}
+
+/// Evaluate all lines for a player, summing pattern scores.
+fn evaluate_all_lines(board: &[[Option<Player>; BOARD_SIZE]; BOARD_SIZE], player: Player) -> i32 {
+    let mut score = 0;
+
+    // Check all rows
+    for r in 0..BOARD_SIZE {
+        score += evaluate_line_segment(board, r, 0, 0, 1, player);
+    }
+
+    // Check all columns
+    for c in 0..BOARD_SIZE {
+        score += evaluate_line_segment(board, 0, c, 1, 0, player);
+    }
+
+    // Check diagonals (down-right)
+    for start in 0..BOARD_SIZE {
+        score += evaluate_line_segment(board, start, 0, 1, 1, player);
+        if start > 0 {
+            score += evaluate_line_segment(board, 0, start, 1, 1, player);
+        }
+    }
+
+    // Check diagonals (down-left)
+    for start in 0..BOARD_SIZE {
+        score += evaluate_line_segment(board, start, BOARD_SIZE - 1, 1, -1, player);
+        if start > 0 {
+            score += evaluate_line_segment(board, 0, BOARD_SIZE - 1 - start, 1, -1, player);
+        }
+    }
+
+    score
+}
+
+/// Evaluate a line segment starting at (r, c) going in direction (dr, dc).
+fn evaluate_line_segment(
+    board: &[[Option<Player>; BOARD_SIZE]; BOARD_SIZE],
+    start_r: usize,
+    start_c: usize,
+    dr: i32,
+    dc: i32,
+    player: Player,
+) -> i32 {
+    let mut score = 0;
+    let mut r = start_r as i32;
+    let mut c = start_c as i32;
+
+    // Collect the line
+    let mut line = Vec::new();
+    while r >= 0 && r < BOARD_SIZE as i32 && c >= 0 && c < BOARD_SIZE as i32 {
+        line.push(board[r as usize][c as usize]);
+        r += dr;
+        c += dc;
+    }
+
+    // Score windows of 5 in this line
+    if line.len() >= 5 {
+        for window in line.windows(5) {
+            score += score_window(window, player);
+        }
+    }
+
+    score
+}
+
+/// Score a window of 5 cells for patterns.
+fn score_window(window: &[Option<Player>], player: Player) -> i32 {
+    let own = window.iter().filter(|&&c| c == Some(player)).count();
+    let empty = window.iter().filter(|&&c| c.is_none()).count();
+    let opponent = 5 - own - empty;
+
+    // If opponent has stones in this window, we can't complete it
+    if opponent > 0 {
+        return 0;
+    }
+
+    match own {
+        5 => SCORE_FIVE,
+        4 if empty == 1 => SCORE_CLOSED_FOUR, // One empty = closed four
+        3 if empty == 2 => SCORE_OPEN_THREE,
+        2 if empty == 3 => SCORE_OPEN_TWO,
+        _ => 0,
+    }
+}
+
+#[cfg(test)]
+mod eval_tests {
+    use super::*;
+    use crate::gomoku::GomokuDifficulty;
+
+    #[test]
+    fn test_evaluate_empty_board() {
+        let game = GomokuGame::new(GomokuDifficulty::Novice);
+        let score = evaluate_board(&game.board);
+        assert_eq!(score, 0);
+    }
+
+    #[test]
+    fn test_evaluate_ai_advantage() {
+        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        // AI has 3 in a row with space
+        game.board[7][7] = Some(Player::Ai);
+        game.board[7][8] = Some(Player::Ai);
+        game.board[7][9] = Some(Player::Ai);
+        let score = evaluate_board(&game.board);
+        assert!(score > 0, "AI should have positive score");
+    }
+
+    #[test]
+    fn test_evaluate_human_advantage() {
+        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        // Human has 3 in a row with space
+        game.board[7][7] = Some(Player::Human);
+        game.board[7][8] = Some(Player::Human);
+        game.board[7][9] = Some(Player::Human);
+        let score = evaluate_board(&game.board);
+        assert!(score < 0, "Human advantage should give negative score");
+    }
+}
