@@ -25,9 +25,9 @@ pub fn render_minesweeper(frame: &mut Frame, area: Rect, game: &MinesweeperGame)
     render_grid(frame, chunks[0], game);
     render_info_panel(frame, chunks[1], game);
 
-    // Game over overlay
+    // Game over overlay (centered on grid area, not full area)
     if game.game_result.is_some() {
-        render_game_over_overlay(frame, area, game);
+        render_game_over_overlay(frame, chunks[0], game);
     }
 }
 
@@ -238,7 +238,7 @@ fn render_game_over_overlay(frame: &mut Frame, area: Rect, game: &MinesweeperGam
     };
 
     // Center overlay
-    let width = 26;
+    let width = 30;
     let height = 6;
     let x = area.x + (area.width.saturating_sub(width)) / 2;
     let y = area.y + (area.height.saturating_sub(height)) / 2;
