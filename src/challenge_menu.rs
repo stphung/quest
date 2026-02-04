@@ -7,6 +7,7 @@
 use crate::chess::ChessDifficulty;
 use crate::game_state::GameState;
 use crate::gomoku::GomokuDifficulty;
+use crate::minesweeper::MinesweeperDifficulty;
 use crate::morris::MorrisDifficulty;
 use rand::Rng;
 
@@ -126,6 +127,39 @@ impl DifficultyInfo for GomokuDifficulty {
     }
 }
 
+impl DifficultyInfo for MinesweeperDifficulty {
+    fn name(&self) -> &'static str {
+        MinesweeperDifficulty::name(self)
+    }
+
+    fn reward(&self) -> ChallengeReward {
+        match self {
+            MinesweeperDifficulty::Novice => ChallengeReward {
+                xp_percent: 50,
+                ..Default::default()
+            },
+            MinesweeperDifficulty::Apprentice => ChallengeReward {
+                xp_percent: 75,
+                ..Default::default()
+            },
+            MinesweeperDifficulty::Journeyman => ChallengeReward {
+                xp_percent: 100,
+                ..Default::default()
+            },
+            MinesweeperDifficulty::Master => ChallengeReward {
+                prestige_ranks: 1,
+                xp_percent: 200,
+                ..Default::default()
+            },
+        }
+    }
+
+    fn extra_info(&self) -> Option<String> {
+        let (h, w) = self.grid_size();
+        Some(format!("{}x{}, {} traps", w, h, self.mine_count()))
+    }
+}
+
 /// Chance per tick to discover any challenge (~2 hour average)
 /// At 10 ticks/sec, 0.000014 chance/tick ≈ 71,429 ticks ≈ 2 hours average
 pub const CHALLENGE_DISCOVERY_CHANCE: f64 = 0.000014;
@@ -141,15 +175,19 @@ struct ChallengeWeight {
 const CHALLENGE_TABLE: &[ChallengeWeight] = &[
     ChallengeWeight {
         challenge_type: ChallengeType::Chess,
-        weight: 33,
+        weight: 25,
     },
     ChallengeWeight {
         challenge_type: ChallengeType::Morris,
-        weight: 33,
+        weight: 25,
     },
     ChallengeWeight {
         challenge_type: ChallengeType::Gomoku,
-        weight: 34,
+        weight: 25,
+    },
+    ChallengeWeight {
+        challenge_type: ChallengeType::Minesweeper,
+        weight: 25,
     },
 ];
 
@@ -168,6 +206,7 @@ pub enum ChallengeType {
     Chess,
     Morris,
     Gomoku,
+    Minesweeper,
 }
 
 /// Menu state for navigation
@@ -259,6 +298,7 @@ pub fn try_discover_challenge<R: Rng>(state: &mut GameState, rng: &mut R) -> Opt
         || state.active_chess.is_some()
         || state.active_morris.is_some()
         || state.active_gomoku.is_some()
+        || state.active_minesweeper.is_some()
     {
         return None;
     }
@@ -328,6 +368,17 @@ pub fn create_challenge(ct: &ChallengeType) -> PendingChallenge {
                 placing black and white stones in her palms. \"First to align five stones \
                 claims victory. The rules are simple, but mastery takes a lifetime. Shall \
                 we test your strategic mind?\""
+                .to_string(),
+        },
+        ChallengeType::Minesweeper => PendingChallenge {
+            challenge_type: ChallengeType::Minesweeper,
+            title: "Minesweeper: Trap Detection".to_string(),
+            icon: "\u{26A0}",
+            description: "A weathered scout beckons you toward a ruined corridor. \
+                'The floor's rigged with pressure plates,' she warns, pulling out a \
+                worn map. 'One wrong step and...' She makes an explosive gesture. \
+                'Help me chart the safe path. Probe carefully—the numbers tell you \
+                how many traps lurk nearby.'"
                 .to_string(),
         },
     }

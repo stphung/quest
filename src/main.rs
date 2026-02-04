@@ -25,6 +25,8 @@ mod item_generation;
 mod item_names;
 mod item_scoring;
 mod items;
+mod minesweeper;
+mod minesweeper_logic;
 mod morris;
 mod morris_logic;
 mod prestige;
@@ -33,7 +35,7 @@ mod ui;
 mod updater;
 mod zones;
 
-use challenge_menu::{try_discover_challenge, ChallengeType};
+use challenge_menu::{try_discover_challenge, ChallengeType, DifficultyInfo};
 use character_manager::CharacterManager;
 use chess::ChessDifficulty;
 use chess_logic::{apply_game_result, process_ai_thinking, start_chess_game};
@@ -51,6 +53,8 @@ use gomoku_logic::{
     apply_game_result as apply_gomoku_result, process_ai_thinking as process_gomoku_ai,
     process_human_move as process_gomoku_move, start_gomoku_game,
 };
+use minesweeper::{MinesweeperDifficulty, MinesweeperGame, MinesweeperResult};
+use minesweeper_logic::{handle_first_click, reveal_cell, toggle_flag};
 use morris::{
     CursorDirection as MorrisCursorDirection, MorrisDifficulty, MorrisMove, MorrisResult,
 };
@@ -688,6 +692,74 @@ fn main() -> io::Result<()> {
                                 }
                             }
 
+                            // Handle active minesweeper game input
+                            if let Some(ref mut minesweeper_game) = state.active_minesweeper {
+                                if let Some(result) = minesweeper_game.game_result {
+                                    // Any key dismisses result and applies rewards
+                                    if result == MinesweeperResult::Win {
+                                        let reward = minesweeper_game.difficulty.reward();
+                                        if reward.xp_percent > 0 {
+                                            let xp_for_level = game_logic::xp_for_next_level(
+                                                state.character_level.max(1),
+                                            );
+                                            let xp_gain =
+                                                (xp_for_level * reward.xp_percent as u64) / 100;
+                                            state.character_xp += xp_gain;
+                                        }
+                                        if reward.prestige_ranks > 0 {
+                                            state.prestige_rank += reward.prestige_ranks;
+                                        }
+                                    }
+                                    state.active_minesweeper = None;
+                                    continue;
+                                }
+
+                                // Handle forfeit confirmation (double-Esc)
+                                if minesweeper_game.forfeit_pending {
+                                    match key_event.code {
+                                        KeyCode::Esc => {
+                                            minesweeper_game.game_result =
+                                                Some(MinesweeperResult::Loss);
+                                        }
+                                        _ => {
+                                            minesweeper_game.forfeit_pending = false;
+                                        }
+                                    }
+                                    continue;
+                                }
+
+                                // Normal game input
+                                match key_event.code {
+                                    KeyCode::Up => minesweeper_game.move_cursor(-1, 0),
+                                    KeyCode::Down => minesweeper_game.move_cursor(1, 0),
+                                    KeyCode::Left => minesweeper_game.move_cursor(0, -1),
+                                    KeyCode::Right => minesweeper_game.move_cursor(0, 1),
+                                    KeyCode::Enter => {
+                                        let (row, col) = minesweeper_game.cursor;
+                                        if !minesweeper_game.first_click_done {
+                                            let mut rng = rand::thread_rng();
+                                            handle_first_click(
+                                                minesweeper_game,
+                                                row,
+                                                col,
+                                                &mut rng,
+                                            );
+                                        } else {
+                                            reveal_cell(minesweeper_game, row, col);
+                                        }
+                                    }
+                                    KeyCode::Char('f') | KeyCode::Char('F') => {
+                                        let (row, col) = minesweeper_game.cursor;
+                                        toggle_flag(minesweeper_game, row, col);
+                                    }
+                                    KeyCode::Esc => {
+                                        minesweeper_game.forfeit_pending = true;
+                                    }
+                                    _ => {}
+                                }
+                                continue;
+                            }
+
                             // Handle active Gomoku game input
                             if let Some(ref mut gomoku_game) = state.active_gomoku {
                                 if gomoku_game.game_result.is_some() {
@@ -993,6 +1065,14 @@ fn main() -> io::Result<()> {
                                                             );
                                                         start_gomoku_game(&mut state, difficulty);
                                                     }
+                                                    ChallengeType::Minesweeper => {
+                                                        let difficulty =
+                                                            MinesweeperDifficulty::from_index(
+                                                                menu.selected_difficulty,
+                                                            );
+                                                        state.active_minesweeper =
+                                                            Some(MinesweeperGame::new(difficulty));
+                                                    }
                                                 }
                                             }
                                         }
@@ -1131,6 +1211,10 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
                 ChallengeType::Gomoku => (
                     "◎",
                     "A wandering strategist places a worn board before you...",
+                ),
+                ChallengeType::Minesweeper => (
+                    "\u{26A0}",
+                    "A weathered scout beckons you toward a ruined corridor...",
                 ),
             };
             game_state

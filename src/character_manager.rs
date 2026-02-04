@@ -123,6 +123,7 @@ impl CharacterManager {
             active_chess: None,
             active_morris: None,
             active_gomoku: None,
+            active_minesweeper: None,
         })
     }
 
@@ -326,6 +327,7 @@ mod tests {
             active_chess: None,
             active_morris: None,
             active_gomoku: None,
+            active_minesweeper: None,
         };
 
         // Save character
@@ -380,6 +382,7 @@ mod tests {
             active_chess: None,
             active_morris: None,
             active_gomoku: None,
+            active_minesweeper: None,
         };
 
         let char2 = GameState {
@@ -403,6 +406,7 @@ mod tests {
             active_chess: None,
             active_morris: None,
             active_gomoku: None,
+            active_minesweeper: None,
         };
 
         manager.save_character(&char1).unwrap();
@@ -456,6 +460,7 @@ mod tests {
             active_chess: None,
             active_morris: None,
             active_gomoku: None,
+            active_minesweeper: None,
         };
 
         manager.save_character(&state).unwrap();
@@ -498,6 +503,7 @@ mod tests {
             active_chess: None,
             active_morris: None,
             active_gomoku: None,
+            active_minesweeper: None,
         };
 
         manager.save_character(&state).unwrap();
@@ -567,6 +573,7 @@ mod tests {
             active_chess: None,
             active_morris: None,
             active_gomoku: None,
+            active_minesweeper: None,
         };
 
         manager.save_character(&state).unwrap();
@@ -675,6 +682,7 @@ mod tests {
             active_chess: None,
             active_morris: None,
             active_gomoku: None,
+            active_minesweeper: None,
         };
 
         manager.save_character(&state).unwrap();

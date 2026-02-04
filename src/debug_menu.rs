@@ -14,6 +14,7 @@ pub const DEBUG_OPTIONS: &[&str] = &[
     "Trigger Chess Challenge",
     "Trigger Morris Challenge",
     "Trigger Gomoku Challenge",
+    "Trigger Minesweeper Challenge",
 ];
 
 /// Debug menu state
@@ -65,6 +66,7 @@ impl DebugMenu {
             2 => trigger_chess_challenge(state),
             3 => trigger_morris_challenge(state),
             4 => trigger_gomoku_challenge(state),
+            5 => trigger_minesweeper_challenge(state),
             _ => "Unknown option",
         };
         self.close();
@@ -122,6 +124,19 @@ fn trigger_gomoku_challenge(state: &mut GameState) -> &'static str {
     "Gomoku challenge added!"
 }
 
+fn trigger_minesweeper_challenge(state: &mut GameState) -> &'static str {
+    if state
+        .challenge_menu
+        .has_challenge(&ChallengeType::Minesweeper)
+    {
+        return "Minesweeper challenge already pending!";
+    }
+    state
+        .challenge_menu
+        .add_challenge(create_challenge(&ChallengeType::Minesweeper));
+    "Minesweeper challenge added!"
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -138,16 +153,18 @@ mod tests {
         menu.navigate_down();
         menu.navigate_down();
         menu.navigate_down();
-        assert_eq!(menu.selected_index, 4);
+        menu.navigate_down();
+        assert_eq!(menu.selected_index, 5);
 
         // Can't go past end
         menu.navigate_down();
-        assert_eq!(menu.selected_index, 4);
+        assert_eq!(menu.selected_index, 5);
 
         menu.navigate_up();
-        assert_eq!(menu.selected_index, 3);
+        assert_eq!(menu.selected_index, 4);
 
         // Can't go before start
+        menu.navigate_up();
         menu.navigate_up();
         menu.navigate_up();
         menu.navigate_up();
@@ -225,5 +242,19 @@ mod tests {
         // Can't add duplicate
         let msg = trigger_gomoku_challenge(&mut state);
         assert_eq!(msg, "Gomoku challenge already pending!");
+    }
+
+    #[test]
+    fn test_trigger_minesweeper_challenge() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let msg = trigger_minesweeper_challenge(&mut state);
+        assert_eq!(msg, "Minesweeper challenge added!");
+        assert!(state
+            .challenge_menu
+            .has_challenge(&ChallengeType::Minesweeper));
+
+        // Can't add duplicate
+        let msg = trigger_minesweeper_challenge(&mut state);
+        assert_eq!(msg, "Minesweeper challenge already pending!");
     }
 }

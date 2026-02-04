@@ -6,6 +6,7 @@ use crate::dungeon::Dungeon;
 use crate::equipment::Equipment;
 use crate::fishing::{FishingSession, FishingState};
 use crate::gomoku::GomokuGame;
+use crate::minesweeper::MinesweeperGame;
 use crate::morris::MorrisGame;
 use crate::zones::ZoneProgression;
 use serde::{Deserialize, Serialize};
@@ -52,6 +53,9 @@ pub struct GameState {
     /// Active gomoku game (transient, not saved)
     #[serde(skip)]
     pub active_gomoku: Option<GomokuGame>,
+    /// Active minesweeper game (transient, not saved)
+    #[serde(skip)]
+    pub active_minesweeper: Option<MinesweeperGame>,
 }
 
 impl GameState {
@@ -84,6 +88,7 @@ impl GameState {
             active_chess: None,
             active_morris: None,
             active_gomoku: None,
+            active_minesweeper: None,
         }
     }
 

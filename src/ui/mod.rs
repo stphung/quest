@@ -12,6 +12,7 @@ pub mod dungeon_map;
 mod enemy_sprites;
 pub mod fishing_scene;
 pub mod gomoku_scene;
+pub mod minesweeper_scene;
 pub mod morris_scene;
 pub mod prestige_confirm;
 mod stats_panel;
@@ -41,7 +42,8 @@ pub fn draw_ui_with_update(
         && !game_state.challenge_menu.is_open
         && game_state.active_chess.is_none()
         && game_state.active_morris.is_none()
-        && game_state.active_gomoku.is_none();
+        && game_state.active_gomoku.is_none()
+        && game_state.active_minesweeper.is_none();
 
     // Split vertically: optional banner at top, main content below
     let main_area = if show_challenge_banner {
@@ -78,8 +80,10 @@ pub fn draw_ui_with_update(
     );
 
     // Draw right panel based on current activity
-    // Priority: gomoku > morris > chess > challenge menu > fishing > dungeon > combat
-    if let Some(ref game) = game_state.active_gomoku {
+    // Priority: minesweeper > gomoku > morris > chess > challenge menu > fishing > dungeon > combat
+    if let Some(ref game) = game_state.active_minesweeper {
+        minesweeper_scene::render_minesweeper(frame, chunks[1], game);
+    } else if let Some(ref game) = game_state.active_gomoku {
         gomoku_scene::render_gomoku_scene(frame, chunks[1], game);
     } else if let Some(ref game) = game_state.active_morris {
         morris_scene::render_morris_scene(frame, chunks[1], game, game_state.character_level);
