@@ -1,6 +1,8 @@
 //! Chess board UI rendering.
 
-use super::game_common::{render_status_bar, render_thinking_status_bar};
+use super::game_common::{
+    render_forfeit_status_bar, render_status_bar, render_thinking_status_bar,
+};
 use crate::chess::{ChessGame, ChessResult};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -209,17 +211,17 @@ fn render_status(frame: &mut Frame, area: Rect, game: &ChessGame) {
         return;
     }
 
-    let (status_text, status_color) = if game.forfeit_pending {
-        ("Forfeit game?", Color::Red)
-    } else if game.selected_square.is_some() {
+    if render_forfeit_status_bar(frame, area, game.forfeit_pending) {
+        return;
+    }
+
+    let (status_text, status_color) = if game.selected_square.is_some() {
         ("Select destination", Color::Cyan)
     } else {
         ("Your move", Color::White)
     };
 
-    let controls: &[(&str, &str)] = if game.forfeit_pending {
-        &[("[Esc]", "Confirm"), ("[Any]", "Cancel")]
-    } else if game.selected_square.is_some() {
+    let controls: &[(&str, &str)] = if game.selected_square.is_some() {
         &[
             ("[Arrows]", "Move"),
             ("[Enter]", "Confirm"),

@@ -146,3 +146,40 @@ pub fn render_thinking_status_bar(frame: &mut Frame, area: Rect, message: &str) 
     let status_text = format!("{} {}", spinner, message);
     render_status_bar(frame, area, &status_text, Color::Yellow, &[]);
 }
+
+/// Forfeit confirmation status text.
+pub const FORFEIT_STATUS_TEXT: &str = "Forfeit game?";
+
+/// Forfeit confirmation status color.
+pub const FORFEIT_STATUS_COLOR: Color = Color::Red;
+
+/// Forfeit confirmation controls.
+pub const FORFEIT_CONTROLS: &[(&str, &str)] = &[("[Esc]", "Confirm"), ("[Any]", "Cancel")];
+
+/// Render the forfeit confirmation status bar.
+///
+/// Call this when `forfeit_pending` is true. Returns `true` if rendered.
+/// Use this at the start of your status bar function for consistent forfeit UI.
+///
+/// # Example
+/// ```ignore
+/// fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &MyGame) {
+///     if render_forfeit_status_bar(frame, area, game.forfeit_pending) {
+///         return;
+///     }
+///     // ... normal status bar logic
+/// }
+/// ```
+pub fn render_forfeit_status_bar(frame: &mut Frame, area: Rect, forfeit_pending: bool) -> bool {
+    if !forfeit_pending {
+        return false;
+    }
+    render_status_bar(
+        frame,
+        area,
+        FORFEIT_STATUS_TEXT,
+        FORFEIT_STATUS_COLOR,
+        FORFEIT_CONTROLS,
+    );
+    true
+}

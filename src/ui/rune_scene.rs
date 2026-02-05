@@ -1,6 +1,6 @@
 //! Rune Deciphering game UI rendering.
 
-use super::game_common::{create_game_layout, render_status_bar};
+use super::game_common::{create_game_layout, render_forfeit_status_bar, render_status_bar};
 use crate::rune::{FeedbackMark, RuneGame, RuneResult, RUNE_SYMBOLS};
 use ratatui::{
     layout::{Alignment, Rect},
@@ -127,6 +127,15 @@ fn render_grid(frame: &mut Frame, area: Rect, game: &RuneGame) {
 }
 
 /// Render the status bar below the grid (status + controls).
+/// Standard controls for Rune game.
+const RUNE_CONTROLS: &[(&str, &str)] = &[
+    ("[←→]", "Move"),
+    ("[↑↓]", "Cycle"),
+    ("[Enter]", "Go"),
+    ("[F]", "Clear"),
+    ("[Esc]", "Quit"),
+];
+
 fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &RuneGame) {
     if game.game_result.is_some() {
         return;
@@ -134,38 +143,21 @@ fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &RuneGame) {
 
     // Handle rejection message specially (shows error inline)
     if let Some(ref msg) = game.reject_message {
-        let controls: &[(&str, &str)] = &[
-            ("[←→]", "Move"),
-            ("[↑↓]", "Cycle"),
-            ("[Enter]", "Go"),
-            ("[F]", "Clear"),
-            ("[Esc]", "Quit"),
-        ];
-        render_status_bar(frame, area, msg, Color::LightRed, controls);
+        render_status_bar(frame, area, msg, Color::LightRed, RUNE_CONTROLS);
         return;
     }
 
-    let (status_text, status_color) = if game.forfeit_pending {
-        ("Forfeit game?", Color::LightRed)
-    } else if game.guesses.is_empty() {
+    if render_forfeit_status_bar(frame, area, game.forfeit_pending) {
+        return;
+    }
+
+    let (status_text, status_color) = if game.guesses.is_empty() {
         ("Begin deciphering", Color::Yellow)
     } else {
         ("Deciphering...", Color::Green)
     };
 
-    let controls: &[(&str, &str)] = if game.forfeit_pending {
-        &[("[Esc]", "Confirm"), ("[Any]", "Cancel")]
-    } else {
-        &[
-            ("[←→]", "Move"),
-            ("[↑↓]", "Cycle"),
-            ("[Enter]", "Go"),
-            ("[F]", "Clear"),
-            ("[Esc]", "Quit"),
-        ]
-    };
-
-    render_status_bar(frame, area, status_text, status_color, controls);
+    render_status_bar(frame, area, status_text, status_color, RUNE_CONTROLS);
 }
 
 /// Render the info panel on the right side.

@@ -1,6 +1,8 @@
 //! Nine Men's Morris UI rendering.
 
-use super::game_common::{render_status_bar, render_thinking_status_bar};
+use super::game_common::{
+    render_forfeit_status_bar, render_status_bar, render_thinking_status_bar,
+};
 use crate::morris::{MorrisGame, MorrisPhase, MorrisResult, Player, ADJACENCIES};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -319,9 +321,11 @@ fn render_status(frame: &mut Frame, area: Rect, game: &MorrisGame) {
         return;
     }
 
-    let (status_text, status_color) = if game.forfeit_pending {
-        ("Forfeit game?", Color::LightRed)
-    } else if game.must_capture {
+    if render_forfeit_status_bar(frame, area, game.forfeit_pending) {
+        return;
+    }
+
+    let (status_text, status_color) = if game.must_capture {
         ("MILL! Select a piece to capture", Color::Green)
     } else if game.selected_position.is_some() {
         ("Select destination", Color::Cyan)
@@ -333,9 +337,7 @@ fn render_status(frame: &mut Frame, area: Rect, game: &MorrisGame) {
         }
     };
 
-    let controls: &[(&str, &str)] = if game.forfeit_pending {
-        &[("[Esc]", "Confirm"), ("[Any]", "Cancel")]
-    } else if game.must_capture {
+    let controls: &[(&str, &str)] = if game.must_capture {
         &[("[Arrows]", "Move"), ("[Enter]", "Capture")]
     } else if game.selected_position.is_some() {
         &[

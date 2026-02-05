@@ -1,6 +1,8 @@
 //! Gomoku game UI rendering.
 
-use super::game_common::{create_game_layout, render_status_bar, render_thinking_status_bar};
+use super::game_common::{
+    create_game_layout, render_forfeit_status_bar, render_status_bar, render_thinking_status_bar,
+};
 use crate::gomoku::{GomokuGame, Player, BOARD_SIZE};
 use ratatui::{
     layout::Rect,
@@ -109,23 +111,21 @@ fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &GomokuGame) {
         return;
     }
 
-    let (status_text, status_color) = if game.forfeit_pending {
-        ("Forfeit game?", Color::LightRed)
-    } else {
-        ("Your turn", Color::White)
-    };
+    if render_forfeit_status_bar(frame, area, game.forfeit_pending) {
+        return;
+    }
 
-    let controls: &[(&str, &str)] = if game.forfeit_pending {
-        &[("[Esc]", "Confirm"), ("[Any]", "Cancel")]
-    } else {
+    render_status_bar(
+        frame,
+        area,
+        "Your turn",
+        Color::White,
         &[
             ("[Arrows]", "Move"),
             ("[Enter]", "Place"),
             ("[Esc]", "Forfeit"),
-        ]
-    };
-
-    render_status_bar(frame, area, status_text, status_color, controls);
+        ],
+    );
 }
 
 fn render_info_panel(frame: &mut Frame, area: Rect, game: &GomokuGame) {

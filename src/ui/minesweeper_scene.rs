@@ -1,6 +1,6 @@
 //! Minesweeper game UI rendering.
 
-use super::game_common::{create_game_layout, render_status_bar};
+use super::game_common::{create_game_layout, render_forfeit_status_bar, render_status_bar};
 use crate::minesweeper::{Cell, MinesweeperGame, MinesweeperResult};
 use ratatui::{
     layout::{Alignment, Rect},
@@ -101,26 +101,28 @@ fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &MinesweeperGa
         return;
     }
 
-    let (status_text, status_color) = if game.forfeit_pending {
-        ("Forfeit game?", Color::LightRed)
-    } else if !game.first_click_done {
+    if render_forfeit_status_bar(frame, area, game.forfeit_pending) {
+        return;
+    }
+
+    let (status_text, status_color) = if !game.first_click_done {
         ("Click to begin", Color::Yellow)
     } else {
         ("Detecting...", Color::Green)
     };
 
-    let controls: &[(&str, &str)] = if game.forfeit_pending {
-        &[("[Esc]", "Confirm"), ("[Any]", "Cancel")]
-    } else {
+    render_status_bar(
+        frame,
+        area,
+        status_text,
+        status_color,
         &[
             ("[Arrows]", "Move"),
             ("[Enter]", "Reveal"),
             ("[F]", "Flag"),
             ("[Esc]", "Forfeit"),
-        ]
-    };
-
-    render_status_bar(frame, area, status_text, status_color, controls);
+        ],
+    );
 }
 
 /// Render the info panel on the right side.
