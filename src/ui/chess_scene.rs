@@ -1,5 +1,6 @@
 //! Chess board UI rendering.
 
+use super::game_common::{render_status_bar, render_thinking_status_bar};
 use crate::chess::{ChessGame, ChessResult};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -203,63 +204,36 @@ fn render_board(frame: &mut Frame, area: Rect, game: &ChessGame) {
 }
 
 fn render_status(frame: &mut Frame, area: Rect, game: &ChessGame) {
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    // Line 1: Status message
-    let (status_text, status_style) = if game.ai_thinking {
-        // Braille spinner animation (100ms per frame)
-        const SPINNER: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-        let millis = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis();
-        let frame_idx = ((millis / 100) % 10) as usize;
-        let spinner = SPINNER[frame_idx];
-
-        (
-            format!("{} Opponent is thinking...", spinner),
-            Style::default().fg(Color::Yellow),
-        )
-    } else if game.forfeit_pending {
-        ("Forfeit game?".to_string(), Style::default().fg(Color::Red))
-    } else if game.selected_square.is_some() {
-        (
-            "Select destination".to_string(),
-            Style::default().fg(Color::Cyan),
-        )
-    } else {
-        ("Your move".to_string(), Style::default().fg(Color::White))
-    };
-
-    // Line 2: Controls hint
-    let controls_text = if game.ai_thinking {
-        ""
-    } else if game.forfeit_pending {
-        "[Esc] Confirm forfeit  [Any] Cancel"
-    } else if game.selected_square.is_some() {
-        "[Arrows] Move  [Enter] Confirm  [Esc] Cancel"
-    } else {
-        "[Arrows] Move  [Enter] Select piece  [Esc] Forfeit"
-    };
-
-    let status = Paragraph::new(status_text)
-        .style(status_style)
-        .alignment(Alignment::Center);
-    frame.render_widget(status, Rect { height: 1, ..area });
-
-    if !controls_text.is_empty() {
-        let controls = Paragraph::new(controls_text)
-            .style(Style::default().fg(Color::DarkGray))
-            .alignment(Alignment::Center);
-        frame.render_widget(
-            controls,
-            Rect {
-                y: area.y + 1,
-                height: 1,
-                ..area
-            },
-        );
+    if game.ai_thinking {
+        render_thinking_status_bar(frame, area, "Opponent is thinking...");
+        return;
     }
+
+    let (status_text, status_color) = if game.forfeit_pending {
+        ("Forfeit game?", Color::Red)
+    } else if game.selected_square.is_some() {
+        ("Select destination", Color::Cyan)
+    } else {
+        ("Your move", Color::White)
+    };
+
+    let controls: &[(&str, &str)] = if game.forfeit_pending {
+        &[("[Esc]", "Confirm"), ("[Any]", "Cancel")]
+    } else if game.selected_square.is_some() {
+        &[
+            ("[Arrows]", "Move"),
+            ("[Enter]", "Confirm"),
+            ("[Esc]", "Cancel"),
+        ]
+    } else {
+        &[
+            ("[Arrows]", "Move"),
+            ("[Enter]", "Select"),
+            ("[Esc]", "Forfeit"),
+        ]
+    };
+
+    render_status_bar(frame, area, status_text, status_color, controls);
 }
 
 fn render_move_history(frame: &mut Frame, area: Rect, game: &ChessGame) {

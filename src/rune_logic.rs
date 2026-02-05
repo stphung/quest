@@ -263,10 +263,7 @@ mod tests {
 
         let accepted = submit_guess(&mut game, &mut rng);
         assert!(!accepted);
-        assert_eq!(
-            game.reject_message,
-            Some("No duplicate runes!".to_string())
-        );
+        assert_eq!(game.reject_message, Some("No duplicate runes!".to_string()));
         // Guess list should not grow on rejection
         assert!(game.guesses.is_empty());
     }

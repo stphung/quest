@@ -1,5 +1,6 @@
 //! Minesweeper game UI rendering.
 
+use super::game_common::render_status_bar;
 use crate::minesweeper::{Cell, MinesweeperGame, MinesweeperResult};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -13,8 +14,8 @@ use ratatui::{
 pub fn render_minesweeper(frame: &mut Frame, area: Rect, game: &MinesweeperGame) {
     frame.render_widget(Clear, area);
 
-    // Split: Grid on left, info panel on right (24 chars wide)
-    let chunks = Layout::default()
+    // Horizontal split: Grid area (left) | Info panel (right)
+    let h_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
             Constraint::Min(20),    // Grid area
@@ -22,12 +23,19 @@ pub fn render_minesweeper(frame: &mut Frame, area: Rect, game: &MinesweeperGame)
         ])
         .split(area);
 
-    render_grid(frame, chunks[0], game);
-    render_info_panel(frame, chunks[1], game);
+    // Left side: Grid (top) + Status bar (bottom 2 lines)
+    let v_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(10), Constraint::Length(2)])
+        .split(h_chunks[0]);
+
+    render_grid(frame, v_chunks[0], game);
+    render_status_bar_content(frame, v_chunks[1], game);
+    render_info_panel(frame, h_chunks[1], game);
 
     // Game over overlay (centered on grid area, not full area)
     if game.game_result.is_some() {
-        render_game_over_overlay(frame, chunks[0], game);
+        render_game_over_overlay(frame, v_chunks[0], game);
     }
 }
 
@@ -107,6 +115,34 @@ fn get_cell_display(cell: &Cell, _game_over: bool) -> (&'static str, Color) {
     }
 }
 
+/// Render the status bar below the grid.
+fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &MinesweeperGame) {
+    if game.game_result.is_some() {
+        return;
+    }
+
+    let (status_text, status_color) = if game.forfeit_pending {
+        ("Forfeit game?", Color::LightRed)
+    } else if !game.first_click_done {
+        ("Click to begin", Color::Yellow)
+    } else {
+        ("Detecting...", Color::Green)
+    };
+
+    let controls: &[(&str, &str)] = if game.forfeit_pending {
+        &[("[Esc]", "Confirm"), ("[Any]", "Cancel")]
+    } else {
+        &[
+            ("[Arrows]", "Move"),
+            ("[Enter]", "Reveal"),
+            ("[F]", "Flag"),
+            ("[Esc]", "Forfeit"),
+        ]
+    };
+
+    render_status_bar(frame, area, status_text, status_color, controls);
+}
+
 /// Render the info panel on the right side.
 fn render_info_panel(frame: &mut Frame, area: Rect, game: &MinesweeperGame) {
     let block = Block::default()
@@ -117,38 +153,6 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &MinesweeperGame) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let mut lines: Vec<Line> = vec![
-        // Title
-        Line::from(Span::styled(
-            "Trap Detection",
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        )),
-        Line::from(""),
-        // Difficulty
-        Line::from(vec![
-            Span::styled("Difficulty: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(game.difficulty.name(), Style::default().fg(Color::Cyan)),
-        ]),
-        // Grid size
-        Line::from(vec![
-            Span::styled("Grid: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                format!("{}x{}", game.width, game.height),
-                Style::default().fg(Color::White),
-            ),
-        ]),
-        // Traps count
-        Line::from(vec![
-            Span::styled("Traps: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                format!("{}", game.total_mines),
-                Style::default().fg(Color::White),
-            ),
-        ]),
-    ];
-
     // Remaining (mines - flags)
     let remaining = game.mines_remaining();
     let remaining_color = if remaining < 0 {
@@ -156,59 +160,61 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &MinesweeperGame) {
     } else {
         Color::White
     };
-    lines.push(Line::from(vec![
-        Span::styled("Remaining: ", Style::default().fg(Color::DarkGray)),
-        Span::styled(
-            format!("{}", remaining),
-            Style::default().fg(remaining_color),
-        ),
-    ]));
 
-    lines.push(Line::from(""));
-
-    // Status
-    let status = if game.game_result.is_some() {
-        Span::styled("", Style::default())
-    } else if game.forfeit_pending {
-        Span::styled("Forfeit game?", Style::default().fg(Color::LightRed))
-    } else if !game.first_click_done {
-        Span::styled("Click to begin", Style::default().fg(Color::Yellow))
-    } else {
-        Span::styled("Detecting...", Style::default().fg(Color::Green))
-    };
-    lines.push(Line::from(status));
-    lines.push(Line::from(""));
-
-    // Controls
-    if game.game_result.is_none() {
-        if game.forfeit_pending {
-            lines.push(Line::from(Span::styled(
-                "[Esc] Confirm forfeit",
-                Style::default().fg(Color::DarkGray),
-            )));
-            lines.push(Line::from(Span::styled(
-                "[Any] Cancel",
-                Style::default().fg(Color::DarkGray),
-            )));
-        } else {
-            lines.push(Line::from(Span::styled(
-                "[Arrows] Move",
-                Style::default().fg(Color::DarkGray),
-            )));
-            lines.push(Line::from(Span::styled(
-                "[Enter] Reveal",
-                Style::default().fg(Color::DarkGray),
-            )));
-            lines.push(Line::from(Span::styled(
-                "[F] Flag",
-                Style::default().fg(Color::DarkGray),
-            )));
-            lines.push(Line::from(Span::styled(
-                "[Esc] Forfeit",
-                Style::default().fg(Color::DarkGray),
-            )));
-        }
-    }
+    let lines: Vec<Line> = vec![
+        Line::from(vec![
+            Span::styled("Difficulty: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(game.difficulty.name(), Style::default().fg(Color::Cyan)),
+        ]),
+        Line::from(vec![
+            Span::styled("Grid: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{}x{}", game.width, game.height),
+                Style::default().fg(Color::White),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("Traps: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{}", game.total_mines),
+                Style::default().fg(Color::White),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("Remaining: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{}", remaining),
+                Style::default().fg(remaining_color),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Legend:",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(vec![
+            Span::styled(" # ", Style::default().fg(Color::Gray)),
+            Span::styled("Hidden", Style::default().fg(Color::DarkGray)),
+        ]),
+        Line::from(vec![
+            Span::styled(" F ", Style::default().fg(Color::Red)),
+            Span::styled("Flag", Style::default().fg(Color::DarkGray)),
+        ]),
+        Line::from(vec![
+            Span::styled(" * ", Style::default().fg(Color::Red)),
+            Span::styled("Trap", Style::default().fg(Color::DarkGray)),
+        ]),
+        Line::from(vec![
+            Span::styled(" . ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Empty", Style::default().fg(Color::DarkGray)),
+        ]),
+        Line::from(vec![
+            Span::styled(" 1-8 ", Style::default().fg(Color::Blue)),
+            Span::styled("Adjacent", Style::default().fg(Color::DarkGray)),
+        ]),
+    ];
 
     let text = Paragraph::new(lines);
     frame.render_widget(text, inner);

@@ -1,5 +1,6 @@
 //! Gomoku game UI rendering.
 
+use super::game_common::{render_status_bar, render_thinking_status_bar};
 use crate::gomoku::{GomokuGame, Player, BOARD_SIZE};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -11,17 +12,24 @@ use ratatui::{
 
 /// Render the Gomoku game scene.
 pub fn render_gomoku_scene(frame: &mut Frame, area: Rect, game: &GomokuGame) {
-    // Split: Board on left, help panel on right
-    let chunks = Layout::default()
+    // Horizontal split: Board area (left) | Info panel (right)
+    let h_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Min(32),    // Board (15*2 + borders)
-            Constraint::Length(22), // Help panel
+            Constraint::Min(32),    // Board area (15*2 + borders)
+            Constraint::Length(22), // Info panel
         ])
         .split(area);
 
-    render_board(frame, chunks[0], game);
-    render_help_panel(frame, chunks[1], game);
+    // Left side: Board (top) + Status bar (bottom 2 lines)
+    let v_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(17), Constraint::Length(2)])
+        .split(h_chunks[0]);
+
+    render_board(frame, v_chunks[0], game);
+    render_status_bar_content(frame, v_chunks[1], game);
+    render_info_panel(frame, h_chunks[1], game);
 
     // Game over overlay
     if game.game_result.is_some() {
@@ -109,7 +117,37 @@ fn render_board(frame: &mut Frame, area: Rect, game: &GomokuGame) {
     }
 }
 
-fn render_help_panel(frame: &mut Frame, area: Rect, game: &GomokuGame) {
+/// Render the status bar below the board.
+fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &GomokuGame) {
+    if game.game_result.is_some() {
+        return;
+    }
+
+    if game.ai_thinking {
+        render_thinking_status_bar(frame, area, "Opponent is thinking...");
+        return;
+    }
+
+    let (status_text, status_color) = if game.forfeit_pending {
+        ("Forfeit game?", Color::LightRed)
+    } else {
+        ("Your turn", Color::White)
+    };
+
+    let controls: &[(&str, &str)] = if game.forfeit_pending {
+        &[("[Esc]", "Confirm"), ("[Any]", "Cancel")]
+    } else {
+        &[
+            ("[Arrows]", "Move"),
+            ("[Enter]", "Place"),
+            ("[Esc]", "Forfeit"),
+        ]
+    };
+
+    render_status_bar(frame, area, status_text, status_color, controls);
+}
+
+fn render_info_panel(frame: &mut Frame, area: Rect, game: &GomokuGame) {
     let block = Block::default()
         .title(" Info ")
         .borders(Borders::ALL)
@@ -118,7 +156,7 @@ fn render_help_panel(frame: &mut Frame, area: Rect, game: &GomokuGame) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let mut lines: Vec<Line> = vec![
+    let lines: Vec<Line> = vec![
         Line::from(Span::styled(
             "RULES",
             Style::default()
@@ -135,52 +173,23 @@ fn render_help_panel(frame: &mut Frame, area: Rect, game: &GomokuGame) {
         )),
         Line::from(Span::styled("wins.", Style::default().fg(Color::Gray))),
         Line::from(""),
+        Line::from(vec![
+            Span::styled("Difficulty: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(game.difficulty.name(), Style::default().fg(Color::Cyan)),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("You: ", Style::default().fg(Color::White)),
+            Span::styled(
+                "●",
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("  AI: ", Style::default().fg(Color::Gray)),
+            Span::styled("●", Style::default().fg(Color::LightRed)),
+        ]),
     ];
-
-    // Difficulty
-    lines.push(Line::from(vec![
-        Span::styled("Difficulty: ", Style::default().fg(Color::DarkGray)),
-        Span::styled(game.difficulty.name(), Style::default().fg(Color::Cyan)),
-    ]));
-    lines.push(Line::from(""));
-
-    // Status
-    let status = if game.ai_thinking {
-        Span::styled("AI thinking...", Style::default().fg(Color::Yellow))
-    } else if game.forfeit_pending {
-        Span::styled("Forfeit game?", Style::default().fg(Color::LightRed))
-    } else if game.current_player == Player::Human {
-        Span::styled("Your turn", Style::default().fg(Color::Green))
-    } else {
-        Span::styled("", Style::default())
-    };
-    lines.push(Line::from(status));
-    lines.push(Line::from(""));
-
-    // Controls
-    if game.forfeit_pending {
-        lines.push(Line::from(Span::styled(
-            "[Esc] Confirm forfeit",
-            Style::default().fg(Color::DarkGray),
-        )));
-        lines.push(Line::from(Span::styled(
-            "[Any] Cancel",
-            Style::default().fg(Color::DarkGray),
-        )));
-    } else {
-        lines.push(Line::from(Span::styled(
-            "[Arrows] Move",
-            Style::default().fg(Color::DarkGray),
-        )));
-        lines.push(Line::from(Span::styled(
-            "[Enter] Place",
-            Style::default().fg(Color::DarkGray),
-        )));
-        lines.push(Line::from(Span::styled(
-            "[Esc] Forfeit",
-            Style::default().fg(Color::DarkGray),
-        )));
-    }
 
     let text = Paragraph::new(lines);
     frame.render_widget(text, inner);

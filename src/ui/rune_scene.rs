@@ -1,5 +1,6 @@
 //! Rune Deciphering game UI rendering.
 
+use super::game_common::render_status_bar;
 use crate::rune::{FeedbackMark, RuneGame, RuneResult, RUNE_SYMBOLS};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -26,7 +27,7 @@ pub fn render_rune(frame: &mut Frame, area: Rect, game: &RuneGame) {
         .split(h_chunks[0]);
 
     render_grid(frame, v_chunks[0], game);
-    render_status_bar(frame, v_chunks[1], game);
+    render_status_bar_content(frame, v_chunks[1], game);
     render_info_panel(frame, h_chunks[1], game);
 
     if game.game_result.is_some() {
@@ -142,62 +143,45 @@ fn render_grid(frame: &mut Frame, area: Rect, game: &RuneGame) {
 }
 
 /// Render the status bar below the grid (status + controls).
-fn render_status_bar(frame: &mut Frame, area: Rect, game: &RuneGame) {
-    if area.height < 2 {
+fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &RuneGame) {
+    if game.game_result.is_some() {
         return;
     }
 
-    // Line 1: Status message
-    let status = if game.game_result.is_some() {
-        Span::styled("", Style::default())
-    } else if let Some(ref msg) = game.reject_message {
-        Span::styled(msg.clone(), Style::default().fg(Color::LightRed))
-    } else if game.forfeit_pending {
-        Span::styled(
-            "Forfeit game? Press Esc again to confirm",
-            Style::default().fg(Color::LightRed),
-        )
-    } else if game.guesses.is_empty() {
-        Span::styled("Begin deciphering", Style::default().fg(Color::Yellow))
-    } else {
-        Span::styled("Deciphering...", Style::default().fg(Color::Green))
-    };
-    let status_line = Paragraph::new(Line::from(vec![Span::raw(" "), status]))
-        .alignment(Alignment::Left);
-    frame.render_widget(
-        status_line,
-        Rect::new(area.x, area.y, area.width, 1),
-    );
-
-    // Line 2: Controls
-    if game.game_result.is_none() {
-        let controls = if game.forfeit_pending {
-            vec![
-                Span::styled(" [Esc]", Style::default().fg(Color::White)),
-                Span::styled(" Confirm  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("[Any]", Style::default().fg(Color::White)),
-                Span::styled(" Cancel", Style::default().fg(Color::DarkGray)),
-            ]
-        } else {
-            vec![
-                Span::styled(" [\u{2190}\u{2192}]", Style::default().fg(Color::White)),
-                Span::styled(" Move  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("[\u{2191}\u{2193}]", Style::default().fg(Color::White)),
-                Span::styled(" Cycle  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("[Enter]", Style::default().fg(Color::White)),
-                Span::styled(" Go  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("[F]", Style::default().fg(Color::White)),
-                Span::styled(" Clear  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("[Esc]", Style::default().fg(Color::White)),
-                Span::styled(" Quit", Style::default().fg(Color::DarkGray)),
-            ]
-        };
-        let controls_line = Paragraph::new(Line::from(controls));
-        frame.render_widget(
-            controls_line,
-            Rect::new(area.x, area.y + 1, area.width, 1),
-        );
+    // Handle rejection message specially (shows error inline)
+    if let Some(ref msg) = game.reject_message {
+        let controls: &[(&str, &str)] = &[
+            ("[←→]", "Move"),
+            ("[↑↓]", "Cycle"),
+            ("[Enter]", "Go"),
+            ("[F]", "Clear"),
+            ("[Esc]", "Quit"),
+        ];
+        render_status_bar(frame, area, msg, Color::LightRed, controls);
+        return;
     }
+
+    let (status_text, status_color) = if game.forfeit_pending {
+        ("Forfeit game?", Color::LightRed)
+    } else if game.guesses.is_empty() {
+        ("Begin deciphering", Color::Yellow)
+    } else {
+        ("Deciphering...", Color::Green)
+    };
+
+    let controls: &[(&str, &str)] = if game.forfeit_pending {
+        &[("[Esc]", "Confirm"), ("[Any]", "Cancel")]
+    } else {
+        &[
+            ("[←→]", "Move"),
+            ("[↑↓]", "Cycle"),
+            ("[Enter]", "Go"),
+            ("[F]", "Clear"),
+            ("[Esc]", "Quit"),
+        ]
+    };
+
+    render_status_bar(frame, area, status_text, status_color, controls);
 }
 
 /// Render the info panel on the right side.

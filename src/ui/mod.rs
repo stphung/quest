@@ -11,6 +11,7 @@ pub mod debug_menu_scene;
 pub mod dungeon_map;
 mod enemy_sprites;
 pub mod fishing_scene;
+pub mod game_common;
 pub mod gomoku_scene;
 pub mod minesweeper_scene;
 pub mod morris_scene;
