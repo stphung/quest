@@ -161,21 +161,26 @@ pub fn submit_guess<R: Rng>(game: &mut RuneGame, rng: &mut R) -> bool {
     true
 }
 
-/// Apply game result: grant rewards on win (XP, prestige, fishing ranks).
-/// Returns (result, xp_gained).
-pub fn apply_game_result(
-    state: &mut crate::core::game_state::GameState,
-) -> Option<(RuneResult, u64)> {
+/// Apply game result: update stats, grant rewards, and add combat log entries.
+/// Returns true if a result was processed.
+pub fn apply_game_result(state: &mut crate::core::game_state::GameState) -> bool {
     use crate::challenges::menu::DifficultyInfo;
 
-    let game = state.active_rune.as_ref()?;
-    let result = game.game_result?;
+    let game = match state.active_rune.as_ref() {
+        Some(g) => g,
+        None => return false,
+    };
+    let result = match game.game_result {
+        Some(r) => r,
+        None => return false,
+    };
     let reward = game.difficulty.reward();
+    let old_prestige = state.prestige_rank;
 
-    let xp_gained = match result {
+    match result {
         RuneResult::Win => {
             // XP reward
-            let xp = if reward.xp_percent > 0 {
+            let xp_gained = if reward.xp_percent > 0 {
                 let xp_for_level =
                     crate::core::game_logic::xp_for_next_level(state.character_level.max(1));
                 let xp = (xp_for_level * reward.xp_percent as u64) / 100;
@@ -186,22 +191,62 @@ pub fn apply_game_result(
             };
 
             // Prestige reward
+            state.prestige_rank += reward.prestige_ranks;
+
+            // Fishing rank reward (capped at 30, preserves fish progress)
+            let fishing_rank_up = if reward.fishing_ranks > 0 && state.fishing.rank < 30 {
+                state.fishing.rank = (state.fishing.rank + reward.fishing_ranks).min(30);
+                true
+            } else {
+                false
+            };
+
+            // Combat log entries
+            state.combat_state.add_log_entry(
+                "\u{16B1} The runes glow with approval! Code deciphered.".to_string(),
+                false,
+                true,
+            );
             if reward.prestige_ranks > 0 {
-                state.prestige_rank += reward.prestige_ranks;
+                state.combat_state.add_log_entry(
+                    format!(
+                        "\u{16B1} +{} Prestige Ranks (P{} \u{2192} P{})",
+                        reward.prestige_ranks, old_prestige, state.prestige_rank
+                    ),
+                    false,
+                    true,
+                );
             }
-
-            // Fishing rank reward
-            if reward.fishing_ranks > 0 {
-                state.fishing.rank = state.fishing.rank.saturating_add(reward.fishing_ranks);
+            if fishing_rank_up {
+                state.combat_state.add_log_entry(
+                    format!(
+                        "\u{16B1} Fishing rank up! Now rank {}: {}",
+                        state.fishing.rank,
+                        state.fishing.rank_name()
+                    ),
+                    false,
+                    true,
+                );
             }
-
-            xp
+            if xp_gained > 0 {
+                state.combat_state.add_log_entry(
+                    format!("\u{16B1} +{} XP", xp_gained),
+                    false,
+                    true,
+                );
+            }
         }
-        RuneResult::Loss => 0,
-    };
+        RuneResult::Loss => {
+            state.combat_state.add_log_entry(
+                "\u{16B1} The tablet fades. The code remains a mystery.".to_string(),
+                false,
+                true,
+            );
+        }
+    }
 
     state.active_rune = None;
-    Some((result, xp_gained))
+    true
 }
 
 #[cfg(test)]
@@ -572,12 +617,9 @@ mod tests {
         game.game_result = Some(RuneResult::Win);
         state.active_rune = Some(game);
 
-        let result = apply_game_result(&mut state);
-        assert!(result.is_some());
-        let (rune_result, xp_gained) = result.unwrap();
-        assert_eq!(rune_result, RuneResult::Win);
-        assert!(xp_gained > 0); // Journeyman gives 75% XP
-        assert_eq!(state.character_xp, initial_xp + xp_gained);
+        let processed = apply_game_result(&mut state);
+        assert!(processed);
+        assert!(state.character_xp > initial_xp); // Journeyman gives 75% XP
         assert!(state.fishing.rank > initial_fishing); // Journeyman gives fishing ranks
         assert!(state.active_rune.is_none());
     }
@@ -595,11 +637,8 @@ mod tests {
         game.game_result = Some(RuneResult::Win);
         state.active_rune = Some(game);
 
-        let result = apply_game_result(&mut state);
-        assert!(result.is_some());
-        let (rune_result, xp_gained) = result.unwrap();
-        assert_eq!(rune_result, RuneResult::Win);
-        assert_eq!(xp_gained, 0); // Master gives no XP
+        let processed = apply_game_result(&mut state);
+        assert!(processed);
         assert!(state.prestige_rank > 5); // Master gives prestige
         assert!(state.fishing.rank > initial_fishing); // Master gives fishing ranks
         assert!(state.active_rune.is_none());
@@ -617,11 +656,8 @@ mod tests {
         game.game_result = Some(RuneResult::Loss);
         state.active_rune = Some(game);
 
-        let result = apply_game_result(&mut state);
-        assert!(result.is_some());
-        let (rune_result, xp_gained) = result.unwrap();
-        assert_eq!(rune_result, RuneResult::Loss);
-        assert_eq!(xp_gained, 0); // No reward for loss
+        let processed = apply_game_result(&mut state);
+        assert!(processed);
         assert_eq!(state.character_xp, initial_xp); // XP unchanged
         assert_eq!(state.prestige_rank, 5); // Prestige unchanged
         assert!(state.active_rune.is_none());
@@ -634,8 +670,8 @@ mod tests {
         let mut state = GameState::new("Test".to_string(), 0);
         state.active_rune = None;
 
-        let result = apply_game_result(&mut state);
-        assert!(result.is_none());
+        let processed = apply_game_result(&mut state);
+        assert!(!processed);
     }
 
     #[test]
@@ -647,8 +683,8 @@ mod tests {
         // game.game_result is None
         state.active_rune = Some(game);
 
-        let result = apply_game_result(&mut state);
-        assert!(result.is_none());
+        let processed = apply_game_result(&mut state);
+        assert!(!processed);
         // Game should still be active
         assert!(state.active_rune.is_some());
     }

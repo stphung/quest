@@ -275,22 +275,27 @@ pub fn handle_first_click<R: Rng>(game: &mut MinesweeperGame, row: usize, col: u
     reveal_cell(game, row, col);
 }
 
-/// Apply game result: grant rewards on win (XP, prestige).
-/// Returns (result, xp_gained).
-pub fn apply_game_result(
-    state: &mut crate::core::game_state::GameState,
-) -> Option<(super::super::MinesweeperResult, u64)> {
+/// Apply game result: update stats, grant rewards, and add combat log entries.
+/// Returns true if a result was processed.
+pub fn apply_game_result(state: &mut crate::core::game_state::GameState) -> bool {
     use super::super::MinesweeperResult;
     use crate::challenges::menu::DifficultyInfo;
 
-    let game = state.active_minesweeper.as_ref()?;
-    let result = game.game_result?;
+    let game = match state.active_minesweeper.as_ref() {
+        Some(g) => g,
+        None => return false,
+    };
+    let result = match game.game_result {
+        Some(r) => r,
+        None => return false,
+    };
     let reward = game.difficulty.reward();
+    let old_prestige = state.prestige_rank;
 
-    let xp_gained = match result {
+    match result {
         MinesweeperResult::Win => {
             // XP reward
-            let xp = if reward.xp_percent > 0 {
+            let xp_gained = if reward.xp_percent > 0 {
                 let xp_for_level =
                     crate::core::game_logic::xp_for_next_level(state.character_level.max(1));
                 let xp = (xp_for_level * reward.xp_percent as u64) / 100;
@@ -301,17 +306,43 @@ pub fn apply_game_result(
             };
 
             // Prestige reward
-            if reward.prestige_ranks > 0 {
-                state.prestige_rank += reward.prestige_ranks;
-            }
+            state.prestige_rank += reward.prestige_ranks;
 
-            xp
+            // Combat log entries
+            state.combat_state.add_log_entry(
+                "\u{26A0} All traps identified! The scout salutes you.".to_string(),
+                false,
+                true,
+            );
+            if reward.prestige_ranks > 0 {
+                state.combat_state.add_log_entry(
+                    format!(
+                        "\u{26A0} +{} Prestige Ranks (P{} \u{2192} P{})",
+                        reward.prestige_ranks, old_prestige, state.prestige_rank
+                    ),
+                    false,
+                    true,
+                );
+            }
+            if xp_gained > 0 {
+                state.combat_state.add_log_entry(
+                    format!("\u{26A0} +{} XP", xp_gained),
+                    false,
+                    true,
+                );
+            }
         }
-        MinesweeperResult::Loss => 0,
-    };
+        MinesweeperResult::Loss => {
+            state.combat_state.add_log_entry(
+                "\u{26A0} A trap detonates! The scout pulls you to safety.".to_string(),
+                false,
+                true,
+            );
+        }
+    }
 
     state.active_minesweeper = None;
-    Some((result, xp_gained))
+    true
 }
 
 #[cfg(test)]
@@ -797,12 +828,9 @@ mod tests {
         game.game_result = Some(MinesweeperResult::Win);
         state.active_minesweeper = Some(game);
 
-        let result = apply_game_result(&mut state);
-        assert!(result.is_some());
-        let (ms_result, xp_gained) = result.unwrap();
-        assert_eq!(ms_result, MinesweeperResult::Win);
-        assert!(xp_gained > 0); // Master gives XP
-        assert_eq!(state.character_xp, initial_xp + xp_gained);
+        let processed = apply_game_result(&mut state);
+        assert!(processed);
+        assert!(state.character_xp > initial_xp); // Master gives XP
         assert!(state.prestige_rank > 5); // Master gives prestige
         assert!(state.active_minesweeper.is_none());
     }
@@ -819,11 +847,8 @@ mod tests {
         game.game_result = Some(MinesweeperResult::Loss);
         state.active_minesweeper = Some(game);
 
-        let result = apply_game_result(&mut state);
-        assert!(result.is_some());
-        let (ms_result, xp_gained) = result.unwrap();
-        assert_eq!(ms_result, MinesweeperResult::Loss);
-        assert_eq!(xp_gained, 0); // No reward for loss
+        let processed = apply_game_result(&mut state);
+        assert!(processed);
         assert_eq!(state.character_xp, initial_xp); // XP unchanged
         assert_eq!(state.prestige_rank, 5); // Prestige unchanged
         assert!(state.active_minesweeper.is_none());
@@ -836,8 +861,8 @@ mod tests {
         let mut state = GameState::new("Test".to_string(), 0);
         state.active_minesweeper = None;
 
-        let result = apply_game_result(&mut state);
-        assert!(result.is_none());
+        let processed = apply_game_result(&mut state);
+        assert!(!processed);
     }
 
     #[test]
@@ -849,8 +874,8 @@ mod tests {
         // game.game_result is None
         state.active_minesweeper = Some(game);
 
-        let result = apply_game_result(&mut state);
-        assert!(result.is_none());
+        let processed = apply_game_result(&mut state);
+        assert!(!processed);
         // Game should still be active
         assert!(state.active_minesweeper.is_some());
     }
