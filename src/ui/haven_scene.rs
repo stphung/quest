@@ -251,9 +251,9 @@ fn render_room_detail(
         .constraints([
             Constraint::Length(3), // Description
             Constraint::Length(1), // Spacer
-            Constraint::Length(4), // Bonus info
+            Constraint::Length(5), // Bonus info (all 3 tiers)
             Constraint::Length(1), // Spacer
-            Constraint::Length(3), // Cost info
+            Constraint::Length(4), // Cost info
             Constraint::Min(0),    // Padding
         ])
         .split(inner);
@@ -264,33 +264,32 @@ fn render_room_detail(
         .wrap(Wrap { trim: true });
     frame.render_widget(desc, chunks[0]);
 
-    // Bonus info
-    let mut bonus_lines = vec![];
+    // Bonus info - show all 3 tiers
+    let mut bonus_lines = vec![Line::from(Span::styled(
+        "Bonuses:",
+        Style::default()
+            .fg(Color::White)
+            .add_modifier(Modifier::BOLD),
+    ))];
 
-    if tier > 0 {
-        bonus_lines.push(Line::from(vec![
-            Span::styled("Current: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(room.format_bonus(tier), Style::default().fg(Color::Green)),
-        ]));
-    }
+    for t in 1..=3 {
+        let is_current = t == tier;
+        let is_next = t == tier + 1 && tier < 3;
+        let style = if is_current {
+            Style::default().fg(Color::Green)
+        } else if is_next {
+            Style::default().fg(Color::Yellow)
+        } else {
+            Style::default().fg(Color::DarkGray)
+        };
 
-    if tier < 3 {
-        let next_tier = tier + 1;
+        let marker = if is_current { "▶ " } else { "  " };
+
         bonus_lines.push(Line::from(vec![
-            Span::styled(
-                format!("T{}: ", next_tier),
-                Style::default().fg(Color::DarkGray),
-            ),
-            Span::styled(
-                room.format_bonus(next_tier),
-                Style::default().fg(Color::Yellow),
-            ),
+            Span::styled(marker, style),
+            Span::styled(format!("T{}: ", t), Style::default().fg(Color::DarkGray)),
+            Span::styled(room.format_bonus(t), style),
         ]));
-    } else {
-        bonus_lines.push(Line::from(Span::styled(
-            "Max tier reached",
-            Style::default().fg(Color::Green),
-        )));
     }
 
     let bonus_para = Paragraph::new(bonus_lines);
@@ -324,18 +323,31 @@ fn render_room_detail(
             Line::from(vec![
                 Span::styled("Cost: ", Style::default().fg(Color::DarkGray)),
                 Span::styled(
-                    format!("{}P {}F", cost.prestige_ranks, cost.fishing_ranks),
+                    format!(
+                        "{} Prestige Ranks, {} Fishing Ranks",
+                        cost.prestige_ranks, cost.fishing_ranks
+                    ),
                     cost_style,
                 ),
             ]),
             Line::from(vec![
                 Span::styled("You have: ", Style::default().fg(Color::DarkGray)),
                 Span::styled(
-                    format!("{}P {}F", prestige_rank, fishing_rank),
+                    format!(
+                        "{} Prestige Ranks, {} Fishing Ranks",
+                        prestige_rank, fishing_rank
+                    ),
                     Style::default().fg(Color::White),
                 ),
             ]),
         ]);
+        frame.render_widget(cost_text, chunks[4]);
+    } else {
+        // Max tier reached
+        let cost_text = Paragraph::new(Line::from(Span::styled(
+            "✓ Max tier reached",
+            Style::default().fg(Color::Green),
+        )));
         frame.render_widget(cost_text, chunks[4]);
     }
 }
@@ -396,7 +408,7 @@ pub fn render_build_confirmation(
     fishing_rank: u32,
 ) {
     // Center the modal
-    let modal_width = 45;
+    let modal_width = 50;
     let modal_height = 9;
     let x = area.x + (area.width.saturating_sub(modal_width)) / 2;
     let y = area.y + (area.height.saturating_sub(modal_height)) / 2;
@@ -439,7 +451,10 @@ pub fn render_build_confirmation(
         Line::from(vec![
             Span::styled("Cost: ", Style::default().fg(Color::White)),
             Span::styled(
-                format!("{}P {}F", cost.prestige_ranks, cost.fishing_ranks),
+                format!(
+                    "{} Prestige Ranks, {} Fishing Ranks",
+                    cost.prestige_ranks, cost.fishing_ranks
+                ),
                 cost_style,
             ),
         ]),
