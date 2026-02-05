@@ -349,4 +349,45 @@ mod tests {
         assert_eq!(master.fishing_ranks, 2);
         assert_eq!(master.xp_percent, 0);
     }
+
+    #[test]
+    fn test_game_new_all_difficulties() {
+        for &diff in &RuneDifficulty::ALL {
+            let game = RuneGame::new(diff);
+            assert_eq!(game.current_guess.len(), game.num_slots);
+            assert!(game.current_guess.iter().all(|s| s.is_none()));
+            assert!(game.secret_code.is_empty());
+            assert!(game.guesses.is_empty());
+            assert!(game.game_result.is_none());
+            assert!(game.reject_message.is_none());
+        }
+    }
+
+    #[test]
+    fn test_cycle_rune_clears_reject_message() {
+        let mut game = RuneGame::new(RuneDifficulty::Novice);
+        game.reject_message = Some("test".to_string());
+
+        game.cycle_rune_up();
+        assert!(game.reject_message.is_none());
+
+        game.reject_message = Some("test".to_string());
+        game.cycle_rune_down();
+        assert!(game.reject_message.is_none());
+    }
+
+    #[test]
+    fn test_cycle_rune_wraps_all_difficulties() {
+        for &diff in &RuneDifficulty::ALL {
+            let mut game = RuneGame::new(diff);
+            // Cycle up through all runes and verify wrap
+            for i in 0..game.num_runes {
+                game.cycle_rune_up();
+                assert_eq!(game.current_guess[0], Some(i));
+            }
+            // Should wrap back to 0
+            game.cycle_rune_up();
+            assert_eq!(game.current_guess[0], Some(0));
+        }
+    }
 }
