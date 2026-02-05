@@ -11,6 +11,7 @@ pub mod combat;
 pub mod core;
 pub mod dungeon;
 pub mod fishing;
+pub mod haven;
 pub mod items;
 pub mod utils;
 pub mod zones;
@@ -20,13 +21,14 @@ mod ui;
 
 // Re-export commonly used types at crate root for convenience
 pub use challenges::{
-    ChessDifficulty, ChessGame, ChessResult, GomokuDifficulty, GomokuGame, GomokuResult,
-    MinesweeperDifficulty, MinesweeperGame, MinesweeperResult, MorrisDifficulty, MorrisGame,
-    MorrisPhase, MorrisResult, RuneDifficulty, RuneGame, RuneResult,
+    ActiveMinigame, ChessDifficulty, ChessGame, ChessResult, GomokuDifficulty, GomokuGame,
+    GomokuResult, MinesweeperDifficulty, MinesweeperGame, MinesweeperResult, MorrisDifficulty,
+    MorrisGame, MorrisPhase, MorrisResult, RuneDifficulty, RuneGame, RuneResult,
 };
 pub use character::{Attributes, DerivedStats, PrestigeTier};
 pub use combat::{CombatState, Enemy};
 pub use core::{GameState, TICK_INTERVAL_MS};
 pub use dungeon::{Dungeon, Room, RoomType};
 pub use fishing::{FishRarity, FishingSession};
+pub use haven::{Haven, HavenBonusType, HavenBonuses, HavenRoomId};
 pub use items::{Equipment, EquipmentSlot, Item, Rarity};

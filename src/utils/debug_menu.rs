@@ -6,6 +6,7 @@ use crate::challenges::menu::{create_challenge, ChallengeType};
 use crate::core::game_state::GameState;
 use crate::dungeon::generation::generate_dungeon;
 use crate::fishing::generation::generate_fishing_session;
+use crate::haven::Haven;
 
 /// Menu options available in debug mode
 pub const DEBUG_OPTIONS: &[&str] = &[
@@ -16,6 +17,7 @@ pub const DEBUG_OPTIONS: &[&str] = &[
     "Trigger Gomoku Challenge",
     "Trigger Minesweeper Challenge",
     "Trigger Rune Challenge",
+    "Trigger Haven Discovery",
 ];
 
 /// Debug menu state
@@ -60,7 +62,7 @@ impl DebugMenu {
     }
 
     /// Trigger the selected debug action. Returns a message describing what happened.
-    pub fn trigger_selected(&mut self, state: &mut GameState) -> &'static str {
+    pub fn trigger_selected(&mut self, state: &mut GameState, haven: &mut Haven) -> &'static str {
         let msg = match self.selected_index {
             0 => trigger_dungeon(state),
             1 => trigger_fishing(state),
@@ -69,6 +71,7 @@ impl DebugMenu {
             4 => trigger_gomoku_challenge(state),
             5 => trigger_minesweeper_challenge(state),
             6 => trigger_rune_challenge(state),
+            7 => trigger_haven_discovery(haven),
             _ => "Unknown option",
         };
         self.close();
@@ -149,6 +152,14 @@ fn trigger_minesweeper_challenge(state: &mut GameState) -> &'static str {
     "Minesweeper challenge added!"
 }
 
+fn trigger_haven_discovery(haven: &mut Haven) -> &'static str {
+    if haven.discovered {
+        return "Haven already discovered!";
+    }
+    haven.discovered = true;
+    "Haven discovered!"
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -167,16 +178,18 @@ mod tests {
         menu.navigate_down();
         menu.navigate_down();
         menu.navigate_down();
-        assert_eq!(menu.selected_index, 6);
+        menu.navigate_down();
+        assert_eq!(menu.selected_index, 7);
 
         // Can't go past end
         menu.navigate_down();
-        assert_eq!(menu.selected_index, 6);
+        assert_eq!(menu.selected_index, 7);
 
         menu.navigate_up();
-        assert_eq!(menu.selected_index, 5);
+        assert_eq!(menu.selected_index, 6);
 
         // Can't go before start
+        menu.navigate_up();
         menu.navigate_up();
         menu.navigate_up();
         menu.navigate_up();
@@ -281,5 +294,19 @@ mod tests {
         // Can't add duplicate
         let msg = trigger_minesweeper_challenge(&mut state);
         assert_eq!(msg, "Minesweeper challenge already pending!");
+    }
+
+    #[test]
+    fn test_trigger_haven_discovery() {
+        let mut haven = Haven::new();
+        assert!(!haven.discovered);
+
+        let msg = trigger_haven_discovery(&mut haven);
+        assert_eq!(msg, "Haven discovered!");
+        assert!(haven.discovered);
+
+        // Can't discover again
+        let msg = trigger_haven_discovery(&mut haven);
+        assert_eq!(msg, "Haven already discovered!");
     }
 }

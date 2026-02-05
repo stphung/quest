@@ -262,11 +262,7 @@ impl SaveManager {
             zone_progression: crate::zones::ZoneProgression::default(),
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: crate::challenges::chess::ChessStats::default(),
-            active_chess: None,
-            active_morris: None,
-            active_gomoku: None,
-            active_minesweeper: None,
-            active_rune: None,
+            active_minigame: None,
         }
     }
 }

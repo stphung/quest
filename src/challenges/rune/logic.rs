@@ -3,6 +3,7 @@
 //! Handles secret code generation, feedback calculation, and guess submission.
 
 use super::{FeedbackMark, RuneGame, RuneGuess, RuneResult};
+use crate::challenges::ActiveMinigame;
 use rand::Rng;
 
 /// Input actions for the Rune game (UI-agnostic).
@@ -166,9 +167,9 @@ pub fn submit_guess<R: Rng>(game: &mut RuneGame, rng: &mut R) -> bool {
 pub fn apply_game_result(state: &mut crate::core::game_state::GameState) -> bool {
     use crate::challenges::menu::DifficultyInfo;
 
-    let game = match state.active_rune.as_ref() {
-        Some(g) => g,
-        None => return false,
+    let game = match state.active_minigame.as_ref() {
+        Some(ActiveMinigame::Rune(g)) => g,
+        _ => return false,
     };
     let result = match game.game_result {
         Some(r) => r,
@@ -245,7 +246,7 @@ pub fn apply_game_result(state: &mut crate::core::game_state::GameState) -> bool
         }
     }
 
-    state.active_rune = None;
+    state.active_minigame = None;
     true
 }
 
@@ -615,13 +616,13 @@ mod tests {
         // Journeyman gives XP and fishing ranks
         let mut game = RuneGame::new(super::super::RuneDifficulty::Journeyman);
         game.game_result = Some(RuneResult::Win);
-        state.active_rune = Some(game);
+        state.active_minigame = Some(ActiveMinigame::Rune(game));
 
         let processed = apply_game_result(&mut state);
         assert!(processed);
         assert!(state.character_xp > initial_xp); // Journeyman gives 75% XP
         assert!(state.fishing.rank > initial_fishing); // Journeyman gives fishing ranks
-        assert!(state.active_rune.is_none());
+        assert!(state.active_minigame.is_none());
     }
 
     #[test]
@@ -635,13 +636,13 @@ mod tests {
         // Master gives prestige and fishing ranks (no XP)
         let mut game = RuneGame::new(super::super::RuneDifficulty::Master);
         game.game_result = Some(RuneResult::Win);
-        state.active_rune = Some(game);
+        state.active_minigame = Some(ActiveMinigame::Rune(game));
 
         let processed = apply_game_result(&mut state);
         assert!(processed);
         assert!(state.prestige_rank > 5); // Master gives prestige
         assert!(state.fishing.rank > initial_fishing); // Master gives fishing ranks
-        assert!(state.active_rune.is_none());
+        assert!(state.active_minigame.is_none());
     }
 
     #[test]
@@ -654,13 +655,13 @@ mod tests {
 
         let mut game = RuneGame::new(super::super::RuneDifficulty::Novice);
         game.game_result = Some(RuneResult::Loss);
-        state.active_rune = Some(game);
+        state.active_minigame = Some(ActiveMinigame::Rune(game));
 
         let processed = apply_game_result(&mut state);
         assert!(processed);
         assert_eq!(state.character_xp, initial_xp); // XP unchanged
         assert_eq!(state.prestige_rank, 5); // Prestige unchanged
-        assert!(state.active_rune.is_none());
+        assert!(state.active_minigame.is_none());
     }
 
     #[test]
@@ -668,7 +669,7 @@ mod tests {
         use crate::core::game_state::GameState;
 
         let mut state = GameState::new("Test".to_string(), 0);
-        state.active_rune = None;
+        state.active_minigame = None;
 
         let processed = apply_game_result(&mut state);
         assert!(!processed);
@@ -681,12 +682,15 @@ mod tests {
         let mut state = GameState::new("Test".to_string(), 0);
         let game = RuneGame::new(super::super::RuneDifficulty::Novice);
         // game.game_result is None
-        state.active_rune = Some(game);
+        state.active_minigame = Some(ActiveMinigame::Rune(game));
 
         let processed = apply_game_result(&mut state);
         assert!(!processed);
         // Game should still be active
-        assert!(state.active_rune.is_some());
+        assert!(matches!(
+            state.active_minigame,
+            Some(ActiveMinigame::Rune(_))
+        ));
     }
 
     #[test]

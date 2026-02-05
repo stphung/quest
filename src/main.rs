@@ -4,37 +4,24 @@ mod combat;
 mod core;
 mod dungeon;
 mod fishing;
+mod haven;
+mod input;
 mod items;
 mod ui;
 mod utils;
 mod zones;
 
-use challenges::chess::logic::{
-    apply_game_result, process_ai_thinking, process_input as process_chess_input, ChessInput,
-};
-use challenges::gomoku::logic::{
-    apply_game_result as apply_gomoku_result, process_ai_thinking as process_gomoku_ai,
-    process_input as process_gomoku_input, GomokuInput,
-};
-use challenges::menu::{process_input as process_menu_input, try_discover_challenge, MenuInput};
-use challenges::minesweeper::logic::{
-    apply_game_result as apply_minesweeper_result, process_input as process_minesweeper_input,
-    MinesweeperInput,
-};
-use challenges::morris::logic::{
-    apply_game_result as apply_morris_result, process_ai_thinking as process_morris_ai,
-    process_input as process_morris_input, MorrisInput,
-};
-use challenges::rune::logic::{
-    apply_game_result as apply_rune_result, process_input as process_rune_input, RuneInput,
-};
+use challenges::chess::logic::process_ai_thinking;
+use challenges::gomoku::logic::process_ai_thinking as process_gomoku_ai;
+use challenges::menu::try_discover_challenge_with_haven;
+use challenges::morris::logic::process_ai_thinking as process_morris_ai;
+use challenges::ActiveMinigame;
 use character::input::{
     process_creation_input, process_delete_input, process_rename_input, process_select_input,
     CreationInput, CreationResult, DeleteInput, DeleteResult, RenameInput, RenameResult,
     SelectInput, SelectResult,
 };
 use character::manager::CharacterManager;
-use character::prestige::*;
 use character::save::SaveManager;
 use chrono::{Local, Utc};
 use core::constants::*;
@@ -45,6 +32,7 @@ use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
 use crossterm::ExecutableCommand;
+use input::{GameOverlay, HavenUiState, InputResult};
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 use std::time::{Duration, Instant};
@@ -109,6 +97,9 @@ fn main() -> io::Result<()> {
     // Initialize CharacterManager
     let character_manager = CharacterManager::new()?;
 
+    // Load account-level Haven state
+    let mut haven = haven::load_haven();
+
     // Check for old save file to migrate
     let old_save_manager = SaveManager::new()?;
     if old_save_manager.save_exists() {
@@ -144,6 +135,8 @@ fn main() -> io::Result<()> {
     let mut delete_screen = CharacterDeleteScreen::new();
     let mut rename_screen = CharacterRenameScreen::new();
     let mut game_state: Option<GameState> = None;
+
+    let mut haven_ui = HavenUiState::new();
 
     // Setup terminal
     enable_raw_mode()?;
@@ -253,15 +246,69 @@ fn main() -> io::Result<()> {
                 // Refresh character list
                 let characters = character_manager.list_characters()?;
 
-                // Draw character select screen
+                // Draw character select screen (includes Haven tree visualization)
                 terminal.draw(|f| {
                     let area = f.size();
-                    select_screen.draw(f, area, &characters);
+                    select_screen.draw(f, area, &characters, &haven);
+                    // Draw Haven management overlay if open
+                    if haven_ui.showing {
+                        ui::haven_scene::render_haven_tree(
+                            f,
+                            area,
+                            &haven,
+                            haven_ui.selected_room,
+                            0, // No character selected, so prestige rank = 0
+                        );
+                    }
                 })?;
 
                 // Handle input
                 if event::poll(Duration::from_millis(50))? {
                     if let Event::Key(key_event) = event::read()? {
+                        // Handle Haven screen (blocks other input when open)
+                        if haven_ui.showing {
+                            if haven_ui.confirming_build {
+                                match key_event.code {
+                                    KeyCode::Enter => {
+                                        // Note: Can't build from character select (no active character)
+                                        // Just close the confirmation
+                                        haven_ui.confirming_build = false;
+                                    }
+                                    KeyCode::Esc => {
+                                        haven_ui.confirming_build = false;
+                                    }
+                                    _ => {}
+                                }
+                            } else {
+                                match key_event.code {
+                                    KeyCode::Up => {
+                                        haven_ui.selected_room =
+                                            haven_ui.selected_room.saturating_sub(1);
+                                    }
+                                    KeyCode::Down => {
+                                        if haven_ui.selected_room + 1
+                                            < haven::HavenRoomId::ALL.len()
+                                        {
+                                            haven_ui.selected_room += 1;
+                                        }
+                                    }
+                                    KeyCode::Esc => {
+                                        haven_ui.close();
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            continue;
+                        }
+
+                        // Handle Haven shortcut (if discovered)
+                        if matches!(key_event.code, KeyCode::Char('h') | KeyCode::Char('H'))
+                            && haven.discovered
+                        {
+                            haven_ui.open();
+                            continue;
+                        }
+
                         let input = match key_event.code {
                             KeyCode::Up => SelectInput::Up,
                             KeyCode::Down => SelectInput::Down,
@@ -301,7 +348,8 @@ fn main() -> io::Result<()> {
                                         let elapsed_seconds = current_time - state.last_save_time;
 
                                         if elapsed_seconds > 60 {
-                                            let report = process_offline_progression(&mut state);
+                                            let haven_offline_bonus = haven.get_bonus(haven::HavenBonusType::OfflineXpPercent);
+                                            let report = process_offline_progression(&mut state, haven_offline_bonus);
                                             // Always show offline progress in combat log
                                             if report.xp_gained > 0 {
                                                 let message = if report.total_level_ups > 0 {
@@ -451,7 +499,7 @@ fn main() -> io::Result<()> {
                 let mut last_autosave = Instant::now();
                 let mut last_update_check = Instant::now();
                 let mut tick_counter: u32 = 0;
-                let mut showing_prestige_confirm = false;
+                let mut overlay = GameOverlay::None;
                 let mut debug_menu = utils::debug_menu::DebugMenu::new();
 
                 // Save indicator state (for non-debug mode)
@@ -485,10 +533,50 @@ fn main() -> io::Result<()> {
                             &state,
                             update_info.as_ref(),
                             update_check_completed,
+                            haven.discovered,
                         );
                         // Draw prestige confirmation overlay if active
-                        if showing_prestige_confirm {
+                        if matches!(overlay, GameOverlay::PrestigeConfirm) {
                             ui::prestige_confirm::draw_prestige_confirm(frame, &state);
+                        }
+                        // Draw Haven discovery modal if active
+                        if matches!(overlay, GameOverlay::HavenDiscovery) {
+                            ui::haven_scene::render_haven_discovery_modal(frame, frame.size());
+                        }
+                        // Draw Vault selection screen if active
+                        if let GameOverlay::VaultSelection {
+                            selected_index,
+                            ref selected_slots,
+                        } = overlay
+                        {
+                            ui::haven_scene::render_vault_selection(
+                                frame,
+                                frame.size(),
+                                &state,
+                                haven.vault_tier(),
+                                selected_index,
+                                selected_slots,
+                            );
+                        }
+                        // Draw Haven screen if active
+                        if haven_ui.showing {
+                            ui::haven_scene::render_haven_tree(
+                                frame,
+                                frame.size(),
+                                &haven,
+                                haven_ui.selected_room,
+                                state.prestige_rank,
+                            );
+                            if haven_ui.confirming_build {
+                                let room = haven::HavenRoomId::ALL[haven_ui.selected_room];
+                                ui::haven_scene::render_build_confirmation(
+                                    frame,
+                                    frame.size(),
+                                    room,
+                                    &haven,
+                                    state.prestige_rank,
+                                );
+                            }
                         }
                         // Draw debug indicator and menu if in debug mode, otherwise save indicator
                         if debug_mode {
@@ -517,200 +605,18 @@ fn main() -> io::Result<()> {
                     // Poll for input (50ms non-blocking)
                     if event::poll(Duration::from_millis(50))? {
                         if let Event::Key(key_event) = event::read()? {
-                            // Handle prestige confirmation dialog
-                            if showing_prestige_confirm {
-                                match key_event.code {
-                                    KeyCode::Char('y') | KeyCode::Char('Y') => {
-                                        perform_prestige(&mut state);
-                                        showing_prestige_confirm = false;
-                                        // Save immediately after prestige to prevent stale enemy on reload
-                                        if !debug_mode {
-                                            let _ = character_manager.save_character(&state);
-                                            last_save_instant = Some(Instant::now());
-                                            last_save_time = Some(Local::now());
-                                        }
-                                        state.combat_state.add_log_entry(
-                                            format!(
-                                                "Prestiged to {}!",
-                                                get_prestige_tier(state.prestige_rank).name
-                                            ),
-                                            false,
-                                            true,
-                                        );
-                                    }
-                                    KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
-                                        showing_prestige_confirm = false;
-                                    }
-                                    _ => {}
-                                }
-                                continue;
-                            }
-
-                            // Handle debug menu (if debug mode enabled)
-                            if debug_mode {
-                                // Backtick toggles debug menu
-                                if key_event.code == KeyCode::Char('`') {
-                                    debug_menu.toggle();
-                                    continue;
-                                }
-
-                                // Handle debug menu navigation when open
-                                if debug_menu.is_open {
-                                    match key_event.code {
-                                        KeyCode::Up => debug_menu.navigate_up(),
-                                        KeyCode::Down => debug_menu.navigate_down(),
-                                        KeyCode::Enter => {
-                                            let msg = debug_menu.trigger_selected(&mut state);
-                                            state.combat_state.add_log_entry(
-                                                format!("[DEBUG] {}", msg),
-                                                false,
-                                                true,
-                                            );
-                                        }
-                                        KeyCode::Esc => debug_menu.close(),
-                                        _ => {}
-                                    }
-                                    continue;
-                                }
-                            }
-
-                            // Handle active rune game input
-                            if let Some(ref mut rune_game) = state.active_rune {
-                                if rune_game.game_result.is_some() {
-                                    // Any key dismisses result and applies rewards
-                                    apply_rune_result(&mut state);
-                                    continue;
-                                }
-
-                                let input = match key_event.code {
-                                    KeyCode::Left => RuneInput::Left,
-                                    KeyCode::Right => RuneInput::Right,
-                                    KeyCode::Up => RuneInput::Up,
-                                    KeyCode::Down => RuneInput::Down,
-                                    KeyCode::Enter => RuneInput::Submit,
-                                    KeyCode::Char('f') | KeyCode::Char('F') => {
-                                        RuneInput::ClearGuess
-                                    }
-                                    KeyCode::Esc => RuneInput::Forfeit,
-                                    _ => RuneInput::Other,
-                                };
-                                let mut rng = rand::thread_rng();
-                                process_rune_input(rune_game, input, &mut rng);
-                                continue;
-                            }
-
-                            // Handle active minesweeper game input
-                            if let Some(ref mut minesweeper_game) = state.active_minesweeper {
-                                if minesweeper_game.game_result.is_some() {
-                                    // Any key dismisses result and applies rewards
-                                    apply_minesweeper_result(&mut state);
-                                    continue;
-                                }
-
-                                let input = match key_event.code {
-                                    KeyCode::Up => MinesweeperInput::Up,
-                                    KeyCode::Down => MinesweeperInput::Down,
-                                    KeyCode::Left => MinesweeperInput::Left,
-                                    KeyCode::Right => MinesweeperInput::Right,
-                                    KeyCode::Enter => MinesweeperInput::Reveal,
-                                    KeyCode::Char('f') | KeyCode::Char('F') => {
-                                        MinesweeperInput::ToggleFlag
-                                    }
-                                    KeyCode::Esc => MinesweeperInput::Forfeit,
-                                    _ => MinesweeperInput::Other,
-                                };
-                                let mut rng = rand::thread_rng();
-                                process_minesweeper_input(minesweeper_game, input, &mut rng);
-                                continue;
-                            }
-
-                            // Handle active Gomoku game input
-                            if let Some(ref mut gomoku_game) = state.active_gomoku {
-                                if gomoku_game.game_result.is_some() {
-                                    // Any key dismisses result and applies rewards
-                                    apply_gomoku_result(&mut state);
-                                    continue;
-                                }
-
-                                let input = match key_event.code {
-                                    KeyCode::Up => GomokuInput::Up,
-                                    KeyCode::Down => GomokuInput::Down,
-                                    KeyCode::Left => GomokuInput::Left,
-                                    KeyCode::Right => GomokuInput::Right,
-                                    KeyCode::Enter => GomokuInput::PlaceStone,
-                                    KeyCode::Esc => GomokuInput::Forfeit,
-                                    _ => GomokuInput::Other,
-                                };
-                                process_gomoku_input(gomoku_game, input);
-                                continue;
-                            }
-
-                            // Handle active chess game input (highest priority)
-                            if let Some(ref mut chess_game) = state.active_chess {
-                                if chess_game.game_result.is_some() {
-                                    // Any key dismisses result and applies rewards
-                                    apply_game_result(&mut state);
-                                    continue;
-                                }
-                                let input = match key_event.code {
-                                    KeyCode::Up => ChessInput::Up,
-                                    KeyCode::Down => ChessInput::Down,
-                                    KeyCode::Left => ChessInput::Left,
-                                    KeyCode::Right => ChessInput::Right,
-                                    KeyCode::Enter => ChessInput::Select,
-                                    KeyCode::Esc => ChessInput::Cancel,
-                                    _ => ChessInput::Other,
-                                };
-                                process_chess_input(chess_game, input);
-                                continue;
-                            }
-
-                            // Handle active Morris game input
-                            if let Some(ref mut morris_game) = state.active_morris {
-                                if morris_game.game_result.is_some() {
-                                    // Any key dismisses result and applies rewards
-                                    apply_morris_result(&mut state);
-                                    continue;
-                                }
-                                let input = match key_event.code {
-                                    KeyCode::Up => MorrisInput::Up,
-                                    KeyCode::Down => MorrisInput::Down,
-                                    KeyCode::Left => MorrisInput::Left,
-                                    KeyCode::Right => MorrisInput::Right,
-                                    KeyCode::Enter => MorrisInput::Select,
-                                    KeyCode::Esc => MorrisInput::Cancel,
-                                    _ => MorrisInput::Other,
-                                };
-                                process_morris_input(morris_game, input);
-                                continue;
-                            }
-
-                            // Handle challenge menu input
-                            if state.challenge_menu.is_open {
-                                let input = match key_event.code {
-                                    KeyCode::Up => MenuInput::Up,
-                                    KeyCode::Down => MenuInput::Down,
-                                    KeyCode::Enter => MenuInput::Select,
-                                    KeyCode::Char('d') | KeyCode::Char('D') => MenuInput::Decline,
-                                    KeyCode::Esc | KeyCode::Tab => MenuInput::Cancel,
-                                    _ => MenuInput::Other,
-                                };
-                                process_menu_input(&mut state, input);
-                                continue;
-                            }
-
-                            // Tab to open challenge menu
-                            if key_event.code == KeyCode::Tab
-                                && !state.challenge_menu.challenges.is_empty()
-                            {
-                                state.challenge_menu.open();
-                                continue;
-                            }
-
-                            match key_event.code {
-                                // Handle 'q'/'Q' to quit
-                                KeyCode::Char('q') | KeyCode::Char('Q') => {
-                                    // Save character before returning to select (skip in debug mode)
+                            let result = input::handle_game_input(
+                                key_event,
+                                &mut state,
+                                &mut haven,
+                                &mut haven_ui,
+                                &mut overlay,
+                                &mut debug_menu,
+                                debug_mode,
+                            );
+                            match result {
+                                InputResult::Continue => {}
+                                InputResult::QuitToSelect => {
                                     if !debug_mode {
                                         character_manager.save_character(&state)?;
                                     }
@@ -718,21 +624,46 @@ fn main() -> io::Result<()> {
                                     current_screen = Screen::CharacterSelect;
                                     break;
                                 }
-                                // Handle 'p'/'P' to show prestige confirmation
-                                KeyCode::Char('p') | KeyCode::Char('P') => {
-                                    if can_prestige(&state) {
-                                        showing_prestige_confirm = true;
+                                InputResult::NeedsSave => {
+                                    if !debug_mode {
+                                        let _ = character_manager.save_character(&state);
+                                        last_save_instant = Some(Instant::now());
+                                        last_save_time = Some(Local::now());
                                     }
                                 }
-                                _ => {}
+                                InputResult::NeedsSaveAll => {
+                                    if !debug_mode {
+                                        let _ = character_manager.save_character(&state);
+                                        haven::save_haven(&haven).ok();
+                                        last_save_instant = Some(Instant::now());
+                                        last_save_time = Some(Local::now());
+                                    }
+                                }
                             }
                         }
                     }
 
                     // Game tick every 100ms
                     if last_tick.elapsed() >= Duration::from_millis(TICK_INTERVAL_MS) {
-                        game_tick(&mut state, &mut tick_counter);
+                        game_tick(&mut state, &mut tick_counter, &haven);
                         last_tick = Instant::now();
+
+                        // Haven discovery check (independent roll, once per tick)
+                        if !haven.discovered
+                            && state.prestige_rank >= 10
+                            && state.active_dungeon.is_none()
+                            && state.active_fishing.is_none()
+                            && state.active_minigame.is_none()
+                        {
+                            let mut rng = rand::thread_rng();
+                            if haven::try_discover_haven(&mut haven, state.prestige_rank, &mut rng)
+                            {
+                                if !debug_mode {
+                                    haven::save_haven(&haven).ok();
+                                }
+                                overlay = GameOverlay::HavenDiscovery;
+                            }
+                        }
                     }
 
                     // Auto-save every 30 seconds (skip in debug mode)
@@ -740,6 +671,7 @@ fn main() -> io::Result<()> {
                         && last_autosave.elapsed() >= Duration::from_secs(AUTOSAVE_INTERVAL_SECONDS)
                     {
                         character_manager.save_character(&state)?;
+                        haven::save_haven(&haven)?;
                         last_autosave = Instant::now();
                         last_save_instant = Some(Instant::now());
                         last_save_time = Some(Local::now());
@@ -772,38 +704,38 @@ fn main() -> io::Result<()> {
 }
 
 /// Processes a single game tick, updating combat and stats
-fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
+fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::Haven) {
     use combat::logic::update_combat;
     use dungeon::logic::{
         on_boss_defeated, on_elite_defeated, on_treasure_room_entered, update_dungeon,
     };
-    use fishing::logic::tick_fishing;
 
     // Each tick is 100ms = 0.1 seconds
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
 
     // Process chess AI thinking
-    if let Some(ref mut chess_game) = game_state.active_chess {
-        let mut rng = rand::thread_rng();
-        process_ai_thinking(chess_game, &mut rng);
-    }
-
-    // Process Morris AI thinking
-    if let Some(ref mut morris_game) = game_state.active_morris {
-        let mut rng = rand::thread_rng();
-        process_morris_ai(morris_game, &mut rng);
-    }
-
-    // Process Gomoku AI thinking
-    if let Some(ref mut gomoku_game) = game_state.active_gomoku {
-        let mut rng = rand::thread_rng();
-        process_gomoku_ai(gomoku_game, &mut rng);
+    // Process AI thinking for active minigame
+    match &mut game_state.active_minigame {
+        Some(ActiveMinigame::Chess(chess_game)) => {
+            let mut rng = rand::thread_rng();
+            process_ai_thinking(chess_game, &mut rng);
+        }
+        Some(ActiveMinigame::Morris(morris_game)) => {
+            let mut rng = rand::thread_rng();
+            process_morris_ai(morris_game, &mut rng);
+        }
+        Some(ActiveMinigame::Gomoku(gomoku_game)) => {
+            let mut rng = rand::thread_rng();
+            process_gomoku_ai(gomoku_game, &mut rng);
+        }
+        _ => {}
     }
 
     // Try challenge discovery (single roll, weighted table picks which type)
     {
         let mut rng = rand::thread_rng();
-        if let Some(challenge_type) = try_discover_challenge(game_state, &mut rng) {
+        let haven_discovery = haven.get_bonus(haven::HavenBonusType::ChallengeDiscoveryPercent);
+        if let Some(challenge_type) = try_discover_challenge_with_haven(game_state, &mut rng, haven_discovery) {
             let icon = challenge_type.icon();
             let flavor = challenge_type.discovery_flavor();
             game_state
@@ -886,7 +818,11 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
     // Update fishing if active (mutually exclusive with combat)
     if game_state.active_fishing.is_some() {
         let mut rng = rand::thread_rng();
-        let fishing_messages = tick_fishing(game_state, &mut rng);
+        let haven_fishing = fishing::logic::HavenFishingBonuses {
+            timer_reduction_percent: haven.get_bonus(haven::HavenBonusType::FishingTimerReduction),
+            double_fish_chance_percent: haven.get_bonus(haven::HavenBonusType::DoubleFishChance),
+        };
+        let fishing_messages = fishing::logic::tick_fishing_with_haven(game_state, &mut rng, &haven_fishing);
         for message in fishing_messages {
             game_state
                 .combat_state
@@ -911,8 +847,16 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
         return; // Skip combat processing while fishing
     }
 
-    // Update combat state
-    let combat_events = update_combat(game_state, delta_time);
+    // Build Haven combat bonuses
+    let haven_combat = combat::logic::HavenCombatBonuses {
+        hp_regen_percent: haven.get_bonus(haven::HavenBonusType::HpRegenPercent),
+        hp_regen_delay_reduction: haven.get_bonus(haven::HavenBonusType::HpRegenDelayReduction),
+        damage_percent: haven.get_bonus(haven::HavenBonusType::DamagePercent),
+        crit_chance_percent: haven.get_bonus(haven::HavenBonusType::CritChancePercent),
+        double_strike_chance: haven.get_bonus(haven::HavenBonusType::DoubleStrikeChance),
+        xp_gain_percent: haven.get_bonus(haven::HavenBonusType::XpGainPercent),
+    };
+    let combat_events = update_combat(game_state, delta_time, &haven_combat);
 
     // Process combat events
     for event in combat_events {
@@ -980,10 +924,12 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
                 }
 
                 // Try to drop item
-                use items::drops::try_drop_item;
+                use items::drops::try_drop_item_with_haven;
                 use items::scoring::auto_equip_if_better;
 
-                if let Some(item) = try_drop_item(game_state) {
+                let haven_drop_rate = haven.get_bonus(haven::HavenBonusType::DropRatePercent);
+                let haven_rarity = haven.get_bonus(haven::HavenBonusType::ItemRarityPercent);
+                if let Some(item) = try_drop_item_with_haven(game_state, haven_drop_rate, haven_rarity) {
                     let item_name = item.display_name.clone();
                     let rarity = item.rarity;
                     let equipped = auto_equip_if_better(item, game_state);

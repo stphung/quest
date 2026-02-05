@@ -13,6 +13,7 @@ mod enemy_sprites;
 pub mod fishing_scene;
 pub mod game_common;
 pub mod gomoku_scene;
+pub mod haven_scene;
 pub mod minesweeper_scene;
 pub mod morris_scene;
 pub mod prestige_confirm;
@@ -20,6 +21,7 @@ pub mod rune_scene;
 mod stats_panel;
 mod throbber;
 
+use crate::challenges::ActiveMinigame;
 use crate::core::game_state::GameState;
 use crate::utils::updater::UpdateInfo;
 use ratatui::{
@@ -36,17 +38,14 @@ pub fn draw_ui_with_update(
     game_state: &GameState,
     update_info: Option<&UpdateInfo>,
     update_check_completed: bool,
+    haven_discovered: bool,
 ) {
     let size = frame.size();
 
     // Check if we should show the challenge notification banner
     let show_challenge_banner = !game_state.challenge_menu.challenges.is_empty()
         && !game_state.challenge_menu.is_open
-        && game_state.active_chess.is_none()
-        && game_state.active_morris.is_none()
-        && game_state.active_gomoku.is_none()
-        && game_state.active_minesweeper.is_none()
-        && game_state.active_rune.is_none();
+        && game_state.active_minigame.is_none();
 
     // Split vertically: optional banner at top, main content below
     let main_area = if show_challenge_banner {
@@ -80,28 +79,42 @@ pub fn draw_ui_with_update(
         game_state,
         update_info,
         update_check_completed,
+        haven_discovered,
     );
 
     // Draw right panel based on current activity
-    // Priority: minesweeper > gomoku > morris > chess > challenge menu > fishing > dungeon > combat
-    if let Some(ref game) = game_state.active_rune {
-        rune_scene::render_rune(frame, chunks[1], game);
-    } else if let Some(ref game) = game_state.active_minesweeper {
-        minesweeper_scene::render_minesweeper(frame, chunks[1], game);
-    } else if let Some(ref game) = game_state.active_gomoku {
-        gomoku_scene::render_gomoku_scene(frame, chunks[1], game);
-    } else if let Some(ref game) = game_state.active_morris {
-        morris_scene::render_morris_scene(frame, chunks[1], game, game_state.character_level);
-    } else if let Some(ref game) = game_state.active_chess {
-        chess_scene::render_chess_scene(frame, chunks[1], game);
-    } else if game_state.challenge_menu.is_open {
-        challenge_menu_scene::render_challenge_menu(frame, chunks[1], &game_state.challenge_menu);
-    } else if let Some(ref session) = game_state.active_fishing {
-        fishing_scene::render_fishing_scene(frame, chunks[1], session, &game_state.fishing);
-    } else if let Some(dungeon) = &game_state.active_dungeon {
-        draw_dungeon_view(frame, chunks[1], game_state, dungeon);
-    } else {
-        combat_scene::draw_combat_scene(frame, chunks[1], game_state);
+    // Priority: minigame > challenge menu > fishing > dungeon > combat
+    match &game_state.active_minigame {
+        Some(ActiveMinigame::Rune(game)) => {
+            rune_scene::render_rune(frame, chunks[1], game);
+        }
+        Some(ActiveMinigame::Minesweeper(game)) => {
+            minesweeper_scene::render_minesweeper(frame, chunks[1], game);
+        }
+        Some(ActiveMinigame::Gomoku(game)) => {
+            gomoku_scene::render_gomoku_scene(frame, chunks[1], game);
+        }
+        Some(ActiveMinigame::Morris(game)) => {
+            morris_scene::render_morris_scene(frame, chunks[1], game, game_state.character_level);
+        }
+        Some(ActiveMinigame::Chess(game)) => {
+            chess_scene::render_chess_scene(frame, chunks[1], game);
+        }
+        None => {
+            if game_state.challenge_menu.is_open {
+                challenge_menu_scene::render_challenge_menu(
+                    frame,
+                    chunks[1],
+                    &game_state.challenge_menu,
+                );
+            } else if let Some(ref session) = game_state.active_fishing {
+                fishing_scene::render_fishing_scene(frame, chunks[1], session, &game_state.fishing);
+            } else if let Some(dungeon) = &game_state.active_dungeon {
+                draw_dungeon_view(frame, chunks[1], game_state, dungeon);
+            } else {
+                combat_scene::draw_combat_scene(frame, chunks[1], game_state);
+            }
+        }
     }
 }
 

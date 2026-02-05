@@ -4,6 +4,7 @@ use rand::seq::SliceRandom;
 use rand::Rng;
 
 use super::{MinesweeperGame, MinesweeperResult};
+use crate::challenges::ActiveMinigame;
 
 /// Input actions for the Minesweeper game (UI-agnostic).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -281,9 +282,9 @@ pub fn apply_game_result(state: &mut crate::core::game_state::GameState) -> bool
     use super::super::MinesweeperResult;
     use crate::challenges::menu::DifficultyInfo;
 
-    let game = match state.active_minesweeper.as_ref() {
-        Some(g) => g,
-        None => return false,
+    let game = match state.active_minigame.as_ref() {
+        Some(ActiveMinigame::Minesweeper(g)) => g,
+        _ => return false,
     };
     let result = match game.game_result {
         Some(r) => r,
@@ -341,7 +342,7 @@ pub fn apply_game_result(state: &mut crate::core::game_state::GameState) -> bool
         }
     }
 
-    state.active_minesweeper = None;
+    state.active_minigame = None;
     true
 }
 
@@ -826,13 +827,13 @@ mod tests {
 
         let mut game = MinesweeperGame::new(MinesweeperDifficulty::Master);
         game.game_result = Some(MinesweeperResult::Win);
-        state.active_minesweeper = Some(game);
+        state.active_minigame = Some(ActiveMinigame::Minesweeper(game));
 
         let processed = apply_game_result(&mut state);
         assert!(processed);
         assert!(state.character_xp > initial_xp); // Master gives XP
         assert!(state.prestige_rank > 5); // Master gives prestige
-        assert!(state.active_minesweeper.is_none());
+        assert!(state.active_minigame.is_none());
     }
 
     #[test]
@@ -845,13 +846,13 @@ mod tests {
 
         let mut game = MinesweeperGame::new(MinesweeperDifficulty::Novice);
         game.game_result = Some(MinesweeperResult::Loss);
-        state.active_minesweeper = Some(game);
+        state.active_minigame = Some(ActiveMinigame::Minesweeper(game));
 
         let processed = apply_game_result(&mut state);
         assert!(processed);
         assert_eq!(state.character_xp, initial_xp); // XP unchanged
         assert_eq!(state.prestige_rank, 5); // Prestige unchanged
-        assert!(state.active_minesweeper.is_none());
+        assert!(state.active_minigame.is_none());
     }
 
     #[test]
@@ -859,7 +860,7 @@ mod tests {
         use crate::core::game_state::GameState;
 
         let mut state = GameState::new("Test".to_string(), 0);
-        state.active_minesweeper = None;
+        state.active_minigame = None;
 
         let processed = apply_game_result(&mut state);
         assert!(!processed);
@@ -872,12 +873,15 @@ mod tests {
         let mut state = GameState::new("Test".to_string(), 0);
         let game = MinesweeperGame::new(MinesweeperDifficulty::Novice);
         // game.game_result is None
-        state.active_minesweeper = Some(game);
+        state.active_minigame = Some(ActiveMinigame::Minesweeper(game));
 
         let processed = apply_game_result(&mut state);
         assert!(!processed);
         // Game should still be active
-        assert!(state.active_minesweeper.is_some());
+        assert!(matches!(
+            state.active_minigame,
+            Some(ActiveMinigame::Minesweeper(_))
+        ));
     }
 
     // ============ process_input Tests ============

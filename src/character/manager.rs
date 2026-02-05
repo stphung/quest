@@ -120,11 +120,7 @@ impl CharacterManager {
             zone_progression: save_data.zone_progression,
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: save_data.chess_stats,
-            active_chess: None,
-            active_morris: None,
-            active_gomoku: None,
-            active_minesweeper: None,
-            active_rune: None,
+            active_minigame: None,
         })
     }
 
@@ -216,6 +212,9 @@ impl CharacterManager {
     }
 }
 
+/// Reserved names that cannot be used for characters (would conflict with system files)
+const RESERVED_NAMES: &[&str] = &["haven"];
+
 #[allow(dead_code)]
 pub fn validate_name(name: &str) -> Result<(), String> {
     let trimmed = name.trim();
@@ -236,6 +235,12 @@ pub fn validate_name(name: &str) -> Result<(), String> {
         return Err(
             "Name can only contain letters, numbers, spaces, hyphens, and underscores".to_string(),
         );
+    }
+
+    // Check for reserved names (case-insensitive, matches sanitized filename)
+    let sanitized = sanitize_name(trimmed);
+    if RESERVED_NAMES.contains(&sanitized.as_str()) {
+        return Err(format!("Name '{}' is reserved", trimmed));
     }
 
     Ok(())
@@ -325,11 +330,7 @@ mod tests {
             zone_progression: crate::zones::ZoneProgression::default(),
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: crate::challenges::chess::ChessStats::default(),
-            active_chess: None,
-            active_morris: None,
-            active_gomoku: None,
-            active_minesweeper: None,
-            active_rune: None,
+            active_minigame: None,
         };
 
         // Save character
@@ -381,11 +382,7 @@ mod tests {
             zone_progression: crate::zones::ZoneProgression::default(),
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: crate::challenges::chess::ChessStats::default(),
-            active_chess: None,
-            active_morris: None,
-            active_gomoku: None,
-            active_minesweeper: None,
-            active_rune: None,
+            active_minigame: None,
         };
 
         let char2 = GameState {
@@ -406,11 +403,7 @@ mod tests {
             zone_progression: crate::zones::ZoneProgression::default(),
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: crate::challenges::chess::ChessStats::default(),
-            active_chess: None,
-            active_morris: None,
-            active_gomoku: None,
-            active_minesweeper: None,
-            active_rune: None,
+            active_minigame: None,
         };
 
         manager.save_character(&char1).unwrap();
@@ -461,11 +454,7 @@ mod tests {
             zone_progression: crate::zones::ZoneProgression::default(),
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: crate::challenges::chess::ChessStats::default(),
-            active_chess: None,
-            active_morris: None,
-            active_gomoku: None,
-            active_minesweeper: None,
-            active_rune: None,
+            active_minigame: None,
         };
 
         manager.save_character(&state).unwrap();
@@ -505,11 +494,7 @@ mod tests {
             zone_progression: crate::zones::ZoneProgression::default(),
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: crate::challenges::chess::ChessStats::default(),
-            active_chess: None,
-            active_morris: None,
-            active_gomoku: None,
-            active_minesweeper: None,
-            active_rune: None,
+            active_minigame: None,
         };
 
         manager.save_character(&state).unwrap();
@@ -576,11 +561,7 @@ mod tests {
             zone_progression: crate::zones::ZoneProgression::default(),
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: crate::challenges::chess::ChessStats::default(),
-            active_chess: None,
-            active_morris: None,
-            active_gomoku: None,
-            active_minesweeper: None,
-            active_rune: None,
+            active_minigame: None,
         };
 
         manager.save_character(&state).unwrap();
@@ -686,11 +667,7 @@ mod tests {
             zone_progression: crate::zones::ZoneProgression::default(),
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: crate::challenges::chess::ChessStats::default(),
-            active_chess: None,
-            active_morris: None,
-            active_gomoku: None,
-            active_minesweeper: None,
-            active_rune: None,
+            active_minigame: None,
         };
 
         manager.save_character(&state).unwrap();
@@ -1354,5 +1331,19 @@ mod tests {
         assert!(validate_name("日本語").is_ok()); // Japanese
         assert!(validate_name("Müller").is_ok()); // German umlaut
         assert!(validate_name("Ωmega").is_ok()); // Greek
+    }
+
+    #[test]
+    fn test_validate_name_reserved_names() {
+        // "haven" is reserved (conflicts with haven.json)
+        assert!(validate_name("haven").is_err());
+        assert!(validate_name("Haven").is_err()); // Case-insensitive
+        assert!(validate_name("HAVEN").is_err());
+        assert!(validate_name("  haven  ").is_err()); // With whitespace
+
+        // Similar names that don't conflict should be fine
+        assert!(validate_name("haven2").is_ok());
+        assert!(validate_name("myhaven").is_ok());
+        assert!(validate_name("the-haven").is_ok());
     }
 }

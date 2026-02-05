@@ -87,9 +87,12 @@ pub fn apply_tick_xp(state: &mut GameState, xp_gain: f64) -> (u32, Vec<Attribute
 }
 
 /// Calculates XP bonus from killing an enemy
-pub fn combat_kill_xp(passive_xp_rate: f64) -> u64 {
+/// `haven_xp_gain_percent` is the Training Yard bonus (0.0 if not built)
+pub fn combat_kill_xp(passive_xp_rate: f64, haven_xp_gain_percent: f64) -> u64 {
     let ticks = rand::thread_rng().gen_range(COMBAT_XP_MIN_TICKS..=COMBAT_XP_MAX_TICKS);
-    (passive_xp_rate * ticks as f64) as u64
+    let base_xp = passive_xp_rate * ticks as f64;
+    // Apply Haven Training Yard bonus
+    (base_xp * (1.0 + haven_xp_gain_percent / 100.0)) as u64
 }
 
 /// Report of offline progression results
@@ -103,11 +106,13 @@ pub struct OfflineReport {
 
 /// Calculates the XP gained during offline time
 /// Now based on simulated monster kills instead of passive time
+/// `haven_offline_xp_percent` is the Hearthstone bonus (0.0 if not built)
 pub fn calculate_offline_xp(
     elapsed_seconds: i64,
     prestige_rank: u32,
     wis_modifier: i32,
     cha_modifier: i32,
+    haven_offline_xp_percent: f64,
 ) -> f64 {
     let capped_seconds = elapsed_seconds.min(MAX_OFFLINE_SECONDS);
 
@@ -119,11 +124,14 @@ pub fn calculate_offline_xp(
     let avg_xp_per_kill = (COMBAT_XP_MIN_TICKS + COMBAT_XP_MAX_TICKS) as f64 / 2.0;
     let xp_per_kill = xp_per_tick_rate * avg_xp_per_kill;
 
-    estimated_kills * xp_per_kill
+    // Apply Haven Hearthstone bonus
+    let base_xp = estimated_kills * xp_per_kill;
+    base_xp * (1.0 + haven_offline_xp_percent / 100.0)
 }
 
 /// Processes offline progression and updates game state
-pub fn process_offline_progression(state: &mut GameState) -> OfflineReport {
+/// `haven_offline_xp_percent` is the Hearthstone bonus (0.0 if not built)
+pub fn process_offline_progression(state: &mut GameState, haven_offline_xp_percent: f64) -> OfflineReport {
     let current_time = Utc::now().timestamp();
     let elapsed_seconds = current_time - state.last_save_time;
 
@@ -133,7 +141,13 @@ pub fn process_offline_progression(state: &mut GameState) -> OfflineReport {
 
     let wis_mod = state.attributes.modifier(AttributeType::Wisdom);
     let cha_mod = state.attributes.modifier(AttributeType::Charisma);
-    let offline_xp = calculate_offline_xp(elapsed_seconds, state.prestige_rank, wis_mod, cha_mod);
+    let offline_xp = calculate_offline_xp(
+        elapsed_seconds,
+        state.prestige_rank,
+        wis_mod,
+        cha_mod,
+        haven_offline_xp_percent,
+    );
 
     let (total_level_ups, _) = apply_tick_xp(state, offline_xp);
 
@@ -347,8 +361,32 @@ mod tests {
 
     #[test]
     fn test_combat_kill_xp() {
-        let xp = combat_kill_xp(1.0);
+        let xp = combat_kill_xp(1.0, 0.0);
         assert!((200..=400).contains(&xp));
+    }
+
+    #[test]
+    fn test_combat_kill_xp_with_haven_bonus() {
+        // Run many trials to verify average XP is higher with bonus
+        let mut total_no_bonus = 0u64;
+        let mut total_with_bonus = 0u64;
+        let trials = 1000;
+
+        for _ in 0..trials {
+            total_no_bonus += combat_kill_xp(1.0, 0.0);
+            total_with_bonus += combat_kill_xp(1.0, 30.0); // +30% XP from Training Yard
+        }
+
+        let avg_no_bonus = total_no_bonus as f64 / trials as f64;
+        let avg_with_bonus = total_with_bonus as f64 / trials as f64;
+        let ratio = avg_with_bonus / avg_no_bonus;
+
+        // Should be approximately 30% higher
+        assert!(
+            (1.25..=1.35).contains(&ratio),
+            "Haven +30% XP should increase average XP by ~30%, got {:.2}x",
+            ratio
+        );
     }
 
     #[test]
@@ -470,7 +508,7 @@ mod tests {
     #[test]
     fn test_calculate_offline_xp_basic() {
         // 1 hour offline, rank 0, no modifiers
-        let xp = calculate_offline_xp(3600, 0, 0, 0);
+        let xp = calculate_offline_xp(3600, 0, 0, 0, 0.0);
 
         // 3600 seconds / 5 = 720 estimated kills * 0.25 offline multiplier = 180 kills
         // XP per kill at rank 0 = 1.0 * 300 (avg) = 300
@@ -484,8 +522,8 @@ mod tests {
         let one_week = 7 * 24 * 3600;
         let two_weeks = 14 * 24 * 3600;
 
-        let xp_one_week = calculate_offline_xp(one_week, 0, 0, 0);
-        let xp_two_weeks = calculate_offline_xp(two_weeks, 0, 0, 0);
+        let xp_one_week = calculate_offline_xp(one_week, 0, 0, 0, 0.0);
+        let xp_two_weeks = calculate_offline_xp(two_weeks, 0, 0, 0, 0.0);
 
         // Should be capped, so two weeks = one week
         assert!((xp_one_week - xp_two_weeks).abs() < 1.0);
@@ -493,8 +531,8 @@ mod tests {
 
     #[test]
     fn test_calculate_offline_xp_with_prestige() {
-        let base_xp = calculate_offline_xp(3600, 0, 0, 0);
-        let prestige_xp = calculate_offline_xp(3600, 1, 0, 0);
+        let base_xp = calculate_offline_xp(3600, 0, 0, 0, 0.0);
+        let prestige_xp = calculate_offline_xp(3600, 1, 0, 0, 0.0);
 
         // Prestige 1 has 1.5x multiplier (using 1 + 0.5*rank^0.7 formula)
         assert!(prestige_xp > base_xp);
@@ -504,13 +542,27 @@ mod tests {
 
     #[test]
     fn test_calculate_offline_xp_with_wisdom() {
-        let base_xp = calculate_offline_xp(3600, 0, 0, 0);
-        let wis_xp = calculate_offline_xp(3600, 0, 5, 0); // +5 WIS modifier
+        let base_xp = calculate_offline_xp(3600, 0, 0, 0, 0.0);
+        let wis_xp = calculate_offline_xp(3600, 0, 5, 0, 0.0); // +5 WIS modifier
 
         // WIS +5 gives 1.25x multiplier
         assert!(wis_xp > base_xp);
         let ratio = wis_xp / base_xp;
         assert!((ratio - 1.25).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_calculate_offline_xp_with_haven_bonus() {
+        let base_xp = calculate_offline_xp(3600, 0, 0, 0, 0.0);
+        let haven_xp = calculate_offline_xp(3600, 0, 0, 0, 100.0); // +100% from Hearthstone T3
+
+        // Haven +100% should double offline XP
+        let ratio = haven_xp / base_xp;
+        assert!(
+            (ratio - 2.0).abs() < 0.01,
+            "Haven +100% offline XP should double base XP, got {:.2}x",
+            ratio
+        );
     }
 
     #[test]

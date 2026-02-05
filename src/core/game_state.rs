@@ -1,9 +1,6 @@
-use crate::challenges::chess::{ChessGame, ChessStats};
-use crate::challenges::gomoku::GomokuGame;
+use crate::challenges::chess::ChessStats;
 use crate::challenges::menu::ChallengeMenu;
-use crate::challenges::minesweeper::MinesweeperGame;
-use crate::challenges::morris::MorrisGame;
-use crate::challenges::rune::RuneGame;
+use crate::challenges::ActiveMinigame;
 use crate::character::attributes::Attributes;
 use crate::combat::types::CombatState;
 use crate::dungeon::types::Dungeon;
@@ -45,21 +42,9 @@ pub struct GameState {
     /// Persistent chess stats (survives prestige, saved to disk)
     #[serde(default)]
     pub chess_stats: ChessStats,
-    /// Active chess game (transient, not saved)
+    /// Active challenge minigame (transient, not saved)
     #[serde(skip)]
-    pub active_chess: Option<ChessGame>,
-    /// Active morris game (transient, not saved)
-    #[serde(skip)]
-    pub active_morris: Option<MorrisGame>,
-    /// Active gomoku game (transient, not saved)
-    #[serde(skip)]
-    pub active_gomoku: Option<GomokuGame>,
-    /// Active minesweeper game (transient, not saved)
-    #[serde(skip)]
-    pub active_minesweeper: Option<MinesweeperGame>,
-    /// Active rune game (transient, not saved)
-    #[serde(skip)]
-    pub active_rune: Option<RuneGame>,
+    pub active_minigame: Option<ActiveMinigame>,
 }
 
 impl GameState {
@@ -89,11 +74,7 @@ impl GameState {
             zone_progression: ZoneProgression::new(),
             challenge_menu: ChallengeMenu::new(),
             chess_stats: ChessStats::default(),
-            active_chess: None,
-            active_morris: None,
-            active_gomoku: None,
-            active_minesweeper: None,
-            active_rune: None,
+            active_minigame: None,
         }
     }
 

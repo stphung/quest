@@ -6,6 +6,23 @@ use rand::Rng;
 
 use crate::zones::BossDefeatResult;
 
+/// Haven bonuses that affect combat
+#[derive(Debug, Clone, Default)]
+pub struct HavenCombatBonuses {
+    /// Alchemy Lab: +% HP regen speed
+    pub hp_regen_percent: f64,
+    /// Bedroom: -% HP regen delay (reduces wait time before regen starts)
+    pub hp_regen_delay_reduction: f64,
+    /// Armory: +% damage
+    pub damage_percent: f64,
+    /// Watchtower: +% crit chance
+    pub crit_chance_percent: f64,
+    /// War Room: +% chance to strike twice
+    pub double_strike_chance: f64,
+    /// Training Yard: +% XP from kills
+    pub xp_gain_percent: f64,
+}
+
 #[allow(dead_code)]
 pub enum CombatEvent {
     PlayerAttack {
@@ -42,16 +59,25 @@ pub enum CombatEvent {
 }
 
 /// Updates combat state, returns events that occurred
-pub fn update_combat(state: &mut GameState, delta_time: f64) -> Vec<CombatEvent> {
+/// `haven` contains all Haven bonuses that affect combat
+pub fn update_combat(
+    state: &mut GameState,
+    delta_time: f64,
+    haven: &HavenCombatBonuses,
+) -> Vec<CombatEvent> {
     let mut events = Vec::new();
 
     // Handle regeneration after enemy death
     if state.combat_state.is_regenerating {
-        // HP regen multiplier: higher = faster regen
+        // HP regen multiplier: higher = faster regen (equipment + haven bonus)
         let regen_derived =
             DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
-        let effective_regen_duration =
-            HP_REGEN_DURATION_SECONDS / regen_derived.hp_regen_multiplier;
+        let total_regen_multiplier =
+            regen_derived.hp_regen_multiplier * (1.0 + haven.hp_regen_percent / 100.0);
+
+        // Apply Bedroom bonus: reduce base regen duration
+        let base_regen_duration = HP_REGEN_DURATION_SECONDS * (1.0 - haven.hp_regen_delay_reduction / 100.0);
+        let effective_regen_duration = base_regen_duration / total_regen_multiplier;
 
         state.combat_state.regen_timer += delta_time;
 
@@ -96,19 +122,34 @@ pub fn update_combat(state: &mut GameState, delta_time: f64) -> Vec<CombatEvent>
             // Enemy still attacks back (see below)
         } else {
             // Player attacks normally
-            let mut damage = derived.total_damage();
+            // Apply Armory bonus: +% damage
+            let base_damage = derived.total_damage();
+            let mut damage = (base_damage as f64 * (1.0 + haven.damage_percent / 100.0)) as u32;
             let mut was_crit = false;
 
-            // Roll for crit
+            // Roll for crit (apply Watchtower bonus: +% crit chance)
+            let total_crit_chance = derived.crit_chance_percent + haven.crit_chance_percent as u32;
             let crit_roll = rand::thread_rng().gen_range(0..100);
-            if crit_roll < derived.crit_chance_percent {
+            if crit_roll < total_crit_chance {
                 damage = (damage as f64 * derived.crit_multiplier) as u32;
                 was_crit = true;
             }
 
+            // Roll for double strike (War Room bonus)
+            let double_strike_roll = rand::thread_rng().gen::<f64>() * 100.0;
+            let num_strikes = if double_strike_roll < haven.double_strike_chance { 2 } else { 1 };
+
             if let Some(enemy) = state.combat_state.current_enemy.as_mut() {
-                enemy.take_damage(damage);
-                events.push(CombatEvent::PlayerAttack { damage, was_crit });
+                // Apply damage (potentially multiple times with double strike)
+                for strike in 0..num_strikes {
+                    if !enemy.is_alive() {
+                        break; // Enemy already dead
+                    }
+                    enemy.take_damage(damage);
+                    // Only first strike uses original crit flag, subsequent strikes are bonus hits
+                    let strike_crit = if strike == 0 { was_crit } else { false };
+                    events.push(CombatEvent::PlayerAttack { damage, was_crit: strike_crit });
+                }
 
                 // Check if enemy died
                 if !enemy.is_alive() {
@@ -124,6 +165,7 @@ pub fn update_combat(state: &mut GameState, delta_time: f64) -> Vec<CombatEvent>
                             wis_mod,
                             cha_mod,
                         ),
+                        haven.xp_gain_percent,
                     );
 
                     // Check if we're in a dungeon and what type of room
@@ -235,7 +277,7 @@ mod tests {
     #[test]
     fn test_update_combat_no_enemy() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
         assert_eq!(events.len(), 0);
     }
 
@@ -245,11 +287,11 @@ mod tests {
         state.combat_state.current_enemy = Some(Enemy::new("Test".to_string(), 100, 5));
 
         // Not enough time passed
-        let events = update_combat(&mut state, 0.5);
+        let events = update_combat(&mut state, 0.5, &HavenCombatBonuses::default());
         assert_eq!(events.len(), 0);
 
         // Enough time for attack
-        let events = update_combat(&mut state, 1.0);
+        let events = update_combat(&mut state, 1.0, &HavenCombatBonuses::default());
         assert!(events.len() >= 2); // Player attack + enemy attack
     }
 
@@ -261,7 +303,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
 
         // Should have player died event
         let died = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
@@ -286,7 +328,7 @@ mod tests {
 
         // Force attack to kill enemy
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
 
         // Should have enemy died event
         let died = events
@@ -299,7 +341,7 @@ mod tests {
         assert!(state.combat_state.current_enemy.is_none());
 
         // Update to complete regen
-        update_combat(&mut state, HP_REGEN_DURATION_SECONDS);
+        update_combat(&mut state, HP_REGEN_DURATION_SECONDS, &HavenCombatBonuses::default());
         assert_eq!(
             state.combat_state.player_current_hp,
             state.combat_state.player_max_hp
@@ -319,7 +361,7 @@ mod tests {
 
         // Force an attack that kills player
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
 
         // Should have PlayerDiedInDungeon event (not PlayerDied)
         let died_in_dungeon = events
@@ -358,7 +400,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
 
         // Should have PlayerAttackBlocked event
         let blocked = events
@@ -386,7 +428,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
 
         // Should have EnemyAttack event
         let enemy_attacked = events
@@ -415,7 +457,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
 
         // Should have PlayerDied event
         let died = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
@@ -445,7 +487,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        update_combat(&mut state, 0.1);
+        update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
 
         // Calculate expected damage reduction
         let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
@@ -470,7 +512,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        update_combat(&mut state, 0.1);
+        update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
 
         // Player should take no damage (5 - 10 = 0 via saturating_sub)
         assert_eq!(state.combat_state.player_current_hp, initial_hp);
@@ -490,7 +532,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
 
         // Should have SubzoneBossDefeated event
         let boss_defeated = events
@@ -513,7 +555,7 @@ mod tests {
 
         // Force an attack to kill
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
 
         // Should have EnemyDied event
         let enemy_died = events
@@ -535,7 +577,7 @@ mod tests {
 
         // Even with attack timer ready, should not attack while regenerating
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
 
         // No combat events during regen
         assert!(events.is_empty());
@@ -554,7 +596,7 @@ mod tests {
         state.combat_state.player_max_hp = 100;
 
         // Partial regen (half duration)
-        update_combat(&mut state, HP_REGEN_DURATION_SECONDS / 2.0);
+        update_combat(&mut state, HP_REGEN_DURATION_SECONDS / 2.0, &HavenCombatBonuses::default());
 
         // HP should be partially restored (roughly halfway)
         assert!(state.combat_state.player_current_hp > 10);
@@ -578,7 +620,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
 
         // Should have PlayerDied event
         let died = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
@@ -610,7 +652,7 @@ mod tests {
         // Give enemy enough HP to survive
         state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
 
         // Find the PlayerAttack event
         let attack_event = events
@@ -645,7 +687,7 @@ mod tests {
                 .set(crate::character::attributes::AttributeType::Dexterity, 0);
             s.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 100000, 0));
             s.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-            let events = update_combat(&mut s, 0.1);
+            let events = update_combat(&mut s, 0.1, &HavenCombatBonuses::default());
 
             for e in &events {
                 if let CombatEvent::PlayerAttack { was_crit, .. } = e {
@@ -678,7 +720,7 @@ mod tests {
 
         state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
 
         let attack_event = events
             .iter()
@@ -708,7 +750,7 @@ mod tests {
         let initial_hp = state.combat_state.player_current_hp;
 
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        update_combat(&mut state, 0.1);
+        update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
 
         let hp_lost = initial_hp - state.combat_state.player_current_hp;
         assert_eq!(hp_lost, enemy_base_damage - derived.defense);
@@ -744,7 +786,7 @@ mod tests {
         // Simulate up to 20 attack cycles
         for _ in 0..20 {
             state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-            let events = update_combat(&mut state, 0.1);
+            let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
             turns += 1;
 
             for e in &events {
@@ -765,7 +807,7 @@ mod tests {
 
             // If regenerating, complete regen before next turn
             if state.combat_state.is_regenerating {
-                update_combat(&mut state, HP_REGEN_DURATION_SECONDS);
+                update_combat(&mut state, HP_REGEN_DURATION_SECONDS, &HavenCombatBonuses::default());
             }
         }
 
@@ -880,7 +922,7 @@ mod tests {
         let max_expected = xp_per_tick * COMBAT_XP_MAX_TICKS as f64;
 
         for _ in 0..100 {
-            let xp = crate::core::game_logic::combat_kill_xp(xp_per_tick);
+            let xp = crate::core::game_logic::combat_kill_xp(xp_per_tick, 0.0);
             assert!(
                 xp >= min_expected as u64 && xp <= max_expected as u64,
                 "XP {} should be in range [{}, {}]",
@@ -899,7 +941,7 @@ mod tests {
         // Weak enemy that dies in one hit
         state.combat_state.current_enemy = Some(Enemy::new("Weak".to_string(), 1, 0));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
 
         let xp_event = events.iter().find_map(|e| match e {
             CombatEvent::EnemyDied { xp_gained } => Some(*xp_gained),
@@ -974,7 +1016,7 @@ mod tests {
         // Enemy with damage less than defense
         state.combat_state.current_enemy = Some(Enemy::new("Weak".to_string(), 10000, 5));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        update_combat(&mut state, 0.1);
+        update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
 
         // Player should take zero damage from the enemy
         assert_eq!(state.combat_state.player_current_hp, initial_hp);
@@ -992,7 +1034,7 @@ mod tests {
         state.combat_state.current_enemy = Some(enemy);
 
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
 
         let died = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
         assert!(died);
@@ -1019,7 +1061,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
 
         // Verify player died
         let died = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
@@ -1062,7 +1104,7 @@ mod tests {
 
         state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
 
         let attack = events
             .iter()
@@ -1103,7 +1145,7 @@ mod tests {
         // With 50% attack speed, effective interval is 1.5 / 1.5 = 1.0 seconds
         // So attack should trigger at 1.0 seconds instead of 1.5
         state.combat_state.attack_timer = 1.0;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
 
         let attacked = events
             .iter()
@@ -1118,7 +1160,7 @@ mod tests {
 
         // Without attack speed bonus, 1.0 seconds is not enough (need 1.5)
         state.combat_state.attack_timer = 1.0;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
 
         let attacked = events
             .iter()
@@ -1155,7 +1197,7 @@ mod tests {
 
         // With +100% regen (2x multiplier), duration is 2.5 / 2 = 1.25 seconds
         // After 1.25 seconds, should be fully healed
-        update_combat(&mut state, 1.25);
+        update_combat(&mut state, 1.25, &HavenCombatBonuses::default());
 
         assert_eq!(state.combat_state.player_current_hp, 100);
         assert!(!state.combat_state.is_regenerating);
@@ -1171,11 +1213,72 @@ mod tests {
         state.combat_state.player_max_hp = 100;
 
         // Without regen bonus, 1.25 seconds is not enough (need 2.5)
-        update_combat(&mut state, 1.25);
+        update_combat(&mut state, 1.25, &HavenCombatBonuses::default());
 
         // Should still be regenerating, not fully healed
         assert!(state.combat_state.is_regenerating);
         assert!(state.combat_state.player_current_hp < 100);
+    }
+
+    #[test]
+    fn test_haven_hp_regen_bonus() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        state.combat_state.is_regenerating = true;
+        state.combat_state.regen_timer = 0.0;
+        state.combat_state.player_current_hp = 10;
+        state.combat_state.player_max_hp = 100;
+
+        // With +100% Haven regen bonus (2x multiplier), duration is 2.5 / 2 = 1.25 seconds
+        // After 1.25 seconds, should be fully healed
+        let haven = HavenCombatBonuses {
+            hp_regen_percent: 100.0,
+            ..Default::default()
+        };
+        update_combat(&mut state, 1.25, &haven);
+
+        assert_eq!(state.combat_state.player_current_hp, 100);
+        assert!(!state.combat_state.is_regenerating);
+    }
+
+    #[test]
+    fn test_haven_hp_regen_stacks_with_equipment() {
+        use crate::items::types::{
+            Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity,
+        };
+
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // Add armor with +100% HP regen (2x speed)
+        let armor = Item {
+            slot: EquipmentSlot::Armor,
+            rarity: Rarity::Rare,
+            base_name: "Armor".to_string(),
+            display_name: "Armor".to_string(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![Affix {
+                affix_type: AffixType::HPRegen,
+                value: 100.0,
+            }],
+        };
+        state.equipment.set(EquipmentSlot::Armor, Some(armor));
+
+        state.combat_state.is_regenerating = true;
+        state.combat_state.regen_timer = 0.0;
+        state.combat_state.player_current_hp = 10;
+        state.combat_state.player_max_hp = 100;
+
+        // Equipment: 2x multiplier, Haven +50%: 1.5x multiplier
+        // Combined: 2.0 * 1.5 = 3x multiplier
+        // Duration: 2.5 / 3 = 0.833 seconds
+        let haven = HavenCombatBonuses {
+            hp_regen_percent: 50.0,
+            ..Default::default()
+        };
+        update_combat(&mut state, 0.84, &haven);
+
+        assert_eq!(state.combat_state.player_current_hp, 100);
+        assert!(!state.combat_state.is_regenerating);
     }
 
     #[test]
@@ -1213,7 +1316,7 @@ mod tests {
         ));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        update_combat(&mut state, 0.1);
+        update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
 
         // Enemy should have taken reflected damage: 20 * 50% = 10
         let enemy = state.combat_state.current_enemy.as_ref().unwrap();
@@ -1258,7 +1361,7 @@ mod tests {
         state.combat_state.player_max_hp = 1000;
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
 
         // Enemy should have died from combined player attack + reflection
         let enemy_died = events
@@ -1301,7 +1404,7 @@ mod tests {
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
         let initial_player_hp = state.combat_state.player_current_hp;
-        update_combat(&mut state, 0.1);
+        update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
 
         // Player took no damage
         assert_eq!(state.combat_state.player_current_hp, initial_player_hp);
@@ -1311,5 +1414,198 @@ mod tests {
         let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
         let expected_hp = enemy_max_hp - derived.total_damage();
         assert_eq!(enemy.current_hp, expected_hp);
+    }
+
+    // =========================================================================
+    // Haven Combat Bonus Tests
+    // =========================================================================
+
+    #[test]
+    fn test_haven_damage_bonus() {
+        use crate::character::attributes::AttributeType;
+
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // Set DEX to 0 to eliminate crits
+        state.attributes.set(AttributeType::Dexterity, 0);
+
+        // Create an enemy with lots of HP
+        state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
+        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+
+        // First, attack with no Haven bonus
+        let events_no_bonus = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let damage_no_bonus = events_no_bonus
+            .iter()
+            .find_map(|e| {
+                if let CombatEvent::PlayerAttack { damage, .. } = e {
+                    Some(*damage)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(0);
+
+        // Reset enemy and attack with +50% damage bonus
+        state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
+        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+
+        let haven = HavenCombatBonuses {
+            damage_percent: 50.0,
+            ..Default::default()
+        };
+        let events_with_bonus = update_combat(&mut state, 0.1, &haven);
+        let damage_with_bonus = events_with_bonus
+            .iter()
+            .find_map(|e| {
+                if let CombatEvent::PlayerAttack { damage, .. } = e {
+                    Some(*damage)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(0);
+
+        // Damage should be 50% higher
+        let expected = (damage_no_bonus as f64 * 1.5) as u32;
+        assert_eq!(
+            damage_with_bonus, expected,
+            "Haven +50% damage should increase {} to {}",
+            damage_no_bonus, expected
+        );
+    }
+
+    #[test]
+    fn test_haven_crit_chance_bonus() {
+        use crate::character::attributes::AttributeType;
+
+        // Run many trials to verify crit rate increase
+        let mut crits_no_bonus = 0;
+        let mut crits_with_bonus = 0;
+        let trials = 10000;
+
+        for _ in 0..trials {
+            let mut state = GameState::new("Test Hero".to_string(), 0);
+            state.attributes.set(AttributeType::Dexterity, 0); // Base 0% crit
+            state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
+            state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+
+            let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+            if events.iter().any(|e| matches!(e, CombatEvent::PlayerAttack { was_crit: true, .. })) {
+                crits_no_bonus += 1;
+            }
+        }
+
+        for _ in 0..trials {
+            let mut state = GameState::new("Test Hero".to_string(), 0);
+            state.attributes.set(AttributeType::Dexterity, 0);
+            state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
+            state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+
+            let haven = HavenCombatBonuses {
+                crit_chance_percent: 20.0, // +20% crit
+                ..Default::default()
+            };
+            let events = update_combat(&mut state, 0.1, &haven);
+            if events.iter().any(|e| matches!(e, CombatEvent::PlayerAttack { was_crit: true, .. })) {
+                crits_with_bonus += 1;
+            }
+        }
+
+        // With +20% crit bonus, should see roughly 20% crits
+        // Allow wide tolerance for randomness
+        assert!(
+            crits_with_bonus > crits_no_bonus + 500,
+            "Haven +20% crit should significantly increase crit rate: no_bonus={}, with_bonus={}",
+            crits_no_bonus,
+            crits_with_bonus
+        );
+    }
+
+    #[test]
+    fn test_haven_double_strike() {
+        use crate::character::attributes::AttributeType;
+
+        // Run many trials to verify double strike rate
+        let mut double_strikes = 0;
+        let trials = 10000;
+
+        for _ in 0..trials {
+            let mut state = GameState::new("Test Hero".to_string(), 0);
+            state.attributes.set(AttributeType::Dexterity, 0);
+            state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
+            state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+
+            let haven = HavenCombatBonuses {
+                double_strike_chance: 35.0, // +35% double strike (T3 War Room)
+                ..Default::default()
+            };
+            let events = update_combat(&mut state, 0.1, &haven);
+
+            // Count PlayerAttack events (should be 2 if double strike procs)
+            let attack_count = events
+                .iter()
+                .filter(|e| matches!(e, CombatEvent::PlayerAttack { .. }))
+                .count();
+            if attack_count == 2 {
+                double_strikes += 1;
+            }
+        }
+
+        // With 35% double strike chance, expect ~3500 double strikes in 10000 trials
+        // Allow 10% tolerance
+        assert!(
+            (3000..=4000).contains(&double_strikes),
+            "Expected ~3500 double strikes (35%), got {}",
+            double_strikes
+        );
+    }
+
+    #[test]
+    fn test_haven_regen_delay_reduction() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        state.combat_state.is_regenerating = true;
+        state.combat_state.regen_timer = 0.0;
+        state.combat_state.player_current_hp = 10;
+        state.combat_state.player_max_hp = 100;
+
+        // With -50% regen delay, base duration is 2.5 * 0.5 = 1.25 seconds
+        let haven = HavenCombatBonuses {
+            hp_regen_delay_reduction: 50.0,
+            ..Default::default()
+        };
+        update_combat(&mut state, 1.25, &haven);
+
+        assert_eq!(state.combat_state.player_current_hp, 100);
+        assert!(!state.combat_state.is_regenerating);
+    }
+
+    #[test]
+    fn test_haven_combined_combat_bonuses() {
+        use crate::character::attributes::AttributeType;
+
+        // Test multiple bonuses together
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        state.attributes.set(AttributeType::Dexterity, 0);
+        state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
+        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+
+        let haven = HavenCombatBonuses {
+            damage_percent: 25.0,
+            crit_chance_percent: 10.0,
+            double_strike_chance: 10.0,
+            hp_regen_percent: 50.0,
+            hp_regen_delay_reduction: 30.0,
+            xp_gain_percent: 20.0,
+        };
+
+        let events = update_combat(&mut state, 0.1, &haven);
+
+        // Should have at least one attack
+        assert!(
+            events.iter().any(|e| matches!(e, CombatEvent::PlayerAttack { .. })),
+            "Should have at least one attack event"
+        );
     }
 }

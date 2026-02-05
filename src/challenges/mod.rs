@@ -17,3 +17,13 @@ pub use morris::{
     MorrisDifficulty, MorrisGame, MorrisPhase, MorrisResult, Player as MorrisPlayer, ADJACENCIES,
 };
 pub use rune::{FeedbackMark, RuneDifficulty, RuneGame, RuneResult, RUNE_SYMBOLS};
+
+/// A currently active challenge minigame. Only one can be active at a time.
+#[derive(Debug, Clone)]
+pub enum ActiveMinigame {
+    Chess(Box<ChessGame>),
+    Morris(MorrisGame),
+    Gomoku(GomokuGame),
+    Minesweeper(MinesweeperGame),
+    Rune(RuneGame),
+}

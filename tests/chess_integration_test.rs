@@ -3,6 +3,7 @@
 //! Tests the full chess flow: discovery → challenge menu → game → result
 
 use quest::challenges::chess::logic::{apply_game_result, start_chess_game};
+use quest::challenges::ActiveMinigame;
 use quest::GameState;
 use quest::{ChessDifficulty, ChessResult};
 
@@ -13,16 +14,23 @@ fn test_complete_chess_win_flow() {
 
     // Start a chess game
     start_chess_game(&mut state, ChessDifficulty::Master);
-    assert!(state.active_chess.is_some());
+    assert!(matches!(
+        state.active_minigame,
+        Some(ActiveMinigame::Chess(_))
+    ));
 
     // Simulate a win
-    state.active_chess.as_mut().unwrap().game_result = Some(ChessResult::Win);
+    if let Some(ActiveMinigame::Chess(game)) = &mut state.active_minigame {
+        game.game_result = Some(ChessResult::Win);
+    } else {
+        panic!("expected chess");
+    }
 
     // Apply result
     let processed = apply_game_result(&mut state);
     assert!(processed);
     assert_eq!(state.prestige_rank, 10); // 5 + 5 (Master reward)
-    assert!(state.active_chess.is_none());
+    assert!(state.active_minigame.is_none());
 }
 
 #[test]
@@ -31,7 +39,11 @@ fn test_chess_loss_no_penalty() {
     state.prestige_rank = 3;
 
     start_chess_game(&mut state, ChessDifficulty::Novice);
-    state.active_chess.as_mut().unwrap().game_result = Some(ChessResult::Loss);
+    if let Some(ActiveMinigame::Chess(game)) = &mut state.active_minigame {
+        game.game_result = Some(ChessResult::Loss);
+    } else {
+        panic!("expected chess");
+    }
 
     let processed = apply_game_result(&mut state);
     assert!(processed);
@@ -44,7 +56,11 @@ fn test_chess_draw_no_penalty() {
     state.prestige_rank = 7;
 
     start_chess_game(&mut state, ChessDifficulty::Journeyman);
-    state.active_chess.as_mut().unwrap().game_result = Some(ChessResult::Draw);
+    if let Some(ActiveMinigame::Chess(game)) = &mut state.active_minigame {
+        game.game_result = Some(ChessResult::Draw);
+    } else {
+        panic!("expected chess");
+    }
 
     let processed = apply_game_result(&mut state);
     assert!(processed);
@@ -57,7 +73,11 @@ fn test_chess_forfeit_counts_as_loss() {
     state.prestige_rank = 2;
 
     start_chess_game(&mut state, ChessDifficulty::Apprentice);
-    state.active_chess.as_mut().unwrap().game_result = Some(ChessResult::Forfeit);
+    if let Some(ActiveMinigame::Chess(game)) = &mut state.active_minigame {
+        game.game_result = Some(ChessResult::Forfeit);
+    } else {
+        panic!("expected chess");
+    }
 
     let processed = apply_game_result(&mut state);
     assert!(processed);
@@ -88,17 +108,29 @@ fn test_chess_stats_tracking() {
 
     // Win a game
     start_chess_game(&mut state, ChessDifficulty::Novice);
-    state.active_chess.as_mut().unwrap().game_result = Some(ChessResult::Win);
+    if let Some(ActiveMinigame::Chess(game)) = &mut state.active_minigame {
+        game.game_result = Some(ChessResult::Win);
+    } else {
+        panic!("expected chess");
+    }
     apply_game_result(&mut state);
 
     // Lose a game
     start_chess_game(&mut state, ChessDifficulty::Master);
-    state.active_chess.as_mut().unwrap().game_result = Some(ChessResult::Loss);
+    if let Some(ActiveMinigame::Chess(game)) = &mut state.active_minigame {
+        game.game_result = Some(ChessResult::Loss);
+    } else {
+        panic!("expected chess");
+    }
     apply_game_result(&mut state);
 
     // Draw a game
     start_chess_game(&mut state, ChessDifficulty::Apprentice);
-    state.active_chess.as_mut().unwrap().game_result = Some(ChessResult::Draw);
+    if let Some(ActiveMinigame::Chess(game)) = &mut state.active_minigame {
+        game.game_result = Some(ChessResult::Draw);
+    } else {
+        panic!("expected chess");
+    }
     apply_game_result(&mut state);
 
     assert_eq!(state.chess_stats.games_played, 3);
@@ -116,7 +148,11 @@ fn test_prestige_accumulates_from_multiple_wins() {
     // Win each difficulty level
     for difficulty in ChessDifficulty::ALL {
         start_chess_game(&mut state, difficulty);
-        state.active_chess.as_mut().unwrap().game_result = Some(ChessResult::Win);
+        if let Some(ActiveMinigame::Chess(game)) = &mut state.active_minigame {
+            game.game_result = Some(ChessResult::Win);
+        } else {
+            panic!("expected chess");
+        }
         apply_game_result(&mut state);
     }
 

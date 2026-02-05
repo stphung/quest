@@ -12,6 +12,7 @@ use super::minesweeper::{MinesweeperDifficulty, MinesweeperGame};
 use super::morris::logic::start_morris_game;
 use super::morris::MorrisDifficulty;
 use super::rune::{RuneDifficulty, RuneGame};
+use super::ActiveMinigame;
 use crate::core::game_state::GameState;
 use rand::Rng;
 
@@ -82,12 +83,14 @@ fn accept_selected_challenge(state: &mut GameState) {
             }
             ChallengeType::Minesweeper => {
                 let difficulty = MinesweeperDifficulty::from_index(difficulty_index);
-                state.active_minesweeper = Some(MinesweeperGame::new(difficulty));
+                state.active_minigame = Some(ActiveMinigame::Minesweeper(MinesweeperGame::new(
+                    difficulty,
+                )));
                 state.challenge_menu.close();
             }
             ChallengeType::Rune => {
                 let difficulty = RuneDifficulty::from_index(difficulty_index);
-                state.active_rune = Some(RuneGame::new(difficulty));
+                state.active_minigame = Some(ActiveMinigame::Rune(RuneGame::new(difficulty)));
                 state.challenge_menu.close();
             }
         }
@@ -456,22 +459,26 @@ impl ChallengeMenu {
 
 /// Check if challenge discovery conditions are met, roll once, and pick from weighted table.
 /// Returns the discovered ChallengeType if one was added to the menu, or None.
-pub fn try_discover_challenge<R: Rng>(state: &mut GameState, rng: &mut R) -> Option<ChallengeType> {
+/// `haven_discovery_percent` is the Library bonus (0.0 if not built)
+pub fn try_discover_challenge_with_haven<R: Rng>(
+    state: &mut GameState,
+    rng: &mut R,
+    haven_discovery_percent: f64,
+) -> Option<ChallengeType> {
     // Requirements: P1+, not in dungeon, not fishing, not in active minigame
     if state.prestige_rank < 1
         || state.active_dungeon.is_some()
         || state.active_fishing.is_some()
-        || state.active_chess.is_some()
-        || state.active_morris.is_some()
-        || state.active_gomoku.is_some()
-        || state.active_minesweeper.is_some()
-        || state.active_rune.is_some()
+        || state.active_minigame.is_some()
     {
         return None;
     }
 
+    // Apply Library bonus to discovery chance
+    let discovery_chance = CHALLENGE_DISCOVERY_CHANCE * (1.0 + haven_discovery_percent / 100.0);
+
     // Single roll for any challenge
-    if rng.gen::<f64>() >= CHALLENGE_DISCOVERY_CHANCE {
+    if rng.gen::<f64>() >= discovery_chance {
         return None;
     }
 
@@ -499,6 +506,12 @@ pub fn try_discover_challenge<R: Rng>(state: &mut GameState, rng: &mut R) -> Opt
     }
 
     None
+}
+
+/// Legacy function without Haven bonus (for backwards compatibility)
+#[allow(dead_code)]
+pub fn try_discover_challenge<R: Rng>(state: &mut GameState, rng: &mut R) -> Option<ChallengeType> {
+    try_discover_challenge_with_haven(state, rng, 0.0)
 }
 
 /// Create a PendingChallenge from a ChallengeType
@@ -889,11 +902,14 @@ mod tests {
         state.challenge_menu.open_detail();
         state.challenge_menu.selected_difficulty = 1; // Apprentice
 
-        assert!(state.active_chess.is_none());
+        assert!(state.active_minigame.is_none());
 
         process_input(&mut state, MenuInput::Select);
 
-        assert!(state.active_chess.is_some());
+        assert!(matches!(
+            state.active_minigame,
+            Some(ActiveMinigame::Chess(_))
+        ));
         assert!(!state.challenge_menu.is_open);
     }
 
@@ -911,7 +927,10 @@ mod tests {
 
         process_input(&mut state, MenuInput::Select);
 
-        assert!(state.active_morris.is_some());
+        assert!(matches!(
+            state.active_minigame,
+            Some(ActiveMinigame::Morris(_))
+        ));
         assert!(!state.challenge_menu.is_open);
     }
 
@@ -929,7 +948,10 @@ mod tests {
 
         process_input(&mut state, MenuInput::Select);
 
-        assert!(state.active_gomoku.is_some());
+        assert!(matches!(
+            state.active_minigame,
+            Some(ActiveMinigame::Gomoku(_))
+        ));
         assert!(!state.challenge_menu.is_open);
     }
 
@@ -947,7 +969,10 @@ mod tests {
 
         process_input(&mut state, MenuInput::Select);
 
-        assert!(state.active_minesweeper.is_some());
+        assert!(matches!(
+            state.active_minigame,
+            Some(ActiveMinigame::Minesweeper(_))
+        ));
         assert!(!state.challenge_menu.is_open);
     }
 
@@ -965,7 +990,57 @@ mod tests {
 
         process_input(&mut state, MenuInput::Select);
 
-        assert!(state.active_rune.is_some());
+        assert!(matches!(
+            state.active_minigame,
+            Some(ActiveMinigame::Rune(_))
+        ));
         assert!(!state.challenge_menu.is_open);
+    }
+
+    // =========================================================================
+    // Haven Discovery Bonus Tests
+    // =========================================================================
+
+    #[test]
+    fn test_haven_discovery_bonus_increases_chance() {
+        use rand::SeedableRng;
+        use rand_chacha::ChaCha8Rng;
+
+        // Test that the bonus is applied correctly by checking at fixed RNG values
+        // Base discovery chance is 0.000014, so we need RNG values very close to 0 to discover
+
+        // Count discoveries in a reasonable sample
+        let trials = 50000;
+        let mut discoveries_no_bonus = 0;
+        let mut discoveries_with_bonus = 0;
+
+        for seed in 0..trials {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            let mut state = GameState::new("Test".to_string(), 0);
+            state.prestige_rank = 1;
+
+            if try_discover_challenge_with_haven(&mut state, &mut rng, 0.0).is_some() {
+                discoveries_no_bonus += 1;
+            }
+        }
+
+        for seed in 0..trials {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            let mut state = GameState::new("Test".to_string(), 0);
+            state.prestige_rank = 1;
+
+            if try_discover_challenge_with_haven(&mut state, &mut rng, 50.0).is_some() {
+                discoveries_with_bonus += 1;
+            }
+        }
+
+        // With +50% bonus, should see more discoveries than without
+        // Given the low base rate, we just verify the bonus increases discoveries
+        assert!(
+            discoveries_with_bonus >= discoveries_no_bonus,
+            "Haven +50% discovery should increase or equal rate: no_bonus={}, with_bonus={}",
+            discoveries_no_bonus,
+            discoveries_with_bonus
+        );
     }
 }

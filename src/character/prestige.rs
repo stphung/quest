@@ -152,6 +152,9 @@ pub fn perform_prestige(state: &mut GameState) {
     // are intentionally preserved across prestige as a separate progression track
     state.active_fishing = None;
 
+    // Clear any active minigame session
+    state.active_minigame = None;
+
     // Reset combat state with base HP (50 for fresh attributes)
     state.combat_state = CombatState::new(50);
 
@@ -163,6 +166,35 @@ pub fn perform_prestige(state: &mut GameState) {
     state
         .zone_progression
         .reset_for_prestige(state.prestige_rank);
+}
+
+/// Performs prestige with Vault item preservation.
+/// `preserved_slots` contains the equipment slots to keep (limited by Vault tier externally).
+pub fn perform_prestige_with_vault(
+    state: &mut GameState,
+    preserved_slots: &[crate::items::EquipmentSlot],
+) {
+    use crate::items::EquipmentSlot;
+
+    if !can_prestige(state) {
+        return;
+    }
+
+    // Save items from preserved slots before reset
+    let mut saved_items: Vec<(EquipmentSlot, crate::items::Item)> = Vec::new();
+    for slot in preserved_slots {
+        if let Some(item) = state.equipment.get(*slot) {
+            saved_items.push((*slot, item.clone()));
+        }
+    }
+
+    // Normal prestige reset
+    perform_prestige(state);
+
+    // Restore preserved items
+    for (slot, item) in saved_items {
+        state.equipment.set(slot, Some(item));
+    }
 }
 
 /// Gets the adventurer rank based on average level
@@ -437,6 +469,64 @@ mod tests {
         assert!(game_state.equipment.get(EquipmentSlot::Boots).is_none());
         assert!(game_state.equipment.get(EquipmentSlot::Amulet).is_none());
         assert!(game_state.equipment.get(EquipmentSlot::Ring).is_none());
+    }
+
+    #[test]
+    fn test_prestige_with_vault_preserves_items() {
+        use crate::items::{AttributeBonuses, EquipmentSlot, Item, Rarity};
+        use chrono::Utc;
+
+        let mut game_state = crate::core::game_state::GameState::new(
+            "Test Hero".to_string(),
+            Utc::now().timestamp(),
+        );
+
+        // Equip a weapon and armor
+        let weapon = Item {
+            slot: EquipmentSlot::Weapon,
+            rarity: Rarity::Legendary,
+            base_name: "Sword".to_string(),
+            display_name: "Stormbreaker".to_string(),
+            attributes: AttributeBonuses {
+                str: 15,
+                ..AttributeBonuses::new()
+            },
+            affixes: vec![],
+        };
+        let armor = Item {
+            slot: EquipmentSlot::Armor,
+            rarity: Rarity::Rare,
+            base_name: "Plate".to_string(),
+            display_name: "Dragon Plate".to_string(),
+            attributes: AttributeBonuses {
+                con: 10,
+                ..AttributeBonuses::new()
+            },
+            affixes: vec![],
+        };
+        game_state
+            .equipment
+            .set(EquipmentSlot::Weapon, Some(weapon));
+        game_state.equipment.set(EquipmentSlot::Armor, Some(armor));
+
+        // Level up enough to prestige
+        game_state.character_level = 10;
+
+        // Prestige with 1 vault slot, preserving weapon only
+        let preserved = vec![EquipmentSlot::Weapon];
+        perform_prestige_with_vault(&mut game_state, &preserved);
+
+        // Prestige should have happened
+        assert_eq!(game_state.prestige_rank, 1);
+        assert_eq!(game_state.character_level, 1);
+
+        // Weapon should be preserved
+        let weapon = game_state.equipment.get(EquipmentSlot::Weapon);
+        assert!(weapon.is_some());
+        assert_eq!(weapon.as_ref().unwrap().display_name, "Stormbreaker");
+
+        // Armor should be cleared (not preserved)
+        assert!(game_state.equipment.get(EquipmentSlot::Armor).is_none());
     }
 
     #[test]

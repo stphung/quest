@@ -15,13 +15,25 @@
 ### Task 1: Haven Data Structures
 
 **Files:**
-- Create: `src/haven.rs`
-- Modify: `src/lib.rs`
-- Modify: `src/main.rs` (module declaration only)
+- Create: `src/haven/mod.rs` (module exports, following the refactored module pattern)
+- Create: `src/haven/types.rs` (room definitions, bonuses, Haven state)
+- Modify: `src/lib.rs` (add `pub mod haven;`)
 
-**Step 1: Write the failing test**
+**Step 1: Create the haven module structure**
 
-Create `src/haven.rs` with tests first:
+Create `src/haven/mod.rs`:
+
+```rust
+//! Haven base building system — account-level skill tree.
+
+pub mod types;
+
+pub use types::*;
+```
+
+**Step 2: Write the types module with tests**
+
+Create `src/haven/types.rs` with the data structures:
 
 ```rust
 //! Haven base building system — account-level skill tree.
@@ -550,28 +562,26 @@ mod tests {
 }
 ```
 
-**Step 2: Run test to verify it compiles and passes**
+**Step 3: Run test to verify it compiles and passes**
 
-Run: `cargo test --lib haven::tests -- --nocapture`
+Run: `cargo test haven::types::tests -- --nocapture`
 
 Expected: All tests PASS.
 
-**Step 3: Add module declarations**
+**Step 4: Add module declaration**
 
-Add `pub mod haven;` to `src/lib.rs` (alphabetically, after `pub mod gomoku_logic;`).
+Add `pub mod haven;` to `src/lib.rs` (alphabetically, after `pub mod fishing;`).
 
-Add `mod haven;` to `src/main.rs` (alphabetically, after `mod gomoku_logic;`).
-
-**Step 4: Run all tests**
+**Step 5: Run all tests**
 
 Run: `cargo test`
 
 Expected: All existing tests + new haven tests pass.
 
-**Step 5: Commit**
+**Step 6: Commit**
 
 ```bash
-git add src/haven.rs src/lib.rs src/main.rs
+git add src/haven/ src/lib.rs
 git commit -m "feat(haven): add data structures, room definitions, and skill tree"
 ```
 
@@ -580,18 +590,17 @@ git commit -m "feat(haven): add data structures, room definitions, and skill tre
 ### Task 2: Haven Logic — Build Validation & Persistence
 
 **Files:**
-- Create: `src/haven_logic.rs`
-- Modify: `src/lib.rs`
-- Modify: `src/main.rs` (module declaration only)
+- Create: `src/haven/logic.rs`
+- Modify: `src/haven/mod.rs` (add `pub mod logic;`)
 
-**Step 1: Write the haven_logic module**
+**Step 1: Write the logic module**
 
-Create `src/haven_logic.rs`:
+Create `src/haven/logic.rs`:
 
 ```rust
 //! Haven build/upgrade logic and persistence.
 
-use crate::haven::{Haven, HavenRoomId, haven_discovery_chance, tier_cost};
+use super::types::{Haven, HavenRoomId, haven_discovery_chance, tier_cost};
 use rand::Rng;
 use std::fs;
 use std::io;
@@ -812,14 +821,13 @@ mod tests {
 
 **Step 2: Run test to verify**
 
-Run: `cargo test --lib haven_logic::tests -- --nocapture`
+Run: `cargo test haven::logic::tests -- --nocapture`
 
 Expected: All tests PASS (except discovery test needs `rand_chacha` — check if it's already a dep, otherwise use `rand::rngs::StdRng`).
 
-**Step 3: Add module declarations**
+**Step 3: Add module declaration**
 
-Add `pub mod haven_logic;` to `src/lib.rs`.
-Add `mod haven_logic;` to `src/main.rs`.
+Add `pub mod logic;` and `pub use logic::*;` to `src/haven/mod.rs`.
 
 **Step 4: Run all tests**
 
@@ -830,25 +838,106 @@ Expected: All pass.
 **Step 5: Commit**
 
 ```bash
-git add src/haven_logic.rs src/lib.rs src/main.rs
+git add src/haven/logic.rs src/haven/mod.rs
 git commit -m "feat(haven): add build/upgrade logic, discovery, and persistence"
 ```
 
 ---
 
-### Task 3: Integrate Haven Discovery into Game Loop
+### Task 3: Add Debug Menu Trigger for Haven
+
+**Files:**
+- Modify: `src/utils/debug_menu.rs`
+
+**Context:** The debug menu (activated with `--debug` flag, toggled with backtick) allows testing chance-based discoveries. Add a "Trigger Haven Discovery" option for testing.
+
+**Step 1: Add Haven to DEBUG_OPTIONS**
+
+In `src/utils/debug_menu.rs`, add to the `DEBUG_OPTIONS` array:
+
+```rust
+pub const DEBUG_OPTIONS: &[&str] = &[
+    "Trigger Dungeon",
+    "Trigger Fishing",
+    "Trigger Chess Challenge",
+    "Trigger Morris Challenge",
+    "Trigger Gomoku Challenge",
+    "Trigger Minesweeper Challenge",
+    "Trigger Rune Challenge",
+    "Trigger Haven Discovery",  // Add this
+];
+```
+
+**Step 2: Add trigger function**
+
+Add the trigger function:
+
+```rust
+fn trigger_haven_discovery(haven: &mut Haven) -> &'static str {
+    if haven.discovered {
+        return "Haven already discovered!";
+    }
+    haven.discovered = true;
+    "Haven discovered!"
+}
+```
+
+**Step 3: Update trigger_selected**
+
+The `trigger_selected` method needs access to Haven. Update its signature to accept `&mut Haven` and add the match arm:
+
+```rust
+pub fn trigger_selected(&mut self, state: &mut GameState, haven: &mut Haven) -> &'static str {
+    let msg = match self.selected_index {
+        // ... existing arms ...
+        7 => trigger_haven_discovery(haven),
+        _ => "Unknown option",
+    };
+    self.close();
+    msg
+}
+```
+
+**Step 4: Update imports**
+
+Add to imports in `debug_menu.rs`:
+
+```rust
+use crate::haven::Haven;
+```
+
+**Step 5: Update callers in main.rs**
+
+Update the call to `trigger_selected` in `main.rs` to pass `&mut haven`.
+
+**Step 6: Run tests and check**
+
+Run: `cargo test utils::debug_menu::tests -- --nocapture`
+
+Expected: All tests pass (may need to update test to pass a Haven).
+
+**Step 7: Commit**
+
+```bash
+git add src/utils/debug_menu.rs src/main.rs
+git commit -m "feat(haven): add debug menu trigger for Haven discovery"
+```
+
+---
+
+### Task 4: Integrate Haven Discovery into Game Loop
 
 **Files:**
 - Modify: `src/main.rs`
 
-**Context:** The game loop in `main.rs` calls `game_tick()` every 100ms. Haven discovery needs its own independent RNG roll, similar to challenge discovery at lines 1201-1228. The Haven must be loaded at startup and passed through the game loop.
+**Context:** The game loop in `main.rs` calls `game_tick()` every 100ms. Haven discovery needs its own independent RNG roll, similar to challenge discovery. The Haven must be loaded at startup and passed through the game loop.
 
 **Step 1: Load Haven at startup**
 
-In `main.rs`, after `CharacterManager::new()` (around line 86), add Haven loading:
+In `main.rs`, after `CharacterManager::new()`, add Haven loading:
 
 ```rust
-use haven_logic::{load_haven, save_haven, try_discover_haven};
+use crate::haven::{load_haven, save_haven, try_discover_haven, Haven};
 
 let mut haven = load_haven();
 ```
@@ -916,7 +1005,7 @@ git commit -m "feat(haven): integrate discovery RNG into game loop"
 
 ---
 
-### Task 4: Add Haven Key Binding & Screen State
+### Task 5: Add Haven Key Binding & Screen State
 
 **Files:**
 - Modify: `src/main.rs`
@@ -955,8 +1044,8 @@ if showing_haven {
         match key_event.code {
             KeyCode::Enter => {
                 // Attempt build
-                let room = haven::HavenRoomId::ALL[haven_selected_room];
-                if let Some((_tier, _p, _f)) = haven_logic::try_build_room(
+                let room = crate::haven::HavenRoomId::ALL[haven_selected_room];
+                if let Some((_tier, _p, _f)) = crate::haven::try_build_room(
                     room,
                     &mut haven,
                     &mut state.prestige_rank,
@@ -985,8 +1074,8 @@ if showing_haven {
                 }
             }
             KeyCode::Enter => {
-                let room = haven::HavenRoomId::ALL[haven_selected_room];
-                if haven.can_build(room) && haven_logic::can_afford(
+                let room = crate::haven::HavenRoomId::ALL[haven_selected_room];
+                if haven.can_build(room) && crate::haven::can_afford(
                     room, &haven, state.prestige_rank, state.fishing.rank
                 ) {
                     haven_confirming_build = true;
@@ -1031,17 +1120,17 @@ git commit -m "feat(haven): add [H] key binding and Haven screen state"
 
 ---
 
-### Task 5: Integrate Vault with Prestige
+### Task 6: Integrate Vault with Prestige
 
 **Files:**
-- Modify: `src/prestige.rs`
+- Modify: `src/character/prestige.rs`
 - Modify: `src/main.rs`
 
 **Context:** The Vault capstone preserves equipped items through prestige. The prestige flow needs: (1) check Vault tier, (2) if > 0, show item selection screen, (3) preserve selected items.
 
 **Step 1: Write test for Vault preservation**
 
-Add to `src/prestige.rs` tests:
+Add to `src/character/prestige.rs` tests:
 
 ```rust
 #[test]
@@ -1080,7 +1169,7 @@ fn test_perform_prestige_with_vault_items() {
 
 **Step 2: Implement `perform_prestige_with_vault`**
 
-Add to `src/prestige.rs`:
+Add to `src/character/prestige.rs`:
 
 ```rust
 /// Performs prestige with Vault item preservation.
@@ -1113,13 +1202,13 @@ pub fn perform_prestige_with_vault(state: &mut GameState, preserved_slots: &[cra
 
 **Step 3: Run tests**
 
-Run: `cargo test --lib prestige::tests -- --nocapture`
+Run: `cargo test character::prestige::tests -- --nocapture`
 
 Expected: All prestige tests pass including new vault test.
 
 **Step 4: Wire up Vault in main.rs prestige flow**
 
-In `main.rs`, modify the prestige confirmation handler (around lines 639-665). When the player confirms prestige, check `haven.vault_tier()`:
+In `main.rs`, modify the prestige confirmation handler. When the player confirms prestige, check `haven.vault_tier()`:
 
 - If 0: call `perform_prestige(&mut state)` as before
 - If > 0: set `showing_vault_selection = true` with the number of slots, let the player pick items, then call `perform_prestige_with_vault(&mut state, &selected_slots)`
@@ -1129,13 +1218,13 @@ This requires additional state variables and a vault selection UI (deferred to T
 **Step 5: Commit**
 
 ```bash
-git add src/prestige.rs src/main.rs
+git add src/character/prestige.rs src/main.rs
 git commit -m "feat(haven): add Vault item preservation on prestige"
 ```
 
 ---
 
-### Task 6: Haven UI — Skill Tree Scene
+### Task 7: Haven UI — Skill Tree Scene
 
 **Files:**
 - Create: `src/ui/haven_scene.rs`
@@ -1194,7 +1283,7 @@ git commit -m "feat(haven): add skill tree UI, discovery modal, and build confir
 
 ---
 
-### Task 7: Haven UI — Vault Item Selection Screen
+### Task 8: Haven UI — Vault Item Selection Screen
 
 **Files:**
 - Modify: `src/ui/haven_scene.rs`
@@ -1246,17 +1335,17 @@ git commit -m "feat(haven): add Vault item selection screen on prestige"
 
 ---
 
-### Task 8: Apply Haven Bonuses to Game Systems
+### Task 9: Apply Haven Bonuses to Game Systems
 
 **Files:**
 - Modify: `src/main.rs` (pass Haven bonuses into relevant systems)
-- Possibly modify: `src/combat_logic.rs`, `src/game_logic.rs`, `src/fishing_logic.rs`, `src/item_drops.rs`
+- Possibly modify: `src/combat/logic.rs`, `src/core/game_logic.rs`, `src/fishing/logic.rs`, `src/items/drops.rs`
 
 **Context:** Haven bonuses are percentages of base values, computed once on character load. Each system needs to read the relevant bonus. The cleanest approach is to compute a `HavenBonuses` struct on load and pass it where needed. Alternatively, pass `&Haven` to each system.
 
 **Step 1: Create a computed bonuses helper**
 
-Add to `src/haven.rs`:
+Add to `src/haven/types.rs`:
 
 ```rust
 /// Pre-computed Haven bonuses for efficient access during gameplay
@@ -1293,11 +1382,11 @@ impl Haven {
 
 This is the most invasive task. For each bonus, find where the base value is used and apply the Haven modifier. Examples:
 
-- **Damage:** In `combat_logic.rs` where physical/magic damage is calculated, multiply base by `(1.0 + haven_bonuses.damage_percent / 100.0)`
-- **XP gain:** In `game_logic.rs` where XP is applied, multiply by `(1.0 + haven_bonuses.xp_gain_percent / 100.0)`
-- **Drop rate:** In `item_drops.rs` where drop chance is calculated, add `haven_bonuses.drop_rate_percent / 100.0`
-- **Offline XP:** In the offline progression calculation, multiply rate by Haven bonus
-- **Challenge discovery:** In `challenge_menu.rs` `CHALLENGE_DISCOVERY_CHANCE`, multiply by Haven bonus
+- **Damage:** In `src/combat/logic.rs` where physical/magic damage is calculated, multiply base by `(1.0 + haven_bonuses.damage_percent / 100.0)`
+- **XP gain:** In `src/core/game_logic.rs` where XP is applied, multiply by `(1.0 + haven_bonuses.xp_gain_percent / 100.0)`
+- **Drop rate:** In `src/items/drops.rs` where drop chance is calculated, add `haven_bonuses.drop_rate_percent / 100.0`
+- **Offline XP:** In `src/core/game_logic.rs` offline progression calculation, multiply rate by Haven bonus
+- **Challenge discovery:** In `src/challenges/menu.rs` `CHALLENGE_DISCOVERY_CHANCE`, multiply by Haven bonus
 
 Each integration point should be minimal — a single multiplication or addition. The Haven struct is read-only during gameplay.
 
@@ -1320,7 +1409,7 @@ git commit -m "feat(haven): apply Haven bonuses to combat, XP, drops, fishing, a
 
 ---
 
-### Task 9: Character Select Haven Integration
+### Task 10: Character Select Haven Integration
 
 **Files:**
 - Modify: `src/ui/character_select.rs`
@@ -1360,7 +1449,7 @@ git commit -m "feat(haven): show Haven progress on character select screen"
 
 ---
 
-### Task 10: Final Integration & Polish
+### Task 11: Final Integration & Polish
 
 **Files:**
 - Modify: `src/main.rs` (ensure Haven is saved on autosave)
@@ -1413,13 +1502,14 @@ git commit -m "feat(haven): final integration, autosave, footer hint, and polish
 
 | Task | Description | Key Files |
 |------|-------------|-----------|
-| 1 | Data structures & room definitions | `haven.rs`, `lib.rs`, `main.rs` |
-| 2 | Build logic & persistence | `haven_logic.rs`, `lib.rs`, `main.rs` |
-| 3 | Discovery in game loop | `main.rs` |
-| 4 | Key binding & screen state | `main.rs` |
-| 5 | Vault + prestige integration | `prestige.rs`, `main.rs` |
-| 6 | Skill tree UI scene | `ui/haven_scene.rs`, `ui/mod.rs` |
-| 7 | Vault item selection UI | `ui/haven_scene.rs`, `main.rs` |
-| 8 | Apply bonuses to game systems | `combat_logic.rs`, `game_logic.rs`, etc. |
-| 9 | Character select integration | `ui/character_select.rs` |
-| 10 | Polish, autosave, edge cases | Various |
+| 1 | Data structures & room definitions | `haven/mod.rs`, `haven/types.rs`, `lib.rs` |
+| 2 | Build logic & persistence | `haven/logic.rs`, `haven/mod.rs` |
+| 3 | Debug menu trigger | `utils/debug_menu.rs`, `main.rs` |
+| 4 | Discovery in game loop | `main.rs` |
+| 5 | Key binding & screen state | `main.rs` |
+| 6 | Vault + prestige integration | `character/prestige.rs`, `main.rs` |
+| 7 | Skill tree UI scene | `ui/haven_scene.rs`, `ui/mod.rs` |
+| 8 | Vault item selection UI | `ui/haven_scene.rs`, `main.rs` |
+| 9 | Apply bonuses to game systems | `combat/logic.rs`, `core/game_logic.rs`, etc. |
+| 10 | Character select integration | `ui/character_select.rs` |
+| 11 | Polish, autosave, edge cases | Various |
