@@ -67,6 +67,56 @@ pub fn get_liberties_at(
     count_liberties(board, &group)
 }
 
+/// Remove a group from the board and return the number of stones captured.
+fn remove_group(
+    board: &mut [[Option<Stone>; BOARD_SIZE]; BOARD_SIZE],
+    group: &HashSet<(usize, usize)>,
+) -> u32 {
+    let count = group.len() as u32;
+    for &(row, col) in group {
+        board[row][col] = None;
+    }
+    count
+}
+
+/// Check and remove any opponent groups with zero liberties adjacent to (row, col).
+/// Returns the total number of stones captured.
+pub fn capture_dead_groups(
+    board: &mut [[Option<Stone>; BOARD_SIZE]; BOARD_SIZE],
+    row: usize,
+    col: usize,
+    capturing_player: Stone,
+) -> u32 {
+    let opponent = capturing_player.opponent();
+    let mut captured = 0;
+    let mut checked = HashSet::new();
+
+    // Check all adjacent positions for opponent groups
+    for (dr, dc) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
+        let nr = row as i32 + dr;
+        let nc = col as i32 + dc;
+        if nr >= 0 && nr < BOARD_SIZE as i32 && nc >= 0 && nc < BOARD_SIZE as i32 {
+            let nr = nr as usize;
+            let nc = nc as usize;
+
+            if checked.contains(&(nr, nc)) {
+                continue;
+            }
+
+            if board[nr][nc] == Some(opponent) {
+                let group = get_group(board, nr, nc);
+                for &pos in &group {
+                    checked.insert(pos);
+                }
+                if count_liberties(board, &group) == 0 {
+                    captured += remove_group(board, &group);
+                }
+            }
+        }
+    }
+    captured
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -141,5 +191,63 @@ mod tests {
         let board = [[None; BOARD_SIZE]; BOARD_SIZE];
         let group = get_group(&board, 4, 4);
         assert!(group.is_empty());
+    }
+
+    #[test]
+    fn test_capture_single_stone() {
+        let mut board = [[None; BOARD_SIZE]; BOARD_SIZE];
+        // Set up a capture scenario
+        place(&mut board, 4, 4, Stone::White);
+        place(&mut board, 3, 4, Stone::Black);
+        place(&mut board, 5, 4, Stone::Black);
+        place(&mut board, 4, 3, Stone::Black);
+        // White has 1 liberty at (4, 5)
+        assert_eq!(get_liberties_at(&board, 4, 4), 1);
+
+        // Black plays at (4, 5) to capture
+        place(&mut board, 4, 5, Stone::Black);
+        let captured = capture_dead_groups(&mut board, 4, 5, Stone::Black);
+
+        assert_eq!(captured, 1);
+        assert!(board[4][4].is_none()); // White stone removed
+    }
+
+    #[test]
+    fn test_capture_group() {
+        let mut board = [[None; BOARD_SIZE]; BOARD_SIZE];
+        // Two white stones
+        place(&mut board, 4, 4, Stone::White);
+        place(&mut board, 4, 5, Stone::White);
+        // Surround with black
+        place(&mut board, 3, 4, Stone::Black);
+        place(&mut board, 3, 5, Stone::Black);
+        place(&mut board, 5, 4, Stone::Black);
+        place(&mut board, 5, 5, Stone::Black);
+        place(&mut board, 4, 3, Stone::Black);
+        // One liberty left at (4, 6)
+
+        place(&mut board, 4, 6, Stone::Black);
+        let captured = capture_dead_groups(&mut board, 4, 6, Stone::Black);
+
+        assert_eq!(captured, 2);
+        assert!(board[4][4].is_none());
+        assert!(board[4][5].is_none());
+    }
+
+    #[test]
+    fn test_no_capture_with_liberties() {
+        let mut board = [[None; BOARD_SIZE]; BOARD_SIZE];
+        place(&mut board, 4, 4, Stone::White);
+        place(&mut board, 3, 4, Stone::Black);
+        place(&mut board, 5, 4, Stone::Black);
+        place(&mut board, 4, 3, Stone::Black);
+        // White still has liberty at (4, 5) - not surrounded
+
+        // Black plays elsewhere
+        place(&mut board, 0, 0, Stone::Black);
+        let captured = capture_dead_groups(&mut board, 0, 0, Stone::Black);
+
+        assert_eq!(captured, 0);
+        assert!(board[4][4].is_some()); // White stone still there
     }
 }
