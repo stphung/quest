@@ -30,6 +30,11 @@ use challenges::morris::logic::{
 use challenges::rune::logic::{
     apply_game_result as apply_rune_result, process_input as process_rune_input, RuneInput,
 };
+use character::input::{
+    process_creation_input, process_delete_input, process_rename_input, process_select_input,
+    CreationInput, CreationResult, DeleteInput, DeleteResult, RenameInput, RenameResult,
+    SelectInput, SelectResult,
+};
 use character::manager::CharacterManager;
 use character::prestige::*;
 use character::save::SaveManager;
@@ -218,39 +223,29 @@ fn main() -> io::Result<()> {
                 // Handle input
                 if event::poll(Duration::from_millis(50))? {
                     if let Event::Key(key_event) = event::read()? {
-                        match key_event.code {
-                            KeyCode::Char(c) => {
-                                creation_screen.handle_char_input(c);
+                        let input = match key_event.code {
+                            KeyCode::Char(c) => CreationInput::Char(c),
+                            KeyCode::Backspace => CreationInput::Backspace,
+                            KeyCode::Enter => CreationInput::Submit,
+                            KeyCode::Esc => CreationInput::Cancel,
+                            _ => CreationInput::Other,
+                        };
+
+                        let has_existing = !character_manager.list_characters()?.is_empty();
+                        let result = process_creation_input(
+                            &mut creation_screen,
+                            input,
+                            &character_manager,
+                            has_existing,
+                        );
+
+                        match result {
+                            CreationResult::Created | CreationResult::Cancelled => {
+                                creation_screen = CharacterCreationScreen::new();
+                                select_screen = CharacterSelectScreen::new();
+                                current_screen = Screen::CharacterSelect;
                             }
-                            KeyCode::Backspace => {
-                                creation_screen.handle_backspace();
-                            }
-                            KeyCode::Enter => {
-                                // Validate and create character
-                                if creation_screen.is_valid() {
-                                    let new_name = creation_screen.get_name();
-                                    let new_state =
-                                        GameState::new(new_name, Utc::now().timestamp());
-                                    if let Err(e) = character_manager.save_character(&new_state) {
-                                        creation_screen.validation_error =
-                                            Some(format!("Save failed: {}", e));
-                                    } else {
-                                        // Reset creation screen and go to select
-                                        creation_screen = CharacterCreationScreen::new();
-                                        select_screen = CharacterSelectScreen::new();
-                                        current_screen = Screen::CharacterSelect;
-                                    }
-                                }
-                            }
-                            KeyCode::Esc => {
-                                // Cancel - go to select if characters exist, else stay
-                                let chars = character_manager.list_characters()?;
-                                if !chars.is_empty() {
-                                    creation_screen = CharacterCreationScreen::new();
-                                    current_screen = Screen::CharacterSelect;
-                                }
-                            }
-                            _ => {}
+                            CreationResult::Continue | CreationResult::SaveFailed(_) => {}
                         }
                     }
                 }
@@ -259,17 +254,6 @@ fn main() -> io::Result<()> {
             Screen::CharacterSelect => {
                 // Refresh character list
                 let characters = character_manager.list_characters()?;
-
-                // If no characters, go to creation
-                if characters.is_empty() {
-                    current_screen = Screen::CharacterCreation;
-                    continue;
-                }
-
-                // Clamp selected index
-                if select_screen.selected_index >= characters.len() {
-                    select_screen.selected_index = characters.len().saturating_sub(1);
-                }
 
                 // Draw character select screen
                 terminal.draw(|f| {
@@ -280,99 +264,87 @@ fn main() -> io::Result<()> {
                 // Handle input
                 if event::poll(Duration::from_millis(50))? {
                     if let Event::Key(key_event) = event::read()? {
-                        match key_event.code {
-                            KeyCode::Up => {
-                                select_screen.selected_index =
-                                    select_screen.selected_index.saturating_sub(1);
+                        let input = match key_event.code {
+                            KeyCode::Up => SelectInput::Up,
+                            KeyCode::Down => SelectInput::Down,
+                            KeyCode::Enter => SelectInput::Select,
+                            KeyCode::Char('n') | KeyCode::Char('N') => SelectInput::New,
+                            KeyCode::Char('d') | KeyCode::Char('D') => SelectInput::Delete,
+                            KeyCode::Char('r') | KeyCode::Char('R') => SelectInput::Rename,
+                            KeyCode::Char('q') | KeyCode::Char('Q') => SelectInput::Quit,
+                            _ => SelectInput::Other,
+                        };
+
+                        let result = process_select_input(&mut select_screen, input, &characters);
+
+                        match result {
+                            SelectResult::NoCharacters => {
+                                current_screen = Screen::CharacterCreation;
                             }
-                            KeyCode::Down => {
-                                if select_screen.selected_index + 1 < characters.len() {
-                                    select_screen.selected_index += 1;
-                                }
-                            }
-                            KeyCode::Enter => {
-                                // Load selected character and start game
-                                let selected = &characters[select_screen.selected_index];
-                                if !selected.is_corrupted {
-                                    match character_manager.load_character(&selected.filename) {
-                                        Ok(mut state) => {
-                                            // Sanity check: clear stale enemy if HP is impossibly high
-                                            // (can happen if save was from before prestige reset)
-                                            let derived = character::derived_stats::DerivedStats::calculate_derived_stats(
-                                                &state.attributes,
-                                                &state.equipment,
-                                            );
-                                            if let Some(enemy) = &state.combat_state.current_enemy {
-                                                // Max possible enemy HP is 2.4x player HP (boss with max variance)
-                                                // If enemy HP is > 2.5x, it's stale from before a stat reset
-                                                if enemy.max_hp
-                                                    > (derived.max_hp as f64 * 2.5) as u32
-                                                {
-                                                    state.combat_state.current_enemy = None;
-                                                }
+                            SelectResult::LoadCharacter(filename) => {
+                                match character_manager.load_character(&filename) {
+                                    Ok(mut state) => {
+                                        // Sanity check: clear stale enemy if HP is impossibly high
+                                        // (can happen if save was from before prestige reset)
+                                        let derived = character::derived_stats::DerivedStats::calculate_derived_stats(
+                                            &state.attributes,
+                                            &state.equipment,
+                                        );
+                                        if let Some(enemy) = &state.combat_state.current_enemy {
+                                            // Max possible enemy HP is 2.4x player HP (boss with max variance)
+                                            // If enemy HP is > 2.5x, it's stale from before a stat reset
+                                            if enemy.max_hp > (derived.max_hp as f64 * 2.5) as u32 {
+                                                state.combat_state.current_enemy = None;
                                             }
+                                        }
 
-                                            // Process offline progression
-                                            let current_time = Utc::now().timestamp();
-                                            let elapsed_seconds =
-                                                current_time - state.last_save_time;
+                                        // Process offline progression
+                                        let current_time = Utc::now().timestamp();
+                                        let elapsed_seconds = current_time - state.last_save_time;
 
-                                            if elapsed_seconds > 60 {
-                                                let report =
-                                                    process_offline_progression(&mut state);
-                                                // Always show offline progress in combat log
-                                                if report.xp_gained > 0 {
-                                                    let message = if report.total_level_ups > 0 {
-                                                        format!(
-                                                            "Offline: +{} XP, +{} levels",
-                                                            report.xp_gained,
-                                                            report.total_level_ups
-                                                        )
-                                                    } else {
-                                                        format!("Offline: +{} XP", report.xp_gained)
-                                                    };
-                                                    state
-                                                        .combat_state
-                                                        .add_log_entry(message, false, true);
-                                                }
+                                        if elapsed_seconds > 60 {
+                                            let report = process_offline_progression(&mut state);
+                                            // Always show offline progress in combat log
+                                            if report.xp_gained > 0 {
+                                                let message = if report.total_level_ups > 0 {
+                                                    format!(
+                                                        "Offline: +{} XP, +{} levels",
+                                                        report.xp_gained, report.total_level_ups
+                                                    )
+                                                } else {
+                                                    format!("Offline: +{} XP", report.xp_gained)
+                                                };
+                                                state
+                                                    .combat_state
+                                                    .add_log_entry(message, false, true);
                                             }
+                                        }
 
-                                            game_state = Some(state);
-                                            current_screen = Screen::Game;
-                                        }
-                                        Err(e) => {
-                                            // Could show error message, for now just stay on select
-                                            eprintln!("Failed to load character: {}", e);
-                                        }
+                                        game_state = Some(state);
+                                        current_screen = Screen::Game;
+                                    }
+                                    Err(e) => {
+                                        // Could show error message, for now just stay on select
+                                        eprintln!("Failed to load character: {}", e);
                                     }
                                 }
                             }
-                            KeyCode::Char('n') | KeyCode::Char('N') => {
-                                // New character
+                            SelectResult::GoToCreation => {
                                 creation_screen = CharacterCreationScreen::new();
                                 current_screen = Screen::CharacterCreation;
                             }
-                            KeyCode::Char('d') | KeyCode::Char('D') => {
-                                // Delete character
-                                let selected = &characters[select_screen.selected_index];
-                                if !selected.is_corrupted {
-                                    delete_screen = CharacterDeleteScreen::new();
-                                    current_screen = Screen::CharacterDelete;
-                                }
+                            SelectResult::GoToDelete => {
+                                delete_screen = CharacterDeleteScreen::new();
+                                current_screen = Screen::CharacterDelete;
                             }
-                            KeyCode::Char('r') | KeyCode::Char('R') => {
-                                // Rename character
-                                let selected = &characters[select_screen.selected_index];
-                                if !selected.is_corrupted {
-                                    rename_screen = CharacterRenameScreen::new();
-                                    current_screen = Screen::CharacterRename;
-                                }
+                            SelectResult::GoToRename => {
+                                rename_screen = CharacterRenameScreen::new();
+                                current_screen = Screen::CharacterRename;
                             }
-                            KeyCode::Char('q') | KeyCode::Char('Q') => {
-                                // Quit
+                            SelectResult::Quit => {
                                 break;
                             }
-                            _ => {}
+                            SelectResult::Continue | SelectResult::LoadFailed(_) => {}
                         }
                     }
                 }
@@ -396,32 +368,31 @@ fn main() -> io::Result<()> {
                 // Handle input
                 if event::poll(Duration::from_millis(50))? {
                     if let Event::Key(key_event) = event::read()? {
-                        match key_event.code {
-                            KeyCode::Char(c) => {
-                                delete_screen.handle_char_input(c);
-                            }
-                            KeyCode::Backspace => {
-                                delete_screen.handle_backspace();
-                            }
-                            KeyCode::Enter => {
-                                // Check if confirmation matches
-                                if delete_screen.is_confirmed(&selected_character.character_name) {
-                                    if let Err(e) = character_manager
-                                        .delete_character(&selected_character.filename)
-                                    {
-                                        eprintln!("Failed to delete character: {}", e);
-                                    }
-                                    delete_screen = CharacterDeleteScreen::new();
-                                    select_screen.selected_index = 0;
-                                    current_screen = Screen::CharacterSelect;
-                                }
-                            }
-                            KeyCode::Esc => {
-                                // Cancel
+                        let input = match key_event.code {
+                            KeyCode::Char(c) => DeleteInput::Char(c),
+                            KeyCode::Backspace => DeleteInput::Backspace,
+                            KeyCode::Enter => DeleteInput::Submit,
+                            KeyCode::Esc => DeleteInput::Cancel,
+                            _ => DeleteInput::Other,
+                        };
+
+                        let result = process_delete_input(
+                            &mut delete_screen,
+                            input,
+                            &character_manager,
+                            selected_character,
+                        );
+
+                        match result {
+                            DeleteResult::Deleted | DeleteResult::Cancelled => {
                                 delete_screen = CharacterDeleteScreen::new();
+                                select_screen.selected_index = 0;
                                 current_screen = Screen::CharacterSelect;
                             }
-                            _ => {}
+                            DeleteResult::DeleteFailed(e) => {
+                                eprintln!("Failed to delete character: {}", e);
+                            }
+                            DeleteResult::Continue => {}
                         }
                     }
                 }
@@ -445,34 +416,27 @@ fn main() -> io::Result<()> {
                 // Handle input
                 if event::poll(Duration::from_millis(50))? {
                     if let Event::Key(key_event) = event::read()? {
-                        match key_event.code {
-                            KeyCode::Char(c) => {
-                                rename_screen.handle_char_input(c);
-                            }
-                            KeyCode::Backspace => {
-                                rename_screen.handle_backspace();
-                            }
-                            KeyCode::Enter => {
-                                // Validate and rename
-                                if rename_screen.is_valid() {
-                                    let new_name = rename_screen.get_name();
-                                    if let Err(e) = character_manager
-                                        .rename_character(&selected_character.filename, new_name)
-                                    {
-                                        rename_screen.validation_error =
-                                            Some(format!("Rename failed: {}", e));
-                                    } else {
-                                        rename_screen = CharacterRenameScreen::new();
-                                        current_screen = Screen::CharacterSelect;
-                                    }
-                                }
-                            }
-                            KeyCode::Esc => {
-                                // Cancel
+                        let input = match key_event.code {
+                            KeyCode::Char(c) => RenameInput::Char(c),
+                            KeyCode::Backspace => RenameInput::Backspace,
+                            KeyCode::Enter => RenameInput::Submit,
+                            KeyCode::Esc => RenameInput::Cancel,
+                            _ => RenameInput::Other,
+                        };
+
+                        let result = process_rename_input(
+                            &mut rename_screen,
+                            input,
+                            &character_manager,
+                            selected_character,
+                        );
+
+                        match result {
+                            RenameResult::Renamed | RenameResult::Cancelled => {
                                 rename_screen = CharacterRenameScreen::new();
                                 current_screen = Screen::CharacterSelect;
                             }
-                            _ => {}
+                            RenameResult::RenameFailed(_) | RenameResult::Continue => {}
                         }
                     }
                 }
