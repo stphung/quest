@@ -408,7 +408,8 @@ mod tests {
         assert!(try_build_room(HavenRoomId::Watchtower, &mut haven, &mut prestige).is_none()); // Still locked
 
         try_build_room(HavenRoomId::TrainingYard, &mut haven, &mut prestige);
-        assert!(try_build_room(HavenRoomId::Watchtower, &mut haven, &mut prestige).is_some()); // Now unlocked!
+        assert!(try_build_room(HavenRoomId::Watchtower, &mut haven, &mut prestige).is_some());
+        // Now unlocked!
     }
 
     #[test]

@@ -131,7 +131,10 @@ pub fn calculate_offline_xp(
 
 /// Processes offline progression and updates game state
 /// `haven_offline_xp_percent` is the Hearthstone bonus (0.0 if not built)
-pub fn process_offline_progression(state: &mut GameState, haven_offline_xp_percent: f64) -> OfflineReport {
+pub fn process_offline_progression(
+    state: &mut GameState,
+    haven_offline_xp_percent: f64,
+) -> OfflineReport {
     let current_time = Utc::now().timestamp();
     let elapsed_seconds = current_time - state.last_save_time;
 

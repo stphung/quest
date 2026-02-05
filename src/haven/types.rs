@@ -711,7 +711,12 @@ mod tests {
         for room in HavenRoomId::ALL {
             assert_eq!(room.bonus_value(0), 0.0, "{:?} tier 0 should be 0", room);
             assert_eq!(room.bonus_value(4), 0.0, "{:?} tier 4 should be 0", room);
-            assert_eq!(room.bonus_value(255), 0.0, "{:?} tier 255 should be 0", room);
+            assert_eq!(
+                room.bonus_value(255),
+                0.0,
+                "{:?} tier 255 should be 0",
+                room
+            );
         }
     }
 
@@ -900,11 +905,7 @@ mod tests {
         // Verify every non-root room has at least one parent
         for room in HavenRoomId::ALL {
             if room != HavenRoomId::Hearthstone {
-                assert!(
-                    !room.parents().is_empty(),
-                    "{:?} should have parents",
-                    room
-                );
+                assert!(!room.parents().is_empty(), "{:?} should have parents", room);
             }
         }
 

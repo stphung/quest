@@ -348,8 +348,12 @@ fn main() -> io::Result<()> {
                                         let elapsed_seconds = current_time - state.last_save_time;
 
                                         if elapsed_seconds > 60 {
-                                            let haven_offline_bonus = haven.get_bonus(haven::HavenBonusType::OfflineXpPercent);
-                                            let report = process_offline_progression(&mut state, haven_offline_bonus);
+                                            let haven_offline_bonus = haven
+                                                .get_bonus(haven::HavenBonusType::OfflineXpPercent);
+                                            let report = process_offline_progression(
+                                                &mut state,
+                                                haven_offline_bonus,
+                                            );
                                             // Always show offline progress in combat log
                                             if report.xp_gained > 0 {
                                                 let message = if report.total_level_ups > 0 {
@@ -735,7 +739,9 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::
     {
         let mut rng = rand::thread_rng();
         let haven_discovery = haven.get_bonus(haven::HavenBonusType::ChallengeDiscoveryPercent);
-        if let Some(challenge_type) = try_discover_challenge_with_haven(game_state, &mut rng, haven_discovery) {
+        if let Some(challenge_type) =
+            try_discover_challenge_with_haven(game_state, &mut rng, haven_discovery)
+        {
             let icon = challenge_type.icon();
             let flavor = challenge_type.discovery_flavor();
             game_state
@@ -822,7 +828,8 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::
             timer_reduction_percent: haven.get_bonus(haven::HavenBonusType::FishingTimerReduction),
             double_fish_chance_percent: haven.get_bonus(haven::HavenBonusType::DoubleFishChance),
         };
-        let fishing_messages = fishing::logic::tick_fishing_with_haven(game_state, &mut rng, &haven_fishing);
+        let fishing_messages =
+            fishing::logic::tick_fishing_with_haven(game_state, &mut rng, &haven_fishing);
         for message in fishing_messages {
             game_state
                 .combat_state
@@ -929,7 +936,9 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::
 
                 let haven_drop_rate = haven.get_bonus(haven::HavenBonusType::DropRatePercent);
                 let haven_rarity = haven.get_bonus(haven::HavenBonusType::ItemRarityPercent);
-                if let Some(item) = try_drop_item_with_haven(game_state, haven_drop_rate, haven_rarity) {
+                if let Some(item) =
+                    try_drop_item_with_haven(game_state, haven_drop_rate, haven_rarity)
+                {
                     let item_name = item.display_name.clone();
                     let rarity = item.rarity;
                     let equipped = auto_equip_if_better(item, game_state);

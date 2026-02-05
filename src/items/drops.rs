@@ -24,7 +24,8 @@ pub fn try_drop_item_with_haven(
 
     // Apply Trophy Hall bonus to drop chance
     let base_chance = drop_chance_for_prestige(game_state.prestige_rank);
-    let drop_chance = (base_chance * (1.0 + haven_drop_rate_percent / 100.0)).min(ITEM_DROP_MAX_CHANCE);
+    let drop_chance =
+        (base_chance * (1.0 + haven_drop_rate_percent / 100.0)).min(ITEM_DROP_MAX_CHANCE);
 
     if rng.gen::<f64>() > drop_chance {
         return None;
@@ -51,7 +52,11 @@ pub fn roll_rarity(prestige_rank: u32, rng: &mut impl Rng) -> Rarity {
 
 /// Roll item rarity with Haven Workshop bonus
 /// `haven_rarity_percent` shifts distribution toward higher rarities
-pub fn roll_rarity_with_haven(prestige_rank: u32, haven_rarity_percent: f64, rng: &mut impl Rng) -> Rarity {
+pub fn roll_rarity_with_haven(
+    prestige_rank: u32,
+    haven_rarity_percent: f64,
+    rng: &mut impl Rng,
+) -> Rarity {
     let roll = rng.gen::<f64>();
 
     // Prestige gives a small bonus (1% per rank, max 10%) that shifts
@@ -296,7 +301,8 @@ mod tests {
             if try_drop_item_with_haven(&game_state, 0.0, 0.0).is_some() {
                 drops_no_bonus += 1;
             }
-            if try_drop_item_with_haven(&game_state, 15.0, 0.0).is_some() { // +15% drop rate from Trophy Hall
+            if try_drop_item_with_haven(&game_state, 15.0, 0.0).is_some() {
+                // +15% drop rate from Trophy Hall
                 drops_with_bonus += 1;
             }
         }
@@ -323,7 +329,8 @@ mod tests {
             if roll_rarity_with_haven(0, 0.0, &mut rng) == Rarity::Common {
                 common_no_bonus += 1;
             }
-            if roll_rarity_with_haven(0, 25.0, &mut rng) == Rarity::Common { // +25% from Workshop T3
+            if roll_rarity_with_haven(0, 25.0, &mut rng) == Rarity::Common {
+                // +25% from Workshop T3
                 common_with_bonus += 1;
             }
         }
