@@ -4,6 +4,7 @@ mod combat;
 mod core;
 mod dungeon;
 mod fishing;
+mod haven;
 mod items;
 mod ui;
 mod utils;
@@ -108,6 +109,9 @@ fn main() -> io::Result<()> {
 
     // Initialize CharacterManager
     let character_manager = CharacterManager::new()?;
+
+    // Load account-level Haven state
+    let mut haven = haven::load_haven();
 
     // Check for old save file to migrate
     let old_save_manager = SaveManager::new()?;
@@ -560,7 +564,7 @@ fn main() -> io::Result<()> {
                                         KeyCode::Up => debug_menu.navigate_up(),
                                         KeyCode::Down => debug_menu.navigate_down(),
                                         KeyCode::Enter => {
-                                            let msg = debug_menu.trigger_selected(&mut state);
+                                            let msg = debug_menu.trigger_selected(&mut state, &mut haven);
                                             state.combat_state.add_log_entry(
                                                 format!("[DEBUG] {}", msg),
                                                 false,
