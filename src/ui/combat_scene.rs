@@ -1,5 +1,5 @@
-use crate::constants::ATTACK_INTERVAL_SECONDS;
-use crate::game_state::GameState;
+use crate::core::constants::ATTACK_INTERVAL_SECONDS;
+use crate::core::game_state::GameState;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},

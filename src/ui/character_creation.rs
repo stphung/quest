@@ -132,7 +132,7 @@ impl CharacterCreationScreen {
     }
 
     pub fn validate(&mut self) {
-        self.validation_error = crate::character_manager::validate_name(&self.name_input).err();
+        self.validation_error = crate::character::manager::validate_name(&self.name_input).err();
     }
 
     pub fn is_valid(&self) -> bool {

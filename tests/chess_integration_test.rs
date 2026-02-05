@@ -2,9 +2,9 @@
 //!
 //! Tests the full chess flow: discovery → challenge menu → game → result
 
-use quest::chess::{ChessDifficulty, ChessResult};
-use quest::chess_logic::{apply_game_result, start_chess_game};
-use quest::game_state::GameState;
+use quest::challenges::chess::logic::{apply_game_result, start_chess_game};
+use quest::GameState;
+use quest::{ChessDifficulty, ChessResult};
 
 #[test]
 fn test_complete_chess_win_flow() {

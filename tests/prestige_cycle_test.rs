@@ -2,10 +2,10 @@
 //!
 //! Tests the full flow: new character → level up → prestige → verify reset
 
-use quest::attributes::AttributeType;
-use quest::game_logic::{apply_tick_xp, xp_for_next_level};
-use quest::game_state::GameState;
-use quest::prestige::{can_prestige, get_prestige_tier, perform_prestige};
+use quest::character::attributes::AttributeType;
+use quest::character::prestige::{can_prestige, get_prestige_tier, perform_prestige};
+use quest::core::game_logic::{apply_tick_xp, xp_for_next_level};
+use quest::GameState;
 
 /// Test a complete prestige cycle from level 1 to first prestige
 #[test]
@@ -225,7 +225,7 @@ fn test_cannot_prestige_when_ineligible() {
 /// Test prestige XP multiplier affects future gains
 #[test]
 fn test_prestige_xp_multiplier() {
-    use quest::game_logic::xp_gain_per_tick;
+    use quest::core::game_logic::xp_gain_per_tick;
 
     // Compare XP rates at different prestige levels
     // Formula: 1 + 0.5 * rank^0.7

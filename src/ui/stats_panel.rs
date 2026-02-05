@@ -1,11 +1,11 @@
-use crate::attributes::AttributeType;
-use crate::derived_stats::DerivedStats;
-use crate::fishing::FishingState;
-use crate::game_logic::xp_for_next_level;
-use crate::game_state::GameState;
-use crate::items::{Affix, AffixType, Rarity};
-use crate::prestige::{get_adventurer_rank, get_prestige_tier};
-use crate::updater::UpdateInfo;
+use crate::character::attributes::AttributeType;
+use crate::character::derived_stats::DerivedStats;
+use crate::character::prestige::{get_adventurer_rank, get_prestige_tier};
+use crate::core::game_logic::xp_for_next_level;
+use crate::core::game_state::GameState;
+use crate::fishing::types::FishingState;
+use crate::items::types::{Affix, AffixType, Rarity};
+use crate::utils::updater::UpdateInfo;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -651,8 +651,8 @@ fn draw_footer(
     update_available: bool,
     update_check_completed: bool,
 ) {
-    use crate::build_info::{BUILD_COMMIT, BUILD_DATE};
-    use crate::prestige::can_prestige;
+    use crate::character::prestige::can_prestige;
+    use crate::utils::build_info::{BUILD_COMMIT, BUILD_DATE};
 
     let can_prestige_now = can_prestige(game_state);
     let prestige_text = if can_prestige_now {

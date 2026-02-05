@@ -4,7 +4,7 @@ use super::game_common::{
     create_game_layout, render_forfeit_status_bar, render_game_over_overlay,
     render_info_panel_frame, render_status_bar, render_thinking_status_bar, GameResultType,
 };
-use crate::morris::{MorrisGame, MorrisPhase, MorrisResult, Player, ADJACENCIES};
+use crate::challenges::morris::{MorrisGame, MorrisPhase, MorrisResult, Player, ADJACENCIES};
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
@@ -17,11 +17,11 @@ use ratatui::{
 pub fn render_morris_scene(frame: &mut Frame, area: Rect, game: &MorrisGame, character_level: u32) {
     // Check for game over overlay
     if let Some(result) = game.game_result {
-        let xp_for_level = crate::game_logic::xp_for_next_level(character_level.max(1));
+        let xp_for_level = crate::core::game_logic::xp_for_next_level(character_level.max(1));
         let xp_reward =
             (xp_for_level as f64 * game.difficulty.reward_xp_percent() as f64 / 100.0) as u64;
         let xp_reward = xp_reward.max(100);
-        let is_master = game.difficulty == crate::morris::MorrisDifficulty::Master;
+        let is_master = game.difficulty == crate::challenges::morris::MorrisDifficulty::Master;
         render_morris_game_over(frame, area, result, xp_reward, is_master);
         return;
     }

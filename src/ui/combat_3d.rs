@@ -1,4 +1,4 @@
-use crate::game_state::GameState;
+use crate::core::game_state::GameState;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -166,8 +166,8 @@ fn render_combat_log(frame: &mut Frame, area: Rect, game_state: &GameState) {
     // Show current status
     if let Some(_enemy) = &game_state.combat_state.current_enemy {
         if game_state.combat_state.attack_timer > 0.0 {
-            let next_attack =
-                crate::constants::ATTACK_INTERVAL_SECONDS - game_state.combat_state.attack_timer;
+            let next_attack = crate::core::constants::ATTACK_INTERVAL_SECONDS
+                - game_state.combat_state.attack_timer;
             log_lines.push(Line::from(vec![
                 Span::styled("⏱ Next attack in ", Style::default().fg(Color::DarkGray)),
                 Span::styled(
@@ -184,7 +184,7 @@ fn render_combat_log(frame: &mut Frame, area: Rect, game_state: &GameState) {
                 .add_modifier(Modifier::ITALIC),
         )]));
         let regen_progress =
-            game_state.combat_state.regen_timer / crate::constants::HP_REGEN_DURATION_SECONDS;
+            game_state.combat_state.regen_timer / crate::core::constants::HP_REGEN_DURATION_SECONDS;
         log_lines.push(Line::from(vec![Span::styled(
             format!("   {:.0}% complete", regen_progress * 100.0),
             Style::default().fg(Color::DarkGray),

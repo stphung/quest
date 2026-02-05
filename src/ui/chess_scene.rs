@@ -4,7 +4,7 @@ use super::game_common::{
     create_game_layout, render_forfeit_status_bar, render_game_over_overlay,
     render_info_panel_frame, render_status_bar, render_thinking_status_bar, GameResultType,
 };
-use crate::chess::{ChessGame, ChessResult};
+use crate::challenges::chess::{ChessGame, ChessResult};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},

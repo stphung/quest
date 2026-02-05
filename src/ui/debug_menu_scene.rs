@@ -1,6 +1,6 @@
 //! Debug menu UI rendering.
 
-use crate::debug_menu::{DebugMenu, DEBUG_OPTIONS};
+use crate::utils::debug_menu::{DebugMenu, DEBUG_OPTIONS};
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},

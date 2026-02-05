@@ -1,5 +1,5 @@
-use crate::character_manager::CharacterInfo;
-use crate::prestige::get_prestige_tier;
+use crate::character::manager::CharacterInfo;
+use crate::character::prestige::get_prestige_tier;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},

@@ -5,7 +5,7 @@
 
 #![allow(dead_code)]
 
-use crate::fishing::{FishRarity, FishingSession, FishingState};
+use crate::fishing::types::{FishRarity, FishingSession, FishingState};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -91,7 +91,7 @@ fn draw_header(frame: &mut Frame, area: Rect, session: &FishingSession) {
 
 /// Draws the ASCII water scene with bobber.
 fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
-    use crate::fishing::FishingPhase;
+    use crate::fishing::types::FishingPhase;
 
     // Calculate bobber animation based on phase
     let bobber_depth = if session.phase == FishingPhase::Reeling {
@@ -171,7 +171,7 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
 
 /// Draws the catch progress indicator with current phase.
 fn draw_catch_progress(frame: &mut Frame, area: Rect, session: &FishingSession) {
-    use crate::fishing::FishingPhase;
+    use crate::fishing::types::FishingPhase;
 
     use super::throbber::spinner_char;
 

@@ -4,7 +4,7 @@ use super::game_common::{
     create_game_layout, render_forfeit_status_bar, render_game_over_overlay,
     render_info_panel_frame, render_status_bar, render_thinking_status_bar, GameResultType,
 };
-use crate::gomoku::{GomokuGame, Player, BOARD_SIZE};
+use crate::challenges::gomoku::{GomokuGame, Player, BOARD_SIZE};
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
@@ -168,21 +168,21 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &GomokuGame) {
 }
 
 fn render_gomoku_game_over(frame: &mut Frame, area: Rect, game: &GomokuGame) {
-    use crate::challenge_menu::DifficultyInfo;
+    use crate::challenges::menu::DifficultyInfo;
 
     let result = game.game_result.as_ref().unwrap();
     let (result_type, title, message) = match result {
-        crate::gomoku::GomokuResult::Win => (
+        crate::challenges::gomoku::GomokuResult::Win => (
             GameResultType::Win,
             ":: VICTORY! ::",
             "You placed five stones in a row!",
         ),
-        crate::gomoku::GomokuResult::Loss => (
+        crate::challenges::gomoku::GomokuResult::Loss => (
             GameResultType::Loss,
             "DEFEAT",
             "The opponent placed five stones in a row.",
         ),
-        crate::gomoku::GomokuResult::Draw => (
+        crate::challenges::gomoku::GomokuResult::Draw => (
             GameResultType::Draw,
             "DRAW",
             "The board is full with no winner.",
@@ -190,7 +190,7 @@ fn render_gomoku_game_over(frame: &mut Frame, area: Rect, game: &GomokuGame) {
     };
 
     let reward = match result {
-        crate::gomoku::GomokuResult::Win => {
+        crate::challenges::gomoku::GomokuResult::Win => {
             game.difficulty.reward().description().replace("Win: ", "")
         }
         _ => "No penalty incurred.".to_string(),

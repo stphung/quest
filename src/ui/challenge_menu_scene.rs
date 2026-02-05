@@ -1,11 +1,11 @@
 //! Challenge menu UI rendering.
 
-use crate::challenge_menu::{ChallengeMenu, ChallengeType, DifficultyInfo};
-use crate::chess::ChessDifficulty;
-use crate::gomoku::GomokuDifficulty;
-use crate::minesweeper::MinesweeperDifficulty;
-use crate::morris::MorrisDifficulty;
-use crate::rune::RuneDifficulty;
+use crate::challenges::chess::ChessDifficulty;
+use crate::challenges::gomoku::GomokuDifficulty;
+use crate::challenges::menu::{ChallengeMenu, ChallengeType, DifficultyInfo};
+use crate::challenges::minesweeper::MinesweeperDifficulty;
+use crate::challenges::morris::MorrisDifficulty;
+use crate::challenges::rune::RuneDifficulty;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
