@@ -130,32 +130,13 @@ impl HavenRoomId {
     }
 }
 
-/// Cost to build or upgrade a room at a given tier
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct HavenCost {
-    pub prestige_ranks: u32,
-    pub fishing_ranks: u32,
-}
-
-/// Get the cost for a specific tier (1, 2, or 3)
-pub fn tier_cost(tier: u8) -> HavenCost {
+/// Get the prestige rank cost for a specific tier (1, 2, or 3)
+pub fn tier_cost(tier: u8) -> u32 {
     match tier {
-        1 => HavenCost {
-            prestige_ranks: 1,
-            fishing_ranks: 2,
-        },
-        2 => HavenCost {
-            prestige_ranks: 3,
-            fishing_ranks: 4,
-        },
-        3 => HavenCost {
-            prestige_ranks: 5,
-            fishing_ranks: 6,
-        },
-        _ => HavenCost {
-            prestige_ranks: 0,
-            fishing_ranks: 0,
-        },
+        1 => 1,
+        2 => 3,
+        3 => 5,
+        _ => 0,
     }
 }
 
@@ -506,27 +487,11 @@ mod tests {
 
     #[test]
     fn test_tier_costs() {
-        assert_eq!(
-            tier_cost(1),
-            HavenCost {
-                prestige_ranks: 1,
-                fishing_ranks: 2
-            }
-        );
-        assert_eq!(
-            tier_cost(2),
-            HavenCost {
-                prestige_ranks: 3,
-                fishing_ranks: 4
-            }
-        );
-        assert_eq!(
-            tier_cost(3),
-            HavenCost {
-                prestige_ranks: 5,
-                fishing_ranks: 6
-            }
-        );
+        assert_eq!(tier_cost(1), 1);
+        assert_eq!(tier_cost(2), 3);
+        assert_eq!(tier_cost(3), 5);
+        assert_eq!(tier_cost(0), 0);
+        assert_eq!(tier_cost(4), 0);
     }
 
     #[test]

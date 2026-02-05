@@ -157,19 +157,15 @@ fn handle_haven(
         match key.code {
             KeyCode::Enter => {
                 let room = haven::HavenRoomId::ALL[haven_ui.selected_room];
-                if let Some((_tier, p_spent, f_spent)) = haven::try_build_room(
-                    room,
-                    haven,
-                    &mut state.prestige_rank,
-                    &mut state.fishing.rank,
-                ) {
+                if let Some((_tier, p_spent)) =
+                    haven::try_build_room(room, haven, &mut state.prestige_rank)
+                {
                     haven::save_haven(haven).ok();
                     state.combat_state.add_log_entry(
                         format!(
-                            "🏠 Built {} (spent {}P, {}F)",
+                            "🏠 Built {} (spent {} Prestige Ranks)",
                             room.name(),
-                            p_spent,
-                            f_spent
+                            p_spent
                         ),
                         false,
                         true,
@@ -196,9 +192,7 @@ fn handle_haven(
             }
             KeyCode::Enter => {
                 let room = haven::HavenRoomId::ALL[haven_ui.selected_room];
-                if haven.can_build(room)
-                    && haven::can_afford(room, haven, state.prestige_rank, state.fishing.rank)
-                {
+                if haven.can_build(room) && haven::can_afford(room, haven, state.prestige_rank) {
                     haven_ui.confirming_build = true;
                 }
             }

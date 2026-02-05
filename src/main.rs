@@ -259,8 +259,7 @@ fn main() -> io::Result<()> {
                             area,
                             &haven,
                             haven_ui.selected_room,
-                            0, // No character selected, so prestige/fishing rank = 0
-                            0,
+                            0, // No character selected, so prestige rank = 0
                         );
                     }
                 })?;
@@ -568,7 +567,6 @@ fn main() -> io::Result<()> {
                                 &haven,
                                 haven_ui.selected_room,
                                 state.prestige_rank,
-                                state.fishing.rank,
                             );
                             if haven_ui.confirming_build {
                                 let room = haven::HavenRoomId::ALL[haven_ui.selected_room];
@@ -578,7 +576,6 @@ fn main() -> io::Result<()> {
                                     room,
                                     &haven,
                                     state.prestige_rank,
-                                    state.fishing.rank,
                                 );
                             }
                         }

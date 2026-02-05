@@ -45,7 +45,6 @@ pub fn render_haven_tree(
     haven: &Haven,
     selected_room: usize,
     prestige_rank: u32,
-    fishing_rank: u32,
 ) {
     frame.render_widget(Clear, area);
 
@@ -77,14 +76,7 @@ pub fn render_haven_tree(
         .split(chunks[1]);
 
     render_skill_tree(frame, main_chunks[0], haven, selected_room);
-    render_room_detail(
-        frame,
-        main_chunks[1],
-        haven,
-        selected_room,
-        prestige_rank,
-        fishing_rank,
-    );
+    render_room_detail(frame, main_chunks[1], haven, selected_room, prestige_rank);
 
     // Help bar
     let help = Paragraph::new("[↑/↓] Navigate  [Enter] Build  [Esc] Close")
@@ -227,7 +219,6 @@ fn render_room_detail(
     haven: &Haven,
     selected_room: usize,
     prestige_rank: u32,
-    fishing_rank: u32,
 ) {
     let room = HavenRoomId::ALL[selected_room];
     let tier = haven.room_tier(room);
@@ -253,7 +244,7 @@ fn render_room_detail(
             Constraint::Length(1), // Spacer
             Constraint::Length(5), // Bonus info (all 3 tiers)
             Constraint::Length(1), // Spacer
-            Constraint::Length(4), // Cost info
+            Constraint::Length(3), // Cost info
             Constraint::Min(0),    // Padding
         ])
         .split(inner);
@@ -311,7 +302,7 @@ fn render_room_detail(
     } else if tier < 3 {
         let next_tier = tier + 1;
         let cost = tier_cost(next_tier);
-        let can_afford_it = can_afford(room, haven, prestige_rank, fishing_rank);
+        let can_afford_it = can_afford(room, haven, prestige_rank);
 
         let cost_style = if can_afford_it {
             Style::default().fg(Color::Green)
@@ -322,21 +313,12 @@ fn render_room_detail(
         let cost_text = Paragraph::new(vec![
             Line::from(vec![
                 Span::styled("Cost: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(
-                    format!(
-                        "{} Prestige Ranks, {} Fishing Ranks",
-                        cost.prestige_ranks, cost.fishing_ranks
-                    ),
-                    cost_style,
-                ),
+                Span::styled(format!("{} Prestige Ranks", cost), cost_style),
             ]),
             Line::from(vec![
                 Span::styled("You have: ", Style::default().fg(Color::DarkGray)),
                 Span::styled(
-                    format!(
-                        "{} Prestige Ranks, {} Fishing Ranks",
-                        prestige_rank, fishing_rank
-                    ),
+                    format!("{} Prestige Ranks", prestige_rank),
                     Style::default().fg(Color::White),
                 ),
             ]),
@@ -405,10 +387,9 @@ pub fn render_build_confirmation(
     room: HavenRoomId,
     haven: &Haven,
     prestige_rank: u32,
-    fishing_rank: u32,
 ) {
     // Center the modal
-    let modal_width = 50;
+    let modal_width = 45;
     let modal_height = 9;
     let x = area.x + (area.width.saturating_sub(modal_width)) / 2;
     let y = area.y + (area.height.saturating_sub(modal_height)) / 2;
@@ -424,7 +405,7 @@ pub fn render_build_confirmation(
     let tier = haven.room_tier(room);
     let next_tier = tier + 1;
     let cost = tier_cost(next_tier);
-    let can_afford_it = can_afford(room, haven, prestige_rank, fishing_rank);
+    let can_afford_it = can_afford(room, haven, prestige_rank);
 
     let title = if tier == 0 {
         format!(" Build {}? ", room.name())
@@ -450,13 +431,7 @@ pub fn render_build_confirmation(
         Line::from(""),
         Line::from(vec![
             Span::styled("Cost: ", Style::default().fg(Color::White)),
-            Span::styled(
-                format!(
-                    "{} Prestige Ranks, {} Fishing Ranks",
-                    cost.prestige_ranks, cost.fishing_ranks
-                ),
-                cost_style,
-            ),
+            Span::styled(format!("{} Prestige Ranks", cost), cost_style),
         ]),
         Line::from(vec![
             Span::styled("Bonus: ", Style::default().fg(Color::White)),
