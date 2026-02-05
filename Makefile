@@ -1,6 +1,6 @@
 # Development helpers for Quest
 
-.PHONY: check fmt lint test build audit all clean
+.PHONY: check fmt lint test build audit all clean install
 
 # Run all PR checks locally (uses same script as CI)
 check:
@@ -21,6 +21,18 @@ test:
 # Just build
 build:
 	@cargo build --all-targets
+
+# Build release and install to ~/.local/bin (with macOS codesigning)
+install:
+	@cargo build --release
+	@mkdir -p ~/.local/bin
+	@cp target/release/quest ~/.local/bin/quest
+	@if [ "$$(uname)" = "Darwin" ]; then \
+		codesign -s - -f ~/.local/bin/quest; \
+		echo "Installed and signed: ~/.local/bin/quest"; \
+	else \
+		echo "Installed: ~/.local/bin/quest"; \
+	fi
 
 # Just security audit
 audit:
