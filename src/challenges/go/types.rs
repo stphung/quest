@@ -1,0 +1,1 @@
+//! Go minigame data structures.

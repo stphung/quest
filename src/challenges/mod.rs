@@ -8,6 +8,7 @@ pub mod menu;
 pub mod minesweeper;
 pub mod morris;
 pub mod rune;
+pub mod go;
 
 pub use chess::{ChessDifficulty, ChessGame, ChessResult};
 pub use gomoku::{GomokuDifficulty, GomokuGame, GomokuResult, Player as GomokuPlayer, BOARD_SIZE};
