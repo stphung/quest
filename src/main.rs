@@ -149,6 +149,11 @@ fn main() -> io::Result<()> {
     let mut rename_screen = CharacterRenameScreen::new();
     let mut game_state: Option<GameState> = None;
 
+    // Haven UI state (shared across screens since Haven is account-level)
+    let mut showing_haven = false;
+    let mut haven_selected_room: usize = 0;
+    let mut haven_confirming_build = false;
+
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -266,6 +271,51 @@ fn main() -> io::Result<()> {
                 // Handle input
                 if event::poll(Duration::from_millis(50))? {
                     if let Event::Key(key_event) = event::read()? {
+                        // Handle Haven screen (blocks other input when open)
+                        if showing_haven {
+                            if haven_confirming_build {
+                                match key_event.code {
+                                    KeyCode::Enter => {
+                                        // Note: Can't build from character select (no active character)
+                                        // Just close the confirmation
+                                        haven_confirming_build = false;
+                                    }
+                                    KeyCode::Esc => {
+                                        haven_confirming_build = false;
+                                    }
+                                    _ => {}
+                                }
+                            } else {
+                                match key_event.code {
+                                    KeyCode::Up => {
+                                        if haven_selected_room > 0 {
+                                            haven_selected_room -= 1;
+                                        }
+                                    }
+                                    KeyCode::Down => {
+                                        if haven_selected_room + 1 < haven::HavenRoomId::ALL.len() {
+                                            haven_selected_room += 1;
+                                        }
+                                    }
+                                    KeyCode::Esc => {
+                                        showing_haven = false;
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            continue;
+                        }
+
+                        // Handle Haven shortcut (if discovered)
+                        if matches!(key_event.code, KeyCode::Char('h') | KeyCode::Char('H'))
+                            && haven.discovered
+                        {
+                            showing_haven = true;
+                            haven_selected_room = 0;
+                            haven_confirming_build = false;
+                            continue;
+                        }
+
                         let input = match key_event.code {
                             KeyCode::Up => SelectInput::Up,
                             KeyCode::Down => SelectInput::Down,
@@ -530,6 +580,74 @@ fn main() -> io::Result<()> {
                                 continue;
                             }
 
+                            // Handle Haven screen (blocks other input when open)
+                            if showing_haven {
+                                if haven_confirming_build {
+                                    match key_event.code {
+                                        KeyCode::Enter => {
+                                            // Attempt build
+                                            let room = haven::HavenRoomId::ALL[haven_selected_room];
+                                            if let Some((_tier, p_spent, f_spent)) = haven::try_build_room(
+                                                room,
+                                                &mut haven,
+                                                &mut state.prestige_rank,
+                                                &mut state.fishing.rank,
+                                            ) {
+                                                haven::save_haven(&haven).ok();
+                                                character_manager.save_character(&state).ok();
+                                                state.combat_state.add_log_entry(
+                                                    format!(
+                                                        "🏠 Built {} (spent {}P, {}F)",
+                                                        room.name(),
+                                                        p_spent,
+                                                        f_spent
+                                                    ),
+                                                    false,
+                                                    true,
+                                                );
+                                            }
+                                            haven_confirming_build = false;
+                                        }
+                                        KeyCode::Esc => {
+                                            haven_confirming_build = false;
+                                        }
+                                        _ => {}
+                                    }
+                                } else {
+                                    match key_event.code {
+                                        KeyCode::Up => {
+                                            if haven_selected_room > 0 {
+                                                haven_selected_room -= 1;
+                                            }
+                                        }
+                                        KeyCode::Down => {
+                                            if haven_selected_room + 1 < haven::HavenRoomId::ALL.len()
+                                            {
+                                                haven_selected_room += 1;
+                                            }
+                                        }
+                                        KeyCode::Enter => {
+                                            let room = haven::HavenRoomId::ALL[haven_selected_room];
+                                            if haven.can_build(room)
+                                                && haven::can_afford(
+                                                    room,
+                                                    &haven,
+                                                    state.prestige_rank,
+                                                    state.fishing.rank,
+                                                )
+                                            {
+                                                haven_confirming_build = true;
+                                            }
+                                        }
+                                        KeyCode::Esc => {
+                                            showing_haven = false;
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                                continue;
+                            }
+
                             // Handle prestige confirmation dialog
                             if showing_prestige_confirm {
                                 match key_event.code {
@@ -735,6 +853,14 @@ fn main() -> io::Result<()> {
                                 KeyCode::Char('p') | KeyCode::Char('P') => {
                                     if can_prestige(&state) {
                                         showing_prestige_confirm = true;
+                                    }
+                                }
+                                // Handle 'h'/'H' to open Haven (if discovered)
+                                KeyCode::Char('h') | KeyCode::Char('H') => {
+                                    if haven.discovered {
+                                        showing_haven = true;
+                                        haven_selected_room = 0;
+                                        haven_confirming_build = false;
                                     }
                                 }
                                 _ => {}
