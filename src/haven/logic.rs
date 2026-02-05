@@ -81,8 +81,8 @@ pub fn load_haven() -> Haven {
 /// Save Haven to disk
 pub fn save_haven(haven: &Haven) -> io::Result<()> {
     let path = haven_save_path()?;
-    let json =
-        serde_json::to_string_pretty(haven).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+    let json = serde_json::to_string_pretty(haven)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
     fs::write(path, json)?;
     Ok(())
 }
@@ -234,7 +234,12 @@ mod tests {
             &mut prestige,
             &mut fishing,
         );
-        try_build_room(HavenRoomId::WarRoom, &mut haven, &mut prestige, &mut fishing);
+        try_build_room(
+            HavenRoomId::WarRoom,
+            &mut haven,
+            &mut prestige,
+            &mut fishing,
+        );
 
         // 7 rooms at T1 = 7 prestige, 14 fishing
         assert_eq!(initial_p - prestige, 7);

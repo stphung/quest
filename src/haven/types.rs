@@ -104,6 +104,7 @@ impl HavenRoomId {
     }
 
     /// Child rooms that this room unlocks when built to T1+.
+    #[allow(dead_code)] // Will be used for UI graph rendering
     pub fn children(&self) -> &'static [HavenRoomId] {
         match self {
             HavenRoomId::Hearthstone => &[HavenRoomId::Armory, HavenRoomId::Bedroom],
@@ -123,6 +124,7 @@ impl HavenRoomId {
     }
 
     /// Whether this room is a capstone (requires two parents)
+    #[allow(dead_code)] // Will be used for UI styling
     pub fn is_capstone(&self) -> bool {
         matches!(self, HavenRoomId::WarRoom | HavenRoomId::Vault)
     }
@@ -374,6 +376,7 @@ pub fn haven_discovery_chance(prestige_rank: u32) -> f64 {
 
 /// Pre-computed Haven bonuses for efficient access during gameplay
 #[derive(Debug, Clone, Default)]
+#[allow(dead_code)] // Will be used for bonus application in follow-up PR
 pub struct HavenBonuses {
     pub damage_percent: f64,
     pub xp_gain_percent: f64,
@@ -392,6 +395,7 @@ pub struct HavenBonuses {
 
 impl Haven {
     /// Compute all bonuses from the current Haven state
+    #[allow(dead_code)] // Will be used for bonus application in follow-up PR
     pub fn compute_bonuses(&self) -> HavenBonuses {
         HavenBonuses {
             damage_percent: self.get_bonus(HavenBonusType::DamagePercent),

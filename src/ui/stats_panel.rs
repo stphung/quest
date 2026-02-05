@@ -39,6 +39,7 @@ pub fn draw_stats_panel_with_update(
     game_state: &GameState,
     update_info: Option<&UpdateInfo>,
     update_check_completed: bool,
+    haven_discovered: bool,
 ) {
     // Calculate update panel height: 4 base + changelog lines (max 5) + overflow indicator
     let update_height = if let Some(info) = update_info {
@@ -107,6 +108,7 @@ pub fn draw_stats_panel_with_update(
         game_state,
         update_info.is_some(),
         update_check_completed,
+        haven_discovered,
     );
 
     // Draw update panel if available
@@ -650,6 +652,7 @@ fn draw_footer(
     game_state: &GameState,
     update_available: bool,
     update_check_completed: bool,
+    haven_discovered: bool,
 ) {
     use crate::character::prestige::can_prestige;
     use crate::utils::build_info::{BUILD_COMMIT, BUILD_DATE};
@@ -701,6 +704,13 @@ fn draw_footer(
         Span::raw("")
     };
 
+    // Build Haven hint text
+    let haven_text = if haven_discovered {
+        Span::styled(" | H = Haven", Style::default().fg(Color::Cyan))
+    } else {
+        Span::raw("")
+    };
+
     let footer_text = vec![Line::from(vec![
         Span::styled("Controls: ", Style::default().add_modifier(Modifier::BOLD)),
         Span::styled(
@@ -709,6 +719,7 @@ fn draw_footer(
         ),
         Span::raw(" = Quit | "),
         prestige_text,
+        haven_text,
         update_status_text,
         challenge_text,
     ])];

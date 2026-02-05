@@ -37,6 +37,7 @@ pub fn draw_ui_with_update(
     game_state: &GameState,
     update_info: Option<&UpdateInfo>,
     update_check_completed: bool,
+    haven_discovered: bool,
 ) {
     let size = frame.size();
 
@@ -81,6 +82,7 @@ pub fn draw_ui_with_update(
         game_state,
         update_info,
         update_check_completed,
+        haven_discovered,
     );
 
     // Draw right panel based on current activity

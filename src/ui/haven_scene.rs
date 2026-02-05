@@ -270,10 +270,7 @@ fn render_room_detail(
     if tier > 0 {
         bonus_lines.push(Line::from(vec![
             Span::styled("Current: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                room.format_bonus(tier),
-                Style::default().fg(Color::Green),
-            ),
+            Span::styled(room.format_bonus(tier), Style::default().fg(Color::Green)),
         ]));
     }
 
@@ -326,7 +323,10 @@ fn render_room_detail(
         let cost_text = Paragraph::new(vec![
             Line::from(vec![
                 Span::styled("Cost: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(format!("{}P {}F", cost.prestige_ranks, cost.fishing_ranks), cost_style),
+                Span::styled(
+                    format!("{}P {}F", cost.prestige_ranks, cost.fishing_ranks),
+                    cost_style,
+                ),
             ]),
             Line::from(vec![
                 Span::styled("You have: ", Style::default().fg(Color::DarkGray)),
@@ -347,7 +347,12 @@ pub fn render_haven_discovery_modal(frame: &mut Frame, area: Rect) {
     let modal_height = 7;
     let x = area.x + (area.width.saturating_sub(modal_width)) / 2;
     let y = area.y + (area.height.saturating_sub(modal_height)) / 2;
-    let modal_area = Rect::new(x, y, modal_width.min(area.width), modal_height.min(area.height));
+    let modal_area = Rect::new(
+        x,
+        y,
+        modal_width.min(area.width),
+        modal_height.min(area.height),
+    );
 
     frame.render_widget(Clear, modal_area);
 
@@ -395,7 +400,12 @@ pub fn render_build_confirmation(
     let modal_height = 9;
     let x = area.x + (area.width.saturating_sub(modal_width)) / 2;
     let y = area.y + (area.height.saturating_sub(modal_height)) / 2;
-    let modal_area = Rect::new(x, y, modal_width.min(area.width), modal_height.min(area.height));
+    let modal_area = Rect::new(
+        x,
+        y,
+        modal_width.min(area.width),
+        modal_height.min(area.height),
+    );
 
     frame.render_widget(Clear, modal_area);
 
@@ -428,15 +438,24 @@ pub fn render_build_confirmation(
         Line::from(""),
         Line::from(vec![
             Span::styled("Cost: ", Style::default().fg(Color::White)),
-            Span::styled(format!("{}P {}F", cost.prestige_ranks, cost.fishing_ranks), cost_style),
+            Span::styled(
+                format!("{}P {}F", cost.prestige_ranks, cost.fishing_ranks),
+                cost_style,
+            ),
         ]),
         Line::from(vec![
             Span::styled("Bonus: ", Style::default().fg(Color::White)),
-            Span::styled(room.format_bonus(next_tier), Style::default().fg(Color::Yellow)),
+            Span::styled(
+                room.format_bonus(next_tier),
+                Style::default().fg(Color::Yellow),
+            ),
         ]),
         Line::from(""),
         Line::from(if can_afford_it {
-            Span::styled("[Enter] Confirm  [Esc] Cancel", Style::default().fg(Color::DarkGray))
+            Span::styled(
+                "[Enter] Confirm  [Esc] Cancel",
+                Style::default().fg(Color::DarkGray),
+            )
         } else {
             Span::styled("Insufficient resources", Style::default().fg(Color::Red))
         }),

@@ -306,9 +306,7 @@ fn main() -> io::Result<()> {
                             } else {
                                 match key_event.code {
                                     KeyCode::Up => {
-                                        if haven_selected_room > 0 {
-                                            haven_selected_room -= 1;
-                                        }
+                                        haven_selected_room = haven_selected_room.saturating_sub(1);
                                     }
                                     KeyCode::Down => {
                                         if haven_selected_room + 1 < haven::HavenRoomId::ALL.len() {
@@ -558,6 +556,7 @@ fn main() -> io::Result<()> {
                             &state,
                             update_info.as_ref(),
                             update_check_completed,
+                            haven.discovered,
                         );
                         // Draw prestige confirmation overlay if active
                         if showing_prestige_confirm {
@@ -642,12 +641,14 @@ fn main() -> io::Result<()> {
                                         KeyCode::Enter => {
                                             // Attempt build
                                             let room = haven::HavenRoomId::ALL[haven_selected_room];
-                                            if let Some((_tier, p_spent, f_spent)) = haven::try_build_room(
-                                                room,
-                                                &mut haven,
-                                                &mut state.prestige_rank,
-                                                &mut state.fishing.rank,
-                                            ) {
+                                            if let Some((_tier, p_spent, f_spent)) =
+                                                haven::try_build_room(
+                                                    room,
+                                                    &mut haven,
+                                                    &mut state.prestige_rank,
+                                                    &mut state.fishing.rank,
+                                                )
+                                            {
                                                 haven::save_haven(&haven).ok();
                                                 character_manager.save_character(&state).ok();
                                                 state.combat_state.add_log_entry(
@@ -671,12 +672,12 @@ fn main() -> io::Result<()> {
                                 } else {
                                     match key_event.code {
                                         KeyCode::Up => {
-                                            if haven_selected_room > 0 {
-                                                haven_selected_room -= 1;
-                                            }
+                                            haven_selected_room =
+                                                haven_selected_room.saturating_sub(1);
                                         }
                                         KeyCode::Down => {
-                                            if haven_selected_room + 1 < haven::HavenRoomId::ALL.len()
+                                            if haven_selected_room + 1
+                                                < haven::HavenRoomId::ALL.len()
                                             {
                                                 haven_selected_room += 1;
                                             }
@@ -707,9 +708,8 @@ fn main() -> io::Result<()> {
                             if showing_vault_selection {
                                 match key_event.code {
                                     KeyCode::Up => {
-                                        if vault_selected_index > 0 {
-                                            vault_selected_index -= 1;
-                                        }
+                                        vault_selected_index =
+                                            vault_selected_index.saturating_sub(1);
                                     }
                                     KeyCode::Down => {
                                         if vault_selected_index < 6 {
@@ -825,7 +825,8 @@ fn main() -> io::Result<()> {
                                         KeyCode::Up => debug_menu.navigate_up(),
                                         KeyCode::Down => debug_menu.navigate_down(),
                                         KeyCode::Enter => {
-                                            let msg = debug_menu.trigger_selected(&mut state, &mut haven);
+                                            let msg =
+                                                debug_menu.trigger_selected(&mut state, &mut haven);
                                             state.combat_state.add_log_entry(
                                                 format!("[DEBUG] {}", msg),
                                                 false,
@@ -1019,7 +1020,8 @@ fn main() -> io::Result<()> {
                             && state.active_rune.is_none()
                         {
                             let mut rng = rand::thread_rng();
-                            if haven::try_discover_haven(&mut haven, state.prestige_rank, &mut rng) {
+                            if haven::try_discover_haven(&mut haven, state.prestige_rank, &mut rng)
+                            {
                                 haven::save_haven(&haven).ok();
                                 showing_haven_discovery = true;
                             }
@@ -1031,6 +1033,7 @@ fn main() -> io::Result<()> {
                         && last_autosave.elapsed() >= Duration::from_secs(AUTOSAVE_INTERVAL_SECONDS)
                     {
                         character_manager.save_character(&state)?;
+                        haven::save_haven(&haven)?;
                         last_autosave = Instant::now();
                         last_save_instant = Some(Instant::now());
                         last_save_time = Some(Local::now());
