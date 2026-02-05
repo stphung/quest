@@ -159,6 +159,7 @@ Discover challenge minigames while adventuring (requires Prestige 1+):
 - **Nine Men's Morris** - Classic strategy board game against AI opponents
 - **Gomoku** - Five-in-a-row on a 15×15 board with minimax AI (4 difficulty levels)
 - **Minesweeper (Trap Detection)** - Clear minefields across 4 difficulty levels (9×9 to 20×16)
+- **Rune Deciphering** - Mastermind-style deduction game with symbol sequences
 - Challenges appear randomly (~2 hour average discovery time)
 - Accept or decline from the challenge menu
 - Winning rewards prestige points based on difficulty
@@ -193,6 +194,36 @@ Discover challenge minigames while adventuring (requires Prestige 1+):
 - Uses [Crossterm](https://github.com/crossterm-rs/crossterm) for cross-platform terminal handling
 - Save files use JSON format
 - 100ms game tick (10 ticks/sec)
+
+## Development
+
+### Project Structure
+
+```
+src/
+├── main.rs            # Entry point, game loop
+├── core/              # Game state, logic, constants
+├── character/         # Attributes, prestige, save system
+├── combat/            # Enemy generation, combat logic
+├── zones/             # Zone data and progression
+├── dungeon/           # Procedural dungeon system
+├── fishing/           # Fishing minigame
+├── items/             # Equipment and drop system
+├── challenges/        # Chess, Morris, Gomoku, Minesweeper, Rune
+├── utils/             # Build info, updater, debug menu
+└── ui/                # Terminal UI components
+```
+
+See [CLAUDE.md](CLAUDE.md) for detailed architecture documentation.
+
+### Build & Test
+
+```bash
+cargo build            # Build
+cargo run              # Run the game
+make check             # Run all CI checks (format, lint, test, build, audit)
+make fmt               # Auto-fix formatting
+```
 
 ## License
 

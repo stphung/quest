@@ -48,20 +48,27 @@ make fmt               # Applies rustfmt to all code
 
 Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Crossterm.
 
-### Core Modules
+### Core Module (`src/core/`)
 
 - `game_state.rs` — Main character state struct (level, XP, prestige, combat state, equipment)
+- `game_logic.rs` — XP curve (`100 × level^1.5`), leveling (+3 random attribute points), enemy spawning, offline progression
+- `constants.rs` — Game balance constants (tick rate, attack interval, XP rates)
+
+### Character Module (`src/character/`)
+
 - `attributes.rs` — 6 RPG attributes (STR, DEX, CON, INT, WIS, CHA), modifier = `(value - 10) / 2`
 - `derived_stats.rs` — Combat stats calculated from attributes (HP, damage, defense, crit, XP mult)
-- `combat.rs` — Enemy generation and combat state machine
-- `combat_logic.rs` — Turn-based combat mechanics, damage calculation, event emission
-- `game_logic.rs` — XP curve (`100 × level^1.5`), leveling (+3 random attribute points), enemy spawning, offline progression
 - `prestige.rs` — Prestige tiers (Bronze→Eternal) with XP multipliers (1.5× compounding) and attribute cap increases
-- `constants.rs` — Game balance constants (tick rate, attack interval, XP rates)
+- `manager.rs` — Character CRUD operations (create, delete, rename), JSON save/load in ~/.quest/, name validation
+- `save.rs` — Legacy binary save/load (deprecated, used for migration only)
+
+### Combat Module (`src/combat/`)
+
+- `types.rs` — Enemy generation and combat state machine
+- `logic.rs` — Turn-based combat mechanics, damage calculation, event emission
 
 ### Zone System (`src/zones/`)
 
-- `mod.rs` — Zone module exports and boss defeat result types
 - `data.rs` — 10 zones with 3-4 subzones each, prestige requirements, boss definitions
 - `progression.rs` — Zone/subzone progression state, kill tracking (10 kills → boss spawn), weapon gates
 
@@ -72,46 +79,43 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 - P15: Crystal Caverns, Sunken Kingdom (4 subzones each)
 - P20: Floating Isles, Storm Citadel (4 subzones each, Zone 10 requires Stormbreaker)
 
-### Dungeon System
+### Dungeon Module (`src/dungeon/`)
 
-- `dungeon.rs` — Room types (Entrance, Combat, Treasure, Elite, Boss), room state (Hidden, Revealed, Current, Cleared), dungeon sizes
-- `dungeon_generation.rs` — Procedural dungeon generation with connected rooms
-- `dungeon_logic.rs` — Dungeon navigation, room clearing, key system, safe death (no prestige loss)
+- `types.rs` — Room types (Entrance, Combat, Treasure, Elite, Boss), room state (Hidden, Revealed, Current, Cleared), dungeon sizes
+- `generation.rs` — Procedural dungeon generation with connected rooms
+- `logic.rs` — Dungeon navigation, room clearing, key system, safe death (no prestige loss)
 
 **Dungeon Sizes:** Small 5×5, Medium 7×7, Large 9×9, Epic 11×11 (based on prestige)
 
-### Fishing System
+### Fishing Module (`src/fishing/`)
 
-- `fishing.rs` — Fish rarities (Common→Legendary), fishing phases (Casting, Waiting, Reeling), 30 ranks across 6 tiers
-- `fishing_generation.rs` — Fish name generation and rarity rolling
-- `fishing_logic.rs` — Fishing session tick processing
+- `types.rs` — Fish rarities (Common→Legendary), fishing phases (Casting, Waiting, Reeling), 30 ranks across 6 tiers
+- `generation.rs` — Fish name generation and rarity rolling
+- `logic.rs` — Fishing session tick processing
 
-### Item System
+### Item Module (`src/items/`)
 
-- `items.rs` — Core item data structures (7 equipment slots, 5 rarity tiers, 12 affix types)
+- `types.rs` — Core item data structures (7 equipment slots, 5 rarity tiers, 12 affix types)
 - `equipment.rs` — Equipment container with slot management and iteration
-- `item_generation.rs` — Rarity-based attribute/affix generation (Common: +1-2 attrs, Legendary: +8-15 attrs + 4-5 affixes)
-- `item_drops.rs` — Drop system (15% base + 1% per prestige rank capped at 25%, continuous rarity distribution)
-- `item_names.rs` — Procedural name generation with prefixes/suffixes
-- `item_scoring.rs` — Smart weighted auto-equip scoring (attribute specialization bonus, affix type weights)
+- `generation.rs` — Rarity-based attribute/affix generation (Common: +1-2 attrs, Legendary: +8-15 attrs + 4-5 affixes)
+- `drops.rs` — Drop system (15% base + 1% per prestige rank capped at 25%, continuous rarity distribution)
+- `names.rs` — Procedural name generation with prefixes/suffixes
+- `scoring.rs` — Smart weighted auto-equip scoring (attribute specialization bonus, affix type weights)
 
-### Challenge Minigames
+### Challenge Minigames (`src/challenges/`)
 
-- `challenge_menu.rs` — Generic challenge menu system (pending challenges, extensible challenge types)
-- `chess.rs` — Chess minigame data structures (4 difficulty levels: Novice→Master, ~500-1350 ELO)
-- `chess_logic.rs` — Chess AI moves, discovery rolls (~2hr avg), game resolution, requires P1+
-- `morris.rs` — Nine Men's Morris minigame data structures (board layout, mill detection, phases)
-- `morris_logic.rs` — Morris AI moves, discovery rolls (~2hr avg), game resolution, requires P1+
-- `gomoku.rs` — Gomoku (Five in a Row) on 15×15 board, 4 AI difficulty levels
-- `gomoku_logic.rs` — Gomoku AI with minimax algorithm (depth 2-5), move validation, win detection
-- `minesweeper.rs` — Minesweeper (Trap Detection) data structures, 4 difficulties (9×9 to 20×16)
-- `minesweeper_logic.rs` — Mine placement, cell revelation, flood fill, flag system
+- `menu.rs` — Generic challenge menu system (pending challenges, extensible challenge types)
+- `chess/` — Chess minigame (4 difficulty levels: Novice→Master, ~500-1350 ELO), requires P1+
+- `morris/` — Nine Men's Morris (board layout, mill detection, phases), requires P1+
+- `gomoku/` — Gomoku (Five in a Row) on 15×15 board, minimax AI (depth 2-5)
+- `minesweeper/` — Trap Detection, 4 difficulties (9×9 to 20×16)
+- `rune/` — Rune Deciphering (Mastermind-style deduction), 4 difficulties
+
+### Utilities (`src/utils/`)
+
+- `build_info.rs` — Build metadata (commit, date) embedded at compile time
+- `updater.rs` — Self-update functionality
 - `debug_menu.rs` — Debug menu for testing discoveries (activate with `--debug` flag, toggle with backtick)
-
-### Character System
-
-- `character_manager.rs` — Character CRUD operations (create, delete, rename), JSON save/load in ~/.quest/, name validation
-- `save_manager.rs` — Legacy binary save/load (deprecated, used for migration only)
 
 ### UI (`src/ui/`)
 
@@ -165,70 +169,62 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 ```
 quest/
 ├── src/
-│   ├── main.rs           # Entry point, game loop, input handling
-│   ├── lib.rs            # Library crate for testing
-│   ├── game_state.rs     # Core game state
-│   ├── game_logic.rs     # XP, leveling, spawning
-│   ├── combat.rs         # Enemy struct, combat state
-│   ├── combat_logic.rs   # Combat resolution
-│   ├── attributes.rs     # 6 RPG attributes
-│   ├── derived_stats.rs  # Stats from attributes
-│   ├── prestige.rs       # Prestige system
-│   ├── constants.rs      # Game constants
-│   ├── zones/            # Zone system
-│   │   ├── mod.rs
-│   │   ├── data.rs       # Zone definitions
-│   │   └── progression.rs
-│   ├── dungeon.rs        # Dungeon types
-│   ├── dungeon_generation.rs
-│   ├── dungeon_logic.rs
-│   ├── fishing.rs        # Fishing types
-│   ├── fishing_generation.rs
-│   ├── fishing_logic.rs
-│   ├── items.rs          # Item types
-│   ├── equipment.rs
-│   ├── item_generation.rs
-│   ├── item_drops.rs
-│   ├── item_names.rs
-│   ├── item_scoring.rs
-│   ├── challenge_menu.rs    # Challenge menu system
-│   ├── chess.rs             # Chess minigame
-│   ├── chess_logic.rs
-│   ├── morris.rs            # Nine Men's Morris minigame
-│   ├── morris_logic.rs
-│   ├── gomoku.rs            # Gomoku minigame
-│   ├── gomoku_logic.rs
-│   ├── minesweeper.rs       # Minesweeper minigame
-│   ├── minesweeper_logic.rs
-│   ├── debug_menu.rs        # Debug menu (--debug flag)
-│   ├── character_manager.rs  # JSON saves
-│   ├── save_manager.rs       # Legacy saves
-│   └── ui/               # UI components
-│       ├── mod.rs
-│       ├── stats_panel.rs
-│       ├── combat_scene.rs
-│       ├── combat_3d.rs
-│       ├── combat_effects.rs
-│       ├── enemy_sprites.rs
-│       ├── dungeon_map.rs
-│       ├── fishing_scene.rs
-│       ├── prestige_confirm.rs
-│       ├── challenge_menu_scene.rs
-│       ├── chess_scene.rs
-│       ├── morris_scene.rs
-│       ├── gomoku_scene.rs
-│       ├── minesweeper_scene.rs
-│       ├── debug_menu_scene.rs
-│       ├── throbber.rs
-│       ├── character_select.rs
-│       ├── character_creation.rs
-│       ├── character_delete.rs
-│       └── character_rename.rs
-├── .github/workflows/ci.yml  # CI/CD pipeline
-├── scripts/ci-checks.sh      # Quality checks
-├── docs/plans/               # Design documents
-├── Makefile                  # Dev helpers
-└── CLAUDE.md                 # This file
+│   ├── main.rs              # Entry point, game loop, input handling
+│   ├── lib.rs               # Library crate for testing
+│   ├── core/                # Core game systems
+│   │   ├── constants.rs     # Game balance constants
+│   │   ├── game_logic.rs    # XP, leveling, spawning
+│   │   └── game_state.rs    # Main game state
+│   ├── character/           # Character system
+│   │   ├── attributes.rs    # 6 RPG attributes
+│   │   ├── derived_stats.rs # Stats from attributes
+│   │   ├── prestige.rs      # Prestige system
+│   │   ├── manager.rs       # JSON saves
+│   │   └── save.rs          # Legacy saves
+│   ├── combat/              # Combat system
+│   │   ├── types.rs         # Enemy, combat state
+│   │   └── logic.rs         # Combat resolution
+│   ├── zones/               # Zone system
+│   │   ├── data.rs          # Zone definitions
+│   │   └── progression.rs   # Zone progression
+│   ├── dungeon/             # Dungeon system
+│   │   ├── types.rs         # Room types, dungeon sizes
+│   │   ├── generation.rs    # Procedural generation
+│   │   └── logic.rs         # Navigation, clearing
+│   ├── fishing/             # Fishing system
+│   │   ├── types.rs         # Fish, phases, ranks
+│   │   ├── generation.rs    # Fish generation
+│   │   └── logic.rs         # Session processing
+│   ├── items/               # Item system
+│   │   ├── types.rs         # Items, slots, affixes
+│   │   ├── equipment.rs     # Equipment container
+│   │   ├── generation.rs    # Item generation
+│   │   ├── drops.rs         # Drop system
+│   │   ├── names.rs         # Name generation
+│   │   └── scoring.rs       # Auto-equip scoring
+│   ├── challenges/          # Challenge minigames
+│   │   ├── menu.rs          # Challenge menu
+│   │   ├── chess/           # Chess minigame
+│   │   ├── morris/          # Nine Men's Morris
+│   │   ├── gomoku/          # Gomoku (Five in a Row)
+│   │   ├── minesweeper/     # Trap Detection
+│   │   └── rune/            # Rune Deciphering
+│   ├── utils/               # Utilities
+│   │   ├── build_info.rs    # Build metadata
+│   │   ├── updater.rs       # Self-update
+│   │   └── debug_menu.rs    # Debug menu
+│   └── ui/                  # UI components
+│       ├── stats_panel.rs   # Character stats
+│       ├── combat_scene.rs  # Combat view
+│       ├── combat_3d.rs     # 3D dungeon renderer
+│       ├── *_scene.rs       # Various game scenes
+│       └── character_*.rs   # Character management UI
+├── tests/                   # Integration tests
+├── .github/workflows/       # CI/CD pipeline
+├── scripts/                 # Quality checks
+├── docs/plans/              # Design documents
+├── Makefile                 # Dev helpers
+└── CLAUDE.md                # This file
 ```
 
 ## Dependencies
