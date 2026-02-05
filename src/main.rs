@@ -21,11 +21,10 @@ use challenges::minesweeper::logic::{handle_first_click, reveal_cell, toggle_fla
 use challenges::minesweeper::{MinesweeperDifficulty, MinesweeperGame, MinesweeperResult};
 use challenges::morris::logic::{
     self as morris_logic, apply_game_result as apply_morris_result,
-    get_legal_moves as get_morris_legal_moves, process_ai_thinking as process_morris_ai,
-    start_morris_game,
+    process_ai_thinking as process_morris_ai, start_morris_game,
 };
 use challenges::morris::{
-    self, CursorDirection as MorrisCursorDirection, MorrisDifficulty, MorrisMove, MorrisResult,
+    CursorDirection as MorrisCursorDirection, MorrisDifficulty, MorrisResult,
 };
 use challenges::rune::logic::submit_guess;
 use challenges::rune::{RuneDifficulty, RuneGame, RuneResult};
@@ -60,63 +59,6 @@ enum Screen {
 }
 
 /// Handle Enter key press during Morris game
-fn handle_morris_enter(state: &mut GameState) {
-    let morris_game = match state.active_morris.as_mut() {
-        Some(game) => game,
-        None => return,
-    };
-
-    let cursor = morris_game.cursor;
-
-    // If must capture, try to capture at cursor
-    if morris_game.must_capture {
-        let capture_moves = get_morris_legal_moves(morris_game);
-        if capture_moves
-            .iter()
-            .any(|m| matches!(m, MorrisMove::Capture(pos) if *pos == cursor))
-        {
-            morris_logic::apply_move(morris_game, MorrisMove::Capture(cursor));
-        }
-        return;
-    }
-
-    // During placing phase, place at cursor if empty
-    if morris_game.phase == morris::MorrisPhase::Placing {
-        if morris_game.board[cursor].is_none() {
-            morris_logic::apply_move(morris_game, MorrisMove::Place(cursor));
-        }
-        return;
-    }
-
-    // During moving/flying phase
-    if let Some(selected) = morris_game.selected_position {
-        // Already selected a piece - try to move to cursor
-        let legal_moves = get_morris_legal_moves(morris_game);
-        if legal_moves.iter().any(
-            |m| matches!(m, MorrisMove::Move { from, to } if *from == selected && *to == cursor),
-        ) {
-            morris_logic::apply_move(
-                morris_game,
-                MorrisMove::Move {
-                    from: selected,
-                    to: cursor,
-                },
-            );
-        } else if morris_game.board[cursor] == Some(morris::Player::Human) {
-            // Clicked on another human piece - select it instead
-            morris_game.selected_position = Some(cursor);
-        } else {
-            // Invalid move - clear selection
-            morris_game.clear_selection();
-        }
-    } else {
-        // No piece selected - try to select piece at cursor
-        if morris_game.board[cursor] == Some(morris::Player::Human) {
-            morris_game.selected_position = Some(cursor);
-        }
-    }
-}
-
 fn main() -> io::Result<()> {
     // Handle CLI arguments
     let args: Vec<String> = std::env::args().collect();
@@ -1052,7 +994,7 @@ fn main() -> io::Result<()> {
                                             morris_game.move_cursor(MorrisCursorDirection::Right)
                                         }
                                         KeyCode::Enter => {
-                                            handle_morris_enter(&mut state);
+                                            morris_logic::process_human_enter(morris_game);
                                         }
                                         KeyCode::Esc => {
                                             if morris_game.forfeit_pending {

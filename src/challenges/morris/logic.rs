@@ -109,6 +109,60 @@ fn get_capture_moves(game: &MorrisGame, player: Player) -> Vec<MorrisMove> {
     moves
 }
 
+/// Process human player pressing Enter at current cursor position.
+/// Handles placing, moving, and capturing based on game phase.
+pub fn process_human_enter(game: &mut MorrisGame) {
+    let cursor = game.cursor;
+
+    // If must capture, try to capture at cursor
+    if game.must_capture {
+        let capture_moves = get_legal_moves(game);
+        if capture_moves
+            .iter()
+            .any(|m| matches!(m, MorrisMove::Capture(pos) if *pos == cursor))
+        {
+            apply_move(game, MorrisMove::Capture(cursor));
+        }
+        return;
+    }
+
+    // During placing phase, place at cursor if empty
+    if game.phase == MorrisPhase::Placing {
+        if game.board[cursor].is_none() {
+            apply_move(game, MorrisMove::Place(cursor));
+        }
+        return;
+    }
+
+    // During moving/flying phase
+    if let Some(selected) = game.selected_position {
+        // Already selected a piece - try to move to cursor
+        let legal_moves = get_legal_moves(game);
+        if legal_moves.iter().any(
+            |m| matches!(m, MorrisMove::Move { from, to } if *from == selected && *to == cursor),
+        ) {
+            apply_move(
+                game,
+                MorrisMove::Move {
+                    from: selected,
+                    to: cursor,
+                },
+            );
+        } else if game.board[cursor] == Some(Player::Human) {
+            // Clicked on another human piece - select it instead
+            game.selected_position = Some(cursor);
+        } else {
+            // Invalid move - clear selection
+            game.clear_selection();
+        }
+    } else {
+        // No piece selected - try to select piece at cursor
+        if game.board[cursor] == Some(Player::Human) {
+            game.selected_position = Some(cursor);
+        }
+    }
+}
+
 /// Apply a move to the game state
 pub fn apply_move(game: &mut MorrisGame, mv: MorrisMove) {
     match mv {
@@ -1074,5 +1128,88 @@ mod tests {
         assert!(!moved); // Should not have applied yet
         assert!(game.ai_pending_move.is_some());
         assert!(game.ai_think_target >= 10);
+    }
+
+    // ============ Human Input Tests ============
+
+    #[test]
+    fn test_process_human_enter_places_piece_in_placing_phase() {
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        assert_eq!(game.phase, MorrisPhase::Placing);
+        assert!(game.board[0].is_none());
+
+        game.cursor = 0;
+        process_human_enter(&mut game);
+
+        assert_eq!(game.board[0], Some(Player::Human));
+        // Turn should switch to AI
+        assert_eq!(game.current_player, Player::Ai);
+    }
+
+    #[test]
+    fn test_process_human_enter_ignores_occupied_position_in_placing() {
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        game.board[0] = Some(Player::Ai);
+
+        game.cursor = 0;
+        let pieces_before = game.pieces_to_place.0;
+        process_human_enter(&mut game);
+
+        // Nothing should change - position was occupied
+        assert_eq!(game.board[0], Some(Player::Ai));
+        assert_eq!(game.pieces_to_place.0, pieces_before);
+    }
+
+    #[test]
+    fn test_process_human_enter_selects_piece_in_moving_phase() {
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        // Set up moving phase with human piece
+        game.phase = MorrisPhase::Moving;
+        game.pieces_to_place = (0, 0);
+        game.board[0] = Some(Player::Human);
+        game.pieces_on_board.0 = 3;
+
+        game.cursor = 0;
+        assert!(game.selected_position.is_none());
+
+        process_human_enter(&mut game);
+
+        assert_eq!(game.selected_position, Some(0));
+    }
+
+    #[test]
+    fn test_process_human_enter_moves_selected_piece() {
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        // Set up moving phase with human piece selected
+        game.phase = MorrisPhase::Moving;
+        game.pieces_to_place = (0, 0);
+        game.board[0] = Some(Player::Human);
+        game.pieces_on_board.0 = 3;
+        game.selected_position = Some(0);
+
+        // Position 1 is adjacent to position 0 in the board layout
+        game.cursor = 1;
+
+        process_human_enter(&mut game);
+
+        // Piece should have moved from 0 to 1
+        assert!(game.board[0].is_none());
+        assert_eq!(game.board[1], Some(Player::Human));
+        assert!(game.selected_position.is_none());
+    }
+
+    #[test]
+    fn test_process_human_enter_captures_opponent_piece() {
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        game.must_capture = true;
+        game.board[5] = Some(Player::Ai);
+        game.pieces_on_board.1 = 3;
+
+        game.cursor = 5;
+        process_human_enter(&mut game);
+
+        // Opponent piece should be captured
+        assert!(game.board[5].is_none());
+        assert!(!game.must_capture);
     }
 }
