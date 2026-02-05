@@ -1,12 +1,15 @@
 //! Minesweeper game UI rendering.
 
-use super::game_common::{create_game_layout, render_forfeit_status_bar, render_status_bar};
+use super::game_common::{
+    create_game_layout, render_forfeit_status_bar, render_game_over_overlay, render_status_bar,
+    GameResultType,
+};
 use crate::minesweeper::{Cell, MinesweeperGame, MinesweeperResult};
 use ratatui::{
-    layout::{Alignment, Rect},
+    layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::{Block, Borders, Paragraph},
     Frame,
 };
 
@@ -14,7 +17,7 @@ use ratatui::{
 pub fn render_minesweeper(frame: &mut Frame, area: Rect, game: &MinesweeperGame) {
     // Game over overlay
     if game.game_result.is_some() {
-        render_game_over_overlay(frame, area, game);
+        render_minesweeper_game_over(frame, area, game);
         return;
     }
 
@@ -202,57 +205,31 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &MinesweeperGame) {
     frame.render_widget(text, inner);
 }
 
-/// Render the game over overlay.
-fn render_game_over_overlay(frame: &mut Frame, area: Rect, game: &MinesweeperGame) {
+fn render_minesweeper_game_over(frame: &mut Frame, area: Rect, game: &MinesweeperGame) {
     let result = game.game_result.as_ref().unwrap();
 
-    let (title, color) = match result {
-        MinesweeperResult::Win => ("Area Secured!", Color::Green),
-        MinesweeperResult::Loss => ("Trap Triggered!", Color::Red),
-    };
-
-    let reward_text = match result {
+    let (result_type, title, message, reward) = match result {
         MinesweeperResult::Win => {
-            // Calculate reward based on difficulty
             let prestige = match game.difficulty {
                 crate::minesweeper::MinesweeperDifficulty::Novice => 1,
                 crate::minesweeper::MinesweeperDifficulty::Apprentice => 2,
                 crate::minesweeper::MinesweeperDifficulty::Journeyman => 3,
                 crate::minesweeper::MinesweeperDifficulty::Master => 5,
             };
-            format!("+{} Prestige Ranks", prestige)
+            (
+                GameResultType::Win,
+                ":: AREA SECURED! ::",
+                "You detected all the traps!",
+                format!("+{} Prestige Ranks", prestige),
+            )
         }
-        MinesweeperResult::Loss => "No reward".to_string(),
+        MinesweeperResult::Loss => (
+            GameResultType::Loss,
+            "TRAP TRIGGERED!",
+            "You stepped on a hidden trap.",
+            "No penalty incurred.".to_string(),
+        ),
     };
 
-    // Center overlay
-    let width = 30;
-    let height = 6;
-    let x = area.x + (area.width.saturating_sub(width)) / 2;
-    let y = area.y + (area.height.saturating_sub(height)) / 2;
-    let overlay_area = Rect::new(x, y, width, height);
-
-    frame.render_widget(Clear, overlay_area);
-
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(color));
-    let inner = block.inner(overlay_area);
-    frame.render_widget(block, overlay_area);
-
-    let lines = vec![
-        Line::from(Span::styled(
-            title,
-            Style::default().fg(color).add_modifier(Modifier::BOLD),
-        )),
-        Line::from(""),
-        Line::from(Span::styled(reward_text, Style::default().fg(Color::White))),
-        Line::from(Span::styled(
-            "[Any key to continue]",
-            Style::default().fg(Color::DarkGray),
-        )),
-    ];
-
-    let text = Paragraph::new(lines).alignment(Alignment::Center);
-    frame.render_widget(text, inner);
+    render_game_over_overlay(frame, area, result_type, title, message, &reward);
 }

@@ -1,14 +1,15 @@
 //! Gomoku game UI rendering.
 
 use super::game_common::{
-    create_game_layout, render_forfeit_status_bar, render_status_bar, render_thinking_status_bar,
+    create_game_layout, render_forfeit_status_bar, render_game_over_overlay, render_status_bar,
+    render_thinking_status_bar, GameResultType,
 };
 use crate::gomoku::{GomokuGame, Player, BOARD_SIZE};
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::{Block, Borders, Paragraph},
     Frame,
 };
 
@@ -16,7 +17,7 @@ use ratatui::{
 pub fn render_gomoku_scene(frame: &mut Frame, area: Rect, game: &GomokuGame) {
     // Game over overlay
     if game.game_result.is_some() {
-        render_game_over_overlay(frame, area, game);
+        render_gomoku_game_over(frame, area, game);
         return;
     }
 
@@ -176,52 +177,34 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &GomokuGame) {
     frame.render_widget(text, inner);
 }
 
-fn render_game_over_overlay(frame: &mut Frame, area: Rect, game: &GomokuGame) {
+fn render_gomoku_game_over(frame: &mut Frame, area: Rect, game: &GomokuGame) {
     use crate::challenge_menu::DifficultyInfo;
 
     let result = game.game_result.as_ref().unwrap();
-    let (title, color) = match result {
-        crate::gomoku::GomokuResult::Win => ("Victory!", Color::Green),
-        crate::gomoku::GomokuResult::Loss => ("Defeat", Color::Red),
-        crate::gomoku::GomokuResult::Draw => ("Draw", Color::Yellow),
+    let (result_type, title, message) = match result {
+        crate::gomoku::GomokuResult::Win => (
+            GameResultType::Win,
+            ":: VICTORY! ::",
+            "You placed five stones in a row!",
+        ),
+        crate::gomoku::GomokuResult::Loss => (
+            GameResultType::Loss,
+            "DEFEAT",
+            "The opponent placed five stones in a row.",
+        ),
+        crate::gomoku::GomokuResult::Draw => (
+            GameResultType::Draw,
+            "DRAW",
+            "The board is full with no winner.",
+        ),
     };
 
-    let reward_text = match result {
+    let reward = match result {
         crate::gomoku::GomokuResult::Win => {
-            // Strip "Win: " prefix since title already shows victory
             game.difficulty.reward().description().replace("Win: ", "")
         }
-        _ => "No reward".to_string(),
+        _ => "No penalty incurred.".to_string(),
     };
 
-    // Center overlay
-    let width = 24;
-    let height = 6;
-    let x = area.x + (area.width.saturating_sub(width)) / 2;
-    let y = area.y + (area.height.saturating_sub(height)) / 2;
-    let overlay_area = Rect::new(x, y, width, height);
-
-    frame.render_widget(Clear, overlay_area);
-
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(color));
-    let inner = block.inner(overlay_area);
-    frame.render_widget(block, overlay_area);
-
-    let lines = vec![
-        Line::from(Span::styled(
-            title,
-            Style::default().fg(color).add_modifier(Modifier::BOLD),
-        )),
-        Line::from(""),
-        Line::from(Span::styled(reward_text, Style::default().fg(Color::White))),
-        Line::from(Span::styled(
-            "[Any key to continue]",
-            Style::default().fg(Color::DarkGray),
-        )),
-    ];
-
-    let text = Paragraph::new(lines).alignment(ratatui::layout::Alignment::Center);
-    frame.render_widget(text, inner);
+    render_game_over_overlay(frame, area, result_type, title, message, &reward);
 }

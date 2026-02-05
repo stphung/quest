@@ -2,7 +2,7 @@
 
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph},
     Frame,
@@ -145,6 +145,81 @@ pub fn render_thinking_status_bar(frame: &mut Frame, area: Rect, message: &str) 
 
     let status_text = format!("{} {}", spinner, message);
     render_status_bar(frame, area, &status_text, Color::Yellow, &[]);
+}
+
+/// Game result type for the shared overlay.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum GameResultType {
+    Win,
+    Loss,
+    Draw,
+    Forfeit,
+}
+
+impl GameResultType {
+    /// Get the color for this result type.
+    pub fn color(self) -> Color {
+        match self {
+            GameResultType::Win => Color::Green,
+            GameResultType::Loss => Color::Red,
+            GameResultType::Draw => Color::Yellow,
+            GameResultType::Forfeit => Color::Gray,
+        }
+    }
+}
+
+/// Render a full-screen game over overlay (Chess/Morris style).
+///
+/// Fills the entire area with a bordered overlay containing:
+/// - Title (bold, colored by result)
+/// - Message describing the outcome
+/// - Reward text
+/// - "[Press any key]"
+pub fn render_game_over_overlay(
+    frame: &mut Frame,
+    area: Rect,
+    result_type: GameResultType,
+    title: &str,
+    message: &str,
+    reward: &str,
+) {
+    frame.render_widget(Clear, area);
+
+    let title_color = result_type.color();
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(title_color));
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let content_height: u16 = 7;
+    let y_offset = inner.y + (inner.height.saturating_sub(content_height)) / 2;
+
+    let lines = vec![
+        Line::from(Span::styled(
+            title,
+            Style::default()
+                .fg(title_color)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(message, Style::default().fg(Color::White))),
+        Line::from(""),
+        Line::from(Span::styled(reward, Style::default().fg(Color::Cyan))),
+        Line::from(""),
+        Line::from(Span::styled(
+            "[Press any key]",
+            Style::default().fg(Color::DarkGray),
+        )),
+    ];
+
+    let text = Paragraph::new(lines).alignment(Alignment::Center);
+    frame.render_widget(
+        text,
+        Rect::new(inner.x, y_offset, inner.width, content_height),
+    );
 }
 
 /// Forfeit confirmation status text.

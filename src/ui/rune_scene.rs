@@ -1,12 +1,15 @@
 //! Rune Deciphering game UI rendering.
 
-use super::game_common::{create_game_layout, render_forfeit_status_bar, render_status_bar};
+use super::game_common::{
+    create_game_layout, render_forfeit_status_bar, render_game_over_overlay, render_status_bar,
+    GameResultType,
+};
 use crate::rune::{FeedbackMark, RuneGame, RuneResult, RUNE_SYMBOLS};
 use ratatui::{
-    layout::{Alignment, Rect},
+    layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::{Block, Borders, Paragraph},
     Frame,
 };
 
@@ -14,7 +17,7 @@ use ratatui::{
 pub fn render_rune(frame: &mut Frame, area: Rect, game: &RuneGame) {
     // Game over overlay
     if game.game_result.is_some() {
-        render_game_over_overlay(frame, area, game);
+        render_rune_game_over(frame, area, game);
         return;
     }
 
@@ -235,64 +238,34 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &RuneGame) {
     frame.render_widget(text, inner);
 }
 
-/// Render the game over overlay.
-fn render_game_over_overlay(frame: &mut Frame, area: Rect, game: &RuneGame) {
+fn render_rune_game_over(frame: &mut Frame, area: Rect, game: &RuneGame) {
+    use crate::challenge_menu::DifficultyInfo;
+
     let result = game.game_result.as_ref().unwrap();
 
-    let (title, color) = match result {
-        RuneResult::Win => ("Runes Deciphered!", Color::Green),
-        RuneResult::Loss => ("Runes Remain Hidden", Color::Red),
-    };
-
-    let mut overlay_lines = vec![
-        Line::from(Span::styled(
-            title,
-            Style::default().fg(color).add_modifier(Modifier::BOLD),
-        )),
-        Line::from(""),
-    ];
-
-    if *result == RuneResult::Loss {
-        let mut code_spans = vec![Span::styled("Code: ", Style::default().fg(Color::DarkGray))];
-        for &idx in &game.secret_code {
-            code_spans.push(Span::styled(
-                format!("{} ", RUNE_SYMBOLS[idx]),
-                Style::default().fg(Color::White),
-            ));
+    let (result_type, title, message, reward) = match result {
+        RuneResult::Win => (
+            GameResultType::Win,
+            ":: RUNES DECIPHERED! ::",
+            "You cracked the ancient code!".to_string(),
+            game.difficulty.reward().description(),
+        ),
+        RuneResult::Loss => {
+            // Build the code string to show in message
+            let code: String = game
+                .secret_code
+                .iter()
+                .map(|&idx| RUNE_SYMBOLS[idx].to_string())
+                .collect::<Vec<_>>()
+                .join(" ");
+            (
+                GameResultType::Loss,
+                "RUNES REMAIN HIDDEN",
+                format!("The code was: {}", code),
+                "No penalty incurred.".to_string(),
+            )
         }
-        overlay_lines.push(Line::from(code_spans));
-    }
-
-    use crate::challenge_menu::DifficultyInfo;
-    let reward_text = if *result == RuneResult::Win {
-        game.difficulty.reward().description()
-    } else {
-        "No reward".to_string()
     };
-    overlay_lines.push(Line::from(Span::styled(
-        reward_text,
-        Style::default().fg(Color::White),
-    )));
 
-    overlay_lines.push(Line::from(Span::styled(
-        "[Any key to continue]",
-        Style::default().fg(Color::DarkGray),
-    )));
-
-    let height = overlay_lines.len() as u16 + 2;
-    let width = 30;
-    let x = area.x + (area.width.saturating_sub(width)) / 2;
-    let y = area.y + (area.height.saturating_sub(height)) / 2;
-    let overlay_area = Rect::new(x, y, width, height);
-
-    frame.render_widget(Clear, overlay_area);
-
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(color));
-    let inner = block.inner(overlay_area);
-    frame.render_widget(block, overlay_area);
-
-    let text = Paragraph::new(overlay_lines).alignment(Alignment::Center);
-    frame.render_widget(text, inner);
+    render_game_over_overlay(frame, area, result_type, title, &message, &reward);
 }

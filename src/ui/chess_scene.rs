@@ -1,7 +1,8 @@
 //! Chess board UI rendering.
 
 use super::game_common::{
-    render_forfeit_status_bar, render_status_bar, render_thinking_status_bar,
+    render_forfeit_status_bar, render_game_over_overlay, render_status_bar,
+    render_thinking_status_bar, GameResultType,
 };
 use crate::chess::{ChessGame, ChessResult};
 use ratatui::{
@@ -18,7 +19,7 @@ pub fn render_chess_scene(frame: &mut Frame, area: Rect, game: &ChessGame) {
 
     // Check for game over overlay
     if let Some(result) = game.game_result {
-        render_game_over_overlay(frame, area, result, game.difficulty.reward_prestige());
+        render_chess_game_over(frame, area, result, game.difficulty.reward_prestige());
         return;
     }
 
@@ -302,72 +303,35 @@ fn render_move_history(frame: &mut Frame, area: Rect, game: &ChessGame) {
     frame.render_widget(text, area);
 }
 
-fn render_game_over_overlay(frame: &mut Frame, area: Rect, result: ChessResult, prestige: u32) {
-    frame.render_widget(Clear, area);
-
-    let (title, message, reward) = match result {
+fn render_chess_game_over(frame: &mut Frame, area: Rect, result: ChessResult, prestige: u32) {
+    let (result_type, title, message, reward) = match result {
         ChessResult::Win => (
+            GameResultType::Win,
             ":: VICTORY! ::",
             "You checkmated the mysterious figure!",
             format!("+{} Prestige Ranks", prestige),
         ),
         ChessResult::Loss => (
+            GameResultType::Loss,
             "DEFEAT",
             "The mysterious figure has checkmated you.",
             "No penalty incurred.".to_string(),
         ),
         ChessResult::Draw => (
+            GameResultType::Draw,
             "DRAW",
             "The game ends in stalemate.",
             "+5000 XP".to_string(),
         ),
         ChessResult::Forfeit => (
+            GameResultType::Forfeit,
             "FORFEIT",
             "You conceded the game.",
             "No penalty incurred.".to_string(),
         ),
     };
 
-    let title_color = match result {
-        ChessResult::Win => Color::Green,
-        ChessResult::Loss => Color::Red,
-        ChessResult::Draw => Color::Yellow,
-        ChessResult::Forfeit => Color::Gray,
-    };
-
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(title_color));
-
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-
-    let content_height: u16 = 7;
-    let y_offset = inner.y + (inner.height.saturating_sub(content_height)) / 2;
-
-    let lines = vec![
-        Line::from(Span::styled(
-            title,
-            Style::default()
-                .fg(title_color)
-                .add_modifier(Modifier::BOLD),
-        )),
-        Line::from(""),
-        Line::from(Span::styled(message, Style::default().fg(Color::White))),
-        Line::from(""),
-        Line::from(Span::styled(reward, Style::default().fg(Color::Cyan))),
-        Line::from(""),
-        Line::from(Span::styled(
-            "[Press any key]",
-            Style::default().fg(Color::DarkGray),
-        )),
-    ];
-
-    let text = Paragraph::new(lines).alignment(Alignment::Center);
-    frame.render_widget(
-        text,
-        Rect::new(inner.x, y_offset, inner.width, content_height),
-    );
+    render_game_over_overlay(frame, area, result_type, title, message, &reward);
 }
 
 /// Get color for a piece character (white pieces are bright, black pieces are dim)

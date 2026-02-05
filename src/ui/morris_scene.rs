@@ -1,11 +1,12 @@
 //! Nine Men's Morris UI rendering.
 
 use super::game_common::{
-    render_forfeit_status_bar, render_status_bar, render_thinking_status_bar,
+    render_forfeit_status_bar, render_game_over_overlay, render_status_bar,
+    render_thinking_status_bar, GameResultType,
 };
 use crate::morris::{MorrisGame, MorrisPhase, MorrisResult, Player, ADJACENCIES};
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph},
@@ -23,7 +24,7 @@ pub fn render_morris_scene(frame: &mut Frame, area: Rect, game: &MorrisGame, cha
             (xp_for_level as f64 * game.difficulty.reward_xp_percent() as f64 / 100.0) as u64;
         let xp_reward = xp_reward.max(100);
         let is_master = game.difficulty == crate::morris::MorrisDifficulty::Master;
-        render_game_over_overlay(frame, area, result, xp_reward, is_master);
+        render_morris_game_over(frame, area, result, xp_reward, is_master);
         return;
     }
 
@@ -507,16 +508,14 @@ fn render_help_panel(frame: &mut Frame, area: Rect, game: &MorrisGame) {
     frame.render_widget(text, inner);
 }
 
-fn render_game_over_overlay(
+fn render_morris_game_over(
     frame: &mut Frame,
     area: Rect,
     result: MorrisResult,
     xp_reward: u64,
     is_master: bool,
 ) {
-    frame.render_widget(Clear, area);
-
-    let (title, message, reward) = match result {
+    let (result_type, title, message, reward) = match result {
         MorrisResult::Win => {
             let reward_text = if is_master {
                 format!("+{} XP, +1 Fishing Rank", xp_reward)
@@ -524,60 +523,25 @@ fn render_game_over_overlay(
                 format!("+{} XP", xp_reward)
             };
             (
+                GameResultType::Win,
                 ":: VICTORY! ::",
                 "You outwitted the sage at the game of mills!",
                 reward_text,
             )
         }
         MorrisResult::Loss => (
+            GameResultType::Loss,
             "DEFEAT",
             "The sage has bested you at the game of mills.",
             "No penalty incurred.".to_string(),
         ),
         MorrisResult::Forfeit => (
+            GameResultType::Forfeit,
             "FORFEIT",
             "You conceded the game.",
             "No penalty incurred.".to_string(),
         ),
     };
 
-    let title_color = match result {
-        MorrisResult::Win => Color::Green,
-        MorrisResult::Loss => Color::Red,
-        MorrisResult::Forfeit => Color::Gray,
-    };
-
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(title_color));
-
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-
-    let content_height: u16 = 7;
-    let y_offset = inner.y + (inner.height.saturating_sub(content_height)) / 2;
-
-    let lines = vec![
-        Line::from(Span::styled(
-            title,
-            Style::default()
-                .fg(title_color)
-                .add_modifier(Modifier::BOLD),
-        )),
-        Line::from(""),
-        Line::from(Span::styled(message, Style::default().fg(Color::White))),
-        Line::from(""),
-        Line::from(Span::styled(reward, Style::default().fg(Color::Cyan))),
-        Line::from(""),
-        Line::from(Span::styled(
-            "[Press any key]",
-            Style::default().fg(Color::DarkGray),
-        )),
-    ];
-
-    let text = Paragraph::new(lines).alignment(Alignment::Center);
-    frame.render_widget(
-        text,
-        Rect::new(inner.x, y_offset, inner.width, content_height),
-    );
+    render_game_over_overlay(frame, area, result_type, title, message, &reward);
 }
