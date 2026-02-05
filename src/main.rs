@@ -545,6 +545,32 @@ fn main() -> io::Result<()> {
                         if showing_prestige_confirm {
                             ui::prestige_confirm::draw_prestige_confirm(frame, &state);
                         }
+                        // Draw Haven discovery modal if active
+                        if showing_haven_discovery {
+                            ui::haven_scene::render_haven_discovery_modal(frame, frame.size());
+                        }
+                        // Draw Haven screen if active
+                        if showing_haven {
+                            ui::haven_scene::render_haven_tree(
+                                frame,
+                                frame.size(),
+                                &haven,
+                                haven_selected_room,
+                                state.prestige_rank,
+                                state.fishing.rank,
+                            );
+                            if haven_confirming_build {
+                                let room = haven::HavenRoomId::ALL[haven_selected_room];
+                                ui::haven_scene::render_build_confirmation(
+                                    frame,
+                                    frame.size(),
+                                    room,
+                                    &haven,
+                                    state.prestige_rank,
+                                    state.fishing.rank,
+                                );
+                            }
+                        }
                         // Draw debug indicator and menu if in debug mode, otherwise save indicator
                         if debug_mode {
                             ui::debug_menu_scene::render_debug_indicator(frame, frame.size());
