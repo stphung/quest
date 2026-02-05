@@ -646,7 +646,7 @@ fn main() -> io::Result<()> {
 
                     // Game tick every 100ms
                     if last_tick.elapsed() >= Duration::from_millis(TICK_INTERVAL_MS) {
-                        game_tick(&mut state, &mut tick_counter);
+                        game_tick(&mut state, &mut tick_counter, &haven);
                         last_tick = Instant::now();
 
                         // Haven discovery check (independent roll, once per tick)
@@ -705,7 +705,7 @@ fn main() -> io::Result<()> {
 }
 
 /// Processes a single game tick, updating combat and stats
-fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
+fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::Haven) {
     use combat::logic::update_combat;
     use dungeon::logic::{
         on_boss_defeated, on_elite_defeated, on_treasure_room_entered, update_dungeon,
@@ -844,8 +844,9 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
         return; // Skip combat processing while fishing
     }
 
-    // Update combat state
-    let combat_events = update_combat(game_state, delta_time);
+    // Update combat state (with Haven HP regen bonus from Alchemy Lab)
+    let haven_hp_regen = haven.get_bonus(haven::HavenBonusType::HpRegenPercent);
+    let combat_events = update_combat(game_state, delta_time, haven_hp_regen);
 
     // Process combat events
     for event in combat_events {

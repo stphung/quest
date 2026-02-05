@@ -101,7 +101,7 @@ fn render_summary_bar(frame: &mut Frame, area: Rect, haven: &Haven) {
         (HavenBonusType::DropRatePercent, "+{}% Drops"),
         (HavenBonusType::CritChancePercent, "+{}% Crit"),
         (HavenBonusType::HpRegenPercent, "+{}% HP Regen"),
-        (HavenBonusType::AttackIntervalReduction, "-{}% Atk Interval"),
+        (HavenBonusType::DoubleStrikeChance, "+{}% Double Strike"),
         (HavenBonusType::OfflineXpPercent, "+{}% Offline XP"),
         (HavenBonusType::ChallengeDiscoveryPercent, "+{}% Discovery"),
     ];
@@ -301,7 +301,7 @@ fn render_room_detail(
         frame.render_widget(cost_text, chunks[4]);
     } else if tier < 3 {
         let next_tier = tier + 1;
-        let cost = tier_cost(next_tier);
+        let cost = tier_cost(room, next_tier);
         let can_afford_it = can_afford(room, haven, prestige_rank);
 
         let cost_style = if can_afford_it {
@@ -404,7 +404,7 @@ pub fn render_build_confirmation(
 
     let tier = haven.room_tier(room);
     let next_tier = tier + 1;
-    let cost = tier_cost(next_tier);
+    let cost = tier_cost(room, next_tier);
     let can_afford_it = can_afford(room, haven, prestige_rank);
 
     let title = if tier == 0 {

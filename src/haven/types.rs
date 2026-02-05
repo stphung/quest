@@ -128,14 +128,46 @@ impl HavenRoomId {
     pub fn is_capstone(&self) -> bool {
         matches!(self, HavenRoomId::WarRoom | HavenRoomId::Vault)
     }
+
+    /// Get the depth of this room in the tree (0 = root, 4 = capstones)
+    pub fn depth(&self) -> u8 {
+        match self {
+            HavenRoomId::Hearthstone => 0,
+            HavenRoomId::Armory | HavenRoomId::Bedroom => 1,
+            HavenRoomId::TrainingYard
+            | HavenRoomId::TrophyHall
+            | HavenRoomId::Garden
+            | HavenRoomId::Library => 2,
+            HavenRoomId::Watchtower
+            | HavenRoomId::AlchemyLab
+            | HavenRoomId::FishingDock
+            | HavenRoomId::Workshop => 3,
+            HavenRoomId::WarRoom | HavenRoomId::Vault => 4,
+        }
+    }
 }
 
-/// Get the prestige rank cost for a specific tier (1, 2, or 3)
-pub fn tier_cost(tier: u8) -> u32 {
-    match tier {
-        1 => 1,
-        2 => 3,
-        3 => 5,
+/// Get the prestige rank cost for a specific tier (1, 2, or 3) and room.
+/// Costs scale with depth: root is cheapest, capstones are most expensive.
+pub fn tier_cost(room: HavenRoomId, tier: u8) -> u32 {
+    let depth = room.depth();
+    match (depth, tier) {
+        // Depth 0 (Hearthstone): 1/2/3
+        (0, 1) => 1,
+        (0, 2) => 2,
+        (0, 3) => 3,
+        // Depth 1 (Armory, Bedroom): 1/3/5
+        (1, 1) => 1,
+        (1, 2) => 3,
+        (1, 3) => 5,
+        // Depth 2-3 (mid-tree): 2/4/6
+        (2..=3, 1) => 2,
+        (2..=3, 2) => 4,
+        (2..=3, 3) => 6,
+        // Depth 4 (capstones): 3/5/7
+        (4, 1) => 3,
+        (4, 2) => 5,
+        (4, 3) => 7,
         _ => 0,
     }
 }
@@ -148,11 +180,11 @@ pub enum HavenBonusType {
     DropRatePercent,
     CritChancePercent,
     HpRegenPercent,
-    AttackIntervalReduction,
+    DoubleStrikeChance,
     OfflineXpPercent,
     ChallengeDiscoveryPercent,
     FishingTimerReduction,
-    FishingRankXpPercent,
+    DoubleFishChance,
     ItemRarityPercent,
     HpRegenDelayReduction,
     VaultSlots,
@@ -171,55 +203,55 @@ impl HavenRoomId {
         match self {
             HavenRoomId::Hearthstone => HavenBonus {
                 bonus_type: HavenBonusType::OfflineXpPercent,
-                values: [10.0, 25.0, 40.0],
+                values: [25.0, 50.0, 100.0],
             },
             HavenRoomId::Armory => HavenBonus {
                 bonus_type: HavenBonusType::DamagePercent,
-                values: [5.0, 10.0, 18.0],
+                values: [5.0, 10.0, 25.0],
             },
             HavenRoomId::TrainingYard => HavenBonus {
                 bonus_type: HavenBonusType::XpGainPercent,
-                values: [5.0, 12.0, 20.0],
+                values: [5.0, 10.0, 30.0],
             },
             HavenRoomId::TrophyHall => HavenBonus {
                 bonus_type: HavenBonusType::DropRatePercent,
-                values: [2.0, 4.0, 7.0],
+                values: [5.0, 10.0, 15.0],
             },
             HavenRoomId::Watchtower => HavenBonus {
                 bonus_type: HavenBonusType::CritChancePercent,
-                values: [3.0, 6.0, 10.0],
+                values: [5.0, 10.0, 20.0],
             },
             HavenRoomId::AlchemyLab => HavenBonus {
                 bonus_type: HavenBonusType::HpRegenPercent,
-                values: [15.0, 30.0, 50.0],
+                values: [25.0, 50.0, 100.0],
             },
             HavenRoomId::WarRoom => HavenBonus {
-                bonus_type: HavenBonusType::AttackIntervalReduction,
-                values: [5.0, 10.0, 15.0],
+                bonus_type: HavenBonusType::DoubleStrikeChance,
+                values: [10.0, 20.0, 35.0],
             },
             HavenRoomId::Bedroom => HavenBonus {
                 bonus_type: HavenBonusType::HpRegenDelayReduction,
-                values: [10.0, 20.0, 35.0],
+                values: [15.0, 30.0, 50.0],
             },
             HavenRoomId::Garden => HavenBonus {
                 bonus_type: HavenBonusType::FishingTimerReduction,
-                values: [10.0, 20.0, 30.0],
+                values: [10.0, 20.0, 40.0],
             },
             HavenRoomId::Library => HavenBonus {
                 bonus_type: HavenBonusType::ChallengeDiscoveryPercent,
-                values: [20.0, 40.0, 65.0],
+                values: [20.0, 30.0, 50.0],
             },
             HavenRoomId::FishingDock => HavenBonus {
-                bonus_type: HavenBonusType::FishingRankXpPercent,
-                values: [15.0, 30.0, 50.0],
+                bonus_type: HavenBonusType::DoubleFishChance,
+                values: [25.0, 50.0, 100.0],
             },
             HavenRoomId::Workshop => HavenBonus {
                 bonus_type: HavenBonusType::ItemRarityPercent,
-                values: [5.0, 10.0, 18.0],
+                values: [10.0, 15.0, 25.0],
             },
             HavenRoomId::Vault => HavenBonus {
                 bonus_type: HavenBonusType::VaultSlots,
-                values: [1.0, 2.0, 3.0],
+                values: [1.0, 3.0, 5.0],
             },
         }
     }
@@ -244,11 +276,11 @@ impl HavenRoomId {
             HavenBonusType::DropRatePercent => format!("+{:.0}% Drops", value),
             HavenBonusType::CritChancePercent => format!("+{:.0}% Crit", value),
             HavenBonusType::HpRegenPercent => format!("+{:.0}% HP Regen", value),
-            HavenBonusType::AttackIntervalReduction => format!("-{:.0}% Attack Interval", value),
+            HavenBonusType::DoubleStrikeChance => format!("+{:.0}% Double Strike", value),
             HavenBonusType::OfflineXpPercent => format!("+{:.0}% Offline XP", value),
             HavenBonusType::ChallengeDiscoveryPercent => format!("+{:.0}% Discovery", value),
             HavenBonusType::FishingTimerReduction => format!("-{:.0}% Fishing Timers", value),
-            HavenBonusType::FishingRankXpPercent => format!("+{:.0}% Fishing XP", value),
+            HavenBonusType::DoubleFishChance => format!("+{:.0}% Double Fish", value),
             HavenBonusType::ItemRarityPercent => format!("+{:.0}% Item Rarity", value),
             HavenBonusType::HpRegenDelayReduction => format!("-{:.0}% Regen Delay", value),
             HavenBonusType::VaultSlots => format!(
@@ -364,11 +396,11 @@ pub struct HavenBonuses {
     pub drop_rate_percent: f64,
     pub crit_chance_percent: f64,
     pub hp_regen_percent: f64,
-    pub attack_interval_reduction: f64,
+    pub double_strike_chance: f64,
     pub offline_xp_percent: f64,
     pub challenge_discovery_percent: f64,
     pub fishing_timer_reduction: f64,
-    pub fishing_rank_xp_percent: f64,
+    pub double_fish_chance: f64,
     pub item_rarity_percent: f64,
     pub hp_regen_delay_reduction: f64,
     pub vault_slots: u8,
@@ -384,11 +416,11 @@ impl Haven {
             drop_rate_percent: self.get_bonus(HavenBonusType::DropRatePercent),
             crit_chance_percent: self.get_bonus(HavenBonusType::CritChancePercent),
             hp_regen_percent: self.get_bonus(HavenBonusType::HpRegenPercent),
-            attack_interval_reduction: self.get_bonus(HavenBonusType::AttackIntervalReduction),
+            double_strike_chance: self.get_bonus(HavenBonusType::DoubleStrikeChance),
             offline_xp_percent: self.get_bonus(HavenBonusType::OfflineXpPercent),
             challenge_discovery_percent: self.get_bonus(HavenBonusType::ChallengeDiscoveryPercent),
             fishing_timer_reduction: self.get_bonus(HavenBonusType::FishingTimerReduction),
-            fishing_rank_xp_percent: self.get_bonus(HavenBonusType::FishingRankXpPercent),
+            double_fish_chance: self.get_bonus(HavenBonusType::DoubleFishChance),
             item_rarity_percent: self.get_bonus(HavenBonusType::ItemRarityPercent),
             hp_regen_delay_reduction: self.get_bonus(HavenBonusType::HpRegenDelayReduction),
             vault_slots: self.vault_tier(),
@@ -487,11 +519,23 @@ mod tests {
 
     #[test]
     fn test_tier_costs() {
-        assert_eq!(tier_cost(1), 1);
-        assert_eq!(tier_cost(2), 3);
-        assert_eq!(tier_cost(3), 5);
-        assert_eq!(tier_cost(0), 0);
-        assert_eq!(tier_cost(4), 0);
+        // Depth 0 (Hearthstone): 1/2/3
+        assert_eq!(tier_cost(HavenRoomId::Hearthstone, 1), 1);
+        assert_eq!(tier_cost(HavenRoomId::Hearthstone, 2), 2);
+        assert_eq!(tier_cost(HavenRoomId::Hearthstone, 3), 3);
+        // Depth 1 (Armory): 1/3/5
+        assert_eq!(tier_cost(HavenRoomId::Armory, 1), 1);
+        assert_eq!(tier_cost(HavenRoomId::Armory, 2), 3);
+        assert_eq!(tier_cost(HavenRoomId::Armory, 3), 5);
+        // Depth 2-3 (mid-tree): 2/4/6
+        assert_eq!(tier_cost(HavenRoomId::TrainingYard, 1), 2);
+        assert_eq!(tier_cost(HavenRoomId::Watchtower, 3), 6);
+        // Depth 4 (capstones): 3/5/7
+        assert_eq!(tier_cost(HavenRoomId::WarRoom, 1), 3);
+        assert_eq!(tier_cost(HavenRoomId::Vault, 3), 7);
+        // Invalid tier
+        assert_eq!(tier_cost(HavenRoomId::Hearthstone, 0), 0);
+        assert_eq!(tier_cost(HavenRoomId::Hearthstone, 4), 0);
     }
 
     #[test]
@@ -499,15 +543,15 @@ mod tests {
         assert_eq!(HavenRoomId::Armory.bonus_value(0), 0.0);
         assert_eq!(HavenRoomId::Armory.bonus_value(1), 5.0);
         assert_eq!(HavenRoomId::Armory.bonus_value(2), 10.0);
-        assert_eq!(HavenRoomId::Armory.bonus_value(3), 18.0);
+        assert_eq!(HavenRoomId::Armory.bonus_value(3), 25.0);
     }
 
     #[test]
     fn test_format_bonus() {
         assert_eq!(HavenRoomId::Armory.format_bonus(1), "+5% DMG");
-        assert_eq!(HavenRoomId::WarRoom.format_bonus(3), "-15% Attack Interval");
+        assert_eq!(HavenRoomId::WarRoom.format_bonus(3), "+35% Double Strike");
         assert_eq!(HavenRoomId::Vault.format_bonus(1), "1 item preserved");
-        assert_eq!(HavenRoomId::Vault.format_bonus(3), "3 items preserved");
+        assert_eq!(HavenRoomId::Vault.format_bonus(3), "5 items preserved");
     }
 
     #[test]
@@ -591,12 +635,12 @@ mod tests {
         assert_eq!(bonuses.vault_slots, 0);
 
         // Build some rooms
-        haven.build_room(HavenRoomId::Hearthstone); // +10% Offline XP
+        haven.build_room(HavenRoomId::Hearthstone); // +25% Offline XP
         haven.build_room(HavenRoomId::Armory); // +5% DMG
 
         let bonuses = haven.compute_bonuses();
         assert_eq!(bonuses.damage_percent, 5.0);
-        assert_eq!(bonuses.offline_xp_percent, 10.0);
+        assert_eq!(bonuses.offline_xp_percent, 25.0);
 
         // Upgrade Armory to T2
         haven.build_room(HavenRoomId::Armory); // +10% DMG now

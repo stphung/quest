@@ -42,16 +42,22 @@ pub enum CombatEvent {
 }
 
 /// Updates combat state, returns events that occurred
-pub fn update_combat(state: &mut GameState, delta_time: f64) -> Vec<CombatEvent> {
+/// `haven_hp_regen_percent` is the Haven Alchemy Lab bonus (0.0 if not built)
+pub fn update_combat(
+    state: &mut GameState,
+    delta_time: f64,
+    haven_hp_regen_percent: f64,
+) -> Vec<CombatEvent> {
     let mut events = Vec::new();
 
     // Handle regeneration after enemy death
     if state.combat_state.is_regenerating {
-        // HP regen multiplier: higher = faster regen
+        // HP regen multiplier: higher = faster regen (equipment + haven bonus)
         let regen_derived =
             DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
-        let effective_regen_duration =
-            HP_REGEN_DURATION_SECONDS / regen_derived.hp_regen_multiplier;
+        let total_regen_multiplier =
+            regen_derived.hp_regen_multiplier * (1.0 + haven_hp_regen_percent / 100.0);
+        let effective_regen_duration = HP_REGEN_DURATION_SECONDS / total_regen_multiplier;
 
         state.combat_state.regen_timer += delta_time;
 
@@ -235,7 +241,7 @@ mod tests {
     #[test]
     fn test_update_combat_no_enemy() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, 0.0);
         assert_eq!(events.len(), 0);
     }
 
@@ -245,11 +251,11 @@ mod tests {
         state.combat_state.current_enemy = Some(Enemy::new("Test".to_string(), 100, 5));
 
         // Not enough time passed
-        let events = update_combat(&mut state, 0.5);
+        let events = update_combat(&mut state, 0.5, 0.0);
         assert_eq!(events.len(), 0);
 
         // Enough time for attack
-        let events = update_combat(&mut state, 1.0);
+        let events = update_combat(&mut state, 1.0, 0.0);
         assert!(events.len() >= 2); // Player attack + enemy attack
     }
 
@@ -261,7 +267,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, 0.0);
 
         // Should have player died event
         let died = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
@@ -286,7 +292,7 @@ mod tests {
 
         // Force attack to kill enemy
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, 0.0);
 
         // Should have enemy died event
         let died = events
@@ -299,7 +305,7 @@ mod tests {
         assert!(state.combat_state.current_enemy.is_none());
 
         // Update to complete regen
-        update_combat(&mut state, HP_REGEN_DURATION_SECONDS);
+        update_combat(&mut state, HP_REGEN_DURATION_SECONDS, 0.0);
         assert_eq!(
             state.combat_state.player_current_hp,
             state.combat_state.player_max_hp
@@ -319,7 +325,7 @@ mod tests {
 
         // Force an attack that kills player
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, 0.0);
 
         // Should have PlayerDiedInDungeon event (not PlayerDied)
         let died_in_dungeon = events
@@ -358,7 +364,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, 0.0);
 
         // Should have PlayerAttackBlocked event
         let blocked = events
@@ -386,7 +392,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, 0.0);
 
         // Should have EnemyAttack event
         let enemy_attacked = events
@@ -415,7 +421,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, 0.0);
 
         // Should have PlayerDied event
         let died = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
@@ -445,7 +451,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        update_combat(&mut state, 0.1);
+        update_combat(&mut state, 0.1, 0.0);
 
         // Calculate expected damage reduction
         let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
@@ -470,7 +476,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        update_combat(&mut state, 0.1);
+        update_combat(&mut state, 0.1, 0.0);
 
         // Player should take no damage (5 - 10 = 0 via saturating_sub)
         assert_eq!(state.combat_state.player_current_hp, initial_hp);
@@ -490,7 +496,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, 0.0);
 
         // Should have SubzoneBossDefeated event
         let boss_defeated = events
@@ -513,7 +519,7 @@ mod tests {
 
         // Force an attack to kill
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, 0.0);
 
         // Should have EnemyDied event
         let enemy_died = events
@@ -535,7 +541,7 @@ mod tests {
 
         // Even with attack timer ready, should not attack while regenerating
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, 0.0);
 
         // No combat events during regen
         assert!(events.is_empty());
@@ -554,7 +560,7 @@ mod tests {
         state.combat_state.player_max_hp = 100;
 
         // Partial regen (half duration)
-        update_combat(&mut state, HP_REGEN_DURATION_SECONDS / 2.0);
+        update_combat(&mut state, HP_REGEN_DURATION_SECONDS / 2.0, 0.0);
 
         // HP should be partially restored (roughly halfway)
         assert!(state.combat_state.player_current_hp > 10);
@@ -578,7 +584,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, 0.0);
 
         // Should have PlayerDied event
         let died = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
@@ -610,7 +616,7 @@ mod tests {
         // Give enemy enough HP to survive
         state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, 0.0);
 
         // Find the PlayerAttack event
         let attack_event = events
@@ -645,7 +651,7 @@ mod tests {
                 .set(crate::character::attributes::AttributeType::Dexterity, 0);
             s.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 100000, 0));
             s.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-            let events = update_combat(&mut s, 0.1);
+            let events = update_combat(&mut s, 0.1, 0.0);
 
             for e in &events {
                 if let CombatEvent::PlayerAttack { was_crit, .. } = e {
@@ -678,7 +684,7 @@ mod tests {
 
         state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, 0.0);
 
         let attack_event = events
             .iter()
@@ -708,7 +714,7 @@ mod tests {
         let initial_hp = state.combat_state.player_current_hp;
 
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        update_combat(&mut state, 0.1);
+        update_combat(&mut state, 0.1, 0.0);
 
         let hp_lost = initial_hp - state.combat_state.player_current_hp;
         assert_eq!(hp_lost, enemy_base_damage - derived.defense);
@@ -744,7 +750,7 @@ mod tests {
         // Simulate up to 20 attack cycles
         for _ in 0..20 {
             state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-            let events = update_combat(&mut state, 0.1);
+            let events = update_combat(&mut state, 0.1, 0.0);
             turns += 1;
 
             for e in &events {
@@ -765,7 +771,7 @@ mod tests {
 
             // If regenerating, complete regen before next turn
             if state.combat_state.is_regenerating {
-                update_combat(&mut state, HP_REGEN_DURATION_SECONDS);
+                update_combat(&mut state, HP_REGEN_DURATION_SECONDS, 0.0);
             }
         }
 
@@ -899,7 +905,7 @@ mod tests {
         // Weak enemy that dies in one hit
         state.combat_state.current_enemy = Some(Enemy::new("Weak".to_string(), 1, 0));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, 0.0);
 
         let xp_event = events.iter().find_map(|e| match e {
             CombatEvent::EnemyDied { xp_gained } => Some(*xp_gained),
@@ -974,7 +980,7 @@ mod tests {
         // Enemy with damage less than defense
         state.combat_state.current_enemy = Some(Enemy::new("Weak".to_string(), 10000, 5));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        update_combat(&mut state, 0.1);
+        update_combat(&mut state, 0.1, 0.0);
 
         // Player should take zero damage from the enemy
         assert_eq!(state.combat_state.player_current_hp, initial_hp);
@@ -992,7 +998,7 @@ mod tests {
         state.combat_state.current_enemy = Some(enemy);
 
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, 0.0);
 
         let died = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
         assert!(died);
@@ -1019,7 +1025,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, 0.0);
 
         // Verify player died
         let died = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
@@ -1062,7 +1068,7 @@ mod tests {
 
         state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, 0.0);
 
         let attack = events
             .iter()
@@ -1103,7 +1109,7 @@ mod tests {
         // With 50% attack speed, effective interval is 1.5 / 1.5 = 1.0 seconds
         // So attack should trigger at 1.0 seconds instead of 1.5
         state.combat_state.attack_timer = 1.0;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, 0.0);
 
         let attacked = events
             .iter()
@@ -1118,7 +1124,7 @@ mod tests {
 
         // Without attack speed bonus, 1.0 seconds is not enough (need 1.5)
         state.combat_state.attack_timer = 1.0;
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, 0.0);
 
         let attacked = events
             .iter()
@@ -1155,7 +1161,7 @@ mod tests {
 
         // With +100% regen (2x multiplier), duration is 2.5 / 2 = 1.25 seconds
         // After 1.25 seconds, should be fully healed
-        update_combat(&mut state, 1.25);
+        update_combat(&mut state, 1.25, 0.0);
 
         assert_eq!(state.combat_state.player_current_hp, 100);
         assert!(!state.combat_state.is_regenerating);
@@ -1171,11 +1177,64 @@ mod tests {
         state.combat_state.player_max_hp = 100;
 
         // Without regen bonus, 1.25 seconds is not enough (need 2.5)
-        update_combat(&mut state, 1.25);
+        update_combat(&mut state, 1.25, 0.0);
 
         // Should still be regenerating, not fully healed
         assert!(state.combat_state.is_regenerating);
         assert!(state.combat_state.player_current_hp < 100);
+    }
+
+    #[test]
+    fn test_haven_hp_regen_bonus() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        state.combat_state.is_regenerating = true;
+        state.combat_state.regen_timer = 0.0;
+        state.combat_state.player_current_hp = 10;
+        state.combat_state.player_max_hp = 100;
+
+        // With +100% Haven regen bonus (2x multiplier), duration is 2.5 / 2 = 1.25 seconds
+        // After 1.25 seconds, should be fully healed
+        update_combat(&mut state, 1.25, 100.0);
+
+        assert_eq!(state.combat_state.player_current_hp, 100);
+        assert!(!state.combat_state.is_regenerating);
+    }
+
+    #[test]
+    fn test_haven_hp_regen_stacks_with_equipment() {
+        use crate::items::types::{
+            Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity,
+        };
+
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // Add armor with +100% HP regen (2x speed)
+        let armor = Item {
+            slot: EquipmentSlot::Armor,
+            rarity: Rarity::Rare,
+            base_name: "Armor".to_string(),
+            display_name: "Armor".to_string(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![Affix {
+                affix_type: AffixType::HPRegen,
+                value: 100.0,
+            }],
+        };
+        state.equipment.set(EquipmentSlot::Armor, Some(armor));
+
+        state.combat_state.is_regenerating = true;
+        state.combat_state.regen_timer = 0.0;
+        state.combat_state.player_current_hp = 10;
+        state.combat_state.player_max_hp = 100;
+
+        // Equipment: 2x multiplier, Haven +50%: 1.5x multiplier
+        // Combined: 2.0 * 1.5 = 3x multiplier
+        // Duration: 2.5 / 3 = 0.833 seconds
+        update_combat(&mut state, 0.84, 50.0);
+
+        assert_eq!(state.combat_state.player_current_hp, 100);
+        assert!(!state.combat_state.is_regenerating);
     }
 
     #[test]
@@ -1213,7 +1272,7 @@ mod tests {
         ));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        update_combat(&mut state, 0.1);
+        update_combat(&mut state, 0.1, 0.0);
 
         // Enemy should have taken reflected damage: 20 * 50% = 10
         let enemy = state.combat_state.current_enemy.as_ref().unwrap();
@@ -1258,7 +1317,7 @@ mod tests {
         state.combat_state.player_max_hp = 1000;
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        let events = update_combat(&mut state, 0.1);
+        let events = update_combat(&mut state, 0.1, 0.0);
 
         // Enemy should have died from combined player attack + reflection
         let enemy_died = events
@@ -1301,7 +1360,7 @@ mod tests {
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
         let initial_player_hp = state.combat_state.player_current_hp;
-        update_combat(&mut state, 0.1);
+        update_combat(&mut state, 0.1, 0.0);
 
         // Player took no damage
         assert_eq!(state.combat_state.player_current_hp, initial_player_hp);

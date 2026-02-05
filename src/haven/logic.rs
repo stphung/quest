@@ -12,7 +12,7 @@ pub fn can_afford(room: HavenRoomId, haven: &Haven, prestige_rank: u32) -> bool 
         Some(t) => t,
         None => return false,
     };
-    let cost = tier_cost(next);
+    let cost = tier_cost(room, next);
     prestige_rank >= cost
 }
 
@@ -27,7 +27,7 @@ pub fn try_build_room(
         return None;
     }
     let next = haven.next_tier(room)?;
-    let cost = tier_cost(next);
+    let cost = tier_cost(room, next);
     if *prestige_rank < cost {
         return None;
     }
@@ -101,9 +101,9 @@ mod tests {
     fn test_can_afford_tier_2() {
         let mut haven = Haven::new();
         haven.build_room(HavenRoomId::Hearthstone); // T1
-                                                    // T2 costs 3 prestige ranks
-        assert!(can_afford(HavenRoomId::Hearthstone, &haven, 3));
-        assert!(!can_afford(HavenRoomId::Hearthstone, &haven, 2));
+                                                    // Hearthstone T2 costs 2 prestige ranks (depth 0: 1/2/3)
+        assert!(can_afford(HavenRoomId::Hearthstone, &haven, 2));
+        assert!(!can_afford(HavenRoomId::Hearthstone, &haven, 1));
     }
 
     #[test]
@@ -184,6 +184,8 @@ mod tests {
         let initial_p = prestige;
 
         // Build full combat branch at T1
+        // Costs: Hearthstone(1) + Armory(1) + TrainingYard(2) + TrophyHall(2)
+        //        + Watchtower(2) + AlchemyLab(2) + WarRoom(3) = 13
         try_build_room(HavenRoomId::Hearthstone, &mut haven, &mut prestige);
         try_build_room(HavenRoomId::Armory, &mut haven, &mut prestige);
         try_build_room(HavenRoomId::TrainingYard, &mut haven, &mut prestige);
@@ -192,7 +194,6 @@ mod tests {
         try_build_room(HavenRoomId::AlchemyLab, &mut haven, &mut prestige);
         try_build_room(HavenRoomId::WarRoom, &mut haven, &mut prestige);
 
-        // 7 rooms at T1 = 7 prestige ranks
-        assert_eq!(initial_p - prestige, 7);
+        assert_eq!(initial_p - prestige, 13);
     }
 }
