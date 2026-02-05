@@ -333,6 +333,17 @@ pub fn replace_binary(new_binary: &Path) -> Result<(), Box<dyn Error>> {
         let mut perms = fs::metadata(&current_exe)?.permissions();
         perms.set_mode(0o755);
         fs::set_permissions(&current_exe, perms)?;
+
+        // On macOS, ad-hoc sign the binary to prevent Gatekeeper from killing it
+        #[cfg(target_os = "macos")]
+        {
+            use std::process::Command;
+            let _ = Command::new("codesign")
+                .args(["-s", "-", "-f"])
+                .arg(&current_exe)
+                .output();
+            // Ignore errors - codesign may not be available, but binary might still work
+        }
     }
 
     #[cfg(target_os = "windows")]
