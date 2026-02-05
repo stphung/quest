@@ -10,30 +10,29 @@ mod utils;
 mod zones;
 
 use challenges::chess::logic::{
-    apply_game_result, process_ai_thinking, process_input as process_chess_input, start_chess_game,
-    ChessInput,
+    apply_game_result, process_ai_thinking, process_input as process_chess_input, ChessInput,
 };
-use challenges::chess::{self, ChessDifficulty};
+use challenges::chess::{self};
 use challenges::gomoku::logic::{
     apply_game_result as apply_gomoku_result, process_ai_thinking as process_gomoku_ai,
-    process_input as process_gomoku_input, start_gomoku_game, GomokuInput,
+    process_input as process_gomoku_input, GomokuInput,
 };
-use challenges::gomoku::{GomokuDifficulty, GomokuResult};
-use challenges::menu::{try_discover_challenge, ChallengeType};
+use challenges::gomoku::GomokuResult;
+use challenges::menu::{
+    process_input as process_menu_input, try_discover_challenge, ChallengeType, MenuInput,
+};
 use challenges::minesweeper::logic::{
     apply_game_result as apply_minesweeper_result, process_input as process_minesweeper_input,
     MinesweeperInput,
 };
-use challenges::minesweeper::{MinesweeperDifficulty, MinesweeperGame};
 use challenges::morris::logic::{
     apply_game_result as apply_morris_result, process_ai_thinking as process_morris_ai,
-    process_input as process_morris_input, start_morris_game, MorrisInput,
+    process_input as process_morris_input, MorrisInput,
 };
-use challenges::morris::{MorrisDifficulty, MorrisResult};
+use challenges::morris::MorrisResult;
 use challenges::rune::logic::{
     apply_game_result as apply_rune_result, process_input as process_rune_input, RuneInput,
 };
-use challenges::rune::{RuneDifficulty, RuneGame};
 use character::manager::CharacterManager;
 use character::prestige::*;
 use character::save::SaveManager;
@@ -867,73 +866,15 @@ fn main() -> io::Result<()> {
 
                             // Handle challenge menu input
                             if state.challenge_menu.is_open {
-                                let menu = &mut state.challenge_menu;
-                                if menu.viewing_detail {
-                                    match key_event.code {
-                                        KeyCode::Up => menu.navigate_up(),
-                                        KeyCode::Down => menu.navigate_down(4),
-                                        KeyCode::Enter => {
-                                            if let Some(challenge) = menu.take_selected() {
-                                                match challenge.challenge_type {
-                                                    ChallengeType::Chess => {
-                                                        let difficulty =
-                                                            ChessDifficulty::from_index(
-                                                                menu.selected_difficulty,
-                                                            );
-                                                        start_chess_game(&mut state, difficulty);
-                                                    }
-                                                    ChallengeType::Morris => {
-                                                        let difficulty =
-                                                            MorrisDifficulty::from_index(
-                                                                menu.selected_difficulty,
-                                                            );
-                                                        start_morris_game(&mut state, difficulty);
-                                                    }
-                                                    ChallengeType::Gomoku => {
-                                                        let difficulty =
-                                                            GomokuDifficulty::from_index(
-                                                                menu.selected_difficulty,
-                                                            );
-                                                        start_gomoku_game(&mut state, difficulty);
-                                                    }
-                                                    ChallengeType::Minesweeper => {
-                                                        let difficulty =
-                                                            MinesweeperDifficulty::from_index(
-                                                                menu.selected_difficulty,
-                                                            );
-                                                        state.active_minesweeper =
-                                                            Some(MinesweeperGame::new(difficulty));
-                                                    }
-                                                    ChallengeType::Rune => {
-                                                        let difficulty = RuneDifficulty::from_index(
-                                                            menu.selected_difficulty,
-                                                        );
-                                                        state.active_rune =
-                                                            Some(RuneGame::new(difficulty));
-                                                    }
-                                                }
-                                                state.challenge_menu.close();
-                                            }
-                                        }
-                                        KeyCode::Char('d') | KeyCode::Char('D') => {
-                                            menu.take_selected();
-                                            menu.close_detail();
-                                            if menu.challenges.is_empty() {
-                                                menu.close();
-                                            }
-                                        }
-                                        KeyCode::Esc => menu.close_detail(),
-                                        _ => {}
-                                    }
-                                } else {
-                                    match key_event.code {
-                                        KeyCode::Up => menu.navigate_up(),
-                                        KeyCode::Down => menu.navigate_down(4),
-                                        KeyCode::Enter => menu.open_detail(),
-                                        KeyCode::Tab | KeyCode::Esc => menu.close(),
-                                        _ => {}
-                                    }
-                                }
+                                let input = match key_event.code {
+                                    KeyCode::Up => MenuInput::Up,
+                                    KeyCode::Down => MenuInput::Down,
+                                    KeyCode::Enter => MenuInput::Select,
+                                    KeyCode::Char('d') | KeyCode::Char('D') => MenuInput::Decline,
+                                    KeyCode::Esc | KeyCode::Tab => MenuInput::Cancel,
+                                    _ => MenuInput::Other,
+                                };
+                                process_menu_input(&mut state, input);
                                 continue;
                             }
 

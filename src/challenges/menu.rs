@@ -4,13 +4,104 @@
 //! Challenge discovery uses a single roll per tick. On success, a weighted distribution
 //! table determines which challenge type appears.
 
+use super::chess::logic::start_chess_game;
 use super::chess::ChessDifficulty;
+use super::gomoku::logic::start_gomoku_game;
 use super::gomoku::GomokuDifficulty;
-use super::minesweeper::MinesweeperDifficulty;
+use super::minesweeper::{MinesweeperDifficulty, MinesweeperGame};
+use super::morris::logic::start_morris_game;
 use super::morris::MorrisDifficulty;
-use super::rune::RuneDifficulty;
+use super::rune::{RuneDifficulty, RuneGame};
 use crate::core::game_state::GameState;
 use rand::Rng;
+
+/// Input actions for the Challenge Menu (UI-agnostic).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MenuInput {
+    Up,
+    Down,
+    Select,  // Enter - open detail or accept challenge
+    Decline, // D - decline/remove challenge
+    Cancel,  // Esc/Tab - close detail or close menu
+    Other,
+}
+
+/// Process a menu input. Returns true if the menu is still open after processing.
+pub fn process_input(state: &mut GameState, input: MenuInput) -> bool {
+    if !state.challenge_menu.is_open {
+        return false;
+    }
+
+    let menu = &mut state.challenge_menu;
+
+    if menu.viewing_detail {
+        match input {
+            MenuInput::Up => menu.navigate_up(),
+            MenuInput::Down => menu.navigate_down(4),
+            MenuInput::Select => {
+                accept_selected_challenge(state);
+            }
+            MenuInput::Decline => {
+                decline_selected_challenge(state);
+            }
+            MenuInput::Cancel => {
+                state.challenge_menu.close_detail();
+            }
+            MenuInput::Other => {}
+        }
+    } else {
+        match input {
+            MenuInput::Up => menu.navigate_up(),
+            MenuInput::Down => menu.navigate_down(4),
+            MenuInput::Select => menu.open_detail(),
+            MenuInput::Cancel => menu.close(),
+            MenuInput::Decline | MenuInput::Other => {}
+        }
+    }
+
+    state.challenge_menu.is_open
+}
+
+/// Accept the currently selected challenge and start the appropriate game.
+fn accept_selected_challenge(state: &mut GameState) {
+    let difficulty_index = state.challenge_menu.selected_difficulty;
+
+    if let Some(challenge) = state.challenge_menu.take_selected() {
+        match challenge.challenge_type {
+            ChallengeType::Chess => {
+                let difficulty = ChessDifficulty::from_index(difficulty_index);
+                start_chess_game(state, difficulty);
+            }
+            ChallengeType::Morris => {
+                let difficulty = MorrisDifficulty::from_index(difficulty_index);
+                start_morris_game(state, difficulty);
+            }
+            ChallengeType::Gomoku => {
+                let difficulty = GomokuDifficulty::from_index(difficulty_index);
+                start_gomoku_game(state, difficulty);
+            }
+            ChallengeType::Minesweeper => {
+                let difficulty = MinesweeperDifficulty::from_index(difficulty_index);
+                state.active_minesweeper = Some(MinesweeperGame::new(difficulty));
+                state.challenge_menu.close();
+            }
+            ChallengeType::Rune => {
+                let difficulty = RuneDifficulty::from_index(difficulty_index);
+                state.active_rune = Some(RuneGame::new(difficulty));
+                state.challenge_menu.close();
+            }
+        }
+    }
+}
+
+/// Decline the currently selected challenge and remove it from the menu.
+fn decline_selected_challenge(state: &mut GameState) {
+    state.challenge_menu.take_selected();
+    state.challenge_menu.close_detail();
+    if state.challenge_menu.challenges.is_empty() {
+        state.challenge_menu.close();
+    }
+}
 
 /// Structured reward for challenge victories - single source of truth
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -601,5 +692,215 @@ mod tests {
     fn test_reward_description_empty() {
         let reward = ChallengeReward::default();
         assert_eq!(reward.description(), "No reward");
+    }
+
+    // ============ Process Input Tests ============
+
+    #[test]
+    fn test_process_input_returns_false_when_menu_closed() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.challenge_menu.is_open = false;
+
+        let result = process_input(&mut state, MenuInput::Up);
+
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_process_input_navigation_in_list_view() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.challenge_menu.add_challenge(make_chess_challenge());
+        state.challenge_menu.add_challenge(make_chess_challenge());
+        state.challenge_menu.add_challenge(make_chess_challenge());
+        state.challenge_menu.open();
+
+        assert_eq!(state.challenge_menu.selected_index, 0);
+
+        process_input(&mut state, MenuInput::Down);
+        assert_eq!(state.challenge_menu.selected_index, 1);
+
+        process_input(&mut state, MenuInput::Down);
+        assert_eq!(state.challenge_menu.selected_index, 2);
+
+        process_input(&mut state, MenuInput::Up);
+        assert_eq!(state.challenge_menu.selected_index, 1);
+    }
+
+    #[test]
+    fn test_process_input_select_opens_detail() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.challenge_menu.add_challenge(make_chess_challenge());
+        state.challenge_menu.open();
+
+        assert!(!state.challenge_menu.viewing_detail);
+
+        process_input(&mut state, MenuInput::Select);
+
+        assert!(state.challenge_menu.viewing_detail);
+    }
+
+    #[test]
+    fn test_process_input_cancel_closes_menu_in_list_view() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.challenge_menu.add_challenge(make_chess_challenge());
+        state.challenge_menu.open();
+
+        assert!(state.challenge_menu.is_open);
+
+        let result = process_input(&mut state, MenuInput::Cancel);
+
+        assert!(!state.challenge_menu.is_open);
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_process_input_cancel_closes_detail_in_detail_view() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.challenge_menu.add_challenge(make_chess_challenge());
+        state.challenge_menu.open();
+        state.challenge_menu.open_detail();
+
+        assert!(state.challenge_menu.viewing_detail);
+
+        process_input(&mut state, MenuInput::Cancel);
+
+        assert!(!state.challenge_menu.viewing_detail);
+        assert!(state.challenge_menu.is_open); // Menu still open
+    }
+
+    #[test]
+    fn test_process_input_navigation_in_detail_view() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.challenge_menu.add_challenge(make_chess_challenge());
+        state.challenge_menu.open();
+        state.challenge_menu.open_detail();
+
+        assert_eq!(state.challenge_menu.selected_difficulty, 0);
+
+        process_input(&mut state, MenuInput::Down);
+        assert_eq!(state.challenge_menu.selected_difficulty, 1);
+
+        process_input(&mut state, MenuInput::Down);
+        assert_eq!(state.challenge_menu.selected_difficulty, 2);
+
+        process_input(&mut state, MenuInput::Up);
+        assert_eq!(state.challenge_menu.selected_difficulty, 1);
+    }
+
+    #[test]
+    fn test_process_input_decline_removes_challenge() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.challenge_menu.add_challenge(make_chess_challenge());
+        state.challenge_menu.add_challenge(make_chess_challenge());
+        state.challenge_menu.open();
+        state.challenge_menu.open_detail();
+
+        assert_eq!(state.challenge_menu.challenges.len(), 2);
+
+        process_input(&mut state, MenuInput::Decline);
+
+        assert_eq!(state.challenge_menu.challenges.len(), 1);
+        assert!(!state.challenge_menu.viewing_detail);
+    }
+
+    #[test]
+    fn test_process_input_decline_closes_menu_when_empty() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.challenge_menu.add_challenge(make_chess_challenge());
+        state.challenge_menu.open();
+        state.challenge_menu.open_detail();
+
+        process_input(&mut state, MenuInput::Decline);
+
+        assert!(!state.challenge_menu.is_open);
+        assert!(state.challenge_menu.challenges.is_empty());
+    }
+
+    #[test]
+    fn test_process_input_select_starts_chess_game() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.challenge_menu.add_challenge(make_chess_challenge());
+        state.challenge_menu.open();
+        state.challenge_menu.open_detail();
+        state.challenge_menu.selected_difficulty = 1; // Apprentice
+
+        assert!(state.active_chess.is_none());
+
+        process_input(&mut state, MenuInput::Select);
+
+        assert!(state.active_chess.is_some());
+        assert!(!state.challenge_menu.is_open);
+    }
+
+    #[test]
+    fn test_process_input_select_starts_morris_game() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.challenge_menu.add_challenge(PendingChallenge {
+            challenge_type: ChallengeType::Morris,
+            title: "Morris Challenge".to_string(),
+            icon: "○",
+            description: "Test".to_string(),
+        });
+        state.challenge_menu.open();
+        state.challenge_menu.open_detail();
+
+        process_input(&mut state, MenuInput::Select);
+
+        assert!(state.active_morris.is_some());
+        assert!(!state.challenge_menu.is_open);
+    }
+
+    #[test]
+    fn test_process_input_select_starts_gomoku_game() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.challenge_menu.add_challenge(PendingChallenge {
+            challenge_type: ChallengeType::Gomoku,
+            title: "Gomoku Challenge".to_string(),
+            icon: "◎",
+            description: "Test".to_string(),
+        });
+        state.challenge_menu.open();
+        state.challenge_menu.open_detail();
+
+        process_input(&mut state, MenuInput::Select);
+
+        assert!(state.active_gomoku.is_some());
+        assert!(!state.challenge_menu.is_open);
+    }
+
+    #[test]
+    fn test_process_input_select_starts_minesweeper_game() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.challenge_menu.add_challenge(PendingChallenge {
+            challenge_type: ChallengeType::Minesweeper,
+            title: "Minesweeper Challenge".to_string(),
+            icon: "⚠",
+            description: "Test".to_string(),
+        });
+        state.challenge_menu.open();
+        state.challenge_menu.open_detail();
+
+        process_input(&mut state, MenuInput::Select);
+
+        assert!(state.active_minesweeper.is_some());
+        assert!(!state.challenge_menu.is_open);
+    }
+
+    #[test]
+    fn test_process_input_select_starts_rune_game() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.challenge_menu.add_challenge(PendingChallenge {
+            challenge_type: ChallengeType::Rune,
+            title: "Rune Challenge".to_string(),
+            icon: "ᚱ",
+            description: "Test".to_string(),
+        });
+        state.challenge_menu.open();
+        state.challenge_menu.open_detail();
+
+        process_input(&mut state, MenuInput::Select);
+
+        assert!(state.active_rune.is_some());
+        assert!(!state.challenge_menu.is_open);
     }
 }
