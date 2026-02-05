@@ -154,6 +154,11 @@ fn main() -> io::Result<()> {
     let mut haven_selected_room: usize = 0;
     let mut haven_confirming_build = false;
 
+    // Vault selection state (for prestige with item preservation)
+    let mut showing_vault_selection = false;
+    let mut vault_selected_index: usize = 0;
+    let mut vault_selected_slots: Vec<items::EquipmentSlot> = Vec::new();
+
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -549,6 +554,17 @@ fn main() -> io::Result<()> {
                         if showing_haven_discovery {
                             ui::haven_scene::render_haven_discovery_modal(frame, frame.size());
                         }
+                        // Draw Vault selection screen if active
+                        if showing_vault_selection {
+                            ui::haven_scene::render_vault_selection(
+                                frame,
+                                frame.size(),
+                                &state,
+                                haven.vault_tier(),
+                                vault_selected_index,
+                                &vault_selected_slots,
+                            );
+                        }
                         // Draw Haven screen if active
                         if showing_haven {
                             ui::haven_scene::render_haven_tree(
@@ -674,13 +690,54 @@ fn main() -> io::Result<()> {
                                 continue;
                             }
 
-                            // Handle prestige confirmation dialog
-                            if showing_prestige_confirm {
+                            // Handle vault item selection (for prestige with Vault)
+                            if showing_vault_selection {
                                 match key_event.code {
-                                    KeyCode::Char('y') | KeyCode::Char('Y') => {
-                                        perform_prestige(&mut state);
-                                        showing_prestige_confirm = false;
-                                        // Save immediately after prestige to prevent stale enemy on reload
+                                    KeyCode::Up => {
+                                        if vault_selected_index > 0 {
+                                            vault_selected_index -= 1;
+                                        }
+                                    }
+                                    KeyCode::Down => {
+                                        if vault_selected_index < 6 {
+                                            // 7 equipment slots
+                                            vault_selected_index += 1;
+                                        }
+                                    }
+                                    KeyCode::Enter => {
+                                        // Toggle selection
+                                        let slots = [
+                                            items::EquipmentSlot::Weapon,
+                                            items::EquipmentSlot::Armor,
+                                            items::EquipmentSlot::Helmet,
+                                            items::EquipmentSlot::Gloves,
+                                            items::EquipmentSlot::Boots,
+                                            items::EquipmentSlot::Amulet,
+                                            items::EquipmentSlot::Ring,
+                                        ];
+                                        let slot = slots[vault_selected_index];
+                                        // Only allow selecting slots that have items
+                                        if state.equipment.get(slot).is_some() {
+                                            if let Some(pos) =
+                                                vault_selected_slots.iter().position(|s| *s == slot)
+                                            {
+                                                vault_selected_slots.remove(pos);
+                                            } else if vault_selected_slots.len()
+                                                < haven.vault_tier() as usize
+                                            {
+                                                vault_selected_slots.push(slot);
+                                            }
+                                        }
+                                    }
+                                    KeyCode::Char(' ') => {
+                                        // Confirm prestige with selected items
+                                        character::prestige::perform_prestige_with_vault(
+                                            &mut state,
+                                            &vault_selected_slots,
+                                        );
+                                        showing_vault_selection = false;
+                                        vault_selected_slots.clear();
+                                        // Save immediately after prestige
                                         if !debug_mode {
                                             let _ = character_manager.save_character(&state);
                                             last_save_instant = Some(Instant::now());
@@ -688,12 +745,50 @@ fn main() -> io::Result<()> {
                                         }
                                         state.combat_state.add_log_entry(
                                             format!(
-                                                "Prestiged to {}!",
+                                                "Prestiged to {}! (Vault preserved items)",
                                                 get_prestige_tier(state.prestige_rank).name
                                             ),
                                             false,
                                             true,
                                         );
+                                    }
+                                    KeyCode::Esc => {
+                                        showing_vault_selection = false;
+                                        vault_selected_slots.clear();
+                                    }
+                                    _ => {}
+                                }
+                                continue;
+                            }
+
+                            // Handle prestige confirmation dialog
+                            if showing_prestige_confirm {
+                                match key_event.code {
+                                    KeyCode::Char('y') | KeyCode::Char('Y') => {
+                                        // Check if Vault is built - show selection screen
+                                        if haven.vault_tier() > 0 {
+                                            showing_prestige_confirm = false;
+                                            showing_vault_selection = true;
+                                            vault_selected_index = 0;
+                                            vault_selected_slots.clear();
+                                        } else {
+                                            perform_prestige(&mut state);
+                                            showing_prestige_confirm = false;
+                                            // Save immediately after prestige to prevent stale enemy on reload
+                                            if !debug_mode {
+                                                let _ = character_manager.save_character(&state);
+                                                last_save_instant = Some(Instant::now());
+                                                last_save_time = Some(Local::now());
+                                            }
+                                            state.combat_state.add_log_entry(
+                                                format!(
+                                                    "Prestiged to {}!",
+                                                    get_prestige_tier(state.prestige_rank).name
+                                                ),
+                                                false,
+                                                true,
+                                            );
+                                        }
                                     }
                                     KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
                                         showing_prestige_confirm = false;

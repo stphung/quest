@@ -1,6 +1,8 @@
 //! Haven skill tree UI rendering.
 
+use crate::core::game_state::GameState;
 use crate::haven::{can_afford, tier_cost, Haven, HavenBonusType, HavenRoomId};
+use crate::items::EquipmentSlot;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -414,4 +416,120 @@ pub fn render_build_confirmation(
     ])
     .alignment(ratatui::layout::Alignment::Center);
     frame.render_widget(text, inner);
+}
+
+/// Render the Vault item selection screen (shown during prestige when Vault is built)
+pub fn render_vault_selection(
+    frame: &mut Frame,
+    area: Rect,
+    game_state: &GameState,
+    vault_slots: u8,
+    selected_index: usize,
+    selected_items: &[EquipmentSlot],
+) {
+    frame.render_widget(Clear, area);
+
+    let block = Block::default()
+        .title(format!(
+            " Vault - Choose {} Item(s) to Preserve ",
+            vault_slots
+        ))
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Yellow));
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(2), // Instructions
+            Constraint::Min(0),    // Item list
+            Constraint::Length(1), // Help
+        ])
+        .split(inner);
+
+    // Instructions
+    let instructions = Paragraph::new(vec![Line::from(Span::styled(
+        format!(
+            "Select up to {} item(s) to keep through prestige. ({}/{} selected)",
+            vault_slots,
+            selected_items.len(),
+            vault_slots
+        ),
+        Style::default().fg(Color::White),
+    ))]);
+    frame.render_widget(instructions, chunks[0]);
+
+    // Get all equipped items
+    let slots = [
+        EquipmentSlot::Weapon,
+        EquipmentSlot::Armor,
+        EquipmentSlot::Helmet,
+        EquipmentSlot::Gloves,
+        EquipmentSlot::Boots,
+        EquipmentSlot::Amulet,
+        EquipmentSlot::Ring,
+    ];
+
+    let items: Vec<ListItem> = slots
+        .iter()
+        .enumerate()
+        .map(|(i, slot)| {
+            let item = game_state.equipment.get(*slot);
+            let is_selected = i == selected_index;
+            let is_preserved = selected_items.contains(slot);
+
+            let prefix = if is_selected { "▶ " } else { "  " };
+            let checkbox = if is_preserved { "[✓] " } else { "[ ] " };
+
+            let (slot_name, item_text, style) = if let Some(item) = item.as_ref() {
+                let rarity_color = match item.rarity {
+                    crate::items::Rarity::Common => Color::White,
+                    crate::items::Rarity::Magic => Color::Green,
+                    crate::items::Rarity::Rare => Color::Blue,
+                    crate::items::Rarity::Epic => Color::Magenta,
+                    crate::items::Rarity::Legendary => Color::Yellow,
+                };
+                (
+                    format!("{:8}", format!("{:?}", slot)),
+                    item.display_name.clone(),
+                    Style::default().fg(rarity_color),
+                )
+            } else {
+                (
+                    format!("{:8}", format!("{:?}", slot)),
+                    "(empty)".to_string(),
+                    Style::default().fg(Color::DarkGray),
+                )
+            };
+
+            let prefix_style = if is_selected {
+                Style::default().fg(Color::Cyan)
+            } else {
+                Style::default()
+            };
+            let checkbox_style = if is_preserved {
+                Style::default().fg(Color::Green)
+            } else {
+                Style::default().fg(Color::DarkGray)
+            };
+
+            ListItem::new(Line::from(vec![
+                Span::styled(prefix, prefix_style),
+                Span::styled(checkbox, checkbox_style),
+                Span::styled(slot_name, Style::default().fg(Color::DarkGray)),
+                Span::styled(item_text, style),
+            ]))
+        })
+        .collect();
+
+    let list = List::new(items);
+    frame.render_widget(list, chunks[1]);
+
+    // Help bar
+    let help =
+        Paragraph::new("[↑/↓] Navigate  [Enter] Toggle  [Space] Confirm Prestige  [Esc] Cancel")
+            .style(Style::default().fg(Color::DarkGray));
+    frame.render_widget(help, chunks[2]);
 }
