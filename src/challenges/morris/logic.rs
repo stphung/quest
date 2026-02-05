@@ -1,10 +1,63 @@
 //! Nine Men's Morris game logic: AI moves, and game resolution.
 
 use super::{
-    MorrisDifficulty, MorrisGame, MorrisMove, MorrisPhase, MorrisResult, Player, ADJACENCIES, MILLS,
+    CursorDirection, MorrisDifficulty, MorrisGame, MorrisMove, MorrisPhase, MorrisResult, Player,
+    ADJACENCIES, MILLS,
 };
 use crate::core::game_state::GameState;
 use rand::Rng;
+
+/// Input actions for the Morris game (UI-agnostic).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MorrisInput {
+    Up,
+    Down,
+    Left,
+    Right,
+    Select, // Enter - select piece, place, move, or capture
+    Cancel, // Esc - clear selection or forfeit
+    Other,
+}
+
+/// Process a key input during active Morris game.
+/// Returns true if the input was handled.
+/// Does nothing if AI is thinking.
+pub fn process_input(game: &mut MorrisGame, input: MorrisInput) -> bool {
+    // Don't process input while AI is thinking
+    if game.ai_thinking {
+        return false;
+    }
+
+    match input {
+        MorrisInput::Up => game.move_cursor(CursorDirection::Up),
+        MorrisInput::Down => game.move_cursor(CursorDirection::Down),
+        MorrisInput::Left => game.move_cursor(CursorDirection::Left),
+        MorrisInput::Right => game.move_cursor(CursorDirection::Right),
+        MorrisInput::Select => {
+            process_human_enter(game);
+        }
+        MorrisInput::Cancel => {
+            process_cancel(game);
+        }
+        MorrisInput::Other => {
+            // Any other key cancels forfeit pending
+            game.forfeit_pending = false;
+        }
+    }
+    true
+}
+
+/// Process Esc key: clear selection or initiate/confirm forfeit.
+fn process_cancel(game: &mut MorrisGame) {
+    if game.forfeit_pending {
+        game.game_result = Some(MorrisResult::Forfeit);
+    } else if game.selected_position.is_some() {
+        game.clear_selection();
+        game.forfeit_pending = false;
+    } else {
+        game.forfeit_pending = true;
+    }
+}
 
 /// Start a morris game with the selected difficulty
 pub fn start_morris_game(state: &mut GameState, difficulty: MorrisDifficulty) {
@@ -107,6 +160,60 @@ fn get_capture_moves(game: &MorrisGame, player: Player) -> Vec<MorrisMove> {
     }
 
     moves
+}
+
+/// Process human player pressing Enter at current cursor position.
+/// Handles placing, moving, and capturing based on game phase.
+pub fn process_human_enter(game: &mut MorrisGame) {
+    let cursor = game.cursor;
+
+    // If must capture, try to capture at cursor
+    if game.must_capture {
+        let capture_moves = get_legal_moves(game);
+        if capture_moves
+            .iter()
+            .any(|m| matches!(m, MorrisMove::Capture(pos) if *pos == cursor))
+        {
+            apply_move(game, MorrisMove::Capture(cursor));
+        }
+        return;
+    }
+
+    // During placing phase, place at cursor if empty
+    if game.phase == MorrisPhase::Placing {
+        if game.board[cursor].is_none() {
+            apply_move(game, MorrisMove::Place(cursor));
+        }
+        return;
+    }
+
+    // During moving/flying phase
+    if let Some(selected) = game.selected_position {
+        // Already selected a piece - try to move to cursor
+        let legal_moves = get_legal_moves(game);
+        if legal_moves.iter().any(
+            |m| matches!(m, MorrisMove::Move { from, to } if *from == selected && *to == cursor),
+        ) {
+            apply_move(
+                game,
+                MorrisMove::Move {
+                    from: selected,
+                    to: cursor,
+                },
+            );
+        } else if game.board[cursor] == Some(Player::Human) {
+            // Clicked on another human piece - select it instead
+            game.selected_position = Some(cursor);
+        } else {
+            // Invalid move - clear selection
+            game.clear_selection();
+        }
+    } else {
+        // No piece selected - try to select piece at cursor
+        if game.board[cursor] == Some(Player::Human) {
+            game.selected_position = Some(cursor);
+        }
+    }
 }
 
 /// Apply a move to the game state
@@ -443,41 +550,80 @@ fn count_mobility(game: &MorrisGame, player: Player) -> i32 {
     moves
 }
 
-/// Apply game result: grant rewards on win (XP scaled to current level, fishing ranks).
-/// Returns (result, xp_gained, fishing_rank_up).
-pub fn apply_game_result(state: &mut GameState) -> Option<(MorrisResult, u64, bool)> {
+/// Apply game result: grant rewards and add combat log entries.
+/// Returns true if a result was processed.
+pub fn apply_game_result(state: &mut GameState) -> bool {
     use crate::challenges::menu::DifficultyInfo;
 
-    let game = state.active_morris.as_ref()?;
-    let result = game.game_result?;
+    let game = match state.active_morris.as_ref() {
+        Some(g) => g,
+        None => return false,
+    };
+    let result = match game.game_result {
+        Some(r) => r,
+        None => return false,
+    };
     let reward = game.difficulty.reward();
 
-    let mut fishing_rank_up = false;
-    let xp_gained = match result {
+    match result {
         MorrisResult::Win => {
             // XP reward
             let xp_for_level =
                 crate::core::game_logic::xp_for_next_level(state.character_level.max(1));
-            let xp = (xp_for_level as f64 * reward.xp_percent as f64 / 100.0) as u64;
-            let xp = xp.max(100); // Floor of 100 XP
-            state.character_xp += xp;
+            let xp_gained = (xp_for_level as f64 * reward.xp_percent as f64 / 100.0) as u64;
+            let xp_gained = xp_gained.max(100); // Floor of 100 XP
+            state.character_xp += xp_gained;
 
             // Fishing rank reward (capped at 30, preserves fish progress)
-            if reward.fishing_ranks > 0 && state.fishing.rank < 30 {
+            let fishing_rank_up = if reward.fishing_ranks > 0 && state.fishing.rank < 30 {
                 state.fishing.rank = (state.fishing.rank + reward.fishing_ranks).min(30);
-                fishing_rank_up = true;
-            }
+                true
+            } else {
+                false
+            };
 
             // Prestige reward (if any)
             state.prestige_rank += reward.prestige_ranks;
 
-            xp
+            // Combat log entries
+            state.combat_state.add_log_entry(
+                "○ Victory! The sage bows with respect.".to_string(),
+                false,
+                true,
+            );
+            state
+                .combat_state
+                .add_log_entry(format!("○ +{} XP", xp_gained), false, true);
+            if fishing_rank_up {
+                state.combat_state.add_log_entry(
+                    format!(
+                        "○ Fishing rank up! Now rank {}: {}",
+                        state.fishing.rank,
+                        state.fishing.rank_name()
+                    ),
+                    false,
+                    true,
+                );
+            }
         }
-        MorrisResult::Loss | MorrisResult::Forfeit => 0,
-    };
+        MorrisResult::Loss => {
+            state.combat_state.add_log_entry(
+                "○ The sage nods knowingly and departs.".to_string(),
+                false,
+                true,
+            );
+        }
+        MorrisResult::Forfeit => {
+            state.combat_state.add_log_entry(
+                "○ You concede. The sage gathers their stones quietly.".to_string(),
+                false,
+                true,
+            );
+        }
+    }
 
     state.active_morris = None;
-    Some((result, xp_gained, fishing_rank_up))
+    true
 }
 
 #[cfg(test)]
@@ -879,18 +1025,13 @@ mod tests {
 
         let old_xp = state.character_xp;
         let old_fishing_rank = state.fishing.rank;
-        let result = apply_game_result(&mut state);
+        let processed = apply_game_result(&mut state);
 
-        assert!(result.is_some());
-        let (morris_result, xp_gained, fishing_rank_up) = result.unwrap();
-        assert_eq!(morris_result, MorrisResult::Win);
+        assert!(processed);
         // Master = 200% of xp_for_next_level(10) = 6324
-        assert_eq!(xp_gained, 6324);
         assert_eq!(state.character_xp, old_xp + 6324);
         // Master grants +1 fishing rank
-        assert!(fishing_rank_up);
         assert_eq!(state.fishing.rank, old_fishing_rank + 1);
-        assert_eq!(state.fishing.fish_toward_next_rank, 0);
         assert!(state.active_morris.is_none());
     }
 
@@ -904,11 +1045,10 @@ mod tests {
         state.active_morris = Some(game);
 
         let old_fishing_rank = state.fishing.rank;
-        let result = apply_game_result(&mut state);
+        let processed = apply_game_result(&mut state);
 
-        let (_, _, fishing_rank_up) = result.unwrap();
-        assert!(!fishing_rank_up);
-        assert_eq!(state.fishing.rank, old_fishing_rank);
+        assert!(processed);
+        assert_eq!(state.fishing.rank, old_fishing_rank); // Novice grants no fishing rank
     }
 
     #[test]
@@ -921,11 +1061,10 @@ mod tests {
         game.game_result = Some(MorrisResult::Win);
         state.active_morris = Some(game);
 
-        let result = apply_game_result(&mut state);
+        let processed = apply_game_result(&mut state);
 
-        let (_, _, fishing_rank_up) = result.unwrap();
-        assert!(!fishing_rank_up);
-        assert_eq!(state.fishing.rank, 30);
+        assert!(processed);
+        assert_eq!(state.fishing.rank, 30); // Capped at max
     }
 
     #[test]
@@ -937,12 +1076,9 @@ mod tests {
         state.active_morris = Some(game);
 
         let old_xp = state.character_xp;
-        let result = apply_game_result(&mut state);
+        let processed = apply_game_result(&mut state);
 
-        let (morris_result, xp_gained, fishing_rank_up) = result.unwrap();
-        assert_eq!(morris_result, MorrisResult::Loss);
-        assert_eq!(xp_gained, 0);
-        assert!(!fishing_rank_up);
+        assert!(processed);
         assert_eq!(state.character_xp, old_xp); // Unchanged
         assert!(state.active_morris.is_none());
     }
@@ -956,12 +1092,9 @@ mod tests {
         state.active_morris = Some(game);
 
         let old_xp = state.character_xp;
-        let result = apply_game_result(&mut state);
+        let processed = apply_game_result(&mut state);
 
-        let (morris_result, xp_gained, fishing_rank_up) = result.unwrap();
-        assert_eq!(morris_result, MorrisResult::Forfeit);
-        assert_eq!(xp_gained, 0);
-        assert!(!fishing_rank_up);
+        assert!(processed);
         assert_eq!(state.character_xp, old_xp); // Unchanged
         assert!(state.active_morris.is_none());
     }
@@ -1074,5 +1207,210 @@ mod tests {
         assert!(!moved); // Should not have applied yet
         assert!(game.ai_pending_move.is_some());
         assert!(game.ai_think_target >= 10);
+    }
+
+    // ============ Human Input Tests ============
+
+    #[test]
+    fn test_process_human_enter_places_piece_in_placing_phase() {
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        assert_eq!(game.phase, MorrisPhase::Placing);
+        assert!(game.board[0].is_none());
+
+        game.cursor = 0;
+        process_human_enter(&mut game);
+
+        assert_eq!(game.board[0], Some(Player::Human));
+        // Turn should switch to AI
+        assert_eq!(game.current_player, Player::Ai);
+    }
+
+    #[test]
+    fn test_process_human_enter_ignores_occupied_position_in_placing() {
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        game.board[0] = Some(Player::Ai);
+
+        game.cursor = 0;
+        let pieces_before = game.pieces_to_place.0;
+        process_human_enter(&mut game);
+
+        // Nothing should change - position was occupied
+        assert_eq!(game.board[0], Some(Player::Ai));
+        assert_eq!(game.pieces_to_place.0, pieces_before);
+    }
+
+    #[test]
+    fn test_process_human_enter_selects_piece_in_moving_phase() {
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        // Set up moving phase with human piece
+        game.phase = MorrisPhase::Moving;
+        game.pieces_to_place = (0, 0);
+        game.board[0] = Some(Player::Human);
+        game.pieces_on_board.0 = 3;
+
+        game.cursor = 0;
+        assert!(game.selected_position.is_none());
+
+        process_human_enter(&mut game);
+
+        assert_eq!(game.selected_position, Some(0));
+    }
+
+    #[test]
+    fn test_process_human_enter_moves_selected_piece() {
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        // Set up moving phase with human piece selected
+        game.phase = MorrisPhase::Moving;
+        game.pieces_to_place = (0, 0);
+        game.board[0] = Some(Player::Human);
+        game.pieces_on_board.0 = 3;
+        game.selected_position = Some(0);
+
+        // Position 1 is adjacent to position 0 in the board layout
+        game.cursor = 1;
+
+        process_human_enter(&mut game);
+
+        // Piece should have moved from 0 to 1
+        assert!(game.board[0].is_none());
+        assert_eq!(game.board[1], Some(Player::Human));
+        assert!(game.selected_position.is_none());
+    }
+
+    #[test]
+    fn test_process_human_enter_captures_opponent_piece() {
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        game.must_capture = true;
+        game.board[5] = Some(Player::Ai);
+        game.pieces_on_board.1 = 3;
+
+        game.cursor = 5;
+        process_human_enter(&mut game);
+
+        // Opponent piece should be captured
+        assert!(game.board[5].is_none());
+        assert!(!game.must_capture);
+    }
+
+    // ============ Process Input Tests ============
+
+    #[test]
+    fn test_process_input_blocked_during_ai_thinking() {
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        game.ai_thinking = true;
+        let old_cursor = game.cursor;
+
+        let handled = process_input(&mut game, MorrisInput::Up);
+
+        assert!(!handled);
+        assert_eq!(game.cursor, old_cursor);
+    }
+
+    #[test]
+    fn test_process_input_cursor_movement() {
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        game.cursor = 4; // Central position
+
+        // Test all directions
+        process_input(&mut game, MorrisInput::Up);
+        // Cursor should change (exact position depends on board layout)
+        let after_up = game.cursor;
+
+        game.cursor = 4;
+        process_input(&mut game, MorrisInput::Down);
+        let after_down = game.cursor;
+
+        game.cursor = 4;
+        process_input(&mut game, MorrisInput::Left);
+        let after_left = game.cursor;
+
+        game.cursor = 4;
+        process_input(&mut game, MorrisInput::Right);
+        let after_right = game.cursor;
+
+        // At least some movements should change the cursor
+        assert!(
+            after_up != 4 || after_down != 4 || after_left != 4 || after_right != 4,
+            "At least one direction should move the cursor"
+        );
+    }
+
+    #[test]
+    fn test_process_input_select_places_piece() {
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        assert_eq!(game.phase, MorrisPhase::Placing);
+        game.cursor = 0;
+
+        process_input(&mut game, MorrisInput::Select);
+
+        assert_eq!(game.board[0], Some(Player::Human));
+    }
+
+    #[test]
+    fn test_process_input_cancel_initiates_forfeit() {
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        assert!(!game.forfeit_pending);
+
+        process_input(&mut game, MorrisInput::Cancel);
+
+        assert!(game.forfeit_pending);
+    }
+
+    #[test]
+    fn test_process_input_cancel_confirms_forfeit() {
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        game.forfeit_pending = true;
+
+        process_input(&mut game, MorrisInput::Cancel);
+
+        assert_eq!(game.game_result, Some(MorrisResult::Forfeit));
+    }
+
+    #[test]
+    fn test_process_input_cancel_clears_selection_first() {
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        game.phase = MorrisPhase::Moving;
+        game.selected_position = Some(5);
+
+        process_input(&mut game, MorrisInput::Cancel);
+
+        // Should clear selection, not initiate forfeit
+        assert!(game.selected_position.is_none());
+        assert!(!game.forfeit_pending);
+    }
+
+    #[test]
+    fn test_process_input_other_cancels_forfeit_pending() {
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        game.forfeit_pending = true;
+
+        process_input(&mut game, MorrisInput::Other);
+
+        assert!(!game.forfeit_pending);
+    }
+
+    #[test]
+    fn test_process_input_returns_true_when_handled() {
+        // Test each input returns true independently
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        assert!(process_input(&mut game, MorrisInput::Up));
+
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        assert!(process_input(&mut game, MorrisInput::Down));
+
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        assert!(process_input(&mut game, MorrisInput::Left));
+
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        assert!(process_input(&mut game, MorrisInput::Right));
+
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        assert!(process_input(&mut game, MorrisInput::Select));
+
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        assert!(process_input(&mut game, MorrisInput::Cancel));
+
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        assert!(process_input(&mut game, MorrisInput::Other));
     }
 }

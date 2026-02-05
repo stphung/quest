@@ -5,6 +5,57 @@ use crate::core::game_state::GameState;
 use rand::seq::SliceRandom;
 use rand::Rng;
 
+/// Input actions for the Gomoku game (UI-agnostic).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GomokuInput {
+    Up,
+    Down,
+    Left,
+    Right,
+    PlaceStone,
+    Forfeit,
+    Other,
+}
+
+/// Process a key input during active Gomoku game.
+/// Returns true if the input was handled.
+/// Does nothing if AI is thinking.
+pub fn process_input(game: &mut GomokuGame, input: GomokuInput) -> bool {
+    // Don't process input while AI is thinking
+    if game.ai_thinking {
+        return false;
+    }
+
+    // Handle forfeit confirmation (double-Esc pattern)
+    if game.forfeit_pending {
+        match input {
+            GomokuInput::Forfeit => {
+                game.game_result = Some(GomokuResult::Loss);
+            }
+            _ => {
+                game.forfeit_pending = false;
+            }
+        }
+        return true;
+    }
+
+    // Normal game input
+    match input {
+        GomokuInput::Up => game.move_cursor(-1, 0),
+        GomokuInput::Down => game.move_cursor(1, 0),
+        GomokuInput::Left => game.move_cursor(0, -1),
+        GomokuInput::Right => game.move_cursor(0, 1),
+        GomokuInput::PlaceStone => {
+            process_human_move(game);
+        }
+        GomokuInput::Forfeit => {
+            game.forfeit_pending = true;
+        }
+        GomokuInput::Other => {}
+    }
+    true
+}
+
 /// Start a gomoku game with the selected difficulty
 pub fn start_gomoku_game(state: &mut GameState, difficulty: GomokuDifficulty) {
     state.active_gomoku = Some(GomokuGame::new(difficulty));
@@ -620,37 +671,78 @@ pub fn find_best_move<R: Rng>(game: &GomokuGame, rng: &mut R) -> Option<(usize, 
     best_moves.choose(rng).copied()
 }
 
-/// Apply game result: update stats and grant rewards on win.
-/// Returns (result, xp_gained, prestige_gained).
-pub fn apply_game_result(state: &mut GameState) -> Option<(GomokuResult, u64, u32)> {
+/// Apply game result: update stats, grant rewards, and add combat log entries.
+/// Returns true if a result was processed.
+pub fn apply_game_result(state: &mut GameState) -> bool {
     use crate::challenges::menu::DifficultyInfo;
 
-    let game = state.active_gomoku.as_ref()?;
-    let result = game.game_result?;
+    let game = match state.active_gomoku.as_ref() {
+        Some(g) => g,
+        None => return false,
+    };
+    let result = match game.game_result {
+        Some(r) => r,
+        None => return false,
+    };
     let reward = game.difficulty.reward();
+    let old_prestige = state.prestige_rank;
 
-    let (xp_gained, prestige_gained) = match result {
+    match result {
         GomokuResult::Win => {
             // XP reward
-            let xp = if reward.xp_percent > 0 {
+            let xp_gained = if reward.xp_percent > 0 {
                 let xp_for_level =
                     crate::core::game_logic::xp_for_next_level(state.character_level.max(1));
-                (xp_for_level * reward.xp_percent as u64) / 100
+                let xp = (xp_for_level * reward.xp_percent as u64) / 100;
+                state.character_xp += xp;
+                xp
             } else {
                 0
             };
-            state.character_xp += xp;
 
             // Prestige reward
             state.prestige_rank += reward.prestige_ranks;
 
-            (xp, reward.prestige_ranks)
+            // Combat log entries
+            state.combat_state.add_log_entry(
+                "◎ Victory! The strategist bows in defeat.".to_string(),
+                false,
+                true,
+            );
+            if reward.prestige_ranks > 0 {
+                state.combat_state.add_log_entry(
+                    format!(
+                        "◎ +{} Prestige Ranks (P{} → P{})",
+                        reward.prestige_ranks, old_prestige, state.prestige_rank
+                    ),
+                    false,
+                    false,
+                );
+            }
+            if xp_gained > 0 {
+                state
+                    .combat_state
+                    .add_log_entry(format!("◎ +{} XP", xp_gained), false, false);
+            }
         }
-        GomokuResult::Loss | GomokuResult::Draw => (0, 0),
-    };
+        GomokuResult::Loss => {
+            state.combat_state.add_log_entry(
+                "◎ The strategist nods respectfully and departs.".to_string(),
+                false,
+                true,
+            );
+        }
+        GomokuResult::Draw => {
+            state.combat_state.add_log_entry(
+                "◎ A rare draw. The strategist seems impressed.".to_string(),
+                false,
+                true,
+            );
+        }
+    }
 
     state.active_gomoku = None;
-    Some((result, xp_gained, prestige_gained))
+    true
 }
 
 /// Process AI thinking (called each tick).
@@ -746,5 +838,93 @@ mod ai_tests {
             !candidates.contains(&(7, 7)),
             "Occupied position should not be candidate"
         );
+    }
+
+    // ============ process_input Tests ============
+
+    #[test]
+    fn test_process_input_cursor_movement() {
+        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+
+        // Start at center (7, 7)
+        assert_eq!(game.cursor, (7, 7));
+
+        process_input(&mut game, GomokuInput::Up);
+        assert_eq!(game.cursor, (6, 7));
+
+        process_input(&mut game, GomokuInput::Down);
+        assert_eq!(game.cursor, (7, 7));
+
+        process_input(&mut game, GomokuInput::Left);
+        assert_eq!(game.cursor, (7, 6));
+
+        process_input(&mut game, GomokuInput::Right);
+        assert_eq!(game.cursor, (7, 7));
+    }
+
+    #[test]
+    fn test_process_input_place_stone() {
+        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        game.cursor = (5, 5);
+
+        assert!(game.board[5][5].is_none());
+
+        process_input(&mut game, GomokuInput::PlaceStone);
+
+        assert_eq!(game.board[5][5], Some(Player::Human));
+    }
+
+    #[test]
+    fn test_process_input_forfeit_single_esc() {
+        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+
+        assert!(!game.forfeit_pending);
+
+        process_input(&mut game, GomokuInput::Forfeit);
+
+        assert!(game.forfeit_pending);
+        assert!(game.game_result.is_none());
+    }
+
+    #[test]
+    fn test_process_input_forfeit_double_esc() {
+        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+
+        // First Esc sets pending
+        process_input(&mut game, GomokuInput::Forfeit);
+        assert!(game.forfeit_pending);
+
+        // Second Esc confirms forfeit
+        process_input(&mut game, GomokuInput::Forfeit);
+
+        assert_eq!(game.game_result, Some(GomokuResult::Loss));
+    }
+
+    #[test]
+    fn test_process_input_forfeit_cancelled() {
+        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+
+        // First Esc sets pending
+        process_input(&mut game, GomokuInput::Forfeit);
+        assert!(game.forfeit_pending);
+
+        // Any other key cancels forfeit
+        process_input(&mut game, GomokuInput::Other);
+
+        assert!(!game.forfeit_pending);
+        assert!(game.game_result.is_none());
+    }
+
+    #[test]
+    fn test_process_input_blocked_during_ai_thinking() {
+        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        game.ai_thinking = true;
+        game.cursor = (7, 7);
+
+        // Input should be blocked
+        let handled = process_input(&mut game, GomokuInput::Up);
+
+        assert!(!handled);
+        assert_eq!(game.cursor, (7, 7)); // Cursor unchanged
     }
 }
