@@ -349,6 +349,47 @@ Pressing `[Enter]` on a buildable room shows a confirmation overlay:
 ╚════════════════════════════════════════╝
 ```
 
+### Active Bonuses Summary
+
+The Haven screen shows a summary of all active bonuses at the top, visible when you open it via `[H]`:
+
+```
+┌──────────────────────── Haven ──────────────────────────┐
+│ Active bonuses (5/13 rooms):                             │
+│ +10% DMG  +5% XP  +2% Drops  +3% Crit  +15% Regen     │
+│ +10% Offline XP                                          │
+├──────────────────────────────────────────────────────────┤
+│         ┌────────────┐  ┌─ ...                           │
+```
+
+Bonuses are not shown on the stats panel — the Haven is "set and forget." Players check `[H]` when they want the full picture.
+
+### Vault Item Selection (on Prestige)
+
+When a player prestiges with the Vault built, the prestige confirmation mentions preserved items. After confirming, a selection screen appears:
+
+```
+╔═ Vault — Choose 2 Items to Keep ═════╗
+║                                        ║
+║  Select items to preserve:             ║
+║                                        ║
+║  > ⚔️ Stormbreaker [Legendary] ★★★★★  ║
+║    🛡 Iron Plate [Rare] ★★★           ║
+║    🪖 Silk Hood [Uncommon] ★★          ║
+║    🧤 Chain Gloves [Common] ★          ║
+║    👢 Steel Boots [Rare] ★★★          ║
+║    📿 Jade Amulet [Epic] ★★★★         ║
+║    💍 Copper Ring [Uncommon] ★★        ║
+║                                        ║
+║  Selected: 1/2                         ║
+║  ⚔️ Stormbreaker                       ║
+║                                        ║
+║  [Enter] Toggle  [Space] Confirm       ║
+╚════════════════════════════════════════╝
+```
+
+Number of items equals the Vault tier (T1: 1, T2: 2, T3: 3). Player selects which equipped items to keep. Prestige proceeds with those items preserved.
+
 ### Access from Gameplay
 
 During gameplay, `[H]` opens the Haven as an overlay (like the challenge menu). The active character's ranks are shown for spending. `[Esc]` returns to combat. Ticks continue in the background.
