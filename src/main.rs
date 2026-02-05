@@ -271,6 +271,19 @@ fn main() -> io::Result<()> {
                 terminal.draw(|f| {
                     let area = f.size();
                     select_screen.draw(f, area, &characters);
+                    // Draw Haven indicator if discovered
+                    ui::haven_scene::render_haven_indicator(f, area, &haven);
+                    // Draw Haven screen if open
+                    if showing_haven {
+                        ui::haven_scene::render_haven_tree(
+                            f,
+                            area,
+                            &haven,
+                            haven_selected_room,
+                            0, // No character selected, so prestige/fishing rank = 0
+                            0,
+                        );
+                    }
                 })?;
 
                 // Handle input

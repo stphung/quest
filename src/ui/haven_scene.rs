@@ -11,6 +11,33 @@ use ratatui::{
     Frame,
 };
 
+/// Render a small Haven status indicator (for character select screen)
+pub fn render_haven_indicator(frame: &mut Frame, area: Rect, haven: &Haven) {
+    if !haven.discovered {
+        return; // Don't show anything if Haven not discovered
+    }
+
+    // Position in bottom-left corner
+    let indicator_width = 30;
+    let indicator_height = 2;
+    let x = area.x + 2;
+    let y = area.y + area.height.saturating_sub(indicator_height + 2);
+    let indicator_area = Rect::new(x, y, indicator_width.min(area.width), indicator_height);
+
+    let rooms_built = haven.rooms_built();
+    let total_rooms = haven.total_rooms();
+
+    let text = Paragraph::new(vec![Line::from(vec![
+        Span::styled("🏠 Haven: ", Style::default().fg(Color::Cyan)),
+        Span::styled(
+            format!("{}/{} rooms", rooms_built, total_rooms),
+            Style::default().fg(Color::White),
+        ),
+        Span::styled(" [H] View", Style::default().fg(Color::DarkGray)),
+    ])]);
+    frame.render_widget(text, indicator_area);
+}
+
 /// Render the Haven skill tree screen
 pub fn render_haven_tree(
     frame: &mut Frame,
