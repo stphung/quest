@@ -4,12 +4,17 @@
 //! state transitions, and offline progression.
 
 use quest::character::derived_stats::DerivedStats;
-use quest::combat::logic::{update_combat, CombatEvent};
+use quest::combat::logic::{update_combat, CombatEvent, HavenCombatBonuses};
 use quest::core::game_logic::{
     process_offline_progression, spawn_enemy_if_needed, xp_for_next_level,
 };
 use quest::GameState;
 use quest::TICK_INTERVAL_MS;
+
+/// Default Haven combat bonuses for testing (no bonuses)
+fn default_haven_bonuses() -> HavenCombatBonuses {
+    HavenCombatBonuses::default()
+}
 
 /// Simulate a single game tick (100ms of game time)
 fn simulate_tick(state: &mut GameState) -> Vec<CombatEvent> {
@@ -23,7 +28,7 @@ fn simulate_tick(state: &mut GameState) -> Vec<CombatEvent> {
     spawn_enemy_if_needed(state);
 
     // Update combat and return events
-    update_combat(state, delta_time)
+    update_combat(state, delta_time, &default_haven_bonuses())
 }
 
 /// Simulate multiple game ticks
@@ -51,9 +56,7 @@ fn test_new_game_state_has_valid_initial_values() {
     assert!(state.combat_state.current_enemy.is_none());
     assert!(state.active_dungeon.is_none());
     assert!(state.active_fishing.is_none());
-    assert!(state.active_chess.is_none());
-    assert!(state.active_morris.is_none());
-    assert!(state.active_gomoku.is_none());
+    assert!(state.active_minigame.is_none());
 }
 
 #[test]
@@ -321,7 +324,7 @@ fn test_offline_progression_grants_xp() {
     // Set last save time to 1 hour ago
     state.last_save_time = chrono::Utc::now().timestamp() - 3600;
 
-    let report = process_offline_progression(&mut state);
+    let report = process_offline_progression(&mut state, 0.0);
 
     assert!(
         report.xp_gained > 0,
@@ -338,7 +341,7 @@ fn test_offline_progression_with_long_absence() {
     let ten_days_seconds: i64 = 10 * 24 * 3600;
     state.last_save_time = chrono::Utc::now().timestamp() - ten_days_seconds;
 
-    let report = process_offline_progression(&mut state);
+    let report = process_offline_progression(&mut state, 0.0);
 
     // elapsed_seconds shows actual time, but XP is calculated with 7-day cap internally
     assert!(
@@ -356,7 +359,7 @@ fn test_offline_progression_can_level_up() {
     state.last_save_time = chrono::Utc::now().timestamp() - 10000;
 
     let initial_level = state.character_level;
-    let report = process_offline_progression(&mut state);
+    let report = process_offline_progression(&mut state, 0.0);
 
     if report.total_level_ups > 0 {
         assert!(
@@ -373,7 +376,7 @@ fn test_short_offline_time_still_processes() {
     // Set last save time to 30 seconds ago
     state.last_save_time = chrono::Utc::now().timestamp() - 30;
 
-    let report = process_offline_progression(&mut state);
+    let report = process_offline_progression(&mut state, 0.0);
 
     // Even short times are processed (threshold check is at display level in main.rs)
     assert!(
