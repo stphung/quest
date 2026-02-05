@@ -30,6 +30,8 @@ mod minesweeper_logic;
 mod morris;
 mod morris_logic;
 mod prestige;
+mod rune;
+mod rune_logic;
 mod save_manager;
 mod ui;
 mod updater;
@@ -64,6 +66,8 @@ use morris_logic::{
 };
 use prestige::*;
 use ratatui::{backend::CrosstermBackend, Terminal};
+use rune::{RuneDifficulty, RuneGame, RuneResult};
+use rune_logic::submit_guess;
 use save_manager::SaveManager;
 use std::io;
 use std::time::{Duration, Instant};
@@ -692,6 +696,68 @@ fn main() -> io::Result<()> {
                                 }
                             }
 
+                            // Handle active rune game input
+                            if let Some(ref mut rune_game) = state.active_rune {
+                                if let Some(result) = rune_game.game_result {
+                                    // Any key dismisses result and applies rewards
+                                    if result == RuneResult::Win {
+                                        let reward = rune_game.difficulty.reward();
+                                        if reward.xp_percent > 0 {
+                                            let xp_for_level = game_logic::xp_for_next_level(
+                                                state.character_level.max(1),
+                                            );
+                                            let xp_gain =
+                                                (xp_for_level * reward.xp_percent as u64) / 100;
+                                            state.character_xp += xp_gain;
+                                        }
+                                        if reward.prestige_ranks > 0 {
+                                            state.prestige_rank += reward.prestige_ranks;
+                                        }
+                                        if reward.fishing_ranks > 0 {
+                                            state.fishing.rank = state
+                                                .fishing
+                                                .rank
+                                                .saturating_add(reward.fishing_ranks);
+                                        }
+                                    }
+                                    state.active_rune = None;
+                                    continue;
+                                }
+
+                                // Handle forfeit confirmation (double-Esc)
+                                if rune_game.forfeit_pending {
+                                    match key_event.code {
+                                        KeyCode::Esc => {
+                                            rune_game.game_result = Some(RuneResult::Loss);
+                                        }
+                                        _ => {
+                                            rune_game.forfeit_pending = false;
+                                        }
+                                    }
+                                    continue;
+                                }
+
+                                // Normal game input
+                                match key_event.code {
+                                    KeyCode::Left => rune_game.move_cursor_left(),
+                                    KeyCode::Right => rune_game.move_cursor_right(),
+                                    KeyCode::Up => rune_game.cycle_rune_up(),
+                                    KeyCode::Down => rune_game.cycle_rune_down(),
+                                    KeyCode::Enter => {
+                                        let mut rng = rand::thread_rng();
+                                        submit_guess(rune_game, &mut rng);
+                                    }
+                                    KeyCode::Char('f') | KeyCode::Char('F') => {
+                                        rune_game.clear_guess();
+                                    }
+                                    KeyCode::Esc => {
+                                        rune_game.forfeit_pending = true;
+                                    }
+                                    _ => {}
+                                }
+                                continue;
+                            }
+
                             // Handle active minesweeper game input
                             if let Some(ref mut minesweeper_game) = state.active_minesweeper {
                                 if let Some(result) = minesweeper_game.game_result {
@@ -1073,7 +1139,15 @@ fn main() -> io::Result<()> {
                                                         state.active_minesweeper =
                                                             Some(MinesweeperGame::new(difficulty));
                                                     }
+                                                    ChallengeType::Rune => {
+                                                        let difficulty = RuneDifficulty::from_index(
+                                                            menu.selected_difficulty,
+                                                        );
+                                                        state.active_rune =
+                                                            Some(RuneGame::new(difficulty));
+                                                    }
                                                 }
+                                                state.challenge_menu.close();
                                             }
                                         }
                                         KeyCode::Char('d') | KeyCode::Char('D') => {
@@ -1216,6 +1290,7 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
                     "\u{26A0}",
                     "A weathered scout beckons you toward a ruined corridor...",
                 ),
+                ChallengeType::Rune => ("ᚱ", "A glowing stone tablet materializes before you..."),
             };
             game_state
                 .combat_state

@@ -1,48 +1,40 @@
 //! Gomoku game UI rendering.
 
+use super::game_common::{
+    create_game_layout, render_forfeit_status_bar, render_game_over_overlay,
+    render_info_panel_frame, render_status_bar, render_thinking_status_bar, GameResultType,
+};
 use crate::gomoku::{GomokuGame, Player, BOARD_SIZE};
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::Paragraph,
     Frame,
 };
 
 /// Render the Gomoku game scene.
 pub fn render_gomoku_scene(frame: &mut Frame, area: Rect, game: &GomokuGame) {
-    // Split: Board on left, help panel on right
-    let chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Min(32),    // Board (15*2 + borders)
-            Constraint::Length(22), // Help panel
-        ])
-        .split(area);
-
-    render_board(frame, chunks[0], game);
-    render_help_panel(frame, chunks[1], game);
-
     // Game over overlay
     if game.game_result.is_some() {
-        render_game_over_overlay(frame, area, game);
+        render_gomoku_game_over(frame, area, game);
+        return;
     }
+
+    // Use shared layout
+    let layout = create_game_layout(frame, area, " Gomoku ", Color::Cyan, 15, 22);
+
+    render_board(frame, layout.content, game);
+    render_status_bar_content(frame, layout.status_bar, game);
+    render_info_panel(frame, layout.info_panel, game);
 }
 
 fn render_board(frame: &mut Frame, area: Rect, game: &GomokuGame) {
-    let block = Block::default()
-        .title(" Gomoku ")
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Cyan));
-
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-
-    // Calculate centering offset
+    // Calculate centering offset (no border - outer block provides it)
     let board_height = BOARD_SIZE as u16;
     let board_width = (BOARD_SIZE * 2 - 1) as u16; // "● " format
-    let y_offset = inner.y + (inner.height.saturating_sub(board_height)) / 2;
-    let x_offset = inner.x + (inner.width.saturating_sub(board_width)) / 2;
+    let y_offset = area.y + (area.height.saturating_sub(board_height)) / 2;
+    let x_offset = area.x + (area.width.saturating_sub(board_width)) / 2;
 
     // Colors
     let human_color = Color::White;
@@ -109,16 +101,34 @@ fn render_board(frame: &mut Frame, area: Rect, game: &GomokuGame) {
     }
 }
 
-fn render_help_panel(frame: &mut Frame, area: Rect, game: &GomokuGame) {
-    let block = Block::default()
-        .title(" Info ")
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray));
+/// Render the status bar below the board.
+fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &GomokuGame) {
+    if game.ai_thinking {
+        render_thinking_status_bar(frame, area, "Opponent is thinking...");
+        return;
+    }
 
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
+    if render_forfeit_status_bar(frame, area, game.forfeit_pending) {
+        return;
+    }
 
-    let mut lines: Vec<Line> = vec![
+    render_status_bar(
+        frame,
+        area,
+        "Your turn",
+        Color::White,
+        &[
+            ("[Arrows]", "Move"),
+            ("[Enter]", "Place"),
+            ("[Esc]", "Forfeit"),
+        ],
+    );
+}
+
+fn render_info_panel(frame: &mut Frame, area: Rect, game: &GomokuGame) {
+    let inner = render_info_panel_frame(frame, area);
+
+    let lines: Vec<Line> = vec![
         Line::from(Span::styled(
             "RULES",
             Style::default()
@@ -135,103 +145,56 @@ fn render_help_panel(frame: &mut Frame, area: Rect, game: &GomokuGame) {
         )),
         Line::from(Span::styled("wins.", Style::default().fg(Color::Gray))),
         Line::from(""),
+        Line::from(vec![
+            Span::styled("Difficulty: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(game.difficulty.name(), Style::default().fg(Color::Cyan)),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("You: ", Style::default().fg(Color::White)),
+            Span::styled(
+                "●",
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("  AI: ", Style::default().fg(Color::Gray)),
+            Span::styled("●", Style::default().fg(Color::LightRed)),
+        ]),
     ];
-
-    // Difficulty
-    lines.push(Line::from(vec![
-        Span::styled("Difficulty: ", Style::default().fg(Color::DarkGray)),
-        Span::styled(game.difficulty.name(), Style::default().fg(Color::Cyan)),
-    ]));
-    lines.push(Line::from(""));
-
-    // Status
-    let status = if game.ai_thinking {
-        Span::styled("AI thinking...", Style::default().fg(Color::Yellow))
-    } else if game.forfeit_pending {
-        Span::styled("Forfeit game?", Style::default().fg(Color::LightRed))
-    } else if game.current_player == Player::Human {
-        Span::styled("Your turn", Style::default().fg(Color::Green))
-    } else {
-        Span::styled("", Style::default())
-    };
-    lines.push(Line::from(status));
-    lines.push(Line::from(""));
-
-    // Controls
-    if game.forfeit_pending {
-        lines.push(Line::from(Span::styled(
-            "[Esc] Confirm forfeit",
-            Style::default().fg(Color::DarkGray),
-        )));
-        lines.push(Line::from(Span::styled(
-            "[Any] Cancel",
-            Style::default().fg(Color::DarkGray),
-        )));
-    } else {
-        lines.push(Line::from(Span::styled(
-            "[Arrows] Move",
-            Style::default().fg(Color::DarkGray),
-        )));
-        lines.push(Line::from(Span::styled(
-            "[Enter] Place",
-            Style::default().fg(Color::DarkGray),
-        )));
-        lines.push(Line::from(Span::styled(
-            "[Esc] Forfeit",
-            Style::default().fg(Color::DarkGray),
-        )));
-    }
 
     let text = Paragraph::new(lines);
     frame.render_widget(text, inner);
 }
 
-fn render_game_over_overlay(frame: &mut Frame, area: Rect, game: &GomokuGame) {
+fn render_gomoku_game_over(frame: &mut Frame, area: Rect, game: &GomokuGame) {
     use crate::challenge_menu::DifficultyInfo;
 
     let result = game.game_result.as_ref().unwrap();
-    let (title, color) = match result {
-        crate::gomoku::GomokuResult::Win => ("Victory!", Color::Green),
-        crate::gomoku::GomokuResult::Loss => ("Defeat", Color::Red),
-        crate::gomoku::GomokuResult::Draw => ("Draw", Color::Yellow),
+    let (result_type, title, message) = match result {
+        crate::gomoku::GomokuResult::Win => (
+            GameResultType::Win,
+            ":: VICTORY! ::",
+            "You placed five stones in a row!",
+        ),
+        crate::gomoku::GomokuResult::Loss => (
+            GameResultType::Loss,
+            "DEFEAT",
+            "The opponent placed five stones in a row.",
+        ),
+        crate::gomoku::GomokuResult::Draw => (
+            GameResultType::Draw,
+            "DRAW",
+            "The board is full with no winner.",
+        ),
     };
 
-    let reward_text = match result {
+    let reward = match result {
         crate::gomoku::GomokuResult::Win => {
-            // Strip "Win: " prefix since title already shows victory
             game.difficulty.reward().description().replace("Win: ", "")
         }
-        _ => "No reward".to_string(),
+        _ => "No penalty incurred.".to_string(),
     };
 
-    // Center overlay
-    let width = 24;
-    let height = 6;
-    let x = area.x + (area.width.saturating_sub(width)) / 2;
-    let y = area.y + (area.height.saturating_sub(height)) / 2;
-    let overlay_area = Rect::new(x, y, width, height);
-
-    frame.render_widget(Clear, overlay_area);
-
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(color));
-    let inner = block.inner(overlay_area);
-    frame.render_widget(block, overlay_area);
-
-    let lines = vec![
-        Line::from(Span::styled(
-            title,
-            Style::default().fg(color).add_modifier(Modifier::BOLD),
-        )),
-        Line::from(""),
-        Line::from(Span::styled(reward_text, Style::default().fg(Color::White))),
-        Line::from(Span::styled(
-            "[Any key to continue]",
-            Style::default().fg(Color::DarkGray),
-        )),
-    ];
-
-    let text = Paragraph::new(lines).alignment(ratatui::layout::Alignment::Center);
-    frame.render_widget(text, inner);
+    render_game_over_overlay(frame, area, result_type, title, message, &reward);
 }

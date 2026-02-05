@@ -15,6 +15,7 @@ pub const DEBUG_OPTIONS: &[&str] = &[
     "Trigger Morris Challenge",
     "Trigger Gomoku Challenge",
     "Trigger Minesweeper Challenge",
+    "Trigger Rune Challenge",
 ];
 
 /// Debug menu state
@@ -67,6 +68,7 @@ impl DebugMenu {
             3 => trigger_morris_challenge(state),
             4 => trigger_gomoku_challenge(state),
             5 => trigger_minesweeper_challenge(state),
+            6 => trigger_rune_challenge(state),
             _ => "Unknown option",
         };
         self.close();
@@ -124,6 +126,16 @@ fn trigger_gomoku_challenge(state: &mut GameState) -> &'static str {
     "Gomoku challenge added!"
 }
 
+fn trigger_rune_challenge(state: &mut GameState) -> &'static str {
+    if state.challenge_menu.has_challenge(&ChallengeType::Rune) {
+        return "Rune challenge already pending!";
+    }
+    state
+        .challenge_menu
+        .add_challenge(create_challenge(&ChallengeType::Rune));
+    "Rune challenge added!"
+}
+
 fn trigger_minesweeper_challenge(state: &mut GameState) -> &'static str {
     if state
         .challenge_menu
@@ -154,16 +166,18 @@ mod tests {
         menu.navigate_down();
         menu.navigate_down();
         menu.navigate_down();
-        assert_eq!(menu.selected_index, 5);
+        menu.navigate_down();
+        assert_eq!(menu.selected_index, 6);
 
         // Can't go past end
         menu.navigate_down();
-        assert_eq!(menu.selected_index, 5);
+        assert_eq!(menu.selected_index, 6);
 
         menu.navigate_up();
-        assert_eq!(menu.selected_index, 4);
+        assert_eq!(menu.selected_index, 5);
 
         // Can't go before start
+        menu.navigate_up();
         menu.navigate_up();
         menu.navigate_up();
         menu.navigate_up();
@@ -242,6 +256,17 @@ mod tests {
         // Can't add duplicate
         let msg = trigger_gomoku_challenge(&mut state);
         assert_eq!(msg, "Gomoku challenge already pending!");
+    }
+
+    #[test]
+    fn test_trigger_rune_challenge() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let msg = trigger_rune_challenge(&mut state);
+        assert_eq!(msg, "Rune challenge added!");
+        assert!(state.challenge_menu.has_challenge(&ChallengeType::Rune));
+
+        let msg = trigger_rune_challenge(&mut state);
+        assert_eq!(msg, "Rune challenge already pending!");
     }
 
     #[test]

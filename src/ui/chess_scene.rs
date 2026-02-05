@@ -1,45 +1,42 @@
 //! Chess board UI rendering.
 
+use super::game_common::{
+    create_game_layout, render_forfeit_status_bar, render_game_over_overlay,
+    render_info_panel_frame, render_status_bar, render_thinking_status_bar, GameResultType,
+};
 use crate::chess::{ChessGame, ChessResult};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::Paragraph,
     Frame,
 };
 
 /// Render the chess game scene
 pub fn render_chess_scene(frame: &mut Frame, area: Rect, game: &ChessGame) {
-    frame.render_widget(Clear, area);
-
     // Check for game over overlay
     if let Some(result) = game.game_result {
-        render_game_over_overlay(frame, area, result, game.difficulty.reward_prestige());
+        render_chess_game_over(frame, area, result, game.difficulty.reward_prestige());
         return;
     }
 
-    let block = Block::default()
-        .title(" Chess ")
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Cyan));
+    // Use shared layout (content needs 19 lines: 1 for move history + 18 for board)
+    let layout = create_game_layout(frame, area, " Chess ", Color::Cyan, 19, 22);
 
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-
-    // Vertical layout: move history on top, board in middle, status at bottom
-    let chunks = Layout::default()
+    // Split content area: move history on top, board below
+    let content_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(1), // Move history (single line)
-            Constraint::Min(18),   // Board (8 rows * 2 + 2 borders)
-            Constraint::Length(2), // Status
+            Constraint::Min(18),   // Board
         ])
-        .split(inner);
+        .split(layout.content);
 
-    render_move_history(frame, chunks[0], game);
-    render_board(frame, chunks[1], game);
-    render_status(frame, chunks[2], game);
+    render_move_history(frame, content_chunks[0], game);
+    render_board(frame, content_chunks[1], game);
+    render_status(frame, layout.status_bar, game);
+    render_info_panel(frame, layout.info_panel, game);
 }
 
 fn render_board(frame: &mut Frame, area: Rect, game: &ChessGame) {
@@ -203,63 +200,36 @@ fn render_board(frame: &mut Frame, area: Rect, game: &ChessGame) {
 }
 
 fn render_status(frame: &mut Frame, area: Rect, game: &ChessGame) {
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    // Line 1: Status message
-    let (status_text, status_style) = if game.ai_thinking {
-        // Braille spinner animation (100ms per frame)
-        const SPINNER: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-        let millis = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis();
-        let frame_idx = ((millis / 100) % 10) as usize;
-        let spinner = SPINNER[frame_idx];
-
-        (
-            format!("{} Opponent is thinking...", spinner),
-            Style::default().fg(Color::Yellow),
-        )
-    } else if game.forfeit_pending {
-        ("Forfeit game?".to_string(), Style::default().fg(Color::Red))
-    } else if game.selected_square.is_some() {
-        (
-            "Select destination".to_string(),
-            Style::default().fg(Color::Cyan),
-        )
-    } else {
-        ("Your move".to_string(), Style::default().fg(Color::White))
-    };
-
-    // Line 2: Controls hint
-    let controls_text = if game.ai_thinking {
-        ""
-    } else if game.forfeit_pending {
-        "[Esc] Confirm forfeit  [Any] Cancel"
-    } else if game.selected_square.is_some() {
-        "[Arrows] Move  [Enter] Confirm  [Esc] Cancel"
-    } else {
-        "[Arrows] Move  [Enter] Select piece  [Esc] Forfeit"
-    };
-
-    let status = Paragraph::new(status_text)
-        .style(status_style)
-        .alignment(Alignment::Center);
-    frame.render_widget(status, Rect { height: 1, ..area });
-
-    if !controls_text.is_empty() {
-        let controls = Paragraph::new(controls_text)
-            .style(Style::default().fg(Color::DarkGray))
-            .alignment(Alignment::Center);
-        frame.render_widget(
-            controls,
-            Rect {
-                y: area.y + 1,
-                height: 1,
-                ..area
-            },
-        );
+    if game.ai_thinking {
+        render_thinking_status_bar(frame, area, "Opponent is thinking...");
+        return;
     }
+
+    if render_forfeit_status_bar(frame, area, game.forfeit_pending) {
+        return;
+    }
+
+    let (status_text, status_color) = if game.selected_square.is_some() {
+        ("Select destination", Color::Cyan)
+    } else {
+        ("Your move", Color::White)
+    };
+
+    let controls: &[(&str, &str)] = if game.selected_square.is_some() {
+        &[
+            ("[Arrows]", "Move"),
+            ("[Enter]", "Confirm"),
+            ("[Esc]", "Cancel"),
+        ]
+    } else {
+        &[
+            ("[Arrows]", "Move"),
+            ("[Enter]", "Select"),
+            ("[Esc]", "Forfeit"),
+        ]
+    };
+
+    render_status_bar(frame, area, status_text, status_color, controls);
 }
 
 fn render_move_history(frame: &mut Frame, area: Rect, game: &ChessGame) {
@@ -326,72 +296,78 @@ fn render_move_history(frame: &mut Frame, area: Rect, game: &ChessGame) {
     frame.render_widget(text, area);
 }
 
-fn render_game_over_overlay(frame: &mut Frame, area: Rect, result: ChessResult, prestige: u32) {
-    frame.render_widget(Clear, area);
+fn render_info_panel(frame: &mut Frame, area: Rect, game: &ChessGame) {
+    let inner = render_info_panel_frame(frame, area);
 
-    let (title, message, reward) = match result {
+    let lines: Vec<Line> = vec![
+        Line::from(Span::styled(
+            "RULES",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(Span::styled(
+            "Checkmate the enemy",
+            Style::default().fg(Color::Gray),
+        )),
+        Line::from(Span::styled(
+            "king to win.",
+            Style::default().fg(Color::Gray),
+        )),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Difficulty: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(game.difficulty.name(), Style::default().fg(Color::Cyan)),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("You: ", Style::default().fg(Color::White)),
+            Span::styled(
+                "♚♛♜♝♞♟",
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("Foe: ", Style::default().fg(Color::Gray)),
+            Span::styled("♔♕♖♗♘♙", Style::default().fg(Color::Rgb(140, 140, 140))),
+        ]),
+    ];
+
+    let text = Paragraph::new(lines);
+    frame.render_widget(text, inner);
+}
+
+fn render_chess_game_over(frame: &mut Frame, area: Rect, result: ChessResult, prestige: u32) {
+    let (result_type, title, message, reward) = match result {
         ChessResult::Win => (
+            GameResultType::Win,
             ":: VICTORY! ::",
             "You checkmated the mysterious figure!",
             format!("+{} Prestige Ranks", prestige),
         ),
         ChessResult::Loss => (
+            GameResultType::Loss,
             "DEFEAT",
             "The mysterious figure has checkmated you.",
             "No penalty incurred.".to_string(),
         ),
         ChessResult::Draw => (
+            GameResultType::Draw,
             "DRAW",
             "The game ends in stalemate.",
             "+5000 XP".to_string(),
         ),
         ChessResult::Forfeit => (
+            GameResultType::Forfeit,
             "FORFEIT",
             "You conceded the game.",
             "No penalty incurred.".to_string(),
         ),
     };
 
-    let title_color = match result {
-        ChessResult::Win => Color::Green,
-        ChessResult::Loss => Color::Red,
-        ChessResult::Draw => Color::Yellow,
-        ChessResult::Forfeit => Color::Gray,
-    };
-
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(title_color));
-
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-
-    let content_height: u16 = 7;
-    let y_offset = inner.y + (inner.height.saturating_sub(content_height)) / 2;
-
-    let lines = vec![
-        Line::from(Span::styled(
-            title,
-            Style::default()
-                .fg(title_color)
-                .add_modifier(Modifier::BOLD),
-        )),
-        Line::from(""),
-        Line::from(Span::styled(message, Style::default().fg(Color::White))),
-        Line::from(""),
-        Line::from(Span::styled(reward, Style::default().fg(Color::Cyan))),
-        Line::from(""),
-        Line::from(Span::styled(
-            "[Press any key]",
-            Style::default().fg(Color::DarkGray),
-        )),
-    ];
-
-    let text = Paragraph::new(lines).alignment(Alignment::Center);
-    frame.render_widget(
-        text,
-        Rect::new(inner.x, y_offset, inner.width, content_height),
-    );
+    render_game_over_overlay(frame, area, result_type, title, message, &reward);
 }
 
 /// Get color for a piece character (white pieces are bright, black pieces are dim)

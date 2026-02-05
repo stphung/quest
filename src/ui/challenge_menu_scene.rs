@@ -5,6 +5,7 @@ use crate::chess::ChessDifficulty;
 use crate::gomoku::GomokuDifficulty;
 use crate::minesweeper::MinesweeperDifficulty;
 use crate::morris::MorrisDifficulty;
+use crate::rune::RuneDifficulty;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -135,6 +136,14 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
                 frame,
                 chunks[2],
                 &MinesweeperDifficulty::ALL,
+                menu.selected_difficulty,
+            );
+        }
+        ChallengeType::Rune => {
+            render_difficulty_selector(
+                frame,
+                chunks[2],
+                &RuneDifficulty::ALL,
                 menu.selected_difficulty,
             );
         }
