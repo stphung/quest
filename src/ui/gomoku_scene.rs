@@ -1,9 +1,9 @@
 //! Gomoku game UI rendering.
 
-use super::game_common::{render_status_bar, render_thinking_status_bar};
+use super::game_common::{create_game_layout, render_status_bar, render_thinking_status_bar};
 use crate::gomoku::{GomokuGame, Player, BOARD_SIZE};
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph},
@@ -12,45 +12,26 @@ use ratatui::{
 
 /// Render the Gomoku game scene.
 pub fn render_gomoku_scene(frame: &mut Frame, area: Rect, game: &GomokuGame) {
-    // Horizontal split: Board area (left) | Info panel (right)
-    let h_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Min(32),    // Board area (15*2 + borders)
-            Constraint::Length(22), // Info panel
-        ])
-        .split(area);
-
-    // Left side: Board (top) + Status bar (bottom 2 lines)
-    let v_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Min(17), Constraint::Length(2)])
-        .split(h_chunks[0]);
-
-    render_board(frame, v_chunks[0], game);
-    render_status_bar_content(frame, v_chunks[1], game);
-    render_info_panel(frame, h_chunks[1], game);
-
     // Game over overlay
     if game.game_result.is_some() {
         render_game_over_overlay(frame, area, game);
+        return;
     }
+
+    // Use shared layout
+    let layout = create_game_layout(frame, area, " Gomoku ", Color::Cyan, 15, 22);
+
+    render_board(frame, layout.content, game);
+    render_status_bar_content(frame, layout.status_bar, game);
+    render_info_panel(frame, layout.info_panel, game);
 }
 
 fn render_board(frame: &mut Frame, area: Rect, game: &GomokuGame) {
-    let block = Block::default()
-        .title(" Gomoku ")
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Cyan));
-
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-
-    // Calculate centering offset
+    // Calculate centering offset (no border - outer block provides it)
     let board_height = BOARD_SIZE as u16;
     let board_width = (BOARD_SIZE * 2 - 1) as u16; // "● " format
-    let y_offset = inner.y + (inner.height.saturating_sub(board_height)) / 2;
-    let x_offset = inner.x + (inner.width.saturating_sub(board_width)) / 2;
+    let y_offset = area.y + (area.height.saturating_sub(board_height)) / 2;
+    let x_offset = area.x + (area.width.saturating_sub(board_width)) / 2;
 
     // Colors
     let human_color = Color::White;

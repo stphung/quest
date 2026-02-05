@@ -1,9 +1,9 @@
 //! Rune Deciphering game UI rendering.
 
-use super::game_common::render_status_bar;
+use super::game_common::{create_game_layout, render_status_bar};
 use crate::rune::{FeedbackMark, RuneGame, RuneResult, RUNE_SYMBOLS};
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph},
@@ -12,44 +12,28 @@ use ratatui::{
 
 /// Render the rune deciphering game scene.
 pub fn render_rune(frame: &mut Frame, area: Rect, game: &RuneGame) {
-    frame.render_widget(Clear, area);
-
-    // Horizontal: game area (left) + info panel (right)
-    let h_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Min(20), Constraint::Length(22)])
-        .split(area);
-
-    // Left side: grid (top) + status bar (bottom 2 lines)
-    let v_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Min(6), Constraint::Length(2)])
-        .split(h_chunks[0]);
-
-    render_grid(frame, v_chunks[0], game);
-    render_status_bar_content(frame, v_chunks[1], game);
-    render_info_panel(frame, h_chunks[1], game);
-
+    // Game over overlay
     if game.game_result.is_some() {
-        render_game_over_overlay(frame, h_chunks[0], game);
+        render_game_over_overlay(frame, area, game);
+        return;
     }
+
+    // Use shared layout
+    let layout = create_game_layout(frame, area, " Rune Deciphering ", Color::Magenta, 6, 22);
+
+    render_grid(frame, layout.content, game);
+    render_status_bar_content(frame, layout.status_bar, game);
+    render_info_panel(frame, layout.info_panel, game);
 }
 
 /// Render guess history and current input.
 fn render_grid(frame: &mut Frame, area: Rect, game: &RuneGame) {
-    let block = Block::default()
-        .title(" Rune Deciphering ")
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Magenta));
-
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-
-    let mut y = inner.y;
+    // No border - outer block provides it
+    let mut y = area.y;
 
     // Render submitted guesses
     for (i, guess) in game.guesses.iter().enumerate() {
-        if y >= inner.y + inner.height {
+        if y >= area.y + area.height {
             break;
         }
         let mut spans = Vec::new();
@@ -83,7 +67,7 @@ fn render_grid(frame: &mut Frame, area: Rect, game: &RuneGame) {
         let line = Paragraph::new(Line::from(spans));
         frame.render_widget(
             line,
-            Rect::new(inner.x + 1, y, inner.width.saturating_sub(2), 1),
+            Rect::new(area.x + 1, y, area.width.saturating_sub(2), 1),
         );
         y += 1;
     }
@@ -94,7 +78,7 @@ fn render_grid(frame: &mut Frame, area: Rect, game: &RuneGame) {
     }
 
     // Render current guess input (only if game not over)
-    if game.game_result.is_none() && y < inner.y + inner.height {
+    if game.game_result.is_none() && y < area.y + area.height {
         let mut spans = Vec::new();
         spans.push(Span::styled(
             format!("{:>2}: ", game.guesses.len() + 1),
@@ -117,13 +101,13 @@ fn render_grid(frame: &mut Frame, area: Rect, game: &RuneGame) {
         let line = Paragraph::new(Line::from(spans));
         frame.render_widget(
             line,
-            Rect::new(inner.x + 1, y, inner.width.saturating_sub(2), 1),
+            Rect::new(area.x + 1, y, area.width.saturating_sub(2), 1),
         );
         y += 2;
     }
 
     // Available runes
-    if game.game_result.is_none() && y < inner.y + inner.height {
+    if game.game_result.is_none() && y < area.y + area.height {
         let mut spans = vec![Span::styled(
             "Runes: ",
             Style::default().fg(Color::DarkGray),
@@ -137,7 +121,7 @@ fn render_grid(frame: &mut Frame, area: Rect, game: &RuneGame) {
         let line = Paragraph::new(Line::from(spans));
         frame.render_widget(
             line,
-            Rect::new(inner.x + 1, y, inner.width.saturating_sub(2), 1),
+            Rect::new(area.x + 1, y, area.width.saturating_sub(2), 1),
         );
     }
 }

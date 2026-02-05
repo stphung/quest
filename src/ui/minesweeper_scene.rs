@@ -1,9 +1,9 @@
 //! Minesweeper game UI rendering.
 
-use super::game_common::render_status_bar;
+use super::game_common::{create_game_layout, render_status_bar};
 use crate::minesweeper::{Cell, MinesweeperGame, MinesweeperResult};
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph},
@@ -12,50 +12,30 @@ use ratatui::{
 
 /// Render the minesweeper game scene.
 pub fn render_minesweeper(frame: &mut Frame, area: Rect, game: &MinesweeperGame) {
-    frame.render_widget(Clear, area);
-
-    // Horizontal split: Grid area (left) | Info panel (right)
-    let h_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Min(20),    // Grid area
-            Constraint::Length(24), // Info panel
-        ])
-        .split(area);
-
-    // Left side: Grid (top) + Status bar (bottom 2 lines)
-    let v_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Min(10), Constraint::Length(2)])
-        .split(h_chunks[0]);
-
-    render_grid(frame, v_chunks[0], game);
-    render_status_bar_content(frame, v_chunks[1], game);
-    render_info_panel(frame, h_chunks[1], game);
-
-    // Game over overlay (centered on grid area, not full area)
+    // Game over overlay
     if game.game_result.is_some() {
-        render_game_over_overlay(frame, v_chunks[0], game);
+        render_game_over_overlay(frame, area, game);
+        return;
     }
+
+    // Use shared layout
+    let layout = create_game_layout(frame, area, " Trap Detection ", Color::Yellow, 10, 24);
+
+    render_grid(frame, layout.content, game);
+    render_status_bar_content(frame, layout.status_bar, game);
+    render_info_panel(frame, layout.info_panel, game);
 }
 
 /// Render the minefield grid.
 fn render_grid(frame: &mut Frame, area: Rect, game: &MinesweeperGame) {
-    let block = Block::default()
-        .title(" Trap Detection ")
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow));
-
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-
     // Calculate grid dimensions (each cell is 2 chars wide, 1 char tall)
+    // No border - outer block provides it
     let grid_width = (game.width * 2) as u16;
     let grid_height = game.height as u16;
 
     // Center the grid in available space
-    let x_offset = inner.x + (inner.width.saturating_sub(grid_width)) / 2;
-    let y_offset = inner.y + (inner.height.saturating_sub(grid_height)) / 2;
+    let x_offset = area.x + (area.width.saturating_sub(grid_width)) / 2;
+    let y_offset = area.y + (area.height.saturating_sub(grid_height)) / 2;
 
     let game_over = game.game_result.is_some();
 

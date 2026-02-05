@@ -1,12 +1,82 @@
 //! Shared UI components for minigames.
 
 use ratatui::{
-    layout::{Alignment, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     text::{Line, Span},
-    widgets::Paragraph,
+    widgets::{Block, Borders, Clear, Paragraph},
     Frame,
 };
+
+/// Layout areas returned by `create_game_layout`.
+pub struct GameLayout {
+    /// Main content area (board/grid) - top left, inside outer border
+    pub content: Rect,
+    /// Status bar area (2 lines) - bottom left, inside outer border
+    pub status_bar: Rect,
+    /// Info panel area - right side, with its own border
+    pub info_panel: Rect,
+}
+
+/// Create a standardized game layout with outer border.
+///
+/// Layout structure (matches Morris/Chess pattern):
+/// ```text
+/// ┌─ Title ─────────────────────────┬─ Info ──────┐
+/// │                                 │             │
+/// │   [content area]                │  [info]     │
+/// │                                 │             │
+/// │ [status bar - 2 lines]          │             │
+/// └─────────────────────────────────┴─────────────┘
+/// ```
+///
+/// # Arguments
+/// * `frame` - The frame to render to
+/// * `area` - The full area to use
+/// * `title` - Title for the outer border (e.g., " Gomoku ")
+/// * `border_color` - Color for the outer border
+/// * `content_min_height` - Minimum height for the content area
+/// * `info_panel_width` - Width of the info panel (typically 22-24)
+///
+/// # Returns
+/// A `GameLayout` struct containing the areas for content, status bar, and info panel.
+pub fn create_game_layout(
+    frame: &mut Frame,
+    area: Rect,
+    title: &str,
+    border_color: Color,
+    content_min_height: u16,
+    info_panel_width: u16,
+) -> GameLayout {
+    frame.render_widget(Clear, area);
+
+    // Outer border around entire game area
+    let block = Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(border_color));
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    // Horizontal split: content area (left) | info panel (right)
+    let h_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Min(20), Constraint::Length(info_panel_width)])
+        .split(inner);
+
+    // Left side: content (top) + status bar (bottom 2 lines)
+    let v_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(content_min_height), Constraint::Length(2)])
+        .split(h_chunks[0]);
+
+    GameLayout {
+        content: v_chunks[0],
+        status_bar: v_chunks[1],
+        info_panel: h_chunks[1],
+    }
+}
 
 /// Render a standardized status bar (2 lines: status message + controls).
 ///
