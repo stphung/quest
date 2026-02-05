@@ -28,7 +28,7 @@ impl CharacterSelectScreen {
                 Constraint::Length(3),  // Title
                 Constraint::Min(0),     // Main content
                 Constraint::Length(16), // Haven tree (14 lines + 2 for border)
-                Constraint::Length(3),  // Controls
+                Constraint::Length(4),  // Controls (2 lines when Haven discovered)
             ]
         } else {
             vec![
@@ -83,12 +83,21 @@ impl CharacterSelectScreen {
         } else {
             "[N] New"
         };
-        let controls = Paragraph::new(format!(
+        let mut control_lines = vec![Line::from(format!(
             "[Enter] Play    [R] Rename    [D] Delete    {}    [Q] Quit",
             new_button
-        ))
-        .alignment(Alignment::Center)
-        .style(Style::default().fg(Color::Gray));
+        ))];
+        if haven.discovered {
+            control_lines.push(Line::from(Span::styled(
+                "[H] Haven",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )));
+        }
+        let controls = Paragraph::new(control_lines)
+            .alignment(Alignment::Center)
+            .style(Style::default().fg(Color::Gray));
         f.render_widget(controls, chunks[controls_idx]);
     }
 
@@ -290,11 +299,11 @@ impl CharacterSelectScreen {
         let vlt = self.tier_dots(haven.room_tier(HavenRoomId::Vault));
 
         vec![
-            Line::from(format!("                      ♨ {}", hs)),
-            Line::from("                    Hearthstone"),
-            Line::from("                    ╱         ╲"),
-            Line::from(format!("              ⚔ {}             {} 🛏", arm, bed)),
-            Line::from("              Armory           Bedroom"),
+            Line::from(format!("                       ♨ {}", hs)),
+            Line::from("                      Hearthstone"),
+            Line::from("                      ╱         ╲"),
+            Line::from(format!("               ⚔ {}            {} 🛏", arm, bed)),
+            Line::from("                Armory           Bedroom"),
             Line::from("             ╱     ╲           ╱     ╲"),
             Line::from(format!(
                 "        {}       {}     {}       {}",
