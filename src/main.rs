@@ -1138,6 +1138,7 @@ fn main() -> io::Result<()> {
                                                             );
                                                         state.active_minesweeper =
                                                             Some(MinesweeperGame::new(difficulty));
+                                                        state.challenge_menu.close();
                                                     }
                                                     ChallengeType::Rune => {
                                                         let difficulty = RuneDifficulty::from_index(
@@ -1145,6 +1146,7 @@ fn main() -> io::Result<()> {
                                                         );
                                                         state.active_rune =
                                                             Some(RuneGame::new(difficulty));
+                                                        state.challenge_menu.close();
                                                     }
                                                 }
                                             }
