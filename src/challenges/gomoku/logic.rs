@@ -5,6 +5,57 @@ use crate::core::game_state::GameState;
 use rand::seq::SliceRandom;
 use rand::Rng;
 
+/// Input actions for the Gomoku game (UI-agnostic).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GomokuInput {
+    Up,
+    Down,
+    Left,
+    Right,
+    PlaceStone,
+    Forfeit,
+    Other,
+}
+
+/// Process a key input during active Gomoku game.
+/// Returns true if the input was handled.
+/// Does nothing if AI is thinking.
+pub fn process_input(game: &mut GomokuGame, input: GomokuInput) -> bool {
+    // Don't process input while AI is thinking
+    if game.ai_thinking {
+        return false;
+    }
+
+    // Handle forfeit confirmation (double-Esc pattern)
+    if game.forfeit_pending {
+        match input {
+            GomokuInput::Forfeit => {
+                game.game_result = Some(GomokuResult::Loss);
+            }
+            _ => {
+                game.forfeit_pending = false;
+            }
+        }
+        return true;
+    }
+
+    // Normal game input
+    match input {
+        GomokuInput::Up => game.move_cursor(-1, 0),
+        GomokuInput::Down => game.move_cursor(1, 0),
+        GomokuInput::Left => game.move_cursor(0, -1),
+        GomokuInput::Right => game.move_cursor(0, 1),
+        GomokuInput::PlaceStone => {
+            process_human_move(game);
+        }
+        GomokuInput::Forfeit => {
+            game.forfeit_pending = true;
+        }
+        GomokuInput::Other => {}
+    }
+    true
+}
+
 /// Start a gomoku game with the selected difficulty
 pub fn start_gomoku_game(state: &mut GameState, difficulty: GomokuDifficulty) {
     state.active_gomoku = Some(GomokuGame::new(difficulty));
@@ -746,5 +797,93 @@ mod ai_tests {
             !candidates.contains(&(7, 7)),
             "Occupied position should not be candidate"
         );
+    }
+
+    // ============ process_input Tests ============
+
+    #[test]
+    fn test_process_input_cursor_movement() {
+        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+
+        // Start at center (7, 7)
+        assert_eq!(game.cursor, (7, 7));
+
+        process_input(&mut game, GomokuInput::Up);
+        assert_eq!(game.cursor, (6, 7));
+
+        process_input(&mut game, GomokuInput::Down);
+        assert_eq!(game.cursor, (7, 7));
+
+        process_input(&mut game, GomokuInput::Left);
+        assert_eq!(game.cursor, (7, 6));
+
+        process_input(&mut game, GomokuInput::Right);
+        assert_eq!(game.cursor, (7, 7));
+    }
+
+    #[test]
+    fn test_process_input_place_stone() {
+        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        game.cursor = (5, 5);
+
+        assert!(game.board[5][5].is_none());
+
+        process_input(&mut game, GomokuInput::PlaceStone);
+
+        assert_eq!(game.board[5][5], Some(Player::Human));
+    }
+
+    #[test]
+    fn test_process_input_forfeit_single_esc() {
+        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+
+        assert!(!game.forfeit_pending);
+
+        process_input(&mut game, GomokuInput::Forfeit);
+
+        assert!(game.forfeit_pending);
+        assert!(game.game_result.is_none());
+    }
+
+    #[test]
+    fn test_process_input_forfeit_double_esc() {
+        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+
+        // First Esc sets pending
+        process_input(&mut game, GomokuInput::Forfeit);
+        assert!(game.forfeit_pending);
+
+        // Second Esc confirms forfeit
+        process_input(&mut game, GomokuInput::Forfeit);
+
+        assert_eq!(game.game_result, Some(GomokuResult::Loss));
+    }
+
+    #[test]
+    fn test_process_input_forfeit_cancelled() {
+        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+
+        // First Esc sets pending
+        process_input(&mut game, GomokuInput::Forfeit);
+        assert!(game.forfeit_pending);
+
+        // Any other key cancels forfeit
+        process_input(&mut game, GomokuInput::Other);
+
+        assert!(!game.forfeit_pending);
+        assert!(game.game_result.is_none());
+    }
+
+    #[test]
+    fn test_process_input_blocked_during_ai_thinking() {
+        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        game.ai_thinking = true;
+        game.cursor = (7, 7);
+
+        // Input should be blocked
+        let handled = process_input(&mut game, GomokuInput::Up);
+
+        assert!(!handled);
+        assert_eq!(game.cursor, (7, 7)); // Cursor unchanged
     }
 }

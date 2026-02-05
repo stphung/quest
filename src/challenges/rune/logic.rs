@@ -5,6 +5,55 @@
 use super::{FeedbackMark, RuneGame, RuneGuess, RuneResult};
 use rand::Rng;
 
+/// Input actions for the Rune game (UI-agnostic).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RuneInput {
+    Left,
+    Right,
+    Up,
+    Down,
+    Submit,
+    ClearGuess,
+    Forfeit,
+    Other,
+}
+
+/// Process a key input during active Rune game.
+/// Returns true if the input was handled (game should continue processing).
+pub fn process_input<R: Rng>(game: &mut RuneGame, input: RuneInput, rng: &mut R) -> bool {
+    // Handle forfeit confirmation (double-Esc pattern)
+    if game.forfeit_pending {
+        match input {
+            RuneInput::Forfeit => {
+                game.game_result = Some(RuneResult::Loss);
+            }
+            _ => {
+                game.forfeit_pending = false;
+            }
+        }
+        return true;
+    }
+
+    // Normal game input
+    match input {
+        RuneInput::Left => game.move_cursor_left(),
+        RuneInput::Right => game.move_cursor_right(),
+        RuneInput::Up => game.cycle_rune_up(),
+        RuneInput::Down => game.cycle_rune_down(),
+        RuneInput::Submit => {
+            submit_guess(game, rng);
+        }
+        RuneInput::ClearGuess => {
+            game.clear_guess();
+        }
+        RuneInput::Forfeit => {
+            game.forfeit_pending = true;
+        }
+        RuneInput::Other => {}
+    }
+    true
+}
+
 /// Generate the secret code for a rune game.
 pub fn generate_code<R: Rng>(game: &mut RuneGame, rng: &mut R) {
     if game.allow_duplicates {
@@ -110,6 +159,47 @@ pub fn submit_guess<R: Rng>(game: &mut RuneGame, rng: &mut R) -> bool {
     }
 
     true
+}
+
+/// Apply game result: grant rewards on win (XP, prestige, fishing ranks).
+/// Returns (result, xp_gained).
+pub fn apply_game_result(state: &mut crate::core::game_state::GameState) -> Option<(RuneResult, u64)> {
+    use crate::challenges::menu::DifficultyInfo;
+
+    let game = state.active_rune.as_ref()?;
+    let result = game.game_result?;
+    let reward = game.difficulty.reward();
+
+    let xp_gained = match result {
+        RuneResult::Win => {
+            // XP reward
+            let xp = if reward.xp_percent > 0 {
+                let xp_for_level =
+                    crate::core::game_logic::xp_for_next_level(state.character_level.max(1));
+                let xp = (xp_for_level * reward.xp_percent as u64) / 100;
+                state.character_xp += xp;
+                xp
+            } else {
+                0
+            };
+
+            // Prestige reward
+            if reward.prestige_ranks > 0 {
+                state.prestige_rank += reward.prestige_ranks;
+            }
+
+            // Fishing rank reward
+            if reward.fishing_ranks > 0 {
+                state.fishing.rank = state.fishing.rank.saturating_add(reward.fishing_ranks);
+            }
+
+            xp
+        }
+        RuneResult::Loss => 0,
+    };
+
+    state.active_rune = None;
+    Some((result, xp_gained))
 }
 
 #[cfg(test)]
@@ -465,6 +555,102 @@ mod tests {
         assert_eq!(game.current_guess, vec![Some(0), Some(0), Some(1)]);
     }
 
+    // ============ apply_game_result Tests ============
+
+    #[test]
+    fn test_apply_win_result_with_xp() {
+        use crate::core::game_state::GameState;
+
+        let mut state = GameState::new("Test".to_string(), 0);
+        let initial_xp = state.character_xp;
+        let initial_fishing = state.fishing.rank;
+
+        // Journeyman gives XP and fishing ranks
+        let mut game = RuneGame::new(super::super::RuneDifficulty::Journeyman);
+        game.game_result = Some(RuneResult::Win);
+        state.active_rune = Some(game);
+
+        let result = apply_game_result(&mut state);
+        assert!(result.is_some());
+        let (rune_result, xp_gained) = result.unwrap();
+        assert_eq!(rune_result, RuneResult::Win);
+        assert!(xp_gained > 0); // Journeyman gives 75% XP
+        assert_eq!(state.character_xp, initial_xp + xp_gained);
+        assert!(state.fishing.rank > initial_fishing); // Journeyman gives fishing ranks
+        assert!(state.active_rune.is_none());
+    }
+
+    #[test]
+    fn test_apply_win_result_with_prestige() {
+        use crate::core::game_state::GameState;
+
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.prestige_rank = 5;
+        let initial_fishing = state.fishing.rank;
+
+        // Master gives prestige and fishing ranks (no XP)
+        let mut game = RuneGame::new(super::super::RuneDifficulty::Master);
+        game.game_result = Some(RuneResult::Win);
+        state.active_rune = Some(game);
+
+        let result = apply_game_result(&mut state);
+        assert!(result.is_some());
+        let (rune_result, xp_gained) = result.unwrap();
+        assert_eq!(rune_result, RuneResult::Win);
+        assert_eq!(xp_gained, 0); // Master gives no XP
+        assert!(state.prestige_rank > 5); // Master gives prestige
+        assert!(state.fishing.rank > initial_fishing); // Master gives fishing ranks
+        assert!(state.active_rune.is_none());
+    }
+
+    #[test]
+    fn test_apply_loss_result() {
+        use crate::core::game_state::GameState;
+
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.prestige_rank = 5;
+        let initial_xp = state.character_xp;
+
+        let mut game = RuneGame::new(super::super::RuneDifficulty::Novice);
+        game.game_result = Some(RuneResult::Loss);
+        state.active_rune = Some(game);
+
+        let result = apply_game_result(&mut state);
+        assert!(result.is_some());
+        let (rune_result, xp_gained) = result.unwrap();
+        assert_eq!(rune_result, RuneResult::Loss);
+        assert_eq!(xp_gained, 0); // No reward for loss
+        assert_eq!(state.character_xp, initial_xp); // XP unchanged
+        assert_eq!(state.prestige_rank, 5); // Prestige unchanged
+        assert!(state.active_rune.is_none());
+    }
+
+    #[test]
+    fn test_apply_result_no_game() {
+        use crate::core::game_state::GameState;
+
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_rune = None;
+
+        let result = apply_game_result(&mut state);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_apply_result_no_result() {
+        use crate::core::game_state::GameState;
+
+        let mut state = GameState::new("Test".to_string(), 0);
+        let game = RuneGame::new(super::super::RuneDifficulty::Novice);
+        // game.game_result is None
+        state.active_rune = Some(game);
+
+        let result = apply_game_result(&mut state);
+        assert!(result.is_none());
+        // Game should still be active
+        assert!(state.active_rune.is_some());
+    }
+
     #[test]
     fn test_loss_at_max_guesses_journeyman() {
         let mut game = RuneGame::new(super::super::RuneDifficulty::Journeyman);
@@ -518,5 +704,114 @@ mod tests {
         assert_eq!(game.game_result, Some(RuneResult::Win));
         assert_eq!(game.guesses.len(), 3);
         assert_eq!(game.guesses_remaining(), 7);
+    }
+
+    // ============ process_input Tests ============
+
+    #[test]
+    fn test_process_input_cursor_movement() {
+        let mut game = RuneGame::new(super::super::RuneDifficulty::Novice);
+        let mut rng = seeded_rng();
+
+        assert_eq!(game.cursor_slot, 0);
+
+        process_input(&mut game, RuneInput::Right, &mut rng);
+        assert_eq!(game.cursor_slot, 1);
+
+        process_input(&mut game, RuneInput::Left, &mut rng);
+        assert_eq!(game.cursor_slot, 0);
+    }
+
+    #[test]
+    fn test_process_input_rune_cycling() {
+        let mut game = RuneGame::new(super::super::RuneDifficulty::Novice);
+        let mut rng = seeded_rng();
+
+        // Initial state: no rune selected
+        assert_eq!(game.current_guess[0], None);
+
+        // Cycle up to select first rune
+        process_input(&mut game, RuneInput::Up, &mut rng);
+        assert_eq!(game.current_guess[0], Some(0));
+
+        // Cycle up again
+        process_input(&mut game, RuneInput::Up, &mut rng);
+        assert_eq!(game.current_guess[0], Some(1));
+
+        // Cycle down
+        process_input(&mut game, RuneInput::Down, &mut rng);
+        assert_eq!(game.current_guess[0], Some(0));
+    }
+
+    #[test]
+    fn test_process_input_clear_guess() {
+        let mut game = RuneGame::new(super::super::RuneDifficulty::Novice);
+        let mut rng = seeded_rng();
+
+        // Set up a partial guess
+        game.current_guess = vec![Some(0), Some(1), None];
+
+        process_input(&mut game, RuneInput::ClearGuess, &mut rng);
+
+        // All slots should be cleared
+        assert!(game.current_guess.iter().all(|s| s.is_none()));
+    }
+
+    #[test]
+    fn test_process_input_forfeit_single_esc() {
+        let mut game = RuneGame::new(super::super::RuneDifficulty::Novice);
+        let mut rng = seeded_rng();
+
+        assert!(!game.forfeit_pending);
+
+        process_input(&mut game, RuneInput::Forfeit, &mut rng);
+
+        assert!(game.forfeit_pending);
+        assert!(game.game_result.is_none()); // Not forfeited yet
+    }
+
+    #[test]
+    fn test_process_input_forfeit_double_esc() {
+        let mut game = RuneGame::new(super::super::RuneDifficulty::Novice);
+        let mut rng = seeded_rng();
+
+        // First Esc sets pending
+        process_input(&mut game, RuneInput::Forfeit, &mut rng);
+        assert!(game.forfeit_pending);
+
+        // Second Esc confirms forfeit
+        process_input(&mut game, RuneInput::Forfeit, &mut rng);
+
+        assert_eq!(game.game_result, Some(RuneResult::Loss));
+    }
+
+    #[test]
+    fn test_process_input_forfeit_cancelled() {
+        let mut game = RuneGame::new(super::super::RuneDifficulty::Novice);
+        let mut rng = seeded_rng();
+
+        // First Esc sets pending
+        process_input(&mut game, RuneInput::Forfeit, &mut rng);
+        assert!(game.forfeit_pending);
+
+        // Any other key cancels forfeit
+        process_input(&mut game, RuneInput::Other, &mut rng);
+
+        assert!(!game.forfeit_pending);
+        assert!(game.game_result.is_none());
+    }
+
+    #[test]
+    fn test_process_input_submit() {
+        let mut game = RuneGame::new(super::super::RuneDifficulty::Novice);
+        let mut rng = seeded_rng();
+        game.secret_code = vec![0, 1, 2];
+
+        // Set up complete guess
+        game.current_guess = vec![Some(0), Some(1), Some(2)];
+
+        process_input(&mut game, RuneInput::Submit, &mut rng);
+
+        assert_eq!(game.game_result, Some(RuneResult::Win));
     }
 }

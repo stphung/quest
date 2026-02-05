@@ -9,16 +9,22 @@ mod ui;
 mod utils;
 mod zones;
 
-use challenges::chess::logic::{apply_game_result, process_ai_thinking, start_chess_game};
+use challenges::chess::logic::{
+    apply_game_result, process_ai_thinking, process_input as process_chess_input,
+    start_chess_game, ChessInput,
+};
 use challenges::chess::{self, ChessDifficulty};
 use challenges::gomoku::logic::{
     apply_game_result as apply_gomoku_result, process_ai_thinking as process_gomoku_ai,
-    process_human_move as process_gomoku_move, start_gomoku_game,
+    process_input as process_gomoku_input, start_gomoku_game, GomokuInput,
 };
 use challenges::gomoku::{GomokuDifficulty, GomokuResult};
-use challenges::menu::{try_discover_challenge, ChallengeType, DifficultyInfo};
-use challenges::minesweeper::logic::{handle_first_click, reveal_cell, toggle_flag};
-use challenges::minesweeper::{MinesweeperDifficulty, MinesweeperGame, MinesweeperResult};
+use challenges::menu::{try_discover_challenge, ChallengeType};
+use challenges::minesweeper::logic::{
+    apply_game_result as apply_minesweeper_result,
+    process_input as process_minesweeper_input, MinesweeperInput,
+};
+use challenges::minesweeper::{MinesweeperDifficulty, MinesweeperGame};
 use challenges::morris::logic::{
     self as morris_logic, apply_game_result as apply_morris_result,
     process_ai_thinking as process_morris_ai, start_morris_game,
@@ -26,8 +32,10 @@ use challenges::morris::logic::{
 use challenges::morris::{
     CursorDirection as MorrisCursorDirection, MorrisDifficulty, MorrisResult,
 };
-use challenges::rune::logic::submit_guess;
-use challenges::rune::{RuneDifficulty, RuneGame, RuneResult};
+use challenges::rune::logic::{
+    apply_game_result as apply_rune_result, process_input as process_rune_input, RuneInput,
+};
+use challenges::rune::{RuneDifficulty, RuneGame};
 use character::manager::CharacterManager;
 use character::prestige::*;
 use character::save::SaveManager;
@@ -613,131 +621,49 @@ fn main() -> io::Result<()> {
 
                             // Handle active rune game input
                             if let Some(ref mut rune_game) = state.active_rune {
-                                if let Some(result) = rune_game.game_result {
+                                if rune_game.game_result.is_some() {
                                     // Any key dismisses result and applies rewards
-                                    if result == RuneResult::Win {
-                                        let reward = rune_game.difficulty.reward();
-                                        if reward.xp_percent > 0 {
-                                            let xp_for_level = core::game_logic::xp_for_next_level(
-                                                state.character_level.max(1),
-                                            );
-                                            let xp_gain =
-                                                (xp_for_level * reward.xp_percent as u64) / 100;
-                                            state.character_xp += xp_gain;
-                                        }
-                                        if reward.prestige_ranks > 0 {
-                                            state.prestige_rank += reward.prestige_ranks;
-                                        }
-                                        if reward.fishing_ranks > 0 {
-                                            state.fishing.rank = state
-                                                .fishing
-                                                .rank
-                                                .saturating_add(reward.fishing_ranks);
-                                        }
-                                    }
-                                    state.active_rune = None;
+                                    apply_rune_result(&mut state);
                                     continue;
                                 }
 
-                                // Handle forfeit confirmation (double-Esc)
-                                if rune_game.forfeit_pending {
-                                    match key_event.code {
-                                        KeyCode::Esc => {
-                                            rune_game.game_result = Some(RuneResult::Loss);
-                                        }
-                                        _ => {
-                                            rune_game.forfeit_pending = false;
-                                        }
-                                    }
-                                    continue;
-                                }
-
-                                // Normal game input
-                                match key_event.code {
-                                    KeyCode::Left => rune_game.move_cursor_left(),
-                                    KeyCode::Right => rune_game.move_cursor_right(),
-                                    KeyCode::Up => rune_game.cycle_rune_up(),
-                                    KeyCode::Down => rune_game.cycle_rune_down(),
-                                    KeyCode::Enter => {
-                                        let mut rng = rand::thread_rng();
-                                        submit_guess(rune_game, &mut rng);
-                                    }
-                                    KeyCode::Char('f') | KeyCode::Char('F') => {
-                                        rune_game.clear_guess();
-                                    }
-                                    KeyCode::Esc => {
-                                        rune_game.forfeit_pending = true;
-                                    }
-                                    _ => {}
-                                }
+                                let input = match key_event.code {
+                                    KeyCode::Left => RuneInput::Left,
+                                    KeyCode::Right => RuneInput::Right,
+                                    KeyCode::Up => RuneInput::Up,
+                                    KeyCode::Down => RuneInput::Down,
+                                    KeyCode::Enter => RuneInput::Submit,
+                                    KeyCode::Char('f') | KeyCode::Char('F') => RuneInput::ClearGuess,
+                                    KeyCode::Esc => RuneInput::Forfeit,
+                                    _ => RuneInput::Other,
+                                };
+                                let mut rng = rand::thread_rng();
+                                process_rune_input(rune_game, input, &mut rng);
                                 continue;
                             }
 
                             // Handle active minesweeper game input
                             if let Some(ref mut minesweeper_game) = state.active_minesweeper {
-                                if let Some(result) = minesweeper_game.game_result {
+                                if minesweeper_game.game_result.is_some() {
                                     // Any key dismisses result and applies rewards
-                                    if result == MinesweeperResult::Win {
-                                        let reward = minesweeper_game.difficulty.reward();
-                                        if reward.xp_percent > 0 {
-                                            let xp_for_level = core::game_logic::xp_for_next_level(
-                                                state.character_level.max(1),
-                                            );
-                                            let xp_gain =
-                                                (xp_for_level * reward.xp_percent as u64) / 100;
-                                            state.character_xp += xp_gain;
-                                        }
-                                        if reward.prestige_ranks > 0 {
-                                            state.prestige_rank += reward.prestige_ranks;
-                                        }
-                                    }
-                                    state.active_minesweeper = None;
+                                    apply_minesweeper_result(&mut state);
                                     continue;
                                 }
 
-                                // Handle forfeit confirmation (double-Esc)
-                                if minesweeper_game.forfeit_pending {
-                                    match key_event.code {
-                                        KeyCode::Esc => {
-                                            minesweeper_game.game_result =
-                                                Some(MinesweeperResult::Loss);
-                                        }
-                                        _ => {
-                                            minesweeper_game.forfeit_pending = false;
-                                        }
-                                    }
-                                    continue;
-                                }
-
-                                // Normal game input
-                                match key_event.code {
-                                    KeyCode::Up => minesweeper_game.move_cursor(-1, 0),
-                                    KeyCode::Down => minesweeper_game.move_cursor(1, 0),
-                                    KeyCode::Left => minesweeper_game.move_cursor(0, -1),
-                                    KeyCode::Right => minesweeper_game.move_cursor(0, 1),
-                                    KeyCode::Enter => {
-                                        let (row, col) = minesweeper_game.cursor;
-                                        if !minesweeper_game.first_click_done {
-                                            let mut rng = rand::thread_rng();
-                                            handle_first_click(
-                                                minesweeper_game,
-                                                row,
-                                                col,
-                                                &mut rng,
-                                            );
-                                        } else {
-                                            reveal_cell(minesweeper_game, row, col);
-                                        }
-                                    }
+                                let input = match key_event.code {
+                                    KeyCode::Up => MinesweeperInput::Up,
+                                    KeyCode::Down => MinesweeperInput::Down,
+                                    KeyCode::Left => MinesweeperInput::Left,
+                                    KeyCode::Right => MinesweeperInput::Right,
+                                    KeyCode::Enter => MinesweeperInput::Reveal,
                                     KeyCode::Char('f') | KeyCode::Char('F') => {
-                                        let (row, col) = minesweeper_game.cursor;
-                                        toggle_flag(minesweeper_game, row, col);
+                                        MinesweeperInput::ToggleFlag
                                     }
-                                    KeyCode::Esc => {
-                                        minesweeper_game.forfeit_pending = true;
-                                    }
-                                    _ => {}
-                                }
+                                    KeyCode::Esc => MinesweeperInput::Forfeit,
+                                    _ => MinesweeperInput::Other,
+                                };
+                                let mut rng = rand::thread_rng();
+                                process_minesweeper_input(minesweeper_game, input, &mut rng);
                                 continue;
                             }
 
@@ -798,35 +724,16 @@ fn main() -> io::Result<()> {
                                     continue;
                                 }
 
-                                // Handle forfeit confirmation (double-Esc to confirm, any other key cancels)
-                                if gomoku_game.forfeit_pending {
-                                    match key_event.code {
-                                        KeyCode::Esc => {
-                                            gomoku_game.game_result = Some(GomokuResult::Loss);
-                                        }
-                                        _ => {
-                                            gomoku_game.forfeit_pending = false;
-                                        }
-                                    }
-                                    continue;
-                                }
-
-                                // Normal game input
-                                if !gomoku_game.ai_thinking {
-                                    match key_event.code {
-                                        KeyCode::Up => gomoku_game.move_cursor(-1, 0),
-                                        KeyCode::Down => gomoku_game.move_cursor(1, 0),
-                                        KeyCode::Left => gomoku_game.move_cursor(0, -1),
-                                        KeyCode::Right => gomoku_game.move_cursor(0, 1),
-                                        KeyCode::Enter => {
-                                            process_gomoku_move(gomoku_game);
-                                        }
-                                        KeyCode::Esc => {
-                                            gomoku_game.forfeit_pending = true;
-                                        }
-                                        _ => {}
-                                    }
-                                }
+                                let input = match key_event.code {
+                                    KeyCode::Up => GomokuInput::Up,
+                                    KeyCode::Down => GomokuInput::Down,
+                                    KeyCode::Left => GomokuInput::Left,
+                                    KeyCode::Right => GomokuInput::Right,
+                                    KeyCode::Enter => GomokuInput::PlaceStone,
+                                    KeyCode::Esc => GomokuInput::Forfeit,
+                                    _ => GomokuInput::Other,
+                                };
+                                process_gomoku_input(gomoku_game, input);
                                 continue;
                             }
 
@@ -882,49 +789,16 @@ fn main() -> io::Result<()> {
                                     }
                                     continue;
                                 }
-                                if !chess_game.ai_thinking {
-                                    match key_event.code {
-                                        KeyCode::Up => chess_game.move_cursor(0, 1),
-                                        KeyCode::Down => chess_game.move_cursor(0, -1),
-                                        KeyCode::Left => chess_game.move_cursor(-1, 0),
-                                        KeyCode::Right => chess_game.move_cursor(1, 0),
-                                        KeyCode::Enter => {
-                                            // If a piece is selected, try to move to cursor
-                                            if chess_game.selected_square.is_some() {
-                                                // Check if cursor is on a legal destination
-                                                if chess_game
-                                                    .legal_move_destinations
-                                                    .contains(&chess_game.cursor)
-                                                {
-                                                    chess_game.try_move_to_cursor();
-                                                } else if chess_game.cursor_on_player_piece() {
-                                                    // Cursor on another player piece - select it instead
-                                                    chess_game.select_piece_at_cursor();
-                                                } else {
-                                                    // Invalid destination - clear selection
-                                                    chess_game.clear_selection();
-                                                }
-                                            } else {
-                                                // No piece selected - try to select piece at cursor
-                                                chess_game.select_piece_at_cursor();
-                                            }
-                                        }
-                                        KeyCode::Esc => {
-                                            if chess_game.forfeit_pending {
-                                                chess_game.game_result =
-                                                    Some(chess::ChessResult::Forfeit);
-                                            } else if chess_game.selected_square.is_some() {
-                                                chess_game.clear_selection();
-                                                chess_game.forfeit_pending = false;
-                                            } else {
-                                                chess_game.forfeit_pending = true;
-                                            }
-                                        }
-                                        _ => {
-                                            chess_game.forfeit_pending = false;
-                                        }
-                                    }
-                                }
+                                let input = match key_event.code {
+                                    KeyCode::Up => ChessInput::Up,
+                                    KeyCode::Down => ChessInput::Down,
+                                    KeyCode::Left => ChessInput::Left,
+                                    KeyCode::Right => ChessInput::Right,
+                                    KeyCode::Enter => ChessInput::Select,
+                                    KeyCode::Esc => ChessInput::Cancel,
+                                    _ => ChessInput::Other,
+                                };
+                                process_chess_input(chess_game, input);
                                 continue;
                             }
 

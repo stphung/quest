@@ -5,6 +5,77 @@ use crate::core::game_state::GameState;
 use chess_engine::Evaluate;
 use rand::Rng;
 
+/// Input actions for the Chess game (UI-agnostic).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChessInput {
+    Up,
+    Down,
+    Left,
+    Right,
+    Select, // Enter - select piece or move
+    Cancel, // Esc - clear selection or forfeit
+    Other,
+}
+
+/// Process a key input during active Chess game.
+/// Returns true if the input was handled.
+/// Does nothing if AI is thinking.
+pub fn process_input(game: &mut ChessGame, input: ChessInput) -> bool {
+    // Don't process input while AI is thinking
+    if game.ai_thinking {
+        return false;
+    }
+
+    match input {
+        ChessInput::Up => game.move_cursor(0, 1),
+        ChessInput::Down => game.move_cursor(0, -1),
+        ChessInput::Left => game.move_cursor(-1, 0),
+        ChessInput::Right => game.move_cursor(1, 0),
+        ChessInput::Select => {
+            process_select(game);
+        }
+        ChessInput::Cancel => {
+            process_cancel(game);
+        }
+        ChessInput::Other => {
+            // Any other key cancels forfeit pending
+            game.forfeit_pending = false;
+        }
+    }
+    true
+}
+
+/// Process Enter key: select piece or move to destination.
+fn process_select(game: &mut ChessGame) {
+    if game.selected_square.is_some() {
+        // A piece is selected - try to move or reselect
+        if game.legal_move_destinations.contains(&game.cursor) {
+            game.try_move_to_cursor();
+        } else if game.cursor_on_player_piece() {
+            // Cursor on another player piece - select it instead
+            game.select_piece_at_cursor();
+        } else {
+            // Invalid destination - clear selection
+            game.clear_selection();
+        }
+    } else {
+        // No piece selected - try to select piece at cursor
+        game.select_piece_at_cursor();
+    }
+}
+
+/// Process Esc key: clear selection or initiate/confirm forfeit.
+fn process_cancel(game: &mut ChessGame) {
+    if game.forfeit_pending {
+        game.game_result = Some(ChessResult::Forfeit);
+    } else if game.selected_square.is_some() {
+        game.clear_selection();
+        game.forfeit_pending = false;
+    } else {
+        game.forfeit_pending = true;
+    }
+}
+
 /// Start a chess game with the selected difficulty
 pub fn start_chess_game(state: &mut GameState, difficulty: ChessDifficulty) {
     state.active_chess = Some(ChessGame::new(difficulty));
@@ -425,5 +496,127 @@ mod tests {
         assert_eq!(prestige, 0);
         assert_eq!(state.chess_stats.games_drawn, 1);
         assert_eq!(state.prestige_rank, 5); // Unchanged
+    }
+
+    // ============ process_input Tests ============
+
+    #[test]
+    fn test_process_input_cursor_movement() {
+        let mut game = ChessGame::new(ChessDifficulty::Novice);
+
+        // Start at initial cursor position (e2 for white)
+        let initial = game.cursor;
+
+        process_input(&mut game, ChessInput::Up);
+        assert_eq!(game.cursor, (initial.0, initial.1 + 1));
+
+        process_input(&mut game, ChessInput::Down);
+        assert_eq!(game.cursor, initial);
+
+        process_input(&mut game, ChessInput::Right);
+        assert_eq!(game.cursor, (initial.0 + 1, initial.1));
+
+        process_input(&mut game, ChessInput::Left);
+        assert_eq!(game.cursor, initial);
+    }
+
+    #[test]
+    fn test_process_input_select_piece() {
+        let mut game = ChessGame::new(ChessDifficulty::Novice);
+
+        // Move to e2 (pawn position for white)
+        game.cursor = (4, 1);
+
+        // Select the pawn
+        process_input(&mut game, ChessInput::Select);
+
+        assert_eq!(game.selected_square, Some((4, 1)));
+        assert!(!game.legal_move_destinations.is_empty());
+    }
+
+    #[test]
+    fn test_process_input_clear_selection_with_cancel() {
+        let mut game = ChessGame::new(ChessDifficulty::Novice);
+
+        // Select a piece first
+        game.cursor = (4, 1);
+        process_input(&mut game, ChessInput::Select);
+        assert!(game.selected_square.is_some());
+
+        // Cancel should clear selection
+        process_input(&mut game, ChessInput::Cancel);
+
+        assert!(game.selected_square.is_none());
+        assert!(!game.forfeit_pending);
+    }
+
+    #[test]
+    fn test_process_input_forfeit_single_esc() {
+        let mut game = ChessGame::new(ChessDifficulty::Novice);
+
+        // No piece selected, first Esc sets pending
+        process_input(&mut game, ChessInput::Cancel);
+
+        assert!(game.forfeit_pending);
+        assert!(game.game_result.is_none());
+    }
+
+    #[test]
+    fn test_process_input_forfeit_double_esc() {
+        let mut game = ChessGame::new(ChessDifficulty::Novice);
+
+        // First Esc sets pending
+        process_input(&mut game, ChessInput::Cancel);
+        assert!(game.forfeit_pending);
+
+        // Second Esc confirms forfeit
+        process_input(&mut game, ChessInput::Cancel);
+
+        assert_eq!(game.game_result, Some(ChessResult::Forfeit));
+    }
+
+    #[test]
+    fn test_process_input_forfeit_cancelled_by_other_key() {
+        let mut game = ChessGame::new(ChessDifficulty::Novice);
+
+        // First Esc sets pending
+        process_input(&mut game, ChessInput::Cancel);
+        assert!(game.forfeit_pending);
+
+        // Any other key cancels forfeit
+        process_input(&mut game, ChessInput::Other);
+
+        assert!(!game.forfeit_pending);
+        assert!(game.game_result.is_none());
+    }
+
+    #[test]
+    fn test_process_input_blocked_during_ai_thinking() {
+        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        game.ai_thinking = true;
+        let initial_cursor = game.cursor;
+
+        // Input should be blocked
+        let handled = process_input(&mut game, ChessInput::Up);
+
+        assert!(!handled);
+        assert_eq!(game.cursor, initial_cursor);
+    }
+
+    #[test]
+    fn test_process_input_reselect_different_piece() {
+        let mut game = ChessGame::new(ChessDifficulty::Novice);
+
+        // Select e2 pawn
+        game.cursor = (4, 1);
+        process_input(&mut game, ChessInput::Select);
+        assert_eq!(game.selected_square, Some((4, 1)));
+
+        // Move cursor to d2 pawn and select
+        game.cursor = (3, 1);
+        process_input(&mut game, ChessInput::Select);
+
+        // Should now have d2 selected
+        assert_eq!(game.selected_square, Some((3, 1)));
     }
 }
