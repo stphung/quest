@@ -215,6 +215,8 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &RuneGame) {
 
     let status = if game.game_result.is_some() {
         Span::styled("", Style::default())
+    } else if let Some(ref msg) = game.reject_message {
+        Span::styled(msg.clone(), Style::default().fg(Color::LightRed))
     } else if game.forfeit_pending {
         Span::styled("Forfeit game?", Style::default().fg(Color::LightRed))
     } else if game.guesses.is_empty() {

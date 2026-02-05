@@ -114,6 +114,7 @@ pub struct RuneGame {
     pub allow_duplicates: bool,
     pub game_result: Option<RuneResult>,
     pub forfeit_pending: bool,
+    pub reject_message: Option<String>,
 }
 
 impl RuneGame {
@@ -131,6 +132,7 @@ impl RuneGame {
             allow_duplicates: difficulty.allow_duplicates(),
             game_result: None,
             forfeit_pending: false,
+            reject_message: None,
         }
     }
 
@@ -147,6 +149,7 @@ impl RuneGame {
     }
 
     pub fn cycle_rune_up(&mut self) {
+        self.reject_message = None;
         let slot = self.cursor_slot;
         self.current_guess[slot] = Some(match self.current_guess[slot] {
             None => 0,
@@ -155,6 +158,7 @@ impl RuneGame {
     }
 
     pub fn cycle_rune_down(&mut self) {
+        self.reject_message = None;
         let slot = self.cursor_slot;
         self.current_guess[slot] = Some(match self.current_guess[slot] {
             None => self.num_runes - 1,

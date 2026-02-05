@@ -82,10 +82,13 @@ pub fn submit_guess<R: Rng>(game: &mut RuneGame, rng: &mut R) -> bool {
         let mut seen = std::collections::HashSet::new();
         for &r in &guess_runes {
             if !seen.insert(r) {
-                return false; // Duplicate in no-dupe mode
+                game.reject_message = Some("No duplicate runes!".to_string());
+                return false;
             }
         }
     }
+
+    game.reject_message = None;
 
     let feedback = calculate_feedback(&guess_runes, &game.secret_code);
 
