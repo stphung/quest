@@ -160,7 +160,7 @@ fn handle_haven(
                 if let Some((_tier, p_spent)) =
                     haven::try_build_room(room, haven, &mut state.prestige_rank)
                 {
-                    haven::save_haven(haven).ok();
+                    // Haven saved via NeedsSaveAll (skipped in debug mode)
                     state.combat_state.add_log_entry(
                         format!(
                             "🏠 Built {} (spent {} Prestige Ranks)",
@@ -316,9 +316,8 @@ fn handle_debug_menu(
             state
                 .combat_state
                 .add_log_entry(format!("[DEBUG] {}", msg), false, true);
-            // Show Haven discovery modal if just discovered
+            // Show Haven discovery modal if just discovered (no save in debug mode)
             if msg == "Haven discovered!" {
-                haven::save_haven(haven).ok();
                 *overlay = GameOverlay::HavenDiscovery;
             }
         }

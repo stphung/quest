@@ -659,7 +659,9 @@ fn main() -> io::Result<()> {
                             let mut rng = rand::thread_rng();
                             if haven::try_discover_haven(&mut haven, state.prestige_rank, &mut rng)
                             {
-                                haven::save_haven(&haven).ok();
+                                if !debug_mode {
+                                    haven::save_haven(&haven).ok();
+                                }
                                 overlay = GameOverlay::HavenDiscovery;
                             }
                         }
