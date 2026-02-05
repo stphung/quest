@@ -191,6 +191,28 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &RuneGame) {
 
     lines.push(Line::from(""));
 
+    // Feedback legend
+    lines.push(Line::from(Span::styled(
+        "Feedback:",
+        Style::default()
+            .fg(Color::White)
+            .add_modifier(Modifier::BOLD),
+    )));
+    lines.push(Line::from(vec![
+        Span::styled(" \u{25CF} ", Style::default().fg(Color::Green)),
+        Span::styled("Correct position", Style::default().fg(Color::DarkGray)),
+    ]));
+    lines.push(Line::from(vec![
+        Span::styled(" \u{25CB} ", Style::default().fg(Color::Yellow)),
+        Span::styled("Wrong position", Style::default().fg(Color::DarkGray)),
+    ]));
+    lines.push(Line::from(vec![
+        Span::styled(" \u{00B7} ", Style::default().fg(Color::DarkGray)),
+        Span::styled("Not in code", Style::default().fg(Color::DarkGray)),
+    ]));
+
+    lines.push(Line::from(""));
+
     let status = if game.game_result.is_some() {
         Span::styled("", Style::default())
     } else if game.forfeit_pending {
