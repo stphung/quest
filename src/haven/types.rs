@@ -647,4 +647,367 @@ mod tests {
         let bonuses = haven.compute_bonuses();
         assert_eq!(bonuses.damage_percent, 10.0);
     }
+
+    // =========================================================================
+    // Comprehensive Bonus Value Tests (all 13 rooms × 3 tiers)
+    // =========================================================================
+
+    #[test]
+    fn test_all_room_bonus_values_tier_1() {
+        // Verify T1 bonus values match design doc
+        assert_eq!(HavenRoomId::Hearthstone.bonus_value(1), 25.0); // Offline XP
+        assert_eq!(HavenRoomId::Armory.bonus_value(1), 5.0); // Damage
+        assert_eq!(HavenRoomId::Bedroom.bonus_value(1), 15.0); // Regen Delay Reduction
+        assert_eq!(HavenRoomId::TrainingYard.bonus_value(1), 5.0); // XP Gain
+        assert_eq!(HavenRoomId::Garden.bonus_value(1), 10.0); // Fishing Timer
+        assert_eq!(HavenRoomId::TrophyHall.bonus_value(1), 5.0); // Drop Rate
+        assert_eq!(HavenRoomId::Library.bonus_value(1), 20.0); // Challenge Discovery
+        assert_eq!(HavenRoomId::Watchtower.bonus_value(1), 5.0); // Crit Chance
+        assert_eq!(HavenRoomId::FishingDock.bonus_value(1), 25.0); // Double Fish
+        assert_eq!(HavenRoomId::AlchemyLab.bonus_value(1), 25.0); // HP Regen
+        assert_eq!(HavenRoomId::Workshop.bonus_value(1), 10.0); // Item Rarity
+        assert_eq!(HavenRoomId::WarRoom.bonus_value(1), 10.0); // Double Strike
+        assert_eq!(HavenRoomId::Vault.bonus_value(1), 1.0); // Vault Slots
+    }
+
+    #[test]
+    fn test_all_room_bonus_values_tier_2() {
+        // Verify T2 bonus values match design doc
+        assert_eq!(HavenRoomId::Hearthstone.bonus_value(2), 50.0);
+        assert_eq!(HavenRoomId::Armory.bonus_value(2), 10.0);
+        assert_eq!(HavenRoomId::Bedroom.bonus_value(2), 30.0);
+        assert_eq!(HavenRoomId::TrainingYard.bonus_value(2), 10.0);
+        assert_eq!(HavenRoomId::Garden.bonus_value(2), 20.0);
+        assert_eq!(HavenRoomId::TrophyHall.bonus_value(2), 10.0);
+        assert_eq!(HavenRoomId::Library.bonus_value(2), 30.0);
+        assert_eq!(HavenRoomId::Watchtower.bonus_value(2), 10.0);
+        assert_eq!(HavenRoomId::FishingDock.bonus_value(2), 50.0);
+        assert_eq!(HavenRoomId::AlchemyLab.bonus_value(2), 50.0);
+        assert_eq!(HavenRoomId::Workshop.bonus_value(2), 15.0);
+        assert_eq!(HavenRoomId::WarRoom.bonus_value(2), 20.0);
+        assert_eq!(HavenRoomId::Vault.bonus_value(2), 3.0);
+    }
+
+    #[test]
+    fn test_all_room_bonus_values_tier_3() {
+        // Verify T3 bonus values match design doc
+        assert_eq!(HavenRoomId::Hearthstone.bonus_value(3), 100.0);
+        assert_eq!(HavenRoomId::Armory.bonus_value(3), 25.0);
+        assert_eq!(HavenRoomId::Bedroom.bonus_value(3), 50.0);
+        assert_eq!(HavenRoomId::TrainingYard.bonus_value(3), 30.0);
+        assert_eq!(HavenRoomId::Garden.bonus_value(3), 40.0);
+        assert_eq!(HavenRoomId::TrophyHall.bonus_value(3), 15.0);
+        assert_eq!(HavenRoomId::Library.bonus_value(3), 50.0);
+        assert_eq!(HavenRoomId::Watchtower.bonus_value(3), 20.0);
+        assert_eq!(HavenRoomId::FishingDock.bonus_value(3), 100.0);
+        assert_eq!(HavenRoomId::AlchemyLab.bonus_value(3), 100.0);
+        assert_eq!(HavenRoomId::Workshop.bonus_value(3), 25.0);
+        assert_eq!(HavenRoomId::WarRoom.bonus_value(3), 35.0);
+        assert_eq!(HavenRoomId::Vault.bonus_value(3), 5.0);
+    }
+
+    #[test]
+    fn test_bonus_value_returns_zero_for_unbuilt_and_invalid() {
+        for room in HavenRoomId::ALL {
+            assert_eq!(room.bonus_value(0), 0.0, "{:?} tier 0 should be 0", room);
+            assert_eq!(room.bonus_value(4), 0.0, "{:?} tier 4 should be 0", room);
+            assert_eq!(room.bonus_value(255), 0.0, "{:?} tier 255 should be 0", room);
+        }
+    }
+
+    // =========================================================================
+    // Full Tree Unlock Path Tests
+    // =========================================================================
+
+    #[test]
+    fn test_full_fishing_branch_buildable() {
+        let mut haven = Haven::new();
+        // Build full fishing/utility branch to Vault capstone
+        assert!(haven.build_room(HavenRoomId::Hearthstone).is_some());
+        assert!(haven.build_room(HavenRoomId::Bedroom).is_some());
+        assert!(haven.build_room(HavenRoomId::Garden).is_some());
+        assert!(haven.build_room(HavenRoomId::Library).is_some());
+        assert!(haven.build_room(HavenRoomId::FishingDock).is_some());
+        assert!(haven.build_room(HavenRoomId::Workshop).is_some());
+        assert!(haven.build_room(HavenRoomId::Vault).is_some());
+        assert_eq!(haven.rooms_built(), 7);
+    }
+
+    #[test]
+    fn test_complete_haven_all_rooms_buildable() {
+        let mut haven = Haven::new();
+
+        // Build entire tree in dependency order
+        // Root
+        assert!(haven.build_room(HavenRoomId::Hearthstone).is_some());
+
+        // Depth 1
+        assert!(haven.build_room(HavenRoomId::Armory).is_some());
+        assert!(haven.build_room(HavenRoomId::Bedroom).is_some());
+
+        // Depth 2
+        assert!(haven.build_room(HavenRoomId::TrainingYard).is_some());
+        assert!(haven.build_room(HavenRoomId::Garden).is_some());
+
+        // Depth 3
+        assert!(haven.build_room(HavenRoomId::TrophyHall).is_some());
+        assert!(haven.build_room(HavenRoomId::Library).is_some());
+        assert!(haven.build_room(HavenRoomId::Watchtower).is_some());
+        assert!(haven.build_room(HavenRoomId::FishingDock).is_some());
+        assert!(haven.build_room(HavenRoomId::AlchemyLab).is_some());
+        assert!(haven.build_room(HavenRoomId::Workshop).is_some());
+
+        // Depth 4 (Capstones)
+        assert!(haven.build_room(HavenRoomId::WarRoom).is_some());
+        assert!(haven.build_room(HavenRoomId::Vault).is_some());
+
+        assert_eq!(haven.rooms_built(), 13);
+        assert_eq!(haven.total_rooms(), 13);
+    }
+
+    #[test]
+    fn test_max_all_rooms_to_tier_3() {
+        let mut haven = Haven::new();
+
+        // Build all rooms to T3
+        for _ in 0..3 {
+            haven.build_room(HavenRoomId::Hearthstone);
+        }
+        for _ in 0..3 {
+            haven.build_room(HavenRoomId::Armory);
+            haven.build_room(HavenRoomId::Bedroom);
+        }
+        for _ in 0..3 {
+            haven.build_room(HavenRoomId::TrainingYard);
+            haven.build_room(HavenRoomId::Garden);
+        }
+        for _ in 0..3 {
+            haven.build_room(HavenRoomId::TrophyHall);
+            haven.build_room(HavenRoomId::Library);
+            haven.build_room(HavenRoomId::Watchtower);
+            haven.build_room(HavenRoomId::FishingDock);
+            haven.build_room(HavenRoomId::AlchemyLab);
+            haven.build_room(HavenRoomId::Workshop);
+        }
+        for _ in 0..3 {
+            haven.build_room(HavenRoomId::WarRoom);
+            haven.build_room(HavenRoomId::Vault);
+        }
+
+        // Verify all rooms at T3
+        for room in HavenRoomId::ALL {
+            assert_eq!(haven.room_tier(room), 3, "{:?} should be T3", room);
+        }
+    }
+
+    // =========================================================================
+    // Prestige Token Economy Tests
+    // =========================================================================
+
+    #[test]
+    fn test_total_tokens_to_max_single_room() {
+        // T1 + T2 + T3 costs for Hearthstone (depth 0): 1 + 2 + 3 = 6
+        let total = tier_cost(HavenRoomId::Hearthstone, 1)
+            + tier_cost(HavenRoomId::Hearthstone, 2)
+            + tier_cost(HavenRoomId::Hearthstone, 3);
+        assert_eq!(total, 6);
+
+        // T1 + T2 + T3 costs for Armory (depth 1): 1 + 3 + 5 = 9
+        let total = tier_cost(HavenRoomId::Armory, 1)
+            + tier_cost(HavenRoomId::Armory, 2)
+            + tier_cost(HavenRoomId::Armory, 3);
+        assert_eq!(total, 9);
+
+        // T1 + T2 + T3 costs for capstone (depth 4): 3 + 5 + 7 = 15
+        let total = tier_cost(HavenRoomId::WarRoom, 1)
+            + tier_cost(HavenRoomId::WarRoom, 2)
+            + tier_cost(HavenRoomId::WarRoom, 3);
+        assert_eq!(total, 15);
+    }
+
+    #[test]
+    fn test_total_tokens_to_max_entire_haven() {
+        // Calculate total tokens needed to max all 13 rooms
+        let mut total = 0u32;
+        for room in HavenRoomId::ALL {
+            for tier in 1..=3 {
+                total += tier_cost(room, tier);
+            }
+        }
+        // This is a lot of tokens - verifies the economy is intentionally grindy
+        assert!(total > 100, "Total tokens to max Haven: {}", total);
+    }
+
+    #[test]
+    fn test_partial_token_spending_preserves_progress() {
+        let mut haven = Haven::new();
+
+        // Build Hearthstone T1 (cost 1)
+        haven.build_room(HavenRoomId::Hearthstone);
+        assert_eq!(haven.room_tier(HavenRoomId::Hearthstone), 1);
+
+        // Build Armory T1 (cost 1)
+        haven.build_room(HavenRoomId::Armory);
+        assert_eq!(haven.room_tier(HavenRoomId::Armory), 1);
+
+        // Upgrade Hearthstone T2 (cost 2)
+        haven.build_room(HavenRoomId::Hearthstone);
+        assert_eq!(haven.room_tier(HavenRoomId::Hearthstone), 2);
+
+        // Previous buildings still intact
+        assert_eq!(haven.room_tier(HavenRoomId::Armory), 1);
+    }
+
+    // =========================================================================
+    // Edge Cases and Error Handling
+    // =========================================================================
+
+    #[test]
+    fn test_cannot_build_child_before_parent() {
+        let haven = Haven::new();
+        // TrainingYard requires Armory, which requires Hearthstone
+        assert!(!haven.is_room_unlocked(HavenRoomId::TrainingYard));
+        assert!(!haven.can_build(HavenRoomId::TrainingYard));
+    }
+
+    #[test]
+    fn test_capstone_not_unlocked_with_only_one_parent() {
+        let mut haven = Haven::new();
+
+        // Build path to Watchtower only
+        haven.build_room(HavenRoomId::Hearthstone);
+        haven.build_room(HavenRoomId::Armory);
+        haven.build_room(HavenRoomId::TrainingYard);
+        haven.build_room(HavenRoomId::TrophyHall);
+        haven.build_room(HavenRoomId::Watchtower);
+
+        // WarRoom needs both Watchtower AND AlchemyLab
+        assert!(!haven.is_room_unlocked(HavenRoomId::WarRoom));
+        assert!(!haven.can_build(HavenRoomId::WarRoom));
+    }
+
+    #[test]
+    fn test_building_returns_new_tier() {
+        let mut haven = Haven::new();
+        assert_eq!(haven.build_room(HavenRoomId::Hearthstone), Some(1));
+        assert_eq!(haven.build_room(HavenRoomId::Hearthstone), Some(2));
+        assert_eq!(haven.build_room(HavenRoomId::Hearthstone), Some(3));
+        assert_eq!(haven.build_room(HavenRoomId::Hearthstone), None); // Already maxed
+    }
+
+    #[test]
+    fn test_tree_structure_integrity() {
+        // Verify every non-root room has at least one parent
+        for room in HavenRoomId::ALL {
+            if room != HavenRoomId::Hearthstone {
+                assert!(
+                    !room.parents().is_empty(),
+                    "{:?} should have parents",
+                    room
+                );
+            }
+        }
+
+        // Verify capstones have exactly 2 parents
+        assert_eq!(HavenRoomId::WarRoom.parents().len(), 2);
+        assert_eq!(HavenRoomId::Vault.parents().len(), 2);
+
+        // Verify capstones have no children
+        assert!(HavenRoomId::WarRoom.children().is_empty());
+        assert!(HavenRoomId::Vault.children().is_empty());
+    }
+
+    #[test]
+    fn test_all_bonus_types_mapped_to_rooms() {
+        // Ensure every bonus type is provided by exactly one room
+        let bonus_types = [
+            HavenBonusType::DamagePercent,
+            HavenBonusType::XpGainPercent,
+            HavenBonusType::DropRatePercent,
+            HavenBonusType::CritChancePercent,
+            HavenBonusType::HpRegenPercent,
+            HavenBonusType::DoubleStrikeChance,
+            HavenBonusType::OfflineXpPercent,
+            HavenBonusType::ChallengeDiscoveryPercent,
+            HavenBonusType::FishingTimerReduction,
+            HavenBonusType::DoubleFishChance,
+            HavenBonusType::ItemRarityPercent,
+            HavenBonusType::HpRegenDelayReduction,
+            HavenBonusType::VaultSlots,
+        ];
+
+        for bonus_type in bonus_types {
+            let providing_rooms: Vec<_> = HavenRoomId::ALL
+                .iter()
+                .filter(|r| r.bonus().bonus_type == bonus_type)
+                .collect();
+            assert_eq!(
+                providing_rooms.len(),
+                1,
+                "{:?} should be provided by exactly one room, found {:?}",
+                bonus_type,
+                providing_rooms
+            );
+        }
+    }
+
+    #[test]
+    fn test_compute_bonuses_all_fields() {
+        let mut haven = Haven::new();
+
+        // Build one room of each bonus type to T1
+        haven.build_room(HavenRoomId::Hearthstone); // Offline XP
+        haven.build_room(HavenRoomId::Armory); // Damage
+        haven.build_room(HavenRoomId::Bedroom); // Regen Delay
+        haven.build_room(HavenRoomId::TrainingYard); // XP Gain
+        haven.build_room(HavenRoomId::Garden); // Fishing Timer
+        haven.build_room(HavenRoomId::TrophyHall); // Drop Rate
+        haven.build_room(HavenRoomId::Library); // Challenge Discovery
+        haven.build_room(HavenRoomId::Watchtower); // Crit
+        haven.build_room(HavenRoomId::FishingDock); // Double Fish
+        haven.build_room(HavenRoomId::AlchemyLab); // HP Regen
+        haven.build_room(HavenRoomId::Workshop); // Item Rarity
+        haven.build_room(HavenRoomId::WarRoom); // Double Strike
+        haven.build_room(HavenRoomId::Vault); // Vault Slots
+
+        let bonuses = haven.compute_bonuses();
+
+        assert_eq!(bonuses.offline_xp_percent, 25.0);
+        assert_eq!(bonuses.damage_percent, 5.0);
+        assert_eq!(bonuses.hp_regen_delay_reduction, 15.0);
+        assert_eq!(bonuses.xp_gain_percent, 5.0);
+        assert_eq!(bonuses.fishing_timer_reduction, 10.0);
+        assert_eq!(bonuses.drop_rate_percent, 5.0);
+        assert_eq!(bonuses.challenge_discovery_percent, 20.0);
+        assert_eq!(bonuses.crit_chance_percent, 5.0);
+        assert_eq!(bonuses.double_fish_chance, 25.0);
+        assert_eq!(bonuses.hp_regen_percent, 25.0);
+        assert_eq!(bonuses.item_rarity_percent, 10.0);
+        assert_eq!(bonuses.double_strike_chance, 10.0);
+        assert_eq!(bonuses.vault_slots, 1);
+    }
+
+    #[test]
+    fn test_vault_tier_convenience_method() {
+        let mut haven = Haven::new();
+        assert_eq!(haven.vault_tier(), 0);
+
+        // Build path to Vault
+        haven.build_room(HavenRoomId::Hearthstone);
+        haven.build_room(HavenRoomId::Bedroom);
+        haven.build_room(HavenRoomId::Garden);
+        haven.build_room(HavenRoomId::Library);
+        haven.build_room(HavenRoomId::FishingDock);
+        haven.build_room(HavenRoomId::Workshop);
+
+        // Build Vault tiers
+        haven.build_room(HavenRoomId::Vault);
+        assert_eq!(haven.vault_tier(), 1);
+
+        haven.build_room(HavenRoomId::Vault);
+        assert_eq!(haven.vault_tier(), 2);
+
+        haven.build_room(HavenRoomId::Vault);
+        assert_eq!(haven.vault_tier(), 3);
+    }
 }

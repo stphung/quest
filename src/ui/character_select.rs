@@ -27,7 +27,7 @@ impl CharacterSelectScreen {
             vec![
                 Constraint::Length(3),  // Title
                 Constraint::Min(0),     // Main content
-                Constraint::Length(14), // Haven tree
+                Constraint::Length(16), // Haven tree (14 lines + 2 for border)
                 Constraint::Length(3),  // Controls
             ]
         } else {

@@ -16,6 +16,12 @@ use rand::Rng;
 /// Discovery chance for finding a fishing spot (5%)
 const FISHING_DISCOVERY_CHANCE: f64 = 0.05;
 
+/// Apply timer reduction from Garden bonus
+fn apply_timer_reduction(base_ticks: u32, reduction_percent: f64) -> u32 {
+    let reduced = base_ticks as f64 * (1.0 - reduction_percent / 100.0);
+    (reduced as u32).max(1) // Minimum 1 tick
+}
+
 /// Item drop chances by fish rarity (percentage)
 const DROP_CHANCE_COMMON: f64 = 0.05; // 5%
 const DROP_CHANCE_UNCOMMON: f64 = 0.05; // 5% (same as common)
@@ -23,13 +29,24 @@ const DROP_CHANCE_RARE: f64 = 0.15; // 15%
 const DROP_CHANCE_EPIC: f64 = 0.35; // 35%
 const DROP_CHANCE_LEGENDARY: f64 = 0.75; // 75%
 
+/// Haven bonuses that affect fishing
+#[derive(Debug, Clone, Default)]
+pub struct HavenFishingBonuses {
+    /// Garden: -% fishing timers (reduces cast/wait/reel time)
+    pub timer_reduction_percent: f64,
+    /// Fishing Dock: +% chance to catch double fish
+    pub double_fish_chance_percent: f64,
+}
+
 /// Processes a fishing session tick with phase-based timing.
 ///
 /// # Fishing Phases (average ~5s per fish)
 /// 1. **Casting** (1s) - Line is being cast
 /// 2. **Waiting** (2-4s) - Waiting for a bite
 /// 3. **Reeling** (1-2s) - Fish is biting, reeling in
-pub fn tick_fishing(state: &mut GameState, rng: &mut impl Rng) -> Vec<String> {
+///
+/// `haven` contains Haven bonuses for fishing
+pub fn tick_fishing_with_haven(state: &mut GameState, rng: &mut impl Rng, haven: &HavenFishingBonuses) -> Vec<String> {
     let mut messages = Vec::new();
 
     // Take ownership of active_fishing to work with it
@@ -51,57 +68,68 @@ pub fn tick_fishing(state: &mut GameState, rng: &mut impl Rng) -> Vec<String> {
             FishingPhase::Casting => {
                 // Casting complete, start waiting for bite
                 session.phase = FishingPhase::Waiting;
-                session.ticks_remaining = fishing_generation::roll_waiting_ticks(rng);
+                let base_ticks = fishing_generation::roll_waiting_ticks(rng);
+                // Apply Garden bonus: reduce timers
+                session.ticks_remaining = apply_timer_reduction(base_ticks, haven.timer_reduction_percent);
                 messages.push("Line cast... waiting for a bite...".to_string());
             }
             FishingPhase::Waiting => {
                 // Got a bite! Start reeling
                 session.phase = FishingPhase::Reeling;
-                session.ticks_remaining = fishing_generation::roll_reeling_ticks(rng);
+                let base_ticks = fishing_generation::roll_reeling_ticks(rng);
+                // Apply Garden bonus: reduce timers
+                session.ticks_remaining = apply_timer_reduction(base_ticks, haven.timer_reduction_percent);
                 messages.push("🐟 Got a bite! Reeling in...".to_string());
             }
             FishingPhase::Reeling => {
                 // Catch the fish!
-                let rarity = fishing_generation::roll_fish_rarity(state.fishing.rank, rng);
-                let fish = fishing_generation::generate_fish(rarity, rng);
+                // Check for double fish (Fishing Dock bonus)
+                let double_fish_roll = rng.gen::<f64>() * 100.0;
+                let fish_count = if double_fish_roll < haven.double_fish_chance_percent { 2 } else { 1 };
 
-                // Calculate XP with prestige multiplier
-                let prestige_multiplier = get_prestige_tier(state.prestige_rank).multiplier;
-                let xp_gained = (fish.xp_reward as f64 * prestige_multiplier) as u64;
+                for fish_num in 0..fish_count {
+                    let rarity = fishing_generation::roll_fish_rarity(state.fishing.rank, rng);
+                    let fish = fishing_generation::generate_fish(rarity, rng);
 
-                // Award character XP
-                state.character_xp += xp_gained;
+                    // Calculate XP with prestige multiplier
+                    let prestige_multiplier = get_prestige_tier(state.prestige_rank).multiplier;
+                    let xp_gained = (fish.xp_reward as f64 * prestige_multiplier) as u64;
 
-                // Award fishing rank progress
-                state.fishing.fish_toward_next_rank += 1;
-                state.fishing.total_fish_caught += 1;
+                    // Award character XP
+                    state.character_xp += xp_gained;
 
-                // Track legendary catches
-                if rarity == FishRarity::Legendary {
-                    state.fishing.legendary_catches += 1;
+                    // Award fishing rank progress
+                    state.fishing.fish_toward_next_rank += 1;
+                    state.fishing.total_fish_caught += 1;
+
+                    // Track legendary catches
+                    if rarity == FishRarity::Legendary {
+                        state.fishing.legendary_catches += 1;
+                    }
+
+                    // Generate catch message
+                    let rarity_name = match rarity {
+                        FishRarity::Common => "Common",
+                        FishRarity::Uncommon => "Uncommon",
+                        FishRarity::Rare => "Rare",
+                        FishRarity::Epic => "Epic",
+                        FishRarity::Legendary => "Legendary",
+                    };
+                    let double_msg = if fish_count == 2 && fish_num == 1 { " (DOUBLE!)" } else { "" };
+                    messages.push(format!(
+                        "🎣 Caught {} [{}]! +{} XP{}",
+                        fish.name, rarity_name, xp_gained, double_msg
+                    ));
+
+                    // Check for item drop
+                    if let Some(item) = try_fishing_item_drop(rarity, state.character_level, rng) {
+                        messages.push(format!("📦 Found item: {}!", item.display_name));
+                        session.items_found.push(item);
+                    }
+
+                    // Add fish to session
+                    session.fish_caught.push(fish);
                 }
-
-                // Generate catch message
-                let rarity_name = match rarity {
-                    FishRarity::Common => "Common",
-                    FishRarity::Uncommon => "Uncommon",
-                    FishRarity::Rare => "Rare",
-                    FishRarity::Epic => "Epic",
-                    FishRarity::Legendary => "Legendary",
-                };
-                messages.push(format!(
-                    "🎣 Caught {} [{}]! +{} XP",
-                    fish.name, rarity_name, xp_gained
-                ));
-
-                // Check for item drop
-                if let Some(item) = try_fishing_item_drop(rarity, state.character_level, rng) {
-                    messages.push(format!("📦 Found item: {}!", item.display_name));
-                    session.items_found.push(item);
-                }
-
-                // Add fish to session
-                session.fish_caught.push(fish);
 
                 // Check if session is complete
                 if session.fish_caught.len() >= session.total_fish as usize {
@@ -116,7 +144,8 @@ pub fn tick_fishing(state: &mut GameState, rng: &mut impl Rng) -> Vec<String> {
 
                 // Start casting again for next fish
                 session.phase = FishingPhase::Casting;
-                session.ticks_remaining = fishing_generation::roll_casting_ticks(rng);
+                let base_ticks = fishing_generation::roll_casting_ticks(rng);
+                session.ticks_remaining = apply_timer_reduction(base_ticks, haven.timer_reduction_percent);
             }
         }
     }
@@ -125,6 +154,11 @@ pub fn tick_fishing(state: &mut GameState, rng: &mut impl Rng) -> Vec<String> {
     state.active_fishing = Some(session);
 
     messages
+}
+
+/// Legacy function without Haven bonuses (for backwards compatibility)
+pub fn tick_fishing(state: &mut GameState, rng: &mut impl Rng) -> Vec<String> {
+    tick_fishing_with_haven(state, rng, &HavenFishingBonuses::default())
 }
 
 /// Attempts to drop an item based on fish rarity.
@@ -773,6 +807,108 @@ mod tests {
             state.active_fishing.as_ref().unwrap().phase,
             FishingPhase::Casting,
             "Should return to Casting after catch"
+        );
+    }
+
+    // =========================================================================
+    // Haven Fishing Bonus Tests
+    // =========================================================================
+
+    #[test]
+    fn test_apply_timer_reduction() {
+        // 0% reduction should not change ticks
+        assert_eq!(apply_timer_reduction(100, 0.0), 100);
+
+        // 50% reduction should halve ticks
+        assert_eq!(apply_timer_reduction(100, 50.0), 50);
+
+        // 40% reduction (Garden T3) on 10 ticks
+        assert_eq!(apply_timer_reduction(10, 40.0), 6);
+
+        // Minimum 1 tick even with 100% reduction
+        assert_eq!(apply_timer_reduction(10, 100.0), 1);
+    }
+
+    #[test]
+    fn test_haven_timer_reduction() {
+        let mut rng = create_test_rng();
+        let mut state = create_test_game_state();
+
+        // Create a fishing session in Casting phase
+        let session = FishingSession {
+            spot_name: "Test Lake".to_string(),
+            total_fish: 5,
+            fish_caught: Vec::new(),
+            items_found: Vec::new(),
+            ticks_remaining: 1,
+            phase: FishingPhase::Casting,
+        };
+        state.active_fishing = Some(session);
+
+        // Transition with 40% timer reduction (Garden T3)
+        let haven = HavenFishingBonuses {
+            timer_reduction_percent: 40.0,
+            double_fish_chance_percent: 0.0,
+        };
+        tick_fishing_with_haven(&mut state, &mut rng, &haven);
+
+        // Should be in Waiting phase with reduced ticks
+        let session = state.active_fishing.as_ref().unwrap();
+        assert_eq!(session.phase, FishingPhase::Waiting);
+
+        // Waiting ticks should be reduced (base is 10-80, reduced by 40%)
+        let max_reduced_ticks = (fishing_generation::WAITING_TICKS_MAX as f64 * 0.6) as u32;
+        assert!(
+            session.ticks_remaining <= max_reduced_ticks,
+            "Ticks {} should be <= {} (40% reduction)",
+            session.ticks_remaining,
+            max_reduced_ticks
+        );
+    }
+
+    #[test]
+    fn test_haven_double_fish() {
+        let mut state = create_test_game_state();
+        let mut double_fish_count = 0;
+        let trials = 1000;
+
+        for seed in 0..trials {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+
+            // Create a fishing session in Reeling phase with 1 tick remaining
+            let session = FishingSession {
+                spot_name: "Test Lake".to_string(),
+                total_fish: 100, // Lots of fish so we don't run out
+                fish_caught: Vec::new(),
+                items_found: Vec::new(),
+                ticks_remaining: 1,
+                phase: FishingPhase::Reeling,
+            };
+            state.active_fishing = Some(session);
+
+            let initial_fish = state.fishing.total_fish_caught;
+
+            // 50% double fish chance (Fishing Dock T2)
+            let haven = HavenFishingBonuses {
+                timer_reduction_percent: 0.0,
+                double_fish_chance_percent: 50.0,
+            };
+            tick_fishing_with_haven(&mut state, &mut rng, &haven);
+
+            let fish_caught = state.fishing.total_fish_caught - initial_fish;
+            if fish_caught == 2 {
+                double_fish_count += 1;
+            }
+
+            // Reset for next trial
+            state.fishing.total_fish_caught = 0;
+        }
+
+        // With 50% chance, expect ~500 double catches in 1000 trials
+        assert!(
+            (400..=600).contains(&double_fish_count),
+            "Expected ~500 double fish (50%), got {}",
+            double_fish_count
         );
     }
 }

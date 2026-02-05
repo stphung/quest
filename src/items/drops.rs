@@ -12,17 +12,26 @@ pub fn drop_chance_for_prestige(prestige_rank: u32) -> f64 {
     chance.min(ITEM_DROP_MAX_CHANCE)
 }
 
-pub fn try_drop_item(game_state: &GameState) -> Option<Item> {
+/// Try to drop an item after killing an enemy
+/// `haven_drop_rate_percent` is the Trophy Hall bonus (0.0 if not built)
+/// `haven_rarity_percent` is the Workshop bonus (0.0 if not built)
+pub fn try_drop_item_with_haven(
+    game_state: &GameState,
+    haven_drop_rate_percent: f64,
+    haven_rarity_percent: f64,
+) -> Option<Item> {
     let mut rng = rand::thread_rng();
 
-    let drop_chance = drop_chance_for_prestige(game_state.prestige_rank);
+    // Apply Trophy Hall bonus to drop chance
+    let base_chance = drop_chance_for_prestige(game_state.prestige_rank);
+    let drop_chance = (base_chance * (1.0 + haven_drop_rate_percent / 100.0)).min(ITEM_DROP_MAX_CHANCE);
 
     if rng.gen::<f64>() > drop_chance {
         return None;
     }
 
-    // Roll rarity based on prestige rank
-    let rarity = roll_rarity(game_state.prestige_rank, &mut rng);
+    // Roll rarity with Workshop bonus
+    let rarity = roll_rarity_with_haven(game_state.prestige_rank, haven_rarity_percent, &mut rng);
 
     // Roll random equipment slot
     let slot = roll_random_slot(&mut rng);
@@ -31,20 +40,36 @@ pub fn try_drop_item(game_state: &GameState) -> Option<Item> {
     Some(generate_item(slot, rarity, game_state.character_level))
 }
 
+/// Legacy function without Haven bonuses (for backwards compatibility)
+pub fn try_drop_item(game_state: &GameState) -> Option<Item> {
+    try_drop_item_with_haven(game_state, 0.0, 0.0)
+}
+
 pub fn roll_rarity(prestige_rank: u32, rng: &mut impl Rng) -> Rarity {
+    roll_rarity_with_haven(prestige_rank, 0.0, rng)
+}
+
+/// Roll item rarity with Haven Workshop bonus
+/// `haven_rarity_percent` shifts distribution toward higher rarities
+pub fn roll_rarity_with_haven(prestige_rank: u32, haven_rarity_percent: f64, rng: &mut impl Rng) -> Rarity {
     let roll = rng.gen::<f64>();
 
     // Prestige gives a small bonus (1% per rank, max 10%) that shifts
     // weight from Common toward higher rarities.
     let prestige_bonus = (prestige_rank as f64 * 0.01).min(0.10);
 
+    // Workshop bonus: shifts distribution further toward higher rarities
+    // Max 25% at T3 which significantly reduces common rate
+    let haven_bonus = (haven_rarity_percent / 100.0).min(0.25);
+    let total_bonus = prestige_bonus + haven_bonus;
+
     // Base distribution: 55% Common, 30% Magic, 12% Rare, 2.5% Epic, 0.5% Legendary
-    // Prestige shifts Common down and spreads the bonus across higher tiers.
-    let common_threshold = 0.55 - prestige_bonus;
+    // Bonuses shift Common down and spread across higher tiers.
+    let common_threshold = (0.55 - total_bonus).max(0.10); // Never go below 10% common
     let magic_threshold = common_threshold + 0.30;
-    let rare_threshold = magic_threshold + 0.12 + prestige_bonus * 0.4;
-    let epic_threshold = rare_threshold + 0.025 + prestige_bonus * 0.4;
-    // Legendary is the remainder: 0.5% base + 20% of prestige bonus
+    let rare_threshold = magic_threshold + 0.12 + total_bonus * 0.4;
+    let epic_threshold = rare_threshold + 0.025 + total_bonus * 0.4;
+    // Legendary is the remainder
 
     if roll < common_threshold {
         Rarity::Common
@@ -252,5 +277,63 @@ mod tests {
         assert!((drop_chance_for_prestige(10) - 0.25).abs() < f64::EPSILON);
         // Prestige 20: still capped at 25%
         assert!((drop_chance_for_prestige(20) - 0.25).abs() < f64::EPSILON);
+    }
+
+    // =========================================================================
+    // Haven Bonus Tests
+    // =========================================================================
+
+    #[test]
+    fn test_haven_drop_rate_bonus() {
+        let game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
+
+        // Compare drop rates with and without Haven bonus
+        let trials = 5000;
+        let mut drops_no_bonus = 0;
+        let mut drops_with_bonus = 0;
+
+        for _ in 0..trials {
+            if try_drop_item_with_haven(&game_state, 0.0, 0.0).is_some() {
+                drops_no_bonus += 1;
+            }
+            if try_drop_item_with_haven(&game_state, 15.0, 0.0).is_some() { // +15% drop rate from Trophy Hall
+                drops_with_bonus += 1;
+            }
+        }
+
+        // With +15% bonus, should see roughly 15% more drops
+        assert!(
+            drops_with_bonus > drops_no_bonus,
+            "Haven +15% drop rate should increase drops: no_bonus={}, with_bonus={}",
+            drops_no_bonus,
+            drops_with_bonus
+        );
+    }
+
+    #[test]
+    fn test_haven_rarity_bonus() {
+        let mut rng = rand::thread_rng();
+
+        // Compare rarity distributions with and without Haven bonus
+        let trials = 10000;
+        let mut common_no_bonus = 0;
+        let mut common_with_bonus = 0;
+
+        for _ in 0..trials {
+            if roll_rarity_with_haven(0, 0.0, &mut rng) == Rarity::Common {
+                common_no_bonus += 1;
+            }
+            if roll_rarity_with_haven(0, 25.0, &mut rng) == Rarity::Common { // +25% from Workshop T3
+                common_with_bonus += 1;
+            }
+        }
+
+        // Workshop bonus should significantly reduce common rate
+        assert!(
+            common_with_bonus < common_no_bonus - 500,
+            "Haven +25% rarity should reduce common rate: no_bonus={}, with_bonus={}",
+            common_no_bonus,
+            common_with_bonus
+        );
     }
 }

@@ -13,7 +13,7 @@ mod zones;
 
 use challenges::chess::logic::process_ai_thinking;
 use challenges::gomoku::logic::process_ai_thinking as process_gomoku_ai;
-use challenges::menu::try_discover_challenge;
+use challenges::menu::try_discover_challenge_with_haven;
 use challenges::morris::logic::process_ai_thinking as process_morris_ai;
 use challenges::ActiveMinigame;
 use character::input::{
@@ -348,7 +348,8 @@ fn main() -> io::Result<()> {
                                         let elapsed_seconds = current_time - state.last_save_time;
 
                                         if elapsed_seconds > 60 {
-                                            let report = process_offline_progression(&mut state);
+                                            let haven_offline_bonus = haven.get_bonus(haven::HavenBonusType::OfflineXpPercent);
+                                            let report = process_offline_progression(&mut state, haven_offline_bonus);
                                             // Always show offline progress in combat log
                                             if report.xp_gained > 0 {
                                                 let message = if report.total_level_ups > 0 {
@@ -708,7 +709,6 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::
     use dungeon::logic::{
         on_boss_defeated, on_elite_defeated, on_treasure_room_entered, update_dungeon,
     };
-    use fishing::logic::tick_fishing;
 
     // Each tick is 100ms = 0.1 seconds
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
@@ -734,7 +734,8 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::
     // Try challenge discovery (single roll, weighted table picks which type)
     {
         let mut rng = rand::thread_rng();
-        if let Some(challenge_type) = try_discover_challenge(game_state, &mut rng) {
+        let haven_discovery = haven.get_bonus(haven::HavenBonusType::ChallengeDiscoveryPercent);
+        if let Some(challenge_type) = try_discover_challenge_with_haven(game_state, &mut rng, haven_discovery) {
             let icon = challenge_type.icon();
             let flavor = challenge_type.discovery_flavor();
             game_state
@@ -817,7 +818,11 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::
     // Update fishing if active (mutually exclusive with combat)
     if game_state.active_fishing.is_some() {
         let mut rng = rand::thread_rng();
-        let fishing_messages = tick_fishing(game_state, &mut rng);
+        let haven_fishing = fishing::logic::HavenFishingBonuses {
+            timer_reduction_percent: haven.get_bonus(haven::HavenBonusType::FishingTimerReduction),
+            double_fish_chance_percent: haven.get_bonus(haven::HavenBonusType::DoubleFishChance),
+        };
+        let fishing_messages = fishing::logic::tick_fishing_with_haven(game_state, &mut rng, &haven_fishing);
         for message in fishing_messages {
             game_state
                 .combat_state
@@ -842,9 +847,16 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::
         return; // Skip combat processing while fishing
     }
 
-    // Update combat state (with Haven HP regen bonus from Alchemy Lab)
-    let haven_hp_regen = haven.get_bonus(haven::HavenBonusType::HpRegenPercent);
-    let combat_events = update_combat(game_state, delta_time, haven_hp_regen);
+    // Build Haven combat bonuses
+    let haven_combat = combat::logic::HavenCombatBonuses {
+        hp_regen_percent: haven.get_bonus(haven::HavenBonusType::HpRegenPercent),
+        hp_regen_delay_reduction: haven.get_bonus(haven::HavenBonusType::HpRegenDelayReduction),
+        damage_percent: haven.get_bonus(haven::HavenBonusType::DamagePercent),
+        crit_chance_percent: haven.get_bonus(haven::HavenBonusType::CritChancePercent),
+        double_strike_chance: haven.get_bonus(haven::HavenBonusType::DoubleStrikeChance),
+        xp_gain_percent: haven.get_bonus(haven::HavenBonusType::XpGainPercent),
+    };
+    let combat_events = update_combat(game_state, delta_time, &haven_combat);
 
     // Process combat events
     for event in combat_events {
@@ -912,10 +924,12 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::
                 }
 
                 // Try to drop item
-                use items::drops::try_drop_item;
+                use items::drops::try_drop_item_with_haven;
                 use items::scoring::auto_equip_if_better;
 
-                if let Some(item) = try_drop_item(game_state) {
+                let haven_drop_rate = haven.get_bonus(haven::HavenBonusType::DropRatePercent);
+                let haven_rarity = haven.get_bonus(haven::HavenBonusType::ItemRarityPercent);
+                if let Some(item) = try_drop_item_with_haven(game_state, haven_drop_rate, haven_rarity) {
                     let item_name = item.display_name.clone();
                     let rarity = item.rarity;
                     let equipped = auto_equip_if_better(item, game_state);

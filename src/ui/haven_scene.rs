@@ -238,15 +238,26 @@ fn render_room_detail(
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
+    // Calculate requirements section height (header + one line per parent)
+    let parents = room.parents();
+    let has_requirements = !parents.is_empty();
+    let req_height = if has_requirements {
+        1 + parents.len() as u16 // "Requires:" + one line per parent
+    } else {
+        0
+    };
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3), // Description
-            Constraint::Length(1), // Spacer
-            Constraint::Length(5), // Bonus info (all 3 tiers)
-            Constraint::Length(1), // Spacer
-            Constraint::Length(3), // Cost info
-            Constraint::Min(0),    // Padding
+            Constraint::Length(3),          // Description
+            Constraint::Length(1),          // Spacer
+            Constraint::Length(5),          // Bonus info (all 3 tiers)
+            Constraint::Length(1),          // Spacer
+            Constraint::Length(req_height), // Requirements (if any)
+            Constraint::Length(if has_requirements { 1 } else { 0 }), // Spacer after requirements
+            Constraint::Length(3),          // Cost info
+            Constraint::Min(0),             // Padding
         ])
         .split(inner);
 
@@ -265,9 +276,9 @@ fn render_room_detail(
     ))];
 
     for t in 1..=3 {
-        let is_current = t == tier;
+        let is_built = t <= tier;
         let is_next = t == tier + 1 && tier < 3;
-        let style = if is_current {
+        let style = if is_built {
             Style::default().fg(Color::Green)
         } else if is_next {
             Style::default().fg(Color::Yellow)
@@ -275,7 +286,8 @@ fn render_room_detail(
             Style::default().fg(Color::DarkGray)
         };
 
-        let marker = if is_current { "▶ " } else { "  " };
+        // Arrow points at the tier being built (the next tier)
+        let marker = if is_next { "▶ " } else { "  " };
 
         bonus_lines.push(Line::from(vec![
             Span::styled(marker, style),
@@ -287,19 +299,53 @@ fn render_room_detail(
     let bonus_para = Paragraph::new(bonus_lines);
     frame.render_widget(bonus_para, chunks[2]);
 
-    // Cost info
+    // Requirements section (if room has parents)
+    if has_requirements {
+        let mut req_lines = vec![Line::from(Span::styled(
+            "Requires:",
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        ))];
+
+        for parent in parents {
+            let parent_tier = haven.room_tier(*parent);
+            let is_built = parent_tier > 0;
+            let (marker, style) = if is_built {
+                ("✓", Style::default().fg(Color::Green))
+            } else {
+                ("✗", Style::default().fg(Color::Red))
+            };
+
+            let tier_info = if parent_tier > 0 {
+                format!(" (T{})", parent_tier)
+            } else {
+                String::new()
+            };
+
+            req_lines.push(Line::from(vec![
+                Span::styled(format!("  {} ", marker), style),
+                Span::styled(parent.name(), style),
+                Span::styled(tier_info, Style::default().fg(Color::DarkGray)),
+            ]));
+        }
+
+        let req_para = Paragraph::new(req_lines);
+        frame.render_widget(req_para, chunks[4]);
+    }
+
+    // Cost info (now at chunks[6] due to new layout)
+    let cost_chunk = chunks[6];
     if !unlocked {
-        // Show what's needed to unlock
-        let parents = room.parents();
-        let parent_names: Vec<&str> = parents.iter().map(|p| p.name()).collect();
+        // Show locked status
         let cost_text = Paragraph::new(vec![
             Line::from(Span::styled("🔒 Locked", Style::default().fg(Color::Red))),
             Line::from(Span::styled(
-                format!("Requires: {}", parent_names.join(" + ")),
+                "Build all required rooms first",
                 Style::default().fg(Color::DarkGray),
             )),
         ]);
-        frame.render_widget(cost_text, chunks[4]);
+        frame.render_widget(cost_text, cost_chunk);
     } else if tier < 3 {
         let next_tier = tier + 1;
         let cost = tier_cost(room, next_tier);
@@ -324,14 +370,14 @@ fn render_room_detail(
                 ),
             ]),
         ]);
-        frame.render_widget(cost_text, chunks[4]);
+        frame.render_widget(cost_text, cost_chunk);
     } else {
         // Max tier reached
         let cost_text = Paragraph::new(Line::from(Span::styled(
             "✓ Max tier reached",
             Style::default().fg(Color::Green),
         )));
-        frame.render_widget(cost_text, chunks[4]);
+        frame.render_widget(cost_text, cost_chunk);
     }
 }
 
