@@ -2,7 +2,7 @@
 
 #![allow(dead_code)]
 
-use crate::dungeon::{Dungeon, RoomState, RoomType, DIR_DOWN, DIR_RIGHT};
+use crate::dungeon::types::{Dungeon, RoomState, RoomType, DIR_DOWN, DIR_RIGHT};
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
@@ -191,11 +191,11 @@ impl Widget for DungeonStatusWidget<'_> {
         }
 
         let size_name = match self.dungeon.size {
-            crate::dungeon::DungeonSize::Small => "Small",
-            crate::dungeon::DungeonSize::Medium => "Medium",
-            crate::dungeon::DungeonSize::Large => "Large",
-            crate::dungeon::DungeonSize::Epic => "Epic",
-            crate::dungeon::DungeonSize::Legendary => "Legendary",
+            crate::dungeon::types::DungeonSize::Small => "Small",
+            crate::dungeon::types::DungeonSize::Medium => "Medium",
+            crate::dungeon::types::DungeonSize::Large => "Large",
+            crate::dungeon::types::DungeonSize::Epic => "Epic",
+            crate::dungeon::types::DungeonSize::Legendary => "Legendary",
         };
 
         let key_status = if self.dungeon.has_key {
@@ -289,7 +289,7 @@ impl Widget for DungeonLegendWidget {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dungeon_generation::generate_dungeon;
+    use crate::dungeon::generation::generate_dungeon;
 
     #[test]
     fn test_dungeon_map_widget_creation() {

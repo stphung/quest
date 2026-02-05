@@ -2,16 +2,16 @@
 //!
 //! Tests the full dungeon flow: enter → explore → elite (key) → boss → rewards
 
-use quest::dungeon::{Dungeon, DungeonSize, RoomState, RoomType};
-use quest::dungeon_generation::generate_dungeon;
-use quest::dungeon_logic::{
+use quest::dungeon::generation::generate_dungeon;
+use quest::dungeon::logic::{
     add_dungeon_xp, collect_dungeon_item, find_next_room, get_enemy_stat_multiplier,
     on_boss_defeated, on_elite_defeated, on_player_died_in_dungeon, on_room_enemy_defeated,
     on_treasure_room_entered, update_dungeon, DungeonEvent, ROOM_MOVE_INTERVAL,
 };
-use quest::game_state::GameState;
-use quest::item_generation::generate_item;
-use quest::items::{EquipmentSlot, Rarity};
+use quest::dungeon::{Dungeon, DungeonSize, RoomState, RoomType};
+use quest::items::generation::generate_item;
+use quest::GameState;
+use quest::{EquipmentSlot, Rarity};
 
 /// Helper to find a room of a specific type in the dungeon
 fn find_room_of_type(dungeon: &Dungeon, room_type: RoomType) -> Option<(usize, usize)> {
@@ -386,7 +386,7 @@ fn test_dungeon_pathfinding_completeness() {
         // From entrance, should be able to reach elite
         if let Some(elite_pos) = find_room_of_type(&dungeon, RoomType::Elite) {
             let path =
-                quest::dungeon_logic::find_path_to(&dungeon, dungeon.entrance_position, elite_pos);
+                quest::dungeon::logic::find_path_to(&dungeon, dungeon.entrance_position, elite_pos);
             assert!(
                 path.is_some(),
                 "Should be able to reach elite from entrance (with all rooms revealed)"
@@ -396,7 +396,7 @@ fn test_dungeon_pathfinding_completeness() {
         // From entrance, should be able to reach boss
         let boss_pos = dungeon.boss_position;
         let path =
-            quest::dungeon_logic::find_path_to(&dungeon, dungeon.entrance_position, boss_pos);
+            quest::dungeon::logic::find_path_to(&dungeon, dungeon.entrance_position, boss_pos);
         assert!(
             path.is_some(),
             "Should be able to reach boss from entrance (with all rooms revealed)"

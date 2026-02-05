@@ -4,7 +4,7 @@ use super::game_common::{
     create_game_layout, render_forfeit_status_bar, render_game_over_overlay,
     render_info_panel_frame, render_status_bar, GameResultType,
 };
-use crate::minesweeper::{Cell, MinesweeperGame, MinesweeperResult};
+use crate::challenges::minesweeper::{Cell, MinesweeperGame, MinesweeperResult};
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
@@ -201,10 +201,10 @@ fn render_minesweeper_game_over(frame: &mut Frame, area: Rect, game: &Minesweepe
     let (result_type, title, message, reward) = match result {
         MinesweeperResult::Win => {
             let prestige = match game.difficulty {
-                crate::minesweeper::MinesweeperDifficulty::Novice => 1,
-                crate::minesweeper::MinesweeperDifficulty::Apprentice => 2,
-                crate::minesweeper::MinesweeperDifficulty::Journeyman => 3,
-                crate::minesweeper::MinesweeperDifficulty::Master => 5,
+                crate::challenges::minesweeper::MinesweeperDifficulty::Novice => 1,
+                crate::challenges::minesweeper::MinesweeperDifficulty::Apprentice => 2,
+                crate::challenges::minesweeper::MinesweeperDifficulty::Journeyman => 3,
+                crate::challenges::minesweeper::MinesweeperDifficulty::Master => 5,
             };
             (
                 GameResultType::Win,

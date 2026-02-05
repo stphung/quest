@@ -4,7 +4,7 @@ use super::game_common::{
     create_game_layout, render_forfeit_status_bar, render_game_over_overlay,
     render_info_panel_frame, render_status_bar, GameResultType,
 };
-use crate::rune::{FeedbackMark, RuneGame, RuneResult, RUNE_SYMBOLS};
+use crate::challenges::rune::{FeedbackMark, RuneGame, RuneResult, RUNE_SYMBOLS};
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
@@ -229,7 +229,7 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &RuneGame) {
 }
 
 fn render_rune_game_over(frame: &mut Frame, area: Rect, game: &RuneGame) {
-    use crate::challenge_menu::DifficultyInfo;
+    use crate::challenges::menu::DifficultyInfo;
 
     let result = game.game_result.as_ref().unwrap();
 

@@ -1,5 +1,5 @@
-use crate::game_state::GameState;
-use crate::prestige::{get_next_prestige_tier, get_prestige_tier};
+use crate::character::prestige::{get_next_prestige_tier, get_prestige_tier};
+use crate::core::game_state::GameState;
 use ratatui::{
     layout::{Alignment, Rect},
     style::{Color, Modifier, Style},

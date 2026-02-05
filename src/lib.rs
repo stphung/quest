@@ -5,43 +5,28 @@
 // Allow dead code in library - some functions are only used by the binary
 #![allow(dead_code)]
 
-pub mod attributes;
-pub mod build_info;
-pub mod challenge_menu;
-pub mod character_manager;
-pub mod chess;
-pub mod chess_logic;
+pub mod challenges;
+pub mod character;
 pub mod combat;
-pub mod combat_logic;
-pub mod constants;
-pub mod debug_menu;
-pub mod derived_stats;
+pub mod core;
 pub mod dungeon;
-pub mod dungeon_generation;
-pub mod dungeon_logic;
-pub mod equipment;
 pub mod fishing;
-pub mod fishing_generation;
-pub mod fishing_logic;
-pub mod game_logic;
-pub mod game_state;
-pub mod gomoku;
-pub mod gomoku_logic;
-pub mod item_drops;
-pub mod item_generation;
-pub mod item_names;
-pub mod item_scoring;
 pub mod items;
-pub mod minesweeper;
-pub mod minesweeper_logic;
-pub mod morris;
-pub mod morris_logic;
-pub mod prestige;
-pub mod rune;
-pub mod rune_logic;
-pub mod save_manager;
-pub mod updater;
+pub mod utils;
 pub mod zones;
 
 // UI module is not exposed as it's tightly coupled to the terminal
 mod ui;
+
+// Re-export commonly used types at crate root for convenience
+pub use challenges::{
+    ChessDifficulty, ChessGame, ChessResult, GomokuDifficulty, GomokuGame, GomokuResult,
+    MinesweeperDifficulty, MinesweeperGame, MinesweeperResult, MorrisDifficulty, MorrisGame,
+    MorrisPhase, MorrisResult, RuneDifficulty, RuneGame, RuneResult,
+};
+pub use character::{Attributes, DerivedStats, PrestigeTier};
+pub use combat::{CombatState, Enemy};
+pub use core::{GameState, TICK_INTERVAL_MS};
+pub use dungeon::{Dungeon, Room, RoomType};
+pub use fishing::{FishRarity, FishingSession};
+pub use items::{Equipment, EquipmentSlot, Item, Rarity};

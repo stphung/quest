@@ -20,8 +20,8 @@ pub mod rune_scene;
 mod stats_panel;
 mod throbber;
 
-use crate::game_state::GameState;
-use crate::updater::UpdateInfo;
+use crate::core::game_state::GameState;
+use crate::utils::updater::UpdateInfo;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -147,7 +147,7 @@ fn draw_dungeon_view(
     frame: &mut Frame,
     area: Rect,
     game_state: &GameState,
-    dungeon: &crate::dungeon::Dungeon,
+    dungeon: &crate::dungeon::types::Dungeon,
 ) {
     // Split into dungeon map (top) and combat (bottom)
     let chunks = Layout::default()
@@ -166,7 +166,7 @@ fn draw_dungeon_view(
 }
 
 /// Draws the dungeon map panel
-fn draw_dungeon_panel(frame: &mut Frame, area: Rect, dungeon: &crate::dungeon::Dungeon) {
+fn draw_dungeon_panel(frame: &mut Frame, area: Rect, dungeon: &crate::dungeon::types::Dungeon) {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     // Create border

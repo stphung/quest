@@ -1,74 +1,47 @@
-mod attributes;
-mod build_info;
-mod challenge_menu;
-mod character_manager;
-mod chess;
-mod chess_logic;
+mod challenges;
+mod character;
 mod combat;
-mod combat_logic;
-mod constants;
-mod debug_menu;
-mod derived_stats;
+mod core;
 mod dungeon;
-mod dungeon_generation;
-mod dungeon_logic;
-mod equipment;
 mod fishing;
-mod fishing_generation;
-mod fishing_logic;
-mod game_logic;
-mod game_state;
-mod gomoku;
-mod gomoku_logic;
-mod item_drops;
-mod item_generation;
-mod item_names;
-mod item_scoring;
 mod items;
-mod minesweeper;
-mod minesweeper_logic;
-mod morris;
-mod morris_logic;
-mod prestige;
-mod rune;
-mod rune_logic;
-mod save_manager;
 mod ui;
-mod updater;
+mod utils;
 mod zones;
 
-use challenge_menu::{try_discover_challenge, ChallengeType, DifficultyInfo};
-use character_manager::CharacterManager;
-use chess::ChessDifficulty;
-use chess_logic::{apply_game_result, process_ai_thinking, start_chess_game};
+use challenges::chess::logic::{apply_game_result, process_ai_thinking, start_chess_game};
+use challenges::chess::{self, ChessDifficulty};
+use challenges::gomoku::logic::{
+    apply_game_result as apply_gomoku_result, process_ai_thinking as process_gomoku_ai,
+    process_human_move as process_gomoku_move, start_gomoku_game,
+};
+use challenges::gomoku::{GomokuDifficulty, GomokuResult};
+use challenges::menu::{try_discover_challenge, ChallengeType, DifficultyInfo};
+use challenges::minesweeper::logic::{handle_first_click, reveal_cell, toggle_flag};
+use challenges::minesweeper::{MinesweeperDifficulty, MinesweeperGame, MinesweeperResult};
+use challenges::morris::logic::{
+    self as morris_logic, apply_game_result as apply_morris_result,
+    get_legal_moves as get_morris_legal_moves, process_ai_thinking as process_morris_ai,
+    start_morris_game,
+};
+use challenges::morris::{
+    self, CursorDirection as MorrisCursorDirection, MorrisDifficulty, MorrisMove, MorrisResult,
+};
+use challenges::rune::logic::submit_guess;
+use challenges::rune::{RuneDifficulty, RuneGame, RuneResult};
+use character::manager::CharacterManager;
+use character::prestige::*;
+use character::save::SaveManager;
 use chrono::{Local, Utc};
-use constants::*;
+use core::constants::*;
+use core::game_logic::*;
+use core::game_state::*;
 use crossterm::event::{self, Event, KeyCode};
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
 use crossterm::ExecutableCommand;
-use game_logic::*;
-use game_state::*;
-use gomoku::{GomokuDifficulty, GomokuResult};
-use gomoku_logic::{
-    apply_game_result as apply_gomoku_result, process_ai_thinking as process_gomoku_ai,
-    process_human_move as process_gomoku_move, start_gomoku_game,
-};
-use minesweeper::{MinesweeperDifficulty, MinesweeperGame, MinesweeperResult};
-use minesweeper_logic::{handle_first_click, reveal_cell, toggle_flag};
-use morris::{
-    CursorDirection as MorrisCursorDirection, MorrisDifficulty, MorrisMove, MorrisResult,
-};
-use morris_logic::{
-    apply_game_result as apply_morris_result, get_legal_moves as get_morris_legal_moves,
-    process_ai_thinking as process_morris_ai, start_morris_game,
-};
-use prestige::*;
 use ratatui::{backend::CrosstermBackend, Terminal};
-use rune::{RuneDifficulty, RuneGame, RuneResult};
-use rune_logic::submit_guess;
-use save_manager::SaveManager;
 use std::io;
 use std::time::{Duration, Instant};
 use ui::character_creation::CharacterCreationScreen;
@@ -76,7 +49,7 @@ use ui::character_delete::CharacterDeleteScreen;
 use ui::character_rename::CharacterRenameScreen;
 use ui::character_select::CharacterSelectScreen;
 use ui::draw_ui_with_update;
-use updater::UpdateInfo;
+use utils::updater::UpdateInfo;
 
 enum Screen {
     CharacterSelect,
@@ -151,15 +124,15 @@ fn main() -> io::Result<()> {
 
     if args.len() > 1 {
         match args[1].as_str() {
-            "update" => match updater::run_update_command() {
+            "update" => match utils::updater::run_update_command() {
                 Ok(_) => std::process::exit(0),
                 Err(_) => std::process::exit(1),
             },
             "--version" | "-v" => {
                 println!(
                     "quest {} ({})",
-                    build_info::BUILD_DATE,
-                    build_info::BUILD_COMMIT
+                    utils::build_info::BUILD_DATE,
+                    utils::build_info::BUILD_COMMIT
                 );
                 std::process::exit(0);
             }
@@ -185,7 +158,7 @@ fn main() -> io::Result<()> {
     }
 
     // Check for updates in background (non-blocking notification)
-    let update_available = std::thread::spawn(updater::check_update_info);
+    let update_available = std::thread::spawn(utils::updater::check_update_info);
 
     // Initialize CharacterManager
     let character_manager = CharacterManager::new()?;
@@ -382,7 +355,7 @@ fn main() -> io::Result<()> {
                                         Ok(mut state) => {
                                             // Sanity check: clear stale enemy if HP is impossibly high
                                             // (can happen if save was from before prestige reset)
-                                            let derived = derived_stats::DerivedStats::calculate_derived_stats(
+                                            let derived = character::derived_stats::DerivedStats::calculate_derived_stats(
                                                 &state.attributes,
                                                 &state.equipment,
                                             );
@@ -574,7 +547,7 @@ fn main() -> io::Result<()> {
                 let mut last_update_check = Instant::now();
                 let mut tick_counter: u32 = 0;
                 let mut showing_prestige_confirm = false;
-                let mut debug_menu = debug_menu::DebugMenu::new();
+                let mut debug_menu = utils::debug_menu::DebugMenu::new();
 
                 // Save indicator state (for non-debug mode)
                 let mut last_save_instant: Option<Instant> = None;
@@ -584,7 +557,7 @@ fn main() -> io::Result<()> {
                 let mut update_info: Option<UpdateInfo> = None;
                 let mut update_check_completed = false;
                 let mut update_check_handle: Option<std::thread::JoinHandle<Option<UpdateInfo>>> =
-                    Some(std::thread::spawn(updater::check_update_info));
+                    Some(std::thread::spawn(utils::updater::check_update_info));
 
                 loop {
                     // Check if background update check completed
@@ -703,7 +676,7 @@ fn main() -> io::Result<()> {
                                     if result == RuneResult::Win {
                                         let reward = rune_game.difficulty.reward();
                                         if reward.xp_percent > 0 {
-                                            let xp_for_level = game_logic::xp_for_next_level(
+                                            let xp_for_level = core::game_logic::xp_for_next_level(
                                                 state.character_level.max(1),
                                             );
                                             let xp_gain =
@@ -765,7 +738,7 @@ fn main() -> io::Result<()> {
                                     if result == MinesweeperResult::Win {
                                         let reward = minesweeper_game.difficulty.reward();
                                         if reward.xp_percent > 0 {
-                                            let xp_for_level = game_logic::xp_for_next_level(
+                                            let xp_for_level = core::game_logic::xp_for_next_level(
                                                 state.character_level.max(1),
                                             );
                                             let xp_gain =
@@ -1225,7 +1198,8 @@ fn main() -> io::Result<()> {
                         && last_update_check.elapsed()
                             >= Duration::from_secs(UPDATE_CHECK_INTERVAL_SECONDS)
                     {
-                        update_check_handle = Some(std::thread::spawn(updater::check_update_info));
+                        update_check_handle =
+                            Some(std::thread::spawn(utils::updater::check_update_info));
                         update_check_completed = false; // Reset to show "Checking..." again
                         last_update_check = Instant::now();
                     }
@@ -1245,11 +1219,11 @@ fn main() -> io::Result<()> {
 
 /// Processes a single game tick, updating combat and stats
 fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
-    use combat_logic::update_combat;
-    use dungeon_logic::{
+    use combat::logic::update_combat;
+    use dungeon::logic::{
         on_boss_defeated, on_elite_defeated, on_treasure_room_entered, update_dungeon,
     };
-    use fishing_logic::tick_fishing;
+    use fishing::logic::tick_fishing;
 
     // Each tick is 100ms = 0.1 seconds
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
@@ -1304,7 +1278,7 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
     }
 
     // Sync player max HP with derived stats (ensures equipment changes are reflected)
-    let derived = derived_stats::DerivedStats::calculate_derived_stats(
+    let derived = character::derived_stats::DerivedStats::calculate_derived_stats(
         &game_state.attributes,
         &game_state.equipment,
     );
@@ -1314,7 +1288,7 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
     if game_state.active_dungeon.is_some() {
         let dungeon_events = update_dungeon(game_state, delta_time);
         for event in dungeon_events {
-            use dungeon_logic::DungeonEvent;
+            use dungeon::logic::DungeonEvent;
             match event {
                 DungeonEvent::EnteredRoom { room_type, .. } => {
                     let message = format!("🚪 Entered {:?} room", room_type);
@@ -1380,7 +1354,7 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
         }
 
         // Check for fishing rank up
-        if let Some(rank_msg) = fishing_logic::check_rank_up(&mut game_state.fishing) {
+        if let Some(rank_msg) = fishing::logic::check_rank_up(&mut game_state.fishing) {
             game_state
                 .combat_state
                 .add_log_entry(format!("🎣 {}", rank_msg), false, true);
@@ -1402,7 +1376,7 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
 
     // Process combat events
     for event in combat_events {
-        use combat_logic::CombatEvent;
+        use combat::logic::CombatEvent;
         match event {
             CombatEvent::PlayerAttackBlocked { weapon_needed } => {
                 // Attack blocked - boss requires legendary weapon
@@ -1460,14 +1434,14 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
                 apply_tick_xp(game_state, xp_gained as f64);
 
                 // Track XP in dungeon if active and mark room cleared
-                dungeon_logic::add_dungeon_xp(game_state, xp_gained);
+                dungeon::logic::add_dungeon_xp(game_state, xp_gained);
                 if let Some(dungeon) = &mut game_state.active_dungeon {
-                    dungeon_logic::on_room_enemy_defeated(dungeon);
+                    dungeon::logic::on_room_enemy_defeated(dungeon);
                 }
 
                 // Try to drop item
-                use item_drops::try_drop_item;
-                use item_scoring::auto_equip_if_better;
+                use items::drops::try_drop_item;
+                use items::scoring::auto_equip_if_better;
 
                 if let Some(item) = try_drop_item(game_state) {
                     let item_name = item.display_name.clone();
@@ -1502,7 +1476,8 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
                     && game_state.active_fishing.is_none()
                 {
                     let mut rng = rand::thread_rng();
-                    if let Some(message) = fishing_logic::try_discover_fishing(game_state, &mut rng)
+                    if let Some(message) =
+                        fishing::logic::try_discover_fishing(game_state, &mut rng)
                     {
                         game_state.combat_state.add_log_entry(
                             format!("🎣 {}", message),
@@ -1519,13 +1494,13 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
                     game_state.combat_state.add_log_entry(message, false, true);
                 }
                 apply_tick_xp(game_state, xp_gained as f64);
-                dungeon_logic::add_dungeon_xp(game_state, xp_gained);
+                dungeon::logic::add_dungeon_xp(game_state, xp_gained);
 
                 // Give key
                 if let Some(dungeon) = &mut game_state.active_dungeon {
                     let events = on_elite_defeated(dungeon);
                     for event in events {
-                        if matches!(event, dungeon_logic::DungeonEvent::FoundKey) {
+                        if matches!(event, dungeon::logic::DungeonEvent::FoundKey) {
                             game_state.combat_state.add_log_entry(
                                 "🗝️ Found the dungeon key!".to_string(),
                                 false,
@@ -1546,7 +1521,7 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
                 // Calculate boss bonus XP (copy values before mutable borrow)
                 let (bonus_xp, total_xp, items) = if let Some(dungeon) = &game_state.active_dungeon
                 {
-                    let bonus = dungeon_logic::calculate_boss_xp_reward(dungeon.size);
+                    let bonus = dungeon::logic::calculate_boss_xp_reward(dungeon.size);
                     let total = dungeon.xp_earned + xp_gained + bonus;
                     let item_count = dungeon.collected_items.len();
                     (bonus, total, item_count)

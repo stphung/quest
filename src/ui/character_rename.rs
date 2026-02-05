@@ -1,5 +1,5 @@
-use crate::character_manager::CharacterInfo;
-use crate::prestige::get_prestige_tier;
+use crate::character::manager::CharacterInfo;
+use crate::character::prestige::get_prestige_tier;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -182,7 +182,8 @@ impl CharacterRenameScreen {
     }
 
     pub fn validate(&mut self) {
-        self.validation_error = crate::character_manager::validate_name(&self.new_name_input).err();
+        self.validation_error =
+            crate::character::manager::validate_name(&self.new_name_input).err();
     }
 
     pub fn is_valid(&self) -> bool {

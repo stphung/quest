@@ -1,6 +1,6 @@
-use crate::character_manager::CharacterInfo;
-use crate::items::EquipmentSlot;
-use crate::prestige::get_prestige_tier;
+use crate::character::manager::CharacterInfo;
+use crate::character::prestige::get_prestige_tier;
+use crate::items::types::EquipmentSlot;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -182,15 +182,15 @@ impl CharacterSelectScreen {
         let attrs = &character.attributes;
         lines.push(Line::from(format!(
             "STR: {}  DEX: {}  CON: {}",
-            attrs.get(crate::attributes::AttributeType::Strength),
-            attrs.get(crate::attributes::AttributeType::Dexterity),
-            attrs.get(crate::attributes::AttributeType::Constitution)
+            attrs.get(crate::character::attributes::AttributeType::Strength),
+            attrs.get(crate::character::attributes::AttributeType::Dexterity),
+            attrs.get(crate::character::attributes::AttributeType::Constitution)
         )));
         lines.push(Line::from(format!(
             "INT: {}  WIS: {}  CHA: {}",
-            attrs.get(crate::attributes::AttributeType::Intelligence),
-            attrs.get(crate::attributes::AttributeType::Wisdom),
-            attrs.get(crate::attributes::AttributeType::Charisma)
+            attrs.get(crate::character::attributes::AttributeType::Intelligence),
+            attrs.get(crate::character::attributes::AttributeType::Wisdom),
+            attrs.get(crate::character::attributes::AttributeType::Charisma)
         )));
 
         // Equipment section
