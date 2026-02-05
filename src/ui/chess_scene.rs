@@ -1,49 +1,42 @@
 //! Chess board UI rendering.
 
 use super::game_common::{
-    render_forfeit_status_bar, render_game_over_overlay, render_status_bar,
-    render_thinking_status_bar, GameResultType,
+    create_game_layout, render_forfeit_status_bar, render_game_over_overlay,
+    render_info_panel_frame, render_status_bar, render_thinking_status_bar, GameResultType,
 };
 use crate::chess::{ChessGame, ChessResult};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::Paragraph,
     Frame,
 };
 
 /// Render the chess game scene
 pub fn render_chess_scene(frame: &mut Frame, area: Rect, game: &ChessGame) {
-    frame.render_widget(Clear, area);
-
     // Check for game over overlay
     if let Some(result) = game.game_result {
         render_chess_game_over(frame, area, result, game.difficulty.reward_prestige());
         return;
     }
 
-    let block = Block::default()
-        .title(" Chess ")
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Cyan));
+    // Use shared layout (content needs 19 lines: 1 for move history + 18 for board)
+    let layout = create_game_layout(frame, area, " Chess ", Color::Cyan, 19, 22);
 
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-
-    // Vertical layout: move history on top, board in middle, status at bottom
-    let chunks = Layout::default()
+    // Split content area: move history on top, board below
+    let content_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(1), // Move history (single line)
-            Constraint::Min(18),   // Board (8 rows * 2 + 2 borders)
-            Constraint::Length(2), // Status
+            Constraint::Min(18),   // Board
         ])
-        .split(inner);
+        .split(layout.content);
 
-    render_move_history(frame, chunks[0], game);
-    render_board(frame, chunks[1], game);
-    render_status(frame, chunks[2], game);
+    render_move_history(frame, content_chunks[0], game);
+    render_board(frame, content_chunks[1], game);
+    render_status(frame, layout.status_bar, game);
+    render_info_panel(frame, layout.info_panel, game);
 }
 
 fn render_board(frame: &mut Frame, area: Rect, game: &ChessGame) {
@@ -301,6 +294,49 @@ fn render_move_history(frame: &mut Frame, area: Rect, game: &ChessGame) {
 
     let text = Paragraph::new(Line::from(spans)).alignment(Alignment::Center);
     frame.render_widget(text, area);
+}
+
+fn render_info_panel(frame: &mut Frame, area: Rect, game: &ChessGame) {
+    let inner = render_info_panel_frame(frame, area);
+
+    let lines: Vec<Line> = vec![
+        Line::from(Span::styled(
+            "RULES",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(Span::styled(
+            "Checkmate the enemy",
+            Style::default().fg(Color::Gray),
+        )),
+        Line::from(Span::styled(
+            "king to win.",
+            Style::default().fg(Color::Gray),
+        )),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Difficulty: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(game.difficulty.name(), Style::default().fg(Color::Cyan)),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("You: ", Style::default().fg(Color::White)),
+            Span::styled(
+                "♚♛♜♝♞♟",
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("Foe: ", Style::default().fg(Color::Gray)),
+            Span::styled("♔♕♖♗♘♙", Style::default().fg(Color::Rgb(140, 140, 140))),
+        ]),
+    ];
+
+    let text = Paragraph::new(lines);
+    frame.render_widget(text, inner);
 }
 
 fn render_chess_game_over(frame: &mut Frame, area: Rect, result: ChessResult, prestige: u32) {

@@ -1,22 +1,20 @@
 //! Nine Men's Morris UI rendering.
 
 use super::game_common::{
-    render_forfeit_status_bar, render_game_over_overlay, render_info_panel_frame,
-    render_status_bar, render_thinking_status_bar, GameResultType,
+    create_game_layout, render_forfeit_status_bar, render_game_over_overlay,
+    render_info_panel_frame, render_status_bar, render_thinking_status_bar, GameResultType,
 };
 use crate::morris::{MorrisGame, MorrisPhase, MorrisResult, Player, ADJACENCIES};
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::Paragraph,
     Frame,
 };
 
 /// Render the Nine Men's Morris game scene
 pub fn render_morris_scene(frame: &mut Frame, area: Rect, game: &MorrisGame, character_level: u32) {
-    frame.render_widget(Clear, area);
-
     // Check for game over overlay
     if let Some(result) = game.game_result {
         let xp_for_level = crate::game_logic::xp_for_next_level(character_level.max(1));
@@ -28,35 +26,12 @@ pub fn render_morris_scene(frame: &mut Frame, area: Rect, game: &MorrisGame, cha
         return;
     }
 
-    let block = Block::default()
-        .title(" Nine Men's Morris ")
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Cyan));
+    // Use shared layout
+    let layout = create_game_layout(frame, area, " Nine Men's Morris ", Color::Cyan, 13, 24);
 
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-
-    // Horizontal layout: Board on left (~30 chars), Help panel on right (~24 chars)
-    let chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Min(30),    // Board area
-            Constraint::Length(24), // Help panel
-        ])
-        .split(inner);
-
-    // Vertical layout for board area: Board + Status
-    let board_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Min(13),   // Board (13 lines)
-            Constraint::Length(2), // Status (2 lines)
-        ])
-        .split(chunks[0]);
-
-    render_board(frame, board_chunks[0], game);
-    render_status(frame, board_chunks[1], game);
-    render_info_panel(frame, chunks[1], game);
+    render_board(frame, layout.content, game);
+    render_status(frame, layout.status_bar, game);
+    render_info_panel(frame, layout.info_panel, game);
 }
 
 /// Position coordinates for rendering the 24 board positions
