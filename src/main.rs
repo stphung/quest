@@ -456,6 +456,7 @@ fn main() -> io::Result<()> {
                 let mut last_update_check = Instant::now();
                 let mut tick_counter: u32 = 0;
                 let mut showing_prestige_confirm = false;
+                let mut showing_haven_discovery = false;
                 let mut debug_menu = utils::debug_menu::DebugMenu::new();
 
                 // Save indicator state (for non-debug mode)
@@ -521,6 +522,14 @@ fn main() -> io::Result<()> {
                     // Poll for input (50ms non-blocking)
                     if event::poll(Duration::from_millis(50))? {
                         if let Event::Key(key_event) = event::read()? {
+                            // Handle Haven discovery modal (blocks other input)
+                            if showing_haven_discovery {
+                                if matches!(key_event.code, KeyCode::Enter | KeyCode::Esc) {
+                                    showing_haven_discovery = false;
+                                }
+                                continue;
+                            }
+
                             // Handle prestige confirmation dialog
                             if showing_prestige_confirm {
                                 match key_event.code {
@@ -737,6 +746,24 @@ fn main() -> io::Result<()> {
                     if last_tick.elapsed() >= Duration::from_millis(TICK_INTERVAL_MS) {
                         game_tick(&mut state, &mut tick_counter);
                         last_tick = Instant::now();
+
+                        // Haven discovery check (independent roll, once per tick)
+                        if !haven.discovered
+                            && state.prestige_rank >= 10
+                            && state.active_dungeon.is_none()
+                            && state.active_fishing.is_none()
+                            && state.active_chess.is_none()
+                            && state.active_morris.is_none()
+                            && state.active_gomoku.is_none()
+                            && state.active_minesweeper.is_none()
+                            && state.active_rune.is_none()
+                        {
+                            let mut rng = rand::thread_rng();
+                            if haven::try_discover_haven(&mut haven, state.prestige_rank, &mut rng) {
+                                haven::save_haven(&haven).ok();
+                                showing_haven_discovery = true;
+                            }
+                        }
                     }
 
                     // Auto-save every 30 seconds (skip in debug mode)
