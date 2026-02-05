@@ -1,8 +1,8 @@
 //! Nine Men's Morris UI rendering.
 
 use super::game_common::{
-    render_forfeit_status_bar, render_game_over_overlay, render_status_bar,
-    render_thinking_status_bar, GameResultType,
+    render_forfeit_status_bar, render_game_over_overlay, render_info_panel_frame,
+    render_status_bar, render_thinking_status_bar, GameResultType,
 };
 use crate::morris::{MorrisGame, MorrisPhase, MorrisResult, Player, ADJACENCIES};
 use ratatui::{
@@ -56,7 +56,7 @@ pub fn render_morris_scene(frame: &mut Frame, area: Rect, game: &MorrisGame, cha
 
     render_board(frame, board_chunks[0], game);
     render_status(frame, board_chunks[1], game);
-    render_help_panel(frame, chunks[1], game);
+    render_info_panel(frame, chunks[1], game);
 }
 
 /// Position coordinates for rendering the 24 board positions
@@ -363,14 +363,8 @@ fn render_status(frame: &mut Frame, area: Rect, game: &MorrisGame) {
     render_status_bar(frame, area, status_text, status_color, controls);
 }
 
-fn render_help_panel(frame: &mut Frame, area: Rect, game: &MorrisGame) {
-    let block = Block::default()
-        .title(" Info ")
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray));
-
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
+fn render_info_panel(frame: &mut Frame, area: Rect, game: &MorrisGame) {
+    let inner = render_info_panel_frame(frame, area);
 
     // Piece counts
     let human_on_board = game.pieces_on_board.0;

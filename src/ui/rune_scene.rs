@@ -1,15 +1,15 @@
 //! Rune Deciphering game UI rendering.
 
 use super::game_common::{
-    create_game_layout, render_forfeit_status_bar, render_game_over_overlay, render_status_bar,
-    GameResultType,
+    create_game_layout, render_forfeit_status_bar, render_game_over_overlay,
+    render_info_panel_frame, render_status_bar, GameResultType,
 };
 use crate::rune::{FeedbackMark, RuneGame, RuneResult, RUNE_SYMBOLS};
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::Paragraph,
     Frame,
 };
 
@@ -140,10 +140,6 @@ const RUNE_CONTROLS: &[(&str, &str)] = &[
 ];
 
 fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &RuneGame) {
-    if game.game_result.is_some() {
-        return;
-    }
-
     // Handle rejection message specially (shows error inline)
     if let Some(ref msg) = game.reject_message {
         render_status_bar(frame, area, msg, Color::LightRed, RUNE_CONTROLS);
@@ -165,13 +161,7 @@ fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &RuneGame) {
 
 /// Render the info panel on the right side.
 fn render_info_panel(frame: &mut Frame, area: Rect, game: &RuneGame) {
-    let block = Block::default()
-        .title(" Info ")
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray));
-
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
+    let inner = render_info_panel_frame(frame, area);
 
     let mut lines: Vec<Line> = vec![
         Line::from(vec![

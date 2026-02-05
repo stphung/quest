@@ -1,15 +1,15 @@
 //! Minesweeper game UI rendering.
 
 use super::game_common::{
-    create_game_layout, render_forfeit_status_bar, render_game_over_overlay, render_status_bar,
-    GameResultType,
+    create_game_layout, render_forfeit_status_bar, render_game_over_overlay,
+    render_info_panel_frame, render_status_bar, GameResultType,
 };
 use crate::minesweeper::{Cell, MinesweeperGame, MinesweeperResult};
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::Paragraph,
     Frame,
 };
 
@@ -50,7 +50,7 @@ fn render_grid(frame: &mut Frame, area: Rect, game: &MinesweeperGame) {
             let cell = &game.grid[row][col];
             let is_cursor = game.cursor == (row, col);
 
-            let (text, color) = get_cell_display(cell, game_over);
+            let (text, color) = get_cell_display(cell);
 
             let mut style = Style::default().fg(color);
             if is_cursor && !game_over {
@@ -69,7 +69,7 @@ fn render_grid(frame: &mut Frame, area: Rect, game: &MinesweeperGame) {
 }
 
 /// Get the display text and color for a cell.
-fn get_cell_display(cell: &Cell, _game_over: bool) -> (&'static str, Color) {
+fn get_cell_display(cell: &Cell) -> (&'static str, Color) {
     if cell.flagged && !cell.revealed {
         return ("F ", Color::Red);
     }
@@ -100,10 +100,6 @@ fn get_cell_display(cell: &Cell, _game_over: bool) -> (&'static str, Color) {
 
 /// Render the status bar below the grid.
 fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &MinesweeperGame) {
-    if game.game_result.is_some() {
-        return;
-    }
-
     if render_forfeit_status_bar(frame, area, game.forfeit_pending) {
         return;
     }
@@ -130,13 +126,7 @@ fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &MinesweeperGa
 
 /// Render the info panel on the right side.
 fn render_info_panel(frame: &mut Frame, area: Rect, game: &MinesweeperGame) {
-    let block = Block::default()
-        .title(" Info ")
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray));
-
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
+    let inner = render_info_panel_frame(frame, area);
 
     // Remaining (mines - flags)
     let remaining = game.mines_remaining();

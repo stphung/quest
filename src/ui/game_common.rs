@@ -222,6 +222,19 @@ pub fn render_game_over_overlay(
     );
 }
 
+/// Render an info panel frame with standard " Info " title and DarkGray border.
+///
+/// Returns the inner Rect for content rendering.
+pub fn render_info_panel_frame(frame: &mut Frame, area: Rect) -> Rect {
+    let block = Block::default()
+        .title(" Info ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::DarkGray));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+    inner
+}
+
 /// Forfeit confirmation status text.
 pub const FORFEIT_STATUS_TEXT: &str = "Forfeit game?";
 

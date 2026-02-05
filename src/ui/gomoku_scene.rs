@@ -1,15 +1,15 @@
 //! Gomoku game UI rendering.
 
 use super::game_common::{
-    create_game_layout, render_forfeit_status_bar, render_game_over_overlay, render_status_bar,
-    render_thinking_status_bar, GameResultType,
+    create_game_layout, render_forfeit_status_bar, render_game_over_overlay,
+    render_info_panel_frame, render_status_bar, render_thinking_status_bar, GameResultType,
 };
 use crate::gomoku::{GomokuGame, Player, BOARD_SIZE};
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::Paragraph,
     Frame,
 };
 
@@ -103,10 +103,6 @@ fn render_board(frame: &mut Frame, area: Rect, game: &GomokuGame) {
 
 /// Render the status bar below the board.
 fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &GomokuGame) {
-    if game.game_result.is_some() {
-        return;
-    }
-
     if game.ai_thinking {
         render_thinking_status_bar(frame, area, "Opponent is thinking...");
         return;
@@ -130,13 +126,7 @@ fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &GomokuGame) {
 }
 
 fn render_info_panel(frame: &mut Frame, area: Rect, game: &GomokuGame) {
-    let block = Block::default()
-        .title(" Info ")
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray));
-
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
+    let inner = render_info_panel_frame(frame, area);
 
     let lines: Vec<Line> = vec![
         Line::from(Span::styled(
