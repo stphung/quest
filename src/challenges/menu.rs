@@ -349,6 +349,32 @@ pub enum ChallengeType {
     Rune,
 }
 
+impl ChallengeType {
+    /// Returns the icon used for this challenge type in log messages.
+    pub fn icon(&self) -> &'static str {
+        match self {
+            ChallengeType::Chess => "♟",
+            ChallengeType::Morris => "\u{25CB}", // ○
+            ChallengeType::Gomoku => "◎",
+            ChallengeType::Minesweeper => "\u{26A0}", // ⚠
+            ChallengeType::Rune => "ᚱ",
+        }
+    }
+
+    /// Returns the flavor text shown when this challenge is discovered.
+    pub fn discovery_flavor(&self) -> &'static str {
+        match self {
+            ChallengeType::Chess => "A mysterious figure steps from the shadows...",
+            ChallengeType::Morris => "A cloaked stranger approaches with a weathered board...",
+            ChallengeType::Gomoku => "A wandering strategist places a worn board before you...",
+            ChallengeType::Minesweeper => {
+                "A weathered scout beckons you toward a ruined corridor..."
+            }
+            ChallengeType::Rune => "A glowing stone tablet materializes before you...",
+        }
+    }
+}
+
 /// Menu state for navigation
 #[derive(Debug, Clone, Default)]
 pub struct ChallengeMenu {
@@ -547,6 +573,45 @@ mod tests {
             description: "A mysterious figure challenges you to chess.".to_string(),
         }
     }
+
+    // ============ ChallengeType Method Tests ============
+
+    #[test]
+    fn test_challenge_type_icon_returns_non_empty() {
+        assert!(!ChallengeType::Chess.icon().is_empty());
+        assert!(!ChallengeType::Morris.icon().is_empty());
+        assert!(!ChallengeType::Gomoku.icon().is_empty());
+        assert!(!ChallengeType::Minesweeper.icon().is_empty());
+        assert!(!ChallengeType::Rune.icon().is_empty());
+    }
+
+    #[test]
+    fn test_challenge_type_discovery_flavor_returns_non_empty() {
+        assert!(!ChallengeType::Chess.discovery_flavor().is_empty());
+        assert!(!ChallengeType::Morris.discovery_flavor().is_empty());
+        assert!(!ChallengeType::Gomoku.discovery_flavor().is_empty());
+        assert!(!ChallengeType::Minesweeper.discovery_flavor().is_empty());
+        assert!(!ChallengeType::Rune.discovery_flavor().is_empty());
+    }
+
+    #[test]
+    fn test_challenge_type_icons_are_unique() {
+        let icons = [
+            ChallengeType::Chess.icon(),
+            ChallengeType::Morris.icon(),
+            ChallengeType::Gomoku.icon(),
+            ChallengeType::Minesweeper.icon(),
+            ChallengeType::Rune.icon(),
+        ];
+        // Check all pairs are different
+        for i in 0..icons.len() {
+            for j in (i + 1)..icons.len() {
+                assert_ne!(icons[i], icons[j], "Icons should be unique");
+            }
+        }
+    }
+
+    // ============ ChallengeMenu Tests ============
 
     #[test]
     fn test_new_menu_is_empty() {

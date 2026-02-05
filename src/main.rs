@@ -16,9 +16,7 @@ use challenges::gomoku::logic::{
     apply_game_result as apply_gomoku_result, process_ai_thinking as process_gomoku_ai,
     process_input as process_gomoku_input, GomokuInput,
 };
-use challenges::menu::{
-    process_input as process_menu_input, try_discover_challenge, ChallengeType, MenuInput,
-};
+use challenges::menu::{process_input as process_menu_input, try_discover_challenge, MenuInput};
 use challenges::minesweeper::logic::{
     apply_game_result as apply_minesweeper_result, process_input as process_minesweeper_input,
     MinesweeperInput,
@@ -806,22 +804,8 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
     {
         let mut rng = rand::thread_rng();
         if let Some(challenge_type) = try_discover_challenge(game_state, &mut rng) {
-            let (icon, flavor) = match challenge_type {
-                ChallengeType::Chess => ("♟", "A mysterious figure steps from the shadows..."),
-                ChallengeType::Morris => (
-                    "\u{25CB}",
-                    "A cloaked stranger approaches with a weathered board...",
-                ),
-                ChallengeType::Gomoku => (
-                    "◎",
-                    "A wandering strategist places a worn board before you...",
-                ),
-                ChallengeType::Minesweeper => (
-                    "\u{26A0}",
-                    "A weathered scout beckons you toward a ruined corridor...",
-                ),
-                ChallengeType::Rune => ("ᚱ", "A glowing stone tablet materializes before you..."),
-            };
+            let icon = challenge_type.icon();
+            let flavor = challenge_type.discovery_flavor();
             game_state
                 .combat_state
                 .add_log_entry(format!("{} {}", icon, flavor), false, true);
