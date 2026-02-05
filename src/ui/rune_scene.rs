@@ -13,16 +13,24 @@ use ratatui::{
 pub fn render_rune(frame: &mut Frame, area: Rect, game: &RuneGame) {
     frame.render_widget(Clear, area);
 
-    let chunks = Layout::default()
+    // Horizontal: game area (left) + info panel (right)
+    let h_chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Min(20), Constraint::Length(24)])
+        .constraints([Constraint::Min(20), Constraint::Length(22)])
         .split(area);
 
-    render_grid(frame, chunks[0], game);
-    render_info_panel(frame, chunks[1], game);
+    // Left side: grid (top) + status bar (bottom 2 lines)
+    let v_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(6), Constraint::Length(2)])
+        .split(h_chunks[0]);
+
+    render_grid(frame, v_chunks[0], game);
+    render_status_bar(frame, v_chunks[1], game);
+    render_info_panel(frame, h_chunks[1], game);
 
     if game.game_result.is_some() {
-        render_game_over_overlay(frame, chunks[0], game);
+        render_game_over_overlay(frame, h_chunks[0], game);
     }
 }
 
@@ -133,6 +141,65 @@ fn render_grid(frame: &mut Frame, area: Rect, game: &RuneGame) {
     }
 }
 
+/// Render the status bar below the grid (status + controls).
+fn render_status_bar(frame: &mut Frame, area: Rect, game: &RuneGame) {
+    if area.height < 2 {
+        return;
+    }
+
+    // Line 1: Status message
+    let status = if game.game_result.is_some() {
+        Span::styled("", Style::default())
+    } else if let Some(ref msg) = game.reject_message {
+        Span::styled(msg.clone(), Style::default().fg(Color::LightRed))
+    } else if game.forfeit_pending {
+        Span::styled(
+            "Forfeit game? Press Esc again to confirm",
+            Style::default().fg(Color::LightRed),
+        )
+    } else if game.guesses.is_empty() {
+        Span::styled("Begin deciphering", Style::default().fg(Color::Yellow))
+    } else {
+        Span::styled("Deciphering...", Style::default().fg(Color::Green))
+    };
+    let status_line = Paragraph::new(Line::from(vec![Span::raw(" "), status]))
+        .alignment(Alignment::Left);
+    frame.render_widget(
+        status_line,
+        Rect::new(area.x, area.y, area.width, 1),
+    );
+
+    // Line 2: Controls
+    if game.game_result.is_none() {
+        let controls = if game.forfeit_pending {
+            vec![
+                Span::styled(" [Esc]", Style::default().fg(Color::White)),
+                Span::styled(" Confirm  ", Style::default().fg(Color::DarkGray)),
+                Span::styled("[Any]", Style::default().fg(Color::White)),
+                Span::styled(" Cancel", Style::default().fg(Color::DarkGray)),
+            ]
+        } else {
+            vec![
+                Span::styled(" [\u{2190}\u{2192}]", Style::default().fg(Color::White)),
+                Span::styled(" Move  ", Style::default().fg(Color::DarkGray)),
+                Span::styled("[\u{2191}\u{2193}]", Style::default().fg(Color::White)),
+                Span::styled(" Cycle  ", Style::default().fg(Color::DarkGray)),
+                Span::styled("[Enter]", Style::default().fg(Color::White)),
+                Span::styled(" Go  ", Style::default().fg(Color::DarkGray)),
+                Span::styled("[F]", Style::default().fg(Color::White)),
+                Span::styled(" Clear  ", Style::default().fg(Color::DarkGray)),
+                Span::styled("[Esc]", Style::default().fg(Color::White)),
+                Span::styled(" Quit", Style::default().fg(Color::DarkGray)),
+            ]
+        };
+        let controls_line = Paragraph::new(Line::from(controls));
+        frame.render_widget(
+            controls_line,
+            Rect::new(area.x, area.y + 1, area.width, 1),
+        );
+    }
+}
+
 /// Render the info panel on the right side.
 fn render_info_panel(frame: &mut Frame, area: Rect, game: &RuneGame) {
     let block = Block::default()
@@ -144,13 +211,6 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &RuneGame) {
     frame.render_widget(block, area);
 
     let mut lines: Vec<Line> = vec![
-        Line::from(Span::styled(
-            "Rune Deciphering",
-            Style::default()
-                .fg(Color::Magenta)
-                .add_modifier(Modifier::BOLD),
-        )),
-        Line::from(""),
         Line::from(vec![
             Span::styled("Difficulty: ", Style::default().fg(Color::DarkGray)),
             Span::styled(game.difficulty.name(), Style::default().fg(Color::Cyan)),
@@ -172,7 +232,7 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &RuneGame) {
         Line::from(vec![
             Span::styled("Guesses: ", Style::default().fg(Color::DarkGray)),
             Span::styled(
-                format!("{} remaining", game.guesses_remaining()),
+                format!("{} left", game.guesses_remaining()),
                 Style::default().fg(if game.guesses_remaining() <= 2 {
                     Color::Red
                 } else {
@@ -200,66 +260,16 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &RuneGame) {
     )));
     lines.push(Line::from(vec![
         Span::styled(" \u{25CF} ", Style::default().fg(Color::Green)),
-        Span::styled("Correct position", Style::default().fg(Color::DarkGray)),
+        Span::styled("Correct pos", Style::default().fg(Color::DarkGray)),
     ]));
     lines.push(Line::from(vec![
         Span::styled(" \u{25CB} ", Style::default().fg(Color::Yellow)),
-        Span::styled("Wrong position", Style::default().fg(Color::DarkGray)),
+        Span::styled("Wrong pos", Style::default().fg(Color::DarkGray)),
     ]));
     lines.push(Line::from(vec![
         Span::styled(" \u{00B7} ", Style::default().fg(Color::DarkGray)),
         Span::styled("Not in code", Style::default().fg(Color::DarkGray)),
     ]));
-
-    lines.push(Line::from(""));
-
-    let status = if game.game_result.is_some() {
-        Span::styled("", Style::default())
-    } else if let Some(ref msg) = game.reject_message {
-        Span::styled(msg.clone(), Style::default().fg(Color::LightRed))
-    } else if game.forfeit_pending {
-        Span::styled("Forfeit game?", Style::default().fg(Color::LightRed))
-    } else if game.guesses.is_empty() {
-        Span::styled("Begin deciphering", Style::default().fg(Color::Yellow))
-    } else {
-        Span::styled("Deciphering...", Style::default().fg(Color::Green))
-    };
-    lines.push(Line::from(status));
-    lines.push(Line::from(""));
-
-    if game.game_result.is_none() {
-        if game.forfeit_pending {
-            lines.push(Line::from(Span::styled(
-                "[Esc] Confirm forfeit",
-                Style::default().fg(Color::DarkGray),
-            )));
-            lines.push(Line::from(Span::styled(
-                "[Any] Cancel",
-                Style::default().fg(Color::DarkGray),
-            )));
-        } else {
-            lines.push(Line::from(Span::styled(
-                "[\u{2190}\u{2192}] Move slot",
-                Style::default().fg(Color::DarkGray),
-            )));
-            lines.push(Line::from(Span::styled(
-                "[\u{2191}\u{2193}] Cycle rune",
-                Style::default().fg(Color::DarkGray),
-            )));
-            lines.push(Line::from(Span::styled(
-                "[Enter] Submit guess",
-                Style::default().fg(Color::DarkGray),
-            )));
-            lines.push(Line::from(Span::styled(
-                "[F] Clear guess",
-                Style::default().fg(Color::DarkGray),
-            )));
-            lines.push(Line::from(Span::styled(
-                "[Esc] Forfeit",
-                Style::default().fg(Color::DarkGray),
-            )));
-        }
-    }
 
     let text = Paragraph::new(lines);
     frame.render_widget(text, inner);
