@@ -186,7 +186,6 @@ mod tests {
 
 /// Score values for different patterns
 const SCORE_FIVE: i32 = 100_000;
-#[allow(dead_code)]
 const SCORE_OPEN_FOUR: i32 = 10_000;
 const SCORE_CLOSED_FOUR: i32 = 1_000;
 const SCORE_OPEN_THREE: i32 = 500;
@@ -194,6 +193,9 @@ const SCORE_OPEN_THREE: i32 = 500;
 const SCORE_CLOSED_THREE: i32 = 100;
 const SCORE_OPEN_TWO: i32 = 50;
 const SCORE_CENTER_BONUS: i32 = 5;
+
+/// Maximum candidates to evaluate at each depth (limits branching factor)
+const MAX_CANDIDATES: usize = 15;
 
 /// Evaluate the board from AI's perspective.
 /// Positive = good for AI, negative = good for Human.
@@ -378,6 +380,128 @@ fn get_candidate_moves(board: &[[Option<Player>; BOARD_SIZE]; BOARD_SIZE]) -> Ve
     candidates.into_iter().collect()
 }
 
+/// Quick score for a single move - evaluates only the lines through this position.
+/// Used for move ordering (not full board evaluation).
+fn score_move_quick(
+    board: &[[Option<Player>; BOARD_SIZE]; BOARD_SIZE],
+    row: usize,
+    col: usize,
+    player: Player,
+) -> i32 {
+    let mut score = 0;
+    let opponent = if player == Player::Ai {
+        Player::Human
+    } else {
+        Player::Ai
+    };
+
+    // Check all 4 directions through this position
+    for (dr, dc) in DIRECTIONS {
+        // Count our stones and empty spaces in this line (window of 5 centered on position)
+        let (own, opp, _empty) = count_line_window(board, row, col, dr, dc, player);
+
+        // Score based on what placing here would create
+        if opp == 0 {
+            // No opponent stones blocking this line
+            match own {
+                4 => score += SCORE_FIVE,      // Would make 5
+                3 => score += SCORE_OPEN_FOUR, // Would make open 4
+                2 => score += SCORE_OPEN_THREE,
+                1 => score += SCORE_OPEN_TWO,
+                _ => {}
+            }
+        } else if own == 0 {
+            // Check if this blocks opponent's threat
+            let (opp_own, _, _) = count_line_window(board, row, col, dr, dc, opponent);
+            match opp_own {
+                4 => score += SCORE_FIVE / 2,      // Block their winning move
+                3 => score += SCORE_OPEN_FOUR / 2, // Block their open 4
+                2 => score += SCORE_OPEN_THREE / 2,
+                _ => {}
+            }
+        }
+    }
+
+    // Small bonus for center proximity
+    let center = BOARD_SIZE / 2;
+    let dist = (row as i32 - center as i32).abs() + (col as i32 - center as i32).abs();
+    score += (BOARD_SIZE as i32 - dist) * 2;
+
+    score
+}
+
+/// Count stones in a line window of 5 centered on (row, col).
+/// Returns (own_count, opponent_count, empty_count).
+fn count_line_window(
+    board: &[[Option<Player>; BOARD_SIZE]; BOARD_SIZE],
+    row: usize,
+    col: usize,
+    dr: i32,
+    dc: i32,
+    player: Player,
+) -> (i32, i32, i32) {
+    let mut own = 0;
+    let mut opp = 0;
+    let mut empty = 0;
+
+    // Check 4 positions in each direction (plus center = 9 total, but we want patterns of 5)
+    for offset in -4i32..=4 {
+        let r = row as i32 + dr * offset;
+        let c = col as i32 + dc * offset;
+
+        if r >= 0 && r < BOARD_SIZE as i32 && c >= 0 && c < BOARD_SIZE as i32 {
+            match board[r as usize][c as usize] {
+                Some(p) if p == player => own += 1,
+                Some(_) => opp += 1,
+                None => empty += 1,
+            }
+        }
+    }
+
+    (own, opp, empty)
+}
+
+/// Get candidate moves sorted by quick heuristic score (best first).
+/// Limits to MAX_CANDIDATES to reduce branching factor.
+fn get_ordered_candidates(
+    board: &[[Option<Player>; BOARD_SIZE]; BOARD_SIZE],
+    maximizing: bool,
+) -> Vec<(usize, usize)> {
+    let candidates = get_candidate_moves(board);
+
+    if candidates.len() <= MAX_CANDIDATES {
+        // Few candidates - just sort them
+        let player = if maximizing {
+            Player::Ai
+        } else {
+            Player::Human
+        };
+        let mut scored: Vec<_> = candidates
+            .into_iter()
+            .map(|(r, c)| ((r, c), score_move_quick(board, r, c, player)))
+            .collect();
+        scored.sort_by(|a, b| b.1.cmp(&a.1)); // Descending by score
+        return scored.into_iter().map(|(pos, _)| pos).collect();
+    }
+
+    // Many candidates - score, sort, and limit
+    let player = if maximizing {
+        Player::Ai
+    } else {
+        Player::Human
+    };
+    let mut scored: Vec<_> = candidates
+        .into_iter()
+        .map(|(r, c)| ((r, c), score_move_quick(board, r, c, player)))
+        .collect();
+    scored.sort_by(|a, b| b.1.cmp(&a.1)); // Descending by score
+    scored
+        .into_iter()
+        .take(MAX_CANDIDATES)
+        .map(|(pos, _)| pos)
+        .collect()
+}
+
 /// Minimax with alpha-beta pruning.
 fn minimax(
     board: &mut [[Option<Player>; BOARD_SIZE]; BOARD_SIZE],
@@ -403,7 +527,8 @@ fn minimax(
         return evaluate_board(board);
     }
 
-    let candidates = get_candidate_moves(board);
+    // Get candidates sorted by heuristic score (best first) and limited in count
+    let candidates = get_ordered_candidates(board, maximizing);
     if candidates.is_empty() {
         return 0; // Draw
     }
@@ -465,11 +590,12 @@ pub fn find_best_move<R: Rng>(game: &GomokuGame, rng: &mut R) -> Option<(usize, 
         board[r][c] = None;
     }
 
-    // Use minimax for other moves
+    // Use minimax for other moves (with ordered and limited candidates for speed)
+    let ordered_candidates = get_ordered_candidates(&board, true);
     let mut best_moves = Vec::new();
     let mut best_score = i32::MIN;
 
-    for (r, c) in candidates {
+    for (r, c) in ordered_candidates {
         board[r][c] = Some(Player::Ai);
         let score = minimax(
             &mut board,
