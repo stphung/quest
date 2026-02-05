@@ -6,9 +6,11 @@ The Haven is an account-level base building system presented as a skill tree. Pl
 
 ## Unlock Conditions
 
-- **Prestige gate:** Character must reach P10 (Celestial tier)
-- **Discovery:** Once at P10, the Haven enters the weighted discovery table alongside challenges (~2hr average via RNG tick)
-- **Persistence:** Once any character discovers the Haven, it remains accessible to all characters regardless of prestige rank — even if the discovering character drops below P10 through spending
+- **Prestige gate:** Character must be P10+ (Celestial tier)
+- **Discovery:** Independent RNG roll per tick (separate from challenge discovery). Chance scales with prestige rank so higher-prestige players find it faster:
+  - `chance = 0.000014 + (prestige_rank - 10) * 0.000007`
+  - P10: ~2 hours average, P12: ~1 hour, P15: ~34 min, P20: ~20 min
+- **One-time:** Once any character discovers the Haven, it remains accessible account-wide to all characters regardless of prestige rank — even if the discovering character drops below P10 through spending
 
 ## Currency: Prestige Ranks & Fishing Ranks
 
@@ -400,7 +402,7 @@ Bonuses are computed once when a character is loaded, not every tick. Each syste
 
 ### Discovery
 
-Add Haven to the weighted discovery table in `challenge_menu.rs`. Requires P10+. Once discovered, set `haven.discovered = true` and save `haven.json`.
+Separate RNG roll per tick in the game loop, independent from challenge discovery. Requires P10+, not in dungeon/fishing/minigame. Chance scales with prestige: `0.000014 + (prestige_rank - 10) * 0.000007`. On success, set `haven.discovered = true`, save `haven.json`, and show the discovery modal overlay.
 
 ### Spending
 
