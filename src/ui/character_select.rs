@@ -1,5 +1,6 @@
 use crate::character::manager::CharacterInfo;
 use crate::character::prestige::get_prestige_tier;
+use crate::haven::{Haven, HavenRoomId};
 use crate::items::types::EquipmentSlot;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -20,15 +21,27 @@ impl CharacterSelectScreen {
         Self { selected_index: 0 }
     }
 
-    pub fn draw(&self, f: &mut Frame, area: Rect, characters: &[CharacterInfo]) {
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .margin(2)
-            .constraints([
+    pub fn draw(&self, f: &mut Frame, area: Rect, characters: &[CharacterInfo], haven: &Haven) {
+        // Only show Haven section if discovered (keep it secret otherwise!)
+        let constraints = if haven.discovered {
+            vec![
+                Constraint::Length(3),  // Title
+                Constraint::Min(0),     // Main content
+                Constraint::Length(14), // Haven tree
+                Constraint::Length(3),  // Controls
+            ]
+        } else {
+            vec![
                 Constraint::Length(3), // Title
                 Constraint::Min(0),    // Main content
                 Constraint::Length(3), // Controls
-            ])
+            ]
+        };
+
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(2)
+            .constraints(constraints)
             .split(area);
 
         // Title
@@ -56,6 +69,14 @@ impl CharacterSelectScreen {
         // Draw character details
         self.draw_character_details(f, main_chunks[1], characters);
 
+        // Draw Haven tree (only if discovered)
+        let controls_idx = if haven.discovered {
+            self.draw_haven_tree(f, chunks[2], haven);
+            3
+        } else {
+            2
+        };
+
         // Controls
         let new_button = if characters.len() >= 3 {
             "[N] New (Max 3)"
@@ -68,7 +89,7 @@ impl CharacterSelectScreen {
         ))
         .alignment(Alignment::Center)
         .style(Style::default().fg(Color::Gray));
-        f.render_widget(controls, chunks[2]);
+        f.render_widget(controls, chunks[controls_idx]);
     }
 
     fn draw_character_list(&self, f: &mut Frame, area: Rect, characters: &[CharacterInfo]) {
@@ -222,6 +243,74 @@ impl CharacterSelectScreen {
 
         let details_widget = Paragraph::new(lines);
         f.render_widget(details_widget, inner_area);
+    }
+
+    fn draw_haven_tree(&self, f: &mut Frame, area: Rect, haven: &Haven) {
+        let block = Block::default().borders(Borders::ALL).title(format!(
+            "Haven ({}/39 tiers)",
+            self.count_haven_tiers(haven)
+        ));
+
+        let inner_area = block.inner(area);
+        f.render_widget(block, area);
+
+        // Build the diamond layout
+        let lines = self.build_haven_diamond(haven);
+        let tree_widget = Paragraph::new(lines).alignment(Alignment::Center);
+        f.render_widget(tree_widget, inner_area);
+    }
+
+    fn count_haven_tiers(&self, haven: &Haven) -> u8 {
+        HavenRoomId::ALL.iter().map(|r| haven.room_tier(*r)).sum()
+    }
+
+    fn tier_dots(&self, tier: u8) -> String {
+        match tier {
+            0 => "○○○".to_string(),
+            1 => "●○○".to_string(),
+            2 => "●●○".to_string(),
+            3 => "●●●".to_string(),
+            _ => "○○○".to_string(),
+        }
+    }
+
+    fn build_haven_diamond(&self, haven: &Haven) -> Vec<Line<'static>> {
+        let hs = self.tier_dots(haven.room_tier(HavenRoomId::Hearthstone));
+        let arm = self.tier_dots(haven.room_tier(HavenRoomId::Armory));
+        let bed = self.tier_dots(haven.room_tier(HavenRoomId::Bedroom));
+        let trn = self.tier_dots(haven.room_tier(HavenRoomId::TrainingYard));
+        let tph = self.tier_dots(haven.room_tier(HavenRoomId::TrophyHall));
+        let gdn = self.tier_dots(haven.room_tier(HavenRoomId::Garden));
+        let lib = self.tier_dots(haven.room_tier(HavenRoomId::Library));
+        let wtc = self.tier_dots(haven.room_tier(HavenRoomId::Watchtower));
+        let alc = self.tier_dots(haven.room_tier(HavenRoomId::AlchemyLab));
+        let dck = self.tier_dots(haven.room_tier(HavenRoomId::FishingDock));
+        let wks = self.tier_dots(haven.room_tier(HavenRoomId::Workshop));
+        let war = self.tier_dots(haven.room_tier(HavenRoomId::WarRoom));
+        let vlt = self.tier_dots(haven.room_tier(HavenRoomId::Vault));
+
+        vec![
+            Line::from(format!("                      ♨ {}", hs)),
+            Line::from("                    Hearthstone"),
+            Line::from("                    ╱         ╲"),
+            Line::from(format!("              ⚔ {}             {} 🛏", arm, bed)),
+            Line::from("              Armory           Bedroom"),
+            Line::from("             ╱     ╲           ╱     ╲"),
+            Line::from(format!(
+                "        {}       {}     {}       {}",
+                trn, tph, gdn, lib
+            )),
+            Line::from("       Train     Trophy  Garden    Library"),
+            Line::from("         │         │       │         │"),
+            Line::from(format!(
+                "        {}       {}     {}       {}",
+                wtc, alc, dck, wks
+            )),
+            Line::from("       Watch     Alchem   Dock    Workshop"),
+            Line::from("          ╲       ╱         ╲       ╱"),
+            Line::from(format!("           {} ⚔             🏦 {}", war, vlt)),
+            Line::from("          War Room            Vault"),
+        ]
     }
 
     pub fn move_up(&mut self, characters: &[CharacterInfo]) {

@@ -12,6 +12,7 @@ use ratatui::{
 };
 
 /// Render a small Haven status indicator (for character select screen)
+#[allow(dead_code)] // May be used for compact display mode later
 pub fn render_haven_indicator(frame: &mut Frame, area: Rect, haven: &Haven) {
     if !haven.discovered {
         return; // Don't show anything if Haven not discovered

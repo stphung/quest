@@ -246,13 +246,11 @@ fn main() -> io::Result<()> {
                 // Refresh character list
                 let characters = character_manager.list_characters()?;
 
-                // Draw character select screen
+                // Draw character select screen (includes Haven tree visualization)
                 terminal.draw(|f| {
                     let area = f.size();
-                    select_screen.draw(f, area, &characters);
-                    // Draw Haven indicator if discovered
-                    ui::haven_scene::render_haven_indicator(f, area, &haven);
-                    // Draw Haven screen if open
+                    select_screen.draw(f, area, &characters, &haven);
+                    // Draw Haven management overlay if open
                     if haven_ui.showing {
                         ui::haven_scene::render_haven_tree(
                             f,
