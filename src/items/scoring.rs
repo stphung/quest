@@ -62,16 +62,14 @@ fn calculate_attribute_weights(game_state: &GameState) -> AttributeBonuses {
 
 pub fn auto_equip_if_better(item: Item, game_state: &mut GameState) -> bool {
     let new_score = score_item(&item, game_state);
+    let current_score = game_state
+        .equipment
+        .get(item.slot)
+        .as_ref()
+        .map(|current| score_item(current, game_state))
+        .unwrap_or(0.0);
 
-    let should_equip = if let Some(current) = game_state.equipment.get(item.slot) {
-        let current_score = score_item(current, game_state);
-        new_score > current_score
-    } else {
-        // Empty slot, always equip
-        true
-    };
-
-    if should_equip {
+    if new_score > current_score {
         game_state.equipment.set(item.slot, Some(item));
         true
     } else {

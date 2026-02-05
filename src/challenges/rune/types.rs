@@ -160,10 +160,11 @@ impl RuneGame {
     pub fn cycle_rune_down(&mut self) {
         self.reject_message = None;
         let slot = self.cursor_slot;
-        self.current_guess[slot] = Some(match self.current_guess[slot] {
-            None => self.num_runes - 1,
-            Some(0) => self.num_runes - 1,
-            Some(i) => i - 1,
+        let current = self.current_guess[slot].unwrap_or(0);
+        self.current_guess[slot] = Some(if current == 0 {
+            self.num_runes - 1
+        } else {
+            current - 1
         });
     }
 
