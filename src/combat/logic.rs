@@ -76,7 +76,8 @@ pub fn update_combat(
             regen_derived.hp_regen_multiplier * (1.0 + haven.hp_regen_percent / 100.0);
 
         // Apply Bedroom bonus: reduce base regen duration
-        let base_regen_duration = HP_REGEN_DURATION_SECONDS * (1.0 - haven.hp_regen_delay_reduction / 100.0);
+        let base_regen_duration =
+            HP_REGEN_DURATION_SECONDS * (1.0 - haven.hp_regen_delay_reduction / 100.0);
         let effective_regen_duration = base_regen_duration / total_regen_multiplier;
 
         state.combat_state.regen_timer += delta_time;
@@ -137,7 +138,11 @@ pub fn update_combat(
 
             // Roll for double strike (War Room bonus)
             let double_strike_roll = rand::thread_rng().gen::<f64>() * 100.0;
-            let num_strikes = if double_strike_roll < haven.double_strike_chance { 2 } else { 1 };
+            let num_strikes = if double_strike_roll < haven.double_strike_chance {
+                2
+            } else {
+                1
+            };
 
             if let Some(enemy) = state.combat_state.current_enemy.as_mut() {
                 // Apply damage (potentially multiple times with double strike)
@@ -148,7 +153,10 @@ pub fn update_combat(
                     enemy.take_damage(damage);
                     // Only first strike uses original crit flag, subsequent strikes are bonus hits
                     let strike_crit = if strike == 0 { was_crit } else { false };
-                    events.push(CombatEvent::PlayerAttack { damage, was_crit: strike_crit });
+                    events.push(CombatEvent::PlayerAttack {
+                        damage,
+                        was_crit: strike_crit,
+                    });
                 }
 
                 // Check if enemy died
@@ -341,7 +349,11 @@ mod tests {
         assert!(state.combat_state.current_enemy.is_none());
 
         // Update to complete regen
-        update_combat(&mut state, HP_REGEN_DURATION_SECONDS, &HavenCombatBonuses::default());
+        update_combat(
+            &mut state,
+            HP_REGEN_DURATION_SECONDS,
+            &HavenCombatBonuses::default(),
+        );
         assert_eq!(
             state.combat_state.player_current_hp,
             state.combat_state.player_max_hp
@@ -596,7 +608,11 @@ mod tests {
         state.combat_state.player_max_hp = 100;
 
         // Partial regen (half duration)
-        update_combat(&mut state, HP_REGEN_DURATION_SECONDS / 2.0, &HavenCombatBonuses::default());
+        update_combat(
+            &mut state,
+            HP_REGEN_DURATION_SECONDS / 2.0,
+            &HavenCombatBonuses::default(),
+        );
 
         // HP should be partially restored (roughly halfway)
         assert!(state.combat_state.player_current_hp > 10);
@@ -807,7 +823,11 @@ mod tests {
 
             // If regenerating, complete regen before next turn
             if state.combat_state.is_regenerating {
-                update_combat(&mut state, HP_REGEN_DURATION_SECONDS, &HavenCombatBonuses::default());
+                update_combat(
+                    &mut state,
+                    HP_REGEN_DURATION_SECONDS,
+                    &HavenCombatBonuses::default(),
+                );
             }
         }
 
@@ -1491,7 +1511,10 @@ mod tests {
             state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
             let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
-            if events.iter().any(|e| matches!(e, CombatEvent::PlayerAttack { was_crit: true, .. })) {
+            if events
+                .iter()
+                .any(|e| matches!(e, CombatEvent::PlayerAttack { was_crit: true, .. }))
+            {
                 crits_no_bonus += 1;
             }
         }
@@ -1507,7 +1530,10 @@ mod tests {
                 ..Default::default()
             };
             let events = update_combat(&mut state, 0.1, &haven);
-            if events.iter().any(|e| matches!(e, CombatEvent::PlayerAttack { was_crit: true, .. })) {
+            if events
+                .iter()
+                .any(|e| matches!(e, CombatEvent::PlayerAttack { was_crit: true, .. }))
+            {
                 crits_with_bonus += 1;
             }
         }
@@ -1604,7 +1630,9 @@ mod tests {
 
         // Should have at least one attack
         assert!(
-            events.iter().any(|e| matches!(e, CombatEvent::PlayerAttack { .. })),
+            events
+                .iter()
+                .any(|e| matches!(e, CombatEvent::PlayerAttack { .. })),
             "Should have at least one attack event"
         );
     }

@@ -46,7 +46,11 @@ pub struct HavenFishingBonuses {
 /// 3. **Reeling** (1-2s) - Fish is biting, reeling in
 ///
 /// `haven` contains Haven bonuses for fishing
-pub fn tick_fishing_with_haven(state: &mut GameState, rng: &mut impl Rng, haven: &HavenFishingBonuses) -> Vec<String> {
+pub fn tick_fishing_with_haven(
+    state: &mut GameState,
+    rng: &mut impl Rng,
+    haven: &HavenFishingBonuses,
+) -> Vec<String> {
     let mut messages = Vec::new();
 
     // Take ownership of active_fishing to work with it
@@ -70,7 +74,8 @@ pub fn tick_fishing_with_haven(state: &mut GameState, rng: &mut impl Rng, haven:
                 session.phase = FishingPhase::Waiting;
                 let base_ticks = fishing_generation::roll_waiting_ticks(rng);
                 // Apply Garden bonus: reduce timers
-                session.ticks_remaining = apply_timer_reduction(base_ticks, haven.timer_reduction_percent);
+                session.ticks_remaining =
+                    apply_timer_reduction(base_ticks, haven.timer_reduction_percent);
                 messages.push("Line cast... waiting for a bite...".to_string());
             }
             FishingPhase::Waiting => {
@@ -78,14 +83,19 @@ pub fn tick_fishing_with_haven(state: &mut GameState, rng: &mut impl Rng, haven:
                 session.phase = FishingPhase::Reeling;
                 let base_ticks = fishing_generation::roll_reeling_ticks(rng);
                 // Apply Garden bonus: reduce timers
-                session.ticks_remaining = apply_timer_reduction(base_ticks, haven.timer_reduction_percent);
+                session.ticks_remaining =
+                    apply_timer_reduction(base_ticks, haven.timer_reduction_percent);
                 messages.push("🐟 Got a bite! Reeling in...".to_string());
             }
             FishingPhase::Reeling => {
                 // Catch the fish!
                 // Check for double fish (Fishing Dock bonus)
                 let double_fish_roll = rng.gen::<f64>() * 100.0;
-                let fish_count = if double_fish_roll < haven.double_fish_chance_percent { 2 } else { 1 };
+                let fish_count = if double_fish_roll < haven.double_fish_chance_percent {
+                    2
+                } else {
+                    1
+                };
 
                 for fish_num in 0..fish_count {
                     let rarity = fishing_generation::roll_fish_rarity(state.fishing.rank, rng);
@@ -115,7 +125,11 @@ pub fn tick_fishing_with_haven(state: &mut GameState, rng: &mut impl Rng, haven:
                         FishRarity::Epic => "Epic",
                         FishRarity::Legendary => "Legendary",
                     };
-                    let double_msg = if fish_count == 2 && fish_num == 1 { " (DOUBLE!)" } else { "" };
+                    let double_msg = if fish_count == 2 && fish_num == 1 {
+                        " (DOUBLE!)"
+                    } else {
+                        ""
+                    };
                     messages.push(format!(
                         "🎣 Caught {} [{}]! +{} XP{}",
                         fish.name, rarity_name, xp_gained, double_msg
@@ -145,7 +159,8 @@ pub fn tick_fishing_with_haven(state: &mut GameState, rng: &mut impl Rng, haven:
                 // Start casting again for next fish
                 session.phase = FishingPhase::Casting;
                 let base_ticks = fishing_generation::roll_casting_ticks(rng);
-                session.ticks_remaining = apply_timer_reduction(base_ticks, haven.timer_reduction_percent);
+                session.ticks_remaining =
+                    apply_timer_reduction(base_ticks, haven.timer_reduction_percent);
             }
         }
     }

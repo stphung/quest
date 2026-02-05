@@ -250,14 +250,14 @@ fn render_room_detail(
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),          // Description
-            Constraint::Length(1),          // Spacer
-            Constraint::Length(5),          // Bonus info (all 3 tiers)
-            Constraint::Length(1),          // Spacer
-            Constraint::Length(req_height), // Requirements (if any)
+            Constraint::Length(3),                                    // Description
+            Constraint::Length(1),                                    // Spacer
+            Constraint::Length(5),                                    // Bonus info (all 3 tiers)
+            Constraint::Length(1),                                    // Spacer
+            Constraint::Length(req_height),                           // Requirements (if any)
             Constraint::Length(if has_requirements { 1 } else { 0 }), // Spacer after requirements
-            Constraint::Length(3),          // Cost info
-            Constraint::Min(0),             // Padding
+            Constraint::Length(3),                                    // Cost info
+            Constraint::Min(0),                                       // Padding
         ])
         .split(inner);
 
