@@ -120,11 +120,7 @@ impl CharacterManager {
             zone_progression: save_data.zone_progression,
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: save_data.chess_stats,
-            active_chess: None,
-            active_morris: None,
-            active_gomoku: None,
-            active_minesweeper: None,
-            active_rune: None,
+            active_minigame: None,
         })
     }
 
@@ -325,11 +321,7 @@ mod tests {
             zone_progression: crate::zones::ZoneProgression::default(),
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: crate::challenges::chess::ChessStats::default(),
-            active_chess: None,
-            active_morris: None,
-            active_gomoku: None,
-            active_minesweeper: None,
-            active_rune: None,
+            active_minigame: None,
         };
 
         // Save character
@@ -381,11 +373,7 @@ mod tests {
             zone_progression: crate::zones::ZoneProgression::default(),
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: crate::challenges::chess::ChessStats::default(),
-            active_chess: None,
-            active_morris: None,
-            active_gomoku: None,
-            active_minesweeper: None,
-            active_rune: None,
+            active_minigame: None,
         };
 
         let char2 = GameState {
@@ -406,11 +394,7 @@ mod tests {
             zone_progression: crate::zones::ZoneProgression::default(),
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: crate::challenges::chess::ChessStats::default(),
-            active_chess: None,
-            active_morris: None,
-            active_gomoku: None,
-            active_minesweeper: None,
-            active_rune: None,
+            active_minigame: None,
         };
 
         manager.save_character(&char1).unwrap();
@@ -461,11 +445,7 @@ mod tests {
             zone_progression: crate::zones::ZoneProgression::default(),
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: crate::challenges::chess::ChessStats::default(),
-            active_chess: None,
-            active_morris: None,
-            active_gomoku: None,
-            active_minesweeper: None,
-            active_rune: None,
+            active_minigame: None,
         };
 
         manager.save_character(&state).unwrap();
@@ -505,11 +485,7 @@ mod tests {
             zone_progression: crate::zones::ZoneProgression::default(),
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: crate::challenges::chess::ChessStats::default(),
-            active_chess: None,
-            active_morris: None,
-            active_gomoku: None,
-            active_minesweeper: None,
-            active_rune: None,
+            active_minigame: None,
         };
 
         manager.save_character(&state).unwrap();
@@ -576,11 +552,7 @@ mod tests {
             zone_progression: crate::zones::ZoneProgression::default(),
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: crate::challenges::chess::ChessStats::default(),
-            active_chess: None,
-            active_morris: None,
-            active_gomoku: None,
-            active_minesweeper: None,
-            active_rune: None,
+            active_minigame: None,
         };
 
         manager.save_character(&state).unwrap();
@@ -686,11 +658,7 @@ mod tests {
             zone_progression: crate::zones::ZoneProgression::default(),
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: crate::challenges::chess::ChessStats::default(),
-            active_chess: None,
-            active_morris: None,
-            active_gomoku: None,
-            active_minesweeper: None,
-            active_rune: None,
+            active_minigame: None,
         };
 
         manager.save_character(&state).unwrap();

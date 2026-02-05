@@ -1,6 +1,7 @@
 //! Gomoku game logic and AI.
 
 use super::{GomokuDifficulty, GomokuGame, GomokuResult, Player, BOARD_SIZE};
+use crate::challenges::ActiveMinigame;
 use crate::core::game_state::GameState;
 use rand::seq::SliceRandom;
 use rand::Rng;
@@ -58,7 +59,7 @@ pub fn process_input(game: &mut GomokuGame, input: GomokuInput) -> bool {
 
 /// Start a gomoku game with the selected difficulty
 pub fn start_gomoku_game(state: &mut GameState, difficulty: GomokuDifficulty) {
-    state.active_gomoku = Some(GomokuGame::new(difficulty));
+    state.active_minigame = Some(ActiveMinigame::Gomoku(GomokuGame::new(difficulty)));
     state.challenge_menu.close();
 }
 
@@ -676,9 +677,9 @@ pub fn find_best_move<R: Rng>(game: &GomokuGame, rng: &mut R) -> Option<(usize, 
 pub fn apply_game_result(state: &mut GameState) -> bool {
     use crate::challenges::menu::DifficultyInfo;
 
-    let game = match state.active_gomoku.as_ref() {
-        Some(g) => g,
-        None => return false,
+    let game = match state.active_minigame.as_ref() {
+        Some(ActiveMinigame::Gomoku(g)) => g,
+        _ => return false,
     };
     let result = match game.game_result {
         Some(r) => r,
@@ -741,7 +742,7 @@ pub fn apply_game_result(state: &mut GameState) -> bool {
         }
     }
 
-    state.active_gomoku = None;
+    state.active_minigame = None;
     true
 }
 

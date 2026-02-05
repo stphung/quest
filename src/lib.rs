@@ -21,9 +21,9 @@ mod ui;
 
 // Re-export commonly used types at crate root for convenience
 pub use challenges::{
-    ChessDifficulty, ChessGame, ChessResult, GomokuDifficulty, GomokuGame, GomokuResult,
-    MinesweeperDifficulty, MinesweeperGame, MinesweeperResult, MorrisDifficulty, MorrisGame,
-    MorrisPhase, MorrisResult, RuneDifficulty, RuneGame, RuneResult,
+    ActiveMinigame, ChessDifficulty, ChessGame, ChessResult, GomokuDifficulty, GomokuGame,
+    GomokuResult, MinesweeperDifficulty, MinesweeperGame, MinesweeperResult, MorrisDifficulty,
+    MorrisGame, MorrisPhase, MorrisResult, RuneDifficulty, RuneGame, RuneResult,
 };
 pub use character::{Attributes, DerivedStats, PrestigeTier};
 pub use combat::{CombatState, Enemy};

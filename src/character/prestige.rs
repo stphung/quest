@@ -152,6 +152,9 @@ pub fn perform_prestige(state: &mut GameState) {
     // are intentionally preserved across prestige as a separate progression track
     state.active_fishing = None;
 
+    // Clear any active minigame session
+    state.active_minigame = None;
+
     // Reset combat state with base HP (50 for fresh attributes)
     state.combat_state = CombatState::new(50);
 

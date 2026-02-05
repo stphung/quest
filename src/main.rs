@@ -5,37 +5,23 @@ mod core;
 mod dungeon;
 mod fishing;
 mod haven;
+mod input;
 mod items;
 mod ui;
 mod utils;
 mod zones;
 
-use challenges::chess::logic::{
-    apply_game_result, process_ai_thinking, process_input as process_chess_input, ChessInput,
-};
-use challenges::gomoku::logic::{
-    apply_game_result as apply_gomoku_result, process_ai_thinking as process_gomoku_ai,
-    process_input as process_gomoku_input, GomokuInput,
-};
-use challenges::menu::{process_input as process_menu_input, try_discover_challenge, MenuInput};
-use challenges::minesweeper::logic::{
-    apply_game_result as apply_minesweeper_result, process_input as process_minesweeper_input,
-    MinesweeperInput,
-};
-use challenges::morris::logic::{
-    apply_game_result as apply_morris_result, process_ai_thinking as process_morris_ai,
-    process_input as process_morris_input, MorrisInput,
-};
-use challenges::rune::logic::{
-    apply_game_result as apply_rune_result, process_input as process_rune_input, RuneInput,
-};
+use challenges::chess::logic::process_ai_thinking;
+use challenges::gomoku::logic::process_ai_thinking as process_gomoku_ai;
+use challenges::menu::try_discover_challenge;
+use challenges::morris::logic::process_ai_thinking as process_morris_ai;
+use challenges::ActiveMinigame;
 use character::input::{
     process_creation_input, process_delete_input, process_rename_input, process_select_input,
     CreationInput, CreationResult, DeleteInput, DeleteResult, RenameInput, RenameResult,
     SelectInput, SelectResult,
 };
 use character::manager::CharacterManager;
-use character::prestige::*;
 use character::save::SaveManager;
 use chrono::{Local, Utc};
 use core::constants::*;
@@ -46,6 +32,7 @@ use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
 use crossterm::ExecutableCommand;
+use input::{GameOverlay, HavenUiState, InputResult};
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 use std::time::{Duration, Instant};
@@ -149,15 +136,7 @@ fn main() -> io::Result<()> {
     let mut rename_screen = CharacterRenameScreen::new();
     let mut game_state: Option<GameState> = None;
 
-    // Haven UI state (shared across screens since Haven is account-level)
-    let mut showing_haven = false;
-    let mut haven_selected_room: usize = 0;
-    let mut haven_confirming_build = false;
-
-    // Vault selection state (for prestige with item preservation)
-    let mut showing_vault_selection = false;
-    let mut vault_selected_index: usize = 0;
-    let mut vault_selected_slots: Vec<items::EquipmentSlot> = Vec::new();
+    let mut haven_ui = HavenUiState::new();
 
     // Setup terminal
     enable_raw_mode()?;
@@ -274,12 +253,12 @@ fn main() -> io::Result<()> {
                     // Draw Haven indicator if discovered
                     ui::haven_scene::render_haven_indicator(f, area, &haven);
                     // Draw Haven screen if open
-                    if showing_haven {
+                    if haven_ui.showing {
                         ui::haven_scene::render_haven_tree(
                             f,
                             area,
                             &haven,
-                            haven_selected_room,
+                            haven_ui.selected_room,
                             0, // No character selected, so prestige/fishing rank = 0
                             0,
                         );
@@ -290,31 +269,34 @@ fn main() -> io::Result<()> {
                 if event::poll(Duration::from_millis(50))? {
                     if let Event::Key(key_event) = event::read()? {
                         // Handle Haven screen (blocks other input when open)
-                        if showing_haven {
-                            if haven_confirming_build {
+                        if haven_ui.showing {
+                            if haven_ui.confirming_build {
                                 match key_event.code {
                                     KeyCode::Enter => {
                                         // Note: Can't build from character select (no active character)
                                         // Just close the confirmation
-                                        haven_confirming_build = false;
+                                        haven_ui.confirming_build = false;
                                     }
                                     KeyCode::Esc => {
-                                        haven_confirming_build = false;
+                                        haven_ui.confirming_build = false;
                                     }
                                     _ => {}
                                 }
                             } else {
                                 match key_event.code {
                                     KeyCode::Up => {
-                                        haven_selected_room = haven_selected_room.saturating_sub(1);
+                                        haven_ui.selected_room =
+                                            haven_ui.selected_room.saturating_sub(1);
                                     }
                                     KeyCode::Down => {
-                                        if haven_selected_room + 1 < haven::HavenRoomId::ALL.len() {
-                                            haven_selected_room += 1;
+                                        if haven_ui.selected_room + 1
+                                            < haven::HavenRoomId::ALL.len()
+                                        {
+                                            haven_ui.selected_room += 1;
                                         }
                                     }
                                     KeyCode::Esc => {
-                                        showing_haven = false;
+                                        haven_ui.close();
                                     }
                                     _ => {}
                                 }
@@ -326,9 +308,7 @@ fn main() -> io::Result<()> {
                         if matches!(key_event.code, KeyCode::Char('h') | KeyCode::Char('H'))
                             && haven.discovered
                         {
-                            showing_haven = true;
-                            haven_selected_room = 0;
-                            haven_confirming_build = false;
+                            haven_ui.open();
                             continue;
                         }
 
@@ -521,8 +501,7 @@ fn main() -> io::Result<()> {
                 let mut last_autosave = Instant::now();
                 let mut last_update_check = Instant::now();
                 let mut tick_counter: u32 = 0;
-                let mut showing_prestige_confirm = false;
-                let mut showing_haven_discovery = false;
+                let mut overlay = GameOverlay::None;
                 let mut debug_menu = utils::debug_menu::DebugMenu::new();
 
                 // Save indicator state (for non-debug mode)
@@ -559,36 +538,40 @@ fn main() -> io::Result<()> {
                             haven.discovered,
                         );
                         // Draw prestige confirmation overlay if active
-                        if showing_prestige_confirm {
+                        if matches!(overlay, GameOverlay::PrestigeConfirm) {
                             ui::prestige_confirm::draw_prestige_confirm(frame, &state);
                         }
                         // Draw Haven discovery modal if active
-                        if showing_haven_discovery {
+                        if matches!(overlay, GameOverlay::HavenDiscovery) {
                             ui::haven_scene::render_haven_discovery_modal(frame, frame.size());
                         }
                         // Draw Vault selection screen if active
-                        if showing_vault_selection {
+                        if let GameOverlay::VaultSelection {
+                            selected_index,
+                            ref selected_slots,
+                        } = overlay
+                        {
                             ui::haven_scene::render_vault_selection(
                                 frame,
                                 frame.size(),
                                 &state,
                                 haven.vault_tier(),
-                                vault_selected_index,
-                                &vault_selected_slots,
+                                selected_index,
+                                selected_slots,
                             );
                         }
                         // Draw Haven screen if active
-                        if showing_haven {
+                        if haven_ui.showing {
                             ui::haven_scene::render_haven_tree(
                                 frame,
                                 frame.size(),
                                 &haven,
-                                haven_selected_room,
+                                haven_ui.selected_room,
                                 state.prestige_rank,
                                 state.fishing.rank,
                             );
-                            if haven_confirming_build {
-                                let room = haven::HavenRoomId::ALL[haven_selected_room];
+                            if haven_ui.confirming_build {
+                                let room = haven::HavenRoomId::ALL[haven_ui.selected_room];
                                 ui::haven_scene::render_build_confirmation(
                                     frame,
                                     frame.size(),
@@ -626,357 +609,18 @@ fn main() -> io::Result<()> {
                     // Poll for input (50ms non-blocking)
                     if event::poll(Duration::from_millis(50))? {
                         if let Event::Key(key_event) = event::read()? {
-                            // Handle Haven discovery modal (blocks other input)
-                            if showing_haven_discovery {
-                                if matches!(key_event.code, KeyCode::Enter | KeyCode::Esc) {
-                                    showing_haven_discovery = false;
-                                }
-                                continue;
-                            }
-
-                            // Handle Haven screen (blocks other input when open)
-                            if showing_haven {
-                                if haven_confirming_build {
-                                    match key_event.code {
-                                        KeyCode::Enter => {
-                                            // Attempt build
-                                            let room = haven::HavenRoomId::ALL[haven_selected_room];
-                                            if let Some((_tier, p_spent, f_spent)) =
-                                                haven::try_build_room(
-                                                    room,
-                                                    &mut haven,
-                                                    &mut state.prestige_rank,
-                                                    &mut state.fishing.rank,
-                                                )
-                                            {
-                                                haven::save_haven(&haven).ok();
-                                                character_manager.save_character(&state).ok();
-                                                state.combat_state.add_log_entry(
-                                                    format!(
-                                                        "🏠 Built {} (spent {}P, {}F)",
-                                                        room.name(),
-                                                        p_spent,
-                                                        f_spent
-                                                    ),
-                                                    false,
-                                                    true,
-                                                );
-                                            }
-                                            haven_confirming_build = false;
-                                        }
-                                        KeyCode::Esc => {
-                                            haven_confirming_build = false;
-                                        }
-                                        _ => {}
-                                    }
-                                } else {
-                                    match key_event.code {
-                                        KeyCode::Up => {
-                                            haven_selected_room =
-                                                haven_selected_room.saturating_sub(1);
-                                        }
-                                        KeyCode::Down => {
-                                            if haven_selected_room + 1
-                                                < haven::HavenRoomId::ALL.len()
-                                            {
-                                                haven_selected_room += 1;
-                                            }
-                                        }
-                                        KeyCode::Enter => {
-                                            let room = haven::HavenRoomId::ALL[haven_selected_room];
-                                            if haven.can_build(room)
-                                                && haven::can_afford(
-                                                    room,
-                                                    &haven,
-                                                    state.prestige_rank,
-                                                    state.fishing.rank,
-                                                )
-                                            {
-                                                haven_confirming_build = true;
-                                            }
-                                        }
-                                        KeyCode::Esc => {
-                                            showing_haven = false;
-                                        }
-                                        _ => {}
-                                    }
-                                }
-                                continue;
-                            }
-
-                            // Handle vault item selection (for prestige with Vault)
-                            if showing_vault_selection {
-                                match key_event.code {
-                                    KeyCode::Up => {
-                                        vault_selected_index =
-                                            vault_selected_index.saturating_sub(1);
-                                    }
-                                    KeyCode::Down => {
-                                        if vault_selected_index < 6 {
-                                            // 7 equipment slots
-                                            vault_selected_index += 1;
-                                        }
-                                    }
-                                    KeyCode::Enter => {
-                                        // Toggle selection
-                                        let slots = [
-                                            items::EquipmentSlot::Weapon,
-                                            items::EquipmentSlot::Armor,
-                                            items::EquipmentSlot::Helmet,
-                                            items::EquipmentSlot::Gloves,
-                                            items::EquipmentSlot::Boots,
-                                            items::EquipmentSlot::Amulet,
-                                            items::EquipmentSlot::Ring,
-                                        ];
-                                        let slot = slots[vault_selected_index];
-                                        // Only allow selecting slots that have items
-                                        if state.equipment.get(slot).is_some() {
-                                            if let Some(pos) =
-                                                vault_selected_slots.iter().position(|s| *s == slot)
-                                            {
-                                                vault_selected_slots.remove(pos);
-                                            } else if vault_selected_slots.len()
-                                                < haven.vault_tier() as usize
-                                            {
-                                                vault_selected_slots.push(slot);
-                                            }
-                                        }
-                                    }
-                                    KeyCode::Char(' ') => {
-                                        // Confirm prestige with selected items
-                                        character::prestige::perform_prestige_with_vault(
-                                            &mut state,
-                                            &vault_selected_slots,
-                                        );
-                                        showing_vault_selection = false;
-                                        vault_selected_slots.clear();
-                                        // Save immediately after prestige
-                                        if !debug_mode {
-                                            let _ = character_manager.save_character(&state);
-                                            last_save_instant = Some(Instant::now());
-                                            last_save_time = Some(Local::now());
-                                        }
-                                        state.combat_state.add_log_entry(
-                                            format!(
-                                                "Prestiged to {}! (Vault preserved items)",
-                                                get_prestige_tier(state.prestige_rank).name
-                                            ),
-                                            false,
-                                            true,
-                                        );
-                                    }
-                                    KeyCode::Esc => {
-                                        showing_vault_selection = false;
-                                        vault_selected_slots.clear();
-                                    }
-                                    _ => {}
-                                }
-                                continue;
-                            }
-
-                            // Handle prestige confirmation dialog
-                            if showing_prestige_confirm {
-                                match key_event.code {
-                                    KeyCode::Char('y') | KeyCode::Char('Y') => {
-                                        // Check if Vault is built - show selection screen
-                                        if haven.vault_tier() > 0 {
-                                            showing_prestige_confirm = false;
-                                            showing_vault_selection = true;
-                                            vault_selected_index = 0;
-                                            vault_selected_slots.clear();
-                                        } else {
-                                            perform_prestige(&mut state);
-                                            showing_prestige_confirm = false;
-                                            // Save immediately after prestige to prevent stale enemy on reload
-                                            if !debug_mode {
-                                                let _ = character_manager.save_character(&state);
-                                                last_save_instant = Some(Instant::now());
-                                                last_save_time = Some(Local::now());
-                                            }
-                                            state.combat_state.add_log_entry(
-                                                format!(
-                                                    "Prestiged to {}!",
-                                                    get_prestige_tier(state.prestige_rank).name
-                                                ),
-                                                false,
-                                                true,
-                                            );
-                                        }
-                                    }
-                                    KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
-                                        showing_prestige_confirm = false;
-                                    }
-                                    _ => {}
-                                }
-                                continue;
-                            }
-
-                            // Handle debug menu (if debug mode enabled)
-                            if debug_mode {
-                                // Backtick toggles debug menu
-                                if key_event.code == KeyCode::Char('`') {
-                                    debug_menu.toggle();
-                                    continue;
-                                }
-
-                                // Handle debug menu navigation when open
-                                if debug_menu.is_open {
-                                    match key_event.code {
-                                        KeyCode::Up => debug_menu.navigate_up(),
-                                        KeyCode::Down => debug_menu.navigate_down(),
-                                        KeyCode::Enter => {
-                                            let msg =
-                                                debug_menu.trigger_selected(&mut state, &mut haven);
-                                            state.combat_state.add_log_entry(
-                                                format!("[DEBUG] {}", msg),
-                                                false,
-                                                true,
-                                            );
-                                        }
-                                        KeyCode::Esc => debug_menu.close(),
-                                        _ => {}
-                                    }
-                                    continue;
-                                }
-                            }
-
-                            // Handle active rune game input
-                            if let Some(ref mut rune_game) = state.active_rune {
-                                if rune_game.game_result.is_some() {
-                                    // Any key dismisses result and applies rewards
-                                    apply_rune_result(&mut state);
-                                    continue;
-                                }
-
-                                let input = match key_event.code {
-                                    KeyCode::Left => RuneInput::Left,
-                                    KeyCode::Right => RuneInput::Right,
-                                    KeyCode::Up => RuneInput::Up,
-                                    KeyCode::Down => RuneInput::Down,
-                                    KeyCode::Enter => RuneInput::Submit,
-                                    KeyCode::Char('f') | KeyCode::Char('F') => {
-                                        RuneInput::ClearGuess
-                                    }
-                                    KeyCode::Esc => RuneInput::Forfeit,
-                                    _ => RuneInput::Other,
-                                };
-                                let mut rng = rand::thread_rng();
-                                process_rune_input(rune_game, input, &mut rng);
-                                continue;
-                            }
-
-                            // Handle active minesweeper game input
-                            if let Some(ref mut minesweeper_game) = state.active_minesweeper {
-                                if minesweeper_game.game_result.is_some() {
-                                    // Any key dismisses result and applies rewards
-                                    apply_minesweeper_result(&mut state);
-                                    continue;
-                                }
-
-                                let input = match key_event.code {
-                                    KeyCode::Up => MinesweeperInput::Up,
-                                    KeyCode::Down => MinesweeperInput::Down,
-                                    KeyCode::Left => MinesweeperInput::Left,
-                                    KeyCode::Right => MinesweeperInput::Right,
-                                    KeyCode::Enter => MinesweeperInput::Reveal,
-                                    KeyCode::Char('f') | KeyCode::Char('F') => {
-                                        MinesweeperInput::ToggleFlag
-                                    }
-                                    KeyCode::Esc => MinesweeperInput::Forfeit,
-                                    _ => MinesweeperInput::Other,
-                                };
-                                let mut rng = rand::thread_rng();
-                                process_minesweeper_input(minesweeper_game, input, &mut rng);
-                                continue;
-                            }
-
-                            // Handle active Gomoku game input
-                            if let Some(ref mut gomoku_game) = state.active_gomoku {
-                                if gomoku_game.game_result.is_some() {
-                                    // Any key dismisses result and applies rewards
-                                    apply_gomoku_result(&mut state);
-                                    continue;
-                                }
-
-                                let input = match key_event.code {
-                                    KeyCode::Up => GomokuInput::Up,
-                                    KeyCode::Down => GomokuInput::Down,
-                                    KeyCode::Left => GomokuInput::Left,
-                                    KeyCode::Right => GomokuInput::Right,
-                                    KeyCode::Enter => GomokuInput::PlaceStone,
-                                    KeyCode::Esc => GomokuInput::Forfeit,
-                                    _ => GomokuInput::Other,
-                                };
-                                process_gomoku_input(gomoku_game, input);
-                                continue;
-                            }
-
-                            // Handle active chess game input (highest priority)
-                            if let Some(ref mut chess_game) = state.active_chess {
-                                if chess_game.game_result.is_some() {
-                                    // Any key dismisses result and applies rewards
-                                    apply_game_result(&mut state);
-                                    continue;
-                                }
-                                let input = match key_event.code {
-                                    KeyCode::Up => ChessInput::Up,
-                                    KeyCode::Down => ChessInput::Down,
-                                    KeyCode::Left => ChessInput::Left,
-                                    KeyCode::Right => ChessInput::Right,
-                                    KeyCode::Enter => ChessInput::Select,
-                                    KeyCode::Esc => ChessInput::Cancel,
-                                    _ => ChessInput::Other,
-                                };
-                                process_chess_input(chess_game, input);
-                                continue;
-                            }
-
-                            // Handle active Morris game input
-                            if let Some(ref mut morris_game) = state.active_morris {
-                                if morris_game.game_result.is_some() {
-                                    // Any key dismisses result and applies rewards
-                                    apply_morris_result(&mut state);
-                                    continue;
-                                }
-                                let input = match key_event.code {
-                                    KeyCode::Up => MorrisInput::Up,
-                                    KeyCode::Down => MorrisInput::Down,
-                                    KeyCode::Left => MorrisInput::Left,
-                                    KeyCode::Right => MorrisInput::Right,
-                                    KeyCode::Enter => MorrisInput::Select,
-                                    KeyCode::Esc => MorrisInput::Cancel,
-                                    _ => MorrisInput::Other,
-                                };
-                                process_morris_input(morris_game, input);
-                                continue;
-                            }
-
-                            // Handle challenge menu input
-                            if state.challenge_menu.is_open {
-                                let input = match key_event.code {
-                                    KeyCode::Up => MenuInput::Up,
-                                    KeyCode::Down => MenuInput::Down,
-                                    KeyCode::Enter => MenuInput::Select,
-                                    KeyCode::Char('d') | KeyCode::Char('D') => MenuInput::Decline,
-                                    KeyCode::Esc | KeyCode::Tab => MenuInput::Cancel,
-                                    _ => MenuInput::Other,
-                                };
-                                process_menu_input(&mut state, input);
-                                continue;
-                            }
-
-                            // Tab to open challenge menu
-                            if key_event.code == KeyCode::Tab
-                                && !state.challenge_menu.challenges.is_empty()
-                            {
-                                state.challenge_menu.open();
-                                continue;
-                            }
-
-                            match key_event.code {
-                                // Handle 'q'/'Q' to quit
-                                KeyCode::Char('q') | KeyCode::Char('Q') => {
-                                    // Save character before returning to select (skip in debug mode)
+                            let result = input::handle_game_input(
+                                key_event,
+                                &mut state,
+                                &mut haven,
+                                &mut haven_ui,
+                                &mut overlay,
+                                &mut debug_menu,
+                                debug_mode,
+                            );
+                            match result {
+                                InputResult::Continue => {}
+                                InputResult::QuitToSelect => {
                                     if !debug_mode {
                                         character_manager.save_character(&state)?;
                                     }
@@ -984,21 +628,21 @@ fn main() -> io::Result<()> {
                                     current_screen = Screen::CharacterSelect;
                                     break;
                                 }
-                                // Handle 'p'/'P' to show prestige confirmation
-                                KeyCode::Char('p') | KeyCode::Char('P') => {
-                                    if can_prestige(&state) {
-                                        showing_prestige_confirm = true;
+                                InputResult::NeedsSave => {
+                                    if !debug_mode {
+                                        let _ = character_manager.save_character(&state);
+                                        last_save_instant = Some(Instant::now());
+                                        last_save_time = Some(Local::now());
                                     }
                                 }
-                                // Handle 'h'/'H' to open Haven (if discovered)
-                                KeyCode::Char('h') | KeyCode::Char('H') => {
-                                    if haven.discovered {
-                                        showing_haven = true;
-                                        haven_selected_room = 0;
-                                        haven_confirming_build = false;
+                                InputResult::NeedsSaveAll => {
+                                    if !debug_mode {
+                                        let _ = character_manager.save_character(&state);
+                                        haven::save_haven(&haven).ok();
+                                        last_save_instant = Some(Instant::now());
+                                        last_save_time = Some(Local::now());
                                     }
                                 }
-                                _ => {}
                             }
                         }
                     }
@@ -1013,17 +657,13 @@ fn main() -> io::Result<()> {
                             && state.prestige_rank >= 10
                             && state.active_dungeon.is_none()
                             && state.active_fishing.is_none()
-                            && state.active_chess.is_none()
-                            && state.active_morris.is_none()
-                            && state.active_gomoku.is_none()
-                            && state.active_minesweeper.is_none()
-                            && state.active_rune.is_none()
+                            && state.active_minigame.is_none()
                         {
                             let mut rng = rand::thread_rng();
                             if haven::try_discover_haven(&mut haven, state.prestige_rank, &mut rng)
                             {
                                 haven::save_haven(&haven).ok();
-                                showing_haven_discovery = true;
+                                overlay = GameOverlay::HavenDiscovery;
                             }
                         }
                     }
@@ -1077,21 +717,21 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32) {
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
 
     // Process chess AI thinking
-    if let Some(ref mut chess_game) = game_state.active_chess {
-        let mut rng = rand::thread_rng();
-        process_ai_thinking(chess_game, &mut rng);
-    }
-
-    // Process Morris AI thinking
-    if let Some(ref mut morris_game) = game_state.active_morris {
-        let mut rng = rand::thread_rng();
-        process_morris_ai(morris_game, &mut rng);
-    }
-
-    // Process Gomoku AI thinking
-    if let Some(ref mut gomoku_game) = game_state.active_gomoku {
-        let mut rng = rand::thread_rng();
-        process_gomoku_ai(gomoku_game, &mut rng);
+    // Process AI thinking for active minigame
+    match &mut game_state.active_minigame {
+        Some(ActiveMinigame::Chess(chess_game)) => {
+            let mut rng = rand::thread_rng();
+            process_ai_thinking(chess_game, &mut rng);
+        }
+        Some(ActiveMinigame::Morris(morris_game)) => {
+            let mut rng = rand::thread_rng();
+            process_morris_ai(morris_game, &mut rng);
+        }
+        Some(ActiveMinigame::Gomoku(gomoku_game)) => {
+            let mut rng = rand::thread_rng();
+            process_gomoku_ai(gomoku_game, &mut rng);
+        }
+        _ => {}
     }
 
     // Try challenge discovery (single roll, weighted table picks which type)

@@ -4,6 +4,7 @@ use super::{
     CursorDirection, MorrisDifficulty, MorrisGame, MorrisMove, MorrisPhase, MorrisResult, Player,
     ADJACENCIES, MILLS,
 };
+use crate::challenges::ActiveMinigame;
 use crate::core::game_state::GameState;
 use rand::Rng;
 
@@ -61,7 +62,7 @@ fn process_cancel(game: &mut MorrisGame) {
 
 /// Start a morris game with the selected difficulty
 pub fn start_morris_game(state: &mut GameState, difficulty: MorrisDifficulty) {
-    state.active_morris = Some(MorrisGame::new(difficulty));
+    state.active_minigame = Some(ActiveMinigame::Morris(MorrisGame::new(difficulty)));
     state.challenge_menu.close();
 }
 
@@ -555,9 +556,9 @@ fn count_mobility(game: &MorrisGame, player: Player) -> i32 {
 pub fn apply_game_result(state: &mut GameState) -> bool {
     use crate::challenges::menu::DifficultyInfo;
 
-    let game = match state.active_morris.as_ref() {
-        Some(g) => g,
-        None => return false,
+    let game = match state.active_minigame.as_ref() {
+        Some(ActiveMinigame::Morris(g)) => g,
+        _ => return false,
     };
     let result = match game.game_result {
         Some(r) => r,
@@ -622,7 +623,7 @@ pub fn apply_game_result(state: &mut GameState) -> bool {
         }
     }
 
-    state.active_morris = None;
+    state.active_minigame = None;
     true
 }
 
@@ -1004,12 +1005,16 @@ mod tests {
 
         start_morris_game(&mut state, MorrisDifficulty::Journeyman);
 
-        assert!(state.active_morris.is_some());
+        assert!(matches!(
+            state.active_minigame,
+            Some(ActiveMinigame::Morris(_))
+        ));
         assert!(!state.challenge_menu.is_open);
-        assert_eq!(
-            state.active_morris.as_ref().unwrap().difficulty,
-            MorrisDifficulty::Journeyman
-        );
+        if let Some(ActiveMinigame::Morris(game)) = &state.active_minigame {
+            assert_eq!(game.difficulty, MorrisDifficulty::Journeyman);
+        } else {
+            panic!("expected morris");
+        }
     }
 
     // ============ Result Application Tests ============
@@ -1021,7 +1026,7 @@ mod tests {
 
         let mut game = MorrisGame::new(MorrisDifficulty::Master);
         game.game_result = Some(MorrisResult::Win);
-        state.active_morris = Some(game);
+        state.active_minigame = Some(ActiveMinigame::Morris(game));
 
         let old_xp = state.character_xp;
         let old_fishing_rank = state.fishing.rank;
@@ -1032,7 +1037,7 @@ mod tests {
         assert_eq!(state.character_xp, old_xp + 6324);
         // Master grants +1 fishing rank
         assert_eq!(state.fishing.rank, old_fishing_rank + 1);
-        assert!(state.active_morris.is_none());
+        assert!(state.active_minigame.is_none());
     }
 
     #[test]
@@ -1042,7 +1047,7 @@ mod tests {
 
         let mut game = MorrisGame::new(MorrisDifficulty::Novice);
         game.game_result = Some(MorrisResult::Win);
-        state.active_morris = Some(game);
+        state.active_minigame = Some(ActiveMinigame::Morris(game));
 
         let old_fishing_rank = state.fishing.rank;
         let processed = apply_game_result(&mut state);
@@ -1059,7 +1064,7 @@ mod tests {
 
         let mut game = MorrisGame::new(MorrisDifficulty::Master);
         game.game_result = Some(MorrisResult::Win);
-        state.active_morris = Some(game);
+        state.active_minigame = Some(ActiveMinigame::Morris(game));
 
         let processed = apply_game_result(&mut state);
 
@@ -1073,14 +1078,14 @@ mod tests {
 
         let mut game = MorrisGame::new(MorrisDifficulty::Novice);
         game.game_result = Some(MorrisResult::Loss);
-        state.active_morris = Some(game);
+        state.active_minigame = Some(ActiveMinigame::Morris(game));
 
         let old_xp = state.character_xp;
         let processed = apply_game_result(&mut state);
 
         assert!(processed);
         assert_eq!(state.character_xp, old_xp); // Unchanged
-        assert!(state.active_morris.is_none());
+        assert!(state.active_minigame.is_none());
     }
 
     #[test]
@@ -1089,14 +1094,14 @@ mod tests {
 
         let mut game = MorrisGame::new(MorrisDifficulty::Novice);
         game.game_result = Some(MorrisResult::Forfeit);
-        state.active_morris = Some(game);
+        state.active_minigame = Some(ActiveMinigame::Morris(game));
 
         let old_xp = state.character_xp;
         let processed = apply_game_result(&mut state);
 
         assert!(processed);
         assert_eq!(state.character_xp, old_xp); // Unchanged
-        assert!(state.active_morris.is_none());
+        assert!(state.active_minigame.is_none());
     }
 
     // ============ Evaluation Tests ============

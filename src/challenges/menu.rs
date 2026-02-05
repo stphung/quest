@@ -12,6 +12,7 @@ use super::minesweeper::{MinesweeperDifficulty, MinesweeperGame};
 use super::morris::logic::start_morris_game;
 use super::morris::MorrisDifficulty;
 use super::rune::{RuneDifficulty, RuneGame};
+use super::ActiveMinigame;
 use crate::core::game_state::GameState;
 use rand::Rng;
 
@@ -82,12 +83,14 @@ fn accept_selected_challenge(state: &mut GameState) {
             }
             ChallengeType::Minesweeper => {
                 let difficulty = MinesweeperDifficulty::from_index(difficulty_index);
-                state.active_minesweeper = Some(MinesweeperGame::new(difficulty));
+                state.active_minigame = Some(ActiveMinigame::Minesweeper(MinesweeperGame::new(
+                    difficulty,
+                )));
                 state.challenge_menu.close();
             }
             ChallengeType::Rune => {
                 let difficulty = RuneDifficulty::from_index(difficulty_index);
-                state.active_rune = Some(RuneGame::new(difficulty));
+                state.active_minigame = Some(ActiveMinigame::Rune(RuneGame::new(difficulty)));
                 state.challenge_menu.close();
             }
         }
@@ -461,11 +464,7 @@ pub fn try_discover_challenge<R: Rng>(state: &mut GameState, rng: &mut R) -> Opt
     if state.prestige_rank < 1
         || state.active_dungeon.is_some()
         || state.active_fishing.is_some()
-        || state.active_chess.is_some()
-        || state.active_morris.is_some()
-        || state.active_gomoku.is_some()
-        || state.active_minesweeper.is_some()
-        || state.active_rune.is_some()
+        || state.active_minigame.is_some()
     {
         return None;
     }
@@ -889,11 +888,14 @@ mod tests {
         state.challenge_menu.open_detail();
         state.challenge_menu.selected_difficulty = 1; // Apprentice
 
-        assert!(state.active_chess.is_none());
+        assert!(state.active_minigame.is_none());
 
         process_input(&mut state, MenuInput::Select);
 
-        assert!(state.active_chess.is_some());
+        assert!(matches!(
+            state.active_minigame,
+            Some(ActiveMinigame::Chess(_))
+        ));
         assert!(!state.challenge_menu.is_open);
     }
 
@@ -911,7 +913,10 @@ mod tests {
 
         process_input(&mut state, MenuInput::Select);
 
-        assert!(state.active_morris.is_some());
+        assert!(matches!(
+            state.active_minigame,
+            Some(ActiveMinigame::Morris(_))
+        ));
         assert!(!state.challenge_menu.is_open);
     }
 
@@ -929,7 +934,10 @@ mod tests {
 
         process_input(&mut state, MenuInput::Select);
 
-        assert!(state.active_gomoku.is_some());
+        assert!(matches!(
+            state.active_minigame,
+            Some(ActiveMinigame::Gomoku(_))
+        ));
         assert!(!state.challenge_menu.is_open);
     }
 
@@ -947,7 +955,10 @@ mod tests {
 
         process_input(&mut state, MenuInput::Select);
 
-        assert!(state.active_minesweeper.is_some());
+        assert!(matches!(
+            state.active_minigame,
+            Some(ActiveMinigame::Minesweeper(_))
+        ));
         assert!(!state.challenge_menu.is_open);
     }
 
@@ -965,7 +976,10 @@ mod tests {
 
         process_input(&mut state, MenuInput::Select);
 
-        assert!(state.active_rune.is_some());
+        assert!(matches!(
+            state.active_minigame,
+            Some(ActiveMinigame::Rune(_))
+        ));
         assert!(!state.challenge_menu.is_open);
     }
 }

@@ -1,6 +1,7 @@
 //! Chess game logic: AI moves, and game resolution.
 
 use super::{ChessDifficulty, ChessGame, ChessResult};
+use crate::challenges::ActiveMinigame;
 use crate::core::game_state::GameState;
 use chess_engine::Evaluate;
 use rand::Rng;
@@ -78,7 +79,7 @@ fn process_cancel(game: &mut ChessGame) {
 
 /// Start a chess game with the selected difficulty
 pub fn start_chess_game(state: &mut GameState, difficulty: ChessDifficulty) {
-    state.active_chess = Some(ChessGame::new(difficulty));
+    state.active_minigame = Some(ActiveMinigame::Chess(Box::new(ChessGame::new(difficulty))));
     state.challenge_menu.close();
 }
 
@@ -222,9 +223,9 @@ pub fn check_game_over(game: &mut ChessGame) {
 pub fn apply_game_result(state: &mut GameState) -> bool {
     use crate::challenges::menu::DifficultyInfo;
 
-    let game = match state.active_chess.as_ref() {
-        Some(g) => g,
-        None => return false,
+    let game = match state.active_minigame.as_ref() {
+        Some(ActiveMinigame::Chess(g)) => g,
+        _ => return false,
     };
     let result = match game.game_result {
         Some(r) => r,
@@ -284,7 +285,7 @@ pub fn apply_game_result(state: &mut GameState) -> bool {
         }
     }
 
-    state.active_chess = None;
+    state.active_minigame = None;
     true
 }
 
@@ -307,7 +308,10 @@ mod tests {
         let mut state = GameState::new("Test".to_string(), 0);
         state.challenge_menu.open();
         start_chess_game(&mut state, ChessDifficulty::Journeyman);
-        assert!(state.active_chess.is_some());
+        assert!(matches!(
+            state.active_minigame,
+            Some(ActiveMinigame::Chess(_))
+        ));
         assert!(!state.challenge_menu.is_open);
     }
 
@@ -317,13 +321,13 @@ mod tests {
         state.prestige_rank = 5;
         let mut game = ChessGame::new(ChessDifficulty::Master);
         game.game_result = Some(ChessResult::Win);
-        state.active_chess = Some(game);
+        state.active_minigame = Some(ActiveMinigame::Chess(Box::new(game)));
 
         let processed = apply_game_result(&mut state);
         assert!(processed);
         assert_eq!(state.prestige_rank, 10); // 5 + 5 (Master reward)
         assert_eq!(state.chess_stats.games_won, 1);
-        assert!(state.active_chess.is_none());
+        assert!(state.active_minigame.is_none());
     }
 
     #[test]
@@ -332,7 +336,7 @@ mod tests {
         state.prestige_rank = 5;
         let mut game = ChessGame::new(ChessDifficulty::Novice);
         game.game_result = Some(ChessResult::Loss);
-        state.active_chess = Some(game);
+        state.active_minigame = Some(ActiveMinigame::Chess(Box::new(game)));
 
         let processed = apply_game_result(&mut state);
         assert!(processed);
@@ -408,12 +412,15 @@ mod tests {
         state.challenge_menu.open();
 
         assert!(state.challenge_menu.has_challenge(&ChallengeType::Chess));
-        assert!(state.active_chess.is_none());
+        assert!(state.active_minigame.is_none());
 
         // Start game (simulating accept)
         start_chess_game(&mut state, ChessDifficulty::Novice);
 
-        assert!(state.active_chess.is_some());
+        assert!(matches!(
+            state.active_minigame,
+            Some(ActiveMinigame::Chess(_))
+        ));
         assert!(!state.challenge_menu.is_open);
     }
 
@@ -442,7 +449,7 @@ mod tests {
         let _declined = state.challenge_menu.take_selected();
 
         assert_eq!(state.challenge_menu.challenges.len(), 0);
-        assert!(state.active_chess.is_none()); // Game not started
+        assert!(state.active_minigame.is_none()); // Game not started
     }
 
     #[test]
@@ -503,7 +510,7 @@ mod tests {
 
         let mut game = ChessGame::new(ChessDifficulty::Novice);
         game.game_result = Some(ChessResult::Forfeit);
-        state.active_chess = Some(game);
+        state.active_minigame = Some(ActiveMinigame::Chess(Box::new(game)));
 
         let processed = apply_game_result(&mut state);
         assert!(processed);
@@ -519,7 +526,7 @@ mod tests {
 
         let mut game = ChessGame::new(ChessDifficulty::Master);
         game.game_result = Some(ChessResult::Draw);
-        state.active_chess = Some(game);
+        state.active_minigame = Some(ActiveMinigame::Chess(Box::new(game)));
 
         let processed = apply_game_result(&mut state);
         assert!(processed);
