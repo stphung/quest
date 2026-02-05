@@ -181,6 +181,171 @@ pub fn get_legal_moves(game: &GoGame) -> Vec<GoMove> {
     moves
 }
 
+/// Execute a move on the game state.
+/// Returns true if the move was successful.
+pub fn make_move(game: &mut GoGame, mv: GoMove) -> bool {
+    match mv {
+        GoMove::Pass => {
+            game.consecutive_passes += 1;
+            game.ko_point = None;
+            game.last_move = Some(GoMove::Pass);
+            game.switch_player();
+
+            // Check for game end (two consecutive passes)
+            if game.consecutive_passes >= 2 {
+                end_game_by_scoring(game);
+            }
+            true
+        }
+        GoMove::Place(row, col) => {
+            if !is_legal_move(game, row, col) {
+                return false;
+            }
+
+            // Place the stone
+            game.board[row][col] = Some(game.current_player);
+            game.consecutive_passes = 0;
+
+            // Capture any dead opponent groups
+            let captured = capture_dead_groups(&mut game.board, row, col, game.current_player);
+
+            // Update capture counts
+            match game.current_player {
+                Stone::Black => game.captured_by_black += captured,
+                Stone::White => game.captured_by_white += captured,
+            }
+
+            // Set ko point if exactly one stone was captured
+            game.ko_point = if captured == 1 {
+                // Find where the captured stone was (it's now empty and adjacent)
+                let mut ko = None;
+                for (dr, dc) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
+                    let nr = row as i32 + dr;
+                    let nc = col as i32 + dc;
+                    if nr >= 0 && nr < BOARD_SIZE as i32 && nc >= 0 && nc < BOARD_SIZE as i32 {
+                        let nr = nr as usize;
+                        let nc = nc as usize;
+                        if game.board[nr][nc].is_none() {
+                            // Verify this was where the capture happened by checking
+                            // if replaying there would recapture our stone
+                            let mut test_board = game.board;
+                            test_board[nr][nc] = Some(game.current_player.opponent());
+                            let test_group = get_group(&test_board, row, col);
+                            if count_liberties(&test_board, &test_group) == 0 {
+                                ko = Some((nr, nc));
+                                break;
+                            }
+                        }
+                    }
+                }
+                ko
+            } else {
+                None
+            };
+
+            game.last_move = Some(GoMove::Place(row, col));
+            game.switch_player();
+            true
+        }
+    }
+}
+
+/// End the game and calculate scores using Chinese rules.
+fn end_game_by_scoring(game: &mut GoGame) {
+    let (black_score, white_score) = calculate_score(&game.board);
+
+    // Determine winner (Black plays as human)
+    game.game_result = Some(if black_score > white_score {
+        GoResult::Win
+    } else if white_score > black_score {
+        GoResult::Loss
+    } else {
+        GoResult::Draw
+    });
+}
+
+/// Calculate scores using Chinese rules (stones + territory).
+pub fn calculate_score(board: &[[Option<Stone>; BOARD_SIZE]; BOARD_SIZE]) -> (i32, i32) {
+    let mut black_score = 0i32;
+    let mut white_score = 0i32;
+    let mut counted = [[false; BOARD_SIZE]; BOARD_SIZE];
+
+    // Count stones
+    for row in 0..BOARD_SIZE {
+        for col in 0..BOARD_SIZE {
+            match board[row][col] {
+                Some(Stone::Black) => black_score += 1,
+                Some(Stone::White) => white_score += 1,
+                None => {}
+            }
+        }
+    }
+
+    // Count territory (empty regions completely surrounded by one color)
+    for row in 0..BOARD_SIZE {
+        for col in 0..BOARD_SIZE {
+            if board[row][col].is_none() && !counted[row][col] {
+                let (region, owner) = get_empty_region(board, row, col);
+                for &(r, c) in &region {
+                    counted[r][c] = true;
+                }
+                match owner {
+                    Some(Stone::Black) => black_score += region.len() as i32,
+                    Some(Stone::White) => white_score += region.len() as i32,
+                    None => {} // Contested - no points
+                }
+            }
+        }
+    }
+
+    // Apply komi (6.5 points to White for going second)
+    // We use integer math, so 6 points (simplified)
+    white_score += 6;
+
+    (black_score, white_score)
+}
+
+/// Get an empty region and determine its owner (if surrounded by one color).
+fn get_empty_region(
+    board: &[[Option<Stone>; BOARD_SIZE]; BOARD_SIZE],
+    start_row: usize,
+    start_col: usize,
+) -> (HashSet<(usize, usize)>, Option<Stone>) {
+    let mut region = HashSet::new();
+    let mut stack = vec![(start_row, start_col)];
+    let mut borders_black = false;
+    let mut borders_white = false;
+
+    while let Some((row, col)) = stack.pop() {
+        if region.contains(&(row, col)) {
+            continue;
+        }
+
+        match board[row][col] {
+            None => {
+                region.insert((row, col));
+                for (dr, dc) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
+                    let nr = row as i32 + dr;
+                    let nc = col as i32 + dc;
+                    if nr >= 0 && nr < BOARD_SIZE as i32 && nc >= 0 && nc < BOARD_SIZE as i32 {
+                        stack.push((nr as usize, nc as usize));
+                    }
+                }
+            }
+            Some(Stone::Black) => borders_black = true,
+            Some(Stone::White) => borders_white = true,
+        }
+    }
+
+    let owner = match (borders_black, borders_white) {
+        (true, false) => Some(Stone::Black),
+        (false, true) => Some(Stone::White),
+        _ => None, // Contested or touches both
+    };
+
+    (region, owner)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -378,5 +543,100 @@ mod tests {
         let moves = get_legal_moves(&game);
         // 81 board positions + 1 pass
         assert_eq!(moves.len(), 82);
+    }
+
+    #[test]
+    fn test_make_move_place() {
+        let mut game = GoGame::new(GoDifficulty::Novice);
+        assert!(make_move(&mut game, GoMove::Place(4, 4)));
+        assert_eq!(game.board[4][4], Some(Stone::Black));
+        assert_eq!(game.current_player, Stone::White);
+        assert_eq!(game.consecutive_passes, 0);
+    }
+
+    #[test]
+    fn test_make_move_pass() {
+        let mut game = GoGame::new(GoDifficulty::Novice);
+        assert!(make_move(&mut game, GoMove::Pass));
+        assert_eq!(game.current_player, Stone::White);
+        assert_eq!(game.consecutive_passes, 1);
+    }
+
+    #[test]
+    fn test_two_passes_end_game() {
+        let mut game = GoGame::new(GoDifficulty::Novice);
+        make_move(&mut game, GoMove::Pass);
+        make_move(&mut game, GoMove::Pass);
+        assert!(game.game_result.is_some());
+    }
+
+    #[test]
+    fn test_capture_updates_count() {
+        let mut game = GoGame::new(GoDifficulty::Novice);
+        // Set up capture
+        game.board[4][4] = Some(Stone::White);
+        game.board[3][4] = Some(Stone::Black);
+        game.board[5][4] = Some(Stone::Black);
+        game.board[4][3] = Some(Stone::Black);
+
+        make_move(&mut game, GoMove::Place(4, 5)); // Black captures
+        assert_eq!(game.captured_by_black, 1);
+        assert!(game.board[4][4].is_none());
+    }
+
+    #[test]
+    fn test_ko_point_set() {
+        let mut game = GoGame::new(GoDifficulty::Novice);
+        // Classic ko shape
+        // . B W .
+        // B . B W
+        // . B W .
+        game.board[0][1] = Some(Stone::Black);
+        game.board[0][2] = Some(Stone::White);
+        game.board[1][0] = Some(Stone::Black);
+        game.board[1][2] = Some(Stone::Black);
+        game.board[1][3] = Some(Stone::White);
+        game.board[2][1] = Some(Stone::Black);
+        game.board[2][2] = Some(Stone::White);
+        game.current_player = Stone::White;
+
+        // White captures at (1,1)
+        make_move(&mut game, GoMove::Place(1, 1));
+
+        // Ko point should be set
+        assert!(game.ko_point.is_some());
+    }
+
+    #[test]
+    fn test_calculate_score_empty_board() {
+        let board = [[None; BOARD_SIZE]; BOARD_SIZE];
+        let (black, white) = calculate_score(&board);
+        // Empty board = 0 + 0 stones, all territory contested, white gets 6 komi
+        assert_eq!(black, 0);
+        assert_eq!(white, 6);
+    }
+
+    #[test]
+    fn test_calculate_score_with_territory() {
+        let mut board = [[None; BOARD_SIZE]; BOARD_SIZE];
+        // Create a small enclosed black territory in corner
+        // Black wall from (0,2) to (2,2) and (2,0) to (2,2)
+        // This encloses a 2x2 region (4 points of territory)
+        board[0][2] = Some(Stone::Black);
+        board[1][2] = Some(Stone::Black);
+        board[2][0] = Some(Stone::Black);
+        board[2][1] = Some(Stone::Black);
+        board[2][2] = Some(Stone::Black);
+
+        // Add white stones elsewhere to make rest of board contested
+        board[4][4] = Some(Stone::White);
+        board[5][5] = Some(Stone::White);
+
+        let (black, white) = calculate_score(&board);
+        // Black: 5 stones + 4 territory (positions (0,0), (0,1), (1,0), (1,1)) = 9
+        // White: 2 stones + 0 territory + 6 komi = 8
+        // Rest of board is contested (touches both colors or neither)
+        assert_eq!(black, 9);
+        assert_eq!(white, 8);
     }
 }
