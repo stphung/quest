@@ -151,29 +151,205 @@ All bonuses are percentages of base values (before other multipliers like presti
 | T2 | 2 equipped items survive prestige |
 | T3 | 3 equipped items survive prestige |
 
-## UI Design
+## User Experience
 
-### Skill Tree View
+### Discovery
 
-Accessed from the character select screen via a keypress (e.g., `H`). Displays the full tree with visual indicators:
+During gameplay, a P10+ character triggers discovery via the existing RNG tick system (~2hr average). The game does **not** pause — ticks continue behind the modal.
 
-- **Built rooms (T1-T3):** Bright, with tier indicator
-- **Available rooms (prerequisites met):** Pulsing or highlighted border
-- **Locked rooms:** Dim, shows prerequisite chain
+A centered modal overlay appears:
 
-Arrow keys navigate between rooms. Selected room shows a detail panel:
-- Room name and description
-- Current tier and bonus
-- Next tier cost (prestige + fishing ranks from active character)
-- Build/upgrade confirmation prompt
+```
+╔══════════════════════════════════════════╗
+║                                          ║
+║           🏠  Haven Discovered           ║
+║                                          ║
+║   Through the treeline, you glimpse      ║
+║   crumbling stone walls wrapped in       ║
+║   ivy. A hearthstone chimney still       ║
+║   stands, waiting for a fire.            ║
+║                                          ║
+║   Press [H] anytime to visit.            ║
+║                                          ║
+║           [Enter] to dismiss             ║
+║                                          ║
+╚══════════════════════════════════════════╝
+```
 
-### Visual Progression
+Player presses `[Enter]` to dismiss. The Haven is now accessible account-wide via `[H]` from both gameplay and character select. No tutorial — the tree UI is self-explanatory on first visit.
 
-Room nodes in the tree change appearance with each tier:
-- Unbuilt: `[ · ]`
-- T1 (Basic): `[room]` dim
-- T2 (Improved): `[ROOM]` normal
-- T3 (Grand): `[ROOM]` bright/highlighted
+### Character Select Screen
+
+After discovery, the character select screen gains `[H] Haven` in its controls:
+
+```
+[Enter] Play  [R] Rename  [D] Delete  [N] New  [Q] Quit
+[H] Haven
+```
+
+### Haven Skill Tree View
+
+Pressing `[H]` opens the skill tree. Left side shows the tree, right side shows details for the selected room.
+
+```
+┌──────────────────────── Haven ──────────────────────────┐
+│                                                          │
+│         ┌────────────┐  ┌─ Hearthstone ★★· ──────────┐  │
+│         │ Hearthstone│  │                              │  │
+│         │    ★★·     │  │  "A warm fire keeps progress │  │
+│         └─────┬──────┘  │   burning while away."       │  │
+│          ╱         ╲    │                              │  │
+│   ┌──────────┐  ┌─────  │  Current: +25% offline XP    │  │
+│   │  Armory  │  │ Bedr  │                              │  │
+│   │    ★··   │  │  ★··  │  Upgrade to Grand (T3)       │  │
+│   └────┬─────┘  └────┬  │  Bonus: +40% offline XP      │  │
+│     ╱     ╲       ╱   │ │                              │  │
+│ ┌──────┐┌──────┐┌──── │ │  Cost:                       │  │
+│ │Train ││Trophy││Gard  │ │    5 Prestige Ranks          │  │
+│ │ · · ·││ · · ·││ · ·  │ │    6 Fishing Ranks           │  │
+│ └──┬───┘└──┬───┘└──┬─ │ │                              │  │
+│    :       :       :   │ │  Aldric has:                 │  │
+│ ┌──────┐┌──────┐┌──── │ │    P12 (5 available)   ✓     │  │
+│ │Watch ││Alchmy││F.Do  │ │    Fish Rank 18 (6 avl) ✓   │  │
+│ │  🔒  ││  🔒  ││  🔒 │ │                              │  │
+│ └──┬───┘└──┬───┘└──┬─ │ └──────────────────────────────┘  │
+│     ╲     ╱       ╲   │                                   │
+│   ┌──────────┐  ┌──────────┐                              │
+│   │ War Room │  │  Vault   │                              │
+│   │   🔒     │  │   🔒     │                              │
+│   └──────────┘  └──────────┘                              │
+│                                                           │
+│ [↑/↓/←/→] Navigate  [Enter] Build/Upgrade  [Esc] Back    │
+└───────────────────────────────────────────────────────────┘
+```
+
+**Visual states for tree nodes:**
+- `★★·` — T2 of 3 (filled stars for completed tiers, dot for remaining)
+- `· · ·` — Unbuilt but available (parent is T1+), pulsing highlight
+- `🔒` — Locked (parent not yet built), dim/gray text
+- Bright text for built rooms, dim for locked
+- Solid `│` connector for unlocked paths, dotted `:` for locked
+
+### Room Detail Panel States
+
+**Built room (can upgrade):**
+```
+┌─ Hearthstone ★★· ────────────────────┐
+│                                        │
+│  "A warm fire keeps progress burning   │
+│   while you're away."                  │
+│                                        │
+│  Current: +25% offline XP (T2)        │
+│                                        │
+│  Upgrade to Grand (T3)                │
+│  Bonus: +40% offline XP               │
+│                                        │
+│  Cost:                                 │
+│    5 Prestige Ranks                    │
+│    6 Fishing Ranks                     │
+│                                        │
+│  Aldric has:                           │
+│    P12 (5 available)   ✓              │
+│    Fish Rank 18 (6 available) ✓       │
+│                                        │
+│  [Enter] Upgrade    [Esc] Back         │
+└────────────────────────────────────────┘
+```
+
+**Unbuilt but available:**
+```
+┌─ Training Yard · · · ─────────────────┐
+│                                        │
+│  "Practice dummies and sparring        │
+│   targets."                            │
+│                                        │
+│  Build Basic (T1)                     │
+│  Bonus: +5% XP gain                   │
+│                                        │
+│  Cost:                                 │
+│    1 Prestige Rank                     │
+│    2 Fishing Ranks                     │
+│                                        │
+│  Aldric has:                           │
+│    P12 (1 available)   ✓              │
+│    Fish Rank 18 (2 available) ✓       │
+│                                        │
+│  [Enter] Build    [Esc] Back           │
+└────────────────────────────────────────┘
+```
+
+**Insufficient ranks:**
+```
+┌─ Training Yard · · · ─────────────────┐
+│                                        │
+│  "Practice dummies and sparring        │
+│   targets."                            │
+│                                        │
+│  Build Basic (T1)                     │
+│  Bonus: +5% XP gain                   │
+│                                        │
+│  Cost:                                 │
+│    1 Prestige Rank                     │
+│    2 Fishing Ranks                     │
+│                                        │
+│  Brynn has:                            │
+│    P1 (1 available)    ✓              │
+│    Fish Rank 0 (0 available) ✗        │
+│                                        │
+│  Cannot build — not enough ranks       │
+└────────────────────────────────────────┘
+```
+
+**Locked room:**
+```
+┌─ Watchtower 🔒 ───────────────────────┐
+│                                        │
+│  "Sharpens your eye for weak points." │
+│                                        │
+│  Locked                                │
+│  Requires: Training Yard (T1)          │
+│                                        │
+│  T1: +3% crit chance                   │
+│  T2: +6% crit chance                   │
+│  T3: +10% crit chance                  │
+└────────────────────────────────────────┘
+```
+
+**Maxed room (T3):**
+```
+┌─ Hearthstone ★★★ ────────────────────┐
+│                                        │
+│  "A warm fire keeps progress burning   │
+│   while you're away."                  │
+│                                        │
+│  Grand (T3) — MAX                     │
+│  +40% offline XP                       │
+└────────────────────────────────────────┘
+```
+
+### Build/Upgrade Confirmation
+
+Pressing `[Enter]` on a buildable room shows a confirmation overlay:
+
+```
+╔═ Confirm Build ═══════════════════════╗
+║                                        ║
+║  Build Training Yard (Basic)?          ║
+║                                        ║
+║  Aldric will spend:                    ║
+║    Prestige: P12 → P11                 ║
+║    Fishing:  Rank 18 → Rank 16        ║
+║                                        ║
+║  Gain: +5% XP (base)                  ║
+║  Unlocks: Watchtower                   ║
+║                                        ║
+║  [Enter] Confirm    [Esc] Cancel       ║
+╚════════════════════════════════════════╝
+```
+
+### Access from Gameplay
+
+During gameplay, `[H]` opens the Haven as an overlay (like the challenge menu). The active character's ranks are shown for spending. `[Esc]` returns to combat. Ticks continue in the background.
 
 ## Data Model
 
