@@ -116,7 +116,7 @@ pub fn handle_game_input(
             return InputResult::Continue;
         }
         if debug_menu.is_open {
-            return handle_debug_menu(key, state, haven, debug_menu);
+            return handle_debug_menu(key, state, haven, overlay, debug_menu);
         }
     }
 
@@ -305,6 +305,7 @@ fn handle_debug_menu(
     key: KeyEvent,
     state: &mut GameState,
     haven: &mut Haven,
+    overlay: &mut GameOverlay,
     debug_menu: &mut DebugMenu,
 ) -> InputResult {
     match key.code {
@@ -315,6 +316,11 @@ fn handle_debug_menu(
             state
                 .combat_state
                 .add_log_entry(format!("[DEBUG] {}", msg), false, true);
+            // Show Haven discovery modal if just discovered
+            if msg == "Haven discovered!" {
+                haven::save_haven(haven).ok();
+                *overlay = GameOverlay::HavenDiscovery;
+            }
         }
         KeyCode::Esc => debug_menu.close(),
         _ => {}
