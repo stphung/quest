@@ -1,6 +1,6 @@
 //! Go game logic: placement, capture, ko, scoring.
 
-use super::types::{GoGame, GoMove, GoResult, Stone, BOARD_SIZE};
+use super::types::{GoDifficulty, GoGame, GoMove, GoResult, Stone, BOARD_SIZE};
 use std::collections::HashSet;
 
 /// Get all stones in the same group as the stone at (row, col).
@@ -344,6 +344,84 @@ fn get_empty_region(
     };
 
     (region, owner)
+}
+
+use super::mcts::mcts_best_move;
+
+/// Start a new Go game with the selected difficulty.
+pub fn start_go_game(_state: &mut crate::core::game_state::GameState, difficulty: GoDifficulty) {
+    // TODO: Uncomment when active_go is added to GameState
+    // state.active_go = Some(GoGame::new(difficulty));
+    // state.challenge_menu.close();
+    let _ = difficulty; // Suppress unused warning
+}
+
+/// Process human move at cursor position.
+pub fn process_human_move(game: &mut GoGame) -> bool {
+    if game.game_result.is_some() || game.current_player != Stone::Black {
+        return false;
+    }
+
+    let (row, col) = game.cursor;
+    if !is_legal_move(game, row, col) {
+        return false;
+    }
+
+    make_move(game, GoMove::Place(row, col));
+
+    // Check for game end
+    if game.game_result.is_some() {
+        return true;
+    }
+
+    // Start AI thinking
+    game.ai_thinking = true;
+    game.ai_think_ticks = 0;
+    true
+}
+
+/// Process human pass.
+pub fn process_human_pass(game: &mut GoGame) -> bool {
+    if game.game_result.is_some() || game.current_player != Stone::Black {
+        return false;
+    }
+
+    make_move(game, GoMove::Pass);
+
+    // Check for game end
+    if game.game_result.is_some() {
+        return true;
+    }
+
+    // Start AI thinking
+    game.ai_thinking = true;
+    game.ai_think_ticks = 0;
+    true
+}
+
+/// Process AI turn (called each tick while ai_thinking is true).
+pub fn process_go_ai<R: rand::Rng>(game: &mut GoGame, rng: &mut R) {
+    if !game.ai_thinking || game.game_result.is_some() {
+        return;
+    }
+
+    // Simulate thinking delay (5-15 ticks = 0.5-1.5 seconds)
+    game.ai_think_ticks += 1;
+    let min_ticks = match game.difficulty {
+        GoDifficulty::Novice => 5,
+        GoDifficulty::Apprentice => 8,
+        GoDifficulty::Journeyman => 10,
+        GoDifficulty::Master => 15,
+    };
+
+    if game.ai_think_ticks < min_ticks {
+        return;
+    }
+
+    // Get AI move using MCTS
+    let ai_move = mcts_best_move(game, rng);
+    make_move(game, ai_move);
+    game.ai_thinking = false;
 }
 
 #[cfg(test)]
