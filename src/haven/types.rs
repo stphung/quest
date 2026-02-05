@@ -372,6 +372,45 @@ pub fn haven_discovery_chance(prestige_rank: u32) -> f64 {
     0.000014 + (prestige_rank - 10) as f64 * 0.000007
 }
 
+/// Pre-computed Haven bonuses for efficient access during gameplay
+#[derive(Debug, Clone, Default)]
+pub struct HavenBonuses {
+    pub damage_percent: f64,
+    pub xp_gain_percent: f64,
+    pub drop_rate_percent: f64,
+    pub crit_chance_percent: f64,
+    pub hp_regen_percent: f64,
+    pub attack_interval_reduction: f64,
+    pub offline_xp_percent: f64,
+    pub challenge_discovery_percent: f64,
+    pub fishing_timer_reduction: f64,
+    pub fishing_rank_xp_percent: f64,
+    pub item_rarity_percent: f64,
+    pub hp_regen_delay_reduction: f64,
+    pub vault_slots: u8,
+}
+
+impl Haven {
+    /// Compute all bonuses from the current Haven state
+    pub fn compute_bonuses(&self) -> HavenBonuses {
+        HavenBonuses {
+            damage_percent: self.get_bonus(HavenBonusType::DamagePercent),
+            xp_gain_percent: self.get_bonus(HavenBonusType::XpGainPercent),
+            drop_rate_percent: self.get_bonus(HavenBonusType::DropRatePercent),
+            crit_chance_percent: self.get_bonus(HavenBonusType::CritChancePercent),
+            hp_regen_percent: self.get_bonus(HavenBonusType::HpRegenPercent),
+            attack_interval_reduction: self.get_bonus(HavenBonusType::AttackIntervalReduction),
+            offline_xp_percent: self.get_bonus(HavenBonusType::OfflineXpPercent),
+            challenge_discovery_percent: self.get_bonus(HavenBonusType::ChallengeDiscoveryPercent),
+            fishing_timer_reduction: self.get_bonus(HavenBonusType::FishingTimerReduction),
+            fishing_rank_xp_percent: self.get_bonus(HavenBonusType::FishingRankXpPercent),
+            item_rarity_percent: self.get_bonus(HavenBonusType::ItemRarityPercent),
+            hp_regen_delay_reduction: self.get_bonus(HavenBonusType::HpRegenDelayReduction),
+            vault_slots: self.vault_tier(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -570,5 +609,29 @@ mod tests {
         assert!(haven.build_room(HavenRoomId::AlchemyLab).is_some());
         assert!(haven.build_room(HavenRoomId::WarRoom).is_some());
         assert_eq!(haven.rooms_built(), 7);
+    }
+
+    #[test]
+    fn test_compute_bonuses() {
+        let mut haven = Haven::new();
+        let bonuses = haven.compute_bonuses();
+
+        // Empty haven has no bonuses
+        assert_eq!(bonuses.damage_percent, 0.0);
+        assert_eq!(bonuses.xp_gain_percent, 0.0);
+        assert_eq!(bonuses.vault_slots, 0);
+
+        // Build some rooms
+        haven.build_room(HavenRoomId::Hearthstone); // +10% Offline XP
+        haven.build_room(HavenRoomId::Armory); // +5% DMG
+
+        let bonuses = haven.compute_bonuses();
+        assert_eq!(bonuses.damage_percent, 5.0);
+        assert_eq!(bonuses.offline_xp_percent, 10.0);
+
+        // Upgrade Armory to T2
+        haven.build_room(HavenRoomId::Armory); // +10% DMG now
+        let bonuses = haven.compute_bonuses();
+        assert_eq!(bonuses.damage_percent, 10.0);
     }
 }
