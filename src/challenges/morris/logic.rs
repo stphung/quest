@@ -1,10 +1,63 @@
 //! Nine Men's Morris game logic: AI moves, and game resolution.
 
 use super::{
-    MorrisDifficulty, MorrisGame, MorrisMove, MorrisPhase, MorrisResult, Player, ADJACENCIES, MILLS,
+    CursorDirection, MorrisDifficulty, MorrisGame, MorrisMove, MorrisPhase, MorrisResult, Player,
+    ADJACENCIES, MILLS,
 };
 use crate::core::game_state::GameState;
 use rand::Rng;
+
+/// Input actions for the Morris game (UI-agnostic).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MorrisInput {
+    Up,
+    Down,
+    Left,
+    Right,
+    Select, // Enter - select piece, place, move, or capture
+    Cancel, // Esc - clear selection or forfeit
+    Other,
+}
+
+/// Process a key input during active Morris game.
+/// Returns true if the input was handled.
+/// Does nothing if AI is thinking.
+pub fn process_input(game: &mut MorrisGame, input: MorrisInput) -> bool {
+    // Don't process input while AI is thinking
+    if game.ai_thinking {
+        return false;
+    }
+
+    match input {
+        MorrisInput::Up => game.move_cursor(CursorDirection::Up),
+        MorrisInput::Down => game.move_cursor(CursorDirection::Down),
+        MorrisInput::Left => game.move_cursor(CursorDirection::Left),
+        MorrisInput::Right => game.move_cursor(CursorDirection::Right),
+        MorrisInput::Select => {
+            process_human_enter(game);
+        }
+        MorrisInput::Cancel => {
+            process_cancel(game);
+        }
+        MorrisInput::Other => {
+            // Any other key cancels forfeit pending
+            game.forfeit_pending = false;
+        }
+    }
+    true
+}
+
+/// Process Esc key: clear selection or initiate/confirm forfeit.
+fn process_cancel(game: &mut MorrisGame) {
+    if game.forfeit_pending {
+        game.game_result = Some(MorrisResult::Forfeit);
+    } else if game.selected_position.is_some() {
+        game.clear_selection();
+        game.forfeit_pending = false;
+    } else {
+        game.forfeit_pending = true;
+    }
+}
 
 /// Start a morris game with the selected difficulty
 pub fn start_morris_game(state: &mut GameState, difficulty: MorrisDifficulty) {
@@ -1211,5 +1264,127 @@ mod tests {
         // Opponent piece should be captured
         assert!(game.board[5].is_none());
         assert!(!game.must_capture);
+    }
+
+    // ============ Process Input Tests ============
+
+    #[test]
+    fn test_process_input_blocked_during_ai_thinking() {
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        game.ai_thinking = true;
+        let old_cursor = game.cursor;
+
+        let handled = process_input(&mut game, MorrisInput::Up);
+
+        assert!(!handled);
+        assert_eq!(game.cursor, old_cursor);
+    }
+
+    #[test]
+    fn test_process_input_cursor_movement() {
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        game.cursor = 4; // Central position
+
+        // Test all directions
+        process_input(&mut game, MorrisInput::Up);
+        // Cursor should change (exact position depends on board layout)
+        let after_up = game.cursor;
+
+        game.cursor = 4;
+        process_input(&mut game, MorrisInput::Down);
+        let after_down = game.cursor;
+
+        game.cursor = 4;
+        process_input(&mut game, MorrisInput::Left);
+        let after_left = game.cursor;
+
+        game.cursor = 4;
+        process_input(&mut game, MorrisInput::Right);
+        let after_right = game.cursor;
+
+        // At least some movements should change the cursor
+        assert!(
+            after_up != 4 || after_down != 4 || after_left != 4 || after_right != 4,
+            "At least one direction should move the cursor"
+        );
+    }
+
+    #[test]
+    fn test_process_input_select_places_piece() {
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        assert_eq!(game.phase, MorrisPhase::Placing);
+        game.cursor = 0;
+
+        process_input(&mut game, MorrisInput::Select);
+
+        assert_eq!(game.board[0], Some(Player::Human));
+    }
+
+    #[test]
+    fn test_process_input_cancel_initiates_forfeit() {
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        assert!(!game.forfeit_pending);
+
+        process_input(&mut game, MorrisInput::Cancel);
+
+        assert!(game.forfeit_pending);
+    }
+
+    #[test]
+    fn test_process_input_cancel_confirms_forfeit() {
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        game.forfeit_pending = true;
+
+        process_input(&mut game, MorrisInput::Cancel);
+
+        assert_eq!(game.game_result, Some(MorrisResult::Forfeit));
+    }
+
+    #[test]
+    fn test_process_input_cancel_clears_selection_first() {
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        game.phase = MorrisPhase::Moving;
+        game.selected_position = Some(5);
+
+        process_input(&mut game, MorrisInput::Cancel);
+
+        // Should clear selection, not initiate forfeit
+        assert!(game.selected_position.is_none());
+        assert!(!game.forfeit_pending);
+    }
+
+    #[test]
+    fn test_process_input_other_cancels_forfeit_pending() {
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        game.forfeit_pending = true;
+
+        process_input(&mut game, MorrisInput::Other);
+
+        assert!(!game.forfeit_pending);
+    }
+
+    #[test]
+    fn test_process_input_returns_true_when_handled() {
+        // Test each input returns true independently
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        assert!(process_input(&mut game, MorrisInput::Up));
+
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        assert!(process_input(&mut game, MorrisInput::Down));
+
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        assert!(process_input(&mut game, MorrisInput::Left));
+
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        assert!(process_input(&mut game, MorrisInput::Right));
+
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        assert!(process_input(&mut game, MorrisInput::Select));
+
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        assert!(process_input(&mut game, MorrisInput::Cancel));
+
+        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        assert!(process_input(&mut game, MorrisInput::Other));
     }
 }

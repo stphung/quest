@@ -20,7 +20,11 @@ pub enum MinesweeperInput {
 
 /// Process a key input during active Minesweeper game.
 /// Returns true if the input was handled.
-pub fn process_input<R: Rng>(game: &mut MinesweeperGame, input: MinesweeperInput, rng: &mut R) -> bool {
+pub fn process_input<R: Rng>(
+    game: &mut MinesweeperGame,
+    input: MinesweeperInput,
+    rng: &mut R,
+) -> bool {
     // Handle forfeit confirmation (double-Esc pattern)
     if game.forfeit_pending {
         match input {

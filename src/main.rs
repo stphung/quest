@@ -10,8 +10,8 @@ mod utils;
 mod zones;
 
 use challenges::chess::logic::{
-    apply_game_result, process_ai_thinking, process_input as process_chess_input,
-    start_chess_game, ChessInput,
+    apply_game_result, process_ai_thinking, process_input as process_chess_input, start_chess_game,
+    ChessInput,
 };
 use challenges::chess::{self, ChessDifficulty};
 use challenges::gomoku::logic::{
@@ -21,17 +21,15 @@ use challenges::gomoku::logic::{
 use challenges::gomoku::{GomokuDifficulty, GomokuResult};
 use challenges::menu::{try_discover_challenge, ChallengeType};
 use challenges::minesweeper::logic::{
-    apply_game_result as apply_minesweeper_result,
-    process_input as process_minesweeper_input, MinesweeperInput,
+    apply_game_result as apply_minesweeper_result, process_input as process_minesweeper_input,
+    MinesweeperInput,
 };
 use challenges::minesweeper::{MinesweeperDifficulty, MinesweeperGame};
 use challenges::morris::logic::{
-    self as morris_logic, apply_game_result as apply_morris_result,
-    process_ai_thinking as process_morris_ai, start_morris_game,
+    apply_game_result as apply_morris_result, process_ai_thinking as process_morris_ai,
+    process_input as process_morris_input, start_morris_game, MorrisInput,
 };
-use challenges::morris::{
-    CursorDirection as MorrisCursorDirection, MorrisDifficulty, MorrisResult,
-};
+use challenges::morris::{MorrisDifficulty, MorrisResult};
 use challenges::rune::logic::{
     apply_game_result as apply_rune_result, process_input as process_rune_input, RuneInput,
 };
@@ -66,7 +64,6 @@ enum Screen {
     Game,
 }
 
-/// Handle Enter key press during Morris game
 fn main() -> io::Result<()> {
     // Handle CLI arguments
     let args: Vec<String> = std::env::args().collect();
@@ -633,7 +630,9 @@ fn main() -> io::Result<()> {
                                     KeyCode::Up => RuneInput::Up,
                                     KeyCode::Down => RuneInput::Down,
                                     KeyCode::Enter => RuneInput::Submit,
-                                    KeyCode::Char('f') | KeyCode::Char('F') => RuneInput::ClearGuess,
+                                    KeyCode::Char('f') | KeyCode::Char('F') => {
+                                        RuneInput::ClearGuess
+                                    }
                                     KeyCode::Esc => RuneInput::Forfeit,
                                     _ => RuneInput::Other,
                                 };
@@ -853,39 +852,16 @@ fn main() -> io::Result<()> {
                                     }
                                     continue;
                                 }
-                                if !morris_game.ai_thinking {
-                                    match key_event.code {
-                                        KeyCode::Up => {
-                                            morris_game.move_cursor(MorrisCursorDirection::Up)
-                                        }
-                                        KeyCode::Down => {
-                                            morris_game.move_cursor(MorrisCursorDirection::Down)
-                                        }
-                                        KeyCode::Left => {
-                                            morris_game.move_cursor(MorrisCursorDirection::Left)
-                                        }
-                                        KeyCode::Right => {
-                                            morris_game.move_cursor(MorrisCursorDirection::Right)
-                                        }
-                                        KeyCode::Enter => {
-                                            morris_logic::process_human_enter(morris_game);
-                                        }
-                                        KeyCode::Esc => {
-                                            if morris_game.forfeit_pending {
-                                                morris_game.game_result =
-                                                    Some(MorrisResult::Forfeit);
-                                            } else if morris_game.selected_position.is_some() {
-                                                morris_game.clear_selection();
-                                                morris_game.forfeit_pending = false;
-                                            } else {
-                                                morris_game.forfeit_pending = true;
-                                            }
-                                        }
-                                        _ => {
-                                            morris_game.forfeit_pending = false;
-                                        }
-                                    }
-                                }
+                                let input = match key_event.code {
+                                    KeyCode::Up => MorrisInput::Up,
+                                    KeyCode::Down => MorrisInput::Down,
+                                    KeyCode::Left => MorrisInput::Left,
+                                    KeyCode::Right => MorrisInput::Right,
+                                    KeyCode::Enter => MorrisInput::Select,
+                                    KeyCode::Esc => MorrisInput::Cancel,
+                                    _ => MorrisInput::Other,
+                                };
+                                process_morris_input(morris_game, input);
                                 continue;
                             }
 

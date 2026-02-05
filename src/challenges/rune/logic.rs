@@ -163,7 +163,9 @@ pub fn submit_guess<R: Rng>(game: &mut RuneGame, rng: &mut R) -> bool {
 
 /// Apply game result: grant rewards on win (XP, prestige, fishing ranks).
 /// Returns (result, xp_gained).
-pub fn apply_game_result(state: &mut crate::core::game_state::GameState) -> Option<(RuneResult, u64)> {
+pub fn apply_game_result(
+    state: &mut crate::core::game_state::GameState,
+) -> Option<(RuneResult, u64)> {
     use crate::challenges::menu::DifficultyInfo;
 
     let game = state.active_rune.as_ref()?;
