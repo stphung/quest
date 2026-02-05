@@ -19,13 +19,9 @@ fn test_complete_chess_win_flow() {
     state.active_chess.as_mut().unwrap().game_result = Some(ChessResult::Win);
 
     // Apply result
-    let result = apply_game_result(&mut state);
-    assert!(result.is_some());
-
-    let (chess_result, prestige) = result.unwrap();
-    assert_eq!(chess_result, ChessResult::Win);
-    assert_eq!(prestige, 5); // Master reward
-    assert_eq!(state.prestige_rank, 10); // 5 + 5
+    let processed = apply_game_result(&mut state);
+    assert!(processed);
+    assert_eq!(state.prestige_rank, 10); // 5 + 5 (Master reward)
     assert!(state.active_chess.is_none());
 }
 
@@ -37,10 +33,8 @@ fn test_chess_loss_no_penalty() {
     start_chess_game(&mut state, ChessDifficulty::Novice);
     state.active_chess.as_mut().unwrap().game_result = Some(ChessResult::Loss);
 
-    let result = apply_game_result(&mut state);
-    let (_, prestige) = result.unwrap();
-
-    assert_eq!(prestige, 0);
+    let processed = apply_game_result(&mut state);
+    assert!(processed);
     assert_eq!(state.prestige_rank, 3); // Unchanged
 }
 
@@ -52,11 +46,8 @@ fn test_chess_draw_no_penalty() {
     start_chess_game(&mut state, ChessDifficulty::Journeyman);
     state.active_chess.as_mut().unwrap().game_result = Some(ChessResult::Draw);
 
-    let result = apply_game_result(&mut state);
-    let (chess_result, prestige) = result.unwrap();
-
-    assert_eq!(chess_result, ChessResult::Draw);
-    assert_eq!(prestige, 0);
+    let processed = apply_game_result(&mut state);
+    assert!(processed);
     assert_eq!(state.prestige_rank, 7); // Unchanged
 }
 
@@ -68,11 +59,9 @@ fn test_chess_forfeit_counts_as_loss() {
     start_chess_game(&mut state, ChessDifficulty::Apprentice);
     state.active_chess.as_mut().unwrap().game_result = Some(ChessResult::Forfeit);
 
-    let result = apply_game_result(&mut state);
-    let (chess_result, prestige) = result.unwrap();
-
-    assert_eq!(chess_result, ChessResult::Forfeit);
-    assert_eq!(prestige, 0);
+    let processed = apply_game_result(&mut state);
+    assert!(processed);
+    assert_eq!(state.prestige_rank, 2); // Unchanged
     assert_eq!(state.chess_stats.games_lost, 1);
 }
 

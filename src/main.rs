@@ -12,12 +12,10 @@ mod zones;
 use challenges::chess::logic::{
     apply_game_result, process_ai_thinking, process_input as process_chess_input, ChessInput,
 };
-use challenges::chess::{self};
 use challenges::gomoku::logic::{
     apply_game_result as apply_gomoku_result, process_ai_thinking as process_gomoku_ai,
     process_input as process_gomoku_input, GomokuInput,
 };
-use challenges::gomoku::GomokuResult;
 use challenges::menu::{
     process_input as process_menu_input, try_discover_challenge, ChallengeType, MenuInput,
 };
@@ -29,7 +27,6 @@ use challenges::morris::logic::{
     apply_game_result as apply_morris_result, process_ai_thinking as process_morris_ai,
     process_input as process_morris_input, MorrisInput,
 };
-use challenges::morris::MorrisResult;
 use challenges::rune::logic::{
     apply_game_result as apply_rune_result, process_input as process_rune_input, RuneInput,
 };
@@ -669,56 +666,7 @@ fn main() -> io::Result<()> {
                             if let Some(ref mut gomoku_game) = state.active_gomoku {
                                 if gomoku_game.game_result.is_some() {
                                     // Any key dismisses result and applies rewards
-                                    let old_prestige = state.prestige_rank;
-                                    if let Some((result, xp_gained, prestige_gained)) =
-                                        apply_gomoku_result(&mut state)
-                                    {
-                                        match result {
-                                            GomokuResult::Win => {
-                                                state.combat_state.add_log_entry(
-                                                    "◎ Victory! The strategist bows in defeat."
-                                                        .to_string(),
-                                                    false,
-                                                    true,
-                                                );
-                                                if prestige_gained > 0 {
-                                                    state.combat_state.add_log_entry(
-                                                        format!(
-                                                            "◎ +{} Prestige Ranks (P{} → P{})",
-                                                            prestige_gained,
-                                                            old_prestige,
-                                                            state.prestige_rank
-                                                        ),
-                                                        false,
-                                                        false,
-                                                    );
-                                                }
-                                                if xp_gained > 0 {
-                                                    state.combat_state.add_log_entry(
-                                                        format!("◎ +{} XP", xp_gained),
-                                                        false,
-                                                        false,
-                                                    );
-                                                }
-                                            }
-                                            GomokuResult::Loss => {
-                                                state.combat_state.add_log_entry(
-                                                    "◎ The strategist nods respectfully and departs."
-                                                        .to_string(),
-                                                    false,
-                                                    true,
-                                                );
-                                            }
-                                            GomokuResult::Draw => {
-                                                state.combat_state.add_log_entry(
-                                                    "◎ A rare draw. The strategist seems impressed."
-                                                        .to_string(),
-                                                    false,
-                                                    true,
-                                                );
-                                            }
-                                        }
-                                    }
+                                    apply_gomoku_result(&mut state);
                                     continue;
                                 }
 
@@ -738,53 +686,8 @@ fn main() -> io::Result<()> {
                             // Handle active chess game input (highest priority)
                             if let Some(ref mut chess_game) = state.active_chess {
                                 if chess_game.game_result.is_some() {
-                                    // Any key dismisses result and adds combat log message
-                                    let old_prestige = state.prestige_rank;
-                                    if let Some((result, prestige_gained)) =
-                                        apply_game_result(&mut state)
-                                    {
-                                        use chess::ChessResult;
-                                        match result {
-                                            ChessResult::Win => {
-                                                let new_prestige = old_prestige + prestige_gained;
-                                                state.combat_state.add_log_entry(
-                                                    "♟ Checkmate! You defeated the mysterious figure.".to_string(),
-                                                    false,
-                                                    true,
-                                                );
-                                                state.combat_state.add_log_entry(
-                                                    format!(
-                                                        "♟ +{} Prestige Ranks (P{} → P{})",
-                                                        prestige_gained, old_prestige, new_prestige
-                                                    ),
-                                                    false,
-                                                    true,
-                                                );
-                                            }
-                                            ChessResult::Loss => {
-                                                state.combat_state.add_log_entry(
-                                                    "♟ The mysterious figure nods respectfully and vanishes.".to_string(),
-                                                    false,
-                                                    true,
-                                                );
-                                            }
-                                            ChessResult::Draw => {
-                                                state.combat_state.add_log_entry(
-                                                    "♟ The figure smiles knowingly and fades away."
-                                                        .to_string(),
-                                                    false,
-                                                    true,
-                                                );
-                                            }
-                                            ChessResult::Forfeit => {
-                                                state.combat_state.add_log_entry(
-                                                    "♟ You concede the game. The figure disappears without a word.".to_string(),
-                                                    false,
-                                                    true,
-                                                );
-                                            }
-                                        }
-                                    }
+                                    // Any key dismisses result and applies rewards
+                                    apply_game_result(&mut state);
                                     continue;
                                 }
                                 let input = match key_event.code {
@@ -803,52 +706,8 @@ fn main() -> io::Result<()> {
                             // Handle active Morris game input
                             if let Some(ref mut morris_game) = state.active_morris {
                                 if morris_game.game_result.is_some() {
-                                    // Any key dismisses result and adds combat log message
-                                    if let Some((result, xp_gained, fishing_rank_up)) =
-                                        apply_morris_result(&mut state)
-                                    {
-                                        match result {
-                                            MorrisResult::Win => {
-                                                state.combat_state.add_log_entry(
-                                                    "\u{25CB} Victory! The sage bows with respect."
-                                                        .to_string(),
-                                                    false,
-                                                    true,
-                                                );
-                                                state.combat_state.add_log_entry(
-                                                    format!("\u{25CB} +{} XP", xp_gained),
-                                                    false,
-                                                    true,
-                                                );
-                                                if fishing_rank_up {
-                                                    state.combat_state.add_log_entry(
-                                                        format!(
-                                                            "\u{25CB} Fishing rank up! Now rank {}: {}",
-                                                            state.fishing.rank,
-                                                            state.fishing.rank_name()
-                                                        ),
-                                                        false,
-                                                        true,
-                                                    );
-                                                }
-                                            }
-                                            MorrisResult::Loss => {
-                                                state.combat_state.add_log_entry(
-                                                    "\u{25CB} The sage nods knowingly and departs."
-                                                        .to_string(),
-                                                    false,
-                                                    true,
-                                                );
-                                            }
-                                            MorrisResult::Forfeit => {
-                                                state.combat_state.add_log_entry(
-                                                    "\u{25CB} You concede. The sage gathers their stones quietly.".to_string(),
-                                                    false,
-                                                    true,
-                                                );
-                                            }
-                                        }
-                                    }
+                                    // Any key dismisses result and applies rewards
+                                    apply_morris_result(&mut state);
                                     continue;
                                 }
                                 let input = match key_event.code {

@@ -217,35 +217,75 @@ pub fn check_game_over(game: &mut ChessGame) {
     }
 }
 
-/// Apply game result: update stats and grant rewards on win
-pub fn apply_game_result(state: &mut GameState) -> Option<(ChessResult, u32)> {
+/// Apply game result: update stats, grant rewards, and add combat log entries.
+/// Returns true if a result was processed.
+pub fn apply_game_result(state: &mut GameState) -> bool {
     use crate::challenges::menu::DifficultyInfo;
 
-    let game = state.active_chess.as_ref()?;
-    let result = game.game_result?;
+    let game = match state.active_chess.as_ref() {
+        Some(g) => g,
+        None => return false,
+    };
+    let result = match game.game_result {
+        Some(r) => r,
+        None => return false,
+    };
     let reward = game.difficulty.reward();
+    let old_prestige = state.prestige_rank;
 
     state.chess_stats.games_played += 1;
 
-    let prestige_gained = match result {
+    match result {
         ChessResult::Win => {
             state.chess_stats.games_won += 1;
             state.prestige_rank += reward.prestige_ranks;
             state.chess_stats.prestige_earned += reward.prestige_ranks;
-            reward.prestige_ranks
+
+            // Combat log entries
+            state.combat_state.add_log_entry(
+                "♟ Checkmate! You defeated the mysterious figure.".to_string(),
+                false,
+                true,
+            );
+            if reward.prestige_ranks > 0 {
+                state.combat_state.add_log_entry(
+                    format!(
+                        "♟ +{} Prestige Ranks (P{} → P{})",
+                        reward.prestige_ranks, old_prestige, state.prestige_rank
+                    ),
+                    false,
+                    true,
+                );
+            }
         }
-        ChessResult::Loss | ChessResult::Forfeit => {
+        ChessResult::Loss => {
             state.chess_stats.games_lost += 1;
-            0
+            state.combat_state.add_log_entry(
+                "♟ The mysterious figure nods respectfully and vanishes.".to_string(),
+                false,
+                true,
+            );
+        }
+        ChessResult::Forfeit => {
+            state.chess_stats.games_lost += 1;
+            state.combat_state.add_log_entry(
+                "♟ You concede the game. The figure disappears without a word.".to_string(),
+                false,
+                true,
+            );
         }
         ChessResult::Draw => {
             state.chess_stats.games_drawn += 1;
-            0
+            state.combat_state.add_log_entry(
+                "♟ The figure smiles knowingly and fades away.".to_string(),
+                false,
+                true,
+            );
         }
-    };
+    }
 
     state.active_chess = None;
-    Some((result, prestige_gained))
+    true
 }
 
 #[cfg(test)]
@@ -279,12 +319,9 @@ mod tests {
         game.game_result = Some(ChessResult::Win);
         state.active_chess = Some(game);
 
-        let result = apply_game_result(&mut state);
-        assert!(result.is_some());
-        let (chess_result, prestige) = result.unwrap();
-        assert_eq!(chess_result, ChessResult::Win);
-        assert_eq!(prestige, 5);
-        assert_eq!(state.prestige_rank, 10);
+        let processed = apply_game_result(&mut state);
+        assert!(processed);
+        assert_eq!(state.prestige_rank, 10); // 5 + 5 (Master reward)
         assert_eq!(state.chess_stats.games_won, 1);
         assert!(state.active_chess.is_none());
     }
@@ -297,11 +334,9 @@ mod tests {
         game.game_result = Some(ChessResult::Loss);
         state.active_chess = Some(game);
 
-        let result = apply_game_result(&mut state);
-        let (chess_result, prestige) = result.unwrap();
-        assert_eq!(chess_result, ChessResult::Loss);
-        assert_eq!(prestige, 0);
-        assert_eq!(state.prestige_rank, 5);
+        let processed = apply_game_result(&mut state);
+        assert!(processed);
+        assert_eq!(state.prestige_rank, 5); // Unchanged
         assert_eq!(state.chess_stats.games_lost, 1);
     }
 
@@ -470,11 +505,8 @@ mod tests {
         game.game_result = Some(ChessResult::Forfeit);
         state.active_chess = Some(game);
 
-        let result = apply_game_result(&mut state);
-        let (chess_result, prestige) = result.unwrap();
-
-        assert_eq!(chess_result, ChessResult::Forfeit);
-        assert_eq!(prestige, 0); // No reward for forfeit
+        let processed = apply_game_result(&mut state);
+        assert!(processed);
         assert_eq!(state.chess_stats.games_lost, 1); // Counts as loss
         assert_eq!(state.chess_stats.games_won, 0);
         assert_eq!(state.prestige_rank, 5); // No penalty
@@ -489,11 +521,8 @@ mod tests {
         game.game_result = Some(ChessResult::Draw);
         state.active_chess = Some(game);
 
-        let result = apply_game_result(&mut state);
-        let (chess_result, prestige) = result.unwrap();
-
-        assert_eq!(chess_result, ChessResult::Draw);
-        assert_eq!(prestige, 0);
+        let processed = apply_game_result(&mut state);
+        assert!(processed);
         assert_eq!(state.chess_stats.games_drawn, 1);
         assert_eq!(state.prestige_rank, 5); // Unchanged
     }

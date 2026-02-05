@@ -671,37 +671,78 @@ pub fn find_best_move<R: Rng>(game: &GomokuGame, rng: &mut R) -> Option<(usize, 
     best_moves.choose(rng).copied()
 }
 
-/// Apply game result: update stats and grant rewards on win.
-/// Returns (result, xp_gained, prestige_gained).
-pub fn apply_game_result(state: &mut GameState) -> Option<(GomokuResult, u64, u32)> {
+/// Apply game result: update stats, grant rewards, and add combat log entries.
+/// Returns true if a result was processed.
+pub fn apply_game_result(state: &mut GameState) -> bool {
     use crate::challenges::menu::DifficultyInfo;
 
-    let game = state.active_gomoku.as_ref()?;
-    let result = game.game_result?;
+    let game = match state.active_gomoku.as_ref() {
+        Some(g) => g,
+        None => return false,
+    };
+    let result = match game.game_result {
+        Some(r) => r,
+        None => return false,
+    };
     let reward = game.difficulty.reward();
+    let old_prestige = state.prestige_rank;
 
-    let (xp_gained, prestige_gained) = match result {
+    match result {
         GomokuResult::Win => {
             // XP reward
-            let xp = if reward.xp_percent > 0 {
+            let xp_gained = if reward.xp_percent > 0 {
                 let xp_for_level =
                     crate::core::game_logic::xp_for_next_level(state.character_level.max(1));
-                (xp_for_level * reward.xp_percent as u64) / 100
+                let xp = (xp_for_level * reward.xp_percent as u64) / 100;
+                state.character_xp += xp;
+                xp
             } else {
                 0
             };
-            state.character_xp += xp;
 
             // Prestige reward
             state.prestige_rank += reward.prestige_ranks;
 
-            (xp, reward.prestige_ranks)
+            // Combat log entries
+            state.combat_state.add_log_entry(
+                "◎ Victory! The strategist bows in defeat.".to_string(),
+                false,
+                true,
+            );
+            if reward.prestige_ranks > 0 {
+                state.combat_state.add_log_entry(
+                    format!(
+                        "◎ +{} Prestige Ranks (P{} → P{})",
+                        reward.prestige_ranks, old_prestige, state.prestige_rank
+                    ),
+                    false,
+                    false,
+                );
+            }
+            if xp_gained > 0 {
+                state
+                    .combat_state
+                    .add_log_entry(format!("◎ +{} XP", xp_gained), false, false);
+            }
         }
-        GomokuResult::Loss | GomokuResult::Draw => (0, 0),
-    };
+        GomokuResult::Loss => {
+            state.combat_state.add_log_entry(
+                "◎ The strategist nods respectfully and departs.".to_string(),
+                false,
+                true,
+            );
+        }
+        GomokuResult::Draw => {
+            state.combat_state.add_log_entry(
+                "◎ A rare draw. The strategist seems impressed.".to_string(),
+                false,
+                true,
+            );
+        }
+    }
 
     state.active_gomoku = None;
-    Some((result, xp_gained, prestige_gained))
+    true
 }
 
 /// Process AI thinking (called each tick).
