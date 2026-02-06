@@ -6,6 +6,7 @@ use crate::combat::types::CombatState;
 use crate::dungeon::types::Dungeon;
 use crate::fishing::types::{FishingSession, FishingState};
 use crate::items::equipment::Equipment;
+use crate::ui::effects::CombatEffectManager;
 use crate::zones::ZoneProgression;
 use serde::{Deserialize, Serialize};
 
@@ -45,6 +46,9 @@ pub struct GameState {
     /// Active challenge minigame (transient, not saved)
     #[serde(skip)]
     pub active_minigame: Option<ActiveMinigame>,
+    /// Combat visual effects manager (transient, not saved)
+    #[serde(skip)]
+    pub combat_effects: CombatEffectManager,
 }
 
 impl GameState {
@@ -75,6 +79,7 @@ impl GameState {
             challenge_menu: ChallengeMenu::new(),
             chess_stats: ChessStats::default(),
             active_minigame: None,
+            combat_effects: CombatEffectManager::new(),
         }
     }
 

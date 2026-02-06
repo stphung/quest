@@ -37,6 +37,22 @@ pub struct CombatEffectManager {
     last_frame: Instant,
 }
 
+impl std::fmt::Debug for CombatEffectManager {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CombatEffectManager")
+            .field("effect_type", &self.effect_type)
+            .field("is_active", &self.active_effect.is_some())
+            .finish()
+    }
+}
+
+impl Clone for CombatEffectManager {
+    fn clone(&self) -> Self {
+        // Effects are transient, so cloning returns a fresh manager
+        Self::new()
+    }
+}
+
 impl Default for CombatEffectManager {
     fn default() -> Self {
         Self::new()

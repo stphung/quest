@@ -36,7 +36,7 @@ use ratatui::{
 /// Main UI drawing function with optional update notification
 pub fn draw_ui_with_update(
     frame: &mut Frame,
-    game_state: &GameState,
+    game_state: &mut GameState,
     update_info: Option<&UpdateInfo>,
     update_check_completed: bool,
     haven_discovered: bool,
@@ -110,8 +110,10 @@ pub fn draw_ui_with_update(
                 );
             } else if let Some(ref session) = game_state.active_fishing {
                 fishing_scene::render_fishing_scene(frame, chunks[1], session, &game_state.fishing);
-            } else if let Some(dungeon) = &game_state.active_dungeon {
-                draw_dungeon_view(frame, chunks[1], game_state, dungeon);
+            } else if game_state.active_dungeon.is_some() {
+                // Clone dungeon ref to avoid borrow conflict with mutable game_state
+                let dungeon = game_state.active_dungeon.as_ref().unwrap().clone();
+                draw_dungeon_view(frame, chunks[1], game_state, &dungeon);
             } else {
                 combat_scene::draw_combat_scene(frame, chunks[1], game_state);
             }
@@ -160,7 +162,7 @@ fn draw_challenge_banner(frame: &mut Frame, area: Rect, game_state: &GameState) 
 fn draw_dungeon_view(
     frame: &mut Frame,
     area: Rect,
-    game_state: &GameState,
+    game_state: &mut GameState,
     dungeon: &crate::dungeon::types::Dungeon,
 ) {
     // Split into dungeon map (top) and combat (bottom)

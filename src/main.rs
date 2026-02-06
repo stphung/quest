@@ -41,6 +41,7 @@ use ui::character_delete::CharacterDeleteScreen;
 use ui::character_rename::CharacterRenameScreen;
 use ui::character_select::CharacterSelectScreen;
 use ui::draw_ui_with_update;
+use ui::effects::CombatEffectType;
 use utils::updater::UpdateInfo;
 
 enum Screen {
@@ -530,11 +531,11 @@ fn main() -> io::Result<()> {
                         }
                     }
 
-                    // Draw UI
+                    // Draw UI (state is mutable for combat effects processing)
                     terminal.draw(|frame| {
                         draw_ui_with_update(
                             frame,
-                            &state,
+                            &mut state,
                             update_info.as_ref(),
                             update_check_completed,
                             haven.discovered,
@@ -908,6 +909,16 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::
                     0.3,
                 );
                 game_state.combat_state.visual_effects.push(impact_effect);
+
+                // Trigger tachyonfx shader effect (area set during render)
+                let effect_type = if was_crit {
+                    CombatEffectType::CriticalHit
+                } else {
+                    CombatEffectType::EnemyHit
+                };
+                game_state
+                    .combat_effects
+                    .trigger(effect_type, ratatui::layout::Rect::default());
             }
             CombatEvent::EnemyAttack { damage } => {
                 // Add enemy attack to combat log
@@ -922,6 +933,13 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::
                     let message = format!("✨ {} defeated! +{} XP", enemy.name, xp_gained);
                     game_state.combat_state.add_log_entry(message, false, true);
                 }
+
+                // Trigger death dissolve effect
+                game_state.combat_effects.trigger(
+                    CombatEffectType::EnemyDeath,
+                    ratatui::layout::Rect::default(),
+                );
+
                 apply_tick_xp(game_state, xp_gained as f64);
 
                 // Track XP in dungeon if active and mark room cleared

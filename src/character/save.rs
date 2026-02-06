@@ -263,6 +263,7 @@ impl SaveManager {
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: crate::challenges::chess::ChessStats::default(),
             active_minigame: None,
+            combat_effects: crate::ui::effects::CombatEffectManager::new(),
         }
     }
 }

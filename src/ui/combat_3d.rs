@@ -10,7 +10,7 @@ use ratatui::{
 use super::enemy_sprites::get_sprite_for_enemy;
 
 /// Renders a simple, clean combat view with sprite and combat log
-pub fn render_combat_3d(frame: &mut Frame, area: Rect, game_state: &GameState) {
+pub fn render_combat_3d(frame: &mut Frame, area: Rect, game_state: &mut GameState) {
     let combat_block = Block::default()
         .borders(Borders::ALL)
         .title("⚔ COMBAT ⚔")
@@ -40,6 +40,12 @@ pub fn render_combat_3d(frame: &mut Frame, area: Rect, game_state: &GameState) {
 
     // Render enemy sprite (simple, centered)
     render_simple_sprite(frame, chunks[0], game_state);
+
+    // Apply tachyonfx effects to sprite area (after sprite is rendered)
+    if game_state.combat_effects.is_active() {
+        let buf = frame.buffer_mut();
+        game_state.combat_effects.process(buf, chunks[0]);
+    }
 
     // Render combat log
     render_combat_log(frame, chunks[1], game_state);

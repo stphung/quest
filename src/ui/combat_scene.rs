@@ -11,7 +11,7 @@ use ratatui::{
 use super::combat_3d::render_combat_3d;
 
 /// Draws the combat scene with 3D first-person view
-pub fn draw_combat_scene(frame: &mut Frame, area: Rect, game_state: &GameState) {
+pub fn draw_combat_scene(frame: &mut Frame, area: Rect, game_state: &mut GameState) {
     // Split into 3D view and status bars
     let chunks = Layout::default()
         .direction(Direction::Vertical)
