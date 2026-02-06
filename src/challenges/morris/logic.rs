@@ -8,6 +8,21 @@ use crate::challenges::ActiveMinigame;
 use crate::core::game_state::GameState;
 use rand::Rng;
 
+/// Undo information for reversing a move during search.
+/// This avoids expensive game.clone() in minimax.
+#[derive(Debug, Clone)]
+struct MoveUndo {
+    mv: MorrisMove,
+    prev_must_capture: bool,
+    prev_phase: MorrisPhase,
+    prev_player: Player,
+    prev_game_result: Option<MorrisResult>,
+    /// For captures: the player whose piece was captured
+    captured_player: Option<Player>,
+    /// Whether a mill was formed (triggering must_capture)
+    formed_mill: bool,
+}
+
 /// Input actions for the Morris game (UI-agnostic).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MorrisInput {
@@ -274,6 +289,154 @@ pub fn apply_move(game: &mut MorrisGame, mv: MorrisMove) {
     }
 }
 
+/// Apply a move for AI search and return undo information.
+/// This is optimized to avoid cloning the game state.
+fn make_move_for_search(game: &mut MorrisGame, mv: MorrisMove) -> MoveUndo {
+    let prev_must_capture = game.must_capture;
+    let prev_phase = game.phase;
+    let prev_player = game.current_player;
+    let prev_game_result = game.game_result;
+
+    let mut undo = MoveUndo {
+        mv,
+        prev_must_capture,
+        prev_phase,
+        prev_player,
+        prev_game_result,
+        captured_player: None,
+        formed_mill: false,
+    };
+
+    match mv {
+        MorrisMove::Place(pos) => {
+            game.board[pos] = Some(game.current_player);
+
+            match game.current_player {
+                Player::Human => {
+                    game.pieces_to_place.0 -= 1;
+                    game.pieces_on_board.0 += 1;
+                }
+                Player::Ai => {
+                    game.pieces_to_place.1 -= 1;
+                    game.pieces_on_board.1 += 1;
+                }
+            }
+
+            if game.forms_mill(pos, game.current_player) {
+                game.must_capture = true;
+                undo.formed_mill = true;
+            } else {
+                end_turn_for_search(game);
+            }
+        }
+        MorrisMove::Move { from, to } => {
+            game.board[from] = None;
+            game.board[to] = Some(game.current_player);
+
+            if game.forms_mill(to, game.current_player) {
+                game.must_capture = true;
+                undo.formed_mill = true;
+            } else {
+                end_turn_for_search(game);
+            }
+        }
+        MorrisMove::Capture(pos) => {
+            let opponent = match game.current_player {
+                Player::Human => Player::Ai,
+                Player::Ai => Player::Human,
+            };
+
+            undo.captured_player = Some(opponent);
+            game.board[pos] = None;
+
+            match opponent {
+                Player::Human => game.pieces_on_board.0 -= 1,
+                Player::Ai => game.pieces_on_board.1 -= 1,
+            }
+
+            game.must_capture = false;
+            end_turn_for_search(game);
+        }
+    }
+
+    undo
+}
+
+/// Reverse a move using undo information.
+fn unmake_move(game: &mut MorrisGame, undo: MoveUndo) {
+    // Restore previous state
+    game.must_capture = undo.prev_must_capture;
+    game.phase = undo.prev_phase;
+    game.current_player = undo.prev_player;
+    game.game_result = undo.prev_game_result;
+
+    match undo.mv {
+        MorrisMove::Place(pos) => {
+            game.board[pos] = None;
+
+            match undo.prev_player {
+                Player::Human => {
+                    game.pieces_to_place.0 += 1;
+                    game.pieces_on_board.0 -= 1;
+                }
+                Player::Ai => {
+                    game.pieces_to_place.1 += 1;
+                    game.pieces_on_board.1 -= 1;
+                }
+            }
+        }
+        MorrisMove::Move { from, to } => {
+            game.board[to] = None;
+            game.board[from] = Some(undo.prev_player);
+        }
+        MorrisMove::Capture(pos) => {
+            if let Some(captured) = undo.captured_player {
+                game.board[pos] = Some(captured);
+
+                match captured {
+                    Player::Human => game.pieces_on_board.0 += 1,
+                    Player::Ai => game.pieces_on_board.1 += 1,
+                }
+            }
+        }
+    }
+}
+
+/// Simplified end_turn for AI search (no UI state, no AI thinking trigger).
+fn end_turn_for_search(game: &mut MorrisGame) {
+    // Check phase transition
+    if game.phase == MorrisPhase::Placing
+        && game.pieces_to_place.0 == 0
+        && game.pieces_to_place.1 == 0
+    {
+        game.phase = MorrisPhase::Moving;
+    }
+
+    // Switch players
+    game.current_player = match game.current_player {
+        Player::Human => Player::Ai,
+        Player::Ai => Player::Human,
+    };
+
+    // Check win conditions (simplified - no UI side effects)
+    if game.phase != MorrisPhase::Placing {
+        if game.pieces_on_board.0 < 3 && game.pieces_to_place.0 == 0 {
+            game.game_result = Some(MorrisResult::Loss);
+        } else if game.pieces_on_board.1 < 3 && game.pieces_to_place.1 == 0 {
+            game.game_result = Some(MorrisResult::Win);
+        } else {
+            // Check for no legal moves
+            let legal_moves = get_legal_moves(game);
+            if legal_moves.is_empty() && !game.must_capture {
+                game.game_result = Some(match game.current_player {
+                    Player::Human => MorrisResult::Loss,
+                    Player::Ai => MorrisResult::Win,
+                });
+            }
+        }
+    }
+}
+
 /// End the current turn and switch players
 fn end_turn(game: &mut MorrisGame) {
     // Check phase transition: from Placing to Moving
@@ -382,18 +545,18 @@ pub fn get_ai_move<R: Rng>(game: &MorrisGame, rng: &mut R) -> Option<MorrisMove>
         return Some(legal_moves[idx]);
     }
 
-    // Use minimax to find best move
+    // Use minimax to find best move (with make/unmake optimization)
     let depth = game.difficulty.search_depth();
+    let mut game_mut = game.clone(); // Single clone at the root
     let mut best_move = None;
     let mut best_score = i32::MIN;
 
     for mv in legal_moves.iter() {
-        let mut game_copy = game.clone();
-        apply_move(&mut game_copy, *mv);
-
-        // If AI was in must_capture state, this might trigger another move need
-        // We evaluate from the opponent's perspective after our move
-        let score = -minimax(&game_copy, depth - 1, i32::MIN, i32::MAX, false);
+        let undo = make_move_for_search(&mut game_mut, *mv);
+        // After AI makes a move, it's Human's turn - Human minimizes (maximizing=false)
+        // No negation needed: standard minimax with evaluation always from AI's perspective
+        let score = minimax_optimized(&mut game_mut, depth - 1, i32::MIN, i32::MAX, false);
+        unmake_move(&mut game_mut, undo);
 
         if score > best_score {
             best_score = score;
@@ -404,8 +567,15 @@ pub fn get_ai_move<R: Rng>(game: &MorrisGame, rng: &mut R) -> Option<MorrisMove>
     best_move
 }
 
-/// Minimax algorithm with alpha-beta pruning
-fn minimax(game: &MorrisGame, depth: i32, mut alpha: i32, mut beta: i32, maximizing: bool) -> i32 {
+/// Optimized minimax with alpha-beta pruning using make/unmake pattern.
+/// This avoids cloning the game state at each node.
+fn minimax_optimized(
+    game: &mut MorrisGame,
+    depth: i32,
+    mut alpha: i32,
+    mut beta: i32,
+    maximizing: bool,
+) -> i32 {
     // Terminal conditions
     if depth == 0 || game.game_result.is_some() {
         return evaluate_board(game);
@@ -419,9 +589,10 @@ fn minimax(game: &MorrisGame, depth: i32, mut alpha: i32, mut beta: i32, maximiz
     if maximizing {
         let mut max_eval = i32::MIN;
         for mv in legal_moves {
-            let mut game_copy = game.clone();
-            apply_move(&mut game_copy, mv);
-            let eval = minimax(&game_copy, depth - 1, alpha, beta, false);
+            let undo = make_move_for_search(game, mv);
+            let eval = minimax_optimized(game, depth - 1, alpha, beta, false);
+            unmake_move(game, undo);
+
             max_eval = max_eval.max(eval);
             alpha = alpha.max(eval);
             if beta <= alpha {
@@ -432,9 +603,10 @@ fn minimax(game: &MorrisGame, depth: i32, mut alpha: i32, mut beta: i32, maximiz
     } else {
         let mut min_eval = i32::MAX;
         for mv in legal_moves {
-            let mut game_copy = game.clone();
-            apply_move(&mut game_copy, mv);
-            let eval = minimax(&game_copy, depth - 1, alpha, beta, true);
+            let undo = make_move_for_search(game, mv);
+            let eval = minimax_optimized(game, depth - 1, alpha, beta, true);
+            unmake_move(game, undo);
+
             min_eval = min_eval.min(eval);
             beta = beta.min(eval);
             if beta <= alpha {
@@ -630,6 +802,7 @@ pub fn apply_game_result(state: &mut GameState) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::SeedableRng;
 
     // ============ Placing Moves Tests ============
 
@@ -894,6 +1067,57 @@ mod tests {
                 difficulty
             );
         }
+    }
+
+    #[test]
+    fn test_ai_blocks_obvious_mill() {
+        // Set up a position where Human has 2 in a row (positions 0, 1)
+        // AI should block at position 2 to prevent mill [0, 1, 2]
+        let mut game = MorrisGame::new(MorrisDifficulty::Master);
+        game.board[0] = Some(Player::Human);
+        game.board[1] = Some(Player::Human);
+        game.pieces_on_board = (2, 0);
+        game.pieces_to_place = (7, 9);
+        game.current_player = Player::Ai;
+
+        // Use a seeded RNG to ensure deterministic behavior (no random moves)
+        let mut rng = rand::rngs::StdRng::seed_from_u64(42);
+
+        let ai_move = get_ai_move(&game, &mut rng);
+
+        // AI should block by placing at position 2
+        assert_eq!(
+            ai_move,
+            Some(MorrisMove::Place(2)),
+            "AI should block the obvious mill at position 2"
+        );
+    }
+
+    #[test]
+    fn test_ai_completes_own_mill_over_blocking() {
+        // Set up a position where AI can complete its own mill (3, 4, 5)
+        // AI should prefer completing its mill over blocking Human's
+        let mut game = MorrisGame::new(MorrisDifficulty::Master);
+        // Human has 2 in row at 0, 1 (threatens 2)
+        game.board[0] = Some(Player::Human);
+        game.board[1] = Some(Player::Human);
+        // AI has 2 in row at 3, 4 (can complete at 5)
+        game.board[3] = Some(Player::Ai);
+        game.board[4] = Some(Player::Ai);
+        game.pieces_on_board = (2, 2);
+        game.pieces_to_place = (7, 7);
+        game.current_player = Player::Ai;
+
+        let mut rng = rand::rngs::StdRng::seed_from_u64(42);
+
+        let ai_move = get_ai_move(&game, &mut rng);
+
+        // AI should complete its own mill at position 5 (attacking > defending)
+        assert_eq!(
+            ai_move,
+            Some(MorrisMove::Place(5)),
+            "AI should complete its own mill rather than just blocking"
+        );
     }
 
     // ============ Win Condition Tests ============

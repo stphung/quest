@@ -130,10 +130,10 @@ impl MorrisDifficulty {
 
     pub fn search_depth(&self) -> i32 {
         match self {
-            Self::Novice => 1,
-            Self::Apprentice => 1,
-            Self::Journeyman => 2,
-            Self::Master => 3,
+            Self::Novice => 2,
+            Self::Apprentice => 3,
+            Self::Journeyman => 4,
+            Self::Master => 5,
         }
     }
 
@@ -433,11 +433,11 @@ mod tests {
 
     #[test]
     fn test_difficulty_properties() {
-        // Search depth
-        assert_eq!(MorrisDifficulty::Novice.search_depth(), 1);
-        assert_eq!(MorrisDifficulty::Apprentice.search_depth(), 1);
-        assert_eq!(MorrisDifficulty::Journeyman.search_depth(), 2);
-        assert_eq!(MorrisDifficulty::Master.search_depth(), 3);
+        // Search depth (optimized with make/unmake pattern)
+        assert_eq!(MorrisDifficulty::Novice.search_depth(), 2);
+        assert_eq!(MorrisDifficulty::Apprentice.search_depth(), 3);
+        assert_eq!(MorrisDifficulty::Journeyman.search_depth(), 4);
+        assert_eq!(MorrisDifficulty::Master.search_depth(), 5);
 
         // Random move chance
         assert_eq!(MorrisDifficulty::Novice.random_move_chance(), 0.5);
