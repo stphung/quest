@@ -1062,6 +1062,50 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::
                     false,
                 );
             }
+            CombatEvent::SubzoneBossDefeated { xp_gained, result } => {
+                use zones::BossDefeatResult;
+                // Apply XP from boss kill
+                apply_tick_xp(game_state, xp_gained as f64);
+
+                // Log based on result
+                let message = match &result {
+                    BossDefeatResult::SubzoneComplete { .. } => {
+                        format!("👑 Boss defeated! +{} XP — Moving to next area.", xp_gained)
+                    }
+                    BossDefeatResult::ZoneComplete {
+                        old_zone,
+                        new_zone_id,
+                    } => {
+                        let new_zone = zones::get_zone(*new_zone_id)
+                            .map(|z| z.name)
+                            .unwrap_or("???");
+                        format!(
+                            "👑 {} conquered! +{} XP — Advancing to {}!",
+                            old_zone, xp_gained, new_zone
+                        )
+                    }
+                    BossDefeatResult::ZoneCompleteButGated {
+                        zone_name,
+                        required_prestige,
+                    } => {
+                        format!(
+                            "👑 {} conquered! +{} XP — Next zone requires Prestige {}.",
+                            zone_name, xp_gained, required_prestige
+                        )
+                    }
+                    BossDefeatResult::GameComplete => {
+                        format!(
+                            "👑 All zones conquered! +{} XP — You have completed the game!",
+                            xp_gained
+                        )
+                    }
+                    BossDefeatResult::WeaponRequired { .. } => {
+                        // Already handled by PlayerAttackBlocked
+                        continue;
+                    }
+                };
+                game_state.combat_state.add_log_entry(message, false, true);
+            }
             _ => {}
         }
     }
