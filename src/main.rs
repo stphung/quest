@@ -638,7 +638,10 @@ fn main() -> io::Result<()> {
                                 InputResult::NeedsSaveAll => {
                                     if !debug_mode {
                                         let _ = character_manager.save_character(&state);
-                                        haven::save_haven(&haven).ok();
+                                        // Only save Haven if it has been discovered
+                                        if haven.discovered {
+                                            haven::save_haven(&haven).ok();
+                                        }
                                         last_save_instant = Some(Instant::now());
                                         last_save_time = Some(Local::now());
                                     }
@@ -675,7 +678,10 @@ fn main() -> io::Result<()> {
                         && last_autosave.elapsed() >= Duration::from_secs(AUTOSAVE_INTERVAL_SECONDS)
                     {
                         character_manager.save_character(&state)?;
-                        haven::save_haven(&haven)?;
+                        // Only save Haven if it has been discovered
+                        if haven.discovered {
+                            haven::save_haven(&haven)?;
+                        }
                         last_autosave = Instant::now();
                         last_save_instant = Some(Instant::now());
                         last_save_time = Some(Local::now());
