@@ -71,6 +71,8 @@ pub enum GameOverlay {
         xp_gained: u64,
         level_before: u32,
         level_after: u32,
+        offline_rate_percent: f64,
+        haven_bonus_percent: f64,
     },
 }
 

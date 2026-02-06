@@ -103,6 +103,8 @@ pub struct OfflineReport {
     pub xp_gained: u64,
     pub level_before: u32,
     pub level_after: u32,
+    /// Effective offline XP rate as a percentage of online rate
+    pub offline_rate_percent: f64,
 }
 
 /// Calculates the XP gained during offline time
@@ -159,12 +161,15 @@ pub fn process_offline_progression(
 
     state.last_save_time = current_time;
 
+    let offline_rate_percent = OFFLINE_MULTIPLIER * (1.0 + haven_offline_xp_percent / 100.0) * 100.0;
+
     OfflineReport {
         elapsed_seconds,
         total_level_ups,
         xp_gained: offline_xp as u64,
         level_before,
         level_after,
+        offline_rate_percent,
     }
 }
 

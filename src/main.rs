@@ -137,6 +137,7 @@ fn main() -> io::Result<()> {
     let mut rename_screen = CharacterRenameScreen::new();
     let mut game_state: Option<GameState> = None;
     let mut pending_offline_report: Option<core::game_logic::OfflineReport> = None;
+    let mut pending_haven_offline_bonus: Option<f64> = None;
 
     let mut haven_ui = HavenUiState::new();
 
@@ -385,7 +386,8 @@ fn main() -> io::Result<()> {
                                                     );
                                                 }
 
-                                                // Store report for welcome overlay
+                                                // Store report and haven bonus for welcome overlay
+                                                pending_haven_offline_bonus = Some(haven_offline_bonus);
                                                 pending_offline_report = Some(report);
                                             }
                                         }
@@ -524,11 +526,14 @@ fn main() -> io::Result<()> {
                 let mut last_update_check = Instant::now();
                 let mut tick_counter: u32 = 0;
                 let mut overlay = if let Some(report) = pending_offline_report.take() {
+                    let haven_bonus = pending_haven_offline_bonus.take().unwrap_or(0.0);
                     GameOverlay::OfflineWelcome {
                         elapsed_seconds: report.elapsed_seconds,
                         xp_gained: report.xp_gained,
                         level_before: report.level_before,
                         level_after: report.level_after,
+                        offline_rate_percent: report.offline_rate_percent,
+                        haven_bonus_percent: haven_bonus,
                     }
                 } else {
                     GameOverlay::None
@@ -574,6 +579,8 @@ fn main() -> io::Result<()> {
                             xp_gained,
                             level_before,
                             level_after,
+                            offline_rate_percent,
+                            haven_bonus_percent,
                         } = &overlay
                         {
                             ui::game_common::render_offline_welcome(
@@ -583,6 +590,8 @@ fn main() -> io::Result<()> {
                                 *xp_gained,
                                 *level_before,
                                 *level_after,
+                                *offline_rate_percent,
+                                *haven_bonus_percent,
                             );
                         }
                         // Draw prestige confirmation overlay if active

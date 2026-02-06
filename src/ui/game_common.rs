@@ -313,10 +313,12 @@ pub fn render_offline_welcome(
     xp_gained: u64,
     level_before: u32,
     level_after: u32,
+    offline_rate_percent: f64,
+    haven_bonus_percent: f64,
 ) {
     // Centered modal box
     let modal_width = 44u16;
-    let modal_height = if level_before < level_after { 10 } else { 9 };
+    let modal_height = if level_before < level_after { 11 } else { 10 };
     let x = area.x + (area.width.saturating_sub(modal_width)) / 2;
     let y = area.y + (area.height.saturating_sub(modal_height)) / 2;
     let modal_area = Rect::new(x, y, modal_width, modal_height);
@@ -330,7 +332,7 @@ pub fn render_offline_welcome(
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         )
-        .title(" ☀️ Welcome Back! ");
+        .title(" Your quest continues... ");
 
     let inner = block.inner(modal_area);
     frame.render_widget(block, modal_area);
@@ -349,6 +351,14 @@ pub fn render_offline_welcome(
         Line::from(Span::styled(
             format!("  Away for: {}", away_str),
             Style::default().fg(Color::White),
+        )),
+        Line::from(Span::styled(
+            if haven_bonus_percent > 0.0 {
+                format!("  Offline rate: {:.0}% (Haven: +{:.0}%)", offline_rate_percent, haven_bonus_percent)
+            } else {
+                format!("  Offline rate: {:.0}%", offline_rate_percent)
+            },
+            Style::default().fg(Color::DarkGray),
         )),
         Line::from(""),
         Line::from(Span::styled(
