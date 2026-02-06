@@ -519,6 +519,14 @@ pub fn process_ai_thinking<R: Rng>(game: &mut MorrisGame, rng: &mut R) -> bool {
         if let Some(mv) = game.ai_pending_move.take() {
             apply_move(game, mv);
         }
+
+        // If AI formed a mill and must capture, keep thinking for the capture move
+        if game.must_capture && game.current_player == Player::Ai {
+            game.ai_think_ticks = 0;
+            game.ai_pending_move = None; // Will compute capture on next tick
+            return true;
+        }
+
         game.ai_thinking = false;
         game.ai_think_ticks = 0;
         return true;
