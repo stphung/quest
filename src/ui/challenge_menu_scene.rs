@@ -1,6 +1,7 @@
 //! Challenge menu UI rendering.
 
 use crate::challenges::chess::ChessDifficulty;
+use crate::challenges::go::GoDifficulty;
 use crate::challenges::gomoku::GomokuDifficulty;
 use crate::challenges::menu::{ChallengeMenu, ChallengeType, DifficultyInfo};
 use crate::challenges::minesweeper::MinesweeperDifficulty;
@@ -144,6 +145,14 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
                 frame,
                 chunks[2],
                 &RuneDifficulty::ALL,
+                menu.selected_difficulty,
+            );
+        }
+        ChallengeType::Go => {
+            render_difficulty_selector(
+                frame,
+                chunks[2],
+                &GoDifficulty::ALL,
                 menu.selected_difficulty,
             );
         }

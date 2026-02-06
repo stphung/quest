@@ -12,6 +12,7 @@ mod utils;
 mod zones;
 
 use challenges::chess::logic::process_ai_thinking;
+use challenges::go::process_go_ai;
 use challenges::gomoku::logic::process_ai_thinking as process_gomoku_ai;
 use challenges::menu::try_discover_challenge_with_haven;
 use challenges::morris::logic::process_ai_thinking as process_morris_ai;
@@ -737,6 +738,10 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::
         Some(ActiveMinigame::Gomoku(gomoku_game)) => {
             let mut rng = rand::thread_rng();
             process_gomoku_ai(gomoku_game, &mut rng);
+        }
+        Some(ActiveMinigame::Go(go_game)) => {
+            let mut rng = rand::thread_rng();
+            process_go_ai(go_game, &mut rng);
         }
         _ => {}
     }

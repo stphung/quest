@@ -6,6 +6,8 @@
 
 use super::chess::logic::start_chess_game;
 use super::chess::ChessDifficulty;
+use super::go::logic::start_go_game;
+use super::go::GoDifficulty;
 use super::gomoku::logic::start_gomoku_game;
 use super::gomoku::GomokuDifficulty;
 use super::minesweeper::{MinesweeperDifficulty, MinesweeperGame};
@@ -92,6 +94,10 @@ fn accept_selected_challenge(state: &mut GameState) {
                 let difficulty = RuneDifficulty::from_index(difficulty_index);
                 state.active_minigame = Some(ActiveMinigame::Rune(RuneGame::new(difficulty)));
                 state.challenge_menu.close();
+            }
+            ChallengeType::Go => {
+                let difficulty = GoDifficulty::from_index(difficulty_index);
+                start_go_game(state, difficulty);
             }
         }
     }
@@ -298,6 +304,23 @@ impl DifficultyInfo for RuneDifficulty {
     }
 }
 
+impl DifficultyInfo for GoDifficulty {
+    fn name(&self) -> &'static str {
+        GoDifficulty::name(self)
+    }
+
+    fn reward(&self) -> ChallengeReward {
+        ChallengeReward {
+            prestige_ranks: self.reward_prestige(),
+            ..Default::default()
+        }
+    }
+
+    fn extra_info(&self) -> Option<String> {
+        Some(format!("{} sims", self.simulation_count()))
+    }
+}
+
 /// Chance per tick to discover any challenge (~2 hour average)
 /// At 10 ticks/sec, 0.000014 chance/tick ≈ 71,429 ticks ≈ 2 hours average
 pub const CHALLENGE_DISCOVERY_CHANCE: f64 = 0.000014;
@@ -310,26 +333,31 @@ struct ChallengeWeight {
 
 /// Weighted distribution table for challenge types.
 /// Higher weight = more likely to appear when a challenge is discovered.
+/// Puzzles (Minesweeper, Rune) are more common; strategy games (Chess, Go) are rarer.
 const CHALLENGE_TABLE: &[ChallengeWeight] = &[
     ChallengeWeight {
-        challenge_type: ChallengeType::Chess,
-        weight: 25,
-    },
-    ChallengeWeight {
-        challenge_type: ChallengeType::Morris,
-        weight: 25,
-    },
-    ChallengeWeight {
-        challenge_type: ChallengeType::Gomoku,
-        weight: 25,
-    },
-    ChallengeWeight {
         challenge_type: ChallengeType::Minesweeper,
-        weight: 25,
+        weight: 30, // ~27% - common quick puzzle
     },
     ChallengeWeight {
         challenge_type: ChallengeType::Rune,
-        weight: 25,
+        weight: 25, // ~23% - common quick puzzle
+    },
+    ChallengeWeight {
+        challenge_type: ChallengeType::Gomoku,
+        weight: 20, // ~18% - moderate
+    },
+    ChallengeWeight {
+        challenge_type: ChallengeType::Morris,
+        weight: 15, // ~14% - less common
+    },
+    ChallengeWeight {
+        challenge_type: ChallengeType::Chess,
+        weight: 10, // ~9% - rare complex strategy
+    },
+    ChallengeWeight {
+        challenge_type: ChallengeType::Go,
+        weight: 10, // ~9% - rare complex strategy
     },
 ];
 
@@ -350,6 +378,7 @@ pub enum ChallengeType {
     Gomoku,
     Minesweeper,
     Rune,
+    Go,
 }
 
 impl ChallengeType {
@@ -361,6 +390,7 @@ impl ChallengeType {
             ChallengeType::Gomoku => "◎",
             ChallengeType::Minesweeper => "\u{26A0}", // ⚠
             ChallengeType::Rune => "ᚱ",
+            ChallengeType::Go => "◉",
         }
     }
 
@@ -374,6 +404,7 @@ impl ChallengeType {
                 "A weathered scout beckons you toward a ruined corridor..."
             }
             ChallengeType::Rune => "A glowing stone tablet materializes before you...",
+            ChallengeType::Go => "An ancient master beckons from beneath a gnarled tree...",
         }
     }
 }
@@ -571,6 +602,17 @@ pub fn create_challenge(ct: &ChallengeType) -> PendingChallenge {
                 false leads. Prove your logic worthy of ancient knowledge.'"
                 .to_string(),
         },
+        ChallengeType::Go => PendingChallenge {
+            challenge_type: ChallengeType::Go,
+            title: "Go: Territory Control".to_string(),
+            icon: "◉",
+            description: "An ancient master beckons from beneath a gnarled tree, a wooden \
+                board resting on a flat stone before them. Nine lines cross nine lines, \
+                forming a grid of intersections. 'Black and white stones,' they say, \
+                'placed one by one. Surround territory, capture enemies. The simplest \
+                rules hide the deepest strategy. Shall we play?'"
+                .to_string(),
+        },
     }
 }
 
@@ -596,6 +638,7 @@ mod tests {
         assert!(!ChallengeType::Gomoku.icon().is_empty());
         assert!(!ChallengeType::Minesweeper.icon().is_empty());
         assert!(!ChallengeType::Rune.icon().is_empty());
+        assert!(!ChallengeType::Go.icon().is_empty());
     }
 
     #[test]
@@ -605,6 +648,7 @@ mod tests {
         assert!(!ChallengeType::Gomoku.discovery_flavor().is_empty());
         assert!(!ChallengeType::Minesweeper.discovery_flavor().is_empty());
         assert!(!ChallengeType::Rune.discovery_flavor().is_empty());
+        assert!(!ChallengeType::Go.discovery_flavor().is_empty());
     }
 
     #[test]
@@ -615,6 +659,7 @@ mod tests {
             ChallengeType::Gomoku.icon(),
             ChallengeType::Minesweeper.icon(),
             ChallengeType::Rune.icon(),
+            ChallengeType::Go.icon(),
         ];
         // Check all pairs are different
         for i in 0..icons.len() {

@@ -12,6 +12,7 @@ pub mod dungeon_map;
 mod enemy_sprites;
 pub mod fishing_scene;
 pub mod game_common;
+pub mod go_scene;
 pub mod gomoku_scene;
 pub mod haven_scene;
 pub mod minesweeper_scene;
@@ -99,6 +100,9 @@ pub fn draw_ui_with_update(
         }
         Some(ActiveMinigame::Chess(game)) => {
             chess_scene::render_chess_scene(frame, chunks[1], game);
+        }
+        Some(ActiveMinigame::Go(game)) => {
+            go_scene::render_go_scene(frame, chunks[1], game);
         }
         None => {
             if game_state.challenge_menu.is_open {

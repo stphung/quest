@@ -5,6 +5,7 @@
 use crate::challenges::chess::logic::{
     apply_game_result as apply_chess_result, process_input as process_chess_input, ChessInput,
 };
+use crate::challenges::go::{apply_go_result, process_input as process_go_input, GoInput};
 use crate::challenges::gomoku::logic::{
     apply_game_result as apply_gomoku_result, process_input as process_gomoku_input, GomokuInput,
 };
@@ -413,6 +414,23 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
                     _ => MorrisInput::Other,
                 };
                 process_morris_input(morris_game, input);
+            }
+            ActiveMinigame::Go(go_game) => {
+                if go_game.game_result.is_some() {
+                    apply_go_result(state);
+                    return InputResult::Continue;
+                }
+                let input = match key.code {
+                    KeyCode::Up => GoInput::Up,
+                    KeyCode::Down => GoInput::Down,
+                    KeyCode::Left => GoInput::Left,
+                    KeyCode::Right => GoInput::Right,
+                    KeyCode::Enter => GoInput::PlaceStone,
+                    KeyCode::Char('p') | KeyCode::Char('P') => GoInput::Pass,
+                    KeyCode::Esc => GoInput::Forfeit,
+                    _ => GoInput::Other,
+                };
+                process_go_input(go_game, input);
             }
         }
     }

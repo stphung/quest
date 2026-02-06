@@ -3,6 +3,7 @@
 #![allow(unused_imports)]
 
 pub mod chess;
+pub mod go;
 pub mod gomoku;
 pub mod menu;
 pub mod minesweeper;
@@ -10,6 +11,7 @@ pub mod morris;
 pub mod rune;
 
 pub use chess::{ChessDifficulty, ChessGame, ChessResult};
+pub use go::{GoDifficulty, GoGame, GoMove, GoResult, Stone, BOARD_SIZE as GO_BOARD_SIZE};
 pub use gomoku::{GomokuDifficulty, GomokuGame, GomokuResult, Player as GomokuPlayer, BOARD_SIZE};
 pub use menu::*;
 pub use minesweeper::{MinesweeperDifficulty, MinesweeperGame, MinesweeperResult};
@@ -26,4 +28,5 @@ pub enum ActiveMinigame {
     Gomoku(GomokuGame),
     Minesweeper(MinesweeperGame),
     Rune(RuneGame),
+    Go(GoGame),
 }
