@@ -139,6 +139,11 @@ impl CharacterManager {
                 continue;
             }
 
+            // Skip haven.json (account-level Haven state, not a character)
+            if path.file_name().and_then(|s| s.to_str()) == Some("haven.json") {
+                continue;
+            }
+
             let filename = path
                 .file_name()
                 .and_then(|s| s.to_str())
