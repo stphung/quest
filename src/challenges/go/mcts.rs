@@ -2,11 +2,13 @@
 
 use super::logic::{get_legal_moves, is_legal_move, make_move};
 use super::types::{GoDifficulty, GoGame, GoMove, GoResult, Stone, BOARD_SIZE};
-use rand::seq::SliceRandom;
 use rand::Rng;
 
 /// UCT exploration constant
 const UCT_C: f64 = 1.4;
+
+/// Maximum moves in a simulation before scoring
+const MAX_SIMULATION_MOVES: u32 = 120;
 
 /// MCTS tree node
 struct MctsNode {
@@ -44,12 +46,12 @@ impl MctsNode {
         }
     }
 
-    fn uct_value(&self, parent_visits: u32) -> f64 {
+    fn uct_value(&self, parent_log_visits: f64) -> f64 {
         if self.visits == 0 {
             return f64::INFINITY;
         }
         let exploitation = self.wins as f64 / self.visits as f64;
-        let exploration = UCT_C * ((parent_visits as f64).ln() / self.visits as f64).sqrt();
+        let exploration = UCT_C * (parent_log_visits / self.visits as f64).sqrt();
         exploitation + exploration
     }
 }
@@ -110,64 +112,101 @@ pub fn mcts_best_move<R: Rng>(game: &GoGame, rng: &mut R) -> GoMove {
 
 /// Select child with highest UCT value.
 fn select_child(nodes: &[MctsNode], parent_idx: usize) -> usize {
-    let parent_visits = nodes[parent_idx].visits;
+    let parent_log_visits = (nodes[parent_idx].visits as f64).ln();
     nodes[parent_idx]
         .children
         .iter()
         .max_by(|&&a, &&b| {
             nodes[a]
-                .uct_value(parent_visits)
-                .partial_cmp(&nodes[b].uct_value(parent_visits))
+                .uct_value(parent_log_visits)
+                .partial_cmp(&nodes[b].uct_value(parent_log_visits))
                 .unwrap()
         })
         .copied()
         .unwrap_or(parent_idx)
 }
 
-/// Simulate a random game to completion.
+/// Simulate a random game to completion using fast random playouts.
+/// Uses a lightweight move selection that avoids full legal move generation.
 fn simulate_random_game<R: Rng>(game: &mut GoGame, rng: &mut R) -> Option<Stone> {
     let mut moves_made = 0;
-    const MAX_MOVES: u32 = 200; // Prevent infinite games
+    let mut consecutive_passes = 0;
 
-    while game.game_result.is_none() && moves_made < MAX_MOVES {
-        let legal_moves = get_legal_moves(game);
-        if legal_moves.is_empty() {
-            break;
-        }
-
-        // Prefer non-pass moves during simulation
-        let non_pass: Vec<_> = legal_moves
-            .iter()
-            .filter(|m| **m != GoMove::Pass)
-            .copied()
-            .collect();
-        let mv = if !non_pass.is_empty() && rng.gen::<f32>() > 0.1 {
-            *non_pass.choose(rng).unwrap()
+    while game.game_result.is_none() && moves_made < MAX_SIMULATION_MOVES {
+        // Fast random move selection: try random empty positions
+        if let Some(mv) = fast_random_move(game, rng) {
+            make_move(game, mv);
+            consecutive_passes = 0;
         } else {
-            *legal_moves.choose(rng).unwrap()
-        };
-
-        make_move(game, mv);
+            // No valid move found after attempts, pass
+            make_move(game, GoMove::Pass);
+            consecutive_passes += 1;
+            if consecutive_passes >= 2 {
+                break;
+            }
+        }
         moves_made += 1;
     }
 
-    // Determine winner
-    match game.game_result {
-        Some(GoResult::Win) => Some(Stone::Black), // Human is Black
-        Some(GoResult::Loss) => Some(Stone::White), // AI is White
-        Some(GoResult::Draw) => None,
-        None => {
-            // Game didn't end naturally, use current score
-            let (black, white) = super::logic::calculate_score(&game.board);
-            if black > white {
-                Some(Stone::Black)
-            } else if white > black {
-                Some(Stone::White)
-            } else {
-                None
+    // Determine winner from final position
+    if let Some(result) = game.game_result {
+        match result {
+            GoResult::Win => Some(Stone::Black),
+            GoResult::Loss => Some(Stone::White),
+            GoResult::Draw => None,
+        }
+    } else {
+        // Score the position
+        let (black, white) = super::logic::calculate_score(&game.board);
+        if black > white {
+            Some(Stone::Black)
+        } else if white > black {
+            Some(Stone::White)
+        } else {
+            None
+        }
+    }
+}
+
+/// Fast random move selection for simulations.
+/// Tries random empty positions without generating full legal move list.
+fn fast_random_move<R: Rng>(game: &GoGame, rng: &mut R) -> Option<GoMove> {
+    // Count empty positions first
+    let mut empty_count = 0;
+    for row in &game.board {
+        for cell in row {
+            if cell.is_none() {
+                empty_count += 1;
             }
         }
     }
+
+    if empty_count == 0 {
+        return None;
+    }
+
+    // Try up to 10 random positions, or fewer if board is mostly full
+    let max_attempts = empty_count.min(10);
+
+    for _ in 0..max_attempts {
+        let row = rng.gen_range(0..BOARD_SIZE);
+        let col = rng.gen_range(0..BOARD_SIZE);
+
+        if game.board[row][col].is_none() && is_legal_move(game, row, col) {
+            return Some(GoMove::Place(row, col));
+        }
+    }
+
+    // Fallback: linear scan for any legal move (rare case)
+    for row in 0..BOARD_SIZE {
+        for col in 0..BOARD_SIZE {
+            if game.board[row][col].is_none() && is_legal_move(game, row, col) {
+                return Some(GoMove::Place(row, col));
+            }
+        }
+    }
+
+    None
 }
 
 /// Backpropagate result through the tree.
@@ -249,7 +288,8 @@ mod tests {
             player_just_moved: Stone::Black,
         };
 
-        let uct = node.uct_value(100);
+        let parent_log_visits = (100_f64).ln();
+        let uct = node.uct_value(parent_log_visits);
         // Should be roughly 0.5 (exploitation) + exploration bonus
         assert!(uct > 0.5);
         assert!(uct < 2.0);
@@ -267,6 +307,7 @@ mod tests {
             player_just_moved: Stone::Black,
         };
 
-        assert!(node.uct_value(100).is_infinite());
+        let parent_log_visits = (100_f64).ln();
+        assert!(node.uct_value(parent_log_visits).is_infinite());
     }
 }
