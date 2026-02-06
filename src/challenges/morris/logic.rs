@@ -234,6 +234,7 @@ pub fn process_human_enter(game: &mut MorrisGame) {
 
 /// Apply a move to the game state
 pub fn apply_move(game: &mut MorrisGame, mv: MorrisMove) {
+    game.last_move = Some(mv);
     match mv {
         MorrisMove::Place(pos) => {
             // Place piece

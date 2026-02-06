@@ -1,7 +1,7 @@
 //! Chess board UI rendering.
 
 use super::game_common::{
-    create_game_layout, render_forfeit_status_bar, render_game_over_overlay,
+    create_game_layout, render_forfeit_status_bar, render_game_over_banner,
     render_info_panel_frame, render_status_bar, render_thinking_status_bar, GameResultType,
 };
 use crate::challenges::chess::{ChessGame, ChessResult};
@@ -15,9 +15,9 @@ use ratatui::{
 
 /// Render the chess game scene
 pub fn render_chess_scene(frame: &mut Frame, area: Rect, game: &ChessGame) {
-    // Check for game over overlay
-    if let Some(result) = game.game_result {
-        render_chess_game_over(frame, area, result, game.difficulty.reward_prestige());
+    // Check for game over - show board with banner
+    if game.game_result.is_some() {
+        render_chess_game_over(frame, area, game);
         return;
     }
 
@@ -339,35 +339,59 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &ChessGame) {
     frame.render_widget(text, inner);
 }
 
-fn render_chess_game_over(frame: &mut Frame, area: Rect, result: ChessResult, prestige: u32) {
+fn render_chess_game_over(frame: &mut Frame, area: Rect, game: &ChessGame) {
+    use ratatui::widgets::Clear;
+
+    // First render the board showing checkmate position
+    frame.render_widget(Clear, area);
+
+    // Create layout matching normal game
+    let layout = create_game_layout(frame, area, " Chess ", Color::Cyan, 19, 22);
+
+    // Split content area: move history on top, board below
+    let content_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1), // Move history
+            Constraint::Min(18),   // Board
+        ])
+        .split(layout.content);
+
+    render_move_history(frame, content_chunks[0], game);
+    render_board(frame, content_chunks[1], game);
+    render_info_panel(frame, layout.info_panel, game);
+
+    let result = game.game_result.unwrap();
+    let prestige = game.difficulty.reward_prestige();
     let (result_type, title, message, reward) = match result {
         ChessResult::Win => (
             GameResultType::Win,
-            ":: VICTORY! ::",
-            "You checkmated the mysterious figure!",
+            "VICTORY!",
+            "Checkmate!",
             format!("+{} Prestige Ranks", prestige),
         ),
         ChessResult::Loss => (
             GameResultType::Loss,
             "DEFEAT",
-            "The mysterious figure has checkmated you.",
-            "No penalty incurred.".to_string(),
+            "Checkmate",
+            String::new(),
         ),
         ChessResult::Draw => (
             GameResultType::Draw,
             "DRAW",
-            "The game ends in stalemate.",
+            "Stalemate",
             "+5000 XP".to_string(),
         ),
         ChessResult::Forfeit => (
             GameResultType::Forfeit,
             "FORFEIT",
-            "You conceded the game.",
-            "No penalty incurred.".to_string(),
+            "You conceded",
+            String::new(),
         ),
     };
 
-    render_game_over_overlay(frame, area, result_type, title, message, &reward);
+    // Render banner at bottom of board area
+    render_game_over_banner(frame, content_chunks[1], result_type, title, message, &reward);
 }
 
 /// Get color for a piece character (white pieces are bright, black pieces are dim)
