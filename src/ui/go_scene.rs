@@ -23,7 +23,7 @@ pub fn render_go_scene(frame: &mut Frame, area: Rect, game: &GoGame) {
     }
 
     // Use shared layout - Go board needs width for box drawing chars
-    let layout = create_game_layout(frame, area, " Go ", Color::Green, 11, 22);
+    let layout = create_game_layout(frame, area, " Go ", Color::Green, 11, 24);
 
     render_board(frame, layout.content, game);
     render_status_bar_content(frame, layout.status_bar, game);
@@ -137,11 +137,18 @@ fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &GoGame) {
         return;
     }
 
+    // Show pass feedback when opponent passed
+    let (status_text, status_color) = if game.last_move == Some(GoMove::Pass) {
+        ("Opponent passed - Your turn", Color::Yellow)
+    } else {
+        ("Your turn", Color::White)
+    };
+
     render_status_bar(
         frame,
         area,
-        "Your turn",
-        Color::White,
+        status_text,
+        status_color,
         &[
             ("[Arrows]", "Move"),
             ("[Enter]", "Place"),
@@ -154,61 +161,74 @@ fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &GoGame) {
 fn render_info_panel(frame: &mut Frame, area: Rect, game: &GoGame) {
     let inner = render_info_panel_frame(frame, area);
 
-    let lines: Vec<Line> = vec![
+    let mut lines: Vec<Line> = vec![
+        // Minimal rules (2-rule style)
         Line::from(Span::styled(
-            "RULES",
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        )),
-        Line::from(Span::styled(
-            "Surround territory",
+            "Surround to capture",
             Style::default().fg(Color::Gray),
         )),
         Line::from(Span::styled(
-            "and capture enemies.",
-            Style::default().fg(Color::Gray),
-        )),
-        Line::from(Span::styled(
-            "Two passes end game.",
+            "Most territory wins",
             Style::default().fg(Color::Gray),
         )),
         Line::from(""),
+        // Players
         Line::from(vec![
-            Span::styled("Black (You): ", Style::default().fg(Color::DarkGray)),
             Span::styled(
-                "●",
+                "● ",
                 Style::default()
                     .fg(Color::White)
                     .add_modifier(Modifier::BOLD),
             ),
+            Span::styled("You", Style::default().fg(Color::DarkGray)),
         ]),
         Line::from(vec![
-            Span::styled("White (AI):  ", Style::default().fg(Color::DarkGray)),
             Span::styled(
-                "○",
+                "○ ",
                 Style::default()
                     .fg(Color::LightRed)
                     .add_modifier(Modifier::BOLD),
             ),
+            Span::styled("Opponent", Style::default().fg(Color::DarkGray)),
         ]),
         Line::from(""),
+        // Captures (split for clarity)
+        Line::from(vec![Span::styled(
+            "Captured:",
+            Style::default().fg(Color::DarkGray),
+        )]),
         Line::from(vec![
-            Span::styled("Captures: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" You: ", Style::default().fg(Color::DarkGray)),
             Span::styled(
-                format!(
-                    "You {} | AI {}",
-                    game.captured_by_black, game.captured_by_white
-                ),
+                format!("{}", game.captured_by_black),
+                Style::default().fg(Color::Cyan),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled(" Foe: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{}", game.captured_by_white),
                 Style::default().fg(Color::Cyan),
             ),
         ]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("Difficulty: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(game.difficulty.name(), Style::default().fg(Color::Cyan)),
-        ]),
+        // Difficulty
+        Line::from(vec![Span::styled(
+            game.difficulty.name(),
+            Style::default().fg(Color::Cyan),
+        )]),
     ];
+
+    // Show pass indicator when opponent passed
+    if game.last_move == Some(GoMove::Pass) {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            ">> Foe passed! <<",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )));
+    }
 
     let para = Paragraph::new(lines);
     frame.render_widget(para, inner);

@@ -333,30 +333,31 @@ struct ChallengeWeight {
 
 /// Weighted distribution table for challenge types.
 /// Higher weight = more likely to appear when a challenge is discovered.
+/// Puzzles (Minesweeper, Rune) are more common; strategy games (Chess, Go) are rarer.
 const CHALLENGE_TABLE: &[ChallengeWeight] = &[
     ChallengeWeight {
-        challenge_type: ChallengeType::Chess,
-        weight: 25,
-    },
-    ChallengeWeight {
-        challenge_type: ChallengeType::Morris,
-        weight: 25,
-    },
-    ChallengeWeight {
-        challenge_type: ChallengeType::Gomoku,
-        weight: 25,
-    },
-    ChallengeWeight {
         challenge_type: ChallengeType::Minesweeper,
-        weight: 25,
+        weight: 30, // ~27% - common quick puzzle
     },
     ChallengeWeight {
         challenge_type: ChallengeType::Rune,
-        weight: 25,
+        weight: 25, // ~23% - common quick puzzle
+    },
+    ChallengeWeight {
+        challenge_type: ChallengeType::Gomoku,
+        weight: 20, // ~18% - moderate
+    },
+    ChallengeWeight {
+        challenge_type: ChallengeType::Morris,
+        weight: 15, // ~14% - less common
+    },
+    ChallengeWeight {
+        challenge_type: ChallengeType::Chess,
+        weight: 10, // ~9% - rare complex strategy
     },
     ChallengeWeight {
         challenge_type: ChallengeType::Go,
-        weight: 25,
+        weight: 10, // ~9% - rare complex strategy
     },
 ];
 
