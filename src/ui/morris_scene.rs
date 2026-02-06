@@ -4,7 +4,9 @@ use super::game_common::{
     create_game_layout, render_forfeit_status_bar, render_game_over_banner,
     render_info_panel_frame, render_status_bar, render_thinking_status_bar, GameResultType,
 };
-use crate::challenges::morris::{MorrisGame, MorrisMove, MorrisPhase, MorrisResult, Player, ADJACENCIES};
+use crate::challenges::morris::{
+    MorrisGame, MorrisMove, MorrisPhase, MorrisResult, Player, ADJACENCIES,
+};
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
@@ -561,12 +563,7 @@ fn render_morris_game_over(
             } else {
                 "No legal moves remaining"
             };
-            (
-                GameResultType::Loss,
-                "DEFEAT",
-                msg,
-                String::new(),
-            )
+            (GameResultType::Loss, "DEFEAT", msg, String::new())
         }
         MorrisResult::Forfeit => (
             GameResultType::Forfeit,

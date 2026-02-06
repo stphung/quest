@@ -370,12 +370,7 @@ fn render_chess_game_over(frame: &mut Frame, area: Rect, game: &ChessGame) {
             "Checkmate!",
             format!("+{} Prestige Ranks", prestige),
         ),
-        ChessResult::Loss => (
-            GameResultType::Loss,
-            "DEFEAT",
-            "Checkmate",
-            String::new(),
-        ),
+        ChessResult::Loss => (GameResultType::Loss, "DEFEAT", "Checkmate", String::new()),
         ChessResult::Draw => (
             GameResultType::Draw,
             "DRAW",
@@ -391,7 +386,14 @@ fn render_chess_game_over(frame: &mut Frame, area: Rect, game: &ChessGame) {
     };
 
     // Render banner at bottom of board area
-    render_game_over_banner(frame, content_chunks[1], result_type, title, message, &reward);
+    render_game_over_banner(
+        frame,
+        content_chunks[1],
+        result_type,
+        title,
+        message,
+        &reward,
+    );
 }
 
 /// Get color for a piece character (white pieces are bright, black pieces are dim)

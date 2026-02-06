@@ -33,7 +33,12 @@ fn render_board(frame: &mut Frame, area: Rect, game: &GomokuGame) {
     render_board_with_highlight(frame, area, game, false);
 }
 
-fn render_board_with_highlight(frame: &mut Frame, area: Rect, game: &GomokuGame, show_winning_line: bool) {
+fn render_board_with_highlight(
+    frame: &mut Frame,
+    area: Rect,
+    game: &GomokuGame,
+    show_winning_line: bool,
+) {
     // Calculate centering offset (no border - outer block provides it)
     let board_height = BOARD_SIZE as u16;
     let board_width = (BOARD_SIZE * 2 - 1) as u16; // "● " format
@@ -71,7 +76,12 @@ fn render_board_with_highlight(frame: &mut Frame, area: Rect, game: &GomokuGame,
                         .fg(human_color)
                         .add_modifier(Modifier::BOLD);
                     if is_winning {
-                        ("●", Style::default().fg(winning_line_color).add_modifier(Modifier::BOLD))
+                        (
+                            "●",
+                            Style::default()
+                                .fg(winning_line_color)
+                                .add_modifier(Modifier::BOLD),
+                        )
                     } else if is_cursor {
                         ("●", base_style.bg(Color::DarkGray))
                     } else if is_last_move {
@@ -83,7 +93,12 @@ fn render_board_with_highlight(frame: &mut Frame, area: Rect, game: &GomokuGame,
                 Some(Player::Ai) => {
                     let base_style = Style::default().fg(ai_color).add_modifier(Modifier::BOLD);
                     if is_winning {
-                        ("●", Style::default().fg(winning_line_color).add_modifier(Modifier::BOLD))
+                        (
+                            "●",
+                            Style::default()
+                                .fg(winning_line_color)
+                                .add_modifier(Modifier::BOLD),
+                        )
                     } else if is_cursor {
                         ("●", base_style.bg(Color::DarkGray))
                     } else if is_last_move {
@@ -202,21 +217,15 @@ fn render_gomoku_game_over(frame: &mut Frame, area: Rect, game: &GomokuGame) {
 
     let result = game.game_result.as_ref().unwrap();
     let (result_type, title, message) = match result {
-        crate::challenges::gomoku::GomokuResult::Win => (
-            GameResultType::Win,
-            "VICTORY!",
-            "Five in a row!",
-        ),
-        crate::challenges::gomoku::GomokuResult::Loss => (
-            GameResultType::Loss,
-            "DEFEAT",
-            "Opponent got five in a row",
-        ),
-        crate::challenges::gomoku::GomokuResult::Draw => (
-            GameResultType::Draw,
-            "DRAW",
-            "Board full, no winner",
-        ),
+        crate::challenges::gomoku::GomokuResult::Win => {
+            (GameResultType::Win, "VICTORY!", "Five in a row!")
+        }
+        crate::challenges::gomoku::GomokuResult::Loss => {
+            (GameResultType::Loss, "DEFEAT", "Opponent got five in a row")
+        }
+        crate::challenges::gomoku::GomokuResult::Draw => {
+            (GameResultType::Draw, "DRAW", "Board full, no winner")
+        }
     };
 
     let reward = match result {

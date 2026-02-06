@@ -265,21 +265,22 @@ pub fn render_game_over_banner(
     let inner = block.inner(banner_area);
     frame.render_widget(block, banner_area);
 
-    let mut lines = vec![
-        Line::from(vec![
-            Span::styled(
-                title,
-                Style::default()
-                    .fg(title_color)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::raw(" - "),
-            Span::styled(message, Style::default().fg(Color::White)),
-        ]),
-    ];
+    let mut lines = vec![Line::from(vec![
+        Span::styled(
+            title,
+            Style::default()
+                .fg(title_color)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::raw(" - "),
+        Span::styled(message, Style::default().fg(Color::White)),
+    ])];
 
     if !reward.is_empty() {
-        lines.push(Line::from(Span::styled(reward, Style::default().fg(Color::Cyan))));
+        lines.push(Line::from(Span::styled(
+            reward,
+            Style::default().fg(Color::Cyan),
+        )));
     }
 
     lines.push(Line::from(Span::styled(
