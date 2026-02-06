@@ -97,6 +97,8 @@ pub struct GomokuGame {
     pub last_move: Option<(usize, usize)>,
     /// Forfeit confirmation pending
     pub forfeit_pending: bool,
+    /// Winning line positions (for highlighting on game over)
+    pub winning_line: Option<Vec<(usize, usize)>>,
 }
 
 impl GomokuGame {
@@ -112,6 +114,7 @@ impl GomokuGame {
             move_history: Vec::new(),
             last_move: None,
             forfeit_pending: false,
+            winning_line: None,
         }
     }
 

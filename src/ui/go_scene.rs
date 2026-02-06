@@ -1,7 +1,7 @@
 //! Go game UI rendering.
 
 use super::game_common::{
-    create_game_layout, render_forfeit_status_bar, render_game_over_overlay,
+    create_game_layout, render_forfeit_status_bar, render_game_over_banner,
     render_info_panel_frame, render_status_bar, render_thinking_status_bar, GameResultType,
 };
 use crate::challenges::go::{GoGame, GoMove, GoResult, Stone, BOARD_SIZE};
@@ -235,25 +235,36 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &GoGame) {
 }
 
 fn render_go_game_over(frame: &mut Frame, area: Rect, game: &GoGame) {
+    use crate::challenges::go::logic::calculate_score;
+    use ratatui::widgets::Clear;
+
+    // First render the board showing final territory
+    frame.render_widget(Clear, area);
+
+    // Create layout matching normal game
+    let layout = create_game_layout(frame, area, " Go ", Color::Green, 11, 24);
+
+    // Render board and info panel (territory will be visible)
+    render_board(frame, layout.content, game);
+    render_info_panel(frame, layout.info_panel, game);
+
     let result = game.game_result.as_ref().unwrap();
+
+    // Get final scores for message (human=Black, AI=White)
+    let (black_score, white_score) = calculate_score(&game.board);
+    let score_msg = format!("You: {} vs AI: {}", black_score, white_score);
+
     let (result_type, title, message) = match result {
-        GoResult::Win => (
-            GameResultType::Win,
-            ":: VICTORY! ::",
-            "You have more territory!",
-        ),
-        GoResult::Loss => (
-            GameResultType::Loss,
-            "DEFEAT",
-            "The opponent controls more territory.",
-        ),
-        GoResult::Draw => (GameResultType::Draw, "DRAW", "The territories are equal."),
+        GoResult::Win => (GameResultType::Win, "VICTORY!", score_msg),
+        GoResult::Loss => (GameResultType::Loss, "DEFEAT", score_msg),
+        GoResult::Draw => (GameResultType::Draw, "DRAW", score_msg),
     };
 
     let reward = match result {
         GoResult::Win => game.difficulty.reward().description().replace("Win: ", ""),
-        _ => "No penalty incurred.".to_string(),
+        _ => String::new(),
     };
 
-    render_game_over_overlay(frame, area, result_type, title, message, &reward);
+    // Render banner at bottom of content area
+    render_game_over_banner(frame, layout.content, result_type, title, &message, &reward);
 }

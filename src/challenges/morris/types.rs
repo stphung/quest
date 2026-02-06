@@ -237,6 +237,8 @@ pub struct MorrisGame {
     pub ai_think_target: u32,
     /// The move the AI has decided on (waiting to execute)
     pub ai_pending_move: Option<MorrisMove>,
+    /// Last move made (for highlighting on game over)
+    pub last_move: Option<MorrisMove>,
 }
 
 /// Cursor position mapping to board positions for navigation
@@ -294,6 +296,7 @@ impl MorrisGame {
             ai_think_ticks: 0,
             ai_think_target: 0,
             ai_pending_move: None,
+            last_move: None,
         }
     }
 

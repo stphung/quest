@@ -222,6 +222,75 @@ pub fn render_game_over_overlay(
     );
 }
 
+/// Render a compact game-over banner at the bottom of an area.
+///
+/// Unlike `render_game_over_overlay`, this does NOT clear the area,
+/// allowing the board to remain visible behind it. The banner is 5 lines tall
+/// and appears at the bottom of the given area.
+///
+/// # Arguments
+/// * `frame` - The frame to render to
+/// * `area` - The area where the banner should appear (banner at bottom)
+/// * `result_type` - Win/Loss/Draw/Forfeit for coloring
+/// * `title` - Main result text (e.g., "VICTORY!" or "DEFEAT")
+/// * `message` - Explanation of how the game ended
+/// * `reward` - Reward text (empty string if no reward)
+pub fn render_game_over_banner(
+    frame: &mut Frame,
+    area: Rect,
+    result_type: GameResultType,
+    title: &str,
+    message: &str,
+    reward: &str,
+) {
+    let banner_height: u16 = if reward.is_empty() { 4 } else { 5 };
+    let banner_y = area.y + area.height.saturating_sub(banner_height);
+
+    let banner_area = Rect {
+        x: area.x,
+        y: banner_y,
+        width: area.width,
+        height: banner_height,
+    };
+
+    // Clear just the banner area
+    frame.render_widget(Clear, banner_area);
+
+    let title_color = result_type.color();
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(title_color));
+
+    let inner = block.inner(banner_area);
+    frame.render_widget(block, banner_area);
+
+    let mut lines = vec![
+        Line::from(vec![
+            Span::styled(
+                title,
+                Style::default()
+                    .fg(title_color)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(" - "),
+            Span::styled(message, Style::default().fg(Color::White)),
+        ]),
+    ];
+
+    if !reward.is_empty() {
+        lines.push(Line::from(Span::styled(reward, Style::default().fg(Color::Cyan))));
+    }
+
+    lines.push(Line::from(Span::styled(
+        "[Press any key]",
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    let text = Paragraph::new(lines).alignment(Alignment::Center);
+    frame.render_widget(text, inner);
+}
+
 /// Render an info panel frame with standard " Info " title and DarkGray border.
 ///
 /// Returns the inner Rect for content rendering.
