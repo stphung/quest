@@ -3,12 +3,12 @@
 #![allow(unused_imports)]
 
 pub mod chess;
+pub mod go;
 pub mod gomoku;
 pub mod menu;
 pub mod minesweeper;
 pub mod morris;
 pub mod rune;
-pub mod go;
 
 pub use chess::{ChessDifficulty, ChessGame, ChessResult};
 pub use go::{GoDifficulty, GoGame, GoMove, GoResult, Stone, BOARD_SIZE as GO_BOARD_SIZE};

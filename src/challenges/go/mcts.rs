@@ -27,7 +27,12 @@ struct MctsNode {
 }
 
 impl MctsNode {
-    fn new(parent: Option<usize>, move_taken: Option<GoMove>, player_just_moved: Stone, legal_moves: Vec<GoMove>) -> Self {
+    fn new(
+        parent: Option<usize>,
+        move_taken: Option<GoMove>,
+        player_just_moved: Stone,
+        legal_moves: Vec<GoMove>,
+    ) -> Self {
         Self {
             move_taken,
             parent,
@@ -85,12 +90,7 @@ pub fn mcts_best_move<R: Rng>(game: &GoGame, rng: &mut R) -> GoMove {
             make_move(&mut game_clone, mv);
 
             let child_legal_moves = get_legal_moves(&game_clone);
-            let child = MctsNode::new(
-                Some(node_idx),
-                Some(mv),
-                current_player,
-                child_legal_moves,
-            );
+            let child = MctsNode::new(Some(node_idx), Some(mv), current_player, child_legal_moves);
             let child_idx = nodes.len();
             nodes.push(child);
             nodes[node_idx].children.push(child_idx);
@@ -136,7 +136,11 @@ fn simulate_random_game<R: Rng>(game: &mut GoGame, rng: &mut R) -> Option<Stone>
         }
 
         // Prefer non-pass moves during simulation
-        let non_pass: Vec<_> = legal_moves.iter().filter(|m| **m != GoMove::Pass).copied().collect();
+        let non_pass: Vec<_> = legal_moves
+            .iter()
+            .filter(|m| **m != GoMove::Pass)
+            .copied()
+            .collect();
         let mv = if !non_pass.is_empty() && rng.gen::<f32>() > 0.1 {
             *non_pass.choose(rng).unwrap()
         } else {
@@ -149,8 +153,8 @@ fn simulate_random_game<R: Rng>(game: &mut GoGame, rng: &mut R) -> Option<Stone>
 
     // Determine winner
     match game.game_result {
-        Some(GoResult::Win) => Some(Stone::Black),   // Human is Black
-        Some(GoResult::Loss) => Some(Stone::White),  // AI is White
+        Some(GoResult::Win) => Some(Stone::Black), // Human is Black
+        Some(GoResult::Loss) => Some(Stone::White), // AI is White
         Some(GoResult::Draw) => None,
         None => {
             // Game didn't end naturally, use current score

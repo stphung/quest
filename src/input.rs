@@ -5,9 +5,7 @@
 use crate::challenges::chess::logic::{
     apply_game_result as apply_chess_result, process_input as process_chess_input, ChessInput,
 };
-use crate::challenges::go::{
-    apply_go_result, process_input as process_go_input, GoInput,
-};
+use crate::challenges::go::{apply_go_result, process_input as process_go_input, GoInput};
 use crate::challenges::gomoku::logic::{
     apply_game_result as apply_gomoku_result, process_input as process_gomoku_input, GomokuInput,
 };

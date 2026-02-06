@@ -196,7 +196,10 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &GoGame) {
         Line::from(vec![
             Span::styled("Captures: ", Style::default().fg(Color::DarkGray)),
             Span::styled(
-                format!("You {} | AI {}", game.captured_by_black, game.captured_by_white),
+                format!(
+                    "You {} | AI {}",
+                    game.captured_by_black, game.captured_by_white
+                ),
                 Style::default().fg(Color::Cyan),
             ),
         ]),
@@ -224,19 +227,11 @@ fn render_go_game_over(frame: &mut Frame, area: Rect, game: &GoGame) {
             "DEFEAT",
             "The opponent controls more territory.",
         ),
-        GoResult::Draw => (
-            GameResultType::Draw,
-            "DRAW",
-            "The territories are equal.",
-        ),
+        GoResult::Draw => (GameResultType::Draw, "DRAW", "The territories are equal."),
     };
 
     let reward = match result {
-        GoResult::Win => game
-            .difficulty
-            .reward()
-            .description()
-            .replace("Win: ", ""),
+        GoResult::Win => game.difficulty.reward().description().replace("Win: ", ""),
         _ => "No penalty incurred.".to_string(),
     };
 

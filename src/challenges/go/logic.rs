@@ -58,6 +58,7 @@ pub fn count_liberties(
 }
 
 /// Get liberties count for the group containing the stone at (row, col).
+#[allow(dead_code)]
 pub fn get_liberties_at(
     board: &[[Option<Stone>; BOARD_SIZE]; BOARD_SIZE],
     row: usize,
@@ -271,9 +272,9 @@ pub fn calculate_score(board: &[[Option<Stone>; BOARD_SIZE]; BOARD_SIZE]) -> (i3
     let mut counted = [[false; BOARD_SIZE]; BOARD_SIZE];
 
     // Count stones
-    for row in 0..BOARD_SIZE {
-        for col in 0..BOARD_SIZE {
-            match board[row][col] {
+    for row in board {
+        for cell in row {
+            match cell {
                 Some(Stone::Black) => black_score += 1,
                 Some(Stone::White) => white_score += 1,
                 None => {}
@@ -282,9 +283,9 @@ pub fn calculate_score(board: &[[Option<Stone>; BOARD_SIZE]; BOARD_SIZE]) -> (i3
     }
 
     // Count territory (empty regions completely surrounded by one color)
-    for row in 0..BOARD_SIZE {
-        for col in 0..BOARD_SIZE {
-            if board[row][col].is_none() && !counted[row][col] {
+    for (row, board_row) in board.iter().enumerate() {
+        for (col, cell) in board_row.iter().enumerate() {
+            if cell.is_none() && !counted[row][col] {
                 let (region, owner) = get_empty_region(board, row, col);
                 for &(r, c) in &region {
                     counted[r][c] = true;
@@ -527,10 +528,15 @@ pub fn process_go_ai<R: rand::Rng>(game: &mut GoGame, rng: &mut R) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::types::GoDifficulty;
+    use super::*;
 
-    fn place(board: &mut [[Option<Stone>; BOARD_SIZE]; BOARD_SIZE], row: usize, col: usize, stone: Stone) {
+    fn place(
+        board: &mut [[Option<Stone>; BOARD_SIZE]; BOARD_SIZE],
+        row: usize,
+        col: usize,
+        stone: Stone,
+    ) {
         board[row][col] = Some(stone);
     }
 
