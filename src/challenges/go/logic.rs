@@ -349,6 +349,108 @@ fn get_empty_region(
 use super::mcts::mcts_best_move;
 use crate::challenges::ActiveMinigame;
 
+/// Input actions for Go game (UI-agnostic).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GoInput {
+    Up,
+    Down,
+    Left,
+    Right,
+    PlaceStone,
+    Pass,
+    Forfeit,
+    Other,
+}
+
+/// Process a key input during active Go game.
+/// Returns true if the input was handled.
+pub fn process_input(game: &mut GoGame, input: GoInput) -> bool {
+    // Don't process input while AI is thinking
+    if game.ai_thinking {
+        return false;
+    }
+
+    // Handle forfeit confirmation (double-Esc pattern)
+    if game.forfeit_pending {
+        match input {
+            GoInput::Forfeit => {
+                // Second Esc - confirm forfeit
+                game.game_result = Some(GoResult::Loss);
+                game.forfeit_pending = false;
+                return true;
+            }
+            _ => {
+                // Any other key cancels forfeit
+                game.forfeit_pending = false;
+                return true;
+            }
+        }
+    }
+
+    match input {
+        GoInput::Up => {
+            game.move_cursor(-1, 0);
+            true
+        }
+        GoInput::Down => {
+            game.move_cursor(1, 0);
+            true
+        }
+        GoInput::Left => {
+            game.move_cursor(0, -1);
+            true
+        }
+        GoInput::Right => {
+            game.move_cursor(0, 1);
+            true
+        }
+        GoInput::PlaceStone => process_human_move(game),
+        GoInput::Pass => process_human_pass(game),
+        GoInput::Forfeit => {
+            game.forfeit_pending = true;
+            true
+        }
+        GoInput::Other => false,
+    }
+}
+
+/// Apply Go game result to state (rewards for win, clear game).
+/// Returns true if a result was applied.
+pub fn apply_go_result(state: &mut crate::core::game_state::GameState) -> bool {
+    use crate::challenges::menu::DifficultyInfo;
+
+    let game = match state.active_minigame.as_ref() {
+        Some(ActiveMinigame::Go(g)) => g,
+        _ => return false,
+    };
+    let result = match game.game_result {
+        Some(r) => r,
+        None => return false,
+    };
+
+    // Apply rewards for win
+    if result == GoResult::Win {
+        let reward = game.difficulty.reward();
+        state.prestige_rank += reward.prestige_ranks;
+        // Add to combat log
+        let icon = "◉";
+        let msg = format!(
+            "{} Won Go ({}) - {}",
+            icon,
+            game.difficulty.name(),
+            reward.description().replace("Win: ", "")
+        );
+        state.combat_state.add_log_entry(msg, false, true);
+    } else if result == GoResult::Loss {
+        let icon = "◉";
+        let msg = format!("{} Lost Go ({}) - No penalty", icon, game.difficulty.name());
+        state.combat_state.add_log_entry(msg, false, true);
+    }
+
+    state.active_minigame = None;
+    true
+}
+
 /// Start a new Go game with the selected difficulty.
 pub fn start_go_game(state: &mut crate::core::game_state::GameState, difficulty: GoDifficulty) {
     state.active_minigame = Some(ActiveMinigame::Go(GoGame::new(difficulty)));
