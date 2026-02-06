@@ -66,6 +66,12 @@ pub enum GameOverlay {
         selected_index: usize,
         selected_slots: Vec<items::EquipmentSlot>,
     },
+    OfflineWelcome {
+        elapsed_seconds: i64,
+        xp_gained: u64,
+        level_before: u32,
+        level_after: u32,
+    },
 }
 
 /// Result of handling a game input event.
@@ -90,6 +96,12 @@ pub fn handle_game_input(
     debug_menu: &mut DebugMenu,
     debug_mode: bool,
 ) -> InputResult {
+    // 0. Offline welcome overlay (any key dismisses)
+    if matches!(overlay, GameOverlay::OfflineWelcome { .. }) {
+        *overlay = GameOverlay::None;
+        return InputResult::Continue;
+    }
+
     // 1. Haven discovery modal (blocks all other input)
     if matches!(overlay, GameOverlay::HavenDiscovery) {
         return handle_haven_discovery(key, overlay);

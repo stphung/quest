@@ -136,6 +136,7 @@ fn main() -> io::Result<()> {
     let mut delete_screen = CharacterDeleteScreen::new();
     let mut rename_screen = CharacterRenameScreen::new();
     let mut game_state: Option<GameState> = None;
+    let mut pending_offline_report: Option<core::game_logic::OfflineReport> = None;
 
     let mut haven_ui = HavenUiState::new();
 
@@ -355,19 +356,37 @@ fn main() -> io::Result<()> {
                                                 &mut state,
                                                 haven_offline_bonus,
                                             );
-                                            // Always show offline progress in combat log
                                             if report.xp_gained > 0 {
-                                                let message = if report.total_level_ups > 0 {
-                                                    format!(
-                                                        "Offline: +{} XP, +{} levels",
-                                                        report.xp_gained, report.total_level_ups
-                                                    )
+                                                // Enhanced combat log entries
+                                                let hours = report.elapsed_seconds / 3600;
+                                                let minutes = (report.elapsed_seconds % 3600) / 60;
+                                                let away_str = if hours > 0 {
+                                                    format!("{}h {}m", hours, minutes)
                                                 } else {
-                                                    format!("Offline: +{} XP", report.xp_gained)
+                                                    format!("{}m", minutes)
                                                 };
-                                                state
-                                                    .combat_state
-                                                    .add_log_entry(message, false, true);
+                                                state.combat_state.add_log_entry(
+                                                    format!("☀️ Welcome back! ({} away)", away_str),
+                                                    false, true,
+                                                );
+                                                state.combat_state.add_log_entry(
+                                                    format!("⚔️ +{} XP gained offline", ui::game_common::format_number_short(report.xp_gained)),
+                                                    false, true,
+                                                );
+                                                if report.total_level_ups > 0 {
+                                                    state.combat_state.add_log_entry(
+                                                        format!(
+                                                            "📈 Leveled up {} times! ({} → {})",
+                                                            report.total_level_ups,
+                                                            report.level_before,
+                                                            report.level_after,
+                                                        ),
+                                                        false, true,
+                                                    );
+                                                }
+
+                                                // Store report for welcome overlay
+                                                pending_offline_report = Some(report);
                                             }
                                         }
 
@@ -504,7 +523,16 @@ fn main() -> io::Result<()> {
                 let mut last_autosave = Instant::now();
                 let mut last_update_check = Instant::now();
                 let mut tick_counter: u32 = 0;
-                let mut overlay = GameOverlay::None;
+                let mut overlay = if let Some(report) = pending_offline_report.take() {
+                    GameOverlay::OfflineWelcome {
+                        elapsed_seconds: report.elapsed_seconds,
+                        xp_gained: report.xp_gained,
+                        level_before: report.level_before,
+                        level_after: report.level_after,
+                    }
+                } else {
+                    GameOverlay::None
+                };
                 let mut debug_menu = utils::debug_menu::DebugMenu::new();
 
                 // Save indicator state (for non-debug mode)
@@ -540,6 +568,23 @@ fn main() -> io::Result<()> {
                             update_check_completed,
                             haven.discovered,
                         );
+                        // Draw offline welcome overlay if active
+                        if let GameOverlay::OfflineWelcome {
+                            elapsed_seconds,
+                            xp_gained,
+                            level_before,
+                            level_after,
+                        } = &overlay
+                        {
+                            ui::game_common::render_offline_welcome(
+                                frame,
+                                frame.size(),
+                                *elapsed_seconds,
+                                *xp_gained,
+                                *level_before,
+                                *level_after,
+                            );
+                        }
                         // Draw prestige confirmation overlay if active
                         if matches!(overlay, GameOverlay::PrestigeConfirm) {
                             ui::prestige_confirm::draw_prestige_confirm(frame, &state);
@@ -841,10 +886,42 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::
         };
         let fishing_messages =
             fishing::logic::tick_fishing_with_haven(game_state, &mut rng, &haven_fishing);
-        for message in fishing_messages {
+        for message in &fishing_messages {
             game_state
                 .combat_state
                 .add_log_entry(format!("🎣 {}", message), false, true);
+
+            // Track fish catches and fishing item finds in recent gains
+            if message.contains("Caught") {
+                // Parse rarity from "[Rarity]" in message
+                let rarity = if message.contains("[Legendary]") {
+                    items::types::Rarity::Legendary
+                } else if message.contains("[Epic]") {
+                    items::types::Rarity::Epic
+                } else if message.contains("[Rare]") {
+                    items::types::Rarity::Rare
+                } else if message.contains("[Uncommon]") {
+                    items::types::Rarity::Magic
+                } else {
+                    items::types::Rarity::Common
+                };
+                // Extract fish name (between "Caught " and " [")
+                let fish_name = message
+                    .split("Caught ")
+                    .nth(1)
+                    .and_then(|s| s.split(" [").next())
+                    .unwrap_or("Fish")
+                    .to_string();
+                game_state.add_recent_drop(fish_name, rarity, false, "🐟", String::new(), String::new());
+            } else if message.contains("Found item:") {
+                let item_name = message
+                    .split("Found item: ")
+                    .nth(1)
+                    .map(|s| s.trim_end_matches('!'))
+                    .unwrap_or("Item")
+                    .to_string();
+                game_state.add_recent_drop(item_name, items::types::Rarity::Rare, false, "📦", String::new(), String::new());
+            }
         }
 
         // Check for fishing rank up
@@ -934,6 +1011,7 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::
                     game_state.combat_state.add_log_entry(message, false, true);
                 }
                 apply_tick_xp(game_state, xp_gained as f64);
+                game_state.session_kills += 1;
 
                 // Track XP in dungeon if active and mark room cleared
                 dungeon::logic::add_dungeon_xp(game_state, xp_gained);
@@ -952,17 +1030,10 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::
                 {
                     let item_name = item.display_name.clone();
                     let rarity = item.rarity;
+                    let slot = item.slot_name().to_string();
+                    let stats = item.stat_summary();
                     let equipped = auto_equip_if_better(item, game_state);
-                    let stars = "⭐".repeat(rarity as usize + 1);
-                    let equipped_text = if equipped { " (equipped!)" } else { "" };
-                    let message = format!(
-                        "🎁 Found: {} [{}] {}{}",
-                        item_name,
-                        rarity.name(),
-                        stars,
-                        equipped_text
-                    );
-                    game_state.combat_state.add_log_entry(message, false, true);
+                    game_state.add_recent_drop(item_name, rarity, equipped, "🎁", slot, stats);
                 }
 
                 // Try to discover dungeon (only when not in a dungeon)
@@ -1066,6 +1137,7 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::
                 use zones::BossDefeatResult;
                 // Apply XP from boss kill
                 apply_tick_xp(game_state, xp_gained as f64);
+                game_state.session_kills += 1;
 
                 // Log based on result
                 let message = match &result {

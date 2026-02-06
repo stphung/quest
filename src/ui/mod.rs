@@ -15,6 +15,7 @@ pub mod game_common;
 pub mod go_scene;
 pub mod gomoku_scene;
 pub mod haven_scene;
+mod info_panel;
 pub mod minesweeper_scene;
 pub mod morris_scene;
 pub mod prestige_confirm;
@@ -64,62 +65,47 @@ pub fn draw_ui_with_update(
         size
     };
 
-    // Split into two main areas: stats panel (left) and combat/dungeon (right)
+    // Split vertically: main content, full-width info panels, footer
+    let v_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Min(0),    // Main content (stats + right panel)
+            Constraint::Length(8), // Full-width Loot + Combat
+            Constraint::Length(3), // Full-width footer
+        ])
+        .split(main_area);
+
+    let content_area = v_chunks[0];
+    let info_area = v_chunks[1];
+    let footer_area = v_chunks[2];
+
+    // Split main content into two areas: stats panel (left) and combat/dungeon (right)
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
             Constraint::Percentage(50), // Stats panel
             Constraint::Percentage(50), // Combat scene or dungeon
         ])
-        .split(main_area);
+        .split(content_area);
 
     // Draw stats panel on the left (with optional update info)
-    stats_panel::draw_stats_panel_with_update(
+    stats_panel::draw_stats_panel_with_update(frame, chunks[0], game_state, update_info);
+
+    // Draw full-width Loot + Combat panels
+    info_panel::draw_info_panel(frame, info_area, game_state);
+
+    // Draw full-width footer at the bottom
+    stats_panel::draw_footer(
         frame,
-        chunks[0],
+        footer_area,
         game_state,
-        update_info,
+        update_info.is_some(),
         update_check_completed,
         haven_discovered,
     );
 
-    // Draw right panel based on current activity
-    // Priority: minigame > challenge menu > fishing > dungeon > combat
-    match &game_state.active_minigame {
-        Some(ActiveMinigame::Rune(game)) => {
-            rune_scene::render_rune(frame, chunks[1], game);
-        }
-        Some(ActiveMinigame::Minesweeper(game)) => {
-            minesweeper_scene::render_minesweeper(frame, chunks[1], game);
-        }
-        Some(ActiveMinigame::Gomoku(game)) => {
-            gomoku_scene::render_gomoku_scene(frame, chunks[1], game);
-        }
-        Some(ActiveMinigame::Morris(game)) => {
-            morris_scene::render_morris_scene(frame, chunks[1], game, game_state.character_level);
-        }
-        Some(ActiveMinigame::Chess(game)) => {
-            chess_scene::render_chess_scene(frame, chunks[1], game);
-        }
-        Some(ActiveMinigame::Go(game)) => {
-            go_scene::render_go_scene(frame, chunks[1], game);
-        }
-        None => {
-            if game_state.challenge_menu.is_open {
-                challenge_menu_scene::render_challenge_menu(
-                    frame,
-                    chunks[1],
-                    &game_state.challenge_menu,
-                );
-            } else if let Some(ref session) = game_state.active_fishing {
-                fishing_scene::render_fishing_scene(frame, chunks[1], session, &game_state.fishing);
-            } else if let Some(dungeon) = &game_state.active_dungeon {
-                draw_dungeon_view(frame, chunks[1], game_state, dungeon);
-            } else {
-                combat_scene::draw_combat_scene(frame, chunks[1], game_state);
-            }
-        }
-    }
+    // Draw right panel with stable layout: zone info + content + info panel
+    draw_right_panel(frame, chunks[1], game_state);
 }
 
 /// Draws the challenge notification banner at the top of the screen
@@ -159,6 +145,66 @@ fn draw_challenge_banner(frame: &mut Frame, area: Rect, game_state: &GameState) 
     frame.render_widget(banner, area);
 }
 
+/// Draws the right panel with a stable 2-part layout: zone info and content.
+/// The content area changes based on activity but zone info stays fixed.
+fn draw_right_panel(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    let zone_completion = stats_panel::compute_zone_completion(game_state);
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(4), // Zone info (always visible)
+            Constraint::Min(10),  // Content (changes by activity)
+        ])
+        .split(area);
+
+    // Zone info at top (always)
+    stats_panel::draw_zone_info(frame, chunks[0], game_state, &zone_completion);
+
+    // Content area — dispatched by current activity
+    draw_right_content(frame, chunks[1], game_state);
+}
+
+/// Draws the main content area of the right panel based on current activity.
+/// Priority: minigame > challenge menu > fishing > dungeon > combat
+fn draw_right_content(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    match &game_state.active_minigame {
+        Some(ActiveMinigame::Rune(game)) => {
+            rune_scene::render_rune(frame, area, game);
+        }
+        Some(ActiveMinigame::Minesweeper(game)) => {
+            minesweeper_scene::render_minesweeper(frame, area, game);
+        }
+        Some(ActiveMinigame::Gomoku(game)) => {
+            gomoku_scene::render_gomoku_scene(frame, area, game);
+        }
+        Some(ActiveMinigame::Morris(game)) => {
+            morris_scene::render_morris_scene(frame, area, game, game_state.character_level);
+        }
+        Some(ActiveMinigame::Chess(game)) => {
+            chess_scene::render_chess_scene(frame, area, game);
+        }
+        Some(ActiveMinigame::Go(game)) => {
+            go_scene::render_go_scene(frame, area, game);
+        }
+        None => {
+            if game_state.challenge_menu.is_open {
+                challenge_menu_scene::render_challenge_menu(
+                    frame,
+                    area,
+                    &game_state.challenge_menu,
+                );
+            } else if let Some(ref session) = game_state.active_fishing {
+                fishing_scene::render_fishing_scene(frame, area, session, &game_state.fishing);
+            } else if let Some(dungeon) = &game_state.active_dungeon {
+                draw_dungeon_view(frame, area, game_state, dungeon);
+            } else {
+                combat_scene::draw_combat_scene(frame, area, game_state);
+            }
+        }
+    }
+}
+
 /// Draws the dungeon view with map and combat
 fn draw_dungeon_view(
     frame: &mut Frame,
@@ -166,12 +212,16 @@ fn draw_dungeon_view(
     game_state: &GameState,
     dungeon: &crate::dungeon::types::Dungeon,
 ) {
-    // Split into dungeon map (top) and combat (bottom)
+    // Dungeon map needs 2 rows per grid cell + 3 for border + status line
+    let grid_size = dungeon.size.grid_size() as u16;
+    let map_height = grid_size * 2 + 3;
+
+    // Split: dungeon map gets what it needs, combat gets the rest
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Percentage(40), // Dungeon map
-            Constraint::Percentage(60), // Combat scene
+            Constraint::Min(map_height), // Dungeon map (sized to fit)
+            Constraint::Min(5),          // Combat scene (whatever remains)
         ])
         .split(area);
 

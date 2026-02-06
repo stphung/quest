@@ -12,31 +12,45 @@ use super::combat_3d::render_combat_3d;
 
 /// Draws the combat scene with 3D first-person view
 pub fn draw_combat_scene(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    // Split into 3D view and status bars
+    // Single outer border wrapping everything
+    let outer_block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Red))
+        .title(" ⚔ Combat ⚔ ")
+        .title_style(
+            Style::default()
+                .fg(Color::Red)
+                .add_modifier(Modifier::BOLD),
+        );
+
+    let inner = outer_block.inner(area);
+    frame.render_widget(outer_block, area);
+
+    // Split inner area — no individual borders
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3), // Player HP
-            Constraint::Min(10),   // 3D Combat View
-            Constraint::Length(3), // Enemy HP
-            Constraint::Length(3), // Status
+            Constraint::Length(1), // Player HP
+            Constraint::Min(5),   // Sprite + Combat log
+            Constraint::Length(1), // Enemy HP
+            Constraint::Length(1), // Status
         ])
-        .split(area);
+        .split(inner);
 
-    // Draw player HP bar
+    // Draw player HP bar (borderless)
     draw_player_hp(frame, chunks[0], game_state);
 
-    // Draw 3D combat scene
+    // Draw 3D combat scene (borderless)
     render_combat_3d(frame, chunks[1], game_state);
 
-    // Draw enemy HP bar
+    // Draw enemy HP bar (borderless)
     draw_enemy_hp(frame, chunks[2], game_state);
 
     // Draw combat status
     draw_combat_status(frame, chunks[3], game_state);
 }
 
-/// Draws the player HP bar
+/// Draws the player HP bar (borderless, single line)
 fn draw_player_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let hp_ratio = game_state.combat_state.player_current_hp as f64
         / game_state.combat_state.player_max_hp as f64;
@@ -47,7 +61,6 @@ fn draw_player_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
     );
 
     let gauge = Gauge::default()
-        .block(Block::default().borders(Borders::ALL).title("Player"))
         .gauge_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
         .label(label)
         .ratio(hp_ratio);
@@ -55,7 +68,7 @@ fn draw_player_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
     frame.render_widget(gauge, area);
 }
 
-/// Draws the enemy HP bar
+/// Draws the enemy HP bar (borderless, single line)
 fn draw_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
     if let Some(enemy) = &game_state.combat_state.current_enemy {
         let hp_ratio = enemy.current_hp as f64 / enemy.max_hp as f64;
@@ -63,14 +76,12 @@ fn draw_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
         let label = format!("{}: {}/{}", enemy.name, enemy.current_hp, enemy.max_hp);
 
         let gauge = Gauge::default()
-            .block(Block::default().borders(Borders::ALL).title("Enemy"))
             .gauge_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
             .label(label)
             .ratio(hp_ratio);
 
         frame.render_widget(gauge, area);
     } else {
-        let empty_block = Block::default().borders(Borders::ALL).title("Enemy");
         let text = if game_state.combat_state.is_regenerating {
             vec![Line::from(Span::styled(
                 "Regenerating...",
@@ -87,26 +98,40 @@ fn draw_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
             ))]
         };
 
-        let paragraph = Paragraph::new(text)
-            .block(empty_block)
-            .alignment(Alignment::Center);
+        let paragraph = Paragraph::new(text).alignment(Alignment::Center);
 
         frame.render_widget(paragraph, area);
     }
 }
 
-/// Draws the combat status information
+/// Draws the combat status information with DPS
 fn draw_combat_status(frame: &mut Frame, area: Rect, game_state: &GameState) {
     use super::throbber::{spinner_char, waiting_message};
+    use crate::character::derived_stats::DerivedStats;
 
     let spinner = spinner_char();
 
+    // Calculate DPS for display
+    let derived =
+        DerivedStats::calculate_derived_stats(&game_state.attributes, &game_state.equipment);
+    let base_dps = derived.total_damage() as f64 / ATTACK_INTERVAL_SECONDS;
+    let effective_dps = base_dps
+        * (1.0
+            + (derived.crit_chance_percent as f64 / 100.0) * (derived.crit_multiplier - 1.0));
+    let dps_span = Span::styled(
+        format!(" | DPS: {:.0}", effective_dps),
+        Style::default().fg(Color::DarkGray),
+    );
+
     let status_text = if game_state.combat_state.is_regenerating {
         let message = waiting_message(game_state.character_xp);
-        vec![Line::from(vec![Span::styled(
-            format!("{} {}", spinner, message),
-            Style::default().fg(Color::Yellow),
-        )])]
+        vec![Line::from(vec![
+            Span::styled(
+                format!("{} {}", spinner, message),
+                Style::default().fg(Color::Yellow),
+            ),
+            dps_span,
+        ])]
     } else if game_state.combat_state.current_enemy.is_some() {
         let next_attack = ATTACK_INTERVAL_SECONDS - game_state.combat_state.attack_timer;
         vec![Line::from(vec![
@@ -114,15 +139,18 @@ fn draw_combat_status(frame: &mut Frame, area: Rect, game_state: &GameState) {
                 format!("{} In Combat", spinner),
                 Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
             ),
-            Span::raw(format!(" | Next attack: {:.1}s", next_attack.max(0.0))),
+            Span::raw(format!(" | Next: {:.1}s", next_attack.max(0.0))),
+            dps_span,
         ])]
     } else {
         let message = waiting_message(game_state.character_xp);
-
-        vec![Line::from(vec![Span::styled(
-            format!("{} {}", spinner, message),
-            Style::default().fg(Color::Yellow),
-        )])]
+        vec![Line::from(vec![
+            Span::styled(
+                format!("{} {}", spinner, message),
+                Style::default().fg(Color::Yellow),
+            ),
+            dps_span,
+        ])]
     };
 
     let status_paragraph = Paragraph::new(status_text).alignment(Alignment::Center);

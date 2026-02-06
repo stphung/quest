@@ -97,11 +97,12 @@ pub fn combat_kill_xp(passive_xp_rate: f64, haven_xp_gain_percent: f64) -> u64 {
 
 /// Report of offline progression results
 #[derive(Debug, Default)]
-#[allow(dead_code)]
 pub struct OfflineReport {
     pub elapsed_seconds: i64,
     pub total_level_ups: u32,
     pub xp_gained: u64,
+    pub level_before: u32,
+    pub level_after: u32,
 }
 
 /// Calculates the XP gained during offline time
@@ -152,7 +153,9 @@ pub fn process_offline_progression(
         haven_offline_xp_percent,
     );
 
+    let level_before = state.character_level;
     let (total_level_ups, _) = apply_tick_xp(state, offline_xp);
+    let level_after = state.character_level;
 
     state.last_save_time = current_time;
 
@@ -160,6 +163,8 @@ pub fn process_offline_progression(
         elapsed_seconds,
         total_level_ups,
         xp_gained: offline_xp as u64,
+        level_before,
+        level_after,
     }
 }
 

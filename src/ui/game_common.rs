@@ -305,6 +305,97 @@ pub fn render_info_panel_frame(frame: &mut Frame, area: Rect) -> Rect {
     inner
 }
 
+/// Render the "Welcome Back" overlay for offline progression.
+pub fn render_offline_welcome(
+    frame: &mut Frame,
+    area: Rect,
+    elapsed_seconds: i64,
+    xp_gained: u64,
+    level_before: u32,
+    level_after: u32,
+) {
+    // Centered modal box
+    let modal_width = 44u16;
+    let modal_height = if level_before < level_after { 10 } else { 9 };
+    let x = area.x + (area.width.saturating_sub(modal_width)) / 2;
+    let y = area.y + (area.height.saturating_sub(modal_height)) / 2;
+    let modal_area = Rect::new(x, y, modal_width, modal_height);
+
+    frame.render_widget(Clear, modal_area);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )
+        .title(" ☀️ Welcome Back! ");
+
+    let inner = block.inner(modal_area);
+    frame.render_widget(block, modal_area);
+
+    // Format time away
+    let hours = elapsed_seconds / 3600;
+    let minutes = (elapsed_seconds % 3600) / 60;
+    let away_str = if hours > 0 {
+        format!("{}h {}m", hours, minutes)
+    } else {
+        format!("{}m", minutes)
+    };
+
+    let mut lines = vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            format!("  Away for: {}", away_str),
+            Style::default().fg(Color::White),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            format!("  ⚔️  XP Gained:  {:>10}", format_number_short(xp_gained)),
+            Style::default().fg(Color::Cyan),
+        )),
+    ];
+
+    if level_before < level_after {
+        lines.push(Line::from(Span::styled(
+            format!(
+                "  📈 Levels:      {:>10}",
+                format!("+{} ({} → {})", level_after - level_before, level_before, level_after)
+            ),
+            Style::default().fg(Color::Green),
+        )));
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "Press any key to continue",
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    let text = Paragraph::new(lines).alignment(Alignment::Center);
+    frame.render_widget(text, inner);
+}
+
+/// Format a number with abbreviated suffixes (K, M, B, T, Q).
+pub fn format_number_short(n: u64) -> String {
+    // (threshold, divisor, suffix)
+    const TIERS: &[(u64, f64, &str)] = &[
+        (1_000_000_000_000_000, 1e15, "Q"),
+        (1_000_000_000_000, 1e12, "T"),
+        (1_000_000_000, 1e9, "B"),
+        (1_000_000, 1e6, "M"),
+        (10_000, 1e3, "K"),
+    ];
+
+    for &(threshold, divisor, suffix) in TIERS {
+        if n >= threshold {
+            return format!("{:.1}{}", n as f64 / divisor, suffix);
+        }
+    }
+    n.to_string()
+}
+
 /// Forfeit confirmation status text.
 pub const FORFEIT_STATUS_TEXT: &str = "Forfeit game?";
 

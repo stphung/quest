@@ -106,6 +106,67 @@ pub struct Item {
     pub affixes: Vec<Affix>,
 }
 
+impl Item {
+    /// Returns a short stat summary string like "+8 STR +3 DEX +Crit"
+    pub fn stat_summary(&self) -> String {
+        let mut parts = Vec::new();
+
+        // Attribute bonuses (only non-zero)
+        if self.attributes.str > 0 {
+            parts.push(format!("+{} STR", self.attributes.str));
+        }
+        if self.attributes.dex > 0 {
+            parts.push(format!("+{} DEX", self.attributes.dex));
+        }
+        if self.attributes.con > 0 {
+            parts.push(format!("+{} CON", self.attributes.con));
+        }
+        if self.attributes.int > 0 {
+            parts.push(format!("+{} INT", self.attributes.int));
+        }
+        if self.attributes.wis > 0 {
+            parts.push(format!("+{} WIS", self.attributes.wis));
+        }
+        if self.attributes.cha > 0 {
+            parts.push(format!("+{} CHA", self.attributes.cha));
+        }
+
+        // Affix short names
+        for affix in &self.affixes {
+            let label = match affix.affix_type {
+                AffixType::DamagePercent => format!("+{:.0}% Dmg", affix.value),
+                AffixType::CritChance => format!("+{:.0}% Crit", affix.value),
+                AffixType::CritMultiplier => format!("+{:.1}x CritDmg", affix.value),
+                AffixType::AttackSpeed => format!("+{:.0}% AtkSpd", affix.value),
+                AffixType::HPBonus => format!("+{:.0} HP", affix.value),
+                AffixType::DamageReduction => format!("+{:.0}% DR", affix.value),
+                AffixType::HPRegen => format!("+{:.0} Regen", affix.value),
+                AffixType::DamageReflection => format!("+{:.0}% Reflect", affix.value),
+                AffixType::XPGain => format!("+{:.0}% XP", affix.value),
+                AffixType::DropRate => format!("+{:.0}% Drop", affix.value),
+                AffixType::PrestigeBonus => format!("+{:.0}% Prestige", affix.value),
+                AffixType::OfflineRate => format!("+{:.0}% Offline", affix.value),
+            };
+            parts.push(label);
+        }
+
+        parts.join(" ")
+    }
+
+    /// Returns the slot name as a string
+    pub fn slot_name(&self) -> &'static str {
+        match self.slot {
+            EquipmentSlot::Weapon => "Weapon",
+            EquipmentSlot::Armor => "Armor",
+            EquipmentSlot::Helmet => "Helmet",
+            EquipmentSlot::Gloves => "Gloves",
+            EquipmentSlot::Boots => "Boots",
+            EquipmentSlot::Amulet => "Amulet",
+            EquipmentSlot::Ring => "Ring",
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
