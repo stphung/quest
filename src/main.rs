@@ -149,7 +149,7 @@ fn main() -> io::Result<()> {
     if let Ok(Some(update_info)) = update_available.join() {
         // Draw notification with changelog
         terminal.draw(|frame| {
-            let area = frame.size();
+            let area = frame.area();
             let block = ratatui::widgets::Block::default()
                 .borders(ratatui::widgets::Borders::ALL)
                 .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Yellow))
@@ -207,7 +207,7 @@ fn main() -> io::Result<()> {
             Screen::CharacterCreation => {
                 // Draw character creation screen
                 terminal.draw(|f| {
-                    let area = f.size();
+                    let area = f.area();
                     creation_screen.draw(f, area);
                 })?;
 
@@ -248,7 +248,7 @@ fn main() -> io::Result<()> {
 
                 // Draw character select screen (includes Haven tree visualization)
                 terminal.draw(|f| {
-                    let area = f.size();
+                    let area = f.area();
                     select_screen.draw(f, area, &characters, &haven);
                     // Draw Haven management overlay if open
                     if haven_ui.showing {
@@ -411,7 +411,7 @@ fn main() -> io::Result<()> {
 
                 // Draw delete confirmation screen
                 terminal.draw(|f| {
-                    let area = f.size();
+                    let area = f.area();
                     delete_screen.draw(f, area, selected_character);
                 })?;
 
@@ -459,7 +459,7 @@ fn main() -> io::Result<()> {
 
                 // Draw rename screen
                 terminal.draw(|f| {
-                    let area = f.size();
+                    let area = f.area();
                     rename_screen.draw(f, area, selected_character);
                 })?;
 
@@ -545,7 +545,7 @@ fn main() -> io::Result<()> {
                         }
                         // Draw Haven discovery modal if active
                         if matches!(overlay, GameOverlay::HavenDiscovery) {
-                            ui::haven_scene::render_haven_discovery_modal(frame, frame.size());
+                            ui::haven_scene::render_haven_discovery_modal(frame, frame.area());
                         }
                         // Draw Vault selection screen if active
                         if let GameOverlay::VaultSelection {
@@ -555,7 +555,7 @@ fn main() -> io::Result<()> {
                         {
                             ui::haven_scene::render_vault_selection(
                                 frame,
-                                frame.size(),
+                                frame.area(),
                                 &state,
                                 haven.vault_tier(),
                                 selected_index,
@@ -566,7 +566,7 @@ fn main() -> io::Result<()> {
                         if haven_ui.showing {
                             ui::haven_scene::render_haven_tree(
                                 frame,
-                                frame.size(),
+                                frame.area(),
                                 &haven,
                                 haven_ui.selected_room,
                                 state.prestige_rank,
@@ -575,7 +575,7 @@ fn main() -> io::Result<()> {
                                 let room = haven::HavenRoomId::ALL[haven_ui.selected_room];
                                 ui::haven_scene::render_build_confirmation(
                                     frame,
-                                    frame.size(),
+                                    frame.area(),
                                     room,
                                     &haven,
                                     state.prestige_rank,
@@ -584,11 +584,11 @@ fn main() -> io::Result<()> {
                         }
                         // Draw debug indicator and menu if in debug mode, otherwise save indicator
                         if debug_mode {
-                            ui::debug_menu_scene::render_debug_indicator(frame, frame.size());
+                            ui::debug_menu_scene::render_debug_indicator(frame, frame.area());
                             if debug_menu.is_open {
                                 ui::debug_menu_scene::render_debug_menu(
                                     frame,
-                                    frame.size(),
+                                    frame.area(),
                                     &debug_menu,
                                 );
                             }
@@ -599,7 +599,7 @@ fn main() -> io::Result<()> {
                                 .unwrap_or(false);
                             ui::debug_menu_scene::render_save_indicator(
                                 frame,
-                                frame.size(),
+                                frame.area(),
                                 is_saving,
                                 last_save_time,
                             );

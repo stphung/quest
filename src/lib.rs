@@ -19,6 +19,9 @@ pub mod zones;
 // UI module is not exposed as it's tightly coupled to the terminal
 mod ui;
 
+// Re-export effects for demos/testing
+pub use ui::effects::{CombatEffectManager, CombatEffectType};
+
 // Re-export commonly used types at crate root for convenience
 pub use challenges::{
     ActiveMinigame, ChessDifficulty, ChessGame, ChessResult, GomokuDifficulty, GomokuGame,

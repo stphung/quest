@@ -6,6 +6,7 @@ pub mod character_select;
 pub mod chess_scene;
 mod combat_3d;
 pub mod combat_effects;
+pub mod effects;
 mod combat_scene;
 pub mod debug_menu_scene;
 pub mod dungeon_map;
@@ -40,7 +41,7 @@ pub fn draw_ui_with_update(
     update_check_completed: bool,
     haven_discovered: bool,
 ) {
-    let size = frame.size();
+    let size = frame.area();
 
     // Check if we should show the challenge notification banner
     let show_challenge_banner = !game_state.challenge_menu.challenges.is_empty()
