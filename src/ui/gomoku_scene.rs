@@ -1,7 +1,7 @@
 //! Gomoku game UI rendering.
 
 use super::game_common::{
-    create_game_layout, render_forfeit_status_bar, render_game_over_overlay,
+    create_game_layout, render_forfeit_status_bar, render_game_over_banner,
     render_info_panel_frame, render_status_bar, render_thinking_status_bar, GameResultType,
 };
 use crate::challenges::gomoku::{GomokuGame, Player, BOARD_SIZE};
@@ -30,6 +30,15 @@ pub fn render_gomoku_scene(frame: &mut Frame, area: Rect, game: &GomokuGame) {
 }
 
 fn render_board(frame: &mut Frame, area: Rect, game: &GomokuGame) {
+    render_board_with_highlight(frame, area, game, false);
+}
+
+fn render_board_with_highlight(
+    frame: &mut Frame,
+    area: Rect,
+    game: &GomokuGame,
+    show_winning_line: bool,
+) {
     // Calculate centering offset (no border - outer block provides it)
     let board_height = BOARD_SIZE as u16;
     let board_width = (BOARD_SIZE * 2 - 1) as u16; // "● " format
@@ -42,20 +51,38 @@ fn render_board(frame: &mut Frame, area: Rect, game: &GomokuGame) {
     let cursor_color = Color::Yellow;
     let last_move_color = Color::Green;
     let empty_color = Color::DarkGray;
+    let winning_line_color = Color::Magenta;
+
+    // Check if position is in winning line
+    let is_winning_pos = |row: usize, col: usize| -> bool {
+        show_winning_line
+            && game
+                .winning_line
+                .as_ref()
+                .is_some_and(|line| line.contains(&(row, col)))
+    };
 
     // Draw board
     for row in 0..BOARD_SIZE {
         let mut spans = Vec::new();
         for col in 0..BOARD_SIZE {
-            let is_cursor = game.cursor == (row, col);
-            let is_last_move = game.last_move == Some((row, col));
+            let is_cursor = game.cursor == (row, col) && !show_winning_line;
+            let is_last_move = game.last_move == Some((row, col)) && !show_winning_line;
+            let is_winning = is_winning_pos(row, col);
 
             let (symbol, style) = match game.board[row][col] {
                 Some(Player::Human) => {
                     let base_style = Style::default()
                         .fg(human_color)
                         .add_modifier(Modifier::BOLD);
-                    if is_cursor {
+                    if is_winning {
+                        (
+                            "●",
+                            Style::default()
+                                .fg(winning_line_color)
+                                .add_modifier(Modifier::BOLD),
+                        )
+                    } else if is_cursor {
                         ("●", base_style.bg(Color::DarkGray))
                     } else if is_last_move {
                         ("●", base_style.fg(last_move_color))
@@ -65,7 +92,14 @@ fn render_board(frame: &mut Frame, area: Rect, game: &GomokuGame) {
                 }
                 Some(Player::Ai) => {
                     let base_style = Style::default().fg(ai_color).add_modifier(Modifier::BOLD);
-                    if is_cursor {
+                    if is_winning {
+                        (
+                            "●",
+                            Style::default()
+                                .fg(winning_line_color)
+                                .add_modifier(Modifier::BOLD),
+                        )
+                    } else if is_cursor {
                         ("●", base_style.bg(Color::DarkGray))
                     } else if is_last_move {
                         ("●", base_style.fg(last_move_color))
@@ -169,32 +203,38 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &GomokuGame) {
 
 fn render_gomoku_game_over(frame: &mut Frame, area: Rect, game: &GomokuGame) {
     use crate::challenges::menu::DifficultyInfo;
+    use ratatui::widgets::Clear;
+
+    // First render the board with winning line highlighted
+    frame.render_widget(Clear, area);
+
+    // Create layout matching normal game (but without status bar interaction)
+    let layout = create_game_layout(frame, area, " Gomoku ", Color::Cyan, 15, 22);
+
+    // Render board with winning line highlighted
+    render_board_with_highlight(frame, layout.content, game, true);
+    render_info_panel(frame, layout.info_panel, game);
 
     let result = game.game_result.as_ref().unwrap();
     let (result_type, title, message) = match result {
-        crate::challenges::gomoku::GomokuResult::Win => (
-            GameResultType::Win,
-            ":: VICTORY! ::",
-            "You placed five stones in a row!",
-        ),
-        crate::challenges::gomoku::GomokuResult::Loss => (
-            GameResultType::Loss,
-            "DEFEAT",
-            "The opponent placed five stones in a row.",
-        ),
-        crate::challenges::gomoku::GomokuResult::Draw => (
-            GameResultType::Draw,
-            "DRAW",
-            "The board is full with no winner.",
-        ),
+        crate::challenges::gomoku::GomokuResult::Win => {
+            (GameResultType::Win, "VICTORY!", "Five in a row!")
+        }
+        crate::challenges::gomoku::GomokuResult::Loss => {
+            (GameResultType::Loss, "DEFEAT", "Opponent got five in a row")
+        }
+        crate::challenges::gomoku::GomokuResult::Draw => {
+            (GameResultType::Draw, "DRAW", "Board full, no winner")
+        }
     };
 
     let reward = match result {
         crate::challenges::gomoku::GomokuResult::Win => {
             game.difficulty.reward().description().replace("Win: ", "")
         }
-        _ => "No penalty incurred.".to_string(),
+        _ => String::new(),
     };
 
-    render_game_over_overlay(frame, area, result_type, title, message, &reward);
+    // Render banner at bottom of content area (not status bar, which is too small)
+    render_game_over_banner(frame, layout.content, result_type, title, message, &reward);
 }

@@ -88,6 +88,63 @@ pub fn check_win(
     false
 }
 
+/// Get the positions of the winning line (5+ in a row) if one exists.
+/// Returns None if no winning line found.
+pub fn get_winning_line(
+    board: &[[Option<Player>; BOARD_SIZE]; BOARD_SIZE],
+    row: usize,
+    col: usize,
+    player: Player,
+) -> Option<Vec<(usize, usize)>> {
+    for (dr, dc) in DIRECTIONS {
+        let count = count_line(board, row, col, dr, dc, player);
+        if count >= 5 {
+            return Some(collect_line_positions(board, row, col, dr, dc, player));
+        }
+    }
+    None
+}
+
+/// Collect all positions in a winning line.
+fn collect_line_positions(
+    board: &[[Option<Player>; BOARD_SIZE]; BOARD_SIZE],
+    row: usize,
+    col: usize,
+    dr: i32,
+    dc: i32,
+    player: Player,
+) -> Vec<(usize, usize)> {
+    let mut positions = vec![(row, col)];
+
+    // Collect in positive direction
+    let mut r = row as i32 + dr;
+    let mut c = col as i32 + dc;
+    while r >= 0 && r < BOARD_SIZE as i32 && c >= 0 && c < BOARD_SIZE as i32 {
+        if board[r as usize][c as usize] == Some(player) {
+            positions.push((r as usize, c as usize));
+            r += dr;
+            c += dc;
+        } else {
+            break;
+        }
+    }
+
+    // Collect in negative direction
+    r = row as i32 - dr;
+    c = col as i32 - dc;
+    while r >= 0 && r < BOARD_SIZE as i32 && c >= 0 && c < BOARD_SIZE as i32 {
+        if board[r as usize][c as usize] == Some(player) {
+            positions.push((r as usize, c as usize));
+            r -= dr;
+            c -= dc;
+        } else {
+            break;
+        }
+    }
+
+    positions
+}
+
 /// Count consecutive stones in both directions from (row, col).
 fn count_line(
     board: &[[Option<Player>; BOARD_SIZE]; BOARD_SIZE],
@@ -157,6 +214,7 @@ pub fn process_human_move(game: &mut GomokuGame) -> bool {
 
     // Check for win
     if check_win(&game.board, row, col, Player::Human) {
+        game.winning_line = get_winning_line(&game.board, row, col, Player::Human);
         game.game_result = Some(GomokuResult::Win);
         return true;
     }
@@ -767,6 +825,7 @@ pub fn process_ai_thinking<R: Rng>(game: &mut GomokuGame, rng: &mut R) {
 
         // Check for AI win
         if check_win(&game.board, r, c, Player::Ai) {
+            game.winning_line = get_winning_line(&game.board, r, c, Player::Ai);
             game.game_result = Some(GomokuResult::Loss);
         } else if is_board_full(&game.board) {
             game.game_result = Some(GomokuResult::Draw);

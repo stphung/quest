@@ -1,10 +1,12 @@
 //! Nine Men's Morris UI rendering.
 
 use super::game_common::{
-    create_game_layout, render_forfeit_status_bar, render_game_over_overlay,
+    create_game_layout, render_forfeit_status_bar, render_game_over_banner,
     render_info_panel_frame, render_status_bar, render_thinking_status_bar, GameResultType,
 };
-use crate::challenges::morris::{MorrisGame, MorrisPhase, MorrisResult, Player, ADJACENCIES};
+use crate::challenges::morris::{
+    MorrisGame, MorrisMove, MorrisPhase, MorrisResult, Player, ADJACENCIES,
+};
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
@@ -15,21 +17,21 @@ use ratatui::{
 
 /// Render the Nine Men's Morris game scene
 pub fn render_morris_scene(frame: &mut Frame, area: Rect, game: &MorrisGame, character_level: u32) {
-    // Check for game over overlay
-    if let Some(result) = game.game_result {
+    // Check for game over - show board with banner
+    if game.game_result.is_some() {
         let xp_for_level = crate::core::game_logic::xp_for_next_level(character_level.max(1));
         let xp_reward =
             (xp_for_level as f64 * game.difficulty.reward_xp_percent() as f64 / 100.0) as u64;
         let xp_reward = xp_reward.max(100);
         let is_master = game.difficulty == crate::challenges::morris::MorrisDifficulty::Master;
-        render_morris_game_over(frame, area, result, xp_reward, is_master);
+        render_morris_game_over(frame, area, game, xp_reward, is_master);
         return;
     }
 
     // Use shared layout
     let layout = create_game_layout(frame, area, " Nine Men's Morris ", Color::Cyan, 13, 24);
 
-    render_board(frame, layout.content, game);
+    render_board(frame, layout.content, game, false);
     render_status(frame, layout.status_bar, game);
     render_info_panel(frame, layout.info_panel, game);
 }
@@ -71,7 +73,7 @@ const POSITION_COORDS: [(u16, u16); 24] = [
     (24, 12), // 23
 ];
 
-fn render_board(frame: &mut Frame, area: Rect, game: &MorrisGame) {
+fn render_board(frame: &mut Frame, area: Rect, game: &MorrisGame, show_last_move: bool) {
     // Board dimensions: 25 chars wide x 13 lines tall
     let board_width: u16 = 25;
     let board_height: u16 = 13;
@@ -87,10 +89,30 @@ fn render_board(frame: &mut Frame, area: Rect, game: &MorrisGame) {
     let selected_color = Color::Rgb(100, 200, 100); // Green for selected
     let legal_dest_color = Color::Rgb(200, 100, 200); // Pink/magenta for legal destinations
     let capturable_color = Color::Red;
+    let last_move_color = Color::Magenta;
 
-    // Compute legal destinations for highlighting
-    let legal_destinations = get_legal_destinations(game);
-    let capturable_positions = get_capturable_positions(game);
+    // Get last move position for highlighting
+    let last_move_pos: Option<usize> = if show_last_move {
+        game.last_move.map(|mv| match mv {
+            MorrisMove::Place(pos) => pos,
+            MorrisMove::Move { to, .. } => to,
+            MorrisMove::Capture(pos) => pos,
+        })
+    } else {
+        None
+    };
+
+    // Compute legal destinations for highlighting (only during active game)
+    let legal_destinations = if show_last_move {
+        Vec::new()
+    } else {
+        get_legal_destinations(game)
+    };
+    let capturable_positions = if show_last_move {
+        Vec::new()
+    } else {
+        get_capturable_positions(game)
+    };
 
     // Draw the board lines
     let board_lines = [
@@ -124,12 +146,35 @@ fn render_board(frame: &mut Frame, area: Rect, game: &MorrisGame) {
         let x = x_offset + px;
         let y = y_offset + py;
 
-        let is_cursor = game.cursor == pos;
-        let is_selected = game.selected_position == Some(pos);
+        let is_cursor = game.cursor == pos && !show_last_move;
+        let is_selected = game.selected_position == Some(pos) && !show_last_move;
         let is_legal_dest = legal_destinations.contains(&pos);
         let is_capturable = capturable_positions.contains(&pos);
+        let is_last_move = last_move_pos == Some(pos);
 
-        let (symbol, style) = if is_cursor {
+        let (symbol, style) = if is_last_move {
+            // Highlight last move position
+            match game.board[pos] {
+                Some(Player::Human) => (
+                    "[\u{25CF}]", // [●]
+                    Style::default()
+                        .fg(last_move_color)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Some(Player::Ai) => (
+                    "[\u{25CF}]", // [●]
+                    Style::default()
+                        .fg(last_move_color)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                None => (
+                    "[X]", // Captured position
+                    Style::default()
+                        .fg(last_move_color)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            }
+        } else if is_cursor {
             // Cursor position
             match game.board[pos] {
                 Some(Player::Human) => (
@@ -480,10 +525,23 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &MorrisGame) {
 fn render_morris_game_over(
     frame: &mut Frame,
     area: Rect,
-    result: MorrisResult,
+    game: &MorrisGame,
     xp_reward: u64,
     is_master: bool,
 ) {
+    use ratatui::widgets::Clear;
+
+    // First render the board with last move highlighted
+    frame.render_widget(Clear, area);
+
+    // Create layout matching normal game
+    let layout = create_game_layout(frame, area, " Nine Men's Morris ", Color::Cyan, 13, 24);
+
+    // Render board with last move highlighted
+    render_board(frame, layout.content, game, true);
+    render_info_panel(frame, layout.info_panel, game);
+
+    let result = game.game_result.unwrap();
     let (result_type, title, message, reward) = match result {
         MorrisResult::Win => {
             let reward_text = if is_master {
@@ -493,24 +551,28 @@ fn render_morris_game_over(
             };
             (
                 GameResultType::Win,
-                ":: VICTORY! ::",
-                "You outwitted the sage at the game of mills!",
+                "VICTORY!",
+                "You outwitted the sage!",
                 reward_text,
             )
         }
-        MorrisResult::Loss => (
-            GameResultType::Loss,
-            "DEFEAT",
-            "The sage has bested you at the game of mills.",
-            "No penalty incurred.".to_string(),
-        ),
+        MorrisResult::Loss => {
+            // Determine loss reason from game state
+            let msg = if game.pieces_on_board.0 < 3 {
+                "Reduced to fewer than 3 pieces"
+            } else {
+                "No legal moves remaining"
+            };
+            (GameResultType::Loss, "DEFEAT", msg, String::new())
+        }
         MorrisResult::Forfeit => (
             GameResultType::Forfeit,
             "FORFEIT",
-            "You conceded the game.",
-            "No penalty incurred.".to_string(),
+            "You conceded the game",
+            String::new(),
         ),
     };
 
-    render_game_over_overlay(frame, area, result_type, title, message, &reward);
+    // Render banner at bottom of content area
+    render_game_over_banner(frame, layout.content, result_type, title, message, &reward);
 }
