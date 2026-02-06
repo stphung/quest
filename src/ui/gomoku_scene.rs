@@ -59,7 +59,7 @@ fn render_board_with_highlight(
             && game
                 .winning_line
                 .as_ref()
-                .map_or(false, |line| line.contains(&(row, col)))
+                .is_some_and(|line| line.contains(&(row, col)))
     };
 
     // Draw board
