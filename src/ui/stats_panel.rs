@@ -53,28 +53,32 @@ pub fn draw_stats_panel_with_update(
         0
     };
 
+    // Check if zone is complete (needs extra line in zone section)
+    let zone_completion = compute_zone_completion(game_state);
+    let zone_height = 4; // Always show next zone line
+
     // Main vertical layout: header, zone, attributes, derived stats, equipment, prestige, footer, [update]
     // When update panel is present, equipment gets smaller minimum to ensure update panel fits
     let constraints = if update_info.is_some() {
         vec![
-            Constraint::Length(4),          // Header + XP bar
-            Constraint::Length(3),          // Zone info
-            Constraint::Length(14),         // Attributes (6 attributes + borders)
-            Constraint::Length(6),          // Derived stats (condensed)
-            Constraint::Min(10),            // Equipment section (reduced min when update shown)
-            Constraint::Length(7),          // Prestige info + fishing rank + fishing bar
-            Constraint::Length(3),          // Footer
-            Constraint::Min(update_height), // Update panel (can shrink if needed)
+            Constraint::Length(4),           // Header + XP bar
+            Constraint::Length(zone_height), // Zone info (3 normal, 4 when gated)
+            Constraint::Length(14),          // Attributes (6 attributes + borders)
+            Constraint::Length(6),           // Derived stats (condensed)
+            Constraint::Min(10),             // Equipment section (reduced min when update shown)
+            Constraint::Length(7),           // Prestige info + fishing rank + fishing bar
+            Constraint::Length(3),           // Footer
+            Constraint::Min(update_height),  // Update panel (can shrink if needed)
         ]
     } else {
         vec![
-            Constraint::Length(4),  // Header + XP bar
-            Constraint::Length(3),  // Zone info
-            Constraint::Length(14), // Attributes (6 attributes + borders)
-            Constraint::Length(6),  // Derived stats (condensed)
-            Constraint::Min(16),    // Equipment section (grows to fit)
-            Constraint::Length(7),  // Prestige info + fishing rank + fishing bar
-            Constraint::Length(3),  // Footer
+            Constraint::Length(4),           // Header + XP bar
+            Constraint::Length(zone_height), // Zone info (3 normal, 4 when gated)
+            Constraint::Length(14),          // Attributes (6 attributes + borders)
+            Constraint::Length(6),           // Derived stats (condensed)
+            Constraint::Min(16),             // Equipment section (grows to fit)
+            Constraint::Length(7),           // Prestige info + fishing rank + fishing bar
+            Constraint::Length(3),           // Footer
         ]
     };
 
@@ -87,7 +91,7 @@ pub fn draw_stats_panel_with_update(
     draw_header(frame, chunks[0], game_state);
 
     // Draw zone info
-    draw_zone_info(frame, chunks[1], game_state);
+    draw_zone_info(frame, chunks[1], game_state, &zone_completion);
 
     // Draw attributes with progress bars
     draw_attributes(frame, chunks[2], game_state);
@@ -184,7 +188,54 @@ fn draw_header(frame: &mut Frame, area: Rect, game_state: &GameState) {
 }
 
 /// Draws the current zone and subzone info
-fn draw_zone_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
+/// Zone completion status for the second line of the zone info panel.
+enum ZoneCompletionStatus {
+    /// Zone complete but next zone requires higher prestige
+    Gated {
+        next_zone_id: u32,
+        next_zone_name: &'static str,
+        required_prestige: u32,
+    },
+    /// Zone complete and player meets the requirement
+    Unlocked {
+        next_zone_id: u32,
+        next_zone_name: &'static str,
+        required_prestige: u32,
+    },
+    /// No next zone — unknown territory
+    Mystery,
+}
+
+fn compute_zone_completion(game_state: &GameState) -> ZoneCompletionStatus {
+    use crate::zones::get_all_zones;
+
+    let zones = get_all_zones();
+    let prog = &game_state.zone_progression;
+
+    // Always show next zone status when a next zone exists
+    match zones.iter().find(|z| z.id == prog.current_zone_id + 1) {
+        Some(next) if next.prestige_requirement > game_state.prestige_rank => {
+            ZoneCompletionStatus::Gated {
+                next_zone_id: next.id,
+                next_zone_name: next.name,
+                required_prestige: next.prestige_requirement,
+            }
+        }
+        Some(next) => ZoneCompletionStatus::Unlocked {
+            next_zone_id: next.id,
+            next_zone_name: next.name,
+            required_prestige: next.prestige_requirement,
+        },
+        None => ZoneCompletionStatus::Mystery,
+    }
+}
+
+fn draw_zone_info(
+    frame: &mut Frame,
+    area: Rect,
+    game_state: &GameState,
+    zone_completion: &ZoneCompletionStatus,
+) {
     use crate::zones::get_all_zones;
 
     let zones = get_all_zones();
@@ -209,9 +260,8 @@ fn draw_zone_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
         _ => Color::White,
     };
 
-    // Build the boss progress display
+    // Build the boss progress display — always show boss status
     let boss_progress = if let Some(weapon) = prog.boss_weapon_blocked() {
-        // Fighting boss that requires weapon we don't have
         Span::styled(
             format!(" ⚔️ BOSS: {} [Need {}!] ", boss_name, weapon),
             Style::default()
@@ -233,7 +283,7 @@ fn draw_zone_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
         )
     };
 
-    let zone_text = vec![Line::from(vec![
+    let mut zone_lines = vec![Line::from(vec![
         Span::styled(
             format!("Zone {}: ", prog.current_zone_id),
             Style::default().add_modifier(Modifier::BOLD),
@@ -251,7 +301,71 @@ fn draw_zone_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
         boss_progress,
     ])];
 
-    let zone_widget = Paragraph::new(zone_text)
+    // Add second line based on completion status
+    match zone_completion {
+        ZoneCompletionStatus::Gated {
+            next_zone_id,
+            next_zone_name,
+            required_prestige,
+        } => {
+            zone_lines.push(Line::from(vec![
+                Span::styled("🔒 Next: ", Style::default().fg(Color::Yellow)),
+                Span::styled(
+                    format!("Zone {}: {}", next_zone_id, next_zone_name),
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    format!(" — requires Prestige {}", required_prestige),
+                    Style::default().fg(Color::Yellow),
+                ),
+            ]));
+        }
+        ZoneCompletionStatus::Unlocked {
+            next_zone_id,
+            next_zone_name,
+            required_prestige,
+        } => {
+            let line = if *required_prestige == 0 {
+                // No prestige needed — just show the arrow
+                Line::from(vec![
+                    Span::styled("➡ Next: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!("Zone {}: {}", next_zone_id, next_zone_name),
+                        Style::default()
+                            .fg(Color::White)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                ])
+            } else {
+                Line::from(vec![
+                    Span::styled("✅ Next: ", Style::default().fg(Color::Green)),
+                    Span::styled(
+                        format!("Zone {}: {}", next_zone_id, next_zone_name),
+                        Style::default()
+                            .fg(Color::White)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(
+                        format!(" — Prestige {} requirement met!", required_prestige),
+                        Style::default().fg(Color::Green),
+                    ),
+                ])
+            };
+            zone_lines.push(line);
+        }
+        ZoneCompletionStatus::Mystery => {
+            zone_lines.push(Line::from(vec![Span::styled(
+                "❓ Next: Zone ???: ????????",
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::DIM),
+            )]));
+        }
+    }
+
+    let zone_widget = Paragraph::new(zone_lines)
         .block(Block::default().borders(Borders::ALL).title("Location"))
         .alignment(Alignment::Center);
 

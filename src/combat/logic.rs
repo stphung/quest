@@ -191,8 +191,11 @@ pub fn update_combat(
                             events.push(CombatEvent::BossDefeated { xp_gained });
                         }
                         _ => {
-                            // Check if this was a subzone boss (overworld)
-                            if state.zone_progression.fighting_boss {
+                            if state.active_dungeon.is_some() {
+                                // Dungeon Combat room kill — don't affect zone progression
+                                events.push(CombatEvent::EnemyDied { xp_gained });
+                            } else if state.zone_progression.fighting_boss {
+                                // Overworld boss defeated
                                 let result =
                                     state.zone_progression.on_boss_defeated(state.prestige_rank);
                                 events.push(CombatEvent::SubzoneBossDefeated { xp_gained, result });
@@ -1634,6 +1637,42 @@ mod tests {
                 .iter()
                 .any(|e| matches!(e, CombatEvent::PlayerAttack { .. })),
             "Should have at least one attack event"
+        );
+    }
+
+    #[test]
+    fn test_dungeon_combat_kills_do_not_affect_zone_progression() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // Put player in a dungeon
+        state.active_dungeon = Some(crate::dungeon::generation::generate_dungeon(1, 0));
+
+        // Set up a weak enemy the player can kill
+        state.combat_state.current_enemy = Some(Enemy::new("Goblin".to_string(), 1, 1));
+        state.combat_state.player_current_hp = 1000;
+
+        let initial_kills = state.zone_progression.kills_in_subzone;
+
+        // Force an attack that kills the enemy
+        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+
+        // Should emit EnemyDied, not SubzoneBossDefeated
+        let enemy_died = events
+            .iter()
+            .any(|e| matches!(e, CombatEvent::EnemyDied { .. }));
+        assert!(enemy_died, "Should emit EnemyDied for dungeon combat kill");
+
+        // Zone progression kill counter should NOT have incremented
+        assert_eq!(
+            state.zone_progression.kills_in_subzone, initial_kills,
+            "Dungeon kills should not increment zone kill counter"
+        );
+
+        // Boss should not have spawned
+        assert!(
+            !state.zone_progression.fighting_boss,
+            "Dungeon kills should not trigger zone boss"
         );
     }
 }
