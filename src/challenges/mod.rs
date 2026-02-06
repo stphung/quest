@@ -28,4 +28,5 @@ pub enum ActiveMinigame {
     Gomoku(GomokuGame),
     Minesweeper(MinesweeperGame),
     Rune(RuneGame),
+    Go(GoGame),
 }

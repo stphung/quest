@@ -100,6 +100,10 @@ pub fn draw_ui_with_update(
         Some(ActiveMinigame::Chess(game)) => {
             chess_scene::render_chess_scene(frame, chunks[1], game);
         }
+        Some(ActiveMinigame::Go(_game)) => {
+            // TODO: Implement Go scene rendering (Task 12)
+            // go_scene::render_go_scene(frame, chunks[1], game);
+        }
         None => {
             if game_state.challenge_menu.is_open {
                 challenge_menu_scene::render_challenge_menu(

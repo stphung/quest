@@ -414,6 +414,13 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
                 };
                 process_morris_input(morris_game, input);
             }
+            ActiveMinigame::Go(_go_game) => {
+                // TODO: Implement Go input handling (Task 12)
+                // For now, ESC to exit
+                if key.code == KeyCode::Esc {
+                    state.active_minigame = None;
+                }
+            }
         }
     }
     InputResult::Continue

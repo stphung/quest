@@ -347,13 +347,12 @@ fn get_empty_region(
 }
 
 use super::mcts::mcts_best_move;
+use crate::challenges::ActiveMinigame;
 
 /// Start a new Go game with the selected difficulty.
-pub fn start_go_game(_state: &mut crate::core::game_state::GameState, difficulty: GoDifficulty) {
-    // TODO: Uncomment when active_go is added to GameState
-    // state.active_go = Some(GoGame::new(difficulty));
-    // state.challenge_menu.close();
-    let _ = difficulty; // Suppress unused warning
+pub fn start_go_game(state: &mut crate::core::game_state::GameState, difficulty: GoDifficulty) {
+    state.active_minigame = Some(ActiveMinigame::Go(GoGame::new(difficulty)));
+    state.challenge_menu.close();
 }
 
 /// Process human move at cursor position.
