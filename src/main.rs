@@ -29,7 +29,7 @@ use chrono::{Local, Utc};
 use core::constants::*;
 use core::game_logic::*;
 use core::game_state::*;
-use crossterm::event::{self, Event, KeyCode};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
@@ -223,6 +223,9 @@ fn main() -> io::Result<()> {
                 // Handle input
                 if event::poll(Duration::from_millis(50))? {
                     if let Event::Key(key_event) = event::read()? {
+                        if key_event.kind != KeyEventKind::Press {
+                            continue;
+                        }
                         let input = match key_event.code {
                             KeyCode::Char(c) => CreationInput::Char(c),
                             KeyCode::Backspace => CreationInput::Backspace,
@@ -283,6 +286,9 @@ fn main() -> io::Result<()> {
                 // Handle input
                 if event::poll(Duration::from_millis(50))? {
                     if let Event::Key(key_event) = event::read()? {
+                        if key_event.kind != KeyEventKind::Press {
+                            continue;
+                        }
                         // Handle achievement browser (blocks other input when open)
                         if achievement_browser.showing {
                             let category_achievements = achievements::get_achievements_by_category(
@@ -492,6 +498,9 @@ fn main() -> io::Result<()> {
                 // Handle input
                 if event::poll(Duration::from_millis(50))? {
                     if let Event::Key(key_event) = event::read()? {
+                        if key_event.kind != KeyEventKind::Press {
+                            continue;
+                        }
                         let input = match key_event.code {
                             KeyCode::Char(c) => DeleteInput::Char(c),
                             KeyCode::Backspace => DeleteInput::Backspace,
@@ -540,6 +549,9 @@ fn main() -> io::Result<()> {
                 // Handle input
                 if event::poll(Duration::from_millis(50))? {
                     if let Event::Key(key_event) = event::read()? {
+                        if key_event.kind != KeyEventKind::Press {
+                            continue;
+                        }
                         let input = match key_event.code {
                             KeyCode::Char(c) => RenameInput::Char(c),
                             KeyCode::Backspace => RenameInput::Backspace,
@@ -694,6 +706,10 @@ fn main() -> io::Result<()> {
                     // Poll for input (50ms non-blocking)
                     if event::poll(Duration::from_millis(50))? {
                         if let Event::Key(key_event) = event::read()? {
+                            // Only handle key press events (ignore release/repeat)
+                            if key_event.kind != KeyEventKind::Press {
+                                continue;
+                            }
                             // Track prestige rank before input to detect prestige
                             let prestige_before = state.prestige_rank;
 
