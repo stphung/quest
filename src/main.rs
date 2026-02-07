@@ -397,12 +397,8 @@ fn main() -> io::Result<()> {
                                         }
 
                                         // Sync achievements from character state (retroactive unlocks)
-                                        let defeated_bosses: Vec<(u32, u32)> = state
-                                            .zone_progression
-                                            .defeated_bosses
-                                            .iter()
-                                            .cloned()
-                                            .collect();
+                                        let defeated_bosses =
+                                            state.zone_progression.defeated_bosses.to_vec();
                                         global_achievements.sync_from_game_state(
                                             state.character_level,
                                             state.prestige_rank,
@@ -422,8 +418,9 @@ fn main() -> io::Result<()> {
                                         if synced_count > 0 {
                                             if synced_count == 1 {
                                                 // Single achievement - show the name
-                                                if let Some(id) =
-                                                    global_achievements.pending_notifications.first()
+                                                if let Some(id) = global_achievements
+                                                    .pending_notifications
+                                                    .first()
                                                 {
                                                     if let Some(def) =
                                                         achievements::get_achievement_def(*id)

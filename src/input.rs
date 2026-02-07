@@ -88,6 +88,7 @@ pub enum InputResult {
 }
 
 /// Main dispatcher for Game screen input. Handles the priority chain.
+#[allow(clippy::too_many_arguments)]
 pub fn handle_game_input(
     key: KeyEvent,
     state: &mut GameState,
