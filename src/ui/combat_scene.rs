@@ -17,11 +17,7 @@ pub fn draw_combat_scene(frame: &mut Frame, area: Rect, game_state: &GameState) 
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Red))
         .title(" ⚔ Combat ⚔ ")
-        .title_style(
-            Style::default()
-                .fg(Color::Red)
-                .add_modifier(Modifier::BOLD),
-        );
+        .title_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD));
 
     let inner = outer_block.inner(area);
     frame.render_widget(outer_block, area);
@@ -31,7 +27,7 @@ pub fn draw_combat_scene(frame: &mut Frame, area: Rect, game_state: &GameState) 
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(1), // Player HP
-            Constraint::Min(5),   // Sprite + Combat log
+            Constraint::Min(5),    // Sprite + Combat log
             Constraint::Length(1), // Enemy HP
             Constraint::Length(1), // Status
         ])
@@ -116,8 +112,7 @@ fn draw_combat_status(frame: &mut Frame, area: Rect, game_state: &GameState) {
         DerivedStats::calculate_derived_stats(&game_state.attributes, &game_state.equipment);
     let base_dps = derived.total_damage() as f64 / ATTACK_INTERVAL_SECONDS;
     let effective_dps = base_dps
-        * (1.0
-            + (derived.crit_chance_percent as f64 / 100.0) * (derived.crit_multiplier - 1.0));
+        * (1.0 + (derived.crit_chance_percent as f64 / 100.0) * (derived.crit_multiplier - 1.0));
     let dps_span = Span::styled(
         format!(" | DPS: {:.0}", effective_dps),
         Style::default().fg(Color::DarkGray),

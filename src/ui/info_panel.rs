@@ -116,9 +116,7 @@ fn draw_recent_gains(frame: &mut Frame, area: Rect, game_state: &GameState) {
                 Span::styled(format!("{} ", drop.icon), Style::default().fg(color)),
                 Span::styled(
                     format!("{} ", rarity_tag),
-                    Style::default()
-                        .fg(color)
-                        .add_modifier(Modifier::BOLD),
+                    Style::default().fg(color).add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(&drop.name, Style::default().fg(color)),
                 Span::styled(equipped_tag, Style::default().fg(Color::Green)),
@@ -161,4 +159,3 @@ fn rarity_color(rarity: Rarity) -> Color {
         Rarity::Legendary => Color::Rgb(255, 165, 0),
     }
 }
-

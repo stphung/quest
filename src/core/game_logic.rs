@@ -161,7 +161,8 @@ pub fn process_offline_progression(
 
     state.last_save_time = current_time;
 
-    let offline_rate_percent = OFFLINE_MULTIPLIER * (1.0 + haven_offline_xp_percent / 100.0) * 100.0;
+    let offline_rate_percent =
+        OFFLINE_MULTIPLIER * (1.0 + haven_offline_xp_percent / 100.0) * 100.0;
 
     OfflineReport {
         elapsed_seconds,

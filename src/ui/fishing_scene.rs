@@ -270,4 +270,3 @@ fn draw_rank_info(frame: &mut Frame, area: Rect, fishing_state: &FishingState) {
 
     frame.render_widget(gauge, inner_chunks[1]);
 }
-

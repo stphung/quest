@@ -306,6 +306,7 @@ pub fn render_info_panel_frame(frame: &mut Frame, area: Rect) -> Rect {
 }
 
 /// Render the "Welcome Back" overlay for offline progression.
+#[allow(clippy::too_many_arguments)]
 pub fn render_offline_welcome(
     frame: &mut Frame,
     area: Rect,
@@ -354,7 +355,10 @@ pub fn render_offline_welcome(
         )),
         Line::from(Span::styled(
             if haven_bonus_percent > 0.0 {
-                format!("  Offline rate: {:.0}% (Haven: +{:.0}%)", offline_rate_percent, haven_bonus_percent)
+                format!(
+                    "  Offline rate: {:.0}% (Haven: +{:.0}%)",
+                    offline_rate_percent, haven_bonus_percent
+                )
             } else {
                 format!("  Offline rate: {:.0}%", offline_rate_percent)
             },
@@ -371,7 +375,12 @@ pub fn render_offline_welcome(
         lines.push(Line::from(Span::styled(
             format!(
                 "  📈 Levels:      {:>10}",
-                format!("+{} ({} → {})", level_after - level_before, level_before, level_after)
+                format!(
+                    "+{} ({} → {})",
+                    level_after - level_before,
+                    level_before,
+                    level_after
+                )
             ),
             Style::default().fg(Color::Green),
         )));

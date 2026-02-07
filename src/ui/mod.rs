@@ -154,7 +154,7 @@ fn draw_right_panel(frame: &mut Frame, area: Rect, game_state: &GameState) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(4), // Zone info (always visible)
-            Constraint::Min(10),  // Content (changes by activity)
+            Constraint::Min(10),   // Content (changes by activity)
         ])
         .split(area);
 

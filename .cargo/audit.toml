@@ -1,0 +1,6 @@
+# Ignore upstream vulnerabilities we can't directly fix
+[advisories]
+ignore = [
+    # lru 0.12.5 - used by ratatui, waiting for upstream fix
+    "RUSTSEC-2026-0002",
+]

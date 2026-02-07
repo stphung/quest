@@ -87,4 +87,3 @@ fn render_simple_sprite(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let sprite_paragraph = Paragraph::new(sprite_lines).alignment(Alignment::Center);
     frame.render_widget(sprite_paragraph, area);
 }
-

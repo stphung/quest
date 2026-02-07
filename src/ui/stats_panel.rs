@@ -53,20 +53,20 @@ pub fn draw_stats_panel_with_update(
     // Footer is drawn full-width at the bottom by the parent layout
     let constraints = if update_info.is_some() {
         vec![
-            Constraint::Length(4),           // Header + XP bar
-            Constraint::Length(7),           // Prestige info + fishing rank + fishing bar
-            Constraint::Length(14),          // Attributes (6 attributes + borders)
-            Constraint::Length(6),           // Derived stats (condensed)
-            Constraint::Min(10),             // Equipment section (reduced min when update shown)
-            Constraint::Min(update_height),  // Update panel (can shrink if needed)
+            Constraint::Length(4),          // Header + XP bar
+            Constraint::Length(7),          // Prestige info + fishing rank + fishing bar
+            Constraint::Length(14),         // Attributes (6 attributes + borders)
+            Constraint::Length(6),          // Derived stats (condensed)
+            Constraint::Min(10),            // Equipment section (reduced min when update shown)
+            Constraint::Min(update_height), // Update panel (can shrink if needed)
         ]
     } else {
         vec![
-            Constraint::Length(4),           // Header + XP bar
-            Constraint::Length(7),           // Prestige info + fishing rank + fishing bar
-            Constraint::Length(14),          // Attributes (6 attributes + borders)
-            Constraint::Length(6),           // Derived stats (condensed)
-            Constraint::Min(16),             // Equipment section (grows to fit)
+            Constraint::Length(4),  // Header + XP bar
+            Constraint::Length(7),  // Prestige info + fishing rank + fishing bar
+            Constraint::Length(14), // Attributes (6 attributes + borders)
+            Constraint::Length(6),  // Derived stats (condensed)
+            Constraint::Min(16),    // Equipment section (grows to fit)
         ]
     };
 

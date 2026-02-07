@@ -368,11 +368,18 @@ fn main() -> io::Result<()> {
                                                 };
                                                 state.combat_state.add_log_entry(
                                                     format!("☀️ Welcome back! ({} away)", away_str),
-                                                    false, true,
+                                                    false,
+                                                    true,
                                                 );
                                                 state.combat_state.add_log_entry(
-                                                    format!("⚔️ +{} XP gained offline", ui::game_common::format_number_short(report.xp_gained)),
-                                                    false, true,
+                                                    format!(
+                                                        "⚔️ +{} XP gained offline",
+                                                        ui::game_common::format_number_short(
+                                                            report.xp_gained
+                                                        )
+                                                    ),
+                                                    false,
+                                                    true,
                                                 );
                                                 if report.total_level_ups > 0 {
                                                     state.combat_state.add_log_entry(
@@ -382,12 +389,14 @@ fn main() -> io::Result<()> {
                                                             report.level_before,
                                                             report.level_after,
                                                         ),
-                                                        false, true,
+                                                        false,
+                                                        true,
                                                     );
                                                 }
 
                                                 // Store report and haven bonus for welcome overlay
-                                                pending_haven_offline_bonus = Some(haven_offline_bonus);
+                                                pending_haven_offline_bonus =
+                                                    Some(haven_offline_bonus);
                                                 pending_offline_report = Some(report);
                                             }
                                         }
@@ -921,7 +930,14 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::
                     .and_then(|s| s.split(" [").next())
                     .unwrap_or("Fish")
                     .to_string();
-                game_state.add_recent_drop(fish_name, rarity, false, "🐟", String::new(), String::new());
+                game_state.add_recent_drop(
+                    fish_name,
+                    rarity,
+                    false,
+                    "🐟",
+                    String::new(),
+                    String::new(),
+                );
             } else if message.contains("Found item:") {
                 let item_name = message
                     .split("Found item: ")
@@ -929,7 +945,14 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::
                     .map(|s| s.trim_end_matches('!'))
                     .unwrap_or("Item")
                     .to_string();
-                game_state.add_recent_drop(item_name, items::types::Rarity::Rare, false, "📦", String::new(), String::new());
+                game_state.add_recent_drop(
+                    item_name,
+                    items::types::Rarity::Rare,
+                    false,
+                    "📦",
+                    String::new(),
+                    String::new(),
+                );
             }
         }
 
