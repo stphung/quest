@@ -114,8 +114,7 @@ pub fn mcts_best_move<R: Rng>(game: &GoGame, rng: &mut R) -> GoMove {
             let child_all_moves = get_legal_moves(&game_clone);
             let child_moves = get_top_moves(&game_clone, &child_all_moves, TOP_MOVES_LIMIT);
 
-            let child =
-                MctsNode::new(Some(node_idx), Some(mv), current_player, child_moves, prior);
+            let child = MctsNode::new(Some(node_idx), Some(mv), current_player, child_moves, prior);
             let child_idx = nodes.len();
             nodes.push(child);
             nodes[node_idx].children.push(child_idx);
