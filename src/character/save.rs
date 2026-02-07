@@ -531,63 +531,7 @@ mod tests {
     }
 
     #[test]
-    fn test_save_load_with_deprecated_affixes() {
-        use crate::items::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
-
-        let manager = SaveManager::new_for_test().unwrap();
-
-        let mut state = GameState::new("Test".to_string(), 0);
-
-        // Create item with deprecated affixes (these no longer drop but should still load)
-        let item_with_deprecated = Item {
-            slot: EquipmentSlot::Ring,
-            rarity: Rarity::Epic,
-            base_name: "Ring".to_string(),
-            display_name: "Legacy Ring".to_string(),
-            attributes: AttributeBonuses::new(),
-            affixes: vec![
-                Affix {
-                    affix_type: AffixType::DropRate,
-                    value: 25.0,
-                },
-                Affix {
-                    affix_type: AffixType::PrestigeBonus,
-                    value: 30.0,
-                },
-                Affix {
-                    affix_type: AffixType::OfflineRate,
-                    value: 20.0,
-                },
-            ],
-        };
-
-        state
-            .equipment
-            .set(EquipmentSlot::Ring, Some(item_with_deprecated));
-
-        // Save and load
-        manager.save(&state).unwrap();
-        let loaded = manager.load().unwrap();
-
-        // Verify deprecated affixes are preserved
-        let ring = loaded.equipment.get(EquipmentSlot::Ring).as_ref().unwrap();
-        assert_eq!(ring.affixes.len(), 3);
-        assert!(ring
-            .affixes
-            .iter()
-            .any(|a| a.affix_type == AffixType::DropRate));
-        assert!(ring
-            .affixes
-            .iter()
-            .any(|a| a.affix_type == AffixType::PrestigeBonus));
-        assert!(ring
-            .affixes
-            .iter()
-            .any(|a| a.affix_type == AffixType::OfflineRate));
-    }
-
-    #[test]
-    fn test_save_load_with_new_affixes() {
+    fn test_save_load_with_affixes() {
         use crate::items::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
 
         let manager = SaveManager::new_for_test().unwrap();

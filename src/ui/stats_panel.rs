@@ -26,9 +26,6 @@ fn format_affix(affix: &Affix) -> String {
         AffixType::HPRegen => format!("+{:.0}% Regen", affix.value),
         AffixType::DamageReflection => format!("+{:.0}% Reflect", affix.value),
         AffixType::XPGain => format!("+{:.0}% XP", affix.value),
-        AffixType::DropRate => format!("+{:.0}% Drops", affix.value),
-        AffixType::PrestigeBonus => format!("+{:.0}% Prestige", affix.value),
-        AffixType::OfflineRate => format!("+{:.0}% Offline", affix.value),
     }
 }
 

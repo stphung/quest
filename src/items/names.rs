@@ -33,9 +33,6 @@ pub fn get_affix_prefix(affix_type: AffixType) -> &'static str {
         AffixType::HPRegen => "Regenerating",
         AffixType::DamageReflection => "Thorned",
         AffixType::XPGain => "Wise",
-        AffixType::DropRate => "Lucky",
-        AffixType::PrestigeBonus => "Prestigious",
-        AffixType::OfflineRate => "Timeless",
     }
 }
 
@@ -50,9 +47,6 @@ pub fn get_affix_suffix(affix_type: AffixType) -> &'static str {
         AffixType::HPRegen => "of Renewal",
         AffixType::DamageReflection => "of Thorns",
         AffixType::XPGain => "of Learning",
-        AffixType::DropRate => "of Fortune",
-        AffixType::PrestigeBonus => "of Glory",
-        AffixType::OfflineRate => "of Eternity",
     }
 }
 
@@ -167,9 +161,6 @@ mod tests {
             AffixType::HPRegen,
             AffixType::DamageReflection,
             AffixType::XPGain,
-            AffixType::DropRate,
-            AffixType::PrestigeBonus,
-            AffixType::OfflineRate,
         ];
         for affix_type in affix_types {
             let prefix = get_affix_prefix(affix_type);
@@ -193,9 +184,6 @@ mod tests {
             AffixType::HPRegen,
             AffixType::DamageReflection,
             AffixType::XPGain,
-            AffixType::DropRate,
-            AffixType::PrestigeBonus,
-            AffixType::OfflineRate,
         ];
         for affix_type in affix_types {
             let suffix = get_affix_suffix(affix_type);

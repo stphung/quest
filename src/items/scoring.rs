@@ -28,9 +28,6 @@ pub fn score_item(item: &Item, game_state: &GameState) -> f64 {
             AffixType::HPRegen => affix.value * 1.0,
             AffixType::DamageReflection => affix.value * 0.8,
             AffixType::XPGain => affix.value * 1.0,
-            AffixType::DropRate => affix.value * 0.5,
-            AffixType::PrestigeBonus => affix.value * 0.8,
-            AffixType::OfflineRate => affix.value * 0.5,
         };
         score += affix_score;
     }
@@ -265,18 +262,18 @@ mod tests {
             }
         };
 
-        // DamagePercent (2.0) should outscore DropRate (0.5)
+        // DamagePercent (2.0) should outscore XPGain (1.0)
         let dmg_score = score_item(&make_affix_item(AffixType::DamagePercent), &game_state);
-        let drop_score = score_item(&make_affix_item(AffixType::DropRate), &game_state);
+        let xp_score = score_item(&make_affix_item(AffixType::XPGain), &game_state);
         assert!(
-            dmg_score > drop_score,
-            "DamagePercent ({dmg_score}) should outscore DropRate ({drop_score})"
+            dmg_score > xp_score,
+            "DamagePercent ({dmg_score}) should outscore XPGain ({xp_score})"
         );
 
         // Verify specific multipliers: DamagePercent = 10 * 2.0 = 20
         assert!((dmg_score - 20.0).abs() < f64::EPSILON);
-        // DropRate = 10 * 0.5 = 5
-        assert!((drop_score - 5.0).abs() < f64::EPSILON);
+        // XPGain = 10 * 1.0 = 10
+        assert!((xp_score - 10.0).abs() < f64::EPSILON);
     }
 
     #[test]
