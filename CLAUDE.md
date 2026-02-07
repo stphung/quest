@@ -106,6 +106,7 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 
 - `menu.rs` — Generic challenge menu system (pending challenges, extensible challenge types)
 - `chess/` — Chess minigame (4 difficulty levels: Novice→Master, ~500-1350 ELO), requires P1+
+- `go/` — Go (Territory Control) on 9×9 board, MCTS AI with heuristics (500-20k simulations), requires P1+
 - `morris/` — Nine Men's Morris (board layout, mill detection, phases), requires P1+
 - `gomoku/` — Gomoku (Five in a Row) on 15×15 board, minimax AI (depth 2-5)
 - `minesweeper/` — Trap Detection, 4 difficulties (9×9 to 20×16)
@@ -130,6 +131,7 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 - `prestige_confirm.rs` — Prestige confirmation dialog
 - `challenge_menu_scene.rs` — Challenge menu list/detail view rendering
 - `chess_scene.rs` — Chess board UI with move history and game-over overlay
+- `go_scene.rs` — Go board UI with territory display and pass/forfeit controls
 - `morris_scene.rs` — Nine Men's Morris board UI with help panel
 - `gomoku_scene.rs` — Gomoku board UI with cursor navigation
 - `minesweeper_scene.rs` — Minesweeper grid UI with game-over overlay
@@ -205,6 +207,7 @@ quest/
 │   ├── challenges/          # Challenge minigames
 │   │   ├── menu.rs          # Challenge menu
 │   │   ├── chess/           # Chess minigame
+│   │   ├── go/              # Go (Territory Control)
 │   │   ├── morris/          # Nine Men's Morris
 │   │   ├── gomoku/          # Gomoku (Five in a Row)
 │   │   ├── minesweeper/     # Trap Detection
