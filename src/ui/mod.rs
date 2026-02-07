@@ -1,3 +1,4 @@
+pub mod board_styles;
 pub mod challenge_menu_scene;
 pub mod character_creation;
 pub mod character_delete;

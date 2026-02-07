@@ -1,5 +1,6 @@
 //! Go game UI rendering.
 
+use super::board_styles::{calculate_board_centering, symbols, BoardColors};
 use super::game_common::{
     create_game_layout, render_forfeit_status_bar, render_game_over_banner,
     render_info_panel_frame, render_status_bar, render_thinking_status_bar, GameResultType,
@@ -12,6 +13,16 @@ use ratatui::{
     text::{Line, Span},
     widgets::Paragraph,
     Frame,
+};
+
+/// Shared colors for Go board rendering
+const COLORS: BoardColors = BoardColors {
+    human: Color::White,
+    ai: Color::LightRed,
+    cursor: Color::Yellow,
+    last_move: Color::Green,
+    empty: Color::DarkGray,
+    winning: Color::Magenta,
 };
 
 /// Render the Go game scene.
@@ -33,14 +44,16 @@ pub fn render_go_scene(frame: &mut Frame, area: Rect, game: &GoGame) {
 fn render_board(frame: &mut Frame, area: Rect, game: &GoGame) {
     let board_height = BOARD_SIZE as u16;
     let board_width = (BOARD_SIZE * 3 - 2) as u16; // "●──" format
-    let y_offset = area.y + (area.height.saturating_sub(board_height)) / 2;
-    let x_offset = area.x + (area.width.saturating_sub(board_width)) / 2;
+    let (x_offset, y_offset) = calculate_board_centering(
+        area.x,
+        area.y,
+        area.width,
+        area.height,
+        board_width,
+        board_height,
+    );
 
-    let human_color = Color::White;
-    let ai_color = Color::LightRed;
-    let cursor_color = Color::Yellow;
-    let last_move_color = Color::Green;
-    let grid_color = Color::DarkGray;
+    let grid_color = COLORS.empty;
 
     for row in 0..BOARD_SIZE {
         let mut spans = Vec::new();
@@ -52,37 +65,18 @@ fn render_board(frame: &mut Frame, area: Rect, game: &GoGame) {
             // Determine the intersection character
             let (symbol, style) = match game.board[row][col] {
                 Some(Stone::Black) => {
-                    let base_style = Style::default()
-                        .fg(human_color)
-                        .add_modifier(Modifier::BOLD);
-                    if is_cursor {
-                        ("●", base_style.bg(Color::DarkGray))
-                    } else if is_last_move {
-                        ("●", base_style.fg(last_move_color))
-                    } else {
-                        ("●", base_style)
-                    }
+                    let style = COLORS.piece_style(true, is_cursor, is_last_move, false);
+                    (symbols::FILLED_CIRCLE, style)
                 }
                 Some(Stone::White) => {
-                    let base_style = Style::default().fg(ai_color).add_modifier(Modifier::BOLD);
-                    if is_cursor {
-                        ("○", base_style.bg(Color::DarkGray))
-                    } else if is_last_move {
-                        ("○", base_style.fg(last_move_color))
-                    } else {
-                        ("○", base_style)
-                    }
+                    let style = COLORS.piece_style(false, is_cursor, is_last_move, false);
+                    (symbols::OPEN_CIRCLE, style)
                 }
                 None => {
                     if is_cursor {
-                        (
-                            "□",
-                            Style::default()
-                                .fg(cursor_color)
-                                .add_modifier(Modifier::BOLD),
-                        )
+                        (symbols::CURSOR_SQUARE, COLORS.cursor_style())
                     } else if is_ko {
-                        ("×", Style::default().fg(Color::Red))
+                        (symbols::KO_MARKER, Style::default().fg(Color::Red))
                     } else {
                         // Grid intersection
                         let ch = get_intersection_char(row, col);
