@@ -88,9 +88,6 @@ pub enum AffixType {
     DamageReflection,
     // Progression
     XPGain,
-    DropRate,
-    PrestigeBonus,
-    OfflineRate,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

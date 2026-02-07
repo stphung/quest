@@ -85,7 +85,6 @@ impl DerivedStats {
                     AffixType::HPRegen => hp_regen_bonus += affix.value,
                     AffixType::DamageReflection => damage_reflection += affix.value,
                     AffixType::XPGain => xp_mult *= 1.0 + (affix.value / 100.0),
-                    _ => {} // DropRate, PrestigeBonus, OfflineRate are no-ops
                 }
             }
         }
