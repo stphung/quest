@@ -155,10 +155,13 @@ fn extension_score(game: &GoGame, row: usize, col: usize, player: Stone) -> f64 
     for (dr, dc) in &[(-1, 0), (1, 0), (0, -1), (0, 1)] {
         let nr = row as i32 + dr;
         let nc = col as i32 + dc;
-        if nr >= 0 && nr < BOARD_SIZE as i32 && nc >= 0 && nc < BOARD_SIZE as i32 {
-            if game.board[nr as usize][nc as usize] == Some(player) {
-                adjacent_friendly += 1;
-            }
+        if nr >= 0
+            && nr < BOARD_SIZE as i32
+            && nc >= 0
+            && nc < BOARD_SIZE as i32
+            && game.board[nr as usize][nc as usize] == Some(player)
+        {
+            adjacent_friendly += 1;
         }
     }
 
@@ -166,10 +169,13 @@ fn extension_score(game: &GoGame, row: usize, col: usize, player: Stone) -> f64 
     for (dr, dc) in &[(-1, -1), (-1, 1), (1, -1), (1, 1)] {
         let nr = row as i32 + dr;
         let nc = col as i32 + dc;
-        if nr >= 0 && nr < BOARD_SIZE as i32 && nc >= 0 && nc < BOARD_SIZE as i32 {
-            if game.board[nr as usize][nc as usize] == Some(player) {
-                diagonal_friendly += 1;
-            }
+        if nr >= 0
+            && nr < BOARD_SIZE as i32
+            && nc >= 0
+            && nc < BOARD_SIZE as i32
+            && game.board[nr as usize][nc as usize] == Some(player)
+        {
+            diagonal_friendly += 1;
         }
     }
 
@@ -256,10 +262,13 @@ fn cut_score(game: &GoGame, row: usize, col: usize, opponent: Stone) -> f64 {
     for (dr, dc) in &[(-1, -1), (-1, 1), (1, -1), (1, 1)] {
         let nr = row as i32 + dr;
         let nc = col as i32 + dc;
-        if nr >= 0 && nr < BOARD_SIZE as i32 && nc >= 0 && nc < BOARD_SIZE as i32 {
-            if game.board[nr as usize][nc as usize] == Some(opponent) {
-                diagonal_opponent += 1;
-            }
+        if nr >= 0
+            && nr < BOARD_SIZE as i32
+            && nc >= 0
+            && nc < BOARD_SIZE as i32
+            && game.board[nr as usize][nc as usize] == Some(opponent)
+        {
+            diagonal_opponent += 1;
         }
     }
 
