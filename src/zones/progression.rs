@@ -181,7 +181,7 @@ impl ZoneProgression {
     /// Handles boss defeat for the current subzone and auto-advances.
     /// Returns a description of what happened (for UI feedback).
     ///
-    /// Uses achievements to check for Stormbreaker and to unlock GameComplete.
+    /// Uses achievements to check for Stormbreaker and to unlock StormsEnd.
     pub fn on_boss_defeated(
         &mut self,
         prestige_rank: u32,
@@ -223,14 +223,14 @@ impl ZoneProgression {
         }
 
         if is_zone_boss {
-            // Zone 10 completion triggers GameComplete achievement and unlocks Zone 11
+            // Zone 10 completion triggers StormsEnd achievement and unlocks Zone 11
             if zone_id == 10 {
-                achievements.unlock(AchievementId::GameComplete, None);
+                achievements.unlock(AchievementId::StormsEnd, None);
                 // Unlock Zone 11 (The Expanse) and advance to it
                 self.unlock_zone(11);
                 self.current_zone_id = 11;
                 self.current_subzone_id = 1;
-                return BossDefeatResult::GameComplete;
+                return BossDefeatResult::StormsEnd;
             }
 
             // Try to advance to next zone
@@ -249,7 +249,7 @@ impl ZoneProgression {
                     required_prestige: next.prestige_requirement,
                 };
             }
-            return BossDefeatResult::GameComplete;
+            return BossDefeatResult::StormsEnd;
         }
 
         // Advance to next subzone
@@ -301,7 +301,7 @@ impl ZoneProgression {
                     required_prestige: next.prestige_requirement,
                 };
             }
-            return BossDefeatResult::GameComplete;
+            return BossDefeatResult::StormsEnd;
         }
 
         self.advance_to_next_subzone();
@@ -426,7 +426,7 @@ pub enum BossDefeatResult {
         required_prestige: u32,
     },
     /// Completed the final zone (Zone 10)
-    GameComplete,
+    StormsEnd,
     /// Boss requires a legendary weapon to defeat (Zone 10)
     WeaponRequired { weapon_name: String },
     /// Completed a cycle of The Expanse (Zone 11) - returns to subzone 1
@@ -871,7 +871,7 @@ mod tests {
         let result = prog.on_boss_defeated(20, &mut achievements);
 
         // Should complete the game
-        assert!(matches!(result, BossDefeatResult::GameComplete));
+        assert!(matches!(result, BossDefeatResult::StormsEnd));
         assert!(prog.is_boss_defeated(10, 4));
     }
 

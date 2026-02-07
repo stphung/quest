@@ -7,16 +7,8 @@ use super::types::{AchievementCategory, AchievementDef, AchievementId};
 /// All achievement definitions in display order.
 pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
     // ═══════════════════════════════════════════════════════════════
-    // COMBAT ACHIEVEMENTS
+    // COMBAT ACHIEVEMENTS - ENEMY KILLS
     // ═══════════════════════════════════════════════════════════════
-    AchievementDef {
-        id: AchievementId::FirstBlood,
-        name: "First Blood",
-        description: "Defeat your first enemy",
-        category: AchievementCategory::Combat,
-        secret: false,
-        icon: "⚔️",
-    },
     AchievementDef {
         id: AchievementId::SlayerI,
         name: "Slayer I",
@@ -28,7 +20,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
     AchievementDef {
         id: AchievementId::SlayerII,
         name: "Slayer II",
-        description: "Defeat 1,000 enemies",
+        description: "Defeat 500 enemies",
         category: AchievementCategory::Combat,
         secret: false,
         icon: "💀",
@@ -36,11 +28,62 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
     AchievementDef {
         id: AchievementId::SlayerIII,
         name: "Slayer III",
-        description: "Defeat 10,000 enemies",
+        description: "Defeat 1,000 enemies",
         category: AchievementCategory::Combat,
         secret: false,
         icon: "💀",
     },
+    AchievementDef {
+        id: AchievementId::SlayerIV,
+        name: "Slayer IV",
+        description: "Defeat 5,000 enemies",
+        category: AchievementCategory::Combat,
+        secret: false,
+        icon: "💀",
+    },
+    AchievementDef {
+        id: AchievementId::SlayerV,
+        name: "Slayer V",
+        description: "Defeat 10,000 enemies",
+        category: AchievementCategory::Combat,
+        secret: false,
+        icon: "☠️",
+    },
+    AchievementDef {
+        id: AchievementId::SlayerVI,
+        name: "Slayer VI",
+        description: "Defeat 50,000 enemies",
+        category: AchievementCategory::Combat,
+        secret: false,
+        icon: "☠️",
+    },
+    AchievementDef {
+        id: AchievementId::SlayerVII,
+        name: "Slayer VII",
+        description: "Defeat 100,000 enemies",
+        category: AchievementCategory::Combat,
+        secret: false,
+        icon: "☠️",
+    },
+    AchievementDef {
+        id: AchievementId::SlayerVIII,
+        name: "Slayer VIII",
+        description: "Defeat 500,000 enemies",
+        category: AchievementCategory::Combat,
+        secret: false,
+        icon: "⚔️",
+    },
+    AchievementDef {
+        id: AchievementId::SlayerIX,
+        name: "Slayer IX",
+        description: "Defeat 1,000,000 enemies",
+        category: AchievementCategory::Combat,
+        secret: false,
+        icon: "⚔️",
+    },
+    // ═══════════════════════════════════════════════════════════════
+    // COMBAT ACHIEVEMENTS - BOSS KILLS
+    // ═══════════════════════════════════════════════════════════════
     AchievementDef {
         id: AchievementId::BossHunterI,
         name: "Boss Hunter I",
@@ -66,21 +109,61 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         icon: "👹",
     },
     AchievementDef {
-        id: AchievementId::ZoneClearer,
-        name: "Zone Clearer",
-        description: "Clear all subzones in any zone",
+        id: AchievementId::BossHunterIV,
+        name: "Boss Hunter IV",
+        description: "Defeat 100 bosses",
         category: AchievementCategory::Combat,
         secret: false,
-        icon: "🗺️",
+        icon: "👿",
+    },
+    AchievementDef {
+        id: AchievementId::BossHunterV,
+        name: "Boss Hunter V",
+        description: "Defeat 500 bosses",
+        category: AchievementCategory::Combat,
+        secret: false,
+        icon: "👿",
+    },
+    AchievementDef {
+        id: AchievementId::BossHunterVI,
+        name: "Boss Hunter VI",
+        description: "Defeat 1,000 bosses",
+        category: AchievementCategory::Combat,
+        secret: false,
+        icon: "😈",
+    },
+    AchievementDef {
+        id: AchievementId::BossHunterVII,
+        name: "Boss Hunter VII",
+        description: "Defeat 5,000 bosses",
+        category: AchievementCategory::Combat,
+        secret: false,
+        icon: "😈",
+    },
+    AchievementDef {
+        id: AchievementId::BossHunterVIII,
+        name: "Boss Hunter VIII",
+        description: "Defeat 10,000 bosses",
+        category: AchievementCategory::Combat,
+        secret: false,
+        icon: "👑",
     },
     // ═══════════════════════════════════════════════════════════════
-    // PROGRESSION ACHIEVEMENTS
+    // LEVEL ACHIEVEMENTS
     // ═══════════════════════════════════════════════════════════════
     AchievementDef {
         id: AchievementId::Level10,
         name: "Getting Started",
         description: "Reach level 10",
-        category: AchievementCategory::Progression,
+        category: AchievementCategory::Level,
+        secret: false,
+        icon: "📈",
+    },
+    AchievementDef {
+        id: AchievementId::Level25,
+        name: "Quarter Century",
+        description: "Reach level 25",
+        category: AchievementCategory::Level,
         secret: false,
         icon: "📈",
     },
@@ -88,7 +171,15 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         id: AchievementId::Level50,
         name: "Seasoned Adventurer",
         description: "Reach level 50",
-        category: AchievementCategory::Progression,
+        category: AchievementCategory::Level,
+        secret: false,
+        icon: "📈",
+    },
+    AchievementDef {
+        id: AchievementId::Level75,
+        name: "Veteran",
+        description: "Reach level 75",
+        category: AchievementCategory::Level,
         secret: false,
         icon: "📈",
     },
@@ -96,55 +187,138 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         id: AchievementId::Level100,
         name: "Centurion",
         description: "Reach level 100",
-        category: AchievementCategory::Progression,
+        category: AchievementCategory::Level,
         secret: false,
         icon: "📈",
     },
     AchievementDef {
+        id: AchievementId::Level150,
+        name: "Beyond the Century",
+        description: "Reach level 150",
+        category: AchievementCategory::Level,
+        secret: false,
+        icon: "🌟",
+    },
+    AchievementDef {
+        id: AchievementId::Level200,
+        name: "Bicentennial",
+        description: "Reach level 200",
+        category: AchievementCategory::Level,
+        secret: false,
+        icon: "🌟",
+    },
+    AchievementDef {
+        id: AchievementId::Level250,
+        name: "Legend",
+        description: "Reach level 250",
+        category: AchievementCategory::Level,
+        secret: false,
+        icon: "⭐",
+    },
+    AchievementDef {
+        id: AchievementId::Level300,
+        name: "Mythic",
+        description: "Reach level 300",
+        category: AchievementCategory::Level,
+        secret: false,
+        icon: "⭐",
+    },
+    // ═══════════════════════════════════════════════════════════════
+    // PRESTIGE ACHIEVEMENTS
+    // ═══════════════════════════════════════════════════════════════
+    AchievementDef {
         id: AchievementId::FirstPrestige,
         name: "Rebirth",
         description: "Prestige for the first time",
-        category: AchievementCategory::Progression,
+        category: AchievementCategory::Level,
         secret: false,
         icon: "🔄",
     },
     AchievementDef {
         id: AchievementId::PrestigeV,
-        name: "Silver Rank",
+        name: "Bronze Rank",
         description: "Reach Prestige Rank 5",
-        category: AchievementCategory::Progression,
+        category: AchievementCategory::Level,
+        secret: false,
+        icon: "🥉",
+    },
+    AchievementDef {
+        id: AchievementId::PrestigeX,
+        name: "Silver Rank",
+        description: "Reach Prestige Rank 10",
+        category: AchievementCategory::Level,
         secret: false,
         icon: "🥈",
     },
     AchievementDef {
-        id: AchievementId::PrestigeX,
+        id: AchievementId::PrestigeXV,
         name: "Gold Rank",
-        description: "Reach Prestige Rank 10",
-        category: AchievementCategory::Progression,
+        description: "Reach Prestige Rank 15",
+        category: AchievementCategory::Level,
         secret: false,
         icon: "🥇",
     },
     AchievementDef {
-        id: AchievementId::PrestigeXV,
+        id: AchievementId::PrestigeXX,
         name: "Platinum Rank",
-        description: "Reach Prestige Rank 15",
-        category: AchievementCategory::Progression,
+        description: "Reach Prestige Rank 20",
+        category: AchievementCategory::Level,
         secret: false,
         icon: "💎",
     },
     AchievementDef {
-        id: AchievementId::PrestigeXX,
+        id: AchievementId::PrestigeXXV,
         name: "Diamond Rank",
-        description: "Reach Prestige Rank 20",
-        category: AchievementCategory::Progression,
+        description: "Reach Prestige Rank 25",
+        category: AchievementCategory::Level,
         secret: false,
         icon: "💠",
     },
     AchievementDef {
+        id: AchievementId::PrestigeXXX,
+        name: "Ruby Rank",
+        description: "Reach Prestige Rank 30",
+        category: AchievementCategory::Level,
+        secret: false,
+        icon: "❤️",
+    },
+    AchievementDef {
+        id: AchievementId::PrestigeXL,
+        name: "Sapphire Rank",
+        description: "Reach Prestige Rank 40",
+        category: AchievementCategory::Level,
+        secret: false,
+        icon: "💙",
+    },
+    AchievementDef {
+        id: AchievementId::PrestigeL,
+        name: "Emerald Rank",
+        description: "Reach Prestige Rank 50",
+        category: AchievementCategory::Level,
+        secret: false,
+        icon: "💚",
+    },
+    AchievementDef {
+        id: AchievementId::PrestigeLXX,
+        name: "Obsidian Rank",
+        description: "Reach Prestige Rank 70",
+        category: AchievementCategory::Level,
+        secret: false,
+        icon: "🖤",
+    },
+    AchievementDef {
+        id: AchievementId::PrestigeXC,
+        name: "Celestial Rank",
+        description: "Reach Prestige Rank 90",
+        category: AchievementCategory::Level,
+        secret: false,
+        icon: "💜",
+    },
+    AchievementDef {
         id: AchievementId::Eternal,
         name: "Eternal",
-        description: "Reach the Eternal prestige tier",
-        category: AchievementCategory::Progression,
+        description: "Reach Prestige Rank 100 - The Eternal tier",
+        category: AchievementCategory::Level,
         secret: false,
         icon: "♾️",
     },
@@ -230,14 +404,6 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         icon: "⛈️",
     },
     AchievementDef {
-        id: AchievementId::Zone11Complete,
-        name: "Beyond Infinity",
-        description: "Complete one cycle of The Expanse",
-        category: AchievementCategory::Progression,
-        secret: false,
-        icon: "♾️",
-    },
-    AchievementDef {
         id: AchievementId::TheStormbreaker,
         name: "The Stormbreaker",
         description: "Forge the legendary Stormbreaker at the Haven forge",
@@ -246,12 +412,45 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         icon: "⚡",
     },
     AchievementDef {
-        id: AchievementId::GameComplete,
+        id: AchievementId::StormsEnd,
         name: "Storm's End",
         description: "Defeat the final boss of Zone 10: Storm Citadel",
         category: AchievementCategory::Progression,
         secret: false,
         icon: "🏆",
+    },
+    // The Expanse cycle achievements
+    AchievementDef {
+        id: AchievementId::ExpanseCycleI,
+        name: "Beyond Infinity I",
+        description: "Complete 1 cycle of The Expanse",
+        category: AchievementCategory::Progression,
+        secret: false,
+        icon: "♾️",
+    },
+    AchievementDef {
+        id: AchievementId::ExpanseCycleII,
+        name: "Beyond Infinity II",
+        description: "Complete 100 cycles of The Expanse",
+        category: AchievementCategory::Progression,
+        secret: false,
+        icon: "♾️",
+    },
+    AchievementDef {
+        id: AchievementId::ExpanseCycleIII,
+        name: "Beyond Infinity III",
+        description: "Complete 1,000 cycles of The Expanse",
+        category: AchievementCategory::Progression,
+        secret: false,
+        icon: "♾️",
+    },
+    AchievementDef {
+        id: AchievementId::ExpanseCycleIV,
+        name: "Beyond Infinity IV",
+        description: "Complete 10,000 cycles of The Expanse",
+        category: AchievementCategory::Progression,
+        secret: false,
+        icon: "♾️",
     },
     // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - CHESS
@@ -483,7 +682,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         icon: "🏅",
     },
     // ═══════════════════════════════════════════════════════════════
-    // EXPLORATION ACHIEVEMENTS
+    // FISHING ACHIEVEMENTS - RANK MILESTONES
     // ═══════════════════════════════════════════════════════════════
     AchievementDef {
         id: AchievementId::GoneFishing,
@@ -525,6 +724,44 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         secret: true, // Hidden until unlocked
         icon: "🐋",
     },
+    // ═══════════════════════════════════════════════════════════════
+    // FISHING ACHIEVEMENTS - CATCH COUNTS
+    // ═══════════════════════════════════════════════════════════════
+    AchievementDef {
+        id: AchievementId::FishCatcherI,
+        name: "Fish Catcher I",
+        description: "Catch 100 fish",
+        category: AchievementCategory::Exploration,
+        secret: false,
+        icon: "🐟",
+    },
+    AchievementDef {
+        id: AchievementId::FishCatcherII,
+        name: "Fish Catcher II",
+        description: "Catch 1,000 fish",
+        category: AchievementCategory::Exploration,
+        secret: false,
+        icon: "🐠",
+    },
+    AchievementDef {
+        id: AchievementId::FishCatcherIII,
+        name: "Fish Catcher III",
+        description: "Catch 10,000 fish",
+        category: AchievementCategory::Exploration,
+        secret: false,
+        icon: "🐡",
+    },
+    AchievementDef {
+        id: AchievementId::FishCatcherIV,
+        name: "Fish Catcher IV",
+        description: "Catch 100,000 fish",
+        category: AchievementCategory::Exploration,
+        secret: false,
+        icon: "🐋",
+    },
+    // ═══════════════════════════════════════════════════════════════
+    // DUNGEON ACHIEVEMENTS
+    // ═══════════════════════════════════════════════════════════════
     AchievementDef {
         id: AchievementId::DungeonDiver,
         name: "Dungeon Diver",
@@ -550,12 +787,63 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         icon: "🗝️",
     },
     AchievementDef {
+        id: AchievementId::DungeonMasterIII,
+        name: "Dungeon Master III",
+        description: "Complete 100 dungeons",
+        category: AchievementCategory::Exploration,
+        secret: false,
+        icon: "🗝️",
+    },
+    AchievementDef {
+        id: AchievementId::DungeonMasterIV,
+        name: "Dungeon Master IV",
+        description: "Complete 1,000 dungeons",
+        category: AchievementCategory::Exploration,
+        secret: false,
+        icon: "⚔️",
+    },
+    AchievementDef {
+        id: AchievementId::DungeonMasterV,
+        name: "Dungeon Master V",
+        description: "Complete 5,000 dungeons",
+        category: AchievementCategory::Exploration,
+        secret: false,
+        icon: "⚔️",
+    },
+    AchievementDef {
+        id: AchievementId::DungeonMasterVI,
+        name: "Dungeon Master VI",
+        description: "Complete 10,000 dungeons",
+        category: AchievementCategory::Exploration,
+        secret: false,
+        icon: "👑",
+    },
+    // ═══════════════════════════════════════════════════════════════
+    // HAVEN ACHIEVEMENTS
+    // ═══════════════════════════════════════════════════════════════
+    AchievementDef {
         id: AchievementId::HavenDiscovered,
         name: "Haven Found",
         description: "Discover the Haven",
         category: AchievementCategory::Exploration,
         secret: false,
         icon: "🏠",
+    },
+    AchievementDef {
+        id: AchievementId::HavenBuilderI,
+        name: "Haven Builder I",
+        description: "Upgrade all Haven rooms to Tier 1",
+        category: AchievementCategory::Exploration,
+        secret: false,
+        icon: "🔨",
+    },
+    AchievementDef {
+        id: AchievementId::HavenBuilderII,
+        name: "Haven Builder II",
+        description: "Upgrade all Haven rooms to Tier 2",
+        category: AchievementCategory::Exploration,
+        secret: false,
+        icon: "🔧",
     },
     AchievementDef {
         id: AchievementId::HavenArchitect,
@@ -599,8 +887,8 @@ mod tests {
 
     #[test]
     fn test_get_achievement_def() {
-        let def = get_achievement_def(AchievementId::FirstBlood).unwrap();
-        assert_eq!(def.name, "First Blood");
+        let def = get_achievement_def(AchievementId::SlayerI).unwrap();
+        assert_eq!(def.name, "Slayer I");
         assert_eq!(def.category, AchievementCategory::Combat);
     }
 
@@ -619,8 +907,8 @@ mod tests {
         let def = get_achievement_def(AchievementId::StormLeviathan).unwrap();
         assert!(def.secret);
 
-        // FirstBlood should not be secret
-        let def = get_achievement_def(AchievementId::FirstBlood).unwrap();
+        // SlayerI should not be secret
+        let def = get_achievement_def(AchievementId::SlayerI).unwrap();
         assert!(!def.secret);
     }
 }

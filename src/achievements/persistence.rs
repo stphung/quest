@@ -56,14 +56,14 @@ mod tests {
     fn test_achievements_serialization() {
         // Create test achievements
         let mut achievements = Achievements::default();
-        achievements.unlock(AchievementId::FirstBlood, Some("TestHero".to_string()));
+        achievements.unlock(AchievementId::SlayerI, Some("TestHero".to_string()));
         achievements.total_kills = 42;
 
         // Serialize and deserialize
         let json = serde_json::to_string_pretty(&achievements).unwrap();
         let loaded: Achievements = serde_json::from_str(&json).unwrap();
 
-        assert!(loaded.is_unlocked(AchievementId::FirstBlood));
+        assert!(loaded.is_unlocked(AchievementId::SlayerI));
         assert_eq!(loaded.total_kills, 42);
     }
 
@@ -72,7 +72,7 @@ mod tests {
         // This tests that loading from a non-existent file returns default
         let default = Achievements::default();
         assert_eq!(default.total_kills, 0);
-        assert!(!default.is_unlocked(AchievementId::FirstBlood));
+        assert!(!default.is_unlocked(AchievementId::SlayerI));
     }
 
     #[test]

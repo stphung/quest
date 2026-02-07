@@ -475,7 +475,7 @@ pub fn get_all_zones() -> Vec<Zone> {
                 },
             ],
         },
-        // Zone 11: The Expanse - Infinite post-game zone (unlocked by GameComplete achievement)
+        // Zone 11: The Expanse - Infinite post-game zone (unlocked by StormsEnd achievement)
         Zone {
             id: 11,
             name: "The Expanse",

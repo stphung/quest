@@ -1294,11 +1294,11 @@ fn game_tick(
                                 .on_zone_fully_cleared(zone.id, Some(&game_state.character_name));
                         }
                     }
-                    BossDefeatResult::GameComplete => {
+                    BossDefeatResult::StormsEnd => {
                         // Zone 10 (Storm Citadel) completed
                         global_achievements
                             .on_zone_fully_cleared(10, Some(&game_state.character_name));
-                        global_achievements.on_game_complete(Some(&game_state.character_name));
+                        global_achievements.on_storms_end(Some(&game_state.character_name));
                     }
                     BossDefeatResult::ExpanseCycle => {
                         // Zone 11 (The Expanse) cycle completed
@@ -1334,7 +1334,7 @@ fn game_tick(
                             zone_name, xp_gained, required_prestige
                         )
                     }
-                    BossDefeatResult::GameComplete => {
+                    BossDefeatResult::StormsEnd => {
                         format!(
                             "👑 All zones conquered! +{} XP — You have completed the game!",
                             xp_gained

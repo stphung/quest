@@ -39,7 +39,8 @@ impl AchievementBrowserState {
 
     pub fn next_category(&mut self) {
         self.selected_category = match self.selected_category {
-            AchievementCategory::Combat => AchievementCategory::Progression,
+            AchievementCategory::Combat => AchievementCategory::Level,
+            AchievementCategory::Level => AchievementCategory::Progression,
             AchievementCategory::Progression => AchievementCategory::Challenges,
             AchievementCategory::Challenges => AchievementCategory::Exploration,
             AchievementCategory::Exploration => AchievementCategory::Combat,
@@ -50,7 +51,8 @@ impl AchievementBrowserState {
     pub fn prev_category(&mut self) {
         self.selected_category = match self.selected_category {
             AchievementCategory::Combat => AchievementCategory::Exploration,
-            AchievementCategory::Progression => AchievementCategory::Combat,
+            AchievementCategory::Level => AchievementCategory::Combat,
+            AchievementCategory::Progression => AchievementCategory::Level,
             AchievementCategory::Challenges => AchievementCategory::Progression,
             AchievementCategory::Exploration => AchievementCategory::Challenges,
         };
@@ -333,6 +335,8 @@ mod tests {
         assert_eq!(state.selected_index, 0);
 
         // Navigate categories
+        state.next_category();
+        assert_eq!(state.selected_category, AchievementCategory::Level);
         state.next_category();
         assert_eq!(state.selected_category, AchievementCategory::Progression);
         state.next_category();

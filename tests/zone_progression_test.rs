@@ -304,7 +304,7 @@ fn test_complete_game_progression() {
 
             // Verify appropriate result
             if zone.id == 10 && subzone_id == zone.subzones.len() as u32 {
-                assert!(matches!(result, BossDefeatResult::GameComplete));
+                assert!(matches!(result, BossDefeatResult::StormsEnd));
             }
         }
     }
@@ -349,7 +349,7 @@ fn test_speedrun_to_zone_10() {
         let result = prog.on_boss_defeated(20, &mut achievements);
 
         if subzone_id == zone10.subzones.len() as u32 {
-            assert!(matches!(result, BossDefeatResult::GameComplete));
+            assert!(matches!(result, BossDefeatResult::StormsEnd));
         }
     }
 }
