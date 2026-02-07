@@ -748,6 +748,7 @@ pub fn draw_footer(
     update_available: bool,
     update_check_completed: bool,
     haven_discovered: bool,
+    pending_achievements: usize,
 ) {
     use crate::character::prestige::can_prestige;
     use crate::utils::build_info::{BUILD_COMMIT, BUILD_DATE};
@@ -806,6 +807,18 @@ pub fn draw_footer(
         Span::raw("")
     };
 
+    // Achievements hint (with pending count if any)
+    let achievements_text = if pending_achievements > 0 {
+        Span::styled(
+            format!(" | A = Achievements (🏆 {} new!)", pending_achievements),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )
+    } else {
+        Span::styled(" | A = Achievements", Style::default().fg(Color::Magenta))
+    };
+
     let footer_text = vec![Line::from(vec![
         Span::styled("Controls: ", Style::default().add_modifier(Modifier::BOLD)),
         Span::styled(
@@ -815,6 +828,7 @@ pub fn draw_footer(
         Span::raw(" = Quit | "),
         prestige_text,
         haven_text,
+        achievements_text,
         update_status_text,
         challenge_text,
     ])];

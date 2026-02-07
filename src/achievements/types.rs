@@ -209,6 +209,14 @@ pub struct Achievements {
     pub highest_fishing_rank: u32,
     pub zones_fully_cleared: u32,
     pub expanse_cycles_completed: u64,
+
+    /// Achievements unlocked but not yet viewed (not persisted) - for UI indicator
+    #[serde(skip)]
+    pub pending_notifications: Vec<AchievementId>,
+
+    /// Achievements unlocked this tick that need to be logged (not persisted)
+    #[serde(skip)]
+    pub newly_unlocked: Vec<AchievementId>,
 }
 
 impl Achievements {
@@ -229,7 +237,29 @@ impl Achievements {
                 character_name,
             },
         );
+        self.pending_notifications.push(id);
+        self.newly_unlocked.push(id);
         true
+    }
+
+    /// Get the count of pending achievement notifications.
+    pub fn pending_count(&self) -> usize {
+        self.pending_notifications.len()
+    }
+
+    /// Take all pending notifications (clears the list and returns them).
+    pub fn take_pending_notifications(&mut self) -> Vec<AchievementId> {
+        std::mem::take(&mut self.pending_notifications)
+    }
+
+    /// Clear pending notifications (call when user views achievements).
+    pub fn clear_pending_notifications(&mut self) {
+        self.pending_notifications.clear();
+    }
+
+    /// Take newly unlocked achievements for logging (clears the list).
+    pub fn take_newly_unlocked(&mut self) -> Vec<AchievementId> {
+        std::mem::take(&mut self.newly_unlocked)
     }
 
     /// Update progress on a tracked achievement.

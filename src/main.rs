@@ -396,6 +396,63 @@ fn main() -> io::Result<()> {
                                             }
                                         }
 
+                                        // Sync achievements from character state (retroactive unlocks)
+                                        let defeated_bosses: Vec<(u32, u32)> = state
+                                            .zone_progression
+                                            .defeated_bosses
+                                            .iter()
+                                            .cloned()
+                                            .collect();
+                                        global_achievements.sync_from_game_state(
+                                            state.character_level,
+                                            state.prestige_rank,
+                                            state.fishing.rank,
+                                            state.fishing.total_fish_caught,
+                                            &defeated_bosses,
+                                            Some(&state.character_name),
+                                        );
+                                        global_achievements.sync_from_haven(
+                                            haven.discovered,
+                                            &haven.rooms,
+                                            Some(&state.character_name),
+                                        );
+
+                                        // Log synced achievements (batch message if multiple)
+                                        let synced_count = global_achievements.pending_count();
+                                        if synced_count > 0 {
+                                            if synced_count == 1 {
+                                                // Single achievement - show the name
+                                                if let Some(id) =
+                                                    global_achievements.pending_notifications.first()
+                                                {
+                                                    if let Some(def) =
+                                                        achievements::get_achievement_def(*id)
+                                                    {
+                                                        state.combat_state.add_log_entry(
+                                                            format!(
+                                                                "🏆 Achievement Unlocked: {}",
+                                                                def.name
+                                                            ),
+                                                            false,
+                                                            true,
+                                                        );
+                                                    }
+                                                }
+                                            } else {
+                                                // Multiple achievements - show count
+                                                state.combat_state.add_log_entry(
+                                                    format!(
+                                                        "🏆 {} achievements synced from progress!",
+                                                        synced_count
+                                                    ),
+                                                    false,
+                                                    true,
+                                                );
+                                            }
+                                            // Clear newly_unlocked since we handled logging here
+                                            global_achievements.newly_unlocked.clear();
+                                        }
+
                                         // Process offline progression
                                         let current_time = Utc::now().timestamp();
                                         let elapsed_seconds = current_time - state.last_save_time;
@@ -660,6 +717,15 @@ fn main() -> io::Result<()> {
                                 selected_slots,
                             );
                         }
+                        // Draw Achievement browser if active
+                        if let GameOverlay::Achievements { browser } = &overlay {
+                            ui::achievement_browser_scene::render_achievement_browser(
+                                frame,
+                                frame.size(),
+                                &global_achievements,
+                                browser,
+                            );
+                        }
                         // Draw Haven screen if active
                         if haven_ui.showing {
                             ui::haven_scene::render_haven_tree(
@@ -722,6 +788,7 @@ fn main() -> io::Result<()> {
                                 &mut overlay,
                                 &mut debug_menu,
                                 debug_mode,
+                                &mut global_achievements,
                             );
 
                             // Track achievements for state changes
@@ -1395,5 +1462,16 @@ fn game_tick(
     if *tick_counter >= 10 {
         game_state.play_time_seconds += 1;
         *tick_counter = 0;
+    }
+
+    // Log any newly unlocked achievements to combat log
+    for id in global_achievements.take_newly_unlocked() {
+        if let Some(def) = achievements::get_achievement_def(id) {
+            game_state.combat_state.add_log_entry(
+                format!("🏆 Achievement Unlocked: {}", def.name),
+                false,
+                true,
+            );
+        }
     }
 }

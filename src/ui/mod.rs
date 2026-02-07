@@ -104,6 +104,7 @@ pub fn draw_ui_with_update(
         update_info.is_some(),
         update_check_completed,
         haven_discovered,
+        achievements.pending_count(),
     );
 
     // Draw right panel with stable layout: zone info + content + info panel
