@@ -729,8 +729,8 @@ fn main() -> io::Result<()> {
                                 state.last_minigame_win = None;
                             }
 
-                            // Save achievements if any changed
-                            if achievements_changed {
+                            // Save achievements if any changed (skip in debug mode)
+                            if achievements_changed && !debug_mode {
                                 if let Err(e) =
                                     achievements::save_achievements(&global_achievements)
                                 {
@@ -777,6 +777,7 @@ fn main() -> io::Result<()> {
                             &mut tick_counter,
                             &haven,
                             &mut global_achievements,
+                            debug_mode,
                         );
                         last_tick = Instant::now();
 
@@ -796,10 +797,12 @@ fn main() -> io::Result<()> {
                                 // Track Haven discovery achievement
                                 global_achievements
                                     .on_haven_discovered(Some(&state.character_name));
-                                if let Err(e) =
-                                    achievements::save_achievements(&global_achievements)
-                                {
-                                    eprintln!("Failed to save achievements: {}", e);
+                                if !debug_mode {
+                                    if let Err(e) =
+                                        achievements::save_achievements(&global_achievements)
+                                    {
+                                        eprintln!("Failed to save achievements: {}", e);
+                                    }
                                 }
                                 overlay = GameOverlay::HavenDiscovery;
                             }
@@ -852,6 +855,7 @@ fn game_tick(
     tick_counter: &mut u32,
     haven: &haven::Haven,
     global_achievements: &mut achievements::Achievements,
+    debug_mode: bool,
 ) {
     use combat::logic::update_combat;
     use dungeon::logic::{
@@ -983,8 +987,10 @@ fn game_tick(
         // Check if Storm Leviathan was caught - unlock achievement
         if fishing_result.caught_storm_leviathan {
             global_achievements.on_storm_leviathan_caught(Some(&game_state.character_name));
-            if let Err(e) = achievements::save_achievements(global_achievements) {
-                eprintln!("Failed to save achievements: {}", e);
+            if !debug_mode {
+                if let Err(e) = achievements::save_achievements(global_achievements) {
+                    eprintln!("Failed to save achievements: {}", e);
+                }
             }
         }
 

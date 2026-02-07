@@ -730,6 +730,125 @@ impl Achievements {
             character_name.map(|s| s.to_string()),
         );
     }
+
+    // =========================================================================
+    // State Synchronization (retroactive achievement unlocking)
+    // =========================================================================
+
+    /// Syncs achievements with current game state.
+    /// Call this when loading a character to retroactively unlock achievements
+    /// for milestones already reached.
+    ///
+    /// This handles the case where a player loads an existing character
+    /// (e.g., level 120, prestige 17) and should have achievements for
+    /// milestones they've already passed.
+    ///
+    /// Note: Some achievements cannot be synced because their counters
+    /// aren't persisted (e.g., total kills, total bosses, total dungeons).
+    /// Those counters start from where they are in the achievements file.
+    pub fn sync_from_game_state(
+        &mut self,
+        level: u32,
+        prestige_rank: u32,
+        fishing_rank: u32,
+        total_fish_caught: u32,
+        defeated_bosses: &[(u32, u32)],
+        character_name: Option<&str>,
+    ) {
+        // Sync level achievements
+        self.on_level_up(level, character_name);
+
+        // Sync prestige achievements
+        if prestige_rank >= 1 {
+            self.on_prestige(prestige_rank, character_name);
+        }
+
+        // Sync fishing rank achievements
+        if fishing_rank >= 1 {
+            self.on_fishing_rank_up(fishing_rank, character_name);
+        }
+
+        // Sync fish catch count
+        // Use the max of save file count vs existing achievement counter
+        let effective_fish = (total_fish_caught as u64).max(self.total_fish_caught);
+        if effective_fish > 0 {
+            // Set the counter to one less and then trigger a catch to unlock achievements
+            self.total_fish_caught = effective_fish.saturating_sub(1);
+            self.on_fish_caught(character_name);
+        }
+
+        // Sync zone completions based on defeated bosses
+        self.sync_zone_completions(defeated_bosses, character_name);
+    }
+
+    /// Syncs zone completion achievements based on defeated bosses.
+    fn sync_zone_completions(
+        &mut self,
+        defeated_bosses: &[(u32, u32)],
+        character_name: Option<&str>,
+    ) {
+        use crate::zones::get_all_zones;
+
+        let zones = get_all_zones();
+
+        for zone in zones.iter() {
+            // Check if all subzones in this zone have been completed
+            let total_subzones = zone.subzones.len() as u32;
+            let completed_subzones = (1..=total_subzones)
+                .filter(|&subzone_id| defeated_bosses.contains(&(zone.id, subzone_id)))
+                .count() as u32;
+
+            // If all subzones are complete, unlock the zone achievement
+            if completed_subzones == total_subzones {
+                self.on_zone_fully_cleared(zone.id, character_name);
+            }
+        }
+    }
+
+    /// Syncs Haven-related achievements based on Haven state.
+    /// Call this when loading Haven data.
+    pub fn sync_from_haven(
+        &mut self,
+        discovered: bool,
+        room_tiers: &std::collections::HashMap<crate::haven::types::HavenRoomId, u8>,
+        character_name: Option<&str>,
+    ) {
+        use crate::haven::types::HavenRoomId;
+
+        if discovered {
+            self.on_haven_discovered(character_name);
+        }
+
+        // Count rooms at each tier level
+        // Note: StormForge max tier is 1, FishingDock max tier is 4, others are 3
+        let buildable_rooms: Vec<_> = HavenRoomId::ALL
+            .iter()
+            .filter(|r| **r != HavenRoomId::StormForge) // StormForge only has T1
+            .collect();
+
+        let all_at_t1 = buildable_rooms
+            .iter()
+            .all(|room| room_tiers.get(room).copied().unwrap_or(0) >= 1);
+        let all_at_t2 = buildable_rooms
+            .iter()
+            .all(|room| room_tiers.get(room).copied().unwrap_or(0) >= 2);
+        let all_at_t3 = buildable_rooms.iter().all(|room| {
+            let tier = room_tiers.get(room).copied().unwrap_or(0);
+            let max_tier = room.max_tier();
+            // For rooms with max tier < 3, being at max tier counts as "T3"
+            tier >= 3 || tier >= max_tier
+        });
+
+        if all_at_t1 {
+            self.on_haven_all_t1(character_name);
+        }
+        if all_at_t2 {
+            self.on_haven_all_t2(character_name);
+        }
+        if all_at_t3 {
+            self.on_haven_architect(character_name);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1170,5 +1289,189 @@ mod tests {
         assert!(!achievements.is_unlocked(AchievementId::StormsEnd));
         achievements.on_storms_end(Some("Hero"));
         assert!(achievements.is_unlocked(AchievementId::StormsEnd));
+    }
+
+    // =========================================================================
+    // State Synchronization Tests
+    // =========================================================================
+
+    #[test]
+    fn test_sync_from_game_state_level_achievements() {
+        let mut achievements = Achievements::default();
+
+        // Sync with level 120 character
+        achievements.sync_from_game_state(120, 0, 1, 0, &[], Some("Hero"));
+
+        // Should have all level achievements up to 100
+        assert!(achievements.is_unlocked(AchievementId::Level10));
+        assert!(achievements.is_unlocked(AchievementId::Level25));
+        assert!(achievements.is_unlocked(AchievementId::Level50));
+        assert!(achievements.is_unlocked(AchievementId::Level75));
+        assert!(achievements.is_unlocked(AchievementId::Level100));
+        // But not 150+
+        assert!(!achievements.is_unlocked(AchievementId::Level150));
+    }
+
+    #[test]
+    fn test_sync_from_game_state_prestige_achievements() {
+        let mut achievements = Achievements::default();
+
+        // Sync with prestige 17 character
+        achievements.sync_from_game_state(1, 17, 1, 0, &[], Some("Hero"));
+
+        // Should have prestige achievements up to P15
+        assert!(achievements.is_unlocked(AchievementId::FirstPrestige));
+        assert!(achievements.is_unlocked(AchievementId::PrestigeV));
+        assert!(achievements.is_unlocked(AchievementId::PrestigeX));
+        assert!(achievements.is_unlocked(AchievementId::PrestigeXV));
+        // But not P20+
+        assert!(!achievements.is_unlocked(AchievementId::PrestigeXX));
+    }
+
+    #[test]
+    fn test_sync_from_game_state_fishing_achievements() {
+        let mut achievements = Achievements::default();
+
+        // Sync with fishing rank 15
+        achievements.sync_from_game_state(1, 0, 15, 500, &[], Some("Hero"));
+
+        // Should have FishermanI (rank 10)
+        assert!(achievements.is_unlocked(AchievementId::FishermanI));
+        // But not FishermanII (rank 20)
+        assert!(!achievements.is_unlocked(AchievementId::FishermanII));
+
+        // Should have fish catch achievements
+        assert!(achievements.is_unlocked(AchievementId::GoneFishing));
+        assert!(achievements.is_unlocked(AchievementId::FishCatcherI)); // 100 fish
+        assert!(!achievements.is_unlocked(AchievementId::FishCatcherII)); // 1000 fish
+    }
+
+    #[test]
+    fn test_sync_from_game_state_zone_completions() {
+        let mut achievements = Achievements::default();
+
+        // Zone 1 has 3 subzones, Zone 2 has 3 subzones
+        let defeated_bosses = vec![
+            (1, 1),
+            (1, 2),
+            (1, 3), // Zone 1 complete
+            (2, 1),
+            (2, 2), // Zone 2 incomplete (missing subzone 3)
+        ];
+
+        achievements.sync_from_game_state(1, 0, 1, 0, &defeated_bosses, Some("Hero"));
+
+        assert!(achievements.is_unlocked(AchievementId::Zone1Complete));
+        assert!(!achievements.is_unlocked(AchievementId::Zone2Complete));
+    }
+
+    #[test]
+    fn test_sync_from_game_state_full_progression() {
+        let mut achievements = Achievements::default();
+
+        // Simulate a well-progressed character
+        let defeated_bosses = vec![
+            // Zone 1-4 complete
+            (1, 1),
+            (1, 2),
+            (1, 3),
+            (2, 1),
+            (2, 2),
+            (2, 3),
+            (3, 1),
+            (3, 2),
+            (3, 3),
+            (4, 1),
+            (4, 2),
+            (4, 3),
+        ];
+
+        achievements.sync_from_game_state(
+            150,  // level
+            25,   // prestige
+            20,   // fishing rank
+            5000, // fish caught
+            &defeated_bosses,
+            Some("Veteran"),
+        );
+
+        // Level achievements
+        assert!(achievements.is_unlocked(AchievementId::Level100));
+        assert!(achievements.is_unlocked(AchievementId::Level150));
+        assert!(!achievements.is_unlocked(AchievementId::Level200));
+
+        // Prestige achievements
+        assert!(achievements.is_unlocked(AchievementId::PrestigeXX));
+        assert!(achievements.is_unlocked(AchievementId::PrestigeXXV));
+        assert!(!achievements.is_unlocked(AchievementId::PrestigeXXX));
+
+        // Fishing achievements
+        assert!(achievements.is_unlocked(AchievementId::FishermanI));
+        assert!(achievements.is_unlocked(AchievementId::FishermanII));
+        assert!(!achievements.is_unlocked(AchievementId::FishermanIII)); // needs rank 30
+
+        // Fish catch achievements (5000 fish)
+        assert!(achievements.is_unlocked(AchievementId::FishCatcherI)); // 100
+        assert!(achievements.is_unlocked(AchievementId::FishCatcherII)); // 1000
+        assert!(!achievements.is_unlocked(AchievementId::FishCatcherIII)); // 10000 - not reached
+
+        // Zone completions
+        assert!(achievements.is_unlocked(AchievementId::Zone1Complete));
+        assert!(achievements.is_unlocked(AchievementId::Zone2Complete));
+        assert!(achievements.is_unlocked(AchievementId::Zone3Complete));
+        assert!(achievements.is_unlocked(AchievementId::Zone4Complete));
+        assert!(!achievements.is_unlocked(AchievementId::Zone5Complete));
+    }
+
+    #[test]
+    fn test_sync_from_haven_discovered() {
+        use std::collections::HashMap;
+
+        let mut achievements = Achievements::default();
+        let room_tiers: HashMap<crate::haven::types::HavenRoomId, u8> = HashMap::new();
+
+        achievements.sync_from_haven(true, &room_tiers, Some("Hero"));
+
+        assert!(achievements.is_unlocked(AchievementId::HavenDiscovered));
+        assert!(!achievements.is_unlocked(AchievementId::HavenBuilderI));
+    }
+
+    #[test]
+    fn test_sync_from_haven_all_t1() {
+        use crate::haven::types::HavenRoomId;
+        use std::collections::HashMap;
+
+        let mut achievements = Achievements::default();
+        let mut room_tiers: HashMap<HavenRoomId, u8> = HashMap::new();
+
+        // Set all buildable rooms to T1 (exclude StormForge which has max T1)
+        for room in HavenRoomId::ALL.iter() {
+            if *room != HavenRoomId::StormForge {
+                room_tiers.insert(*room, 1);
+            }
+        }
+
+        achievements.sync_from_haven(true, &room_tiers, Some("Hero"));
+
+        assert!(achievements.is_unlocked(AchievementId::HavenDiscovered));
+        assert!(achievements.is_unlocked(AchievementId::HavenBuilderI));
+        assert!(!achievements.is_unlocked(AchievementId::HavenBuilderII));
+    }
+
+    #[test]
+    fn test_sync_does_not_overwrite_higher_counters() {
+        // Pre-set a higher fish count in achievements
+        let mut achievements = Achievements {
+            total_fish_caught: 50000,
+            ..Default::default()
+        };
+
+        // Sync with a lower fish count from save
+        achievements.sync_from_game_state(1, 0, 1, 1000, &[], Some("Hero"));
+
+        // Should NOT have decreased the counter
+        assert_eq!(achievements.total_fish_caught, 50000);
+        // Should still have the high-count achievements
+        assert!(achievements.is_unlocked(AchievementId::FishCatcherIII)); // 10000
     }
 }
