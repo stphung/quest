@@ -269,10 +269,13 @@ fn cut_score(game: &GoGame, row: usize, col: usize, opponent: Stone) -> f64 {
         for (dr, dc) in &[(-1, 0), (1, 0), (0, -1), (0, 1)] {
             let nr = row as i32 + dr;
             let nc = col as i32 + dc;
-            if nr >= 0 && nr < BOARD_SIZE as i32 && nc >= 0 && nc < BOARD_SIZE as i32 {
-                if game.board[nr as usize][nc as usize].is_none() {
-                    adj_empty += 1;
-                }
+            if nr >= 0
+                && nr < BOARD_SIZE as i32
+                && nc >= 0
+                && nc < BOARD_SIZE as i32
+                && game.board[nr as usize][nc as usize].is_none()
+            {
+                adj_empty += 1;
             }
         }
         if adj_empty >= 2 {
@@ -292,28 +295,31 @@ fn connection_score(game: &GoGame, row: usize, col: usize, player: Stone) -> f64
     for (dr, dc) in &directions {
         let nr = row as i32 + dr;
         let nc = col as i32 + dc;
-        if nr >= 0 && nr < BOARD_SIZE as i32 && nc >= 0 && nc < BOARD_SIZE as i32 {
-            if game.board[nr as usize][nc as usize] == Some(player) {
-                // Check the two adjacent squares
-                let adj1_r = row as i32 + dr;
-                let adj1_c = col as i32;
-                let adj2_r = row as i32;
-                let adj2_c = col as i32 + dc;
+        if nr >= 0
+            && nr < BOARD_SIZE as i32
+            && nc >= 0
+            && nc < BOARD_SIZE as i32
+            && game.board[nr as usize][nc as usize] == Some(player)
+        {
+            // Check the two adjacent squares
+            let adj1_r = row as i32 + dr;
+            let adj1_c = col as i32;
+            let adj2_r = row as i32;
+            let adj2_c = col as i32 + dc;
 
-                let empty1 = if adj1_r >= 0 && adj1_r < BOARD_SIZE as i32 {
-                    game.board[adj1_r as usize][adj1_c as usize].is_none()
-                } else {
-                    false
-                };
-                let empty2 = if adj2_c >= 0 && adj2_c < BOARD_SIZE as i32 {
-                    game.board[adj2_r as usize][adj2_c as usize].is_none()
-                } else {
-                    false
-                };
+            let empty1 = if adj1_r >= 0 && adj1_r < BOARD_SIZE as i32 {
+                game.board[adj1_r as usize][adj1_c as usize].is_none()
+            } else {
+                false
+            };
+            let empty2 = if adj2_c >= 0 && adj2_c < BOARD_SIZE as i32 {
+                game.board[adj2_r as usize][adj2_c as usize].is_none()
+            } else {
+                false
+            };
 
-                if empty1 && empty2 {
-                    score += 6.0; // Connecting diagonal stones
-                }
+            if empty1 && empty2 {
+                score += 6.0; // Connecting diagonal stones
             }
         }
     }
@@ -322,7 +328,7 @@ fn connection_score(game: &GoGame, row: usize, col: usize, player: Stone) -> f64
 }
 
 /// Order moves by heuristic score for MCTS.
-pub fn order_moves(game: &GoGame, moves: &mut Vec<GoMove>) {
+pub fn order_moves(game: &GoGame, moves: &mut [GoMove]) {
     moves.sort_by(|a, b| {
         let score_a = match a {
             GoMove::Place(r, c) => score_move(game, *r, *c),
