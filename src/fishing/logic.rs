@@ -260,6 +260,9 @@ pub fn try_discover_fishing(state: &mut GameState, rng: &mut impl Rng) -> Option
     Some(format!("Discovered fishing spot: {}!", spot_name))
 }
 
+/// Maximum fishing rank (corresponds to RANK_NAMES length)
+pub const MAX_FISHING_RANK: u32 = 30;
+
 /// Checks if the player should rank up in fishing.
 ///
 /// Returns a rank up message if the threshold is reached.
@@ -268,7 +271,13 @@ pub fn try_discover_fishing(state: &mut GameState, rng: &mut impl Rng) -> Option
 /// - Each rank requires a certain number of fish to catch
 /// - Fish requirement increases with rank tier
 /// - Excess fish count carries over to next rank
+/// - Rank is capped at MAX_FISHING_RANK (30)
 pub fn check_rank_up(fishing_state: &mut FishingState) -> Option<String> {
+    // Already at max rank - no further progression
+    if fishing_state.rank >= MAX_FISHING_RANK {
+        return None;
+    }
+
     let required = FishingState::fish_required_for_rank(fishing_state.rank);
 
     if fishing_state.fish_toward_next_rank >= required {
@@ -552,6 +561,28 @@ mod tests {
         assert_eq!(
             fishing_state.fish_toward_next_rank, 50,
             "Progress should remain"
+        );
+    }
+
+    #[test]
+    fn test_check_rank_up_capped_at_max() {
+        let mut fishing_state = FishingState {
+            rank: MAX_FISHING_RANK, // Already at max (30)
+            total_fish_caught: 50000,
+            fish_toward_next_rank: 5000, // Way more than enough to rank up
+            legendary_catches: 100,
+        };
+
+        let result = check_rank_up(&mut fishing_state);
+
+        assert!(result.is_none(), "Should not rank up past max rank");
+        assert_eq!(
+            fishing_state.rank, MAX_FISHING_RANK,
+            "Rank should remain at max (30)"
+        );
+        assert_eq!(
+            fishing_state.fish_toward_next_rank, 5000,
+            "Progress should not be consumed at max rank"
         );
     }
 
