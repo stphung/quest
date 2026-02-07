@@ -336,21 +336,6 @@ fn connection_score(game: &GoGame, row: usize, col: usize, player: Stone) -> f64
     score
 }
 
-/// Order moves by heuristic score for MCTS.
-pub fn order_moves(game: &GoGame, moves: &mut [GoMove]) {
-    moves.sort_by(|a, b| {
-        let score_a = match a {
-            GoMove::Place(r, c) => score_move(game, *r, *c),
-            GoMove::Pass => -50.0, // Pass is usually undesirable
-        };
-        let score_b = match b {
-            GoMove::Place(r, c) => score_move(game, *r, *c),
-            GoMove::Pass => -50.0,
-        };
-        score_b.partial_cmp(&score_a).unwrap()
-    });
-}
-
 /// Get the top N moves by heuristic score.
 pub fn get_top_moves(game: &GoGame, moves: &[GoMove], n: usize) -> Vec<GoMove> {
     let mut scored: Vec<_> = moves
