@@ -277,6 +277,10 @@ impl ZoneProgression {
         self.current_zone_id = 1;
         self.current_subzone_id = 1;
 
+        // Reset kill tracking
+        self.kills_in_subzone = 0;
+        self.fighting_boss = false;
+
         // Clear defeated bosses
         self.defeated_bosses.clear();
 
@@ -757,5 +761,26 @@ mod tests {
         // Should complete the game
         assert!(matches!(result, BossDefeatResult::GameComplete));
         assert!(prog.is_boss_defeated(10, 4));
+    }
+
+    #[test]
+    fn test_reset_for_prestige_clears_kill_tracking() {
+        let mut prog = ZoneProgression::new();
+
+        // Accumulate some kills and trigger boss
+        for _ in 0..KILLS_FOR_BOSS {
+            prog.record_kill();
+        }
+        assert_eq!(prog.kills_in_subzone, KILLS_FOR_BOSS);
+        assert!(prog.fighting_boss);
+
+        // Prestige reset
+        prog.reset_for_prestige(1);
+
+        assert_eq!(prog.kills_in_subzone, 0);
+        assert!(!prog.fighting_boss);
+        assert_eq!(prog.current_zone_id, 1);
+        assert_eq!(prog.current_subzone_id, 1);
+        assert!(prog.defeated_bosses.is_empty());
     }
 }
