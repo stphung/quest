@@ -121,6 +121,8 @@ impl CharacterManager {
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: save_data.chess_stats,
             active_minigame: None,
+            session_kills: 0,
+            recent_drops: std::collections::VecDeque::new(),
         })
     }
 
@@ -336,6 +338,8 @@ mod tests {
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: crate::challenges::chess::ChessStats::default(),
             active_minigame: None,
+            session_kills: 0,
+            recent_drops: std::collections::VecDeque::new(),
         };
 
         // Save character
@@ -388,6 +392,8 @@ mod tests {
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: crate::challenges::chess::ChessStats::default(),
             active_minigame: None,
+            session_kills: 0,
+            recent_drops: std::collections::VecDeque::new(),
         };
 
         let char2 = GameState {
@@ -409,6 +415,8 @@ mod tests {
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: crate::challenges::chess::ChessStats::default(),
             active_minigame: None,
+            session_kills: 0,
+            recent_drops: std::collections::VecDeque::new(),
         };
 
         manager.save_character(&char1).unwrap();
@@ -460,6 +468,8 @@ mod tests {
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: crate::challenges::chess::ChessStats::default(),
             active_minigame: None,
+            session_kills: 0,
+            recent_drops: std::collections::VecDeque::new(),
         };
 
         manager.save_character(&state).unwrap();
@@ -500,6 +510,8 @@ mod tests {
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: crate::challenges::chess::ChessStats::default(),
             active_minigame: None,
+            session_kills: 0,
+            recent_drops: std::collections::VecDeque::new(),
         };
 
         manager.save_character(&state).unwrap();
@@ -567,6 +579,8 @@ mod tests {
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: crate::challenges::chess::ChessStats::default(),
             active_minigame: None,
+            session_kills: 0,
+            recent_drops: std::collections::VecDeque::new(),
         };
 
         manager.save_character(&state).unwrap();
@@ -673,6 +687,8 @@ mod tests {
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: crate::challenges::chess::ChessStats::default(),
             active_minigame: None,
+            session_kills: 0,
+            recent_drops: std::collections::VecDeque::new(),
         };
 
         manager.save_character(&state).unwrap();

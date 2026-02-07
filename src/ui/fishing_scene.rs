@@ -5,7 +5,7 @@
 
 #![allow(dead_code)]
 
-use crate::fishing::types::{FishRarity, FishingSession, FishingState};
+use crate::fishing::types::{FishingSession, FishingState};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -42,16 +42,14 @@ pub fn render_fishing_scene(
     session: &FishingSession,
     fishing_state: &FishingState,
 ) {
-    // Main vertical layout
+    // Main vertical layout (recent catches now shown in the Loot panel)
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3), // Header with spot name
-            Constraint::Length(6), // Water animation area
+            Constraint::Min(6),    // Water animation area
             Constraint::Length(4), // Catch progress + phase status
-            Constraint::Length(9), // Caught fish list (last 5 + borders)
             Constraint::Length(5), // Rank info and progress bar
-            Constraint::Min(0),    // Remaining space
         ])
         .split(area);
 
@@ -64,11 +62,8 @@ pub fn render_fishing_scene(
     // Draw catch progress
     draw_catch_progress(frame, chunks[2], session);
 
-    // Draw caught fish list
-    draw_fish_list(frame, chunks[3], session);
-
     // Draw rank info and progress
-    draw_rank_info(frame, chunks[4], fishing_state);
+    draw_rank_info(frame, chunks[3], fishing_state);
 }
 
 /// Draws the header with fishing spot name.
@@ -215,85 +210,6 @@ fn draw_catch_progress(frame: &mut Frame, area: Rect, session: &FishingSession) 
     frame.render_widget(progress_paragraph, area);
 }
 
-/// Draws the list of caught fish (last 5).
-fn draw_fish_list(frame: &mut Frame, area: Rect, session: &FishingSession) {
-    let fish_block = Block::default()
-        .borders(Borders::ALL)
-        .title(" Recent Catches ");
-
-    let inner = fish_block.inner(area);
-    frame.render_widget(fish_block, area);
-
-    // Get the last 5 caught fish (most recent first)
-    let recent_fish: Vec<_> = session.fish_caught.iter().rev().take(5).collect();
-
-    if recent_fish.is_empty() {
-        let empty_text = vec![Line::from(Span::styled(
-            "No fish caught yet...",
-            Style::default()
-                .fg(Color::DarkGray)
-                .add_modifier(Modifier::ITALIC),
-        ))];
-
-        let empty_paragraph = Paragraph::new(empty_text).alignment(Alignment::Center);
-        frame.render_widget(empty_paragraph, inner);
-        return;
-    }
-
-    // Track which fish indices dropped items
-    let fish_with_items: std::collections::HashSet<usize> = session
-        .items_found
-        .iter()
-        .enumerate()
-        .map(|(i, _)| i)
-        .collect();
-
-    let mut lines = Vec::new();
-
-    for (display_idx, fish) in recent_fish.iter().enumerate() {
-        // Calculate the actual index in fish_caught (for item drop tracking)
-        let actual_idx = session.fish_caught.len() - 1 - display_idx;
-
-        // Get rarity color and name
-        let (rarity_color, rarity_name) = get_rarity_style(fish.rarity);
-
-        // Check if this fish dropped an item (simplified: check if we have items and index matches)
-        let has_item = fish_with_items.len() > display_idx
-            && actual_idx < session.fish_caught.len()
-            && session.items_found.len() > display_idx;
-
-        let mut spans = vec![
-            Span::styled(
-                format!("[{}]", rarity_name),
-                Style::default().fg(rarity_color),
-            ),
-            Span::raw(" "),
-            Span::styled(&fish.name, Style::default().add_modifier(Modifier::BOLD)),
-            Span::raw(" - "),
-            Span::styled(
-                format!("{} XP", fish.xp_reward),
-                Style::default().fg(Color::Yellow),
-            ),
-        ];
-
-        // Add item indicator if this fish dropped an item
-        if has_item {
-            spans.push(Span::raw("  "));
-            spans.push(Span::styled(
-                "[Item]",
-                Style::default()
-                    .fg(Color::Magenta)
-                    .add_modifier(Modifier::BOLD),
-            ));
-        }
-
-        lines.push(Line::from(spans));
-    }
-
-    let fish_paragraph = Paragraph::new(lines);
-    frame.render_widget(fish_paragraph, inner);
-}
-
 /// Draws the fishing rank info and progress bar.
 fn draw_rank_info(frame: &mut Frame, area: Rect, fishing_state: &FishingState) {
     let rank_block = Block::default()
@@ -353,15 +269,4 @@ fn draw_rank_info(frame: &mut Frame, area: Rect, fishing_state: &FishingState) {
         .ratio(ratio);
 
     frame.render_widget(gauge, inner_chunks[1]);
-}
-
-/// Returns the color and display name for a fish rarity.
-fn get_rarity_style(rarity: FishRarity) -> (Color, &'static str) {
-    match rarity {
-        FishRarity::Common => (Color::Gray, "Common"),
-        FishRarity::Uncommon => (Color::Green, "Uncommon"),
-        FishRarity::Rare => (Color::Blue, "Rare"),
-        FishRarity::Epic => (Color::Magenta, "Epic"),
-        FishRarity::Legendary => (Color::Yellow, "Legendary"),
-    }
 }

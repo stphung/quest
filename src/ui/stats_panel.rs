@@ -35,8 +35,6 @@ pub fn draw_stats_panel_with_update(
     area: Rect,
     game_state: &GameState,
     update_info: Option<&UpdateInfo>,
-    update_check_completed: bool,
-    haven_discovered: bool,
 ) {
     // Calculate update panel height: 4 base + changelog lines (max 5) + overflow indicator
     let update_height = if let Some(info) = update_info {
@@ -50,32 +48,25 @@ pub fn draw_stats_panel_with_update(
         0
     };
 
-    // Check if zone is complete (needs extra line in zone section)
-    let zone_completion = compute_zone_completion(game_state);
-    let zone_height = 4; // Always show next zone line
-
-    // Main vertical layout: header, zone, attributes, derived stats, equipment, prestige, footer, [update]
-    // When update panel is present, equipment gets smaller minimum to ensure update panel fits
+    // Main vertical layout: header, prestige, attributes, derived stats, equipment, [update]
+    // Zone info is now drawn in the right panel
+    // Footer is drawn full-width at the bottom by the parent layout
     let constraints = if update_info.is_some() {
         vec![
-            Constraint::Length(4),           // Header + XP bar
-            Constraint::Length(zone_height), // Zone info (3 normal, 4 when gated)
-            Constraint::Length(14),          // Attributes (6 attributes + borders)
-            Constraint::Length(6),           // Derived stats (condensed)
-            Constraint::Min(10),             // Equipment section (reduced min when update shown)
-            Constraint::Length(7),           // Prestige info + fishing rank + fishing bar
-            Constraint::Length(3),           // Footer
-            Constraint::Min(update_height),  // Update panel (can shrink if needed)
+            Constraint::Length(4),          // Header + XP bar
+            Constraint::Length(7),          // Prestige info + fishing rank + fishing bar
+            Constraint::Length(14),         // Attributes (6 attributes + borders)
+            Constraint::Length(6),          // Derived stats (condensed)
+            Constraint::Min(10),            // Equipment section (reduced min when update shown)
+            Constraint::Min(update_height), // Update panel (can shrink if needed)
         ]
     } else {
         vec![
-            Constraint::Length(4),           // Header + XP bar
-            Constraint::Length(zone_height), // Zone info (3 normal, 4 when gated)
-            Constraint::Length(14),          // Attributes (6 attributes + borders)
-            Constraint::Length(6),           // Derived stats (condensed)
-            Constraint::Min(16),             // Equipment section (grows to fit)
-            Constraint::Length(7),           // Prestige info + fishing rank + fishing bar
-            Constraint::Length(3),           // Footer
+            Constraint::Length(4),  // Header + XP bar
+            Constraint::Length(7),  // Prestige info + fishing rank + fishing bar
+            Constraint::Length(14), // Attributes (6 attributes + borders)
+            Constraint::Length(6),  // Derived stats (condensed)
+            Constraint::Min(16),    // Equipment section (grows to fit)
         ]
     };
 
@@ -87,8 +78,8 @@ pub fn draw_stats_panel_with_update(
     // Draw header with character info
     draw_header(frame, chunks[0], game_state);
 
-    // Draw zone info
-    draw_zone_info(frame, chunks[1], game_state, &zone_completion);
+    // Draw prestige info (below header)
+    draw_prestige_info(frame, chunks[1], game_state);
 
     // Draw attributes with progress bars
     draw_attributes(frame, chunks[2], game_state);
@@ -99,22 +90,9 @@ pub fn draw_stats_panel_with_update(
     // Draw equipment section
     draw_equipment_section(frame, chunks[4], game_state);
 
-    // Draw prestige info
-    draw_prestige_info(frame, chunks[5], game_state);
-
-    // Draw footer with controls and update status
-    draw_footer(
-        frame,
-        chunks[6],
-        game_state,
-        update_info.is_some(),
-        update_check_completed,
-        haven_discovered,
-    );
-
     // Draw update panel if available
     if let Some(info) = update_info {
-        draw_update_panel(frame, chunks[7], info);
+        draw_update_panel(frame, chunks[5], info);
     }
 }
 
@@ -186,7 +164,7 @@ fn draw_header(frame: &mut Frame, area: Rect, game_state: &GameState) {
 
 /// Draws the current zone and subzone info
 /// Zone completion status for the second line of the zone info panel.
-enum ZoneCompletionStatus {
+pub(super) enum ZoneCompletionStatus {
     /// Zone complete but next zone requires higher prestige
     Gated {
         next_zone_id: u32,
@@ -203,7 +181,7 @@ enum ZoneCompletionStatus {
     Mystery,
 }
 
-fn compute_zone_completion(game_state: &GameState) -> ZoneCompletionStatus {
+pub(super) fn compute_zone_completion(game_state: &GameState) -> ZoneCompletionStatus {
     use crate::zones::get_all_zones;
 
     let zones = get_all_zones();
@@ -227,7 +205,7 @@ fn compute_zone_completion(game_state: &GameState) -> ZoneCompletionStatus {
     }
 }
 
-fn draw_zone_info(
+pub(super) fn draw_zone_info(
     frame: &mut Frame,
     area: Rect,
     game_state: &GameState,
@@ -363,7 +341,12 @@ fn draw_zone_info(
     }
 
     let zone_widget = Paragraph::new(zone_lines)
-        .block(Block::default().borders(Borders::ALL).title("Location"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(zone_color))
+                .title("Location"),
+        )
         .alignment(Alignment::Center);
 
     frame.render_widget(zone_widget, area);
@@ -757,7 +740,7 @@ fn format_play_time(total_seconds: u64) -> String {
 }
 
 /// Draws the footer with control instructions and version info
-fn draw_footer(
+pub fn draw_footer(
     frame: &mut Frame,
     area: Rect,
     game_state: &GameState,

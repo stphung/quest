@@ -6,8 +6,51 @@ use crate::combat::types::CombatState;
 use crate::dungeon::types::Dungeon;
 use crate::fishing::types::{FishingSession, FishingState};
 use crate::items::equipment::Equipment;
+use crate::items::types::Rarity;
 use crate::zones::ZoneProgression;
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
+
+/// A recently gained item or fish for display in the Loot panel
+#[derive(Debug, Clone)]
+pub struct RecentDrop {
+    pub name: String,
+    pub rarity: Rarity,
+    pub equipped: bool,
+    pub icon: &'static str,
+    /// Equipment slot name (e.g. "Weapon", "Armor"), empty for non-equipment
+    pub slot: String,
+    /// Stat summary (e.g. "+8 STR +3 DEX +Crit"), empty for non-equipment
+    pub stats: String,
+}
+
+/// Max number of recent drops to track
+const MAX_RECENT_DROPS: usize = 10;
+
+impl GameState {
+    /// Record a recent gain (item drop, fish catch, etc.)
+    pub fn add_recent_drop(
+        &mut self,
+        name: String,
+        rarity: Rarity,
+        equipped: bool,
+        icon: &'static str,
+        slot: String,
+        stats: String,
+    ) {
+        if self.recent_drops.len() >= MAX_RECENT_DROPS {
+            self.recent_drops.pop_back();
+        }
+        self.recent_drops.push_front(RecentDrop {
+            name,
+            rarity,
+            equipped,
+            icon,
+            slot,
+            stats,
+        });
+    }
+}
 
 /// Main game state containing all player progress
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,6 +88,12 @@ pub struct GameState {
     /// Active challenge minigame (transient, not saved)
     #[serde(skip)]
     pub active_minigame: Option<ActiveMinigame>,
+    /// Session kill count (transient, not saved)
+    #[serde(skip)]
+    pub session_kills: u64,
+    /// Recent item drops for display (transient, not saved)
+    #[serde(skip)]
+    pub recent_drops: VecDeque<RecentDrop>,
 }
 
 impl GameState {
@@ -75,6 +124,8 @@ impl GameState {
             challenge_menu: ChallengeMenu::new(),
             chess_stats: ChessStats::default(),
             active_minigame: None,
+            session_kills: 0,
+            recent_drops: VecDeque::with_capacity(5),
         }
     }
 

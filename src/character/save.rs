@@ -263,6 +263,8 @@ impl SaveManager {
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
             chess_stats: crate::challenges::chess::ChessStats::default(),
             active_minigame: None,
+            session_kills: 0,
+            recent_drops: std::collections::VecDeque::new(),
         }
     }
 }
