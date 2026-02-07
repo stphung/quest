@@ -616,4 +616,415 @@ mod tests {
         // Should return empty since no points could be distributed
         assert!(increased.len() < 3); // May distribute some if loop hasn't hit max attempts
     }
+
+    // =========================================================================
+    // DUNGEON ROOM TYPE SPAWNING TESTS
+    // =========================================================================
+
+    /// Helper: create a minimal dungeon with the player in a room of the given type.
+    /// Returns a GameState with an active dungeon where current_room_cleared = false
+    /// so spawn_enemy_if_needed will attempt to spawn.
+    fn setup_dungeon_with_room_type(room_type: RoomType) -> GameState {
+        use crate::dungeon::types::{Dungeon, DungeonSize, Room, RoomState};
+
+        let mut state = GameState::new("Dungeon Tester".to_string(), 0);
+        state.character_level = 10;
+
+        // Build a minimal 5x5 dungeon with one room at center
+        let mut dungeon = Dungeon::new(DungeonSize::Small);
+        let pos = (2, 2);
+
+        let mut room = Room::new(room_type, pos);
+        room.state = RoomState::Current;
+        dungeon.grid[pos.1][pos.0] = Some(room);
+        dungeon.player_position = pos;
+        dungeon.entrance_position = pos;
+        dungeon.boss_position = pos;
+        dungeon.current_room_cleared = false;
+
+        state.active_dungeon = Some(dungeon);
+        state
+    }
+
+    #[test]
+    fn test_spawn_dungeon_enemy_combat_room_spawns_regular() {
+        let mut state = setup_dungeon_with_room_type(RoomType::Combat);
+
+        spawn_enemy_if_needed(&mut state);
+
+        let enemy = state
+            .combat_state
+            .current_enemy
+            .as_ref()
+            .expect("Combat room should spawn an enemy");
+
+        // Regular dungeon enemies do NOT have "Elite" or "Boss" prefix
+        assert!(
+            !enemy.name.starts_with("Elite "),
+            "Combat room should spawn regular enemy, got: {}",
+            enemy.name
+        );
+        assert!(
+            !enemy.name.starts_with("Boss "),
+            "Combat room should spawn regular enemy, got: {}",
+            enemy.name
+        );
+        assert!(enemy.max_hp > 0);
+        assert!(enemy.damage > 0);
+    }
+
+    #[test]
+    fn test_spawn_dungeon_enemy_elite_room_spawns_elite() {
+        let mut state = setup_dungeon_with_room_type(RoomType::Elite);
+
+        spawn_enemy_if_needed(&mut state);
+
+        let enemy = state
+            .combat_state
+            .current_enemy
+            .as_ref()
+            .expect("Elite room should spawn an enemy");
+
+        assert!(
+            enemy.name.starts_with("Elite "),
+            "Elite room should spawn elite enemy, got: {}",
+            enemy.name
+        );
+        assert!(enemy.max_hp > 0);
+        assert!(enemy.damage > 0);
+    }
+
+    #[test]
+    fn test_spawn_dungeon_enemy_boss_room_spawns_boss() {
+        let mut state = setup_dungeon_with_room_type(RoomType::Boss);
+
+        spawn_enemy_if_needed(&mut state);
+
+        let enemy = state
+            .combat_state
+            .current_enemy
+            .as_ref()
+            .expect("Boss room should spawn an enemy");
+
+        assert!(
+            enemy.name.starts_with("Boss "),
+            "Boss room should spawn boss enemy, got: {}",
+            enemy.name
+        );
+        assert!(enemy.max_hp > 0);
+        assert!(enemy.damage > 0);
+    }
+
+    #[test]
+    fn test_spawn_dungeon_enemy_entrance_does_not_spawn() {
+        let mut state = setup_dungeon_with_room_type(RoomType::Entrance);
+
+        spawn_enemy_if_needed(&mut state);
+
+        assert!(
+            state.combat_state.current_enemy.is_none(),
+            "Entrance room should NOT spawn an enemy"
+        );
+    }
+
+    #[test]
+    fn test_spawn_dungeon_enemy_treasure_does_not_spawn() {
+        let mut state = setup_dungeon_with_room_type(RoomType::Treasure);
+
+        spawn_enemy_if_needed(&mut state);
+
+        assert!(
+            state.combat_state.current_enemy.is_none(),
+            "Treasure room should NOT spawn an enemy"
+        );
+    }
+
+    #[test]
+    fn test_spawn_enemy_if_needed_respects_current_room_cleared() {
+        // When current_room_cleared is true, no enemy should be spawned
+        // even for combat room types
+        let mut state = setup_dungeon_with_room_type(RoomType::Combat);
+
+        // Mark room as already cleared
+        state.active_dungeon.as_mut().unwrap().current_room_cleared = true;
+
+        spawn_enemy_if_needed(&mut state);
+
+        assert!(
+            state.combat_state.current_enemy.is_none(),
+            "Should not spawn enemy when current_room_cleared is true"
+        );
+    }
+
+    #[test]
+    fn test_spawn_enemy_if_needed_cleared_elite_no_spawn() {
+        let mut state = setup_dungeon_with_room_type(RoomType::Elite);
+
+        state.active_dungeon.as_mut().unwrap().current_room_cleared = true;
+
+        spawn_enemy_if_needed(&mut state);
+
+        assert!(
+            state.combat_state.current_enemy.is_none(),
+            "Should not spawn elite enemy when room is already cleared"
+        );
+    }
+
+    #[test]
+    fn test_spawn_enemy_if_needed_cleared_boss_no_spawn() {
+        let mut state = setup_dungeon_with_room_type(RoomType::Boss);
+
+        state.active_dungeon.as_mut().unwrap().current_room_cleared = true;
+
+        spawn_enemy_if_needed(&mut state);
+
+        assert!(
+            state.combat_state.current_enemy.is_none(),
+            "Should not spawn boss enemy when room is already cleared"
+        );
+    }
+
+    #[test]
+    fn test_dungeon_elite_stats_higher_than_regular() {
+        // Elite enemies (1.5x multiplier) should on average have higher stats
+        // than regular enemies for the same player stats
+        let player_hp = 200;
+        let player_dmg = 30;
+        let samples = 300;
+
+        let mut regular_hp_sum: f64 = 0.0;
+        let mut elite_hp_sum: f64 = 0.0;
+        let mut regular_dmg_sum: f64 = 0.0;
+        let mut elite_dmg_sum: f64 = 0.0;
+
+        for _ in 0..samples {
+            let regular = crate::combat::types::generate_enemy(player_hp, player_dmg);
+            let elite = crate::combat::types::generate_elite_enemy(player_hp, player_dmg);
+            regular_hp_sum += regular.max_hp as f64;
+            elite_hp_sum += elite.max_hp as f64;
+            regular_dmg_sum += regular.damage as f64;
+            elite_dmg_sum += elite.damage as f64;
+        }
+
+        let avg_regular_hp = regular_hp_sum / samples as f64;
+        let avg_elite_hp = elite_hp_sum / samples as f64;
+        let hp_ratio = avg_elite_hp / avg_regular_hp;
+
+        let avg_regular_dmg = regular_dmg_sum / samples as f64;
+        let avg_elite_dmg = elite_dmg_sum / samples as f64;
+        let dmg_ratio = avg_elite_dmg / avg_regular_dmg;
+
+        // Elite should be ~1.5x (allow tolerance for random variance)
+        assert!(
+            (1.2..=1.8).contains(&hp_ratio),
+            "Elite HP ratio should be ~1.5x, got {:.2}x (avg regular={:.0}, elite={:.0})",
+            hp_ratio,
+            avg_regular_hp,
+            avg_elite_hp
+        );
+        assert!(
+            (1.2..=1.8).contains(&dmg_ratio),
+            "Elite damage ratio should be ~1.5x, got {:.2}x (avg regular={:.0}, elite={:.0})",
+            dmg_ratio,
+            avg_regular_dmg,
+            avg_elite_dmg
+        );
+    }
+
+    #[test]
+    fn test_dungeon_boss_stats_higher_than_elite() {
+        // Boss enemies (2.0x multiplier) should on average have higher stats
+        // than elite enemies (1.5x multiplier)
+        let player_hp = 200;
+        let player_dmg = 30;
+        let samples = 300;
+
+        let mut elite_hp_sum: f64 = 0.0;
+        let mut boss_hp_sum: f64 = 0.0;
+        let mut elite_dmg_sum: f64 = 0.0;
+        let mut boss_dmg_sum: f64 = 0.0;
+
+        for _ in 0..samples {
+            let elite = crate::combat::types::generate_elite_enemy(player_hp, player_dmg);
+            let boss = crate::combat::types::generate_boss_enemy(player_hp, player_dmg);
+            elite_hp_sum += elite.max_hp as f64;
+            boss_hp_sum += boss.max_hp as f64;
+            elite_dmg_sum += elite.damage as f64;
+            boss_dmg_sum += boss.damage as f64;
+        }
+
+        let avg_elite_hp = elite_hp_sum / samples as f64;
+        let avg_boss_hp = boss_hp_sum / samples as f64;
+        let hp_ratio = avg_boss_hp / avg_elite_hp;
+
+        let avg_elite_dmg = elite_dmg_sum / samples as f64;
+        let avg_boss_dmg = boss_dmg_sum / samples as f64;
+        let dmg_ratio = avg_boss_dmg / avg_elite_dmg;
+
+        // Boss/Elite ratio should be ~2.0/1.5 = ~1.33x
+        assert!(
+            (1.1..=1.6).contains(&hp_ratio),
+            "Boss/Elite HP ratio should be ~1.33x, got {:.2}x",
+            hp_ratio
+        );
+        assert!(
+            (1.1..=1.6).contains(&dmg_ratio),
+            "Boss/Elite damage ratio should be ~1.33x, got {:.2}x",
+            dmg_ratio
+        );
+    }
+
+    #[test]
+    fn test_dungeon_enemy_stats_scale_with_player_hp() {
+        // Enemies should scale with player max HP
+        let low_hp = 50;
+        let high_hp = 500;
+        let player_dmg = 20;
+        let samples = 200;
+
+        let mut low_hp_sum: f64 = 0.0;
+        let mut high_hp_sum: f64 = 0.0;
+
+        for _ in 0..samples {
+            let low = crate::combat::types::generate_enemy(low_hp, player_dmg);
+            let high = crate::combat::types::generate_enemy(high_hp, player_dmg);
+            low_hp_sum += low.max_hp as f64;
+            high_hp_sum += high.max_hp as f64;
+        }
+
+        let avg_low = low_hp_sum / samples as f64;
+        let avg_high = high_hp_sum / samples as f64;
+
+        // With 10x player HP, enemy HP should also be ~10x
+        let ratio = avg_high / avg_low;
+        assert!(
+            (7.0..=13.0).contains(&ratio),
+            "Enemy HP should scale roughly with player HP. ratio={:.2}x (avg low={:.0}, high={:.0})",
+            ratio,
+            avg_low,
+            avg_high
+        );
+    }
+
+    #[test]
+    fn test_dungeon_enemy_damage_scales_with_player_hp() {
+        // Enemy damage is based on player_max_hp / 7.0 (for 5-10 second fights)
+        let low_hp = 50;
+        let high_hp = 500;
+        let player_dmg = 20;
+        let samples = 200;
+
+        let mut low_dmg_sum: f64 = 0.0;
+        let mut high_dmg_sum: f64 = 0.0;
+
+        for _ in 0..samples {
+            let low = crate::combat::types::generate_enemy(low_hp, player_dmg);
+            let high = crate::combat::types::generate_enemy(high_hp, player_dmg);
+            low_dmg_sum += low.damage as f64;
+            high_dmg_sum += high.damage as f64;
+        }
+
+        let avg_low = low_dmg_sum / samples as f64;
+        let avg_high = high_dmg_sum / samples as f64;
+
+        let ratio = avg_high / avg_low;
+        assert!(
+            (7.0..=13.0).contains(&ratio),
+            "Enemy damage should scale with player HP. ratio={:.2}x (avg low={:.0}, high={:.0})",
+            ratio,
+            avg_low,
+            avg_high
+        );
+    }
+
+    #[test]
+    fn test_spawn_dungeon_enemy_uses_derived_stats() {
+        // Verify that dungeon enemy spawning reads player attributes to calculate
+        // derived stats (max_hp, damage) and uses them for enemy scaling
+        let mut state = setup_dungeon_with_room_type(RoomType::Combat);
+
+        // Increase player STR and CON for higher derived stats
+        state.attributes.set(AttributeType::Strength, 30); // +10 modifier
+        state.attributes.set(
+            crate::character::attributes::AttributeType::Constitution,
+            30,
+        ); // More HP
+
+        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+        let player_hp = derived.max_hp;
+
+        spawn_enemy_if_needed(&mut state);
+
+        let enemy = state
+            .combat_state
+            .current_enemy
+            .as_ref()
+            .expect("Should have spawned enemy");
+
+        // Enemy HP should be in the ballpark of player HP (80%-120% for regular enemies)
+        // Allow wider tolerance since there's random variance
+        assert!(
+            enemy.max_hp >= (player_hp as f64 * 0.5) as u32,
+            "Enemy HP {} should be at least 50% of player HP {}",
+            enemy.max_hp,
+            player_hp
+        );
+        assert!(
+            enemy.max_hp <= (player_hp as f64 * 1.5) as u32,
+            "Enemy HP {} should be at most 150% of player HP {}",
+            enemy.max_hp,
+            player_hp
+        );
+    }
+
+    #[test]
+    fn test_spawn_dungeon_enemy_does_not_overwrite_existing() {
+        // If an enemy already exists, spawn_enemy_if_needed should not replace it
+        let mut state = setup_dungeon_with_room_type(RoomType::Combat);
+
+        // Manually place an enemy
+        let sentinel = crate::combat::types::Enemy::new("Sentinel".to_string(), 9999, 1);
+        state.combat_state.current_enemy = Some(sentinel);
+
+        spawn_enemy_if_needed(&mut state);
+
+        let enemy = state.combat_state.current_enemy.as_ref().unwrap();
+        assert_eq!(
+            enemy.name, "Sentinel",
+            "Should not overwrite existing enemy"
+        );
+        assert_eq!(enemy.max_hp, 9999);
+    }
+
+    #[test]
+    fn test_spawn_dungeon_enemy_skips_when_regenerating() {
+        // During HP regen phase, no enemy should be spawned
+        let mut state = setup_dungeon_with_room_type(RoomType::Combat);
+        state.combat_state.is_regenerating = true;
+
+        spawn_enemy_if_needed(&mut state);
+
+        assert!(
+            state.combat_state.current_enemy.is_none(),
+            "Should not spawn enemy while regenerating"
+        );
+    }
+
+    #[test]
+    fn test_spawn_dungeon_enemy_resets_attack_timer() {
+        // When a new dungeon enemy is spawned, the attack timer should be reset to 0
+        let mut state = setup_dungeon_with_room_type(RoomType::Combat);
+        state.combat_state.attack_timer = 5.0; // Non-zero
+
+        spawn_enemy_if_needed(&mut state);
+
+        assert!(
+            state.combat_state.current_enemy.is_some(),
+            "Should have spawned enemy"
+        );
+        assert_eq!(
+            state.combat_state.attack_timer, 0.0,
+            "Attack timer should be reset to 0 on new enemy spawn"
+        );
+    }
 }

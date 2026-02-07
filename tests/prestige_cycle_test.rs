@@ -222,6 +222,123 @@ fn test_cannot_prestige_when_ineligible() {
     assert_eq!(state.character_level, old_level);
 }
 
+/// Test full combat → XP → level-up → prestige loop end-to-end
+#[test]
+fn test_combat_to_prestige_full_loop() {
+    use quest::character::derived_stats::DerivedStats;
+    use quest::character::prestige::{can_prestige, perform_prestige};
+    use quest::combat::logic::{update_combat, CombatEvent, HavenCombatBonuses};
+    use quest::core::game_logic::spawn_enemy_if_needed;
+    use quest::TICK_INTERVAL_MS;
+
+    let mut state = GameState::new("Combat Prestige Hero".to_string(), 0);
+    let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
+
+    assert_eq!(state.prestige_rank, 0);
+    assert_eq!(state.character_level, 1);
+    assert!(!can_prestige(&state));
+
+    // Phase 1: Gain XP purely through combat kills until we reach prestige requirement
+    let mut total_kills = 0u32;
+    let target_level = 10;
+
+    for tick in 0..200_000 {
+        // Sync derived stats
+        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+        state.combat_state.update_max_hp(derived.max_hp);
+
+        // Spawn enemy
+        spawn_enemy_if_needed(&mut state);
+
+        // Combat tick
+        let events = update_combat(&mut state, delta_time, &HavenCombatBonuses::default());
+
+        // Apply XP from kills (mimics main.rs game loop)
+        for event in &events {
+            if let CombatEvent::EnemyDied { xp_gained }
+            | CombatEvent::SubzoneBossDefeated { xp_gained, .. } = event
+            {
+                apply_tick_xp(&mut state, *xp_gained as f64);
+                total_kills += 1;
+            }
+        }
+
+        if state.character_level >= target_level {
+            break;
+        }
+
+        // Safety: ensure we don't infinite loop
+        assert!(
+            tick < 199_999,
+            "Should reach level {} within 200k ticks",
+            target_level
+        );
+    }
+
+    // Verify combat produced real progression
+    assert!(total_kills > 0, "Should have killed enemies through combat");
+    assert!(
+        state.character_level >= target_level,
+        "Should reach level {}",
+        target_level
+    );
+
+    // Verify attributes increased from level-ups
+    let total_attrs: u32 = AttributeType::all()
+        .iter()
+        .map(|a| state.attributes.get(*a))
+        .sum();
+    assert!(
+        total_attrs > 60,
+        "Should have gained attributes from leveling (got {} total)",
+        total_attrs
+    );
+
+    // Phase 2: Prestige
+    assert!(can_prestige(&state));
+    perform_prestige(&mut state);
+
+    // Verify complete reset
+    assert_eq!(state.prestige_rank, 1);
+    assert_eq!(state.total_prestige_count, 1);
+    assert_eq!(state.character_level, 1);
+    assert_eq!(state.character_xp, 0);
+
+    for attr in AttributeType::all() {
+        assert_eq!(
+            state.attributes.get(attr),
+            10,
+            "{:?} should reset to 10",
+            attr
+        );
+    }
+
+    assert_eq!(state.combat_state.player_current_hp, 50);
+    assert!(state.equipment.iter_equipped().count() == 0);
+    assert!(state.active_dungeon.is_none());
+    assert_eq!(state.zone_progression.current_zone_id, 1);
+    assert_eq!(state.zone_progression.current_subzone_id, 1);
+
+    // Phase 3: Verify post-prestige combat still works
+    let mut post_prestige_kill = false;
+    for _ in 0..2000 {
+        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+        state.combat_state.update_max_hp(derived.max_hp);
+        spawn_enemy_if_needed(&mut state);
+        let events = update_combat(&mut state, delta_time, &HavenCombatBonuses::default());
+        for event in &events {
+            if matches!(event, CombatEvent::EnemyDied { .. }) {
+                post_prestige_kill = true;
+                break;
+            }
+        }
+        if post_prestige_kill {
+            break;
+        }
+    }
+    assert!(post_prestige_kill, "Combat should work after prestige");
+}
+
 /// Test prestige XP multiplier affects future gains
 #[test]
 fn test_prestige_xp_multiplier() {

@@ -436,6 +436,141 @@ fn test_zone_progression_initial_state() {
 }
 
 // =============================================================================
+// Zone Advancement E2E Tests
+// =============================================================================
+
+#[test]
+fn test_zone_advancement_subzone_to_subzone() {
+    use quest::character::attributes::AttributeType;
+    use quest::core::game_logic::apply_tick_xp;
+    use quest::zones::BossDefeatResult;
+
+    let mut state = GameState::new("Zone Advance Test".to_string(), 0);
+
+    // Set high STR/INT for reliable boss kills (testing zone mechanics, not difficulty).
+    // Boss HP scales with player_max_hp (3x for zone boss), so keep CON at base (10)
+    // to minimize boss HP, and maximize STR/INT for damage output.
+    state.attributes.set(AttributeType::Strength, 50);
+    state.attributes.set(AttributeType::Intelligence, 50);
+    let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+    state.combat_state.update_max_hp(derived.max_hp);
+    state.combat_state.player_current_hp = state.combat_state.player_max_hp;
+
+    // Verify starting position
+    assert_eq!(state.zone_progression.current_zone_id, 1);
+    assert_eq!(state.zone_progression.current_subzone_id, 1);
+    assert_eq!(state.zone_progression.kills_in_subzone, 0);
+
+    // Kill enemies and bosses through combat until subzone advances
+    let mut boss_defeated = false;
+    let mut defeat_result = None;
+    for _ in 0..50_000 {
+        let events = simulate_tick(&mut state);
+        for event in &events {
+            match event {
+                CombatEvent::EnemyDied { xp_gained } => {
+                    apply_tick_xp(&mut state, *xp_gained as f64);
+                }
+                CombatEvent::SubzoneBossDefeated { xp_gained, result } => {
+                    apply_tick_xp(&mut state, *xp_gained as f64);
+                    defeat_result = Some(result.clone());
+                    boss_defeated = true;
+                }
+                _ => {}
+            }
+        }
+        if boss_defeated {
+            break;
+        }
+    }
+
+    assert!(boss_defeated, "Boss should be defeated eventually");
+
+    // Should advance to subzone 2 (zone 1 has 3 subzones)
+    assert!(
+        matches!(
+            defeat_result,
+            Some(BossDefeatResult::SubzoneComplete { new_subzone_id: 2 })
+        ),
+        "Should advance to subzone 2, got {:?}",
+        defeat_result
+    );
+    assert_eq!(state.zone_progression.current_zone_id, 1);
+    assert_eq!(state.zone_progression.current_subzone_id, 2);
+    assert!(!state.zone_progression.fighting_boss);
+    assert_eq!(state.zone_progression.kills_in_subzone, 0);
+}
+
+#[test]
+fn test_zone_advancement_full_zone_clear() {
+    use quest::character::attributes::AttributeType;
+    use quest::core::game_logic::apply_tick_xp;
+    use quest::zones::BossDefeatResult;
+
+    let mut state = GameState::new("Full Zone Clear Test".to_string(), 0);
+
+    // Set high STR/INT for reliable boss kills (testing zone mechanics, not difficulty).
+    // Boss HP scales with player_max_hp (3x for zone boss), so keep CON at base (10)
+    // to minimize boss HP, and maximize STR/INT for damage output.
+    state.attributes.set(AttributeType::Strength, 50);
+    state.attributes.set(AttributeType::Intelligence, 50);
+    let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+    state.combat_state.update_max_hp(derived.max_hp);
+    state.combat_state.player_current_hp = state.combat_state.player_max_hp;
+
+    // Clear all 3 subzones of zone 1 to advance to zone 2
+    for expected_subzone in 1..=3u32 {
+        assert_eq!(state.zone_progression.current_subzone_id, expected_subzone);
+
+        // Run combat until boss is defeated (handles kills, boss spawn, and boss death)
+        let mut subzone_boss_defeated = false;
+        for _ in 0..100_000 {
+            let events = simulate_tick(&mut state);
+            for event in &events {
+                match event {
+                    CombatEvent::EnemyDied { xp_gained } => {
+                        apply_tick_xp(&mut state, *xp_gained as f64);
+                    }
+                    CombatEvent::SubzoneBossDefeated { xp_gained, result } => {
+                        apply_tick_xp(&mut state, *xp_gained as f64);
+
+                        if expected_subzone < 3 {
+                            assert!(
+                                matches!(result, BossDefeatResult::SubzoneComplete { .. }),
+                                "Subzone {} boss should give SubzoneComplete, got {:?}",
+                                expected_subzone,
+                                result
+                            );
+                        } else {
+                            assert!(
+                                matches!(result, BossDefeatResult::ZoneComplete { .. }),
+                                "Final subzone boss should give ZoneComplete, got {:?}",
+                                result
+                            );
+                        }
+                        subzone_boss_defeated = true;
+                    }
+                    _ => {}
+                }
+            }
+            if subzone_boss_defeated {
+                break;
+            }
+        }
+        assert!(
+            subzone_boss_defeated,
+            "Boss in subzone {} should be defeated",
+            expected_subzone
+        );
+    }
+
+    // Should now be in zone 2, subzone 1
+    assert_eq!(state.zone_progression.current_zone_id, 2);
+    assert_eq!(state.zone_progression.current_subzone_id, 1);
+    assert_eq!(state.zone_progression.kills_in_subzone, 0);
+}
+
+// =============================================================================
 // Play Time Tracking Tests
 // =============================================================================
 
