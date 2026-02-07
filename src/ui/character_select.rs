@@ -27,14 +27,14 @@ impl CharacterSelectScreen {
             vec![
                 Constraint::Length(3),  // Title
                 Constraint::Min(0),     // Main content
-                Constraint::Length(16), // Haven tree (14 lines + 2 for border)
-                Constraint::Length(4),  // Controls (2 lines when Haven discovered)
+                Constraint::Length(19), // Haven tree (17 lines + 2 for border) - includes StormForge
+                Constraint::Length(4),  // Controls (2 lines)
             ]
         } else {
             vec![
                 Constraint::Length(3), // Title
                 Constraint::Min(0),    // Main content
-                Constraint::Length(3), // Controls
+                Constraint::Length(4), // Controls (2 lines)
             ]
         };
 
@@ -87,14 +87,23 @@ impl CharacterSelectScreen {
             "[Enter] Play    [R] Rename    [D] Delete    {}    [Q] Quit",
             new_button
         ))];
+        // Second row: Achievements always shown, Haven only if discovered
+        let mut second_row_spans = vec![Span::styled(
+            "[A] Achievements",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )];
         if haven.discovered {
-            control_lines.push(Line::from(Span::styled(
+            second_row_spans.push(Span::raw("    "));
+            second_row_spans.push(Span::styled(
                 "[H] Haven",
                 Style::default()
                     .fg(Color::Yellow)
                     .add_modifier(Modifier::BOLD),
-            )));
+            ));
         }
+        control_lines.push(Line::from(second_row_spans));
         let controls = Paragraph::new(control_lines)
             .alignment(Alignment::Center)
             .style(Style::default().fg(Color::Gray));
@@ -255,8 +264,9 @@ impl CharacterSelectScreen {
     }
 
     fn draw_haven_tree(&self, f: &mut Frame, area: Rect, haven: &Haven) {
+        // Max tiers: 12 rooms × 3 tiers + FishingDock (4 tiers) + StormForge (1 tier) = 36 + 4 + 1 = 41
         let block = Block::default().borders(Borders::ALL).title(format!(
-            "Haven ({}/39 tiers)",
+            "Haven ({}/41 tiers)",
             self.count_haven_tiers(haven)
         ));
 
@@ -273,30 +283,54 @@ impl CharacterSelectScreen {
         HavenRoomId::ALL.iter().map(|r| haven.room_tier(*r)).sum()
     }
 
-    fn tier_dots(&self, tier: u8) -> String {
-        match tier {
-            0 => "○○○".to_string(),
-            1 => "●○○".to_string(),
-            2 => "●●○".to_string(),
-            3 => "●●●".to_string(),
-            _ => "○○○".to_string(),
+    fn tier_dots(&self, tier: u8, max_tier: u8) -> String {
+        // Display dots based on max tier (most are 3, some have different max)
+        match max_tier {
+            1 => {
+                // Single tier room (StormForge)
+                if tier >= 1 {
+                    "●".to_string()
+                } else {
+                    "○".to_string()
+                }
+            }
+            4 => {
+                // Four tier room (FishingDock)
+                match tier {
+                    0 => "○○○○".to_string(),
+                    1 => "●○○○".to_string(),
+                    2 => "●●○○".to_string(),
+                    3 => "●●●○".to_string(),
+                    _ => "●●●●".to_string(),
+                }
+            }
+            _ => {
+                // Standard 3 tier room
+                match tier {
+                    0 => "○○○".to_string(),
+                    1 => "●○○".to_string(),
+                    2 => "●●○".to_string(),
+                    _ => "●●●".to_string(),
+                }
+            }
         }
     }
 
     fn build_haven_diamond(&self, haven: &Haven) -> Vec<Line<'static>> {
-        let hs = self.tier_dots(haven.room_tier(HavenRoomId::Hearthstone));
-        let arm = self.tier_dots(haven.room_tier(HavenRoomId::Armory));
-        let bed = self.tier_dots(haven.room_tier(HavenRoomId::Bedroom));
-        let trn = self.tier_dots(haven.room_tier(HavenRoomId::TrainingYard));
-        let tph = self.tier_dots(haven.room_tier(HavenRoomId::TrophyHall));
-        let gdn = self.tier_dots(haven.room_tier(HavenRoomId::Garden));
-        let lib = self.tier_dots(haven.room_tier(HavenRoomId::Library));
-        let wtc = self.tier_dots(haven.room_tier(HavenRoomId::Watchtower));
-        let alc = self.tier_dots(haven.room_tier(HavenRoomId::AlchemyLab));
-        let dck = self.tier_dots(haven.room_tier(HavenRoomId::FishingDock));
-        let wks = self.tier_dots(haven.room_tier(HavenRoomId::Workshop));
-        let war = self.tier_dots(haven.room_tier(HavenRoomId::WarRoom));
-        let vlt = self.tier_dots(haven.room_tier(HavenRoomId::Vault));
+        let hs = self.tier_dots(haven.room_tier(HavenRoomId::Hearthstone), 3);
+        let arm = self.tier_dots(haven.room_tier(HavenRoomId::Armory), 3);
+        let bed = self.tier_dots(haven.room_tier(HavenRoomId::Bedroom), 3);
+        let trn = self.tier_dots(haven.room_tier(HavenRoomId::TrainingYard), 3);
+        let tph = self.tier_dots(haven.room_tier(HavenRoomId::TrophyHall), 3);
+        let gdn = self.tier_dots(haven.room_tier(HavenRoomId::Garden), 3);
+        let lib = self.tier_dots(haven.room_tier(HavenRoomId::Library), 3);
+        let wtc = self.tier_dots(haven.room_tier(HavenRoomId::Watchtower), 3);
+        let alc = self.tier_dots(haven.room_tier(HavenRoomId::AlchemyLab), 3);
+        let dck = self.tier_dots(haven.room_tier(HavenRoomId::FishingDock), 4);
+        let wks = self.tier_dots(haven.room_tier(HavenRoomId::Workshop), 3);
+        let war = self.tier_dots(haven.room_tier(HavenRoomId::WarRoom), 3);
+        let vlt = self.tier_dots(haven.room_tier(HavenRoomId::Vault), 3);
+        let frg = self.tier_dots(haven.room_tier(HavenRoomId::StormForge), 1);
 
         vec![
             Line::from(format!("                       ♨ {}", hs)),
@@ -312,13 +346,16 @@ impl CharacterSelectScreen {
             Line::from("       Train     Trophy  Garden    Library"),
             Line::from("         │         │       │         │"),
             Line::from(format!(
-                "        {}       {}     {}       {}",
+                "        {}       {}     {}      {}",
                 wtc, alc, dck, wks
             )),
             Line::from("       Watch     Alchem   Dock    Workshop"),
             Line::from("          ╲       ╱         ╲       ╱"),
             Line::from(format!("           {} ⚔             🏦 {}", war, vlt)),
             Line::from("          War Room            Vault"),
+            Line::from("                    ╲       ╱"),
+            Line::from(format!("                     {} ⚡", frg)),
+            Line::from("                   Storm Forge"),
         ]
     }
 

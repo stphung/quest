@@ -175,6 +175,7 @@ fn render_skill_tree(frame: &mut Frame, area: Rect, haven: &Haven, selected_room
                 | HavenRoomId::FishingDock
                 | HavenRoomId::Workshop => "      ",
                 HavenRoomId::WarRoom | HavenRoomId::Vault => "        ",
+                HavenRoomId::StormForge => "          ",
             };
 
             let style = if !unlocked {

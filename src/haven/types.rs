@@ -22,11 +22,13 @@ pub enum HavenRoomId {
     FishingDock,
     Workshop,
     Vault,
+    // Special buildings
+    StormForge,
 }
 
 impl HavenRoomId {
     /// All room IDs in tree order
-    pub const ALL: [HavenRoomId; 13] = [
+    pub const ALL: [HavenRoomId; 14] = [
         HavenRoomId::Hearthstone,
         HavenRoomId::Armory,
         HavenRoomId::TrainingYard,
@@ -40,6 +42,7 @@ impl HavenRoomId {
         HavenRoomId::FishingDock,
         HavenRoomId::Workshop,
         HavenRoomId::Vault,
+        HavenRoomId::StormForge,
     ];
 
     /// Display name for UI
@@ -58,6 +61,7 @@ impl HavenRoomId {
             HavenRoomId::FishingDock => "Fishing Dock",
             HavenRoomId::Workshop => "Workshop",
             HavenRoomId::Vault => "Vault",
+            HavenRoomId::StormForge => "Storm Forge",
         }
     }
 
@@ -77,6 +81,7 @@ impl HavenRoomId {
             HavenRoomId::FishingDock => "A private spot to cast.",
             HavenRoomId::Workshop => "Better tools yield better finds.",
             HavenRoomId::Vault => "Preserves treasured equipment through prestige resets.",
+            HavenRoomId::StormForge => "The legendary forge where Stormbreaker can be crafted.",
         }
     }
 
@@ -100,6 +105,8 @@ impl HavenRoomId {
             HavenRoomId::FishingDock => &[HavenRoomId::Garden],
             HavenRoomId::Workshop => &[HavenRoomId::Library],
             HavenRoomId::Vault => &[HavenRoomId::FishingDock, HavenRoomId::Workshop],
+            // StormForge requires both capstones
+            HavenRoomId::StormForge => &[HavenRoomId::WarRoom, HavenRoomId::Vault],
         }
     }
 
@@ -113,23 +120,27 @@ impl HavenRoomId {
             HavenRoomId::TrophyHall => &[HavenRoomId::AlchemyLab],
             HavenRoomId::Watchtower => &[HavenRoomId::WarRoom],
             HavenRoomId::AlchemyLab => &[HavenRoomId::WarRoom],
-            HavenRoomId::WarRoom => &[],
+            HavenRoomId::WarRoom => &[HavenRoomId::StormForge],
             HavenRoomId::Bedroom => &[HavenRoomId::Garden, HavenRoomId::Library],
             HavenRoomId::Garden => &[HavenRoomId::FishingDock],
             HavenRoomId::Library => &[HavenRoomId::Workshop],
             HavenRoomId::FishingDock => &[HavenRoomId::Vault],
             HavenRoomId::Workshop => &[HavenRoomId::Vault],
-            HavenRoomId::Vault => &[],
+            HavenRoomId::Vault => &[HavenRoomId::StormForge],
+            HavenRoomId::StormForge => &[],
         }
     }
 
     /// Whether this room is a capstone (requires two parents)
     #[allow(dead_code)] // Will be used for UI styling
     pub fn is_capstone(&self) -> bool {
-        matches!(self, HavenRoomId::WarRoom | HavenRoomId::Vault)
+        matches!(
+            self,
+            HavenRoomId::WarRoom | HavenRoomId::Vault | HavenRoomId::StormForge
+        )
     }
 
-    /// Get the depth of this room in the tree (0 = root, 4 = capstones)
+    /// Get the depth of this room in the tree (0 = root, 4 = capstones, 5 = StormForge)
     pub fn depth(&self) -> u8 {
         match self {
             HavenRoomId::Hearthstone => 0,
@@ -143,37 +154,72 @@ impl HavenRoomId {
             | HavenRoomId::FishingDock
             | HavenRoomId::Workshop => 3,
             HavenRoomId::WarRoom | HavenRoomId::Vault => 4,
+            HavenRoomId::StormForge => 5,
+        }
+    }
+
+    /// Maximum tier for this room (most rooms are 3, StormForge and FishingDock have special max)
+    pub fn max_tier(&self) -> u8 {
+        match self {
+            HavenRoomId::StormForge => 1,  // Single tier only
+            HavenRoomId::FishingDock => 4, // Has tier 4 for max fishing rank
+            _ => 3,
         }
     }
 }
 
-/// Get the prestige rank cost for a specific tier (1, 2, or 3) and room.
+/// Get the prestige rank cost for a specific tier and room.
 /// Costs scale with depth: root is cheapest, capstones are most expensive.
+/// Special rooms have unique costs.
 pub fn tier_cost(room: HavenRoomId, tier: u8) -> u32 {
-    let depth = room.depth();
-    match (depth, tier) {
-        // Depth 0 (Hearthstone): 1/2/3
-        (0, 1) => 1,
-        (0, 2) => 2,
-        (0, 3) => 3,
-        // Depth 1 (Armory, Bedroom): 1/3/5
-        (1, 1) => 1,
-        (1, 2) => 3,
-        (1, 3) => 5,
-        // Depth 2-3 (mid-tree): 2/4/6
-        (2..=3, 1) => 2,
-        (2..=3, 2) => 4,
-        (2..=3, 3) => 6,
-        // Depth 4 (capstones): 3/5/7
-        (4, 1) => 3,
-        (4, 2) => 5,
-        (4, 3) => 7,
-        _ => 0,
+    // Special room costs
+    match room {
+        HavenRoomId::StormForge => {
+            // Single tier, costs 25 PR
+            if tier == 1 {
+                25
+            } else {
+                0
+            }
+        }
+        HavenRoomId::FishingDock => {
+            // T1-3 follow normal depth 3 costs, T4 is special
+            match tier {
+                1 => 2,
+                2 => 4,
+                3 => 6,
+                4 => 10, // Special T4 cost
+                _ => 0,
+            }
+        }
+        _ => {
+            let depth = room.depth();
+            match (depth, tier) {
+                // Depth 0 (Hearthstone): 1/2/3
+                (0, 1) => 1,
+                (0, 2) => 2,
+                (0, 3) => 3,
+                // Depth 1 (Armory, Bedroom): 1/3/5
+                (1, 1) => 1,
+                (1, 2) => 3,
+                (1, 3) => 5,
+                // Depth 2-3 (mid-tree): 2/4/6
+                (2..=3, 1) => 2,
+                (2..=3, 2) => 4,
+                (2..=3, 3) => 6,
+                // Depth 4 (capstones): 3/5/7
+                (4, 1) => 3,
+                (4, 2) => 5,
+                (4, 3) => 7,
+                _ => 0,
+            }
+        }
     }
 }
 
 /// Bonus type that a room provides
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[allow(dead_code)] // MaxFishingRank will be used in fishing logic
 pub enum HavenBonusType {
     DamagePercent,
     XpGainPercent,
@@ -188,13 +234,15 @@ pub enum HavenBonusType {
     ItemRarityPercent,
     HpRegenDelayReduction,
     VaultSlots,
+    MaxFishingRank,   // FishingDock T4 bonus
+    StormForgeAccess, // StormForge enables forging
 }
 
 /// A specific bonus value for a room at a given tier
 #[derive(Debug, Clone, Copy)]
 pub struct HavenBonus {
     pub bonus_type: HavenBonusType,
-    pub values: [f64; 3], // T1, T2, T3
+    pub values: [f64; 4], // T1, T2, T3, T4 (T4 only used by FishingDock)
 }
 
 impl HavenRoomId {
@@ -203,62 +251,68 @@ impl HavenRoomId {
         match self {
             HavenRoomId::Hearthstone => HavenBonus {
                 bonus_type: HavenBonusType::OfflineXpPercent,
-                values: [25.0, 50.0, 100.0],
+                values: [25.0, 50.0, 100.0, 0.0],
             },
             HavenRoomId::Armory => HavenBonus {
                 bonus_type: HavenBonusType::DamagePercent,
-                values: [5.0, 10.0, 25.0],
+                values: [5.0, 10.0, 25.0, 0.0],
             },
             HavenRoomId::TrainingYard => HavenBonus {
                 bonus_type: HavenBonusType::XpGainPercent,
-                values: [5.0, 10.0, 30.0],
+                values: [5.0, 10.0, 30.0, 0.0],
             },
             HavenRoomId::TrophyHall => HavenBonus {
                 bonus_type: HavenBonusType::DropRatePercent,
-                values: [5.0, 10.0, 15.0],
+                values: [5.0, 10.0, 15.0, 0.0],
             },
             HavenRoomId::Watchtower => HavenBonus {
                 bonus_type: HavenBonusType::CritChancePercent,
-                values: [5.0, 10.0, 20.0],
+                values: [5.0, 10.0, 20.0, 0.0],
             },
             HavenRoomId::AlchemyLab => HavenBonus {
                 bonus_type: HavenBonusType::HpRegenPercent,
-                values: [25.0, 50.0, 100.0],
+                values: [25.0, 50.0, 100.0, 0.0],
             },
             HavenRoomId::WarRoom => HavenBonus {
                 bonus_type: HavenBonusType::DoubleStrikeChance,
-                values: [10.0, 20.0, 35.0],
+                values: [10.0, 20.0, 35.0, 0.0],
             },
             HavenRoomId::Bedroom => HavenBonus {
                 bonus_type: HavenBonusType::HpRegenDelayReduction,
-                values: [15.0, 30.0, 50.0],
+                values: [15.0, 30.0, 50.0, 0.0],
             },
             HavenRoomId::Garden => HavenBonus {
                 bonus_type: HavenBonusType::FishingTimerReduction,
-                values: [10.0, 20.0, 40.0],
+                values: [10.0, 20.0, 40.0, 0.0],
             },
             HavenRoomId::Library => HavenBonus {
                 bonus_type: HavenBonusType::ChallengeDiscoveryPercent,
-                values: [20.0, 30.0, 50.0],
+                values: [20.0, 30.0, 50.0, 0.0],
             },
             HavenRoomId::FishingDock => HavenBonus {
                 bonus_type: HavenBonusType::DoubleFishChance,
-                values: [25.0, 50.0, 100.0],
+                // T1-3: Double fish chance, T4: +10 max fishing rank (handled separately)
+                values: [25.0, 50.0, 100.0, 100.0],
             },
             HavenRoomId::Workshop => HavenBonus {
                 bonus_type: HavenBonusType::ItemRarityPercent,
-                values: [10.0, 15.0, 25.0],
+                values: [10.0, 15.0, 25.0, 0.0],
             },
             HavenRoomId::Vault => HavenBonus {
                 bonus_type: HavenBonusType::VaultSlots,
-                values: [1.0, 3.0, 5.0],
+                values: [1.0, 3.0, 5.0, 0.0],
+            },
+            HavenRoomId::StormForge => HavenBonus {
+                bonus_type: HavenBonusType::StormForgeAccess,
+                values: [1.0, 0.0, 0.0, 0.0], // Single tier, value 1.0 = enabled
             },
         }
     }
 
     /// Get the bonus value for a specific tier (0 = unbuilt)
     pub fn bonus_value(&self, tier: u8) -> f64 {
-        if tier == 0 || tier > 3 {
+        let max_tier = self.max_tier();
+        if tier == 0 || tier > max_tier {
             return 0.0;
         }
         self.bonus().values[(tier - 1) as usize]
@@ -268,6 +322,10 @@ impl HavenRoomId {
     pub fn format_bonus(&self, tier: u8) -> String {
         if tier == 0 {
             return String::new();
+        }
+        // Special case: FishingDock T4 has a different bonus type
+        if *self == HavenRoomId::FishingDock && tier == 4 {
+            return "+10 Max Fishing Rank".to_string();
         }
         let value = self.bonus_value(tier);
         match self.bonus().bonus_type {
@@ -288,6 +346,8 @@ impl HavenRoomId {
                 value,
                 if value > 1.0 { "s" } else { "" }
             ),
+            HavenBonusType::MaxFishingRank => format!("+{:.0} Max Fishing Rank", value),
+            HavenBonusType::StormForgeAccess => "Stormbreaker forging enabled".to_string(),
         }
     }
 }
@@ -330,17 +390,31 @@ impl Haven {
     /// Check if a room can be built or upgraded
     pub fn can_build(&self, room: HavenRoomId) -> bool {
         let tier = self.room_tier(room);
-        tier < 3 && self.is_room_unlocked(room)
+        tier < room.max_tier() && self.is_room_unlocked(room)
     }
 
     /// Get the next tier for a room (current + 1), or None if maxed
     pub fn next_tier(&self, room: HavenRoomId) -> Option<u8> {
         let tier = self.room_tier(room);
-        if tier < 3 {
+        if tier < room.max_tier() {
             Some(tier + 1)
         } else {
             None
         }
+    }
+
+    /// Get the fishing rank bonus from FishingDock T4 (0 if not at T4)
+    pub fn fishing_rank_bonus(&self) -> u32 {
+        if self.room_tier(HavenRoomId::FishingDock) >= 4 {
+            10
+        } else {
+            0
+        }
+    }
+
+    /// Check if StormForge is built
+    pub fn has_storm_forge(&self) -> bool {
+        self.room_tier(HavenRoomId::StormForge) >= 1
     }
 
     /// Build or upgrade a room. Returns the new tier, or None if not possible.
@@ -404,6 +478,8 @@ pub struct HavenBonuses {
     pub item_rarity_percent: f64,
     pub hp_regen_delay_reduction: f64,
     pub vault_slots: u8,
+    pub max_fishing_rank_bonus: u32,
+    pub has_storm_forge: bool,
 }
 
 impl Haven {
@@ -424,6 +500,8 @@ impl Haven {
             item_rarity_percent: self.get_bonus(HavenBonusType::ItemRarityPercent),
             hp_regen_delay_reduction: self.get_bonus(HavenBonusType::HpRegenDelayReduction),
             vault_slots: self.vault_tier(),
+            max_fishing_rank_bonus: self.fishing_rank_bonus(),
+            has_storm_forge: self.has_storm_forge(),
         }
     }
 }
@@ -437,7 +515,7 @@ mod tests {
         let haven = Haven::new();
         assert!(!haven.discovered);
         assert_eq!(haven.rooms_built(), 0);
-        assert_eq!(haven.total_rooms(), 13);
+        assert_eq!(haven.total_rooms(), 14); // 13 original + StormForge
         for room in HavenRoomId::ALL {
             assert_eq!(haven.room_tier(room), 0);
         }
@@ -710,7 +788,15 @@ mod tests {
     fn test_bonus_value_returns_zero_for_unbuilt_and_invalid() {
         for room in HavenRoomId::ALL {
             assert_eq!(room.bonus_value(0), 0.0, "{:?} tier 0 should be 0", room);
-            assert_eq!(room.bonus_value(4), 0.0, "{:?} tier 4 should be 0", room);
+            // Tier above max should be 0
+            let above_max = room.max_tier() + 1;
+            assert_eq!(
+                room.bonus_value(above_max),
+                0.0,
+                "{:?} tier {} (above max) should be 0",
+                room,
+                above_max
+            );
             assert_eq!(
                 room.bonus_value(255),
                 0.0,
@@ -766,15 +852,18 @@ mod tests {
         assert!(haven.build_room(HavenRoomId::WarRoom).is_some());
         assert!(haven.build_room(HavenRoomId::Vault).is_some());
 
-        assert_eq!(haven.rooms_built(), 13);
-        assert_eq!(haven.total_rooms(), 13);
+        // Depth 5 (StormForge - requires both capstones)
+        assert!(haven.build_room(HavenRoomId::StormForge).is_some());
+
+        assert_eq!(haven.rooms_built(), 14);
+        assert_eq!(haven.total_rooms(), 14);
     }
 
     #[test]
-    fn test_max_all_rooms_to_tier_3() {
+    fn test_max_all_rooms_to_max_tier() {
         let mut haven = Haven::new();
 
-        // Build all rooms to T3
+        // Build all rooms to their max tier
         for _ in 0..3 {
             haven.build_room(HavenRoomId::Hearthstone);
         }
@@ -790,18 +879,29 @@ mod tests {
             haven.build_room(HavenRoomId::TrophyHall);
             haven.build_room(HavenRoomId::Library);
             haven.build_room(HavenRoomId::Watchtower);
-            haven.build_room(HavenRoomId::FishingDock);
             haven.build_room(HavenRoomId::AlchemyLab);
             haven.build_room(HavenRoomId::Workshop);
+        }
+        // FishingDock has 4 tiers
+        for _ in 0..4 {
+            haven.build_room(HavenRoomId::FishingDock);
         }
         for _ in 0..3 {
             haven.build_room(HavenRoomId::WarRoom);
             haven.build_room(HavenRoomId::Vault);
         }
+        // StormForge has 1 tier
+        haven.build_room(HavenRoomId::StormForge);
 
-        // Verify all rooms at T3
+        // Verify all rooms at their max tier
         for room in HavenRoomId::ALL {
-            assert_eq!(haven.room_tier(room), 3, "{:?} should be T3", room);
+            assert_eq!(
+                haven.room_tier(room),
+                room.max_tier(),
+                "{:?} should be at max tier {}",
+                room,
+                room.max_tier()
+            );
         }
     }
 
@@ -912,10 +1012,10 @@ mod tests {
         // Verify capstones have exactly 2 parents
         assert_eq!(HavenRoomId::WarRoom.parents().len(), 2);
         assert_eq!(HavenRoomId::Vault.parents().len(), 2);
+        assert_eq!(HavenRoomId::StormForge.parents().len(), 2);
 
-        // Verify capstones have no children
-        assert!(HavenRoomId::WarRoom.children().is_empty());
-        assert!(HavenRoomId::Vault.children().is_empty());
+        // Verify StormForge (ultimate capstone) has no children
+        assert!(HavenRoomId::StormForge.children().is_empty());
     }
 
     #[test]

@@ -5,6 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::data::{get_all_zones, Zone};
+use crate::achievements::{AchievementId, Achievements};
 
 /// Number of enemies to defeat before the subzone boss spawns
 pub const KILLS_FOR_BOSS: u32 = 10;
@@ -83,7 +84,33 @@ impl ZoneProgression {
 
     /// Checks if the current boss requires a weapon the player doesn't have.
     /// Returns Some(weapon_name) if blocked, None if can proceed.
-    pub fn boss_weapon_blocked(&self) -> Option<&'static str> {
+    ///
+    /// Uses the TheStormbreaker achievement to check if the player has forged Stormbreaker.
+    pub fn boss_weapon_blocked(&self, achievements: &Achievements) -> Option<&'static str> {
+        if !self.fighting_boss {
+            return None;
+        }
+
+        let zones = get_all_zones();
+        let zone = zones.iter().find(|z| z.id == self.current_zone_id)?;
+
+        // Only the zone's final boss requires the weapon
+        let is_zone_boss = self.current_subzone_id == zone.subzones.len() as u32;
+        // Check achievement instead of has_stormbreaker flag
+        let has_stormbreaker = achievements.is_unlocked(AchievementId::TheStormbreaker);
+        let needs_weapon = zone.requires_weapon && is_zone_boss && !has_stormbreaker;
+
+        if needs_weapon {
+            zone.weapon_name
+        } else {
+            None
+        }
+    }
+
+    /// Legacy version for backwards compatibility.
+    /// Uses the has_stormbreaker flag instead of achievements.
+    #[deprecated(note = "Use boss_weapon_blocked with achievements parameter instead")]
+    pub fn boss_weapon_blocked_legacy(&self) -> Option<&'static str> {
         if !self.fighting_boss {
             return None;
         }
@@ -153,7 +180,13 @@ impl ZoneProgression {
 
     /// Handles boss defeat for the current subzone and auto-advances.
     /// Returns a description of what happened (for UI feedback).
-    pub fn on_boss_defeated(&mut self, prestige_rank: u32) -> BossDefeatResult {
+    ///
+    /// Uses achievements to check for Stormbreaker and to unlock GameComplete.
+    pub fn on_boss_defeated(
+        &mut self,
+        prestige_rank: u32,
+        achievements: &mut Achievements,
+    ) -> BossDefeatResult {
         let zone_id = self.current_zone_id;
         let subzone_id = self.current_subzone_id;
 
@@ -166,8 +199,9 @@ impl ZoneProgression {
 
         let is_zone_boss = subzone_id == zone.subzones.len() as u32;
 
-        // Check for Zone 10 final boss weapon requirement
-        if zone.requires_weapon && is_zone_boss && !self.has_stormbreaker {
+        // Check for Zone 10 final boss weapon requirement (use achievement)
+        let has_stormbreaker = achievements.is_unlocked(AchievementId::TheStormbreaker);
+        if zone.requires_weapon && is_zone_boss && !has_stormbreaker {
             // Can't defeat this boss without the weapon - boss survives!
             // Reset fighting state so player can try again (after getting weapon)
             self.fighting_boss = false;
@@ -180,7 +214,25 @@ impl ZoneProgression {
         // Record the defeat
         self.defeat_boss(zone_id, subzone_id);
 
+        // Special handling for Zone 11 (The Expanse) - infinite cycling
+        if zone_id == 11 && is_zone_boss {
+            // Cycle back to subzone 1
+            self.current_subzone_id = 1;
+            self.kills_in_subzone = 0;
+            return BossDefeatResult::ExpanseCycle;
+        }
+
         if is_zone_boss {
+            // Zone 10 completion triggers GameComplete achievement and unlocks Zone 11
+            if zone_id == 10 {
+                achievements.unlock(AchievementId::GameComplete, None);
+                // Unlock Zone 11 (The Expanse) and advance to it
+                self.unlock_zone(11);
+                self.current_zone_id = 11;
+                self.current_subzone_id = 1;
+                return BossDefeatResult::GameComplete;
+            }
+
             // Try to advance to next zone
             if self.advance_to_next_zone(prestige_rank) {
                 return BossDefeatResult::ZoneComplete {
@@ -201,6 +253,57 @@ impl ZoneProgression {
         }
 
         // Advance to next subzone
+        self.advance_to_next_subzone();
+        BossDefeatResult::SubzoneComplete {
+            new_subzone_id: self.current_subzone_id,
+        }
+    }
+
+    /// Legacy version for backwards compatibility (uses has_stormbreaker flag).
+    #[deprecated(note = "Use on_boss_defeated with achievements parameter instead")]
+    #[allow(dead_code)]
+    pub fn on_boss_defeated_legacy(&mut self, prestige_rank: u32) -> BossDefeatResult {
+        let zone_id = self.current_zone_id;
+        let subzone_id = self.current_subzone_id;
+
+        let zones = get_all_zones();
+        let Some(zone) = zones.iter().find(|z| z.id == zone_id) else {
+            return BossDefeatResult::SubzoneComplete {
+                new_subzone_id: self.current_subzone_id,
+            };
+        };
+
+        let is_zone_boss = subzone_id == zone.subzones.len() as u32;
+
+        // Check for Zone 10 final boss weapon requirement
+        if zone.requires_weapon && is_zone_boss && !self.has_stormbreaker {
+            self.fighting_boss = false;
+            self.kills_in_subzone = 0;
+            return BossDefeatResult::WeaponRequired {
+                weapon_name: zone.weapon_name.unwrap_or("legendary weapon").to_string(),
+            };
+        }
+
+        self.defeat_boss(zone_id, subzone_id);
+
+        if is_zone_boss {
+            if self.advance_to_next_zone(prestige_rank) {
+                return BossDefeatResult::ZoneComplete {
+                    old_zone: zone.name.to_string(),
+                    new_zone_id: self.current_zone_id,
+                };
+            }
+
+            let next_zone = zones.iter().find(|z| z.id == zone_id + 1);
+            if let Some(next) = next_zone {
+                return BossDefeatResult::ZoneCompleteButGated {
+                    zone_name: zone.name.to_string(),
+                    required_prestige: next.prestige_requirement,
+                };
+            }
+            return BossDefeatResult::GameComplete;
+        }
+
         self.advance_to_next_subzone();
         BossDefeatResult::SubzoneComplete {
             new_subzone_id: self.current_subzone_id,
@@ -326,11 +429,14 @@ pub enum BossDefeatResult {
     GameComplete,
     /// Boss requires a legendary weapon to defeat (Zone 10)
     WeaponRequired { weapon_name: String },
+    /// Completed a cycle of The Expanse (Zone 11) - returns to subzone 1
+    ExpanseCycle,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::achievements::Achievements;
 
     #[test]
     fn test_zone_progression_default() {
@@ -636,6 +742,7 @@ mod tests {
     #[test]
     fn test_on_boss_defeated_advances_subzone() {
         let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
 
         // Get to boss
         for _ in 0..KILLS_FOR_BOSS {
@@ -645,7 +752,7 @@ mod tests {
         assert_eq!(prog.current_subzone_id, 1);
 
         // Defeat boss
-        let result = prog.on_boss_defeated(0);
+        let result = prog.on_boss_defeated(0, &mut achievements);
         assert!(matches!(
             result,
             BossDefeatResult::SubzoneComplete { new_subzone_id: 2 }
@@ -658,13 +765,14 @@ mod tests {
     #[test]
     fn test_on_boss_defeated_zone_complete() {
         let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
 
         // Clear subzones 1 and 2
         for _subzone in 1..=2 {
             for _ in 0..KILLS_FOR_BOSS {
                 prog.record_kill();
             }
-            prog.on_boss_defeated(0);
+            prog.on_boss_defeated(0, &mut achievements);
         }
         assert_eq!(prog.current_subzone_id, 3);
 
@@ -673,7 +781,7 @@ mod tests {
             prog.record_kill();
         }
 
-        let result = prog.on_boss_defeated(0);
+        let result = prog.on_boss_defeated(0, &mut achievements);
         match result {
             BossDefeatResult::ZoneComplete {
                 old_zone,
@@ -691,13 +799,14 @@ mod tests {
     #[test]
     fn test_on_boss_defeated_prestige_gated() {
         let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
 
         // Clear zone 1
         for _subzone in 1..=3 {
             for _ in 0..KILLS_FOR_BOSS {
                 prog.record_kill();
             }
-            prog.on_boss_defeated(0);
+            prog.on_boss_defeated(0, &mut achievements);
         }
         assert_eq!(prog.current_zone_id, 2);
 
@@ -706,11 +815,11 @@ mod tests {
             for _ in 0..KILLS_FOR_BOSS {
                 prog.record_kill();
             }
-            prog.on_boss_defeated(0);
+            prog.on_boss_defeated(0, &mut achievements);
         }
 
         // Should be gated at zone 3 (needs P5)
-        match prog.on_boss_defeated(0) {
+        match prog.on_boss_defeated(0, &mut achievements) {
             BossDefeatResult::ZoneCompleteButGated {
                 zone_name,
                 required_prestige,
@@ -727,7 +836,10 @@ mod tests {
 
     #[test]
     fn test_zone_10_boss_requires_stormbreaker() {
+        use crate::achievements::AchievementId;
+
         let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
 
         // Simulate being at Zone 10, final subzone (4), fighting boss
         prog.current_zone_id = 10;
@@ -735,9 +847,9 @@ mod tests {
         prog.unlock_zone(10);
         prog.fighting_boss = true;
 
-        // Try to defeat boss without Stormbreaker
-        assert!(!prog.has_stormbreaker);
-        let result = prog.on_boss_defeated(20);
+        // Try to defeat boss without Stormbreaker achievement
+        assert!(!achievements.is_unlocked(AchievementId::TheStormbreaker));
+        let result = prog.on_boss_defeated(20, &mut achievements);
 
         match result {
             BossDefeatResult::WeaponRequired { weapon_name } => {
@@ -752,11 +864,11 @@ mod tests {
         assert!(!prog.fighting_boss);
         assert_eq!(prog.kills_in_subzone, 0);
 
-        // Now get Stormbreaker and try again
-        prog.has_stormbreaker = true;
+        // Now unlock Stormbreaker achievement and try again
+        achievements.unlock(AchievementId::TheStormbreaker, None);
         prog.fighting_boss = true;
 
-        let result = prog.on_boss_defeated(20);
+        let result = prog.on_boss_defeated(20, &mut achievements);
 
         // Should complete the game
         assert!(matches!(result, BossDefeatResult::GameComplete));

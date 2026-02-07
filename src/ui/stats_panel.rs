@@ -210,6 +210,7 @@ pub(super) fn draw_zone_info(
     area: Rect,
     game_state: &GameState,
     zone_completion: &ZoneCompletionStatus,
+    achievements: &crate::achievements::Achievements,
 ) {
     use crate::zones::get_all_zones;
 
@@ -236,7 +237,7 @@ pub(super) fn draw_zone_info(
     };
 
     // Build the boss progress display — always show boss status
-    let boss_progress = if let Some(weapon) = prog.boss_weapon_blocked() {
+    let boss_progress = if let Some(weapon) = prog.boss_weapon_blocked(achievements) {
         Span::styled(
             format!(" ⚔️ BOSS: {} [Need {}!] ", boss_name, weapon),
             Style::default()

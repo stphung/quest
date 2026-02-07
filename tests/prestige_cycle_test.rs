@@ -2,6 +2,7 @@
 //!
 //! Tests the full flow: new character → level up → prestige → verify reset
 
+use quest::achievements::Achievements;
 use quest::character::attributes::AttributeType;
 use quest::character::prestige::{can_prestige, get_prestige_tier, perform_prestige};
 use quest::core::game_logic::{apply_tick_xp, xp_for_next_level};
@@ -232,6 +233,7 @@ fn test_combat_to_prestige_full_loop() {
     use quest::TICK_INTERVAL_MS;
 
     let mut state = GameState::new("Combat Prestige Hero".to_string(), 0);
+    let mut achievements = Achievements::default();
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
 
     assert_eq!(state.prestige_rank, 0);
@@ -251,7 +253,12 @@ fn test_combat_to_prestige_full_loop() {
         spawn_enemy_if_needed(&mut state);
 
         // Combat tick
-        let events = update_combat(&mut state, delta_time, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            delta_time,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Apply XP from kills (mimics main.rs game loop)
         for event in &events {
@@ -325,7 +332,12 @@ fn test_combat_to_prestige_full_loop() {
         let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
         state.combat_state.update_max_hp(derived.max_hp);
         spawn_enemy_if_needed(&mut state);
-        let events = update_combat(&mut state, delta_time, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            delta_time,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
         for event in &events {
             if matches!(event, CombatEvent::EnemyDied { .. }) {
                 post_prestige_kill = true;

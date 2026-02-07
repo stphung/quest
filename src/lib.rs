@@ -5,6 +5,7 @@
 // Allow dead code in library - some functions are only used by the binary
 #![allow(dead_code)]
 
+pub mod achievements;
 pub mod challenges;
 pub mod character;
 pub mod combat;
@@ -20,6 +21,7 @@ pub mod zones;
 mod ui;
 
 // Re-export commonly used types at crate root for convenience
+pub use achievements::{AchievementCategory, AchievementId, Achievements};
 pub use challenges::{
     ActiveMinigame, ChessDifficulty, ChessGame, ChessResult, GoDifficulty, GoGame, GoResult,
     GomokuDifficulty, GomokuGame, GomokuResult, MinesweeperDifficulty, MinesweeperGame,

@@ -36,6 +36,17 @@ pub struct HavenFishingBonuses {
     pub timer_reduction_percent: f64,
     /// Fishing Dock: +% chance to catch double fish
     pub double_fish_chance_percent: f64,
+    /// Fishing Dock T4: +max fishing rank (10 at T4)
+    pub max_fishing_rank_bonus: u32,
+}
+
+/// Result from fishing tick that may include special catches
+#[derive(Debug, Clone, Default)]
+pub struct FishingTickResult {
+    /// Messages to display to the player
+    pub messages: Vec<String>,
+    /// True if the Storm Leviathan was caught this tick
+    pub caught_storm_leviathan: bool,
 }
 
 /// Processes a fishing session tick with phase-based timing.
@@ -46,17 +57,19 @@ pub struct HavenFishingBonuses {
 /// 3. **Reeling** (1-2s) - Fish is biting, reeling in
 ///
 /// `haven` contains Haven bonuses for fishing
-pub fn tick_fishing_with_haven(
+///
+/// Returns a `FishingTickResult` with messages and special catch flags.
+pub fn tick_fishing_with_haven_result(
     state: &mut GameState,
     rng: &mut impl Rng,
     haven: &HavenFishingBonuses,
-) -> Vec<String> {
-    let mut messages = Vec::new();
+) -> FishingTickResult {
+    let mut result = FishingTickResult::default();
 
     // Take ownership of active_fishing to work with it
     let session = match state.active_fishing.take() {
         Some(s) => s,
-        None => return messages,
+        None => return result,
     };
 
     let mut session = session;
@@ -76,7 +89,9 @@ pub fn tick_fishing_with_haven(
                 // Apply Garden bonus: reduce timers
                 session.ticks_remaining =
                     apply_timer_reduction(base_ticks, haven.timer_reduction_percent);
-                messages.push("Line cast... waiting for a bite...".to_string());
+                result
+                    .messages
+                    .push("Line cast... waiting for a bite...".to_string());
             }
             FishingPhase::Waiting => {
                 // Got a bite! Start reeling
@@ -85,7 +100,9 @@ pub fn tick_fishing_with_haven(
                 // Apply Garden bonus: reduce timers
                 session.ticks_remaining =
                     apply_timer_reduction(base_ticks, haven.timer_reduction_percent);
-                messages.push("🐟 Got a bite! Reeling in...".to_string());
+                result
+                    .messages
+                    .push("🐟 Got a bite! Reeling in...".to_string());
             }
             FishingPhase::Reeling => {
                 // Catch the fish!
@@ -99,7 +116,16 @@ pub fn tick_fishing_with_haven(
 
                 for fish_num in 0..fish_count {
                     let rarity = fishing_generation::roll_fish_rarity(state.fishing.rank, rng);
-                    let fish = fishing_generation::generate_fish(rarity, rng);
+                    // Use rank-aware fish generation for Storm Leviathan
+                    let (fish, is_storm_leviathan) = fishing_generation::generate_fish_with_rank(
+                        rarity,
+                        state.fishing.rank,
+                        rng,
+                    );
+
+                    if is_storm_leviathan {
+                        result.caught_storm_leviathan = true;
+                    }
 
                     // Calculate XP with prestige multiplier
                     let prestige_multiplier = get_prestige_tier(state.prestige_rank).multiplier;
@@ -130,14 +156,28 @@ pub fn tick_fishing_with_haven(
                     } else {
                         ""
                     };
-                    messages.push(format!(
-                        "🎣 Caught {} [{}]! +{} XP{}",
-                        fish.name, rarity_name, xp_gained, double_msg
-                    ));
+
+                    // Special message for Storm Leviathan
+                    if is_storm_leviathan {
+                        result.messages.push(format!(
+                            "⚡🐉 YOU CAUGHT THE STORM LEVIATHAN! [{}] +{} XP{}",
+                            rarity_name, xp_gained, double_msg
+                        ));
+                        result.messages.push(
+                            "The legendary beast! You can now forge the Stormbreaker at the Storm Forge!".to_string()
+                        );
+                    } else {
+                        result.messages.push(format!(
+                            "🎣 Caught {} [{}]! +{} XP{}",
+                            fish.name, rarity_name, xp_gained, double_msg
+                        ));
+                    }
 
                     // Check for item drop
                     if let Some(item) = try_fishing_item_drop(rarity, state.character_level, rng) {
-                        messages.push(format!("📦 Found item: {}!", item.display_name));
+                        result
+                            .messages
+                            .push(format!("📦 Found item: {}!", item.display_name));
                         session.items_found.push(item);
                     }
 
@@ -147,13 +187,13 @@ pub fn tick_fishing_with_haven(
 
                 // Check if session is complete
                 if session.fish_caught.len() >= session.total_fish as usize {
-                    messages.push(format!(
+                    result.messages.push(format!(
                         "Fishing spot depleted! Caught {} fish at {}.",
                         session.fish_caught.len(),
                         session.spot_name
                     ));
                     // Don't put session back - it ends
-                    return messages;
+                    return result;
                 }
 
                 // Start casting again for next fish
@@ -168,7 +208,23 @@ pub fn tick_fishing_with_haven(
     // Put session back
     state.active_fishing = Some(session);
 
-    messages
+    result
+}
+
+/// Processes a fishing session tick with phase-based timing.
+///
+/// # Fishing Phases (average ~5s per fish)
+/// 1. **Casting** (1s) - Line is being cast
+/// 2. **Waiting** (2-4s) - Waiting for a bite
+/// 3. **Reeling** (1-2s) - Fish is biting, reeling in
+///
+/// `haven` contains Haven bonuses for fishing
+pub fn tick_fishing_with_haven(
+    state: &mut GameState,
+    rng: &mut impl Rng,
+    haven: &HavenFishingBonuses,
+) -> Vec<String> {
+    tick_fishing_with_haven_result(state, rng, haven).messages
 }
 
 /// Legacy function without Haven bonuses (for backwards compatibility)
@@ -260,21 +316,36 @@ pub fn try_discover_fishing(state: &mut GameState, rng: &mut impl Rng) -> Option
     Some(format!("Discovered fishing spot: {}!", spot_name))
 }
 
+/// Base maximum fishing rank without Haven bonuses
+pub const BASE_MAX_FISHING_RANK: u32 = 20;
+
 /// Maximum fishing rank (corresponds to RANK_NAMES length)
+/// This is the absolute cap with all Haven bonuses (FishingDock T4 adds +10)
 pub const MAX_FISHING_RANK: u32 = 30;
+
+/// Returns the effective maximum fishing rank based on Haven bonus.
+///
+/// Base max is 20, but FishingDock T4 adds +10 for a total of 30.
+pub fn get_max_fishing_rank(fishing_rank_bonus: u32) -> u32 {
+    (BASE_MAX_FISHING_RANK + fishing_rank_bonus).min(MAX_FISHING_RANK)
+}
 
 /// Checks if the player should rank up in fishing.
 ///
 /// Returns a rank up message if the threshold is reached.
 ///
+/// # Arguments
+/// - `fishing_state`: The player's fishing state
+/// - `max_rank`: The effective maximum rank (base 20 + Haven bonus)
+///
 /// # Rank Up Mechanics
 /// - Each rank requires a certain number of fish to catch
 /// - Fish requirement increases with rank tier
 /// - Excess fish count carries over to next rank
-/// - Rank is capped at MAX_FISHING_RANK (30)
-pub fn check_rank_up(fishing_state: &mut FishingState) -> Option<String> {
+/// - Rank is capped at the effective max rank
+pub fn check_rank_up_with_max(fishing_state: &mut FishingState, max_rank: u32) -> Option<String> {
     // Already at max rank - no further progression
-    if fishing_state.rank >= MAX_FISHING_RANK {
+    if fishing_state.rank >= max_rank {
         return None;
     }
 
@@ -293,6 +364,19 @@ pub fn check_rank_up(fishing_state: &mut FishingState) -> Option<String> {
     } else {
         None
     }
+}
+
+/// Checks if the player should rank up in fishing (legacy, uses absolute max).
+///
+/// Returns a rank up message if the threshold is reached.
+///
+/// # Rank Up Mechanics
+/// - Each rank requires a certain number of fish to catch
+/// - Fish requirement increases with rank tier
+/// - Excess fish count carries over to next rank
+/// - Rank is capped at MAX_FISHING_RANK (30)
+pub fn check_rank_up(fishing_state: &mut FishingState) -> Option<String> {
+    check_rank_up_with_max(fishing_state, MAX_FISHING_RANK)
 }
 
 #[cfg(test)]
@@ -895,6 +979,7 @@ mod tests {
         let haven = HavenFishingBonuses {
             timer_reduction_percent: 40.0,
             double_fish_chance_percent: 0.0,
+            max_fishing_rank_bonus: 0,
         };
         tick_fishing_with_haven(&mut state, &mut rng, &haven);
 
@@ -938,6 +1023,7 @@ mod tests {
             let haven = HavenFishingBonuses {
                 timer_reduction_percent: 0.0,
                 double_fish_chance_percent: 50.0,
+                max_fishing_rank_bonus: 0,
             };
             tick_fishing_with_haven(&mut state, &mut rng, &haven);
 

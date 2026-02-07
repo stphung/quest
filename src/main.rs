@@ -1,3 +1,4 @@
+mod achievements;
 mod challenges;
 mod character;
 mod combat;
@@ -37,6 +38,7 @@ use input::{GameOverlay, HavenUiState, InputResult};
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 use std::time::{Duration, Instant};
+use ui::achievement_browser_scene::AchievementBrowserState;
 use ui::character_creation::CharacterCreationScreen;
 use ui::character_delete::CharacterDeleteScreen;
 use ui::character_rename::CharacterRenameScreen;
@@ -101,6 +103,9 @@ fn main() -> io::Result<()> {
     // Load account-level Haven state
     let mut haven = haven::load_haven();
 
+    // Load global achievements (shared across all characters)
+    let mut global_achievements = achievements::load_achievements();
+
     // Check for old save file to migrate
     let old_save_manager = SaveManager::new()?;
     if old_save_manager.save_exists() {
@@ -140,6 +145,7 @@ fn main() -> io::Result<()> {
     let mut pending_haven_offline_bonus: Option<f64> = None;
 
     let mut haven_ui = HavenUiState::new();
+    let mut achievement_browser = AchievementBrowserState::new();
 
     // Setup terminal
     enable_raw_mode()?;
@@ -263,11 +269,42 @@ fn main() -> io::Result<()> {
                             0, // No character selected, so prestige rank = 0
                         );
                     }
+                    // Draw achievement browser overlay if open
+                    if achievement_browser.showing {
+                        ui::achievement_browser_scene::render_achievement_browser(
+                            f,
+                            area,
+                            &global_achievements,
+                            &achievement_browser,
+                        );
+                    }
                 })?;
 
                 // Handle input
                 if event::poll(Duration::from_millis(50))? {
                     if let Event::Key(key_event) = event::read()? {
+                        // Handle achievement browser (blocks other input when open)
+                        if achievement_browser.showing {
+                            let category_achievements = achievements::get_achievements_by_category(
+                                achievement_browser.selected_category,
+                            );
+                            match key_event.code {
+                                KeyCode::Up => achievement_browser.move_up(),
+                                KeyCode::Down => {
+                                    achievement_browser.move_down(category_achievements.len())
+                                }
+                                KeyCode::Left | KeyCode::Char(',') | KeyCode::Char('<') => {
+                                    achievement_browser.prev_category()
+                                }
+                                KeyCode::Right | KeyCode::Char('.') | KeyCode::Char('>') => {
+                                    achievement_browser.next_category()
+                                }
+                                KeyCode::Esc => achievement_browser.close(),
+                                _ => {}
+                            }
+                            continue;
+                        }
+
                         // Handle Haven screen (blocks other input when open)
                         if haven_ui.showing {
                             if haven_ui.confirming_build {
@@ -301,6 +338,12 @@ fn main() -> io::Result<()> {
                                     _ => {}
                                 }
                             }
+                            continue;
+                        }
+
+                        // Handle achievement browser shortcut
+                        if matches!(key_event.code, KeyCode::Char('a') | KeyCode::Char('A')) {
+                            achievement_browser.open();
                             continue;
                         }
 
@@ -575,6 +618,7 @@ fn main() -> io::Result<()> {
                             update_info.as_ref(),
                             update_check_completed,
                             haven.discovered,
+                            &global_achievements,
                         );
                         // Draw offline welcome overlay if active
                         if let GameOverlay::OfflineWelcome { report } = &overlay {
@@ -650,6 +694,11 @@ fn main() -> io::Result<()> {
                     // Poll for input (50ms non-blocking)
                     if event::poll(Duration::from_millis(50))? {
                         if let Event::Key(key_event) = event::read()? {
+                            // Track prestige rank before input to detect prestige
+                            let prestige_before = state.prestige_rank;
+                            // Track chess wins before input
+                            let chess_wins_before = state.chess_stats.games_won;
+
                             let result = input::handle_game_input(
                                 key_event,
                                 &mut state,
@@ -659,6 +708,39 @@ fn main() -> io::Result<()> {
                                 &mut debug_menu,
                                 debug_mode,
                             );
+
+                            // Track achievements for state changes
+                            let mut achievements_changed = false;
+
+                            // Check if prestige occurred and track achievement
+                            if state.prestige_rank > prestige_before {
+                                global_achievements
+                                    .on_prestige(state.prestige_rank, Some(&state.character_name));
+                                achievements_changed = true;
+                            }
+
+                            // Check if chess win occurred
+                            if state.chess_stats.games_won > chess_wins_before {
+                                // Check if it was a Master difficulty win
+                                // (Unfortunately we can't easily check difficulty here,
+                                // so we rely on the prestige tracking for now)
+                                global_achievements.on_minigame_won(
+                                    "chess",
+                                    false, // We'd need to track difficulty separately
+                                    Some(&state.character_name),
+                                );
+                                achievements_changed = true;
+                            }
+
+                            // Save achievements if any changed
+                            if achievements_changed {
+                                if let Err(e) =
+                                    achievements::save_achievements(&global_achievements)
+                                {
+                                    eprintln!("Failed to save achievements: {}", e);
+                                }
+                            }
+
                             match result {
                                 InputResult::Continue => {}
                                 InputResult::QuitToSelect => {
@@ -693,7 +775,12 @@ fn main() -> io::Result<()> {
 
                     // Game tick every 100ms
                     if last_tick.elapsed() >= Duration::from_millis(TICK_INTERVAL_MS) {
-                        game_tick(&mut state, &mut tick_counter, &haven);
+                        game_tick(
+                            &mut state,
+                            &mut tick_counter,
+                            &haven,
+                            &mut global_achievements,
+                        );
                         last_tick = Instant::now();
 
                         // Haven discovery check (independent roll, once per tick)
@@ -708,6 +795,14 @@ fn main() -> io::Result<()> {
                             {
                                 if !debug_mode {
                                     haven::save_haven(&haven).ok();
+                                }
+                                // Track Haven discovery achievement
+                                global_achievements
+                                    .on_haven_discovered(Some(&state.character_name));
+                                if let Err(e) =
+                                    achievements::save_achievements(&global_achievements)
+                                {
+                                    eprintln!("Failed to save achievements: {}", e);
                                 }
                                 overlay = GameOverlay::HavenDiscovery;
                             }
@@ -755,7 +850,12 @@ fn main() -> io::Result<()> {
 }
 
 /// Processes a single game tick, updating combat and stats
-fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::Haven) {
+fn game_tick(
+    game_state: &mut GameState,
+    tick_counter: &mut u32,
+    haven: &haven::Haven,
+    global_achievements: &mut achievements::Achievements,
+) {
     use combat::logic::update_combat;
     use dungeon::logic::{
         on_boss_defeated, on_elite_defeated, on_treasure_room_entered, update_dungeon,
@@ -878,9 +978,20 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::
         let haven_fishing = fishing::logic::HavenFishingBonuses {
             timer_reduction_percent: haven.get_bonus(haven::HavenBonusType::FishingTimerReduction),
             double_fish_chance_percent: haven.get_bonus(haven::HavenBonusType::DoubleFishChance),
+            max_fishing_rank_bonus: haven.fishing_rank_bonus(),
         };
-        let fishing_messages =
-            fishing::logic::tick_fishing_with_haven(game_state, &mut rng, &haven_fishing);
+        let fishing_result =
+            fishing::logic::tick_fishing_with_haven_result(game_state, &mut rng, &haven_fishing);
+
+        // Check if Storm Leviathan was caught - unlock achievement
+        if fishing_result.caught_storm_leviathan {
+            global_achievements.on_storm_leviathan_caught(Some(&game_state.character_name));
+            if let Err(e) = achievements::save_achievements(global_achievements) {
+                eprintln!("Failed to save achievements: {}", e);
+            }
+        }
+
+        let fishing_messages = fishing_result.messages;
         for message in &fishing_messages {
             game_state
                 .combat_state
@@ -960,7 +1071,7 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::
         double_strike_chance: haven.get_bonus(haven::HavenBonusType::DoubleStrikeChance),
         xp_gain_percent: haven.get_bonus(haven::HavenBonusType::XpGainPercent),
     };
-    let combat_events = update_combat(game_state, delta_time, &haven_combat);
+    let combat_events = update_combat(game_state, delta_time, &haven_combat, global_achievements);
 
     // Process combat events
     for event in combat_events {
@@ -1019,7 +1130,12 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::
                     let message = format!("✨ {} defeated! +{} XP", enemy.name, xp_gained);
                     game_state.combat_state.add_log_entry(message, false, true);
                 }
+                let level_before = game_state.character_level;
                 apply_tick_xp(game_state, xp_gained as f64);
+                if game_state.character_level > level_before {
+                    global_achievements
+                        .on_level_up(game_state.character_level, Some(&game_state.character_name));
+                }
                 game_state.session_kills += 1;
 
                 // Track XP in dungeon if active and mark room cleared
@@ -1079,7 +1195,12 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::
                     let message = format!("⚔️ {} defeated! +{} XP", enemy.name, xp_gained);
                     game_state.combat_state.add_log_entry(message, false, true);
                 }
+                let level_before = game_state.character_level;
                 apply_tick_xp(game_state, xp_gained as f64);
+                if game_state.character_level > level_before {
+                    global_achievements
+                        .on_level_up(game_state.character_level, Some(&game_state.character_name));
+                }
                 dungeon::logic::add_dungeon_xp(game_state, xp_gained);
 
                 // Give key
@@ -1102,6 +1223,7 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::
                     let message = format!("👑 {} vanquished! +{} XP", enemy.name, xp_gained);
                     game_state.combat_state.add_log_entry(message, false, true);
                 }
+                let level_before = game_state.character_level;
                 apply_tick_xp(game_state, xp_gained as f64);
 
                 // Calculate boss bonus XP (copy values before mutable borrow)
@@ -1116,6 +1238,13 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::
                 };
 
                 apply_tick_xp(game_state, bonus_xp as f64);
+                if game_state.character_level > level_before {
+                    global_achievements
+                        .on_level_up(game_state.character_level, Some(&game_state.character_name));
+                }
+
+                // Track dungeon completion for achievements
+                global_achievements.on_dungeon_completed(Some(&game_state.character_name));
 
                 let message = format!(
                     "🏆 Dungeon Complete! +{} bonus XP ({} total, {} items)",
@@ -1145,8 +1274,23 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::
             CombatEvent::SubzoneBossDefeated { xp_gained, result } => {
                 use zones::BossDefeatResult;
                 // Apply XP from boss kill
+                let level_before = game_state.character_level;
                 apply_tick_xp(game_state, xp_gained as f64);
+                if game_state.character_level > level_before {
+                    global_achievements
+                        .on_level_up(game_state.character_level, Some(&game_state.character_name));
+                }
                 game_state.session_kills += 1;
+
+                // Track zone fully cleared for achievements
+                if let BossDefeatResult::ZoneComplete { old_zone, .. } = &result {
+                    // Get zone ID from the old zone name
+                    if let Some(zone) = zones::get_all_zones().iter().find(|z| z.name == *old_zone)
+                    {
+                        global_achievements
+                            .on_zone_fully_cleared(zone.id, Some(&game_state.character_name));
+                    }
+                }
 
                 // Log based on result
                 let message = match &result {
@@ -1183,6 +1327,12 @@ fn game_tick(game_state: &mut GameState, tick_counter: &mut u32, haven: &haven::
                     BossDefeatResult::WeaponRequired { .. } => {
                         // Already handled by PlayerAttackBlocked
                         continue;
+                    }
+                    BossDefeatResult::ExpanseCycle => {
+                        format!(
+                            "👑 The Endless defeated! +{} XP — The Expanse cycles anew...",
+                            xp_gained
+                        )
                     }
                 };
                 game_state.combat_state.add_log_entry(message, false, true);
