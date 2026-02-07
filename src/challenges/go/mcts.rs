@@ -243,10 +243,10 @@ fn guided_random_move<R: Rng>(game: &GoGame, rng: &mut R) -> Option<GoMove> {
     let total_weight: f64 = candidates.iter().map(|(_, w)| w).sum();
     let mut pick = rng.gen_range(0.0..total_weight);
 
-    for (mv, weight) in candidates {
+    for (mv, weight) in &candidates {
         pick -= weight;
         if pick <= 0.0 {
-            return Some(mv);
+            return Some(*mv);
         }
     }
 

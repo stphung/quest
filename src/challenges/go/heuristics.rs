@@ -91,7 +91,7 @@ fn is_star_point(row: usize, col: usize) -> bool {
 }
 
 /// Score for capturing opponent stones.
-fn capture_score(game: &GoGame, row: usize, col: usize, player: Stone, opponent: Stone) -> f64 {
+fn capture_score(game: &GoGame, row: usize, col: usize, _player: Stone, opponent: Stone) -> f64 {
     let mut score = 0.0;
 
     // Check adjacent opponent groups
