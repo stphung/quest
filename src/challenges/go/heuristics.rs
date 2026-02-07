@@ -91,13 +91,7 @@ fn is_star_point(row: usize, col: usize) -> bool {
 }
 
 /// Score for capturing opponent stones.
-fn capture_score(
-    game: &GoGame,
-    row: usize,
-    col: usize,
-    player: Stone,
-    opponent: Stone,
-) -> f64 {
+fn capture_score(game: &GoGame, row: usize, col: usize, player: Stone, opponent: Stone) -> f64 {
     let mut score = 0.0;
 
     // Check adjacent opponent groups
@@ -182,9 +176,9 @@ fn extension_score(game: &GoGame, row: usize, col: usize, player: Stone) -> f64 
     // One adjacent is good (extension), too many is slow (clumping)
     match adjacent_friendly {
         0 => diagonal_friendly as f64 * 3.0, // Knight's move or jump
-        1 => 8.0,                             // Good extension
-        2 => 4.0,                             // Okay
-        _ => -5.0,                            // Clumping, usually bad
+        1 => 8.0,                            // Good extension
+        2 => 4.0,                            // Okay
+        _ => -5.0,                           // Clumping, usually bad
     }
 }
 
@@ -361,8 +355,8 @@ pub fn get_top_moves(game: &GoGame, moves: &[GoMove], n: usize) -> Vec<GoMove> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::types::GoDifficulty;
+    use super::*;
 
     #[test]
     fn test_star_points() {

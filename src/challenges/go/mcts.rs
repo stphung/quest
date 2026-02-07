@@ -63,10 +63,10 @@ impl MctsNode {
         }
         let exploitation = self.wins as f64 / self.visits as f64;
         let exploration = UCT_C * (parent_log_visits / self.visits as f64).sqrt();
-        
+
         // Add small prior bonus that diminishes with visits
         let prior_bonus = self.prior_score / (1.0 + self.visits as f64);
-        
+
         exploitation + exploration + prior_bonus * 0.01
     }
 }
@@ -81,13 +81,7 @@ pub fn mcts_best_move<R: Rng>(game: &GoGame, rng: &mut R) -> GoMove {
     let top_moves = get_top_moves(game, &all_moves, TOP_MOVES_LIMIT);
 
     // Create root node with ordered moves
-    let root = MctsNode::new(
-        None,
-        None,
-        game.current_player.opponent(),
-        top_moves,
-        0.0,
-    );
+    let root = MctsNode::new(None, None, game.current_player.opponent(), top_moves, 0.0);
     nodes.push(root);
 
     for _ in 0..simulations {
@@ -107,7 +101,7 @@ pub fn mcts_best_move<R: Rng>(game: &GoGame, rng: &mut R) -> GoMove {
             // Pick move with best heuristic score from untried
             let best_idx = select_best_untried(&nodes[node_idx].untried_moves, &game_clone);
             let mv = nodes[node_idx].untried_moves.swap_remove(best_idx);
-            
+
             let prior = match mv {
                 GoMove::Place(r, c) => score_move(&game_clone, r, c),
                 GoMove::Pass => -50.0,
@@ -119,14 +113,9 @@ pub fn mcts_best_move<R: Rng>(game: &GoGame, rng: &mut R) -> GoMove {
             // Get top moves for child (progressive widening)
             let child_all_moves = get_legal_moves(&game_clone);
             let child_moves = get_top_moves(&game_clone, &child_all_moves, TOP_MOVES_LIMIT);
-            
-            let child = MctsNode::new(
-                Some(node_idx),
-                Some(mv),
-                current_player,
-                child_moves,
-                prior,
-            );
+
+            let child =
+                MctsNode::new(Some(node_idx), Some(mv), current_player, child_moves, prior);
             let child_idx = nodes.len();
             nodes.push(child);
             nodes[node_idx].children.push(child_idx);
