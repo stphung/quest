@@ -96,7 +96,7 @@ pub fn combat_kill_xp(passive_xp_rate: f64, haven_xp_gain_percent: f64) -> u64 {
 }
 
 /// Report of offline progression results
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct OfflineReport {
     pub elapsed_seconds: i64,
     pub total_level_ups: u32,
@@ -105,6 +105,8 @@ pub struct OfflineReport {
     pub level_after: u32,
     /// Effective offline XP rate as a percentage of online rate
     pub offline_rate_percent: f64,
+    /// Haven bonus percentage (0.0 if Haven not discovered)
+    pub haven_bonus_percent: f64,
 }
 
 /// Calculates the XP gained during offline time
@@ -171,6 +173,7 @@ pub fn process_offline_progression(
         level_before,
         level_after,
         offline_rate_percent,
+        haven_bonus_percent: haven_offline_xp_percent,
     }
 }
 
