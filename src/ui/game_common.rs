@@ -1,5 +1,6 @@
 //! Shared UI components for minigames.
 
+use crate::core::game_logic::OfflineReport;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -306,20 +307,14 @@ pub fn render_info_panel_frame(frame: &mut Frame, area: Rect) -> Rect {
 }
 
 /// Render the "Welcome Back" overlay for offline progression.
-#[allow(clippy::too_many_arguments)]
-pub fn render_offline_welcome(
-    frame: &mut Frame,
-    area: Rect,
-    elapsed_seconds: i64,
-    xp_gained: u64,
-    level_before: u32,
-    level_after: u32,
-    offline_rate_percent: f64,
-    haven_bonus_percent: f64,
-) {
+pub fn render_offline_welcome(frame: &mut Frame, area: Rect, report: &OfflineReport) {
     // Centered modal box
     let modal_width = 44u16;
-    let modal_height = if level_before < level_after { 11 } else { 10 };
+    let modal_height = if report.level_before < report.level_after {
+        11
+    } else {
+        10
+    };
     let x = area.x + (area.width.saturating_sub(modal_width)) / 2;
     let y = area.y + (area.height.saturating_sub(modal_height)) / 2;
     let modal_area = Rect::new(x, y, modal_width, modal_height);
@@ -339,8 +334,8 @@ pub fn render_offline_welcome(
     frame.render_widget(block, modal_area);
 
     // Format time away
-    let hours = elapsed_seconds / 3600;
-    let minutes = (elapsed_seconds % 3600) / 60;
+    let hours = report.elapsed_seconds / 3600;
+    let minutes = (report.elapsed_seconds % 3600) / 60;
     let away_str = if hours > 0 {
         format!("{}h {}m", hours, minutes)
     } else {
@@ -354,32 +349,35 @@ pub fn render_offline_welcome(
             Style::default().fg(Color::White),
         )),
         Line::from(Span::styled(
-            if haven_bonus_percent > 0.0 {
+            if report.haven_bonus_percent > 0.0 {
                 format!(
                     "  Offline rate: {:.0}% (Haven: +{:.0}%)",
-                    offline_rate_percent, haven_bonus_percent
+                    report.offline_rate_percent, report.haven_bonus_percent
                 )
             } else {
-                format!("  Offline rate: {:.0}%", offline_rate_percent)
+                format!("  Offline rate: {:.0}%", report.offline_rate_percent)
             },
             Style::default().fg(Color::DarkGray),
         )),
         Line::from(""),
         Line::from(Span::styled(
-            format!("  ⚔️  XP Gained:  {:>10}", format_number_short(xp_gained)),
+            format!(
+                "  ⚔️  XP Gained:  {:>10}",
+                format_number_short(report.xp_gained)
+            ),
             Style::default().fg(Color::Cyan),
         )),
     ];
 
-    if level_before < level_after {
+    if report.level_before < report.level_after {
         lines.push(Line::from(Span::styled(
             format!(
                 "  📈 Levels:      {:>10}",
                 format!(
                     "+{} ({} → {})",
-                    level_after - level_before,
-                    level_before,
-                    level_after
+                    report.level_after - report.level_before,
+                    report.level_before,
+                    report.level_after
                 )
             ),
             Style::default().fg(Color::Green),

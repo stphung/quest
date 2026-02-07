@@ -535,15 +535,9 @@ fn main() -> io::Result<()> {
                 let mut last_update_check = Instant::now();
                 let mut tick_counter: u32 = 0;
                 let mut overlay = if let Some(report) = pending_offline_report.take() {
-                    let haven_bonus = pending_haven_offline_bonus.take().unwrap_or(0.0);
-                    GameOverlay::OfflineWelcome {
-                        elapsed_seconds: report.elapsed_seconds,
-                        xp_gained: report.xp_gained,
-                        level_before: report.level_before,
-                        level_after: report.level_after,
-                        offline_rate_percent: report.offline_rate_percent,
-                        haven_bonus_percent: haven_bonus,
-                    }
+                    // Haven bonus already included in report from process_offline_progression
+                    let _ = pending_haven_offline_bonus.take(); // Clear unused bonus
+                    GameOverlay::OfflineWelcome { report }
                 } else {
                     GameOverlay::None
                 };
@@ -583,25 +577,8 @@ fn main() -> io::Result<()> {
                             haven.discovered,
                         );
                         // Draw offline welcome overlay if active
-                        if let GameOverlay::OfflineWelcome {
-                            elapsed_seconds,
-                            xp_gained,
-                            level_before,
-                            level_after,
-                            offline_rate_percent,
-                            haven_bonus_percent,
-                        } = &overlay
-                        {
-                            ui::game_common::render_offline_welcome(
-                                frame,
-                                frame.size(),
-                                *elapsed_seconds,
-                                *xp_gained,
-                                *level_before,
-                                *level_after,
-                                *offline_rate_percent,
-                                *haven_bonus_percent,
-                            );
+                        if let GameOverlay::OfflineWelcome { report } = &overlay {
+                            ui::game_common::render_offline_welcome(frame, frame.size(), report);
                         }
                         // Draw prestige confirmation overlay if active
                         if matches!(overlay, GameOverlay::PrestigeConfirm) {

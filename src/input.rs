@@ -22,6 +22,7 @@ use crate::challenges::rune::logic::{
 };
 use crate::challenges::ActiveMinigame;
 use crate::character::prestige::{can_prestige, get_prestige_tier, perform_prestige};
+use crate::core::game_logic::OfflineReport;
 use crate::core::game_state::GameState;
 use crate::haven;
 use crate::haven::Haven;
@@ -67,12 +68,7 @@ pub enum GameOverlay {
         selected_slots: Vec<items::EquipmentSlot>,
     },
     OfflineWelcome {
-        elapsed_seconds: i64,
-        xp_gained: u64,
-        level_before: u32,
-        level_after: u32,
-        offline_rate_percent: f64,
-        haven_bonus_percent: f64,
+        report: OfflineReport,
     },
 }
 
