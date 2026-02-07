@@ -85,6 +85,7 @@ fn main() -> io::Result<()> {
             }
             "--debug" => {
                 debug_mode = true;
+                eprintln!("=== DEBUG MODE ENABLED - SAVES DISABLED ===");
             }
             other => {
                 eprintln!("Unknown command: {}", other);
