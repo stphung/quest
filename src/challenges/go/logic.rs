@@ -168,6 +168,42 @@ pub fn is_legal_move(game: &GoGame, row: usize, col: usize) -> bool {
     count_liberties(&test_board, &our_group) > 0
 }
 
+/// Check if placing a stone would result in immediate capture (suicide).
+/// Returns true if the move is suicide (stone would be captured immediately
+/// without capturing opponent stones first).
+pub fn would_be_captured(game: &GoGame, row: usize, col: usize, player: Stone) -> bool {
+    // Position must be empty
+    if !game.is_empty(row, col) {
+        return false;
+    }
+
+    // Temporarily place the stone
+    let mut test_board = game.board;
+    test_board[row][col] = Some(player);
+
+    // Check if this move captures anything
+    let opponent = player.opponent();
+    for (dr, dc) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
+        let nr = row as i32 + dr;
+        let nc = col as i32 + dc;
+        if nr >= 0 && nr < BOARD_SIZE as i32 && nc >= 0 && nc < BOARD_SIZE as i32 {
+            let nr = nr as usize;
+            let nc = nc as usize;
+            if test_board[nr][nc] == Some(opponent) {
+                let group = get_group(&test_board, nr, nc);
+                if count_liberties(&test_board, &group) == 0 {
+                    // We capture something, so not suicide
+                    return false;
+                }
+            }
+        }
+    }
+
+    // Check if our group would have liberties
+    let our_group = get_group(&test_board, row, col);
+    count_liberties(&test_board, &our_group) == 0
+}
+
 /// Get all legal moves for the current player.
 pub fn get_legal_moves(game: &GoGame) -> Vec<GoMove> {
     let mut moves = Vec::new();

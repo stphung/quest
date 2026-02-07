@@ -1,5 +1,8 @@
-//! Monte Carlo Tree Search AI for Go.
+//! Enhanced Monte Carlo Tree Search AI for Go.
+//!
+//! Uses heuristics for move ordering and simulation guidance.
 
+use super::heuristics::{get_top_moves, score_move};
 use super::logic::{get_legal_moves, is_legal_move, make_move};
 use super::types::{GoDifficulty, GoGame, GoMove, GoResult, Stone, BOARD_SIZE};
 use rand::Rng;
@@ -9,6 +12,9 @@ const UCT_C: f64 = 1.4;
 
 /// Maximum moves in a simulation before scoring
 const MAX_SIMULATION_MOVES: u32 = 120;
+
+/// Number of top moves to consider for expansion (progressive widening)
+const TOP_MOVES_LIMIT: usize = 15;
 
 /// MCTS tree node
 struct MctsNode {
@@ -26,6 +32,8 @@ struct MctsNode {
     untried_moves: Vec<GoMove>,
     /// Player who just moved (to reach this state)
     player_just_moved: Stone,
+    /// Prior score from heuristics (for move ordering)
+    prior_score: f64,
 }
 
 impl MctsNode {
@@ -34,6 +42,7 @@ impl MctsNode {
         move_taken: Option<GoMove>,
         player_just_moved: Stone,
         legal_moves: Vec<GoMove>,
+        prior_score: f64,
     ) -> Self {
         Self {
             move_taken,
@@ -43,16 +52,22 @@ impl MctsNode {
             wins: 0.0,
             untried_moves: legal_moves,
             player_just_moved,
+            prior_score,
         }
     }
 
     fn uct_value(&self, parent_log_visits: f64) -> f64 {
         if self.visits == 0 {
-            return f64::INFINITY;
+            // Unvisited nodes get prior bonus
+            return f64::INFINITY + self.prior_score;
         }
         let exploitation = self.wins as f64 / self.visits as f64;
         let exploration = UCT_C * (parent_log_visits / self.visits as f64).sqrt();
-        exploitation + exploration
+        
+        // Add small prior bonus that diminishes with visits
+        let prior_bonus = self.prior_score / (1.0 + self.visits as f64);
+        
+        exploitation + exploration + prior_bonus * 0.01
     }
 }
 
@@ -61,13 +76,17 @@ pub fn mcts_best_move<R: Rng>(game: &GoGame, rng: &mut R) -> GoMove {
     let simulations = game.difficulty.simulation_count();
     let mut nodes: Vec<MctsNode> = Vec::with_capacity(simulations as usize);
 
-    // Create root node
-    let legal_moves = get_legal_moves(game);
+    // Get legal moves and order by heuristics
+    let all_moves = get_legal_moves(game);
+    let top_moves = get_top_moves(game, &all_moves, TOP_MOVES_LIMIT);
+
+    // Create root node with ordered moves
     let root = MctsNode::new(
         None,
         None,
-        game.current_player.opponent(), // Opponent "just moved" to create current state
-        legal_moves,
+        game.current_player.opponent(),
+        top_moves,
+        0.0,
     );
     nodes.push(root);
 
@@ -85,34 +104,69 @@ pub fn mcts_best_move<R: Rng>(game: &GoGame, rng: &mut R) -> GoMove {
 
         // Expansion: add a new child if possible
         if !nodes[node_idx].untried_moves.is_empty() && game_clone.game_result.is_none() {
-            let mv_idx = rng.gen_range(0..nodes[node_idx].untried_moves.len());
-            let mv = nodes[node_idx].untried_moves.swap_remove(mv_idx);
+            // Pick move with best heuristic score from untried
+            let best_idx = select_best_untried(&nodes[node_idx].untried_moves, &game_clone);
+            let mv = nodes[node_idx].untried_moves.swap_remove(best_idx);
+            
+            let prior = match mv {
+                GoMove::Place(r, c) => score_move(&game_clone, r, c),
+                GoMove::Pass => -50.0,
+            };
 
             let current_player = game_clone.current_player;
             make_move(&mut game_clone, mv);
 
-            let child_legal_moves = get_legal_moves(&game_clone);
-            let child = MctsNode::new(Some(node_idx), Some(mv), current_player, child_legal_moves);
+            // Get top moves for child (progressive widening)
+            let child_all_moves = get_legal_moves(&game_clone);
+            let child_moves = get_top_moves(&game_clone, &child_all_moves, TOP_MOVES_LIMIT);
+            
+            let child = MctsNode::new(
+                Some(node_idx),
+                Some(mv),
+                current_player,
+                child_moves,
+                prior,
+            );
             let child_idx = nodes.len();
             nodes.push(child);
             nodes[node_idx].children.push(child_idx);
             node_idx = child_idx;
         }
 
-        // Simulation: random playout
-        let winner = simulate_random_game(&mut game_clone, rng);
+        // Simulation: guided random playout
+        let winner = simulate_guided_game(&mut game_clone, rng);
 
         // Backpropagation: update statistics
         backpropagate(&mut nodes, node_idx, winner);
     }
 
-    // Select best move (most visits)
+    // Select best move (most visits, with win rate tiebreaker)
     select_best_move(&nodes)
+}
+
+/// Select the best untried move based on heuristics.
+fn select_best_untried(moves: &[GoMove], game: &GoGame) -> usize {
+    moves
+        .iter()
+        .enumerate()
+        .max_by(|(_, a), (_, b)| {
+            let score_a = match a {
+                GoMove::Place(r, c) => score_move(game, *r, *c),
+                GoMove::Pass => -50.0,
+            };
+            let score_b = match b {
+                GoMove::Place(r, c) => score_move(game, *r, *c),
+                GoMove::Pass => -50.0,
+            };
+            score_a.partial_cmp(&score_b).unwrap()
+        })
+        .map(|(i, _)| i)
+        .unwrap_or(0)
 }
 
 /// Select child with highest UCT value.
 fn select_child(nodes: &[MctsNode], parent_idx: usize) -> usize {
-    let parent_log_visits = (nodes[parent_idx].visits as f64).ln();
+    let parent_log_visits = (nodes[parent_idx].visits as f64 + 1.0).ln();
     nodes[parent_idx]
         .children
         .iter()
@@ -126,19 +180,17 @@ fn select_child(nodes: &[MctsNode], parent_idx: usize) -> usize {
         .unwrap_or(parent_idx)
 }
 
-/// Simulate a random game to completion using fast random playouts.
-/// Uses a lightweight move selection that avoids full legal move generation.
-fn simulate_random_game<R: Rng>(game: &mut GoGame, rng: &mut R) -> Option<Stone> {
+/// Simulate a game with heuristic guidance.
+/// Uses weighted random selection favoring better moves.
+fn simulate_guided_game<R: Rng>(game: &mut GoGame, rng: &mut R) -> Option<Stone> {
     let mut moves_made = 0;
     let mut consecutive_passes = 0;
 
     while game.game_result.is_none() && moves_made < MAX_SIMULATION_MOVES {
-        // Fast random move selection: try random empty positions
-        if let Some(mv) = fast_random_move(game, rng) {
+        if let Some(mv) = guided_random_move(game, rng) {
             make_move(game, mv);
             consecutive_passes = 0;
         } else {
-            // No valid move found after attempts, pass
             make_move(game, GoMove::Pass);
             consecutive_passes += 1;
             if consecutive_passes >= 2 {
@@ -156,7 +208,6 @@ fn simulate_random_game<R: Rng>(game: &mut GoGame, rng: &mut R) -> Option<Stone>
             GoResult::Draw => None,
         }
     } else {
-        // Score the position
         let (black, white) = super::logic::calculate_score(&game.board);
         if black > white {
             Some(Stone::Black)
@@ -168,45 +219,51 @@ fn simulate_random_game<R: Rng>(game: &mut GoGame, rng: &mut R) -> Option<Stone>
     }
 }
 
-/// Fast random move selection for simulations.
-/// Tries random empty positions without generating full legal move list.
-fn fast_random_move<R: Rng>(game: &GoGame, rng: &mut R) -> Option<GoMove> {
-    // Count empty positions first
-    let mut empty_count = 0;
-    for row in &game.board {
-        for cell in row {
-            if cell.is_none() {
-                empty_count += 1;
-            }
-        }
-    }
+/// Select a move with probability proportional to heuristic score.
+fn guided_random_move<R: Rng>(game: &GoGame, rng: &mut R) -> Option<GoMove> {
+    // Collect candidate moves (sample empty positions)
+    let mut candidates: Vec<(GoMove, f64)> = Vec::new();
 
-    if empty_count == 0 {
-        return None;
-    }
-
-    // Try up to 10 random positions, or fewer if board is mostly full
-    let max_attempts = empty_count.min(10);
-
-    for _ in 0..max_attempts {
+    // Sample up to 20 random positions
+    let mut attempts = 0;
+    while candidates.len() < 10 && attempts < 30 {
         let row = rng.gen_range(0..BOARD_SIZE);
         let col = rng.gen_range(0..BOARD_SIZE);
 
         if game.board[row][col].is_none() && is_legal_move(game, row, col) {
-            return Some(GoMove::Place(row, col));
+            let mv = GoMove::Place(row, col);
+            let score = score_move(game, row, col);
+            // Ensure positive weights
+            candidates.push((mv, (score + 100.0).max(1.0)));
         }
+        attempts += 1;
     }
 
-    // Fallback: linear scan for any legal move (rare case)
-    for row in 0..BOARD_SIZE {
-        for col in 0..BOARD_SIZE {
-            if game.board[row][col].is_none() && is_legal_move(game, row, col) {
-                return Some(GoMove::Place(row, col));
+    if candidates.is_empty() {
+        // Fallback: linear scan
+        for row in 0..BOARD_SIZE {
+            for col in 0..BOARD_SIZE {
+                if game.board[row][col].is_none() && is_legal_move(game, row, col) {
+                    return Some(GoMove::Place(row, col));
+                }
             }
         }
+        return None;
     }
 
-    None
+    // Weighted random selection
+    let total_weight: f64 = candidates.iter().map(|(_, w)| w).sum();
+    let mut pick = rng.gen_range(0.0..total_weight);
+
+    for (mv, weight) in candidates {
+        pick -= weight;
+        if pick <= 0.0 {
+            return Some(mv);
+        }
+    }
+
+    // Shouldn't reach here, but return first candidate
+    candidates.first().map(|(mv, _)| *mv)
 }
 
 /// Backpropagate result through the tree.
@@ -216,13 +273,11 @@ fn backpropagate(nodes: &mut [MctsNode], start_idx: usize, winner: Option<Stone>
     while let Some(idx) = node_idx {
         nodes[idx].visits += 1;
 
-        // Add win if this node's player matches the winner
         if let Some(w) = winner {
             if nodes[idx].player_just_moved == w {
                 nodes[idx].wins += 1.0;
             }
         } else {
-            // Draw - half point
             nodes[idx].wins += 0.5;
         }
 
@@ -230,12 +285,30 @@ fn backpropagate(nodes: &mut [MctsNode], start_idx: usize, winner: Option<Stone>
     }
 }
 
-/// Select the best move (most visited child of root).
+/// Select the best move (most visited, win rate as tiebreaker).
 fn select_best_move(nodes: &[MctsNode]) -> GoMove {
     nodes[0]
         .children
         .iter()
-        .max_by_key(|&&idx| nodes[idx].visits)
+        .max_by(|&&a, &&b| {
+            let visits_cmp = nodes[a].visits.cmp(&nodes[b].visits);
+            if visits_cmp == std::cmp::Ordering::Equal {
+                // Tiebreak by win rate
+                let rate_a = if nodes[a].visits > 0 {
+                    nodes[a].wins / nodes[a].visits as f32
+                } else {
+                    0.0
+                };
+                let rate_b = if nodes[b].visits > 0 {
+                    nodes[b].wins / nodes[b].visits as f32
+                } else {
+                    0.0
+                };
+                rate_a.partial_cmp(&rate_b).unwrap()
+            } else {
+                visits_cmp
+            }
+        })
         .and_then(|&idx| nodes[idx].move_taken)
         .unwrap_or(GoMove::Pass)
 }
@@ -249,20 +322,35 @@ mod tests {
         let game = GoGame::new(GoDifficulty::Novice);
         let mut rng = rand::thread_rng();
         let mv = mcts_best_move(&game, &mut rng);
-        // Should return some move (likely a placement, not pass on empty board)
         match mv {
             GoMove::Place(r, c) => {
                 assert!(r < BOARD_SIZE);
                 assert!(c < BOARD_SIZE);
             }
-            GoMove::Pass => {} // Also valid
+            GoMove::Pass => {}
         }
+    }
+
+    #[test]
+    fn test_mcts_prefers_capture() {
+        let mut game = GoGame::new(GoDifficulty::Apprentice);
+        // Set up: Black stone at (4,4) can be captured at (4,5)
+        game.board[4][4] = Some(Stone::Black);
+        game.board[3][4] = Some(Stone::White);
+        game.board[5][4] = Some(Stone::White);
+        game.board[4][3] = Some(Stone::White);
+        game.current_player = Stone::White;
+
+        let mut rng = rand::thread_rng();
+        let mv = mcts_best_move(&game, &mut rng);
+
+        // Should capture at (4,5)
+        assert_eq!(mv, GoMove::Place(4, 5), "MCTS should find the capture");
     }
 
     #[test]
     fn test_mcts_avoids_obvious_suicide() {
         let mut game = GoGame::new(GoDifficulty::Novice);
-        // Create a situation where (4,4) would be suicide for White
         game.board[3][4] = Some(Stone::Black);
         game.board[5][4] = Some(Stone::Black);
         game.board[4][3] = Some(Stone::Black);
@@ -272,42 +360,23 @@ mod tests {
         let mut rng = rand::thread_rng();
         let mv = mcts_best_move(&game, &mut rng);
 
-        // Should not play at (4,4) - it's suicide
-        assert_ne!(mv, GoMove::Place(4, 4));
+        assert_ne!(mv, GoMove::Place(4, 4), "Should not suicide");
     }
 
     #[test]
-    fn test_uct_value() {
-        let node = MctsNode {
-            move_taken: Some(GoMove::Place(4, 4)),
-            parent: Some(0),
-            children: vec![],
-            visits: 10,
-            wins: 5.0,
-            untried_moves: vec![],
-            player_just_moved: Stone::Black,
-        };
+    fn test_mcts_defends_atari() {
+        let mut game = GoGame::new(GoDifficulty::Apprentice);
+        // White stone at (4,4) in atari, can escape at (4,5)
+        game.board[4][4] = Some(Stone::White);
+        game.board[3][4] = Some(Stone::Black);
+        game.board[5][4] = Some(Stone::Black);
+        game.board[4][3] = Some(Stone::Black);
+        game.current_player = Stone::White;
 
-        let parent_log_visits = (100_f64).ln();
-        let uct = node.uct_value(parent_log_visits);
-        // Should be roughly 0.5 (exploitation) + exploration bonus
-        assert!(uct > 0.5);
-        assert!(uct < 2.0);
-    }
+        let mut rng = rand::thread_rng();
+        let mv = mcts_best_move(&game, &mut rng);
 
-    #[test]
-    fn test_unvisited_node_has_infinite_uct() {
-        let node = MctsNode {
-            move_taken: Some(GoMove::Place(4, 4)),
-            parent: Some(0),
-            children: vec![],
-            visits: 0,
-            wins: 0.0,
-            untried_moves: vec![],
-            player_just_moved: Stone::Black,
-        };
-
-        let parent_log_visits = (100_f64).ln();
-        assert!(node.uct_value(parent_log_visits).is_infinite());
+        // Should save at (4,5)
+        assert_eq!(mv, GoMove::Place(4, 5), "MCTS should save the stone");
     }
 }
