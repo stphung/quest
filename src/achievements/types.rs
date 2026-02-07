@@ -57,9 +57,18 @@ pub enum AchievementId {
     PrestigeXV,
     PrestigeXX,
     Eternal,
-    ZoneMasterI,
-    ZoneMasterII,
-    ZoneMasterIII,
+    // Zone completion achievements (one per zone)
+    Zone1Complete,  // Meadow
+    Zone2Complete,  // Dark Forest
+    Zone3Complete,  // Mountain Pass
+    Zone4Complete,  // Ancient Ruins
+    Zone5Complete,  // Volcanic Wastes
+    Zone6Complete,  // Frozen Tundra
+    Zone7Complete,  // Crystal Caverns
+    Zone8Complete,  // Sunken Kingdom
+    Zone9Complete,  // Floating Isles
+    Zone10Complete, // Storm Citadel
+    Zone11Complete, // The Expanse (first cycle)
     TheStormbreaker,
     GameComplete,
 
@@ -412,18 +421,24 @@ impl Achievements {
         // ZoneClearer - clear any zone
         self.unlock(AchievementId::ZoneClearer, char_name.clone());
 
-        // Zone master milestones (specific zones)
-        match zone_id {
-            2 => {
-                self.unlock(AchievementId::ZoneMasterI, char_name);
-            } // Dark Forest
-            5 => {
-                self.unlock(AchievementId::ZoneMasterII, char_name);
-            } // Volcanic Wastes
-            9 => {
-                self.unlock(AchievementId::ZoneMasterIII, char_name);
-            } // Floating Isles
-            _ => {}
+        // Individual zone completion achievements
+        let achievement = match zone_id {
+            1 => Some(AchievementId::Zone1Complete),   // Meadow
+            2 => Some(AchievementId::Zone2Complete),   // Dark Forest
+            3 => Some(AchievementId::Zone3Complete),   // Mountain Pass
+            4 => Some(AchievementId::Zone4Complete),   // Ancient Ruins
+            5 => Some(AchievementId::Zone5Complete),   // Volcanic Wastes
+            6 => Some(AchievementId::Zone6Complete),   // Frozen Tundra
+            7 => Some(AchievementId::Zone7Complete),   // Crystal Caverns
+            8 => Some(AchievementId::Zone8Complete),   // Sunken Kingdom
+            9 => Some(AchievementId::Zone9Complete),   // Floating Isles
+            10 => Some(AchievementId::Zone10Complete), // Storm Citadel
+            11 => Some(AchievementId::Zone11Complete), // The Expanse (first cycle)
+            _ => None,
+        };
+
+        if let Some(id) = achievement {
+            self.unlock(id, char_name);
         }
     }
 
