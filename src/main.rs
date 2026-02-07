@@ -1070,13 +1070,12 @@ fn game_tick(
                 .add_log_entry(format!("🎣 {}", rank_msg), false, true);
         }
 
-        // Update play_time_seconds and last_save_time (still needed while fishing)
+        // Update play_time_seconds while fishing
         *tick_counter += 1;
         if *tick_counter >= 10 {
             game_state.play_time_seconds += 1;
             *tick_counter = 0;
         }
-        game_state.last_save_time = Utc::now().timestamp();
 
         return; // Skip combat processing while fishing
     }
@@ -1396,7 +1395,4 @@ fn game_tick(
         game_state.play_time_seconds += 1;
         *tick_counter = 0;
     }
-
-    // Update last_save_time to current time for tracking
-    game_state.last_save_time = Utc::now().timestamp();
 }
