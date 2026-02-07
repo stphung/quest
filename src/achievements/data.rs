@@ -223,7 +223,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
     },
     AchievementDef {
         id: AchievementId::Zone10Complete,
-        name: "Storm Breaker",
+        name: "Citadel Conqueror",
         description: "Clear Zone 10: Storm Citadel",
         category: AchievementCategory::Progression,
         secret: false,
