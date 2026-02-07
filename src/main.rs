@@ -1280,13 +1280,32 @@ fn game_tick(
                 game_state.session_kills += 1;
 
                 // Track zone fully cleared for achievements
-                if let BossDefeatResult::ZoneComplete { old_zone, .. } = &result {
-                    // Get zone ID from the old zone name
-                    if let Some(zone) = zones::get_all_zones().iter().find(|z| z.name == *old_zone)
-                    {
-                        global_achievements
-                            .on_zone_fully_cleared(zone.id, Some(&game_state.character_name));
+                match &result {
+                    BossDefeatResult::ZoneComplete { old_zone, .. }
+                    | BossDefeatResult::ZoneCompleteButGated {
+                        zone_name: old_zone,
+                        ..
+                    } => {
+                        // Get zone ID from the old zone name
+                        if let Some(zone) =
+                            zones::get_all_zones().iter().find(|z| z.name == *old_zone)
+                        {
+                            global_achievements
+                                .on_zone_fully_cleared(zone.id, Some(&game_state.character_name));
+                        }
                     }
+                    BossDefeatResult::GameComplete => {
+                        // Zone 10 (Storm Citadel) completed
+                        global_achievements
+                            .on_zone_fully_cleared(10, Some(&game_state.character_name));
+                        global_achievements.on_game_complete(Some(&game_state.character_name));
+                    }
+                    BossDefeatResult::ExpanseCycle => {
+                        // Zone 11 (The Expanse) cycle completed
+                        global_achievements
+                            .on_zone_fully_cleared(11, Some(&game_state.character_name));
+                    }
+                    _ => {}
                 }
 
                 // Log based on result

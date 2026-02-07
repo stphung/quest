@@ -442,6 +442,12 @@ impl Achievements {
         }
     }
 
+    /// Called when the game is completed (Zone 10 boss defeated with Stormbreaker).
+    pub fn on_game_complete(&mut self, character_name: Option<&str>) {
+        let char_name = character_name.map(|s| s.to_string());
+        self.unlock(AchievementId::GameComplete, char_name);
+    }
+
     // =========================================================================
     // Dungeon Event Handlers
     // =========================================================================
