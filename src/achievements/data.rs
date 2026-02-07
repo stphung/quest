@@ -666,14 +666,6 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
     // CHALLENGE ACHIEVEMENTS - META
     // ═══════════════════════════════════════════════════════════════
     AchievementDef {
-        id: AchievementId::AllRounder,
-        name: "All-Rounder",
-        description: "Win each type of minigame at least once",
-        category: AchievementCategory::Challenges,
-        secret: false,
-        icon: "🎮",
-    },
-    AchievementDef {
         id: AchievementId::GrandChampion,
         name: "Grand Champion",
         description: "Win 100 minigames total",

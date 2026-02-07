@@ -134,7 +134,6 @@ pub enum AchievementId {
     GoJourneyman,
     GoMaster,
     // Challenge achievements - Meta
-    AllRounder,
     GrandChampion,
 
     // Fishing achievements - rank milestones
@@ -680,36 +679,6 @@ impl Achievements {
 
         if let Some(id) = achievement {
             self.unlock(id, char_name.clone());
-        }
-
-        // AllRounder - check if won at least one game of each type (any difficulty)
-        let has_chess = self.is_unlocked(AchievementId::ChessNovice)
-            || self.is_unlocked(AchievementId::ChessApprentice)
-            || self.is_unlocked(AchievementId::ChessJourneyman)
-            || self.is_unlocked(AchievementId::ChessMaster);
-        let has_morris = self.is_unlocked(AchievementId::MorrisNovice)
-            || self.is_unlocked(AchievementId::MorrisApprentice)
-            || self.is_unlocked(AchievementId::MorrisJourneyman)
-            || self.is_unlocked(AchievementId::MorrisMaster);
-        let has_gomoku = self.is_unlocked(AchievementId::GomokuNovice)
-            || self.is_unlocked(AchievementId::GomokuApprentice)
-            || self.is_unlocked(AchievementId::GomokuJourneyman)
-            || self.is_unlocked(AchievementId::GomokuMaster);
-        let has_minesweeper = self.is_unlocked(AchievementId::MinesweeperNovice)
-            || self.is_unlocked(AchievementId::MinesweeperApprentice)
-            || self.is_unlocked(AchievementId::MinesweeperJourneyman)
-            || self.is_unlocked(AchievementId::MinesweeperMaster);
-        let has_rune = self.is_unlocked(AchievementId::RuneNovice)
-            || self.is_unlocked(AchievementId::RuneApprentice)
-            || self.is_unlocked(AchievementId::RuneJourneyman)
-            || self.is_unlocked(AchievementId::RuneMaster);
-        let has_go = self.is_unlocked(AchievementId::GoNovice)
-            || self.is_unlocked(AchievementId::GoApprentice)
-            || self.is_unlocked(AchievementId::GoJourneyman)
-            || self.is_unlocked(AchievementId::GoMaster);
-
-        if has_chess && has_morris && has_gomoku && has_minesweeper && has_rune && has_go {
-            self.unlock(AchievementId::AllRounder, char_name.clone());
         }
 
         // Grand Champion - 100 total wins
