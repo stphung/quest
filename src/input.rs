@@ -343,7 +343,7 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
         match minigame {
             ActiveMinigame::Rune(rune_game) => {
                 if rune_game.game_result.is_some() {
-                    apply_rune_result(state);
+                    state.last_minigame_win = apply_rune_result(state);
                     return InputResult::Continue;
                 }
                 let input = match key.code {
@@ -361,7 +361,7 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
             }
             ActiveMinigame::Minesweeper(minesweeper_game) => {
                 if minesweeper_game.game_result.is_some() {
-                    apply_minesweeper_result(state);
+                    state.last_minigame_win = apply_minesweeper_result(state);
                     return InputResult::Continue;
                 }
                 let input = match key.code {
@@ -379,7 +379,7 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
             }
             ActiveMinigame::Gomoku(gomoku_game) => {
                 if gomoku_game.game_result.is_some() {
-                    apply_gomoku_result(state);
+                    state.last_minigame_win = apply_gomoku_result(state);
                     return InputResult::Continue;
                 }
                 let input = match key.code {
@@ -395,7 +395,7 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
             }
             ActiveMinigame::Chess(chess_game) => {
                 if chess_game.game_result.is_some() {
-                    apply_chess_result(state);
+                    state.last_minigame_win = apply_chess_result(state);
                     return InputResult::Continue;
                 }
                 let input = match key.code {
@@ -411,7 +411,7 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
             }
             ActiveMinigame::Morris(morris_game) => {
                 if morris_game.game_result.is_some() {
-                    apply_morris_result(state);
+                    state.last_minigame_win = apply_morris_result(state);
                     return InputResult::Continue;
                 }
                 let input = match key.code {
@@ -427,7 +427,7 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
             }
             ActiveMinigame::Go(go_game) => {
                 if go_game.game_result.is_some() {
-                    apply_go_result(state);
+                    state.last_minigame_win = apply_go_result(state);
                     return InputResult::Continue;
                 }
                 let input = match key.code {

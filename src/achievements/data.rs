@@ -189,12 +189,28 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         icon: "🏆",
     },
     // ═══════════════════════════════════════════════════════════════
-    // CHALLENGE ACHIEVEMENTS
+    // CHALLENGE ACHIEVEMENTS - CHESS
     // ═══════════════════════════════════════════════════════════════
     AchievementDef {
         id: AchievementId::ChessNovice,
         name: "Chess Novice",
-        description: "Win a game of chess",
+        description: "Win chess on Novice difficulty",
+        category: AchievementCategory::Challenges,
+        secret: false,
+        icon: "♟️",
+    },
+    AchievementDef {
+        id: AchievementId::ChessApprentice,
+        name: "Chess Apprentice",
+        description: "Win chess on Apprentice difficulty",
+        category: AchievementCategory::Challenges,
+        secret: false,
+        icon: "♟️",
+    },
+    AchievementDef {
+        id: AchievementId::ChessJourneyman,
+        name: "Chess Journeyman",
+        description: "Win chess on Journeyman difficulty",
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "♟️",
@@ -202,19 +218,189 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
     AchievementDef {
         id: AchievementId::ChessMaster,
         name: "Chess Master",
-        description: "Win a game of chess on Master difficulty",
+        description: "Win chess on Master difficulty",
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "♛",
     },
+    // ═══════════════════════════════════════════════════════════════
+    // CHALLENGE ACHIEVEMENTS - MORRIS
+    // ═══════════════════════════════════════════════════════════════
     AchievementDef {
-        id: AchievementId::MorrisWinner,
-        name: "Mill Master",
-        description: "Win a game of Nine Men's Morris",
+        id: AchievementId::MorrisNovice,
+        name: "Morris Novice",
+        description: "Win Morris on Novice difficulty",
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "⚪",
     },
+    AchievementDef {
+        id: AchievementId::MorrisApprentice,
+        name: "Morris Apprentice",
+        description: "Win Morris on Apprentice difficulty",
+        category: AchievementCategory::Challenges,
+        secret: false,
+        icon: "⚪",
+    },
+    AchievementDef {
+        id: AchievementId::MorrisJourneyman,
+        name: "Morris Journeyman",
+        description: "Win Morris on Journeyman difficulty",
+        category: AchievementCategory::Challenges,
+        secret: false,
+        icon: "⚪",
+    },
+    AchievementDef {
+        id: AchievementId::MorrisMaster,
+        name: "Morris Master",
+        description: "Win Morris on Master difficulty",
+        category: AchievementCategory::Challenges,
+        secret: false,
+        icon: "⚪",
+    },
+    // ═══════════════════════════════════════════════════════════════
+    // CHALLENGE ACHIEVEMENTS - GOMOKU
+    // ═══════════════════════════════════════════════════════════════
+    AchievementDef {
+        id: AchievementId::GomokuNovice,
+        name: "Gomoku Novice",
+        description: "Win Gomoku on Novice difficulty",
+        category: AchievementCategory::Challenges,
+        secret: false,
+        icon: "⚫",
+    },
+    AchievementDef {
+        id: AchievementId::GomokuApprentice,
+        name: "Gomoku Apprentice",
+        description: "Win Gomoku on Apprentice difficulty",
+        category: AchievementCategory::Challenges,
+        secret: false,
+        icon: "⚫",
+    },
+    AchievementDef {
+        id: AchievementId::GomokuJourneyman,
+        name: "Gomoku Journeyman",
+        description: "Win Gomoku on Journeyman difficulty",
+        category: AchievementCategory::Challenges,
+        secret: false,
+        icon: "⚫",
+    },
+    AchievementDef {
+        id: AchievementId::GomokuMaster,
+        name: "Gomoku Master",
+        description: "Win Gomoku on Master difficulty",
+        category: AchievementCategory::Challenges,
+        secret: false,
+        icon: "⚫",
+    },
+    // ═══════════════════════════════════════════════════════════════
+    // CHALLENGE ACHIEVEMENTS - MINESWEEPER
+    // ═══════════════════════════════════════════════════════════════
+    AchievementDef {
+        id: AchievementId::MinesweeperNovice,
+        name: "Minesweeper Novice",
+        description: "Win Minesweeper on Novice difficulty",
+        category: AchievementCategory::Challenges,
+        secret: false,
+        icon: "💣",
+    },
+    AchievementDef {
+        id: AchievementId::MinesweeperApprentice,
+        name: "Minesweeper Apprentice",
+        description: "Win Minesweeper on Apprentice difficulty",
+        category: AchievementCategory::Challenges,
+        secret: false,
+        icon: "💣",
+    },
+    AchievementDef {
+        id: AchievementId::MinesweeperJourneyman,
+        name: "Minesweeper Journeyman",
+        description: "Win Minesweeper on Journeyman difficulty",
+        category: AchievementCategory::Challenges,
+        secret: false,
+        icon: "💣",
+    },
+    AchievementDef {
+        id: AchievementId::MinesweeperMaster,
+        name: "Minesweeper Master",
+        description: "Win Minesweeper on Master difficulty",
+        category: AchievementCategory::Challenges,
+        secret: false,
+        icon: "💣",
+    },
+    // ═══════════════════════════════════════════════════════════════
+    // CHALLENGE ACHIEVEMENTS - RUNE
+    // ═══════════════════════════════════════════════════════════════
+    AchievementDef {
+        id: AchievementId::RuneNovice,
+        name: "Rune Novice",
+        description: "Win Rune on Novice difficulty",
+        category: AchievementCategory::Challenges,
+        secret: false,
+        icon: "🔮",
+    },
+    AchievementDef {
+        id: AchievementId::RuneApprentice,
+        name: "Rune Apprentice",
+        description: "Win Rune on Apprentice difficulty",
+        category: AchievementCategory::Challenges,
+        secret: false,
+        icon: "🔮",
+    },
+    AchievementDef {
+        id: AchievementId::RuneJourneyman,
+        name: "Rune Journeyman",
+        description: "Win Rune on Journeyman difficulty",
+        category: AchievementCategory::Challenges,
+        secret: false,
+        icon: "🔮",
+    },
+    AchievementDef {
+        id: AchievementId::RuneMaster,
+        name: "Rune Master",
+        description: "Win Rune on Master difficulty",
+        category: AchievementCategory::Challenges,
+        secret: false,
+        icon: "🔮",
+    },
+    // ═══════════════════════════════════════════════════════════════
+    // CHALLENGE ACHIEVEMENTS - GO
+    // ═══════════════════════════════════════════════════════════════
+    AchievementDef {
+        id: AchievementId::GoNovice,
+        name: "Go Novice",
+        description: "Win Go on Novice difficulty",
+        category: AchievementCategory::Challenges,
+        secret: false,
+        icon: "🟤",
+    },
+    AchievementDef {
+        id: AchievementId::GoApprentice,
+        name: "Go Apprentice",
+        description: "Win Go on Apprentice difficulty",
+        category: AchievementCategory::Challenges,
+        secret: false,
+        icon: "🟤",
+    },
+    AchievementDef {
+        id: AchievementId::GoJourneyman,
+        name: "Go Journeyman",
+        description: "Win Go on Journeyman difficulty",
+        category: AchievementCategory::Challenges,
+        secret: false,
+        icon: "🟤",
+    },
+    AchievementDef {
+        id: AchievementId::GoMaster,
+        name: "Go Master",
+        description: "Win Go on Master difficulty",
+        category: AchievementCategory::Challenges,
+        secret: false,
+        icon: "🟤",
+    },
+    // ═══════════════════════════════════════════════════════════════
+    // CHALLENGE ACHIEVEMENTS - META
+    // ═══════════════════════════════════════════════════════════════
     AchievementDef {
         id: AchievementId::AllRounder,
         name: "All-Rounder",

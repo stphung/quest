@@ -1,6 +1,7 @@
 use crate::challenges::chess::ChessStats;
 use crate::challenges::menu::ChallengeMenu;
 use crate::challenges::ActiveMinigame;
+use crate::challenges::MinigameWinInfo;
 use crate::character::attributes::Attributes;
 use crate::combat::types::CombatState;
 use crate::dungeon::types::Dungeon;
@@ -94,6 +95,9 @@ pub struct GameState {
     /// Recent item drops for display (transient, not saved)
     #[serde(skip)]
     pub recent_drops: VecDeque<RecentDrop>,
+    /// Last minigame win info for achievement tracking (transient, not saved)
+    #[serde(skip)]
+    pub last_minigame_win: Option<MinigameWinInfo>,
 }
 
 impl GameState {
@@ -126,6 +130,7 @@ impl GameState {
             active_minigame: None,
             session_kills: 0,
             recent_drops: VecDeque::with_capacity(5),
+            last_minigame_win: None,
         }
     }
 

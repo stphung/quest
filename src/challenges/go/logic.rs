@@ -416,40 +416,76 @@ pub fn process_input(game: &mut GoGame, input: GoInput) -> bool {
 }
 
 /// Apply Go game result to state (rewards for win, clear game).
-/// Returns true if a result was applied.
-pub fn apply_go_result(state: &mut crate::core::game_state::GameState) -> bool {
+/// Returns Some(MinigameWinInfo) if the player won, None otherwise.
+pub fn apply_go_result(
+    state: &mut crate::core::game_state::GameState,
+) -> Option<crate::challenges::MinigameWinInfo> {
     use crate::challenges::menu::DifficultyInfo;
+    use crate::challenges::MinigameWinInfo;
 
     let game = match state.active_minigame.as_ref() {
         Some(ActiveMinigame::Go(g)) => g,
-        _ => return false,
+        _ => return None,
     };
-    let result = match game.game_result {
-        Some(r) => r,
-        None => return false,
-    };
+    let result = game.game_result?;
+    let difficulty = game.difficulty;
+    let old_prestige = state.prestige_rank;
 
-    // Apply rewards for win
-    if result == GoResult::Win {
-        let reward = game.difficulty.reward();
-        state.prestige_rank += reward.prestige_ranks;
-        // Add to combat log
-        let icon = "◉";
-        let msg = format!(
-            "{} Won Go ({}) - {}",
-            icon,
-            game.difficulty.name(),
-            reward.description().replace("Win: ", "")
-        );
-        state.combat_state.add_log_entry(msg, false, true);
-    } else if result == GoResult::Loss {
-        let icon = "◉";
-        let msg = format!("{} Lost Go ({}) - No penalty", icon, game.difficulty.name());
-        state.combat_state.add_log_entry(msg, false, true);
-    }
+    let won = match result {
+        GoResult::Win => {
+            let reward = difficulty.reward();
+            state.prestige_rank += reward.prestige_ranks;
+            // Add to combat log
+            state.combat_state.add_log_entry(
+                "◉ Victory! The master bows in respect.".to_string(),
+                false,
+                true,
+            );
+            if reward.prestige_ranks > 0 {
+                state.combat_state.add_log_entry(
+                    format!(
+                        "◉ +{} Prestige Ranks (P{} → P{})",
+                        reward.prestige_ranks, old_prestige, state.prestige_rank
+                    ),
+                    false,
+                    false,
+                );
+            }
+            true
+        }
+        GoResult::Loss => {
+            state.combat_state.add_log_entry(
+                "◉ The master nods thoughtfully and departs.".to_string(),
+                false,
+                true,
+            );
+            false
+        }
+        GoResult::Draw => {
+            state.combat_state.add_log_entry(
+                "◉ A rare tie. The master seems impressed.".to_string(),
+                false,
+                true,
+            );
+            false
+        }
+    };
 
     state.active_minigame = None;
-    true
+
+    if won {
+        Some(MinigameWinInfo {
+            game_type: "go",
+            difficulty: match difficulty {
+                GoDifficulty::Novice => "novice",
+                GoDifficulty::Apprentice => "apprentice",
+                GoDifficulty::Journeyman => "journeyman",
+                GoDifficulty::Master => "master",
+            },
+        })
+    } else {
+        None
+    }
 }
 
 /// Start a new Go game with the selected difficulty.

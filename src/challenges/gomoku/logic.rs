@@ -731,22 +731,21 @@ pub fn find_best_move<R: Rng>(game: &GomokuGame, rng: &mut R) -> Option<(usize, 
 }
 
 /// Apply game result: update stats, grant rewards, and add combat log entries.
-/// Returns true if a result was processed.
-pub fn apply_game_result(state: &mut GameState) -> bool {
+/// Returns Some(MinigameWinInfo) if the player won, None otherwise.
+pub fn apply_game_result(state: &mut GameState) -> Option<crate::challenges::MinigameWinInfo> {
     use crate::challenges::menu::DifficultyInfo;
+    use crate::challenges::MinigameWinInfo;
 
     let game = match state.active_minigame.as_ref() {
         Some(ActiveMinigame::Gomoku(g)) => g,
-        _ => return false,
+        _ => return None,
     };
-    let result = match game.game_result {
-        Some(r) => r,
-        None => return false,
-    };
+    let result = game.game_result?;
     let reward = game.difficulty.reward();
     let old_prestige = state.prestige_rank;
+    let difficulty = game.difficulty;
 
-    match result {
+    let won = match result {
         GomokuResult::Win => {
             // XP reward
             let xp_gained = if reward.xp_percent > 0 {
@@ -783,6 +782,7 @@ pub fn apply_game_result(state: &mut GameState) -> bool {
                     .combat_state
                     .add_log_entry(format!("◎ +{} XP", xp_gained), false, false);
             }
+            true
         }
         GomokuResult::Loss => {
             state.combat_state.add_log_entry(
@@ -790,6 +790,7 @@ pub fn apply_game_result(state: &mut GameState) -> bool {
                 false,
                 true,
             );
+            false
         }
         GomokuResult::Draw => {
             state.combat_state.add_log_entry(
@@ -797,11 +798,25 @@ pub fn apply_game_result(state: &mut GameState) -> bool {
                 false,
                 true,
             );
+            false
         }
-    }
+    };
 
     state.active_minigame = None;
-    true
+
+    if won {
+        Some(MinigameWinInfo {
+            game_type: "gomoku",
+            difficulty: match difficulty {
+                GomokuDifficulty::Novice => "novice",
+                GomokuDifficulty::Apprentice => "apprentice",
+                GomokuDifficulty::Journeyman => "journeyman",
+                GomokuDifficulty::Master => "master",
+            },
+        })
+    } else {
+        None
+    }
 }
 
 /// Process AI thinking (called each tick).
@@ -1215,7 +1230,7 @@ mod ai_tests {
 
         let result = apply_game_result(&mut state);
 
-        assert!(result);
+        assert!(result.is_some()); // Win returns Some(MinigameWinInfo)
         assert!(
             state.active_minigame.is_none(),
             "Minigame should be cleared"
@@ -1256,8 +1271,8 @@ mod ai_tests {
 
         let result = apply_game_result(&mut state);
 
-        assert!(result);
-        assert!(state.active_minigame.is_none());
+        assert!(result.is_none()); // Loss returns None
+        assert!(state.active_minigame.is_none()); // But game is still cleared
         assert_eq!(state.character_xp, initial_xp, "No XP on loss");
         assert_eq!(state.prestige_rank, initial_prestige, "No prestige on loss");
     }
@@ -1275,28 +1290,28 @@ mod ai_tests {
 
         let result = apply_game_result(&mut state);
 
-        assert!(result);
-        assert!(state.active_minigame.is_none());
+        assert!(result.is_none()); // Draw returns None
+        assert!(state.active_minigame.is_none()); // But game is still cleared
         assert_eq!(state.character_xp, initial_xp, "No XP on draw");
     }
 
     #[test]
-    fn test_apply_game_result_returns_false_no_minigame() {
+    fn test_apply_game_result_returns_none_no_minigame() {
         use crate::core::game_state::GameState;
 
         let mut state = GameState::new("Test".to_string(), 0);
-        assert!(!apply_game_result(&mut state));
+        assert!(apply_game_result(&mut state).is_none());
     }
 
     #[test]
-    fn test_apply_game_result_returns_false_no_result() {
+    fn test_apply_game_result_returns_none_no_result() {
         use crate::core::game_state::GameState;
 
         let mut state = GameState::new("Test".to_string(), 0);
         let game = GomokuGame::new(GomokuDifficulty::Novice);
         state.active_minigame = Some(ActiveMinigame::Gomoku(game));
 
-        assert!(!apply_game_result(&mut state));
+        assert!(apply_game_result(&mut state).is_none());
     }
 
     #[test]

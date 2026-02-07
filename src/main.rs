@@ -696,8 +696,6 @@ fn main() -> io::Result<()> {
                         if let Event::Key(key_event) = event::read()? {
                             // Track prestige rank before input to detect prestige
                             let prestige_before = state.prestige_rank;
-                            // Track chess wins before input
-                            let chess_wins_before = state.chess_stats.games_won;
 
                             let result = input::handle_game_input(
                                 key_event,
@@ -719,17 +717,16 @@ fn main() -> io::Result<()> {
                                 achievements_changed = true;
                             }
 
-                            // Check if chess win occurred
-                            if state.chess_stats.games_won > chess_wins_before {
-                                // Check if it was a Master difficulty win
-                                // (Unfortunately we can't easily check difficulty here,
-                                // so we rely on the prestige tracking for now)
+                            // Check if a minigame win occurred
+                            if let Some(ref win_info) = state.last_minigame_win {
                                 global_achievements.on_minigame_won(
-                                    "chess",
-                                    false, // We'd need to track difficulty separately
+                                    win_info.game_type,
+                                    win_info.difficulty,
                                     Some(&state.character_name),
                                 );
                                 achievements_changed = true;
+                                // Clear the win info after processing
+                                state.last_minigame_win = None;
                             }
 
                             // Save achievements if any changed

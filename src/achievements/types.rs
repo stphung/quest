@@ -63,10 +63,37 @@ pub enum AchievementId {
     TheStormbreaker,
     GameComplete,
 
-    // Challenge achievements
+    // Challenge achievements - Chess
     ChessNovice,
+    ChessApprentice,
+    ChessJourneyman,
     ChessMaster,
-    MorrisWinner,
+    // Challenge achievements - Morris
+    MorrisNovice,
+    MorrisApprentice,
+    MorrisJourneyman,
+    MorrisMaster,
+    // Challenge achievements - Gomoku
+    GomokuNovice,
+    GomokuApprentice,
+    GomokuJourneyman,
+    GomokuMaster,
+    // Challenge achievements - Minesweeper
+    MinesweeperNovice,
+    MinesweeperApprentice,
+    MinesweeperJourneyman,
+    MinesweeperMaster,
+    // Challenge achievements - Rune
+    RuneNovice,
+    RuneApprentice,
+    RuneJourneyman,
+    RuneMaster,
+    // Challenge achievements - Go
+    GoNovice,
+    GoApprentice,
+    GoJourneyman,
+    GoMaster,
+    // Challenge achievements - Meta
     AllRounder,
     GrandChampion,
 
@@ -442,36 +469,84 @@ impl Achievements {
     // =========================================================================
 
     /// Called when a minigame is won.
-    /// game_type: "chess", "morris", etc.
-    /// difficulty: for chess, tracks if master difficulty
+    /// game_type: "chess", "morris", "gomoku", "minesweeper", "rune", "go"
+    /// difficulty: "novice", "apprentice", "journeyman", "master"
     pub fn on_minigame_won(
         &mut self,
         game_type: &str,
-        is_master_difficulty: bool,
+        difficulty: &str,
         character_name: Option<&str>,
     ) {
         let char_name = character_name.map(|s| s.to_string());
 
         self.total_minigame_wins += 1;
 
-        // Game-specific achievements
-        match game_type {
-            "chess" => {
-                self.unlock(AchievementId::ChessNovice, char_name.clone());
-                if is_master_difficulty {
-                    self.unlock(AchievementId::ChessMaster, char_name.clone());
-                }
-            }
-            "morris" => {
-                self.unlock(AchievementId::MorrisWinner, char_name.clone());
-            }
-            _ => {}
+        // Game-specific achievements based on difficulty
+        let achievement = match (game_type, difficulty) {
+            // Chess
+            ("chess", "novice") => Some(AchievementId::ChessNovice),
+            ("chess", "apprentice") => Some(AchievementId::ChessApprentice),
+            ("chess", "journeyman") => Some(AchievementId::ChessJourneyman),
+            ("chess", "master") => Some(AchievementId::ChessMaster),
+            // Morris
+            ("morris", "novice") => Some(AchievementId::MorrisNovice),
+            ("morris", "apprentice") => Some(AchievementId::MorrisApprentice),
+            ("morris", "journeyman") => Some(AchievementId::MorrisJourneyman),
+            ("morris", "master") => Some(AchievementId::MorrisMaster),
+            // Gomoku
+            ("gomoku", "novice") => Some(AchievementId::GomokuNovice),
+            ("gomoku", "apprentice") => Some(AchievementId::GomokuApprentice),
+            ("gomoku", "journeyman") => Some(AchievementId::GomokuJourneyman),
+            ("gomoku", "master") => Some(AchievementId::GomokuMaster),
+            // Minesweeper
+            ("minesweeper", "novice") => Some(AchievementId::MinesweeperNovice),
+            ("minesweeper", "apprentice") => Some(AchievementId::MinesweeperApprentice),
+            ("minesweeper", "journeyman") => Some(AchievementId::MinesweeperJourneyman),
+            ("minesweeper", "master") => Some(AchievementId::MinesweeperMaster),
+            // Rune
+            ("rune", "novice") => Some(AchievementId::RuneNovice),
+            ("rune", "apprentice") => Some(AchievementId::RuneApprentice),
+            ("rune", "journeyman") => Some(AchievementId::RuneJourneyman),
+            ("rune", "master") => Some(AchievementId::RuneMaster),
+            // Go
+            ("go", "novice") => Some(AchievementId::GoNovice),
+            ("go", "apprentice") => Some(AchievementId::GoApprentice),
+            ("go", "journeyman") => Some(AchievementId::GoJourneyman),
+            ("go", "master") => Some(AchievementId::GoMaster),
+            _ => None,
+        };
+
+        if let Some(id) = achievement {
+            self.unlock(id, char_name.clone());
         }
 
-        // AllRounder - check if won both chess and morris
-        if self.is_unlocked(AchievementId::ChessNovice)
-            && self.is_unlocked(AchievementId::MorrisWinner)
-        {
+        // AllRounder - check if won at least one game of each type (any difficulty)
+        let has_chess = self.is_unlocked(AchievementId::ChessNovice)
+            || self.is_unlocked(AchievementId::ChessApprentice)
+            || self.is_unlocked(AchievementId::ChessJourneyman)
+            || self.is_unlocked(AchievementId::ChessMaster);
+        let has_morris = self.is_unlocked(AchievementId::MorrisNovice)
+            || self.is_unlocked(AchievementId::MorrisApprentice)
+            || self.is_unlocked(AchievementId::MorrisJourneyman)
+            || self.is_unlocked(AchievementId::MorrisMaster);
+        let has_gomoku = self.is_unlocked(AchievementId::GomokuNovice)
+            || self.is_unlocked(AchievementId::GomokuApprentice)
+            || self.is_unlocked(AchievementId::GomokuJourneyman)
+            || self.is_unlocked(AchievementId::GomokuMaster);
+        let has_minesweeper = self.is_unlocked(AchievementId::MinesweeperNovice)
+            || self.is_unlocked(AchievementId::MinesweeperApprentice)
+            || self.is_unlocked(AchievementId::MinesweeperJourneyman)
+            || self.is_unlocked(AchievementId::MinesweeperMaster);
+        let has_rune = self.is_unlocked(AchievementId::RuneNovice)
+            || self.is_unlocked(AchievementId::RuneApprentice)
+            || self.is_unlocked(AchievementId::RuneJourneyman)
+            || self.is_unlocked(AchievementId::RuneMaster);
+        let has_go = self.is_unlocked(AchievementId::GoNovice)
+            || self.is_unlocked(AchievementId::GoApprentice)
+            || self.is_unlocked(AchievementId::GoJourneyman)
+            || self.is_unlocked(AchievementId::GoMaster);
+
+        if has_chess && has_morris && has_gomoku && has_minesweeper && has_rune && has_go {
             self.unlock(AchievementId::AllRounder, char_name.clone());
         }
 

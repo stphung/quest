@@ -265,6 +265,7 @@ impl SaveManager {
             active_minigame: None,
             session_kills: 0,
             recent_drops: std::collections::VecDeque::new(),
+            last_minigame_win: None,
         }
     }
 }
