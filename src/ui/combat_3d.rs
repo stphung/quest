@@ -62,18 +62,15 @@ fn render_simple_sprite(frame: &mut Frame, area: Rect, game_state: &GameState) {
             sprite_lines.push(Line::from(""));
         }
 
-        // Render sprite centered
+        // Render sprite (centered by Paragraph alignment)
         for line in sprite_art.lines() {
-            let line_width = line.chars().count();
-            let padding = (area.width as usize).saturating_sub(line_width) / 2;
-
-            sprite_lines.push(Line::from(vec![
-                Span::raw(" ".repeat(padding)),
-                Span::styled(
+            sprite_lines.push(
+                Line::from(Span::styled(
                     line,
                     Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-                ),
-            ]));
+                ))
+                .alignment(Alignment::Center),
+            );
         }
 
         // Add enemy name below sprite
