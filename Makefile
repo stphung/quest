@@ -1,6 +1,6 @@
 # Development helpers for Quest
 
-.PHONY: check fmt lint test build audit all clean install
+.PHONY: check fmt lint test build audit all clean install setup
 
 # Run all PR checks locally (uses same script as CI)
 check:
@@ -45,6 +45,11 @@ run:
 # Clean build artifacts
 clean:
 	@cargo clean
+
+# Set up development environment (git hooks, etc.)
+setup:
+	@git config core.hooksPath scripts/hooks
+	@echo "Git hooks configured. Pre-commit will now run fmt and clippy checks."
 
 # Default target
 all: check

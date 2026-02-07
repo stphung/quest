@@ -5,6 +5,7 @@ A terminal-based idle RPG written in Rust. Your hero automatically battles enemi
 ## Build & Run
 
 ```bash
+make setup             # First time: configure git hooks
 cargo build            # Build
 cargo run              # Run the game
 make check             # Run all CI checks locally
