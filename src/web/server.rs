@@ -74,12 +74,12 @@ pub async fn start_web_server(port: u16, server: Arc<WebServer>) -> std::io::Res
                 let server = Arc::clone(&server);
                 tokio::spawn(async move {
                     if let Err(e) = handle_connection(stream, addr, server).await {
-                        eprintln!("Connection error from {}: {}", addr, e);
+                        // Connection error (silent to avoid corrupting terminal UI)
                     }
                 });
             }
             Err(e) => {
-                eprintln!("Accept error: {}", e);
+                // Accept error (silent to avoid corrupting terminal UI)
             }
         }
     }
@@ -113,7 +113,7 @@ async fn handle_connection(
 
     // WebSocket upgrade
     let ws_stream = tokio_tungstenite::accept_async(stream).await?;
-    eprintln!("WebSocket connection from: {}", addr);
+    // Connection established (no log to avoid corrupting terminal UI)
 
     let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
@@ -154,7 +154,7 @@ async fn handle_connection(
     }
 
     send_task.abort();
-    eprintln!("WebSocket disconnected: {}", addr);
+    // Connection closed (no log to avoid corrupting terminal UI)
 
     Ok(())
 }
