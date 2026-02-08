@@ -77,7 +77,7 @@ impl HavenRoomId {
             HavenRoomId::WarRoom => "Faded footwork circles are carved into the stone floor, each one paired with strike marks on the opposing wall — one high, one low, in rapid succession. The room teaches your muscles what your mind already knows: one strike is never enough.",
             HavenRoomId::Bedroom => "Heavy curtains block out every sliver of light, and the bed is piled high with furs. In this perfect darkness, your body recovers with an almost unnatural speed.",
             HavenRoomId::Garden => "Water trickles from a carved stone fountain into a shallow basin where lily pads drift. Tending this garden teaches a stillness that makes even the longest fishing wait feel brief.",
-            HavenRoomId::Library => "Ancient tomes reveal hidden challenges.",
+            HavenRoomId::Library => "A reading nook tucked beneath a stained-glass window, surrounded by towers of scrolls and ink-stained notes. The more you read, the more the world reveals its hidden trials to you.",
             HavenRoomId::FishingDock => "A private spot to cast.",
             HavenRoomId::Workshop => "Better tools yield better finds.",
             HavenRoomId::Vault => "Preserves treasured equipment through prestige resets.",
