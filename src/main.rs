@@ -1160,8 +1160,11 @@ fn game_tick(
             }
         }
 
-        // Check for fishing rank up
-        if let Some(rank_msg) = fishing::logic::check_rank_up(&mut game_state.fishing) {
+        // Check for fishing rank up (capped by Haven Fishing Dock tier)
+        let max_rank = fishing::logic::get_max_fishing_rank(haven_fishing.max_fishing_rank_bonus);
+        if let Some(rank_msg) =
+            fishing::logic::check_rank_up_with_max(&mut game_state.fishing, max_rank)
+        {
             game_state
                 .combat_state
                 .add_log_entry(format!("🎣 {}", rank_msg), false, true);
