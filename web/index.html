@@ -203,19 +203,16 @@
             };
         }
 
-        // Send ALL keyboard input to server via document handler
-        // (xterm.js is display-only, we don't use its input handling)
-        document.addEventListener('keydown', (e) => {
+        // Send ALL keyboard input to server via window capture
+        // (must use capture phase to intercept before xterm.js)
+        window.addEventListener('keydown', (e) => {
             if (ws && ws.readyState === WebSocket.OPEN) {
-                // Send the key to the server
                 ws.send(JSON.stringify({ key: e.key }));
-                // Prevent default for non-printable keys and all game keys
-                // to stop browser shortcuts (e.g., Ctrl+D bookmark)
                 if (e.key.length > 1 || e.ctrlKey || e.altKey || e.metaKey) {
                     e.preventDefault();
                 }
             }
-        });
+        }, true);
 
         // Start connection
         connect();
