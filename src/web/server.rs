@@ -87,27 +87,32 @@ pub async fn start_web_server(port: u16, server: Arc<WebServer>) -> std::io::Res
     }
 }
 
-/// Handle a single WebSocket connection
+/// Handle a single connection (HTTP or WebSocket)
 async fn handle_connection(
     stream: TcpStream,
     addr: SocketAddr,
     server: Arc<WebServer>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // Check if this is a regular HTTP request or WebSocket upgrade
-    let mut buf = [0u8; 4];
-    let n = stream.peek(&mut buf).await?;
+    // Peek at the request to determine type
+    let mut peek_buf = [0u8; 512];
+    let n = stream.peek(&mut peek_buf).await?;
+    let request = String::from_utf8_lossy(&peek_buf[..n]);
 
-    if n >= 3 && &buf[..3] == b"GET" {
-        // Peek more to check the path
-        let mut peek_buf = [0u8; 256];
-        let n = stream.peek(&mut peek_buf).await?;
-        let request = String::from_utf8_lossy(&peek_buf[..n]);
+    // Check if this is a WebSocket upgrade request
+    let is_websocket = request.contains("Upgrade: websocket")
+        || request.contains("upgrade: websocket")
+        || request.contains("Upgrade: WebSocket");
 
-        if request.contains("GET / ") && !request.contains("Upgrade: websocket") {
+    if !is_websocket {
+        // Handle as regular HTTP request
+        if request.starts_with("GET / ") || request.starts_with("GET /index.html") {
             // Serve the HTML page
             serve_html(stream).await?;
-            return Ok(());
+        } else {
+            // Return 404 for other paths (favicon, etc.)
+            serve_404(stream).await?;
         }
+        return Ok(());
     }
 
     // WebSocket upgrade
@@ -160,7 +165,12 @@ async fn handle_connection(
 
 /// Serve the HTML page for the web terminal
 async fn serve_html(mut stream: TcpStream) -> std::io::Result<()> {
+    use tokio::io::AsyncReadExt;
     use tokio::io::AsyncWriteExt;
+
+    // Consume the HTTP request first
+    let mut request_buf = vec![0u8; 1024];
+    let _ = stream.read(&mut request_buf).await;
 
     let html = include_str!("../../web/index.html");
     let response = format!(
@@ -169,6 +179,20 @@ async fn serve_html(mut stream: TcpStream) -> std::io::Result<()> {
         html
     );
 
+    stream.write_all(response.as_bytes()).await?;
+    Ok(())
+}
+
+/// Serve a 404 response for unknown paths
+async fn serve_404(mut stream: TcpStream) -> std::io::Result<()> {
+    use tokio::io::AsyncReadExt;
+    use tokio::io::AsyncWriteExt;
+
+    // Consume the HTTP request first
+    let mut request_buf = vec![0u8; 1024];
+    let _ = stream.read(&mut request_buf).await;
+
+    let response = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
     stream.write_all(response.as_bytes()).await?;
     Ok(())
 }
