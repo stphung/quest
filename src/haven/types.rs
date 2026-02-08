@@ -80,7 +80,7 @@ impl HavenRoomId {
             HavenRoomId::Library => "A reading nook tucked beneath a stained-glass window, surrounded by towers of scrolls and ink-stained notes. The more you read, the more the world reveals its hidden trials to you.",
             HavenRoomId::FishingDock => "Morning mist clings to the water as your line breaks the stillness. The fish here bite in pairs, and those who cast long enough swear they've felt something vast stir in the deep — something most anglers will never be ready for.",
             HavenRoomId::Workshop => "Sawdust and iron filings crunch underfoot as you pass workbenches cluttered with half-finished tools and polishing rigs. Gear crafted here always seems to turn out a cut above the rest.",
-            HavenRoomId::Vault => "Preserves treasured equipment through prestige resets.",
+            HavenRoomId::Vault => "Behind a door that only opens to your touch, shelves of dark wood cradle the weapons and armor you've sworn never to lose. The vault doesn't care how many times the world starts over — it keeps its promises.",
             HavenRoomId::StormForge => "The legendary forge where Stormbreaker can be crafted.",
         }
     }
