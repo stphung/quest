@@ -74,7 +74,7 @@ impl HavenRoomId {
             HavenRoomId::TrophyHall => "Glass cases display the spoils of a hundred battles — a dragon's scale, a bandit lord's signet ring, a shard of cursed obsidian. Their presence draws more treasure your way.",
             HavenRoomId::Watchtower => "A spiral staircase leads to a narrow platform where hawks nest and cold wind bites. Hours spent scanning the horizon have taught you to spot a weakness before your enemy even knows it's there.",
             HavenRoomId::AlchemyLab => "Bubbling flasks and copper coils crowd every surface, filling the room with a warm, herbal haze. The potions brewed here mend wounds faster than any battlefield medic could dream.",
-            HavenRoomId::WarRoom => "Tactical planning speeds your strikes.",
+            HavenRoomId::WarRoom => "Faded footwork circles are carved into the stone floor, each one paired with strike marks on the opposing wall — one high, one low, in rapid succession. The room teaches your muscles what your mind already knows: one strike is never enough.",
             HavenRoomId::Bedroom => "Rest well, fight well.",
             HavenRoomId::Garden => "Patience cultivated here carries over.",
             HavenRoomId::Library => "Ancient tomes reveal hidden challenges.",
