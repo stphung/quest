@@ -49,21 +49,33 @@ make fmt               # Applies rustfmt to all code
 
 Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Crossterm.
 
+### Module Documentation
+
+Larger modules have their own `CLAUDE.md` with implementation patterns, integration points, and extension guides:
+
+- [`src/challenges/CLAUDE.md`](src/challenges/CLAUDE.md) — Adding new minigames (step-by-step checklist)
+- [`src/items/CLAUDE.md`](src/items/CLAUDE.md) — Item generation pipeline, scoring, drop rates
+- [`src/character/CLAUDE.md`](src/character/CLAUDE.md) — Attributes, prestige, persistence
+- [`src/combat/CLAUDE.md`](src/combat/CLAUDE.md) — Combat state machine, enemy generation
+- [`src/dungeon/CLAUDE.md`](src/dungeon/CLAUDE.md) — Procedural generation, room system
+- [`src/haven/CLAUDE.md`](src/haven/CLAUDE.md) — Account-level base building, bonus system
+- [`src/ui/CLAUDE.md`](src/ui/CLAUDE.md) — Shared game layout components, color conventions
+
 ### Core Module (`src/core/`)
 
 - `game_state.rs` — Main character state struct (level, XP, prestige, combat state, equipment)
 - `game_logic.rs` — XP curve (`100 × level^1.5`), leveling (+3 random attribute points), enemy spawning, offline progression
 - `constants.rs` — Game balance constants (tick rate, attack interval, XP rates)
 
-### Character Module (`src/character/`)
+### Character Module (`src/character/`) — [detailed docs](src/character/CLAUDE.md)
 
 - `attributes.rs` — 6 RPG attributes (STR, DEX, CON, INT, WIS, CHA), modifier = `(value - 10) / 2`
 - `derived_stats.rs` — Combat stats calculated from attributes (HP, damage, defense, crit, XP mult)
 - `prestige.rs` — Prestige tiers (Bronze→Eternal) with XP multipliers (1.5× compounding) and attribute cap increases
 - `manager.rs` — Character CRUD operations (create, delete, rename), JSON save/load in ~/.quest/, name validation
-- `save.rs` — Legacy binary save/load (deprecated, used for migration only)
+- `input.rs` — Character selection, creation, deletion, renaming input handling and UI states
 
-### Combat Module (`src/combat/`)
+### Combat Module (`src/combat/`) — [detailed docs](src/combat/CLAUDE.md)
 
 - `types.rs` — Enemy generation and combat state machine
 - `logic.rs` — Turn-based combat mechanics, damage calculation, event emission
@@ -80,7 +92,7 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 - P15: Crystal Caverns, Sunken Kingdom (4 subzones each)
 - P20: Floating Isles, Storm Citadel (4 subzones each, Zone 10 requires Stormbreaker)
 
-### Dungeon Module (`src/dungeon/`)
+### Dungeon Module (`src/dungeon/`) — [detailed docs](src/dungeon/CLAUDE.md)
 
 - `types.rs` — Room types (Entrance, Combat, Treasure, Elite, Boss), room state (Hidden, Revealed, Current, Cleared), dungeon sizes
 - `generation.rs` — Procedural dungeon generation with connected rooms
@@ -94,16 +106,16 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 - `generation.rs` — Fish name generation and rarity rolling
 - `logic.rs` — Fishing session tick processing
 
-### Item Module (`src/items/`)
+### Item Module (`src/items/`) — [detailed docs](src/items/CLAUDE.md)
 
-- `types.rs` — Core item data structures (7 equipment slots, 5 rarity tiers, 12 affix types)
+- `types.rs` — Core item data structures (7 equipment slots, 5 rarity tiers, 9 affix types)
 - `equipment.rs` — Equipment container with slot management and iteration
 - `generation.rs` — Rarity-based attribute/affix generation (Common: +1-2 attrs, Legendary: +8-15 attrs + 4-5 affixes)
 - `drops.rs` — Drop system (15% base + 1% per prestige rank capped at 25%, continuous rarity distribution)
 - `names.rs` — Procedural name generation with prefixes/suffixes
 - `scoring.rs` — Smart weighted auto-equip scoring (attribute specialization bonus, affix type weights)
 
-### Challenge Minigames (`src/challenges/`)
+### Challenge Minigames (`src/challenges/`) — [detailed docs](src/challenges/CLAUDE.md)
 
 - `menu.rs` — Generic challenge menu system (pending challenges, extensible challenge types)
 - `chess/` — Chess minigame (4 difficulty levels: Novice→Master, ~500-1350 ELO), requires P1+
@@ -113,41 +125,76 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 - `minesweeper/` — Trap Detection, 4 difficulties (9×9 to 20×16)
 - `rune/` — Rune Deciphering (Mastermind-style deduction), 4 difficulties
 
+### Haven Module (`src/haven/`) — [detailed docs](src/haven/CLAUDE.md)
+
+- `types.rs` — Haven struct, room definitions, upgrade trees, bonus types
+- `logic.rs` — Room construction, upgrade logic, bonus calculation
+
+Account-level base building that persists across prestiges. Rooms provide bonuses (XP mult, drop rate, rarity, fishing gain, discovery rate). Costs prestige ranks and fishing ranks.
+
+### Achievement Module (`src/achievements/`)
+
+- `types.rs` — AchievementId enum, categories, unlock tracking
+- `data.rs` — Achievement database with descriptions and unlock conditions
+- `persistence.rs` — Save/load from `~/.quest/achievements.json`
+
+Account-level achievement system that persists across characters. Tracks combat, zone, fishing, challenge, and prestige milestones.
+
+### Input Handling (`src/input.rs`)
+
+Routes keyboard input to the appropriate handler based on current game state. Dispatches to minigame input handlers, character management flows, haven overlay, and debug menu.
+
 ### Utilities (`src/utils/`)
 
 - `build_info.rs` — Build metadata (commit, date) embedded at compile time
 - `updater.rs` — Self-update functionality
 - `debug_menu.rs` — Debug menu for testing discoveries (activate with `--debug` flag, toggle with backtick)
 
-### UI (`src/ui/`)
+### UI (`src/ui/`) — [detailed docs](src/ui/CLAUDE.md)
 
 - `mod.rs` — Layout coordinator (stats panel left 50%, combat scene right 50%)
-- `stats_panel.rs` — Character name header, stats, attributes, derived stats, equipment display, prestige info, fishing rank
-- `combat_scene.rs` — Combat view orchestration with HP bars
+- `game_common.rs` — Shared minigame layout, status bars, game-over overlays
+- `stats_panel.rs` — Character stats, attributes, equipment display, prestige info
+- `info_panel.rs` — Full-width Loot + Combat log panels
+- `combat_scene.rs` — Combat view with HP bars and enemy sprites
 - `combat_3d.rs` — 3D ASCII first-person dungeon renderer
-- `combat_effects.rs` — Visual effects (damage numbers, attack flashes, hit impacts)
+- `combat_effects.rs` — Visual effects (damage numbers, attack flashes)
 - `enemy_sprites.rs` — ASCII enemy sprite templates
-- `dungeon_map.rs` — Top-down dungeon minimap
+- `dungeon_map.rs` — Top-down dungeon minimap with fog of war
 - `fishing_scene.rs` — Fishing UI with phase display
+- `haven_scene.rs` — Haven base building overlay
 - `prestige_confirm.rs` — Prestige confirmation dialog
-- `challenge_menu_scene.rs` — Challenge menu list/detail view rendering
-- `chess_scene.rs` — Chess board UI with move history and game-over overlay
-- `go_scene.rs` — Go board UI with territory display and pass/forfeit controls
-- `morris_scene.rs` — Nine Men's Morris board UI with help panel
-- `gomoku_scene.rs` — Gomoku board UI with cursor navigation
-- `minesweeper_scene.rs` — Minesweeper grid UI with game-over overlay
-- `debug_menu_scene.rs` — Debug menu overlay rendering
-- `throbber.rs` — Shared spinner/throbber animations and atmospheric waiting messages
-- `character_select.rs` — Character selection screen with detailed preview panel
-- `character_creation.rs` — Character creation with real-time name validation
-- `character_delete.rs` — Delete confirmation requiring exact name typing
-- `character_rename.rs` — Character renaming with validation
+- `achievement_browser_scene.rs` — Achievement browsing and tracking
+- `challenge_menu_scene.rs` — Challenge menu list/detail view
+- `chess_scene.rs`, `go_scene.rs`, `morris_scene.rs`, `gomoku_scene.rs`, `minesweeper_scene.rs`, `rune_scene.rs` — Minigame UIs
+- `debug_menu_scene.rs` — Debug menu overlay
+- `throbber.rs` — Shared spinner animations and atmospheric messages
+- `character_select.rs`, `character_creation.rs`, `character_delete.rs`, `character_rename.rs` — Character management UI
 
-### Utilities
+### Library Crate (`src/lib.rs`)
 
-- `lib.rs` — Library crate exposing game logic modules for testing
-- `build_info.rs` — Build metadata (commit, date) embedded at compile time
-- `updater.rs` — Self-update functionality
+Exposes all game logic modules for integration testing. UI module is private (terminal-coupled). Re-exports commonly used types at crate root.
+
+## Common Patterns
+
+### Module Structure
+Most game modules follow this layout:
+```
+module/
+├── mod.rs         # Public API re-exports
+├── types.rs       # Data structures and enums
+├── logic.rs       # Business logic and state transitions
+└── generation.rs  # (optional) Procedural generation
+```
+
+### Difficulty Tiers
+All challenge minigames use 4 difficulty levels: Novice, Apprentice, Journeyman, Master.
+
+### Forfeit Pattern
+All interactive minigames: first Esc sets `forfeit_pending`, second Esc confirms, any other key cancels.
+
+### Haven Bonus Injection
+Haven bonuses are passed as explicit parameters rather than accessed globally. This keeps modules decoupled.
 
 ## Key Constants
 
@@ -174,23 +221,24 @@ quest/
 ├── src/
 │   ├── main.rs              # Entry point, game loop, input handling
 │   ├── lib.rs               # Library crate for testing
+│   ├── input.rs             # Keyboard input routing
 │   ├── core/                # Core game systems
 │   │   ├── constants.rs     # Game balance constants
 │   │   ├── game_logic.rs    # XP, leveling, spawning
 │   │   └── game_state.rs    # Main game state
-│   ├── character/           # Character system
+│   ├── character/           # Character system [CLAUDE.md]
 │   │   ├── attributes.rs    # 6 RPG attributes
 │   │   ├── derived_stats.rs # Stats from attributes
 │   │   ├── prestige.rs      # Prestige system
 │   │   ├── manager.rs       # JSON saves
-│   │   └── save.rs          # Legacy saves
-│   ├── combat/              # Combat system
+│   │   └── input.rs         # Character management input
+│   ├── combat/              # Combat system [CLAUDE.md]
 │   │   ├── types.rs         # Enemy, combat state
 │   │   └── logic.rs         # Combat resolution
 │   ├── zones/               # Zone system
 │   │   ├── data.rs          # Zone definitions
 │   │   └── progression.rs   # Zone progression
-│   ├── dungeon/             # Dungeon system
+│   ├── dungeon/             # Dungeon system [CLAUDE.md]
 │   │   ├── types.rs         # Room types, dungeon sizes
 │   │   ├── generation.rs    # Procedural generation
 │   │   └── logic.rs         # Navigation, clearing
@@ -198,14 +246,14 @@ quest/
 │   │   ├── types.rs         # Fish, phases, ranks
 │   │   ├── generation.rs    # Fish generation
 │   │   └── logic.rs         # Session processing
-│   ├── items/               # Item system
+│   ├── items/               # Item system [CLAUDE.md]
 │   │   ├── types.rs         # Items, slots, affixes
 │   │   ├── equipment.rs     # Equipment container
 │   │   ├── generation.rs    # Item generation
 │   │   ├── drops.rs         # Drop system
 │   │   ├── names.rs         # Name generation
 │   │   └── scoring.rs       # Auto-equip scoring
-│   ├── challenges/          # Challenge minigames
+│   ├── challenges/          # Challenge minigames [CLAUDE.md]
 │   │   ├── menu.rs          # Challenge menu
 │   │   ├── chess/           # Chess minigame
 │   │   ├── go/              # Go (Territory Control)
@@ -213,11 +261,19 @@ quest/
 │   │   ├── gomoku/          # Gomoku (Five in a Row)
 │   │   ├── minesweeper/     # Trap Detection
 │   │   └── rune/            # Rune Deciphering
+│   ├── haven/               # Haven base building [CLAUDE.md]
+│   │   ├── types.rs         # Room definitions, bonuses
+│   │   └── logic.rs         # Construction, upgrades
+│   ├── achievements/        # Achievement system
+│   │   ├── types.rs         # Achievement definitions
+│   │   ├── data.rs          # Achievement database
+│   │   └── persistence.rs   # Save/load
 │   ├── utils/               # Utilities
 │   │   ├── build_info.rs    # Build metadata
 │   │   ├── updater.rs       # Self-update
 │   │   └── debug_menu.rs    # Debug menu
-│   └── ui/                  # UI components
+│   └── ui/                  # UI components [CLAUDE.md]
+│       ├── game_common.rs   # Shared minigame layout
 │       ├── stats_panel.rs   # Character stats
 │       ├── combat_scene.rs  # Combat view
 │       ├── combat_3d.rs     # 3D dungeon renderer

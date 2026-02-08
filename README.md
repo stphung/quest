@@ -31,6 +31,8 @@ Then run `quest` to start your adventure!
 - **Multi-Character** - Create and manage multiple characters with JSON saves
 - **Offline Progress** - Continue gaining XP even when closed (50% rate, max 7 days)
 - **Challenge Minigames** - Discover and play Chess, Go, Nine Men's Morris, Gomoku, Minesweeper, and Rune Deciphering (requires P1+)
+- **Haven Base Building** - Account-level base with upgradeable rooms providing permanent bonuses
+- **Achievements** - Track milestones across combat, zones, fishing, challenges, and prestige
 - **3D ASCII Combat** - First-person dungeon view with visual effects
 - **Animated UI** - Throbber animations and progress bars for XP and fishing rank
 
@@ -165,6 +167,21 @@ Discover challenge minigames while adventuring (requires Prestige 1+):
 - Accept or decline from the challenge menu
 - Winning rewards prestige points based on difficulty
 
+### Haven (Base Building)
+
+An account-level base that persists across all prestige resets:
+- Build and upgrade rooms that provide permanent bonuses
+- Bonuses include: XP multiplier, item drop rate, item rarity, fishing gain, challenge discovery rate
+- Rooms cost prestige ranks and fishing ranks to build and upgrade
+- Benefits apply to all characters on the account
+
+### Achievements
+
+Track your progress across all characters:
+- Categories: Combat, Zones, Fishing, Challenges, Prestige, and more
+- Account-level persistence (never lost on prestige or character deletion)
+- Stored in `~/.quest/achievements.json`
+
 ### Items & Equipment
 
 **7 Equipment Slots**: Weapon, Armor, Helmet, Gloves, Boots, Amulet, Ring
@@ -203,6 +220,7 @@ Discover challenge minigames while adventuring (requires Prestige 1+):
 ```
 src/
 ├── main.rs            # Entry point, game loop
+├── input.rs           # Keyboard input routing
 ├── core/              # Game state, logic, constants
 ├── character/         # Attributes, prestige, save system
 ├── combat/            # Enemy generation, combat logic
@@ -211,6 +229,8 @@ src/
 ├── fishing/           # Fishing minigame
 ├── items/             # Equipment and drop system
 ├── challenges/        # Chess, Go, Morris, Gomoku, Minesweeper, Rune
+├── haven/             # Account-level base building
+├── achievements/      # Achievement tracking system
 ├── utils/             # Build info, updater, debug menu
 └── ui/                # Terminal UI components
 ```
