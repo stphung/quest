@@ -40,6 +40,7 @@ pub fn draw_ui_with_update(
     frame: &mut Frame,
     game_state: &GameState,
     update_info: Option<&UpdateInfo>,
+    update_expanded: bool,
     update_check_completed: bool,
     haven_discovered: bool,
     achievements: &crate::achievements::Achievements,
@@ -90,8 +91,8 @@ pub fn draw_ui_with_update(
         ])
         .split(content_area);
 
-    // Draw stats panel on the left (with optional update info)
-    stats_panel::draw_stats_panel_with_update(frame, chunks[0], game_state, update_info);
+    // Draw stats panel on the left
+    stats_panel::draw_stats_panel(frame, chunks[0], game_state);
 
     // Draw full-width Loot + Combat panels
     info_panel::draw_info_panel(frame, info_area, game_state);
@@ -101,7 +102,8 @@ pub fn draw_ui_with_update(
         frame,
         footer_area,
         game_state,
-        update_info.is_some(),
+        update_info,
+        update_expanded,
         update_check_completed,
         haven_discovered,
         achievements.pending_count(),

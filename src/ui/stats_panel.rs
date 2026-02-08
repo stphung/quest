@@ -29,50 +29,20 @@ fn format_affix(affix: &Affix) -> String {
     }
 }
 
-/// Draws the stats panel with optional update notification
-pub fn draw_stats_panel_with_update(
-    frame: &mut Frame,
-    area: Rect,
-    game_state: &GameState,
-    update_info: Option<&UpdateInfo>,
-) {
-    // Calculate update panel height: 4 base + changelog lines (max 5) + overflow indicator
-    let update_height = if let Some(info) = update_info {
-        let overflow_line = if info.changelog_total > info.changelog.len() {
-            1
-        } else {
-            0
-        };
-        4 + info.changelog.len().min(5) as u16 + overflow_line
-    } else {
-        0
-    };
-
-    // Main vertical layout: header, prestige, attributes, derived stats, equipment, [update]
+/// Draws the stats panel
+pub fn draw_stats_panel(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    // Main vertical layout: header, prestige, attributes, derived stats, equipment
     // Zone info is now drawn in the right panel
     // Footer is drawn full-width at the bottom by the parent layout
-    let constraints = if update_info.is_some() {
-        vec![
-            Constraint::Length(4),          // Header + XP bar
-            Constraint::Length(7),          // Prestige info + fishing rank + fishing bar
-            Constraint::Length(14),         // Attributes (6 attributes + borders)
-            Constraint::Length(6),          // Derived stats (condensed)
-            Constraint::Min(10),            // Equipment section (reduced min when update shown)
-            Constraint::Min(update_height), // Update panel (can shrink if needed)
-        ]
-    } else {
-        vec![
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
             Constraint::Length(4),  // Header + XP bar
             Constraint::Length(7),  // Prestige info + fishing rank + fishing bar
             Constraint::Length(14), // Attributes (6 attributes + borders)
             Constraint::Length(6),  // Derived stats (condensed)
             Constraint::Min(16),    // Equipment section (grows to fit)
-        ]
-    };
-
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(constraints)
+        ])
         .split(area);
 
     // Draw header with character info
@@ -89,11 +59,6 @@ pub fn draw_stats_panel_with_update(
 
     // Draw equipment section
     draw_equipment_section(frame, chunks[4], game_state);
-
-    // Draw update panel if available
-    if let Some(info) = update_info {
-        draw_update_panel(frame, chunks[5], info);
-    }
 }
 
 /// Draws the header with character level, XP bar, and play time
@@ -741,11 +706,13 @@ fn format_play_time(total_seconds: u64) -> String {
 }
 
 /// Draws the footer with control instructions and version info
+#[allow(clippy::too_many_arguments)]
 pub fn draw_footer(
     frame: &mut Frame,
     area: Rect,
     game_state: &GameState,
-    update_available: bool,
+    update_info: Option<&UpdateInfo>,
+    update_expanded: bool,
     update_check_completed: bool,
     haven_discovered: bool,
     pending_achievements: usize,
@@ -753,6 +720,70 @@ pub fn draw_footer(
     use crate::character::prestige::can_prestige;
     use crate::utils::build_info::{BUILD_COMMIT, BUILD_DATE};
 
+    // Build version string for the title
+    let version_title = format!("v{} ({}) ", BUILD_DATE, BUILD_COMMIT);
+
+    // If update expanded, show detailed update info
+    if update_expanded {
+        if let Some(info) = update_info {
+            let mut lines = vec![Line::from(vec![
+                Span::styled("v", Style::default().fg(Color::White)),
+                Span::styled(
+                    info.new_version.clone(),
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(": ", Style::default().fg(Color::White)),
+                // Inline changelog summary
+                Span::styled(
+                    info.changelog
+                        .iter()
+                        .take(3)
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .join(" • "),
+                    Style::default().fg(Color::White),
+                ),
+                if info.changelog_total > 3 {
+                    Span::styled(
+                        format!(" (+{})", info.changelog_total - 3),
+                        Style::default().fg(Color::DarkGray),
+                    )
+                } else {
+                    Span::raw("")
+                },
+            ])];
+
+            lines.push(Line::from(vec![
+                Span::styled(
+                    "Run 'quest update' to install",
+                    Style::default().fg(Color::DarkGray),
+                ),
+                Span::raw("    "),
+                Span::styled("[Esc] Back", Style::default().fg(Color::Red)),
+            ]));
+
+            let footer = Paragraph::new(lines)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(Color::Yellow))
+                        .title(Span::styled(
+                            " 🆕 Update Available ",
+                            Style::default()
+                                .fg(Color::Yellow)
+                                .add_modifier(Modifier::BOLD),
+                        )),
+                )
+                .alignment(Alignment::Center);
+
+            frame.render_widget(footer, area);
+            return;
+        }
+    }
+
+    // Normal collapsed footer
     let can_prestige_now = can_prestige(game_state);
     let prestige_text = if can_prestige_now {
         Span::styled(
@@ -770,9 +801,9 @@ pub fn draw_footer(
     };
 
     // Build update status text
-    let update_status_text = if update_available {
+    let update_status_text = if let Some(info) = update_info {
         Span::styled(
-            "    🆕 Update available",
+            format!("    🆕 [U] Update (v{})", info.new_version),
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
@@ -825,67 +856,9 @@ pub fn draw_footer(
         update_status_text,
     ])];
 
-    // Build version string for the title
-    let version_title = format!("v{} ({}) ", BUILD_DATE, BUILD_COMMIT);
-
     let footer = Paragraph::new(footer_text)
         .block(Block::default().borders(Borders::ALL).title(version_title))
         .alignment(Alignment::Center);
 
     frame.render_widget(footer, area);
-}
-
-/// Draws the update notification panel
-fn draw_update_panel(frame: &mut Frame, area: Rect, update_info: &UpdateInfo) {
-    let mut lines = vec![
-        Line::from(vec![
-            Span::styled("New version: ", Style::default().fg(Color::White)),
-            Span::styled(
-                format!("{} ({})", update_info.new_version, update_info.new_commit),
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            ),
-        ]),
-        Line::from(""),
-    ];
-
-    // Add changelog entries
-    if !update_info.changelog.is_empty() {
-        for entry in &update_info.changelog {
-            lines.push(Line::from(vec![
-                Span::styled(" • ", Style::default().fg(Color::DarkGray)),
-                Span::styled(entry.as_str(), Style::default().fg(Color::White)),
-            ]));
-        }
-        // Show overflow indicator if there are more entries
-        if update_info.changelog_total > update_info.changelog.len() {
-            let remaining = update_info.changelog_total - update_info.changelog.len();
-            lines.push(Line::from(vec![Span::styled(
-                format!(" ...and {} more", remaining),
-                Style::default().fg(Color::DarkGray),
-            )]));
-        }
-    }
-
-    // Add install instruction
-    lines.push(Line::from(""));
-    lines.push(Line::from(vec![Span::styled(
-        "Run 'quest update' to install",
-        Style::default().fg(Color::DarkGray),
-    )]));
-
-    let update_panel = Paragraph::new(lines).block(
-        Block::default()
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Yellow))
-            .title(Span::styled(
-                " 🆕 Update Available ",
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            )),
-    );
-
-    frame.render_widget(update_panel, area);
 }
