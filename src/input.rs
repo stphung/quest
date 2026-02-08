@@ -101,6 +101,8 @@ pub enum InputResult {
     NeedsSave,
     /// Haven was modified along with state — save both.
     NeedsSaveAll,
+    /// Toggle the update details expanded state.
+    ToggleUpdateDetails,
 }
 
 /// Main dispatcher for Game screen input. Handles the priority chain.
@@ -114,6 +116,8 @@ pub fn handle_game_input(
     debug_menu: &mut DebugMenu,
     debug_mode: bool,
     achievements: &mut crate::achievements::Achievements,
+    update_available: bool,
+    update_expanded: bool,
 ) -> InputResult {
     // 0. Offline welcome overlay (any key dismisses)
     if matches!(overlay, GameOverlay::OfflineWelcome { .. }) {
@@ -197,7 +201,16 @@ pub fn handle_game_input(
     }
 
     // 9. Base game input
-    handle_base_game(key, state, haven, haven_ui, overlay, achievements)
+    handle_base_game(
+        key,
+        state,
+        haven,
+        haven_ui,
+        overlay,
+        achievements,
+        update_available,
+        update_expanded,
+    )
 }
 
 fn handle_haven_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
@@ -567,6 +580,7 @@ fn handle_challenge_menu(key: KeyEvent, state: &mut GameState) -> InputResult {
     InputResult::Continue
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_base_game(
     key: KeyEvent,
     state: &mut GameState,
@@ -574,9 +588,19 @@ fn handle_base_game(
     haven_ui: &mut HavenUiState,
     overlay: &mut GameOverlay,
     achievements: &mut crate::achievements::Achievements,
+    update_available: bool,
+    update_expanded: bool,
 ) -> InputResult {
     match key.code {
-        KeyCode::Char('q') | KeyCode::Char('Q') => InputResult::QuitToSelect,
+        KeyCode::Esc => InputResult::QuitToSelect,
+        KeyCode::Char('u') | KeyCode::Char('U') => {
+            // Toggle update details if update available OR already expanded
+            if update_available || update_expanded {
+                InputResult::ToggleUpdateDetails
+            } else {
+                InputResult::Continue
+            }
+        }
         KeyCode::Char('p') | KeyCode::Char('P') => {
             if can_prestige(state) {
                 *overlay = GameOverlay::PrestigeConfirm;

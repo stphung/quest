@@ -350,7 +350,7 @@ fn main() -> io::Result<()> {
                             KeyCode::Char('n') | KeyCode::Char('N') => SelectInput::New,
                             KeyCode::Char('d') | KeyCode::Char('D') => SelectInput::Delete,
                             KeyCode::Char('r') | KeyCode::Char('R') => SelectInput::Rename,
-                            KeyCode::Char('q') | KeyCode::Char('Q') => SelectInput::Quit,
+                            KeyCode::Esc => SelectInput::Quit,
                             _ => SelectInput::Other,
                         };
 
@@ -641,6 +641,7 @@ fn main() -> io::Result<()> {
                 // Update check state - start initial background check immediately
                 let mut update_info: Option<UpdateInfo> = None;
                 let mut update_check_completed = false;
+                let mut update_expanded = false;
                 let mut update_check_handle: Option<std::thread::JoinHandle<Option<UpdateInfo>>> =
                     Some(std::thread::spawn(utils::updater::check_update_info));
 
@@ -664,6 +665,7 @@ fn main() -> io::Result<()> {
                             frame,
                             &state,
                             update_info.as_ref(),
+                            update_expanded,
                             update_check_completed,
                             haven.discovered,
                             &global_achievements,
@@ -795,6 +797,8 @@ fn main() -> io::Result<()> {
                                 &mut debug_menu,
                                 debug_mode,
                                 &mut global_achievements,
+                                update_info.is_some(),
+                                update_expanded,
                             );
 
                             // Track achievements for state changes
@@ -833,6 +837,8 @@ fn main() -> io::Result<()> {
                                 InputResult::QuitToSelect => {
                                     if !debug_mode {
                                         character_manager.save_character(&state)?;
+                                        // Save achievements when quitting to character select
+                                        achievements::save_achievements(&global_achievements)?;
                                     }
                                     game_state = None;
                                     current_screen = Screen::CharacterSelect;
@@ -855,6 +861,9 @@ fn main() -> io::Result<()> {
                                         last_save_instant = Some(Instant::now());
                                         last_save_time = Some(Local::now());
                                     }
+                                }
+                                InputResult::ToggleUpdateDetails => {
+                                    update_expanded = !update_expanded;
                                 }
                             }
                         }
@@ -916,6 +925,13 @@ fn main() -> io::Result<()> {
                                 overlay = GameOverlay::AchievementUnlocked { achievements };
                             }
                         }
+
+                        // Save achievements immediately when any are newly unlocked
+                        if !debug_mode && !global_achievements.newly_unlocked.is_empty() {
+                            if let Err(e) = achievements::save_achievements(&global_achievements) {
+                                eprintln!("Failed to save achievements: {}", e);
+                            }
+                        }
                     }
 
                     // Auto-save every 30 seconds (skip in debug mode)
@@ -927,6 +943,8 @@ fn main() -> io::Result<()> {
                         if haven.discovered {
                             haven::save_haven(&haven)?;
                         }
+                        // Save achievements (global, shared across characters)
+                        achievements::save_achievements(&global_achievements)?;
                         last_autosave = Instant::now();
                         last_save_instant = Some(Instant::now());
                         last_save_time = Some(Local::now());

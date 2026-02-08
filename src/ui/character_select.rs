@@ -84,7 +84,7 @@ impl CharacterSelectScreen {
             "[N] New"
         };
         let mut control_lines = vec![Line::from(format!(
-            "[Enter] Play    [R] Rename    [D] Delete    {}    [Q] Quit",
+            "[Enter] Play    [R] Rename    [D] Delete    {}    [Esc] Quit",
             new_button
         ))];
         // Second row: Achievements always shown, Haven only if discovered

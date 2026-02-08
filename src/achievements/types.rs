@@ -64,12 +64,14 @@ pub enum AchievementId {
     Level10,
     Level25,
     Level50,
-    Level75,
     Level100,
     Level150,
     Level200,
     Level250,
-    Level300,
+    Level500,
+    Level750,
+    Level1000,
+    Level1500,
 
     // Prestige achievements
     FirstPrestige,
@@ -488,12 +490,14 @@ impl Achievements {
                 (10, AchievementId::Level10),
                 (25, AchievementId::Level25),
                 (50, AchievementId::Level50),
-                (75, AchievementId::Level75),
                 (100, AchievementId::Level100),
                 (150, AchievementId::Level150),
                 (200, AchievementId::Level200),
                 (250, AchievementId::Level250),
-                (300, AchievementId::Level300),
+                (500, AchievementId::Level500),
+                (750, AchievementId::Level750),
+                (1000, AchievementId::Level1000),
+                (1500, AchievementId::Level1500),
             ],
             char_name,
         );
@@ -1208,12 +1212,14 @@ mod tests {
             (10, AchievementId::Level10),
             (25, AchievementId::Level25),
             (50, AchievementId::Level50),
-            (75, AchievementId::Level75),
             (100, AchievementId::Level100),
             (150, AchievementId::Level150),
             (200, AchievementId::Level200),
             (250, AchievementId::Level250),
-            (300, AchievementId::Level300),
+            (500, AchievementId::Level500),
+            (750, AchievementId::Level750),
+            (1000, AchievementId::Level1000),
+            (1500, AchievementId::Level1500),
         ];
 
         for (level, achievement_id) in milestones {
@@ -1289,7 +1295,6 @@ mod tests {
         assert!(achievements.is_unlocked(AchievementId::Level10));
         assert!(achievements.is_unlocked(AchievementId::Level25));
         assert!(achievements.is_unlocked(AchievementId::Level50));
-        assert!(achievements.is_unlocked(AchievementId::Level75));
         assert!(achievements.is_unlocked(AchievementId::Level100));
         // But not 150+
         assert!(!achievements.is_unlocked(AchievementId::Level150));
