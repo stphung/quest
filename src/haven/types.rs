@@ -81,7 +81,7 @@ impl HavenRoomId {
             HavenRoomId::FishingDock => "Morning mist clings to the water as your line breaks the stillness. The fish here bite in pairs, and those who cast long enough swear they've felt something vast stir in the deep — something most anglers will never be ready for.",
             HavenRoomId::Workshop => "Sawdust and iron filings crunch underfoot as you pass workbenches cluttered with half-finished tools and polishing rigs. Gear crafted here always seems to turn out a cut above the rest.",
             HavenRoomId::Vault => "Behind a door that only opens to your touch, shelves of dark wood cradle the weapons and armor you've sworn never to lose. The vault doesn't care how many times the world starts over — it keeps its promises.",
-            HavenRoomId::StormForge => "The legendary forge where Stormbreaker can be crafted.",
+            HavenRoomId::StormForge => "A forge of black iron sits beneath an open sky, struck by lightning that never stops. It took more prestiges than most adventurers will ever earn just to lay these stones, and the forging demands you sacrifice more still. The anvil will not wake for just anyone — only hands that have felt the Storm Leviathan's fury carry the spark needed to ignite the forge and shape Stormbreaker from raw thunder.",
         }
     }
 
