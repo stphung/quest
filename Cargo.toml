@@ -21,6 +21,15 @@ flate2 = "1.0"
 tar = "0.4"
 zip = "0.6"
 
+# Web streaming (optional feature)
+tokio = { version = "1", features = ["rt-multi-thread", "net", "sync", "macros"], optional = true }
+tokio-tungstenite = { version = "0.21", optional = true }
+futures-util = { version = "0.3", optional = true }
+
+[features]
+default = []
+web = ["tokio", "tokio-tungstenite", "futures-util"]
+
 [dev-dependencies]
 rand_chacha = "0.3"
 
