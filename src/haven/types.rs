@@ -75,7 +75,7 @@ impl HavenRoomId {
             HavenRoomId::Watchtower => "A spiral staircase leads to a narrow platform where hawks nest and cold wind bites. Hours spent scanning the horizon have taught you to spot a weakness before your enemy even knows it's there.",
             HavenRoomId::AlchemyLab => "Bubbling flasks and copper coils crowd every surface, filling the room with a warm, herbal haze. The potions brewed here mend wounds faster than any battlefield medic could dream.",
             HavenRoomId::WarRoom => "Faded footwork circles are carved into the stone floor, each one paired with strike marks on the opposing wall — one high, one low, in rapid succession. The room teaches your muscles what your mind already knows: one strike is never enough.",
-            HavenRoomId::Bedroom => "Rest well, fight well.",
+            HavenRoomId::Bedroom => "Heavy curtains block out every sliver of light, and the bed is piled high with furs. In this perfect darkness, your body recovers with an almost unnatural speed.",
             HavenRoomId::Garden => "Patience cultivated here carries over.",
             HavenRoomId::Library => "Ancient tomes reveal hidden challenges.",
             HavenRoomId::FishingDock => "A private spot to cast.",
