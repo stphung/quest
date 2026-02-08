@@ -173,6 +173,8 @@ pub struct AchievementDef {
     pub category: AchievementCategory,
     pub secret: bool,
     pub icon: &'static str,
+    /// If true, this achievement is hidden until Haven is discovered
+    pub requires_haven: bool,
 }
 
 /// Progress on a single achievement (for multi-stage achievements).

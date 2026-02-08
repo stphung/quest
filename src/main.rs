@@ -281,6 +281,7 @@ fn main() -> io::Result<()> {
                             area,
                             &global_achievements,
                             &achievement_browser,
+                            haven.discovered,
                         );
                     }
                 })?;
@@ -730,6 +731,7 @@ fn main() -> io::Result<()> {
                                 frame.size(),
                                 &global_achievements,
                                 browser,
+                                haven.discovered,
                             );
                         }
                         // Draw Haven screen if active

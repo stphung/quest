@@ -87,6 +87,7 @@ pub fn render_achievement_browser(
     area: Rect,
     achievements: &Achievements,
     ui_state: &AchievementBrowserState,
+    haven_discovered: bool,
 ) {
     frame.render_widget(Clear, area);
 
@@ -118,8 +119,20 @@ pub fn render_achievement_browser(
         .constraints([Constraint::Percentage(45), Constraint::Percentage(55)])
         .split(chunks[1]);
 
-    render_achievement_list(frame, content_chunks[0], achievements, ui_state);
-    render_achievement_detail(frame, content_chunks[1], achievements, ui_state);
+    render_achievement_list(
+        frame,
+        content_chunks[0],
+        achievements,
+        ui_state,
+        haven_discovered,
+    );
+    render_achievement_detail(
+        frame,
+        content_chunks[1],
+        achievements,
+        ui_state,
+        haven_discovered,
+    );
 
     let help = Paragraph::new("[</>] Category  [Up/Down] Select  [Esc] Close")
         .style(Style::default().fg(Color::DarkGray))
@@ -161,6 +174,7 @@ fn render_achievement_list(
     area: Rect,
     achievements: &Achievements,
     ui_state: &AchievementBrowserState,
+    haven_discovered: bool,
 ) {
     let block = Block::default()
         .borders(Borders::ALL)
@@ -178,7 +192,10 @@ fn render_achievement_list(
             let is_unlocked = achievements.is_unlocked(def.id);
             let is_selected = i == ui_state.selected_index;
 
-            let (icon, name) = if is_unlocked || !def.secret {
+            // Hide if: secret and not unlocked, OR requires haven and haven not discovered
+            let is_hidden =
+                (def.secret && !is_unlocked) || (def.requires_haven && !haven_discovered);
+            let (icon, name) = if is_unlocked || !is_hidden {
                 (def.icon, def.name)
             } else {
                 ("?", "???")
@@ -220,6 +237,7 @@ fn render_achievement_detail(
     area: Rect,
     achievements: &Achievements,
     ui_state: &AchievementBrowserState,
+    haven_discovered: bool,
 ) {
     let category_achievements = get_achievements_by_category(ui_state.selected_category);
 
@@ -228,7 +246,9 @@ fn render_achievement_detail(
     };
 
     let is_unlocked = achievements.is_unlocked(def.id);
-    let show_details = is_unlocked || !def.secret;
+    // Hide if: secret and not unlocked, OR requires haven and haven not discovered
+    let is_hidden = (def.secret && !is_unlocked) || (def.requires_haven && !haven_discovered);
+    let show_details = is_unlocked || !is_hidden;
 
     let title = if show_details { def.name } else { "???" };
     let block = Block::default()

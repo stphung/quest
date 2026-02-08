@@ -16,6 +16,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Combat,
         secret: false,
         icon: "💀",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::SlayerII,
@@ -24,6 +25,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Combat,
         secret: false,
         icon: "💀",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::SlayerIII,
@@ -32,6 +34,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Combat,
         secret: false,
         icon: "💀",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::SlayerIV,
@@ -40,6 +43,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Combat,
         secret: false,
         icon: "💀",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::SlayerV,
@@ -48,6 +52,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Combat,
         secret: false,
         icon: "☠️",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::SlayerVI,
@@ -56,6 +61,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Combat,
         secret: false,
         icon: "☠️",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::SlayerVII,
@@ -64,6 +70,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Combat,
         secret: false,
         icon: "☠️",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::SlayerVIII,
@@ -72,6 +79,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Combat,
         secret: false,
         icon: "⚔️",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::SlayerIX,
@@ -80,6 +88,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Combat,
         secret: false,
         icon: "⚔️",
+        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // COMBAT ACHIEVEMENTS - BOSS KILLS
@@ -91,6 +100,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Combat,
         secret: false,
         icon: "👹",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::BossHunterII,
@@ -99,6 +109,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Combat,
         secret: false,
         icon: "👹",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::BossHunterIII,
@@ -107,6 +118,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Combat,
         secret: false,
         icon: "👹",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::BossHunterIV,
@@ -115,6 +127,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Combat,
         secret: false,
         icon: "👿",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::BossHunterV,
@@ -123,6 +136,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Combat,
         secret: false,
         icon: "👿",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::BossHunterVI,
@@ -131,6 +145,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Combat,
         secret: false,
         icon: "😈",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::BossHunterVII,
@@ -139,6 +154,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Combat,
         secret: false,
         icon: "😈",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::BossHunterVIII,
@@ -147,6 +163,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Combat,
         secret: false,
         icon: "👑",
+        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // LEVEL ACHIEVEMENTS
@@ -158,6 +175,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Level,
         secret: false,
         icon: "📈",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Level25,
@@ -166,6 +184,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Level,
         secret: false,
         icon: "📈",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Level50,
@@ -174,6 +193,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Level,
         secret: false,
         icon: "📈",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Level75,
@@ -182,6 +202,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Level,
         secret: false,
         icon: "📈",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Level100,
@@ -190,6 +211,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Level,
         secret: false,
         icon: "📈",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Level150,
@@ -198,6 +220,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Level,
         secret: false,
         icon: "🌟",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Level200,
@@ -206,6 +229,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Level,
         secret: false,
         icon: "🌟",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Level250,
@@ -214,6 +238,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Level,
         secret: false,
         icon: "⭐",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Level300,
@@ -222,6 +247,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Level,
         secret: false,
         icon: "⭐",
+        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // PRESTIGE ACHIEVEMENTS
@@ -233,6 +259,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Level,
         secret: false,
         icon: "🔄",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::PrestigeV,
@@ -241,6 +268,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Level,
         secret: false,
         icon: "🥉",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::PrestigeX,
@@ -249,6 +277,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Level,
         secret: false,
         icon: "🥈",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::PrestigeXV,
@@ -257,6 +286,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Level,
         secret: false,
         icon: "🥇",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::PrestigeXX,
@@ -265,6 +295,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Level,
         secret: false,
         icon: "💎",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::PrestigeXXV,
@@ -273,6 +304,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Level,
         secret: false,
         icon: "💠",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::PrestigeXXX,
@@ -281,6 +313,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Level,
         secret: false,
         icon: "❤️",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::PrestigeXL,
@@ -289,6 +322,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Level,
         secret: false,
         icon: "💙",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::PrestigeL,
@@ -297,6 +331,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Level,
         secret: false,
         icon: "💚",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::PrestigeLXX,
@@ -305,6 +340,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Level,
         secret: false,
         icon: "🖤",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::PrestigeXC,
@@ -313,6 +349,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Level,
         secret: false,
         icon: "💜",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Eternal,
@@ -321,6 +358,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Level,
         secret: false,
         icon: "♾️",
+        requires_haven: false,
     },
     // Zone completion achievements (one per zone)
     AchievementDef {
@@ -330,6 +368,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Progression,
         secret: false,
         icon: "🌻",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Zone2Complete,
@@ -338,6 +377,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Progression,
         secret: false,
         icon: "🌲",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Zone3Complete,
@@ -346,6 +386,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Progression,
         secret: false,
         icon: "🏔️",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Zone4Complete,
@@ -354,6 +395,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Progression,
         secret: false,
         icon: "🏛️",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Zone5Complete,
@@ -362,6 +404,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Progression,
         secret: false,
         icon: "🌋",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Zone6Complete,
@@ -370,6 +413,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Progression,
         secret: false,
         icon: "❄️",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Zone7Complete,
@@ -378,6 +422,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Progression,
         secret: false,
         icon: "💎",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Zone8Complete,
@@ -386,6 +431,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Progression,
         secret: false,
         icon: "🌊",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Zone9Complete,
@@ -394,6 +440,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Progression,
         secret: false,
         icon: "☁️",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Zone10Complete,
@@ -402,6 +449,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Progression,
         secret: false,
         icon: "⛈️",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::TheStormbreaker,
@@ -410,6 +458,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Progression,
         secret: false,
         icon: "⚡",
+        requires_haven: true,
     },
     AchievementDef {
         id: AchievementId::StormsEnd,
@@ -418,6 +467,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Progression,
         secret: false,
         icon: "🏆",
+        requires_haven: false,
     },
     // The Expanse cycle achievements
     AchievementDef {
@@ -427,6 +477,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Progression,
         secret: false,
         icon: "♾️",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::ExpanseCycleII,
@@ -435,6 +486,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Progression,
         secret: false,
         icon: "♾️",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::ExpanseCycleIII,
@@ -443,6 +495,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Progression,
         secret: false,
         icon: "♾️",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::ExpanseCycleIV,
@@ -451,6 +504,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Progression,
         secret: false,
         icon: "♾️",
+        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - CHESS
@@ -462,6 +516,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "♟️",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::ChessApprentice,
@@ -470,6 +525,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "♟️",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::ChessJourneyman,
@@ -478,6 +534,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "♟️",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::ChessMaster,
@@ -486,6 +543,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "♛",
+        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - MORRIS
@@ -497,6 +555,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "⚪",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::MorrisApprentice,
@@ -505,6 +564,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "⚪",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::MorrisJourneyman,
@@ -513,6 +573,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "⚪",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::MorrisMaster,
@@ -521,6 +582,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "⚪",
+        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - GOMOKU
@@ -532,6 +594,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "⚫",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::GomokuApprentice,
@@ -540,6 +603,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "⚫",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::GomokuJourneyman,
@@ -548,6 +612,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "⚫",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::GomokuMaster,
@@ -556,6 +621,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "⚫",
+        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - MINESWEEPER
@@ -567,6 +633,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "💣",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::MinesweeperApprentice,
@@ -575,6 +642,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "💣",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::MinesweeperJourneyman,
@@ -583,6 +651,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "💣",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::MinesweeperMaster,
@@ -591,6 +660,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "💣",
+        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - RUNE
@@ -602,6 +672,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "🔮",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::RuneApprentice,
@@ -610,6 +681,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "🔮",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::RuneJourneyman,
@@ -618,6 +690,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "🔮",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::RuneMaster,
@@ -626,6 +699,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "🔮",
+        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - GO
@@ -637,6 +711,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "🟤",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::GoApprentice,
@@ -645,6 +720,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "🟤",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::GoJourneyman,
@@ -653,6 +729,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "🟤",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::GoMaster,
@@ -661,6 +738,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "🟤",
+        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - META
@@ -672,6 +750,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Challenges,
         secret: false,
         icon: "🏅",
+        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // FISHING ACHIEVEMENTS - RANK MILESTONES
@@ -683,6 +762,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Exploration,
         secret: false,
         icon: "🎣",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::FishermanI,
@@ -691,6 +771,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Exploration,
         secret: false,
         icon: "🐟",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::FishermanII,
@@ -699,6 +780,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Exploration,
         secret: false,
         icon: "🐠",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::FishermanIII,
@@ -707,6 +789,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Exploration,
         secret: false,
         icon: "🐡",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::StormLeviathan,
@@ -715,6 +798,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Exploration,
         secret: true, // Hidden until unlocked
         icon: "🐋",
+        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // FISHING ACHIEVEMENTS - CATCH COUNTS
@@ -726,6 +810,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Exploration,
         secret: false,
         icon: "🐟",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::FishCatcherII,
@@ -734,6 +819,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Exploration,
         secret: false,
         icon: "🐠",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::FishCatcherIII,
@@ -742,6 +828,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Exploration,
         secret: false,
         icon: "🐡",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::FishCatcherIV,
@@ -750,6 +837,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Exploration,
         secret: false,
         icon: "🐋",
+        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // DUNGEON ACHIEVEMENTS
@@ -761,6 +849,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Exploration,
         secret: false,
         icon: "🏰",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::DungeonMasterI,
@@ -769,6 +858,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Exploration,
         secret: false,
         icon: "🗝️",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::DungeonMasterII,
@@ -777,6 +867,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Exploration,
         secret: false,
         icon: "🗝️",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::DungeonMasterIII,
@@ -785,6 +876,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Exploration,
         secret: false,
         icon: "🗝️",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::DungeonMasterIV,
@@ -793,6 +885,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Exploration,
         secret: false,
         icon: "⚔️",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::DungeonMasterV,
@@ -801,6 +894,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Exploration,
         secret: false,
         icon: "⚔️",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::DungeonMasterVI,
@@ -809,6 +903,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Exploration,
         secret: false,
         icon: "👑",
+        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // HAVEN ACHIEVEMENTS
@@ -820,6 +915,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Exploration,
         secret: false,
         icon: "🏠",
+        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::HavenBuilderI,
@@ -828,6 +924,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Exploration,
         secret: false,
         icon: "🔨",
+        requires_haven: true,
     },
     AchievementDef {
         id: AchievementId::HavenBuilderII,
@@ -836,6 +933,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Exploration,
         secret: false,
         icon: "🔧",
+        requires_haven: true,
     },
     AchievementDef {
         id: AchievementId::HavenArchitect,
@@ -844,6 +942,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Exploration,
         secret: false,
         icon: "🏛️",
+        requires_haven: true,
     },
 ];
 
