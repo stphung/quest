@@ -79,7 +79,7 @@ impl HavenRoomId {
             HavenRoomId::Garden => "Water trickles from a carved stone fountain into a shallow basin where lily pads drift. Tending this garden teaches a stillness that makes even the longest fishing wait feel brief.",
             HavenRoomId::Library => "A reading nook tucked beneath a stained-glass window, surrounded by towers of scrolls and ink-stained notes. The more you read, the more the world reveals its hidden trials to you.",
             HavenRoomId::FishingDock => "Morning mist clings to the water as your line breaks the stillness. The fish here bite in pairs, and those who cast long enough swear they've felt something vast stir in the deep — something most anglers will never be ready for.",
-            HavenRoomId::Workshop => "Better tools yield better finds.",
+            HavenRoomId::Workshop => "Sawdust and iron filings crunch underfoot as you pass workbenches cluttered with half-finished tools and polishing rigs. Gear crafted here always seems to turn out a cut above the rest.",
             HavenRoomId::Vault => "Preserves treasured equipment through prestige resets.",
             HavenRoomId::StormForge => "The legendary forge where Stormbreaker can be crafted.",
         }
