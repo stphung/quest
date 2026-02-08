@@ -915,7 +915,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Exploration,
         secret: false,
         icon: "🏠",
-        requires_haven: false,
+        requires_haven: true,
     },
     AchievementDef {
         id: AchievementId::HavenBuilderI,
