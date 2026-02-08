@@ -56,8 +56,8 @@ impl Write for TeeWriter {
         if let Some(ref sender) = self.ws_sender {
             if !self.buffer.is_empty() {
                 // Ignore send errors (no subscribers is fine)
-                let _ = sender.send(self.buffer.clone());
-                self.buffer.clear();
+                // Use take() to avoid clone - replaces buffer with empty Vec
+                let _ = sender.send(std::mem::take(&mut self.buffer));
             }
         }
 

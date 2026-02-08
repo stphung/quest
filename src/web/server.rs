@@ -98,10 +98,8 @@ async fn handle_connection(
     let n = stream.peek(&mut peek_buf).await?;
     let request = String::from_utf8_lossy(&peek_buf[..n]);
 
-    // Check if this is a WebSocket upgrade request
-    let is_websocket = request.contains("Upgrade: websocket")
-        || request.contains("upgrade: websocket")
-        || request.contains("Upgrade: WebSocket");
+    // Check if this is a WebSocket upgrade request (case-insensitive)
+    let is_websocket = request.to_ascii_lowercase().contains("upgrade: websocket");
 
     if !is_websocket {
         // Handle as regular HTTP request
@@ -163,38 +161,54 @@ async fn handle_connection(
     Ok(())
 }
 
-/// Serve the HTML page for the web terminal
-async fn serve_html(mut stream: TcpStream) -> std::io::Result<()> {
-    use tokio::io::AsyncReadExt;
-    use tokio::io::AsyncWriteExt;
+/// Send an HTTP response after consuming the request
+async fn send_http_response(
+    mut stream: TcpStream,
+    status: &str,
+    content_type: Option<&str>,
+    body: &str,
+) -> std::io::Result<()> {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     // Consume the HTTP request first
     let mut request_buf = vec![0u8; 1024];
     let _ = stream.read(&mut request_buf).await;
 
-    let html = include_str!("../../web/index.html");
-    let response = format!(
-        "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-        html.len(),
-        html
-    );
+    let headers = match content_type {
+        Some(ct) => format!(
+            "HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+            status,
+            ct,
+            body.len()
+        ),
+        None => format!(
+            "HTTP/1.1 {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+            status,
+            body.len()
+        ),
+    };
 
-    stream.write_all(response.as_bytes()).await?;
+    stream.write_all(headers.as_bytes()).await?;
+    if !body.is_empty() {
+        stream.write_all(body.as_bytes()).await?;
+    }
     Ok(())
 }
 
+/// Serve the HTML page for the web terminal
+async fn serve_html(stream: TcpStream) -> std::io::Result<()> {
+    send_http_response(
+        stream,
+        "200 OK",
+        Some("text/html"),
+        include_str!("../../web/index.html"),
+    )
+    .await
+}
+
 /// Serve a 404 response for unknown paths
-async fn serve_404(mut stream: TcpStream) -> std::io::Result<()> {
-    use tokio::io::AsyncReadExt;
-    use tokio::io::AsyncWriteExt;
-
-    // Consume the HTTP request first
-    let mut request_buf = vec![0u8; 1024];
-    let _ = stream.read(&mut request_buf).await;
-
-    let response = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
-    stream.write_all(response.as_bytes()).await?;
-    Ok(())
+async fn serve_404(stream: TcpStream) -> std::io::Result<()> {
+    send_http_response(stream, "404 Not Found", None, "").await
 }
 
 /// Parse a key event from JSON sent by the browser
