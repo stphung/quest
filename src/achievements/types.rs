@@ -171,18 +171,7 @@ pub struct AchievementDef {
     pub name: &'static str,
     pub description: &'static str,
     pub category: AchievementCategory,
-    pub secret: bool,
     pub icon: &'static str,
-    /// If true, this achievement is hidden until Haven is discovered
-    pub requires_haven: bool,
-}
-
-impl AchievementDef {
-    /// Check if this achievement should be hidden from the UI.
-    /// Returns true if: secret and not unlocked, OR requires haven and haven not discovered
-    pub fn is_hidden(&self, is_unlocked: bool, haven_discovered: bool) -> bool {
-        (self.secret && !is_unlocked) || (self.requires_haven && !haven_discovered)
-    }
 }
 
 /// Progress on a single achievement (for multi-stage achievements).
@@ -373,7 +362,7 @@ impl Achievements {
     // =========================================================================
 
     /// Called when the Storm Leviathan is caught.
-    /// Unlocks the StormLeviathan achievement (secret, required for Stormbreaker).
+    /// Unlocks the StormLeviathan achievement (required for Stormbreaker).
     pub fn on_storm_leviathan_caught(&mut self, character_name: Option<&str>) {
         self.unlock(
             AchievementId::StormLeviathan,

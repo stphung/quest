@@ -87,7 +87,6 @@ pub fn render_achievement_browser(
     area: Rect,
     achievements: &Achievements,
     ui_state: &AchievementBrowserState,
-    haven_discovered: bool,
 ) {
     frame.render_widget(Clear, area);
 
@@ -119,20 +118,8 @@ pub fn render_achievement_browser(
         .constraints([Constraint::Percentage(45), Constraint::Percentage(55)])
         .split(chunks[1]);
 
-    render_achievement_list(
-        frame,
-        content_chunks[0],
-        achievements,
-        ui_state,
-        haven_discovered,
-    );
-    render_achievement_detail(
-        frame,
-        content_chunks[1],
-        achievements,
-        ui_state,
-        haven_discovered,
-    );
+    render_achievement_list(frame, content_chunks[0], achievements, ui_state);
+    render_achievement_detail(frame, content_chunks[1], achievements, ui_state);
 
     let help = Paragraph::new("[</>] Category  [Up/Down] Select  [Esc] Close")
         .style(Style::default().fg(Color::DarkGray))
@@ -174,7 +161,6 @@ fn render_achievement_list(
     area: Rect,
     achievements: &Achievements,
     ui_state: &AchievementBrowserState,
-    haven_discovered: bool,
 ) {
     let block = Block::default()
         .borders(Borders::ALL)
@@ -191,13 +177,6 @@ fn render_achievement_list(
         .map(|(i, def)| {
             let is_unlocked = achievements.is_unlocked(def.id);
             let is_selected = i == ui_state.selected_index;
-
-            let is_hidden = def.is_hidden(is_unlocked, haven_discovered);
-            let (icon, name) = if is_unlocked || !is_hidden {
-                (def.icon, def.name)
-            } else {
-                ("?", "???")
-            };
 
             let prefix = if is_selected { "> " } else { "  " };
             let checkmark = if is_unlocked { "[X] " } else { "[ ] " };
@@ -220,8 +199,8 @@ fn render_achievement_list(
                         Style::default().fg(Color::DarkGray)
                     },
                 ),
-                Span::raw(format!("{} ", icon)),
-                Span::styled(name, style),
+                Span::raw(format!("{} ", def.icon)),
+                Span::styled(def.name, style),
             ]))
         })
         .collect();
@@ -235,7 +214,6 @@ fn render_achievement_detail(
     area: Rect,
     achievements: &Achievements,
     ui_state: &AchievementBrowserState,
-    haven_discovered: bool,
 ) {
     let category_achievements = get_achievements_by_category(ui_state.selected_category);
 
@@ -244,12 +222,8 @@ fn render_achievement_detail(
     };
 
     let is_unlocked = achievements.is_unlocked(def.id);
-    let is_hidden = def.is_hidden(is_unlocked, haven_discovered);
-    let show_details = is_unlocked || !is_hidden;
-
-    let title = if show_details { def.name } else { "???" };
     let block = Block::default()
-        .title(format!(" {} ", title))
+        .title(format!(" {} ", def.name))
         .borders(Borders::ALL)
         .border_style(Style::default().fg(if is_unlocked {
             Color::Green
@@ -262,74 +236,62 @@ fn render_achievement_detail(
 
     let mut lines = Vec::new();
 
-    if show_details {
-        // Icon and name
-        lines.push(Line::from(Span::styled(
-            format!("{} {}", def.icon, def.name),
-            Style::default()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
-        )));
-        lines.push(Line::from(""));
+    // Icon and name
+    lines.push(Line::from(Span::styled(
+        format!("{} {}", def.icon, def.name),
+        Style::default()
+            .fg(Color::White)
+            .add_modifier(Modifier::BOLD),
+    )));
+    lines.push(Line::from(""));
 
-        // Description
-        lines.push(Line::from(Span::styled(
-            def.description,
-            Style::default().fg(Color::White),
-        )));
-        lines.push(Line::from(""));
+    // Description
+    lines.push(Line::from(Span::styled(
+        def.description,
+        Style::default().fg(Color::White),
+    )));
+    lines.push(Line::from(""));
 
-        // Unlock status
-        if is_unlocked {
-            if let Some(record) = achievements.unlocked.get(&def.id) {
-                let timestamp = chrono::DateTime::from_timestamp(record.unlocked_at, 0)
-                    .map(|dt| dt.format("%Y-%m-%d %H:%M").to_string())
-                    .unwrap_or_else(|| "Unknown".to_string());
+    // Unlock status
+    if is_unlocked {
+        if let Some(record) = achievements.unlocked.get(&def.id) {
+            let timestamp = chrono::DateTime::from_timestamp(record.unlocked_at, 0)
+                .map(|dt| dt.format("%Y-%m-%d %H:%M").to_string())
+                .unwrap_or_else(|| "Unknown".to_string());
 
-                lines.push(Line::from(Span::styled(
-                    format!("[X] Unlocked: {}", timestamp),
-                    Style::default().fg(Color::Green),
-                )));
-
-                if let Some(ref char_name) = record.character_name {
-                    lines.push(Line::from(Span::styled(
-                        format!("    By: {}", char_name),
-                        Style::default().fg(Color::DarkGray),
-                    )));
-                }
-            }
-        } else {
             lines.push(Line::from(Span::styled(
-                "[ ] Not yet unlocked",
-                Style::default().fg(Color::Red),
+                format!("[X] Unlocked: {}", timestamp),
+                Style::default().fg(Color::Green),
             )));
 
-            // Show progress if applicable
-            if let Some(progress) = achievements.get_progress(def.id) {
-                let percent = if progress.target > 0 {
-                    (progress.current as f64 / progress.target as f64 * 100.0) as u32
-                } else {
-                    0
-                };
+            if let Some(ref char_name) = record.character_name {
                 lines.push(Line::from(Span::styled(
-                    format!(
-                        "    Progress: {}/{} ({}%)",
-                        progress.current, progress.target, percent
-                    ),
-                    Style::default().fg(Color::Yellow),
+                    format!("    By: {}", char_name),
+                    Style::default().fg(Color::DarkGray),
                 )));
             }
         }
     } else {
         lines.push(Line::from(Span::styled(
-            "This achievement is hidden.",
-            Style::default().fg(Color::DarkGray),
+            "[ ] Not yet unlocked",
+            Style::default().fg(Color::Red),
         )));
-        lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            "Unlock it to reveal its details.",
-            Style::default().fg(Color::DarkGray),
-        )));
+
+        // Show progress if applicable
+        if let Some(progress) = achievements.get_progress(def.id) {
+            let percent = if progress.target > 0 {
+                (progress.current as f64 / progress.target as f64 * 100.0) as u32
+            } else {
+                0
+            };
+            lines.push(Line::from(Span::styled(
+                format!(
+                    "    Progress: {}/{} ({}%)",
+                    progress.current, progress.target, percent
+                ),
+                Style::default().fg(Color::Yellow),
+            )));
+        }
     }
 
     let para = Paragraph::new(lines).wrap(Wrap { trim: true });

@@ -14,81 +14,63 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         name: "Slayer I",
         description: "Defeat 100 enemies",
         category: AchievementCategory::Combat,
-        secret: false,
         icon: "💀",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::SlayerII,
         name: "Slayer II",
         description: "Defeat 500 enemies",
         category: AchievementCategory::Combat,
-        secret: false,
         icon: "💀",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::SlayerIII,
         name: "Slayer III",
         description: "Defeat 1,000 enemies",
         category: AchievementCategory::Combat,
-        secret: false,
         icon: "💀",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::SlayerIV,
         name: "Slayer IV",
         description: "Defeat 5,000 enemies",
         category: AchievementCategory::Combat,
-        secret: false,
         icon: "💀",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::SlayerV,
         name: "Slayer V",
         description: "Defeat 10,000 enemies",
         category: AchievementCategory::Combat,
-        secret: false,
         icon: "☠️",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::SlayerVI,
         name: "Slayer VI",
         description: "Defeat 50,000 enemies",
         category: AchievementCategory::Combat,
-        secret: false,
         icon: "☠️",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::SlayerVII,
         name: "Slayer VII",
         description: "Defeat 100,000 enemies",
         category: AchievementCategory::Combat,
-        secret: false,
         icon: "☠️",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::SlayerVIII,
         name: "Slayer VIII",
         description: "Defeat 500,000 enemies",
         category: AchievementCategory::Combat,
-        secret: false,
         icon: "⚔️",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::SlayerIX,
         name: "Slayer IX",
         description: "Defeat 1,000,000 enemies",
         category: AchievementCategory::Combat,
-        secret: false,
         icon: "⚔️",
-        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // COMBAT ACHIEVEMENTS - BOSS KILLS
@@ -98,72 +80,56 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         name: "Boss Hunter I",
         description: "Defeat your first boss",
         category: AchievementCategory::Combat,
-        secret: false,
         icon: "👹",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::BossHunterII,
         name: "Boss Hunter II",
         description: "Defeat 10 bosses",
         category: AchievementCategory::Combat,
-        secret: false,
         icon: "👹",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::BossHunterIII,
         name: "Boss Hunter III",
         description: "Defeat 50 bosses",
         category: AchievementCategory::Combat,
-        secret: false,
         icon: "👹",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::BossHunterIV,
         name: "Boss Hunter IV",
         description: "Defeat 100 bosses",
         category: AchievementCategory::Combat,
-        secret: false,
         icon: "👿",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::BossHunterV,
         name: "Boss Hunter V",
         description: "Defeat 500 bosses",
         category: AchievementCategory::Combat,
-        secret: false,
         icon: "👿",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::BossHunterVI,
         name: "Boss Hunter VI",
         description: "Defeat 1,000 bosses",
         category: AchievementCategory::Combat,
-        secret: false,
         icon: "😈",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::BossHunterVII,
         name: "Boss Hunter VII",
         description: "Defeat 5,000 bosses",
         category: AchievementCategory::Combat,
-        secret: false,
         icon: "😈",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::BossHunterVIII,
         name: "Boss Hunter VIII",
         description: "Defeat 10,000 bosses",
         category: AchievementCategory::Combat,
-        secret: false,
         icon: "👑",
-        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // LEVEL ACHIEVEMENTS
@@ -173,81 +139,63 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         name: "Getting Started",
         description: "Reach level 10",
         category: AchievementCategory::Level,
-        secret: false,
         icon: "📈",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Level25,
         name: "Quarter Century",
         description: "Reach level 25",
         category: AchievementCategory::Level,
-        secret: false,
         icon: "📈",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Level50,
         name: "Seasoned Adventurer",
         description: "Reach level 50",
         category: AchievementCategory::Level,
-        secret: false,
         icon: "📈",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Level75,
         name: "Veteran",
         description: "Reach level 75",
         category: AchievementCategory::Level,
-        secret: false,
         icon: "📈",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Level100,
         name: "Centurion",
         description: "Reach level 100",
         category: AchievementCategory::Level,
-        secret: false,
         icon: "📈",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Level150,
         name: "Beyond the Century",
         description: "Reach level 150",
         category: AchievementCategory::Level,
-        secret: false,
         icon: "🌟",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Level200,
         name: "Bicentennial",
         description: "Reach level 200",
         category: AchievementCategory::Level,
-        secret: false,
         icon: "🌟",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Level250,
         name: "Legend",
         description: "Reach level 250",
         category: AchievementCategory::Level,
-        secret: false,
         icon: "⭐",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Level300,
         name: "Mythic",
         description: "Reach level 300",
         category: AchievementCategory::Level,
-        secret: false,
         icon: "⭐",
-        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // PRESTIGE ACHIEVEMENTS
@@ -257,108 +205,84 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         name: "Rebirth",
         description: "Prestige for the first time",
         category: AchievementCategory::Level,
-        secret: false,
         icon: "🔄",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::PrestigeV,
         name: "Bronze Rank",
         description: "Reach Prestige Rank 5",
         category: AchievementCategory::Level,
-        secret: false,
         icon: "🥉",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::PrestigeX,
         name: "Silver Rank",
         description: "Reach Prestige Rank 10",
         category: AchievementCategory::Level,
-        secret: false,
         icon: "🥈",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::PrestigeXV,
         name: "Gold Rank",
         description: "Reach Prestige Rank 15",
         category: AchievementCategory::Level,
-        secret: false,
         icon: "🥇",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::PrestigeXX,
         name: "Platinum Rank",
         description: "Reach Prestige Rank 20",
         category: AchievementCategory::Level,
-        secret: false,
         icon: "💎",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::PrestigeXXV,
         name: "Diamond Rank",
         description: "Reach Prestige Rank 25",
         category: AchievementCategory::Level,
-        secret: false,
         icon: "💠",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::PrestigeXXX,
         name: "Ruby Rank",
         description: "Reach Prestige Rank 30",
         category: AchievementCategory::Level,
-        secret: false,
         icon: "❤️",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::PrestigeXL,
         name: "Sapphire Rank",
         description: "Reach Prestige Rank 40",
         category: AchievementCategory::Level,
-        secret: false,
         icon: "💙",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::PrestigeL,
         name: "Emerald Rank",
         description: "Reach Prestige Rank 50",
         category: AchievementCategory::Level,
-        secret: false,
         icon: "💚",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::PrestigeLXX,
         name: "Obsidian Rank",
         description: "Reach Prestige Rank 70",
         category: AchievementCategory::Level,
-        secret: false,
         icon: "🖤",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::PrestigeXC,
         name: "Celestial Rank",
         description: "Reach Prestige Rank 90",
         category: AchievementCategory::Level,
-        secret: false,
         icon: "💜",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Eternal,
         name: "Eternal",
         description: "Reach Prestige Rank 100 - The Eternal tier",
         category: AchievementCategory::Level,
-        secret: false,
         icon: "♾️",
-        requires_haven: false,
     },
     // Zone completion achievements (one per zone)
     AchievementDef {
@@ -366,108 +290,84 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         name: "Meadow Wanderer",
         description: "Clear Zone 1: Meadow",
         category: AchievementCategory::Progression,
-        secret: false,
         icon: "🌻",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Zone2Complete,
         name: "Forest Walker",
         description: "Clear Zone 2: Dark Forest",
         category: AchievementCategory::Progression,
-        secret: false,
         icon: "🌲",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Zone3Complete,
         name: "Peak Climber",
         description: "Clear Zone 3: Mountain Pass",
         category: AchievementCategory::Progression,
-        secret: false,
         icon: "🏔️",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Zone4Complete,
         name: "Ruin Explorer",
         description: "Clear Zone 4: Ancient Ruins",
         category: AchievementCategory::Progression,
-        secret: false,
         icon: "🏛️",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Zone5Complete,
         name: "Volcano Conqueror",
         description: "Clear Zone 5: Volcanic Wastes",
         category: AchievementCategory::Progression,
-        secret: false,
         icon: "🌋",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Zone6Complete,
         name: "Frost Survivor",
         description: "Clear Zone 6: Frozen Tundra",
         category: AchievementCategory::Progression,
-        secret: false,
         icon: "❄️",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Zone7Complete,
         name: "Crystal Seeker",
         description: "Clear Zone 7: Crystal Caverns",
         category: AchievementCategory::Progression,
-        secret: false,
         icon: "💎",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Zone8Complete,
         name: "Deep Diver",
         description: "Clear Zone 8: Sunken Kingdom",
         category: AchievementCategory::Progression,
-        secret: false,
         icon: "🌊",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Zone9Complete,
         name: "Sky Lord",
         description: "Clear Zone 9: Floating Isles",
         category: AchievementCategory::Progression,
-        secret: false,
         icon: "☁️",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::Zone10Complete,
         name: "Citadel Conqueror",
         description: "Clear Zone 10: Storm Citadel",
         category: AchievementCategory::Progression,
-        secret: false,
         icon: "⛈️",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::TheStormbreaker,
         name: "The Stormbreaker",
         description: "Forge the legendary Stormbreaker at the Haven forge",
         category: AchievementCategory::Progression,
-        secret: false,
         icon: "⚡",
-        requires_haven: true,
     },
     AchievementDef {
         id: AchievementId::StormsEnd,
         name: "Storm's End",
         description: "Defeat the final boss of Zone 10: Storm Citadel",
         category: AchievementCategory::Progression,
-        secret: false,
         icon: "🏆",
-        requires_haven: false,
     },
     // The Expanse cycle achievements
     AchievementDef {
@@ -475,36 +375,28 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         name: "Beyond Infinity I",
         description: "Complete 1 cycle of The Expanse",
         category: AchievementCategory::Progression,
-        secret: false,
         icon: "♾️",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::ExpanseCycleII,
         name: "Beyond Infinity II",
         description: "Complete 100 cycles of The Expanse",
         category: AchievementCategory::Progression,
-        secret: false,
         icon: "♾️",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::ExpanseCycleIII,
         name: "Beyond Infinity III",
         description: "Complete 1,000 cycles of The Expanse",
         category: AchievementCategory::Progression,
-        secret: false,
         icon: "♾️",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::ExpanseCycleIV,
         name: "Beyond Infinity IV",
         description: "Complete 10,000 cycles of The Expanse",
         category: AchievementCategory::Progression,
-        secret: false,
         icon: "♾️",
-        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - CHESS
@@ -514,36 +406,28 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         name: "Chess Novice",
         description: "Win chess on Novice difficulty",
         category: AchievementCategory::Challenges,
-        secret: false,
         icon: "♟️",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::ChessApprentice,
         name: "Chess Apprentice",
         description: "Win chess on Apprentice difficulty",
         category: AchievementCategory::Challenges,
-        secret: false,
         icon: "♟️",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::ChessJourneyman,
         name: "Chess Journeyman",
         description: "Win chess on Journeyman difficulty",
         category: AchievementCategory::Challenges,
-        secret: false,
         icon: "♟️",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::ChessMaster,
         name: "Chess Master",
         description: "Win chess on Master difficulty",
         category: AchievementCategory::Challenges,
-        secret: false,
         icon: "♛",
-        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - MORRIS
@@ -553,36 +437,28 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         name: "Morris Novice",
         description: "Win Morris on Novice difficulty",
         category: AchievementCategory::Challenges,
-        secret: false,
         icon: "⚪",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::MorrisApprentice,
         name: "Morris Apprentice",
         description: "Win Morris on Apprentice difficulty",
         category: AchievementCategory::Challenges,
-        secret: false,
         icon: "⚪",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::MorrisJourneyman,
         name: "Morris Journeyman",
         description: "Win Morris on Journeyman difficulty",
         category: AchievementCategory::Challenges,
-        secret: false,
         icon: "⚪",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::MorrisMaster,
         name: "Morris Master",
         description: "Win Morris on Master difficulty",
         category: AchievementCategory::Challenges,
-        secret: false,
         icon: "⚪",
-        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - GOMOKU
@@ -592,36 +468,28 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         name: "Gomoku Novice",
         description: "Win Gomoku on Novice difficulty",
         category: AchievementCategory::Challenges,
-        secret: false,
         icon: "⚫",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::GomokuApprentice,
         name: "Gomoku Apprentice",
         description: "Win Gomoku on Apprentice difficulty",
         category: AchievementCategory::Challenges,
-        secret: false,
         icon: "⚫",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::GomokuJourneyman,
         name: "Gomoku Journeyman",
         description: "Win Gomoku on Journeyman difficulty",
         category: AchievementCategory::Challenges,
-        secret: false,
         icon: "⚫",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::GomokuMaster,
         name: "Gomoku Master",
         description: "Win Gomoku on Master difficulty",
         category: AchievementCategory::Challenges,
-        secret: false,
         icon: "⚫",
-        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - MINESWEEPER
@@ -631,36 +499,28 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         name: "Minesweeper Novice",
         description: "Win Minesweeper on Novice difficulty",
         category: AchievementCategory::Challenges,
-        secret: false,
         icon: "💣",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::MinesweeperApprentice,
         name: "Minesweeper Apprentice",
         description: "Win Minesweeper on Apprentice difficulty",
         category: AchievementCategory::Challenges,
-        secret: false,
         icon: "💣",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::MinesweeperJourneyman,
         name: "Minesweeper Journeyman",
         description: "Win Minesweeper on Journeyman difficulty",
         category: AchievementCategory::Challenges,
-        secret: false,
         icon: "💣",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::MinesweeperMaster,
         name: "Minesweeper Master",
         description: "Win Minesweeper on Master difficulty",
         category: AchievementCategory::Challenges,
-        secret: false,
         icon: "💣",
-        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - RUNE
@@ -670,36 +530,28 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         name: "Rune Novice",
         description: "Win Rune on Novice difficulty",
         category: AchievementCategory::Challenges,
-        secret: false,
         icon: "🔮",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::RuneApprentice,
         name: "Rune Apprentice",
         description: "Win Rune on Apprentice difficulty",
         category: AchievementCategory::Challenges,
-        secret: false,
         icon: "🔮",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::RuneJourneyman,
         name: "Rune Journeyman",
         description: "Win Rune on Journeyman difficulty",
         category: AchievementCategory::Challenges,
-        secret: false,
         icon: "🔮",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::RuneMaster,
         name: "Rune Master",
         description: "Win Rune on Master difficulty",
         category: AchievementCategory::Challenges,
-        secret: false,
         icon: "🔮",
-        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - GO
@@ -709,36 +561,28 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         name: "Go Novice",
         description: "Win Go on Novice difficulty",
         category: AchievementCategory::Challenges,
-        secret: false,
         icon: "🟤",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::GoApprentice,
         name: "Go Apprentice",
         description: "Win Go on Apprentice difficulty",
         category: AchievementCategory::Challenges,
-        secret: false,
         icon: "🟤",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::GoJourneyman,
         name: "Go Journeyman",
         description: "Win Go on Journeyman difficulty",
         category: AchievementCategory::Challenges,
-        secret: false,
         icon: "🟤",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::GoMaster,
         name: "Go Master",
         description: "Win Go on Master difficulty",
         category: AchievementCategory::Challenges,
-        secret: false,
         icon: "🟤",
-        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - META
@@ -748,9 +592,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         name: "Grand Champion",
         description: "Win 100 minigames total",
         category: AchievementCategory::Challenges,
-        secret: false,
         icon: "🏅",
-        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // FISHING ACHIEVEMENTS - RANK MILESTONES
@@ -760,45 +602,35 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         name: "Gone Fishing",
         description: "Catch your first fish",
         category: AchievementCategory::Exploration,
-        secret: false,
         icon: "🎣",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::FishermanI,
         name: "Fisherman I",
         description: "Reach fishing rank 10",
         category: AchievementCategory::Exploration,
-        secret: false,
         icon: "🐟",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::FishermanII,
         name: "Fisherman II",
         description: "Reach fishing rank 20",
         category: AchievementCategory::Exploration,
-        secret: false,
         icon: "🐠",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::FishermanIII,
         name: "Fisherman III",
         description: "Reach fishing rank 30 (requires Fishing Dock T4)",
         category: AchievementCategory::Exploration,
-        secret: false,
         icon: "🐡",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::StormLeviathan,
         name: "Storm Leviathan",
         description: "Catch the legendary Storm Leviathan",
         category: AchievementCategory::Exploration,
-        secret: true, // Hidden until unlocked
         icon: "🐋",
-        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // FISHING ACHIEVEMENTS - CATCH COUNTS
@@ -808,36 +640,28 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         name: "Fish Catcher I",
         description: "Catch 100 fish",
         category: AchievementCategory::Exploration,
-        secret: false,
         icon: "🐟",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::FishCatcherII,
         name: "Fish Catcher II",
         description: "Catch 1,000 fish",
         category: AchievementCategory::Exploration,
-        secret: false,
         icon: "🐠",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::FishCatcherIII,
         name: "Fish Catcher III",
         description: "Catch 10,000 fish",
         category: AchievementCategory::Exploration,
-        secret: false,
         icon: "🐡",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::FishCatcherIV,
         name: "Fish Catcher IV",
         description: "Catch 100,000 fish",
         category: AchievementCategory::Exploration,
-        secret: false,
         icon: "🐋",
-        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // DUNGEON ACHIEVEMENTS
@@ -847,63 +671,49 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         name: "Dungeon Diver",
         description: "Complete your first dungeon",
         category: AchievementCategory::Exploration,
-        secret: false,
         icon: "🏰",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::DungeonMasterI,
         name: "Dungeon Master I",
         description: "Complete 10 dungeons",
         category: AchievementCategory::Exploration,
-        secret: false,
         icon: "🗝️",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::DungeonMasterII,
         name: "Dungeon Master II",
         description: "Complete 50 dungeons",
         category: AchievementCategory::Exploration,
-        secret: false,
         icon: "🗝️",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::DungeonMasterIII,
         name: "Dungeon Master III",
         description: "Complete 100 dungeons",
         category: AchievementCategory::Exploration,
-        secret: false,
         icon: "🗝️",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::DungeonMasterIV,
         name: "Dungeon Master IV",
         description: "Complete 1,000 dungeons",
         category: AchievementCategory::Exploration,
-        secret: false,
         icon: "⚔️",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::DungeonMasterV,
         name: "Dungeon Master V",
         description: "Complete 5,000 dungeons",
         category: AchievementCategory::Exploration,
-        secret: false,
         icon: "⚔️",
-        requires_haven: false,
     },
     AchievementDef {
         id: AchievementId::DungeonMasterVI,
         name: "Dungeon Master VI",
         description: "Complete 10,000 dungeons",
         category: AchievementCategory::Exploration,
-        secret: false,
         icon: "👑",
-        requires_haven: false,
     },
     // ═══════════════════════════════════════════════════════════════
     // HAVEN ACHIEVEMENTS
@@ -913,36 +723,28 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         name: "Haven Found",
         description: "Discover the Haven",
         category: AchievementCategory::Exploration,
-        secret: false,
         icon: "🏠",
-        requires_haven: true,
     },
     AchievementDef {
         id: AchievementId::HavenBuilderI,
         name: "Haven Builder I",
         description: "Upgrade all Haven rooms to Tier 1",
         category: AchievementCategory::Exploration,
-        secret: false,
         icon: "🔨",
-        requires_haven: true,
     },
     AchievementDef {
         id: AchievementId::HavenBuilderII,
         name: "Haven Builder II",
         description: "Upgrade all Haven rooms to Tier 2",
         category: AchievementCategory::Exploration,
-        secret: false,
         icon: "🔧",
-        requires_haven: true,
     },
     AchievementDef {
         id: AchievementId::HavenArchitect,
         name: "Haven Architect",
         description: "Upgrade all Haven rooms to Tier 3",
         category: AchievementCategory::Exploration,
-        secret: false,
         icon: "🏛️",
-        requires_haven: true,
     },
 ];
 
@@ -989,308 +791,6 @@ mod tests {
         assert!(!combat.is_empty());
         for a in combat {
             assert_eq!(a.category, AchievementCategory::Combat);
-        }
-    }
-
-    #[test]
-    fn test_secret_achievements() {
-        // StormLeviathan should be secret
-        let def = get_achievement_def(AchievementId::StormLeviathan).unwrap();
-        assert!(def.secret);
-
-        // SlayerI should not be secret
-        let def = get_achievement_def(AchievementId::SlayerI).unwrap();
-        assert!(!def.secret);
-    }
-
-    // =========================================================================
-    // requires_haven Field Tests
-    // =========================================================================
-
-    #[test]
-    fn test_requires_haven_field_exists() {
-        // Test that requires_haven field is accessible on achievement definitions
-        let def = get_achievement_def(AchievementId::HavenDiscovered).unwrap();
-        assert!(def.requires_haven);
-
-        let def = get_achievement_def(AchievementId::SlayerI).unwrap();
-        assert!(!def.requires_haven);
-    }
-
-    #[test]
-    fn test_haven_discovered_requires_haven() {
-        let def = get_achievement_def(AchievementId::HavenDiscovered).unwrap();
-        assert!(def.requires_haven, "HavenDiscovered should require Haven");
-    }
-
-    #[test]
-    fn test_haven_builder_i_requires_haven() {
-        let def = get_achievement_def(AchievementId::HavenBuilderI).unwrap();
-        assert!(def.requires_haven, "HavenBuilderI should require Haven");
-    }
-
-    #[test]
-    fn test_haven_builder_ii_requires_haven() {
-        let def = get_achievement_def(AchievementId::HavenBuilderII).unwrap();
-        assert!(def.requires_haven, "HavenBuilderII should require Haven");
-    }
-
-    #[test]
-    fn test_haven_architect_requires_haven() {
-        let def = get_achievement_def(AchievementId::HavenArchitect).unwrap();
-        assert!(def.requires_haven, "HavenArchitect should require Haven");
-    }
-
-    #[test]
-    fn test_stormbreaker_requires_haven() {
-        let def = get_achievement_def(AchievementId::TheStormbreaker).unwrap();
-        assert!(def.requires_haven, "TheStormbreaker should require Haven");
-    }
-
-    #[test]
-    fn test_storm_leviathan_does_not_require_haven() {
-        // Storm Leviathan can be caught without Haven discovered
-        let def = get_achievement_def(AchievementId::StormLeviathan).unwrap();
-        assert!(
-            !def.requires_haven,
-            "StormLeviathan should not require Haven"
-        );
-    }
-
-    #[test]
-    fn test_non_haven_achievements_do_not_require_haven() {
-        // Test a sample of non-Haven achievements
-        let non_haven_achievements = [
-            AchievementId::SlayerI,
-            AchievementId::BossHunterI,
-            AchievementId::Level10,
-            AchievementId::FirstPrestige,
-            AchievementId::ChessNovice,
-            AchievementId::GoneFishing,
-            AchievementId::DungeonDiver,
-            AchievementId::Zone1Complete,
-            AchievementId::StormLeviathan,
-        ];
-
-        for id in non_haven_achievements {
-            let def = get_achievement_def(id).unwrap();
-            assert!(!def.requires_haven, "{:?} should not require Haven", id);
-        }
-    }
-
-    #[test]
-    fn test_all_haven_related_achievements_require_haven() {
-        // Test that all 5 Haven-related achievements have requires_haven = true
-        let haven_achievements = [
-            AchievementId::HavenDiscovered,
-            AchievementId::HavenBuilderI,
-            AchievementId::HavenBuilderII,
-            AchievementId::HavenArchitect,
-            AchievementId::TheStormbreaker,
-        ];
-
-        for id in haven_achievements {
-            let def = get_achievement_def(id).unwrap();
-            assert!(def.requires_haven, "{:?} should require Haven", id);
-        }
-    }
-
-    // =========================================================================
-    // Achievement Browser Hiding Logic Tests (is_hidden method)
-    // =========================================================================
-
-    #[test]
-    fn test_is_hidden_secret_achievement_not_unlocked() {
-        let def = get_achievement_def(AchievementId::StormLeviathan).unwrap();
-
-        // Secret achievement, not unlocked, Haven discovered
-        assert!(def.is_hidden(false, true));
-
-        // Secret achievement, not unlocked, Haven not discovered
-        assert!(def.is_hidden(false, false));
-    }
-
-    #[test]
-    fn test_is_hidden_secret_achievement_unlocked() {
-        let def = get_achievement_def(AchievementId::StormLeviathan).unwrap();
-
-        // Secret achievement, unlocked, Haven discovered - should be visible
-        assert!(!def.is_hidden(true, true));
-
-        // Secret achievement, unlocked, Haven not discovered - should be visible
-        assert!(!def.is_hidden(true, false));
-    }
-
-    #[test]
-    fn test_is_hidden_haven_achievement_not_discovered() {
-        let def = get_achievement_def(AchievementId::HavenDiscovered).unwrap();
-
-        // Haven achievement, Haven not discovered - should be hidden
-        assert!(def.is_hidden(false, false));
-
-        // Haven achievement unlocked, but Haven not discovered (shouldn't happen in practice) - still hidden
-        // Logic: (secret && !unlocked) || (requires_haven && !haven_discovered)
-        // Since requires_haven=true and haven_discovered=false, it's hidden
-        assert!(def.is_hidden(true, false));
-    }
-
-    #[test]
-    fn test_is_hidden_haven_achievement_discovered() {
-        let def = get_achievement_def(AchievementId::HavenDiscovered).unwrap();
-
-        // Haven achievement, Haven discovered, not unlocked - should be visible
-        assert!(!def.is_hidden(false, true));
-
-        // Haven achievement, Haven discovered, unlocked - should be visible
-        assert!(!def.is_hidden(true, true));
-    }
-
-    #[test]
-    fn test_is_hidden_normal_achievement() {
-        let def = get_achievement_def(AchievementId::SlayerI).unwrap();
-
-        // Normal achievement (not secret, not requires_haven) - always visible
-        assert!(!def.is_hidden(false, true));
-        assert!(!def.is_hidden(false, false));
-        assert!(!def.is_hidden(true, true));
-        assert!(!def.is_hidden(true, false));
-    }
-
-    #[test]
-    fn test_is_hidden_stormbreaker_not_discovered() {
-        let def = get_achievement_def(AchievementId::TheStormbreaker).unwrap();
-
-        // TheStormbreaker requires Haven, not unlocked, Haven not discovered
-        assert!(def.is_hidden(false, false));
-
-        // TheStormbreaker requires Haven, not unlocked, Haven discovered
-        assert!(!def.is_hidden(false, true));
-    }
-
-    #[test]
-    fn test_is_hidden_stormbreaker_unlocked() {
-        let def = get_achievement_def(AchievementId::TheStormbreaker).unwrap();
-
-        // TheStormbreaker unlocked, Haven discovered - visible
-        assert!(!def.is_hidden(true, true));
-
-        // TheStormbreaker unlocked, Haven not discovered (shouldn't happen in practice) - still hidden
-        // Logic: (secret && !unlocked) || (requires_haven && !haven_discovered)
-        // Since requires_haven=true and haven_discovered=false, it's hidden
-        assert!(def.is_hidden(true, false));
-    }
-
-    #[test]
-    fn test_is_hidden_haven_builder_achievements() {
-        let builder_achievements = [
-            AchievementId::HavenBuilderI,
-            AchievementId::HavenBuilderII,
-            AchievementId::HavenArchitect,
-        ];
-
-        for id in builder_achievements {
-            let def = get_achievement_def(id).unwrap();
-
-            // Hidden when Haven not discovered
-            assert!(
-                def.is_hidden(false, false),
-                "{:?} should be hidden when Haven not discovered",
-                id
-            );
-
-            // Visible when Haven discovered
-            assert!(
-                !def.is_hidden(false, true),
-                "{:?} should be visible when Haven discovered",
-                id
-            );
-
-            // When unlocked but Haven not discovered - still hidden (requires_haven logic)
-            assert!(
-                def.is_hidden(true, false),
-                "{:?} should be hidden when Haven not discovered even if unlocked",
-                id
-            );
-            // When unlocked and Haven discovered - visible
-            assert!(
-                !def.is_hidden(true, true),
-                "{:?} should be visible when unlocked and Haven discovered",
-                id
-            );
-        }
-    }
-
-    #[test]
-    fn test_is_hidden_combination_secret_and_requires_haven() {
-        // Test edge case: if an achievement is both secret AND requires_haven
-        // it should be hidden when either condition is true
-        // (Currently no achievement has both, but test the logic)
-
-        // Create a test achievement definition manually for this edge case
-        let test_def = super::AchievementDef {
-            id: AchievementId::HavenDiscovered, // Arbitrary ID for test
-            name: "Test Secret Haven",
-            description: "Test",
-            category: AchievementCategory::Exploration,
-            secret: true,
-            icon: "🔒",
-            requires_haven: true,
-        };
-
-        // Not unlocked, Haven not discovered - hidden (both conditions)
-        assert!(test_def.is_hidden(false, false));
-
-        // Not unlocked, Haven discovered - still hidden (secret)
-        assert!(test_def.is_hidden(false, true));
-
-        // Unlocked, Haven not discovered - hidden (requires_haven)
-        assert!(test_def.is_hidden(true, false));
-
-        // Unlocked, Haven discovered - visible (both conditions met)
-        assert!(!test_def.is_hidden(true, true));
-    }
-
-    #[test]
-    fn test_is_hidden_all_haven_achievements_when_not_discovered() {
-        let haven_achievement_ids = [
-            AchievementId::HavenDiscovered,
-            AchievementId::HavenBuilderI,
-            AchievementId::HavenBuilderII,
-            AchievementId::HavenArchitect,
-            AchievementId::TheStormbreaker,
-        ];
-
-        for id in haven_achievement_ids {
-            let def = get_achievement_def(id).unwrap();
-
-            // All Haven achievements should be hidden when Haven not discovered and not unlocked
-            assert!(
-                def.is_hidden(false, false),
-                "{:?} should be hidden when Haven not discovered and not unlocked",
-                id
-            );
-        }
-    }
-
-    #[test]
-    fn test_is_hidden_all_haven_achievements_when_discovered() {
-        let haven_achievement_ids = [
-            AchievementId::HavenDiscovered,
-            AchievementId::HavenBuilderI,
-            AchievementId::HavenBuilderII,
-            AchievementId::HavenArchitect,
-            AchievementId::TheStormbreaker,
-        ];
-
-        for id in haven_achievement_ids {
-            let def = get_achievement_def(id).unwrap();
-
-            // All Haven achievements should be visible when Haven discovered (even if not unlocked)
-            assert!(
-                !def.is_hidden(false, true),
-                "{:?} should be visible when Haven discovered",
-                id
-            );
         }
     }
 }
