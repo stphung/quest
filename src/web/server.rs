@@ -15,7 +15,6 @@ pub type InputReceiver = mpsc::Receiver<crossterm::event::KeyEvent>;
 pub type InputSender = mpsc::Sender<crossterm::event::KeyEvent>;
 
 /// The web server state
-#[allow(dead_code)]
 pub struct WebServer {
     /// Broadcast channel for terminal output
     pub output_tx: OutputSender,
@@ -38,14 +37,7 @@ impl WebServer {
         }
     }
 
-    /// Get a clone of the output sender for the tee backend
-    #[allow(dead_code)]
-    pub fn output_sender(&self) -> OutputSender {
-        self.output_tx.clone()
-    }
-
     /// Try to receive input from web clients (non-blocking, sync version)
-    #[allow(dead_code)]
     pub fn try_recv_input_sync(&self) -> Option<crossterm::event::KeyEvent> {
         // Use try_lock to avoid blocking
         if let Ok(mut rx) = self.input_rx.try_lock() {
@@ -249,4 +241,93 @@ fn parse_key_event(json: &str) -> Result<crossterm::event::KeyEvent, ()> {
         kind: KeyEventKind::Press,
         state: KeyEventState::empty(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossterm::event::KeyCode;
+
+    #[test]
+    fn test_parse_key_event_enter() {
+        let result = parse_key_event(r#"{"key": "Enter"}"#);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().code, KeyCode::Enter);
+    }
+
+    #[test]
+    fn test_parse_key_event_escape() {
+        let result = parse_key_event(r#"{"key": "Escape"}"#);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().code, KeyCode::Esc);
+    }
+
+    #[test]
+    fn test_parse_key_event_arrow_keys() {
+        assert_eq!(
+            parse_key_event(r#"{"key": "ArrowUp"}"#).unwrap().code,
+            KeyCode::Up
+        );
+        assert_eq!(
+            parse_key_event(r#"{"key": "ArrowDown"}"#).unwrap().code,
+            KeyCode::Down
+        );
+        assert_eq!(
+            parse_key_event(r#"{"key": "ArrowLeft"}"#).unwrap().code,
+            KeyCode::Left
+        );
+        assert_eq!(
+            parse_key_event(r#"{"key": "ArrowRight"}"#).unwrap().code,
+            KeyCode::Right
+        );
+    }
+
+    #[test]
+    fn test_parse_key_event_single_char() {
+        let result = parse_key_event(r#"{"key": "a"}"#);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().code, KeyCode::Char('a'));
+    }
+
+    #[test]
+    fn test_parse_key_event_space() {
+        let result = parse_key_event(r#"{"key": " "}"#);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().code, KeyCode::Char(' '));
+    }
+
+    #[test]
+    fn test_parse_key_event_tab() {
+        let result = parse_key_event(r#"{"key": "Tab"}"#);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().code, KeyCode::Tab);
+    }
+
+    #[test]
+    fn test_parse_key_event_backspace() {
+        let result = parse_key_event(r#"{"key": "Backspace"}"#);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().code, KeyCode::Backspace);
+    }
+
+    #[test]
+    fn test_parse_key_event_invalid_json() {
+        assert!(parse_key_event("not json").is_err());
+        assert!(parse_key_event("").is_err());
+        assert!(parse_key_event("{}").is_err());
+        assert!(parse_key_event(r#"{"wrong": "field"}"#).is_err());
+    }
+
+    #[test]
+    fn test_parse_key_event_unknown_key() {
+        assert!(parse_key_event(r#"{"key": "F13"}"#).is_err());
+        assert!(parse_key_event(r#"{"key": "Unknown"}"#).is_err());
+    }
+
+    #[test]
+    fn test_parse_key_event_with_whitespace() {
+        let result = parse_key_event(r#"  {"key": "Enter"}  "#);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().code, KeyCode::Enter);
+    }
 }
