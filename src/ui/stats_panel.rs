@@ -734,6 +734,10 @@ pub fn draw_footer(
                         .fg(Color::Yellow)
                         .add_modifier(Modifier::BOLD),
                 ),
+                Span::styled(
+                    format!(" ({})", info.new_commit),
+                    Style::default().fg(Color::DarkGray),
+                ),
                 Span::styled(": ", Style::default().fg(Color::White)),
                 // Inline changelog summary
                 Span::styled(
@@ -761,7 +765,7 @@ pub fn draw_footer(
                     Style::default().fg(Color::DarkGray),
                 ),
                 Span::raw("    "),
-                Span::styled("[Esc] Back", Style::default().fg(Color::Red)),
+                Span::styled("[U] Close", Style::default().fg(Color::Yellow)),
             ]));
 
             let footer = Paragraph::new(lines)

@@ -837,6 +837,8 @@ fn main() -> io::Result<()> {
                                 InputResult::QuitToSelect => {
                                     if !debug_mode {
                                         character_manager.save_character(&state)?;
+                                        // Save achievements when quitting to character select
+                                        achievements::save_achievements(&global_achievements)?;
                                     }
                                     game_state = None;
                                     current_screen = Screen::CharacterSelect;
@@ -923,6 +925,13 @@ fn main() -> io::Result<()> {
                                 overlay = GameOverlay::AchievementUnlocked { achievements };
                             }
                         }
+
+                        // Save achievements immediately when any are newly unlocked
+                        if !debug_mode && !global_achievements.newly_unlocked.is_empty() {
+                            if let Err(e) = achievements::save_achievements(&global_achievements) {
+                                eprintln!("Failed to save achievements: {}", e);
+                            }
+                        }
                     }
 
                     // Auto-save every 30 seconds (skip in debug mode)
@@ -934,6 +943,8 @@ fn main() -> io::Result<()> {
                         if haven.discovered {
                             haven::save_haven(&haven)?;
                         }
+                        // Save achievements (global, shared across characters)
+                        achievements::save_achievements(&global_achievements)?;
                         last_autosave = Instant::now();
                         last_save_instant = Some(Instant::now());
                         last_save_time = Some(Local::now());

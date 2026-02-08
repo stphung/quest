@@ -592,16 +592,10 @@ fn handle_base_game(
     update_expanded: bool,
 ) -> InputResult {
     match key.code {
-        KeyCode::Esc => {
-            if update_expanded {
-                // Collapse update details instead of quitting
-                InputResult::ToggleUpdateDetails
-            } else {
-                InputResult::QuitToSelect
-            }
-        }
+        KeyCode::Esc => InputResult::QuitToSelect,
         KeyCode::Char('u') | KeyCode::Char('U') => {
-            if update_available {
+            // Toggle update details if update available OR already expanded
+            if update_available || update_expanded {
                 InputResult::ToggleUpdateDetails
             } else {
                 InputResult::Continue
