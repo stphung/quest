@@ -203,25 +203,15 @@
             };
         }
 
-        // Send keyboard input to server
-        term.onKey(({ key, domEvent }) => {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                // Map key names for the server
-                let keyName = domEvent.key;
-
-                // Send as JSON
-                ws.send(JSON.stringify({ key: keyName }));
-            }
-        });
-
-        // Handle special keys that onKey might miss
+        // Send ALL keyboard input to server via document handler
+        // (xterm.js is display-only, we don't use its input handling)
         document.addEventListener('keydown', (e) => {
-            // Only handle if terminal is focused and WS is connected
             if (ws && ws.readyState === WebSocket.OPEN) {
-                // Handle keys that xterm might not capture properly
-                const specialKeys = ['Escape', 'Tab', 'Enter'];
-                if (specialKeys.includes(e.key)) {
-                    ws.send(JSON.stringify({ key: e.key }));
+                // Send the key to the server
+                ws.send(JSON.stringify({ key: e.key }));
+                // Prevent default for non-printable keys and all game keys
+                // to stop browser shortcuts (e.g., Ctrl+D bookmark)
+                if (e.key.length > 1 || e.ctrlKey || e.altKey || e.metaKey) {
                     e.preventDefault();
                 }
             }

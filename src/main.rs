@@ -56,6 +56,41 @@ enum Screen {
     Game,
 }
 
+/// Poll for keyboard input from terminal or web clients
+/// Returns Some(KeyEvent) if a key was pressed, None otherwise
+#[cfg(feature = "web")]
+fn poll_input(
+    web_server: &Option<std::sync::Arc<web::WebServer>>,
+) -> io::Result<Option<crossterm::event::KeyEvent>> {
+    // Check terminal input first
+    if event::poll(Duration::from_millis(50))? {
+        if let Event::Key(key_event) = event::read()? {
+            if key_event.kind == KeyEventKind::Press {
+                return Ok(Some(key_event));
+            }
+        }
+    }
+    // Fall back to WebSocket input
+    if let Some(ref server) = web_server {
+        if let Some(key_event) = server.try_recv_input_sync() {
+            return Ok(Some(key_event));
+        }
+    }
+    Ok(None)
+}
+
+#[cfg(not(feature = "web"))]
+fn poll_input(_: &()) -> io::Result<Option<crossterm::event::KeyEvent>> {
+    if event::poll(Duration::from_millis(50))? {
+        if let Event::Key(key_event) = event::read()? {
+            if key_event.kind == KeyEventKind::Press {
+                return Ok(Some(key_event));
+            }
+        }
+    }
+    Ok(None)
+}
+
 fn main() -> io::Result<()> {
     // Handle CLI arguments
     let args: Vec<String> = std::env::args().collect();
@@ -350,253 +385,249 @@ fn main() -> io::Result<()> {
                     }
                 })?;
 
-                // Handle input
-                if event::poll(Duration::from_millis(50))? {
-                    if let Event::Key(key_event) = event::read()? {
-                        if key_event.kind != KeyEventKind::Press {
-                            continue;
+                // Handle input from terminal or web
+                #[cfg(feature = "web")]
+                let key_event = poll_input(&_web_server)?;
+                #[cfg(not(feature = "web"))]
+                let key_event = poll_input(&())?;
+
+                if let Some(key_event) = key_event {
+                    // Handle achievement browser (blocks other input when open)
+                    if achievement_browser.showing {
+                        let category_achievements = achievements::get_achievements_by_category(
+                            achievement_browser.selected_category,
+                        );
+                        match key_event.code {
+                            KeyCode::Up => achievement_browser.move_up(),
+                            KeyCode::Down => {
+                                achievement_browser.move_down(category_achievements.len())
+                            }
+                            KeyCode::Left | KeyCode::Char(',') | KeyCode::Char('<') => {
+                                achievement_browser.prev_category()
+                            }
+                            KeyCode::Right | KeyCode::Char('.') | KeyCode::Char('>') => {
+                                achievement_browser.next_category()
+                            }
+                            KeyCode::Esc => achievement_browser.close(),
+                            _ => {}
                         }
-                        // Handle achievement browser (blocks other input when open)
-                        if achievement_browser.showing {
-                            let category_achievements = achievements::get_achievements_by_category(
-                                achievement_browser.selected_category,
-                            );
+                        continue;
+                    }
+
+                    // Handle Haven screen (blocks other input when open)
+                    if haven_ui.showing {
+                        if haven_ui.confirming_build {
                             match key_event.code {
-                                KeyCode::Up => achievement_browser.move_up(),
-                                KeyCode::Down => {
-                                    achievement_browser.move_down(category_achievements.len())
+                                KeyCode::Enter => {
+                                    // Note: Can't build from character select (no active character)
+                                    // Just close the confirmation
+                                    haven_ui.confirming_build = false;
                                 }
-                                KeyCode::Left | KeyCode::Char(',') | KeyCode::Char('<') => {
-                                    achievement_browser.prev_category()
+                                KeyCode::Esc => {
+                                    haven_ui.confirming_build = false;
                                 }
-                                KeyCode::Right | KeyCode::Char('.') | KeyCode::Char('>') => {
-                                    achievement_browser.next_category()
-                                }
-                                KeyCode::Esc => achievement_browser.close(),
                                 _ => {}
                             }
-                            continue;
-                        }
-
-                        // Handle Haven screen (blocks other input when open)
-                        if haven_ui.showing {
-                            if haven_ui.confirming_build {
-                                match key_event.code {
-                                    KeyCode::Enter => {
-                                        // Note: Can't build from character select (no active character)
-                                        // Just close the confirmation
-                                        haven_ui.confirming_build = false;
-                                    }
-                                    KeyCode::Esc => {
-                                        haven_ui.confirming_build = false;
-                                    }
-                                    _ => {}
+                        } else {
+                            match key_event.code {
+                                KeyCode::Up => {
+                                    haven_ui.selected_room =
+                                        haven_ui.selected_room.saturating_sub(1);
                                 }
-                            } else {
-                                match key_event.code {
-                                    KeyCode::Up => {
-                                        haven_ui.selected_room =
-                                            haven_ui.selected_room.saturating_sub(1);
+                                KeyCode::Down => {
+                                    if haven_ui.selected_room + 1 < haven::HavenRoomId::ALL.len() {
+                                        haven_ui.selected_room += 1;
                                     }
-                                    KeyCode::Down => {
-                                        if haven_ui.selected_room + 1
-                                            < haven::HavenRoomId::ALL.len()
-                                        {
-                                            haven_ui.selected_room += 1;
-                                        }
-                                    }
-                                    KeyCode::Esc => {
-                                        haven_ui.close();
-                                    }
-                                    _ => {}
                                 }
+                                KeyCode::Esc => {
+                                    haven_ui.close();
+                                }
+                                _ => {}
                             }
-                            continue;
                         }
+                        continue;
+                    }
 
-                        // Handle achievement browser shortcut
-                        if matches!(key_event.code, KeyCode::Char('a') | KeyCode::Char('A')) {
-                            achievement_browser.open();
-                            continue;
+                    // Handle achievement browser shortcut
+                    if matches!(key_event.code, KeyCode::Char('a') | KeyCode::Char('A')) {
+                        achievement_browser.open();
+                        continue;
+                    }
+
+                    // Handle Haven shortcut (if discovered)
+                    if matches!(key_event.code, KeyCode::Char('h') | KeyCode::Char('H'))
+                        && haven.discovered
+                    {
+                        haven_ui.open();
+                        continue;
+                    }
+
+                    let input = match key_event.code {
+                        KeyCode::Up => SelectInput::Up,
+                        KeyCode::Down => SelectInput::Down,
+                        KeyCode::Enter => SelectInput::Select,
+                        KeyCode::Char('n') | KeyCode::Char('N') => SelectInput::New,
+                        KeyCode::Char('d') | KeyCode::Char('D') => SelectInput::Delete,
+                        KeyCode::Char('r') | KeyCode::Char('R') => SelectInput::Rename,
+                        KeyCode::Char('q') | KeyCode::Char('Q') => SelectInput::Quit,
+                        _ => SelectInput::Other,
+                    };
+
+                    let result = process_select_input(&mut select_screen, input, &characters);
+
+                    match result {
+                        SelectResult::NoCharacters => {
+                            current_screen = Screen::CharacterCreation;
                         }
-
-                        // Handle Haven shortcut (if discovered)
-                        if matches!(key_event.code, KeyCode::Char('h') | KeyCode::Char('H'))
-                            && haven.discovered
-                        {
-                            haven_ui.open();
-                            continue;
-                        }
-
-                        let input = match key_event.code {
-                            KeyCode::Up => SelectInput::Up,
-                            KeyCode::Down => SelectInput::Down,
-                            KeyCode::Enter => SelectInput::Select,
-                            KeyCode::Char('n') | KeyCode::Char('N') => SelectInput::New,
-                            KeyCode::Char('d') | KeyCode::Char('D') => SelectInput::Delete,
-                            KeyCode::Char('r') | KeyCode::Char('R') => SelectInput::Rename,
-                            KeyCode::Char('q') | KeyCode::Char('Q') => SelectInput::Quit,
-                            _ => SelectInput::Other,
-                        };
-
-                        let result = process_select_input(&mut select_screen, input, &characters);
-
-                        match result {
-                            SelectResult::NoCharacters => {
-                                current_screen = Screen::CharacterCreation;
-                            }
-                            SelectResult::LoadCharacter(filename) => {
-                                match character_manager.load_character(&filename) {
-                                    Ok(mut state) => {
-                                        // Sanity check: clear stale enemy if HP is impossibly high
-                                        // (can happen if save was from before prestige reset)
-                                        let derived = character::derived_stats::DerivedStats::calculate_derived_stats(
+                        SelectResult::LoadCharacter(filename) => {
+                            match character_manager.load_character(&filename) {
+                                Ok(mut state) => {
+                                    // Sanity check: clear stale enemy if HP is impossibly high
+                                    // (can happen if save was from before prestige reset)
+                                    let derived = character::derived_stats::DerivedStats::calculate_derived_stats(
                                             &state.attributes,
                                             &state.equipment,
                                         );
-                                        if let Some(enemy) = &state.combat_state.current_enemy {
-                                            // Max possible enemy HP is 2.4x player HP (boss with max variance)
-                                            // If enemy HP is > 2.5x, it's stale from before a stat reset
-                                            if enemy.max_hp > (derived.max_hp as f64 * 2.5) as u32 {
-                                                state.combat_state.current_enemy = None;
-                                            }
+                                    if let Some(enemy) = &state.combat_state.current_enemy {
+                                        // Max possible enemy HP is 2.4x player HP (boss with max variance)
+                                        // If enemy HP is > 2.5x, it's stale from before a stat reset
+                                        if enemy.max_hp > (derived.max_hp as f64 * 2.5) as u32 {
+                                            state.combat_state.current_enemy = None;
                                         }
+                                    }
 
-                                        // Sync achievements from character state (retroactive unlocks)
-                                        let defeated_bosses =
-                                            state.zone_progression.defeated_bosses.to_vec();
-                                        global_achievements.sync_from_game_state(
-                                            state.character_level,
-                                            state.prestige_rank,
-                                            state.fishing.rank,
-                                            state.fishing.total_fish_caught,
-                                            &defeated_bosses,
-                                            Some(&state.character_name),
-                                        );
-                                        global_achievements.sync_from_haven(
-                                            haven.discovered,
-                                            &haven.rooms,
-                                            Some(&state.character_name),
-                                        );
+                                    // Sync achievements from character state (retroactive unlocks)
+                                    let defeated_bosses =
+                                        state.zone_progression.defeated_bosses.to_vec();
+                                    global_achievements.sync_from_game_state(
+                                        state.character_level,
+                                        state.prestige_rank,
+                                        state.fishing.rank,
+                                        state.fishing.total_fish_caught,
+                                        &defeated_bosses,
+                                        Some(&state.character_name),
+                                    );
+                                    global_achievements.sync_from_haven(
+                                        haven.discovered,
+                                        &haven.rooms,
+                                        Some(&state.character_name),
+                                    );
 
-                                        // Log synced achievements (batch message if multiple)
-                                        let synced_count = global_achievements.pending_count();
-                                        if synced_count > 0 {
-                                            if synced_count == 1 {
-                                                // Single achievement - show the name
-                                                if let Some(id) = global_achievements
-                                                    .pending_notifications
-                                                    .first()
+                                    // Log synced achievements (batch message if multiple)
+                                    let synced_count = global_achievements.pending_count();
+                                    if synced_count > 0 {
+                                        if synced_count == 1 {
+                                            // Single achievement - show the name
+                                            if let Some(id) =
+                                                global_achievements.pending_notifications.first()
+                                            {
+                                                if let Some(def) =
+                                                    achievements::get_achievement_def(*id)
                                                 {
-                                                    if let Some(def) =
-                                                        achievements::get_achievement_def(*id)
-                                                    {
-                                                        state.combat_state.add_log_entry(
-                                                            format!(
-                                                                "🏆 Achievement Unlocked: {}",
-                                                                def.name
-                                                            ),
-                                                            false,
-                                                            true,
-                                                        );
-                                                    }
-                                                }
-                                            } else {
-                                                // Multiple achievements - show count
-                                                state.combat_state.add_log_entry(
-                                                    format!(
-                                                        "🏆 {} achievements synced from progress!",
-                                                        synced_count
-                                                    ),
-                                                    false,
-                                                    true,
-                                                );
-                                            }
-                                            // Clear newly_unlocked since we handled logging here
-                                            global_achievements.newly_unlocked.clear();
-                                        }
-
-                                        // Process offline progression
-                                        let current_time = Utc::now().timestamp();
-                                        let elapsed_seconds = current_time - state.last_save_time;
-
-                                        if elapsed_seconds > 60 {
-                                            let haven_offline_bonus = haven
-                                                .get_bonus(haven::HavenBonusType::OfflineXpPercent);
-                                            let report = process_offline_progression(
-                                                &mut state,
-                                                haven_offline_bonus,
-                                            );
-                                            if report.xp_gained > 0 {
-                                                // Enhanced combat log entries
-                                                let hours = report.elapsed_seconds / 3600;
-                                                let minutes = (report.elapsed_seconds % 3600) / 60;
-                                                let away_str = if hours > 0 {
-                                                    format!("{}h {}m", hours, minutes)
-                                                } else {
-                                                    format!("{}m", minutes)
-                                                };
-                                                state.combat_state.add_log_entry(
-                                                    format!("☀️ Welcome back! ({} away)", away_str),
-                                                    false,
-                                                    true,
-                                                );
-                                                state.combat_state.add_log_entry(
-                                                    format!(
-                                                        "⚔️ +{} XP gained offline",
-                                                        ui::game_common::format_number_short(
-                                                            report.xp_gained
-                                                        )
-                                                    ),
-                                                    false,
-                                                    true,
-                                                );
-                                                if report.total_level_ups > 0 {
                                                     state.combat_state.add_log_entry(
                                                         format!(
-                                                            "📈 Leveled up {} times! ({} → {})",
-                                                            report.total_level_ups,
-                                                            report.level_before,
-                                                            report.level_after,
+                                                            "🏆 Achievement Unlocked: {}",
+                                                            def.name
                                                         ),
                                                         false,
                                                         true,
                                                     );
                                                 }
-
-                                                // Store report and haven bonus for welcome overlay
-                                                pending_haven_offline_bonus =
-                                                    Some(haven_offline_bonus);
-                                                pending_offline_report = Some(report);
                                             }
+                                        } else {
+                                            // Multiple achievements - show count
+                                            state.combat_state.add_log_entry(
+                                                format!(
+                                                    "🏆 {} achievements synced from progress!",
+                                                    synced_count
+                                                ),
+                                                false,
+                                                true,
+                                            );
                                         }
+                                        // Clear newly_unlocked since we handled logging here
+                                        global_achievements.newly_unlocked.clear();
+                                    }
 
-                                        game_state = Some(state);
-                                        current_screen = Screen::Game;
+                                    // Process offline progression
+                                    let current_time = Utc::now().timestamp();
+                                    let elapsed_seconds = current_time - state.last_save_time;
+
+                                    if elapsed_seconds > 60 {
+                                        let haven_offline_bonus = haven
+                                            .get_bonus(haven::HavenBonusType::OfflineXpPercent);
+                                        let report = process_offline_progression(
+                                            &mut state,
+                                            haven_offline_bonus,
+                                        );
+                                        if report.xp_gained > 0 {
+                                            // Enhanced combat log entries
+                                            let hours = report.elapsed_seconds / 3600;
+                                            let minutes = (report.elapsed_seconds % 3600) / 60;
+                                            let away_str = if hours > 0 {
+                                                format!("{}h {}m", hours, minutes)
+                                            } else {
+                                                format!("{}m", minutes)
+                                            };
+                                            state.combat_state.add_log_entry(
+                                                format!("☀️ Welcome back! ({} away)", away_str),
+                                                false,
+                                                true,
+                                            );
+                                            state.combat_state.add_log_entry(
+                                                format!(
+                                                    "⚔️ +{} XP gained offline",
+                                                    ui::game_common::format_number_short(
+                                                        report.xp_gained
+                                                    )
+                                                ),
+                                                false,
+                                                true,
+                                            );
+                                            if report.total_level_ups > 0 {
+                                                state.combat_state.add_log_entry(
+                                                    format!(
+                                                        "📈 Leveled up {} times! ({} → {})",
+                                                        report.total_level_ups,
+                                                        report.level_before,
+                                                        report.level_after,
+                                                    ),
+                                                    false,
+                                                    true,
+                                                );
+                                            }
+
+                                            // Store report and haven bonus for welcome overlay
+                                            pending_haven_offline_bonus = Some(haven_offline_bonus);
+                                            pending_offline_report = Some(report);
+                                        }
                                     }
-                                    Err(e) => {
-                                        // Could show error message, for now just stay on select
-                                        eprintln!("Failed to load character: {}", e);
-                                    }
+
+                                    game_state = Some(state);
+                                    current_screen = Screen::Game;
+                                }
+                                Err(e) => {
+                                    // Could show error message, for now just stay on select
+                                    eprintln!("Failed to load character: {}", e);
                                 }
                             }
-                            SelectResult::GoToCreation => {
-                                creation_screen = CharacterCreationScreen::new();
-                                current_screen = Screen::CharacterCreation;
-                            }
-                            SelectResult::GoToDelete => {
-                                delete_screen = CharacterDeleteScreen::new();
-                                current_screen = Screen::CharacterDelete;
-                            }
-                            SelectResult::GoToRename => {
-                                rename_screen = CharacterRenameScreen::new();
-                                current_screen = Screen::CharacterRename;
-                            }
-                            SelectResult::Quit => {
-                                break;
-                            }
-                            SelectResult::Continue | SelectResult::LoadFailed(_) => {}
                         }
+                        SelectResult::GoToCreation => {
+                            creation_screen = CharacterCreationScreen::new();
+                            current_screen = Screen::CharacterCreation;
+                        }
+                        SelectResult::GoToDelete => {
+                            delete_screen = CharacterDeleteScreen::new();
+                            current_screen = Screen::CharacterDelete;
+                        }
+                        SelectResult::GoToRename => {
+                            rename_screen = CharacterRenameScreen::new();
+                            current_screen = Screen::CharacterRename;
+                        }
+                        SelectResult::Quit => {
+                            break;
+                        }
+                        SelectResult::Continue | SelectResult::LoadFailed(_) => {}
                     }
                 }
             }
@@ -856,29 +887,11 @@ fn main() -> io::Result<()> {
                         }
                     })?;
 
-                    // Poll for input (50ms non-blocking)
-                    // Check terminal input first, then WebSocket input
-                    let key_event = if event::poll(Duration::from_millis(50))? {
-                        if let Event::Key(key_event) = event::read()? {
-                            if key_event.kind == KeyEventKind::Press {
-                                Some(key_event)
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    };
-
-                    // Also check WebSocket input if web server is running
+                    // Poll for input from terminal or web
                     #[cfg(feature = "web")]
-                    let key_event = key_event.or_else(|| {
-                        _web_server
-                            .as_ref()
-                            .and_then(|server| server.try_recv_input_sync())
-                    });
+                    let key_event = poll_input(&_web_server)?;
+                    #[cfg(not(feature = "web"))]
+                    let key_event = poll_input(&())?;
 
                     if let Some(key_event) = key_event {
                         // Track prestige rank before input to detect prestige
