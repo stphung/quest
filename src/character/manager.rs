@@ -142,8 +142,11 @@ impl CharacterManager {
                 continue;
             }
 
-            // Skip haven.json (account-level Haven state, not a character)
-            if path.file_name().and_then(|s| s.to_str()) == Some("haven.json") {
+            // Skip account-level JSON files (not character saves)
+            if matches!(
+                path.file_name().and_then(|s| s.to_str()),
+                Some("haven.json") | Some("achievements.json")
+            ) {
                 continue;
             }
 
@@ -221,7 +224,7 @@ impl CharacterManager {
 }
 
 /// Reserved names that cannot be used for characters (would conflict with system files)
-const RESERVED_NAMES: &[&str] = &["haven"];
+const RESERVED_NAMES: &[&str] = &["haven", "achievements"];
 
 #[allow(dead_code)]
 pub fn validate_name(name: &str) -> Result<(), String> {
@@ -1370,9 +1373,17 @@ mod tests {
         assert!(validate_name("HAVEN").is_err());
         assert!(validate_name("  haven  ").is_err()); // With whitespace
 
+        // "achievements" is reserved (conflicts with achievements.json)
+        assert!(validate_name("achievements").is_err());
+        assert!(validate_name("Achievements").is_err()); // Case-insensitive
+        assert!(validate_name("ACHIEVEMENTS").is_err());
+        assert!(validate_name("  achievements  ").is_err()); // With whitespace
+
         // Similar names that don't conflict should be fine
         assert!(validate_name("haven2").is_ok());
         assert!(validate_name("myhaven").is_ok());
         assert!(validate_name("the-haven").is_ok());
+        assert!(validate_name("achievements2").is_ok());
+        assert!(validate_name("myachievements").is_ok());
     }
 }
