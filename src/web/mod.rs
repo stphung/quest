@@ -26,4 +26,7 @@ mod server;
 mod backend;
 
 #[cfg(feature = "web")]
+pub use backend::TeeWriter;
+
+#[cfg(feature = "web")]
 pub use server::{start_web_server, WebServer};

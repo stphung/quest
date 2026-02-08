@@ -199,10 +199,27 @@ fn main() -> io::Result<()> {
 
     // Setup terminal
     enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    stdout.execute(EnterAlternateScreen)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
+    io::stdout().execute(EnterAlternateScreen)?;
+
+    // Create terminal with appropriate backend
+    #[cfg(feature = "web")]
+    let mut terminal = {
+        let tee_writer = if let Some(ref server) = _web_server {
+            // Use TeeWriter to broadcast to WebSocket clients
+            web::TeeWriter::new(server.output_tx.clone())
+        } else {
+            // No web server, just write to stdout
+            web::TeeWriter::stdout_only()
+        };
+        let backend = CrosstermBackend::new(tee_writer);
+        Terminal::new(backend)?
+    };
+
+    #[cfg(not(feature = "web"))]
+    let mut terminal = {
+        let backend = CrosstermBackend::new(io::stdout());
+        Terminal::new(backend)?
+    };
 
     // Show update notification if available
     if let Ok(Some(update_info)) = update_available.join() {
@@ -825,84 +842,99 @@ fn main() -> io::Result<()> {
                     })?;
 
                     // Poll for input (50ms non-blocking)
-                    if event::poll(Duration::from_millis(50))? {
+                    // Check terminal input first, then WebSocket input
+                    let key_event = if event::poll(Duration::from_millis(50))? {
                         if let Event::Key(key_event) = event::read()? {
-                            // Only handle key press events (ignore release/repeat)
-                            if key_event.kind != KeyEventKind::Press {
-                                continue;
+                            if key_event.kind == KeyEventKind::Press {
+                                Some(key_event)
+                            } else {
+                                None
                             }
-                            // Track prestige rank before input to detect prestige
-                            let prestige_before = state.prestige_rank;
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
 
-                            let result = input::handle_game_input(
-                                key_event,
-                                &mut state,
-                                &mut haven,
-                                &mut haven_ui,
-                                &mut overlay,
-                                &mut debug_menu,
-                                debug_mode,
-                                &mut global_achievements,
+                    // Also check WebSocket input if web server is running
+                    #[cfg(feature = "web")]
+                    let key_event = key_event.or_else(|| {
+                        _web_server
+                            .as_ref()
+                            .and_then(|server| server.try_recv_input_sync())
+                    });
+
+                    if let Some(key_event) = key_event {
+                        // Track prestige rank before input to detect prestige
+                        let prestige_before = state.prestige_rank;
+
+                        let result = input::handle_game_input(
+                            key_event,
+                            &mut state,
+                            &mut haven,
+                            &mut haven_ui,
+                            &mut overlay,
+                            &mut debug_menu,
+                            debug_mode,
+                            &mut global_achievements,
+                        );
+
+                        // Track achievements for state changes
+                        let mut achievements_changed = false;
+
+                        // Check if prestige occurred and track achievement
+                        if state.prestige_rank > prestige_before {
+                            global_achievements
+                                .on_prestige(state.prestige_rank, Some(&state.character_name));
+                            achievements_changed = true;
+                        }
+
+                        // Check if a minigame win occurred
+                        if let Some(ref win_info) = state.last_minigame_win {
+                            global_achievements.on_minigame_won(
+                                win_info.game_type,
+                                win_info.difficulty,
+                                Some(&state.character_name),
                             );
+                            achievements_changed = true;
+                            // Clear the win info after processing
+                            state.last_minigame_win = None;
+                        }
 
-                            // Track achievements for state changes
-                            let mut achievements_changed = false;
-
-                            // Check if prestige occurred and track achievement
-                            if state.prestige_rank > prestige_before {
-                                global_achievements
-                                    .on_prestige(state.prestige_rank, Some(&state.character_name));
-                                achievements_changed = true;
+                        // Save achievements if any changed (skip in debug mode)
+                        if achievements_changed && !debug_mode {
+                            if let Err(e) = achievements::save_achievements(&global_achievements) {
+                                eprintln!("Failed to save achievements: {}", e);
                             }
+                        }
 
-                            // Check if a minigame win occurred
-                            if let Some(ref win_info) = state.last_minigame_win {
-                                global_achievements.on_minigame_won(
-                                    win_info.game_type,
-                                    win_info.difficulty,
-                                    Some(&state.character_name),
-                                );
-                                achievements_changed = true;
-                                // Clear the win info after processing
-                                state.last_minigame_win = None;
+                        match result {
+                            InputResult::Continue => {}
+                            InputResult::QuitToSelect => {
+                                if !debug_mode {
+                                    character_manager.save_character(&state)?;
+                                }
+                                game_state = None;
+                                current_screen = Screen::CharacterSelect;
+                                break;
                             }
-
-                            // Save achievements if any changed (skip in debug mode)
-                            if achievements_changed && !debug_mode {
-                                if let Err(e) =
-                                    achievements::save_achievements(&global_achievements)
-                                {
-                                    eprintln!("Failed to save achievements: {}", e);
+                            InputResult::NeedsSave => {
+                                if !debug_mode {
+                                    let _ = character_manager.save_character(&state);
+                                    last_save_instant = Some(Instant::now());
+                                    last_save_time = Some(Local::now());
                                 }
                             }
-
-                            match result {
-                                InputResult::Continue => {}
-                                InputResult::QuitToSelect => {
-                                    if !debug_mode {
-                                        character_manager.save_character(&state)?;
+                            InputResult::NeedsSaveAll => {
+                                if !debug_mode {
+                                    let _ = character_manager.save_character(&state);
+                                    // Only save Haven if it has been discovered
+                                    if haven.discovered {
+                                        haven::save_haven(&haven).ok();
                                     }
-                                    game_state = None;
-                                    current_screen = Screen::CharacterSelect;
-                                    break;
-                                }
-                                InputResult::NeedsSave => {
-                                    if !debug_mode {
-                                        let _ = character_manager.save_character(&state);
-                                        last_save_instant = Some(Instant::now());
-                                        last_save_time = Some(Local::now());
-                                    }
-                                }
-                                InputResult::NeedsSaveAll => {
-                                    if !debug_mode {
-                                        let _ = character_manager.save_character(&state);
-                                        // Only save Haven if it has been discovered
-                                        if haven.discovered {
-                                            haven::save_haven(&haven).ok();
-                                        }
-                                        last_save_instant = Some(Instant::now());
-                                        last_save_time = Some(Local::now());
-                                    }
+                                    last_save_instant = Some(Instant::now());
+                                    last_save_time = Some(Local::now());
                                 }
                             }
                         }
