@@ -756,7 +756,7 @@ pub fn draw_footer(
     let can_prestige_now = can_prestige(game_state);
     let prestige_text = if can_prestige_now {
         Span::styled(
-            "P = Prestige (AVAILABLE!)",
+            "[P] Prestige (Available!)",
             Style::default()
                 .fg(Color::Green)
                 .add_modifier(Modifier::BOLD | Modifier::SLOW_BLINK),
@@ -764,7 +764,7 @@ pub fn draw_footer(
     } else {
         let next_tier = get_prestige_tier(game_state.prestige_rank + 1);
         Span::styled(
-            format!("P = Prestige (Need Lv.{})", next_tier.required_level),
+            format!("[P] Prestige (Need Lv.{})", next_tier.required_level),
             Style::default().fg(Color::DarkGray),
         )
     };
@@ -772,26 +772,22 @@ pub fn draw_footer(
     // Build update status text
     let update_status_text = if update_available {
         Span::styled(
-            " | 🆕 Update available",
+            "    🆕 Update available",
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         )
     } else if update_check_completed {
-        Span::styled(" | ✓ Up to date", Style::default().fg(Color::Green))
+        Span::styled("    ✓ Up to date", Style::default().fg(Color::Green))
     } else {
-        Span::styled(" | 🔄 Checking...", Style::default().fg(Color::DarkGray))
+        Span::styled("    🔄 Checking...", Style::default().fg(Color::DarkGray))
     };
 
     // Build challenge notification text
     let challenge_count = game_state.challenge_menu.challenges.len();
     let challenge_text = if challenge_count > 0 {
         Span::styled(
-            format!(
-                " | {} challenge{} pending - [Tab] to view",
-                challenge_count,
-                if challenge_count == 1 { "" } else { "s" }
-            ),
+            format!("    [Tab] Challenges ({})", challenge_count),
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
@@ -802,7 +798,7 @@ pub fn draw_footer(
 
     // Build Haven hint text
     let haven_text = if haven_discovered {
-        Span::styled(" | H = Haven", Style::default().fg(Color::Cyan))
+        Span::styled("    [H] Haven", Style::default().fg(Color::Cyan))
     } else {
         Span::raw("")
     };
@@ -810,27 +806,23 @@ pub fn draw_footer(
     // Achievements hint (with pending count if any)
     let achievements_text = if pending_achievements > 0 {
         Span::styled(
-            format!(" | A = Achievements (🏆 {} new!)", pending_achievements),
+            format!("    [A] Achievements (🏆 {} new!)", pending_achievements),
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         )
     } else {
-        Span::styled(" | A = Achievements", Style::default().fg(Color::Magenta))
+        Span::styled("    [A] Achievements", Style::default().fg(Color::Magenta))
     };
 
     let footer_text = vec![Line::from(vec![
-        Span::styled("Controls: ", Style::default().add_modifier(Modifier::BOLD)),
-        Span::styled(
-            "Q",
-            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(" = Quit | "),
+        Span::styled("[Esc] Quit", Style::default().fg(Color::Red)),
+        Span::raw("    "),
         prestige_text,
         haven_text,
         achievements_text,
-        update_status_text,
         challenge_text,
+        update_status_text,
     ])];
 
     // Build version string for the title

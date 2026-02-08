@@ -576,7 +576,7 @@ fn handle_base_game(
     achievements: &mut crate::achievements::Achievements,
 ) -> InputResult {
     match key.code {
-        KeyCode::Char('q') | KeyCode::Char('Q') => InputResult::QuitToSelect,
+        KeyCode::Esc => InputResult::QuitToSelect,
         KeyCode::Char('p') | KeyCode::Char('P') => {
             if can_prestige(state) {
                 *overlay = GameOverlay::PrestigeConfirm;

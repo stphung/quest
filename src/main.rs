@@ -350,7 +350,7 @@ fn main() -> io::Result<()> {
                             KeyCode::Char('n') | KeyCode::Char('N') => SelectInput::New,
                             KeyCode::Char('d') | KeyCode::Char('D') => SelectInput::Delete,
                             KeyCode::Char('r') | KeyCode::Char('R') => SelectInput::Rename,
-                            KeyCode::Char('q') | KeyCode::Char('Q') => SelectInput::Quit,
+                            KeyCode::Esc => SelectInput::Quit,
                             _ => SelectInput::Other,
                         };
 
