@@ -271,6 +271,7 @@ fn main() -> io::Result<()> {
                             &haven,
                             haven_ui.selected_room,
                             0, // No character selected, so prestige rank = 0
+                            &global_achievements,
                         );
                     }
                     // Draw achievement browser overlay if open
@@ -739,6 +740,7 @@ fn main() -> io::Result<()> {
                                 &haven,
                                 haven_ui.selected_room,
                                 state.prestige_rank,
+                                &global_achievements,
                             );
                             if haven_ui.confirming_build {
                                 let room = haven::HavenRoomId::ALL[haven_ui.selected_room];
@@ -747,6 +749,14 @@ fn main() -> io::Result<()> {
                                     frame.size(),
                                     room,
                                     &haven,
+                                    state.prestige_rank,
+                                );
+                            }
+                            if haven_ui.confirming_forge {
+                                ui::haven_scene::render_forge_confirmation(
+                                    frame,
+                                    frame.size(),
+                                    &global_achievements,
                                     state.prestige_rank,
                                 );
                             }
