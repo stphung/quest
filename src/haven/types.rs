@@ -68,7 +68,7 @@ impl HavenRoomId {
     /// Flavor description for detail panel
     pub fn description(&self) -> &'static str {
         match self {
-            HavenRoomId::Hearthstone => "The warm center of your Haven.",
+            HavenRoomId::Hearthstone => "A crackling fire burns at the heart of your Haven, its embers never quite dying out. Even when you're away, its warmth keeps your skills sharp.",
             HavenRoomId::Armory => "Your weapon collection strengthens all who visit.",
             HavenRoomId::TrainingYard => "Practice dummies and sparring targets.",
             HavenRoomId::TrophyHall => "Trophies from past victories attract fortune.",
