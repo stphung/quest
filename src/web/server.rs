@@ -46,6 +46,12 @@ impl WebServer {
             None
         }
     }
+
+    /// Check if any web clients are connected
+    pub fn has_clients(&self) -> bool {
+        // receiver_count() returns number of active subscribers
+        self.output_tx.receiver_count() > 0
+    }
 }
 
 impl Default for WebServer {

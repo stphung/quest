@@ -723,6 +723,10 @@ fn main() -> io::Result<()> {
                 let mut last_save_instant: Option<Instant> = None;
                 let mut last_save_time: Option<chrono::DateTime<chrono::Local>> = None;
 
+                // Web refresh state - force full redraw periodically for browser clients
+                #[cfg(feature = "web")]
+                let mut last_web_refresh = Instant::now();
+
                 // Update check state - start initial background check immediately
                 let mut update_info: Option<UpdateInfo> = None;
                 let mut update_check_completed = false;
@@ -740,6 +744,17 @@ fn main() -> io::Result<()> {
                         } else {
                             // Not finished yet, put it back
                             update_check_handle = Some(handle);
+                        }
+                    }
+
+                    // Force full redraw periodically for web clients
+                    #[cfg(feature = "web")]
+                    if let Some(ref server) = _web_server {
+                        if server.has_clients()
+                            && last_web_refresh.elapsed() >= Duration::from_secs(2)
+                        {
+                            let _ = terminal.clear();
+                            last_web_refresh = Instant::now();
                         }
                     }
 
