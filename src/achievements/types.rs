@@ -387,7 +387,7 @@ impl Achievements {
         if new_rank >= 20 {
             self.unlock(AchievementId::FishermanII, char_name.clone());
         }
-        if new_rank >= 30 {
+        if new_rank >= 40 {
             self.unlock(AchievementId::FishermanIII, char_name);
         }
     }
@@ -1387,7 +1387,7 @@ mod tests {
         // Fishing achievements
         assert!(achievements.is_unlocked(AchievementId::FishermanI));
         assert!(achievements.is_unlocked(AchievementId::FishermanII));
-        assert!(!achievements.is_unlocked(AchievementId::FishermanIII)); // needs rank 30
+        assert!(!achievements.is_unlocked(AchievementId::FishermanIII)); // needs rank 40
 
         // Fish catch achievements (5000 fish)
         assert!(achievements.is_unlocked(AchievementId::FishCatcherI)); // 100

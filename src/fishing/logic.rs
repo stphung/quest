@@ -317,15 +317,15 @@ pub fn try_discover_fishing(state: &mut GameState, rng: &mut impl Rng) -> Option
 }
 
 /// Base maximum fishing rank without Haven bonuses
-pub const BASE_MAX_FISHING_RANK: u32 = 20;
+pub const BASE_MAX_FISHING_RANK: u32 = 30;
 
 /// Maximum fishing rank (corresponds to RANK_NAMES length)
 /// This is the absolute cap with all Haven bonuses (FishingDock T4 adds +10)
-pub const MAX_FISHING_RANK: u32 = 30;
+pub const MAX_FISHING_RANK: u32 = 40;
 
 /// Returns the effective maximum fishing rank based on Haven bonus.
 ///
-/// Base max is 20, but FishingDock T4 adds +10 for a total of 30.
+/// Base max is 30, but FishingDock T4 adds +10 for a total of 40.
 pub fn get_max_fishing_rank(fishing_rank_bonus: u32) -> u32 {
     (BASE_MAX_FISHING_RANK + fishing_rank_bonus).min(MAX_FISHING_RANK)
 }

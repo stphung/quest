@@ -41,7 +41,7 @@ pub const FISH_NAMES_LEGENDARY: [&str; 5] = [
     "Phantom Whale",
 ];
 
-/// The legendary Storm Leviathan - only appears at max rank (30).
+/// The legendary Storm Leviathan - only appears at max rank (40).
 /// Catching this fish is required to forge the Stormbreaker.
 pub const STORM_LEVIATHAN: &str = "Storm Leviathan";
 
@@ -156,7 +156,7 @@ const STORM_LEVIATHAN_XP: (u32, u32) = (10000, 15000);
 
 /// Generates a fish with rank awareness.
 ///
-/// At rank 30, legendary fish have a chance to be the Storm Leviathan.
+/// At rank 40, legendary fish have a chance to be the Storm Leviathan.
 /// The Storm Leviathan is required to forge the Stormbreaker weapon.
 ///
 /// # Arguments
@@ -171,9 +171,9 @@ pub fn generate_fish_with_rank(
     rank: u32,
     rng: &mut impl Rng,
 ) -> (CaughtFish, bool) {
-    // Storm Leviathan only appears at rank 30 for legendary fish
+    // Storm Leviathan only appears at rank 40 for legendary fish
     // It has a 25% chance to appear when catching a legendary at max rank
-    if rarity == FishRarity::Legendary && rank >= 30 {
+    if rarity == FishRarity::Legendary && rank >= 40 {
         let storm_leviathan_roll: f64 = rng.gen();
         if storm_leviathan_roll < 0.25 {
             let xp_reward = rng.gen_range(STORM_LEVIATHAN_XP.0..=STORM_LEVIATHAN_XP.1);

@@ -621,7 +621,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
     AchievementDef {
         id: AchievementId::FishermanIII,
         name: "Fisherman III",
-        description: "Reach fishing rank 30 (requires Fishing Dock T4)",
+        description: "Reach fishing rank 40 (requires Fishing Dock T4)",
         category: AchievementCategory::Exploration,
         icon: "🐡",
     },
