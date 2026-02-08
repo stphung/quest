@@ -252,6 +252,12 @@ Challenges are discovered randomly (~2hr average). The `CHALLENGE_TABLE` in `men
 
 When adding a new challenge, add it to `CHALLENGE_TABLE` with an appropriate weight.
 
+Haven's discovery boost room increases the base discovery chance.
+
+## Achievement Integration
+
+Winning a minigame emits a `MinigameWinInfo` (defined in `mod.rs`) with `game_type` and `difficulty` strings. The achievement system in `src/achievements/` tracks wins per game type and difficulty level. When adding a new challenge, ensure `MinigameWinInfo` values are emitted in `apply_game_result()`.
+
 ## Existing Challenges
 
 | Challenge | Board | AI Type | Special Features |
