@@ -78,7 +78,7 @@ impl HavenRoomId {
             HavenRoomId::Bedroom => "Heavy curtains block out every sliver of light, and the bed is piled high with furs. In this perfect darkness, your body recovers with an almost unnatural speed.",
             HavenRoomId::Garden => "Water trickles from a carved stone fountain into a shallow basin where lily pads drift. Tending this garden teaches a stillness that makes even the longest fishing wait feel brief.",
             HavenRoomId::Library => "A reading nook tucked beneath a stained-glass window, surrounded by towers of scrolls and ink-stained notes. The more you read, the more the world reveals its hidden trials to you.",
-            HavenRoomId::FishingDock => "A private spot to cast.",
+            HavenRoomId::FishingDock => "Morning mist clings to the water as your line breaks the stillness. The fish here bite in pairs, and those who cast long enough swear they've felt something vast stir in the deep — something most anglers will never be ready for.",
             HavenRoomId::Workshop => "Better tools yield better finds.",
             HavenRoomId::Vault => "Preserves treasured equipment through prestige resets.",
             HavenRoomId::StormForge => "The legendary forge where Stormbreaker can be crafted.",
