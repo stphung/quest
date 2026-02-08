@@ -46,6 +46,7 @@ pub fn render_haven_tree(
     haven: &Haven,
     selected_room: usize,
     prestige_rank: u32,
+    achievements: &crate::achievements::Achievements,
 ) {
     frame.render_widget(Clear, area);
 
@@ -77,10 +78,17 @@ pub fn render_haven_tree(
         .split(chunks[1]);
 
     render_skill_tree(frame, main_chunks[0], haven, selected_room);
-    render_room_detail(frame, main_chunks[1], haven, selected_room, prestige_rank);
+    render_room_detail(
+        frame,
+        main_chunks[1],
+        haven,
+        selected_room,
+        prestige_rank,
+        achievements,
+    );
 
     // Help bar
-    let help = Paragraph::new("[↑/↓] Navigate  [Enter] Build  [Esc] Close")
+    let help = Paragraph::new("[↑/↓] Navigate  [Enter] Build/Forge  [Esc] Close")
         .style(Style::default().fg(Color::DarkGray));
     frame.render_widget(help, chunks[2]);
 }
@@ -221,6 +229,7 @@ fn render_room_detail(
     haven: &Haven,
     selected_room: usize,
     prestige_rank: u32,
+    achievements: &crate::achievements::Achievements,
 ) {
     let room = HavenRoomId::ALL[selected_room];
     let tier = haven.room_tier(room);
@@ -373,12 +382,44 @@ fn render_room_detail(
         ]);
         frame.render_widget(cost_text, cost_chunk);
     } else {
-        // Max tier reached
-        let cost_text = Paragraph::new(Line::from(Span::styled(
-            "✓ Max tier reached",
-            Style::default().fg(Color::Green),
-        )));
-        frame.render_widget(cost_text, cost_chunk);
+        // Max tier reached - special handling for Storm Forge
+        if room == HavenRoomId::StormForge {
+            use crate::achievements::AchievementId;
+            let has_stormbreaker = achievements.is_unlocked(AchievementId::TheStormbreaker);
+
+            let cost_text = if has_stormbreaker {
+                Paragraph::new(vec![
+                    Line::from(Span::styled(
+                        "⚡ Stormbreaker forged!",
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD),
+                    )),
+                    Line::from(Span::styled(
+                        "Zone 10 boss accessible",
+                        Style::default().fg(Color::Green),
+                    )),
+                ])
+            } else {
+                Paragraph::new(vec![
+                    Line::from(Span::styled(
+                        "Press [Enter] to forge",
+                        Style::default().fg(Color::Yellow),
+                    )),
+                    Line::from(Span::styled(
+                        "Requires: Storm Leviathan + 25 PR",
+                        Style::default().fg(Color::DarkGray),
+                    )),
+                ])
+            };
+            frame.render_widget(cost_text, cost_chunk);
+        } else {
+            let cost_text = Paragraph::new(Line::from(Span::styled(
+                "✓ Max tier reached",
+                Style::default().fg(Color::Green),
+            )));
+            frame.render_widget(cost_text, cost_chunk);
+        }
     }
 }
 
@@ -496,6 +537,101 @@ pub fn render_build_confirmation(
             )
         } else {
             Span::styled("Insufficient resources", Style::default().fg(Color::Red))
+        }),
+    ])
+    .alignment(ratatui::layout::Alignment::Center);
+    frame.render_widget(text, inner);
+}
+
+/// Render the Storm Forge confirmation overlay
+pub fn render_forge_confirmation(
+    frame: &mut Frame,
+    area: Rect,
+    achievements: &crate::achievements::Achievements,
+    prestige_rank: u32,
+) {
+    // Center the modal
+    let modal_width = 50;
+    let modal_height = 12;
+    let x = area.x + (area.width.saturating_sub(modal_width)) / 2;
+    let y = area.y + (area.height.saturating_sub(modal_height)) / 2;
+    let modal_area = Rect::new(
+        x,
+        y,
+        modal_width.min(area.width),
+        modal_height.min(area.height),
+    );
+
+    frame.render_widget(Clear, modal_area);
+
+    let block = Block::default()
+        .title(" Forge Stormbreaker? ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Yellow));
+
+    let inner = block.inner(modal_area);
+    frame.render_widget(block, modal_area);
+
+    let (has_leviathan, has_prestige, can_forge) =
+        crate::haven::can_forge_stormbreaker(achievements, prestige_rank);
+
+    let leviathan_check = if has_leviathan { "✓" } else { "✗" };
+    let leviathan_style = if has_leviathan {
+        Style::default().fg(Color::Green)
+    } else {
+        Style::default().fg(Color::Red)
+    };
+
+    let prestige_after = prestige_rank.saturating_sub(25);
+
+    let text = Paragraph::new(vec![
+        Line::from(""),
+        // "Requires:" section - Cyan header (not consumed)
+        Line::from(Span::styled(
+            "Requires:",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(vec![
+            Span::styled(format!("  {} ", leviathan_check), leviathan_style),
+            Span::styled("Storm Leviathan caught", Style::default().fg(Color::White)),
+        ]),
+        Line::from(""),
+        // "Cost:" section - Yellow header (will be spent)
+        Line::from(Span::styled(
+            "Cost:",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(vec![Span::styled(
+            format!(
+                "  ⚡ 25 Prestige Ranks ({} → {})",
+                prestige_rank, prestige_after
+            ),
+            if has_prestige {
+                Style::default().fg(Color::Yellow)
+            } else {
+                Style::default().fg(Color::Red)
+            },
+        )]),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Grants access to Zone 10's final boss",
+            Style::default().fg(Color::White),
+        )),
+        Line::from(""),
+        Line::from(if can_forge {
+            Span::styled(
+                "[Enter] Forge  [Esc] Cancel",
+                Style::default().fg(Color::DarkGray),
+            )
+        } else {
+            Span::styled(
+                "Requirements not met  [Esc] Cancel",
+                Style::default().fg(Color::Red),
+            )
         }),
     ])
     .alignment(ratatui::layout::Alignment::Center);

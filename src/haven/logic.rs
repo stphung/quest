@@ -36,6 +36,19 @@ pub fn try_build_room(
     Some((next, cost))
 }
 
+/// Check if the player can forge Stormbreaker.
+/// Returns (has_leviathan, has_prestige, can_forge).
+pub fn can_forge_stormbreaker(
+    achievements: &crate::achievements::Achievements,
+    prestige_rank: u32,
+) -> (bool, bool, bool) {
+    use crate::achievements::AchievementId;
+    let has_leviathan = achievements.is_unlocked(AchievementId::StormLeviathan);
+    let has_prestige = prestige_rank >= 25;
+    let can_forge = has_leviathan && has_prestige;
+    (has_leviathan, has_prestige, can_forge)
+}
+
 /// Try to discover the Haven. Independent roll per tick.
 /// Returns true if discovered this tick.
 pub fn try_discover_haven<R: Rng>(haven: &mut Haven, prestige_rank: u32, rng: &mut R) -> bool {
@@ -436,5 +449,133 @@ mod tests {
 
         // Now WarRoom should be buildable
         assert!(try_build_room(HavenRoomId::WarRoom, &mut haven, &mut prestige).is_some());
+    }
+
+    // =========================================================================
+    // Storm Forge Building Tests
+    // =========================================================================
+
+    #[test]
+    fn test_storm_forge_costs_25_prestige() {
+        // StormForge T1 costs 25 prestige ranks
+        assert_eq!(super::tier_cost(HavenRoomId::StormForge, 1), 25);
+    }
+
+    #[test]
+    fn test_storm_forge_only_has_one_tier() {
+        // StormForge max tier is 1
+        assert_eq!(HavenRoomId::StormForge.max_tier(), 1);
+
+        // Tier 2 cost should be 0 (invalid)
+        assert_eq!(super::tier_cost(HavenRoomId::StormForge, 2), 0);
+        assert_eq!(super::tier_cost(HavenRoomId::StormForge, 3), 0);
+    }
+
+    #[test]
+    fn test_storm_forge_requires_both_capstones() {
+        let mut haven = Haven::new();
+
+        // Build complete tree to WarRoom
+        haven.build_room(HavenRoomId::Hearthstone);
+        haven.build_room(HavenRoomId::Armory);
+        haven.build_room(HavenRoomId::TrainingYard);
+        haven.build_room(HavenRoomId::TrophyHall);
+        haven.build_room(HavenRoomId::Watchtower);
+        haven.build_room(HavenRoomId::AlchemyLab);
+        haven.build_room(HavenRoomId::WarRoom);
+
+        // Should NOT be able to build StormForge yet (needs Vault too)
+        assert!(!haven.is_room_unlocked(HavenRoomId::StormForge));
+
+        // Build path to Vault
+        haven.build_room(HavenRoomId::Bedroom);
+        haven.build_room(HavenRoomId::Garden);
+        haven.build_room(HavenRoomId::Library);
+        haven.build_room(HavenRoomId::FishingDock);
+        haven.build_room(HavenRoomId::Workshop);
+        haven.build_room(HavenRoomId::Vault);
+
+        // Now StormForge should be unlocked
+        assert!(haven.is_room_unlocked(HavenRoomId::StormForge));
+    }
+
+    #[test]
+    fn test_storm_forge_cannot_build_without_25_prestige() {
+        let mut haven = Haven::new();
+        let mut prestige = 24u32; // One short of required
+
+        // Build full tree to unlock StormForge
+        build_full_tree_to_capstones(&mut haven);
+
+        // Cannot build with insufficient prestige
+        assert!(!can_afford(HavenRoomId::StormForge, &haven, prestige));
+        assert!(try_build_room(HavenRoomId::StormForge, &mut haven, &mut prestige).is_none());
+        assert_eq!(prestige, 24); // No prestige spent
+    }
+
+    #[test]
+    fn test_storm_forge_can_build_with_exactly_25_prestige() {
+        let mut haven = Haven::new();
+        let mut prestige = 25u32; // Exactly the required amount
+
+        // Build full tree to unlock StormForge
+        build_full_tree_to_capstones(&mut haven);
+
+        // Can build with exact amount
+        assert!(can_afford(HavenRoomId::StormForge, &haven, prestige));
+        let result = try_build_room(HavenRoomId::StormForge, &mut haven, &mut prestige);
+        assert_eq!(result, Some((1, 25)));
+        assert_eq!(prestige, 0); // All prestige spent
+        assert_eq!(haven.room_tier(HavenRoomId::StormForge), 1);
+    }
+
+    #[test]
+    fn test_storm_forge_built_grants_access() {
+        let mut haven = Haven::new();
+
+        assert!(!haven.has_storm_forge());
+
+        // Build full tree including StormForge
+        build_full_tree_to_capstones(&mut haven);
+        haven.build_room(HavenRoomId::StormForge);
+
+        assert!(haven.has_storm_forge());
+    }
+
+    #[test]
+    fn test_storm_forge_cannot_upgrade_past_tier_1() {
+        let mut haven = Haven::new();
+
+        // Build StormForge
+        build_full_tree_to_capstones(&mut haven);
+        haven.build_room(HavenRoomId::StormForge);
+
+        assert_eq!(haven.room_tier(HavenRoomId::StormForge), 1);
+
+        // Cannot build again (already at max tier)
+        assert!(!haven.can_build(HavenRoomId::StormForge));
+        assert!(haven.next_tier(HavenRoomId::StormForge).is_none());
+    }
+
+    // Helper function to build full tree to both capstones (WarRoom and Vault)
+    fn build_full_tree_to_capstones(haven: &mut Haven) {
+        // Root
+        haven.build_room(HavenRoomId::Hearthstone);
+
+        // Combat branch to WarRoom
+        haven.build_room(HavenRoomId::Armory);
+        haven.build_room(HavenRoomId::TrainingYard);
+        haven.build_room(HavenRoomId::TrophyHall);
+        haven.build_room(HavenRoomId::Watchtower);
+        haven.build_room(HavenRoomId::AlchemyLab);
+        haven.build_room(HavenRoomId::WarRoom);
+
+        // QoL branch to Vault
+        haven.build_room(HavenRoomId::Bedroom);
+        haven.build_room(HavenRoomId::Garden);
+        haven.build_room(HavenRoomId::Library);
+        haven.build_room(HavenRoomId::FishingDock);
+        haven.build_room(HavenRoomId::Workshop);
+        haven.build_room(HavenRoomId::Vault);
     }
 }

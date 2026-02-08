@@ -271,6 +271,7 @@ fn main() -> io::Result<()> {
                             &haven,
                             haven_ui.selected_room,
                             0, // No character selected, so prestige rank = 0
+                            &global_achievements,
                         );
                     }
                     // Draw achievement browser overlay if open
@@ -314,15 +315,15 @@ fn main() -> io::Result<()> {
 
                         // Handle Haven screen (blocks other input when open)
                         if haven_ui.showing {
-                            if haven_ui.confirming_build {
+                            if haven_ui.confirmation == input::HavenConfirmation::Build {
                                 match key_event.code {
                                     KeyCode::Enter => {
                                         // Note: Can't build from character select (no active character)
                                         // Just close the confirmation
-                                        haven_ui.confirming_build = false;
+                                        haven_ui.confirmation = input::HavenConfirmation::None;
                                     }
                                     KeyCode::Esc => {
-                                        haven_ui.confirming_build = false;
+                                        haven_ui.confirmation = input::HavenConfirmation::None;
                                     }
                                     _ => {}
                                 }
@@ -739,16 +740,28 @@ fn main() -> io::Result<()> {
                                 &haven,
                                 haven_ui.selected_room,
                                 state.prestige_rank,
+                                &global_achievements,
                             );
-                            if haven_ui.confirming_build {
-                                let room = haven::HavenRoomId::ALL[haven_ui.selected_room];
-                                ui::haven_scene::render_build_confirmation(
-                                    frame,
-                                    frame.size(),
-                                    room,
-                                    &haven,
-                                    state.prestige_rank,
-                                );
+                            match haven_ui.confirmation {
+                                input::HavenConfirmation::Build => {
+                                    let room = haven::HavenRoomId::ALL[haven_ui.selected_room];
+                                    ui::haven_scene::render_build_confirmation(
+                                        frame,
+                                        frame.size(),
+                                        room,
+                                        &haven,
+                                        state.prestige_rank,
+                                    );
+                                }
+                                input::HavenConfirmation::Forge => {
+                                    ui::haven_scene::render_forge_confirmation(
+                                        frame,
+                                        frame.size(),
+                                        &global_achievements,
+                                        state.prestige_rank,
+                                    );
+                                }
+                                input::HavenConfirmation::None => {}
                             }
                         }
                         // Draw debug indicator and menu if in debug mode, otherwise save indicator

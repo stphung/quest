@@ -171,7 +171,6 @@ pub struct AchievementDef {
     pub name: &'static str,
     pub description: &'static str,
     pub category: AchievementCategory,
-    pub secret: bool,
     pub icon: &'static str,
 }
 
@@ -326,6 +325,21 @@ impl Achievements {
         (self.unlocked_count() as f32 / total as f32) * 100.0
     }
 
+    /// Helper to check and unlock milestones. Checks all milestones in order.
+    /// Used to consolidate repeated milestone checking patterns.
+    fn check_milestones(
+        &mut self,
+        current: u64,
+        milestones: &[(u64, AchievementId)],
+        char_name: Option<String>,
+    ) {
+        for &(threshold, achievement_id) in milestones {
+            if current >= threshold {
+                self.unlock(achievement_id, char_name.clone());
+            }
+        }
+    }
+
     /// Get count of unlocked/total by category.
     pub fn count_by_category(&self, category: AchievementCategory) -> (usize, usize) {
         use super::data::ALL_ACHIEVEMENTS;
@@ -348,7 +362,7 @@ impl Achievements {
     // =========================================================================
 
     /// Called when the Storm Leviathan is caught.
-    /// Unlocks the StormLeviathan achievement (secret, required for Stormbreaker).
+    /// Unlocks the StormLeviathan achievement (required for Stormbreaker).
     pub fn on_storm_leviathan_caught(&mut self, character_name: Option<&str>) {
         self.unlock(
             AchievementId::StormLeviathan,
@@ -386,21 +400,17 @@ impl Achievements {
         self.total_fish_caught += 1;
 
         // Fish catching milestones
-        if self.total_fish_caught >= 1 {
-            self.unlock(AchievementId::GoneFishing, char_name.clone());
-        }
-        if self.total_fish_caught >= 100 {
-            self.unlock(AchievementId::FishCatcherI, char_name.clone());
-        }
-        if self.total_fish_caught >= 1000 {
-            self.unlock(AchievementId::FishCatcherII, char_name.clone());
-        }
-        if self.total_fish_caught >= 10000 {
-            self.unlock(AchievementId::FishCatcherIII, char_name.clone());
-        }
-        if self.total_fish_caught >= 100000 {
-            self.unlock(AchievementId::FishCatcherIV, char_name);
-        }
+        self.check_milestones(
+            self.total_fish_caught,
+            &[
+                (1, AchievementId::GoneFishing),
+                (100, AchievementId::FishCatcherI),
+                (1000, AchievementId::FishCatcherII),
+                (10000, AchievementId::FishCatcherIII),
+                (100000, AchievementId::FishCatcherIV),
+            ],
+            char_name,
+        );
     }
 
     // =========================================================================
@@ -415,63 +425,41 @@ impl Achievements {
         self.total_kills += 1;
 
         // Slayer milestones: 100, 500, 1K, 5K, 10K, 50K, 100K, 500K, 1M
-        if self.total_kills >= 100 {
-            self.unlock(AchievementId::SlayerI, char_name.clone());
-        }
-        if self.total_kills >= 500 {
-            self.unlock(AchievementId::SlayerII, char_name.clone());
-        }
-        if self.total_kills >= 1000 {
-            self.unlock(AchievementId::SlayerIII, char_name.clone());
-        }
-        if self.total_kills >= 5000 {
-            self.unlock(AchievementId::SlayerIV, char_name.clone());
-        }
-        if self.total_kills >= 10000 {
-            self.unlock(AchievementId::SlayerV, char_name.clone());
-        }
-        if self.total_kills >= 50000 {
-            self.unlock(AchievementId::SlayerVI, char_name.clone());
-        }
-        if self.total_kills >= 100000 {
-            self.unlock(AchievementId::SlayerVII, char_name.clone());
-        }
-        if self.total_kills >= 500000 {
-            self.unlock(AchievementId::SlayerVIII, char_name.clone());
-        }
-        if self.total_kills >= 1000000 {
-            self.unlock(AchievementId::SlayerIX, char_name.clone());
-        }
+        self.check_milestones(
+            self.total_kills,
+            &[
+                (100, AchievementId::SlayerI),
+                (500, AchievementId::SlayerII),
+                (1000, AchievementId::SlayerIII),
+                (5000, AchievementId::SlayerIV),
+                (10000, AchievementId::SlayerV),
+                (50000, AchievementId::SlayerVI),
+                (100000, AchievementId::SlayerVII),
+                (500000, AchievementId::SlayerVIII),
+                (1000000, AchievementId::SlayerIX),
+            ],
+            char_name.clone(),
+        );
 
         // Track boss kills
         if is_boss {
             self.total_bosses_defeated += 1;
 
             // Boss hunter milestones: 1, 10, 50, 100, 500, 1K, 5K, 10K
-            if self.total_bosses_defeated >= 1 {
-                self.unlock(AchievementId::BossHunterI, char_name.clone());
-            }
-            if self.total_bosses_defeated >= 10 {
-                self.unlock(AchievementId::BossHunterII, char_name.clone());
-            }
-            if self.total_bosses_defeated >= 50 {
-                self.unlock(AchievementId::BossHunterIII, char_name.clone());
-            }
-            if self.total_bosses_defeated >= 100 {
-                self.unlock(AchievementId::BossHunterIV, char_name.clone());
-            }
-            if self.total_bosses_defeated >= 500 {
-                self.unlock(AchievementId::BossHunterV, char_name.clone());
-            }
-            if self.total_bosses_defeated >= 1000 {
-                self.unlock(AchievementId::BossHunterVI, char_name.clone());
-            }
-            if self.total_bosses_defeated >= 5000 {
-                self.unlock(AchievementId::BossHunterVII, char_name.clone());
-            }
-            if self.total_bosses_defeated >= 10000 {
-                self.unlock(AchievementId::BossHunterVIII, char_name);
-            }
+            self.check_milestones(
+                self.total_bosses_defeated,
+                &[
+                    (1, AchievementId::BossHunterI),
+                    (10, AchievementId::BossHunterII),
+                    (50, AchievementId::BossHunterIII),
+                    (100, AchievementId::BossHunterIV),
+                    (500, AchievementId::BossHunterV),
+                    (1000, AchievementId::BossHunterVI),
+                    (5000, AchievementId::BossHunterVII),
+                    (10000, AchievementId::BossHunterVIII),
+                ],
+                char_name,
+            );
         }
     }
 
@@ -490,33 +478,21 @@ impl Achievements {
         }
 
         // Level milestones
-        if new_level >= 10 {
-            self.unlock(AchievementId::Level10, char_name.clone());
-        }
-        if new_level >= 25 {
-            self.unlock(AchievementId::Level25, char_name.clone());
-        }
-        if new_level >= 50 {
-            self.unlock(AchievementId::Level50, char_name.clone());
-        }
-        if new_level >= 75 {
-            self.unlock(AchievementId::Level75, char_name.clone());
-        }
-        if new_level >= 100 {
-            self.unlock(AchievementId::Level100, char_name.clone());
-        }
-        if new_level >= 150 {
-            self.unlock(AchievementId::Level150, char_name.clone());
-        }
-        if new_level >= 200 {
-            self.unlock(AchievementId::Level200, char_name.clone());
-        }
-        if new_level >= 250 {
-            self.unlock(AchievementId::Level250, char_name.clone());
-        }
-        if new_level >= 300 {
-            self.unlock(AchievementId::Level300, char_name);
-        }
+        self.check_milestones(
+            new_level as u64,
+            &[
+                (10, AchievementId::Level10),
+                (25, AchievementId::Level25),
+                (50, AchievementId::Level50),
+                (75, AchievementId::Level75),
+                (100, AchievementId::Level100),
+                (150, AchievementId::Level150),
+                (200, AchievementId::Level200),
+                (250, AchievementId::Level250),
+                (300, AchievementId::Level300),
+            ],
+            char_name,
+        );
     }
 
     /// Called when the character prestiges.
@@ -529,47 +505,25 @@ impl Achievements {
             self.highest_prestige_rank = new_rank;
         }
 
-        // First prestige
-        if new_rank >= 1 {
-            self.unlock(AchievementId::FirstPrestige, char_name.clone());
-        }
-
-        // Prestige milestones
-        if new_rank >= 5 {
-            self.unlock(AchievementId::PrestigeV, char_name.clone());
-        }
-        if new_rank >= 10 {
-            self.unlock(AchievementId::PrestigeX, char_name.clone());
-        }
-        if new_rank >= 15 {
-            self.unlock(AchievementId::PrestigeXV, char_name.clone());
-        }
-        if new_rank >= 20 {
-            self.unlock(AchievementId::PrestigeXX, char_name.clone());
-        }
-        if new_rank >= 25 {
-            self.unlock(AchievementId::PrestigeXXV, char_name.clone());
-        }
-        if new_rank >= 30 {
-            self.unlock(AchievementId::PrestigeXXX, char_name.clone());
-        }
-        if new_rank >= 40 {
-            self.unlock(AchievementId::PrestigeXL, char_name.clone());
-        }
-        if new_rank >= 50 {
-            self.unlock(AchievementId::PrestigeL, char_name.clone());
-        }
-        if new_rank >= 70 {
-            self.unlock(AchievementId::PrestigeLXX, char_name.clone());
-        }
-        if new_rank >= 90 {
-            self.unlock(AchievementId::PrestigeXC, char_name.clone());
-        }
-
-        // Eternal tier (P100+)
-        if new_rank >= 100 {
-            self.unlock(AchievementId::Eternal, char_name);
-        }
+        // Prestige milestones (including first prestige)
+        self.check_milestones(
+            new_rank as u64,
+            &[
+                (1, AchievementId::FirstPrestige),
+                (5, AchievementId::PrestigeV),
+                (10, AchievementId::PrestigeX),
+                (15, AchievementId::PrestigeXV),
+                (20, AchievementId::PrestigeXX),
+                (25, AchievementId::PrestigeXXV),
+                (30, AchievementId::PrestigeXXX),
+                (40, AchievementId::PrestigeXL),
+                (50, AchievementId::PrestigeL),
+                (70, AchievementId::PrestigeLXX),
+                (90, AchievementId::PrestigeXC),
+                (100, AchievementId::Eternal),
+            ],
+            char_name,
+        );
     }
 
     /// Called when a zone is fully cleared (all subzones completed).
@@ -636,27 +590,19 @@ impl Achievements {
         self.total_dungeons_completed += 1;
 
         // Dungeon completion milestones
-        if self.total_dungeons_completed >= 1 {
-            self.unlock(AchievementId::DungeonDiver, char_name.clone());
-        }
-        if self.total_dungeons_completed >= 10 {
-            self.unlock(AchievementId::DungeonMasterI, char_name.clone());
-        }
-        if self.total_dungeons_completed >= 50 {
-            self.unlock(AchievementId::DungeonMasterII, char_name.clone());
-        }
-        if self.total_dungeons_completed >= 100 {
-            self.unlock(AchievementId::DungeonMasterIII, char_name.clone());
-        }
-        if self.total_dungeons_completed >= 1000 {
-            self.unlock(AchievementId::DungeonMasterIV, char_name.clone());
-        }
-        if self.total_dungeons_completed >= 5000 {
-            self.unlock(AchievementId::DungeonMasterV, char_name.clone());
-        }
-        if self.total_dungeons_completed >= 10000 {
-            self.unlock(AchievementId::DungeonMasterVI, char_name);
-        }
+        self.check_milestones(
+            self.total_dungeons_completed,
+            &[
+                (1, AchievementId::DungeonDiver),
+                (10, AchievementId::DungeonMasterI),
+                (50, AchievementId::DungeonMasterII),
+                (100, AchievementId::DungeonMasterIII),
+                (1000, AchievementId::DungeonMasterIV),
+                (5000, AchievementId::DungeonMasterV),
+                (10000, AchievementId::DungeonMasterVI),
+            ],
+            char_name,
+        );
     }
 
     // =========================================================================
@@ -1506,5 +1452,144 @@ mod tests {
         assert_eq!(achievements.total_fish_caught, 50000);
         // Should still have the high-count achievements
         assert!(achievements.is_unlocked(AchievementId::FishCatcherIII)); // 10000
+    }
+
+    // =========================================================================
+    // Storm Leviathan Achievement Tests
+    // =========================================================================
+
+    #[test]
+    fn test_storm_leviathan_unlocking() {
+        let mut achievements = Achievements::default();
+
+        // Storm Leviathan should not be unlocked initially
+        assert!(!achievements.is_unlocked(AchievementId::StormLeviathan));
+
+        // Call the event handler for catching Storm Leviathan
+        achievements.on_storm_leviathan_caught(Some("Hero"));
+
+        // Should now be unlocked
+        assert!(achievements.is_unlocked(AchievementId::StormLeviathan));
+    }
+
+    #[test]
+    fn test_storm_leviathan_only_unlocks_once() {
+        let mut achievements = Achievements::default();
+
+        // First catch unlocks the achievement
+        assert!(achievements.unlock(AchievementId::StormLeviathan, Some("Hero".to_string())));
+
+        // Second catch should not unlock again
+        assert!(!achievements.unlock(AchievementId::StormLeviathan, None));
+    }
+
+    // =========================================================================
+    // TheStormbreaker Achievement Tests
+    // =========================================================================
+
+    #[test]
+    fn test_stormbreaker_can_be_unlocked() {
+        let mut achievements = Achievements::default();
+
+        // TheStormbreaker should not be unlocked initially
+        assert!(!achievements.is_unlocked(AchievementId::TheStormbreaker));
+
+        // Unlock TheStormbreaker (simulating forge)
+        achievements.unlock(AchievementId::TheStormbreaker, Some("Hero".to_string()));
+
+        // Should now be unlocked
+        assert!(achievements.is_unlocked(AchievementId::TheStormbreaker));
+    }
+
+    #[test]
+    fn test_stormbreaker_unlocks_independently_of_leviathan() {
+        let mut achievements = Achievements::default();
+
+        // Can unlock TheStormbreaker without Storm Leviathan (test only - game logic prevents this)
+        achievements.unlock(AchievementId::TheStormbreaker, Some("Hero".to_string()));
+
+        assert!(achievements.is_unlocked(AchievementId::TheStormbreaker));
+        assert!(!achievements.is_unlocked(AchievementId::StormLeviathan));
+    }
+
+    // =========================================================================
+    // Haven Sync Achievement Tests
+    // =========================================================================
+
+    #[test]
+    fn test_haven_sync_discovered() {
+        use std::collections::HashMap;
+
+        let mut achievements = Achievements::default();
+        let room_tiers: HashMap<crate::haven::types::HavenRoomId, u8> = HashMap::new();
+
+        // Sync with discovered Haven
+        achievements.sync_from_haven(true, &room_tiers, Some("Hero"));
+
+        assert!(achievements.is_unlocked(AchievementId::HavenDiscovered));
+    }
+
+    #[test]
+    fn test_haven_sync_builder_i() {
+        use crate::haven::types::HavenRoomId;
+        use std::collections::HashMap;
+
+        let mut achievements = Achievements::default();
+        let mut room_tiers: HashMap<HavenRoomId, u8> = HashMap::new();
+
+        // Set all buildable rooms to T1 (exclude StormForge which only has T1)
+        for room in HavenRoomId::ALL.iter() {
+            if *room != HavenRoomId::StormForge {
+                room_tiers.insert(*room, 1);
+            }
+        }
+
+        achievements.sync_from_haven(true, &room_tiers, Some("Hero"));
+
+        assert!(achievements.is_unlocked(AchievementId::HavenDiscovered));
+        assert!(achievements.is_unlocked(AchievementId::HavenBuilderI));
+        assert!(!achievements.is_unlocked(AchievementId::HavenBuilderII));
+    }
+
+    #[test]
+    fn test_haven_sync_builder_ii() {
+        use crate::haven::types::HavenRoomId;
+        use std::collections::HashMap;
+
+        let mut achievements = Achievements::default();
+        let mut room_tiers: HashMap<HavenRoomId, u8> = HashMap::new();
+
+        // Set all buildable rooms to T2
+        for room in HavenRoomId::ALL.iter() {
+            if *room != HavenRoomId::StormForge {
+                room_tiers.insert(*room, 2);
+            }
+        }
+
+        achievements.sync_from_haven(true, &room_tiers, Some("Hero"));
+
+        assert!(achievements.is_unlocked(AchievementId::HavenBuilderI));
+        assert!(achievements.is_unlocked(AchievementId::HavenBuilderII));
+        assert!(!achievements.is_unlocked(AchievementId::HavenArchitect));
+    }
+
+    #[test]
+    fn test_haven_sync_architect() {
+        use crate::haven::types::HavenRoomId;
+        use std::collections::HashMap;
+
+        let mut achievements = Achievements::default();
+        let mut room_tiers: HashMap<HavenRoomId, u8> = HashMap::new();
+
+        // Set all rooms to their max tier
+        for room in HavenRoomId::ALL.iter() {
+            room_tiers.insert(*room, room.max_tier());
+        }
+
+        achievements.sync_from_haven(true, &room_tiers, Some("Hero"));
+
+        assert!(achievements.is_unlocked(AchievementId::HavenBuilderI));
+        assert!(achievements.is_unlocked(AchievementId::HavenBuilderII));
+        assert!(achievements.is_unlocked(AchievementId::HavenArchitect));
     }
 }
