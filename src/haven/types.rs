@@ -69,7 +69,7 @@ impl HavenRoomId {
     pub fn description(&self) -> &'static str {
         match self {
             HavenRoomId::Hearthstone => "A crackling fire burns at the heart of your Haven, its embers never quite dying out. Even when you're away, its warmth keeps your skills sharp.",
-            HavenRoomId::Armory => "Your weapon collection strengthens all who visit.",
+            HavenRoomId::Armory => "Whetstones and weapon oil fill the air with a sharp, metallic tang. Every blade here has been honed to a razor's edge, and their fury flows into whoever wields them.",
             HavenRoomId::TrainingYard => "Practice dummies and sparring targets.",
             HavenRoomId::TrophyHall => "Trophies from past victories attract fortune.",
             HavenRoomId::Watchtower => "Sharpens your eye for weak points.",
