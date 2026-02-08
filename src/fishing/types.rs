@@ -51,6 +51,11 @@ pub struct FishingSession {
     pub phase: FishingPhase,
 }
 
+/// Helper for serde skip_serializing_if
+fn is_zero(n: &u8) -> bool {
+    *n == 0
+}
+
 /// Persistent fishing state that is saved with the character.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FishingState {
@@ -58,6 +63,9 @@ pub struct FishingState {
     pub total_fish_caught: u32,
     pub fish_toward_next_rank: u32,
     pub legendary_catches: u32,
+    /// Storm Leviathan encounter progress (0-10). At 10, the next encounter catches it.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub leviathan_encounters: u8,
 }
 
 impl Default for FishingState {
@@ -67,18 +75,21 @@ impl Default for FishingState {
             total_fish_caught: 0,
             fish_toward_next_rank: 0,
             legendary_catches: 0,
+            leviathan_encounters: 0,
         }
     }
 }
 
-/// All 30 fishing rank names organized by tier.
+/// All 40 fishing rank names organized by tier.
 /// - Novice tier (1-5): Learning the basics
 /// - Apprentice tier (6-10): Developing skills
 /// - Journeyman tier (11-15): Competent angler
 /// - Expert tier (16-20): Mastering the depths
 /// - Master tier (21-25): Legendary pursuits
-/// - Grandmaster tier (26-30): Ocean mastery
-pub const RANK_NAMES: [&str; 30] = [
+/// - Grandmaster tier (26-30): Ocean mastery (BASE MAX without Haven)
+/// - Mythic tier (31-35): Beyond mortal limits (requires Fishing Dock T4)
+/// - Transcendent tier (36-40): Cosmic mastery (Storm Leviathan at 40)
+pub const RANK_NAMES: [&str; 40] = [
     // Novice tier (1-5)
     "Bait Handler",
     "Line Tangler",
@@ -109,12 +120,24 @@ pub const RANK_NAMES: [&str; 30] = [
     "Leviathan Lurer",
     "Serpent Tamer",
     "Kraken Caller",
-    // Grandmaster tier (26-30)
+    // Grandmaster tier (26-30) - BASE MAX without Haven
     "Ocean Sage",
     "Tidebinder",
     "Depthless One",
     "Sea Eternal",
     "Poseidon's Chosen",
+    // Mythic tier (31-35) - Requires Fishing Dock T4
+    "Titan's Bane",
+    "World Fisher",
+    "Primordial Angler",
+    "Abyss Walker",
+    "Fate Weaver",
+    // Transcendent tier (36-40) - Storm Leviathan at 40
+    "Void Fisher",
+    "Eternal Caster",
+    "Reality Bender",
+    "Cosmos Reeler",
+    "The Unchained",
 ];
 
 impl FishingState {
@@ -132,7 +155,12 @@ impl FishingState {
     /// - Journeyman (11-15): 400 fish per rank = 2000 total
     /// - Expert (16-20): 800 fish per rank = 4000 total
     /// - Master (21-25): 1500 fish per rank = 7500 total
-    /// - Grandmaster (26-30): 2000 fish per rank = 10000 total
+    /// - Grandmaster (26-30): 2000 fish per rank = 10000 total (BASE MAX)
+    /// - Mythic (31-35): Exponential scaling = 61000 total (requires Dock T4)
+    /// - Transcendent (36-40): Exponential scaling = 615000 total
+    ///
+    /// Total to rank 30: 25,000 fish
+    /// Total to rank 40: 701,000 fish
     pub fn fish_required_for_rank(rank: u32) -> u32 {
         match rank {
             1..=5 => 100,
@@ -141,7 +169,19 @@ impl FishingState {
             16..=20 => 800,
             21..=25 => 1500,
             26..=30 => 2000,
-            _ => 2000, // Max tier requirement for ranks beyond 30
+            // Mythic tier (31-35) - exponential scaling
+            31 => 4_000,
+            32 => 6_000,
+            33 => 10_000,
+            34 => 16_000,
+            35 => 25_000,
+            // Transcendent tier (36-40) - exponential scaling
+            36 => 40_000,
+            37 => 65_000,
+            38 => 100_000,
+            39 => 160_000,
+            40 => 250_000,
+            _ => 250_000, // Max tier requirement for ranks beyond 40
         }
     }
 }
@@ -210,12 +250,19 @@ mod tests {
         };
         assert_eq!(state.rank_name(), "Kraken Caller");
 
-        // Test max rank (Grandmaster tier)
+        // Test base max rank (Grandmaster tier)
         let state = FishingState {
             rank: 30,
             ..Default::default()
         };
         assert_eq!(state.rank_name(), "Poseidon's Chosen");
+
+        // Test absolute max rank (Transcendent tier)
+        let state = FishingState {
+            rank: 40,
+            ..Default::default()
+        };
+        assert_eq!(state.rank_name(), "The Unchained");
     }
 
     #[test]
@@ -232,7 +279,7 @@ mod tests {
             rank: 100,
             ..Default::default()
         };
-        assert_eq!(state.rank_name(), "Poseidon's Chosen");
+        assert_eq!(state.rank_name(), "The Unchained");
     }
 
     #[test]
@@ -261,9 +308,23 @@ mod tests {
         assert_eq!(FishingState::fish_required_for_rank(26), 2000);
         assert_eq!(FishingState::fish_required_for_rank(30), 2000);
 
+        // Mythic tier (31-35): exponential scaling
+        assert_eq!(FishingState::fish_required_for_rank(31), 4_000);
+        assert_eq!(FishingState::fish_required_for_rank(32), 6_000);
+        assert_eq!(FishingState::fish_required_for_rank(33), 10_000);
+        assert_eq!(FishingState::fish_required_for_rank(34), 16_000);
+        assert_eq!(FishingState::fish_required_for_rank(35), 25_000);
+
+        // Transcendent tier (36-40): exponential scaling
+        assert_eq!(FishingState::fish_required_for_rank(36), 40_000);
+        assert_eq!(FishingState::fish_required_for_rank(37), 65_000);
+        assert_eq!(FishingState::fish_required_for_rank(38), 100_000);
+        assert_eq!(FishingState::fish_required_for_rank(39), 160_000);
+        assert_eq!(FishingState::fish_required_for_rank(40), 250_000);
+
         // Beyond max rank
-        assert_eq!(FishingState::fish_required_for_rank(31), 2000);
-        assert_eq!(FishingState::fish_required_for_rank(100), 2000);
+        assert_eq!(FishingState::fish_required_for_rank(41), 250_000);
+        assert_eq!(FishingState::fish_required_for_rank(100), 250_000);
     }
 
     #[test]

@@ -85,6 +85,10 @@ pub enum GameOverlay {
     AchievementUnlocked {
         achievements: Vec<crate::achievements::AchievementId>,
     },
+    /// Storm Leviathan encounter modal (fishing)
+    LeviathanEncounter {
+        encounter_number: u8,
+    },
 }
 
 /// Result of handling a game input event.
@@ -114,6 +118,14 @@ pub fn handle_game_input(
     // 0. Offline welcome overlay (any key dismisses)
     if matches!(overlay, GameOverlay::OfflineWelcome { .. }) {
         *overlay = GameOverlay::None;
+        return InputResult::Continue;
+    }
+
+    // 0.25. Storm Leviathan encounter modal (Enter dismisses)
+    if matches!(overlay, GameOverlay::LeviathanEncounter { .. }) {
+        if matches!(key.code, KeyCode::Enter) {
+            *overlay = GameOverlay::None;
+        }
         return InputResult::Continue;
     }
 

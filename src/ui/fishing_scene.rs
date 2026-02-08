@@ -10,7 +10,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Gauge, Paragraph},
+    widgets::{Block, Borders, Clear, Gauge, Paragraph, Wrap},
     Frame,
 };
 
@@ -269,4 +269,175 @@ fn draw_rank_info(frame: &mut Frame, area: Rect, fishing_state: &FishingState) {
         .ratio(ratio);
 
     frame.render_widget(gauge, inner_chunks[1]);
+}
+
+/// Data for each Storm Leviathan encounter stage.
+struct LeviathanEncounterData {
+    title: &'static str,
+    flavor: &'static str,
+    status: &'static str,
+    health_bar: &'static str,
+}
+
+/// The 10 progressive encounters with the Storm Leviathan.
+const LEVIATHAN_ENCOUNTERS: [LeviathanEncounterData; 10] = [
+    LeviathanEncounterData {
+        title: "RIPPLES",
+        flavor: "Something disturbed the deep. A shadow vast as a ship passes beneath you. Before you can react, it vanishes into the abyss.",
+        status: "UNTOUCHED",
+        health_bar: "████████████████████",
+    },
+    LeviathanEncounterData {
+        title: "THE SHADOW",
+        flavor: "The Leviathan surfaces for a heartbeat - scales like storm clouds, eyes like lightning. It knows you now. Then it's gone.",
+        status: "AWARE",
+        health_bar: "██████████████████░░",
+    },
+    LeviathanEncounterData {
+        title: "EMERGENCE",
+        flavor: "It breaches! The beast roars - a sound like thunder over the waves. Your boat rocks violently as it dives deep.",
+        status: "AGITATED",
+        health_bar: "████████████████░░░░",
+    },
+    LeviathanEncounterData {
+        title: "KNOWN",
+        flavor: "It circles your position. Watching. Waiting. This is no mere fish - it's deciding if YOU are worthy prey.",
+        status: "HUNTING",
+        health_bar: "██████████████░░░░░░",
+    },
+    LeviathanEncounterData {
+        title: "FIRST STRIKE",
+        flavor: "Your hook finds flesh! The beast screams - a sound that will haunt your dreams. It dives, trailing darkness and blood.",
+        status: "WOUNDED",
+        health_bar: "████████████░░░░░░░░",
+    },
+    LeviathanEncounterData {
+        title: "FURY",
+        flavor: "It rams your boat in rage! You barely hold on as waves crash over the deck. But in its fury, it expends precious strength.",
+        status: "RAGING",
+        health_bar: "██████████░░░░░░░░░░",
+    },
+    LeviathanEncounterData {
+        title: "BLOOD IN WATER",
+        flavor: "Wounded and bleeding, it circles. You are both predator and prey now. Neither will yield. Neither can escape.",
+        status: "BLEEDING",
+        health_bar: "████████░░░░░░░░░░░░",
+    },
+    LeviathanEncounterData {
+        title: "THE LONG NIGHT",
+        flavor: "Hours pass. The beast surfaces less often, its movements slower. Stars wheel overhead. Dawn approaches. You will not sleep until this ends.",
+        status: "TIRING",
+        health_bar: "██████░░░░░░░░░░░░░░",
+    },
+    LeviathanEncounterData {
+        title: "EXHAUSTION",
+        flavor: "It can barely surface now. Each breath is labored, each dive shorter. Victory is close. You can taste it.",
+        status: "EXHAUSTED",
+        health_bar: "████░░░░░░░░░░░░░░░░",
+    },
+    LeviathanEncounterData {
+        title: "LEGEND",
+        flavor: "With a final, defiant bellow, it succumbs. Your line holds. Your arms burn. But you've done the impossible.",
+        status: "DEFEATED",
+        health_bar: "██░░░░░░░░░░░░░░░░░░",
+    },
+];
+
+/// Renders the Storm Leviathan encounter modal.
+///
+/// This modal appears when the player encounters the Leviathan during fishing.
+/// The encounter number (1-10) determines which stage of the hunt is shown.
+pub fn render_leviathan_encounter_modal(frame: &mut Frame, area: Rect, encounter_number: u8) {
+    if encounter_number == 0 || encounter_number > 10 {
+        return;
+    }
+
+    let data = &LEVIATHAN_ENCOUNTERS[(encounter_number - 1) as usize];
+
+    let modal_width = 64;
+    let modal_height = 16;
+
+    // Center the modal
+    let x = area.x + (area.width.saturating_sub(modal_width)) / 2;
+    let y = area.y + (area.height.saturating_sub(modal_height)) / 2;
+    let modal_area = Rect::new(
+        x,
+        y,
+        modal_width.min(area.width),
+        modal_height.min(area.height),
+    );
+
+    frame.render_widget(Clear, modal_area);
+
+    let title = format!(" ⛈️  {}  ⛈️ ", data.title);
+
+    let block = Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Cyan));
+
+    let inner = block.inner(modal_area);
+    frame.render_widget(block, modal_area);
+
+    let mut lines = vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            "🐋",
+            Style::default().add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+    ];
+
+    // Flavor text (wrapped)
+    lines.push(Line::from(Span::styled(
+        data.flavor,
+        Style::default().fg(Color::White),
+    )));
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(""));
+
+    // Health bar
+    lines.push(Line::from(vec![
+        Span::raw(" "),
+        Span::styled(data.health_bar, Style::default().fg(Color::Red)),
+        Span::raw("  "),
+        Span::styled(
+            data.status,
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::raw("  "),
+        Span::styled(
+            format!("{}/10", encounter_number),
+            Style::default().fg(Color::DarkGray),
+        ),
+    ]));
+
+    lines.push(Line::from(""));
+
+    // Hint text based on encounter
+    let hint = if encounter_number < 10 {
+        "\"The beast learns. Each escape makes it warier...\""
+    } else {
+        "\"This is your moment. The hunt ends now.\""
+    };
+    lines.push(Line::from(Span::styled(
+        hint,
+        Style::default()
+            .fg(Color::DarkGray)
+            .add_modifier(Modifier::ITALIC),
+    )));
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "[Enter] to continue",
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    let para = Paragraph::new(lines)
+        .alignment(Alignment::Center)
+        .wrap(Wrap { trim: true });
+    frame.render_widget(para, inner);
 }

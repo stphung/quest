@@ -141,6 +141,7 @@ pub enum AchievementId {
     FishermanI,
     FishermanII,
     FishermanIII,
+    FishermanIV,
     StormLeviathan,
     // Fishing achievements - catch counts
     FishCatcherI,   // 100 fish
@@ -388,7 +389,10 @@ impl Achievements {
             self.unlock(AchievementId::FishermanII, char_name.clone());
         }
         if new_rank >= 30 {
-            self.unlock(AchievementId::FishermanIII, char_name);
+            self.unlock(AchievementId::FishermanIII, char_name.clone());
+        }
+        if new_rank >= 40 {
+            self.unlock(AchievementId::FishermanIV, char_name);
         }
     }
 
@@ -1388,6 +1392,7 @@ mod tests {
         assert!(achievements.is_unlocked(AchievementId::FishermanI));
         assert!(achievements.is_unlocked(AchievementId::FishermanII));
         assert!(!achievements.is_unlocked(AchievementId::FishermanIII)); // needs rank 30
+        assert!(!achievements.is_unlocked(AchievementId::FishermanIV)); // needs rank 40
 
         // Fish catch achievements (5000 fish)
         assert!(achievements.is_unlocked(AchievementId::FishCatcherI)); // 100

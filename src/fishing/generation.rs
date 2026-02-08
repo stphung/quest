@@ -41,7 +41,7 @@ pub const FISH_NAMES_LEGENDARY: [&str; 5] = [
     "Phantom Whale",
 ];
 
-/// The legendary Storm Leviathan - only appears at max rank (30).
+/// The legendary Storm Leviathan - only appears at max rank (40).
 /// Catching this fish is required to forge the Stormbreaker.
 pub const STORM_LEVIATHAN: &str = "Storm Leviathan";
 
@@ -154,28 +154,61 @@ pub fn generate_fish(rarity: FishRarity, rng: &mut impl Rng) -> CaughtFish {
 /// XP reward for the Storm Leviathan (significantly higher than normal legendary)
 const STORM_LEVIATHAN_XP: (u32, u32) = (10000, 15000);
 
-/// Generates a fish with rank awareness.
+/// Minimum fishing rank required to encounter the Storm Leviathan
+const LEVIATHAN_MIN_RANK: u32 = 40;
+
+/// Number of encounters required before the Leviathan can be caught
+const LEVIATHAN_REQUIRED_ENCOUNTERS: u8 = 10;
+
+/// Chance to catch the Leviathan after completing all encounters (25%)
+const LEVIATHAN_CATCH_CHANCE: f64 = 0.25;
+
+/// Progressive encounter chances for the Storm Leviathan hunt.
+/// The beast learns and becomes harder to find with each encounter.
+/// Total of 10 encounters needed, taking roughly a month of casual play.
+const LEVIATHAN_ENCOUNTER_CHANCES: [f64; 10] = [
+    0.08,   // Encounter 1: 8%   - "Ripples"
+    0.06,   // Encounter 2: 6%   - "The Shadow"
+    0.05,   // Encounter 3: 5%   - "Emergence"
+    0.04,   // Encounter 4: 4%   - "Known"
+    0.03,   // Encounter 5: 3%   - "First Strike"
+    0.02,   // Encounter 6: 2%   - "Fury"
+    0.015,  // Encounter 7: 1.5% - "Blood in Water"
+    0.01,   // Encounter 8: 1%   - "The Long Night"
+    0.005,  // Encounter 9: 0.5% - "Exhaustion"
+    0.0025, // Encounter 10: 0.25% - "Legend"
+];
+
+/// Result of a Storm Leviathan roll during fishing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LeviathanResult {
+    /// No Leviathan appeared (normal fish)
+    None,
+    /// Leviathan appeared but escaped (encounter, not caught yet)
+    Escaped { encounter_number: u8 },
+    /// Leviathan was finally caught after all encounters
+    Caught,
+}
+
+/// Generates a fish with rank awareness and Leviathan hunt progression.
 ///
-/// At rank 30, legendary fish have a chance to be the Storm Leviathan.
-/// The Storm Leviathan is required to forge the Stormbreaker weapon.
-///
-/// # Arguments
-/// - `rarity`: The rarity tier of the fish
-/// - `rank`: The player's current fishing rank
-/// - `rng`: Random number generator
-///
-/// # Returns
-/// A tuple of (CaughtFish, is_storm_leviathan)
+/// At rank 40+, legendary fish have a progressive chance to trigger a Storm Leviathan
+/// encounter. The beast must be encountered 10 times before it can be caught.
+/// Each encounter has a decreasing chance, making the hunt take roughly a month.
 pub fn generate_fish_with_rank(
     rarity: FishRarity,
     rank: u32,
+    leviathan_encounters: u8,
     rng: &mut impl Rng,
-) -> (CaughtFish, bool) {
-    // Storm Leviathan only appears at rank 30 for legendary fish
-    // It has a 25% chance to appear when catching a legendary at max rank
-    if rarity == FishRarity::Legendary && rank >= 30 {
-        let storm_leviathan_roll: f64 = rng.gen();
-        if storm_leviathan_roll < 0.25 {
+) -> (CaughtFish, LeviathanResult) {
+    // Early exit: Leviathan only appears for legendary fish at rank 40+
+    if rarity != FishRarity::Legendary || rank < LEVIATHAN_MIN_RANK {
+        return (generate_fish(rarity, rng), LeviathanResult::None);
+    }
+
+    // After 10 encounters, chance to catch
+    if leviathan_encounters >= LEVIATHAN_REQUIRED_ENCOUNTERS {
+        if rng.gen::<f64>() < LEVIATHAN_CATCH_CHANCE {
             let xp_reward = rng.gen_range(STORM_LEVIATHAN_XP.0..=STORM_LEVIATHAN_XP.1);
             return (
                 CaughtFish {
@@ -183,13 +216,25 @@ pub fn generate_fish_with_rank(
                     rarity: FishRarity::Legendary,
                     xp_reward,
                 },
-                true,
+                LeviathanResult::Caught,
             );
         }
+        return (generate_fish(rarity, rng), LeviathanResult::None);
     }
 
-    // Normal fish generation
-    (generate_fish(rarity, rng), false)
+    // Progressive encounter roll
+    let encounter_chance = LEVIATHAN_ENCOUNTER_CHANCES[leviathan_encounters as usize];
+    if rng.gen::<f64>() < encounter_chance {
+        let fish = generate_fish(rarity, rng);
+        return (
+            fish,
+            LeviathanResult::Escaped {
+                encounter_number: leviathan_encounters + 1,
+            },
+        );
+    }
+
+    (generate_fish(rarity, rng), LeviathanResult::None)
 }
 
 /// Checks if a caught fish is the Storm Leviathan.
@@ -473,5 +518,186 @@ mod tests {
         assert_eq!(FISH_NAMES_RARE.len(), 5);
         assert_eq!(FISH_NAMES_EPIC.len(), 5);
         assert_eq!(FISH_NAMES_LEGENDARY.len(), 5);
+    }
+
+    // ==================== Storm Leviathan Tests ====================
+
+    #[test]
+    fn test_leviathan_encounter_chances_decreasing() {
+        // Each encounter chance should be less than or equal to the previous
+        for i in 1..LEVIATHAN_ENCOUNTER_CHANCES.len() {
+            assert!(
+                LEVIATHAN_ENCOUNTER_CHANCES[i] <= LEVIATHAN_ENCOUNTER_CHANCES[i - 1],
+                "Encounter {} chance ({}) should be <= encounter {} chance ({})",
+                i + 1,
+                LEVIATHAN_ENCOUNTER_CHANCES[i],
+                i,
+                LEVIATHAN_ENCOUNTER_CHANCES[i - 1]
+            );
+        }
+    }
+
+    #[test]
+    fn test_leviathan_encounter_chances_valid_range() {
+        for (i, chance) in LEVIATHAN_ENCOUNTER_CHANCES.iter().enumerate() {
+            assert!(
+                *chance > 0.0 && *chance <= 1.0,
+                "Encounter {} chance {} should be between 0 and 1",
+                i + 1,
+                chance
+            );
+        }
+    }
+
+    #[test]
+    fn test_generate_fish_with_rank_non_legendary_returns_none() {
+        let mut rng = create_test_rng();
+
+        // Non-legendary fish should never trigger Leviathan encounters
+        for rarity in [
+            FishRarity::Common,
+            FishRarity::Uncommon,
+            FishRarity::Rare,
+            FishRarity::Epic,
+        ] {
+            for encounters in 0..=10 {
+                let (fish, result) = generate_fish_with_rank(rarity, 40, encounters, &mut rng);
+                assert_eq!(result, LeviathanResult::None);
+                assert_eq!(fish.rarity, rarity);
+            }
+        }
+    }
+
+    #[test]
+    fn test_generate_fish_with_rank_low_rank_returns_none() {
+        let mut rng = create_test_rng();
+
+        // Ranks below 40 should never trigger Leviathan encounters
+        for rank in [1, 10, 20, 30, 39] {
+            for _ in 0..100 {
+                let (fish, result) =
+                    generate_fish_with_rank(FishRarity::Legendary, rank, 0, &mut rng);
+                assert_eq!(
+                    result,
+                    LeviathanResult::None,
+                    "Rank {} should not trigger Leviathan",
+                    rank
+                );
+                assert_eq!(fish.rarity, FishRarity::Legendary);
+            }
+        }
+    }
+
+    #[test]
+    fn test_generate_fish_with_rank_encounter_increments() {
+        // Use a seeded RNG that will produce an encounter
+        // We'll run multiple attempts to find one that triggers
+        let mut rng = create_test_rng();
+
+        // At rank 40, legendary fish with 0 encounters has 8% chance
+        // Run enough times to get some encounters
+        let mut encountered = false;
+        for _ in 0..1000 {
+            let (_, result) = generate_fish_with_rank(FishRarity::Legendary, 40, 0, &mut rng);
+            if let LeviathanResult::Escaped { encounter_number } = result {
+                assert_eq!(encounter_number, 1, "First encounter should be number 1");
+                encountered = true;
+                break;
+            }
+        }
+        assert!(
+            encountered,
+            "Should have encountered Leviathan at least once in 1000 tries at 8% chance"
+        );
+    }
+
+    #[test]
+    fn test_generate_fish_with_rank_catch_after_10_encounters() {
+        let mut rng = create_test_rng();
+
+        // With 10 encounters complete, there's a 25% chance to catch
+        let mut caught = false;
+        for _ in 0..1000 {
+            let (fish, result) = generate_fish_with_rank(FishRarity::Legendary, 40, 10, &mut rng);
+            if result == LeviathanResult::Caught {
+                assert_eq!(fish.name, STORM_LEVIATHAN);
+                assert_eq!(fish.rarity, FishRarity::Legendary);
+                assert!(
+                    fish.xp_reward >= STORM_LEVIATHAN_XP.0
+                        && fish.xp_reward <= STORM_LEVIATHAN_XP.1,
+                    "Storm Leviathan XP {} should be in range {:?}",
+                    fish.xp_reward,
+                    STORM_LEVIATHAN_XP
+                );
+                caught = true;
+                break;
+            }
+        }
+        assert!(
+            caught,
+            "Should have caught Leviathan at least once in 1000 tries at 25% chance"
+        );
+    }
+
+    #[test]
+    fn test_is_storm_leviathan() {
+        let leviathan = CaughtFish {
+            name: STORM_LEVIATHAN.to_string(),
+            rarity: FishRarity::Legendary,
+            xp_reward: 12000,
+        };
+        assert!(is_storm_leviathan(&leviathan));
+
+        // Wrong name
+        let fake = CaughtFish {
+            name: "Ancient Kraken".to_string(),
+            rarity: FishRarity::Legendary,
+            xp_reward: 12000,
+        };
+        assert!(!is_storm_leviathan(&fake));
+
+        // Wrong rarity (shouldn't happen but test anyway)
+        let wrong_rarity = CaughtFish {
+            name: STORM_LEVIATHAN.to_string(),
+            rarity: FishRarity::Epic,
+            xp_reward: 12000,
+        };
+        assert!(!is_storm_leviathan(&wrong_rarity));
+    }
+
+    #[test]
+    fn test_leviathan_result_equality() {
+        assert_eq!(LeviathanResult::None, LeviathanResult::None);
+        assert_eq!(LeviathanResult::Caught, LeviathanResult::Caught);
+        assert_eq!(
+            LeviathanResult::Escaped {
+                encounter_number: 5
+            },
+            LeviathanResult::Escaped {
+                encounter_number: 5
+            }
+        );
+        assert_ne!(
+            LeviathanResult::Escaped {
+                encounter_number: 5
+            },
+            LeviathanResult::Escaped {
+                encounter_number: 6
+            }
+        );
+        assert_ne!(LeviathanResult::None, LeviathanResult::Caught);
+    }
+
+    #[test]
+    fn test_storm_leviathan_xp_range() {
+        // Verify the XP constant is reasonable
+        assert!(
+            STORM_LEVIATHAN_XP.0 >= 10000,
+            "Minimum Leviathan XP should be at least 10000"
+        );
+        assert!(
+            STORM_LEVIATHAN_XP.1 >= STORM_LEVIATHAN_XP.0,
+            "Max XP should be >= min XP"
+        );
     }
 }

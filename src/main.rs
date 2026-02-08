@@ -24,7 +24,6 @@ use character::input::{
     SelectInput, SelectResult,
 };
 use character::manager::CharacterManager;
-use character::save::SaveManager;
 use chrono::{Local, Utc};
 use core::constants::*;
 use core::game_logic::*;
@@ -106,25 +105,6 @@ fn main() -> io::Result<()> {
 
     // Load global achievements (shared across all characters)
     let mut global_achievements = achievements::load_achievements();
-
-    // Check for old save file to migrate
-    let old_save_manager = SaveManager::new()?;
-    if old_save_manager.save_exists() {
-        println!("Old save file detected. Importing as 'Imported Character'...");
-
-        match old_save_manager.load() {
-            Ok(old_state) => {
-                // Save as new character
-                character_manager.save_character(&old_state)?;
-                println!("Import successful! Character available in character select.");
-                println!("Old save file left at original location (you can delete it manually).");
-            }
-            Err(e) => {
-                println!("Warning: Could not import old save: {}", e);
-                println!("You can still create new characters.");
-            }
-        }
-    }
 
     // List existing characters
     let characters = character_manager.list_characters()?;
@@ -732,6 +712,14 @@ fn main() -> io::Result<()> {
                                 browser,
                             );
                         }
+                        // Draw Leviathan encounter modal if active
+                        if let GameOverlay::LeviathanEncounter { encounter_number } = overlay {
+                            ui::fishing_scene::render_leviathan_encounter_modal(
+                                frame,
+                                frame.size(),
+                                encounter_number,
+                            );
+                        }
                         // Draw Haven screen if active
                         if haven_ui.showing {
                             ui::haven_scene::render_haven_tree(
@@ -874,13 +862,21 @@ fn main() -> io::Result<()> {
 
                     // Game tick every 100ms
                     if last_tick.elapsed() >= Duration::from_millis(TICK_INTERVAL_MS) {
-                        game_tick(
-                            &mut state,
-                            &mut tick_counter,
-                            &haven,
-                            &mut global_achievements,
-                            debug_mode,
-                        );
+                        // Skip game ticks while Leviathan modal is showing
+                        if !matches!(overlay, GameOverlay::LeviathanEncounter { .. }) {
+                            let leviathan_encounter = game_tick(
+                                &mut state,
+                                &mut tick_counter,
+                                &haven,
+                                &mut global_achievements,
+                                debug_mode,
+                            );
+
+                            // Show Leviathan encounter modal if one occurred
+                            if let Some(encounter_number) = leviathan_encounter {
+                                overlay = GameOverlay::LeviathanEncounter { encounter_number };
+                            }
+                        }
                         last_tick = Instant::now();
 
                         // Haven discovery check (independent roll, once per tick)
@@ -962,14 +958,15 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-/// Processes a single game tick, updating combat and stats
+/// Processes a single game tick, updating combat and stats.
+/// Returns Some(encounter_number) if a Storm Leviathan encounter occurred during fishing.
 fn game_tick(
     game_state: &mut GameState,
     tick_counter: &mut u32,
     haven: &haven::Haven,
     global_achievements: &mut achievements::Achievements,
     debug_mode: bool,
-) {
+) -> Option<u8> {
     use combat::logic::update_combat;
     use dungeon::logic::{
         on_boss_defeated, on_elite_defeated, on_treasure_room_entered, update_dungeon,
@@ -1177,7 +1174,7 @@ fn game_tick(
             *tick_counter = 0;
         }
 
-        return; // Skip combat processing while fishing
+        return fishing_result.leviathan_encounter; // Skip combat processing while fishing
     }
 
     // Build Haven combat bonuses
@@ -1506,4 +1503,6 @@ fn game_tick(
             );
         }
     }
+
+    None
 }
