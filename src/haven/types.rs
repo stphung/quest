@@ -72,7 +72,7 @@ impl HavenRoomId {
             HavenRoomId::Armory => "Whetstones and weapon oil fill the air with a sharp, metallic tang. Every blade here has been honed to a razor's edge, and their fury flows into whoever wields them.",
             HavenRoomId::TrainingYard => "The clang of steel on wood echoes through the yard at all hours. Sweat-stained targets and chalk-drawn footwork patterns mark the path to mastery.",
             HavenRoomId::TrophyHall => "Glass cases display the spoils of a hundred battles — a dragon's scale, a bandit lord's signet ring, a shard of cursed obsidian. Their presence draws more treasure your way.",
-            HavenRoomId::Watchtower => "Sharpens your eye for weak points.",
+            HavenRoomId::Watchtower => "A spiral staircase leads to a narrow platform where hawks nest and cold wind bites. Hours spent scanning the horizon have taught you to spot a weakness before your enemy even knows it's there.",
             HavenRoomId::AlchemyLab => "Brews and tonics always simmering.",
             HavenRoomId::WarRoom => "Tactical planning speeds your strikes.",
             HavenRoomId::Bedroom => "Rest well, fight well.",
