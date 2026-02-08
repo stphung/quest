@@ -216,6 +216,14 @@ pub struct Achievements {
     /// Achievements unlocked this tick that need to be logged (not persisted)
     #[serde(skip)]
     pub newly_unlocked: Vec<AchievementId>,
+
+    /// Achievements waiting to be shown in modal (accumulation window)
+    #[serde(skip)]
+    pub modal_queue: Vec<AchievementId>,
+
+    /// When the accumulation window started (first achievement unlocked)
+    #[serde(skip)]
+    pub accumulation_start: Option<std::time::Instant>,
 }
 
 impl Achievements {
@@ -238,6 +246,13 @@ impl Achievements {
         );
         self.pending_notifications.push(id);
         self.newly_unlocked.push(id);
+
+        // Add to modal queue and start accumulation timer if not already started
+        self.modal_queue.push(id);
+        if self.accumulation_start.is_none() {
+            self.accumulation_start = Some(std::time::Instant::now());
+        }
+
         true
     }
 
@@ -259,6 +274,25 @@ impl Achievements {
     /// Take newly unlocked achievements for logging (clears the list).
     pub fn take_newly_unlocked(&mut self) -> Vec<AchievementId> {
         std::mem::take(&mut self.newly_unlocked)
+    }
+
+    /// Check if the achievement modal is ready to show.
+    /// Returns true if there are queued achievements and 500ms has elapsed.
+    pub fn is_modal_ready(&self) -> bool {
+        if self.modal_queue.is_empty() {
+            return false;
+        }
+        if let Some(start) = self.accumulation_start {
+            start.elapsed() >= std::time::Duration::from_millis(500)
+        } else {
+            false
+        }
+    }
+
+    /// Take the modal queue for display (clears queue and resets timer).
+    pub fn take_modal_queue(&mut self) -> Vec<AchievementId> {
+        self.accumulation_start = None;
+        std::mem::take(&mut self.modal_queue)
     }
 
     /// Update progress on a tracked achievement.

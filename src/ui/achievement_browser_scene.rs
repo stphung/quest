@@ -3,7 +3,10 @@
 //! Displays a browsable list of achievements organized by category,
 //! with a detail panel showing description and unlock status.
 
-use crate::achievements::{get_achievements_by_category, AchievementCategory, Achievements};
+use crate::achievements::{
+    get_achievement_def, get_achievements_by_category, AchievementCategory, AchievementId,
+    Achievements,
+};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -313,6 +316,105 @@ fn render_achievement_detail(
     }
 
     let para = Paragraph::new(lines).wrap(Wrap { trim: true });
+    frame.render_widget(para, inner);
+}
+
+/// Render the achievement unlocked celebration modal.
+pub fn render_achievement_unlocked_modal(
+    frame: &mut Frame,
+    area: Rect,
+    achievements: &[AchievementId],
+) {
+    if achievements.is_empty() {
+        return;
+    }
+
+    let is_single = achievements.len() == 1;
+    let modal_height = if is_single {
+        9 // Single achievement with description
+    } else {
+        (6 + achievements.len()).min(20) as u16 // List format, capped at 20
+    };
+    let modal_width = 50;
+
+    // Center the modal
+    let x = area.x + (area.width.saturating_sub(modal_width)) / 2;
+    let y = area.y + (area.height.saturating_sub(modal_height)) / 2;
+    let modal_area = Rect::new(
+        x,
+        y,
+        modal_width.min(area.width),
+        modal_height.min(area.height),
+    );
+
+    frame.render_widget(Clear, modal_area);
+
+    let title = if is_single {
+        " Achievement Unlocked! "
+    } else {
+        " Achievements Unlocked! "
+    };
+
+    let block = Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Yellow));
+
+    let inner = block.inner(modal_area);
+    frame.render_widget(block, modal_area);
+
+    let mut lines = vec![Line::from("")];
+
+    if is_single {
+        // Single achievement: show icon, name, and description
+        if let Some(def) = get_achievement_def(achievements[0]) {
+            lines.push(Line::from(Span::styled(
+                format!("{}  {}", def.icon, def.name),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )));
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                def.description,
+                Style::default().fg(Color::White),
+            )));
+        }
+    } else {
+        // Multiple achievements: show count and list
+        lines.push(Line::from(Span::styled(
+            format!("🏆  {} achievements!", achievements.len()),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )));
+        lines.push(Line::from(""));
+
+        for id in achievements.iter().take(12) {
+            if let Some(def) = get_achievement_def(*id) {
+                lines.push(Line::from(Span::styled(
+                    format!("  {}  {}", def.icon, def.name),
+                    Style::default().fg(Color::White),
+                )));
+            }
+        }
+
+        if achievements.len() > 12 {
+            lines.push(Line::from(Span::styled(
+                format!("  ...and {} more", achievements.len() - 12),
+                Style::default().fg(Color::DarkGray),
+            )));
+        }
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![
+        Span::styled("[Enter] to continue", Style::default().fg(Color::DarkGray)),
+        Span::styled(" | ", Style::default().fg(Color::DarkGray)),
+        Span::styled("A = Achievements", Style::default().fg(Color::Magenta)),
+    ]));
+
+    let para = Paragraph::new(lines).alignment(Alignment::Center);
     frame.render_widget(para, inner);
 }
 

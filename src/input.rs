@@ -73,6 +73,10 @@ pub enum GameOverlay {
     Achievements {
         browser: crate::ui::achievement_browser_scene::AchievementBrowserState,
     },
+    /// Achievement unlock celebration modal
+    AchievementUnlocked {
+        achievements: Vec<crate::achievements::AchievementId>,
+    },
 }
 
 /// Result of handling a game input event.
@@ -125,6 +129,11 @@ pub fn handle_game_input(
         return handle_haven_discovery(key, overlay);
     }
 
+    // 1b. Achievement unlocked modal (blocks all other input)
+    if matches!(overlay, GameOverlay::AchievementUnlocked { .. }) {
+        return handle_achievement_unlocked(key, overlay);
+    }
+
     // 2. Haven screen (blocks other input when open)
     if haven_ui.showing {
         return handle_haven(key, state, haven, haven_ui);
@@ -173,6 +182,14 @@ pub fn handle_game_input(
 
 fn handle_haven_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
     if matches!(key.code, KeyCode::Enter | KeyCode::Esc) {
+        *overlay = GameOverlay::None;
+    }
+    InputResult::Continue
+}
+
+fn handle_achievement_unlocked(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
+    // Any key dismisses the achievement modal
+    if matches!(key.code, KeyCode::Enter | KeyCode::Esc | KeyCode::Char(' ')) {
         *overlay = GameOverlay::None;
     }
     InputResult::Continue

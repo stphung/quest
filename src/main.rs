@@ -699,6 +699,14 @@ fn main() -> io::Result<()> {
                         if matches!(overlay, GameOverlay::HavenDiscovery) {
                             ui::haven_scene::render_haven_discovery_modal(frame, frame.size());
                         }
+                        // Draw Achievement unlocked modal if active
+                        if let GameOverlay::AchievementUnlocked { ref achievements } = overlay {
+                            ui::achievement_browser_scene::render_achievement_unlocked_modal(
+                                frame,
+                                frame.size(),
+                                achievements,
+                            );
+                        }
                         // Draw Vault selection screen if active
                         if let GameOverlay::VaultSelection {
                             selected_index,
@@ -886,6 +894,17 @@ fn main() -> io::Result<()> {
                                     }
                                 }
                                 overlay = GameOverlay::HavenDiscovery;
+                            }
+                        }
+
+                        // Check if achievement modal is ready to show
+                        // Only show if no other overlay is active
+                        if matches!(overlay, GameOverlay::None)
+                            && global_achievements.is_modal_ready()
+                        {
+                            let achievements = global_achievements.take_modal_queue();
+                            if !achievements.is_empty() {
+                                overlay = GameOverlay::AchievementUnlocked { achievements };
                             }
                         }
                     }
