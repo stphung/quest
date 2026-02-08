@@ -68,19 +68,38 @@ pub fn draw_ui_with_update(
         size
     };
 
-    // Split vertically: main content, full-width info panels, footer
-    let v_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Min(0),    // Main content (stats + right panel)
-            Constraint::Length(8), // Full-width Loot + Combat
-            Constraint::Length(3), // Full-width footer
-        ])
-        .split(main_area);
+    // Determine if we need space for update drawer
+    let show_update_drawer = update_expanded && update_info.is_some();
+
+    // Split vertically: main content, full-width info panels, optional update drawer, footer
+    let v_chunks = if show_update_drawer {
+        Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Min(0),    // Main content (stats + right panel)
+                Constraint::Length(8), // Full-width Loot + Combat
+                Constraint::Length(6), // Update drawer panel
+                Constraint::Length(3), // Full-width footer
+            ])
+            .split(main_area)
+    } else {
+        Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Min(0),    // Main content (stats + right panel)
+                Constraint::Length(8), // Full-width Loot + Combat
+                Constraint::Length(3), // Full-width footer
+            ])
+            .split(main_area)
+    };
 
     let content_area = v_chunks[0];
     let info_area = v_chunks[1];
-    let footer_area = v_chunks[2];
+    let (update_drawer_area, footer_area) = if show_update_drawer {
+        (Some(v_chunks[2]), v_chunks[3])
+    } else {
+        (None, v_chunks[2])
+    };
 
     // Split main content into two areas: stats panel (left) and combat/dungeon (right)
     let chunks = Layout::default()
@@ -96,6 +115,11 @@ pub fn draw_ui_with_update(
 
     // Draw full-width Loot + Combat panels
     info_panel::draw_info_panel(frame, info_area, game_state);
+
+    // Draw update drawer if expanded
+    if let (Some(drawer_area), Some(info)) = (update_drawer_area, update_info) {
+        stats_panel::draw_update_drawer(frame, drawer_area, info);
+    }
 
     // Draw full-width footer at the bottom
     stats_panel::draw_footer(

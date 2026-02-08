@@ -705,6 +705,70 @@ fn format_play_time(total_seconds: u64) -> String {
     }
 }
 
+/// Draws the update drawer panel when expanded
+pub fn draw_update_drawer(frame: &mut Frame, area: Rect, info: &UpdateInfo) {
+    let lines = vec![
+        Line::from(vec![
+            Span::styled("New Version: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("v{}", info.new_version),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!("  ({})", info.new_commit),
+                Style::default().fg(Color::DarkGray),
+            ),
+        ]),
+        Line::from(vec![]),
+        Line::from(vec![
+            Span::styled("Changes: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                info.changelog
+                    .iter()
+                    .take(3)
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join(" • "),
+                Style::default().fg(Color::White),
+            ),
+            if info.changelog_total > 3 {
+                Span::styled(
+                    format!(" (+{} more)", info.changelog_total - 3),
+                    Style::default().fg(Color::DarkGray),
+                )
+            } else {
+                Span::raw("")
+            },
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "Run 'quest update' to install",
+                Style::default().fg(Color::DarkGray),
+            ),
+            Span::raw("                              "),
+            Span::styled("[U] Close", Style::default().fg(Color::Yellow)),
+        ]),
+    ];
+
+    let drawer = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Yellow))
+                .title(Span::styled(
+                    " 🆕 Update Available ",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                )),
+        )
+        .alignment(Alignment::Center);
+
+    frame.render_widget(drawer, area);
+}
+
 /// Draws the footer with control instructions and version info
 #[allow(clippy::too_many_arguments)]
 pub fn draw_footer(
@@ -712,7 +776,7 @@ pub fn draw_footer(
     area: Rect,
     game_state: &GameState,
     update_info: Option<&UpdateInfo>,
-    update_expanded: bool,
+    _update_expanded: bool,
     update_check_completed: bool,
     haven_discovered: bool,
     pending_achievements: usize,
@@ -723,71 +787,7 @@ pub fn draw_footer(
     // Build version string for the title
     let version_title = format!("v{} ({}) ", BUILD_DATE, BUILD_COMMIT);
 
-    // If update expanded, show detailed update info
-    if update_expanded {
-        if let Some(info) = update_info {
-            let mut lines = vec![Line::from(vec![
-                Span::styled("v", Style::default().fg(Color::White)),
-                Span::styled(
-                    info.new_version.clone(),
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(
-                    format!(" ({})", info.new_commit),
-                    Style::default().fg(Color::DarkGray),
-                ),
-                Span::styled(": ", Style::default().fg(Color::White)),
-                // Inline changelog summary
-                Span::styled(
-                    info.changelog
-                        .iter()
-                        .take(3)
-                        .cloned()
-                        .collect::<Vec<_>>()
-                        .join(" • "),
-                    Style::default().fg(Color::White),
-                ),
-                if info.changelog_total > 3 {
-                    Span::styled(
-                        format!(" (+{})", info.changelog_total - 3),
-                        Style::default().fg(Color::DarkGray),
-                    )
-                } else {
-                    Span::raw("")
-                },
-            ])];
-
-            lines.push(Line::from(vec![
-                Span::styled(
-                    "Run 'quest update' to install",
-                    Style::default().fg(Color::DarkGray),
-                ),
-                Span::raw("    "),
-                Span::styled("[U] Close", Style::default().fg(Color::Yellow)),
-            ]));
-
-            let footer = Paragraph::new(lines)
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .border_style(Style::default().fg(Color::Yellow))
-                        .title(Span::styled(
-                            " 🆕 Update Available ",
-                            Style::default()
-                                .fg(Color::Yellow)
-                                .add_modifier(Modifier::BOLD),
-                        )),
-                )
-                .alignment(Alignment::Center);
-
-            frame.render_widget(footer, area);
-            return;
-        }
-    }
-
-    // Normal collapsed footer
+    // Normal footer (update drawer is drawn separately when expanded)
     let can_prestige_now = can_prestige(game_state);
     let prestige_text = if can_prestige_now {
         Span::styled(
