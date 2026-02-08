@@ -51,6 +51,11 @@ pub struct FishingSession {
     pub phase: FishingPhase,
 }
 
+/// Helper for serde skip_serializing_if
+fn is_zero(n: &u8) -> bool {
+    *n == 0
+}
+
 /// Persistent fishing state that is saved with the character.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FishingState {
@@ -58,6 +63,9 @@ pub struct FishingState {
     pub total_fish_caught: u32,
     pub fish_toward_next_rank: u32,
     pub legendary_catches: u32,
+    /// Storm Leviathan encounter progress (0-10). At 10, the next encounter catches it.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub leviathan_encounters: u8,
 }
 
 impl Default for FishingState {
@@ -67,6 +75,7 @@ impl Default for FishingState {
             total_fish_caught: 0,
             fish_toward_next_rank: 0,
             legendary_catches: 0,
+            leviathan_encounters: 0,
         }
     }
 }

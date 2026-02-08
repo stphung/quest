@@ -5,7 +5,7 @@
 
 #![allow(dead_code)]
 
-use super::generation as fishing_generation;
+use super::generation::{self as fishing_generation, is_storm_leviathan, LeviathanResult};
 use super::types::{FishRarity, FishingPhase, FishingState};
 use crate::character::prestige::get_prestige_tier;
 use crate::core::game_state::GameState;
@@ -47,6 +47,8 @@ pub struct FishingTickResult {
     pub messages: Vec<String>,
     /// True if the Storm Leviathan was caught this tick
     pub caught_storm_leviathan: bool,
+    /// If set, a Leviathan encounter occurred (it escaped). Value is encounter number (1-10).
+    pub leviathan_encounter: Option<u8>,
 }
 
 /// Processes a fishing session tick with phase-based timing.
@@ -116,15 +118,24 @@ pub fn tick_fishing_with_haven_result(
 
                 for fish_num in 0..fish_count {
                     let rarity = fishing_generation::roll_fish_rarity(state.fishing.rank, rng);
-                    // Use rank-aware fish generation for Storm Leviathan
-                    let (fish, is_storm_leviathan) = fishing_generation::generate_fish_with_rank(
+                    // Use rank-aware fish generation for Storm Leviathan hunt
+                    let (fish, leviathan_result) = fishing_generation::generate_fish_with_rank(
                         rarity,
                         state.fishing.rank,
+                        state.fishing.leviathan_encounters,
                         rng,
                     );
 
-                    if is_storm_leviathan {
-                        result.caught_storm_leviathan = true;
+                    match leviathan_result {
+                        LeviathanResult::Caught => {
+                            result.caught_storm_leviathan = true;
+                        }
+                        LeviathanResult::Escaped { encounter_number } => {
+                            // Increment encounters and signal modal should show
+                            state.fishing.leviathan_encounters = encounter_number;
+                            result.leviathan_encounter = Some(encounter_number);
+                        }
+                        LeviathanResult::None => {}
                     }
 
                     // Calculate XP with prestige multiplier
@@ -158,7 +169,7 @@ pub fn tick_fishing_with_haven_result(
                     };
 
                     // Special message for Storm Leviathan
-                    if is_storm_leviathan {
+                    if is_storm_leviathan(&fish) {
                         result.messages.push(format!(
                             "⚡🐉 YOU CAUGHT THE STORM LEVIATHAN! [{}] +{} XP{}",
                             rarity_name, xp_gained, double_msg
@@ -598,6 +609,7 @@ mod tests {
             total_fish_caught: 100,
             fish_toward_next_rank: 100, // Exactly at threshold for rank 1 (requires 100)
             legendary_catches: 0,
+            leviathan_encounters: 0,
         };
 
         let result = check_rank_up(&mut fishing_state);
@@ -617,6 +629,7 @@ mod tests {
             total_fish_caught: 120,
             fish_toward_next_rank: 120, // 20 excess
             legendary_catches: 0,
+            leviathan_encounters: 0,
         };
 
         let result = check_rank_up(&mut fishing_state);
@@ -636,6 +649,7 @@ mod tests {
             total_fish_caught: 50,
             fish_toward_next_rank: 50, // Only halfway to 100
             legendary_catches: 0,
+            leviathan_encounters: 0,
         };
 
         let result = check_rank_up(&mut fishing_state);
@@ -655,6 +669,7 @@ mod tests {
             total_fish_caught: 50000,
             fish_toward_next_rank: 5000, // Way more than enough to rank up
             legendary_catches: 100,
+            leviathan_encounters: 0,
         };
 
         let result = check_rank_up(&mut fishing_state);

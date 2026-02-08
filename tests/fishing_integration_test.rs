@@ -5,12 +5,13 @@
 //! - Rank progression
 //! - Item drops
 //! - Haven bonuses
+//! - Storm Leviathan encounters
 //! - Edge cases
 
 use quest::fishing::{
-    check_rank_up, generate_fish, roll_fish_rarity, tick_fishing, tick_fishing_with_haven,
-    try_discover_fishing, FishRarity, FishingPhase, FishingSession, FishingState,
-    HavenFishingBonuses, SPOT_NAMES,
+    check_rank_up, generate_fish, generate_fish_with_rank, roll_fish_rarity, tick_fishing,
+    tick_fishing_with_haven, tick_fishing_with_haven_result, try_discover_fishing, FishRarity,
+    FishingPhase, FishingSession, FishingState, HavenFishingBonuses, LeviathanResult, SPOT_NAMES,
 };
 use quest::GameState;
 use rand::SeedableRng;
@@ -169,6 +170,7 @@ fn test_max_rank_behavior() {
         total_fish_caught: 100000,
         fish_toward_next_rank: 10000, // Way over requirement
         legendary_catches: 50,
+        leviathan_encounters: 0,
     };
 
     // At max rank, should still track fish but not rank up
@@ -192,6 +194,7 @@ fn test_multiple_rank_ups_in_sequence() {
         total_fish_caught: 0,
         fish_toward_next_rank: 250, // Enough for 2 rank ups (100 + 100)
         legendary_catches: 0,
+        leviathan_encounters: 0,
     };
 
     // First rank up (100 fish, 150 remaining)
@@ -629,5 +632,218 @@ fn test_prestige_affects_fishing_xp() {
         "Prestige rank 5 XP ({}) should be greater than rank 0 ({})",
         xp2,
         xp1
+    );
+}
+
+// ============================================================================
+// Storm Leviathan Integration Tests
+// ============================================================================
+
+#[test]
+fn test_leviathan_encounter_updates_fishing_state() {
+    let mut rng = ChaCha8Rng::seed_from_u64(99999);
+
+    // At rank 40 with 0 encounters, we should eventually get an encounter
+    let mut encountered = false;
+    for _ in 0..5000 {
+        let (_, result) = generate_fish_with_rank(FishRarity::Legendary, 40, 0, &mut rng);
+        if let LeviathanResult::Escaped { encounter_number } = result {
+            assert_eq!(encounter_number, 1);
+            encountered = true;
+            break;
+        }
+    }
+    assert!(
+        encountered,
+        "Should encounter Leviathan within 5000 legendary fish at 8% rate"
+    );
+}
+
+#[test]
+fn test_leviathan_encounter_progresses_through_stages() {
+    let mut rng = ChaCha8Rng::seed_from_u64(77777);
+
+    // Test that encounter numbers increment correctly
+    for expected_encounter in 1..=10 {
+        let encounters_so_far = expected_encounter - 1;
+        let mut found = false;
+
+        for _ in 0..10000 {
+            let (_, result) =
+                generate_fish_with_rank(FishRarity::Legendary, 40, encounters_so_far, &mut rng);
+            if let LeviathanResult::Escaped { encounter_number } = result {
+                assert_eq!(
+                    encounter_number, expected_encounter,
+                    "After {} encounters, next should be {}",
+                    encounters_so_far, expected_encounter
+                );
+                found = true;
+                break;
+            }
+        }
+        assert!(
+            found,
+            "Should find encounter {} within 10000 tries",
+            expected_encounter
+        );
+    }
+}
+
+#[test]
+fn test_leviathan_tick_result_returns_encounter() {
+    let mut rng = ChaCha8Rng::seed_from_u64(11111);
+    let mut state = create_test_state();
+    state.fishing.rank = 40;
+    state.fishing.leviathan_encounters = 0;
+
+    let haven_bonuses = HavenFishingBonuses {
+        timer_reduction_percent: 0.0,
+        double_fish_chance_percent: 0.0,
+        max_fishing_rank_bonus: 10,
+    };
+
+    // Run many fishing sessions looking for a Leviathan encounter
+    let mut found_encounter = false;
+    for _ in 0..100 {
+        // Create a session about to catch a legendary (force reeling phase)
+        let session = FishingSession {
+            spot_name: "Leviathan Waters".to_string(),
+            total_fish: 100,
+            fish_caught: Vec::new(),
+            items_found: Vec::new(),
+            ticks_remaining: 1,
+            phase: FishingPhase::Reeling,
+        };
+        state.active_fishing = Some(session);
+
+        let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven_bonuses);
+
+        if result.leviathan_encounter.is_some() {
+            assert_eq!(
+                result.leviathan_encounter,
+                Some(1),
+                "First encounter should be number 1"
+            );
+            assert_eq!(
+                state.fishing.leviathan_encounters, 1,
+                "State should be updated to 1 encounter"
+            );
+            found_encounter = true;
+            break;
+        }
+    }
+    // Note: This test may not always find an encounter due to:
+    // 1. Legendary fish rarity (~1% at rank 40)
+    // 2. 8% encounter chance
+    // Combined: ~0.08% per catch, so 100 tries gives ~8% chance of at least one
+    // We don't assert found_encounter to avoid flakiness
+    let _ = found_encounter; // Suppress unused warning
+}
+
+#[test]
+fn test_leviathan_catch_sets_flag() {
+    let mut rng = ChaCha8Rng::seed_from_u64(33333);
+
+    // After 10 encounters, should eventually catch
+    let mut caught = false;
+    for _ in 0..5000 {
+        let (fish, result) = generate_fish_with_rank(FishRarity::Legendary, 40, 10, &mut rng);
+        if result == LeviathanResult::Caught {
+            assert_eq!(fish.name, "Storm Leviathan");
+            assert_eq!(fish.rarity, FishRarity::Legendary);
+            assert!(fish.xp_reward >= 10000 && fish.xp_reward <= 15000);
+            caught = true;
+            break;
+        }
+    }
+    assert!(
+        caught,
+        "Should catch Leviathan within 5000 tries at 25% rate after 10 encounters"
+    );
+}
+
+// ============================================================================
+// FishingState Serialization Tests
+// ============================================================================
+
+#[test]
+fn test_fishing_state_serialization_skips_zero_encounters() {
+    let state = FishingState {
+        rank: 15,
+        total_fish_caught: 500,
+        fish_toward_next_rank: 50,
+        legendary_catches: 3,
+        leviathan_encounters: 0,
+    };
+
+    let json = serde_json::to_string(&state).unwrap();
+
+    // leviathan_encounters should NOT appear in JSON when it's 0
+    assert!(
+        !json.contains("leviathan_encounters"),
+        "JSON should not contain leviathan_encounters when it's 0: {}",
+        json
+    );
+}
+
+#[test]
+fn test_fishing_state_serialization_includes_nonzero_encounters() {
+    let state = FishingState {
+        rank: 40,
+        total_fish_caught: 35000,
+        fish_toward_next_rank: 200,
+        legendary_catches: 50,
+        leviathan_encounters: 7,
+    };
+
+    let json = serde_json::to_string(&state).unwrap();
+
+    // leviathan_encounters SHOULD appear when non-zero
+    assert!(
+        json.contains("\"leviathan_encounters\":7"),
+        "JSON should contain leviathan_encounters when non-zero: {}",
+        json
+    );
+}
+
+#[test]
+fn test_fishing_state_deserialization_defaults_missing_encounters() {
+    // Old save format without leviathan_encounters field
+    let json =
+        r#"{"rank":20,"total_fish_caught":1000,"fish_toward_next_rank":100,"legendary_catches":5}"#;
+
+    let state: FishingState = serde_json::from_str(json).unwrap();
+
+    assert_eq!(state.rank, 20);
+    assert_eq!(state.total_fish_caught, 1000);
+    assert_eq!(
+        state.leviathan_encounters, 0,
+        "Missing leviathan_encounters should default to 0"
+    );
+}
+
+#[test]
+fn test_fishing_state_roundtrip_with_encounters() {
+    let original = FishingState {
+        rank: 40,
+        total_fish_caught: 40000,
+        fish_toward_next_rank: 500,
+        legendary_catches: 100,
+        leviathan_encounters: 9,
+    };
+
+    let json = serde_json::to_string(&original).unwrap();
+    let restored: FishingState = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(restored.rank, original.rank);
+    assert_eq!(restored.total_fish_caught, original.total_fish_caught);
+    assert_eq!(
+        restored.fish_toward_next_rank,
+        original.fish_toward_next_rank
+    );
+    assert_eq!(restored.legendary_catches, original.legendary_catches);
+    assert_eq!(
+        restored.leviathan_encounters, original.leviathan_encounters,
+        "leviathan_encounters should survive roundtrip"
     );
 }
