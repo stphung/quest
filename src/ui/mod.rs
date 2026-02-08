@@ -1,3 +1,4 @@
+pub mod achievement_browser_scene;
 pub mod challenge_menu_scene;
 pub mod character_creation;
 pub mod character_delete;
@@ -41,6 +42,7 @@ pub fn draw_ui_with_update(
     update_info: Option<&UpdateInfo>,
     update_check_completed: bool,
     haven_discovered: bool,
+    achievements: &crate::achievements::Achievements,
 ) {
     let size = frame.size();
 
@@ -102,10 +104,11 @@ pub fn draw_ui_with_update(
         update_info.is_some(),
         update_check_completed,
         haven_discovered,
+        achievements.pending_count(),
     );
 
     // Draw right panel with stable layout: zone info + content + info panel
-    draw_right_panel(frame, chunks[1], game_state);
+    draw_right_panel(frame, chunks[1], game_state, achievements);
 }
 
 /// Draws the challenge notification banner at the top of the screen
@@ -147,7 +150,12 @@ fn draw_challenge_banner(frame: &mut Frame, area: Rect, game_state: &GameState) 
 
 /// Draws the right panel with a stable 2-part layout: zone info and content.
 /// The content area changes based on activity but zone info stays fixed.
-fn draw_right_panel(frame: &mut Frame, area: Rect, game_state: &GameState) {
+fn draw_right_panel(
+    frame: &mut Frame,
+    area: Rect,
+    game_state: &GameState,
+    achievements: &crate::achievements::Achievements,
+) {
     let zone_completion = stats_panel::compute_zone_completion(game_state);
 
     let chunks = Layout::default()
@@ -159,7 +167,7 @@ fn draw_right_panel(frame: &mut Frame, area: Rect, game_state: &GameState) {
         .split(area);
 
     // Zone info at top (always)
-    stats_panel::draw_zone_info(frame, chunks[0], game_state, &zone_completion);
+    stats_panel::draw_zone_info(frame, chunks[0], game_state, &zone_completion, achievements);
 
     // Content area — dispatched by current activity
     draw_right_content(frame, chunks[1], game_state);

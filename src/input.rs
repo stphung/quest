@@ -70,6 +70,13 @@ pub enum GameOverlay {
     OfflineWelcome {
         report: OfflineReport,
     },
+    Achievements {
+        browser: crate::ui::achievement_browser_scene::AchievementBrowserState,
+    },
+    /// Achievement unlock celebration modal
+    AchievementUnlocked {
+        achievements: Vec<crate::achievements::AchievementId>,
+    },
 }
 
 /// Result of handling a game input event.
@@ -85,6 +92,7 @@ pub enum InputResult {
 }
 
 /// Main dispatcher for Game screen input. Handles the priority chain.
+#[allow(clippy::too_many_arguments)]
 pub fn handle_game_input(
     key: KeyEvent,
     state: &mut GameState,
@@ -93,6 +101,7 @@ pub fn handle_game_input(
     overlay: &mut GameOverlay,
     debug_menu: &mut DebugMenu,
     debug_mode: bool,
+    achievements: &mut crate::achievements::Achievements,
 ) -> InputResult {
     // 0. Offline welcome overlay (any key dismisses)
     if matches!(overlay, GameOverlay::OfflineWelcome { .. }) {
@@ -100,9 +109,29 @@ pub fn handle_game_input(
         return InputResult::Continue;
     }
 
+    // 0.5. Achievement browser overlay
+    if let GameOverlay::Achievements { ref mut browser } = overlay {
+        match key.code {
+            KeyCode::Esc | KeyCode::Char('a') | KeyCode::Char('A') => {
+                *overlay = GameOverlay::None;
+            }
+            KeyCode::Left => browser.prev_category(),
+            KeyCode::Right => browser.next_category(),
+            KeyCode::Up => browser.move_up(),
+            KeyCode::Down => browser.move_down(1000),
+            _ => {}
+        }
+        return InputResult::Continue;
+    }
+
     // 1. Haven discovery modal (blocks all other input)
     if matches!(overlay, GameOverlay::HavenDiscovery) {
         return handle_haven_discovery(key, overlay);
+    }
+
+    // 1b. Achievement unlocked modal (blocks all other input)
+    if matches!(overlay, GameOverlay::AchievementUnlocked { .. }) {
+        return handle_achievement_unlocked(key, overlay);
     }
 
     // 2. Haven screen (blocks other input when open)
@@ -148,11 +177,19 @@ pub fn handle_game_input(
     }
 
     // 9. Base game input
-    handle_base_game(key, state, haven, haven_ui, overlay)
+    handle_base_game(key, state, haven, haven_ui, overlay, achievements)
 }
 
 fn handle_haven_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
     if matches!(key.code, KeyCode::Enter | KeyCode::Esc) {
+        *overlay = GameOverlay::None;
+    }
+    InputResult::Continue
+}
+
+fn handle_achievement_unlocked(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
+    // Any key dismisses the achievement modal
+    if matches!(key.code, KeyCode::Enter | KeyCode::Esc | KeyCode::Char(' ')) {
         *overlay = GameOverlay::None;
     }
     InputResult::Continue
@@ -343,7 +380,7 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
         match minigame {
             ActiveMinigame::Rune(rune_game) => {
                 if rune_game.game_result.is_some() {
-                    apply_rune_result(state);
+                    state.last_minigame_win = apply_rune_result(state);
                     return InputResult::Continue;
                 }
                 let input = match key.code {
@@ -361,7 +398,7 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
             }
             ActiveMinigame::Minesweeper(minesweeper_game) => {
                 if minesweeper_game.game_result.is_some() {
-                    apply_minesweeper_result(state);
+                    state.last_minigame_win = apply_minesweeper_result(state);
                     return InputResult::Continue;
                 }
                 let input = match key.code {
@@ -379,7 +416,7 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
             }
             ActiveMinigame::Gomoku(gomoku_game) => {
                 if gomoku_game.game_result.is_some() {
-                    apply_gomoku_result(state);
+                    state.last_minigame_win = apply_gomoku_result(state);
                     return InputResult::Continue;
                 }
                 let input = match key.code {
@@ -395,7 +432,7 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
             }
             ActiveMinigame::Chess(chess_game) => {
                 if chess_game.game_result.is_some() {
-                    apply_chess_result(state);
+                    state.last_minigame_win = apply_chess_result(state);
                     return InputResult::Continue;
                 }
                 let input = match key.code {
@@ -411,7 +448,7 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
             }
             ActiveMinigame::Morris(morris_game) => {
                 if morris_game.game_result.is_some() {
-                    apply_morris_result(state);
+                    state.last_minigame_win = apply_morris_result(state);
                     return InputResult::Continue;
                 }
                 let input = match key.code {
@@ -427,7 +464,7 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
             }
             ActiveMinigame::Go(go_game) => {
                 if go_game.game_result.is_some() {
-                    apply_go_result(state);
+                    state.last_minigame_win = apply_go_result(state);
                     return InputResult::Continue;
                 }
                 let input = match key.code {
@@ -466,6 +503,7 @@ fn handle_base_game(
     haven: &Haven,
     haven_ui: &mut HavenUiState,
     overlay: &mut GameOverlay,
+    achievements: &mut crate::achievements::Achievements,
 ) -> InputResult {
     match key.code {
         KeyCode::Char('q') | KeyCode::Char('Q') => InputResult::QuitToSelect,
@@ -479,6 +517,14 @@ fn handle_base_game(
             if haven.discovered {
                 haven_ui.open();
             }
+            InputResult::Continue
+        }
+        KeyCode::Char('a') | KeyCode::Char('A') => {
+            // Clear pending notifications when opening achievements
+            achievements.clear_pending_notifications();
+            *overlay = GameOverlay::Achievements {
+                browser: crate::ui::achievement_browser_scene::AchievementBrowserState::new(),
+            };
             InputResult::Continue
         }
         _ => InputResult::Continue,

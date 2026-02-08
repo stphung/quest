@@ -1,0 +1,8 @@
+#!/bin/bash
+# Pre-commit hook - runs full CI checks before commit
+# This ensures commits always pass CI
+
+# Get the repo root (where ci-checks.sh lives)
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+exec "$REPO_ROOT/scripts/ci-checks.sh"

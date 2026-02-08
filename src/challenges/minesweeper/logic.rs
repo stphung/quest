@@ -277,23 +277,24 @@ pub fn handle_first_click<R: Rng>(game: &mut MinesweeperGame, row: usize, col: u
 }
 
 /// Apply game result: update stats, grant rewards, and add combat log entries.
-/// Returns true if a result was processed.
-pub fn apply_game_result(state: &mut crate::core::game_state::GameState) -> bool {
+/// Returns Some(MinigameWinInfo) if the player won, None otherwise.
+pub fn apply_game_result(
+    state: &mut crate::core::game_state::GameState,
+) -> Option<crate::challenges::MinigameWinInfo> {
     use super::super::MinesweeperResult;
     use crate::challenges::menu::DifficultyInfo;
+    use crate::challenges::MinigameWinInfo;
 
     let game = match state.active_minigame.as_ref() {
         Some(ActiveMinigame::Minesweeper(g)) => g,
-        _ => return false,
+        _ => return None,
     };
-    let result = match game.game_result {
-        Some(r) => r,
-        None => return false,
-    };
+    let result = game.game_result?;
     let reward = game.difficulty.reward();
     let old_prestige = state.prestige_rank;
+    let difficulty = game.difficulty;
 
-    match result {
+    let won = match result {
         MinesweeperResult::Win => {
             // XP reward
             let xp_gained = if reward.xp_percent > 0 {
@@ -332,6 +333,7 @@ pub fn apply_game_result(state: &mut crate::core::game_state::GameState) -> bool
                     true,
                 );
             }
+            true
         }
         MinesweeperResult::Loss => {
             state.combat_state.add_log_entry(
@@ -339,11 +341,25 @@ pub fn apply_game_result(state: &mut crate::core::game_state::GameState) -> bool
                 false,
                 true,
             );
+            false
         }
-    }
+    };
 
     state.active_minigame = None;
-    true
+
+    if won {
+        Some(MinigameWinInfo {
+            game_type: "minesweeper",
+            difficulty: match difficulty {
+                super::super::MinesweeperDifficulty::Novice => "novice",
+                super::super::MinesweeperDifficulty::Apprentice => "apprentice",
+                super::super::MinesweeperDifficulty::Journeyman => "journeyman",
+                super::super::MinesweeperDifficulty::Master => "master",
+            },
+        })
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -830,7 +846,7 @@ mod tests {
         state.active_minigame = Some(ActiveMinigame::Minesweeper(game));
 
         let processed = apply_game_result(&mut state);
-        assert!(processed);
+        assert!(processed.is_some()); // Win returns Some(MinigameWinInfo)
         assert!(state.character_xp > initial_xp); // Master gives XP
         assert!(state.prestige_rank > 5); // Master gives prestige
         assert!(state.active_minigame.is_none());
@@ -849,10 +865,10 @@ mod tests {
         state.active_minigame = Some(ActiveMinigame::Minesweeper(game));
 
         let processed = apply_game_result(&mut state);
-        assert!(processed);
+        assert!(processed.is_none()); // Loss returns None
         assert_eq!(state.character_xp, initial_xp); // XP unchanged
         assert_eq!(state.prestige_rank, 5); // Prestige unchanged
-        assert!(state.active_minigame.is_none());
+        assert!(state.active_minigame.is_none()); // But game is still cleared
     }
 
     #[test]
@@ -863,7 +879,7 @@ mod tests {
         state.active_minigame = None;
 
         let processed = apply_game_result(&mut state);
-        assert!(!processed);
+        assert!(processed.is_none());
     }
 
     #[test]
@@ -876,7 +892,7 @@ mod tests {
         state.active_minigame = Some(ActiveMinigame::Minesweeper(game));
 
         let processed = apply_game_result(&mut state);
-        assert!(!processed);
+        assert!(processed.is_none());
         // Game should still be active
         assert!(matches!(
             state.active_minigame,

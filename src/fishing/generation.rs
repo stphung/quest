@@ -41,6 +41,10 @@ pub const FISH_NAMES_LEGENDARY: [&str; 5] = [
     "Phantom Whale",
 ];
 
+/// The legendary Storm Leviathan - only appears at max rank (30).
+/// Catching this fish is required to forge the Stormbreaker.
+pub const STORM_LEVIATHAN: &str = "Storm Leviathan";
+
 /// XP reward ranges by rarity (min, max).
 const XP_REWARDS: [(u32, u32); 5] = [
     (50, 100),    // Common
@@ -145,6 +149,52 @@ pub fn generate_fish(rarity: FishRarity, rng: &mut impl Rng) -> CaughtFish {
         rarity,
         xp_reward,
     }
+}
+
+/// XP reward for the Storm Leviathan (significantly higher than normal legendary)
+const STORM_LEVIATHAN_XP: (u32, u32) = (10000, 15000);
+
+/// Generates a fish with rank awareness.
+///
+/// At rank 30, legendary fish have a chance to be the Storm Leviathan.
+/// The Storm Leviathan is required to forge the Stormbreaker weapon.
+///
+/// # Arguments
+/// - `rarity`: The rarity tier of the fish
+/// - `rank`: The player's current fishing rank
+/// - `rng`: Random number generator
+///
+/// # Returns
+/// A tuple of (CaughtFish, is_storm_leviathan)
+pub fn generate_fish_with_rank(
+    rarity: FishRarity,
+    rank: u32,
+    rng: &mut impl Rng,
+) -> (CaughtFish, bool) {
+    // Storm Leviathan only appears at rank 30 for legendary fish
+    // It has a 25% chance to appear when catching a legendary at max rank
+    if rarity == FishRarity::Legendary && rank >= 30 {
+        let storm_leviathan_roll: f64 = rng.gen();
+        if storm_leviathan_roll < 0.25 {
+            let xp_reward = rng.gen_range(STORM_LEVIATHAN_XP.0..=STORM_LEVIATHAN_XP.1);
+            return (
+                CaughtFish {
+                    name: STORM_LEVIATHAN.to_string(),
+                    rarity: FishRarity::Legendary,
+                    xp_reward,
+                },
+                true,
+            );
+        }
+    }
+
+    // Normal fish generation
+    (generate_fish(rarity, rng), false)
+}
+
+/// Checks if a caught fish is the Storm Leviathan.
+pub fn is_storm_leviathan(fish: &CaughtFish) -> bool {
+    fish.name == STORM_LEVIATHAN && fish.rarity == FishRarity::Legendary
 }
 
 /// Phase timing constants (at 100ms tick rate)

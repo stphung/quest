@@ -123,6 +123,7 @@ impl CharacterManager {
             active_minigame: None,
             session_kills: 0,
             recent_drops: std::collections::VecDeque::new(),
+            last_minigame_win: None,
         })
     }
 
@@ -340,6 +341,7 @@ mod tests {
             active_minigame: None,
             session_kills: 0,
             recent_drops: std::collections::VecDeque::new(),
+            last_minigame_win: None,
         };
 
         // Save character
@@ -394,6 +396,7 @@ mod tests {
             active_minigame: None,
             session_kills: 0,
             recent_drops: std::collections::VecDeque::new(),
+            last_minigame_win: None,
         };
 
         let char2 = GameState {
@@ -417,6 +420,7 @@ mod tests {
             active_minigame: None,
             session_kills: 0,
             recent_drops: std::collections::VecDeque::new(),
+            last_minigame_win: None,
         };
 
         manager.save_character(&char1).unwrap();
@@ -470,6 +474,7 @@ mod tests {
             active_minigame: None,
             session_kills: 0,
             recent_drops: std::collections::VecDeque::new(),
+            last_minigame_win: None,
         };
 
         manager.save_character(&state).unwrap();
@@ -512,6 +517,7 @@ mod tests {
             active_minigame: None,
             session_kills: 0,
             recent_drops: std::collections::VecDeque::new(),
+            last_minigame_win: None,
         };
 
         manager.save_character(&state).unwrap();
@@ -581,6 +587,7 @@ mod tests {
             active_minigame: None,
             session_kills: 0,
             recent_drops: std::collections::VecDeque::new(),
+            last_minigame_win: None,
         };
 
         manager.save_character(&state).unwrap();
@@ -689,6 +696,7 @@ mod tests {
             active_minigame: None,
             session_kills: 0,
             recent_drops: std::collections::VecDeque::new(),
+            last_minigame_win: None,
         };
 
         manager.save_character(&state).unwrap();

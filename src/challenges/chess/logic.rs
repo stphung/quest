@@ -219,24 +219,23 @@ pub fn check_game_over(game: &mut ChessGame) {
 }
 
 /// Apply game result: update stats, grant rewards, and add combat log entries.
-/// Returns true if a result was processed.
-pub fn apply_game_result(state: &mut GameState) -> bool {
+/// Returns Some(MinigameWinInfo) if the player won, None otherwise.
+pub fn apply_game_result(state: &mut GameState) -> Option<crate::challenges::MinigameWinInfo> {
     use crate::challenges::menu::DifficultyInfo;
+    use crate::challenges::MinigameWinInfo;
 
     let game = match state.active_minigame.as_ref() {
         Some(ActiveMinigame::Chess(g)) => g,
-        _ => return false,
+        _ => return None,
     };
-    let result = match game.game_result {
-        Some(r) => r,
-        None => return false,
-    };
+    let result = game.game_result?;
     let reward = game.difficulty.reward();
     let old_prestige = state.prestige_rank;
+    let difficulty = game.difficulty;
 
     state.chess_stats.games_played += 1;
 
-    match result {
+    let won = match result {
         ChessResult::Win => {
             state.chess_stats.games_won += 1;
             state.prestige_rank += reward.prestige_ranks;
@@ -258,6 +257,7 @@ pub fn apply_game_result(state: &mut GameState) -> bool {
                     true,
                 );
             }
+            true
         }
         ChessResult::Loss => {
             state.chess_stats.games_lost += 1;
@@ -266,6 +266,7 @@ pub fn apply_game_result(state: &mut GameState) -> bool {
                 false,
                 true,
             );
+            false
         }
         ChessResult::Forfeit => {
             state.chess_stats.games_lost += 1;
@@ -274,6 +275,7 @@ pub fn apply_game_result(state: &mut GameState) -> bool {
                 false,
                 true,
             );
+            false
         }
         ChessResult::Draw => {
             state.chess_stats.games_drawn += 1;
@@ -282,11 +284,25 @@ pub fn apply_game_result(state: &mut GameState) -> bool {
                 false,
                 true,
             );
+            false
         }
-    }
+    };
 
     state.active_minigame = None;
-    true
+
+    if won {
+        Some(MinigameWinInfo {
+            game_type: "chess",
+            difficulty: match difficulty {
+                ChessDifficulty::Novice => "novice",
+                ChessDifficulty::Apprentice => "apprentice",
+                ChessDifficulty::Journeyman => "journeyman",
+                ChessDifficulty::Master => "master",
+            },
+        })
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -324,7 +340,7 @@ mod tests {
         state.active_minigame = Some(ActiveMinigame::Chess(Box::new(game)));
 
         let processed = apply_game_result(&mut state);
-        assert!(processed);
+        assert!(processed.is_some()); // Win returns Some(MinigameWinInfo)
         assert_eq!(state.prestige_rank, 10); // 5 + 5 (Master reward)
         assert_eq!(state.chess_stats.games_won, 1);
         assert!(state.active_minigame.is_none());
@@ -339,7 +355,7 @@ mod tests {
         state.active_minigame = Some(ActiveMinigame::Chess(Box::new(game)));
 
         let processed = apply_game_result(&mut state);
-        assert!(processed);
+        assert!(processed.is_none()); // Loss returns None
         assert_eq!(state.prestige_rank, 5); // Unchanged
         assert_eq!(state.chess_stats.games_lost, 1);
     }
@@ -513,7 +529,7 @@ mod tests {
         state.active_minigame = Some(ActiveMinigame::Chess(Box::new(game)));
 
         let processed = apply_game_result(&mut state);
-        assert!(processed);
+        assert!(processed.is_none()); // Forfeit counts as loss, returns None
         assert_eq!(state.chess_stats.games_lost, 1); // Counts as loss
         assert_eq!(state.chess_stats.games_won, 0);
         assert_eq!(state.prestige_rank, 5); // No penalty
@@ -529,7 +545,7 @@ mod tests {
         state.active_minigame = Some(ActiveMinigame::Chess(Box::new(game)));
 
         let processed = apply_game_result(&mut state);
-        assert!(processed);
+        assert!(processed.is_none()); // Draw returns None
         assert_eq!(state.chess_stats.games_drawn, 1);
         assert_eq!(state.prestige_rank, 5); // Unchanged
     }

@@ -733,21 +733,20 @@ fn count_mobility(game: &MorrisGame, player: Player) -> i32 {
 }
 
 /// Apply game result: grant rewards and add combat log entries.
-/// Returns true if a result was processed.
-pub fn apply_game_result(state: &mut GameState) -> bool {
+/// Returns Some(MinigameWinInfo) if the player won, None otherwise.
+pub fn apply_game_result(state: &mut GameState) -> Option<crate::challenges::MinigameWinInfo> {
     use crate::challenges::menu::DifficultyInfo;
+    use crate::challenges::MinigameWinInfo;
 
     let game = match state.active_minigame.as_ref() {
         Some(ActiveMinigame::Morris(g)) => g,
-        _ => return false,
+        _ => return None,
     };
-    let result = match game.game_result {
-        Some(r) => r,
-        None => return false,
-    };
+    let result = game.game_result?;
     let reward = game.difficulty.reward();
+    let difficulty = game.difficulty;
 
-    match result {
+    let won = match result {
         MorrisResult::Win => {
             // XP reward
             let xp_for_level =
@@ -787,6 +786,7 @@ pub fn apply_game_result(state: &mut GameState) -> bool {
                     true,
                 );
             }
+            true
         }
         MorrisResult::Loss => {
             state.combat_state.add_log_entry(
@@ -794,6 +794,7 @@ pub fn apply_game_result(state: &mut GameState) -> bool {
                 false,
                 true,
             );
+            false
         }
         MorrisResult::Forfeit => {
             state.combat_state.add_log_entry(
@@ -801,11 +802,25 @@ pub fn apply_game_result(state: &mut GameState) -> bool {
                 false,
                 true,
             );
+            false
         }
-    }
+    };
 
     state.active_minigame = None;
-    true
+
+    if won {
+        Some(MinigameWinInfo {
+            game_type: "morris",
+            difficulty: match difficulty {
+                MorrisDifficulty::Novice => "novice",
+                MorrisDifficulty::Apprentice => "apprentice",
+                MorrisDifficulty::Journeyman => "journeyman",
+                MorrisDifficulty::Master => "master",
+            },
+        })
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -1265,8 +1280,8 @@ mod tests {
         let old_fishing_rank = state.fishing.rank;
         let processed = apply_game_result(&mut state);
 
-        assert!(processed);
-        // Master = 200% of xp_for_next_level(10) = 6324
+        assert!(processed.is_some()); // Win returns Some(MinigameWinInfo)
+                                      // Master = 200% of xp_for_next_level(10) = 6324
         assert_eq!(state.character_xp, old_xp + 6324);
         // Master grants +1 fishing rank
         assert_eq!(state.fishing.rank, old_fishing_rank + 1);
@@ -1285,7 +1300,7 @@ mod tests {
         let old_fishing_rank = state.fishing.rank;
         let processed = apply_game_result(&mut state);
 
-        assert!(processed);
+        assert!(processed.is_some()); // Win returns Some(MinigameWinInfo)
         assert_eq!(state.fishing.rank, old_fishing_rank); // Novice grants no fishing rank
     }
 
@@ -1301,7 +1316,7 @@ mod tests {
 
         let processed = apply_game_result(&mut state);
 
-        assert!(processed);
+        assert!(processed.is_some()); // Win returns Some(MinigameWinInfo)
         assert_eq!(state.fishing.rank, 30); // Capped at max
     }
 
@@ -1316,9 +1331,9 @@ mod tests {
         let old_xp = state.character_xp;
         let processed = apply_game_result(&mut state);
 
-        assert!(processed);
+        assert!(processed.is_none()); // Loss returns None
         assert_eq!(state.character_xp, old_xp); // Unchanged
-        assert!(state.active_minigame.is_none());
+        assert!(state.active_minigame.is_none()); // But game is still cleared
     }
 
     #[test]
@@ -1332,9 +1347,9 @@ mod tests {
         let old_xp = state.character_xp;
         let processed = apply_game_result(&mut state);
 
-        assert!(processed);
+        assert!(processed.is_none()); // Forfeit returns None
         assert_eq!(state.character_xp, old_xp); // Unchanged
-        assert!(state.active_minigame.is_none());
+        assert!(state.active_minigame.is_none()); // But game is still cleared
     }
 
     // ============ Evaluation Tests ============

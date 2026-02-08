@@ -413,6 +413,7 @@ fn test_haven_bonuses_speed_up_fishing() {
     let with_haven = HavenFishingBonuses {
         timer_reduction_percent: 50.0,
         double_fish_chance_percent: 0.0,
+        max_fishing_rank_bonus: 0,
     };
 
     // Count ticks to complete 3 fish
@@ -461,6 +462,7 @@ fn test_double_fish_bonus_increases_catches() {
         let haven = HavenFishingBonuses {
             timer_reduction_percent: 0.0,
             double_fish_chance_percent: 100.0,
+            max_fishing_rank_bonus: 0,
         };
         tick_fishing_with_haven(&mut state, &mut rng, &haven);
 

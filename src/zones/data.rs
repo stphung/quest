@@ -475,6 +475,54 @@ pub fn get_all_zones() -> Vec<Zone> {
                 },
             ],
         },
+        // Zone 11: The Expanse - Infinite post-game zone (unlocked by StormsEnd achievement)
+        Zone {
+            id: 11,
+            name: "The Expanse",
+            prestige_requirement: 0, // Unlocked by achievement, not prestige
+            min_level: 150,
+            max_level: u32::MAX,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Void's Edge",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Void Sentinel",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Eternal Storm",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "Tempest Incarnate",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Abyssal Rift",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Rift Behemoth",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "The Endless",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "Avatar of Infinity",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
     ]
 }
 
@@ -497,7 +545,7 @@ mod tests {
     #[test]
     fn test_zone_count() {
         let zones = get_all_zones();
-        assert_eq!(zones.len(), 10);
+        assert_eq!(zones.len(), 11); // Including Zone 11: The Expanse
     }
 
     #[test]
@@ -582,7 +630,9 @@ mod tests {
         assert_eq!(get_zone(1).unwrap().name, "Meadow");
         assert!(get_zone(10).is_some());
         assert_eq!(get_zone(10).unwrap().name, "Storm Citadel");
-        assert!(get_zone(11).is_none());
+        assert!(get_zone(11).is_some());
+        assert_eq!(get_zone(11).unwrap().name, "The Expanse");
+        assert!(get_zone(12).is_none());
         assert!(get_zone(0).is_none());
     }
 
@@ -600,8 +650,15 @@ mod tests {
         assert_eq!(zone.name, "Storm Citadel");
         assert_eq!(subzone.name, "Apex Spire");
 
+        // Zone 11 (The Expanse) exists
+        let result = get_subzone(11, 1);
+        assert!(result.is_some());
+        let (zone, subzone) = result.unwrap();
+        assert_eq!(zone.name, "The Expanse");
+        assert_eq!(subzone.name, "Void's Edge");
+
         // Invalid zone
-        assert!(get_subzone(11, 1).is_none());
+        assert!(get_subzone(12, 1).is_none());
         // Invalid subzone
         assert!(get_subzone(1, 5).is_none());
     }

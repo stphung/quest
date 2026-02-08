@@ -3,6 +3,7 @@
 //! Tests the full zone progression flow with game state integration,
 //! covering edge cases and prestige tier transitions.
 
+use quest::achievements::Achievements;
 use quest::zones::get_all_zones;
 use quest::zones::{BossDefeatResult, ZoneProgression};
 
@@ -45,48 +46,57 @@ fn test_should_spawn_boss_edge_case() {
 #[test]
 fn test_boss_weapon_blocked_returns_none_when_not_fighting() {
     let mut prog = ZoneProgression::new();
+    let achievements = Achievements::default();
     prog.current_zone_id = 10;
     prog.current_subzone_id = 4; // Final subzone
     prog.unlock_zone(10);
     prog.fighting_boss = false; // Not fighting
 
-    assert!(prog.boss_weapon_blocked().is_none());
+    assert!(prog.boss_weapon_blocked(&achievements).is_none());
 }
 
 #[test]
 fn test_boss_weapon_blocked_returns_none_for_non_final_subzone() {
     let mut prog = ZoneProgression::new();
+    let achievements = Achievements::default();
     prog.current_zone_id = 10;
     prog.current_subzone_id = 2; // Not final subzone
     prog.unlock_zone(10);
     prog.fighting_boss = true;
 
     // Intermediate bosses don't require weapon
-    assert!(prog.boss_weapon_blocked().is_none());
+    assert!(prog.boss_weapon_blocked(&achievements).is_none());
 }
 
 #[test]
 fn test_boss_weapon_blocked_returns_weapon_name() {
     let mut prog = ZoneProgression::new();
+    let achievements = Achievements::default(); // No TheStormbreaker achievement
     prog.current_zone_id = 10;
     prog.current_subzone_id = 4; // Final subzone
     prog.unlock_zone(10);
     prog.fighting_boss = true;
-    prog.has_stormbreaker = false;
 
-    assert_eq!(prog.boss_weapon_blocked(), Some("Stormbreaker"));
+    assert_eq!(
+        prog.boss_weapon_blocked(&achievements),
+        Some("Stormbreaker")
+    );
 }
 
 #[test]
 fn test_boss_weapon_blocked_none_with_weapon() {
+    use quest::achievements::AchievementId;
+
     let mut prog = ZoneProgression::new();
+    let mut achievements = Achievements::default();
+    // Unlock the TheStormbreaker achievement
+    achievements.unlock(AchievementId::TheStormbreaker, None);
     prog.current_zone_id = 10;
     prog.current_subzone_id = 4;
     prog.unlock_zone(10);
     prog.fighting_boss = true;
-    prog.has_stormbreaker = true; // Has the weapon
 
-    assert!(prog.boss_weapon_blocked().is_none());
+    assert!(prog.boss_weapon_blocked(&achievements).is_none());
 }
 
 #[test]
@@ -233,6 +243,7 @@ fn test_defeat_boss_resets_fighting_state() {
 #[test]
 fn test_on_boss_defeated_at_zone_boundary() {
     let mut prog = ZoneProgression::new();
+    let mut achievements = Achievements::default();
 
     // Set up at zone 2, subzone 3 (final subzone of zone 2)
     prog.current_zone_id = 2;
@@ -240,7 +251,7 @@ fn test_on_boss_defeated_at_zone_boundary() {
     prog.fighting_boss = true;
 
     // Defeat boss with prestige 4 (zone 3 needs P5)
-    let result = prog.on_boss_defeated(4);
+    let result = prog.on_boss_defeated(4, &mut achievements);
 
     // Should be gated
     match result {
@@ -262,14 +273,17 @@ fn test_on_boss_defeated_at_zone_boundary() {
 
 #[test]
 fn test_complete_game_progression() {
+    use quest::achievements::AchievementId;
+
     let mut prog = ZoneProgression::new();
+    let mut achievements = Achievements::default();
     let zones = get_all_zones();
 
     // Simulate completing the entire game with prestige 20
     prog.reset_for_prestige(20); // Unlock all zones
 
-    // Complete all zones
-    for zone in &zones {
+    // Complete all zones (excluding Zone 11 which is infinite post-game)
+    for zone in zones.iter().take(10) {
         prog.current_zone_id = zone.id;
 
         for subzone_id in 1..=zone.subzones.len() as u32 {
@@ -281,22 +295,22 @@ fn test_complete_game_progression() {
             }
             assert!(prog.fighting_boss);
 
-            // For zone 10 final boss, need Stormbreaker
+            // For zone 10 final boss, need Stormbreaker achievement
             if zone.id == 10 && subzone_id == zone.subzones.len() as u32 {
-                prog.has_stormbreaker = true;
+                achievements.unlock(AchievementId::TheStormbreaker, None);
             }
 
-            let result = prog.on_boss_defeated(20);
+            let result = prog.on_boss_defeated(20, &mut achievements);
 
             // Verify appropriate result
             if zone.id == 10 && subzone_id == zone.subzones.len() as u32 {
-                assert!(matches!(result, BossDefeatResult::GameComplete));
+                assert!(matches!(result, BossDefeatResult::StormsEnd));
             }
         }
     }
 
-    // Verify all bosses defeated
-    for zone in &zones {
+    // Verify all bosses defeated (zones 1-10)
+    for zone in zones.iter().take(10) {
         for subzone_id in 1..=zone.subzones.len() as u32 {
             assert!(prog.is_boss_defeated(zone.id, subzone_id));
         }
@@ -305,7 +319,10 @@ fn test_complete_game_progression() {
 
 #[test]
 fn test_speedrun_to_zone_10() {
+    use quest::achievements::AchievementId;
+
     let mut prog = ZoneProgression::new();
+    let mut achievements = Achievements::default();
 
     // Simulate a "speedrun" with max prestige - can travel directly to high zones
     prog.reset_for_prestige(20);
@@ -326,13 +343,13 @@ fn test_speedrun_to_zone_10() {
         }
 
         if subzone_id == zone10.subzones.len() as u32 {
-            prog.has_stormbreaker = true;
+            achievements.unlock(AchievementId::TheStormbreaker, None);
         }
 
-        let result = prog.on_boss_defeated(20);
+        let result = prog.on_boss_defeated(20, &mut achievements);
 
         if subzone_id == zone10.subzones.len() as u32 {
-            assert!(matches!(result, BossDefeatResult::GameComplete));
+            assert!(matches!(result, BossDefeatResult::StormsEnd));
         }
     }
 }

@@ -28,7 +28,7 @@ fn test_complete_chess_win_flow() {
 
     // Apply result
     let processed = apply_game_result(&mut state);
-    assert!(processed);
+    assert!(processed.is_some()); // Win returns Some(MinigameWinInfo)
     assert_eq!(state.prestige_rank, 10); // 5 + 5 (Master reward)
     assert!(state.active_minigame.is_none());
 }
@@ -46,7 +46,7 @@ fn test_chess_loss_no_penalty() {
     }
 
     let processed = apply_game_result(&mut state);
-    assert!(processed);
+    assert!(processed.is_none()); // Loss returns None
     assert_eq!(state.prestige_rank, 3); // Unchanged
 }
 
@@ -63,7 +63,7 @@ fn test_chess_draw_no_penalty() {
     }
 
     let processed = apply_game_result(&mut state);
-    assert!(processed);
+    assert!(processed.is_none()); // Draw returns None
     assert_eq!(state.prestige_rank, 7); // Unchanged
 }
 
@@ -80,7 +80,7 @@ fn test_chess_forfeit_counts_as_loss() {
     }
 
     let processed = apply_game_result(&mut state);
-    assert!(processed);
+    assert!(processed.is_none()); // Forfeit returns None
     assert_eq!(state.prestige_rank, 2); // Unchanged
     assert_eq!(state.chess_stats.games_lost, 1);
 }

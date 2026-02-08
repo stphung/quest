@@ -60,10 +60,12 @@ pub enum CombatEvent {
 
 /// Updates combat state, returns events that occurred
 /// `haven` contains all Haven bonuses that affect combat
+/// `achievements` is used to check for Stormbreaker achievement (Zone 10 boss)
 pub fn update_combat(
     state: &mut GameState,
     delta_time: f64,
     haven: &HavenCombatBonuses,
+    achievements: &mut crate::achievements::Achievements,
 ) -> Vec<CombatEvent> {
     let mut events = Vec::new();
 
@@ -114,7 +116,7 @@ pub fn update_combat(
         state.combat_state.attack_timer = 0.0;
 
         // Check if boss requires a weapon we don't have
-        if let Some(weapon_name) = state.zone_progression.boss_weapon_blocked() {
+        if let Some(weapon_name) = state.zone_progression.boss_weapon_blocked(achievements) {
             // Attack is blocked - no damage dealt
             events.push(CombatEvent::PlayerAttackBlocked {
                 weapon_needed: weapon_name.to_string(),
@@ -183,6 +185,13 @@ pub fn update_combat(
                         .and_then(|d| d.current_room())
                         .map(|r| r.room_type);
 
+                    // Track if this was a boss-level kill for achievements
+                    let is_boss_kill = matches!(
+                        dungeon_room_type,
+                        Some(RoomType::Elite) | Some(RoomType::Boss)
+                    ) || (state.active_dungeon.is_none()
+                        && state.zone_progression.fighting_boss);
+
                     match dungeon_room_type {
                         Some(RoomType::Elite) => {
                             events.push(CombatEvent::EliteDefeated { xp_gained });
@@ -196,8 +205,9 @@ pub fn update_combat(
                                 events.push(CombatEvent::EnemyDied { xp_gained });
                             } else if state.zone_progression.fighting_boss {
                                 // Overworld boss defeated
-                                let result =
-                                    state.zone_progression.on_boss_defeated(state.prestige_rank);
+                                let result = state
+                                    .zone_progression
+                                    .on_boss_defeated(state.prestige_rank, achievements);
                                 events.push(CombatEvent::SubzoneBossDefeated { xp_gained, result });
                             } else {
                                 // Record the kill for boss spawn tracking (boss flag set if threshold reached)
@@ -206,6 +216,9 @@ pub fn update_combat(
                             }
                         }
                     }
+
+                    // Track kill for achievements
+                    achievements.on_enemy_killed(is_boss_kill, Some(&state.character_name));
 
                     // Remove enemy and start regeneration
                     state.combat_state.current_enemy = None;
@@ -284,37 +297,61 @@ mod tests {
         CombatState, Enemy,
     };
     use super::*;
+    use crate::achievements::Achievements;
 
     #[test]
     fn test_update_combat_no_enemy() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let mut achievements = Achievements::default();
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
         assert_eq!(events.len(), 0);
     }
 
     #[test]
     fn test_update_combat_attack_interval() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
         state.combat_state.current_enemy = Some(Enemy::new("Test".to_string(), 100, 5));
 
         // Not enough time passed
-        let events = update_combat(&mut state, 0.5, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.5,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
         assert_eq!(events.len(), 0);
 
         // Enough time for attack
-        let events = update_combat(&mut state, 1.0, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            1.0,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
         assert!(events.len() >= 2); // Player attack + enemy attack
     }
 
     #[test]
     fn test_player_died_resets() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
         state.combat_state.player_current_hp = 1;
         state.combat_state.current_enemy = Some(Enemy::new("Test".to_string(), 100, 50));
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Should have player died event
         let died = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
@@ -334,12 +371,18 @@ mod tests {
     #[test]
     fn test_regeneration_after_kill() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
         state.combat_state.player_current_hp = 10;
         state.combat_state.current_enemy = Some(Enemy::new("Test".to_string(), 1, 5));
 
         // Force attack to kill enemy
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Should have enemy died event
         let died = events
@@ -356,6 +399,7 @@ mod tests {
             &mut state,
             HP_REGEN_DURATION_SECONDS,
             &HavenCombatBonuses::default(),
+            &mut achievements,
         );
         assert_eq!(
             state.combat_state.player_current_hp,
@@ -367,6 +411,7 @@ mod tests {
     #[test]
     fn test_player_died_in_dungeon() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
         state.combat_state.player_current_hp = 1;
         state.combat_state.current_enemy = Some(Enemy::new("Test".to_string(), 100, 50));
 
@@ -376,7 +421,12 @@ mod tests {
 
         // Force an attack that kills player
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Should have PlayerDiedInDungeon event (not PlayerDied)
         let died_in_dungeon = events
@@ -402,12 +452,12 @@ mod tests {
     #[test]
     fn test_weapon_blocked_boss_no_damage() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default(); // No TheStormbreaker achievement
 
         // Set up Zone 10 boss fight without Stormbreaker
         state.zone_progression.current_zone_id = 10;
         state.zone_progression.current_subzone_id = 4; // Zone 10 has 4 subzones, this is the zone boss
         state.zone_progression.fighting_boss = true;
-        state.zone_progression.has_stormbreaker = false;
 
         let enemy_hp = 100;
         state.combat_state.current_enemy =
@@ -415,7 +465,12 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Should have PlayerAttackBlocked event
         let blocked = events
@@ -431,19 +486,24 @@ mod tests {
     #[test]
     fn test_weapon_blocked_boss_still_attacks_back() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default(); // No TheStormbreaker achievement
 
         // Set up Zone 10 boss fight without Stormbreaker
         state.zone_progression.current_zone_id = 10;
         state.zone_progression.current_subzone_id = 4;
         state.zone_progression.fighting_boss = true;
-        state.zone_progression.has_stormbreaker = false;
 
         let player_hp = state.combat_state.player_current_hp;
         state.combat_state.current_enemy = Some(Enemy::new("Eternal Storm".to_string(), 100, 10));
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Should have EnemyAttack event
         let enemy_attacked = events
@@ -458,13 +518,13 @@ mod tests {
     #[test]
     fn test_death_to_weapon_blocked_boss_resets_encounter() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default(); // No TheStormbreaker achievement
 
         // Set up Zone 10 boss fight without Stormbreaker
         state.zone_progression.current_zone_id = 10;
         state.zone_progression.current_subzone_id = 4;
         state.zone_progression.fighting_boss = true;
         state.zone_progression.kills_in_subzone = 10;
-        state.zone_progression.has_stormbreaker = false;
 
         // Low HP so player dies
         state.combat_state.player_current_hp = 1;
@@ -472,7 +532,12 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Should have PlayerDied event
         let died = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
@@ -489,6 +554,7 @@ mod tests {
     #[test]
     fn test_defense_reduces_enemy_damage() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
 
         // Increase DEX for more defense (defense = DEX modifier)
         state
@@ -502,7 +568,12 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Calculate expected damage reduction
         let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
@@ -515,6 +586,7 @@ mod tests {
     #[test]
     fn test_defense_can_reduce_damage_to_zero() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
 
         // High DEX for high defense (defense = DEX modifier)
         state
@@ -527,7 +599,12 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Player should take no damage (5 - 10 = 0 via saturating_sub)
         assert_eq!(state.combat_state.player_current_hp, initial_hp);
@@ -536,6 +613,7 @@ mod tests {
     #[test]
     fn test_subzone_boss_defeat() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
 
         // Set up a subzone boss fight (not Zone 10)
         state.zone_progression.current_zone_id = 1;
@@ -547,7 +625,12 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Should have SubzoneBossDefeated event
         let boss_defeated = events
@@ -562,6 +645,7 @@ mod tests {
     #[test]
     fn test_regular_kill_records_progress() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
 
         let initial_kills = state.zone_progression.kills_in_subzone;
 
@@ -570,7 +654,12 @@ mod tests {
 
         // Force an attack to kill
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Should have EnemyDied event
         let enemy_died = events
@@ -585,6 +674,7 @@ mod tests {
     #[test]
     fn test_regeneration_skips_combat() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
         state.combat_state.is_regenerating = true;
         state.combat_state.regen_timer = 0.0;
         state.combat_state.player_current_hp = 10;
@@ -592,7 +682,12 @@ mod tests {
 
         // Even with attack timer ready, should not attack while regenerating
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // No combat events during regen
         assert!(events.is_empty());
@@ -605,6 +700,7 @@ mod tests {
     #[test]
     fn test_gradual_regeneration() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
         state.combat_state.is_regenerating = true;
         state.combat_state.regen_timer = 0.0;
         state.combat_state.player_current_hp = 10;
@@ -615,6 +711,7 @@ mod tests {
             &mut state,
             HP_REGEN_DURATION_SECONDS / 2.0,
             &HavenCombatBonuses::default(),
+            &mut achievements,
         );
 
         // HP should be partially restored (roughly halfway)
@@ -626,6 +723,7 @@ mod tests {
     #[test]
     fn test_death_to_any_boss_resets_encounter() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
 
         // Set up a normal boss fight (not weapon-blocked)
         state.zone_progression.current_zone_id = 5;
@@ -639,7 +737,12 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Should have PlayerDied event
         let died = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
@@ -657,6 +760,7 @@ mod tests {
     fn test_crit_doubles_damage() {
         // Verify that when a crit occurs, damage is exactly 2x base total_damage
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
 
         // Set high DEX for 100% crit chance (need crit_chance_percent >= 100)
         // crit_chance_percent = 5 + DEX_mod; DEX 210 gives mod 100 => 105%
@@ -671,7 +775,12 @@ mod tests {
         // Give enemy enough HP to survive
         state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Find the PlayerAttack event
         let attack_event = events
@@ -702,11 +811,17 @@ mod tests {
         let mut crit_count = 0;
         for _ in 0..100 {
             let mut s = GameState::new("Test Hero".to_string(), 0);
+            let mut achievements = Achievements::default();
             s.attributes
                 .set(crate::character::attributes::AttributeType::Dexterity, 0);
             s.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 100000, 0));
             s.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-            let events = update_combat(&mut s, 0.1, &HavenCombatBonuses::default());
+            let events = update_combat(
+                &mut s,
+                0.1,
+                &HavenCombatBonuses::default(),
+                &mut achievements,
+            );
 
             for e in &events {
                 if let CombatEvent::PlayerAttack { was_crit, .. } = e {
@@ -723,6 +838,7 @@ mod tests {
     fn test_player_total_damage_matches_derived_stats() {
         // With no crit (low DEX), verify damage equals derived total_damage
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
         state
             .attributes
             .set(crate::character::attributes::AttributeType::Dexterity, 0); // 0% crit
@@ -739,7 +855,12 @@ mod tests {
 
         state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         let attack_event = events
             .iter()
@@ -756,6 +877,7 @@ mod tests {
     fn test_enemy_damage_exactly_reduced_by_defense() {
         // Verify enemy_damage = enemy.damage.saturating_sub(defense) precisely
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
         state
             .attributes
             .set(crate::character::attributes::AttributeType::Dexterity, 16); // mod +3 => defense 3
@@ -769,7 +891,12 @@ mod tests {
         let initial_hp = state.combat_state.player_current_hp;
 
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         let hp_lost = initial_hp - state.combat_state.player_current_hp;
         assert_eq!(hp_lost, enemy_base_damage - derived.defense);
@@ -779,6 +906,7 @@ mod tests {
     fn test_multi_turn_combat_kills_enemy() {
         // Run combat over multiple turns until the enemy dies
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
         // High STR for high damage, low DEX so no crits
         state
             .attributes
@@ -805,7 +933,12 @@ mod tests {
         // Simulate up to 20 attack cycles
         for _ in 0..20 {
             state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-            let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+            let events = update_combat(
+                &mut state,
+                0.1,
+                &HavenCombatBonuses::default(),
+                &mut achievements,
+            );
             turns += 1;
 
             for e in &events {
@@ -830,6 +963,7 @@ mod tests {
                     &mut state,
                     HP_REGEN_DURATION_SECONDS,
                     &HavenCombatBonuses::default(),
+                    &mut achievements,
                 );
             }
         }
@@ -959,12 +1093,18 @@ mod tests {
     #[test]
     fn test_xp_gained_on_enemy_death() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
         let initial_xp = state.character_xp;
 
         // Weak enemy that dies in one hit
         state.combat_state.current_enemy = Some(Enemy::new("Weak".to_string(), 1, 0));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         let xp_event = events.iter().find_map(|e| match e {
             CombatEvent::EnemyDied { xp_gained } => Some(*xp_gained),
@@ -1028,6 +1168,7 @@ mod tests {
     fn test_enemy_zero_damage_with_high_defense() {
         // When defense >= enemy damage, player takes 0 damage
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
         state
             .attributes
             .set(crate::character::attributes::AttributeType::Dexterity, 40); // mod 15 => defense 15
@@ -1039,7 +1180,12 @@ mod tests {
         // Enemy with damage less than defense
         state.combat_state.current_enemy = Some(Enemy::new("Weak".to_string(), 10000, 5));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Player should take zero damage from the enemy
         assert_eq!(state.combat_state.player_current_hp, initial_hp);
@@ -1048,6 +1194,7 @@ mod tests {
     #[test]
     fn test_death_to_regular_enemy_resets_enemy_hp() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
         state.zone_progression.fighting_boss = false;
         state.combat_state.player_current_hp = 1;
 
@@ -1057,7 +1204,12 @@ mod tests {
         state.combat_state.current_enemy = Some(enemy);
 
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         let died = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
         assert!(died);
@@ -1070,6 +1222,7 @@ mod tests {
     #[test]
     fn test_prestige_rank_preserved_on_death() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
 
         // Set a prestige rank (3 = Gold)
         state.prestige_rank = 3;
@@ -1084,7 +1237,12 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Verify player died
         let died = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
@@ -1127,7 +1285,13 @@ mod tests {
 
         state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let mut achievements = Achievements::default();
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         let attack = events
             .iter()
@@ -1148,6 +1312,7 @@ mod tests {
         };
 
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
 
         // Add gloves with +50% attack speed
         let gloves = Item {
@@ -1168,7 +1333,12 @@ mod tests {
         // With 50% attack speed, effective interval is 1.5 / 1.5 = 1.0 seconds
         // So attack should trigger at 1.0 seconds instead of 1.5
         state.combat_state.attack_timer = 1.0;
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         let attacked = events
             .iter()
@@ -1179,11 +1349,17 @@ mod tests {
     #[test]
     fn test_attack_speed_normal_interval_without_affix() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
         state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
 
         // Without attack speed bonus, 1.0 seconds is not enough (need 1.5)
         state.combat_state.attack_timer = 1.0;
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         let attacked = events
             .iter()
@@ -1198,6 +1374,7 @@ mod tests {
         };
 
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
 
         // Add armor with +100% HP regen (2x speed = half duration)
         let armor = Item {
@@ -1220,7 +1397,12 @@ mod tests {
 
         // With +100% regen (2x multiplier), duration is 2.5 / 2 = 1.25 seconds
         // After 1.25 seconds, should be fully healed
-        update_combat(&mut state, 1.25, &HavenCombatBonuses::default());
+        update_combat(
+            &mut state,
+            1.25,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         assert_eq!(state.combat_state.player_current_hp, 100);
         assert!(!state.combat_state.is_regenerating);
@@ -1229,6 +1411,7 @@ mod tests {
     #[test]
     fn test_hp_regen_normal_duration_without_affix() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
 
         state.combat_state.is_regenerating = true;
         state.combat_state.regen_timer = 0.0;
@@ -1236,7 +1419,12 @@ mod tests {
         state.combat_state.player_max_hp = 100;
 
         // Without regen bonus, 1.25 seconds is not enough (need 2.5)
-        update_combat(&mut state, 1.25, &HavenCombatBonuses::default());
+        update_combat(
+            &mut state,
+            1.25,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Should still be regenerating, not fully healed
         assert!(state.combat_state.is_regenerating);
@@ -1246,6 +1434,7 @@ mod tests {
     #[test]
     fn test_haven_hp_regen_bonus() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
 
         state.combat_state.is_regenerating = true;
         state.combat_state.regen_timer = 0.0;
@@ -1258,7 +1447,7 @@ mod tests {
             hp_regen_percent: 100.0,
             ..Default::default()
         };
-        update_combat(&mut state, 1.25, &haven);
+        update_combat(&mut state, 1.25, &haven, &mut achievements);
 
         assert_eq!(state.combat_state.player_current_hp, 100);
         assert!(!state.combat_state.is_regenerating);
@@ -1298,7 +1487,8 @@ mod tests {
             hp_regen_percent: 50.0,
             ..Default::default()
         };
-        update_combat(&mut state, 0.84, &haven);
+        let mut achievements = Achievements::default();
+        update_combat(&mut state, 0.84, &haven, &mut achievements);
 
         assert_eq!(state.combat_state.player_current_hp, 100);
         assert!(!state.combat_state.is_regenerating);
@@ -1312,6 +1502,7 @@ mod tests {
         };
 
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
 
         // Set DEX to 0 to eliminate crit chance (base 5% + dex_mod, with DEX=0 gives 0%)
         state.attributes.set(AttributeType::Dexterity, 0);
@@ -1339,7 +1530,12 @@ mod tests {
         ));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Enemy should have taken reflected damage: 20 * 50% = 10
         let enemy = state.combat_state.current_enemy.as_ref().unwrap();
@@ -1384,7 +1580,13 @@ mod tests {
         state.combat_state.player_max_hp = 1000;
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let mut achievements = Achievements::default();
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Enemy should have died from combined player attack + reflection
         let enemy_died = events
@@ -1400,6 +1602,7 @@ mod tests {
         };
 
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
 
         // Set DEX to 0 to guarantee 0% crit chance
         state
@@ -1427,7 +1630,12 @@ mod tests {
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
         let initial_player_hp = state.combat_state.player_current_hp;
-        update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Player took no damage
         assert_eq!(state.combat_state.player_current_hp, initial_player_hp);
@@ -1448,6 +1656,7 @@ mod tests {
         use crate::character::attributes::AttributeType;
 
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
 
         // Set DEX to 0 to eliminate crits
         state.attributes.set(AttributeType::Dexterity, 0);
@@ -1457,7 +1666,12 @@ mod tests {
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
         // First, attack with no Haven bonus
-        let events_no_bonus = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events_no_bonus = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
         let damage_no_bonus = events_no_bonus
             .iter()
             .find_map(|e| {
@@ -1477,7 +1691,7 @@ mod tests {
             damage_percent: 50.0,
             ..Default::default()
         };
-        let events_with_bonus = update_combat(&mut state, 0.1, &haven);
+        let events_with_bonus = update_combat(&mut state, 0.1, &haven, &mut achievements);
         let damage_with_bonus = events_with_bonus
             .iter()
             .find_map(|e| {
@@ -1509,11 +1723,17 @@ mod tests {
 
         for _ in 0..trials {
             let mut state = GameState::new("Test Hero".to_string(), 0);
+            let mut achievements = Achievements::default();
             state.attributes.set(AttributeType::Dexterity, 0); // Base 0% crit
             state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
             state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-            let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+            let events = update_combat(
+                &mut state,
+                0.1,
+                &HavenCombatBonuses::default(),
+                &mut achievements,
+            );
             if events
                 .iter()
                 .any(|e| matches!(e, CombatEvent::PlayerAttack { was_crit: true, .. }))
@@ -1524,6 +1744,7 @@ mod tests {
 
         for _ in 0..trials {
             let mut state = GameState::new("Test Hero".to_string(), 0);
+            let mut achievements = Achievements::default();
             state.attributes.set(AttributeType::Dexterity, 0);
             state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
             state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
@@ -1532,7 +1753,7 @@ mod tests {
                 crit_chance_percent: 20.0, // +20% crit
                 ..Default::default()
             };
-            let events = update_combat(&mut state, 0.1, &haven);
+            let events = update_combat(&mut state, 0.1, &haven, &mut achievements);
             if events
                 .iter()
                 .any(|e| matches!(e, CombatEvent::PlayerAttack { was_crit: true, .. }))
@@ -1561,6 +1782,7 @@ mod tests {
 
         for _ in 0..trials {
             let mut state = GameState::new("Test Hero".to_string(), 0);
+            let mut achievements = Achievements::default();
             state.attributes.set(AttributeType::Dexterity, 0);
             state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
             state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
@@ -1569,7 +1791,7 @@ mod tests {
                 double_strike_chance: 35.0, // +35% double strike (T3 War Room)
                 ..Default::default()
             };
-            let events = update_combat(&mut state, 0.1, &haven);
+            let events = update_combat(&mut state, 0.1, &haven, &mut achievements);
 
             // Count PlayerAttack events (should be 2 if double strike procs)
             let attack_count = events
@@ -1593,6 +1815,7 @@ mod tests {
     #[test]
     fn test_haven_regen_delay_reduction() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
 
         state.combat_state.is_regenerating = true;
         state.combat_state.regen_timer = 0.0;
@@ -1604,7 +1827,7 @@ mod tests {
             hp_regen_delay_reduction: 50.0,
             ..Default::default()
         };
-        update_combat(&mut state, 1.25, &haven);
+        update_combat(&mut state, 1.25, &haven, &mut achievements);
 
         assert_eq!(state.combat_state.player_current_hp, 100);
         assert!(!state.combat_state.is_regenerating);
@@ -1616,6 +1839,7 @@ mod tests {
 
         // Test multiple bonuses together
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
         state.attributes.set(AttributeType::Dexterity, 0);
         state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
@@ -1629,7 +1853,7 @@ mod tests {
             xp_gain_percent: 20.0,
         };
 
-        let events = update_combat(&mut state, 0.1, &haven);
+        let events = update_combat(&mut state, 0.1, &haven, &mut achievements);
 
         // Should have at least one attack
         assert!(
@@ -1643,6 +1867,7 @@ mod tests {
     #[test]
     fn test_dungeon_combat_kills_do_not_affect_zone_progression() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
 
         // Put player in a dungeon
         state.active_dungeon = Some(crate::dungeon::generation::generate_dungeon(1, 0));
@@ -1655,7 +1880,12 @@ mod tests {
 
         // Force an attack that kills the enemy
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Should emit EnemyDied, not SubzoneBossDefeated
         let enemy_died = events
@@ -1724,6 +1954,7 @@ mod tests {
     #[test]
     fn test_dungeon_combat_room_kill_emits_enemy_died() {
         let mut state = setup_dungeon_with_room_type(RoomType::Combat);
+        let mut achievements = Achievements::default();
 
         // Set up a weak enemy the player can one-shot
         state.combat_state.current_enemy = Some(Enemy::new("Goblin".to_string(), 1, 0));
@@ -1731,7 +1962,12 @@ mod tests {
         state.combat_state.player_max_hp = 1000;
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Must emit EnemyDied
         let enemy_died = events
@@ -1767,6 +2003,7 @@ mod tests {
     #[test]
     fn test_dungeon_elite_room_kill_emits_elite_defeated() {
         let mut state = setup_dungeon_with_room_type(RoomType::Elite);
+        let mut achievements = Achievements::default();
 
         // Set up a weak enemy the player can one-shot
         state.combat_state.current_enemy = Some(Enemy::new("Elite Guard".to_string(), 1, 0));
@@ -1774,7 +2011,12 @@ mod tests {
         state.combat_state.player_max_hp = 1000;
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Must emit EliteDefeated
         let has_elite = events
@@ -1804,6 +2046,7 @@ mod tests {
     #[test]
     fn test_dungeon_boss_room_kill_emits_boss_defeated() {
         let mut state = setup_dungeon_with_room_type(RoomType::Boss);
+        let mut achievements = Achievements::default();
 
         // Set up a weak enemy the player can one-shot
         state.combat_state.current_enemy = Some(Enemy::new("Dungeon Boss".to_string(), 1, 0));
@@ -1811,7 +2054,12 @@ mod tests {
         state.combat_state.player_max_hp = 1000;
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Must emit BossDefeated
         let has_boss = events
@@ -1841,13 +2089,19 @@ mod tests {
     #[test]
     fn test_dungeon_combat_room_kill_xp_in_valid_range() {
         let mut state = setup_dungeon_with_room_type(RoomType::Combat);
+        let mut achievements = Achievements::default();
 
         state.combat_state.current_enemy = Some(Enemy::new("Goblin".to_string(), 1, 0));
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         let xp_gained = events.iter().find_map(|e| match e {
             CombatEvent::EnemyDied { xp_gained } => Some(*xp_gained),
@@ -1882,13 +2136,19 @@ mod tests {
     #[test]
     fn test_dungeon_elite_room_kill_xp_in_valid_range() {
         let mut state = setup_dungeon_with_room_type(RoomType::Elite);
+        let mut achievements = Achievements::default();
 
         state.combat_state.current_enemy = Some(Enemy::new("Elite Guard".to_string(), 1, 0));
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         let xp_gained = events.iter().find_map(|e| match e {
             CombatEvent::EliteDefeated { xp_gained } => Some(*xp_gained),
@@ -1926,13 +2186,19 @@ mod tests {
     #[test]
     fn test_dungeon_boss_room_kill_xp_in_valid_range() {
         let mut state = setup_dungeon_with_room_type(RoomType::Boss);
+        let mut achievements = Achievements::default();
 
         state.combat_state.current_enemy = Some(Enemy::new("Dungeon Boss".to_string(), 1, 0));
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         let xp_gained = events.iter().find_map(|e| match e {
             CombatEvent::BossDefeated { xp_gained } => Some(*xp_gained),
@@ -1970,13 +2236,19 @@ mod tests {
     #[test]
     fn test_player_died_in_dungeon_emits_correct_event_and_exits() {
         let mut state = setup_dungeon_with_room_type(RoomType::Combat);
+        let mut achievements = Achievements::default();
 
         // Low HP so player dies from the enemy counter-attack
         state.combat_state.player_current_hp = 1;
         state.combat_state.current_enemy = Some(Enemy::new("Deadly Mob".to_string(), 100, 50));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Must emit PlayerDiedInDungeon
         let died_in_dungeon = events
@@ -2016,6 +2288,7 @@ mod tests {
     #[test]
     fn test_dungeon_elite_kill_does_not_affect_zone_progression() {
         let mut state = setup_dungeon_with_room_type(RoomType::Elite);
+        let mut achievements = Achievements::default();
 
         let initial_kills = state.zone_progression.kills_in_subzone;
         let initial_fighting_boss = state.zone_progression.fighting_boss;
@@ -2025,7 +2298,12 @@ mod tests {
         state.combat_state.player_max_hp = 1000;
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         assert_eq!(
             state.zone_progression.kills_in_subzone, initial_kills,
@@ -2040,6 +2318,7 @@ mod tests {
     #[test]
     fn test_dungeon_boss_kill_does_not_affect_zone_progression() {
         let mut state = setup_dungeon_with_room_type(RoomType::Boss);
+        let mut achievements = Achievements::default();
 
         let initial_kills = state.zone_progression.kills_in_subzone;
         let initial_fighting_boss = state.zone_progression.fighting_boss;
@@ -2049,7 +2328,12 @@ mod tests {
         state.combat_state.player_max_hp = 1000;
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         assert_eq!(
             state.zone_progression.kills_in_subzone, initial_kills,
@@ -2066,6 +2350,7 @@ mod tests {
         // Edge case: if zone_progression.fighting_boss is true but player is
         // in a dungeon, dungeon event logic should take priority.
         let mut state = setup_dungeon_with_room_type(RoomType::Combat);
+        let mut achievements = Achievements::default();
 
         // Simulate an overworld boss fight being active (should be ignored in dungeon)
         state.zone_progression.fighting_boss = true;
@@ -2076,7 +2361,12 @@ mod tests {
         state.combat_state.player_max_hp = 1000;
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Should emit EnemyDied (dungeon path), NOT SubzoneBossDefeated (overworld path)
         let enemy_died = events
@@ -2109,13 +2399,19 @@ mod tests {
     #[test]
     fn test_dungeon_death_preserves_prestige_rank() {
         let mut state = setup_dungeon_with_room_type(RoomType::Combat);
+        let mut achievements = Achievements::default();
         state.prestige_rank = 7;
 
         state.combat_state.player_current_hp = 1;
         state.combat_state.current_enemy = Some(Enemy::new("Deadly Mob".to_string(), 100, 50));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         assert_eq!(
             state.prestige_rank, 7,
@@ -2128,13 +2424,19 @@ mod tests {
         // Entrance rooms normally have no combat, but if an enemy is somehow
         // present, the fallback path should emit EnemyDied (not a special event)
         let mut state = setup_dungeon_with_room_type(RoomType::Entrance);
+        let mut achievements = Achievements::default();
 
         state.combat_state.current_enemy = Some(Enemy::new("Straggler".to_string(), 1, 0));
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        let events = update_combat(&mut state, 0.1, &HavenCombatBonuses::default());
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Entrance falls through the match to the `_` arm which checks active_dungeon
         let enemy_died = events

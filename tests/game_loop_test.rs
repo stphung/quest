@@ -3,6 +3,7 @@
 //! Tests the core game loop functionality: tick processing, combat flow,
 //! state transitions, and offline progression.
 
+use quest::achievements::Achievements;
 use quest::character::derived_stats::DerivedStats;
 use quest::combat::logic::{update_combat, CombatEvent, HavenCombatBonuses};
 use quest::core::game_logic::{
@@ -19,6 +20,7 @@ fn default_haven_bonuses() -> HavenCombatBonuses {
 /// Simulate a single game tick (100ms of game time)
 fn simulate_tick(state: &mut GameState) -> Vec<CombatEvent> {
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
+    let mut achievements = Achievements::default();
 
     // Sync max HP with derived stats
     let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
@@ -28,7 +30,12 @@ fn simulate_tick(state: &mut GameState) -> Vec<CombatEvent> {
     spawn_enemy_if_needed(state);
 
     // Update combat and return events
-    update_combat(state, delta_time, &default_haven_bonuses())
+    update_combat(
+        state,
+        delta_time,
+        &default_haven_bonuses(),
+        &mut achievements,
+    )
 }
 
 /// Simulate multiple game ticks

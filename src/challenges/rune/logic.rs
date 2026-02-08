@@ -2,7 +2,7 @@
 //!
 //! Handles secret code generation, feedback calculation, and guess submission.
 
-use super::{FeedbackMark, RuneGame, RuneGuess, RuneResult};
+use super::{FeedbackMark, RuneDifficulty, RuneGame, RuneGuess, RuneResult};
 use crate::challenges::ActiveMinigame;
 use rand::Rng;
 
@@ -163,22 +163,23 @@ pub fn submit_guess<R: Rng>(game: &mut RuneGame, rng: &mut R) -> bool {
 }
 
 /// Apply game result: update stats, grant rewards, and add combat log entries.
-/// Returns true if a result was processed.
-pub fn apply_game_result(state: &mut crate::core::game_state::GameState) -> bool {
+/// Returns Some(MinigameWinInfo) if the player won, None otherwise.
+pub fn apply_game_result(
+    state: &mut crate::core::game_state::GameState,
+) -> Option<crate::challenges::MinigameWinInfo> {
     use crate::challenges::menu::DifficultyInfo;
+    use crate::challenges::MinigameWinInfo;
 
     let game = match state.active_minigame.as_ref() {
         Some(ActiveMinigame::Rune(g)) => g,
-        _ => return false,
+        _ => return None,
     };
-    let result = match game.game_result {
-        Some(r) => r,
-        None => return false,
-    };
+    let result = game.game_result?;
     let reward = game.difficulty.reward();
     let old_prestige = state.prestige_rank;
+    let difficulty = game.difficulty;
 
-    match result {
+    let won = match result {
         RuneResult::Win => {
             // XP reward
             let xp_gained = if reward.xp_percent > 0 {
@@ -236,6 +237,7 @@ pub fn apply_game_result(state: &mut crate::core::game_state::GameState) -> bool
                     true,
                 );
             }
+            true
         }
         RuneResult::Loss => {
             state.combat_state.add_log_entry(
@@ -243,11 +245,25 @@ pub fn apply_game_result(state: &mut crate::core::game_state::GameState) -> bool
                 false,
                 true,
             );
+            false
         }
-    }
+    };
 
     state.active_minigame = None;
-    true
+
+    if won {
+        Some(MinigameWinInfo {
+            game_type: "rune",
+            difficulty: match difficulty {
+                RuneDifficulty::Novice => "novice",
+                RuneDifficulty::Apprentice => "apprentice",
+                RuneDifficulty::Journeyman => "journeyman",
+                RuneDifficulty::Master => "master",
+            },
+        })
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -619,7 +635,7 @@ mod tests {
         state.active_minigame = Some(ActiveMinigame::Rune(game));
 
         let processed = apply_game_result(&mut state);
-        assert!(processed);
+        assert!(processed.is_some()); // Win returns Some(MinigameWinInfo)
         assert!(state.character_xp > initial_xp); // Journeyman gives 75% XP
         assert!(state.fishing.rank > initial_fishing); // Journeyman gives fishing ranks
         assert!(state.active_minigame.is_none());
@@ -639,7 +655,7 @@ mod tests {
         state.active_minigame = Some(ActiveMinigame::Rune(game));
 
         let processed = apply_game_result(&mut state);
-        assert!(processed);
+        assert!(processed.is_some()); // Win returns Some(MinigameWinInfo)
         assert!(state.prestige_rank > 5); // Master gives prestige
         assert!(state.fishing.rank > initial_fishing); // Master gives fishing ranks
         assert!(state.active_minigame.is_none());
@@ -658,10 +674,10 @@ mod tests {
         state.active_minigame = Some(ActiveMinigame::Rune(game));
 
         let processed = apply_game_result(&mut state);
-        assert!(processed);
+        assert!(processed.is_none()); // Loss returns None
         assert_eq!(state.character_xp, initial_xp); // XP unchanged
         assert_eq!(state.prestige_rank, 5); // Prestige unchanged
-        assert!(state.active_minigame.is_none());
+        assert!(state.active_minigame.is_none()); // But game is still cleared
     }
 
     #[test]
@@ -672,7 +688,7 @@ mod tests {
         state.active_minigame = None;
 
         let processed = apply_game_result(&mut state);
-        assert!(!processed);
+        assert!(processed.is_none());
     }
 
     #[test]
@@ -685,7 +701,7 @@ mod tests {
         state.active_minigame = Some(ActiveMinigame::Rune(game));
 
         let processed = apply_game_result(&mut state);
-        assert!(!processed);
+        assert!(processed.is_none());
         // Game should still be active
         assert!(matches!(
             state.active_minigame,

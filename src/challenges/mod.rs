@@ -30,3 +30,12 @@ pub enum ActiveMinigame {
     Rune(RuneGame),
     Go(GoGame),
 }
+
+/// Information about a minigame win for achievement tracking.
+#[derive(Debug, Clone)]
+pub struct MinigameWinInfo {
+    /// The type of game: "chess", "morris", "gomoku", "minesweeper", "rune", "go"
+    pub game_type: &'static str,
+    /// The difficulty level: "novice", "apprentice", "journeyman", "master"
+    pub difficulty: &'static str,
+}
