@@ -68,20 +68,20 @@ impl HavenRoomId {
     /// Flavor description for detail panel
     pub fn description(&self) -> &'static str {
         match self {
-            HavenRoomId::Hearthstone => "The warm center of your Haven.",
-            HavenRoomId::Armory => "Your weapon collection strengthens all who visit.",
-            HavenRoomId::TrainingYard => "Practice dummies and sparring targets.",
-            HavenRoomId::TrophyHall => "Trophies from past victories attract fortune.",
-            HavenRoomId::Watchtower => "Sharpens your eye for weak points.",
-            HavenRoomId::AlchemyLab => "Brews and tonics always simmering.",
-            HavenRoomId::WarRoom => "Tactical planning speeds your strikes.",
-            HavenRoomId::Bedroom => "Rest well, fight well.",
-            HavenRoomId::Garden => "Patience cultivated here carries over.",
-            HavenRoomId::Library => "Ancient tomes reveal hidden challenges.",
-            HavenRoomId::FishingDock => "A private spot to cast.",
-            HavenRoomId::Workshop => "Better tools yield better finds.",
-            HavenRoomId::Vault => "Preserves treasured equipment through prestige resets.",
-            HavenRoomId::StormForge => "The legendary forge where Stormbreaker can be crafted.",
+            HavenRoomId::Hearthstone => "A crackling fire burns at the heart of your Haven, its embers never quite dying out. Even when you're away, its warmth keeps your skills sharp.",
+            HavenRoomId::Armory => "Whetstones and weapon oil fill the air with a sharp, metallic tang. Every blade here has been honed to a razor's edge, and their fury flows into whoever wields them.",
+            HavenRoomId::TrainingYard => "The clang of steel on wood echoes through the yard at all hours. Sweat-stained targets and chalk-drawn footwork patterns mark the path to mastery.",
+            HavenRoomId::TrophyHall => "Glass cases display the spoils of a hundred battles — a dragon's scale, a bandit lord's signet ring, a shard of cursed obsidian. Their presence draws more treasure your way.",
+            HavenRoomId::Watchtower => "A spiral staircase leads to a narrow platform where hawks nest and cold wind bites. Hours spent scanning the horizon have taught you to spot a weakness before your enemy even knows it's there.",
+            HavenRoomId::AlchemyLab => "Bubbling flasks and copper coils crowd every surface, filling the room with a warm, herbal haze. The potions brewed here mend wounds faster than any battlefield medic could dream.",
+            HavenRoomId::WarRoom => "Faded footwork circles are carved into the stone floor, each one paired with strike marks on the opposing wall — one high, one low, in rapid succession. The room teaches your muscles what your mind already knows: one strike is never enough.",
+            HavenRoomId::Bedroom => "Heavy curtains block out every sliver of light, and the bed is piled high with furs. In this perfect darkness, your body recovers with an almost unnatural speed.",
+            HavenRoomId::Garden => "Water trickles from a carved stone fountain into a shallow basin where lily pads drift. Tending this garden teaches a stillness that makes even the longest fishing wait feel brief.",
+            HavenRoomId::Library => "A reading nook tucked beneath a stained-glass window, surrounded by towers of scrolls and ink-stained notes. The more you read, the more the world reveals its hidden trials to you.",
+            HavenRoomId::FishingDock => "Morning mist clings to the water as your line breaks the stillness. The fish here bite in pairs, and those who cast long enough swear they've felt something vast stir in the deep — something most anglers will never be ready for.",
+            HavenRoomId::Workshop => "Sawdust and iron filings crunch underfoot as you pass workbenches cluttered with half-finished tools and polishing rigs. Gear crafted here always seems to turn out a cut above the rest.",
+            HavenRoomId::Vault => "Behind a door that only opens to your touch, shelves of dark wood cradle the weapons and armor you've sworn never to lose. The vault doesn't care how many times the world starts over — it keeps its promises.",
+            HavenRoomId::StormForge => "A forge of black iron sits beneath an open sky, struck by lightning that never stops. It took more prestiges than most adventurers will ever earn just to lay these stones, and the forging demands you sacrifice more still. The anvil will not wake for just anyone — only hands that have felt the Storm Leviathan's fury carry the spark needed to ignite the forge and shape Stormbreaker from raw thunder.",
         }
     }
 
