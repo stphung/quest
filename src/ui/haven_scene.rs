@@ -582,36 +582,44 @@ pub fn render_forge_confirmation(
         Style::default().fg(Color::Red)
     };
 
-    let prestige_check = if has_prestige { "✓" } else { "✗" };
-    let prestige_style = if has_prestige {
-        Style::default().fg(Color::Green)
-    } else {
-        Style::default().fg(Color::Red)
-    };
+    let prestige_after = prestige_rank.saturating_sub(25);
 
     let text = Paragraph::new(vec![
         Line::from(""),
+        // "Requires:" section - Cyan header (not consumed)
         Line::from(Span::styled(
-            "Requirements:",
+            "Requires:",
             Style::default()
-                .fg(Color::White)
+                .fg(Color::Cyan)
                 .add_modifier(Modifier::BOLD),
         )),
         Line::from(vec![
             Span::styled(format!("  {} ", leviathan_check), leviathan_style),
             Span::styled("Storm Leviathan caught", Style::default().fg(Color::White)),
         ]),
-        Line::from(vec![
-            Span::styled(format!("  {} ", prestige_check), prestige_style),
-            Span::styled(
-                format!("25 Prestige Ranks (you have {})", prestige_rank),
-                Style::default().fg(Color::White),
+        Line::from(""),
+        // "Cost:" section - Yellow header (will be spent)
+        Line::from(Span::styled(
+            "Cost:",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(vec![Span::styled(
+            format!(
+                "  ⚡ 25 Prestige Ranks ({} → {})",
+                prestige_rank, prestige_after
             ),
-        ]),
+            if has_prestige {
+                Style::default().fg(Color::Yellow)
+            } else {
+                Style::default().fg(Color::Red)
+            },
+        )]),
         Line::from(""),
         Line::from(Span::styled(
-            "⚡ Forging grants access to Zone 10's boss",
-            Style::default().fg(Color::Yellow),
+            "Grants access to Zone 10's final boss",
+            Style::default().fg(Color::White),
         )),
         Line::from(""),
         Line::from(if can_forge {
