@@ -218,8 +218,8 @@
         document.addEventListener('keydown', (e) => {
             // Only handle if terminal is focused and WS is connected
             if (ws && ws.readyState === WebSocket.OPEN) {
-                // Handle keys that xterm might not capture
-                const specialKeys = ['Escape', 'Tab'];
+                // Handle keys that xterm might not capture properly
+                const specialKeys = ['Escape', 'Tab', 'Enter'];
                 if (specialKeys.includes(e.key)) {
                     ws.send(JSON.stringify({ key: e.key }));
                     e.preventDefault();
