@@ -1002,4 +1002,295 @@ mod tests {
         let def = get_achievement_def(AchievementId::SlayerI).unwrap();
         assert!(!def.secret);
     }
+
+    // =========================================================================
+    // requires_haven Field Tests
+    // =========================================================================
+
+    #[test]
+    fn test_requires_haven_field_exists() {
+        // Test that requires_haven field is accessible on achievement definitions
+        let def = get_achievement_def(AchievementId::HavenDiscovered).unwrap();
+        assert!(def.requires_haven);
+
+        let def = get_achievement_def(AchievementId::SlayerI).unwrap();
+        assert!(!def.requires_haven);
+    }
+
+    #[test]
+    fn test_haven_discovered_requires_haven() {
+        let def = get_achievement_def(AchievementId::HavenDiscovered).unwrap();
+        assert!(def.requires_haven, "HavenDiscovered should require Haven");
+    }
+
+    #[test]
+    fn test_haven_builder_i_requires_haven() {
+        let def = get_achievement_def(AchievementId::HavenBuilderI).unwrap();
+        assert!(def.requires_haven, "HavenBuilderI should require Haven");
+    }
+
+    #[test]
+    fn test_haven_builder_ii_requires_haven() {
+        let def = get_achievement_def(AchievementId::HavenBuilderII).unwrap();
+        assert!(def.requires_haven, "HavenBuilderII should require Haven");
+    }
+
+    #[test]
+    fn test_haven_architect_requires_haven() {
+        let def = get_achievement_def(AchievementId::HavenArchitect).unwrap();
+        assert!(def.requires_haven, "HavenArchitect should require Haven");
+    }
+
+    #[test]
+    fn test_stormbreaker_requires_haven() {
+        let def = get_achievement_def(AchievementId::TheStormbreaker).unwrap();
+        assert!(def.requires_haven, "TheStormbreaker should require Haven");
+    }
+
+    #[test]
+    fn test_storm_leviathan_does_not_require_haven() {
+        // Storm Leviathan can be caught without Haven discovered
+        let def = get_achievement_def(AchievementId::StormLeviathan).unwrap();
+        assert!(
+            !def.requires_haven,
+            "StormLeviathan should not require Haven"
+        );
+    }
+
+    #[test]
+    fn test_non_haven_achievements_do_not_require_haven() {
+        // Test a sample of non-Haven achievements
+        let non_haven_achievements = [
+            AchievementId::SlayerI,
+            AchievementId::BossHunterI,
+            AchievementId::Level10,
+            AchievementId::FirstPrestige,
+            AchievementId::ChessNovice,
+            AchievementId::GoneFishing,
+            AchievementId::DungeonDiver,
+            AchievementId::Zone1Complete,
+            AchievementId::StormLeviathan,
+        ];
+
+        for id in non_haven_achievements {
+            let def = get_achievement_def(id).unwrap();
+            assert!(!def.requires_haven, "{:?} should not require Haven", id);
+        }
+    }
+
+    #[test]
+    fn test_all_haven_related_achievements_require_haven() {
+        // Test that all 5 Haven-related achievements have requires_haven = true
+        let haven_achievements = [
+            AchievementId::HavenDiscovered,
+            AchievementId::HavenBuilderI,
+            AchievementId::HavenBuilderII,
+            AchievementId::HavenArchitect,
+            AchievementId::TheStormbreaker,
+        ];
+
+        for id in haven_achievements {
+            let def = get_achievement_def(id).unwrap();
+            assert!(def.requires_haven, "{:?} should require Haven", id);
+        }
+    }
+
+    // =========================================================================
+    // Achievement Browser Hiding Logic Tests (is_hidden method)
+    // =========================================================================
+
+    #[test]
+    fn test_is_hidden_secret_achievement_not_unlocked() {
+        let def = get_achievement_def(AchievementId::StormLeviathan).unwrap();
+
+        // Secret achievement, not unlocked, Haven discovered
+        assert!(def.is_hidden(false, true));
+
+        // Secret achievement, not unlocked, Haven not discovered
+        assert!(def.is_hidden(false, false));
+    }
+
+    #[test]
+    fn test_is_hidden_secret_achievement_unlocked() {
+        let def = get_achievement_def(AchievementId::StormLeviathan).unwrap();
+
+        // Secret achievement, unlocked, Haven discovered - should be visible
+        assert!(!def.is_hidden(true, true));
+
+        // Secret achievement, unlocked, Haven not discovered - should be visible
+        assert!(!def.is_hidden(true, false));
+    }
+
+    #[test]
+    fn test_is_hidden_haven_achievement_not_discovered() {
+        let def = get_achievement_def(AchievementId::HavenDiscovered).unwrap();
+
+        // Haven achievement, Haven not discovered - should be hidden
+        assert!(def.is_hidden(false, false));
+
+        // Haven achievement unlocked, but Haven not discovered (shouldn't happen in practice) - still hidden
+        // Logic: (secret && !unlocked) || (requires_haven && !haven_discovered)
+        // Since requires_haven=true and haven_discovered=false, it's hidden
+        assert!(def.is_hidden(true, false));
+    }
+
+    #[test]
+    fn test_is_hidden_haven_achievement_discovered() {
+        let def = get_achievement_def(AchievementId::HavenDiscovered).unwrap();
+
+        // Haven achievement, Haven discovered, not unlocked - should be visible
+        assert!(!def.is_hidden(false, true));
+
+        // Haven achievement, Haven discovered, unlocked - should be visible
+        assert!(!def.is_hidden(true, true));
+    }
+
+    #[test]
+    fn test_is_hidden_normal_achievement() {
+        let def = get_achievement_def(AchievementId::SlayerI).unwrap();
+
+        // Normal achievement (not secret, not requires_haven) - always visible
+        assert!(!def.is_hidden(false, true));
+        assert!(!def.is_hidden(false, false));
+        assert!(!def.is_hidden(true, true));
+        assert!(!def.is_hidden(true, false));
+    }
+
+    #[test]
+    fn test_is_hidden_stormbreaker_not_discovered() {
+        let def = get_achievement_def(AchievementId::TheStormbreaker).unwrap();
+
+        // TheStormbreaker requires Haven, not unlocked, Haven not discovered
+        assert!(def.is_hidden(false, false));
+
+        // TheStormbreaker requires Haven, not unlocked, Haven discovered
+        assert!(!def.is_hidden(false, true));
+    }
+
+    #[test]
+    fn test_is_hidden_stormbreaker_unlocked() {
+        let def = get_achievement_def(AchievementId::TheStormbreaker).unwrap();
+
+        // TheStormbreaker unlocked, Haven discovered - visible
+        assert!(!def.is_hidden(true, true));
+
+        // TheStormbreaker unlocked, Haven not discovered (shouldn't happen in practice) - still hidden
+        // Logic: (secret && !unlocked) || (requires_haven && !haven_discovered)
+        // Since requires_haven=true and haven_discovered=false, it's hidden
+        assert!(def.is_hidden(true, false));
+    }
+
+    #[test]
+    fn test_is_hidden_haven_builder_achievements() {
+        let builder_achievements = [
+            AchievementId::HavenBuilderI,
+            AchievementId::HavenBuilderII,
+            AchievementId::HavenArchitect,
+        ];
+
+        for id in builder_achievements {
+            let def = get_achievement_def(id).unwrap();
+
+            // Hidden when Haven not discovered
+            assert!(
+                def.is_hidden(false, false),
+                "{:?} should be hidden when Haven not discovered",
+                id
+            );
+
+            // Visible when Haven discovered
+            assert!(
+                !def.is_hidden(false, true),
+                "{:?} should be visible when Haven discovered",
+                id
+            );
+
+            // When unlocked but Haven not discovered - still hidden (requires_haven logic)
+            assert!(
+                def.is_hidden(true, false),
+                "{:?} should be hidden when Haven not discovered even if unlocked",
+                id
+            );
+            // When unlocked and Haven discovered - visible
+            assert!(
+                !def.is_hidden(true, true),
+                "{:?} should be visible when unlocked and Haven discovered",
+                id
+            );
+        }
+    }
+
+    #[test]
+    fn test_is_hidden_combination_secret_and_requires_haven() {
+        // Test edge case: if an achievement is both secret AND requires_haven
+        // it should be hidden when either condition is true
+        // (Currently no achievement has both, but test the logic)
+
+        // Create a test achievement definition manually for this edge case
+        let test_def = super::AchievementDef {
+            id: AchievementId::HavenDiscovered, // Arbitrary ID for test
+            name: "Test Secret Haven",
+            description: "Test",
+            category: AchievementCategory::Exploration,
+            secret: true,
+            icon: "🔒",
+            requires_haven: true,
+        };
+
+        // Not unlocked, Haven not discovered - hidden (both conditions)
+        assert!(test_def.is_hidden(false, false));
+
+        // Not unlocked, Haven discovered - still hidden (secret)
+        assert!(test_def.is_hidden(false, true));
+
+        // Unlocked, Haven not discovered - hidden (requires_haven)
+        assert!(test_def.is_hidden(true, false));
+
+        // Unlocked, Haven discovered - visible (both conditions met)
+        assert!(!test_def.is_hidden(true, true));
+    }
+
+    #[test]
+    fn test_is_hidden_all_haven_achievements_when_not_discovered() {
+        let haven_achievement_ids = [
+            AchievementId::HavenDiscovered,
+            AchievementId::HavenBuilderI,
+            AchievementId::HavenBuilderII,
+            AchievementId::HavenArchitect,
+            AchievementId::TheStormbreaker,
+        ];
+
+        for id in haven_achievement_ids {
+            let def = get_achievement_def(id).unwrap();
+
+            // All Haven achievements should be hidden when Haven not discovered and not unlocked
+            assert!(
+                def.is_hidden(false, false),
+                "{:?} should be hidden when Haven not discovered and not unlocked",
+                id
+            );
+        }
+    }
+
+    #[test]
+    fn test_is_hidden_all_haven_achievements_when_discovered() {
+        let haven_achievement_ids = [
+            AchievementId::HavenDiscovered,
+            AchievementId::HavenBuilderI,
+            AchievementId::HavenBuilderII,
+            AchievementId::HavenArchitect,
+            AchievementId::TheStormbreaker,
+        ];
+
+        for id in haven_achievement_ids {
+            let def = get_achievement_def(id).unwrap();
+
+            // All Haven achievements should be visible when Haven discovered (even if not unlocked)
+            assert!(
+                !def.is_hidden(false, true),
+                "{:?} should be visible when Haven discovered",
+                id
+            );
+        }
+    }
 }

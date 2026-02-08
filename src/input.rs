@@ -30,12 +30,19 @@ use crate::items;
 use crate::utils::debug_menu::DebugMenu;
 use crossterm::event::{KeyCode, KeyEvent};
 
+/// Haven confirmation dialog state
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HavenConfirmation {
+    None,
+    Build,
+    Forge,
+}
+
 /// Haven overlay state, shared between CharacterSelect and Game screens.
 pub struct HavenUiState {
     pub showing: bool,
     pub selected_room: usize,
-    pub confirming_build: bool,
-    pub confirming_forge: bool,
+    pub confirmation: HavenConfirmation,
 }
 
 impl HavenUiState {
@@ -43,22 +50,19 @@ impl HavenUiState {
         Self {
             showing: false,
             selected_room: 0,
-            confirming_build: false,
-            confirming_forge: false,
+            confirmation: HavenConfirmation::None,
         }
     }
 
     pub fn open(&mut self) {
         self.showing = true;
         self.selected_room = 0;
-        self.confirming_build = false;
-        self.confirming_forge = false;
+        self.confirmation = HavenConfirmation::None;
     }
 
     pub fn close(&mut self) {
         self.showing = false;
-        self.confirming_build = false;
-        self.confirming_forge = false;
+        self.confirmation = HavenConfirmation::None;
     }
 }
 
@@ -206,104 +210,105 @@ fn handle_haven(
     haven_ui: &mut HavenUiState,
     achievements: &mut crate::achievements::Achievements,
 ) -> InputResult {
-    // Handle forge confirmation for Storm Forge
-    if haven_ui.confirming_forge {
-        match key.code {
-            KeyCode::Enter => {
-                // Check requirements: Storm Leviathan caught and 25 prestige available
-                let has_leviathan =
-                    achievements.is_unlocked(crate::achievements::AchievementId::StormLeviathan);
-                let has_prestige = state.prestige_rank >= 25;
+    match haven_ui.confirmation {
+        HavenConfirmation::Forge => {
+            match key.code {
+                KeyCode::Enter => {
+                    // Check requirements: Storm Leviathan caught and 25 prestige available
+                    let (_has_leviathan, _has_prestige, can_forge) =
+                        haven::can_forge_stormbreaker(achievements, state.prestige_rank);
 
-                if has_leviathan && has_prestige {
-                    // Deduct prestige cost
-                    state.prestige_rank -= 25;
+                    if can_forge {
+                        // Deduct prestige cost
+                        state.prestige_rank -= 25;
 
-                    // Unlock TheStormbreaker achievement
-                    achievements.unlock(
-                        crate::achievements::AchievementId::TheStormbreaker,
-                        Some(state.character_name.clone()),
-                    );
+                        // Unlock TheStormbreaker achievement
+                        achievements.unlock(
+                            crate::achievements::AchievementId::TheStormbreaker,
+                            Some(state.character_name.clone()),
+                        );
 
-                    state.combat_state.add_log_entry(
-                        "⚡ You forged the legendary Stormbreaker!".to_string(),
-                        false,
-                        true,
-                    );
-                    haven_ui.confirming_forge = false;
-                    return InputResult::NeedsSaveAll;
-                }
-                haven_ui.confirming_forge = false;
-            }
-            KeyCode::Esc => {
-                haven_ui.confirming_forge = false;
-            }
-            _ => {}
-        }
-        return InputResult::Continue;
-    }
-
-    if haven_ui.confirming_build {
-        match key.code {
-            KeyCode::Enter => {
-                let room = haven::HavenRoomId::ALL[haven_ui.selected_room];
-                if let Some((_tier, p_spent)) =
-                    haven::try_build_room(room, haven, &mut state.prestige_rank)
-                {
-                    // Haven saved via NeedsSaveAll (skipped in debug mode)
-                    state.combat_state.add_log_entry(
-                        format!(
-                            "🏠 Built {} (spent {} Prestige Ranks)",
-                            room.name(),
-                            p_spent
-                        ),
-                        false,
-                        true,
-                    );
-                    haven_ui.confirming_build = false;
-                    return InputResult::NeedsSaveAll;
-                }
-                haven_ui.confirming_build = false;
-            }
-            KeyCode::Esc => {
-                haven_ui.confirming_build = false;
-            }
-            _ => {}
-        }
-    } else {
-        match key.code {
-            KeyCode::Up => {
-                haven_ui.selected_room = haven_ui.selected_room.saturating_sub(1);
-            }
-            KeyCode::Down => {
-                if haven_ui.selected_room + 1 < haven::HavenRoomId::ALL.len() {
-                    haven_ui.selected_room += 1;
-                }
-            }
-            KeyCode::Enter => {
-                let room = haven::HavenRoomId::ALL[haven_ui.selected_room];
-
-                // Special handling for Storm Forge - show forge menu if already built
-                if room == haven::HavenRoomId::StormForge && haven.has_storm_forge() {
-                    // Only show forge if not already forged
-                    if !achievements
-                        .is_unlocked(crate::achievements::AchievementId::TheStormbreaker)
-                    {
-                        haven_ui.confirming_forge = true;
+                        state.combat_state.add_log_entry(
+                            "⚡ You forged the legendary Stormbreaker!".to_string(),
+                            false,
+                            true,
+                        );
+                        haven_ui.confirmation = HavenConfirmation::None;
+                        return InputResult::NeedsSaveAll;
                     }
-                } else if haven.can_build(room)
-                    && haven::can_afford(room, haven, state.prestige_rank)
-                {
-                    haven_ui.confirming_build = true;
+                    haven_ui.confirmation = HavenConfirmation::None;
                 }
+                KeyCode::Esc => {
+                    haven_ui.confirmation = HavenConfirmation::None;
+                }
+                _ => {}
             }
-            KeyCode::Esc => {
-                haven_ui.close();
+            InputResult::Continue
+        }
+        HavenConfirmation::Build => {
+            match key.code {
+                KeyCode::Enter => {
+                    let room = haven::HavenRoomId::ALL[haven_ui.selected_room];
+                    if let Some((_tier, p_spent)) =
+                        haven::try_build_room(room, haven, &mut state.prestige_rank)
+                    {
+                        // Haven saved via NeedsSaveAll (skipped in debug mode)
+                        state.combat_state.add_log_entry(
+                            format!(
+                                "🏠 Built {} (spent {} Prestige Ranks)",
+                                room.name(),
+                                p_spent
+                            ),
+                            false,
+                            true,
+                        );
+                        haven_ui.confirmation = HavenConfirmation::None;
+                        return InputResult::NeedsSaveAll;
+                    }
+                    haven_ui.confirmation = HavenConfirmation::None;
+                }
+                KeyCode::Esc => {
+                    haven_ui.confirmation = HavenConfirmation::None;
+                }
+                _ => {}
             }
-            _ => {}
+            InputResult::Continue
+        }
+        HavenConfirmation::None => {
+            match key.code {
+                KeyCode::Up => {
+                    haven_ui.selected_room = haven_ui.selected_room.saturating_sub(1);
+                }
+                KeyCode::Down => {
+                    if haven_ui.selected_room + 1 < haven::HavenRoomId::ALL.len() {
+                        haven_ui.selected_room += 1;
+                    }
+                }
+                KeyCode::Enter => {
+                    let room = haven::HavenRoomId::ALL[haven_ui.selected_room];
+
+                    // Special handling for Storm Forge - show forge menu if already built
+                    if room == haven::HavenRoomId::StormForge && haven.has_storm_forge() {
+                        // Only show forge if not already forged
+                        if !achievements
+                            .is_unlocked(crate::achievements::AchievementId::TheStormbreaker)
+                        {
+                            haven_ui.confirmation = HavenConfirmation::Forge;
+                        }
+                    } else if haven.can_build(room)
+                        && haven::can_afford(room, haven, state.prestige_rank)
+                    {
+                        haven_ui.confirmation = HavenConfirmation::Build;
+                    }
+                }
+                KeyCode::Esc => {
+                    haven_ui.close();
+                }
+                _ => {}
+            }
+            InputResult::Continue
         }
     }
-    InputResult::Continue
 }
 
 fn handle_vault_selection(

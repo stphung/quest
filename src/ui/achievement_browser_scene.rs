@@ -192,9 +192,7 @@ fn render_achievement_list(
             let is_unlocked = achievements.is_unlocked(def.id);
             let is_selected = i == ui_state.selected_index;
 
-            // Hide if: secret and not unlocked, OR requires haven and haven not discovered
-            let is_hidden =
-                (def.secret && !is_unlocked) || (def.requires_haven && !haven_discovered);
+            let is_hidden = def.is_hidden(is_unlocked, haven_discovered);
             let (icon, name) = if is_unlocked || !is_hidden {
                 (def.icon, def.name)
             } else {
@@ -246,8 +244,7 @@ fn render_achievement_detail(
     };
 
     let is_unlocked = achievements.is_unlocked(def.id);
-    // Hide if: secret and not unlocked, OR requires haven and haven not discovered
-    let is_hidden = (def.secret && !is_unlocked) || (def.requires_haven && !haven_discovered);
+    let is_hidden = def.is_hidden(is_unlocked, haven_discovered);
     let show_details = is_unlocked || !is_hidden;
 
     let title = if show_details { def.name } else { "???" };

@@ -550,8 +550,6 @@ pub fn render_forge_confirmation(
     achievements: &crate::achievements::Achievements,
     prestige_rank: u32,
 ) {
-    use crate::achievements::AchievementId;
-
     // Center the modal
     let modal_width = 50;
     let modal_height = 12;
@@ -574,9 +572,8 @@ pub fn render_forge_confirmation(
     let inner = block.inner(modal_area);
     frame.render_widget(block, modal_area);
 
-    let has_leviathan = achievements.is_unlocked(AchievementId::StormLeviathan);
-    let has_prestige = prestige_rank >= 25;
-    let can_forge = has_leviathan && has_prestige;
+    let (has_leviathan, has_prestige, can_forge) =
+        crate::haven::can_forge_stormbreaker(achievements, prestige_rank);
 
     let leviathan_check = if has_leviathan { "✓" } else { "✗" };
     let leviathan_style = if has_leviathan {
