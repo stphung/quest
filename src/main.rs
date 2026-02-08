@@ -10,6 +10,8 @@ mod input;
 mod items;
 mod ui;
 mod utils;
+#[cfg(feature = "web")]
+mod web;
 mod zones;
 
 use challenges::chess::logic::process_ai_thinking;
@@ -58,6 +60,8 @@ fn main() -> io::Result<()> {
     // Handle CLI arguments
     let args: Vec<String> = std::env::args().collect();
     let mut debug_mode = false;
+    #[cfg(feature = "web")]
+    let mut web_port: Option<u16> = None;
 
     if args.len() > 1 {
         match args[1].as_str() {
@@ -77,15 +81,34 @@ fn main() -> io::Result<()> {
                 println!("Quest - Terminal-Based Idle RPG\n");
                 println!("Usage: quest [command]\n");
                 println!("Commands:");
-                println!("  update     Check for and install updates");
-                println!("  --debug    Enable debug menu (press ` to toggle)");
-                println!("  --version  Show version information");
-                println!("  --help     Show this help message");
+                println!("  update       Check for and install updates");
+                println!("  --debug      Enable debug menu (press ` to toggle)");
+                #[cfg(feature = "web")]
+                println!("  --serve      Start web server for browser access (port 3000)");
+                #[cfg(feature = "web")]
+                println!("  --serve=PORT Start web server on custom port");
+                println!("  --version    Show version information");
+                println!("  --help       Show this help message");
                 std::process::exit(0);
             }
             "--debug" => {
                 debug_mode = true;
                 eprintln!("=== DEBUG MODE ENABLED - SAVES DISABLED ===");
+            }
+            #[cfg(feature = "web")]
+            "--serve" => {
+                web_port = Some(3000);
+            }
+            #[cfg(feature = "web")]
+            s if s.starts_with("--serve=") => {
+                let port_str = s.trim_start_matches("--serve=");
+                match port_str.parse::<u16>() {
+                    Ok(p) => web_port = Some(p),
+                    Err(_) => {
+                        eprintln!("Invalid port number: {}", port_str);
+                        std::process::exit(1);
+                    }
+                }
             }
             other => {
                 eprintln!("Unknown command: {}", other);
@@ -94,6 +117,32 @@ fn main() -> io::Result<()> {
             }
         }
     }
+
+    // Start web server if requested
+    #[cfg(feature = "web")]
+    let _web_server = if let Some(port) = web_port {
+        use std::sync::Arc;
+        let server = Arc::new(web::WebServer::new());
+        let server_clone = Arc::clone(&server);
+
+        // Start tokio runtime in a background thread
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+            rt.block_on(async {
+                if let Err(e) = web::start_web_server(port, server_clone).await {
+                    eprintln!("Web server error: {}", e);
+                }
+            });
+        });
+
+        // Give server a moment to start
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        eprintln!("=== WEB SERVER ENABLED on port {} ===", port);
+
+        Some(server)
+    } else {
+        None
+    };
 
     // Check for updates in background (non-blocking notification)
     let update_available = std::thread::spawn(utils::updater::check_update_info);

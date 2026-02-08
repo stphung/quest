@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quest - Web Terminal</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #1a1a2e;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        header {
+            background: #16213e;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #0f3460;
+        }
+        h1 {
+            color: #e94560;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #888;
+            font-size: 0.9rem;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #888;
+        }
+        .status-dot.connected {
+            background: #00d26a;
+        }
+        .status-dot.connecting {
+            background: #ffc107;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        #terminal-container {
+            flex: 1;
+            padding: 10px;
+            overflow: hidden;
+        }
+        #terminal {
+            height: 100%;
+        }
+        .info-bar {
+            background: #16213e;
+            padding: 8px 20px;
+            color: #666;
+            font-size: 0.8rem;
+            border-top: 1px solid #0f3460;
+            display: flex;
+            justify-content: space-between;
+        }
+        .controls {
+            color: #888;
+        }
+        .controls kbd {
+            background: #0f3460;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin: 0 2px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Quest</h1>
+        <div class="status">
+            <div class="status-dot" id="status-dot"></div>
+            <span id="status-text">Connecting...</span>
+        </div>
+    </header>
+
+    <div id="terminal-container">
+        <div id="terminal"></div>
+    </div>
+
+    <div class="info-bar">
+        <div class="controls">
+            <kbd>Arrow Keys</kbd> Navigate
+            <kbd>Enter</kbd> Confirm
+            <kbd>Esc</kbd> Back
+            <kbd>Tab</kbd> Challenges
+        </div>
+        <div>
+            Remote terminal view - Game running on server
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+    <script>
+        // Initialize terminal
+        const term = new Terminal({
+            theme: {
+                background: '#1a1a2e',
+                foreground: '#eee',
+                cursor: '#e94560',
+                cursorAccent: '#1a1a2e',
+                selection: 'rgba(233, 69, 96, 0.3)',
+                black: '#1a1a2e',
+                red: '#e94560',
+                green: '#00d26a',
+                yellow: '#ffc107',
+                blue: '#0f3460',
+                magenta: '#9b59b6',
+                cyan: '#00bcd4',
+                white: '#eee',
+                brightBlack: '#666',
+                brightRed: '#ff6b6b',
+                brightGreen: '#51cf66',
+                brightYellow: '#ffd43b',
+                brightBlue: '#339af0',
+                brightMagenta: '#cc5de8',
+                brightCyan: '#22b8cf',
+                brightWhite: '#fff'
+            },
+            fontFamily: '"Fira Code", "Cascadia Code", "JetBrains Mono", Menlo, Monaco, monospace',
+            fontSize: 14,
+            cursorBlink: true,
+            cursorStyle: 'block'
+        });
+
+        const fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
+
+        const terminalEl = document.getElementById('terminal');
+        term.open(terminalEl);
+        fitAddon.fit();
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            fitAddon.fit();
+        });
+
+        // Status elements
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+
+        function setStatus(status, text) {
+            statusDot.className = 'status-dot ' + status;
+            statusText.textContent = text;
+        }
+
+        // WebSocket connection
+        let ws = null;
+        let reconnectTimeout = null;
+
+        function connect() {
+            setStatus('connecting', 'Connecting...');
+
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}`;
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                setStatus('connected', 'Connected');
+                term.clear();
+            };
+
+            ws.onmessage = (event) => {
+                // Handle binary data (terminal output)
+                if (event.data instanceof Blob) {
+                    event.data.arrayBuffer().then(buffer => {
+                        const text = new TextDecoder().decode(buffer);
+                        term.write(text);
+                    });
+                } else {
+                    term.write(event.data);
+                }
+            };
+
+            ws.onclose = () => {
+                setStatus('', 'Disconnected');
+                // Attempt to reconnect after 2 seconds
+                reconnectTimeout = setTimeout(connect, 2000);
+            };
+
+            ws.onerror = () => {
+                setStatus('', 'Connection error');
+            };
+        }
+
+        // Send keyboard input to server
+        term.onKey(({ key, domEvent }) => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                // Map key names for the server
+                let keyName = domEvent.key;
+
+                // Send as JSON
+                ws.send(JSON.stringify({ key: keyName }));
+            }
+        });
+
+        // Handle special keys that onKey might miss
+        document.addEventListener('keydown', (e) => {
+            // Only handle if terminal is focused and WS is connected
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                // Handle keys that xterm might not capture
+                const specialKeys = ['Escape', 'Tab'];
+                if (specialKeys.includes(e.key)) {
+                    ws.send(JSON.stringify({ key: e.key }));
+                    e.preventDefault();
+                }
+            }
+        });
+
+        // Start connection
+        connect();
+
+        // Focus terminal
+        term.focus();
+    </script>
+</body>
+</html>
