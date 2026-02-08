@@ -811,7 +811,11 @@ pub fn draw_footer(
     } else if update_check_completed {
         Span::styled("    ✓ Up to date", Style::default().fg(Color::Green))
     } else {
-        Span::styled("    🔄 Checking...", Style::default().fg(Color::DarkGray))
+        use super::throbber::spinner_char;
+        Span::styled(
+            format!("    {} Checking...", spinner_char()),
+            Style::default().fg(Color::DarkGray),
+        )
     };
 
     // Build challenge notification text
