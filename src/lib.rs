@@ -14,6 +14,7 @@ pub mod dungeon;
 pub mod fishing;
 pub mod haven;
 pub mod items;
+pub mod simulator;
 pub mod utils;
 pub mod zones;
 
