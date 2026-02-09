@@ -282,7 +282,9 @@ quest/
 ├── tests/                   # Integration tests
 ├── .github/workflows/       # CI/CD pipeline
 ├── scripts/                 # Quality checks
-├── docs/plans/              # Design documents
+├── docs/design/             # Consolidated design documents
+├── docs/archive/            # Original dated design documents
+├── docs/DECISIONS.md        # Key design decisions and rationale
 ├── Makefile                 # Dev helpers
 └── CLAUDE.md                # This file
 ```
