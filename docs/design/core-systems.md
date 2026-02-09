@@ -20,7 +20,7 @@ All attributes start at 10 (average human baseline).
 ### Modifier System
 
 ```
-modifier = (attribute - 10) / 2  (integer division, min 0)
+modifier = (attribute - 10) / 2  (integer division, can be negative)
 ```
 
 Power spikes occur every 2 attribute points (e.g., 12 = +1, 14 = +2, 16 = +3).
@@ -32,15 +32,15 @@ On level up, 3 attribute points are randomly distributed among non-capped attrib
 ### Attribute Caps
 
 ```
-cap = 10 + (prestige_rank * 5)
+cap = 20 + (prestige_rank * 5)
 ```
 
 | Prestige | Cap |
 |----------|-----|
-| P0 | 10 |
-| P1 | 15 |
-| P5 | 35 |
-| P10 | 60 |
+| P0 | 20 |
+| P1 | 25 |
+| P5 | 45 |
+| P10 | 70 |
 
 ## Derived Stats
 
@@ -293,13 +293,13 @@ Weapon, Armor, Helmet, Gloves, Boots, Amulet, Ring.
 ### Drop System
 
 - Base drop rate: 15% per kill
-- Prestige bonus: +1% per prestige rank (max +10% at P10)
+- Prestige bonus: +1% per prestige rank
 - Haven Trophy Hall bonus: multiplicative on base chance
-- Maximum total: 25%
+- Maximum total: 25% (reached at P10 without Haven, earlier with Haven)
 
 **Rarity distribution** (base at P0):
 - Common: 55%, Magic: 30%, Rare: 12%, Epic: 2.5%, Legendary: 0.5%
-- Prestige bonus (+1%/rank, max 10%) and Haven Workshop bonus (max 25%) shift weight away from Common toward higher rarities
+- Prestige bonus for rarity: +1%/rank, capped at 10%. Haven Workshop bonus: up to 25%. Both shift weight away from Common toward higher rarities
 - Common floor: never drops below 10%
 
 ### Affix Types (9)

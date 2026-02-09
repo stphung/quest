@@ -111,6 +111,7 @@ Procedurally generated dungeon exploration triggered randomly after kills (2% ch
 | Medium | 7x7 | Mid prestige |
 | Large | 9x9 | High prestige |
 | Epic | 11x11 | Very high prestige |
+| Legendary | 13x13 | Highest prestige |
 
 ### Room Types
 

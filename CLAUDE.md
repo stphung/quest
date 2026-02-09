@@ -71,7 +71,7 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 
 - `attributes.rs` — 6 RPG attributes (STR, DEX, CON, INT, WIS, CHA), modifier = `(value - 10) / 2`
 - `derived_stats.rs` — Combat stats calculated from attributes (HP, damage, defense, crit, XP mult)
-- `prestige.rs` — Prestige tiers (Bronze→Eternal) with XP multipliers (1.5× compounding) and attribute cap increases
+- `prestige.rs` — Prestige tiers (Bronze→Eternal) with XP multipliers (`1+0.5×rank^0.7`, diminishing returns) and attribute cap increases (`20+rank×5`)
 - `manager.rs` — Character CRUD operations (create, delete, rename), JSON save/load in ~/.quest/, name validation
 - `input.rs` — Character selection, creation, deletion, renaming input handling and UI states
 

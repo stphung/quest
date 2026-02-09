@@ -35,7 +35,7 @@ All interactive minigames: first Esc sets `forfeit_pending`, second Esc confirms
 | Chess | +1 PR | +2 PR | +3 PR | +5 PR |
 | Go | +1 PR | +2 PR | +3 PR | +5 PR |
 | Gomoku | +75% XP | +100% XP | +1 PR, +50% XP | +2 PR, +100% XP |
-| Morris | XP% | XP% | XP% | +1 FR, XP% |
+| Morris | +50% XP | +100% XP | +150% XP | +1 FR, +200% XP |
 | Minesweeper | +50% XP | +75% XP | +100% XP | +1 PR, +200% XP |
 | Rune | +25% XP | +50% XP | +1 FR, +75% XP | +1 PR, +2 FR |
 
@@ -55,12 +55,12 @@ Standard chess rules. Uses the `chess-engine` crate (v0.1) for move validation a
 
 Minimax search with difficulty-based depth:
 
-| Difficulty | Depth | Est. ELO | Prestige Reward |
-|------------|-------|----------|-----------------|
-| Novice | 1-ply | ~500 | +1 |
-| Apprentice | 2-ply | ~800 | +2 |
-| Journeyman | 3-ply | ~1100 | +3 |
-| Master | 3-ply+ | ~1350 | +5 |
+| Difficulty | Depth | Random Move % | Est. ELO | Prestige Reward |
+|------------|-------|---------------|----------|-----------------|
+| Novice | 1-ply | 50% | ~500 | +1 |
+| Apprentice | 1-ply | 0% | ~800 | +2 |
+| Journeyman | 2-ply | 0% | ~1100 | +3 |
+| Master | 3-ply | 0% | ~1350 | +5 |
 
 ### UI
 
@@ -164,10 +164,10 @@ Three-phase game on a 24-position board (3 concentric squares with connecting sp
 
 | Difficulty | Search Depth | Random Move % | Reward |
 |------------|-------------|---------------|--------|
-| Novice | 1-ply | 50% | XP% |
-| Apprentice | 1-ply | 0% | XP% |
-| Journeyman | 2-ply | 0% | XP% |
-| Master | 3-ply | 0% | +1 FR, XP% |
+| Novice | 2-ply | 50% | +50% XP |
+| Apprentice | 3-ply | 0% | +100% XP |
+| Journeyman | 4-ply | 0% | +150% XP |
+| Master | 5-ply | 0% | +1 FR, +200% XP |
 
 **Evaluation**: Piece count difference (heavy), mill count, potential mills (2 of 3), mobility.
 

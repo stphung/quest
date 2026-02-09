@@ -145,6 +145,7 @@ When active, a `[DEBUG]` indicator shows in the UI corner.
 6. **Trigger Minesweeper Challenge** — Adds minesweeper to challenge menu
 7. **Trigger Rune Challenge** — Adds rune challenge to challenge menu
 8. **Trigger Go Challenge** — Adds go to challenge menu
+9. **Trigger Haven Discovery** — Discovers Haven immediately
 
 Each option calls existing generation functions to bypass the normal RNG discovery system. Useful for testing features without waiting for random events.
 
