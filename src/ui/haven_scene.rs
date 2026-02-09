@@ -261,7 +261,7 @@ fn render_room_detail(
         .constraints([
             Constraint::Length(3),                                    // Description
             Constraint::Length(1),                                    // Spacer
-            Constraint::Length(1 + room.max_tier() as u16),              // Bonus info (header + tiers)
+            Constraint::Length(1 + room.max_tier() as u16),           // Bonus info (header + tiers)
             Constraint::Length(1),                                    // Spacer
             Constraint::Length(req_height),                           // Requirements (if any)
             Constraint::Length(if has_requirements { 1 } else { 0 }), // Spacer after requirements

@@ -34,6 +34,7 @@ use crossterm::terminal::{
 };
 use crossterm::ExecutableCommand;
 use input::{GameOverlay, HavenUiState, InputResult};
+use rand::Rng;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 use std::time::{Duration, Instant};
@@ -51,6 +52,16 @@ enum Screen {
     CharacterDelete,
     CharacterRename,
     Game,
+}
+
+/// Returns the update check interval with random jitter applied.
+/// Jitter spreads checks across [base - jitter, base + jitter] to avoid
+/// simultaneous API requests from many clients.
+fn jittered_update_interval() -> Duration {
+    let mut rng = rand::thread_rng();
+    let jitter = rng.gen_range(0..=2 * UPDATE_CHECK_JITTER_SECONDS);
+    let interval = UPDATE_CHECK_INTERVAL_SECONDS - UPDATE_CHECK_JITTER_SECONDS + jitter;
+    Duration::from_secs(interval)
 }
 
 fn main() -> io::Result<()> {
@@ -624,6 +635,7 @@ fn main() -> io::Result<()> {
                 let mut last_tick = Instant::now();
                 let mut last_autosave = Instant::now();
                 let mut last_update_check = Instant::now();
+                let mut next_update_check_interval = jittered_update_interval();
                 let mut tick_counter: u32 = 0;
                 let mut overlay = if let Some(report) = pending_offline_report.take() {
                     // Haven bonus already included in report from process_offline_progression
@@ -950,17 +962,17 @@ fn main() -> io::Result<()> {
                         last_save_time = Some(Local::now());
                     }
 
-                    // Periodic update check (every 30 minutes)
+                    // Periodic update check (every ~30 minutes with jitter)
                     // Only start a new check if we don't have one running and haven't found an update
                     if update_info.is_none()
                         && update_check_handle.is_none()
-                        && last_update_check.elapsed()
-                            >= Duration::from_secs(UPDATE_CHECK_INTERVAL_SECONDS)
+                        && last_update_check.elapsed() >= next_update_check_interval
                     {
                         update_check_handle =
                             Some(std::thread::spawn(utils::updater::check_update_info));
                         update_check_completed = false; // Reset to show "Checking..." again
                         last_update_check = Instant::now();
+                        next_update_check_interval = jittered_update_interval();
                     }
                 }
             }
