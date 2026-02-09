@@ -269,4 +269,227 @@ mod tests {
         game_state.prestige_rank = 20;
         assert_eq!(game_state.get_attribute_cap(), 120);
     }
+
+    #[test]
+    fn test_add_recent_drop_single() {
+        let mut gs = GameState::new("Hero".to_string(), 0);
+        assert!(gs.recent_drops.is_empty());
+
+        gs.add_recent_drop(
+            "Iron Sword".to_string(),
+            Rarity::Common,
+            true,
+            "⚔",
+            "Weapon".to_string(),
+            "+2 STR".to_string(),
+        );
+
+        assert_eq!(gs.recent_drops.len(), 1);
+        assert_eq!(gs.recent_drops[0].name, "Iron Sword");
+        assert_eq!(gs.recent_drops[0].rarity, Rarity::Common);
+        assert!(gs.recent_drops[0].equipped);
+        assert_eq!(gs.recent_drops[0].slot, "Weapon");
+        assert_eq!(gs.recent_drops[0].stats, "+2 STR");
+    }
+
+    #[test]
+    fn test_add_recent_drop_fifo_order() {
+        let mut gs = GameState::new("Hero".to_string(), 0);
+
+        gs.add_recent_drop(
+            "First".to_string(),
+            Rarity::Common,
+            false,
+            "",
+            "".to_string(),
+            "".to_string(),
+        );
+        gs.add_recent_drop(
+            "Second".to_string(),
+            Rarity::Rare,
+            false,
+            "",
+            "".to_string(),
+            "".to_string(),
+        );
+        gs.add_recent_drop(
+            "Third".to_string(),
+            Rarity::Epic,
+            false,
+            "",
+            "".to_string(),
+            "".to_string(),
+        );
+
+        // Most recent should be at front
+        assert_eq!(gs.recent_drops.len(), 3);
+        assert_eq!(gs.recent_drops[0].name, "Third");
+        assert_eq!(gs.recent_drops[1].name, "Second");
+        assert_eq!(gs.recent_drops[2].name, "First");
+    }
+
+    #[test]
+    fn test_add_recent_drop_caps_at_max() {
+        let mut gs = GameState::new("Hero".to_string(), 0);
+
+        // Fill to the cap (MAX_RECENT_DROPS = 10)
+        for i in 0..10 {
+            gs.add_recent_drop(
+                format!("Item {i}"),
+                Rarity::Common,
+                false,
+                "",
+                "".to_string(),
+                "".to_string(),
+            );
+        }
+        assert_eq!(gs.recent_drops.len(), 10);
+
+        // Adding one more should evict the oldest
+        gs.add_recent_drop(
+            "Overflow".to_string(),
+            Rarity::Legendary,
+            true,
+            "",
+            "".to_string(),
+            "".to_string(),
+        );
+        assert_eq!(gs.recent_drops.len(), 10);
+        assert_eq!(gs.recent_drops[0].name, "Overflow");
+        // "Item 0" (the oldest) should have been evicted
+        assert!(gs.recent_drops.iter().all(|d| d.name != "Item 0"));
+        // "Item 1" should still be present as the last element
+        assert_eq!(gs.recent_drops[9].name, "Item 1");
+    }
+
+    #[test]
+    fn test_add_recent_drop_at_exact_cap_boundary() {
+        let mut gs = GameState::new("Hero".to_string(), 0);
+
+        // Add exactly MAX_RECENT_DROPS items
+        for i in 0..10 {
+            gs.add_recent_drop(
+                format!("Item {i}"),
+                Rarity::Common,
+                false,
+                "",
+                "".to_string(),
+                "".to_string(),
+            );
+        }
+        assert_eq!(gs.recent_drops.len(), 10);
+
+        // Add two more, should still be capped at 10
+        gs.add_recent_drop(
+            "Extra1".to_string(),
+            Rarity::Common,
+            false,
+            "",
+            "".to_string(),
+            "".to_string(),
+        );
+        gs.add_recent_drop(
+            "Extra2".to_string(),
+            Rarity::Common,
+            false,
+            "",
+            "".to_string(),
+            "".to_string(),
+        );
+        assert_eq!(gs.recent_drops.len(), 10);
+        assert_eq!(gs.recent_drops[0].name, "Extra2");
+        assert_eq!(gs.recent_drops[1].name, "Extra1");
+    }
+
+    #[test]
+    fn test_serialization_round_trip_preserves_persistent_fields() {
+        let mut gs = GameState::new("Serde Hero".to_string(), 42);
+        gs.character_level = 15;
+        gs.character_xp = 5000;
+        gs.prestige_rank = 3;
+        gs.total_prestige_count = 5;
+        gs.play_time_seconds = 3600;
+        gs.attributes.set(AttributeType::Strength, 18);
+
+        let json = serde_json::to_string(&gs).unwrap();
+        let loaded: GameState = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(loaded.character_name, "Serde Hero");
+        assert_eq!(loaded.character_level, 15);
+        assert_eq!(loaded.character_xp, 5000);
+        assert_eq!(loaded.prestige_rank, 3);
+        assert_eq!(loaded.total_prestige_count, 5);
+        assert_eq!(loaded.play_time_seconds, 3600);
+        assert_eq!(loaded.last_save_time, 42);
+        assert_eq!(loaded.attributes.get(AttributeType::Strength), 18);
+    }
+
+    #[test]
+    fn test_serialization_skips_transient_fields() {
+        let mut gs = GameState::new("Hero".to_string(), 0);
+        gs.session_kills = 999;
+        gs.add_recent_drop(
+            "Sword".to_string(),
+            Rarity::Rare,
+            true,
+            "",
+            "".to_string(),
+            "".to_string(),
+        );
+
+        let json = serde_json::to_string(&gs).unwrap();
+        let loaded: GameState = serde_json::from_str(&json).unwrap();
+
+        // Transient fields should be at default values after deserialization
+        assert_eq!(loaded.session_kills, 0);
+        assert!(loaded.recent_drops.is_empty());
+        assert!(loaded.active_fishing.is_none());
+        assert!(loaded.active_minigame.is_none());
+        assert!(loaded.last_minigame_win.is_none());
+    }
+
+    #[test]
+    fn test_serialization_default_fields_from_old_json() {
+        // Simulate loading from an older save that lacks optional fields
+        let minimal_json = serde_json::json!({
+            "character_id": "test-id",
+            "character_name": "Old Hero",
+            "character_level": 5,
+            "character_xp": 100,
+            "attributes": { "values": [10, 10, 10, 10, 10, 10] },
+            "prestige_rank": 0,
+            "total_prestige_count": 0,
+            "last_save_time": 0,
+            "play_time_seconds": 0,
+            "combat_state": {
+                "player_max_hp": 50,
+                "player_current_hp": 50,
+                "current_enemy": null,
+                "is_regenerating": false,
+                "regen_timer": 0.0,
+                "attack_timer": 0.0,
+                "kills_in_subzone": 0,
+                "fighting_boss": false,
+                "total_kills": 0,
+                "combat_log": []
+            },
+            "equipment": {
+                "weapon": null,
+                "armor": null,
+                "helmet": null,
+                "gloves": null,
+                "boots": null,
+                "amulet": null,
+                "ring": null
+            }
+        });
+
+        let loaded: GameState = serde_json::from_value(minimal_json).unwrap();
+
+        // #[serde(default)] fields should get their defaults
+        assert!(loaded.active_dungeon.is_none());
+        assert_eq!(loaded.fishing.rank, 1);
+        assert_eq!(loaded.zone_progression.current_zone_id, 1);
+        assert_eq!(loaded.chess_stats.games_played, 0);
+    }
 }
