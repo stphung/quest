@@ -7,6 +7,9 @@ use crate::core::balance::{
     attributes_at_level, BOSS_XP_MULTIPLIER, COMBAT_XP_BASE, COMBAT_XP_PER_SUBZONE,
     COMBAT_XP_PER_ZONE,
 };
+use crate::core::combat_math::{
+    apply_damage, calculate_attack_simple, calculate_damage_taken, is_alive,
+};
 use crate::items::Equipment;
 use crate::zones::get_zone;
 use rand::Rng;
@@ -102,25 +105,17 @@ impl SimPlayer {
     }
 
     /// Take damage, returns true if still alive.
+    /// Uses shared combat_math for calculation.
     pub fn take_damage(&mut self, amount: u32) -> bool {
-        let actual = amount.saturating_sub(self.derived.defense);
-        self.current_hp = self.current_hp.saturating_sub(actual);
-        self.current_hp > 0
+        let actual = calculate_damage_taken(amount, self.derived.defense);
+        self.current_hp = apply_damage(self.current_hp, actual);
+        is_alive(self.current_hp)
     }
 
-    /// Calculate damage for one attack (using real crit mechanics).
+    /// Calculate damage for one attack (using shared combat_math).
     pub fn calc_attack_damage(&self, rng: &mut impl Rng) -> (u32, bool) {
-        let base = self.derived.total_damage();
-        let crit_roll = rng.gen_range(0..100);
-        let is_crit = crit_roll < self.derived.crit_chance_percent;
-
-        let damage = if is_crit {
-            (base as f64 * self.derived.crit_multiplier) as u32
-        } else {
-            base
-        };
-
-        (damage, is_crit)
+        let result = calculate_attack_simple(&self.derived, rng);
+        (result.damage, result.is_crit)
     }
 }
 
