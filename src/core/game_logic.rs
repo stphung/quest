@@ -1,4 +1,7 @@
-use super::balance::{PRESTIGE_MULT_PER_CHA_MOD, XP_CURVE_BASE, XP_CURVE_EXPONENT, XP_MULT_PER_WIS_MOD};
+use super::balance::{
+    distribute_level_up_points as distribute_points, PRESTIGE_MULT_PER_CHA_MOD, XP_CURVE_BASE,
+    XP_CURVE_EXPONENT, XP_MULT_PER_WIS_MOD,
+};
 use super::constants::*;
 use super::game_state::GameState;
 use crate::character::attributes::AttributeType;
@@ -33,30 +36,11 @@ pub fn xp_gain_per_tick(prestige_rank: u32, wis_modifier: i32, cha_modifier: i32
     BASE_XP_PER_TICK * prestige_mult * wis_mult
 }
 
-/// Distributes 3 attribute points randomly among non-capped attributes
+/// Distributes 3 attribute points randomly among non-capped attributes.
+/// Uses shared balance function.
 pub fn distribute_level_up_points(state: &mut GameState) -> Vec<AttributeType> {
     let mut rng = rand::thread_rng();
-    let cap = state.get_attribute_cap();
-    let mut increased = Vec::new();
-
-    let mut points = 3;
-    let mut attempts = 0;
-    let max_attempts = 100; // Prevent infinite loop
-
-    while points > 0 && attempts < max_attempts {
-        let attr_index = rng.gen_range(0..6);
-        let attr = AttributeType::all()[attr_index];
-
-        if state.attributes.get(attr) < cap {
-            state.attributes.increment(attr);
-            increased.push(attr);
-            points -= 1;
-        }
-
-        attempts += 1;
-    }
-
-    increased
+    distribute_points(&mut state.attributes, state.prestige_rank, &mut rng)
 }
 
 /// Applies XP to the character and processes any level-ups

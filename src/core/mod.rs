@@ -7,7 +7,8 @@ pub mod constants;
 pub mod game_logic;
 pub mod game_state;
 
-pub use balance::*;
+// Re-export selectively to avoid ambiguity
 pub use constants::*;
 pub use game_logic::*;
 pub use game_state::*;
+// balance module accessed via crate::core::balance::

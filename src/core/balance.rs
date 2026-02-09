@@ -111,25 +111,74 @@ pub const BOSS_LEGENDARY_CHANCE: f64 = 0.05;
 pub const ZONE10_BOSS_LEGENDARY_CHANCE: f64 = 0.10;
 
 // =============================================================================
-// ATTRIBUTE POINT ALLOCATION (for simulator leveling)
+// ATTRIBUTE POINT ALLOCATION
 // =============================================================================
 
-/// STR bonus per 2 levels.
-pub const LEVEL_STR_RATE: u32 = 2;
+/// Points gained per level up.
+pub const POINTS_PER_LEVEL: u32 = 3;
 
-/// CON bonus per 2 levels.
-pub const LEVEL_CON_RATE: u32 = 2;
+/// Base attribute cap (before prestige bonuses).
+pub const BASE_ATTRIBUTE_CAP: u32 = 20;
 
-/// DEX bonus per 3 levels.
-pub const LEVEL_DEX_RATE: u32 = 3;
+/// Additional cap per prestige rank.
+pub const ATTRIBUTE_CAP_PER_PRESTIGE: u32 = 5;
 
 // =============================================================================
 // Helpers
 // =============================================================================
 
+use crate::character::attributes::{AttributeType, Attributes};
+use rand::Rng;
+
 /// Calculate XP required for a given level.
 pub fn xp_required_for_level(level: u32) -> u64 {
     (XP_CURVE_BASE * f64::powf(level as f64, XP_CURVE_EXPONENT)) as u64
+}
+
+/// Calculate attribute cap for a given prestige rank.
+pub fn attribute_cap(prestige_rank: u32) -> u32 {
+    BASE_ATTRIBUTE_CAP + (prestige_rank * ATTRIBUTE_CAP_PER_PRESTIGE)
+}
+
+/// Distribute level-up points randomly among attributes.
+/// Returns which attributes were increased.
+pub fn distribute_level_up_points(
+    attrs: &mut Attributes,
+    prestige_rank: u32,
+    rng: &mut impl Rng,
+) -> Vec<AttributeType> {
+    let cap = attribute_cap(prestige_rank);
+    let mut increased = Vec::new();
+
+    let mut points = POINTS_PER_LEVEL;
+    let mut attempts = 0;
+    let max_attempts = 100;
+
+    while points > 0 && attempts < max_attempts {
+        let attr_index = rng.gen_range(0..6);
+        let attr = AttributeType::all()[attr_index];
+
+        if attrs.get(attr) < cap {
+            attrs.increment(attr);
+            increased.push(attr);
+            points -= 1;
+        }
+        attempts += 1;
+    }
+
+    increased
+}
+
+/// Create attributes for a character at a given level (simulating level-ups from 1).
+pub fn attributes_at_level(level: u32, prestige_rank: u32, rng: &mut impl Rng) -> Attributes {
+    let mut attrs = Attributes::default();
+
+    // Simulate leveling from 1 to target level
+    for _ in 1..level {
+        distribute_level_up_points(&mut attrs, prestige_rank, rng);
+    }
+
+    attrs
 }
 
 /// Calculate zone multiplier for enemy stats.

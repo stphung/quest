@@ -1,11 +1,11 @@
 //! Combat simulation using real game mechanics.
 
-use crate::character::attributes::{AttributeType, Attributes};
+use crate::character::attributes::Attributes;
 use crate::character::derived_stats::DerivedStats;
 use crate::combat::types::{generate_enemy_for_current_zone, generate_subzone_boss, Enemy};
 use crate::core::balance::{
-    BOSS_XP_MULTIPLIER, COMBAT_XP_BASE, COMBAT_XP_PER_SUBZONE, COMBAT_XP_PER_ZONE,
-    LEVEL_CON_RATE, LEVEL_DEX_RATE, LEVEL_STR_RATE,
+    attributes_at_level, BOSS_XP_MULTIPLIER, COMBAT_XP_BASE, COMBAT_XP_PER_SUBZONE,
+    COMBAT_XP_PER_ZONE,
 };
 use crate::items::Equipment;
 use crate::zones::get_zone;
@@ -40,24 +40,41 @@ impl SimPlayer {
     }
 
     /// Create a player at a specific level with scaled attributes.
+    /// Uses the same random distribution as the real game.
     pub fn at_level(level: u32) -> Self {
-        let mut player = Self::new();
+        Self::at_level_with_prestige(level, 0)
+    }
 
-        // Scale base attributes with level using balance constants
-        let bonus = level.saturating_sub(1);
-        player
-            .attributes
-            .set(AttributeType::Strength, 10 + bonus / LEVEL_STR_RATE);
-        player
-            .attributes
-            .set(AttributeType::Constitution, 10 + bonus / LEVEL_CON_RATE);
-        player
-            .attributes
-            .set(AttributeType::Dexterity, 10 + bonus / LEVEL_DEX_RATE);
+    /// Create a player at a specific level and prestige rank.
+    /// Uses the same random distribution as the real game.
+    pub fn at_level_with_prestige(level: u32, prestige_rank: u32) -> Self {
+        let mut rng = rand::thread_rng();
+        let attributes = attributes_at_level(level, prestige_rank, &mut rng);
+        let equipment = Equipment::new();
+        let derived = DerivedStats::calculate_derived_stats(&attributes, &equipment);
 
-        player.level = level;
-        player.recalculate_stats();
-        player
+        Self {
+            level,
+            attributes,
+            equipment,
+            current_hp: derived.max_hp,
+            derived,
+        }
+    }
+
+    /// Create a player at a specific level with a seeded RNG for reproducibility.
+    pub fn at_level_seeded(level: u32, prestige_rank: u32, rng: &mut impl Rng) -> Self {
+        let attributes = attributes_at_level(level, prestige_rank, rng);
+        let equipment = Equipment::new();
+        let derived = DerivedStats::calculate_derived_stats(&attributes, &equipment);
+
+        Self {
+            level,
+            attributes,
+            equipment,
+            current_hp: derived.max_hp,
+            derived,
+        }
     }
 
     /// Recalculate derived stats after equipment/attribute changes.
