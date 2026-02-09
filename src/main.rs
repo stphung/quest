@@ -1278,20 +1278,31 @@ fn game_tick(
                 }
 
                 // Try to drop item
-                use items::drops::try_drop_item_with_haven;
+                use items::drops::{try_drop_from_boss, try_drop_from_mob};
                 use items::scoring::auto_equip_if_better;
 
-                let haven_drop_rate = haven.get_bonus(haven::HavenBonusType::DropRatePercent);
-                let haven_rarity = haven.get_bonus(haven::HavenBonusType::ItemRarityPercent);
-                if let Some(item) =
-                    try_drop_item_with_haven(game_state, haven_drop_rate, haven_rarity)
-                {
+                let zone_id = game_state.zone_progression.current_zone_id as usize;
+                let was_boss = game_state.zone_progression.fighting_boss;
+                let is_final_zone = zone_id == 10;
+
+                let dropped_item = if was_boss {
+                    // Boss always drops an item, can drop legendaries
+                    Some(try_drop_from_boss(zone_id, is_final_zone))
+                } else {
+                    // Normal mobs use haven bonuses, capped at Epic
+                    let haven_drop_rate = haven.get_bonus(haven::HavenBonusType::DropRatePercent);
+                    let haven_rarity = haven.get_bonus(haven::HavenBonusType::ItemRarityPercent);
+                    try_drop_from_mob(game_state, zone_id, haven_drop_rate, haven_rarity)
+                };
+
+                if let Some(item) = dropped_item {
                     let item_name = item.display_name.clone();
                     let rarity = item.rarity;
                     let slot = item.slot_name().to_string();
                     let stats = item.stat_summary();
+                    let icon = if was_boss { "👑" } else { "🎁" };
                     let equipped = auto_equip_if_better(item, game_state);
-                    game_state.add_recent_drop(item_name, rarity, equipped, "🎁", slot, stats);
+                    game_state.add_recent_drop(item_name, rarity, equipped, icon, slot, stats);
                 }
 
                 // Try to discover dungeon (only when not in a dungeon)

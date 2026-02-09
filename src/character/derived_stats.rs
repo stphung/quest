@@ -225,6 +225,7 @@ mod tests {
         let weapon = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Common,
+            ilvl: 10,
             base_name: "Sword".to_string(),
             display_name: "Iron Sword".to_string(),
             attributes: AttributeBonuses {
@@ -261,6 +262,7 @@ mod tests {
         let amulet = Item {
             slot: EquipmentSlot::Amulet,
             rarity: Rarity::Common,
+            ilvl: 10,
             base_name: "Amulet".to_string(),
             display_name: "Blessed Amulet".to_string(),
             attributes: AttributeBonuses {
@@ -291,6 +293,7 @@ mod tests {
         let weapon = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Common,
+            ilvl: 10,
             base_name: "Sword".to_string(),
             display_name: "Enchanted Sword".to_string(),
             attributes: AttributeBonuses {
@@ -326,6 +329,7 @@ mod tests {
         let weapon = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Rare,
+            ilvl: 10,
             base_name: "Sword".to_string(),
             display_name: "Legendary Sword".to_string(),
             attributes: AttributeBonuses {
@@ -379,6 +383,7 @@ mod tests {
         let armor = Item {
             slot: EquipmentSlot::Armor,
             rarity: Rarity::Rare,
+            ilvl: 10,
             base_name: "Armor".to_string(),
             display_name: "Reinforced Armor".to_string(),
             attributes: AttributeBonuses {
@@ -413,6 +418,7 @@ mod tests {
         let amulet = Item {
             slot: EquipmentSlot::Amulet,
             rarity: Rarity::Rare,
+            ilvl: 10,
             base_name: "Amulet".to_string(),
             display_name: "Enchanted Amulet".to_string(),
             attributes: AttributeBonuses {
@@ -447,6 +453,7 @@ mod tests {
         let weapon = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Rare,
+            ilvl: 10,
             base_name: "Sword".to_string(),
             display_name: "Vicious Sword".to_string(),
             attributes: AttributeBonuses::new(),
@@ -473,6 +480,7 @@ mod tests {
         let weapon = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Rare,
+            ilvl: 10,
             base_name: "Sword".to_string(),
             display_name: "Sword".to_string(),
             attributes: AttributeBonuses::new(),
@@ -485,6 +493,7 @@ mod tests {
         let ring = Item {
             slot: EquipmentSlot::Ring,
             rarity: Rarity::Rare,
+            ilvl: 10,
             base_name: "Ring".to_string(),
             display_name: "Ring".to_string(),
             attributes: AttributeBonuses::new(),
@@ -511,6 +520,7 @@ mod tests {
         let gloves = Item {
             slot: EquipmentSlot::Gloves,
             rarity: Rarity::Rare,
+            ilvl: 10,
             base_name: "Gloves".to_string(),
             display_name: "Swift Gloves".to_string(),
             attributes: AttributeBonuses::new(),
@@ -536,6 +546,7 @@ mod tests {
         let armor = Item {
             slot: EquipmentSlot::Armor,
             rarity: Rarity::Rare,
+            ilvl: 10,
             base_name: "Armor".to_string(),
             display_name: "Regenerating Armor".to_string(),
             attributes: AttributeBonuses::new(),
@@ -561,6 +572,7 @@ mod tests {
         let armor = Item {
             slot: EquipmentSlot::Armor,
             rarity: Rarity::Rare,
+            ilvl: 10,
             base_name: "Armor".to_string(),
             display_name: "Thorned Armor".to_string(),
             attributes: AttributeBonuses::new(),
@@ -586,6 +598,7 @@ mod tests {
         let armor = Item {
             slot: EquipmentSlot::Armor,
             rarity: Rarity::Rare,
+            ilvl: 10,
             base_name: "Armor".to_string(),
             display_name: "Armor".to_string(),
             attributes: AttributeBonuses::new(),
@@ -598,6 +611,7 @@ mod tests {
         let helmet = Item {
             slot: EquipmentSlot::Helmet,
             rarity: Rarity::Rare,
+            ilvl: 10,
             base_name: "Helmet".to_string(),
             display_name: "Helmet".to_string(),
             attributes: AttributeBonuses::new(),

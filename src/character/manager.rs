@@ -1279,6 +1279,7 @@ mod tests {
         let item = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Common,
+        ilvl: 10,
             base_name: "Sword".to_string(),
             display_name: "Test Sword".to_string(),
             attributes: AttributeBonuses::new(),

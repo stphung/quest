@@ -184,8 +184,9 @@ pub fn tick_fishing_with_haven_result(
                         ));
                     }
 
-                    // Check for item drop
-                    if let Some(item) = try_fishing_item_drop(rarity, state.character_level, rng) {
+                    // Check for item drop (use zone for ilvl)
+                    let zone_id = state.zone_progression.current_zone_id as usize;
+                    if let Some(item) = try_fishing_item_drop(rarity, zone_id, rng) {
                         result
                             .messages
                             .push(format!("📦 Found item: {}!", item.display_name));
@@ -251,9 +252,11 @@ pub fn tick_fishing(state: &mut GameState, rng: &mut impl Rng) -> Vec<String> {
 /// - Rare: 15%
 /// - Epic: 35%
 /// - Legendary: 75%
+///
+/// Item level is based on zone_id (ilvl = zone_id * 10).
 fn try_fishing_item_drop(
     rarity: FishRarity,
-    player_level: u32,
+    zone_id: usize,
     rng: &mut impl Rng,
 ) -> Option<crate::items::Item> {
     let drop_chance = match rarity {
@@ -286,11 +289,10 @@ fn try_fishing_item_drop(
         ];
         let slot = slots[rng.gen_range(0..slots.len())];
 
-        Some(item_generation::generate_item(
-            slot,
-            item_rarity,
-            player_level,
-        ))
+        // Item level based on zone
+        let ilvl = (zone_id as u32) * 10;
+
+        Some(item_generation::generate_item(slot, item_rarity, ilvl))
     } else {
         None
     }
