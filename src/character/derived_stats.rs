@@ -52,7 +52,8 @@ impl DerivedStats {
         let mut max_hp = (BASE_HP + con_mod * HP_PER_CON_MOD).max(1) as u32;
 
         // Physical Damage = BASE_PHYSICAL_DAMAGE + (STR_mod × DAMAGE_PER_STR_MOD)
-        let mut physical_damage = (BASE_PHYSICAL_DAMAGE + str_mod * DAMAGE_PER_STR_MOD).max(1) as u32;
+        let mut physical_damage =
+            (BASE_PHYSICAL_DAMAGE + str_mod * DAMAGE_PER_STR_MOD).max(1) as u32;
 
         // Magic Damage = BASE_MAGIC_DAMAGE + (INT_mod × DAMAGE_PER_INT_MOD)
         let mut magic_damage = (BASE_MAGIC_DAMAGE + int_mod * DAMAGE_PER_INT_MOD).max(1) as u32;
@@ -61,7 +62,8 @@ impl DerivedStats {
         let mut defense = (dex_mod * DEFENSE_PER_DEX_MOD).max(0) as u32;
 
         // Crit Chance = BASE_CRIT_CHANCE + (DEX_mod × CRIT_CHANCE_PER_DEX_MOD)
-        let mut crit_chance_percent = (BASE_CRIT_CHANCE + dex_mod * CRIT_CHANCE_PER_DEX_MOD).max(0) as u32;
+        let mut crit_chance_percent =
+            (BASE_CRIT_CHANCE + dex_mod * CRIT_CHANCE_PER_DEX_MOD).max(0) as u32;
 
         // XP Multiplier = 1.0 + (WIS_mod × XP_MULT_PER_WIS_MOD)
         let mut xp_multiplier = 1.0 + (wis_mod as f64 * XP_MULT_PER_WIS_MOD);

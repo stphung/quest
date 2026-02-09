@@ -217,8 +217,7 @@ mod tests {
         let stats = make_test_stats();
         let mut rng = rand::thread_rng();
 
-        let (player_hp, enemy_hp, attack) =
-            simulate_combat_round(&stats, 100, 50, 10, &mut rng);
+        let (player_hp, enemy_hp, attack) = simulate_combat_round(&stats, 100, 50, 10, &mut rng);
 
         // Player dealt damage
         assert!(enemy_hp < 50 || attack.damage == 0);

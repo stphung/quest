@@ -258,9 +258,9 @@ mod tests {
             verbosity: 0,
             ..Default::default()
         };
-        
+
         let report = run_simulation(&config);
-        
+
         // Should complete without panic
         assert_eq!(report.num_runs, 2);
         assert!(report.avg_total_kills > 0.0);
