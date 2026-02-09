@@ -60,10 +60,10 @@ fn simulate_single_run(config: &SimConfig, rng: &mut impl Rng) -> RunStats {
 
     loop {
         // Check termination conditions
-        if progression.current_zone >= config.target_zone as u32 {
-            if !config.simulate_prestige || progression.prestige_rank >= config.target_prestige {
-                break;
-            }
+        if progression.current_zone >= config.target_zone as u32
+            && (!config.simulate_prestige || progression.prestige_rank >= config.target_prestige)
+        {
+            break;
         }
 
         if ticks >= config.max_ticks_per_run {
@@ -180,6 +180,7 @@ fn simulate_single_run(config: &SimConfig, rng: &mut impl Rng) -> RunStats {
 
     // Calculate ticks per zone
     let mut ticks_per_zone = vec![0u64; 11];
+    #[allow(clippy::needless_range_loop)]
     for i in 1..=10 {
         if i < 10 && progression.zone_entries[i + 1] > 0 {
             ticks_per_zone[i] = progression.zone_entries[i + 1] - progression.zone_entries[i];
