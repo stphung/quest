@@ -1,14 +1,14 @@
 //! Zone and level progression simulation using real game data.
 
 use super::loot_sim::LootStats;
+use crate::core::balance::{xp_required_for_level, KILLS_PER_BOSS};
 #[cfg(test)]
 use crate::zones::get_all_zones;
 use crate::zones::{get_zone, Zone};
 
-/// XP required to level up - matches real game curve.
+/// XP required to level up - uses shared balance config.
 pub fn xp_for_level(level: u32) -> u64 {
-    // Real game uses exponential curve
-    (100.0 * (1.1_f64).powi(level as i32)) as u64
+    xp_required_for_level(level)
 }
 
 /// Get zone data for simulation.
@@ -100,9 +100,9 @@ impl SimProgression {
         self.kills_in_subzone = 0;
     }
 
-    /// Check if should spawn boss (every 10 kills in subzone).
+    /// Check if should spawn boss (every KILLS_PER_BOSS kills in subzone).
     pub fn should_spawn_boss(&self) -> bool {
-        self.kills_in_subzone >= 10
+        self.kills_in_subzone >= KILLS_PER_BOSS
     }
 
     /// Advance after defeating a boss.

@@ -1,3 +1,4 @@
+use super::balance::{PRESTIGE_MULT_PER_CHA_MOD, XP_CURVE_BASE, XP_CURVE_EXPONENT, XP_MULT_PER_WIS_MOD};
 use super::constants::*;
 use super::game_state::GameState;
 use crate::character::attributes::AttributeType;
@@ -11,21 +12,24 @@ use crate::zones::get_zone;
 use chrono::Utc;
 use rand::Rng;
 
-/// Calculates the XP required to reach the next level
+/// Calculates the XP required to reach the next level.
+/// Uses shared balance constants.
 pub fn xp_for_next_level(level: u32) -> u64 {
     (XP_CURVE_BASE * f64::powf(level as f64, XP_CURVE_EXPONENT)) as u64
 }
 
-/// Calculates the prestige multiplier for XP gains including CHA bonus
+/// Calculates the prestige multiplier for XP gains including CHA bonus.
+/// Uses shared balance constants.
 pub fn prestige_multiplier(rank: u32, cha_modifier: i32) -> f64 {
     let base = crate::character::prestige::get_prestige_tier(rank).multiplier;
-    base + (cha_modifier as f64 * 0.1)
+    base + (cha_modifier as f64 * PRESTIGE_MULT_PER_CHA_MOD)
 }
 
-/// Calculates the XP gained per tick based on prestige rank and WIS
+/// Calculates the XP gained per tick based on prestige rank and WIS.
+/// Uses shared balance constants.
 pub fn xp_gain_per_tick(prestige_rank: u32, wis_modifier: i32, cha_modifier: i32) -> f64 {
     let prestige_mult = prestige_multiplier(prestige_rank, cha_modifier);
-    let wis_mult = 1.0 + (wis_modifier as f64 * 0.05);
+    let wis_mult = 1.0 + (wis_modifier as f64 * XP_MULT_PER_WIS_MOD);
     BASE_XP_PER_TICK * prestige_mult * wis_mult
 }
 

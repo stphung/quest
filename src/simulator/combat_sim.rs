@@ -1,8 +1,12 @@
 //! Combat simulation using real game mechanics.
 
-use crate::character::attributes::Attributes;
+use crate::character::attributes::{AttributeType, Attributes};
 use crate::character::derived_stats::DerivedStats;
 use crate::combat::types::{generate_enemy_for_current_zone, generate_subzone_boss, Enemy};
+use crate::core::balance::{
+    BOSS_XP_MULTIPLIER, COMBAT_XP_BASE, COMBAT_XP_PER_SUBZONE, COMBAT_XP_PER_ZONE,
+    LEVEL_CON_RATE, LEVEL_DEX_RATE, LEVEL_STR_RATE,
+};
 use crate::items::Equipment;
 use crate::zones::get_zone;
 use rand::Rng;
@@ -39,21 +43,17 @@ impl SimPlayer {
     pub fn at_level(level: u32) -> Self {
         let mut player = Self::new();
 
-        // Scale base attributes with level (simplified)
-        // In real game this comes from leveling up
+        // Scale base attributes with level using balance constants
         let bonus = level.saturating_sub(1);
-        player.attributes.set(
-            crate::character::attributes::AttributeType::Strength,
-            10 + bonus / 2,
-        );
-        player.attributes.set(
-            crate::character::attributes::AttributeType::Constitution,
-            10 + bonus / 2,
-        );
-        player.attributes.set(
-            crate::character::attributes::AttributeType::Dexterity,
-            10 + bonus / 3,
-        );
+        player
+            .attributes
+            .set(AttributeType::Strength, 10 + bonus / LEVEL_STR_RATE);
+        player
+            .attributes
+            .set(AttributeType::Constitution, 10 + bonus / LEVEL_CON_RATE);
+        player
+            .attributes
+            .set(AttributeType::Dexterity, 10 + bonus / LEVEL_DEX_RATE);
 
         player.level = level;
         player.recalculate_stats();
@@ -131,8 +131,9 @@ impl SimEnemy {
             player.stats().total_damage(),
         );
 
-        // XP scales with zone
-        let xp_reward = 10 + zone_id * 5 + subzone_id * 2;
+        // XP scales with zone using balance constants
+        let xp_reward =
+            COMBAT_XP_BASE + zone_id * COMBAT_XP_PER_ZONE + subzone_id * COMBAT_XP_PER_SUBZONE;
 
         Self {
             inner: enemy,
@@ -152,8 +153,9 @@ impl SimEnemy {
                     player.stats().total_damage(),
                 );
 
-                // Boss XP is much higher
-                let xp_reward = (10 + zone_id * 5) * 10;
+                // Boss XP uses multiplier from balance constants
+                let xp_reward =
+                    (COMBAT_XP_BASE + zone_id * COMBAT_XP_PER_ZONE) * BOSS_XP_MULTIPLIER;
 
                 return Self {
                     inner: enemy,
@@ -169,7 +171,7 @@ impl SimEnemy {
         normal.inner.current_hp *= 3;
         normal.inner.damage *= 2;
         normal.is_boss = true;
-        normal.xp_reward *= 10;
+        normal.xp_reward *= BOSS_XP_MULTIPLIER;
         normal
     }
 

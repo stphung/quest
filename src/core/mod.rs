@@ -2,10 +2,12 @@
 
 #![allow(unused_imports)]
 
+pub mod balance;
 pub mod constants;
 pub mod game_logic;
 pub mod game_state;
 
+pub use balance::*;
 pub use constants::*;
 pub use game_logic::*;
 pub use game_state::*;
