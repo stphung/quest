@@ -132,11 +132,30 @@ pub fn max_zone_for_prestige(rank: u32) -> u32;
 5. **Modify:** `src/simulator/progression_sim.rs` - Use shared prestige logic
 6. **Delete:** Duplicated XP/prestige calculations from sim
 
-## Estimated Effort
+## Completed Refactoring
 
-- Phase 1 (Traits): ~2 hours
-- Phase 2 (Combat): ~1 hour  
-- Phase 3 (Prestige): ~30 min
-- Testing: ~1 hour
+### Phase 1: Shared Progression Trait ✅
+- Created `core/progression.rs` with `Progression` trait
+- `SimProgression` implements the trait
+- Shared functions: `max_zone_for_prestige()`, `can_access_zone()`
 
-Total: ~4-5 hours to fully unify
+### Phase 2: Shared Combat Math ✅
+- Created `core/combat_math.rs` with pure functions
+- Functions: `calculate_player_attack()`, `calculate_damage_taken()`, etc.
+- `SimPlayer` uses shared functions
+
+### Phase 3: Game Uses Shared Code ✅
+- `combat/logic.rs` now uses `combat_math` functions
+- Player attack, enemy damage, damage reflection all use shared code
+
+## Remaining Work
+
+- [ ] `ZoneProgression` could implement `Progression` trait (lower priority)
+  - Requires handling prestige_rank which is stored in GameState, not ZoneProgression
+  - Would need a wrapper struct or parameter passing
+
+## Summary
+
+**Lines of shared code:** ~360 lines
+**Duplicated code eliminated:** ~80 lines
+**All tests passing:** 962
