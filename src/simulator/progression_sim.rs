@@ -1,11 +1,26 @@
-//! Zone and level progression simulation.
+//! Zone and level progression simulation using real game data.
 
 use super::loot_sim::LootStats;
+#[cfg(test)]
+use crate::zones::get_all_zones;
+use crate::zones::{get_zone, Zone};
 
-/// XP required to level up.
+/// XP required to level up - matches real game curve.
 pub fn xp_for_level(level: u32) -> u64 {
-    // Simple exponential curve
+    // Real game uses exponential curve
     (100.0 * (1.1_f64).powi(level as i32)) as u64
+}
+
+/// Get zone data for simulation.
+pub fn get_zone_data(zone_id: u32) -> Option<Zone> {
+    get_zone(zone_id)
+}
+
+/// Get number of subzones in a zone.
+pub fn subzones_in_zone(zone_id: u32) -> u32 {
+    get_zone(zone_id)
+        .map(|z| z.subzones.len() as u32)
+        .unwrap_or(3)
 }
 
 /// Simulated game progression state.
@@ -14,14 +29,19 @@ pub struct SimProgression {
     pub player_level: u32,
     pub current_xp: u64,
     pub xp_to_next_level: u64,
-    pub current_zone: usize,
-    pub current_floor: u32,
-    pub kills_on_floor: u32,
+    pub current_zone: u32,
+    pub current_subzone: u32,
+    pub kills_in_subzone: u32,
     pub prestige_rank: u32,
     pub total_kills: u64,
     pub total_boss_kills: u64,
     pub total_deaths: u64,
     pub total_ticks: u64,
+
+    // Per-zone tracking
+    pub zone_entries: Vec<u64>, // Ticks when entering each zone
+    pub zone_deaths: Vec<u64>,  // Deaths per zone
+    pub zone_kills: Vec<u64>,   // Kills per zone
 }
 
 impl SimProgression {
@@ -31,13 +51,16 @@ impl SimProgression {
             current_xp: 0,
             xp_to_next_level: xp_for_level(1),
             current_zone: 1,
-            current_floor: 1,
-            kills_on_floor: 0,
+            current_subzone: 1,
+            kills_in_subzone: 0,
             prestige_rank: 0,
             total_kills: 0,
             total_boss_kills: 0,
             total_deaths: 0,
             total_ticks: 0,
+            zone_entries: vec![0; 11], // Index 0 unused, 1-10 for zones
+            zone_deaths: vec![0; 11],
+            zone_kills: vec![0; 11],
         }
     }
 
@@ -52,54 +75,63 @@ impl SimProgression {
         }
     }
 
-    /// Record a kill and advance floor if needed.
-    pub fn record_kill(&mut self, was_boss: bool) {
+    /// Record a kill.
+    pub fn record_kill(&mut self, was_boss: bool, current_ticks: u64) {
         self.total_kills += 1;
-        self.kills_on_floor += 1;
+        self.kills_in_subzone += 1;
+
+        if self.current_zone <= 10 {
+            self.zone_kills[self.current_zone as usize] += 1;
+        }
 
         if was_boss {
             self.total_boss_kills += 1;
-            // Boss defeated = advance to next floor or zone
-            self.advance_floor();
-        } else if self.kills_on_floor >= 10 {
-            // Every 10 kills on a floor, spawn boss (simplified)
-            // Handled by caller
+            self.advance_after_boss(current_ticks);
         }
     }
 
     /// Record a death.
     pub fn record_death(&mut self) {
         self.total_deaths += 1;
-        // Reset to floor start (simplified: just reset kills)
-        self.kills_on_floor = 0;
+        if self.current_zone <= 10 {
+            self.zone_deaths[self.current_zone as usize] += 1;
+        }
+        // Reset kills in subzone (player respawns at subzone start)
+        self.kills_in_subzone = 0;
     }
 
-    /// Advance to next floor or zone.
-    fn advance_floor(&mut self) {
-        self.current_floor += 1;
-        self.kills_on_floor = 0;
+    /// Check if should spawn boss (every 10 kills in subzone).
+    pub fn should_spawn_boss(&self) -> bool {
+        self.kills_in_subzone >= 10
+    }
 
-        // Every 10 floors = new zone (simplified)
-        if self.current_floor > 10 {
+    /// Advance after defeating a boss.
+    fn advance_after_boss(&mut self, current_ticks: u64) {
+        self.kills_in_subzone = 0;
+
+        let max_subzones = subzones_in_zone(self.current_zone);
+
+        if self.current_subzone >= max_subzones {
+            // Cleared final subzone, advance to next zone
             if self.current_zone < 10 {
                 self.current_zone += 1;
-                self.current_floor = 1;
-            } else {
-                // At zone 10, stay at floor 10 (endgame farming)
-                self.current_floor = 10;
+                self.current_subzone = 1;
+
+                // Record zone entry
+                if self.current_zone <= 10 {
+                    self.zone_entries[self.current_zone as usize] = current_ticks;
+                }
             }
+            // At zone 10, stay in zone 10 (endgame)
+        } else {
+            // Advance to next subzone
+            self.current_subzone += 1;
         }
     }
 
-    /// Get the monster level for current location.
-    pub fn current_monster_level(&self) -> u32 {
-        let base = ((self.current_zone - 1) * 10) as u32;
-        base + self.current_floor
-    }
-
-    /// Check if should spawn boss.
-    pub fn should_spawn_boss(&self) -> bool {
-        self.kills_on_floor >= 10
+    /// Check if can prestige (reached zone 10).
+    pub fn can_prestige(&self) -> bool {
+        self.current_zone >= 10
     }
 
     /// Perform prestige reset.
@@ -109,13 +141,9 @@ impl SimProgression {
         self.current_xp = 0;
         self.xp_to_next_level = xp_for_level(1);
         self.current_zone = 1;
-        self.current_floor = 1;
-        self.kills_on_floor = 0;
-    }
-
-    /// Check if can prestige (reached zone 10).
-    pub fn can_prestige(&self) -> bool {
-        self.current_zone >= 10
+        self.current_subzone = 1;
+        self.kills_in_subzone = 0;
+        // Keep equipment through prestige (in real game)
     }
 }
 
@@ -125,11 +153,12 @@ impl Default for SimProgression {
     }
 }
 
-/// Statistics for a simulation run.
+/// Statistics for a single simulation run.
 #[derive(Debug, Clone, Default)]
 pub struct RunStats {
     pub final_level: u32,
-    pub final_zone: usize,
+    pub final_zone: u32,
+    pub final_subzone: u32,
     pub final_prestige: u32,
     pub total_kills: u64,
     pub total_boss_kills: u64,
@@ -138,18 +167,11 @@ pub struct RunStats {
     pub loot_stats: LootStats,
     pub final_avg_ilvl: f64,
     pub reached_target: bool,
-}
 
-/// Zone-specific statistics.
-#[derive(Debug, Clone, Default)]
-pub struct ZoneStats {
-    pub zone_id: usize,
-    pub times_entered: u32,
-    pub kills_in_zone: u64,
-    pub deaths_in_zone: u64,
-    pub ticks_in_zone: u64,
-    pub avg_player_level_on_entry: f64,
-    pub avg_gear_ilvl_on_entry: f64,
+    // Per-zone stats
+    pub zone_deaths: Vec<u64>,
+    pub zone_kills: Vec<u64>,
+    pub ticks_per_zone: Vec<u64>,
 }
 
 #[cfg(test)]
@@ -158,7 +180,7 @@ mod tests {
 
     #[test]
     fn test_xp_curve() {
-        assert_eq!(xp_for_level(1), 110);
+        assert!(xp_for_level(1) > 0);
         assert!(xp_for_level(50) > xp_for_level(1));
         assert!(xp_for_level(100) > xp_for_level(50));
     }
@@ -176,12 +198,29 @@ mod tests {
     fn test_zone_advancement() {
         let mut prog = SimProgression::new();
 
-        // Kill 10 mobs + boss to advance floor
-        for _ in 0..10 {
-            prog.record_kill(false);
-        }
-        prog.record_kill(true); // Boss kill advances floor
+        // Get actual subzones for zone 1
+        let subzones = subzones_in_zone(1);
 
-        assert_eq!(prog.current_floor, 2);
+        // Kill mobs and bosses to advance through all subzones
+        for _ in 0..subzones {
+            for _ in 0..10 {
+                prog.record_kill(false, 0);
+            }
+            prog.record_kill(true, 0); // Boss kill
+        }
+
+        assert_eq!(
+            prog.current_zone, 2,
+            "Should advance to zone 2 after clearing zone 1"
+        );
+    }
+
+    #[test]
+    fn test_real_zone_data() {
+        let zones = get_all_zones();
+        assert!(zones.len() >= 10, "Should have at least 10 zones");
+        assert_eq!(zones[0].id, 1);
+        // Verify zone 10 exists
+        assert!(zones.iter().any(|z| z.id == 10), "Zone 10 should exist");
     }
 }

@@ -1,6 +1,6 @@
 //! Simulation report generation.
 
-use super::progression_sim::{RunStats, ZoneStats};
+use super::progression_sim::RunStats;
 use std::collections::HashMap;
 
 /// Aggregated results from multiple simulation runs.
@@ -19,21 +19,19 @@ pub struct SimReport {
 
     // Distribution data
     pub level_distribution: HashMap<u32, u32>,
-    pub zone_distribution: HashMap<usize, u32>,
+    pub zone_distribution: HashMap<u32, u32>,
     pub death_distribution: Vec<u64>,
-
-    // Zone-specific analysis
-    pub zone_stats: Vec<ZoneStats>,
 
     // Loot analysis
     pub avg_legendary_drops: f64,
     pub avg_upgrades_equipped: f64,
     pub avg_final_ilvl: f64,
+    pub actual_drop_rate: f64,
 
-    // Balance indicators
-    pub deaths_per_zone: Vec<f64>,
-    pub kills_to_clear_zone: Vec<f64>,
-    pub ticks_per_zone: Vec<f64>,
+    // Per-zone analysis
+    pub avg_deaths_per_zone: Vec<f64>,
+    pub avg_kills_per_zone: Vec<f64>,
+    pub avg_ticks_per_zone: Vec<f64>,
 
     // Individual run stats for detailed analysis
     pub run_stats: Vec<RunStats>,
@@ -89,6 +87,31 @@ impl SimReport {
             .sum::<f64>()
             / num_runs as f64;
         let avg_final_ilvl = runs.iter().map(|r| r.final_avg_ilvl).sum::<f64>() / num_runs as f64;
+        let actual_drop_rate =
+            runs.iter().map(|r| r.loot_stats.drop_rate()).sum::<f64>() / num_runs as f64;
+
+        // Per-zone stats
+        let mut avg_deaths_per_zone = vec![0.0; 11];
+        let mut avg_kills_per_zone = vec![0.0; 11];
+        let mut avg_ticks_per_zone = vec![0.0; 11];
+
+        for i in 1..=10 {
+            avg_deaths_per_zone[i] = runs
+                .iter()
+                .map(|r| r.zone_deaths.get(i).copied().unwrap_or(0) as f64)
+                .sum::<f64>()
+                / num_runs as f64;
+            avg_kills_per_zone[i] = runs
+                .iter()
+                .map(|r| r.zone_kills.get(i).copied().unwrap_or(0) as f64)
+                .sum::<f64>()
+                / num_runs as f64;
+            avg_ticks_per_zone[i] = runs
+                .iter()
+                .map(|r| r.ticks_per_zone.get(i).copied().unwrap_or(0) as f64)
+                .sum::<f64>()
+                / num_runs as f64;
+        }
 
         Self {
             num_runs,
@@ -102,13 +125,13 @@ impl SimReport {
             level_distribution,
             zone_distribution,
             death_distribution,
-            zone_stats: Vec::new(), // TODO: aggregate zone stats
             avg_legendary_drops,
             avg_upgrades_equipped,
             avg_final_ilvl,
-            deaths_per_zone: Vec::new(),
-            kills_to_clear_zone: Vec::new(),
-            ticks_per_zone: Vec::new(),
+            actual_drop_rate,
+            avg_deaths_per_zone,
+            avg_kills_per_zone,
+            avg_ticks_per_zone,
             run_stats: runs,
         }
     }
@@ -119,6 +142,7 @@ impl SimReport {
 
         report.push_str("═══════════════════════════════════════════════════════════════\n");
         report.push_str("                    SIMULATION REPORT\n");
+        report.push_str("               (Using Real Game Mechanics)\n");
         report.push_str("═══════════════════════════════════════════════════════════════\n\n");
 
         report.push_str(&format!(
@@ -150,6 +174,10 @@ impl SimReport {
 
         report.push_str("── LOOT ─────────────────────────────────────────────────────────\n");
         report.push_str(&format!(
+            "  Actual Drop Rate:    {:.1}%\n",
+            self.actual_drop_rate * 100.0
+        ));
+        report.push_str(&format!(
             "  Avg Legendary Drops: {:.2}\n",
             self.avg_legendary_drops
         ));
@@ -169,6 +197,24 @@ impl SimReport {
             let bar_len = (pct / 5.0) as usize;
             let bar: String = "█".repeat(bar_len);
             report.push_str(&format!("  Zone {:2}: {:>5.1}% {}\n", zone, pct, bar));
+        }
+        report.push('\n');
+
+        report.push_str("── PER-ZONE BREAKDOWN ───────────────────────────────────────────\n");
+        report.push_str("  Zone   Deaths    Kills    Ticks    Deaths/Kill\n");
+        report.push_str("  ────   ──────    ─────    ─────    ───────────\n");
+        for zone in 1..=10 {
+            let deaths = self.avg_deaths_per_zone[zone];
+            let kills = self.avg_kills_per_zone[zone];
+            let ticks = self.avg_ticks_per_zone[zone];
+            let deaths_per_kill = if kills > 0.0 { deaths / kills } else { 0.0 };
+
+            if kills > 0.0 {
+                report.push_str(&format!(
+                    "  {:4}   {:6.1}   {:6.0}   {:6.0}   {:.3}\n",
+                    zone, deaths, kills, ticks, deaths_per_kill
+                ));
+            }
         }
         report.push('\n');
 
@@ -199,10 +245,26 @@ impl SimReport {
         report.push_str(&format!("  Completion Rate: {:.1}%\n", completion_rate));
         report.push_str(&format!("  Death Rating:    {}\n", death_rating));
 
+        // Identify problem zones (high death rate)
+        for zone in 1..=10 {
+            let deaths = self.avg_deaths_per_zone[zone];
+            let kills = self.avg_kills_per_zone[zone];
+            if kills > 0.0 {
+                let deaths_per_kill = deaths / kills;
+                if deaths_per_kill > 0.5 {
+                    report.push_str(&format!(
+                        "  ⚠️  Zone {} has high death rate ({:.1}% per fight)\n",
+                        zone,
+                        deaths_per_kill * 100.0
+                    ));
+                }
+            }
+        }
+
         if self.avg_final_zone < 5.0 {
             report.push_str("  ⚠️  Most runs stuck early - early game too hard?\n");
         }
-        if self.avg_legendary_drops < 0.5 {
+        if self.avg_legendary_drops < 0.5 && self.runs_completed > 0 {
             report.push_str("  ⚠️  Very few legendaries - boss rates too low?\n");
         }
         if self.avg_total_deaths > 100.0 {
@@ -228,7 +290,7 @@ impl serde::Serialize for SimReport {
     {
         use serde::ser::SerializeStruct;
 
-        let mut state = serializer.serialize_struct("SimReport", 12)?;
+        let mut state = serializer.serialize_struct("SimReport", 16)?;
         state.serialize_field("num_runs", &self.num_runs)?;
         state.serialize_field("runs_completed", &self.runs_completed)?;
         state.serialize_field("runs_timed_out", &self.runs_timed_out)?;
@@ -240,6 +302,9 @@ impl serde::Serialize for SimReport {
         state.serialize_field("avg_legendary_drops", &self.avg_legendary_drops)?;
         state.serialize_field("avg_upgrades_equipped", &self.avg_upgrades_equipped)?;
         state.serialize_field("avg_final_ilvl", &self.avg_final_ilvl)?;
+        state.serialize_field("actual_drop_rate", &self.actual_drop_rate)?;
+        state.serialize_field("avg_deaths_per_zone", &self.avg_deaths_per_zone)?;
+        state.serialize_field("avg_kills_per_zone", &self.avg_kills_per_zone)?;
         state.serialize_field(
             "completion_rate",
             &((self.runs_completed as f64 / self.num_runs as f64) * 100.0),
@@ -259,6 +324,7 @@ mod tests {
             RunStats {
                 final_level: 50,
                 final_zone: 5,
+                final_subzone: 1,
                 final_prestige: 0,
                 total_kills: 500,
                 total_boss_kills: 10,
@@ -267,10 +333,14 @@ mod tests {
                 loot_stats: LootStats::default(),
                 final_avg_ilvl: 45.0,
                 reached_target: true,
+                zone_deaths: vec![0; 11],
+                zone_kills: vec![0; 11],
+                ticks_per_zone: vec![0; 11],
             },
             RunStats {
                 final_level: 45,
                 final_zone: 5,
+                final_subzone: 1,
                 final_prestige: 0,
                 total_kills: 450,
                 total_boss_kills: 8,
@@ -279,6 +349,9 @@ mod tests {
                 loot_stats: LootStats::default(),
                 final_avg_ilvl: 40.0,
                 reached_target: true,
+                zone_deaths: vec![0; 11],
+                zone_kills: vec![0; 11],
+                ticks_per_zone: vec![0; 11],
             },
         ];
 
