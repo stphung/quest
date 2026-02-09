@@ -84,6 +84,7 @@ mod tests {
         Item {
             slot,
             rarity: Rarity::Common,
+            ilvl: 10,
             base_name: "Test".to_string(),
             display_name: "Test Item".to_string(),
             attributes: AttributeBonuses::new(),
@@ -153,6 +154,7 @@ mod tests {
         let item1 = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Common,
+            ilvl: 10,
             base_name: "Old Sword".to_string(),
             display_name: "Old Sword".to_string(),
             attributes: AttributeBonuses {
@@ -164,6 +166,7 @@ mod tests {
         let item2 = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Rare,
+            ilvl: 10,
             base_name: "New Sword".to_string(),
             display_name: "New Sword".to_string(),
             attributes: AttributeBonuses {
@@ -216,6 +219,7 @@ mod tests {
         let weapon = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Common,
+            ilvl: 10,
             base_name: "Sword".to_string(),
             display_name: "Sword".to_string(),
             attributes: AttributeBonuses {
@@ -227,6 +231,7 @@ mod tests {
         let armor = Item {
             slot: EquipmentSlot::Armor,
             rarity: Rarity::Rare,
+            ilvl: 10,
             base_name: "Plate".to_string(),
             display_name: "Plate".to_string(),
             attributes: AttributeBonuses {

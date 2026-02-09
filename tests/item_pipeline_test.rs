@@ -329,6 +329,7 @@ fn test_score_reflects_attribute_specialization() {
     let str_item = Item {
         slot: EquipmentSlot::Weapon,
         rarity: Rarity::Common,
+        ilvl: 10,
         base_name: "STR Sword".to_string(),
         display_name: "STR Sword".to_string(),
         attributes: AttributeBonuses {
@@ -341,6 +342,7 @@ fn test_score_reflects_attribute_specialization() {
     let dex_item = Item {
         slot: EquipmentSlot::Weapon,
         rarity: Rarity::Common,
+        ilvl: 10,
         base_name: "DEX Dagger".to_string(),
         display_name: "DEX Dagger".to_string(),
         attributes: AttributeBonuses {
@@ -406,6 +408,7 @@ fn test_auto_equip_higher_scored_item_replaces_lower() {
     let weak = Item {
         slot: EquipmentSlot::Weapon,
         rarity: Rarity::Common,
+        ilvl: 10,
         base_name: "Rusty Sword".to_string(),
         display_name: "Rusty Sword".to_string(),
         attributes: AttributeBonuses {
@@ -429,6 +432,7 @@ fn test_auto_equip_higher_scored_item_replaces_lower() {
     let strong = Item {
         slot: EquipmentSlot::Weapon,
         rarity: Rarity::Legendary,
+        ilvl: 10,
         base_name: "Legendary Blade".to_string(),
         display_name: "Legendary Blade".to_string(),
         attributes: AttributeBonuses {
@@ -473,6 +477,7 @@ fn test_auto_equip_lower_scored_item_does_not_replace() {
     let strong = Item {
         slot: EquipmentSlot::Armor,
         rarity: Rarity::Legendary,
+        ilvl: 10,
         base_name: "Dragon Plate".to_string(),
         display_name: "Dragon Plate".to_string(),
         attributes: AttributeBonuses {
@@ -491,6 +496,7 @@ fn test_auto_equip_lower_scored_item_does_not_replace() {
     let weak = Item {
         slot: EquipmentSlot::Armor,
         rarity: Rarity::Common,
+        ilvl: 10,
         base_name: "Cloth Shirt".to_string(),
         display_name: "Cloth Shirt".to_string(),
         attributes: AttributeBonuses {
@@ -524,6 +530,7 @@ fn test_auto_equip_across_different_slots_is_independent() {
     let weapon = Item {
         slot: EquipmentSlot::Weapon,
         rarity: Rarity::Rare,
+        ilvl: 10,
         base_name: "Sword".to_string(),
         display_name: "Fine Sword".to_string(),
         attributes: AttributeBonuses {
@@ -535,6 +542,7 @@ fn test_auto_equip_across_different_slots_is_independent() {
     let helmet = Item {
         slot: EquipmentSlot::Helmet,
         rarity: Rarity::Magic,
+        ilvl: 10,
         base_name: "Helm".to_string(),
         display_name: "Iron Helm".to_string(),
         attributes: AttributeBonuses {
@@ -546,6 +554,7 @@ fn test_auto_equip_across_different_slots_is_independent() {
     let boots = Item {
         slot: EquipmentSlot::Boots,
         rarity: Rarity::Epic,
+        ilvl: 10,
         base_name: "Boots".to_string(),
         display_name: "Swift Boots".to_string(),
         attributes: AttributeBonuses {
@@ -625,6 +634,7 @@ fn test_full_pipeline_progressive_upgrade_chain() {
         Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Common,
+            ilvl: 10,
             base_name: "Tier1".to_string(),
             display_name: "Wooden Sword".to_string(),
             attributes: AttributeBonuses {
@@ -636,6 +646,7 @@ fn test_full_pipeline_progressive_upgrade_chain() {
         Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Magic,
+            ilvl: 10,
             base_name: "Tier2".to_string(),
             display_name: "Iron Sword".to_string(),
             attributes: AttributeBonuses {
@@ -650,6 +661,7 @@ fn test_full_pipeline_progressive_upgrade_chain() {
         Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Rare,
+            ilvl: 10,
             base_name: "Tier3".to_string(),
             display_name: "Steel Longsword".to_string(),
             attributes: AttributeBonuses {
@@ -671,6 +683,7 @@ fn test_full_pipeline_progressive_upgrade_chain() {
         Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Legendary,
+            ilvl: 10,
             base_name: "Tier4".to_string(),
             display_name: "Excalibur".to_string(),
             attributes: AttributeBonuses {
@@ -774,24 +787,29 @@ fn test_full_pipeline_equip_all_seven_slots_from_drops() {
 // =========================================================================
 
 #[test]
-fn test_roll_rarity_covers_all_tiers() {
-    // Over enough rolls, all 5 rarity tiers should appear
+fn test_roll_rarity_covers_all_mob_tiers() {
+    // Over enough rolls, all 4 mob rarity tiers should appear (no Legendary from mobs)
+    // Legendary only drops from bosses now
     let mut rng = rand::thread_rng();
     let mut seen = std::collections::HashSet::new();
 
     for _ in 0..10_000 {
         let rarity = roll_rarity(0, &mut rng);
         seen.insert(format!("{:?}", rarity));
-        if seen.len() == 5 {
+        if seen.len() == 4 {
             break;
         }
     }
 
     assert_eq!(
         seen.len(),
-        5,
-        "All 5 rarity tiers should be reachable. Got: {:?}",
+        4,
+        "All 4 mob rarity tiers should be reachable (Common, Magic, Rare, Epic). Got: {:?}",
         seen
+    );
+    assert!(
+        !seen.contains("Legendary"),
+        "Legendary should not drop from mobs"
     );
 }
 
@@ -880,6 +898,7 @@ fn test_damage_percent_affix_outscores_hp_bonus_affix_at_same_value() {
     let dmg_item = Item {
         slot: EquipmentSlot::Ring,
         rarity: Rarity::Magic,
+        ilvl: 10,
         base_name: "DmgRing".to_string(),
         display_name: "Ring of Damage".to_string(),
         attributes: AttributeBonuses::new(),
@@ -892,6 +911,7 @@ fn test_damage_percent_affix_outscores_hp_bonus_affix_at_same_value() {
     let hp_item = Item {
         slot: EquipmentSlot::Ring,
         rarity: Rarity::Magic,
+        ilvl: 10,
         base_name: "HPRing".to_string(),
         display_name: "Ring of Health".to_string(),
         attributes: AttributeBonuses::new(),
@@ -931,6 +951,7 @@ fn test_score_affix_only_item_is_positive() {
     let item = Item {
         slot: EquipmentSlot::Amulet,
         rarity: Rarity::Rare,
+        ilvl: 10,
         base_name: "Pure Affix".to_string(),
         display_name: "Amulet of Power".to_string(),
         attributes: AttributeBonuses::new(), // zero attributes
@@ -1041,6 +1062,7 @@ fn test_auto_equip_equal_score_does_not_replace() {
     let item1 = Item {
         slot: EquipmentSlot::Ring,
         rarity: Rarity::Common,
+        ilvl: 10,
         base_name: "Ring1".to_string(),
         display_name: "Ring Alpha".to_string(),
         attributes: AttributeBonuses {
@@ -1054,6 +1076,7 @@ fn test_auto_equip_equal_score_does_not_replace() {
     let item2 = Item {
         slot: EquipmentSlot::Ring,
         rarity: Rarity::Common,
+        ilvl: 10,
         base_name: "Ring2".to_string(),
         display_name: "Ring Beta".to_string(),
         attributes: AttributeBonuses {

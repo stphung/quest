@@ -100,10 +100,16 @@ pub struct Affix {
 pub struct Item {
     pub slot: EquipmentSlot,
     pub rarity: Rarity,
+    #[serde(default = "default_ilvl")]
+    pub ilvl: u32,
     pub base_name: String,
     pub display_name: String,
     pub attributes: AttributeBonuses,
     pub affixes: Vec<Affix>,
+}
+
+fn default_ilvl() -> u32 {
+    10
 }
 
 impl Item {
@@ -194,6 +200,7 @@ mod tests {
         let item = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Common,
+            ilvl: 10,
             base_name: "Sword".to_string(),
             display_name: "Fine Sword".to_string(),
             attributes: AttributeBonuses {
@@ -264,6 +271,7 @@ mod tests {
         let item = Item {
             slot: EquipmentSlot::Ring,
             rarity: Rarity::Epic,
+            ilvl: 10,
             base_name: "Ring".to_string(),
             display_name: "Ring of Power".to_string(),
             attributes: AttributeBonuses::new(),

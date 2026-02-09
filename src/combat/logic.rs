@@ -1269,6 +1269,7 @@ mod tests {
         let weapon = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Legendary,
+            ilvl: 10,
             base_name: "Sword".to_string(),
             display_name: "Sword".to_string(),
             attributes: AttributeBonuses::new(),
@@ -1318,6 +1319,7 @@ mod tests {
         let gloves = Item {
             slot: EquipmentSlot::Gloves,
             rarity: Rarity::Rare,
+            ilvl: 10,
             base_name: "Gloves".to_string(),
             display_name: "Gloves".to_string(),
             attributes: AttributeBonuses::new(),
@@ -1380,6 +1382,7 @@ mod tests {
         let armor = Item {
             slot: EquipmentSlot::Armor,
             rarity: Rarity::Rare,
+            ilvl: 10,
             base_name: "Armor".to_string(),
             display_name: "Armor".to_string(),
             attributes: AttributeBonuses::new(),
@@ -1465,6 +1468,7 @@ mod tests {
         let armor = Item {
             slot: EquipmentSlot::Armor,
             rarity: Rarity::Rare,
+            ilvl: 10,
             base_name: "Armor".to_string(),
             display_name: "Armor".to_string(),
             attributes: AttributeBonuses::new(),
@@ -1511,6 +1515,7 @@ mod tests {
         let armor = Item {
             slot: EquipmentSlot::Armor,
             rarity: Rarity::Rare,
+            ilvl: 10,
             base_name: "Armor".to_string(),
             display_name: "Armor".to_string(),
             attributes: AttributeBonuses::new(),
@@ -1564,6 +1569,7 @@ mod tests {
         let armor = Item {
             slot: EquipmentSlot::Armor,
             rarity: Rarity::Legendary,
+            ilvl: 10,
             base_name: "Armor".to_string(),
             display_name: "Armor".to_string(),
             attributes: AttributeBonuses::new(),
@@ -1613,6 +1619,7 @@ mod tests {
         let armor = Item {
             slot: EquipmentSlot::Armor,
             rarity: Rarity::Rare,
+            ilvl: 10,
             base_name: "Armor".to_string(),
             display_name: "Armor".to_string(),
             attributes: AttributeBonuses::new(),

@@ -89,6 +89,7 @@ mod tests {
         let item = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Common,
+            ilvl: 10,
             base_name: "Sword".to_string(),
             display_name: String::new(),
             attributes: AttributeBonuses::new(),
@@ -105,6 +106,7 @@ mod tests {
         let item = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Magic,
+            ilvl: 10,
             base_name: "Sword".to_string(),
             display_name: String::new(),
             attributes: AttributeBonuses::new(),
@@ -119,6 +121,7 @@ mod tests {
         let item = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Rare,
+            ilvl: 10,
             base_name: "Sword".to_string(),
             display_name: String::new(),
             attributes: AttributeBonuses::new(),
@@ -205,6 +208,7 @@ mod tests {
         let item = Item {
             slot: EquipmentSlot::Armor,
             rarity: Rarity::Epic,
+            ilvl: 10,
             base_name: String::new(),
             display_name: String::new(),
             attributes: AttributeBonuses::new(),
@@ -227,6 +231,7 @@ mod tests {
         let item = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Legendary,
+            ilvl: 10,
             base_name: String::new(),
             display_name: String::new(),
             attributes: AttributeBonuses::new(),
@@ -248,6 +253,7 @@ mod tests {
         let item = Item {
             slot: EquipmentSlot::Ring,
             rarity: Rarity::Rare,
+            ilvl: 10,
             base_name: String::new(),
             display_name: String::new(),
             attributes: AttributeBonuses::new(),
@@ -270,6 +276,7 @@ mod tests {
             let item = Item {
                 slot: EquipmentSlot::Boots,
                 rarity: Rarity::Common,
+                ilvl: 10,
                 base_name: String::new(),
                 display_name: String::new(),
                 attributes: AttributeBonuses::new(),
@@ -324,6 +331,7 @@ mod tests {
                     let item = Item {
                         slot: *slot,
                         rarity: *rarity,
+                        ilvl: 10,
                         base_name: String::new(),
                         display_name: String::new(),
                         attributes: AttributeBonuses::new(),
@@ -369,6 +377,7 @@ mod tests {
                 let item = Item {
                     slot: *slot,
                     rarity: Rarity::Magic,
+                    ilvl: 10,
                     base_name: String::new(),
                     display_name: String::new(),
                     attributes: AttributeBonuses::new(),

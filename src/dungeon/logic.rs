@@ -332,8 +332,9 @@ pub fn calculate_boss_xp_reward(size: DungeonSize) -> u64 {
     rng.gen_range(min_xp..=max_xp)
 }
 
-/// Generates a treasure room item with rarity boost based on dungeon size
-pub fn generate_treasure_item(prestige_rank: u32, player_level: u32, rarity_boost: u32) -> Item {
+/// Generates a treasure room item with rarity boost based on dungeon size.
+/// `zone_id` determines item level (ilvl = zone_id * 10).
+pub fn generate_treasure_item(prestige_rank: u32, zone_id: usize, rarity_boost: u32) -> Item {
     let mut rng = rand::thread_rng();
 
     // Roll a random slot
@@ -343,7 +344,10 @@ pub fn generate_treasure_item(prestige_rank: u32, player_level: u32, rarity_boos
     let base_rarity = roll_rarity(prestige_rank, &mut rng);
     let boosted_rarity = boost_rarity(base_rarity, rarity_boost);
 
-    generate_item(slot, boosted_rarity, player_level)
+    // Item level based on zone
+    let ilvl = (zone_id as u32) * 10;
+
+    generate_item(slot, boosted_rarity, ilvl)
 }
 
 /// Boosts a rarity by N tiers (capped at Legendary)
@@ -389,7 +393,10 @@ pub fn on_treasure_room_entered(state: &mut GameState) -> Option<(Item, bool)> {
         .map(|d| d.size.treasure_rarity_boost())
         .unwrap_or(1);
 
-    let item = generate_treasure_item(state.prestige_rank, state.character_level, rarity_boost);
+    // Use current zone for item level
+    let zone_id = state.zone_progression.current_zone_id as usize;
+
+    let item = generate_treasure_item(state.prestige_rank, zone_id, rarity_boost);
 
     // Auto-equip if better
     let item_clone = item.clone();
@@ -527,8 +534,10 @@ mod tests {
 
     #[test]
     fn test_generate_treasure_item() {
-        let item = generate_treasure_item(0, 10, 1);
+        // prestige_rank=0, zone_id=5 (ilvl 50), rarity_boost=1
+        let item = generate_treasure_item(0, 5, 1);
         assert!(!item.display_name.is_empty());
+        assert_eq!(item.ilvl, 50);
     }
 
     #[test]

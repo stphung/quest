@@ -84,6 +84,7 @@ mod tests {
         Item {
             slot,
             rarity,
+            ilvl: 10,
             base_name: "Test".to_string(),
             display_name: "Test Item".to_string(),
             attributes: AttributeBonuses {
@@ -109,6 +110,7 @@ mod tests {
         let item = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Magic,
+            ilvl: 10,
             base_name: "Test".to_string(),
             display_name: "Test Item".to_string(),
             attributes: AttributeBonuses::new(),
@@ -198,6 +200,7 @@ mod tests {
         let str_item = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Common,
+            ilvl: 10,
             base_name: "Test".to_string(),
             display_name: "Test".to_string(),
             attributes: AttributeBonuses {
@@ -209,6 +212,7 @@ mod tests {
         let dex_item = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Common,
+            ilvl: 10,
             base_name: "Test".to_string(),
             display_name: "Test".to_string(),
             attributes: AttributeBonuses {
@@ -231,6 +235,7 @@ mod tests {
         let item = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Common,
+            ilvl: 10,
             base_name: "Test".to_string(),
             display_name: "Test".to_string(),
             attributes: AttributeBonuses::new(),
@@ -252,6 +257,7 @@ mod tests {
             Item {
                 slot: EquipmentSlot::Weapon,
                 rarity: Rarity::Magic,
+                ilvl: 10,
                 base_name: "Test".to_string(),
                 display_name: "Test".to_string(),
                 attributes: AttributeBonuses::new(),
@@ -283,6 +289,7 @@ mod tests {
         let attr_only = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Common,
+            ilvl: 10,
             base_name: "Test".to_string(),
             display_name: "Test".to_string(),
             attributes: AttributeBonuses {
@@ -294,6 +301,7 @@ mod tests {
         let combined = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Magic,
+            ilvl: 10,
             base_name: "Test".to_string(),
             display_name: "Test".to_string(),
             attributes: AttributeBonuses {
@@ -321,6 +329,7 @@ mod tests {
         let armor = Item {
             slot: EquipmentSlot::Armor,
             rarity: Rarity::Common,
+            ilvl: 10,
             base_name: "Test".to_string(),
             display_name: "Test".to_string(),
             attributes: AttributeBonuses {
@@ -349,6 +358,7 @@ mod tests {
         let affix_item = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Magic,
+            ilvl: 10,
             base_name: "Test".to_string(),
             display_name: "Test".to_string(),
             attributes: AttributeBonuses {
