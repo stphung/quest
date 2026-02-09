@@ -193,11 +193,15 @@ mod tests {
     #[test]
     fn test_mob_drops_never_legendary() {
         let mut rng = rand::thread_rng();
-        
+
         // Roll 10000 times - should never get legendary
         for _ in 0..10000 {
             let rarity = roll_rarity_for_mob(10, 25.0, &mut rng); // Max bonuses
-            assert_ne!(rarity, Rarity::Legendary, "Mobs should never drop legendary");
+            assert_ne!(
+                rarity,
+                Rarity::Legendary,
+                "Mobs should never drop legendary"
+            );
         }
     }
 
@@ -205,7 +209,7 @@ mod tests {
     fn test_boss_can_drop_legendary() {
         let mut rng = rand::thread_rng();
         let mut found_legendary = false;
-        
+
         // Normal boss has 5% legendary rate
         for _ in 0..500 {
             if roll_rarity_for_boss(false, &mut rng) == Rarity::Legendary {
@@ -220,10 +224,10 @@ mod tests {
     fn test_final_boss_higher_legendary_rate() {
         let mut rng = rand::thread_rng();
         let trials = 10000;
-        
+
         let mut normal_legendaries = 0;
         let mut final_legendaries = 0;
-        
+
         for _ in 0..trials {
             if roll_rarity_for_boss(false, &mut rng) == Rarity::Legendary {
                 normal_legendaries += 1;
@@ -232,25 +236,30 @@ mod tests {
                 final_legendaries += 1;
             }
         }
-        
+
         // Final boss should have roughly 2x the legendary rate
         assert!(
             final_legendaries > normal_legendaries,
             "Final boss should have higher legendary rate: normal={}, final={}",
-            normal_legendaries, final_legendaries
+            normal_legendaries,
+            final_legendaries
         );
     }
 
     #[test]
     fn test_boss_never_drops_common() {
         let mut rng = rand::thread_rng();
-        
+
         for _ in 0..1000 {
             let rarity = roll_rarity_for_boss(false, &mut rng);
             assert_ne!(rarity, Rarity::Common, "Bosses should never drop common");
-            
+
             let rarity = roll_rarity_for_boss(true, &mut rng);
-            assert_ne!(rarity, Rarity::Common, "Final boss should never drop common");
+            assert_ne!(
+                rarity,
+                Rarity::Common,
+                "Final boss should never drop common"
+            );
         }
     }
 
@@ -258,12 +267,12 @@ mod tests {
     fn test_mob_distribution_base() {
         let mut rng = rand::thread_rng();
         let trials = 10000;
-        
+
         let mut common = 0;
         let mut magic = 0;
         let mut rare = 0;
         let mut epic = 0;
-        
+
         for _ in 0..trials {
             match roll_rarity_for_mob(0, 0.0, &mut rng) {
                 Rarity::Common => common += 1,
@@ -273,7 +282,7 @@ mod tests {
                 Rarity::Legendary => panic!("Should never happen"),
             }
         }
-        
+
         // Expected: 60% common, 28% magic, 10% rare, 2% epic
         assert!(common > 5000, "Common should be ~60%, got {}", common);
         assert!(magic > 2000, "Magic should be ~28%, got {}", magic);
@@ -284,11 +293,11 @@ mod tests {
     #[test]
     fn test_try_drop_from_mob_respects_zone_ilvl() {
         let game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
-        
+
         // Try to get drops from different zones
         let mut zone1_drops = Vec::new();
         let mut zone10_drops = Vec::new();
-        
+
         for _ in 0..1000 {
             if let Some(item) = try_drop_from_mob(&game_state, 1, 0.0, 0.0) {
                 zone1_drops.push(item);
@@ -297,7 +306,7 @@ mod tests {
                 zone10_drops.push(item);
             }
         }
-        
+
         // Verify ilvls
         for item in &zone1_drops {
             assert_eq!(item.ilvl, 10, "Zone 1 items should have ilvl 10");
@@ -326,7 +335,11 @@ mod tests {
             slots_seen.insert(format!("{:?}", roll_random_slot(&mut rng)));
         }
 
-        assert_eq!(slots_seen.len(), 7, "All 7 equipment slots should be reachable");
+        assert_eq!(
+            slots_seen.len(),
+            7,
+            "All 7 equipment slots should be reachable"
+        );
     }
 
     #[test]
@@ -344,10 +357,10 @@ mod tests {
     fn test_haven_bonuses_affect_mob_drops() {
         let mut rng = rand::thread_rng();
         let trials = 10000;
-        
+
         let mut common_no_bonus = 0;
         let mut common_with_bonus = 0;
-        
+
         for _ in 0..trials {
             if roll_rarity_for_mob(0, 0.0, &mut rng) == Rarity::Common {
                 common_no_bonus += 1;
@@ -356,23 +369,24 @@ mod tests {
                 common_with_bonus += 1;
             }
         }
-        
+
         // With +25% haven bonus, common rate should drop significantly
         assert!(
             common_with_bonus < common_no_bonus - 500,
             "Haven bonus should reduce common rate: no_bonus={}, with_bonus={}",
-            common_no_bonus, common_with_bonus
+            common_no_bonus,
+            common_with_bonus
         );
     }
 
     #[test]
     fn test_legacy_functions_work() {
         let game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
-        
+
         // Legacy functions should not panic
         let _ = try_drop_item(&game_state);
         let _ = try_drop_item_with_haven(&game_state, 10.0, 10.0);
-        
+
         let mut rng = rand::thread_rng();
         let _ = roll_rarity(5, &mut rng);
         let _ = roll_rarity_with_haven(5, 10.0, &mut rng);

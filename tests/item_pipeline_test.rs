@@ -807,7 +807,10 @@ fn test_roll_rarity_covers_all_mob_tiers() {
         "All 4 mob rarity tiers should be reachable (Common, Magic, Rare, Epic). Got: {:?}",
         seen
     );
-    assert!(!seen.contains("Legendary"), "Legendary should not drop from mobs");
+    assert!(
+        !seen.contains("Legendary"),
+        "Legendary should not drop from mobs"
+    );
 }
 
 #[test]

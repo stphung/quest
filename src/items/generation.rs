@@ -102,7 +102,12 @@ fn generate_affixes(rarity: Rarity, ilvl: u32, rng: &mut impl Rng) -> Vec<Affix>
     affixes
 }
 
-fn generate_affix_value(affix_type: AffixType, rarity: Rarity, ilvl: u32, rng: &mut impl Rng) -> f64 {
+fn generate_affix_value(
+    affix_type: AffixType,
+    rarity: Rarity,
+    ilvl: u32,
+    rng: &mut impl Rng,
+) -> f64 {
     let multiplier = ilvl_multiplier(ilvl);
 
     // Base ranges at ilvl 10 (significantly reduced from original)
@@ -231,28 +236,46 @@ mod tests {
         // Verify ilvl 100 legendaries are in expected range
         for _ in 0..20 {
             let item = generate_item(EquipmentSlot::Weapon, Rarity::Legendary, 100);
-            
+
             // Attributes: 4-6 base * 4.0 multiplier * 1-3 stats = 16-72 total
-            assert!(item.attributes.total() >= 16, "Legendary attrs too low: {}", item.attributes.total());
-            assert!(item.attributes.total() <= 80, "Legendary attrs too high: {}", item.attributes.total());
-            
+            assert!(
+                item.attributes.total() >= 16,
+                "Legendary attrs too low: {}",
+                item.attributes.total()
+            );
+            assert!(
+                item.attributes.total() <= 80,
+                "Legendary attrs too high: {}",
+                item.attributes.total()
+            );
+
             // Check affix values are reasonable
             for affix in &item.affixes {
                 match affix.affix_type {
                     AffixType::HPBonus => {
                         // 50-80 base * 4.0 = 200-320
-                        assert!(affix.value >= 150.0 && affix.value <= 350.0,
-                            "HP bonus out of range: {}", affix.value);
+                        assert!(
+                            affix.value >= 150.0 && affix.value <= 350.0,
+                            "HP bonus out of range: {}",
+                            affix.value
+                        );
                     }
                     AffixType::CritMultiplier => {
                         // 0.2-0.35 base * 4.0 = 0.8-1.4
-                        assert!(affix.value >= 0.5 && affix.value <= 1.5,
-                            "Crit mult out of range: {}", affix.value);
+                        assert!(
+                            affix.value >= 0.5 && affix.value <= 1.5,
+                            "Crit mult out of range: {}",
+                            affix.value
+                        );
                     }
                     _ => {
                         // 6-10 base * 4.0 = 24-40%
-                        assert!(affix.value >= 20.0 && affix.value <= 45.0,
-                            "Affix {:?} out of range: {}", affix.affix_type, affix.value);
+                        assert!(
+                            affix.value >= 20.0 && affix.value <= 45.0,
+                            "Affix {:?} out of range: {}",
+                            affix.affix_type,
+                            affix.value
+                        );
                     }
                 }
             }
@@ -264,10 +287,18 @@ mod tests {
         // Verify ilvl 10 items are appropriately weak
         for _ in 0..20 {
             let item = generate_item(EquipmentSlot::Weapon, Rarity::Legendary, 10);
-            
+
             // Attributes: 4-6 base * 1.0 multiplier * 1-3 stats = 4-18 total
-            assert!(item.attributes.total() >= 4, "Legendary attrs too low: {}", item.attributes.total());
-            assert!(item.attributes.total() <= 20, "Legendary attrs too high at ilvl 10: {}", item.attributes.total());
+            assert!(
+                item.attributes.total() >= 4,
+                "Legendary attrs too low: {}",
+                item.attributes.total()
+            );
+            assert!(
+                item.attributes.total() <= 20,
+                "Legendary attrs too high at ilvl 10: {}",
+                item.attributes.total()
+            );
         }
     }
 
@@ -275,7 +306,11 @@ mod tests {
     fn test_common_items_never_have_affixes() {
         for _ in 0..50 {
             let item = generate_item(EquipmentSlot::Gloves, Rarity::Common, 100);
-            assert_eq!(item.affixes.len(), 0, "Common items should never have affixes");
+            assert_eq!(
+                item.affixes.len(),
+                0,
+                "Common items should never have affixes"
+            );
         }
     }
 }
