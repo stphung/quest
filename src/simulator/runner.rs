@@ -102,8 +102,14 @@ fn simulate_single_run(config: &SimConfig, rng: &mut impl Rng) -> RunStats {
         let combat_result = simulate_combat(&mut player, &mut enemy, rng);
         ticks += combat_result.ticks_elapsed as u64;
 
+        // Passive XP gain (real game gives BASE_XP_PER_TICK per tick)
+        // Each tick represents ~1.5 seconds of game time (attack interval)
+        // Passive XP = ticks * 15 (15 game ticks per combat tick at 100ms each)
+        let passive_xp = combat_result.ticks_elapsed as u64 * 15;
+        progression.add_xp(passive_xp);
+
         if combat_result.player_won {
-            // Add XP
+            // Bonus XP for kill
             progression.add_xp(combat_result.xp_gained as u64);
             progression.record_kill(combat_result.was_boss, ticks);
 
@@ -151,7 +157,7 @@ fn simulate_single_run(config: &SimConfig, rng: &mut impl Rng) -> RunStats {
             player.heal_full();
         } else {
             // Player died
-            progression.record_death();
+            progression.record_death(combat_result.was_boss);
             // Respawn at full HP
             player.heal_full();
         }

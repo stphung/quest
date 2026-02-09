@@ -91,13 +91,16 @@ impl SimProgression {
     }
 
     /// Record a death.
-    pub fn record_death(&mut self) {
+    /// If was_boss_fight is true, reset kill progress (matches real game).
+    pub fn record_death(&mut self, was_boss_fight: bool) {
         self.total_deaths += 1;
         if self.current_zone <= 10 {
             self.zone_deaths[self.current_zone as usize] += 1;
         }
-        // Reset kills in subzone (player respawns at subzone start)
-        self.kills_in_subzone = 0;
+        // Only reset kills if died to a boss (matches real game behavior)
+        if was_boss_fight {
+            self.kills_in_subzone = 0;
+        }
     }
 
     /// Check if should spawn boss (every KILLS_PER_BOSS kills in subzone).
@@ -112,14 +115,22 @@ impl SimProgression {
         let max_subzones = subzones_in_zone(self.current_zone);
 
         if self.current_subzone >= max_subzones {
-            // Cleared final subzone, advance to next zone
+            // Cleared final subzone, check if can advance to next zone
             if self.current_zone < 10 {
-                self.current_zone += 1;
-                self.current_subzone = 1;
+                let next_zone = self.current_zone + 1;
 
-                // Record zone entry
-                if self.current_zone <= 10 {
-                    self.zone_entries[self.current_zone as usize] = current_ticks;
+                // Check prestige requirement for next zone
+                if let Some(zone) = get_zone(next_zone) {
+                    if self.prestige_rank >= zone.prestige_requirement {
+                        self.current_zone = next_zone;
+                        self.current_subzone = 1;
+
+                        // Record zone entry
+                        if self.current_zone <= 10 {
+                            self.zone_entries[self.current_zone as usize] = current_ticks;
+                        }
+                    }
+                    // Else: prestige gated, stay in current zone
                 }
             }
             // At zone 10, stay in zone 10 (endgame)
