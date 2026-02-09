@@ -3,6 +3,9 @@
 //! This trait defines the core progression interface that both
 //! the real game (ZoneProgression) and simulator (SimProgression) implement.
 
+// Allow dead code - trait and helpers are being integrated incrementally
+#![allow(dead_code)]
+
 use crate::core::balance::KILLS_PER_BOSS;
 
 /// Core progression state and operations.

@@ -3,6 +3,9 @@
 //! All core balance numbers should be defined here.
 //! Change once, test everywhere.
 
+// Allow dead code - these constants are defined for future use and simulator integration
+#![allow(dead_code)]
+
 // =============================================================================
 // DERIVED STATS - How attributes convert to combat stats
 // =============================================================================
