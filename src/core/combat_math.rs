@@ -3,6 +3,9 @@
 //! These pure functions calculate combat outcomes without side effects.
 //! Both the real game and simulator use these for consistent combat math.
 
+// Allow dead code - these functions are being integrated incrementally
+#![allow(dead_code)]
+
 use crate::character::derived_stats::DerivedStats;
 use rand::Rng;
 
