@@ -27,13 +27,18 @@ pub fn run_simulation(config: &SimConfig) -> SimReport {
         all_runs.push(run_stats);
 
         if config.verbosity >= 2 {
+            let r = all_runs.last().unwrap();
             println!(
-                "Run {}/{} complete - Zone {}, Level {}, Deaths {}",
+                "Run {}/{} - Zone {}.{}, Level {}, Kills {}, Boss Kills {}, Deaths {}, Prestige {}",
                 run_idx + 1,
                 config.num_runs,
-                all_runs.last().unwrap().final_zone,
-                all_runs.last().unwrap().final_level,
-                all_runs.last().unwrap().total_deaths
+                r.final_zone,
+                r.final_subzone,
+                r.final_level,
+                r.total_kills,
+                r.total_boss_kills,
+                r.total_deaths,
+                r.final_prestige
             );
         }
     }
@@ -58,18 +63,27 @@ fn simulate_single_run(config: &SimConfig, rng: &mut impl Rng) -> RunStats {
             if !config.simulate_prestige || progression.prestige_rank >= config.target_prestige {
                 break;
             }
-            // Prestige and continue
-            progression.prestige();
-            // Reset player level but keep equipment
-            player = SimPlayer::at_level(1);
-            // Re-apply equipment to new player
-            for item in temp_game_state.equipment.iter_equipped() {
-                player.equip(item.clone());
-            }
         }
 
         if ticks >= config.max_ticks_per_run {
             break;
+        }
+
+        // Check for prestige opportunity
+        // Only prestige when: at max zone for current prestige AND can prestige AND want to continue
+        let at_prestige_wall = progression.at_max_zone_for_prestige();
+        if config.simulate_prestige
+            && at_prestige_wall
+            && progression.can_prestige()
+            && progression.prestige_rank < config.target_prestige
+        {
+            progression.prestige();
+            // Reset player level but keep equipment
+            player = SimPlayer::at_level_with_prestige(1, progression.prestige_rank);
+            // Re-apply equipment to new player
+            for item in temp_game_state.equipment.iter_equipped() {
+                player.equip(item.clone());
+            }
         }
 
         // Sync player level with progression

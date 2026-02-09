@@ -140,9 +140,31 @@ impl SimProgression {
         }
     }
 
-    /// Check if can prestige (reached zone 10).
+    /// Check if can prestige (level meets requirement for next rank).
     pub fn can_prestige(&self) -> bool {
-        self.current_zone >= 10
+        let required_level = match self.prestige_rank {
+            0 => 10,
+            1 => 25,
+            2 => 50,
+            3 => 65,
+            4 => 80,
+            _ => 80 + (self.prestige_rank - 4) * 10, // 90, 100, 110...
+        };
+        self.player_level >= required_level
+    }
+
+    /// Check if at max zone for current prestige (can't advance further without prestiging).
+    pub fn at_max_zone_for_prestige(&self) -> bool {
+        // Zone prestige requirements:
+        // Zone 1-2: P0, Zone 3-4: P5, Zone 5-6: P10, Zone 7-8: P15, Zone 9-10: P20
+        let max_zone = match self.prestige_rank {
+            0..=4 => 2,
+            5..=9 => 4,
+            10..=14 => 6,
+            15..=19 => 8,
+            _ => 10,
+        };
+        self.current_zone >= max_zone
     }
 
     /// Perform prestige reset.

@@ -26,6 +26,9 @@ fn main() {
     println!("  Target Zone:    {}", config.target_zone);
     println!("  Simulate Loot:  {}", config.simulate_loot);
     println!("  Max Ticks:      {}", config.max_ticks_per_run);
+    if config.simulate_prestige {
+        println!("  Prestige:       enabled (target P{})", config.target_prestige);
+    }
     if let Some(seed) = config.seed {
         println!("  Seed:           {}", seed);
     }
