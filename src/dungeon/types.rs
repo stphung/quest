@@ -391,4 +391,227 @@ mod tests {
         assert_eq!(RoomType::Elite.icon(), 'K');
         assert_eq!(RoomType::Boss.icon(), 'B');
     }
+
+    #[test]
+    fn test_cleared_icon_always_dot() {
+        let types = [
+            RoomType::Entrance,
+            RoomType::Combat,
+            RoomType::Treasure,
+            RoomType::Elite,
+            RoomType::Boss,
+        ];
+        for rt in types {
+            assert_eq!(rt.cleared_icon(), '.');
+        }
+    }
+
+    #[test]
+    fn test_room_starts_hidden() {
+        let room = Room::new(RoomType::Combat, (3, 4));
+        assert_eq!(room.state, RoomState::Hidden);
+        assert_eq!(room.position, (3, 4));
+        assert_eq!(room.room_type, RoomType::Combat);
+        assert_eq!(room.connections, [false; 4]);
+    }
+
+    #[test]
+    fn test_room_is_accessible() {
+        let mut room = Room::new(RoomType::Combat, (0, 0));
+
+        // Hidden is not accessible
+        assert!(!room.is_accessible());
+
+        // Revealed is accessible
+        room.state = RoomState::Revealed;
+        assert!(room.is_accessible());
+
+        // Current is not accessible (player is already there)
+        room.state = RoomState::Current;
+        assert!(!room.is_accessible());
+
+        // Cleared is accessible (can revisit)
+        room.state = RoomState::Cleared;
+        assert!(room.is_accessible());
+    }
+
+    #[test]
+    fn test_dungeon_size_room_count_ranges() {
+        // All ranges should have min < max
+        let sizes = [
+            DungeonSize::Small,
+            DungeonSize::Medium,
+            DungeonSize::Large,
+            DungeonSize::Epic,
+            DungeonSize::Legendary,
+        ];
+        for size in sizes {
+            let (min, max) = size.room_count_range();
+            assert!(
+                min < max,
+                "{:?} room count range: min ({min}) >= max ({max})",
+                size
+            );
+            // Room count should fit within grid
+            let grid = size.grid_size();
+            assert!(
+                max <= grid * grid,
+                "{:?} max rooms ({max}) exceeds grid capacity ({})",
+                size,
+                grid * grid
+            );
+        }
+    }
+
+    #[test]
+    fn test_dungeon_size_boss_xp_ranges() {
+        let sizes = [
+            DungeonSize::Small,
+            DungeonSize::Medium,
+            DungeonSize::Large,
+            DungeonSize::Epic,
+            DungeonSize::Legendary,
+        ];
+        let mut prev_max = 0;
+        for size in sizes {
+            let (min, max) = size.boss_xp_range();
+            assert!(min < max, "{:?} XP range: min ({min}) >= max ({max})", size);
+            // Each tier should give more XP than the last
+            assert!(
+                min > prev_max,
+                "{:?} XP min ({min}) should exceed previous tier max ({prev_max})",
+                size
+            );
+            prev_max = max;
+        }
+    }
+
+    #[test]
+    fn test_dungeon_size_treasure_rooms_increase() {
+        let sizes = [
+            DungeonSize::Small,
+            DungeonSize::Medium,
+            DungeonSize::Large,
+            DungeonSize::Epic,
+            DungeonSize::Legendary,
+        ];
+        let mut prev = 0;
+        for size in sizes {
+            let count = size.treasure_room_count();
+            assert!(
+                count >= prev,
+                "{:?} treasure count ({count}) < previous ({prev})",
+                size
+            );
+            prev = count;
+        }
+    }
+
+    #[test]
+    fn test_dungeon_get_room_out_of_bounds() {
+        let dungeon = Dungeon::new(DungeonSize::Small);
+        // Grid is 5x5, so (5,5) is out of bounds
+        assert!(dungeon.get_room(5, 5).is_none());
+        assert!(dungeon.get_room(100, 100).is_none());
+        // (0,0) exists in grid but no room placed yet
+        assert!(dungeon.get_room(0, 0).is_none());
+    }
+
+    #[test]
+    fn test_dungeon_room_count_empty() {
+        let dungeon = Dungeon::new(DungeonSize::Small);
+        assert_eq!(dungeon.room_count(), 0);
+    }
+
+    #[test]
+    fn test_dungeon_room_count_with_rooms() {
+        let mut dungeon = Dungeon::new(DungeonSize::Small);
+        dungeon.grid[0][0] = Some(Room::new(RoomType::Entrance, (0, 0)));
+        dungeon.grid[1][1] = Some(Room::new(RoomType::Combat, (1, 1)));
+        assert_eq!(dungeon.room_count(), 2);
+    }
+
+    #[test]
+    fn test_dungeon_is_boss_unlocked() {
+        let mut dungeon = Dungeon::new(DungeonSize::Small);
+        assert!(!dungeon.is_boss_unlocked());
+
+        dungeon.has_key = true;
+        assert!(dungeon.is_boss_unlocked());
+    }
+
+    #[test]
+    fn test_dungeon_current_room() {
+        let mut dungeon = Dungeon::new(DungeonSize::Small);
+        dungeon.player_position = (2, 3);
+
+        // No room placed yet
+        assert!(dungeon.current_room().is_none());
+
+        // Place a room at player position
+        dungeon.grid[3][2] = Some(Room::new(RoomType::Combat, (2, 3)));
+        let room = dungeon.current_room().unwrap();
+        assert_eq!(room.room_type, RoomType::Combat);
+        assert_eq!(room.position, (2, 3));
+    }
+
+    #[test]
+    fn test_dungeon_current_room_mut() {
+        let mut dungeon = Dungeon::new(DungeonSize::Small);
+        dungeon.player_position = (1, 1);
+        dungeon.grid[1][1] = Some(Room::new(RoomType::Treasure, (1, 1)));
+
+        // Mutate the room state
+        dungeon.current_room_mut().unwrap().state = RoomState::Cleared;
+        assert_eq!(dungeon.current_room().unwrap().state, RoomState::Cleared);
+    }
+
+    #[test]
+    fn test_dungeon_get_connected_neighbors() {
+        let mut dungeon = Dungeon::new(DungeonSize::Small);
+
+        // Place rooms at (1,1) and (2,1), connect them (right/left)
+        let mut room_a = Room::new(RoomType::Entrance, (1, 1));
+        room_a.connections[DIR_RIGHT] = true;
+        dungeon.grid[1][1] = Some(room_a);
+
+        let mut room_b = Room::new(RoomType::Combat, (2, 1));
+        room_b.connections[DIR_LEFT] = true;
+        dungeon.grid[1][2] = Some(room_b);
+
+        let neighbors = dungeon.get_connected_neighbors(1, 1);
+        assert_eq!(neighbors.len(), 1);
+        assert_eq!(neighbors[0], (2, 1));
+    }
+
+    #[test]
+    fn test_dungeon_get_connected_neighbors_no_room() {
+        let dungeon = Dungeon::new(DungeonSize::Small);
+        // No room at (0,0), should return empty
+        let neighbors = dungeon.get_connected_neighbors(0, 0);
+        assert!(neighbors.is_empty());
+    }
+
+    #[test]
+    fn test_dungeon_get_connected_neighbors_edge() {
+        let mut dungeon = Dungeon::new(DungeonSize::Small);
+
+        // Room at (0,0) with a connection pointing up (out of bounds)
+        let mut room = Room::new(RoomType::Entrance, (0, 0));
+        room.connections[DIR_UP] = true; // Points to (0, -1) — out of bounds
+        room.connections[DIR_LEFT] = true; // Points to (-1, 0) — out of bounds
+        dungeon.grid[0][0] = Some(room);
+
+        let neighbors = dungeon.get_connected_neighbors(0, 0);
+        assert!(neighbors.is_empty());
+    }
+
+    #[test]
+    fn test_dungeon_size_from_progression_tier_clamping() {
+        // Very high prestige should cap at Legendary, not panic
+        assert_eq!(
+            DungeonSize::from_progression(100, 100),
+            DungeonSize::Legendary
+        );
+    }
 }
