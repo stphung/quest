@@ -291,4 +291,4 @@ quest/
 
 ## Dependencies
 
-Ratatui 0.26, Crossterm 0.27, Serde (JSON), SHA2, Rand, Chrono, Directories, Chess-engine 0.1
+Ratatui 0.26, Crossterm 0.27, Serde (JSON), Rand, Chrono, Directories, Chess-engine 0.1

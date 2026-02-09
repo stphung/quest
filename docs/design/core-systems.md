@@ -325,7 +325,7 @@ Items get procedurally generated names with prefixes and suffixes tied to their 
 
 ### Save Format
 
-Individual JSON files per character stored in `~/.quest/`. Maximum 3 characters. Each file is self-contained with a SHA256 checksum for integrity protection.
+Individual JSON files per character stored in `~/.quest/`. Maximum 3 characters. Plain JSON with no checksum — relies on serde for structural validation on load.
 
 ```
 ~/.quest/

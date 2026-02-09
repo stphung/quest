@@ -66,9 +66,9 @@ Several Haven bonuses changed from design to implementation:
 
 **Original design**: Binary format with bincode for speed.
 
-**Implemented**: JSON with SHA256 checksum.
+**Implemented**: Plain JSON with serde, no checksum.
 
-**Rationale**: JSON is human-readable, debuggable, and trivially compatible with serde. Save files are small (<10KB), so binary encoding offers no meaningful performance benefit. SHA256 checksum prevents casual tampering.
+**Rationale**: JSON is human-readable, debuggable, and trivially compatible with serde. Save files are small (<10KB), so binary encoding offers no meaningful performance benefit. The original design called for SHA256 checksums but these were never implemented — serde's structural validation on load is sufficient to catch corruption.
 
 ## Challenge Discovery Weights
 

@@ -171,7 +171,6 @@ Yellow border popup overlay, centered on screen. Matches challenge menu styling.
 | ratatui | 0.26 | Terminal UI framework |
 | crossterm | 0.27 | Terminal backend |
 | serde / serde_json | - | JSON serialization |
-| sha2 | - | SHA256 checksums for save integrity |
 | rand | - | RNG for all procedural systems |
 | chrono | - | Date/time for offline progression |
 | directories | - | Platform-appropriate save paths |
