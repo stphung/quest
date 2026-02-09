@@ -347,7 +347,7 @@ pub fn get_max_fishing_rank(fishing_rank_bonus: u32) -> u32 {
 ///
 /// # Arguments
 /// - `fishing_state`: The player's fishing state
-/// - `max_rank`: The effective maximum rank (base 20 + Haven bonus)
+/// - `max_rank`: The effective maximum rank (base 30 + Haven bonus)
 ///
 /// # Rank Up Mechanics
 /// - Each rank requires a certain number of fish to catch
