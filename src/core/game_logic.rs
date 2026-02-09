@@ -216,6 +216,7 @@ pub fn spawn_enemy_if_needed(state: &mut GameState) {
             };
             state.combat_state.current_enemy = Some(enemy);
             state.combat_state.attack_timer = 0.0;
+            state.combat_state.enemy_attack_timer = 0.0;
         }
     }
 }
@@ -258,6 +259,7 @@ fn spawn_dungeon_enemy(state: &mut GameState) {
 
     state.combat_state.current_enemy = Some(enemy);
     state.combat_state.attack_timer = 0.0;
+    state.combat_state.enemy_attack_timer = 0.0;
 }
 
 /// Flat chance to discover a dungeon after killing an enemy (2%)

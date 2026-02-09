@@ -104,12 +104,13 @@ pub fn update_combat(
         return events;
     }
 
-    // Update attack timer
+    // Update both attack timers independently
     state.combat_state.attack_timer += delta_time;
+    state.combat_state.enemy_attack_timer += delta_time;
 
     let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
 
-    // Attack speed multiplier: higher = faster attacks
+    // Player attack speed multiplier: higher = faster attacks (only affects player)
     let effective_attack_interval = ATTACK_INTERVAL_SECONDS / derived.attack_speed_multiplier;
 
     if state.combat_state.attack_timer >= effective_attack_interval {
@@ -229,8 +230,12 @@ pub fn update_combat(
                 }
             }
         }
+    }
 
-        // Enemy attacks back
+    // --- ENEMY ATTACK (separate timer) ---
+    if state.combat_state.enemy_attack_timer >= ENEMY_ATTACK_INTERVAL_SECONDS {
+        state.combat_state.enemy_attack_timer = 0.0;
+
         if let Some(enemy) = state.combat_state.current_enemy.as_mut() {
             let enemy_damage = enemy.damage.saturating_sub(derived.defense);
             state.combat_state.player_current_hp = state
@@ -346,6 +351,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         let events = update_combat(
             &mut state,
             0.1,
@@ -377,6 +383,7 @@ mod tests {
 
         // Force attack to kill enemy
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         let events = update_combat(
             &mut state,
             0.1,
@@ -421,6 +428,7 @@ mod tests {
 
         // Force an attack that kills player
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         let events = update_combat(
             &mut state,
             0.1,
@@ -465,6 +473,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         let events = update_combat(
             &mut state,
             0.1,
@@ -498,6 +507,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         let events = update_combat(
             &mut state,
             0.1,
@@ -532,6 +542,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         let events = update_combat(
             &mut state,
             0.1,
@@ -568,6 +579,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         update_combat(
             &mut state,
             0.1,
@@ -599,6 +611,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         update_combat(
             &mut state,
             0.1,
@@ -625,6 +638,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         let events = update_combat(
             &mut state,
             0.1,
@@ -654,6 +668,7 @@ mod tests {
 
         // Force an attack to kill
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         let events = update_combat(
             &mut state,
             0.1,
@@ -682,6 +697,7 @@ mod tests {
 
         // Even with attack timer ready, should not attack while regenerating
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         let events = update_combat(
             &mut state,
             0.1,
@@ -737,6 +753,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         let events = update_combat(
             &mut state,
             0.1,
@@ -775,6 +792,7 @@ mod tests {
         // Give enemy enough HP to survive
         state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         let events = update_combat(
             &mut state,
             0.1,
@@ -816,6 +834,7 @@ mod tests {
                 .set(crate::character::attributes::AttributeType::Dexterity, 0);
             s.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 100000, 0));
             s.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+            s.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
             let events = update_combat(
                 &mut s,
                 0.1,
@@ -855,6 +874,7 @@ mod tests {
 
         state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         let events = update_combat(
             &mut state,
             0.1,
@@ -891,6 +911,7 @@ mod tests {
         let initial_hp = state.combat_state.player_current_hp;
 
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         update_combat(
             &mut state,
             0.1,
@@ -933,6 +954,7 @@ mod tests {
         // Simulate up to 20 attack cycles
         for _ in 0..20 {
             state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+            state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
             let events = update_combat(
                 &mut state,
                 0.1,
@@ -1099,6 +1121,7 @@ mod tests {
         // Weak enemy that dies in one hit
         state.combat_state.current_enemy = Some(Enemy::new("Weak".to_string(), 1, 0));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         let events = update_combat(
             &mut state,
             0.1,
@@ -1180,6 +1203,7 @@ mod tests {
         // Enemy with damage less than defense
         state.combat_state.current_enemy = Some(Enemy::new("Weak".to_string(), 10000, 5));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         update_combat(
             &mut state,
             0.1,
@@ -1204,6 +1228,7 @@ mod tests {
         state.combat_state.current_enemy = Some(enemy);
 
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         let events = update_combat(
             &mut state,
             0.1,
@@ -1237,6 +1262,7 @@ mod tests {
 
         // Force an attack
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         let events = update_combat(
             &mut state,
             0.1,
@@ -1286,6 +1312,7 @@ mod tests {
 
         state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         let mut achievements = Achievements::default();
         let events = update_combat(
             &mut state,
@@ -1534,6 +1561,7 @@ mod tests {
             enemy_damage,
         ));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
 
         update_combat(
             &mut state,
@@ -1585,6 +1613,7 @@ mod tests {
         state.combat_state.player_current_hp = 1000; // Survive the hit
         state.combat_state.player_max_hp = 1000;
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
 
         let mut achievements = Achievements::default();
         let events = update_combat(
@@ -1635,6 +1664,7 @@ mod tests {
         state.combat_state.current_enemy =
             Some(Enemy::new("Pacifist".to_string(), enemy_max_hp, 0));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
 
         let initial_player_hp = state.combat_state.player_current_hp;
         update_combat(
@@ -1671,6 +1701,7 @@ mod tests {
         // Create an enemy with lots of HP
         state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
 
         // First, attack with no Haven bonus
         let events_no_bonus = update_combat(
@@ -1693,6 +1724,7 @@ mod tests {
         // Reset enemy and attack with +50% damage bonus
         state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
 
         let haven = HavenCombatBonuses {
             damage_percent: 50.0,
@@ -1734,6 +1766,7 @@ mod tests {
             state.attributes.set(AttributeType::Dexterity, 0); // Base 0% crit
             state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
             state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+            state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
 
             let events = update_combat(
                 &mut state,
@@ -1755,6 +1788,7 @@ mod tests {
             state.attributes.set(AttributeType::Dexterity, 0);
             state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
             state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+            state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
 
             let haven = HavenCombatBonuses {
                 crit_chance_percent: 20.0, // +20% crit
@@ -1793,6 +1827,7 @@ mod tests {
             state.attributes.set(AttributeType::Dexterity, 0);
             state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
             state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+            state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
 
             let haven = HavenCombatBonuses {
                 double_strike_chance: 35.0, // +35% double strike (T3 War Room)
@@ -1850,6 +1885,7 @@ mod tests {
         state.attributes.set(AttributeType::Dexterity, 0);
         state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
 
         let haven = HavenCombatBonuses {
             damage_percent: 25.0,
@@ -1887,6 +1923,7 @@ mod tests {
 
         // Force an attack that kills the enemy
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         let events = update_combat(
             &mut state,
             0.1,
@@ -1968,6 +2005,7 @@ mod tests {
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
 
         let events = update_combat(
             &mut state,
@@ -2017,6 +2055,7 @@ mod tests {
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
 
         let events = update_combat(
             &mut state,
@@ -2060,6 +2099,7 @@ mod tests {
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
 
         let events = update_combat(
             &mut state,
@@ -2102,6 +2142,7 @@ mod tests {
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
 
         let events = update_combat(
             &mut state,
@@ -2149,6 +2190,7 @@ mod tests {
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
 
         let events = update_combat(
             &mut state,
@@ -2199,6 +2241,7 @@ mod tests {
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
 
         let events = update_combat(
             &mut state,
@@ -2249,6 +2292,7 @@ mod tests {
         state.combat_state.player_current_hp = 1;
         state.combat_state.current_enemy = Some(Enemy::new("Deadly Mob".to_string(), 100, 50));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
 
         let events = update_combat(
             &mut state,
@@ -2304,6 +2348,7 @@ mod tests {
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
 
         update_combat(
             &mut state,
@@ -2334,6 +2379,7 @@ mod tests {
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
 
         update_combat(
             &mut state,
@@ -2367,6 +2413,7 @@ mod tests {
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
 
         let events = update_combat(
             &mut state,
@@ -2412,6 +2459,7 @@ mod tests {
         state.combat_state.player_current_hp = 1;
         state.combat_state.current_enemy = Some(Enemy::new("Deadly Mob".to_string(), 100, 50));
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
 
         update_combat(
             &mut state,
@@ -2437,6 +2485,7 @@ mod tests {
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
         state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
 
         let events = update_combat(
             &mut state,

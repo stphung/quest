@@ -1,4 +1,4 @@
-use crate::core::constants::ATTACK_INTERVAL_SECONDS;
+use crate::core::constants::{ATTACK_INTERVAL_SECONDS, ENEMY_ATTACK_INTERVAL_SECONDS};
 use crate::core::game_state::GameState;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -128,13 +128,22 @@ fn draw_combat_status(frame: &mut Frame, area: Rect, game_state: &GameState) {
             dps_span,
         ])]
     } else if game_state.combat_state.current_enemy.is_some() {
-        let next_attack = ATTACK_INTERVAL_SECONDS - game_state.combat_state.attack_timer;
+        let effective_player_interval = ATTACK_INTERVAL_SECONDS / derived.attack_speed_multiplier;
+        let player_next = effective_player_interval - game_state.combat_state.attack_timer;
+        let enemy_next = ENEMY_ATTACK_INTERVAL_SECONDS - game_state.combat_state.enemy_attack_timer;
         vec![Line::from(vec![
             Span::styled(
                 format!("{} In Combat", spinner),
                 Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
             ),
-            Span::raw(format!(" | Next: {:.1}s", next_attack.max(0.0))),
+            Span::styled(
+                format!(" | ⚔️ {:.1}s", player_next.max(0.0)),
+                Style::default().fg(Color::Green),
+            ),
+            Span::styled(
+                format!(" | 👹 {:.1}s", enemy_next.max(0.0)),
+                Style::default().fg(Color::Red),
+            ),
             dps_span,
         ])]
     } else {

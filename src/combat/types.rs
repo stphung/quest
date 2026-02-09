@@ -228,6 +228,8 @@ pub struct CombatState {
     pub player_current_hp: u32,
     pub player_max_hp: u32,
     pub attack_timer: f64,
+    #[serde(default)]
+    pub enemy_attack_timer: f64,
     pub regen_timer: f64,
     pub is_regenerating: bool,
     #[serde(skip)]
@@ -249,6 +251,7 @@ impl CombatState {
             player_current_hp: player_max_hp,
             player_max_hp,
             attack_timer: 0.0,
+            enemy_attack_timer: 0.0,
             regen_timer: 0.0,
             is_regenerating: false,
             visual_effects: Vec::new(),
