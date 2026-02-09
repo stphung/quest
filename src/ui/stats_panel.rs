@@ -707,9 +707,10 @@ fn format_play_time(total_seconds: u64) -> String {
 
 /// Draws the update drawer panel when expanded
 pub fn draw_update_drawer(frame: &mut Frame, area: Rect, info: &UpdateInfo) {
-    let lines = vec![
+    let mut lines = vec![
+        Line::from(vec![]),
         Line::from(vec![
-            Span::styled("New Version: ", Style::default().fg(Color::DarkGray)),
+            Span::styled("  New Version: ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 format!("v{}", info.new_version),
                 Style::default()
@@ -722,49 +723,53 @@ pub fn draw_update_drawer(frame: &mut Frame, area: Rect, info: &UpdateInfo) {
             ),
         ]),
         Line::from(vec![]),
-        Line::from(vec![
-            Span::styled("Changes: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                info.changelog
-                    .iter()
-                    .take(3)
-                    .cloned()
-                    .collect::<Vec<_>>()
-                    .join(" • "),
-                Style::default().fg(Color::White),
-            ),
-            if info.changelog_total > 3 {
-                Span::styled(
-                    format!(" (+{} more)", info.changelog_total - 3),
-                    Style::default().fg(Color::DarkGray),
-                )
-            } else {
-                Span::raw("")
-            },
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "Run 'quest update' to install",
-                Style::default().fg(Color::DarkGray),
-            ),
-            Span::raw("                              "),
-            Span::styled("[U] Close", Style::default().fg(Color::Yellow)),
-        ]),
+        Line::from(vec![Span::styled(
+            "  What's New:",
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        )]),
     ];
 
-    let drawer = Paragraph::new(lines)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Yellow))
-                .title(Span::styled(
-                    " 🆕 Update Available ",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                )),
-        )
-        .alignment(Alignment::Center);
+    // Add changelog items as bullet points (up to 5)
+    let max_items = 5;
+    for item in info.changelog.iter().take(max_items) {
+        lines.push(Line::from(vec![
+            Span::styled("    • ", Style::default().fg(Color::DarkGray)),
+            Span::styled(item.clone(), Style::default().fg(Color::White)),
+        ]));
+    }
+
+    // Show remaining count if there are more
+    if info.changelog_total > max_items {
+        lines.push(Line::from(vec![Span::styled(
+            format!("    (+{} more changes)", info.changelog_total - max_items),
+            Style::default().fg(Color::DarkGray),
+        )]));
+    }
+
+    // Add empty line and footer
+    lines.push(Line::from(vec![]));
+    lines.push(Line::from(vec![
+        Span::styled(
+            "  Run 'quest update' to install",
+            Style::default().fg(Color::DarkGray),
+        ),
+        Span::raw("                              "),
+        Span::styled("[U] Close", Style::default().fg(Color::Yellow)),
+    ]));
+
+    let drawer = Paragraph::new(lines).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Yellow))
+            .title(Span::styled(
+                " 🆕 Update Available ",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )),
+    );
 
     frame.render_widget(drawer, area);
 }

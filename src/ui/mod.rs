@@ -76,10 +76,10 @@ pub fn draw_ui_with_update(
         Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Min(0),    // Main content (stats + right panel)
-                Constraint::Length(8), // Full-width Loot + Combat
-                Constraint::Length(6), // Update drawer panel
-                Constraint::Length(3), // Full-width footer
+                Constraint::Min(0),     // Main content (stats + right panel)
+                Constraint::Length(8),  // Full-width Loot + Combat
+                Constraint::Length(12), // Update drawer panel (taller for changelog)
+                Constraint::Length(3),  // Full-width footer
             ])
             .split(main_area)
     } else {
