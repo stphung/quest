@@ -71,7 +71,7 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 
 - `attributes.rs` — 6 RPG attributes (STR, DEX, CON, INT, WIS, CHA), modifier = `(value - 10) / 2`
 - `derived_stats.rs` — Combat stats calculated from attributes (HP, damage, defense, crit, XP mult)
-- `prestige.rs` — Prestige tiers (Bronze→Eternal) with XP multipliers (1.5× compounding) and attribute cap increases
+- `prestige.rs` — Prestige tiers (Bronze→Eternal) with XP multipliers (`1+0.5×rank^0.7`, diminishing returns) and attribute cap increases (`20+rank×5`)
 - `manager.rs` — Character CRUD operations (create, delete, rename), JSON save/load in ~/.quest/, name validation
 - `input.rs` — Character selection, creation, deletion, renaming input handling and UI states
 
@@ -282,11 +282,13 @@ quest/
 ├── tests/                   # Integration tests
 ├── .github/workflows/       # CI/CD pipeline
 ├── scripts/                 # Quality checks
-├── docs/plans/              # Design documents
+├── docs/design/             # Consolidated design documents
+├── docs/archive/            # Original dated design documents
+├── docs/DECISIONS.md        # Key design decisions and rationale
 ├── Makefile                 # Dev helpers
 └── CLAUDE.md                # This file
 ```
 
 ## Dependencies
 
-Ratatui 0.26, Crossterm 0.27, Serde (JSON), SHA2, Rand, Chrono, Directories, Chess-engine 0.1
+Ratatui 0.26, Crossterm 0.27, Serde (JSON), Rand, Chrono, Directories, Chess-engine 0.1
