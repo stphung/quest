@@ -1,7 +1,8 @@
 //! Zone and level progression simulation using real game data.
 
 use super::loot_sim::LootStats;
-use crate::core::balance::{xp_required_for_level, KILLS_PER_BOSS};
+use crate::core::balance::xp_required_for_level;
+use crate::core::progression::{can_access_zone, max_zone_for_prestige, Progression};
 #[cfg(test)]
 use crate::zones::get_all_zones;
 use crate::zones::{get_zone, Zone};
@@ -75,96 +76,51 @@ impl SimProgression {
         }
     }
 
-    /// Record a kill.
-    pub fn record_kill(&mut self, was_boss: bool, current_ticks: u64) {
+    /// Record a kill with simulation tracking.
+    pub fn record_kill_sim(&mut self, was_boss: bool, current_ticks: u64) {
         self.total_kills += 1;
-        self.kills_in_subzone += 1;
 
         if self.current_zone <= 10 {
             self.zone_kills[self.current_zone as usize] += 1;
         }
 
+        // Use trait method for core kill tracking
+        Progression::record_kill(self);
+
         if was_boss {
             self.total_boss_kills += 1;
-            self.advance_after_boss(current_ticks);
+            self.advance_after_boss_sim(current_ticks);
         }
     }
 
-    /// Record a death.
-    /// If was_boss_fight is true, reset kill progress (matches real game).
-    pub fn record_death(&mut self, was_boss_fight: bool) {
+    /// Record a death with simulation tracking.
+    /// If was_boss_fight is true, resets kill progress (matches real game).
+    pub fn record_death_sim(&mut self, was_boss_fight: bool) {
         self.total_deaths += 1;
         if self.current_zone <= 10 {
             self.zone_deaths[self.current_zone as usize] += 1;
         }
-        // Only reset kills if died to a boss (matches real game behavior)
-        if was_boss_fight {
-            self.kills_in_subzone = 0;
-        }
+        // Use trait implementation for core logic
+        Progression::record_death(self, was_boss_fight);
     }
 
-    /// Check if should spawn boss (every KILLS_PER_BOSS kills in subzone).
-    pub fn should_spawn_boss(&self) -> bool {
-        self.kills_in_subzone >= KILLS_PER_BOSS
-    }
+    /// Advance after defeating a boss (with tick tracking for sim).
+    pub fn advance_after_boss_sim(&mut self, current_ticks: u64) {
+        let old_zone = self.current_zone;
 
-    /// Advance after defeating a boss.
-    fn advance_after_boss(&mut self, current_ticks: u64) {
-        self.kills_in_subzone = 0;
+        // Use trait implementation for core advancement logic
+        Progression::advance_after_boss(self);
 
-        let max_subzones = subzones_in_zone(self.current_zone);
-
-        if self.current_subzone >= max_subzones {
-            // Cleared final subzone, check if can advance to next zone
-            if self.current_zone < 10 {
-                let next_zone = self.current_zone + 1;
-
-                // Check prestige requirement for next zone
-                if let Some(zone) = get_zone(next_zone) {
-                    if self.prestige_rank >= zone.prestige_requirement {
-                        self.current_zone = next_zone;
-                        self.current_subzone = 1;
-
-                        // Record zone entry
-                        if self.current_zone <= 10 {
-                            self.zone_entries[self.current_zone as usize] = current_ticks;
-                        }
-                    }
-                    // Else: prestige gated, stay in current zone
-                }
-            }
-            // At zone 10, stay in zone 10 (endgame)
-        } else {
-            // Advance to next subzone
-            self.current_subzone += 1;
+        // Record zone entry time if we advanced
+        if self.current_zone != old_zone && self.current_zone <= 10 {
+            self.zone_entries[self.current_zone as usize] = current_ticks;
         }
     }
 
     /// Check if can prestige (level meets requirement for next rank).
     pub fn can_prestige(&self) -> bool {
-        let required_level = match self.prestige_rank {
-            0 => 10,
-            1 => 25,
-            2 => 50,
-            3 => 65,
-            4 => 80,
-            _ => 80 + (self.prestige_rank - 4) * 10, // 90, 100, 110...
-        };
-        self.player_level >= required_level
-    }
-
-    /// Check if at max zone for current prestige (can't advance further without prestiging).
-    pub fn at_max_zone_for_prestige(&self) -> bool {
-        // Zone prestige requirements:
-        // Zone 1-2: P0, Zone 3-4: P5, Zone 5-6: P10, Zone 7-8: P15, Zone 9-10: P20
-        let max_zone = match self.prestige_rank {
-            0..=4 => 2,
-            5..=9 => 4,
-            10..=14 => 6,
-            15..=19 => 8,
-            _ => 10,
-        };
-        self.current_zone >= max_zone
+        use crate::character::prestige::get_next_prestige_tier;
+        self.player_level >= get_next_prestige_tier(self.prestige_rank).required_level
     }
 
     /// Perform prestige reset.
@@ -183,6 +139,64 @@ impl SimProgression {
 impl Default for SimProgression {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Implement the shared Progression trait for SimProgression.
+impl Progression for SimProgression {
+    fn current_zone(&self) -> u32 {
+        self.current_zone
+    }
+
+    fn current_subzone(&self) -> u32 {
+        self.current_subzone
+    }
+
+    fn kills_in_subzone(&self) -> u32 {
+        self.kills_in_subzone
+    }
+
+    fn prestige_rank(&self) -> u32 {
+        self.prestige_rank
+    }
+
+    fn record_kill(&mut self) -> bool {
+        self.kills_in_subzone += 1;
+        self.should_spawn_boss()
+    }
+
+    fn record_death(&mut self, was_boss_fight: bool) {
+        if was_boss_fight {
+            self.kills_in_subzone = 0;
+        }
+    }
+
+    fn advance_after_boss(&mut self) {
+        self.kills_in_subzone = 0;
+
+        let max_subzones = subzones_in_zone(self.current_zone);
+
+        if self.current_subzone >= max_subzones {
+            // Cleared final subzone, check if can advance to next zone
+            if self.current_zone < 10 {
+                let next_zone = self.current_zone + 1;
+
+                // Use shared prestige check
+                if can_access_zone(self.prestige_rank, next_zone) {
+                    self.current_zone = next_zone;
+                    self.current_subzone = 1;
+                }
+                // Else: prestige gated, stay in current zone
+            }
+            // At zone 10, stay in zone 10 (endgame)
+        } else {
+            // Advance to next subzone
+            self.current_subzone += 1;
+        }
+    }
+
+    fn at_max_zone_for_prestige(&self) -> bool {
+        self.current_zone >= max_zone_for_prestige(self.prestige_rank)
     }
 }
 
@@ -237,9 +251,9 @@ mod tests {
         // Kill mobs and bosses to advance through all subzones
         for _ in 0..subzones {
             for _ in 0..10 {
-                prog.record_kill(false, 0);
+                prog.record_kill_sim(false, 0);
             }
-            prog.record_kill(true, 0); // Boss kill
+            prog.record_kill_sim(true, 0); // Boss kill
         }
 
         assert_eq!(

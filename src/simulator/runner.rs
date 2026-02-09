@@ -6,6 +6,7 @@ use super::loot_sim::{average_equipped_ilvl, roll_boss_drop_real, roll_mob_drop_
 use super::progression_sim::{RunStats, SimProgression};
 use super::report::SimReport;
 use crate::core::game_state::GameState;
+use crate::core::progression::Progression; // Shared trait
 use crate::items::scoring::auto_equip_if_better;
 use chrono::Utc;
 use rand::Rng;
@@ -125,7 +126,7 @@ fn simulate_single_run(config: &SimConfig, rng: &mut impl Rng) -> RunStats {
         if combat_result.player_won {
             // Bonus XP for kill
             progression.add_xp(combat_result.xp_gained as u64);
-            progression.record_kill(combat_result.was_boss, ticks);
+            progression.record_kill_sim(combat_result.was_boss, ticks);
 
             // Level up player if needed
             while player.level < progression.player_level {
@@ -171,7 +172,7 @@ fn simulate_single_run(config: &SimConfig, rng: &mut impl Rng) -> RunStats {
             player.heal_full();
         } else {
             // Player died
-            progression.record_death(combat_result.was_boss);
+            progression.record_death_sim(combat_result.was_boss);
             // Respawn at full HP
             player.heal_full();
         }
