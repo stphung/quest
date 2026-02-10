@@ -71,11 +71,11 @@ fn simulate_single_run(config: &SimConfig, rng: &mut impl Rng) -> RunStats {
         }
 
         // Check for prestige opportunity
-        // Prestige when: cleared zone 10 boss (at_prestige_wall with zone 10) AND can prestige AND want to continue
+        // Prestige when: at max zone for current prestige rank AND meet level requirement
+        // At P0, max zone is 2; at P5, max zone is 4; etc.
         let at_prestige_wall = progression.at_max_zone_for_prestige();
-        let cleared_zone_10 = progression.current_zone >= 10 && at_prestige_wall;
         if config.simulate_prestige
-            && cleared_zone_10
+            && at_prestige_wall
             && progression.can_prestige()
             && progression.prestige_rank < config.target_prestige
         {
