@@ -1420,6 +1420,16 @@ fn game_tick(
             global_achievements.on_fish_caught(Some(&game_state.character_name));
         }
 
+        // Handle level-ups from fishing XP
+        if fishing_result.levelups > 0 {
+            global_achievements.on_level_up(game_state.character_level, Some(&game_state.character_name));
+            game_state.combat_state.add_log_entry(
+                format!("🎉 Level up! You are now level {}!", game_state.character_level),
+                false,
+                true,
+            );
+        }
+
         let fishing_messages = fishing_result.messages;
         for message in &fishing_messages {
             game_state

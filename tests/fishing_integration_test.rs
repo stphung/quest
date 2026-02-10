@@ -600,6 +600,7 @@ fn test_prestige_affects_fishing_xp() {
     // Without prestige
     let mut state1 = create_test_state();
     state1.prestige_rank = 0;
+    state1.character_level = 100; // High level to avoid level-ups consuming XP
     let session1 = FishingSession {
         spot_name: "Test".to_string(),
         total_fish: 10,
@@ -615,6 +616,7 @@ fn test_prestige_affects_fishing_xp() {
     // With prestige rank 5
     let mut state2 = create_test_state();
     state2.prestige_rank = 5;
+    state2.character_level = 100; // High level to avoid level-ups consuming XP
     let session2 = FishingSession {
         spot_name: "Test".to_string(),
         total_fish: 10,

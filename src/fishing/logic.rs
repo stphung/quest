@@ -51,6 +51,8 @@ pub struct FishingTickResult {
     pub leviathan_encounter: Option<u8>,
     /// Number of fish caught this tick (for achievement tracking)
     pub fish_caught_count: u32,
+    /// Number of level-ups that occurred from fishing XP
+    pub levelups: u32,
 }
 
 /// Processes a fishing session tick with phase-based timing.
@@ -153,8 +155,9 @@ pub fn tick_fishing_with_haven_result(
                     let prestige_multiplier = base_mult + (cha_mod as f64 * PRESTIGE_MULT_PER_CHA_MOD);
                     let xp_gained = (fish.xp_reward as f64 * prestige_multiplier) as u64;
 
-                    // Award character XP
-                    state.character_xp += xp_gained;
+                    // Award character XP (using apply_tick_xp to handle level-ups)
+                    let (levelups, _) = crate::core::game_logic::apply_tick_xp(state, xp_gained as f64);
+                    result.levelups += levelups;
 
                     // Award fishing rank progress
                     state.fishing.fish_toward_next_rank += 1;
@@ -742,6 +745,8 @@ mod tests {
     fn test_prestige_multiplier_affects_xp() {
         let mut rng = ChaCha8Rng::seed_from_u64(99999); // Fixed seed for reproducibility
         let mut state = create_test_game_state();
+        // Set high level to avoid level-ups consuming XP during test
+        state.character_level = 100;
 
         // First catch without prestige
         let session = FishingSession {
@@ -762,6 +767,7 @@ mod tests {
         // Now with prestige rank 2 (1.5^2 = 2.25x multiplier)
         let mut rng2 = ChaCha8Rng::seed_from_u64(99999); // Same seed for same fish
         let mut state2 = create_test_game_state();
+        state2.character_level = 100; // High level to avoid level-ups
 
         let session2 = FishingSession {
             spot_name: "Test".to_string(),
@@ -795,6 +801,7 @@ mod tests {
 
         let mut rng = ChaCha8Rng::seed_from_u64(12345);
         let mut state = create_test_game_state();
+        state.character_level = 100; // High level to avoid level-ups consuming XP
 
         // Set up fishing session
         let session = FishingSession {
@@ -817,6 +824,7 @@ mod tests {
         // Now with high CHA (20 = +5 modifier = +0.5 bonus = 2.0x total)
         let mut rng2 = ChaCha8Rng::seed_from_u64(12345); // Same seed for same fish
         let mut state2 = create_test_game_state();
+        state2.character_level = 100; // High level to avoid level-ups
 
         let session2 = FishingSession {
             spot_name: "Test".to_string(),

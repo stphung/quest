@@ -135,15 +135,6 @@ pub fn update_combat(
             let damage_multiplier = 1.0 + haven.damage_percent / 100.0;
             let bonus_crit = haven.crit_chance_percent as u32;
 
-            let attack_result = calculate_player_attack(
-                &derived,
-                bonus_crit,
-                damage_multiplier,
-                &mut rand::thread_rng(),
-            );
-            let damage = attack_result.damage;
-            let was_crit = attack_result.is_crit;
-
             // Roll for double strike (War Room bonus)
             let double_strike_roll = rand::thread_rng().gen::<f64>() * 100.0;
             let num_strikes = if double_strike_roll < haven.double_strike_chance {
@@ -154,16 +145,22 @@ pub fn update_combat(
 
             if let Some(enemy) = state.combat_state.current_enemy.as_mut() {
                 // Apply damage (potentially multiple times with double strike)
-                for strike in 0..num_strikes {
+                // Each strike gets its own independent roll for damage and crit
+                for _ in 0..num_strikes {
                     if !enemy.is_alive() {
                         break; // Enemy already dead
                     }
-                    enemy.take_damage(damage);
-                    // Only first strike uses original crit flag, subsequent strikes are bonus hits
-                    let strike_crit = if strike == 0 { was_crit } else { false };
+                    // Each strike rolls independently (fixes bug where both used same roll)
+                    let strike_result = calculate_player_attack(
+                        &derived,
+                        bonus_crit,
+                        damage_multiplier,
+                        &mut rand::thread_rng(),
+                    );
+                    enemy.take_damage(strike_result.damage);
                     events.push(CombatEvent::PlayerAttack {
-                        damage,
-                        was_crit: strike_crit,
+                        damage: strike_result.damage,
+                        was_crit: strike_result.is_crit,
                     });
                 }
 
