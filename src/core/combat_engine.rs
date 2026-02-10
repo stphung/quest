@@ -630,7 +630,9 @@ pub fn resolve_combat_tick(
                         }
 
                         // Handle zone/subzone advancement for boss kills
-                        if result.was_boss {
+                        // Skip if attack was blocked (e.g., Zone 10 boss without Stormbreaker)
+                        // - reflection can damage/kill the boss, but shouldn't count as a valid defeat
+                        if result.was_boss && !result.attack_blocked {
                             let old_zone = state.zone_progression.current_zone_id;
                             let boss_result = advance_after_boss_kill(state, achievements);
                             result.boss_defeat_result = Some(boss_result);
@@ -638,9 +640,16 @@ pub fn resolve_combat_tick(
                                 result.zone_advanced = true;
                                 result.new_zone = state.zone_progression.current_zone_id;
                             }
+                        } else if result.was_boss && result.attack_blocked {
+                            // Boss killed via reflection without required weapon - reset encounter
+                            state.zone_progression.fighting_boss = false;
+                            state.zone_progression.kills_in_subzone = 0;
                         }
 
-                        achievements.on_enemy_killed(result.was_boss, Some(&state.character_name));
+                        achievements.on_enemy_killed(
+                            result.was_boss && !result.attack_blocked,
+                            Some(&state.character_name),
+                        );
 
                         state.combat_state.current_enemy = None;
                         if result.was_boss {
