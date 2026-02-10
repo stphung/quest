@@ -5,6 +5,7 @@ pub const OFFLINE_MULTIPLIER: f64 = 0.25;
 pub const MAX_OFFLINE_SECONDS: i64 = 7 * 24 * 60 * 60;
 pub const AUTOSAVE_INTERVAL_SECONDS: u64 = 30;
 pub const UPDATE_CHECK_INTERVAL_SECONDS: u64 = 30 * 60; // 30 minutes
+pub const UPDATE_CHECK_JITTER_SECONDS: u64 = 5 * 60; // ±5 minutes jitter
 pub const _ENEMY_RESPAWN_SECONDS: f64 = 2.5;
 pub const ATTACK_INTERVAL_SECONDS: f64 = 1.5;
 pub const HP_REGEN_DURATION_SECONDS: f64 = 2.5;

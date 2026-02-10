@@ -159,13 +159,12 @@ fn render_skill_tree(frame: &mut Frame, area: Rect, haven: &Haven, selected_room
             let unlocked = haven.is_room_unlocked(*room);
             let is_selected = i == selected_room;
 
-            // Tier indicator: ★★★ for built tiers, ··· for unbuilt
-            let tier_str = format!(
-                "{}{}{}",
-                if tier >= 1 { "★" } else { "·" },
-                if tier >= 2 { "★" } else { "·" },
-                if tier >= 3 { "★" } else { "·" }
-            );
+            // Tier indicator: ★ for built tiers, · for unbuilt (respects max_tier)
+            let max_t = room.max_tier();
+            let tier_str: String = (1..=max_t)
+                .map(|t| if tier >= t { "★" } else { "·" })
+                .collect::<Vec<_>>()
+                .join("");
 
             // Room prefix based on state
             let prefix = if is_selected { "▶ " } else { "  " };
@@ -262,7 +261,7 @@ fn render_room_detail(
         .constraints([
             Constraint::Length(3),                                    // Description
             Constraint::Length(1),                                    // Spacer
-            Constraint::Length(5),                                    // Bonus info (all 3 tiers)
+            Constraint::Length(1 + room.max_tier() as u16),           // Bonus info (header + tiers)
             Constraint::Length(1),                                    // Spacer
             Constraint::Length(req_height),                           // Requirements (if any)
             Constraint::Length(if has_requirements { 1 } else { 0 }), // Spacer after requirements
@@ -277,7 +276,8 @@ fn render_room_detail(
         .wrap(Wrap { trim: true });
     frame.render_widget(desc, chunks[0]);
 
-    // Bonus info - show all 3 tiers
+    // Bonus info - show tiers up to room's max
+    let max_tier = room.max_tier();
     let mut bonus_lines = vec![Line::from(Span::styled(
         "Bonuses:",
         Style::default()
@@ -285,9 +285,9 @@ fn render_room_detail(
             .add_modifier(Modifier::BOLD),
     ))];
 
-    for t in 1..=3 {
+    for t in 1..=max_tier {
         let is_built = t <= tier;
-        let is_next = t == tier + 1 && tier < 3;
+        let is_next = t == tier + 1 && tier < max_tier;
         let style = if is_built {
             Style::default().fg(Color::Green)
         } else if is_next {
@@ -356,7 +356,7 @@ fn render_room_detail(
             )),
         ]);
         frame.render_widget(cost_text, cost_chunk);
-    } else if tier < 3 {
+    } else if tier < room.max_tier() {
         let next_tier = tier + 1;
         let cost = tier_cost(room, next_tier);
         let can_afford_it = can_afford(room, haven, prestige_rank);
