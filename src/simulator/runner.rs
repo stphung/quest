@@ -343,6 +343,11 @@ fn simulate_single_run(config: &SimConfig, rng: &mut ChaCha8Rng) -> RunStats {
     // Create CoreGame - this is the shared game engine
     let mut core_game = CoreGame::new("SimPlayer".to_string());
 
+    // Set starting prestige if configured
+    if config.starting_prestige > 0 {
+        core_game.state_mut().prestige_rank = config.starting_prestige;
+    }
+
     // Create stats tracker
     let mut stats = SimStats::new();
 

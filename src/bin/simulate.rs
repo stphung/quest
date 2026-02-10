@@ -26,6 +26,9 @@ fn main() {
     println!("  Target Zone:    {}", config.target_zone);
     println!("  Simulate Loot:  {}", config.simulate_loot);
     println!("  Max Ticks:      {}", config.max_ticks_per_run);
+    if config.starting_prestige > 0 {
+        println!("  Starting at:    P{}", config.starting_prestige);
+    }
     if config.simulate_prestige {
         println!(
             "  Prestige:       enabled (target P{})",
@@ -103,6 +106,14 @@ fn parse_args(args: &[String]) -> (SimConfig, bool) {
                     }
                 }
             }
+            "--start" => {
+                if i + 1 < args.len() {
+                    if let Ok(rank) = args[i + 1].parse::<u32>() {
+                        config.starting_prestige = rank;
+                        i += 1;
+                    }
+                }
+            }
             "--level-curve" => {
                 show_level_curve = true;
             }
@@ -139,6 +150,7 @@ fn print_help() {
     println!("    -s, --seed <S>      Random seed for reproducibility");
     println!("    -t, --ticks <T>     Max ticks per run (default: 1,000,000)");
     println!("    --no-loot           Disable loot simulation");
+    println!("    --start <R>         Start at prestige rank R (test mid-game balance)");
     println!("    --prestige <R>      Simulate prestige to rank R");
     println!("    --level-curve       Show detailed level-up pacing");
     println!("    -v, --verbose       Verbose output");
