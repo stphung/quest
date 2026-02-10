@@ -35,6 +35,7 @@ use rand::Rng;
 /// This struct owns its GameState and is the central game engine.
 /// Use `tick()` for simulation mode or `combat_tick()` for interactive mode
 /// with Haven bonuses.
+#[allow(dead_code)]
 pub struct CoreGame {
     state: GameState,
     /// Internal enemy for simulation mode (tick())
