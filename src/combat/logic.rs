@@ -264,8 +264,11 @@ pub fn update_combat(
                     events.push(CombatEvent::PlayerDied);
                 }
 
-                // Reset player HP (in dungeon or not)
+                // Reset player HP and start regeneration period
+                // (consistent with post-kill behavior - player needs recovery time)
                 state.combat_state.player_current_hp = state.combat_state.player_max_hp;
+                state.combat_state.is_regenerating = true;
+                state.combat_state.regen_timer = 0.0;
 
                 // Reset enemy HP if we're not in dungeon (normal combat continues)
                 if !in_dungeon {
@@ -337,7 +340,7 @@ mod tests {
     }
 
     #[test]
-    fn test_player_died_resets() {
+    fn test_player_died_resets_and_starts_regen() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
         state.combat_state.player_current_hp = 1;
@@ -362,7 +365,17 @@ mod tests {
             state.combat_state.player_max_hp
         );
 
-        // Enemy should be reset
+        // Player should be regenerating after death
+        assert!(
+            state.combat_state.is_regenerating,
+            "Player should be regenerating after death"
+        );
+        assert_eq!(
+            state.combat_state.regen_timer, 0.0,
+            "Regen timer should be reset"
+        );
+
+        // Enemy should be reset (for non-boss)
         let enemy = state.combat_state.current_enemy.as_ref().unwrap();
         assert_eq!(enemy.current_hp, enemy.max_hp);
     }
@@ -442,6 +455,12 @@ mod tests {
         assert_eq!(
             state.combat_state.player_current_hp,
             state.combat_state.player_max_hp
+        );
+
+        // Player should be regenerating after dungeon death
+        assert!(
+            state.combat_state.is_regenerating,
+            "Player should be regenerating after dungeon death"
         );
 
         // Enemy should be cleared (not reset like in overworld)

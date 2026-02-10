@@ -100,33 +100,39 @@ pub struct OfflineReport {
 /// Calculates the XP gained during offline time
 /// Now based on simulated monster kills instead of passive time
 /// `haven_offline_xp_percent` is the Hearthstone bonus (0.0 if not built)
+/// `haven_xp_gain_percent` is the Training Yard bonus (0.0 if not built)
 pub fn calculate_offline_xp(
     elapsed_seconds: i64,
     prestige_rank: u32,
     wis_modifier: i32,
     cha_modifier: i32,
     haven_offline_xp_percent: f64,
+    haven_xp_gain_percent: f64,
 ) -> f64 {
     let capped_seconds = elapsed_seconds.min(MAX_OFFLINE_SECONDS);
 
     // Estimate kills: average 1 kill every 5 seconds (includes combat + regen time)
     let estimated_kills = (capped_seconds as f64 / 5.0) * OFFLINE_MULTIPLIER;
 
-    // Average XP per kill
+    // Average XP per kill (matches combat_kill_xp formula)
     let xp_per_tick_rate = xp_gain_per_tick(prestige_rank, wis_modifier, cha_modifier);
     let avg_xp_per_kill = (COMBAT_XP_MIN_TICKS + COMBAT_XP_MAX_TICKS) as f64 / 2.0;
-    let xp_per_kill = xp_per_tick_rate * avg_xp_per_kill;
 
-    // Apply Haven Hearthstone bonus
+    // Apply Training Yard bonus to each kill (same as online combat)
+    let xp_per_kill = xp_per_tick_rate * avg_xp_per_kill * (1.0 + haven_xp_gain_percent / 100.0);
+
+    // Apply Haven Hearthstone bonus (offline multiplier)
     let base_xp = estimated_kills * xp_per_kill;
     base_xp * (1.0 + haven_offline_xp_percent / 100.0)
 }
 
 /// Processes offline progression and updates game state
 /// `haven_offline_xp_percent` is the Hearthstone bonus (0.0 if not built)
+/// `haven_xp_gain_percent` is the Training Yard bonus (0.0 if not built)
 pub fn process_offline_progression(
     state: &mut GameState,
     haven_offline_xp_percent: f64,
+    haven_xp_gain_percent: f64,
 ) -> OfflineReport {
     let current_time = Utc::now().timestamp();
     let elapsed_seconds = current_time - state.last_save_time;
@@ -143,6 +149,7 @@ pub fn process_offline_progression(
         wis_mod,
         cha_mod,
         haven_offline_xp_percent,
+        haven_xp_gain_percent,
     );
 
     let level_before = state.character_level;
@@ -151,8 +158,11 @@ pub fn process_offline_progression(
 
     state.last_save_time = current_time;
 
-    let offline_rate_percent =
-        OFFLINE_MULTIPLIER * (1.0 + haven_offline_xp_percent / 100.0) * 100.0;
+    // Effective offline rate includes both bonuses
+    let offline_rate_percent = OFFLINE_MULTIPLIER
+        * (1.0 + haven_offline_xp_percent / 100.0)
+        * (1.0 + haven_xp_gain_percent / 100.0)
+        * 100.0;
 
     OfflineReport {
         elapsed_seconds,
@@ -513,7 +523,7 @@ mod tests {
     #[test]
     fn test_calculate_offline_xp_basic() {
         // 1 hour offline, rank 0, no modifiers
-        let xp = calculate_offline_xp(3600, 0, 0, 0, 0.0);
+        let xp = calculate_offline_xp(3600, 0, 0, 0, 0.0, 0.0);
 
         // 3600 seconds / 5 = 720 estimated kills * 0.25 offline multiplier = 180 kills
         // XP per kill at rank 0 = 1.0 * 300 (avg) = 300
@@ -527,8 +537,8 @@ mod tests {
         let one_week = 7 * 24 * 3600;
         let two_weeks = 14 * 24 * 3600;
 
-        let xp_one_week = calculate_offline_xp(one_week, 0, 0, 0, 0.0);
-        let xp_two_weeks = calculate_offline_xp(two_weeks, 0, 0, 0, 0.0);
+        let xp_one_week = calculate_offline_xp(one_week, 0, 0, 0, 0.0, 0.0);
+        let xp_two_weeks = calculate_offline_xp(two_weeks, 0, 0, 0, 0.0, 0.0);
 
         // Should be capped, so two weeks = one week
         assert!((xp_one_week - xp_two_weeks).abs() < 1.0);
@@ -536,8 +546,8 @@ mod tests {
 
     #[test]
     fn test_calculate_offline_xp_with_prestige() {
-        let base_xp = calculate_offline_xp(3600, 0, 0, 0, 0.0);
-        let prestige_xp = calculate_offline_xp(3600, 1, 0, 0, 0.0);
+        let base_xp = calculate_offline_xp(3600, 0, 0, 0, 0.0, 0.0);
+        let prestige_xp = calculate_offline_xp(3600, 1, 0, 0, 0.0, 0.0);
 
         // Prestige 1 has 1.5x multiplier (using 1 + 0.5*rank^0.7 formula)
         assert!(prestige_xp > base_xp);
@@ -547,8 +557,8 @@ mod tests {
 
     #[test]
     fn test_calculate_offline_xp_with_wisdom() {
-        let base_xp = calculate_offline_xp(3600, 0, 0, 0, 0.0);
-        let wis_xp = calculate_offline_xp(3600, 0, 5, 0, 0.0); // +5 WIS modifier
+        let base_xp = calculate_offline_xp(3600, 0, 0, 0, 0.0, 0.0);
+        let wis_xp = calculate_offline_xp(3600, 0, 5, 0, 0.0, 0.0); // +5 WIS modifier
 
         // WIS +5 gives 1.25x multiplier
         assert!(wis_xp > base_xp);
@@ -557,15 +567,46 @@ mod tests {
     }
 
     #[test]
-    fn test_calculate_offline_xp_with_haven_bonus() {
-        let base_xp = calculate_offline_xp(3600, 0, 0, 0, 0.0);
-        let haven_xp = calculate_offline_xp(3600, 0, 0, 0, 100.0); // +100% from Hearthstone T3
+    fn test_calculate_offline_xp_with_hearthstone_bonus() {
+        let base_xp = calculate_offline_xp(3600, 0, 0, 0, 0.0, 0.0);
+        let haven_xp = calculate_offline_xp(3600, 0, 0, 0, 100.0, 0.0); // +100% from Hearthstone T3
 
         // Haven +100% should double offline XP
         let ratio = haven_xp / base_xp;
         assert!(
             (ratio - 2.0).abs() < 0.01,
             "Haven +100% offline XP should double base XP, got {:.2}x",
+            ratio
+        );
+    }
+
+    #[test]
+    fn test_calculate_offline_xp_with_training_yard_bonus() {
+        // BUG FIX TEST: Offline XP should include Training Yard bonus
+        // This matches online combat where combat_kill_xp applies haven_xp_gain_percent
+        let base_xp = calculate_offline_xp(3600, 0, 0, 0, 0.0, 0.0);
+        let training_xp = calculate_offline_xp(3600, 0, 0, 0, 0.0, 50.0); // +50% from Training Yard
+
+        // Training Yard +50% should increase XP by 50%
+        let ratio = training_xp / base_xp;
+        assert!(
+            (ratio - 1.5).abs() < 0.01,
+            "Training Yard +50% XP should increase offline XP by 50%, got {:.2}x",
+            ratio
+        );
+    }
+
+    #[test]
+    fn test_calculate_offline_xp_with_both_haven_bonuses() {
+        // Both Hearthstone (offline) and Training Yard (XP) bonuses should stack multiplicatively
+        let base_xp = calculate_offline_xp(3600, 0, 0, 0, 0.0, 0.0);
+        let both_xp = calculate_offline_xp(3600, 0, 0, 0, 100.0, 50.0); // +100% Hearthstone, +50% Training
+
+        // (1 + 50%) * (1 + 100%) = 1.5 * 2.0 = 3.0x
+        let ratio = both_xp / base_xp;
+        assert!(
+            (ratio - 3.0).abs() < 0.01,
+            "Hearthstone +100% and Training Yard +50% should give 3x XP, got {:.2}x",
             ratio
         );
     }

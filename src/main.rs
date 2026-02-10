@@ -439,9 +439,12 @@ fn main() -> io::Result<()> {
                                         if elapsed_seconds > 60 {
                                             let haven_offline_bonus = haven
                                                 .get_bonus(haven::HavenBonusType::OfflineXpPercent);
+                                            let haven_xp_bonus =
+                                                haven.get_bonus(haven::HavenBonusType::XpGainPercent);
                                             let report = process_offline_progression(
                                                 &mut state,
                                                 haven_offline_bonus,
+                                                haven_xp_bonus,
                                             );
                                             if report.xp_gained > 0 {
                                                 // Enhanced combat log entries

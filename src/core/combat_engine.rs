@@ -285,6 +285,16 @@ impl GameLoop for CombatEngine {
             self.state.combat_state.player_current_hp =
                 apply_damage(self.state.combat_state.player_current_hp, damage_taken);
 
+            // Apply damage reflection: reflect percentage of damage taken back to attacker
+            if derived.damage_reflection_percent > 0.0 && damage_taken > 0 {
+                let reflected =
+                    calculate_damage_reflection(damage_taken, derived.damage_reflection_percent);
+                if reflected > 0 {
+                    let enemy = self.current_enemy.as_mut().unwrap();
+                    enemy.current_hp = enemy.current_hp.saturating_sub(reflected);
+                }
+            }
+
             if self.state.combat_state.player_current_hp == 0 {
                 // Player died - respawn
                 result.player_died = true;
@@ -484,7 +494,7 @@ pub fn resolve_combat_tick(
         // Handle zone/subzone advancement for boss kills
         if result.was_boss {
             let old_zone = state.zone_progression.current_zone_id;
-            advance_after_boss_kill(state);
+            advance_after_boss_kill(state, achievements);
             if state.zone_progression.current_zone_id > old_zone {
                 result.zone_advanced = true;
                 result.new_zone = state.zone_progression.current_zone_id;
@@ -538,8 +548,11 @@ pub fn resolve_combat_tick(
                 }
             }
 
-            // Reset player HP
+            // Reset player HP and start regeneration period
+            // (consistent with post-kill behavior - player needs recovery time)
             state.combat_state.player_current_hp = state.combat_state.player_max_hp;
+            state.combat_state.is_regenerating = true;
+            state.combat_state.regen_timer = 0.0;
         }
     }
 
@@ -569,7 +582,13 @@ fn calculate_kill_xp(
 }
 
 /// Advance zone/subzone after killing a boss.
-fn advance_after_boss_kill(state: &mut GameState) {
+///
+/// Handles special cases:
+/// - Zone 10 completion: unlocks Zone 11 (The Expanse) and triggers StormsEnd achievement
+/// - Zone 11 completion: cycles back to Zone 11 Subzone 1 (infinite endgame zone)
+fn advance_after_boss_kill(state: &mut GameState, achievements: &mut Achievements) {
+    use crate::achievements::AchievementId;
+
     let zone_id = state.zone_progression.current_zone_id;
     let subzone_id = state.zone_progression.current_subzone_id;
 
@@ -581,8 +600,26 @@ fn advance_after_boss_kill(state: &mut GameState) {
         .map(|z| z.subzones.len() as u32)
         .unwrap_or(3);
 
-    if subzone_id >= max_subzones {
-        // Try to advance to next zone
+    let is_zone_boss = subzone_id >= max_subzones;
+
+    if is_zone_boss {
+        // Zone 11 (The Expanse) - infinite cycling back to subzone 1
+        if zone_id == 11 {
+            state.zone_progression.current_subzone_id = 1;
+            state.zone_progression.kills_in_subzone = 0;
+            return;
+        }
+
+        // Zone 10 completion - unlock Zone 11 and award StormsEnd achievement
+        if zone_id == 10 {
+            achievements.unlock(AchievementId::StormsEnd, None);
+            state.zone_progression.unlock_zone(11);
+            state.zone_progression.current_zone_id = 11;
+            state.zone_progression.current_subzone_id = 1;
+            return;
+        }
+
+        // Normal zone advancement (zones 1-9)
         let next_zone = zone_id + 1;
         if next_zone <= 10 && can_access_zone(state.prestige_rank, next_zone) {
             state.zone_progression.current_zone_id = next_zone;
@@ -590,7 +627,7 @@ fn advance_after_boss_kill(state: &mut GameState) {
         }
         // At prestige wall - stay in current zone
     } else {
-        // Advance to next subzone
+        // Advance to next subzone within the same zone
         state.zone_progression.current_subzone_id += 1;
     }
 }
@@ -840,6 +877,8 @@ mod tests {
         // Run until player dies
         let mut saw_death = false;
         for _ in 0..1000 {
+            // Reset regen to keep combat active
+            state.combat_state.is_regenerating = false;
             let result = resolve_combat_tick(&mut state, &bonuses, &mut achievements, &mut rng);
             if result.player_died {
                 saw_death = true;
@@ -852,12 +891,52 @@ mod tests {
                 state.combat_state.is_regenerating,
                 "Player death should trigger regeneration"
             );
-            assert!(
-                state.combat_state.current_enemy.is_none(),
-                "Enemy should be cleared on player death"
-            );
+            // Note: Enemy is cleared for boss deaths, but reset HP for non-boss deaths
+            // Both cases should trigger regeneration
         }
         // If no death in 1000 ticks, that's OK - player is just winning
+    }
+
+    #[test]
+    fn test_resolve_combat_tick_player_death_to_boss_clears_enemy_and_regens() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // Set up a boss fight
+        state.zone_progression.fighting_boss = true;
+        state.zone_progression.kills_in_subzone = 10;
+
+        // Spawn a strong boss that will kill the player
+        state.combat_state.current_enemy = Some(crate::combat::types::Enemy::new(
+            "Deadly Boss".to_string(),
+            1000,
+            5000, // Very high damage
+        ));
+        state.combat_state.player_current_hp = 1; // Player is weak
+
+        let bonuses = CombatBonuses::default();
+        let mut achievements = Achievements::default();
+        let mut rng = rand::thread_rng();
+
+        let result = resolve_combat_tick(&mut state, &bonuses, &mut achievements, &mut rng);
+
+        assert!(result.player_died, "Player should have died");
+        assert!(result.was_boss, "Should have been a boss fight");
+        assert!(
+            state.combat_state.is_regenerating,
+            "Player death to boss should trigger regeneration"
+        );
+        assert!(
+            state.combat_state.current_enemy.is_none(),
+            "Boss should be cleared on player death"
+        );
+        assert!(
+            !state.zone_progression.fighting_boss,
+            "Boss encounter flag should be reset"
+        );
+        assert_eq!(
+            state.zone_progression.kills_in_subzone, 0,
+            "Kill counter should be reset"
+        );
     }
 
     #[test]
@@ -995,7 +1074,7 @@ mod tests {
     // formula, so we verify the code path exists rather than duplicating those tests.
 
     #[test]
-    fn test_resolve_combat_tick_non_boss_death_resets_enemy() {
+    fn test_resolve_combat_tick_non_boss_death_resets_enemy_and_regens() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
 
         // Spawn a strong enemy that will kill the player
@@ -1013,18 +1092,25 @@ mod tests {
         // This should result in player death
         let result = resolve_combat_tick(&mut state, &bonuses, &mut achievements, &mut rng);
 
-        if result.player_died && !result.was_boss {
-            // Enemy should still exist with reset HP
-            assert!(
-                state.combat_state.current_enemy.is_some(),
-                "Non-boss enemy should remain after player death"
-            );
-            let enemy = state.combat_state.current_enemy.as_ref().unwrap();
-            assert_eq!(
-                enemy.current_hp, enemy.max_hp,
-                "Enemy HP should be reset after player death"
-            );
-        }
+        assert!(result.player_died, "Player should have died");
+        assert!(!result.was_boss, "Should not have been a boss fight");
+
+        // Player should be regenerating
+        assert!(
+            state.combat_state.is_regenerating,
+            "Player death to non-boss should trigger regeneration"
+        );
+
+        // Enemy should still exist with reset HP
+        assert!(
+            state.combat_state.current_enemy.is_some(),
+            "Non-boss enemy should remain after player death"
+        );
+        let enemy = state.combat_state.current_enemy.as_ref().unwrap();
+        assert_eq!(
+            enemy.current_hp, enemy.max_hp,
+            "Enemy HP should be reset after player death"
+        );
     }
 
     #[test]
@@ -1094,6 +1180,136 @@ mod tests {
         assert_eq!(
             result.damage_dealt, 0,
             "Should deal no damage when blocked"
+        );
+    }
+
+    // ==========================================================================
+    // Tests for damage reflection in tick() mode (simulation)
+    // ==========================================================================
+
+    #[test]
+    fn test_tick_applies_damage_reflection() {
+        use crate::items::types::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
+
+        let mut game = CombatEngine::new("Test Hero".to_string());
+
+        // Equip armor with 100% damage reflection
+        let armor = Item {
+            slot: EquipmentSlot::Armor,
+            rarity: Rarity::Legendary,
+            ilvl: 10,
+            base_name: "Thorned Armor".to_string(),
+            display_name: "Thorned Armor".to_string(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![Affix {
+                affix_type: AffixType::DamageReflection,
+                value: 100.0, // 100% reflection
+            }],
+        };
+        game.state_mut()
+            .equipment
+            .set(EquipmentSlot::Armor, Some(armor));
+
+        // Manually set up an enemy with known damage
+        let enemy_damage = 20;
+        let enemy_hp = 1000;
+        game.current_enemy = Some(crate::combat::types::Enemy::new(
+            "Test Enemy".to_string(),
+            enemy_hp,
+            enemy_damage,
+        ));
+        game.kills_in_subzone = 0;
+
+        // Give player high HP so they survive
+        game.state_mut().combat_state.player_current_hp = 10000;
+        game.state_mut().combat_state.player_max_hp = 10000;
+
+        let mut rng = rand::thread_rng();
+        let result = game.tick(&mut rng);
+
+        // If player didn't win (enemy survived), check that reflection was applied
+        if !result.player_won && game.current_enemy.is_some() {
+            let enemy = game.current_enemy.as_ref().unwrap();
+            // Enemy should have taken: player's attack + reflected damage
+            // With 100% reflection and 20 damage, reflected = 20
+            // (assuming player has some defense, actual damage taken may be less)
+            let derived = DerivedStats::calculate_derived_stats(
+                &game.state().attributes,
+                &game.state().equipment,
+            );
+            let damage_taken_by_player =
+                calculate_damage_taken(enemy_damage, derived.defense);
+            let reflected = calculate_damage_reflection(
+                damage_taken_by_player,
+                derived.damage_reflection_percent,
+            );
+
+            // Enemy HP should have decreased by player attack + reflection
+            // We can't know exact player damage due to crit variance, but we can verify
+            // the enemy took at least the reflection damage
+            assert!(
+                enemy.current_hp < enemy_hp,
+                "Enemy should have taken damage from player attack"
+            );
+
+            // The enemy should have taken more damage than just the player's base attack
+            // because of reflection - verify reflection was applied
+            let player_damage_only = derived.total_damage();
+            let expected_min_hp_loss = player_damage_only + reflected;
+
+            // Allow for crits doubling damage
+            let actual_hp_loss = enemy_hp - enemy.current_hp;
+            assert!(
+                actual_hp_loss >= expected_min_hp_loss || actual_hp_loss >= player_damage_only * 2,
+                "Enemy should take at least {} damage (attack + reflection), took {}",
+                expected_min_hp_loss,
+                actual_hp_loss
+            );
+        }
+    }
+
+    #[test]
+    fn test_tick_damage_reflection_can_kill_enemy() {
+        use crate::items::types::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
+
+        let mut game = CombatEngine::new("Test Hero".to_string());
+
+        // Equip armor with very high damage reflection
+        let armor = Item {
+            slot: EquipmentSlot::Armor,
+            rarity: Rarity::Legendary,
+            ilvl: 10,
+            base_name: "Mega Thorned Armor".to_string(),
+            display_name: "Mega Thorned Armor".to_string(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![Affix {
+                affix_type: AffixType::DamageReflection,
+                value: 5000.0, // 5000% reflection - massive
+            }],
+        };
+        game.state_mut()
+            .equipment
+            .set(EquipmentSlot::Armor, Some(armor));
+
+        // Low HP enemy with high damage (kills itself via reflection)
+        game.current_enemy = Some(crate::combat::types::Enemy::new(
+            "Suicidal Enemy".to_string(),
+            10,  // Low HP
+            100, // High damage
+        ));
+        game.kills_in_subzone = 0;
+
+        // Give player high HP so they survive
+        game.state_mut().combat_state.player_current_hp = 10000;
+        game.state_mut().combat_state.player_max_hp = 10000;
+
+        let mut rng = rand::thread_rng();
+        let result = game.tick(&mut rng);
+
+        // Enemy should be dead from combined player attack + reflection
+        assert!(
+            result.player_won,
+            "Enemy should die from player attack + damage reflection"
         );
     }
 }

@@ -331,7 +331,7 @@ fn test_offline_progression_grants_xp() {
     // Set last save time to 1 hour ago
     state.last_save_time = chrono::Utc::now().timestamp() - 3600;
 
-    let report = process_offline_progression(&mut state, 0.0);
+    let report = process_offline_progression(&mut state, 0.0, 0.0);
 
     assert!(
         report.xp_gained > 0,
@@ -348,7 +348,7 @@ fn test_offline_progression_with_long_absence() {
     let ten_days_seconds: i64 = 10 * 24 * 3600;
     state.last_save_time = chrono::Utc::now().timestamp() - ten_days_seconds;
 
-    let report = process_offline_progression(&mut state, 0.0);
+    let report = process_offline_progression(&mut state, 0.0, 0.0);
 
     // elapsed_seconds shows actual time, but XP is calculated with 7-day cap internally
     assert!(
@@ -366,7 +366,7 @@ fn test_offline_progression_can_level_up() {
     state.last_save_time = chrono::Utc::now().timestamp() - 10000;
 
     let initial_level = state.character_level;
-    let report = process_offline_progression(&mut state, 0.0);
+    let report = process_offline_progression(&mut state, 0.0, 0.0);
 
     if report.total_level_ups > 0 {
         assert!(
@@ -383,7 +383,7 @@ fn test_short_offline_time_still_processes() {
     // Set last save time to 30 seconds ago
     state.last_save_time = chrono::Utc::now().timestamp() - 30;
 
-    let report = process_offline_progression(&mut state, 0.0);
+    let report = process_offline_progression(&mut state, 0.0, 0.0);
 
     // Even short times are processed (threshold check is at display level in main.rs)
     assert!(
