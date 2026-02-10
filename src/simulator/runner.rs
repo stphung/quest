@@ -1,6 +1,6 @@
-//! Main simulation runner using CoreGame for real game mechanics.
+//! Main simulation runner using CombatLoop for real game mechanics.
 //!
-//! This module uses CoreGame (the shared game engine) instead of duplicating
+//! This module uses CombatLoop (the shared game engine) instead of duplicating
 //! game logic in simulator-specific types. Statistics are tracked externally
 //! from TickResult events.
 
@@ -8,7 +8,7 @@ use super::config::SimConfig;
 use super::loot_sim::{average_equipped_ilvl, LootStats};
 use super::progression_sim::{PrestigeCycle, RunStats};
 use super::report::SimReport;
-use crate::core::core_game::CoreGame;
+use crate::core::combat_loop::CombatLoop;
 use crate::core::game_loop::{GameLoop, TickResult};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -336,14 +336,14 @@ impl SimStats {
     }
 }
 
-/// Simulate a single run from start to target using CoreGame.
+/// Simulate a single run from start to target using CombatLoop.
 fn simulate_single_run(config: &SimConfig, rng: &mut ChaCha8Rng) -> RunStats {
-    // Create CoreGame - this is the shared game engine
-    let mut core_game = CoreGame::new("SimPlayer".to_string());
+    // Create CombatLoop - this is the shared game engine
+    let mut combat_loop = CombatLoop::new("SimPlayer".to_string());
 
     // Set starting prestige if configured
     if config.starting_prestige > 0 {
-        core_game.state_mut().prestige_rank = config.starting_prestige;
+        combat_loop.state_mut().prestige_rank = config.starting_prestige;
     }
 
     // Create stats tracker
@@ -353,12 +353,12 @@ fn simulate_single_run(config: &SimConfig, rng: &mut ChaCha8Rng) -> RunStats {
 
     loop {
         // Get current state for termination check
-        let state = core_game.state();
+        let state = combat_loop.state();
         let current_zone = state.zone_progression.current_zone_id;
         let current_prestige = state.prestige_rank;
 
         // Check if at zone cap for prestige wall tracking
-        let at_zone_cap = core_game.at_prestige_wall();
+        let at_zone_cap = combat_loop.at_prestige_wall();
 
         // Check termination conditions
         if current_zone >= config.target_zone as u32
@@ -374,16 +374,16 @@ fn simulate_single_run(config: &SimConfig, rng: &mut ChaCha8Rng) -> RunStats {
         // Check for prestige opportunity before ticking
         if config.simulate_prestige
             && at_zone_cap
-            && core_game.can_prestige()
+            && combat_loop.can_prestige()
             && current_prestige < config.target_prestige
         {
-            let level_before = core_game.state().character_level;
+            let level_before = combat_loop.state().character_level;
             stats.record_prestige(ticks, level_before);
-            core_game.prestige();
+            combat_loop.prestige();
         }
 
-        // Execute one game tick using CoreGame
-        let result = core_game.tick(rng);
+        // Execute one game tick using CombatLoop
+        let result = combat_loop.tick(rng);
 
         // Process the result to update stats
         stats.process_tick(&result, ticks, at_zone_cap);
@@ -392,7 +392,7 @@ fn simulate_single_run(config: &SimConfig, rng: &mut ChaCha8Rng) -> RunStats {
     }
 
     // Finalize stats
-    let final_state = core_game.state();
+    let final_state = combat_loop.state();
     stats.finalize_cycle(ticks, final_state.character_level);
 
     // Calculate ticks per zone before moving stats fields

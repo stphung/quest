@@ -1,8 +1,8 @@
 //! Core game engine implementing GameLoop trait.
 //!
-//! This module provides CoreGame as the central game engine:
+//! This module provides CombatLoop as the central game engine:
 //!
-//! **CoreGame struct** - The main game engine that owns GameState and manages
+//! **CombatLoop struct** - The main game engine that owns GameState and manages
 //! all game logic. It provides two modes of operation:
 //!
 //! 1. **Simulation mode** (`tick()`) - Self-contained combat for balance testing
@@ -36,7 +36,7 @@ use rand::Rng;
 /// Use `tick()` for simulation mode or `combat_tick()` for interactive mode
 /// with Haven bonuses.
 #[allow(dead_code)]
-pub struct CoreGame {
+pub struct CombatLoop {
     state: GameState,
     /// Internal enemy for simulation mode (tick())
     current_enemy: Option<Enemy>,
@@ -47,7 +47,7 @@ pub struct CoreGame {
 }
 
 #[allow(dead_code)]
-impl CoreGame {
+impl CombatLoop {
     /// Create a new game with the given player name.
     pub fn new(player_name: String) -> Self {
         Self {
@@ -202,7 +202,7 @@ impl CoreGame {
     }
 }
 
-impl GameLoop for CoreGame {
+impl GameLoop for CombatLoop {
     fn tick(&mut self, rng: &mut impl Rng) -> TickResult {
         let mut result = TickResult::default();
 
@@ -538,7 +538,7 @@ mod tests {
 
     #[test]
     fn test_new_game() {
-        let game = CoreGame::new("Test Hero".to_string());
+        let game = CombatLoop::new("Test Hero".to_string());
         assert_eq!(game.state().character_level, 1);
         assert_eq!(game.state().character_xp, 0);
         assert_eq!(game.current_zone(), 1);
@@ -547,7 +547,7 @@ mod tests {
 
     #[test]
     fn test_tick_spawns_enemy() {
-        let mut game = CoreGame::new("Test Hero".to_string());
+        let mut game = CombatLoop::new("Test Hero".to_string());
         let mut rng = rand::thread_rng();
 
         let result = game.tick(&mut rng);
@@ -559,7 +559,7 @@ mod tests {
 
     #[test]
     fn test_kill_grants_xp() {
-        let mut game = CoreGame::new("Test Hero".to_string());
+        let mut game = CombatLoop::new("Test Hero".to_string());
         let mut rng = rand::thread_rng();
 
         // Run ticks until we get a kill
@@ -577,7 +577,7 @@ mod tests {
 
     #[test]
     fn test_boss_spawns_after_kills() {
-        let mut game = CoreGame::new("Test Hero".to_string());
+        let mut game = CombatLoop::new("Test Hero".to_string());
         let mut rng = rand::thread_rng();
 
         // Kill enough enemies to reach boss
@@ -598,13 +598,13 @@ mod tests {
 
     #[test]
     fn test_can_prestige_initially_false() {
-        let game = CoreGame::new("Test Hero".to_string());
+        let game = CombatLoop::new("Test Hero".to_string());
         assert!(!game.can_prestige());
     }
 
     #[test]
     fn test_at_prestige_wall_initially_false() {
-        let game = CoreGame::new("Test Hero".to_string());
+        let game = CombatLoop::new("Test Hero".to_string());
         // At P0, max zone is 2, starting at zone 1
         assert!(!game.at_prestige_wall());
     }
@@ -612,7 +612,7 @@ mod tests {
     #[test]
     fn test_from_state() {
         let state = GameState::new("Loaded Hero".to_string(), 0);
-        let game = CoreGame::from_state(state);
+        let game = CombatLoop::from_state(state);
 
         assert_eq!(game.state().character_name, "Loaded Hero");
     }

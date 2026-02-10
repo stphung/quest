@@ -1,7 +1,7 @@
 //! Simulation statistics types.
 //!
 //! This module contains types for tracking and reporting simulation results.
-//! The actual game logic is now in CoreGame; these are just data structures.
+//! The actual game logic is now in CombatLoop; these are just data structures.
 
 use super::loot_sim::LootStats;
 
