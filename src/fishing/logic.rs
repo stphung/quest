@@ -131,6 +131,10 @@ pub fn tick_fishing_with_haven_result(
                     match leviathan_result {
                         LeviathanResult::Caught => {
                             result.caught_storm_leviathan = true;
+                            // Mark as caught to prevent double-catch in same tick
+                            // (e.g., when double fish bonus triggers)
+                            state.fishing.leviathan_encounters =
+                                fishing_generation::LEVIATHAN_CAUGHT_MARKER;
                         }
                         LeviathanResult::Escaped { encounter_number } => {
                             // Increment encounters and signal modal should show
@@ -140,8 +144,13 @@ pub fn tick_fishing_with_haven_result(
                         LeviathanResult::None => {}
                     }
 
-                    // Calculate XP with prestige multiplier
-                    let prestige_multiplier = get_prestige_tier(state.prestige_rank).multiplier;
+                    // Calculate XP with prestige multiplier and CHA bonus
+                    // Uses the same formula as combat XP for consistency
+                    use crate::character::attributes::AttributeType;
+                    use crate::core::balance::PRESTIGE_MULT_PER_CHA_MOD;
+                    let cha_mod = state.attributes.modifier(AttributeType::Charisma);
+                    let base_mult = get_prestige_tier(state.prestige_rank).multiplier;
+                    let prestige_multiplier = base_mult + (cha_mod as f64 * PRESTIGE_MULT_PER_CHA_MOD);
                     let xp_gained = (fish.xp_reward as f64 * prestige_multiplier) as u64;
 
                     // Award character XP
@@ -779,6 +788,75 @@ mod tests {
     }
 
     #[test]
+    fn test_fishing_xp_includes_charisma_bonus() {
+        // Bug fix test: Fishing XP should include CHA modifier bonus
+        // just like combat XP does (uses PRESTIGE_MULT_PER_CHA_MOD = 0.1)
+        use crate::character::attributes::AttributeType;
+
+        let mut rng = ChaCha8Rng::seed_from_u64(12345);
+        let mut state = create_test_game_state();
+
+        // Set up fishing session
+        let session = FishingSession {
+            spot_name: "Test".to_string(),
+            total_fish: 5,
+            fish_caught: Vec::new(),
+            items_found: Vec::new(),
+            ticks_remaining: 1,
+            phase: FishingPhase::Reeling,
+        };
+        state.active_fishing = Some(session);
+        state.prestige_rank = 1; // 1.5x base multiplier
+
+        // Base CHA (10 = +0 modifier)
+        state.attributes.set(AttributeType::Charisma, 10);
+        let initial_xp = state.character_xp;
+        tick_fishing(&mut state, &mut rng);
+        let xp_base_cha = state.character_xp - initial_xp;
+
+        // Now with high CHA (20 = +5 modifier = +0.5 bonus = 2.0x total)
+        let mut rng2 = ChaCha8Rng::seed_from_u64(12345); // Same seed for same fish
+        let mut state2 = create_test_game_state();
+
+        let session2 = FishingSession {
+            spot_name: "Test".to_string(),
+            total_fish: 5,
+            fish_caught: Vec::new(),
+            items_found: Vec::new(),
+            ticks_remaining: 1,
+            phase: FishingPhase::Reeling,
+        };
+        state2.active_fishing = Some(session2);
+        state2.prestige_rank = 1; // Same prestige
+        state2.attributes.set(AttributeType::Charisma, 20); // +5 CHA modifier
+
+        let initial_xp2 = state2.character_xp;
+        tick_fishing(&mut state2, &mut rng2);
+        let xp_high_cha = state2.character_xp - initial_xp2;
+
+        // With +5 CHA modifier at prestige 1:
+        // Base: 1.5 + 0*0.1 = 1.5x
+        // High CHA: 1.5 + 5*0.1 = 2.0x
+        // Ratio should be 2.0/1.5 = 1.33x
+        assert!(
+            xp_high_cha > xp_base_cha,
+            "High CHA ({} XP) should give more fishing XP than base CHA ({} XP)",
+            xp_high_cha,
+            xp_base_cha
+        );
+
+        // Check the ratio is approximately correct (allow some variance for integer rounding)
+        if xp_base_cha > 0 {
+            let ratio = xp_high_cha as f64 / xp_base_cha as f64;
+            assert!(
+                (1.2..=1.5).contains(&ratio),
+                "XP ratio with +5 CHA should be ~1.33x, got {:.2}x",
+                ratio
+            );
+        }
+    }
+
+    #[test]
     fn test_tick_fishing_no_session() {
         let mut rng = create_test_rng();
         let mut state = create_test_game_state();
@@ -1063,6 +1141,78 @@ mod tests {
             (400..=600).contains(&double_fish_count),
             "Expected ~500 double fish (50%), got {}",
             double_fish_count
+        );
+    }
+
+    #[test]
+    fn test_storm_leviathan_caught_sets_marker() {
+        // Bug fix test: When catching the Storm Leviathan, the encounters counter
+        // should be set to the caught marker to prevent double-catching in the
+        // same tick (e.g., when double fish bonus triggers).
+
+        let mut caught_leviathan = false;
+        let trials = 2000;
+
+        for seed in 0..trials {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            let mut state = create_test_game_state();
+
+            // Set up for Leviathan catch
+            state.fishing.rank = 40;
+            state.fishing.leviathan_encounters = 10; // Ready to catch
+
+            // Create a fishing session in Reeling phase
+            let session = FishingSession {
+                spot_name: "Test Lake".to_string(),
+                total_fish: 100,
+                fish_caught: Vec::new(),
+                items_found: Vec::new(),
+                ticks_remaining: 1,
+                phase: FishingPhase::Reeling,
+            };
+            state.active_fishing = Some(session);
+
+            // 100% double fish chance to test the marker prevents second catch
+            let haven = HavenFishingBonuses {
+                timer_reduction_percent: 0.0,
+                double_fish_chance_percent: 100.0,
+                max_fishing_rank_bonus: 10,
+            };
+
+            let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven);
+
+            if result.caught_storm_leviathan {
+                caught_leviathan = true;
+
+                // Verify the marker was set
+                assert_eq!(
+                    state.fishing.leviathan_encounters,
+                    fishing_generation::LEVIATHAN_CAUGHT_MARKER,
+                    "Catching Leviathan should set the caught marker"
+                );
+
+                // With 100% double fish, we catch 2 fish.
+                // The second fish should NOT be another Leviathan catch.
+                // (The marker prevents it)
+                let session = state.active_fishing.as_ref().unwrap();
+                let leviathan_count = session
+                    .fish_caught
+                    .iter()
+                    .filter(|f| f.name == "Storm Leviathan")
+                    .count();
+                assert_eq!(
+                    leviathan_count, 1,
+                    "Should only catch ONE Storm Leviathan even with double fish"
+                );
+
+                break;
+            }
+        }
+
+        assert!(
+            caught_leviathan,
+            "Should have caught Leviathan at least once in {} trials at 25% catch rate",
+            trials
         );
     }
 }
