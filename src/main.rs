@@ -1415,6 +1415,11 @@ fn game_tick(
             }
         }
 
+        // Track fish caught for achievements
+        for _ in 0..fishing_result.fish_caught_count {
+            global_achievements.on_fish_caught(Some(&game_state.character_name));
+        }
+
         let fishing_messages = fishing_result.messages;
         for message in &fishing_messages {
             game_state
@@ -1470,12 +1475,21 @@ fn game_tick(
 
         // Check for fishing rank up (capped by Haven Fishing Dock tier)
         let max_rank = fishing::logic::get_max_fishing_rank(haven_fishing.max_fishing_rank_bonus);
+        let rank_before = game_state.fishing.rank;
         if let Some(rank_msg) =
             fishing::logic::check_rank_up_with_max(&mut game_state.fishing, max_rank)
         {
             game_state
                 .combat_state
                 .add_log_entry(format!("🎣 {}", rank_msg), false, true);
+
+            // Track fishing rank up for achievements
+            if game_state.fishing.rank > rank_before {
+                global_achievements.on_fishing_rank_up(
+                    game_state.fishing.rank,
+                    Some(&game_state.character_name),
+                );
+            }
         }
 
         // Update play_time_seconds while fishing

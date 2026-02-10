@@ -49,6 +49,8 @@ pub struct FishingTickResult {
     pub caught_storm_leviathan: bool,
     /// If set, a Leviathan encounter occurred (it escaped). Value is encounter number (1-10).
     pub leviathan_encounter: Option<u8>,
+    /// Number of fish caught this tick (for achievement tracking)
+    pub fish_caught_count: u32,
 }
 
 /// Processes a fishing session tick with phase-based timing.
@@ -148,6 +150,9 @@ pub fn tick_fishing_with_haven_result(
                     // Award fishing rank progress
                     state.fishing.fish_toward_next_rank += 1;
                     state.fishing.total_fish_caught += 1;
+
+                    // Track fish caught count for achievements
+                    result.fish_caught_count += 1;
 
                     // Track legendary catches
                     if rarity == FishRarity::Legendary {

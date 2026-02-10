@@ -847,3 +847,69 @@ fn test_fishing_state_roundtrip_with_encounters() {
         "leviathan_encounters should survive roundtrip"
     );
 }
+
+// ============================================================================
+// Fish Caught Count for Achievement Tracking Tests
+// ============================================================================
+
+#[test]
+fn test_fishing_tick_result_tracks_fish_caught_count() {
+    let mut rng = create_test_rng();
+    let mut state = create_test_state();
+
+    // Create session in Reeling phase (about to catch fish)
+    let session = FishingSession {
+        spot_name: "Test Lake".to_string(),
+        total_fish: 10,
+        fish_caught: Vec::new(),
+        items_found: Vec::new(),
+        ticks_remaining: 1,
+        phase: FishingPhase::Reeling,
+    };
+    state.active_fishing = Some(session);
+
+    let haven = HavenFishingBonuses::default();
+    let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven);
+
+    // Should have caught at least 1 fish
+    assert!(
+        result.fish_caught_count >= 1,
+        "fish_caught_count should be at least 1 when catching fish, got {}",
+        result.fish_caught_count
+    );
+
+    // Verify the count matches what was actually caught
+    if let Some(session) = &state.active_fishing {
+        assert_eq!(
+            result.fish_caught_count,
+            session.fish_caught.len() as u32,
+            "fish_caught_count should match session fish count"
+        );
+    }
+}
+
+#[test]
+fn test_fishing_tick_result_zero_when_not_catching() {
+    let mut rng = create_test_rng();
+    let mut state = create_test_state();
+
+    // Create session in Casting phase (not catching yet)
+    let session = FishingSession {
+        spot_name: "Test Lake".to_string(),
+        total_fish: 10,
+        fish_caught: Vec::new(),
+        items_found: Vec::new(),
+        ticks_remaining: 10, // Long time until catch
+        phase: FishingPhase::Casting,
+    };
+    state.active_fishing = Some(session);
+
+    let haven = HavenFishingBonuses::default();
+    let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven);
+
+    // Should not have caught any fish in casting phase
+    assert_eq!(
+        result.fish_caught_count, 0,
+        "fish_caught_count should be 0 during casting phase"
+    );
+}
