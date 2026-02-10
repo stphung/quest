@@ -88,9 +88,12 @@ fn simulate_single_run(config: &SimConfig, rng: &mut impl Rng) -> RunStats {
             }
         }
 
-        // Sync player level with progression
+        // Sync player level with progression (preserve prestige rank!)
         if player.level != progression.player_level {
-            player = SimPlayer::at_level(progression.player_level);
+            player = SimPlayer::at_level_with_prestige(
+                progression.player_level,
+                progression.prestige_rank,
+            );
             // Re-apply equipment
             player.equipment = temp_game_state.equipment.clone();
             player.recalculate_stats();
