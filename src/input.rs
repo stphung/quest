@@ -287,6 +287,15 @@ fn handle_haven(
                             false,
                             true,
                         );
+
+                        // Check for Haven Builder achievements after building
+                        // This syncs achievements based on current room tiers
+                        achievements.sync_from_haven(
+                            haven.discovered,
+                            &haven.rooms,
+                            Some(&state.character_name),
+                        );
+
                         haven_ui.confirmation = HavenConfirmation::None;
                         return InputResult::NeedsSaveAll;
                     }
