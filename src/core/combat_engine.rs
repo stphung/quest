@@ -309,6 +309,26 @@ impl GameLoop for CombatEngine {
                             result.new_level = self.state.character_level;
                         }
 
+                        // Handle loot drops (same as normal kills)
+                        let zone_id = self.current_zone() as usize;
+                        let is_final_zone = zone_id == 10;
+
+                        if result.was_boss {
+                            let item = try_drop_from_boss(zone_id, is_final_zone);
+                            result.loot_dropped = Some(item.clone());
+                            if auto_equip_if_better(item, &mut self.state) {
+                                result.loot_equipped = true;
+                            }
+                        } else {
+                            if let Some(item) = try_drop_from_mob(&self.state, zone_id, 0.0, 0.0) {
+                                result.loot_dropped = Some(item.clone());
+                                if auto_equip_if_better(item, &mut self.state) {
+                                    result.loot_equipped = true;
+                                }
+                            }
+                        }
+
+                        // Advance zone if boss
                         if result.was_boss {
                             let old_zone = self.current_zone();
                             if self.advance_zone() && self.current_zone() > old_zone {
@@ -582,8 +602,30 @@ pub fn resolve_combat_tick(
                             result.new_level = state.character_level;
                         }
 
-                        // Record kill for progression (non-boss only)
-                        if !result.was_boss {
+                        // Handle loot drops (same as normal kills)
+                        let zone_id = state.zone_progression.current_zone_id as usize;
+                        let is_final_zone = zone_id == 10;
+
+                        if result.was_boss {
+                            let item = try_drop_from_boss(zone_id, is_final_zone);
+                            result.loot_dropped = Some(item.clone());
+                            if auto_equip_if_better(item, state) {
+                                result.loot_equipped = true;
+                            }
+                        } else {
+                            if let Some(item) = try_drop_from_mob(
+                                state,
+                                zone_id,
+                                bonuses.drop_rate_percent,
+                                bonuses.item_rarity_percent,
+                            ) {
+                                result.loot_dropped = Some(item.clone());
+                                if auto_equip_if_better(item, state) {
+                                    result.loot_equipped = true;
+                                }
+                            }
+
+                            // Record kill for progression (non-boss only)
                             state.zone_progression.record_kill();
                         }
 
