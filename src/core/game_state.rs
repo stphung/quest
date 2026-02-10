@@ -141,7 +141,7 @@ impl GameState {
     }
 
     pub fn get_attribute_cap(&self) -> u32 {
-        super::balance::attribute_cap(self.prestige_rank)
+        20 + (self.prestige_rank * 5)
     }
 }
 
