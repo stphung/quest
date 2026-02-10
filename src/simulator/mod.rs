@@ -5,8 +5,11 @@
 //! - Item drop rates and upgrade patterns
 //! - Damage/HP balance at each stage
 //! - Prestige progression rates
+//!
+//! The simulator uses CoreGame (src/core/core_game.rs) for all game logic,
+//! ensuring simulation results match real gameplay behavior.
 
-mod combat_sim;
+mod combat_sim; // Deprecated, kept for backward compatibility
 mod config;
 mod loot_sim;
 mod progression_sim;
