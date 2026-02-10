@@ -163,6 +163,10 @@ const LEVIATHAN_REQUIRED_ENCOUNTERS: u8 = 10;
 /// Chance to catch the Leviathan after completing all encounters (25%)
 const LEVIATHAN_CATCH_CHANCE: f64 = 0.25;
 
+/// Marker value indicating the Storm Leviathan has been caught.
+/// Used to prevent double-catching in the same tick (e.g., with double fish bonus).
+pub const LEVIATHAN_CAUGHT_MARKER: u8 = 255;
+
 /// Progressive encounter chances for the Storm Leviathan hunt.
 /// The beast learns and becomes harder to find with each encounter.
 /// Total of 10 encounters needed, taking roughly a month of casual play.
@@ -203,6 +207,11 @@ pub fn generate_fish_with_rank(
 ) -> (CaughtFish, LeviathanResult) {
     // Early exit: Leviathan only appears for legendary fish at rank 40+
     if rarity != FishRarity::Legendary || rank < LEVIATHAN_MIN_RANK {
+        return (generate_fish(rarity, rng), LeviathanResult::None);
+    }
+
+    // Already caught (marker set) - no more Leviathan encounters
+    if leviathan_encounters == LEVIATHAN_CAUGHT_MARKER {
         return (generate_fish(rarity, rng), LeviathanResult::None);
     }
 
@@ -699,5 +708,40 @@ mod tests {
             STORM_LEVIATHAN_XP.1 >= STORM_LEVIATHAN_XP.0,
             "Max XP should be >= min XP"
         );
+    }
+
+    #[test]
+    fn test_leviathan_caught_marker_prevents_double_catch() {
+        // Bug fix test: After catching the Storm Leviathan, the caught marker
+        // should prevent any further encounters or catches (e.g., from double fish bonus).
+        let mut rng = create_test_rng();
+
+        // When encounters is set to the caught marker, no Leviathan events should occur
+        for _ in 0..1000 {
+            let (fish, result) = generate_fish_with_rank(
+                FishRarity::Legendary,
+                40, // Max rank
+                LEVIATHAN_CAUGHT_MARKER,
+                &mut rng,
+            );
+
+            assert_eq!(
+                result,
+                LeviathanResult::None,
+                "Caught marker should prevent all Leviathan encounters"
+            );
+            // Should get a regular legendary fish, not the Storm Leviathan
+            assert_ne!(
+                fish.name, STORM_LEVIATHAN,
+                "Should not catch Storm Leviathan when marker is set"
+            );
+        }
+    }
+
+    #[test]
+    fn test_leviathan_caught_marker_value() {
+        // Verify the caught marker is distinct from valid encounter counts
+        assert_eq!(LEVIATHAN_CAUGHT_MARKER, 255);
+        assert!(LEVIATHAN_CAUGHT_MARKER > LEVIATHAN_REQUIRED_ENCOUNTERS);
     }
 }
