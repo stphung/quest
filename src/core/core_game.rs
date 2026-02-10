@@ -46,6 +46,7 @@ pub struct CoreGame {
     bonuses: CombatBonuses,
 }
 
+#[allow(dead_code)]
 impl CoreGame {
     /// Create a new game with the given player name.
     pub fn new(player_name: String) -> Self {

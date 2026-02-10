@@ -54,6 +54,7 @@ pub struct TickResult {
 /// This trait abstracts the game tick execution, allowing:
 /// - Real game to run with UI updates and visual effects
 /// - Simulator to run thousands of ticks for testing/balancing
+#[allow(dead_code)]
 pub trait GameLoop {
     /// Execute one game tick. Returns what happened.
     fn tick(&mut self, rng: &mut impl Rng) -> TickResult;
