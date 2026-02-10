@@ -65,13 +65,13 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 
 - `game_state.rs` — Main character state struct (level, XP, prestige, combat state, equipment)
 - `game_logic.rs` — XP curve (`100 × level^1.5`), leveling (+3 random attribute points), enemy spawning, offline progression
-- `constants.rs` — Game balance constants (tick rate, attack interval, XP rates)
+- `constants.rs` — Game balance constants (tick rate, attack interval, XP rates, item drop rates, update check jitter)
 
 ### Character Module (`src/character/`) — [detailed docs](src/character/CLAUDE.md)
 
 - `attributes.rs` — 6 RPG attributes (STR, DEX, CON, INT, WIS, CHA), modifier = `(value - 10) / 2`
 - `derived_stats.rs` — Combat stats calculated from attributes (HP, damage, defense, crit, XP mult)
-- `prestige.rs` — Prestige tiers (Bronze→Eternal) with XP multipliers (`1+0.5×rank^0.7`, diminishing returns) and attribute cap increases (`20+rank×5`)
+- `prestige.rs` — Prestige tiers (Bronze→Eternal) with XP multipliers (`1+0.5×rank^0.7`, diminishing returns) and attribute cap increases (`10+rank×5`)
 - `manager.rs` — Character CRUD operations (create, delete, rename), JSON save/load in ~/.quest/, name validation
 - `input.rs` — Character selection, creation, deletion, renaming input handling and UI states
 
@@ -102,16 +102,20 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 
 ### Fishing Module (`src/fishing/`)
 
-- `types.rs` — Fish rarities (Common→Legendary), fishing phases (Casting, Waiting, Reeling), 30 ranks across 6 tiers
-- `generation.rs` — Fish name generation and rarity rolling
-- `logic.rs` — Fishing session tick processing
+- `types.rs` — Fish rarities (Common→Legendary), fishing phases (Casting, Waiting, Reeling), 40 ranks across 8 tiers, Storm Leviathan encounter tracking
+- `generation.rs` — Fish name generation, rarity rolling, Storm Leviathan progressive hunt
+- `logic.rs` — Fishing session tick processing, Haven bonus integration, item drops from fishing
+
+**Fishing Ranks:** 40 ranks across 8 tiers (Novice 1-5, Apprentice 6-10, Journeyman 11-15, Expert 16-20, Master 21-25, Grandmaster 26-30 base max, Mythic 31-35, Transcendent 36-40 with Fishing Dock T4). Storm Leviathan encounter at rank 40.
+
+**Storm Leviathan:** A 10-encounter progressive hunt. At max fishing rank, legendary fish catches may trigger Leviathan encounters. After 10 encounters, the player catches it, unlocking the ability to forge Stormbreaker at the Storm Forge.
 
 ### Item Module (`src/items/`) — [detailed docs](src/items/CLAUDE.md)
 
-- `types.rs` — Core item data structures (7 equipment slots, 5 rarity tiers, 9 affix types)
+- `types.rs` — Core item data structures (7 equipment slots, 5 rarity tiers, 9 affix types, ilvl scaling)
 - `equipment.rs` — Equipment container with slot management and iteration
-- `generation.rs` — Rarity-based attribute/affix generation (Common: +1-2 attrs, Legendary: +8-15 attrs + 4-5 affixes)
-- `drops.rs` — Drop system (15% base + 1% per prestige rank capped at 25%, continuous rarity distribution)
+- `generation.rs` — Rarity-based attribute/affix generation with ilvl scaling (1.0x at ilvl 10 to 4.0x at ilvl 100)
+- `drops.rs` — Separate mob/boss drop systems: mobs have 15% base drop chance (capped at Epic), bosses always drop (can drop Legendary)
 - `names.rs` — Procedural name generation with prefixes/suffixes
 - `scoring.rs` — Smart weighted auto-equip scoring (attribute specialization bonus, affix type weights)
 
@@ -127,10 +131,10 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 
 ### Haven Module (`src/haven/`) — [detailed docs](src/haven/CLAUDE.md)
 
-- `types.rs` — Haven struct, room definitions, upgrade trees, bonus types
-- `logic.rs` — Room construction, upgrade logic, bonus calculation
+- `types.rs` — Haven struct, 14 room definitions in a skill tree, upgrade tiers, 15 bonus types, Storm Forge
+- `logic.rs` — Room construction, upgrade logic, bonus calculation, prestige rank cost system
 
-Account-level base building that persists across prestiges. Rooms provide bonuses (XP mult, drop rate, rarity, fishing gain, discovery rate). Costs prestige ranks and fishing ranks.
+Account-level base building that persists across prestiges. 14 rooms in a two-branch skill tree (combat + QoL) with 3 capstones (War Room, Vault, Storm Forge). Rooms provide bonuses (damage, XP, drop rate, rarity, crit, HP regen, double strike, offline XP, fishing, discovery). Costs prestige ranks. Discovered at P10+.
 
 ### Achievement Module (`src/achievements/`)
 
@@ -138,7 +142,7 @@ Account-level base building that persists across prestiges. Rooms provide bonuse
 - `data.rs` — Achievement database with descriptions and unlock conditions
 - `persistence.rs` — Save/load from `~/.quest/achievements.json`
 
-Account-level achievement system that persists across characters. Tracks combat, zone, fishing, challenge, and prestige milestones.
+Account-level achievement system that persists across characters. 5 categories (Combat, Level, Progression, Challenges, Exploration). Tracks kills, boss kills, levels, prestige, zone completion, challenge wins, fishing ranks/catches, dungeon completions, and Haven building. Includes modal notification system with 500ms accumulation window.
 
 ### Input Handling (`src/input.rs`)
 
@@ -147,8 +151,8 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 ### Utilities (`src/utils/`)
 
 - `build_info.rs` — Build metadata (commit, date) embedded at compile time
-- `updater.rs` — Self-update functionality
-- `debug_menu.rs` — Debug menu for testing discoveries (activate with `--debug` flag, toggle with backtick)
+- `updater.rs` — Self-update from GitHub releases (30min check interval ±5min jitter)
+- `debug_menu.rs` — Debug menu for testing discoveries (activate with `--debug` flag, toggle with backtick). Options: trigger dungeons, fishing, all 6 challenge types, Haven discovery
 
 ### UI (`src/ui/`) — [detailed docs](src/ui/CLAUDE.md)
 
@@ -202,17 +206,22 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 - Attack interval: 1.5s
 - HP regen after kill: 2.5s
 - Autosave: every 30s
+- Update check: every 30min ±5min jitter
 - XP gain: Only from defeating enemies (200-400 XP per kill)
-- Offline XP: 50% rate, max 7 days (simulates kills)
-- Item drop rate: 15% base + 1% per prestige rank (capped at 25%)
+- Offline XP: 25% rate, max 7 days (simulates kills)
+- Mob item drop rate: 15% base + 1% per prestige rank (capped at 25%), max rarity Epic
+- Boss item drops: Guaranteed, can include Legendary (5% normal boss, 10% Zone 10 final boss)
+- Item level: ilvl = zone_id × 10 (Zone 1 = ilvl 10, Zone 10 = ilvl 100)
 - Boss spawn: After 10 kills in subzone
-- Minigame discovery: ~2hr avg per challenge (0.000014 chance/tick), requires P1+
+- Haven discovery: requires P10+, base chance 0.000014/tick + 0.000007 per rank above 10
+- Challenge discovery: ~2hr avg per challenge (requires P1+)
 
 ## Combat Mechanics
 
 - **Death to Boss**: Resets encounter (fighting_boss=false, kills_in_subzone=0) but preserves prestige
 - **Death in Dungeon**: Exits dungeon, no prestige loss
-- **Weapon Gates**: Zone 10 final boss requires Stormbreaker weapon
+- **Weapon Gates**: Zone 10 final boss requires Stormbreaker (checked via TheStormbreaker achievement)
+- **Stormbreaker Path**: Max fishing rank → catch Storm Leviathan (10 encounters) → build Storm Forge in Haven → forge Stormbreaker
 
 ## Project Structure
 

@@ -20,10 +20,11 @@ src/items/
 ### `Item` (`types.rs`)
 ```rust
 pub struct Item {
-    pub name: String,
     pub slot: EquipmentSlot,
     pub rarity: Rarity,
-    pub level: u32,
+    pub ilvl: u32,                     // Item level (zone_id × 10)
+    pub base_name: String,
+    pub display_name: String,
     pub attributes: AttributeBonuses,  // STR, DEX, CON, INT, WIS, CHA
     pub affixes: Vec<Affix>,
 }
@@ -36,23 +37,47 @@ pub struct Item {
 
 ## Item Generation Pipeline
 
-Items flow through this pipeline:
+Items flow through two separate drop paths:
 
-1. **Drop roll** (`drops.rs`): `try_drop_item_with_haven()` checks drop chance → rolls rarity → rolls slot → calls generation
-2. **Rarity roll** (`drops.rs`): Base distribution (55% Common, 30% Magic, 12% Rare, 2.5% Epic, 0.5% Legendary) shifted by prestige (+1%/rank, max 10%) and Haven Workshop bonus (max 25%)
-3. **Item generation** (`generation.rs`): `generate_item(slot, rarity, level)` creates Item with rarity-scaled attributes and affixes
-4. **Name generation** (`names.rs`): Procedural name from prefix/suffix tables based on rarity and slot
-5. **Auto-equip** (`scoring.rs`): `auto_equip_if_better()` compares weighted score against current equipment
+### Mob Drops (`try_drop_from_mob`)
+1. **Drop roll**: 15% base + 1% per prestige rank (capped at 25%), Trophy Hall bonus applied multiplicatively
+2. **Rarity roll** (`roll_rarity_for_mob`): 60% Common, 28% Magic, 10% Rare, 2% Epic. **No Legendaries from mobs.** Prestige (+1%/rank, max 10%) and Workshop bonus (max 25%) shift Common downward.
+3. **Item generation**: `generate_item(slot, rarity, ilvl)` with ilvl = zone_id × 10
+4. **Name generation** and **auto-equip** as below
+
+### Boss Drops (`try_drop_from_boss`)
+1. **Always drops** — guaranteed item on boss kill
+2. **No Haven/prestige bonuses** — fixed rarity tables
+3. **Normal boss**: 40% Magic, 35% Rare, 20% Epic, 5% Legendary
+4. **Zone 10 final boss**: 20% Magic, 40% Rare, 30% Epic, 10% Legendary
+5. **No Common drops** from bosses
+
+### Shared Steps
+- **Item generation** (`generation.rs`): `generate_item(slot, rarity, ilvl)` creates Item with ilvl-scaled attributes and affixes
+- **Name generation** (`names.rs`): Procedural name from prefix/suffix tables based on rarity and slot
+- **Auto-equip** (`scoring.rs`): `auto_equip_if_better()` compares weighted score against current equipment
+
+## Item Level (ilvl) Scaling
+
+Items scale with zone progression via `ilvl = zone_id × 10`:
+- **ilvl multiplier**: `1.0 + (ilvl - 10) / 30.0`
+- ilvl 10 (Zone 1): 1.0x stats
+- ilvl 50 (Zone 5): 2.33x stats
+- ilvl 100 (Zone 10): 4.0x stats
+
+Both attribute values and affix values are multiplied by the ilvl multiplier.
 
 ## Generation Rules by Rarity
 
-| Rarity    | Attribute Points | Affixes | Distribution |
-|-----------|-----------------|---------|-------------|
-| Common    | +1-2            | 0       | 1-2 attrs randomly |
-| Magic     | +2-4            | 1       | Focused on 2-3 attrs |
-| Rare      | +4-7            | 2       | Spread across attrs |
-| Epic      | +6-10           | 3       | Generous spread |
-| Legendary | +8-15           | 4-5     | High values everywhere |
+Base attribute ranges at ilvl 10 (scaled by ilvl multiplier), 1-3 random attributes:
+
+| Rarity    | Base Attr Range | Affixes | At ilvl 10 | At ilvl 100 (4.0x) |
+|-----------|----------------|---------|------------|---------------------|
+| Common    | 1              | 0       | 1-3 total  | 4-12 total          |
+| Magic     | 1-2            | 1       | 1-6 total  | 4-24 total          |
+| Rare      | 2-3            | 2-3     | 2-9 total  | 8-36 total          |
+| Epic      | 3-4            | 3-4     | 3-12 total | 12-48 total         |
+| Legendary | 4-6            | 4-5     | 4-18 total | 16-72 total         |
 
 ## Auto-Equip Scoring (`scoring.rs`)
 
@@ -72,7 +97,7 @@ Affix weights (from `score_item`):
 - DamageReflection: 0.8x
 - HPBonus: 0.5x (lowest — flat HP less valuable at scale)
 
-## Drop Rate Formula
+## Mob Drop Rate Formula
 
 ```
 base_chance = ITEM_DROP_BASE_CHANCE + (prestige_rank * ITEM_DROP_PRESTIGE_BONUS)
@@ -83,11 +108,21 @@ Constants from `core/constants.rs`: 15% base, +1% per prestige rank, capped at 2
 
 ## Haven Integration
 
-Two Haven rooms affect items:
+Two Haven rooms affect mob drops (boss drops are not affected):
 - **Trophy Hall**: Increases drop rate percentage (applied multiplicatively to base chance)
 - **Workshop**: Shifts rarity distribution toward higher tiers (max 25% bonus)
 
-Both bonuses are passed as parameters to `try_drop_item_with_haven()`.
+Both bonuses are passed as parameters to `try_drop_from_mob()`.
+
+## Fishing Item Drops
+
+Fish catches can also drop items based on fish rarity:
+- Common/Uncommon: 5% drop chance
+- Rare: 15% drop chance
+- Epic: 35% drop chance
+- Legendary: 75% drop chance
+
+Item rarity matches the fish rarity. Item ilvl is based on the current zone.
 
 ## Adding a New Affix Type
 
