@@ -530,9 +530,7 @@ impl SimReport {
         };
         report.push_str(&format!(
             "  Avg Fight Duration:  {:.1}s ({} ticks) — {}\n",
-            avg_fight_seconds,
-            self.avg_fight_duration_ticks as u64,
-            fight_rating
+            avg_fight_seconds, self.avg_fight_duration_ticks as u64, fight_rating
         ));
         report.push_str(&format!(
             "  Time in Combat:      {:.1}%\n\n",
