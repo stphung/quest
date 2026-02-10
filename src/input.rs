@@ -142,7 +142,11 @@ pub fn handle_game_input(
             KeyCode::Left => browser.prev_category(),
             KeyCode::Right => browser.next_category(),
             KeyCode::Up => browser.move_up(),
-            KeyCode::Down => browser.move_down(1000),
+            KeyCode::Down => {
+                let category_achievements =
+                    crate::achievements::get_achievements_by_category(browser.selected_category);
+                browser.move_down(category_achievements.len())
+            }
             _ => {}
         }
         return InputResult::Continue;
@@ -221,7 +225,7 @@ fn handle_haven_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> InputResu
 }
 
 fn handle_achievement_unlocked(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
-    // Any key dismisses the achievement modal
+    // Enter, Esc, or Space dismisses the achievement modal
     if matches!(key.code, KeyCode::Enter | KeyCode::Esc | KeyCode::Char(' ')) {
         *overlay = GameOverlay::None;
     }
