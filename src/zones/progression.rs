@@ -368,6 +368,9 @@ impl ZoneProgression {
         if self.can_enter_subzone(zone_id, subzone_id) {
             self.current_zone_id = zone_id;
             self.current_subzone_id = subzone_id;
+            // Reset combat state when traveling - abandons any boss fight or kill progress
+            self.kills_in_subzone = 0;
+            self.fighting_boss = false;
             return true;
         }
         false
