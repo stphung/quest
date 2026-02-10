@@ -704,7 +704,7 @@ fn main() -> io::Result<()> {
                                 frame,
                                 frame.size(),
                                 game.state(),
-                                haven.vault_slots(),
+                                haven.vault_tier(),
                                 selected_index,
                                 selected_slots,
                             );
