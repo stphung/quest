@@ -1037,12 +1037,13 @@ fn process_overworld_combat(
         drop_rate_percent: haven.get_bonus(haven::HavenBonusType::DropRatePercent),
         item_rarity_percent: haven.get_bonus(haven::HavenBonusType::ItemRarityPercent),
         xp_gain_percent: haven.get_bonus(haven::HavenBonusType::XpGainPercent),
+        double_strike_chance: haven.get_bonus(haven::HavenBonusType::DoubleStrikeChance),
     };
     combat_engine.set_bonuses(bonuses);
 
     // Execute combat using CombatEngine's combat_tick
     let mut rng = rand::thread_rng();
-    let result = combat_engine.combat_tick(&mut rng);
+    let result = combat_engine.combat_tick(global_achievements, &mut rng);
 
     // Convert TickResult to visual effects and combat log entries
     process_tick_result(combat_engine.state_mut(), &result, global_achievements);
@@ -1058,9 +1059,21 @@ fn process_tick_result(
         return;
     }
 
+    // Attack blocked by weapon requirement
+    if result.attack_blocked {
+        if let Some(ref weapon) = result.weapon_needed {
+            let message = format!("🚫 {} required to damage this foe!", weapon);
+            game_state.combat_state.add_log_entry(message, false, true);
+        }
+    }
+
     // Player attack
     if result.damage_dealt > 0 {
-        let message = if result.was_crit {
+        let message = if result.was_double_strike && result.was_crit {
+            format!("⚔⚔ DOUBLE STRIKE! 💥 CRITICAL! {} damage!", result.damage_dealt)
+        } else if result.was_double_strike {
+            format!("⚔⚔ DOUBLE STRIKE for {} damage!", result.damage_dealt)
+        } else if result.was_crit {
             format!("💥 CRITICAL HIT for {} damage!", result.damage_dealt)
         } else {
             format!("⚔ You hit for {} damage", result.damage_dealt)
@@ -1090,11 +1103,16 @@ fn process_tick_result(
 
     // Enemy attack
     if result.damage_taken > 0 {
-        if let Some(ref enemy_name) = result.enemy_name {
-            let message = format!(
-                "🛡 {} hits you for {} damage",
-                enemy_name, result.damage_taken
-            );
+        // Get enemy name from result (if killed) or from current enemy (if still alive)
+        let enemy_name = result.enemy_name.as_ref().or_else(|| {
+            game_state
+                .combat_state
+                .current_enemy
+                .as_ref()
+                .map(|e| &e.name)
+        });
+        if let Some(name) = enemy_name {
+            let message = format!("🛡 {} hits you for {} damage", name, result.damage_taken);
             game_state.combat_state.add_log_entry(message, false, false);
         }
     }

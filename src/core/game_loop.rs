@@ -21,10 +21,16 @@ pub struct TickResult {
     pub player_died: bool,
     /// Was fighting a boss
     pub was_boss: bool,
+    /// Attack was blocked (boss requires legendary weapon)
+    pub attack_blocked: bool,
+    /// Weapon needed to damage boss (if blocked)
+    pub weapon_needed: Option<String>,
     /// Damage dealt by player this tick
     pub damage_dealt: u32,
     /// Whether the attack was a critical hit
     pub was_crit: bool,
+    /// Whether double strike procced
+    pub was_double_strike: bool,
     /// Damage taken by player this tick
     pub damage_taken: u32,
     /// Name of the enemy fought/killed
