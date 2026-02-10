@@ -2,6 +2,7 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -66,6 +67,9 @@ impl CharacterManager {
     }
 
     pub fn save_character(&self, state: &crate::core::game_state::GameState) -> io::Result<()> {
+        // Use current time as last_save_time to prevent offline XP exploits.
+        // Previously this used state.last_save_time which was only updated on load,
+        // allowing players to accumulate offline XP during active play sessions.
         let save_data = CharacterSaveData {
             version: 2,
             character_id: state.character_id.clone(),
@@ -75,7 +79,7 @@ impl CharacterManager {
             attributes: state.attributes,
             prestige_rank: state.prestige_rank,
             total_prestige_count: state.total_prestige_count,
-            last_save_time: state.last_save_time,
+            last_save_time: Utc::now().timestamp(),
             play_time_seconds: state.play_time_seconds,
             combat_state: state.combat_state.clone(),
             equipment: state.equipment.clone(),
@@ -427,6 +431,8 @@ mod tests {
         };
 
         manager.save_character(&char1).unwrap();
+        // Small delay to ensure different timestamps (save uses current time)
+        std::thread::sleep(std::time::Duration::from_millis(1100));
         manager.save_character(&char2).unwrap();
 
         // List characters and filter to only our test characters (for parallel test isolation)
