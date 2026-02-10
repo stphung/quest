@@ -91,14 +91,15 @@ impl CombatEngine {
     /// - Uses `state.combat_state.current_enemy` for enemies
     /// - Applies combat bonuses from Haven
     /// - Checks boss weapon requirements
+    /// - Tracks kills for achievements
     ///
     /// # Arguments
-    /// * `achievements` - Global achievements (for boss weapon check)
+    /// * `achievements` - Global achievements (for boss weapon check and kill tracking)
     /// * `rng` - Random number generator
     ///
     /// # Returns
     /// A TickResult describing what happened
-    pub fn combat_tick(&mut self, achievements: &Achievements, rng: &mut impl Rng) -> TickResult {
+    pub fn combat_tick(&mut self, achievements: &mut Achievements, rng: &mut impl Rng) -> TickResult {
         resolve_combat_tick(&mut self.state, &self.bonuses, achievements, rng)
     }
 
@@ -361,7 +362,7 @@ pub struct CombatBonuses {
 /// # Arguments
 /// * `state` - The game state to modify
 /// * `bonuses` - Combat bonuses from Haven, etc.
-/// * `achievements` - Global achievements (for boss weapon check)
+/// * `achievements` - Global achievements (for boss weapon check and kill tracking)
 /// * `rng` - Random number generator
 ///
 /// # Returns
@@ -369,7 +370,7 @@ pub struct CombatBonuses {
 pub fn resolve_combat_tick(
     state: &mut GameState,
     bonuses: &CombatBonuses,
-    achievements: &Achievements,
+    achievements: &mut Achievements,
     rng: &mut impl Rng,
 ) -> TickResult {
     let mut result = TickResult::default();
@@ -475,6 +476,9 @@ pub fn resolve_combat_tick(
                     result.loot_equipped = true;
                 }
             }
+
+            // Record kill for boss spawn tracking (non-boss kills only)
+            state.zone_progression.record_kill();
         }
 
         // Handle zone/subzone advancement for boss kills
@@ -487,9 +491,14 @@ pub fn resolve_combat_tick(
             }
         }
 
-        // Clear enemy
+        // Track kill for achievements
+        achievements.on_enemy_killed(result.was_boss, Some(&state.character_name));
+
+        // Clear enemy and start regeneration
         state.combat_state.current_enemy = None;
         state.zone_progression.fighting_boss = false;
+        state.combat_state.is_regenerating = true;
+        state.combat_state.regen_timer = 0.0;
     } else {
         // Enemy survives (or attack was blocked) - enemy attacks back
         let damage_taken = calculate_damage_taken(enemy_damage, derived.defense);
@@ -498,22 +507,35 @@ pub fn resolve_combat_tick(
         state.combat_state.player_current_hp =
             apply_damage(state.combat_state.player_current_hp, damage_taken);
 
+        // Damage reflection: reflect percentage of damage taken back to attacker
+        if derived.damage_reflection_percent > 0.0 && damage_taken > 0 {
+            let reflected =
+                (damage_taken as f64 * derived.damage_reflection_percent / 100.0) as u32;
+            if reflected > 0 {
+                if let Some(enemy) = state.combat_state.current_enemy.as_mut() {
+                    enemy.current_hp = enemy.current_hp.saturating_sub(reflected);
+                }
+            }
+        }
+
         if state.combat_state.player_current_hp == 0 {
             // Player died
             result.player_died = true;
 
-            // Reset boss progress on death
             if result.was_boss {
+                // Reset boss progress on death
                 state.zone_progression.fighting_boss = false;
                 state.zone_progression.kills_in_subzone = 0;
+                state.combat_state.current_enemy = None;
+            } else {
+                // Non-boss death: reset enemy HP so fight continues with same mob
+                if let Some(enemy) = state.combat_state.current_enemy.as_mut() {
+                    enemy.reset_hp();
+                }
             }
 
-            // Start regeneration
-            state.combat_state.is_regenerating = true;
-            state.combat_state.regen_timer = 0.0;
-
-            // Clear enemy
-            state.combat_state.current_enemy = None;
+            // Reset player HP
+            state.combat_state.player_current_hp = state.combat_state.player_max_hp;
         }
     }
 
@@ -659,11 +681,11 @@ mod tests {
     fn test_resolve_combat_tick_spawns_enemy() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let bonuses = CombatBonuses::default();
-        let achievements = Achievements::default();
+        let mut achievements = Achievements::default();
         let mut rng = rand::thread_rng();
 
         // First call should spawn an enemy and do combat
-        let result = resolve_combat_tick(&mut state, &bonuses, &achievements, &mut rng);
+        let result = resolve_combat_tick(&mut state, &bonuses, &mut achievements, &mut rng);
 
         assert!(result.had_combat);
         // Enemy should be spawned (either killed or still alive)
@@ -675,10 +697,10 @@ mod tests {
         let mut state = GameState::new("Test Hero".to_string(), 0);
         state.combat_state.is_regenerating = true;
         let bonuses = CombatBonuses::default();
-        let achievements = Achievements::default();
+        let mut achievements = Achievements::default();
         let mut rng = rand::thread_rng();
 
-        let result = resolve_combat_tick(&mut state, &bonuses, &achievements, &mut rng);
+        let result = resolve_combat_tick(&mut state, &bonuses, &mut achievements, &mut rng);
 
         assert!(
             !result.had_combat,
@@ -691,13 +713,13 @@ mod tests {
     fn test_resolve_combat_tick_grants_xp_on_kill() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let bonuses = CombatBonuses::default();
-        let achievements = Achievements::default();
+        let mut achievements = Achievements::default();
         let mut rng = rand::thread_rng();
 
         // Run until we get a kill
         let mut total_xp = 0u64;
         for _ in 0..100 {
-            let result = resolve_combat_tick(&mut state, &bonuses, &achievements, &mut rng);
+            let result = resolve_combat_tick(&mut state, &bonuses, &mut achievements, &mut rng);
             total_xp += result.xp_gained;
             if result.xp_gained > 0 {
                 break;
@@ -719,15 +741,15 @@ mod tests {
             damage_percent: 100.0, // +100% damage
             ..CombatBonuses::default()
         };
-        let achievements = Achievements::default();
+        let mut achievements = Achievements::default();
 
         for _ in 0..trials {
             let mut state_a = GameState::new("A".to_string(), 0);
             let mut state_b = GameState::new("B".to_string(), 0);
             let mut rng = rand::thread_rng();
 
-            let result_a = resolve_combat_tick(&mut state_a, &no_bonus, &achievements, &mut rng);
-            let result_b = resolve_combat_tick(&mut state_b, &with_bonus, &achievements, &mut rng);
+            let result_a = resolve_combat_tick(&mut state_a, &no_bonus, &mut achievements, &mut rng);
+            let result_b = resolve_combat_tick(&mut state_b, &with_bonus, &mut achievements, &mut rng);
 
             damage_no_bonus += result_a.damage_dealt;
             damage_with_bonus += result_b.damage_dealt;
@@ -755,7 +777,7 @@ mod tests {
             xp_gain_percent: 50.0, // +50% XP
             ..CombatBonuses::default()
         };
-        let achievements = Achievements::default();
+        let mut achievements = Achievements::default();
 
         for _ in 0..trials {
             let mut state_a = GameState::new("A".to_string(), 0);
@@ -765,7 +787,7 @@ mod tests {
             // Get a kill for each
             for _ in 0..100 {
                 let result_a =
-                    resolve_combat_tick(&mut state_a, &no_bonus, &achievements, &mut rng);
+                    resolve_combat_tick(&mut state_a, &no_bonus, &mut achievements, &mut rng);
                 if result_a.xp_gained > 0 {
                     xp_no_bonus += result_a.xp_gained;
                     break;
@@ -773,7 +795,7 @@ mod tests {
             }
             for _ in 0..100 {
                 let result_b =
-                    resolve_combat_tick(&mut state_b, &with_bonus, &achievements, &mut rng);
+                    resolve_combat_tick(&mut state_b, &with_bonus, &mut achievements, &mut rng);
                 if result_b.xp_gained > 0 {
                     xp_with_bonus += result_b.xp_gained;
                     break;
@@ -794,11 +816,11 @@ mod tests {
     fn test_resolve_combat_tick_returns_damage_info() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let bonuses = CombatBonuses::default();
-        let achievements = Achievements::default();
+        let mut achievements = Achievements::default();
         let mut rng = rand::thread_rng();
 
         // Get a combat result
-        let result = resolve_combat_tick(&mut state, &bonuses, &achievements, &mut rng);
+        let result = resolve_combat_tick(&mut state, &bonuses, &mut achievements, &mut rng);
 
         assert!(result.had_combat);
         assert!(result.damage_dealt > 0, "Should have dealt some damage");
@@ -808,13 +830,13 @@ mod tests {
     fn test_resolve_combat_tick_player_death_starts_regen() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let bonuses = CombatBonuses::default();
-        let achievements = Achievements::default();
+        let mut achievements = Achievements::default();
         let mut rng = rand::thread_rng();
 
         // Run until player dies
         let mut saw_death = false;
         for _ in 0..1000 {
-            let result = resolve_combat_tick(&mut state, &bonuses, &achievements, &mut rng);
+            let result = resolve_combat_tick(&mut state, &bonuses, &mut achievements, &mut rng);
             if result.player_died {
                 saw_death = true;
                 break;
@@ -844,13 +866,13 @@ mod tests {
             double_strike_chance: 50.0, // 50% double strike chance
             ..CombatBonuses::default()
         };
-        let achievements = Achievements::default();
+        let mut achievements = Achievements::default();
 
         for _ in 0..trials {
             let mut state = GameState::new("Test".to_string(), 0);
             let mut rng = rand::thread_rng();
 
-            let result = resolve_combat_tick(&mut state, &bonuses, &achievements, &mut rng);
+            let result = resolve_combat_tick(&mut state, &bonuses, &mut achievements, &mut rng);
             if result.was_double_strike {
                 double_strikes += 1;
             }
