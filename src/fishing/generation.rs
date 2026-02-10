@@ -67,8 +67,8 @@ const RANK_BONUS_PER_5: [f64; 5] = [-2.0, 1.0, 0.5, 0.3, 0.2];
 /// Base chances: Common 60%, Uncommon 25%, Rare 10%, Epic 4%, Legendary 1%
 /// Every 5 ranks: -2% Common, +1% Uncommon, +0.5% Rare, +0.3% Epic, +0.2% Legendary
 pub fn roll_fish_rarity(rank: u32, rng: &mut impl Rng) -> FishRarity {
-    // Calculate how many bonus tiers we get (1 per 5 ranks, starting from rank 5)
-    let bonus_tiers = rank.saturating_sub(1) / 5;
+    // Calculate how many bonus tiers we get (1 per 5 ranks: rank 5, 10, 15, ...)
+    let bonus_tiers = rank / 5;
 
     // Calculate adjusted chances
     let mut chances = BASE_CHANCES;

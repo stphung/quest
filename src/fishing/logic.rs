@@ -163,6 +163,12 @@ pub fn tick_fishing_with_haven_result(
                     state.fishing.fish_toward_next_rank += 1;
                     state.fishing.total_fish_caught += 1;
 
+                    // Check for rank up (using Haven max rank bonus)
+                    let max_rank = get_max_fishing_rank(haven.max_fishing_rank_bonus);
+                    if let Some(rank_msg) = check_rank_up_with_max(&mut state.fishing, max_rank) {
+                        result.messages.push(rank_msg);
+                    }
+
                     // Track fish caught count for achievements
                     result.fish_caught_count += 1;
 
