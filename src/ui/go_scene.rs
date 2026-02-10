@@ -4,8 +4,8 @@ use super::game_common::{
     create_game_layout, render_forfeit_status_bar, render_game_over_banner,
     render_info_panel_frame, render_status_bar, render_thinking_status_bar, GameResultType,
 };
-use crate::challenges::go::{GoGame, GoMove, GoResult, Stone, BOARD_SIZE};
-use crate::challenges::menu::DifficultyInfo;
+use crate::challenges::go::{GoGame, GoMove, Stone, BOARD_SIZE};
+use crate::challenges::ChallengeResult;
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
@@ -255,13 +255,18 @@ fn render_go_game_over(frame: &mut Frame, area: Rect, game: &GoGame) {
     let score_msg = format!("You: {} vs AI: {}", black_score, white_score);
 
     let (result_type, title, message) = match result {
-        GoResult::Win => (GameResultType::Win, "VICTORY!", score_msg),
-        GoResult::Loss => (GameResultType::Loss, "DEFEAT", score_msg),
-        GoResult::Draw => (GameResultType::Draw, "DRAW", score_msg),
+        ChallengeResult::Win => (GameResultType::Win, "VICTORY!", score_msg),
+        ChallengeResult::Loss | ChallengeResult::Forfeit => {
+            (GameResultType::Loss, "DEFEAT", score_msg)
+        }
+        ChallengeResult::Draw => (GameResultType::Draw, "DRAW", score_msg),
     };
 
     let reward = match result {
-        GoResult::Win => game.difficulty.reward().description().replace("Win: ", ""),
+        ChallengeResult::Win => crate::challenges::menu::ChallengeType::Go
+            .reward(game.difficulty)
+            .description()
+            .replace("Win: ", ""),
         _ => String::new(),
     };
 

@@ -1,7 +1,8 @@
 //! Monte Carlo Tree Search AI for Go.
 
 use super::logic::{get_legal_moves, is_legal_move, make_move};
-use super::types::{GoDifficulty, GoGame, GoMove, GoResult, Stone, BOARD_SIZE};
+use super::types::{GoGame, GoMove, Stone, BOARD_SIZE};
+use crate::challenges::ChallengeResult;
 use rand::Rng;
 
 /// UCT exploration constant
@@ -58,7 +59,7 @@ impl MctsNode {
 
 /// Run MCTS and return the best move.
 pub fn mcts_best_move<R: Rng>(game: &GoGame, rng: &mut R) -> GoMove {
-    let simulations = game.difficulty.simulation_count();
+    let simulations = game.simulation_count();
     let mut nodes: Vec<MctsNode> = Vec::with_capacity(simulations as usize);
 
     // Create root node
@@ -151,9 +152,9 @@ fn simulate_random_game<R: Rng>(game: &mut GoGame, rng: &mut R) -> Option<Stone>
     // Determine winner from final position
     if let Some(result) = game.game_result {
         match result {
-            GoResult::Win => Some(Stone::Black),
-            GoResult::Loss => Some(Stone::White),
-            GoResult::Draw => None,
+            ChallengeResult::Win => Some(Stone::Black),
+            ChallengeResult::Loss => Some(Stone::White),
+            ChallengeResult::Draw | ChallengeResult::Forfeit => None,
         }
     } else {
         // Score the position
@@ -246,7 +247,7 @@ mod tests {
 
     #[test]
     fn test_mcts_returns_move() {
-        let game = GoGame::new(GoDifficulty::Novice);
+        let game = GoGame::new(crate::challenges::ChallengeDifficulty::Novice);
         let mut rng = rand::thread_rng();
         let mv = mcts_best_move(&game, &mut rng);
         // Should return some move (likely a placement, not pass on empty board)
@@ -261,7 +262,7 @@ mod tests {
 
     #[test]
     fn test_mcts_avoids_obvious_suicide() {
-        let mut game = GoGame::new(GoDifficulty::Novice);
+        let mut game = GoGame::new(crate::challenges::ChallengeDifficulty::Novice);
         // Create a situation where (4,4) would be suicide for White
         game.board[3][4] = Some(Stone::Black);
         game.board[5][4] = Some(Stone::Black);

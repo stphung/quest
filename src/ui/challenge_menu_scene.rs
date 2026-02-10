@@ -1,12 +1,7 @@
 //! Challenge menu UI rendering.
 
-use crate::challenges::chess::ChessDifficulty;
-use crate::challenges::go::GoDifficulty;
-use crate::challenges::gomoku::GomokuDifficulty;
-use crate::challenges::menu::{ChallengeMenu, ChallengeType, DifficultyInfo};
-use crate::challenges::minesweeper::MinesweeperDifficulty;
-use crate::challenges::morris::MorrisDifficulty;
-use crate::challenges::rune::RuneDifficulty;
+use crate::challenges::menu::{ChallengeMenu, ChallengeType};
+use crate::challenges::ChallengeDifficulty;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -107,56 +102,12 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
     frame.render_widget(desc, chunks[0]);
 
     // Difficulty selector
-    match challenge.challenge_type {
-        ChallengeType::Chess => {
-            render_difficulty_selector(
-                frame,
-                chunks[2],
-                &ChessDifficulty::ALL,
-                menu.selected_difficulty,
-            );
-        }
-        ChallengeType::Morris => {
-            render_difficulty_selector(
-                frame,
-                chunks[2],
-                &MorrisDifficulty::ALL,
-                menu.selected_difficulty,
-            );
-        }
-        ChallengeType::Gomoku => {
-            render_difficulty_selector(
-                frame,
-                chunks[2],
-                &GomokuDifficulty::ALL,
-                menu.selected_difficulty,
-            );
-        }
-        ChallengeType::Minesweeper => {
-            render_difficulty_selector(
-                frame,
-                chunks[2],
-                &MinesweeperDifficulty::ALL,
-                menu.selected_difficulty,
-            );
-        }
-        ChallengeType::Rune => {
-            render_difficulty_selector(
-                frame,
-                chunks[2],
-                &RuneDifficulty::ALL,
-                menu.selected_difficulty,
-            );
-        }
-        ChallengeType::Go => {
-            render_difficulty_selector(
-                frame,
-                chunks[2],
-                &GoDifficulty::ALL,
-                menu.selected_difficulty,
-            );
-        }
-    }
+    render_difficulty_selector(
+        frame,
+        chunks[2],
+        &challenge.challenge_type,
+        menu.selected_difficulty,
+    );
 
     // Outcomes
     let outcomes = Paragraph::new(vec![Line::from(vec![
@@ -173,11 +124,11 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
     frame.render_widget(help, chunks[6]);
 }
 
-/// Generic difficulty selector that works with any type implementing DifficultyInfo
-fn render_difficulty_selector<D: DifficultyInfo>(
+/// Difficulty selector using shared ChallengeDifficulty for all games
+fn render_difficulty_selector(
     frame: &mut Frame,
     area: Rect,
-    options: &[D],
+    challenge_type: &ChallengeType,
     selected: usize,
 ) {
     let title = Paragraph::new("Select difficulty:").style(
@@ -193,7 +144,7 @@ fn render_difficulty_selector<D: DifficultyInfo>(
         ..area
     };
 
-    let items: Vec<ListItem> = options
+    let items: Vec<ListItem> = ChallengeDifficulty::ALL
         .iter()
         .enumerate()
         .map(|(i, diff)| {
@@ -224,14 +175,17 @@ fn render_difficulty_selector<D: DifficultyInfo>(
             ];
 
             // Add extra info if present (e.g., ELO for chess)
-            if let Some(extra) = diff.extra_info() {
+            if let Some(extra) = challenge_type.difficulty_extra_info(*diff) {
                 spans.push(Span::styled(
                     format!("{:<14}", extra),
                     Style::default().fg(Color::DarkGray),
                 ));
             }
 
-            spans.push(Span::styled(diff.reward().description(), reward_style));
+            spans.push(Span::styled(
+                challenge_type.reward(*diff).description(),
+                reward_style,
+            ));
 
             ListItem::new(Line::from(spans))
         })

@@ -4,7 +4,8 @@ use super::game_common::{
     create_game_layout, render_forfeit_status_bar, render_game_over_overlay,
     render_info_panel_frame, render_status_bar, GameResultType,
 };
-use crate::challenges::rune::{FeedbackMark, RuneGame, RuneResult, RUNE_SYMBOLS};
+use crate::challenges::rune::{FeedbackMark, RuneGame, RUNE_SYMBOLS};
+use crate::challenges::ChallengeResult;
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
@@ -229,18 +230,18 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &RuneGame) {
 }
 
 fn render_rune_game_over(frame: &mut Frame, area: Rect, game: &RuneGame) {
-    use crate::challenges::menu::DifficultyInfo;
+    use crate::challenges::menu::ChallengeType;
 
     let result = game.game_result.as_ref().unwrap();
 
     let (result_type, title, message, reward) = match result {
-        RuneResult::Win => (
+        ChallengeResult::Win => (
             GameResultType::Win,
             ":: RUNES DECIPHERED! ::",
             "You cracked the ancient code!".to_string(),
-            game.difficulty.reward().description(),
+            ChallengeType::Rune.reward(game.difficulty).description(),
         ),
-        RuneResult::Loss => {
+        ChallengeResult::Loss | ChallengeResult::Draw | ChallengeResult::Forfeit => {
             // Build the code string to show in message
             let code: String = game
                 .secret_code

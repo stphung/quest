@@ -5,6 +5,7 @@ use super::game_common::{
     render_info_panel_frame, render_status_bar, render_thinking_status_bar, GameResultType,
 };
 use crate::challenges::gomoku::{GomokuGame, Player, BOARD_SIZE};
+use crate::challenges::ChallengeResult;
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
@@ -202,7 +203,6 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &GomokuGame) {
 }
 
 fn render_gomoku_game_over(frame: &mut Frame, area: Rect, game: &GomokuGame) {
-    use crate::challenges::menu::DifficultyInfo;
     use ratatui::widgets::Clear;
 
     // First render the board with winning line highlighted
@@ -217,21 +217,18 @@ fn render_gomoku_game_over(frame: &mut Frame, area: Rect, game: &GomokuGame) {
 
     let result = game.game_result.as_ref().unwrap();
     let (result_type, title, message) = match result {
-        crate::challenges::gomoku::GomokuResult::Win => {
-            (GameResultType::Win, "VICTORY!", "Five in a row!")
-        }
-        crate::challenges::gomoku::GomokuResult::Loss => {
+        ChallengeResult::Win => (GameResultType::Win, "VICTORY!", "Five in a row!"),
+        ChallengeResult::Loss | ChallengeResult::Forfeit => {
             (GameResultType::Loss, "DEFEAT", "Opponent got five in a row")
         }
-        crate::challenges::gomoku::GomokuResult::Draw => {
-            (GameResultType::Draw, "DRAW", "Board full, no winner")
-        }
+        ChallengeResult::Draw => (GameResultType::Draw, "DRAW", "Board full, no winner"),
     };
 
     let reward = match result {
-        crate::challenges::gomoku::GomokuResult::Win => {
-            game.difficulty.reward().description().replace("Win: ", "")
-        }
+        ChallengeResult::Win => crate::challenges::menu::ChallengeType::Gomoku
+            .reward(game.difficulty)
+            .description()
+            .replace("Win: ", ""),
         _ => String::new(),
     };
 

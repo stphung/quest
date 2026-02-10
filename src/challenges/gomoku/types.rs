@@ -2,6 +2,7 @@
 //!
 //! 15x15 board, first to get 5+ in a row wins.
 
+use crate::challenges::{ChallengeDifficulty, ChallengeResult};
 use serde::{Deserialize, Serialize};
 
 /// Board size (15x15 standard)
@@ -23,57 +24,6 @@ impl Player {
     }
 }
 
-/// AI difficulty levels
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum GomokuDifficulty {
-    Novice,     // depth 2
-    Apprentice, // depth 3
-    Journeyman, // depth 4
-    Master,     // depth 5
-}
-
-impl GomokuDifficulty {
-    pub const ALL: [GomokuDifficulty; 4] = [
-        GomokuDifficulty::Novice,
-        GomokuDifficulty::Apprentice,
-        GomokuDifficulty::Journeyman,
-        GomokuDifficulty::Master,
-    ];
-
-    pub fn from_index(index: usize) -> Self {
-        Self::ALL
-            .get(index)
-            .copied()
-            .unwrap_or(GomokuDifficulty::Novice)
-    }
-
-    pub fn search_depth(&self) -> i32 {
-        match self {
-            Self::Novice => 2,
-            Self::Apprentice => 3,
-            Self::Journeyman => 4,
-            Self::Master => 5,
-        }
-    }
-
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::Novice => "Novice",
-            Self::Apprentice => "Apprentice",
-            Self::Journeyman => "Journeyman",
-            Self::Master => "Master",
-        }
-    }
-}
-
-/// Game result
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GomokuResult {
-    Win,
-    Loss,
-    Draw,
-}
-
 /// Main game state
 #[derive(Debug, Clone)]
 pub struct GomokuGame {
@@ -84,9 +34,9 @@ pub struct GomokuGame {
     /// Whose turn it is
     pub current_player: Player,
     /// Difficulty level
-    pub difficulty: GomokuDifficulty,
+    pub difficulty: ChallengeDifficulty,
     /// Game result (None if game in progress)
-    pub game_result: Option<GomokuResult>,
+    pub game_result: Option<ChallengeResult>,
     /// Is AI currently thinking?
     pub ai_thinking: bool,
     /// Ticks spent thinking (for delayed AI move)
@@ -102,7 +52,16 @@ pub struct GomokuGame {
 }
 
 impl GomokuGame {
-    pub fn new(difficulty: GomokuDifficulty) -> Self {
+    pub fn search_depth(&self) -> i32 {
+        match self.difficulty {
+            ChallengeDifficulty::Novice => 2,
+            ChallengeDifficulty::Apprentice => 3,
+            ChallengeDifficulty::Journeyman => 4,
+            ChallengeDifficulty::Master => 5,
+        }
+    }
+
+    pub fn new(difficulty: ChallengeDifficulty) -> Self {
         Self {
             board: [[None; BOARD_SIZE]; BOARD_SIZE],
             cursor: (BOARD_SIZE / 2, BOARD_SIZE / 2), // Center
@@ -153,7 +112,7 @@ mod tests {
 
     #[test]
     fn test_new_game() {
-        let game = GomokuGame::new(GomokuDifficulty::Novice);
+        let game = GomokuGame::new(ChallengeDifficulty::Novice);
         assert_eq!(game.cursor, (7, 7));
         assert_eq!(game.current_player, Player::Human);
         assert!(game.game_result.is_none());
@@ -161,7 +120,7 @@ mod tests {
 
     #[test]
     fn test_place_stone() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
         assert!(game.place_stone(7, 7));
         assert_eq!(game.board[7][7], Some(Player::Human));
         assert!(!game.place_stone(7, 7)); // Can't place on occupied
@@ -169,38 +128,42 @@ mod tests {
 
     #[test]
     fn test_difficulty_depths() {
-        assert_eq!(GomokuDifficulty::Novice.search_depth(), 2);
-        assert_eq!(GomokuDifficulty::Apprentice.search_depth(), 3);
-        assert_eq!(GomokuDifficulty::Journeyman.search_depth(), 4);
-        assert_eq!(GomokuDifficulty::Master.search_depth(), 5);
+        let game_n = GomokuGame::new(ChallengeDifficulty::Novice);
+        let game_a = GomokuGame::new(ChallengeDifficulty::Apprentice);
+        let game_j = GomokuGame::new(ChallengeDifficulty::Journeyman);
+        let game_m = GomokuGame::new(ChallengeDifficulty::Master);
+        assert_eq!(game_n.search_depth(), 2);
+        assert_eq!(game_a.search_depth(), 3);
+        assert_eq!(game_j.search_depth(), 4);
+        assert_eq!(game_m.search_depth(), 5);
     }
 
     #[test]
     fn test_difficulty_rewards() {
-        use crate::challenges::menu::DifficultyInfo;
+        use crate::challenges::menu::ChallengeType;
 
         // Novice/Apprentice: XP only
-        let novice = GomokuDifficulty::Novice.reward();
+        let novice = ChallengeType::Gomoku.reward(ChallengeDifficulty::Novice);
         assert_eq!(novice.xp_percent, 75);
         assert_eq!(novice.prestige_ranks, 0);
 
-        let apprentice = GomokuDifficulty::Apprentice.reward();
+        let apprentice = ChallengeType::Gomoku.reward(ChallengeDifficulty::Apprentice);
         assert_eq!(apprentice.xp_percent, 100);
         assert_eq!(apprentice.prestige_ranks, 0);
 
         // Journeyman/Master: XP + Prestige
-        let journeyman = GomokuDifficulty::Journeyman.reward();
+        let journeyman = ChallengeType::Gomoku.reward(ChallengeDifficulty::Journeyman);
         assert_eq!(journeyman.xp_percent, 50);
         assert_eq!(journeyman.prestige_ranks, 1);
 
-        let master = GomokuDifficulty::Master.reward();
+        let master = ChallengeType::Gomoku.reward(ChallengeDifficulty::Master);
         assert_eq!(master.xp_percent, 100);
         assert_eq!(master.prestige_ranks, 2);
     }
 
     #[test]
     fn test_move_cursor() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
         game.move_cursor(-1, 0); // Up
         assert_eq!(game.cursor, (6, 7));
         game.cursor = (0, 0);

@@ -1,11 +1,7 @@
 //! Nine Men's Morris game logic: AI moves, and game resolution.
 
-use super::{
-    CursorDirection, MorrisDifficulty, MorrisGame, MorrisMove, MorrisPhase, MorrisResult, Player,
-    ADJACENCIES, MILLS,
-};
-use crate::challenges::ActiveMinigame;
-use crate::core::game_state::GameState;
+use super::{CursorDirection, MorrisGame, MorrisMove, MorrisPhase, Player, ADJACENCIES, MILLS};
+use crate::challenges::{ChallengeDifficulty, ChallengeResult, MinigameInput};
 use rand::Rng;
 
 /// Undo information for reversing a move during search.
@@ -16,46 +12,34 @@ struct MoveUndo {
     prev_must_capture: bool,
     prev_phase: MorrisPhase,
     prev_player: Player,
-    prev_game_result: Option<MorrisResult>,
+    prev_game_result: Option<ChallengeResult>,
     /// For captures: the player whose piece was captured
     captured_player: Option<Player>,
     /// Whether a mill was formed (triggering must_capture)
     formed_mill: bool,
 }
 
-/// Input actions for the Morris game (UI-agnostic).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MorrisInput {
-    Up,
-    Down,
-    Left,
-    Right,
-    Select, // Enter - select piece, place, move, or capture
-    Cancel, // Esc - clear selection or forfeit
-    Other,
-}
-
 /// Process a key input during active Morris game.
 /// Returns true if the input was handled.
 /// Does nothing if AI is thinking.
-pub fn process_input(game: &mut MorrisGame, input: MorrisInput) -> bool {
+pub fn process_input(game: &mut MorrisGame, input: MinigameInput) -> bool {
     // Don't process input while AI is thinking
     if game.ai_thinking {
         return false;
     }
 
     match input {
-        MorrisInput::Up => game.move_cursor(CursorDirection::Up),
-        MorrisInput::Down => game.move_cursor(CursorDirection::Down),
-        MorrisInput::Left => game.move_cursor(CursorDirection::Left),
-        MorrisInput::Right => game.move_cursor(CursorDirection::Right),
-        MorrisInput::Select => {
+        MinigameInput::Up => game.move_cursor(CursorDirection::Up),
+        MinigameInput::Down => game.move_cursor(CursorDirection::Down),
+        MinigameInput::Left => game.move_cursor(CursorDirection::Left),
+        MinigameInput::Right => game.move_cursor(CursorDirection::Right),
+        MinigameInput::Primary => {
             process_human_enter(game);
         }
-        MorrisInput::Cancel => {
+        MinigameInput::Cancel => {
             process_cancel(game);
         }
-        MorrisInput::Other => {
+        MinigameInput::Secondary | MinigameInput::Other => {
             // Any other key cancels forfeit pending
             game.forfeit_pending = false;
         }
@@ -66,19 +50,13 @@ pub fn process_input(game: &mut MorrisGame, input: MorrisInput) -> bool {
 /// Process Esc key: clear selection or initiate/confirm forfeit.
 fn process_cancel(game: &mut MorrisGame) {
     if game.forfeit_pending {
-        game.game_result = Some(MorrisResult::Forfeit);
+        game.game_result = Some(ChallengeResult::Forfeit);
     } else if game.selected_position.is_some() {
         game.clear_selection();
         game.forfeit_pending = false;
     } else {
         game.forfeit_pending = true;
     }
-}
-
-/// Start a morris game with the selected difficulty
-pub fn start_morris_game(state: &mut GameState, difficulty: MorrisDifficulty) {
-    state.active_minigame = Some(ActiveMinigame::Morris(MorrisGame::new(difficulty)));
-    state.challenge_menu.close();
 }
 
 /// Get all legal moves for the current player
@@ -422,16 +400,16 @@ fn end_turn_for_search(game: &mut MorrisGame) {
     // Check win conditions (simplified - no UI side effects)
     if game.phase != MorrisPhase::Placing {
         if game.pieces_on_board.0 < 3 && game.pieces_to_place.0 == 0 {
-            game.game_result = Some(MorrisResult::Loss);
+            game.game_result = Some(ChallengeResult::Loss);
         } else if game.pieces_on_board.1 < 3 && game.pieces_to_place.1 == 0 {
-            game.game_result = Some(MorrisResult::Win);
+            game.game_result = Some(ChallengeResult::Win);
         } else {
             // Check for no legal moves
             let legal_moves = get_legal_moves(game);
             if legal_moves.is_empty() && !game.must_capture {
                 game.game_result = Some(match game.current_player {
-                    Player::Human => MorrisResult::Loss,
-                    Player::Ai => MorrisResult::Win,
+                    Player::Human => ChallengeResult::Loss,
+                    Player::Ai => ChallengeResult::Win,
                 });
             }
         }
@@ -483,11 +461,11 @@ fn check_win_condition(game: &mut MorrisGame) {
 
     // Check for loss by piece count (less than 3 pieces)
     if game.pieces_on_board.0 < 3 && game.pieces_to_place.0 == 0 {
-        game.game_result = Some(MorrisResult::Loss);
+        game.game_result = Some(ChallengeResult::Loss);
         return;
     }
     if game.pieces_on_board.1 < 3 && game.pieces_to_place.1 == 0 {
-        game.game_result = Some(MorrisResult::Win);
+        game.game_result = Some(ChallengeResult::Win);
         return;
     }
 
@@ -495,8 +473,8 @@ fn check_win_condition(game: &mut MorrisGame) {
     let legal_moves = get_legal_moves(game);
     if legal_moves.is_empty() && !game.must_capture {
         game.game_result = Some(match game.current_player {
-            Player::Human => MorrisResult::Loss,
-            Player::Ai => MorrisResult::Win,
+            Player::Human => ChallengeResult::Loss,
+            Player::Ai => ChallengeResult::Win,
         });
     }
 }
@@ -549,13 +527,13 @@ pub fn get_ai_move<R: Rng>(game: &MorrisGame, rng: &mut R) -> Option<MorrisMove>
     }
 
     // Random move chance for Novice
-    if rng.gen::<f64>() < game.difficulty.random_move_chance() {
+    if rng.gen::<f64>() < game.random_move_chance() {
         let idx = rng.gen_range(0..legal_moves.len());
         return Some(legal_moves[idx]);
     }
 
     // Use minimax to find best move (with make/unmake optimization)
-    let depth = game.difficulty.search_depth();
+    let depth = game.search_depth();
     let mut game_mut = game.clone(); // Single clone at the root
     let mut best_move = None;
     let mut best_score = i32::MIN;
@@ -631,9 +609,10 @@ fn evaluate_board(game: &MorrisGame) -> i32 {
     // Check for terminal states
     if let Some(result) = &game.game_result {
         return match result {
-            MorrisResult::Win => -10000, // Human wins = bad for AI
-            MorrisResult::Loss => 10000, // Human loses = good for AI
-            MorrisResult::Forfeit => 10000,
+            ChallengeResult::Win => -10000, // Human wins = bad for AI
+            ChallengeResult::Loss => 10000, // Human loses = good for AI
+            ChallengeResult::Draw => 0,
+            ChallengeResult::Forfeit => 10000,
         };
     }
 
@@ -732,97 +711,6 @@ fn count_mobility(game: &MorrisGame, player: Player) -> i32 {
     moves
 }
 
-/// Apply game result: grant rewards and add combat log entries.
-/// Returns Some(MinigameWinInfo) if the player won, None otherwise.
-pub fn apply_game_result(state: &mut GameState) -> Option<crate::challenges::MinigameWinInfo> {
-    use crate::challenges::menu::DifficultyInfo;
-    use crate::challenges::MinigameWinInfo;
-
-    let game = match state.active_minigame.as_ref() {
-        Some(ActiveMinigame::Morris(g)) => g,
-        _ => return None,
-    };
-    let result = game.game_result?;
-    let reward = game.difficulty.reward();
-    let difficulty = game.difficulty;
-
-    let won = match result {
-        MorrisResult::Win => {
-            // XP reward
-            let xp_for_level =
-                crate::core::game_logic::xp_for_next_level(state.character_level.max(1));
-            let xp_gained = (xp_for_level as f64 * reward.xp_percent as f64 / 100.0) as u64;
-            let xp_gained = xp_gained.max(100); // Floor of 100 XP
-            state.character_xp += xp_gained;
-
-            // Fishing rank reward (capped at 30, preserves fish progress)
-            let fishing_rank_up = if reward.fishing_ranks > 0 && state.fishing.rank < 30 {
-                state.fishing.rank = (state.fishing.rank + reward.fishing_ranks).min(30);
-                true
-            } else {
-                false
-            };
-
-            // Prestige reward (if any)
-            state.prestige_rank += reward.prestige_ranks;
-
-            // Combat log entries
-            state.combat_state.add_log_entry(
-                "○ Victory! The sage bows with respect.".to_string(),
-                false,
-                true,
-            );
-            state
-                .combat_state
-                .add_log_entry(format!("○ +{} XP", xp_gained), false, true);
-            if fishing_rank_up {
-                state.combat_state.add_log_entry(
-                    format!(
-                        "○ Fishing rank up! Now rank {}: {}",
-                        state.fishing.rank,
-                        state.fishing.rank_name()
-                    ),
-                    false,
-                    true,
-                );
-            }
-            true
-        }
-        MorrisResult::Loss => {
-            state.combat_state.add_log_entry(
-                "○ The sage nods knowingly and departs.".to_string(),
-                false,
-                true,
-            );
-            false
-        }
-        MorrisResult::Forfeit => {
-            state.combat_state.add_log_entry(
-                "○ You concede. The sage gathers their stones quietly.".to_string(),
-                false,
-                true,
-            );
-            false
-        }
-    };
-
-    state.active_minigame = None;
-
-    if won {
-        Some(MinigameWinInfo {
-            game_type: "morris",
-            difficulty: match difficulty {
-                MorrisDifficulty::Novice => "novice",
-                MorrisDifficulty::Apprentice => "apprentice",
-                MorrisDifficulty::Journeyman => "journeyman",
-                MorrisDifficulty::Master => "master",
-            },
-        })
-    } else {
-        None
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -832,7 +720,7 @@ mod tests {
 
     #[test]
     fn test_placing_moves() {
-        let game = MorrisGame::new(MorrisDifficulty::Novice);
+        let game = MorrisGame::new(ChallengeDifficulty::Novice);
 
         let moves = get_placing_moves(&game);
 
@@ -847,7 +735,7 @@ mod tests {
 
     #[test]
     fn test_placing_moves_with_occupied() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         game.board[0] = Some(Player::Human);
         game.board[5] = Some(Player::Ai);
         game.board[10] = Some(Player::Human);
@@ -869,7 +757,7 @@ mod tests {
 
     #[test]
     fn test_apply_place_move() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         assert_eq!(game.pieces_to_place.0, 9);
         assert_eq!(game.pieces_on_board.0, 0);
 
@@ -886,7 +774,7 @@ mod tests {
 
     #[test]
     fn test_mill_triggers_capture() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
 
         // Set up two pieces of a mill
         game.board[0] = Some(Player::Human);
@@ -914,7 +802,7 @@ mod tests {
 
     #[test]
     fn test_capture_move() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
 
         // Set up a completed mill
         game.board[0] = Some(Player::Human);
@@ -941,7 +829,7 @@ mod tests {
 
     #[test]
     fn test_capture_moves_respect_mill_protection() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         game.current_player = Player::Human;
         game.must_capture = true;
 
@@ -962,7 +850,7 @@ mod tests {
 
     #[test]
     fn test_capture_all_in_mills() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         game.current_player = Player::Human;
         game.must_capture = true;
 
@@ -981,7 +869,7 @@ mod tests {
 
     #[test]
     fn test_movement_moves() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         game.phase = MorrisPhase::Moving;
         game.pieces_to_place = (0, 0);
 
@@ -1007,7 +895,7 @@ mod tests {
 
     #[test]
     fn test_movement_blocked() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         game.phase = MorrisPhase::Moving;
         game.pieces_to_place = (0, 0);
 
@@ -1028,7 +916,7 @@ mod tests {
 
     #[test]
     fn test_flying_moves() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         game.phase = MorrisPhase::Moving;
         game.pieces_to_place = (0, 0);
         game.pieces_on_board = (3, 5); // Human has exactly 3 pieces
@@ -1058,7 +946,7 @@ mod tests {
 
     #[test]
     fn test_ai_returns_legal_move() {
-        let game = MorrisGame::new(MorrisDifficulty::Novice);
+        let game = MorrisGame::new(ChallengeDifficulty::Novice);
         let mut rng = rand::thread_rng();
 
         let legal_moves = get_legal_moves(&game);
@@ -1073,7 +961,7 @@ mod tests {
     fn test_ai_different_difficulties() {
         let mut rng = rand::thread_rng();
 
-        for difficulty in MorrisDifficulty::ALL {
+        for difficulty in ChallengeDifficulty::ALL {
             let mut game = MorrisGame::new(difficulty);
             game.current_player = Player::Ai;
 
@@ -1097,7 +985,7 @@ mod tests {
     fn test_ai_blocks_obvious_mill() {
         // Set up a position where Human has 2 in a row (positions 0, 1)
         // AI should block at position 2 to prevent mill [0, 1, 2]
-        let mut game = MorrisGame::new(MorrisDifficulty::Master);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Master);
         game.board[0] = Some(Player::Human);
         game.board[1] = Some(Player::Human);
         game.pieces_on_board = (2, 0);
@@ -1121,7 +1009,7 @@ mod tests {
     fn test_ai_completes_own_mill_over_blocking() {
         // Set up a position where AI can complete its own mill (3, 4, 5)
         // AI should prefer completing its mill over blocking Human's
-        let mut game = MorrisGame::new(MorrisDifficulty::Master);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Master);
         // Human has 2 in row at 0, 1 (threatens 2)
         game.board[0] = Some(Player::Human);
         game.board[1] = Some(Player::Human);
@@ -1148,7 +1036,7 @@ mod tests {
 
     #[test]
     fn test_win_by_piece_count() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         game.phase = MorrisPhase::Moving;
         game.pieces_to_place = (0, 0);
         game.pieces_on_board = (5, 2); // AI has only 2 pieces
@@ -1165,12 +1053,12 @@ mod tests {
         check_win_condition(&mut game);
 
         // Human should win because AI has < 3 pieces
-        assert_eq!(game.game_result, Some(MorrisResult::Win));
+        assert_eq!(game.game_result, Some(ChallengeResult::Win));
     }
 
     #[test]
     fn test_loss_by_piece_count() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         game.phase = MorrisPhase::Moving;
         game.pieces_to_place = (0, 0);
         game.pieces_on_board = (2, 5); // Human has only 2 pieces
@@ -1187,12 +1075,12 @@ mod tests {
         check_win_condition(&mut game);
 
         // Human should lose
-        assert_eq!(game.game_result, Some(MorrisResult::Loss));
+        assert_eq!(game.game_result, Some(ChallengeResult::Loss));
     }
 
     #[test]
     fn test_no_win_during_placing() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         game.phase = MorrisPhase::Placing;
         game.pieces_to_place = (7, 7);
         game.pieces_on_board = (2, 2);
@@ -1207,7 +1095,7 @@ mod tests {
 
     #[test]
     fn test_phase_transition_to_moving() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
 
         // Set up end of placing phase
         game.phase = MorrisPhase::Placing;
@@ -1244,119 +1132,11 @@ mod tests {
         assert_eq!(game.phase, MorrisPhase::Moving);
     }
 
-    // ============ Start Game Tests ============
-
-    #[test]
-    fn test_start_morris_game() {
-        let mut state = GameState::new("Test".to_string(), 0);
-        state.challenge_menu.open();
-
-        start_morris_game(&mut state, MorrisDifficulty::Journeyman);
-
-        assert!(matches!(
-            state.active_minigame,
-            Some(ActiveMinigame::Morris(_))
-        ));
-        assert!(!state.challenge_menu.is_open);
-        if let Some(ActiveMinigame::Morris(game)) = &state.active_minigame {
-            assert_eq!(game.difficulty, MorrisDifficulty::Journeyman);
-        } else {
-            panic!("expected morris");
-        }
-    }
-
-    // ============ Result Application Tests ============
-
-    #[test]
-    fn test_apply_win_result() {
-        let mut state = GameState::new("Test".to_string(), 0);
-        state.character_level = 10;
-
-        let mut game = MorrisGame::new(MorrisDifficulty::Master);
-        game.game_result = Some(MorrisResult::Win);
-        state.active_minigame = Some(ActiveMinigame::Morris(game));
-
-        let old_xp = state.character_xp;
-        let old_fishing_rank = state.fishing.rank;
-        let processed = apply_game_result(&mut state);
-
-        assert!(processed.is_some()); // Win returns Some(MinigameWinInfo)
-                                      // Master = 200% of xp_for_next_level(10) = 6324
-        assert_eq!(state.character_xp, old_xp + 6324);
-        // Master grants +1 fishing rank
-        assert_eq!(state.fishing.rank, old_fishing_rank + 1);
-        assert!(state.active_minigame.is_none());
-    }
-
-    #[test]
-    fn test_apply_win_novice_no_fishing_rank() {
-        let mut state = GameState::new("Test".to_string(), 0);
-        state.character_level = 5;
-
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
-        game.game_result = Some(MorrisResult::Win);
-        state.active_minigame = Some(ActiveMinigame::Morris(game));
-
-        let old_fishing_rank = state.fishing.rank;
-        let processed = apply_game_result(&mut state);
-
-        assert!(processed.is_some()); // Win returns Some(MinigameWinInfo)
-        assert_eq!(state.fishing.rank, old_fishing_rank); // Novice grants no fishing rank
-    }
-
-    #[test]
-    fn test_apply_win_master_fishing_rank_capped_at_30() {
-        let mut state = GameState::new("Test".to_string(), 0);
-        state.character_level = 10;
-        state.fishing.rank = 30; // Already max
-
-        let mut game = MorrisGame::new(MorrisDifficulty::Master);
-        game.game_result = Some(MorrisResult::Win);
-        state.active_minigame = Some(ActiveMinigame::Morris(game));
-
-        let processed = apply_game_result(&mut state);
-
-        assert!(processed.is_some()); // Win returns Some(MinigameWinInfo)
-        assert_eq!(state.fishing.rank, 30); // Capped at max
-    }
-
-    #[test]
-    fn test_apply_loss_result() {
-        let mut state = GameState::new("Test".to_string(), 0);
-
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
-        game.game_result = Some(MorrisResult::Loss);
-        state.active_minigame = Some(ActiveMinigame::Morris(game));
-
-        let old_xp = state.character_xp;
-        let processed = apply_game_result(&mut state);
-
-        assert!(processed.is_none()); // Loss returns None
-        assert_eq!(state.character_xp, old_xp); // Unchanged
-        assert!(state.active_minigame.is_none()); // But game is still cleared
-    }
-
-    #[test]
-    fn test_apply_forfeit_result() {
-        let mut state = GameState::new("Test".to_string(), 0);
-
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
-        game.game_result = Some(MorrisResult::Forfeit);
-        state.active_minigame = Some(ActiveMinigame::Morris(game));
-
-        let old_xp = state.character_xp;
-        let processed = apply_game_result(&mut state);
-
-        assert!(processed.is_none()); // Forfeit returns None
-        assert_eq!(state.character_xp, old_xp); // Unchanged
-        assert!(state.active_minigame.is_none()); // But game is still cleared
-    }
-
     // ============ Evaluation Tests ============
 
     #[test]
     fn test_evaluate_board_piece_advantage() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         game.phase = MorrisPhase::Moving;
         game.pieces_to_place = (0, 0);
         game.pieces_on_board = (3, 5);
@@ -1368,7 +1148,7 @@ mod tests {
 
     #[test]
     fn test_evaluate_board_human_advantage() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         game.phase = MorrisPhase::Moving;
         game.pieces_to_place = (0, 0);
         game.pieces_on_board = (5, 3);
@@ -1401,7 +1181,7 @@ mod tests {
 
     #[test]
     fn test_get_legal_moves_placing() {
-        let game = MorrisGame::new(MorrisDifficulty::Novice);
+        let game = MorrisGame::new(ChallengeDifficulty::Novice);
         let moves = get_legal_moves(&game);
 
         assert_eq!(moves.len(), 24);
@@ -1412,7 +1192,7 @@ mod tests {
 
     #[test]
     fn test_get_legal_moves_capture() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         game.must_capture = true;
         game.board[10] = Some(Player::Ai);
 
@@ -1424,8 +1204,8 @@ mod tests {
 
     #[test]
     fn test_get_legal_moves_game_over() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
-        game.game_result = Some(MorrisResult::Win);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
+        game.game_result = Some(ChallengeResult::Win);
 
         let moves = get_legal_moves(&game);
 
@@ -1436,7 +1216,7 @@ mod tests {
 
     #[test]
     fn test_process_ai_thinking_not_thinking() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         game.ai_thinking = false;
         let mut rng = rand::thread_rng();
 
@@ -1447,7 +1227,7 @@ mod tests {
 
     #[test]
     fn test_process_ai_thinking_computes_move() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         game.current_player = Player::Ai;
         game.ai_thinking = true;
         game.ai_think_ticks = 0;
@@ -1466,7 +1246,7 @@ mod tests {
 
     #[test]
     fn test_process_human_enter_places_piece_in_placing_phase() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         assert_eq!(game.phase, MorrisPhase::Placing);
         assert!(game.board[0].is_none());
 
@@ -1480,7 +1260,7 @@ mod tests {
 
     #[test]
     fn test_process_human_enter_ignores_occupied_position_in_placing() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         game.board[0] = Some(Player::Ai);
 
         game.cursor = 0;
@@ -1494,7 +1274,7 @@ mod tests {
 
     #[test]
     fn test_process_human_enter_selects_piece_in_moving_phase() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         // Set up moving phase with human piece
         game.phase = MorrisPhase::Moving;
         game.pieces_to_place = (0, 0);
@@ -1511,7 +1291,7 @@ mod tests {
 
     #[test]
     fn test_process_human_enter_moves_selected_piece() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         // Set up moving phase with human piece selected
         game.phase = MorrisPhase::Moving;
         game.pieces_to_place = (0, 0);
@@ -1532,7 +1312,7 @@ mod tests {
 
     #[test]
     fn test_process_human_enter_captures_opponent_piece() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         game.must_capture = true;
         game.board[5] = Some(Player::Ai);
         game.pieces_on_board.1 = 3;
@@ -1549,11 +1329,11 @@ mod tests {
 
     #[test]
     fn test_process_input_blocked_during_ai_thinking() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         game.ai_thinking = true;
         let old_cursor = game.cursor;
 
-        let handled = process_input(&mut game, MorrisInput::Up);
+        let handled = process_input(&mut game, MinigameInput::Up);
 
         assert!(!handled);
         assert_eq!(game.cursor, old_cursor);
@@ -1561,24 +1341,24 @@ mod tests {
 
     #[test]
     fn test_process_input_cursor_movement() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         game.cursor = 4; // Central position
 
         // Test all directions
-        process_input(&mut game, MorrisInput::Up);
+        process_input(&mut game, MinigameInput::Up);
         // Cursor should change (exact position depends on board layout)
         let after_up = game.cursor;
 
         game.cursor = 4;
-        process_input(&mut game, MorrisInput::Down);
+        process_input(&mut game, MinigameInput::Down);
         let after_down = game.cursor;
 
         game.cursor = 4;
-        process_input(&mut game, MorrisInput::Left);
+        process_input(&mut game, MinigameInput::Left);
         let after_left = game.cursor;
 
         game.cursor = 4;
-        process_input(&mut game, MorrisInput::Right);
+        process_input(&mut game, MinigameInput::Right);
         let after_right = game.cursor;
 
         // At least some movements should change the cursor
@@ -1590,42 +1370,42 @@ mod tests {
 
     #[test]
     fn test_process_input_select_places_piece() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         assert_eq!(game.phase, MorrisPhase::Placing);
         game.cursor = 0;
 
-        process_input(&mut game, MorrisInput::Select);
+        process_input(&mut game, MinigameInput::Primary);
 
         assert_eq!(game.board[0], Some(Player::Human));
     }
 
     #[test]
     fn test_process_input_cancel_initiates_forfeit() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         assert!(!game.forfeit_pending);
 
-        process_input(&mut game, MorrisInput::Cancel);
+        process_input(&mut game, MinigameInput::Cancel);
 
         assert!(game.forfeit_pending);
     }
 
     #[test]
     fn test_process_input_cancel_confirms_forfeit() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         game.forfeit_pending = true;
 
-        process_input(&mut game, MorrisInput::Cancel);
+        process_input(&mut game, MinigameInput::Cancel);
 
-        assert_eq!(game.game_result, Some(MorrisResult::Forfeit));
+        assert_eq!(game.game_result, Some(ChallengeResult::Forfeit));
     }
 
     #[test]
     fn test_process_input_cancel_clears_selection_first() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         game.phase = MorrisPhase::Moving;
         game.selected_position = Some(5);
 
-        process_input(&mut game, MorrisInput::Cancel);
+        process_input(&mut game, MinigameInput::Cancel);
 
         // Should clear selection, not initiate forfeit
         assert!(game.selected_position.is_none());
@@ -1634,10 +1414,10 @@ mod tests {
 
     #[test]
     fn test_process_input_other_cancels_forfeit_pending() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         game.forfeit_pending = true;
 
-        process_input(&mut game, MorrisInput::Other);
+        process_input(&mut game, MinigameInput::Other);
 
         assert!(!game.forfeit_pending);
     }
@@ -1645,25 +1425,25 @@ mod tests {
     #[test]
     fn test_process_input_returns_true_when_handled() {
         // Test each input returns true independently
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
-        assert!(process_input(&mut game, MorrisInput::Up));
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
+        assert!(process_input(&mut game, MinigameInput::Up));
 
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
-        assert!(process_input(&mut game, MorrisInput::Down));
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
+        assert!(process_input(&mut game, MinigameInput::Down));
 
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
-        assert!(process_input(&mut game, MorrisInput::Left));
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
+        assert!(process_input(&mut game, MinigameInput::Left));
 
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
-        assert!(process_input(&mut game, MorrisInput::Right));
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
+        assert!(process_input(&mut game, MinigameInput::Right));
 
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
-        assert!(process_input(&mut game, MorrisInput::Select));
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
+        assert!(process_input(&mut game, MinigameInput::Primary));
 
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
-        assert!(process_input(&mut game, MorrisInput::Cancel));
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
+        assert!(process_input(&mut game, MinigameInput::Cancel));
 
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
-        assert!(process_input(&mut game, MorrisInput::Other));
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
+        assert!(process_input(&mut game, MinigameInput::Other));
     }
 }

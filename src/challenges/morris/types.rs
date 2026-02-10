@@ -17,6 +17,7 @@
 //! 21----------22----------23
 //! ```
 
+use crate::challenges::{ChallengeDifficulty, ChallengeResult};
 use serde::{Deserialize, Serialize};
 
 /// The 16 valid mill lines (three-in-a-row formations)
@@ -104,75 +105,6 @@ pub enum Player {
     Ai,
 }
 
-/// AI difficulty levels for Nine Men's Morris
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum MorrisDifficulty {
-    Novice,     // 50% random moves, depth 1
-    Apprentice, // depth 1
-    Journeyman, // depth 2
-    Master,     // depth 3
-}
-
-impl MorrisDifficulty {
-    pub const ALL: [MorrisDifficulty; 4] = [
-        MorrisDifficulty::Novice,
-        MorrisDifficulty::Apprentice,
-        MorrisDifficulty::Journeyman,
-        MorrisDifficulty::Master,
-    ];
-
-    pub fn from_index(index: usize) -> Self {
-        Self::ALL
-            .get(index)
-            .copied()
-            .unwrap_or(MorrisDifficulty::Novice)
-    }
-
-    pub fn search_depth(&self) -> i32 {
-        match self {
-            Self::Novice => 2,
-            Self::Apprentice => 3,
-            Self::Journeyman => 4,
-            Self::Master => 5,
-        }
-    }
-
-    pub fn random_move_chance(&self) -> f64 {
-        match self {
-            Self::Novice => 0.5,
-            _ => 0.0,
-        }
-    }
-
-    /// XP reward as a percentage of XP needed for current level.
-    /// e.g. 25 means 25% of `xp_for_next_level(current_level)`.
-    pub fn reward_xp_percent(&self) -> u32 {
-        match self {
-            Self::Novice => 50,
-            Self::Apprentice => 100,
-            Self::Journeyman => 150,
-            Self::Master => 200,
-        }
-    }
-
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::Novice => "Novice",
-            Self::Apprentice => "Apprentice",
-            Self::Journeyman => "Journeyman",
-            Self::Master => "Master",
-        }
-    }
-}
-
-/// Result of a completed Morris game
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MorrisResult {
-    Win,
-    Loss,
-    Forfeit,
-}
-
 /// Game phase in Nine Men's Morris
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MorrisPhase {
@@ -216,7 +148,7 @@ pub struct MorrisGame {
     /// Pieces currently on the board: (human, ai)
     pub pieces_on_board: (u8, u8),
     /// AI difficulty level
-    pub difficulty: MorrisDifficulty,
+    pub difficulty: ChallengeDifficulty,
     /// Current cursor position (0-23)
     pub cursor: usize,
     /// Selected position for moving a piece
@@ -226,7 +158,7 @@ pub struct MorrisGame {
     /// Whose turn it is
     pub current_player: Player,
     /// Game result (None if game is ongoing)
-    pub game_result: Option<MorrisResult>,
+    pub game_result: Option<ChallengeResult>,
     /// Whether forfeit confirmation is pending
     pub forfeit_pending: bool,
     /// Whether AI is currently thinking
@@ -279,7 +211,7 @@ const CURSOR_MAP: [(i8, i8); 24] = [
 
 impl MorrisGame {
     /// Create a new Morris game with the given difficulty
-    pub fn new(difficulty: MorrisDifficulty) -> Self {
+    pub fn new(difficulty: ChallengeDifficulty) -> Self {
         Self {
             board: [None; 24],
             phase: MorrisPhase::Placing,
@@ -412,6 +344,24 @@ impl MorrisGame {
     pub fn clear_selection(&mut self) {
         self.selected_position = None;
     }
+
+    pub fn search_depth(&self) -> i32 {
+        match self.difficulty {
+            ChallengeDifficulty::Novice => 2,
+            ChallengeDifficulty::Apprentice => 3,
+            ChallengeDifficulty::Journeyman => 4,
+            ChallengeDifficulty::Master => 5,
+        }
+    }
+
+    pub fn random_move_chance(&self) -> f64 {
+        match self.difficulty {
+            ChallengeDifficulty::Novice => 0.35,
+            ChallengeDifficulty::Apprentice => 0.2,
+            ChallengeDifficulty::Journeyman => 0.1,
+            ChallengeDifficulty::Master => 0.0,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -419,78 +369,35 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_difficulty_from_index() {
-        assert_eq!(MorrisDifficulty::from_index(0), MorrisDifficulty::Novice);
-        assert_eq!(
-            MorrisDifficulty::from_index(1),
-            MorrisDifficulty::Apprentice
-        );
-        assert_eq!(
-            MorrisDifficulty::from_index(2),
-            MorrisDifficulty::Journeyman
-        );
-        assert_eq!(MorrisDifficulty::from_index(3), MorrisDifficulty::Master);
-        // Out of bounds should return Novice
-        assert_eq!(MorrisDifficulty::from_index(99), MorrisDifficulty::Novice);
+    fn test_game_search_depth() {
+        let game = MorrisGame::new(ChallengeDifficulty::Novice);
+        assert_eq!(game.search_depth(), 2);
+        let game = MorrisGame::new(ChallengeDifficulty::Apprentice);
+        assert_eq!(game.search_depth(), 3);
+        let game = MorrisGame::new(ChallengeDifficulty::Journeyman);
+        assert_eq!(game.search_depth(), 4);
+        let game = MorrisGame::new(ChallengeDifficulty::Master);
+        assert_eq!(game.search_depth(), 5);
     }
 
     #[test]
-    fn test_difficulty_properties() {
-        // Search depth (optimized with make/unmake pattern)
-        assert_eq!(MorrisDifficulty::Novice.search_depth(), 2);
-        assert_eq!(MorrisDifficulty::Apprentice.search_depth(), 3);
-        assert_eq!(MorrisDifficulty::Journeyman.search_depth(), 4);
-        assert_eq!(MorrisDifficulty::Master.search_depth(), 5);
-
-        // Random move chance
-        assert_eq!(MorrisDifficulty::Novice.random_move_chance(), 0.5);
-        assert_eq!(MorrisDifficulty::Apprentice.random_move_chance(), 0.0);
-        assert_eq!(MorrisDifficulty::Journeyman.random_move_chance(), 0.0);
-        assert_eq!(MorrisDifficulty::Master.random_move_chance(), 0.0);
-
-        // XP reward percentages
-        assert_eq!(MorrisDifficulty::Novice.reward_xp_percent(), 50);
-        assert_eq!(MorrisDifficulty::Apprentice.reward_xp_percent(), 100);
-        assert_eq!(MorrisDifficulty::Journeyman.reward_xp_percent(), 150);
-        assert_eq!(MorrisDifficulty::Master.reward_xp_percent(), 200);
-
-        // Names
-        assert_eq!(MorrisDifficulty::Novice.name(), "Novice");
-        assert_eq!(MorrisDifficulty::Apprentice.name(), "Apprentice");
-        assert_eq!(MorrisDifficulty::Journeyman.name(), "Journeyman");
-        assert_eq!(MorrisDifficulty::Master.name(), "Master");
-    }
-
-    #[test]
-    fn test_difficulty_rewards_via_trait() {
-        use crate::challenges::menu::DifficultyInfo;
-
-        // Morris rewards XP, with fishing rank at Master
-        let novice = MorrisDifficulty::Novice.reward();
-        assert_eq!(novice.xp_percent, 50);
-        assert_eq!(novice.prestige_ranks, 0);
-        assert_eq!(novice.fishing_ranks, 0);
-
-        let apprentice = MorrisDifficulty::Apprentice.reward();
-        assert_eq!(apprentice.xp_percent, 100);
-        assert_eq!(apprentice.fishing_ranks, 0);
-
-        let journeyman = MorrisDifficulty::Journeyman.reward();
-        assert_eq!(journeyman.xp_percent, 150);
-        assert_eq!(journeyman.fishing_ranks, 0);
-
-        let master = MorrisDifficulty::Master.reward();
-        assert_eq!(master.xp_percent, 200);
-        assert_eq!(master.fishing_ranks, 1);
-        assert_eq!(master.prestige_ranks, 0);
+    fn test_game_random_move_chance() {
+        let game = MorrisGame::new(ChallengeDifficulty::Novice);
+        assert_eq!(game.random_move_chance(), 0.35);
+        let game = MorrisGame::new(ChallengeDifficulty::Apprentice);
+        assert_eq!(game.random_move_chance(), 0.2);
+        let game = MorrisGame::new(ChallengeDifficulty::Journeyman);
+        assert_eq!(game.random_move_chance(), 0.1);
+        let game = MorrisGame::new(ChallengeDifficulty::Master);
+        assert_eq!(game.random_move_chance(), 0.0);
     }
 
     #[test]
     fn test_new_game() {
-        let game = MorrisGame::new(MorrisDifficulty::Journeyman);
+        let game = MorrisGame::new(ChallengeDifficulty::Journeyman);
 
         // Check initial state
-        assert_eq!(game.difficulty, MorrisDifficulty::Journeyman);
+        assert_eq!(game.difficulty, ChallengeDifficulty::Journeyman);
         assert_eq!(game.phase, MorrisPhase::Placing);
         assert_eq!(game.pieces_to_place, (9, 9));
         assert_eq!(game.pieces_on_board, (0, 0));
@@ -568,7 +475,7 @@ mod tests {
 
     #[test]
     fn test_is_in_mill() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
 
         // Place pieces to form a mill at positions 0, 1, 2
         game.board[0] = Some(Player::Human);
@@ -589,7 +496,7 @@ mod tests {
 
     #[test]
     fn test_forms_mill() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
 
         // Place two pieces of a potential mill
         game.board[0] = Some(Player::Human);
@@ -607,7 +514,7 @@ mod tests {
 
     #[test]
     fn test_can_fly() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
 
         // Initially cannot fly (no pieces on board, 9 pieces to place)
         assert!(!game.can_fly(Player::Human));
@@ -624,7 +531,7 @@ mod tests {
 
     #[test]
     fn test_pieces_to_place_for() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
 
         assert_eq!(game.pieces_to_place_for(Player::Human), 9);
         assert_eq!(game.pieces_to_place_for(Player::Ai), 9);
@@ -637,7 +544,7 @@ mod tests {
 
     #[test]
     fn test_clear_selection() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
         game.selected_position = Some(5);
 
         game.clear_selection();
@@ -647,7 +554,7 @@ mod tests {
 
     #[test]
     fn test_move_cursor() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
 
         // Start at position 0 (top-left corner)
         assert_eq!(game.cursor, 0);
@@ -672,7 +579,7 @@ mod tests {
 
     #[test]
     fn test_cursor_bounds() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
 
         // At position 0 (top-left), moving up or left should stay at 0
         game.cursor = 0;
@@ -723,16 +630,16 @@ mod tests {
     }
 
     #[test]
-    fn test_morris_result_variants() {
-        assert_eq!(MorrisResult::Win, MorrisResult::Win);
-        assert_eq!(MorrisResult::Loss, MorrisResult::Loss);
-        assert_eq!(MorrisResult::Forfeit, MorrisResult::Forfeit);
-        assert_ne!(MorrisResult::Win, MorrisResult::Loss);
+    fn test_challenge_result_variants() {
+        assert_eq!(ChallengeResult::Win, ChallengeResult::Win);
+        assert_eq!(ChallengeResult::Loss, ChallengeResult::Loss);
+        assert_eq!(ChallengeResult::Forfeit, ChallengeResult::Forfeit);
+        assert_ne!(ChallengeResult::Win, ChallengeResult::Loss);
     }
 
     #[test]
     fn test_multiple_mills_detection() {
-        let mut game = MorrisGame::new(MorrisDifficulty::Novice);
+        let mut game = MorrisGame::new(ChallengeDifficulty::Novice);
 
         // Create two mills sharing position 1:
         // Mill 1: 0-1-2 (horizontal top)

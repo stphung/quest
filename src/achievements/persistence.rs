@@ -3,48 +3,16 @@
 #![allow(dead_code)] // Will be used when integrated with main.rs
 
 use super::types::Achievements;
-use std::fs;
 use std::io;
-use std::path::PathBuf;
-
-/// Get the achievements save file path (~/.quest/achievements.json).
-pub fn achievements_save_path() -> io::Result<PathBuf> {
-    let home_dir = dirs::home_dir().ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::NotFound,
-            "Could not determine home directory",
-        )
-    })?;
-    Ok(home_dir.join(".quest").join("achievements.json"))
-}
 
 /// Load achievements from disk, or return default if not found.
 pub fn load_achievements() -> Achievements {
-    let path = match achievements_save_path() {
-        Ok(p) => p,
-        Err(_) => return Achievements::default(),
-    };
-
-    match fs::read_to_string(&path) {
-        Ok(json) => serde_json::from_str(&json).unwrap_or_default(),
-        Err(_) => Achievements::default(),
-    }
+    crate::utils::persistence::load_json_or_default("achievements.json")
 }
 
 /// Save achievements to disk.
 pub fn save_achievements(achievements: &Achievements) -> io::Result<()> {
-    let path = achievements_save_path()?;
-
-    // Ensure directory exists
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-
-    let json = serde_json::to_string_pretty(achievements)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-
-    fs::write(path, json)?;
-    Ok(())
+    crate::utils::persistence::save_json("achievements.json", achievements)
 }
 
 #[cfg(test)]
@@ -78,7 +46,7 @@ mod tests {
     #[test]
     fn test_achievements_save_path() {
         // Just verify the path generation doesn't panic
-        let result = achievements_save_path();
+        let result = crate::utils::persistence::save_path("achievements.json");
         assert!(result.is_ok());
         let path = result.unwrap();
         assert!(path.to_string_lossy().contains("achievements.json"));

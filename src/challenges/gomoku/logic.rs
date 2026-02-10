@@ -1,27 +1,14 @@
 //! Gomoku game logic and AI.
 
-use super::{GomokuDifficulty, GomokuGame, GomokuResult, Player, BOARD_SIZE};
-use crate::challenges::ActiveMinigame;
-use crate::core::game_state::GameState;
+use super::{GomokuGame, Player, BOARD_SIZE};
+use crate::challenges::{ChallengeResult, MinigameInput};
 use rand::seq::SliceRandom;
 use rand::Rng;
-
-/// Input actions for the Gomoku game (UI-agnostic).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GomokuInput {
-    Up,
-    Down,
-    Left,
-    Right,
-    PlaceStone,
-    Forfeit,
-    Other,
-}
 
 /// Process a key input during active Gomoku game.
 /// Returns true if the input was handled.
 /// Does nothing if AI is thinking.
-pub fn process_input(game: &mut GomokuGame, input: GomokuInput) -> bool {
+pub fn process_input(game: &mut GomokuGame, input: MinigameInput) -> bool {
     // Don't process input while AI is thinking
     if game.ai_thinking {
         return false;
@@ -30,8 +17,8 @@ pub fn process_input(game: &mut GomokuGame, input: GomokuInput) -> bool {
     // Handle forfeit confirmation (double-Esc pattern)
     if game.forfeit_pending {
         match input {
-            GomokuInput::Forfeit => {
-                game.game_result = Some(GomokuResult::Loss);
+            MinigameInput::Cancel => {
+                game.game_result = Some(ChallengeResult::Loss);
             }
             _ => {
                 game.forfeit_pending = false;
@@ -42,25 +29,19 @@ pub fn process_input(game: &mut GomokuGame, input: GomokuInput) -> bool {
 
     // Normal game input
     match input {
-        GomokuInput::Up => game.move_cursor(-1, 0),
-        GomokuInput::Down => game.move_cursor(1, 0),
-        GomokuInput::Left => game.move_cursor(0, -1),
-        GomokuInput::Right => game.move_cursor(0, 1),
-        GomokuInput::PlaceStone => {
+        MinigameInput::Up => game.move_cursor(-1, 0),
+        MinigameInput::Down => game.move_cursor(1, 0),
+        MinigameInput::Left => game.move_cursor(0, -1),
+        MinigameInput::Right => game.move_cursor(0, 1),
+        MinigameInput::Primary => {
             process_human_move(game);
         }
-        GomokuInput::Forfeit => {
+        MinigameInput::Cancel => {
             game.forfeit_pending = true;
         }
-        GomokuInput::Other => {}
+        MinigameInput::Secondary | MinigameInput::Other => {}
     }
     true
-}
-
-/// Start a gomoku game with the selected difficulty
-pub fn start_gomoku_game(state: &mut GameState, difficulty: GomokuDifficulty) {
-    state.active_minigame = Some(ActiveMinigame::Gomoku(GomokuGame::new(difficulty)));
-    state.challenge_menu.close();
 }
 
 /// Directions to check for lines: (row_delta, col_delta)
@@ -215,13 +196,13 @@ pub fn process_human_move(game: &mut GomokuGame) -> bool {
     // Check for win
     if check_win(&game.board, row, col, Player::Human) {
         game.winning_line = get_winning_line(&game.board, row, col, Player::Human);
-        game.game_result = Some(GomokuResult::Win);
+        game.game_result = Some(ChallengeResult::Win);
         return true;
     }
 
     // Check for draw
     if is_board_full(&game.board) {
-        game.game_result = Some(GomokuResult::Draw);
+        game.game_result = Some(ChallengeResult::Draw);
         return true;
     }
 
@@ -235,6 +216,7 @@ pub fn process_human_move(game: &mut GomokuGame) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::challenges::ChallengeDifficulty;
 
     fn place(game: &mut GomokuGame, row: usize, col: usize, player: Player) {
         game.board[row][col] = Some(player);
@@ -242,7 +224,7 @@ mod tests {
 
     #[test]
     fn test_horizontal_win() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
         for c in 0..5 {
             place(&mut game, 7, c, Player::Human);
         }
@@ -251,7 +233,7 @@ mod tests {
 
     #[test]
     fn test_vertical_win() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
         for r in 0..5 {
             place(&mut game, r, 7, Player::Human);
         }
@@ -260,7 +242,7 @@ mod tests {
 
     #[test]
     fn test_diagonal_win() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
         for i in 0..5 {
             place(&mut game, i, i, Player::Human);
         }
@@ -269,7 +251,7 @@ mod tests {
 
     #[test]
     fn test_no_win_with_four() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
         for c in 0..4 {
             place(&mut game, 7, c, Player::Human);
         }
@@ -278,7 +260,7 @@ mod tests {
 
     #[test]
     fn test_six_in_row_wins() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
         for c in 0..6 {
             place(&mut game, 7, c, Player::Human);
         }
@@ -287,7 +269,7 @@ mod tests {
 
     #[test]
     fn test_board_not_full() {
-        let game = GomokuGame::new(super::super::GomokuDifficulty::Novice);
+        let game = GomokuGame::new(ChallengeDifficulty::Novice);
         assert!(!is_board_full(&game.board));
     }
 }
@@ -419,19 +401,19 @@ fn score_window(window: &[Option<Player>], player: Player) -> i32 {
 
 #[cfg(test)]
 mod eval_tests {
-    use super::super::GomokuDifficulty;
     use super::*;
+    use crate::challenges::ChallengeDifficulty;
 
     #[test]
     fn test_evaluate_empty_board() {
-        let game = GomokuGame::new(GomokuDifficulty::Novice);
+        let game = GomokuGame::new(ChallengeDifficulty::Novice);
         let score = evaluate_board(&game.board);
         assert_eq!(score, 0);
     }
 
     #[test]
     fn test_evaluate_ai_advantage() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
         // AI has 3 in a row with space
         game.board[7][7] = Some(Player::Ai);
         game.board[7][8] = Some(Player::Ai);
@@ -442,7 +424,7 @@ mod eval_tests {
 
     #[test]
     fn test_evaluate_human_advantage() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
         // Human has 3 in a row with space
         game.board[7][7] = Some(Player::Human);
         game.board[7][8] = Some(Player::Human);
@@ -675,7 +657,7 @@ fn minimax(
 /// Find the best move for AI using minimax.
 pub fn find_best_move<R: Rng>(game: &GomokuGame, rng: &mut R) -> Option<(usize, usize)> {
     let mut board = game.board;
-    let depth = game.difficulty.search_depth();
+    let depth = game.search_depth();
     let candidates = get_candidate_moves(&board);
 
     if candidates.is_empty() {
@@ -730,95 +712,6 @@ pub fn find_best_move<R: Rng>(game: &GomokuGame, rng: &mut R) -> Option<(usize, 
     best_moves.choose(rng).copied()
 }
 
-/// Apply game result: update stats, grant rewards, and add combat log entries.
-/// Returns Some(MinigameWinInfo) if the player won, None otherwise.
-pub fn apply_game_result(state: &mut GameState) -> Option<crate::challenges::MinigameWinInfo> {
-    use crate::challenges::menu::DifficultyInfo;
-    use crate::challenges::MinigameWinInfo;
-
-    let game = match state.active_minigame.as_ref() {
-        Some(ActiveMinigame::Gomoku(g)) => g,
-        _ => return None,
-    };
-    let result = game.game_result?;
-    let reward = game.difficulty.reward();
-    let old_prestige = state.prestige_rank;
-    let difficulty = game.difficulty;
-
-    let won = match result {
-        GomokuResult::Win => {
-            // XP reward
-            let xp_gained = if reward.xp_percent > 0 {
-                let xp_for_level =
-                    crate::core::game_logic::xp_for_next_level(state.character_level.max(1));
-                let xp = (xp_for_level * reward.xp_percent as u64) / 100;
-                state.character_xp += xp;
-                xp
-            } else {
-                0
-            };
-
-            // Prestige reward
-            state.prestige_rank += reward.prestige_ranks;
-
-            // Combat log entries
-            state.combat_state.add_log_entry(
-                "◎ Victory! The strategist bows in defeat.".to_string(),
-                false,
-                true,
-            );
-            if reward.prestige_ranks > 0 {
-                state.combat_state.add_log_entry(
-                    format!(
-                        "◎ +{} Prestige Ranks (P{} → P{})",
-                        reward.prestige_ranks, old_prestige, state.prestige_rank
-                    ),
-                    false,
-                    false,
-                );
-            }
-            if xp_gained > 0 {
-                state
-                    .combat_state
-                    .add_log_entry(format!("◎ +{} XP", xp_gained), false, false);
-            }
-            true
-        }
-        GomokuResult::Loss => {
-            state.combat_state.add_log_entry(
-                "◎ The strategist nods respectfully and departs.".to_string(),
-                false,
-                true,
-            );
-            false
-        }
-        GomokuResult::Draw => {
-            state.combat_state.add_log_entry(
-                "◎ A rare draw. The strategist seems impressed.".to_string(),
-                false,
-                true,
-            );
-            false
-        }
-    };
-
-    state.active_minigame = None;
-
-    if won {
-        Some(MinigameWinInfo {
-            game_type: "gomoku",
-            difficulty: match difficulty {
-                GomokuDifficulty::Novice => "novice",
-                GomokuDifficulty::Apprentice => "apprentice",
-                GomokuDifficulty::Journeyman => "journeyman",
-                GomokuDifficulty::Master => "master",
-            },
-        })
-    } else {
-        None
-    }
-}
-
 /// Process AI thinking (called each tick).
 pub fn process_ai_thinking<R: Rng>(game: &mut GomokuGame, rng: &mut R) {
     if !game.ai_thinking || game.game_result.is_some() {
@@ -827,7 +720,7 @@ pub fn process_ai_thinking<R: Rng>(game: &mut GomokuGame, rng: &mut R) {
 
     // Add small delay for visual feedback (5-15 ticks = 0.5-1.5 seconds)
     game.ai_think_ticks += 1;
-    let min_ticks = 5 + game.difficulty.search_depth() as u32 * 2;
+    let min_ticks = 5 + game.search_depth() as u32 * 2;
     if game.ai_think_ticks < min_ticks {
         return;
     }
@@ -841,9 +734,9 @@ pub fn process_ai_thinking<R: Rng>(game: &mut GomokuGame, rng: &mut R) {
         // Check for AI win
         if check_win(&game.board, r, c, Player::Ai) {
             game.winning_line = get_winning_line(&game.board, r, c, Player::Ai);
-            game.game_result = Some(GomokuResult::Loss);
+            game.game_result = Some(ChallengeResult::Loss);
         } else if is_board_full(&game.board) {
-            game.game_result = Some(GomokuResult::Draw);
+            game.game_result = Some(ChallengeResult::Draw);
         } else {
             game.switch_player();
         }
@@ -855,12 +748,12 @@ pub fn process_ai_thinking<R: Rng>(game: &mut GomokuGame, rng: &mut R) {
 
 #[cfg(test)]
 mod ai_tests {
-    use super::GomokuDifficulty;
     use super::*;
+    use crate::challenges::{ChallengeDifficulty, ChallengeResult};
 
     #[test]
     fn test_ai_takes_winning_move() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
         // AI has 4 in a row, should complete it
         game.board[7][3] = Some(Player::Ai);
         game.board[7][4] = Some(Player::Ai);
@@ -877,7 +770,7 @@ mod ai_tests {
 
     #[test]
     fn test_ai_blocks_human_win() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
         // Human has 4 in a row
         game.board[7][3] = Some(Player::Human);
         game.board[7][4] = Some(Player::Human);
@@ -894,7 +787,7 @@ mod ai_tests {
 
     #[test]
     fn test_get_candidates_empty_board() {
-        let game = GomokuGame::new(GomokuDifficulty::Novice);
+        let game = GomokuGame::new(ChallengeDifficulty::Novice);
         let candidates = get_candidate_moves(&game.board);
         assert_eq!(
             candidates,
@@ -905,7 +798,7 @@ mod ai_tests {
 
     #[test]
     fn test_get_candidates_near_stones() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
         game.board[7][7] = Some(Player::Human);
         let candidates = get_candidate_moves(&game.board);
         assert!(!candidates.is_empty());
@@ -919,43 +812,43 @@ mod ai_tests {
 
     #[test]
     fn test_process_input_cursor_movement() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
 
         // Start at center (7, 7)
         assert_eq!(game.cursor, (7, 7));
 
-        process_input(&mut game, GomokuInput::Up);
+        process_input(&mut game, MinigameInput::Up);
         assert_eq!(game.cursor, (6, 7));
 
-        process_input(&mut game, GomokuInput::Down);
+        process_input(&mut game, MinigameInput::Down);
         assert_eq!(game.cursor, (7, 7));
 
-        process_input(&mut game, GomokuInput::Left);
+        process_input(&mut game, MinigameInput::Left);
         assert_eq!(game.cursor, (7, 6));
 
-        process_input(&mut game, GomokuInput::Right);
+        process_input(&mut game, MinigameInput::Right);
         assert_eq!(game.cursor, (7, 7));
     }
 
     #[test]
     fn test_process_input_place_stone() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
         game.cursor = (5, 5);
 
         assert!(game.board[5][5].is_none());
 
-        process_input(&mut game, GomokuInput::PlaceStone);
+        process_input(&mut game, MinigameInput::Primary);
 
         assert_eq!(game.board[5][5], Some(Player::Human));
     }
 
     #[test]
     fn test_process_input_forfeit_single_esc() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
 
         assert!(!game.forfeit_pending);
 
-        process_input(&mut game, GomokuInput::Forfeit);
+        process_input(&mut game, MinigameInput::Cancel);
 
         assert!(game.forfeit_pending);
         assert!(game.game_result.is_none());
@@ -963,28 +856,28 @@ mod ai_tests {
 
     #[test]
     fn test_process_input_forfeit_double_esc() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
 
         // First Esc sets pending
-        process_input(&mut game, GomokuInput::Forfeit);
+        process_input(&mut game, MinigameInput::Cancel);
         assert!(game.forfeit_pending);
 
         // Second Esc confirms forfeit
-        process_input(&mut game, GomokuInput::Forfeit);
+        process_input(&mut game, MinigameInput::Cancel);
 
-        assert_eq!(game.game_result, Some(GomokuResult::Loss));
+        assert_eq!(game.game_result, Some(ChallengeResult::Loss));
     }
 
     #[test]
     fn test_process_input_forfeit_cancelled() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
 
         // First Esc sets pending
-        process_input(&mut game, GomokuInput::Forfeit);
+        process_input(&mut game, MinigameInput::Cancel);
         assert!(game.forfeit_pending);
 
         // Any other key cancels forfeit
-        process_input(&mut game, GomokuInput::Other);
+        process_input(&mut game, MinigameInput::Other);
 
         assert!(!game.forfeit_pending);
         assert!(game.game_result.is_none());
@@ -992,12 +885,12 @@ mod ai_tests {
 
     #[test]
     fn test_process_input_blocked_during_ai_thinking() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
         game.ai_thinking = true;
         game.cursor = (7, 7);
 
         // Input should be blocked
-        let handled = process_input(&mut game, GomokuInput::Up);
+        let handled = process_input(&mut game, MinigameInput::Up);
 
         assert!(!handled);
         assert_eq!(game.cursor, (7, 7)); // Cursor unchanged
@@ -1007,7 +900,7 @@ mod ai_tests {
 
     #[test]
     fn test_human_move_triggers_win() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
         // Place 4 human stones, then place 5th via process_human_move
         for c in 0..4 {
             game.board[7][c] = Some(Player::Human);
@@ -1015,7 +908,7 @@ mod ai_tests {
         game.cursor = (7, 4);
         process_human_move(&mut game);
 
-        assert_eq!(game.game_result, Some(GomokuResult::Win));
+        assert_eq!(game.game_result, Some(ChallengeResult::Win));
         assert!(game.winning_line.is_some());
         let line = game.winning_line.as_ref().unwrap();
         assert!(line.len() >= 5);
@@ -1023,7 +916,7 @@ mod ai_tests {
 
     #[test]
     fn test_human_move_switches_to_ai() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
         game.cursor = (5, 5);
 
         let result = process_human_move(&mut game);
@@ -1038,7 +931,7 @@ mod ai_tests {
 
     #[test]
     fn test_human_move_rejected_on_occupied() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
         game.board[5][5] = Some(Player::Ai);
         game.cursor = (5, 5);
 
@@ -1050,8 +943,8 @@ mod ai_tests {
 
     #[test]
     fn test_human_move_rejected_when_game_over() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
-        game.game_result = Some(GomokuResult::Win);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
+        game.game_result = Some(ChallengeResult::Win);
         game.cursor = (5, 5);
 
         let result = process_human_move(&mut game);
@@ -1062,7 +955,7 @@ mod ai_tests {
 
     #[test]
     fn test_human_move_rejected_during_ai_turn() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
         game.current_player = Player::Ai;
         game.cursor = (5, 5);
 
@@ -1075,7 +968,7 @@ mod ai_tests {
 
     #[test]
     fn test_ai_thinking_delays_move() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
         // Place a human stone so AI has context
         game.board[7][7] = Some(Player::Human);
         game.move_history.push((7, 7, Player::Human));
@@ -1100,7 +993,7 @@ mod ai_tests {
 
     #[test]
     fn test_ai_thinking_makes_move_after_delay() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
         game.board[7][7] = Some(Player::Human);
         game.move_history.push((7, 7, Player::Human));
         game.current_player = Player::Ai;
@@ -1131,7 +1024,7 @@ mod ai_tests {
 
     #[test]
     fn test_ai_thinking_skipped_when_not_thinking() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
         game.ai_thinking = false;
 
         let mut rng = rand::thread_rng();
@@ -1144,9 +1037,9 @@ mod ai_tests {
 
     #[test]
     fn test_ai_thinking_skipped_when_game_over() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
         game.ai_thinking = true;
-        game.game_result = Some(GomokuResult::Win);
+        game.game_result = Some(ChallengeResult::Win);
 
         let mut rng = rand::thread_rng();
         for _ in 0..20 {
@@ -1160,7 +1053,7 @@ mod ai_tests {
 
     #[test]
     fn test_ai_wins_sets_loss() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
         // Set up AI with 4 in a row, human stone elsewhere
         game.board[7][3] = Some(Player::Ai);
         game.board[7][4] = Some(Player::Ai);
@@ -1179,7 +1072,7 @@ mod ai_tests {
             }
         }
 
-        assert_eq!(game.game_result, Some(GomokuResult::Loss));
+        assert_eq!(game.game_result, Some(ChallengeResult::Loss));
         assert!(game.winning_line.is_some());
     }
 
@@ -1187,11 +1080,11 @@ mod ai_tests {
 
     #[test]
     fn test_full_turn_cycle_human_then_ai() {
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
+        let mut game = GomokuGame::new(ChallengeDifficulty::Novice);
 
         // Human places stone
         game.cursor = (7, 7);
-        process_input(&mut game, GomokuInput::PlaceStone);
+        process_input(&mut game, MinigameInput::Primary);
 
         assert_eq!(game.board[7][7], Some(Player::Human));
         assert!(game.ai_thinking);
@@ -1210,126 +1103,5 @@ mod ai_tests {
         assert_eq!(game.current_player, Player::Human);
         let total_stones: usize = game.board.iter().flatten().filter(|c| c.is_some()).count();
         assert_eq!(total_stones, 2, "Should have human + AI stones");
-    }
-
-    // ============ apply_game_result ============
-
-    #[test]
-    fn test_apply_game_result_win_grants_xp() {
-        use crate::challenges::menu::DifficultyInfo;
-        use crate::core::game_state::GameState;
-
-        let mut state = GameState::new("Test".to_string(), 0);
-        let initial_xp = state.character_xp;
-        let xp_for_level = crate::core::game_logic::xp_for_next_level(state.character_level);
-
-        // Set up won game
-        let mut game = GomokuGame::new(GomokuDifficulty::Apprentice);
-        game.game_result = Some(GomokuResult::Win);
-        state.active_minigame = Some(ActiveMinigame::Gomoku(game));
-
-        let result = apply_game_result(&mut state);
-
-        assert!(result.is_some()); // Win returns Some(MinigameWinInfo)
-        assert!(
-            state.active_minigame.is_none(),
-            "Minigame should be cleared"
-        );
-        // Apprentice: xp_percent=100, so full level XP
-        let expected_xp = (xp_for_level * 100) / 100;
-        assert_eq!(state.character_xp, initial_xp + expected_xp);
-    }
-
-    #[test]
-    fn test_apply_game_result_win_grants_prestige() {
-        use crate::core::game_state::GameState;
-
-        let mut state = GameState::new("Test".to_string(), 0);
-        let initial_prestige = state.prestige_rank;
-
-        // Master gives 2 prestige ranks
-        let mut game = GomokuGame::new(GomokuDifficulty::Master);
-        game.game_result = Some(GomokuResult::Win);
-        state.active_minigame = Some(ActiveMinigame::Gomoku(game));
-
-        apply_game_result(&mut state);
-
-        assert_eq!(state.prestige_rank, initial_prestige + 2);
-    }
-
-    #[test]
-    fn test_apply_game_result_loss_no_rewards() {
-        use crate::core::game_state::GameState;
-
-        let mut state = GameState::new("Test".to_string(), 0);
-        let initial_xp = state.character_xp;
-        let initial_prestige = state.prestige_rank;
-
-        let mut game = GomokuGame::new(GomokuDifficulty::Master);
-        game.game_result = Some(GomokuResult::Loss);
-        state.active_minigame = Some(ActiveMinigame::Gomoku(game));
-
-        let result = apply_game_result(&mut state);
-
-        assert!(result.is_none()); // Loss returns None
-        assert!(state.active_minigame.is_none()); // But game is still cleared
-        assert_eq!(state.character_xp, initial_xp, "No XP on loss");
-        assert_eq!(state.prestige_rank, initial_prestige, "No prestige on loss");
-    }
-
-    #[test]
-    fn test_apply_game_result_draw_no_rewards() {
-        use crate::core::game_state::GameState;
-
-        let mut state = GameState::new("Test".to_string(), 0);
-        let initial_xp = state.character_xp;
-
-        let mut game = GomokuGame::new(GomokuDifficulty::Novice);
-        game.game_result = Some(GomokuResult::Draw);
-        state.active_minigame = Some(ActiveMinigame::Gomoku(game));
-
-        let result = apply_game_result(&mut state);
-
-        assert!(result.is_none()); // Draw returns None
-        assert!(state.active_minigame.is_none()); // But game is still cleared
-        assert_eq!(state.character_xp, initial_xp, "No XP on draw");
-    }
-
-    #[test]
-    fn test_apply_game_result_returns_none_no_minigame() {
-        use crate::core::game_state::GameState;
-
-        let mut state = GameState::new("Test".to_string(), 0);
-        assert!(apply_game_result(&mut state).is_none());
-    }
-
-    #[test]
-    fn test_apply_game_result_returns_none_no_result() {
-        use crate::core::game_state::GameState;
-
-        let mut state = GameState::new("Test".to_string(), 0);
-        let game = GomokuGame::new(GomokuDifficulty::Novice);
-        state.active_minigame = Some(ActiveMinigame::Gomoku(game));
-
-        assert!(apply_game_result(&mut state).is_none());
-    }
-
-    #[test]
-    fn test_apply_game_result_adds_combat_log() {
-        use crate::core::game_state::GameState;
-
-        let mut state = GameState::new("Test".to_string(), 0);
-        let initial_log_len = state.combat_state.combat_log.len();
-
-        let mut game = GomokuGame::new(GomokuDifficulty::Journeyman);
-        game.game_result = Some(GomokuResult::Win);
-        state.active_minigame = Some(ActiveMinigame::Gomoku(game));
-
-        apply_game_result(&mut state);
-
-        assert!(
-            state.combat_state.combat_log.len() > initial_log_len,
-            "Should add combat log entries"
-        );
     }
 }

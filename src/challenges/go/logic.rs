@@ -1,6 +1,7 @@
 //! Go game logic: placement, capture, ko, scoring.
 
-use super::types::{GoDifficulty, GoGame, GoMove, GoResult, Stone, BOARD_SIZE};
+use super::types::{GoGame, GoMove, Stone, BOARD_SIZE};
+use crate::challenges::{ChallengeDifficulty, ChallengeResult, MinigameInput};
 use std::collections::HashSet;
 
 /// Get all stones in the same group as the stone at (row, col).
@@ -257,11 +258,11 @@ fn end_game_by_scoring(game: &mut GoGame) {
 
     // Determine winner (Black plays as human)
     game.game_result = Some(if black_score > white_score {
-        GoResult::Win
+        ChallengeResult::Win
     } else if white_score > black_score {
-        GoResult::Loss
+        ChallengeResult::Loss
     } else {
-        GoResult::Draw
+        ChallengeResult::Draw
     });
 }
 
@@ -348,24 +349,10 @@ fn get_empty_region(
 }
 
 use super::mcts::mcts_best_move;
-use crate::challenges::ActiveMinigame;
-
-/// Input actions for Go game (UI-agnostic).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GoInput {
-    Up,
-    Down,
-    Left,
-    Right,
-    PlaceStone,
-    Pass,
-    Forfeit,
-    Other,
-}
 
 /// Process a key input during active Go game.
 /// Returns true if the input was handled.
-pub fn process_input(game: &mut GoGame, input: GoInput) -> bool {
+pub fn process_input(game: &mut GoGame, input: MinigameInput) -> bool {
     // Don't process input while AI is thinking
     if game.ai_thinking {
         return false;
@@ -374,9 +361,9 @@ pub fn process_input(game: &mut GoGame, input: GoInput) -> bool {
     // Handle forfeit confirmation (double-Esc pattern)
     if game.forfeit_pending {
         match input {
-            GoInput::Forfeit => {
+            MinigameInput::Cancel => {
                 // Second Esc - confirm forfeit
-                game.game_result = Some(GoResult::Loss);
+                game.game_result = Some(ChallengeResult::Forfeit);
                 game.forfeit_pending = false;
                 return true;
             }
@@ -389,109 +376,30 @@ pub fn process_input(game: &mut GoGame, input: GoInput) -> bool {
     }
 
     match input {
-        GoInput::Up => {
+        MinigameInput::Up => {
             game.move_cursor(-1, 0);
             true
         }
-        GoInput::Down => {
+        MinigameInput::Down => {
             game.move_cursor(1, 0);
             true
         }
-        GoInput::Left => {
+        MinigameInput::Left => {
             game.move_cursor(0, -1);
             true
         }
-        GoInput::Right => {
+        MinigameInput::Right => {
             game.move_cursor(0, 1);
             true
         }
-        GoInput::PlaceStone => process_human_move(game),
-        GoInput::Pass => process_human_pass(game),
-        GoInput::Forfeit => {
+        MinigameInput::Primary => process_human_move(game),
+        MinigameInput::Secondary => process_human_pass(game),
+        MinigameInput::Cancel => {
             game.forfeit_pending = true;
             true
         }
-        GoInput::Other => false,
+        MinigameInput::Other => false,
     }
-}
-
-/// Apply Go game result to state (rewards for win, clear game).
-/// Returns Some(MinigameWinInfo) if the player won, None otherwise.
-pub fn apply_go_result(
-    state: &mut crate::core::game_state::GameState,
-) -> Option<crate::challenges::MinigameWinInfo> {
-    use crate::challenges::menu::DifficultyInfo;
-    use crate::challenges::MinigameWinInfo;
-
-    let game = match state.active_minigame.as_ref() {
-        Some(ActiveMinigame::Go(g)) => g,
-        _ => return None,
-    };
-    let result = game.game_result?;
-    let difficulty = game.difficulty;
-    let old_prestige = state.prestige_rank;
-
-    let won = match result {
-        GoResult::Win => {
-            let reward = difficulty.reward();
-            state.prestige_rank += reward.prestige_ranks;
-            // Add to combat log
-            state.combat_state.add_log_entry(
-                "◉ Victory! The master bows in respect.".to_string(),
-                false,
-                true,
-            );
-            if reward.prestige_ranks > 0 {
-                state.combat_state.add_log_entry(
-                    format!(
-                        "◉ +{} Prestige Ranks (P{} → P{})",
-                        reward.prestige_ranks, old_prestige, state.prestige_rank
-                    ),
-                    false,
-                    false,
-                );
-            }
-            true
-        }
-        GoResult::Loss => {
-            state.combat_state.add_log_entry(
-                "◉ The master nods thoughtfully and departs.".to_string(),
-                false,
-                true,
-            );
-            false
-        }
-        GoResult::Draw => {
-            state.combat_state.add_log_entry(
-                "◉ A rare tie. The master seems impressed.".to_string(),
-                false,
-                true,
-            );
-            false
-        }
-    };
-
-    state.active_minigame = None;
-
-    if won {
-        Some(MinigameWinInfo {
-            game_type: "go",
-            difficulty: match difficulty {
-                GoDifficulty::Novice => "novice",
-                GoDifficulty::Apprentice => "apprentice",
-                GoDifficulty::Journeyman => "journeyman",
-                GoDifficulty::Master => "master",
-            },
-        })
-    } else {
-        None
-    }
-}
-
-/// Start a new Go game with the selected difficulty.
-pub fn start_go_game(state: &mut crate::core::game_state::GameState, difficulty: GoDifficulty) {
-    state.active_minigame = Some(ActiveMinigame::Go(GoGame::new(difficulty)));
-    state.challenge_menu.close();
 }
 
 /// Process human move at cursor position.
@@ -546,10 +454,10 @@ pub fn process_go_ai<R: rand::Rng>(game: &mut GoGame, rng: &mut R) {
     // Simulate thinking delay (5-15 ticks = 0.5-1.5 seconds)
     game.ai_think_ticks += 1;
     let min_ticks = match game.difficulty {
-        GoDifficulty::Novice => 5,
-        GoDifficulty::Apprentice => 8,
-        GoDifficulty::Journeyman => 10,
-        GoDifficulty::Master => 15,
+        ChallengeDifficulty::Novice => 5,
+        ChallengeDifficulty::Apprentice => 8,
+        ChallengeDifficulty::Journeyman => 10,
+        ChallengeDifficulty::Master => 15,
     };
 
     if game.ai_think_ticks < min_ticks {
@@ -564,7 +472,6 @@ pub fn process_go_ai<R: rand::Rng>(game: &mut GoGame, rng: &mut R) {
 
 #[cfg(test)]
 mod tests {
-    use super::super::types::GoDifficulty;
     use super::*;
 
     fn place(
@@ -704,28 +611,28 @@ mod tests {
 
     #[test]
     fn test_legal_move_empty_board() {
-        let game = GoGame::new(GoDifficulty::Novice);
+        let game = GoGame::new(ChallengeDifficulty::Novice);
         assert!(is_legal_move(&game, 4, 4));
         assert!(is_legal_move(&game, 0, 0));
     }
 
     #[test]
     fn test_illegal_move_occupied() {
-        let mut game = GoGame::new(GoDifficulty::Novice);
+        let mut game = GoGame::new(ChallengeDifficulty::Novice);
         game.board[4][4] = Some(Stone::Black);
         assert!(!is_legal_move(&game, 4, 4));
     }
 
     #[test]
     fn test_illegal_move_ko() {
-        let mut game = GoGame::new(GoDifficulty::Novice);
+        let mut game = GoGame::new(ChallengeDifficulty::Novice);
         game.ko_point = Some((4, 4));
         assert!(!is_legal_move(&game, 4, 4));
     }
 
     #[test]
     fn test_suicide_illegal() {
-        let mut game = GoGame::new(GoDifficulty::Novice);
+        let mut game = GoGame::new(ChallengeDifficulty::Novice);
         // Create a surrounded empty point
         game.board[3][4] = Some(Stone::White);
         game.board[5][4] = Some(Stone::White);
@@ -738,7 +645,7 @@ mod tests {
 
     #[test]
     fn test_capture_not_suicide() {
-        let mut game = GoGame::new(GoDifficulty::Novice);
+        let mut game = GoGame::new(ChallengeDifficulty::Novice);
         // White stone at center
         game.board[4][4] = Some(Stone::White);
         // Black almost surrounds
@@ -753,14 +660,14 @@ mod tests {
 
     #[test]
     fn test_get_legal_moves_includes_pass() {
-        let game = GoGame::new(GoDifficulty::Novice);
+        let game = GoGame::new(ChallengeDifficulty::Novice);
         let moves = get_legal_moves(&game);
         assert!(moves.contains(&GoMove::Pass));
     }
 
     #[test]
     fn test_get_legal_moves_empty_board() {
-        let game = GoGame::new(GoDifficulty::Novice);
+        let game = GoGame::new(ChallengeDifficulty::Novice);
         let moves = get_legal_moves(&game);
         // 81 board positions + 1 pass
         assert_eq!(moves.len(), 82);
@@ -768,7 +675,7 @@ mod tests {
 
     #[test]
     fn test_make_move_place() {
-        let mut game = GoGame::new(GoDifficulty::Novice);
+        let mut game = GoGame::new(ChallengeDifficulty::Novice);
         assert!(make_move(&mut game, GoMove::Place(4, 4)));
         assert_eq!(game.board[4][4], Some(Stone::Black));
         assert_eq!(game.current_player, Stone::White);
@@ -777,7 +684,7 @@ mod tests {
 
     #[test]
     fn test_make_move_pass() {
-        let mut game = GoGame::new(GoDifficulty::Novice);
+        let mut game = GoGame::new(ChallengeDifficulty::Novice);
         assert!(make_move(&mut game, GoMove::Pass));
         assert_eq!(game.current_player, Stone::White);
         assert_eq!(game.consecutive_passes, 1);
@@ -785,7 +692,7 @@ mod tests {
 
     #[test]
     fn test_two_passes_end_game() {
-        let mut game = GoGame::new(GoDifficulty::Novice);
+        let mut game = GoGame::new(ChallengeDifficulty::Novice);
         make_move(&mut game, GoMove::Pass);
         make_move(&mut game, GoMove::Pass);
         assert!(game.game_result.is_some());
@@ -793,7 +700,7 @@ mod tests {
 
     #[test]
     fn test_capture_updates_count() {
-        let mut game = GoGame::new(GoDifficulty::Novice);
+        let mut game = GoGame::new(ChallengeDifficulty::Novice);
         // Set up capture
         game.board[4][4] = Some(Stone::White);
         game.board[3][4] = Some(Stone::Black);
@@ -807,7 +714,7 @@ mod tests {
 
     #[test]
     fn test_ko_point_set() {
-        let mut game = GoGame::new(GoDifficulty::Novice);
+        let mut game = GoGame::new(ChallengeDifficulty::Novice);
         // Classic ko shape
         // . B W .
         // B . B W

@@ -4,7 +4,8 @@ use super::game_common::{
     create_game_layout, render_forfeit_status_bar, render_game_over_banner,
     render_info_panel_frame, render_status_bar, render_thinking_status_bar, GameResultType,
 };
-use crate::challenges::chess::{ChessGame, ChessResult};
+use crate::challenges::chess::ChessGame;
+use crate::challenges::ChallengeResult;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -362,22 +363,24 @@ fn render_chess_game_over(frame: &mut Frame, area: Rect, game: &ChessGame) {
     render_info_panel(frame, layout.info_panel, game);
 
     let result = game.game_result.unwrap();
-    let prestige = game.difficulty.reward_prestige();
+    let prestige = crate::challenges::menu::ChallengeType::Chess
+        .reward(game.difficulty)
+        .prestige_ranks;
     let (result_type, title, message, reward) = match result {
-        ChessResult::Win => (
+        ChallengeResult::Win => (
             GameResultType::Win,
             "VICTORY!",
             "Checkmate!",
             format!("+{} Prestige Ranks", prestige),
         ),
-        ChessResult::Loss => (GameResultType::Loss, "DEFEAT", "Checkmate", String::new()),
-        ChessResult::Draw => (
+        ChallengeResult::Loss => (GameResultType::Loss, "DEFEAT", "Checkmate", String::new()),
+        ChallengeResult::Draw => (
             GameResultType::Draw,
             "DRAW",
             "Stalemate",
             "+5000 XP".to_string(),
         ),
-        ChessResult::Forfeit => (
+        ChallengeResult::Forfeit => (
             GameResultType::Forfeit,
             "FORFEIT",
             "You conceded",

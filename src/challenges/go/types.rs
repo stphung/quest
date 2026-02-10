@@ -2,6 +2,7 @@
 //!
 //! 9x9 board, players place stones to surround territory.
 
+use crate::challenges::{ChallengeDifficulty, ChallengeResult};
 use serde::{Deserialize, Serialize};
 
 /// Board size (9x9)
@@ -30,66 +31,6 @@ pub enum GoMove {
     Pass,
 }
 
-/// AI difficulty levels (based on MCTS simulation count)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum GoDifficulty {
-    Novice,     // 500 simulations
-    Apprentice, // 2,000 simulations
-    Journeyman, // 8,000 simulations
-    Master,     // 20,000 simulations
-}
-
-impl GoDifficulty {
-    pub const ALL: [GoDifficulty; 4] = [
-        GoDifficulty::Novice,
-        GoDifficulty::Apprentice,
-        GoDifficulty::Journeyman,
-        GoDifficulty::Master,
-    ];
-
-    pub fn from_index(index: usize) -> Self {
-        Self::ALL
-            .get(index)
-            .copied()
-            .unwrap_or(GoDifficulty::Novice)
-    }
-
-    pub fn simulation_count(&self) -> u32 {
-        match self {
-            Self::Novice => 500,
-            Self::Apprentice => 2_000,
-            Self::Journeyman => 8_000,
-            Self::Master => 20_000,
-        }
-    }
-
-    pub fn reward_prestige(&self) -> u32 {
-        match self {
-            Self::Novice => 1,
-            Self::Apprentice => 2,
-            Self::Journeyman => 3,
-            Self::Master => 5,
-        }
-    }
-
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::Novice => "Novice",
-            Self::Apprentice => "Apprentice",
-            Self::Journeyman => "Journeyman",
-            Self::Master => "Master",
-        }
-    }
-}
-
-/// Result of a completed Go game
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GoResult {
-    Win,
-    Loss,
-    Draw,
-}
-
 /// Main Go game state
 #[derive(Debug, Clone)]
 pub struct GoGame {
@@ -108,9 +49,9 @@ pub struct GoGame {
     /// Cursor position (row, col) for UI
     pub cursor: (usize, usize),
     /// Difficulty level
-    pub difficulty: GoDifficulty,
+    pub difficulty: ChallengeDifficulty,
     /// Game result (None if in progress)
-    pub game_result: Option<GoResult>,
+    pub game_result: Option<ChallengeResult>,
     /// Is AI currently thinking?
     pub ai_thinking: bool,
     /// Ticks spent thinking (for delayed AI move)
@@ -122,7 +63,7 @@ pub struct GoGame {
 }
 
 impl GoGame {
-    pub fn new(difficulty: GoDifficulty) -> Self {
+    pub fn new(difficulty: ChallengeDifficulty) -> Self {
         Self {
             board: [[None; BOARD_SIZE]; BOARD_SIZE],
             current_player: Stone::Black, // Black plays first in Go
@@ -156,6 +97,16 @@ impl GoGame {
     pub fn switch_player(&mut self) {
         self.current_player = self.current_player.opponent();
     }
+
+    /// MCTS simulation count based on difficulty
+    pub fn simulation_count(&self) -> u32 {
+        match self.difficulty {
+            ChallengeDifficulty::Novice => 500,
+            ChallengeDifficulty::Apprentice => 2_000,
+            ChallengeDifficulty::Journeyman => 8_000,
+            ChallengeDifficulty::Master => 20_000,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -169,31 +120,20 @@ mod tests {
     }
 
     #[test]
-    fn test_difficulty_from_index() {
-        assert_eq!(GoDifficulty::from_index(0), GoDifficulty::Novice);
-        assert_eq!(GoDifficulty::from_index(3), GoDifficulty::Master);
-        assert_eq!(GoDifficulty::from_index(99), GoDifficulty::Novice);
-    }
-
-    #[test]
-    fn test_difficulty_simulation_count() {
-        assert_eq!(GoDifficulty::Novice.simulation_count(), 500);
-        assert_eq!(GoDifficulty::Apprentice.simulation_count(), 2_000);
-        assert_eq!(GoDifficulty::Journeyman.simulation_count(), 8_000);
-        assert_eq!(GoDifficulty::Master.simulation_count(), 20_000);
-    }
-
-    #[test]
-    fn test_difficulty_reward_prestige() {
-        assert_eq!(GoDifficulty::Novice.reward_prestige(), 1);
-        assert_eq!(GoDifficulty::Apprentice.reward_prestige(), 2);
-        assert_eq!(GoDifficulty::Journeyman.reward_prestige(), 3);
-        assert_eq!(GoDifficulty::Master.reward_prestige(), 5);
+    fn test_simulation_count() {
+        let game_novice = GoGame::new(ChallengeDifficulty::Novice);
+        assert_eq!(game_novice.simulation_count(), 500);
+        let game_apprentice = GoGame::new(ChallengeDifficulty::Apprentice);
+        assert_eq!(game_apprentice.simulation_count(), 2_000);
+        let game_journeyman = GoGame::new(ChallengeDifficulty::Journeyman);
+        assert_eq!(game_journeyman.simulation_count(), 8_000);
+        let game_master = GoGame::new(ChallengeDifficulty::Master);
+        assert_eq!(game_master.simulation_count(), 20_000);
     }
 
     #[test]
     fn test_new_game() {
-        let game = GoGame::new(GoDifficulty::Novice);
+        let game = GoGame::new(ChallengeDifficulty::Novice);
         assert_eq!(game.cursor, (4, 4)); // Center of 9x9
         assert_eq!(game.current_player, Stone::Black);
         assert!(game.game_result.is_none());
@@ -203,7 +143,7 @@ mod tests {
 
     #[test]
     fn test_move_cursor() {
-        let mut game = GoGame::new(GoDifficulty::Novice);
+        let mut game = GoGame::new(ChallengeDifficulty::Novice);
         game.move_cursor(-1, 0); // Up
         assert_eq!(game.cursor, (3, 4));
         game.cursor = (0, 0);
@@ -216,7 +156,7 @@ mod tests {
 
     #[test]
     fn test_is_empty() {
-        let mut game = GoGame::new(GoDifficulty::Novice);
+        let mut game = GoGame::new(ChallengeDifficulty::Novice);
         assert!(game.is_empty(4, 4));
         game.board[4][4] = Some(Stone::Black);
         assert!(!game.is_empty(4, 4));
@@ -224,7 +164,7 @@ mod tests {
 
     #[test]
     fn test_switch_player() {
-        let mut game = GoGame::new(GoDifficulty::Novice);
+        let mut game = GoGame::new(ChallengeDifficulty::Novice);
         assert_eq!(game.current_player, Stone::Black);
         game.switch_player();
         assert_eq!(game.current_player, Stone::White);

@@ -1,75 +1,8 @@
 //! Chess minigame data structures and state management.
 
+use crate::challenges::{ChallengeDifficulty, ChallengeResult};
 use chess_engine::{Color as ChessColor, Evaluate, Move, Position};
 use serde::{Deserialize, Serialize};
-
-/// AI difficulty levels
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ChessDifficulty {
-    Novice,     // 50% random moves, ~500 ELO
-    Apprentice, // 1-ply search, ~800 ELO
-    Journeyman, // 2-ply search, ~1100 ELO
-    Master,     // 3-ply search, ~1350 ELO
-}
-
-impl ChessDifficulty {
-    pub const ALL: [ChessDifficulty; 4] = [
-        ChessDifficulty::Novice,
-        ChessDifficulty::Apprentice,
-        ChessDifficulty::Journeyman,
-        ChessDifficulty::Master,
-    ];
-
-    pub fn from_index(index: usize) -> Self {
-        Self::ALL
-            .get(index)
-            .copied()
-            .unwrap_or(ChessDifficulty::Novice)
-    }
-
-    pub fn search_depth(&self) -> i32 {
-        match self {
-            Self::Novice => 1,
-            Self::Apprentice => 1,
-            Self::Journeyman => 2,
-            Self::Master => 3,
-        }
-    }
-
-    pub fn random_move_chance(&self) -> f64 {
-        match self {
-            Self::Novice => 0.5,
-            _ => 0.0,
-        }
-    }
-
-    pub fn reward_prestige(&self) -> u32 {
-        match self {
-            Self::Novice => 1,
-            Self::Apprentice => 2,
-            Self::Journeyman => 3,
-            Self::Master => 5,
-        }
-    }
-
-    pub fn estimated_elo(&self) -> u32 {
-        match self {
-            Self::Novice => 500,
-            Self::Apprentice => 800,
-            Self::Journeyman => 1100,
-            Self::Master => 1350,
-        }
-    }
-
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::Novice => "Novice",
-            Self::Apprentice => "Apprentice",
-            Self::Journeyman => "Journeyman",
-            Self::Master => "Master",
-        }
-    }
-}
 
 /// Persistent chess stats (saved to disk)
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -81,24 +14,15 @@ pub struct ChessStats {
     pub prestige_earned: u32,
 }
 
-/// Result of a completed chess game
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ChessResult {
-    Win,
-    Loss,
-    Draw,
-    Forfeit,
-}
-
 /// Active chess game session (transient, not saved)
 #[derive(Debug, Clone)]
 pub struct ChessGame {
     pub board: chess_engine::Board,
-    pub difficulty: ChessDifficulty,
+    pub difficulty: ChallengeDifficulty,
     pub cursor: (u8, u8),
     pub selected_square: Option<(u8, u8)>,
     pub legal_move_destinations: Vec<(u8, u8)>,
-    pub game_result: Option<ChessResult>,
+    pub game_result: Option<ChallengeResult>,
     pub forfeit_pending: bool,
     pub ai_thinking: bool,
     pub ai_think_ticks: u32,
@@ -113,7 +37,25 @@ pub struct ChessGame {
 }
 
 impl ChessGame {
-    pub fn new(difficulty: ChessDifficulty) -> Self {
+    /// Chess-specific AI search depth based on difficulty.
+    pub fn search_depth(&self) -> i32 {
+        match self.difficulty {
+            ChallengeDifficulty::Novice => 1,
+            ChallengeDifficulty::Apprentice => 1,
+            ChallengeDifficulty::Journeyman => 2,
+            ChallengeDifficulty::Master => 3,
+        }
+    }
+
+    /// Chess-specific random move chance based on difficulty.
+    pub fn random_move_chance(&self) -> f64 {
+        match self.difficulty {
+            ChallengeDifficulty::Novice => 0.5,
+            _ => 0.0,
+        }
+    }
+
+    pub fn new(difficulty: ChallengeDifficulty) -> Self {
         Self {
             board: chess_engine::Board::default(),
             difficulty,
@@ -292,9 +234,9 @@ impl ChessGame {
 
                 // Determine winner
                 self.game_result = Some(if winner == self.player_color() {
-                    ChessResult::Win
+                    ChallengeResult::Win
                 } else {
-                    ChessResult::Loss
+                    ChallengeResult::Loss
                 });
                 true
             }
@@ -304,7 +246,7 @@ impl ChessGame {
 
                 self.selected_square = None;
                 self.legal_move_destinations.clear();
-                self.game_result = Some(ChessResult::Draw);
+                self.game_result = Some(ChallengeResult::Draw);
                 true
             }
             chess_engine::GameResult::IllegalMove(_) => {
@@ -382,40 +324,54 @@ mod tests {
 
     #[test]
     fn test_difficulty_from_index() {
-        assert_eq!(ChessDifficulty::from_index(0), ChessDifficulty::Novice);
-        assert_eq!(ChessDifficulty::from_index(1), ChessDifficulty::Apprentice);
-        assert_eq!(ChessDifficulty::from_index(2), ChessDifficulty::Journeyman);
-        assert_eq!(ChessDifficulty::from_index(3), ChessDifficulty::Master);
-        assert_eq!(ChessDifficulty::from_index(99), ChessDifficulty::Novice);
+        assert_eq!(
+            ChallengeDifficulty::from_index(0),
+            ChallengeDifficulty::Novice
+        );
+        assert_eq!(
+            ChallengeDifficulty::from_index(1),
+            ChallengeDifficulty::Apprentice
+        );
+        assert_eq!(
+            ChallengeDifficulty::from_index(2),
+            ChallengeDifficulty::Journeyman
+        );
+        assert_eq!(
+            ChallengeDifficulty::from_index(3),
+            ChallengeDifficulty::Master
+        );
+        assert_eq!(
+            ChallengeDifficulty::from_index(99),
+            ChallengeDifficulty::Novice
+        );
     }
 
     #[test]
     fn test_difficulty_properties() {
-        assert_eq!(ChessDifficulty::Novice.random_move_chance(), 0.5);
-        assert_eq!(ChessDifficulty::Apprentice.random_move_chance(), 0.0);
-        assert_eq!(ChessDifficulty::Novice.reward_prestige(), 1);
-        assert_eq!(ChessDifficulty::Master.reward_prestige(), 5);
-        assert_eq!(ChessDifficulty::Novice.estimated_elo(), 500);
-        assert_eq!(ChessDifficulty::Master.estimated_elo(), 1350);
+        let novice = ChessGame::new(ChallengeDifficulty::Novice);
+        let apprentice = ChessGame::new(ChallengeDifficulty::Apprentice);
+
+        assert_eq!(novice.random_move_chance(), 0.5);
+        assert_eq!(apprentice.random_move_chance(), 0.0);
     }
 
     #[test]
-    fn test_difficulty_rewards_via_trait() {
-        use crate::challenges::menu::DifficultyInfo;
+    fn test_difficulty_rewards_via_challenge_type() {
+        use crate::challenges::menu::ChallengeType;
 
         // Chess rewards prestige only
-        let novice = ChessDifficulty::Novice.reward();
+        let novice = ChallengeType::Chess.reward(ChallengeDifficulty::Novice);
         assert_eq!(novice.prestige_ranks, 1);
         assert_eq!(novice.xp_percent, 0);
         assert_eq!(novice.fishing_ranks, 0);
 
-        let apprentice = ChessDifficulty::Apprentice.reward();
+        let apprentice = ChallengeType::Chess.reward(ChallengeDifficulty::Apprentice);
         assert_eq!(apprentice.prestige_ranks, 2);
 
-        let journeyman = ChessDifficulty::Journeyman.reward();
+        let journeyman = ChallengeType::Chess.reward(ChallengeDifficulty::Journeyman);
         assert_eq!(journeyman.prestige_ranks, 3);
 
-        let master = ChessDifficulty::Master.reward();
+        let master = ChallengeType::Chess.reward(ChallengeDifficulty::Master);
         assert_eq!(master.prestige_ranks, 5);
         assert_eq!(master.xp_percent, 0);
         assert_eq!(master.fishing_ranks, 0);
@@ -423,8 +379,8 @@ mod tests {
 
     #[test]
     fn test_chess_game_new() {
-        let game = ChessGame::new(ChessDifficulty::Journeyman);
-        assert_eq!(game.difficulty, ChessDifficulty::Journeyman);
+        let game = ChessGame::new(ChallengeDifficulty::Journeyman);
+        assert_eq!(game.difficulty, ChallengeDifficulty::Journeyman);
         assert_eq!(game.cursor, (4, 1));
         assert!(game.selected_square.is_none());
         assert!(game.game_result.is_none());
@@ -433,7 +389,7 @@ mod tests {
 
     #[test]
     fn test_cursor_movement() {
-        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        let mut game = ChessGame::new(ChallengeDifficulty::Novice);
         game.cursor = (3, 3);
         game.move_cursor(1, 0);
         assert_eq!(game.cursor, (4, 3));
@@ -445,7 +401,7 @@ mod tests {
 
     #[test]
     fn test_cursor_bounds() {
-        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        let mut game = ChessGame::new(ChallengeDifficulty::Novice);
         game.cursor = (0, 0);
         game.move_cursor(-1, -1);
         assert_eq!(game.cursor, (0, 0));
@@ -464,7 +420,7 @@ mod tests {
 
     #[test]
     fn test_player_color() {
-        let game = ChessGame::new(ChessDifficulty::Novice);
+        let game = ChessGame::new(ChallengeDifficulty::Novice);
         assert!(game.player_is_white);
         assert_eq!(game.player_color(), ChessColor::White);
         assert!(game.is_player_turn());
@@ -472,14 +428,14 @@ mod tests {
 
     #[test]
     fn test_cursor_on_player_piece() {
-        let game = ChessGame::new(ChessDifficulty::Novice);
+        let game = ChessGame::new(ChallengeDifficulty::Novice);
         // Cursor starts at e2 which has a white pawn
         assert!(game.cursor_on_player_piece());
     }
 
     #[test]
     fn test_select_piece_at_cursor() {
-        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        let mut game = ChessGame::new(ChallengeDifficulty::Novice);
         // Cursor at e2 (white pawn)
         let selected = game.select_piece_at_cursor();
         assert!(selected);
@@ -491,7 +447,7 @@ mod tests {
 
     #[test]
     fn test_select_empty_square() {
-        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        let mut game = ChessGame::new(ChallengeDifficulty::Novice);
         game.cursor = (4, 4); // e5 - empty square
         let selected = game.select_piece_at_cursor();
         assert!(!selected);
@@ -500,7 +456,7 @@ mod tests {
 
     #[test]
     fn test_select_enemy_piece() {
-        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        let mut game = ChessGame::new(ChallengeDifficulty::Novice);
         game.cursor = (4, 6); // e7 - black pawn
         let selected = game.select_piece_at_cursor();
         assert!(!selected);
@@ -509,7 +465,7 @@ mod tests {
 
     #[test]
     fn test_clear_selection() {
-        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        let mut game = ChessGame::new(ChallengeDifficulty::Novice);
         game.select_piece_at_cursor();
         assert!(game.selected_square.is_some());
         game.clear_selection();
@@ -519,7 +475,7 @@ mod tests {
 
     #[test]
     fn test_try_move_to_cursor() {
-        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        let mut game = ChessGame::new(ChallengeDifficulty::Novice);
         // Select e2 pawn
         game.select_piece_at_cursor();
         // Move cursor to e4
@@ -534,7 +490,7 @@ mod tests {
 
     #[test]
     fn test_try_invalid_move() {
-        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        let mut game = ChessGame::new(ChallengeDifficulty::Novice);
         // Select e2 pawn
         game.select_piece_at_cursor();
         // Move cursor to e5 (not a legal move for pawn)
@@ -649,7 +605,7 @@ mod tests {
 
     #[test]
     fn test_record_move_updates_last_move() {
-        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        let mut game = ChessGame::new(ChallengeDifficulty::Novice);
         assert!(game.last_move.is_none());
 
         game.record_move((4, 1), (4, 3), "e4".to_string());
@@ -659,7 +615,7 @@ mod tests {
 
     #[test]
     fn test_record_move_adds_to_history() {
-        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        let mut game = ChessGame::new(ChallengeDifficulty::Novice);
         assert!(game.move_history.is_empty());
 
         game.record_move((4, 1), (4, 3), "e4".to_string());
@@ -672,7 +628,7 @@ mod tests {
 
     #[test]
     fn test_move_history_after_player_move() {
-        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        let mut game = ChessGame::new(ChallengeDifficulty::Novice);
         // Select e2 pawn and move to e4
         game.select_piece_at_cursor();
         game.cursor = (4, 3);
@@ -686,7 +642,7 @@ mod tests {
 
     #[test]
     fn test_last_move_updates_each_move() {
-        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        let mut game = ChessGame::new(ChallengeDifficulty::Novice);
 
         game.record_move((4, 1), (4, 3), "e4".to_string());
         assert_eq!(game.last_move, Some(((4, 1), (4, 3))));
@@ -700,7 +656,7 @@ mod tests {
 
     #[test]
     fn test_new_game_has_empty_history() {
-        let game = ChessGame::new(ChessDifficulty::Master);
+        let game = ChessGame::new(ChallengeDifficulty::Master);
         assert!(game.move_history.is_empty());
         assert!(game.last_move.is_none());
     }
@@ -709,27 +665,27 @@ mod tests {
 
     #[test]
     fn test_forfeit_pending_starts_false() {
-        let game = ChessGame::new(ChessDifficulty::Novice);
+        let game = ChessGame::new(ChallengeDifficulty::Novice);
         assert!(!game.forfeit_pending);
     }
 
     #[test]
     fn test_forfeit_pending_can_be_set() {
-        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        let mut game = ChessGame::new(ChallengeDifficulty::Novice);
         game.forfeit_pending = true;
         assert!(game.forfeit_pending);
     }
 
     #[test]
     fn test_forfeit_result_sets_game_over() {
-        let mut game = ChessGame::new(ChessDifficulty::Novice);
-        game.game_result = Some(ChessResult::Forfeit);
-        assert_eq!(game.game_result, Some(ChessResult::Forfeit));
+        let mut game = ChessGame::new(ChallengeDifficulty::Novice);
+        game.game_result = Some(ChallengeResult::Forfeit);
+        assert_eq!(game.game_result, Some(ChallengeResult::Forfeit));
     }
 
     #[test]
     fn test_forfeit_clears_on_piece_selection() {
-        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        let mut game = ChessGame::new(ChallengeDifficulty::Novice);
         game.forfeit_pending = true;
 
         // Selecting a piece should conceptually clear forfeit
@@ -741,7 +697,7 @@ mod tests {
 
     #[test]
     fn test_move_clears_selection_not_forfeit() {
-        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        let mut game = ChessGame::new(ChallengeDifficulty::Novice);
         game.forfeit_pending = true;
 
         // Make a move

@@ -2,9 +2,7 @@
 
 use super::types::{haven_discovery_chance, tier_cost, Haven, HavenRoomId};
 use rand::Rng;
-use std::fs;
 use std::io;
-use std::path::PathBuf;
 
 /// Check if a character can afford to build/upgrade a room
 pub fn can_afford(room: HavenRoomId, haven: &Haven, prestige_rank: u32) -> bool {
@@ -66,36 +64,14 @@ pub fn try_discover_haven<R: Rng>(haven: &mut Haven, prestige_rank: u32, rng: &m
     false
 }
 
-/// Get the Haven save file path
-pub fn haven_save_path() -> io::Result<PathBuf> {
-    let home_dir = dirs::home_dir().ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::NotFound,
-            "Could not determine home directory",
-        )
-    })?;
-    Ok(home_dir.join(".quest").join("haven.json"))
-}
-
 /// Load Haven from disk, or return default if not found
 pub fn load_haven() -> Haven {
-    let path = match haven_save_path() {
-        Ok(p) => p,
-        Err(_) => return Haven::new(),
-    };
-    match fs::read_to_string(&path) {
-        Ok(json) => serde_json::from_str(&json).unwrap_or_default(),
-        Err(_) => Haven::new(),
-    }
+    crate::utils::persistence::load_json_or_default("haven.json")
 }
 
 /// Save Haven to disk
 pub fn save_haven(haven: &Haven) -> io::Result<()> {
-    let path = haven_save_path()?;
-    let json = serde_json::to_string_pretty(haven)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-    fs::write(path, json)?;
-    Ok(())
+    crate::utils::persistence::save_json("haven.json", haven)
 }
 
 #[cfg(test)]

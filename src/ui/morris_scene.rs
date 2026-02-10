@@ -4,9 +4,8 @@ use super::game_common::{
     create_game_layout, render_forfeit_status_bar, render_game_over_banner,
     render_info_panel_frame, render_status_bar, render_thinking_status_bar, GameResultType,
 };
-use crate::challenges::morris::{
-    MorrisGame, MorrisMove, MorrisPhase, MorrisResult, Player, ADJACENCIES,
-};
+use crate::challenges::morris::{MorrisGame, MorrisMove, MorrisPhase, Player, ADJACENCIES};
+use crate::challenges::ChallengeResult;
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
@@ -20,10 +19,12 @@ pub fn render_morris_scene(frame: &mut Frame, area: Rect, game: &MorrisGame, cha
     // Check for game over - show board with banner
     if game.game_result.is_some() {
         let xp_for_level = crate::core::game_logic::xp_for_next_level(character_level.max(1));
-        let xp_reward =
-            (xp_for_level as f64 * game.difficulty.reward_xp_percent() as f64 / 100.0) as u64;
+        let xp_percent = crate::challenges::menu::ChallengeType::Morris
+            .reward(game.difficulty)
+            .xp_percent;
+        let xp_reward = (xp_for_level as f64 * xp_percent as f64 / 100.0) as u64;
         let xp_reward = xp_reward.max(100);
-        let is_master = game.difficulty == crate::challenges::morris::MorrisDifficulty::Master;
+        let is_master = game.difficulty == crate::challenges::ChallengeDifficulty::Master;
         render_morris_game_over(frame, area, game, xp_reward, is_master);
         return;
     }
@@ -543,7 +544,7 @@ fn render_morris_game_over(
 
     let result = game.game_result.unwrap();
     let (result_type, title, message, reward) = match result {
-        MorrisResult::Win => {
+        ChallengeResult::Win => {
             let reward_text = if is_master {
                 format!("+{} XP, +1 Fishing Rank", xp_reward)
             } else {
@@ -556,7 +557,7 @@ fn render_morris_game_over(
                 reward_text,
             )
         }
-        MorrisResult::Loss => {
+        ChallengeResult::Loss => {
             // Determine loss reason from game state
             let msg = if game.pieces_on_board.0 < 3 {
                 "Reduced to fewer than 3 pieces"
@@ -565,10 +566,16 @@ fn render_morris_game_over(
             };
             (GameResultType::Loss, "DEFEAT", msg, String::new())
         }
-        MorrisResult::Forfeit => (
+        ChallengeResult::Forfeit => (
             GameResultType::Forfeit,
             "FORFEIT",
             "You conceded the game",
+            String::new(),
+        ),
+        ChallengeResult::Draw => (
+            GameResultType::Draw,
+            "DRAW",
+            "The game ended in a draw",
             String::new(),
         ),
     };

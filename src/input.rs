@@ -2,25 +2,8 @@
 //!
 //! Extracts the input dispatch logic from main.rs into a clean priority chain.
 
-use crate::challenges::chess::logic::{
-    apply_game_result as apply_chess_result, process_input as process_chess_input, ChessInput,
-};
-use crate::challenges::go::{apply_go_result, process_input as process_go_input, GoInput};
-use crate::challenges::gomoku::logic::{
-    apply_game_result as apply_gomoku_result, process_input as process_gomoku_input, GomokuInput,
-};
 use crate::challenges::menu::{process_input as process_menu_input, MenuInput};
-use crate::challenges::minesweeper::logic::{
-    apply_game_result as apply_minesweeper_result, process_input as process_minesweeper_input,
-    MinesweeperInput,
-};
-use crate::challenges::morris::logic::{
-    apply_game_result as apply_morris_result, process_input as process_morris_input, MorrisInput,
-};
-use crate::challenges::rune::logic::{
-    apply_game_result as apply_rune_result, process_input as process_rune_input, RuneInput,
-};
-use crate::challenges::ActiveMinigame;
+use crate::challenges::{apply_minigame_result, ActiveMinigame, MinigameInput};
 use crate::character::prestige::{can_prestige, get_prestige_tier, perform_prestige};
 use crate::core::game_logic::OfflineReport;
 use crate::core::game_state::GameState;
@@ -459,110 +442,65 @@ fn handle_debug_menu(
 }
 
 fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
-    if let Some(ref mut minigame) = state.active_minigame {
-        match minigame {
-            ActiveMinigame::Rune(rune_game) => {
-                if rune_game.game_result.is_some() {
-                    state.last_minigame_win = apply_rune_result(state);
-                    return InputResult::Continue;
-                }
-                let input = match key.code {
-                    KeyCode::Left => RuneInput::Left,
-                    KeyCode::Right => RuneInput::Right,
-                    KeyCode::Up => RuneInput::Up,
-                    KeyCode::Down => RuneInput::Down,
-                    KeyCode::Enter => RuneInput::Submit,
-                    KeyCode::Char('f') | KeyCode::Char('F') => RuneInput::ClearGuess,
-                    KeyCode::Esc => RuneInput::Forfeit,
-                    _ => RuneInput::Other,
-                };
-                let mut rng = rand::thread_rng();
-                process_rune_input(rune_game, input, &mut rng);
-            }
-            ActiveMinigame::Minesweeper(minesweeper_game) => {
-                if minesweeper_game.game_result.is_some() {
-                    state.last_minigame_win = apply_minesweeper_result(state);
-                    return InputResult::Continue;
-                }
-                let input = match key.code {
-                    KeyCode::Up => MinesweeperInput::Up,
-                    KeyCode::Down => MinesweeperInput::Down,
-                    KeyCode::Left => MinesweeperInput::Left,
-                    KeyCode::Right => MinesweeperInput::Right,
-                    KeyCode::Enter => MinesweeperInput::Reveal,
-                    KeyCode::Char('f') | KeyCode::Char('F') => MinesweeperInput::ToggleFlag,
-                    KeyCode::Esc => MinesweeperInput::Forfeit,
-                    _ => MinesweeperInput::Other,
-                };
-                let mut rng = rand::thread_rng();
-                process_minesweeper_input(minesweeper_game, input, &mut rng);
-            }
-            ActiveMinigame::Gomoku(gomoku_game) => {
-                if gomoku_game.game_result.is_some() {
-                    state.last_minigame_win = apply_gomoku_result(state);
-                    return InputResult::Continue;
-                }
-                let input = match key.code {
-                    KeyCode::Up => GomokuInput::Up,
-                    KeyCode::Down => GomokuInput::Down,
-                    KeyCode::Left => GomokuInput::Left,
-                    KeyCode::Right => GomokuInput::Right,
-                    KeyCode::Enter => GomokuInput::PlaceStone,
-                    KeyCode::Esc => GomokuInput::Forfeit,
-                    _ => GomokuInput::Other,
-                };
-                process_gomoku_input(gomoku_game, input);
-            }
-            ActiveMinigame::Chess(chess_game) => {
-                if chess_game.game_result.is_some() {
-                    state.last_minigame_win = apply_chess_result(state);
-                    return InputResult::Continue;
-                }
-                let input = match key.code {
-                    KeyCode::Up => ChessInput::Up,
-                    KeyCode::Down => ChessInput::Down,
-                    KeyCode::Left => ChessInput::Left,
-                    KeyCode::Right => ChessInput::Right,
-                    KeyCode::Enter => ChessInput::Select,
-                    KeyCode::Esc => ChessInput::Cancel,
-                    _ => ChessInput::Other,
-                };
-                process_chess_input(chess_game, input);
-            }
-            ActiveMinigame::Morris(morris_game) => {
-                if morris_game.game_result.is_some() {
-                    state.last_minigame_win = apply_morris_result(state);
-                    return InputResult::Continue;
-                }
-                let input = match key.code {
-                    KeyCode::Up => MorrisInput::Up,
-                    KeyCode::Down => MorrisInput::Down,
-                    KeyCode::Left => MorrisInput::Left,
-                    KeyCode::Right => MorrisInput::Right,
-                    KeyCode::Enter => MorrisInput::Select,
-                    KeyCode::Esc => MorrisInput::Cancel,
-                    _ => MorrisInput::Other,
-                };
-                process_morris_input(morris_game, input);
-            }
-            ActiveMinigame::Go(go_game) => {
-                if go_game.game_result.is_some() {
-                    state.last_minigame_win = apply_go_result(state);
-                    return InputResult::Continue;
-                }
-                let input = match key.code {
-                    KeyCode::Up => GoInput::Up,
-                    KeyCode::Down => GoInput::Down,
-                    KeyCode::Left => GoInput::Left,
-                    KeyCode::Right => GoInput::Right,
-                    KeyCode::Enter => GoInput::PlaceStone,
-                    KeyCode::Char('p') | KeyCode::Char('P') => GoInput::Pass,
-                    KeyCode::Esc => GoInput::Forfeit,
-                    _ => GoInput::Other,
-                };
-                process_go_input(go_game, input);
-            }
+    // Check if the current game is finished — apply result on any key
+    let game_over = match state.active_minigame.as_ref() {
+        Some(ActiveMinigame::Chess(g)) => g.game_result.is_some(),
+        Some(ActiveMinigame::Go(g)) => g.game_result.is_some(),
+        Some(ActiveMinigame::Morris(g)) => g.game_result.is_some(),
+        Some(ActiveMinigame::Gomoku(g)) => g.game_result.is_some(),
+        Some(ActiveMinigame::Minesweeper(g)) => g.game_result.is_some(),
+        Some(ActiveMinigame::Rune(g)) => g.game_result.is_some(),
+        None => return InputResult::Continue,
+    };
+
+    if game_over {
+        state.last_minigame_win = apply_minigame_result(state);
+        return InputResult::Continue;
+    }
+
+    // Unified key → MinigameInput mapping
+    let input = match key.code {
+        KeyCode::Up => MinigameInput::Up,
+        KeyCode::Down => MinigameInput::Down,
+        KeyCode::Left => MinigameInput::Left,
+        KeyCode::Right => MinigameInput::Right,
+        KeyCode::Enter => MinigameInput::Primary,
+        KeyCode::Char('f') | KeyCode::Char('F') => MinigameInput::Secondary,
+        KeyCode::Char('p') | KeyCode::Char('P') => MinigameInput::Secondary,
+        KeyCode::Esc => MinigameInput::Cancel,
+        _ => MinigameInput::Other,
+    };
+
+    // Dispatch to game-specific input handler
+    use crate::challenges::chess::logic::process_input as process_chess_input;
+    use crate::challenges::go::process_input as process_go_input;
+    use crate::challenges::gomoku::logic::process_input as process_gomoku_input;
+    use crate::challenges::minesweeper::logic::process_input as process_minesweeper_input;
+    use crate::challenges::morris::logic::process_input as process_morris_input;
+    use crate::challenges::rune::logic::process_input as process_rune_input;
+
+    match state.active_minigame.as_mut() {
+        Some(ActiveMinigame::Chess(g)) => {
+            process_chess_input(g, input);
         }
+        Some(ActiveMinigame::Go(g)) => {
+            process_go_input(g, input);
+        }
+        Some(ActiveMinigame::Morris(g)) => {
+            process_morris_input(g, input);
+        }
+        Some(ActiveMinigame::Gomoku(g)) => {
+            process_gomoku_input(g, input);
+        }
+        Some(ActiveMinigame::Minesweeper(g)) => {
+            let mut rng = rand::thread_rng();
+            process_minesweeper_input(g, input, &mut rng);
+        }
+        Some(ActiveMinigame::Rune(g)) => {
+            let mut rng = rand::thread_rng();
+            process_rune_input(g, input, &mut rng);
+        }
+        None => {}
     }
     InputResult::Continue
 }

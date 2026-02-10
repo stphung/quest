@@ -1,44 +1,31 @@
 //! Chess game logic: AI moves, and game resolution.
 
-use super::{ChessDifficulty, ChessGame, ChessResult};
-use crate::challenges::ActiveMinigame;
-use crate::core::game_state::GameState;
+use super::ChessGame;
+use crate::challenges::{ChallengeResult, MinigameInput};
 use chess_engine::Evaluate;
 use rand::Rng;
-
-/// Input actions for the Chess game (UI-agnostic).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ChessInput {
-    Up,
-    Down,
-    Left,
-    Right,
-    Select, // Enter - select piece or move
-    Cancel, // Esc - clear selection or forfeit
-    Other,
-}
 
 /// Process a key input during active Chess game.
 /// Returns true if the input was handled.
 /// Does nothing if AI is thinking.
-pub fn process_input(game: &mut ChessGame, input: ChessInput) -> bool {
+pub fn process_input(game: &mut ChessGame, input: MinigameInput) -> bool {
     // Don't process input while AI is thinking
     if game.ai_thinking {
         return false;
     }
 
     match input {
-        ChessInput::Up => game.move_cursor(0, 1),
-        ChessInput::Down => game.move_cursor(0, -1),
-        ChessInput::Left => game.move_cursor(-1, 0),
-        ChessInput::Right => game.move_cursor(1, 0),
-        ChessInput::Select => {
+        MinigameInput::Up => game.move_cursor(0, 1),
+        MinigameInput::Down => game.move_cursor(0, -1),
+        MinigameInput::Left => game.move_cursor(-1, 0),
+        MinigameInput::Right => game.move_cursor(1, 0),
+        MinigameInput::Primary => {
             process_select(game);
         }
-        ChessInput::Cancel => {
+        MinigameInput::Cancel => {
             process_cancel(game);
         }
-        ChessInput::Other => {
+        MinigameInput::Secondary | MinigameInput::Other => {
             // Any other key cancels forfeit pending
             game.forfeit_pending = false;
         }
@@ -68,19 +55,13 @@ fn process_select(game: &mut ChessGame) {
 /// Process Esc key: clear selection or initiate/confirm forfeit.
 fn process_cancel(game: &mut ChessGame) {
     if game.forfeit_pending {
-        game.game_result = Some(ChessResult::Forfeit);
+        game.game_result = Some(ChallengeResult::Forfeit);
     } else if game.selected_square.is_some() {
         game.clear_selection();
         game.forfeit_pending = false;
     } else {
         game.forfeit_pending = true;
     }
-}
-
-/// Start a chess game with the selected difficulty
-pub fn start_chess_game(state: &mut GameState, difficulty: ChessDifficulty) {
-    state.active_minigame = Some(ActiveMinigame::Chess(Box::new(ChessGame::new(difficulty))));
-    state.challenge_menu.close();
 }
 
 /// Calculate variable AI thinking time in ticks (1.5-6s range at 100ms/tick)
@@ -94,7 +75,7 @@ pub fn calculate_think_ticks<R: Rng>(board: &chess_engine::Board, rng: &mut R) -
 /// Get AI move with difficulty-based weakening, returns the chosen Move
 pub fn get_ai_move<R: Rng>(
     board: &chess_engine::Board,
-    difficulty: ChessDifficulty,
+    game: &ChessGame,
     rng: &mut R,
 ) -> chess_engine::Move {
     let legal_moves = board.get_legal_moves();
@@ -103,12 +84,12 @@ pub fn get_ai_move<R: Rng>(
     }
 
     // Random move for Novice difficulty
-    if rng.gen::<f64>() < difficulty.random_move_chance() {
+    if rng.gen::<f64>() < game.random_move_chance() {
         let idx = rng.gen_range(0..legal_moves.len());
         return legal_moves[idx];
     }
 
-    let (best_move, _, _) = board.get_best_next_move(difficulty.search_depth());
+    let (best_move, _, _) = board.get_best_next_move(game.search_depth());
     best_move
 }
 
@@ -133,7 +114,7 @@ pub fn process_ai_thinking<R: Rng>(game: &mut ChessGame, rng: &mut R) -> bool {
 
     // Compute AI move on first tick
     if game.ai_pending_board.is_none() {
-        let ai_move = get_ai_move(&game.board, game.difficulty, rng);
+        let ai_move = get_ai_move(&game.board, game, rng);
         // Apply the move to get the resulting board
         if let Some(new_board) = apply_move_to_board(&game.board, ai_move) {
             game.ai_pending_board = Some(new_board);
@@ -209,99 +190,12 @@ pub fn check_game_over(game: &mut ChessGame) {
         // Current player (whose turn it is) is in checkmate
         let loser = game.board.get_turn_color();
         game.game_result = Some(if loser == game.player_color() {
-            ChessResult::Loss
+            ChallengeResult::Loss
         } else {
-            ChessResult::Win
+            ChallengeResult::Win
         });
     } else if game.board.is_stalemate() {
-        game.game_result = Some(ChessResult::Draw);
-    }
-}
-
-/// Apply game result: update stats, grant rewards, and add combat log entries.
-/// Returns Some(MinigameWinInfo) if the player won, None otherwise.
-pub fn apply_game_result(state: &mut GameState) -> Option<crate::challenges::MinigameWinInfo> {
-    use crate::challenges::menu::DifficultyInfo;
-    use crate::challenges::MinigameWinInfo;
-
-    let game = match state.active_minigame.as_ref() {
-        Some(ActiveMinigame::Chess(g)) => g,
-        _ => return None,
-    };
-    let result = game.game_result?;
-    let reward = game.difficulty.reward();
-    let old_prestige = state.prestige_rank;
-    let difficulty = game.difficulty;
-
-    state.chess_stats.games_played += 1;
-
-    let won = match result {
-        ChessResult::Win => {
-            state.chess_stats.games_won += 1;
-            state.prestige_rank += reward.prestige_ranks;
-            state.chess_stats.prestige_earned += reward.prestige_ranks;
-
-            // Combat log entries
-            state.combat_state.add_log_entry(
-                "♟ Checkmate! You defeated the mysterious figure.".to_string(),
-                false,
-                true,
-            );
-            if reward.prestige_ranks > 0 {
-                state.combat_state.add_log_entry(
-                    format!(
-                        "♟ +{} Prestige Ranks (P{} → P{})",
-                        reward.prestige_ranks, old_prestige, state.prestige_rank
-                    ),
-                    false,
-                    true,
-                );
-            }
-            true
-        }
-        ChessResult::Loss => {
-            state.chess_stats.games_lost += 1;
-            state.combat_state.add_log_entry(
-                "♟ The mysterious figure nods respectfully and vanishes.".to_string(),
-                false,
-                true,
-            );
-            false
-        }
-        ChessResult::Forfeit => {
-            state.chess_stats.games_lost += 1;
-            state.combat_state.add_log_entry(
-                "♟ You concede the game. The figure disappears without a word.".to_string(),
-                false,
-                true,
-            );
-            false
-        }
-        ChessResult::Draw => {
-            state.chess_stats.games_drawn += 1;
-            state.combat_state.add_log_entry(
-                "♟ The figure smiles knowingly and fades away.".to_string(),
-                false,
-                true,
-            );
-            false
-        }
-    };
-
-    state.active_minigame = None;
-
-    if won {
-        Some(MinigameWinInfo {
-            game_type: "chess",
-            difficulty: match difficulty {
-                ChessDifficulty::Novice => "novice",
-                ChessDifficulty::Apprentice => "apprentice",
-                ChessDifficulty::Journeyman => "journeyman",
-                ChessDifficulty::Master => "master",
-            },
-        })
-    } else {
-        None
+        game.game_result = Some(ChallengeResult::Draw);
     }
 }
 
@@ -309,6 +203,10 @@ pub fn apply_game_result(state: &mut GameState) -> Option<crate::challenges::Min
 mod tests {
     use super::*;
     use crate::challenges::menu::{ChallengeType, PendingChallenge};
+    use crate::challenges::{
+        apply_minigame_result, start_minigame, ActiveMinigame, ChallengeDifficulty,
+    };
+    use crate::core::game_state::GameState;
 
     fn make_chess_challenge() -> PendingChallenge {
         PendingChallenge {
@@ -323,7 +221,11 @@ mod tests {
     fn test_start_chess_game() {
         let mut state = GameState::new("Test".to_string(), 0);
         state.challenge_menu.open();
-        start_chess_game(&mut state, ChessDifficulty::Journeyman);
+        start_minigame(
+            &mut state,
+            &ChallengeType::Chess,
+            ChallengeDifficulty::Journeyman,
+        );
         assert!(matches!(
             state.active_minigame,
             Some(ActiveMinigame::Chess(_))
@@ -335,11 +237,11 @@ mod tests {
     fn test_apply_win_result() {
         let mut state = GameState::new("Test".to_string(), 0);
         state.prestige_rank = 5;
-        let mut game = ChessGame::new(ChessDifficulty::Master);
-        game.game_result = Some(ChessResult::Win);
+        let mut game = ChessGame::new(ChallengeDifficulty::Master);
+        game.game_result = Some(ChallengeResult::Win);
         state.active_minigame = Some(ActiveMinigame::Chess(Box::new(game)));
 
-        let processed = apply_game_result(&mut state);
+        let processed = apply_minigame_result(&mut state);
         assert!(processed.is_some()); // Win returns Some(MinigameWinInfo)
         assert_eq!(state.prestige_rank, 10); // 5 + 5 (Master reward)
         assert_eq!(state.chess_stats.games_won, 1);
@@ -350,11 +252,11 @@ mod tests {
     fn test_apply_loss_result() {
         let mut state = GameState::new("Test".to_string(), 0);
         state.prestige_rank = 5;
-        let mut game = ChessGame::new(ChessDifficulty::Novice);
-        game.game_result = Some(ChessResult::Loss);
+        let mut game = ChessGame::new(ChallengeDifficulty::Novice);
+        game.game_result = Some(ChallengeResult::Loss);
         state.active_minigame = Some(ActiveMinigame::Chess(Box::new(game)));
 
-        let processed = apply_game_result(&mut state);
+        let processed = apply_minigame_result(&mut state);
         assert!(processed.is_none()); // Loss returns None
         assert_eq!(state.prestige_rank, 5); // Unchanged
         assert_eq!(state.chess_stats.games_lost, 1);
@@ -365,9 +267,10 @@ mod tests {
     #[test]
     fn test_ai_makes_legal_move() {
         let board = chess_engine::Board::default();
+        let game = ChessGame::new(ChallengeDifficulty::Novice);
         let mut rng = rand::thread_rng();
 
-        let ai_move = get_ai_move(&board, ChessDifficulty::Novice, &mut rng);
+        let ai_move = get_ai_move(&board, &game, &mut rng);
 
         // Move should be in the legal moves list
         let legal_moves = board.get_legal_moves();
@@ -383,8 +286,9 @@ mod tests {
         let mut rng = rand::thread_rng();
 
         // All difficulties should return legal moves
-        for difficulty in ChessDifficulty::ALL {
-            let ai_move = get_ai_move(&board, difficulty, &mut rng);
+        for difficulty in ChallengeDifficulty::ALL {
+            let game = ChessGame::new(difficulty);
+            let ai_move = get_ai_move(&board, &game, &mut rng);
             let legal_moves = board.get_legal_moves();
             assert!(
                 legal_moves.contains(&ai_move),
@@ -431,7 +335,11 @@ mod tests {
         assert!(state.active_minigame.is_none());
 
         // Start game (simulating accept)
-        start_chess_game(&mut state, ChessDifficulty::Novice);
+        start_minigame(
+            &mut state,
+            &ChallengeType::Chess,
+            ChallengeDifficulty::Novice,
+        );
 
         assert!(matches!(
             state.active_minigame,
@@ -524,11 +432,11 @@ mod tests {
         let mut state = GameState::new("Test".to_string(), 0);
         state.prestige_rank = 5;
 
-        let mut game = ChessGame::new(ChessDifficulty::Novice);
-        game.game_result = Some(ChessResult::Forfeit);
+        let mut game = ChessGame::new(ChallengeDifficulty::Novice);
+        game.game_result = Some(ChallengeResult::Forfeit);
         state.active_minigame = Some(ActiveMinigame::Chess(Box::new(game)));
 
-        let processed = apply_game_result(&mut state);
+        let processed = apply_minigame_result(&mut state);
         assert!(processed.is_none()); // Forfeit counts as loss, returns None
         assert_eq!(state.chess_stats.games_lost, 1); // Counts as loss
         assert_eq!(state.chess_stats.games_won, 0);
@@ -540,11 +448,11 @@ mod tests {
         let mut state = GameState::new("Test".to_string(), 0);
         state.prestige_rank = 5;
 
-        let mut game = ChessGame::new(ChessDifficulty::Master);
-        game.game_result = Some(ChessResult::Draw);
+        let mut game = ChessGame::new(ChallengeDifficulty::Master);
+        game.game_result = Some(ChallengeResult::Draw);
         state.active_minigame = Some(ActiveMinigame::Chess(Box::new(game)));
 
-        let processed = apply_game_result(&mut state);
+        let processed = apply_minigame_result(&mut state);
         assert!(processed.is_none()); // Draw returns None
         assert_eq!(state.chess_stats.games_drawn, 1);
         assert_eq!(state.prestige_rank, 5); // Unchanged
@@ -554,33 +462,33 @@ mod tests {
 
     #[test]
     fn test_process_input_cursor_movement() {
-        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        let mut game = ChessGame::new(ChallengeDifficulty::Novice);
 
         // Start at initial cursor position (e2 for white)
         let initial = game.cursor;
 
-        process_input(&mut game, ChessInput::Up);
+        process_input(&mut game, MinigameInput::Up);
         assert_eq!(game.cursor, (initial.0, initial.1 + 1));
 
-        process_input(&mut game, ChessInput::Down);
+        process_input(&mut game, MinigameInput::Down);
         assert_eq!(game.cursor, initial);
 
-        process_input(&mut game, ChessInput::Right);
+        process_input(&mut game, MinigameInput::Right);
         assert_eq!(game.cursor, (initial.0 + 1, initial.1));
 
-        process_input(&mut game, ChessInput::Left);
+        process_input(&mut game, MinigameInput::Left);
         assert_eq!(game.cursor, initial);
     }
 
     #[test]
     fn test_process_input_select_piece() {
-        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        let mut game = ChessGame::new(ChallengeDifficulty::Novice);
 
         // Move to e2 (pawn position for white)
         game.cursor = (4, 1);
 
         // Select the pawn
-        process_input(&mut game, ChessInput::Select);
+        process_input(&mut game, MinigameInput::Primary);
 
         assert_eq!(game.selected_square, Some((4, 1)));
         assert!(!game.legal_move_destinations.is_empty());
@@ -588,15 +496,15 @@ mod tests {
 
     #[test]
     fn test_process_input_clear_selection_with_cancel() {
-        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        let mut game = ChessGame::new(ChallengeDifficulty::Novice);
 
         // Select a piece first
         game.cursor = (4, 1);
-        process_input(&mut game, ChessInput::Select);
+        process_input(&mut game, MinigameInput::Primary);
         assert!(game.selected_square.is_some());
 
         // Cancel should clear selection
-        process_input(&mut game, ChessInput::Cancel);
+        process_input(&mut game, MinigameInput::Cancel);
 
         assert!(game.selected_square.is_none());
         assert!(!game.forfeit_pending);
@@ -604,10 +512,10 @@ mod tests {
 
     #[test]
     fn test_process_input_forfeit_single_esc() {
-        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        let mut game = ChessGame::new(ChallengeDifficulty::Novice);
 
         // No piece selected, first Esc sets pending
-        process_input(&mut game, ChessInput::Cancel);
+        process_input(&mut game, MinigameInput::Cancel);
 
         assert!(game.forfeit_pending);
         assert!(game.game_result.is_none());
@@ -615,28 +523,28 @@ mod tests {
 
     #[test]
     fn test_process_input_forfeit_double_esc() {
-        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        let mut game = ChessGame::new(ChallengeDifficulty::Novice);
 
         // First Esc sets pending
-        process_input(&mut game, ChessInput::Cancel);
+        process_input(&mut game, MinigameInput::Cancel);
         assert!(game.forfeit_pending);
 
         // Second Esc confirms forfeit
-        process_input(&mut game, ChessInput::Cancel);
+        process_input(&mut game, MinigameInput::Cancel);
 
-        assert_eq!(game.game_result, Some(ChessResult::Forfeit));
+        assert_eq!(game.game_result, Some(ChallengeResult::Forfeit));
     }
 
     #[test]
     fn test_process_input_forfeit_cancelled_by_other_key() {
-        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        let mut game = ChessGame::new(ChallengeDifficulty::Novice);
 
         // First Esc sets pending
-        process_input(&mut game, ChessInput::Cancel);
+        process_input(&mut game, MinigameInput::Cancel);
         assert!(game.forfeit_pending);
 
         // Any other key cancels forfeit
-        process_input(&mut game, ChessInput::Other);
+        process_input(&mut game, MinigameInput::Other);
 
         assert!(!game.forfeit_pending);
         assert!(game.game_result.is_none());
@@ -644,12 +552,12 @@ mod tests {
 
     #[test]
     fn test_process_input_blocked_during_ai_thinking() {
-        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        let mut game = ChessGame::new(ChallengeDifficulty::Novice);
         game.ai_thinking = true;
         let initial_cursor = game.cursor;
 
         // Input should be blocked
-        let handled = process_input(&mut game, ChessInput::Up);
+        let handled = process_input(&mut game, MinigameInput::Up);
 
         assert!(!handled);
         assert_eq!(game.cursor, initial_cursor);
@@ -657,16 +565,16 @@ mod tests {
 
     #[test]
     fn test_process_input_reselect_different_piece() {
-        let mut game = ChessGame::new(ChessDifficulty::Novice);
+        let mut game = ChessGame::new(ChallengeDifficulty::Novice);
 
         // Select e2 pawn
         game.cursor = (4, 1);
-        process_input(&mut game, ChessInput::Select);
+        process_input(&mut game, MinigameInput::Primary);
         assert_eq!(game.selected_square, Some((4, 1)));
 
         // Move cursor to d2 pawn and select
         game.cursor = (3, 1);
-        process_input(&mut game, ChessInput::Select);
+        process_input(&mut game, MinigameInput::Primary);
 
         // Should now have d2 selected
         assert_eq!(game.selected_square, Some((3, 1)));

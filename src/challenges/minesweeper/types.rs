@@ -2,7 +2,7 @@
 //!
 //! Classic minesweeper with variable grid sizes and mine counts.
 
-use serde::{Deserialize, Serialize};
+use crate::challenges::{ChallengeDifficulty, ChallengeResult};
 
 /// Represents a single cell in the minesweeper grid.
 #[derive(Debug, Clone, Copy, Default)]
@@ -17,65 +17,24 @@ pub struct Cell {
     pub adjacent_mines: u8,
 }
 
-/// Difficulty levels for Minesweeper with varying grid sizes and mine counts.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum MinesweeperDifficulty {
-    Novice,     // 9x9, 10 mines
-    Apprentice, // 12x12, 25 mines
-    Journeyman, // 16x16, 40 mines
-    Master,     // 16x20, 60 mines
-}
-
-impl MinesweeperDifficulty {
-    pub const ALL: [MinesweeperDifficulty; 4] = [
-        MinesweeperDifficulty::Novice,
-        MinesweeperDifficulty::Apprentice,
-        MinesweeperDifficulty::Journeyman,
-        MinesweeperDifficulty::Master,
-    ];
-
-    pub fn from_index(index: usize) -> Self {
-        Self::ALL
-            .get(index)
-            .copied()
-            .unwrap_or(MinesweeperDifficulty::Novice)
-    }
-
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::Novice => "Novice",
-            Self::Apprentice => "Apprentice",
-            Self::Journeyman => "Journeyman",
-            Self::Master => "Master",
-        }
-    }
-
-    /// Returns (height, width) for the grid.
-    pub fn grid_size(&self) -> (usize, usize) {
-        match self {
-            Self::Novice => (9, 9),
-            Self::Apprentice => (12, 12),
-            Self::Journeyman => (16, 16),
-            Self::Master => (16, 20),
-        }
-    }
-
-    /// Returns the number of mines for this difficulty.
-    pub fn mine_count(&self) -> u16 {
-        match self {
-            Self::Novice => 10,
-            Self::Apprentice => 25,
-            Self::Journeyman => 40,
-            Self::Master => 60,
-        }
+/// Returns (height, width) for the grid based on difficulty.
+fn grid_size_for(difficulty: ChallengeDifficulty) -> (usize, usize) {
+    match difficulty {
+        ChallengeDifficulty::Novice => (9, 9),
+        ChallengeDifficulty::Apprentice => (12, 12),
+        ChallengeDifficulty::Journeyman => (16, 16),
+        ChallengeDifficulty::Master => (16, 20),
     }
 }
 
-/// Result of a completed minesweeper game.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MinesweeperResult {
-    Win,
-    Loss,
+/// Returns the number of mines for the given difficulty.
+fn mine_count_for(difficulty: ChallengeDifficulty) -> u16 {
+    match difficulty {
+        ChallengeDifficulty::Novice => 10,
+        ChallengeDifficulty::Apprentice => 25,
+        ChallengeDifficulty::Journeyman => 40,
+        ChallengeDifficulty::Master => 60,
+    }
 }
 
 /// Active minesweeper game session.
@@ -90,9 +49,9 @@ pub struct MinesweeperGame {
     /// Current cursor position (row, col).
     pub cursor: (usize, usize),
     /// Difficulty level.
-    pub difficulty: MinesweeperDifficulty,
+    pub difficulty: ChallengeDifficulty,
     /// Game result (None if game in progress).
-    pub game_result: Option<MinesweeperResult>,
+    pub game_result: Option<ChallengeResult>,
     /// Whether the first click has been made (mines placed after first click).
     pub first_click_done: bool,
     /// Total number of mines in the grid.
@@ -106,8 +65,8 @@ pub struct MinesweeperGame {
 impl MinesweeperGame {
     /// Create a new minesweeper game with the given difficulty.
     /// Note: Mines are not placed until the first reveal to ensure first click is safe.
-    pub fn new(difficulty: MinesweeperDifficulty) -> Self {
-        let (height, width) = difficulty.grid_size();
+    pub fn new(difficulty: ChallengeDifficulty) -> Self {
+        let (height, width) = grid_size_for(difficulty);
         let grid = vec![vec![Cell::default(); width]; height];
 
         Self {
@@ -118,7 +77,7 @@ impl MinesweeperGame {
             difficulty,
             game_result: None,
             first_click_done: false,
-            total_mines: difficulty.mine_count(),
+            total_mines: mine_count_for(difficulty),
             flags_placed: 0,
             forfeit_pending: false,
         }
@@ -144,7 +103,7 @@ mod tests {
 
     #[test]
     fn test_new_game() {
-        let game = MinesweeperGame::new(MinesweeperDifficulty::Novice);
+        let game = MinesweeperGame::new(ChallengeDifficulty::Novice);
 
         // Check grid dimensions
         assert_eq!(game.height, 9);
@@ -154,7 +113,7 @@ mod tests {
 
         // Check initial state
         assert_eq!(game.cursor, (4, 4)); // Center of 9x9
-        assert_eq!(game.difficulty, MinesweeperDifficulty::Novice);
+        assert_eq!(game.difficulty, ChallengeDifficulty::Novice);
         assert!(game.game_result.is_none());
         assert!(!game.first_click_done);
         assert_eq!(game.total_mines, 10);
@@ -175,25 +134,25 @@ mod tests {
     #[test]
     fn test_difficulty_grid_sizes() {
         // Novice: 9x9, 10 mines
-        assert_eq!(MinesweeperDifficulty::Novice.grid_size(), (9, 9));
-        assert_eq!(MinesweeperDifficulty::Novice.mine_count(), 10);
+        assert_eq!(grid_size_for(ChallengeDifficulty::Novice), (9, 9));
+        assert_eq!(mine_count_for(ChallengeDifficulty::Novice), 10);
 
         // Apprentice: 12x12, 25 mines
-        assert_eq!(MinesweeperDifficulty::Apprentice.grid_size(), (12, 12));
-        assert_eq!(MinesweeperDifficulty::Apprentice.mine_count(), 25);
+        assert_eq!(grid_size_for(ChallengeDifficulty::Apprentice), (12, 12));
+        assert_eq!(mine_count_for(ChallengeDifficulty::Apprentice), 25);
 
         // Journeyman: 16x16, 40 mines
-        assert_eq!(MinesweeperDifficulty::Journeyman.grid_size(), (16, 16));
-        assert_eq!(MinesweeperDifficulty::Journeyman.mine_count(), 40);
+        assert_eq!(grid_size_for(ChallengeDifficulty::Journeyman), (16, 16));
+        assert_eq!(mine_count_for(ChallengeDifficulty::Journeyman), 40);
 
         // Master: 16x20, 60 mines
-        assert_eq!(MinesweeperDifficulty::Master.grid_size(), (16, 20));
-        assert_eq!(MinesweeperDifficulty::Master.mine_count(), 60);
+        assert_eq!(grid_size_for(ChallengeDifficulty::Master), (16, 20));
+        assert_eq!(mine_count_for(ChallengeDifficulty::Master), 60);
     }
 
     #[test]
     fn test_move_cursor() {
-        let mut game = MinesweeperGame::new(MinesweeperDifficulty::Novice);
+        let mut game = MinesweeperGame::new(ChallengeDifficulty::Novice);
 
         // Start at center (4, 4)
         assert_eq!(game.cursor, (4, 4));
@@ -223,7 +182,7 @@ mod tests {
 
     #[test]
     fn test_mines_remaining() {
-        let mut game = MinesweeperGame::new(MinesweeperDifficulty::Novice);
+        let mut game = MinesweeperGame::new(ChallengeDifficulty::Novice);
 
         // Initially: 10 mines, 0 flags
         assert_eq!(game.mines_remaining(), 10);
@@ -242,64 +201,16 @@ mod tests {
     }
 
     #[test]
-    fn test_difficulty_from_index() {
-        assert_eq!(
-            MinesweeperDifficulty::from_index(0),
-            MinesweeperDifficulty::Novice
-        );
-        assert_eq!(
-            MinesweeperDifficulty::from_index(1),
-            MinesweeperDifficulty::Apprentice
-        );
-        assert_eq!(
-            MinesweeperDifficulty::from_index(2),
-            MinesweeperDifficulty::Journeyman
-        );
-        assert_eq!(
-            MinesweeperDifficulty::from_index(3),
-            MinesweeperDifficulty::Master
-        );
-        // Out of bounds defaults to Novice
-        assert_eq!(
-            MinesweeperDifficulty::from_index(99),
-            MinesweeperDifficulty::Novice
-        );
-    }
-
-    #[test]
-    fn test_difficulty_names() {
-        assert_eq!(MinesweeperDifficulty::Novice.name(), "Novice");
-        assert_eq!(MinesweeperDifficulty::Apprentice.name(), "Apprentice");
-        assert_eq!(MinesweeperDifficulty::Journeyman.name(), "Journeyman");
-        assert_eq!(MinesweeperDifficulty::Master.name(), "Master");
-    }
-
-    #[test]
-    fn test_all_difficulties() {
-        assert_eq!(MinesweeperDifficulty::ALL.len(), 4);
-        assert_eq!(MinesweeperDifficulty::ALL[0], MinesweeperDifficulty::Novice);
-        assert_eq!(
-            MinesweeperDifficulty::ALL[1],
-            MinesweeperDifficulty::Apprentice
-        );
-        assert_eq!(
-            MinesweeperDifficulty::ALL[2],
-            MinesweeperDifficulty::Journeyman
-        );
-        assert_eq!(MinesweeperDifficulty::ALL[3], MinesweeperDifficulty::Master);
-    }
-
-    #[test]
     fn test_game_with_each_difficulty() {
-        for difficulty in MinesweeperDifficulty::ALL {
+        for difficulty in ChallengeDifficulty::ALL {
             let game = MinesweeperGame::new(difficulty);
-            let (expected_height, expected_width) = difficulty.grid_size();
+            let (expected_height, expected_width) = grid_size_for(difficulty);
 
             assert_eq!(game.height, expected_height);
             assert_eq!(game.width, expected_width);
             assert_eq!(game.grid.len(), expected_height);
             assert_eq!(game.grid[0].len(), expected_width);
-            assert_eq!(game.total_mines, difficulty.mine_count());
+            assert_eq!(game.total_mines, mine_count_for(difficulty));
 
             // Cursor should be at center
             assert_eq!(game.cursor, (expected_height / 2, expected_width / 2));

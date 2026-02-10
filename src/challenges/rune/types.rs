@@ -3,81 +3,43 @@
 //! A Mastermind-style logic/deduction minigame where the player
 //! decodes hidden sequences of ancient runes.
 
+use crate::challenges::{ChallengeDifficulty, ChallengeResult};
+
 /// Rune symbols for display. First 5 used for Novice, first 6 for Apprentice/Journeyman, all 8 for Master.
 pub const RUNE_SYMBOLS: &[char] = &['᛭', 'ᚦ', 'ᛟ', 'ᚱ', 'ᛊ', 'ᚹ', 'ᛏ', 'ᚲ'];
 
-/// Rune difficulty levels
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RuneDifficulty {
-    Novice,
-    Apprentice,
-    Journeyman,
-    Master,
-}
-
-impl RuneDifficulty {
-    pub const ALL: [RuneDifficulty; 4] = [
-        RuneDifficulty::Novice,
-        RuneDifficulty::Apprentice,
-        RuneDifficulty::Journeyman,
-        RuneDifficulty::Master,
-    ];
-
-    pub fn from_index(index: usize) -> Self {
-        match index {
-            0 => Self::Novice,
-            1 => Self::Apprentice,
-            2 => Self::Journeyman,
-            3 => Self::Master,
-            _ => Self::Novice,
-        }
-    }
-
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::Novice => "Novice",
-            Self::Apprentice => "Apprentice",
-            Self::Journeyman => "Journeyman",
-            Self::Master => "Master",
-        }
-    }
-
-    pub fn num_runes(&self) -> usize {
-        match self {
-            Self::Novice => 5,
-            Self::Apprentice | Self::Journeyman => 6,
-            Self::Master => 8,
-        }
-    }
-
-    pub fn num_slots(&self) -> usize {
-        match self {
-            Self::Novice => 3,
-            Self::Apprentice | Self::Journeyman => 4,
-            Self::Master => 5,
-        }
-    }
-
-    pub fn max_guesses(&self) -> usize {
-        match self {
-            Self::Novice | Self::Apprentice => 10,
-            Self::Journeyman | Self::Master => 8,
-        }
-    }
-
-    pub fn allow_duplicates(&self) -> bool {
-        match self {
-            Self::Novice | Self::Apprentice => false,
-            Self::Journeyman | Self::Master => true,
-        }
+/// Number of available rune symbols for the given difficulty.
+pub fn num_runes_for(difficulty: ChallengeDifficulty) -> usize {
+    match difficulty {
+        ChallengeDifficulty::Novice => 5,
+        ChallengeDifficulty::Apprentice | ChallengeDifficulty::Journeyman => 6,
+        ChallengeDifficulty::Master => 8,
     }
 }
 
-/// Result of a rune game
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RuneResult {
-    Win,
-    Loss,
+/// Number of code slots for the given difficulty.
+pub fn num_slots_for(difficulty: ChallengeDifficulty) -> usize {
+    match difficulty {
+        ChallengeDifficulty::Novice => 3,
+        ChallengeDifficulty::Apprentice | ChallengeDifficulty::Journeyman => 4,
+        ChallengeDifficulty::Master => 5,
+    }
+}
+
+/// Maximum guesses allowed for the given difficulty.
+pub fn max_guesses_for(difficulty: ChallengeDifficulty) -> usize {
+    match difficulty {
+        ChallengeDifficulty::Novice | ChallengeDifficulty::Apprentice => 10,
+        ChallengeDifficulty::Journeyman | ChallengeDifficulty::Master => 8,
+    }
+}
+
+/// Whether duplicate runes are allowed in the code for the given difficulty.
+pub fn allow_duplicates_for(difficulty: ChallengeDifficulty) -> bool {
+    match difficulty {
+        ChallengeDifficulty::Novice | ChallengeDifficulty::Apprentice => false,
+        ChallengeDifficulty::Journeyman | ChallengeDifficulty::Master => true,
+    }
 }
 
 /// Feedback for a single position in a guess
@@ -103,7 +65,7 @@ pub struct RuneGuess {
 /// Full rune game state
 #[derive(Debug, Clone)]
 pub struct RuneGame {
-    pub difficulty: RuneDifficulty,
+    pub difficulty: ChallengeDifficulty,
     pub secret_code: Vec<usize>,
     pub guesses: Vec<RuneGuess>,
     pub current_guess: Vec<Option<usize>>,
@@ -112,24 +74,24 @@ pub struct RuneGame {
     pub num_runes: usize,
     pub num_slots: usize,
     pub allow_duplicates: bool,
-    pub game_result: Option<RuneResult>,
+    pub game_result: Option<ChallengeResult>,
     pub forfeit_pending: bool,
     pub reject_message: Option<String>,
 }
 
 impl RuneGame {
-    pub fn new(difficulty: RuneDifficulty) -> Self {
-        let num_slots = difficulty.num_slots();
+    pub fn new(difficulty: ChallengeDifficulty) -> Self {
+        let num_slots = num_slots_for(difficulty);
         Self {
             difficulty,
             secret_code: Vec::new(),
             guesses: Vec::new(),
             current_guess: vec![None; num_slots],
             cursor_slot: 0,
-            max_guesses: difficulty.max_guesses(),
-            num_runes: difficulty.num_runes(),
+            max_guesses: max_guesses_for(difficulty),
+            num_runes: num_runes_for(difficulty),
             num_slots,
-            allow_duplicates: difficulty.allow_duplicates(),
+            allow_duplicates: allow_duplicates_for(difficulty),
             game_result: None,
             forfeit_pending: false,
             reject_message: None,
@@ -190,56 +152,34 @@ mod tests {
 
     #[test]
     fn test_difficulty_config() {
-        let n = RuneDifficulty::Novice;
-        assert_eq!(n.num_runes(), 5);
-        assert_eq!(n.num_slots(), 3);
-        assert_eq!(n.max_guesses(), 10);
-        assert!(!n.allow_duplicates());
+        let n = ChallengeDifficulty::Novice;
+        assert_eq!(num_runes_for(n), 5);
+        assert_eq!(num_slots_for(n), 3);
+        assert_eq!(max_guesses_for(n), 10);
+        assert!(!allow_duplicates_for(n));
 
-        let a = RuneDifficulty::Apprentice;
-        assert_eq!(a.num_runes(), 6);
-        assert_eq!(a.num_slots(), 4);
-        assert_eq!(a.max_guesses(), 10);
-        assert!(!a.allow_duplicates());
+        let a = ChallengeDifficulty::Apprentice;
+        assert_eq!(num_runes_for(a), 6);
+        assert_eq!(num_slots_for(a), 4);
+        assert_eq!(max_guesses_for(a), 10);
+        assert!(!allow_duplicates_for(a));
 
-        let j = RuneDifficulty::Journeyman;
-        assert_eq!(j.num_runes(), 6);
-        assert_eq!(j.num_slots(), 4);
-        assert_eq!(j.max_guesses(), 8);
-        assert!(j.allow_duplicates());
+        let j = ChallengeDifficulty::Journeyman;
+        assert_eq!(num_runes_for(j), 6);
+        assert_eq!(num_slots_for(j), 4);
+        assert_eq!(max_guesses_for(j), 8);
+        assert!(allow_duplicates_for(j));
 
-        let m = RuneDifficulty::Master;
-        assert_eq!(m.num_runes(), 8);
-        assert_eq!(m.num_slots(), 5);
-        assert_eq!(m.max_guesses(), 8);
-        assert!(m.allow_duplicates());
-    }
-
-    #[test]
-    fn test_difficulty_names() {
-        assert_eq!(RuneDifficulty::Novice.name(), "Novice");
-        assert_eq!(RuneDifficulty::Apprentice.name(), "Apprentice");
-        assert_eq!(RuneDifficulty::Journeyman.name(), "Journeyman");
-        assert_eq!(RuneDifficulty::Master.name(), "Master");
-    }
-
-    #[test]
-    fn test_from_index() {
-        assert_eq!(RuneDifficulty::from_index(0), RuneDifficulty::Novice);
-        assert_eq!(RuneDifficulty::from_index(1), RuneDifficulty::Apprentice);
-        assert_eq!(RuneDifficulty::from_index(2), RuneDifficulty::Journeyman);
-        assert_eq!(RuneDifficulty::from_index(3), RuneDifficulty::Master);
-        assert_eq!(RuneDifficulty::from_index(99), RuneDifficulty::Novice);
-    }
-
-    #[test]
-    fn test_all_constant() {
-        assert_eq!(RuneDifficulty::ALL.len(), 4);
+        let m = ChallengeDifficulty::Master;
+        assert_eq!(num_runes_for(m), 8);
+        assert_eq!(num_slots_for(m), 5);
+        assert_eq!(max_guesses_for(m), 8);
+        assert!(allow_duplicates_for(m));
     }
 
     #[test]
     fn test_rune_game_new() {
-        let game = RuneGame::new(RuneDifficulty::Novice);
+        let game = RuneGame::new(ChallengeDifficulty::Novice);
         assert_eq!(game.num_slots, 3);
         assert_eq!(game.num_runes, 5);
         assert_eq!(game.max_guesses, 10);
@@ -258,7 +198,7 @@ mod tests {
 
     #[test]
     fn test_cursor_movement() {
-        let mut game = RuneGame::new(RuneDifficulty::Apprentice);
+        let mut game = RuneGame::new(ChallengeDifficulty::Apprentice);
         assert_eq!(game.cursor_slot, 0);
 
         game.move_cursor_right();
@@ -282,7 +222,7 @@ mod tests {
 
     #[test]
     fn test_cycle_rune() {
-        let mut game = RuneGame::new(RuneDifficulty::Novice);
+        let mut game = RuneGame::new(ChallengeDifficulty::Novice);
         assert_eq!(game.current_guess[0], None);
 
         game.cycle_rune_up();
@@ -300,7 +240,7 @@ mod tests {
 
     #[test]
     fn test_clear_guess() {
-        let mut game = RuneGame::new(RuneDifficulty::Novice);
+        let mut game = RuneGame::new(ChallengeDifficulty::Novice);
         game.current_guess[0] = Some(0);
         game.current_guess[1] = Some(1);
         game.current_guess[2] = Some(2);
@@ -312,7 +252,7 @@ mod tests {
 
     #[test]
     fn test_guess_complete() {
-        let mut game = RuneGame::new(RuneDifficulty::Novice);
+        let mut game = RuneGame::new(ChallengeDifficulty::Novice);
         assert!(!game.is_guess_complete());
 
         game.current_guess[0] = Some(0);
@@ -325,27 +265,27 @@ mod tests {
 
     #[test]
     fn test_guesses_remaining() {
-        let game = RuneGame::new(RuneDifficulty::Novice);
+        let game = RuneGame::new(ChallengeDifficulty::Novice);
         assert_eq!(game.guesses_remaining(), 10);
     }
 
     #[test]
     fn test_reward_structure() {
-        use crate::challenges::menu::DifficultyInfo;
+        use crate::challenges::menu::ChallengeType;
 
-        let novice = RuneDifficulty::Novice.reward();
+        let novice = ChallengeType::Rune.reward(ChallengeDifficulty::Novice);
         assert_eq!(novice.xp_percent, 25);
         assert_eq!(novice.prestige_ranks, 0);
         assert_eq!(novice.fishing_ranks, 0);
 
-        let apprentice = RuneDifficulty::Apprentice.reward();
+        let apprentice = ChallengeType::Rune.reward(ChallengeDifficulty::Apprentice);
         assert_eq!(apprentice.xp_percent, 50);
 
-        let journeyman = RuneDifficulty::Journeyman.reward();
+        let journeyman = ChallengeType::Rune.reward(ChallengeDifficulty::Journeyman);
         assert_eq!(journeyman.fishing_ranks, 1);
         assert_eq!(journeyman.xp_percent, 75);
 
-        let master = RuneDifficulty::Master.reward();
+        let master = ChallengeType::Rune.reward(ChallengeDifficulty::Master);
         assert_eq!(master.prestige_ranks, 1);
         assert_eq!(master.fishing_ranks, 2);
         assert_eq!(master.xp_percent, 0);
@@ -353,7 +293,7 @@ mod tests {
 
     #[test]
     fn test_game_new_all_difficulties() {
-        for &diff in &RuneDifficulty::ALL {
+        for &diff in &ChallengeDifficulty::ALL {
             let game = RuneGame::new(diff);
             assert_eq!(game.current_guess.len(), game.num_slots);
             assert!(game.current_guess.iter().all(|s| s.is_none()));
@@ -366,7 +306,7 @@ mod tests {
 
     #[test]
     fn test_cycle_rune_clears_reject_message() {
-        let mut game = RuneGame::new(RuneDifficulty::Novice);
+        let mut game = RuneGame::new(ChallengeDifficulty::Novice);
         game.reject_message = Some("test".to_string());
 
         game.cycle_rune_up();
@@ -379,7 +319,7 @@ mod tests {
 
     #[test]
     fn test_cycle_rune_wraps_all_difficulties() {
-        for &diff in &RuneDifficulty::ALL {
+        for &diff in &ChallengeDifficulty::ALL {
             let mut game = RuneGame::new(diff);
             // Cycle up through all runes and verify wrap
             for i in 0..game.num_runes {

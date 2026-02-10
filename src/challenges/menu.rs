@@ -4,17 +4,7 @@
 //! Challenge discovery uses a single roll per tick. On success, a weighted distribution
 //! table determines which challenge type appears.
 
-use super::chess::logic::start_chess_game;
-use super::chess::ChessDifficulty;
-use super::go::logic::start_go_game;
-use super::go::GoDifficulty;
-use super::gomoku::logic::start_gomoku_game;
-use super::gomoku::GomokuDifficulty;
-use super::minesweeper::{MinesweeperDifficulty, MinesweeperGame};
-use super::morris::logic::start_morris_game;
-use super::morris::MorrisDifficulty;
-use super::rune::{RuneDifficulty, RuneGame};
-use super::ActiveMinigame;
+use super::{ChallengeDifficulty, ChallengeResult};
 use crate::core::game_state::GameState;
 use rand::Rng;
 
@@ -68,38 +58,10 @@ pub fn process_input(state: &mut GameState, input: MenuInput) -> bool {
 /// Accept the currently selected challenge and start the appropriate game.
 fn accept_selected_challenge(state: &mut GameState) {
     let difficulty_index = state.challenge_menu.selected_difficulty;
+    let difficulty = ChallengeDifficulty::from_index(difficulty_index);
 
     if let Some(challenge) = state.challenge_menu.take_selected() {
-        match challenge.challenge_type {
-            ChallengeType::Chess => {
-                let difficulty = ChessDifficulty::from_index(difficulty_index);
-                start_chess_game(state, difficulty);
-            }
-            ChallengeType::Morris => {
-                let difficulty = MorrisDifficulty::from_index(difficulty_index);
-                start_morris_game(state, difficulty);
-            }
-            ChallengeType::Gomoku => {
-                let difficulty = GomokuDifficulty::from_index(difficulty_index);
-                start_gomoku_game(state, difficulty);
-            }
-            ChallengeType::Minesweeper => {
-                let difficulty = MinesweeperDifficulty::from_index(difficulty_index);
-                state.active_minigame = Some(ActiveMinigame::Minesweeper(MinesweeperGame::new(
-                    difficulty,
-                )));
-                state.challenge_menu.close();
-            }
-            ChallengeType::Rune => {
-                let difficulty = RuneDifficulty::from_index(difficulty_index);
-                state.active_minigame = Some(ActiveMinigame::Rune(RuneGame::new(difficulty)));
-                state.challenge_menu.close();
-            }
-            ChallengeType::Go => {
-                let difficulty = GoDifficulty::from_index(difficulty_index);
-                start_go_game(state, difficulty);
-            }
-        }
+        super::start_minigame(state, &challenge.challenge_type, difficulty);
     }
 }
 
@@ -150,176 +112,7 @@ impl ChallengeReward {
     }
 }
 
-/// Trait for difficulty levels that can be displayed in the challenge menu
-pub trait DifficultyInfo {
-    /// Display name (e.g., "Novice", "Master")
-    fn name(&self) -> &'static str;
-
-    /// Structured reward for winning at this difficulty
-    fn reward(&self) -> ChallengeReward;
-
-    /// Optional extra info shown between name and reward (e.g., "~500 ELO")
-    fn extra_info(&self) -> Option<String> {
-        None
-    }
-}
-
-impl DifficultyInfo for ChessDifficulty {
-    fn name(&self) -> &'static str {
-        ChessDifficulty::name(self)
-    }
-
-    fn reward(&self) -> ChallengeReward {
-        ChallengeReward {
-            prestige_ranks: self.reward_prestige(),
-            ..Default::default()
-        }
-    }
-
-    fn extra_info(&self) -> Option<String> {
-        Some(format!("~{} ELO", self.estimated_elo()))
-    }
-}
-
-impl DifficultyInfo for MorrisDifficulty {
-    fn name(&self) -> &'static str {
-        MorrisDifficulty::name(self)
-    }
-
-    fn reward(&self) -> ChallengeReward {
-        ChallengeReward {
-            xp_percent: self.reward_xp_percent(),
-            fishing_ranks: if *self == MorrisDifficulty::Master {
-                1
-            } else {
-                0
-            },
-            ..Default::default()
-        }
-    }
-}
-
-impl DifficultyInfo for GomokuDifficulty {
-    fn name(&self) -> &'static str {
-        GomokuDifficulty::name(self)
-    }
-
-    fn reward(&self) -> ChallengeReward {
-        match self {
-            GomokuDifficulty::Novice => ChallengeReward {
-                xp_percent: 75,
-                ..Default::default()
-            },
-            GomokuDifficulty::Apprentice => ChallengeReward {
-                xp_percent: 100,
-                ..Default::default()
-            },
-            GomokuDifficulty::Journeyman => ChallengeReward {
-                prestige_ranks: 1,
-                xp_percent: 50,
-                ..Default::default()
-            },
-            GomokuDifficulty::Master => ChallengeReward {
-                prestige_ranks: 2,
-                xp_percent: 100,
-                ..Default::default()
-            },
-        }
-    }
-}
-
-impl DifficultyInfo for MinesweeperDifficulty {
-    fn name(&self) -> &'static str {
-        MinesweeperDifficulty::name(self)
-    }
-
-    fn reward(&self) -> ChallengeReward {
-        match self {
-            MinesweeperDifficulty::Novice => ChallengeReward {
-                xp_percent: 50,
-                ..Default::default()
-            },
-            MinesweeperDifficulty::Apprentice => ChallengeReward {
-                xp_percent: 75,
-                ..Default::default()
-            },
-            MinesweeperDifficulty::Journeyman => ChallengeReward {
-                xp_percent: 100,
-                ..Default::default()
-            },
-            MinesweeperDifficulty::Master => ChallengeReward {
-                prestige_ranks: 1,
-                xp_percent: 200,
-                ..Default::default()
-            },
-        }
-    }
-
-    fn extra_info(&self) -> Option<String> {
-        let (h, w) = self.grid_size();
-        Some(format!("{}x{}, {} traps", w, h, self.mine_count()))
-    }
-}
-
-impl DifficultyInfo for RuneDifficulty {
-    fn name(&self) -> &'static str {
-        RuneDifficulty::name(self)
-    }
-
-    fn reward(&self) -> ChallengeReward {
-        match self {
-            RuneDifficulty::Novice => ChallengeReward {
-                xp_percent: 25,
-                ..Default::default()
-            },
-            RuneDifficulty::Apprentice => ChallengeReward {
-                xp_percent: 50,
-                ..Default::default()
-            },
-            RuneDifficulty::Journeyman => ChallengeReward {
-                fishing_ranks: 1,
-                xp_percent: 75,
-                ..Default::default()
-            },
-            RuneDifficulty::Master => ChallengeReward {
-                prestige_ranks: 1,
-                fishing_ranks: 2,
-                ..Default::default()
-            },
-        }
-    }
-
-    fn extra_info(&self) -> Option<String> {
-        let dupes = if self.allow_duplicates() {
-            ", dupes"
-        } else {
-            ""
-        };
-        Some(format!(
-            "{} runes, {} slots{}",
-            self.num_runes(),
-            self.num_slots(),
-            dupes
-        ))
-    }
-}
-
-impl DifficultyInfo for GoDifficulty {
-    fn name(&self) -> &'static str {
-        GoDifficulty::name(self)
-    }
-
-    fn reward(&self) -> ChallengeReward {
-        ChallengeReward {
-            prestige_ranks: self.reward_prestige(),
-            ..Default::default()
-        }
-    }
-
-    fn extra_info(&self) -> Option<String> {
-        Some(format!("{} sims", self.simulation_count()))
-    }
-}
+// DifficultyInfo trait removed — reward/extra_info now on ChallengeType directly.
 
 /// Chance per tick to discover any challenge (~2 hour average)
 /// At 10 ticks/sec, 0.000014 chance/tick ≈ 71,429 ticks ≈ 2 hours average
@@ -405,6 +198,240 @@ impl ChallengeType {
             }
             ChallengeType::Rune => "A glowing stone tablet materializes before you...",
             ChallengeType::Go => "An ancient master beckons from beneath a gnarled tree...",
+        }
+    }
+
+    /// Icon string for combat log entries (same as icon() but kept separate for clarity).
+    pub fn log_icon(&self) -> &'static str {
+        self.icon()
+    }
+
+    /// String identifier for achievement tracking.
+    pub fn game_type_str(&self) -> &'static str {
+        match self {
+            ChallengeType::Chess => "chess",
+            ChallengeType::Morris => "morris",
+            ChallengeType::Gomoku => "gomoku",
+            ChallengeType::Minesweeper => "minesweeper",
+            ChallengeType::Rune => "rune",
+            ChallengeType::Go => "go",
+        }
+    }
+
+    /// Reward for winning at the given difficulty.
+    pub fn reward(&self, difficulty: ChallengeDifficulty) -> ChallengeReward {
+        use ChallengeDifficulty::*;
+        match self {
+            ChallengeType::Chess => ChallengeReward {
+                prestige_ranks: match difficulty {
+                    Novice => 1,
+                    Apprentice => 2,
+                    Journeyman => 3,
+                    Master => 5,
+                },
+                ..Default::default()
+            },
+            ChallengeType::Go => ChallengeReward {
+                prestige_ranks: match difficulty {
+                    Novice => 1,
+                    Apprentice => 2,
+                    Journeyman => 3,
+                    Master => 5,
+                },
+                ..Default::default()
+            },
+            ChallengeType::Morris => ChallengeReward {
+                xp_percent: match difficulty {
+                    Novice => 50,
+                    Apprentice => 100,
+                    Journeyman => 150,
+                    Master => 200,
+                },
+                fishing_ranks: if difficulty == Master { 1 } else { 0 },
+                ..Default::default()
+            },
+            ChallengeType::Gomoku => match difficulty {
+                Novice => ChallengeReward {
+                    xp_percent: 75,
+                    ..Default::default()
+                },
+                Apprentice => ChallengeReward {
+                    xp_percent: 100,
+                    ..Default::default()
+                },
+                Journeyman => ChallengeReward {
+                    prestige_ranks: 1,
+                    xp_percent: 50,
+                    ..Default::default()
+                },
+                Master => ChallengeReward {
+                    prestige_ranks: 2,
+                    xp_percent: 100,
+                    ..Default::default()
+                },
+            },
+            ChallengeType::Minesweeper => match difficulty {
+                Novice => ChallengeReward {
+                    xp_percent: 50,
+                    ..Default::default()
+                },
+                Apprentice => ChallengeReward {
+                    xp_percent: 75,
+                    ..Default::default()
+                },
+                Journeyman => ChallengeReward {
+                    xp_percent: 100,
+                    ..Default::default()
+                },
+                Master => ChallengeReward {
+                    prestige_ranks: 1,
+                    xp_percent: 200,
+                    ..Default::default()
+                },
+            },
+            ChallengeType::Rune => match difficulty {
+                Novice => ChallengeReward {
+                    xp_percent: 25,
+                    ..Default::default()
+                },
+                Apprentice => ChallengeReward {
+                    xp_percent: 50,
+                    ..Default::default()
+                },
+                Journeyman => ChallengeReward {
+                    fishing_ranks: 1,
+                    xp_percent: 75,
+                    ..Default::default()
+                },
+                Master => ChallengeReward {
+                    prestige_ranks: 1,
+                    fishing_ranks: 2,
+                    ..Default::default()
+                },
+            },
+        }
+    }
+
+    /// Optional extra info for difficulty selector (e.g., "~500 ELO", "9x9, 10 traps").
+    pub fn difficulty_extra_info(&self, difficulty: ChallengeDifficulty) -> Option<String> {
+        use ChallengeDifficulty::*;
+        match self {
+            ChallengeType::Chess => {
+                let elo = match difficulty {
+                    Novice => 500,
+                    Apprentice => 800,
+                    Journeyman => 1100,
+                    Master => 1350,
+                };
+                Some(format!("~{} ELO", elo))
+            }
+            ChallengeType::Go => {
+                let sims = match difficulty {
+                    Novice => 500,
+                    Apprentice => 2_000,
+                    Journeyman => 8_000,
+                    Master => 20_000,
+                };
+                Some(format!("{} sims", sims))
+            }
+            ChallengeType::Minesweeper => {
+                let (h, w, mines) = match difficulty {
+                    Novice => (9, 9, 10),
+                    Apprentice => (12, 12, 25),
+                    Journeyman => (16, 16, 40),
+                    Master => (16, 20, 60),
+                };
+                Some(format!("{}x{}, {} traps", w, h, mines))
+            }
+            ChallengeType::Rune => {
+                let (runes, slots, dupes) = match difficulty {
+                    Novice => (5, 3, false),
+                    Apprentice => (6, 4, false),
+                    Journeyman => (6, 4, true),
+                    Master => (8, 5, true),
+                };
+                let dupe_str = if dupes { ", dupes" } else { "" };
+                Some(format!("{} runes, {} slots{}", runes, slots, dupe_str))
+            }
+            _ => None,
+        }
+    }
+
+    /// Flavor text for combat log based on game result.
+    pub fn result_flavor(&self, result: ChallengeResult) -> &'static str {
+        match (self, result) {
+            // Chess
+            (ChallengeType::Chess, ChallengeResult::Win) => {
+                "♟ Checkmate! You defeated the mysterious figure."
+            }
+            (ChallengeType::Chess, ChallengeResult::Loss) => {
+                "♟ The mysterious figure nods respectfully and vanishes."
+            }
+            (ChallengeType::Chess, ChallengeResult::Draw) => {
+                "♟ The figure smiles knowingly and fades away."
+            }
+            (ChallengeType::Chess, ChallengeResult::Forfeit) => {
+                "♟ You concede the game. The figure disappears without a word."
+            }
+            // Go
+            (ChallengeType::Go, ChallengeResult::Win) => "◉ Victory! The master bows in respect.",
+            (ChallengeType::Go, ChallengeResult::Loss) => {
+                "◉ The master nods thoughtfully and departs."
+            }
+            (ChallengeType::Go, ChallengeResult::Draw) => {
+                "◉ A rare tie. The master seems impressed."
+            }
+            (ChallengeType::Go, ChallengeResult::Forfeit) => {
+                "◉ You concede. The master nods and departs."
+            }
+            // Morris
+            (ChallengeType::Morris, ChallengeResult::Win) => {
+                "○ Victory! The sage bows with respect."
+            }
+            (ChallengeType::Morris, ChallengeResult::Loss) => {
+                "○ The sage nods knowingly and departs."
+            }
+            (ChallengeType::Morris, ChallengeResult::Forfeit) => {
+                "○ You concede. The sage gathers their stones quietly."
+            }
+            (ChallengeType::Morris, ChallengeResult::Draw) => {
+                "○ A rare stalemate. The sage seems impressed."
+            }
+            // Gomoku
+            (ChallengeType::Gomoku, ChallengeResult::Win) => {
+                "◎ Victory! The strategist bows in defeat."
+            }
+            (ChallengeType::Gomoku, ChallengeResult::Loss) => {
+                "◎ The strategist nods respectfully and departs."
+            }
+            (ChallengeType::Gomoku, ChallengeResult::Draw) => {
+                "◎ A rare draw. The strategist seems impressed."
+            }
+            (ChallengeType::Gomoku, ChallengeResult::Forfeit) => {
+                "◎ You concede. The strategist nods and departs."
+            }
+            // Minesweeper
+            (ChallengeType::Minesweeper, ChallengeResult::Win) => {
+                "⚠ All traps identified! The scout salutes you."
+            }
+            (ChallengeType::Minesweeper, ChallengeResult::Loss) => {
+                "⚠ A trap detonates! The scout pulls you to safety."
+            }
+            (ChallengeType::Minesweeper, ChallengeResult::Forfeit) => {
+                "⚠ You retreat from the minefield."
+            }
+            (ChallengeType::Minesweeper, ChallengeResult::Draw) => {
+                "⚠ The minefield remains partially cleared."
+            }
+            // Rune
+            (ChallengeType::Rune, ChallengeResult::Win) => {
+                "ᚱ The runes glow with approval! Code deciphered."
+            }
+            (ChallengeType::Rune, ChallengeResult::Loss) => {
+                "ᚱ The tablet fades. The code remains a mystery."
+            }
+            (ChallengeType::Rune, ChallengeResult::Forfeit) => "ᚱ You step away from the tablet.",
+            (ChallengeType::Rune, ChallengeResult::Draw) => "ᚱ The tablet flickers and fades.",
         }
     }
 }
@@ -619,6 +646,7 @@ pub fn create_challenge(ct: &ChallengeType) -> PendingChallenge {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::challenges::ActiveMinigame;
 
     fn make_chess_challenge() -> PendingChallenge {
         PendingChallenge {

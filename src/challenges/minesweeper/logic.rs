@@ -3,34 +3,21 @@
 use rand::seq::SliceRandom;
 use rand::Rng;
 
-use super::{MinesweeperGame, MinesweeperResult};
-use crate::challenges::ActiveMinigame;
-
-/// Input actions for the Minesweeper game (UI-agnostic).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MinesweeperInput {
-    Up,
-    Down,
-    Left,
-    Right,
-    Reveal,
-    ToggleFlag,
-    Forfeit,
-    Other,
-}
+use super::MinesweeperGame;
+use crate::challenges::{ChallengeResult, MinigameInput};
 
 /// Process a key input during active Minesweeper game.
 /// Returns true if the input was handled.
 pub fn process_input<R: Rng>(
     game: &mut MinesweeperGame,
-    input: MinesweeperInput,
+    input: MinigameInput,
     rng: &mut R,
 ) -> bool {
     // Handle forfeit confirmation (double-Esc pattern)
     if game.forfeit_pending {
         match input {
-            MinesweeperInput::Forfeit => {
-                game.game_result = Some(MinesweeperResult::Loss);
+            MinigameInput::Cancel => {
+                game.game_result = Some(ChallengeResult::Forfeit);
             }
             _ => {
                 game.forfeit_pending = false;
@@ -41,11 +28,11 @@ pub fn process_input<R: Rng>(
 
     // Normal game input
     match input {
-        MinesweeperInput::Up => game.move_cursor(-1, 0),
-        MinesweeperInput::Down => game.move_cursor(1, 0),
-        MinesweeperInput::Left => game.move_cursor(0, -1),
-        MinesweeperInput::Right => game.move_cursor(0, 1),
-        MinesweeperInput::Reveal => {
+        MinigameInput::Up => game.move_cursor(-1, 0),
+        MinigameInput::Down => game.move_cursor(1, 0),
+        MinigameInput::Left => game.move_cursor(0, -1),
+        MinigameInput::Right => game.move_cursor(0, 1),
+        MinigameInput::Primary => {
             let (row, col) = game.cursor;
             if !game.first_click_done {
                 handle_first_click(game, row, col, rng);
@@ -53,14 +40,14 @@ pub fn process_input<R: Rng>(
                 reveal_cell(game, row, col);
             }
         }
-        MinesweeperInput::ToggleFlag => {
+        MinigameInput::Secondary => {
             let (row, col) = game.cursor;
             toggle_flag(game, row, col);
         }
-        MinesweeperInput::Forfeit => {
+        MinigameInput::Cancel => {
             game.forfeit_pending = true;
         }
-        MinesweeperInput::Other => {}
+        MinigameInput::Other => {}
     }
     true
 }
@@ -167,7 +154,7 @@ pub fn reveal_cell(game: &mut MinesweeperGame, row: usize, col: usize) -> bool {
 
     // Check if it's a mine
     if game.grid[row][col].has_mine {
-        game.game_result = Some(MinesweeperResult::Loss);
+        game.game_result = Some(ChallengeResult::Loss);
         reveal_all_mines(game);
         return false;
     }
@@ -261,7 +248,7 @@ pub fn check_win_condition(game: &mut MinesweeperGame) {
     }
 
     if unrevealed_count == game.total_mines {
-        game.game_result = Some(MinesweeperResult::Win);
+        game.game_result = Some(ChallengeResult::Win);
     }
 }
 
@@ -276,96 +263,10 @@ pub fn handle_first_click<R: Rng>(game: &mut MinesweeperGame, row: usize, col: u
     reveal_cell(game, row, col);
 }
 
-/// Apply game result: update stats, grant rewards, and add combat log entries.
-/// Returns Some(MinigameWinInfo) if the player won, None otherwise.
-pub fn apply_game_result(
-    state: &mut crate::core::game_state::GameState,
-) -> Option<crate::challenges::MinigameWinInfo> {
-    use super::super::MinesweeperResult;
-    use crate::challenges::menu::DifficultyInfo;
-    use crate::challenges::MinigameWinInfo;
-
-    let game = match state.active_minigame.as_ref() {
-        Some(ActiveMinigame::Minesweeper(g)) => g,
-        _ => return None,
-    };
-    let result = game.game_result?;
-    let reward = game.difficulty.reward();
-    let old_prestige = state.prestige_rank;
-    let difficulty = game.difficulty;
-
-    let won = match result {
-        MinesweeperResult::Win => {
-            // XP reward
-            let xp_gained = if reward.xp_percent > 0 {
-                let xp_for_level =
-                    crate::core::game_logic::xp_for_next_level(state.character_level.max(1));
-                let xp = (xp_for_level * reward.xp_percent as u64) / 100;
-                state.character_xp += xp;
-                xp
-            } else {
-                0
-            };
-
-            // Prestige reward
-            state.prestige_rank += reward.prestige_ranks;
-
-            // Combat log entries
-            state.combat_state.add_log_entry(
-                "\u{26A0} All traps identified! The scout salutes you.".to_string(),
-                false,
-                true,
-            );
-            if reward.prestige_ranks > 0 {
-                state.combat_state.add_log_entry(
-                    format!(
-                        "\u{26A0} +{} Prestige Ranks (P{} \u{2192} P{})",
-                        reward.prestige_ranks, old_prestige, state.prestige_rank
-                    ),
-                    false,
-                    true,
-                );
-            }
-            if xp_gained > 0 {
-                state.combat_state.add_log_entry(
-                    format!("\u{26A0} +{} XP", xp_gained),
-                    false,
-                    true,
-                );
-            }
-            true
-        }
-        MinesweeperResult::Loss => {
-            state.combat_state.add_log_entry(
-                "\u{26A0} A trap detonates! The scout pulls you to safety.".to_string(),
-                false,
-                true,
-            );
-            false
-        }
-    };
-
-    state.active_minigame = None;
-
-    if won {
-        Some(MinigameWinInfo {
-            game_type: "minesweeper",
-            difficulty: match difficulty {
-                super::super::MinesweeperDifficulty::Novice => "novice",
-                super::super::MinesweeperDifficulty::Apprentice => "apprentice",
-                super::super::MinesweeperDifficulty::Journeyman => "journeyman",
-                super::super::MinesweeperDifficulty::Master => "master",
-            },
-        })
-    } else {
-        None
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::super::MinesweeperDifficulty;
     use super::*;
+    use crate::challenges::ChallengeDifficulty;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
 
@@ -421,7 +322,7 @@ mod tests {
 
     #[test]
     fn test_place_mines_count() {
-        let mut game = MinesweeperGame::new(MinesweeperDifficulty::Novice);
+        let mut game = MinesweeperGame::new(ChallengeDifficulty::Novice);
         let mut rng = StdRng::seed_from_u64(42);
 
         // First click at center
@@ -440,7 +341,7 @@ mod tests {
 
     #[test]
     fn test_place_mines_avoids_first_click() {
-        let mut game = MinesweeperGame::new(MinesweeperDifficulty::Novice);
+        let mut game = MinesweeperGame::new(ChallengeDifficulty::Novice);
         let mut rng = StdRng::seed_from_u64(42);
 
         let first_row = 4;
@@ -467,7 +368,7 @@ mod tests {
     #[test]
     fn test_place_mines_avoids_first_click_corner() {
         // Test corner click where there are fewer neighbors
-        let mut game = MinesweeperGame::new(MinesweeperDifficulty::Novice);
+        let mut game = MinesweeperGame::new(ChallengeDifficulty::Novice);
         let mut rng = StdRng::seed_from_u64(42);
 
         let first_row = 0;
@@ -502,7 +403,7 @@ mod tests {
 
     #[test]
     fn test_adjacent_counts() {
-        let mut game = MinesweeperGame::new(MinesweeperDifficulty::Novice);
+        let mut game = MinesweeperGame::new(ChallengeDifficulty::Novice);
 
         // Manually place mines in a known pattern for testing
         // Place mines at (0,0), (0,1), (1,0) - forming an L in top-left
@@ -544,12 +445,12 @@ mod tests {
 
     #[test]
     fn test_adjacent_counts_all_difficulties() {
-        for difficulty in MinesweeperDifficulty::ALL {
+        for difficulty in ChallengeDifficulty::ALL {
             let mut game = MinesweeperGame::new(difficulty);
             let mut rng = StdRng::seed_from_u64(42);
 
             // Place mines with first click at center
-            let (height, width) = difficulty.grid_size();
+            let (height, width) = (game.height, game.width);
             place_mines(&mut game, height / 2, width / 2, &mut rng);
             calculate_adjacent_counts(&mut game);
 
@@ -574,8 +475,8 @@ mod tests {
     #[test]
     fn test_deterministic_with_seed() {
         // Verify that using the same seed produces the same mine placement
-        let mut game1 = MinesweeperGame::new(MinesweeperDifficulty::Novice);
-        let mut game2 = MinesweeperGame::new(MinesweeperDifficulty::Novice);
+        let mut game1 = MinesweeperGame::new(ChallengeDifficulty::Novice);
+        let mut game2 = MinesweeperGame::new(ChallengeDifficulty::Novice);
 
         let mut rng1 = StdRng::seed_from_u64(42);
         let mut rng2 = StdRng::seed_from_u64(42);
@@ -597,7 +498,7 @@ mod tests {
 
     #[test]
     fn test_reveal_safe_cell() {
-        let mut game = MinesweeperGame::new(MinesweeperDifficulty::Novice);
+        let mut game = MinesweeperGame::new(ChallengeDifficulty::Novice);
 
         // Manually set up a simple grid with a known mine pattern
         // Place a mine at (0, 0)
@@ -620,9 +521,7 @@ mod tests {
 
     #[test]
     fn test_reveal_mine() {
-        use super::super::MinesweeperResult;
-
-        let mut game = MinesweeperGame::new(MinesweeperDifficulty::Novice);
+        let mut game = MinesweeperGame::new(ChallengeDifficulty::Novice);
 
         // Place a mine at (2, 2)
         game.grid[2][2].has_mine = true;
@@ -634,14 +533,14 @@ mod tests {
         assert!(game.grid[2][2].revealed, "Mine cell should be revealed");
         assert_eq!(
             game.game_result,
-            Some(MinesweeperResult::Loss),
+            Some(ChallengeResult::Loss),
             "Game should be lost"
         );
     }
 
     #[test]
     fn test_toggle_flag() {
-        let mut game = MinesweeperGame::new(MinesweeperDifficulty::Novice);
+        let mut game = MinesweeperGame::new(ChallengeDifficulty::Novice);
 
         // Initially: no flags
         assert_eq!(game.flags_placed, 0);
@@ -660,7 +559,7 @@ mod tests {
 
     #[test]
     fn test_cannot_reveal_flagged() {
-        let mut game = MinesweeperGame::new(MinesweeperDifficulty::Novice);
+        let mut game = MinesweeperGame::new(ChallengeDifficulty::Novice);
         game.first_click_done = true;
 
         // Flag a cell
@@ -678,9 +577,7 @@ mod tests {
 
     #[test]
     fn test_win_condition() {
-        use super::super::MinesweeperResult;
-
-        let mut game = MinesweeperGame::new(MinesweeperDifficulty::Novice);
+        let mut game = MinesweeperGame::new(ChallengeDifficulty::Novice);
 
         // Place mines at known positions
         let mine_positions = vec![
@@ -715,14 +612,14 @@ mod tests {
         check_win_condition(&mut game);
         assert_eq!(
             game.game_result,
-            Some(MinesweeperResult::Win),
+            Some(ChallengeResult::Win),
             "Game should be won when all non-mine cells are revealed"
         );
     }
 
     #[test]
     fn test_flood_fill_reveal() {
-        let mut game = MinesweeperGame::new(MinesweeperDifficulty::Novice);
+        let mut game = MinesweeperGame::new(ChallengeDifficulty::Novice);
 
         // Place a mine in the corner - this leaves a large area with 0 adjacent mines
         game.grid[0][0].has_mine = true;
@@ -757,7 +654,7 @@ mod tests {
 
     #[test]
     fn test_handle_first_click() {
-        let mut game = MinesweeperGame::new(MinesweeperDifficulty::Novice);
+        let mut game = MinesweeperGame::new(ChallengeDifficulty::Novice);
         let mut rng = StdRng::seed_from_u64(42);
 
         assert!(!game.first_click_done);
@@ -787,7 +684,7 @@ mod tests {
 
     #[test]
     fn test_reveal_all_mines() {
-        let mut game = MinesweeperGame::new(MinesweeperDifficulty::Novice);
+        let mut game = MinesweeperGame::new(ChallengeDifficulty::Novice);
 
         // Place mines at known positions
         game.grid[0][0].has_mine = true;
@@ -815,7 +712,7 @@ mod tests {
 
     #[test]
     fn test_cannot_flag_revealed_cell() {
-        let mut game = MinesweeperGame::new(MinesweeperDifficulty::Novice);
+        let mut game = MinesweeperGame::new(ChallengeDifficulty::Novice);
 
         // Reveal a cell
         game.grid[3][3].revealed = true;
@@ -831,108 +728,39 @@ mod tests {
         assert_eq!(game.flags_placed, 0, "No flags should be placed");
     }
 
-    // ============ apply_game_result Tests ============
-
-    #[test]
-    fn test_apply_win_result() {
-        use crate::core::game_state::GameState;
-
-        let mut state = GameState::new("Test".to_string(), 0);
-        state.prestige_rank = 5;
-        let initial_xp = state.character_xp;
-
-        let mut game = MinesweeperGame::new(MinesweeperDifficulty::Master);
-        game.game_result = Some(MinesweeperResult::Win);
-        state.active_minigame = Some(ActiveMinigame::Minesweeper(game));
-
-        let processed = apply_game_result(&mut state);
-        assert!(processed.is_some()); // Win returns Some(MinigameWinInfo)
-        assert!(state.character_xp > initial_xp); // Master gives XP
-        assert!(state.prestige_rank > 5); // Master gives prestige
-        assert!(state.active_minigame.is_none());
-    }
-
-    #[test]
-    fn test_apply_loss_result() {
-        use crate::core::game_state::GameState;
-
-        let mut state = GameState::new("Test".to_string(), 0);
-        state.prestige_rank = 5;
-        let initial_xp = state.character_xp;
-
-        let mut game = MinesweeperGame::new(MinesweeperDifficulty::Novice);
-        game.game_result = Some(MinesweeperResult::Loss);
-        state.active_minigame = Some(ActiveMinigame::Minesweeper(game));
-
-        let processed = apply_game_result(&mut state);
-        assert!(processed.is_none()); // Loss returns None
-        assert_eq!(state.character_xp, initial_xp); // XP unchanged
-        assert_eq!(state.prestige_rank, 5); // Prestige unchanged
-        assert!(state.active_minigame.is_none()); // But game is still cleared
-    }
-
-    #[test]
-    fn test_apply_result_no_game() {
-        use crate::core::game_state::GameState;
-
-        let mut state = GameState::new("Test".to_string(), 0);
-        state.active_minigame = None;
-
-        let processed = apply_game_result(&mut state);
-        assert!(processed.is_none());
-    }
-
-    #[test]
-    fn test_apply_result_no_result() {
-        use crate::core::game_state::GameState;
-
-        let mut state = GameState::new("Test".to_string(), 0);
-        let game = MinesweeperGame::new(MinesweeperDifficulty::Novice);
-        // game.game_result is None
-        state.active_minigame = Some(ActiveMinigame::Minesweeper(game));
-
-        let processed = apply_game_result(&mut state);
-        assert!(processed.is_none());
-        // Game should still be active
-        assert!(matches!(
-            state.active_minigame,
-            Some(ActiveMinigame::Minesweeper(_))
-        ));
-    }
-
     // ============ process_input Tests ============
 
     #[test]
     fn test_process_input_cursor_movement() {
-        let mut game = MinesweeperGame::new(MinesweeperDifficulty::Novice);
+        let mut game = MinesweeperGame::new(ChallengeDifficulty::Novice);
         let mut rng = StdRng::seed_from_u64(42);
 
         // Start at center (4, 4) for 9x9 Novice grid
         assert_eq!(game.cursor, (4, 4));
 
-        process_input(&mut game, MinesweeperInput::Down, &mut rng);
+        process_input(&mut game, MinigameInput::Down, &mut rng);
         assert_eq!(game.cursor, (5, 4));
 
-        process_input(&mut game, MinesweeperInput::Right, &mut rng);
+        process_input(&mut game, MinigameInput::Right, &mut rng);
         assert_eq!(game.cursor, (5, 5));
 
-        process_input(&mut game, MinesweeperInput::Up, &mut rng);
+        process_input(&mut game, MinigameInput::Up, &mut rng);
         assert_eq!(game.cursor, (4, 5));
 
-        process_input(&mut game, MinesweeperInput::Left, &mut rng);
+        process_input(&mut game, MinigameInput::Left, &mut rng);
         assert_eq!(game.cursor, (4, 4));
     }
 
     #[test]
     fn test_process_input_reveal_first_click() {
-        let mut game = MinesweeperGame::new(MinesweeperDifficulty::Novice);
+        let mut game = MinesweeperGame::new(ChallengeDifficulty::Novice);
         let mut rng = StdRng::seed_from_u64(42);
 
         assert!(!game.first_click_done);
 
         // Cursor starts at center (4, 4), reveal there
         assert_eq!(game.cursor, (4, 4));
-        process_input(&mut game, MinesweeperInput::Reveal, &mut rng);
+        process_input(&mut game, MinigameInput::Primary, &mut rng);
 
         assert!(game.first_click_done);
         assert!(game.grid[4][4].revealed);
@@ -940,7 +768,7 @@ mod tests {
 
     #[test]
     fn test_process_input_toggle_flag() {
-        let mut game = MinesweeperGame::new(MinesweeperDifficulty::Novice);
+        let mut game = MinesweeperGame::new(ChallengeDifficulty::Novice);
         let mut rng = StdRng::seed_from_u64(42);
 
         // Cursor starts at center (4, 4)
@@ -948,13 +776,13 @@ mod tests {
         assert!(!game.grid[row][col].flagged);
         assert_eq!(game.flags_placed, 0);
 
-        process_input(&mut game, MinesweeperInput::ToggleFlag, &mut rng);
+        process_input(&mut game, MinigameInput::Secondary, &mut rng);
 
         assert!(game.grid[row][col].flagged);
         assert_eq!(game.flags_placed, 1);
 
         // Toggle off
-        process_input(&mut game, MinesweeperInput::ToggleFlag, &mut rng);
+        process_input(&mut game, MinigameInput::Secondary, &mut rng);
 
         assert!(!game.grid[row][col].flagged);
         assert_eq!(game.flags_placed, 0);
@@ -962,12 +790,12 @@ mod tests {
 
     #[test]
     fn test_process_input_forfeit_single_esc() {
-        let mut game = MinesweeperGame::new(MinesweeperDifficulty::Novice);
+        let mut game = MinesweeperGame::new(ChallengeDifficulty::Novice);
         let mut rng = StdRng::seed_from_u64(42);
 
         assert!(!game.forfeit_pending);
 
-        process_input(&mut game, MinesweeperInput::Forfeit, &mut rng);
+        process_input(&mut game, MinigameInput::Cancel, &mut rng);
 
         assert!(game.forfeit_pending);
         assert!(game.game_result.is_none());
@@ -975,30 +803,30 @@ mod tests {
 
     #[test]
     fn test_process_input_forfeit_double_esc() {
-        let mut game = MinesweeperGame::new(MinesweeperDifficulty::Novice);
+        let mut game = MinesweeperGame::new(ChallengeDifficulty::Novice);
         let mut rng = StdRng::seed_from_u64(42);
 
         // First Esc sets pending
-        process_input(&mut game, MinesweeperInput::Forfeit, &mut rng);
+        process_input(&mut game, MinigameInput::Cancel, &mut rng);
         assert!(game.forfeit_pending);
 
         // Second Esc confirms forfeit
-        process_input(&mut game, MinesweeperInput::Forfeit, &mut rng);
+        process_input(&mut game, MinigameInput::Cancel, &mut rng);
 
-        assert_eq!(game.game_result, Some(MinesweeperResult::Loss));
+        assert_eq!(game.game_result, Some(ChallengeResult::Forfeit));
     }
 
     #[test]
     fn test_process_input_forfeit_cancelled() {
-        let mut game = MinesweeperGame::new(MinesweeperDifficulty::Novice);
+        let mut game = MinesweeperGame::new(ChallengeDifficulty::Novice);
         let mut rng = StdRng::seed_from_u64(42);
 
         // First Esc sets pending
-        process_input(&mut game, MinesweeperInput::Forfeit, &mut rng);
+        process_input(&mut game, MinigameInput::Cancel, &mut rng);
         assert!(game.forfeit_pending);
 
         // Any other key cancels forfeit
-        process_input(&mut game, MinesweeperInput::Other, &mut rng);
+        process_input(&mut game, MinigameInput::Other, &mut rng);
 
         assert!(!game.forfeit_pending);
         assert!(game.game_result.is_none());
@@ -1034,7 +862,7 @@ mod tests {
             height,
             width,
             cursor: (0, 0),
-            difficulty: MinesweeperDifficulty::Novice,
+            difficulty: ChallengeDifficulty::Novice,
             game_result: None,
             first_click_done: true,
             total_mines: mine_count,
@@ -1247,7 +1075,7 @@ mod tests {
         // Reveal the mine at (0, 0).
         let result = reveal_cell(&mut game, 0, 0);
         assert!(!result, "Hitting a mine should return false");
-        assert_eq!(game.game_result, Some(MinesweeperResult::Loss));
+        assert_eq!(game.game_result, Some(ChallengeResult::Loss));
 
         // All mines should be revealed after loss.
         assert!(game.grid[0][0].revealed, "Hit mine revealed");
@@ -1436,7 +1264,7 @@ mod tests {
         // Win condition should have been triggered.
         assert_eq!(
             game.game_result,
-            Some(MinesweeperResult::Win),
+            Some(ChallengeResult::Win),
             "Game should be won when all non-mine cells are revealed"
         );
     }
@@ -1469,7 +1297,7 @@ mod tests {
         reveal_cell(&mut game, 0, 0);
         assert!(game.grid[0][0].revealed);
         // With 0 mines and 1 cell, revealing it should win.
-        assert_eq!(game.game_result, Some(MinesweeperResult::Win));
+        assert_eq!(game.game_result, Some(ChallengeResult::Win));
     }
 
     // ---- Flood fill with multiple disjoint empty regions ----
@@ -1581,7 +1409,7 @@ mod tests {
         assert_eq!(count_revealed(&game), 16);
 
         // Win condition: unrevealed == total_mines == 0 -> Win.
-        assert_eq!(game.game_result, Some(MinesweeperResult::Win));
+        assert_eq!(game.game_result, Some(ChallengeResult::Win));
     }
 
     // ---- Flagged cell adjacent to empty region blocks propagation locally ----
@@ -1623,7 +1451,7 @@ mod tests {
 
         // Move cursor to (3, 3) and reveal.
         game.cursor = (3, 3);
-        process_input(&mut game, MinesweeperInput::Reveal, &mut rng);
+        process_input(&mut game, MinigameInput::Primary, &mut rng);
 
         // Cell (3,3) has 0 adjacent mines, flood fill should occur.
         assert!(game.grid[3][3].revealed);
