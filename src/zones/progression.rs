@@ -6,9 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use super::data::{get_all_zones, Zone};
 use crate::achievements::{AchievementId, Achievements};
-
-/// Number of enemies to defeat before the subzone boss spawns
-pub const KILLS_FOR_BOSS: u32 = 10;
+pub use crate::core::constants::KILLS_FOR_BOSS;
 
 /// Tracks the player's progression through zones and subzones.
 #[derive(Debug, Clone, Serialize, Deserialize)]

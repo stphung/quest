@@ -1,3 +1,4 @@
+use crate::core::constants::{PRESTIGE_MULT_BASE_FACTOR, PRESTIGE_MULT_EXPONENT};
 use crate::core::game_state::GameState;
 
 /// Represents a prestige tier with its properties
@@ -60,9 +61,9 @@ fn get_prestige_name(rank: u32) -> &'static str {
 ///
 /// See docs/plans/2026-02-03-prestige-multiplier-rebalance.md for details.
 pub fn get_prestige_tier(rank: u32) -> PrestigeTier {
-    // Diminishing returns formula: 1 + 0.5 * rank^0.7
+    // Diminishing returns formula: 1 + BASE_FACTOR * rank^EXPONENT
     // P1: 1.5x, P5: 2.5x, P10: 3.5x, P20: 5.1x, P30: 6.4x
-    let multiplier = 1.0 + 0.5 * (rank as f64).powf(0.7);
+    let multiplier = 1.0 + PRESTIGE_MULT_BASE_FACTOR * (rank as f64).powf(PRESTIGE_MULT_EXPONENT);
 
     let required_level = match rank {
         0 => 0,

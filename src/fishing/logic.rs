@@ -8,13 +8,11 @@
 use super::generation::{self as fishing_generation, is_storm_leviathan, LeviathanResult};
 use super::types::{FishRarity, FishingPhase, FishingState};
 use crate::character::prestige::get_prestige_tier;
+use crate::core::constants::{BASE_MAX_FISHING_RANK, FISHING_DISCOVERY_CHANCE, MAX_FISHING_RANK};
 use crate::core::game_state::GameState;
 use crate::items::generation as item_generation;
 use crate::items::{EquipmentSlot, Rarity};
 use rand::Rng;
-
-/// Discovery chance for finding a fishing spot (5%)
-const FISHING_DISCOVERY_CHANCE: f64 = 0.05;
 
 /// Apply timer reduction from Garden bonus
 fn apply_timer_reduction(base_ticks: u32, reduction_percent: f64) -> u32 {
@@ -329,12 +327,7 @@ pub fn try_discover_fishing(state: &mut GameState, rng: &mut impl Rng) -> Option
     Some(format!("Discovered fishing spot: {}!", spot_name))
 }
 
-/// Base maximum fishing rank without Haven bonuses
-pub const BASE_MAX_FISHING_RANK: u32 = 30;
-
-/// Maximum fishing rank (corresponds to RANK_NAMES length)
-/// This is the absolute cap with all Haven bonuses (FishingDock T4 adds +10)
-pub const MAX_FISHING_RANK: u32 = 40;
+// BASE_MAX_FISHING_RANK and MAX_FISHING_RANK are imported from core::constants
 
 /// Returns the effective maximum fishing rank based on Haven bonus.
 ///

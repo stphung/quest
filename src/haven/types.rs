@@ -453,12 +453,16 @@ impl Haven {
 }
 
 /// Discovery chance per tick. Scales with prestige rank.
-/// Base: 0.000014 (~2hr at P10), +0.000007 per rank above 10.
+/// Base: HAVEN_DISCOVERY_BASE_CHANCE (~2hr at P10), +HAVEN_DISCOVERY_RANK_BONUS per rank above min.
 pub fn haven_discovery_chance(prestige_rank: u32) -> f64 {
-    if prestige_rank < 10 {
+    use crate::core::constants::{
+        HAVEN_DISCOVERY_BASE_CHANCE, HAVEN_DISCOVERY_RANK_BONUS, HAVEN_MIN_PRESTIGE_RANK,
+    };
+    if prestige_rank < HAVEN_MIN_PRESTIGE_RANK {
         return 0.0;
     }
-    0.000014 + (prestige_rank - 10) as f64 * 0.000007
+    HAVEN_DISCOVERY_BASE_CHANCE
+        + (prestige_rank - HAVEN_MIN_PRESTIGE_RANK) as f64 * HAVEN_DISCOVERY_RANK_BONUS
 }
 
 /// Pre-computed Haven bonuses for efficient access during gameplay

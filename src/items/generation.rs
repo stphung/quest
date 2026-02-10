@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 use super::names::generate_display_name;
 use super::types::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
+use crate::core::constants::{ILVL_SCALING_BASE, ILVL_SCALING_DIVISOR};
 use rand::Rng;
 
 /// Generate an item with the given slot, rarity, and item level.
@@ -33,7 +34,7 @@ pub fn generate_item(slot: EquipmentSlot, rarity: Rarity, ilvl: u32) -> Item {
 /// Calculate the ilvl multiplier for scaling stats.
 /// ilvl 10: 1.0x, ilvl 50: 2.33x, ilvl 100: 4.0x
 fn ilvl_multiplier(ilvl: u32) -> f64 {
-    1.0 + (ilvl.max(10) as f64 - 10.0) / 30.0
+    1.0 + (ilvl.max(ILVL_SCALING_BASE as u32) as f64 - ILVL_SCALING_BASE) / ILVL_SCALING_DIVISOR
 }
 
 fn generate_attributes(rarity: Rarity, ilvl: u32, rng: &mut impl Rng) -> AttributeBonuses {

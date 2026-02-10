@@ -1,3 +1,4 @@
+use crate::core::constants::{BASE_ATTRIBUTE_VALUE, NUM_ATTRIBUTES};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -11,7 +12,7 @@ pub enum AttributeType {
 }
 
 impl AttributeType {
-    pub fn all() -> [AttributeType; 6] {
+    pub fn all() -> [AttributeType; NUM_ATTRIBUTES] {
         [
             AttributeType::Strength,
             AttributeType::Dexterity,
@@ -47,7 +48,7 @@ impl AttributeType {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct Attributes {
-    values: [u32; 6],
+    values: [u32; NUM_ATTRIBUTES],
 }
 
 impl Default for Attributes {
@@ -58,7 +59,9 @@ impl Default for Attributes {
 
 impl Attributes {
     pub fn new() -> Self {
-        Self { values: [10; 6] }
+        Self {
+            values: [BASE_ATTRIBUTE_VALUE; NUM_ATTRIBUTES],
+        }
     }
 
     pub fn get(&self, attr: AttributeType) -> u32 {
@@ -75,7 +78,7 @@ impl Attributes {
 
     pub fn modifier(&self, attr: AttributeType) -> i32 {
         let value = self.get(attr) as i32;
-        (value - 10) / 2
+        (value - BASE_ATTRIBUTE_VALUE as i32) / 2
     }
 
     /// Adds another Attributes' values to this one (for equipment bonuses).

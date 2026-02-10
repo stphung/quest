@@ -3,6 +3,7 @@ use super::generation::generate_item;
 use super::types::{EquipmentSlot, Item, Rarity};
 use crate::core::constants::{
     ITEM_DROP_BASE_CHANCE, ITEM_DROP_MAX_CHANCE, ITEM_DROP_PRESTIGE_BONUS,
+    MOB_RARITY_PRESTIGE_BONUS_CAP, MOB_RARITY_PRESTIGE_BONUS_PER_RANK, ZONE_ILVL_MULTIPLIER,
 };
 use crate::core::game_state::GameState;
 use rand::Rng;
@@ -15,7 +16,7 @@ pub fn drop_chance_for_prestige(prestige_rank: u32) -> f64 {
 /// Calculate item level from zone ID.
 /// Zone 1 = ilvl 10, Zone 10 = ilvl 100.
 pub fn ilvl_for_zone(zone_id: usize) -> u32 {
-    (zone_id as u32) * 10
+    (zone_id as u32) * ZONE_ILVL_MULTIPLIER
 }
 
 /// Try to drop an item from a normal mob (non-boss).
@@ -75,8 +76,9 @@ pub fn roll_rarity_for_mob(
 ) -> Rarity {
     let roll = rng.gen::<f64>();
 
-    // Prestige gives a small bonus (1% per rank, max 10%)
-    let prestige_bonus = (prestige_rank as f64 * 0.01).min(0.10);
+    // Prestige gives a small bonus per rank, capped
+    let prestige_bonus = (prestige_rank as f64 * MOB_RARITY_PRESTIGE_BONUS_PER_RANK)
+        .min(MOB_RARITY_PRESTIGE_BONUS_CAP);
 
     // Workshop bonus: shifts distribution toward higher rarities (max 25%)
     let haven_bonus = (haven_rarity_percent / 100.0).min(0.25);
