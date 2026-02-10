@@ -496,7 +496,11 @@ pub fn resolve_combat_tick(
 
         // Clear enemy and start regeneration
         state.combat_state.current_enemy = None;
-        state.zone_progression.fighting_boss = false;
+        // Only clear fighting_boss flag if we killed a boss (not for regular mob kills)
+        // For regular mobs, record_kill() may have just SET this flag to trigger boss spawn
+        if result.was_boss {
+            state.zone_progression.fighting_boss = false;
+        }
         state.combat_state.is_regenerating = true;
         state.combat_state.regen_timer = 0.0;
     } else {
@@ -884,6 +888,212 @@ mod tests {
             (200..=300).contains(&double_strikes),
             "Expected ~250 double strikes (50%), got {}",
             double_strikes
+        );
+    }
+
+    #[test]
+    fn test_resolve_combat_tick_record_kill_triggers_boss() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        let bonuses = CombatBonuses::default();
+        let mut achievements = Achievements::default();
+        let mut rng = rand::thread_rng();
+
+        // Verify we start with no kills and no boss
+        assert_eq!(state.zone_progression.kills_in_subzone, 0);
+        assert!(!state.zone_progression.fighting_boss);
+
+        // Kill enough enemies to trigger boss spawn (KILLS_FOR_BOSS = 10)
+        let mut kills = 0;
+        for _ in 0..1000 {
+            // Reset regeneration to allow combat
+            state.combat_state.is_regenerating = false;
+
+            let result = resolve_combat_tick(&mut state, &bonuses, &mut achievements, &mut rng);
+
+            if result.player_won && !result.was_boss {
+                kills += 1;
+            }
+
+            // Check if boss flag got set (happens when kills_in_subzone >= 10)
+            if state.zone_progression.fighting_boss {
+                break;
+            }
+        }
+
+        assert!(
+            state.zone_progression.fighting_boss,
+            "Boss should spawn after {} kills (need 10), kills_in_subzone={}",
+            kills,
+            state.zone_progression.kills_in_subzone
+        );
+        assert!(
+            kills >= 10,
+            "Should need at least 10 kills, got {}",
+            kills
+        );
+    }
+
+    #[test]
+    fn test_resolve_combat_tick_regen_after_kill() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        let bonuses = CombatBonuses::default();
+        let mut achievements = Achievements::default();
+        let mut rng = rand::thread_rng();
+
+        // Run until we get a kill
+        for _ in 0..100 {
+            let result = resolve_combat_tick(&mut state, &bonuses, &mut achievements, &mut rng);
+            if result.player_won {
+                // After a kill, should be regenerating
+                assert!(
+                    state.combat_state.is_regenerating,
+                    "Should start regenerating after kill"
+                );
+                assert!(
+                    state.combat_state.current_enemy.is_none(),
+                    "Enemy should be cleared after kill"
+                );
+                return;
+            }
+        }
+        panic!("Failed to get a kill in 100 ticks");
+    }
+
+    #[test]
+    fn test_resolve_combat_tick_achievement_tracking() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        let bonuses = CombatBonuses::default();
+        let mut achievements = Achievements::default();
+        let mut rng = rand::thread_rng();
+
+        let initial_kills = achievements.total_kills;
+
+        // Run until we get some kills
+        let mut kills = 0;
+        for _ in 0..200 {
+            // Reset regen to keep fighting
+            state.combat_state.is_regenerating = false;
+            let result = resolve_combat_tick(&mut state, &bonuses, &mut achievements, &mut rng);
+            if result.player_won {
+                kills += 1;
+                if kills >= 5 {
+                    break;
+                }
+            }
+        }
+
+        assert!(
+            achievements.total_kills > initial_kills,
+            "Achievements should track kills (had {}, now {})",
+            initial_kills,
+            achievements.total_kills
+        );
+    }
+
+    // Note: Damage reflection is tested via combat_math::calculate_damage_reflection tests
+    // and combat::logic tests. The integration in resolve_combat_tick uses the same
+    // formula, so we verify the code path exists rather than duplicating those tests.
+
+    #[test]
+    fn test_resolve_combat_tick_non_boss_death_resets_enemy() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // Spawn a strong enemy that will kill the player
+        state.combat_state.current_enemy = Some(crate::combat::types::Enemy::new(
+            "Strong Enemy".to_string(),
+            100,  // Some HP
+            5000, // Very high damage to kill player
+        ));
+        state.combat_state.player_current_hp = 1; // Player is weak
+
+        let bonuses = CombatBonuses::default();
+        let mut achievements = Achievements::default();
+        let mut rng = rand::thread_rng();
+
+        // This should result in player death
+        let result = resolve_combat_tick(&mut state, &bonuses, &mut achievements, &mut rng);
+
+        if result.player_died && !result.was_boss {
+            // Enemy should still exist with reset HP
+            assert!(
+                state.combat_state.current_enemy.is_some(),
+                "Non-boss enemy should remain after player death"
+            );
+            let enemy = state.combat_state.current_enemy.as_ref().unwrap();
+            assert_eq!(
+                enemy.current_hp, enemy.max_hp,
+                "Enemy HP should be reset after player death"
+            );
+        }
+    }
+
+    #[test]
+    fn test_resolve_combat_tick_boss_defeat_tracked() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        let bonuses = CombatBonuses::default();
+        let mut achievements = Achievements::default();
+        let mut rng = rand::thread_rng();
+
+        // Manually set up a boss fight
+        state.zone_progression.fighting_boss = true;
+        state.zone_progression.kills_in_subzone = 10;
+
+        // Spawn a very weak "boss" that player can one-shot
+        state.combat_state.current_enemy = Some(crate::combat::types::Enemy::new(
+            "Weak Boss".to_string(),
+            1, // 1 HP = instant kill
+            1,
+        ));
+
+        let initial_defeated = state.zone_progression.defeated_bosses.len();
+
+        let result = resolve_combat_tick(&mut state, &bonuses, &mut achievements, &mut rng);
+
+        if result.player_won && result.was_boss {
+            assert!(
+                state.zone_progression.defeated_bosses.len() > initial_defeated,
+                "Boss defeat should be tracked in defeated_bosses"
+            );
+        }
+    }
+
+    #[test]
+    fn test_resolve_combat_tick_boss_weapon_blocked() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // Set up Zone 10 final boss fight (requires Stormbreaker)
+        // Zone 10 has 4 subzones, the final one (id=4) is Apex Spire with The Undying Storm
+        state.zone_progression.current_zone_id = 10;
+        state.zone_progression.current_subzone_id = 4; // Final subzone (Apex Spire)
+        state.zone_progression.fighting_boss = true;
+        state.prestige_rank = 20; // High enough to access zone 10
+
+        // Spawn a boss
+        state.combat_state.current_enemy = Some(crate::combat::types::Enemy::new(
+            "The Undying Storm".to_string(),
+            1000,
+            50,
+        ));
+
+        let bonuses = CombatBonuses::default();
+        let mut achievements = Achievements::default();
+        // Don't unlock Stormbreaker achievement - attack should be blocked
+        let mut rng = rand::thread_rng();
+
+        let result = resolve_combat_tick(&mut state, &bonuses, &mut achievements, &mut rng);
+
+        // Attack should be blocked
+        assert!(
+            result.attack_blocked,
+            "Attack should be blocked without Stormbreaker"
+        );
+        assert!(
+            result.weapon_needed.is_some(),
+            "Should indicate weapon is needed"
+        );
+        assert_eq!(
+            result.damage_dealt, 0,
+            "Should deal no damage when blocked"
         );
     }
 }
