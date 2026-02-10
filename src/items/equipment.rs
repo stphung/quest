@@ -43,6 +43,13 @@ impl Equipment {
     }
 
     pub fn set(&mut self, slot: EquipmentSlot, item: Option<Item>) {
+        if let Some(ref i) = item {
+            debug_assert_eq!(
+                i.slot, slot,
+                "Item slot {:?} doesn't match target slot {:?}",
+                i.slot, slot
+            );
+        }
         match slot {
             EquipmentSlot::Weapon => self.weapon = item,
             EquipmentSlot::Armor => self.armor = item,

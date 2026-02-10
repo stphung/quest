@@ -133,16 +133,17 @@ fn generate_affix_value(
             (base * multiplier).round()
         }
         AffixType::CritMultiplier => {
-            // Crit multiplier is smaller (0.1x - 0.5x range)
+            // Crit multiplier bonus as percentage points (e.g., 20.0 = +20% crit mult)
+            // Applied as: crit_mult = 2.0 + (value / 100.0)
             let (cm_min, cm_max) = match rarity {
                 Rarity::Common => (0.0, 0.0),
-                Rarity::Magic => (0.05, 0.1),
-                Rarity::Rare => (0.1, 0.15),
-                Rarity::Epic => (0.15, 0.25),
-                Rarity::Legendary => (0.2, 0.35),
+                Rarity::Magic => (5.0, 10.0),
+                Rarity::Rare => (10.0, 15.0),
+                Rarity::Epic => (15.0, 25.0),
+                Rarity::Legendary => (20.0, 35.0),
             };
             let base = rng.gen_range(cm_min..=cm_max);
-            ((base * multiplier) * 100.0).round() / 100.0 // Round to 2 decimals
+            (base * multiplier).round()
         }
         _ => {
             // Percentage affixes
@@ -261,9 +262,9 @@ mod tests {
                         );
                     }
                     AffixType::CritMultiplier => {
-                        // 0.2-0.35 base * 4.0 = 0.8-1.4
+                        // 20-35 base * 4.0 = 80-140 (percentage points)
                         assert!(
-                            affix.value >= 0.5 && affix.value <= 1.5,
+                            affix.value >= 70.0 && affix.value <= 150.0,
                             "Crit mult out of range: {}",
                             affix.value
                         );
