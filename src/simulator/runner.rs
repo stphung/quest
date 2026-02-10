@@ -153,8 +153,8 @@ impl SimStats {
     /// Process a tick result and update statistics.
     fn process_tick(&mut self, result: &TickResult, current_tick: u64, at_zone_cap: bool) {
         // Track combat timing
-        if result.had_combat {
-            if !self.in_combat {
+        if result.had_combat
+            && !self.in_combat {
                 // Starting a new fight
                 self.in_combat = true;
                 self.combat_start_tick = current_tick;
@@ -166,7 +166,6 @@ impl SimStats {
                     self.regen_start_tick = 0;
                 }
             }
-        }
 
         // Track kills
         if result.player_won {
