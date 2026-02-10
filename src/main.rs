@@ -704,7 +704,7 @@ fn main() -> io::Result<()> {
                                 frame,
                                 frame.size(),
                                 game.state(),
-                                haven.vault_tier(),
+                                haven.vault_slots(),
                                 selected_index,
                                 selected_slots,
                             );
@@ -1567,11 +1567,9 @@ fn game_tick(
                         game_state.combat_state.add_log_entry(message, false, false);
                     }
                 }
-                CombatEvent::EnemyDied { xp_gained } => {
-                    if let Some(enemy) = &game_state.combat_state.current_enemy {
-                        let message = format!("✨ {} defeated! +{} XP", enemy.name, xp_gained);
-                        game_state.combat_state.add_log_entry(message, false, true);
-                    }
+                CombatEvent::EnemyDied { xp_gained, enemy_name } => {
+                    let message = format!("✨ {} defeated! +{} XP", enemy_name, xp_gained);
+                    game_state.combat_state.add_log_entry(message, false, true);
                     let level_before = game_state.character_level;
                     apply_tick_xp(game_state, xp_gained as f64);
                     if game_state.character_level > level_before {
@@ -1616,12 +1614,10 @@ fn game_tick(
                         game_state.add_recent_drop(item_name, rarity, equipped, icon, slot, stats);
                     }
                 }
-                CombatEvent::EliteDefeated { xp_gained } => {
+                CombatEvent::EliteDefeated { xp_gained, enemy_name } => {
                     // Elite defeated - give key
-                    if let Some(enemy) = &game_state.combat_state.current_enemy {
-                        let message = format!("⚔️ {} defeated! +{} XP", enemy.name, xp_gained);
-                        game_state.combat_state.add_log_entry(message, false, true);
-                    }
+                    let message = format!("⚔️ {} defeated! +{} XP", enemy_name, xp_gained);
+                    game_state.combat_state.add_log_entry(message, false, true);
                     let level_before = game_state.character_level;
                     apply_tick_xp(game_state, xp_gained as f64);
                     if game_state.character_level > level_before {
@@ -1646,12 +1642,10 @@ fn game_tick(
                         }
                     }
                 }
-                CombatEvent::BossDefeated { xp_gained } => {
+                CombatEvent::BossDefeated { xp_gained, enemy_name } => {
                     // Boss defeated - complete dungeon
-                    if let Some(enemy) = &game_state.combat_state.current_enemy {
-                        let message = format!("👑 {} vanquished! +{} XP", enemy.name, xp_gained);
-                        game_state.combat_state.add_log_entry(message, false, true);
-                    }
+                    let message = format!("👑 {} vanquished! +{} XP", enemy_name, xp_gained);
+                    game_state.combat_state.add_log_entry(message, false, true);
                     let level_before = game_state.character_level;
                     apply_tick_xp(game_state, xp_gained as f64);
 

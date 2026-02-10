@@ -44,14 +44,17 @@ pub enum CombatEvent {
     PlayerDiedInDungeon,
     EnemyDied {
         xp_gained: u64,
+        enemy_name: String,
     },
     /// Elite enemy defeated in dungeon (player gets key)
     EliteDefeated {
         xp_gained: u64,
+        enemy_name: String,
     },
     /// Boss enemy defeated in dungeon (dungeon complete)
     BossDefeated {
         xp_gained: u64,
+        enemy_name: String,
     },
     /// Subzone boss defeated (zone progression)
     SubzoneBossDefeated {
@@ -166,6 +169,9 @@ pub fn update_combat(
 
                 // Check if enemy died
                 if !enemy.is_alive() {
+                    // Capture enemy name before clearing (bug fix)
+                    let enemy_name = enemy.name.clone();
+
                     let wis_mod = state
                         .attributes
                         .modifier(crate::character::attributes::AttributeType::Wisdom);
@@ -197,15 +203,15 @@ pub fn update_combat(
 
                     match dungeon_room_type {
                         Some(RoomType::Elite) => {
-                            events.push(CombatEvent::EliteDefeated { xp_gained });
+                            events.push(CombatEvent::EliteDefeated { xp_gained, enemy_name: enemy_name.clone() });
                         }
                         Some(RoomType::Boss) => {
-                            events.push(CombatEvent::BossDefeated { xp_gained });
+                            events.push(CombatEvent::BossDefeated { xp_gained, enemy_name: enemy_name.clone() });
                         }
                         _ => {
                             if state.active_dungeon.is_some() {
                                 // Dungeon Combat room kill — don't affect zone progression
-                                events.push(CombatEvent::EnemyDied { xp_gained });
+                                events.push(CombatEvent::EnemyDied { xp_gained, enemy_name: enemy_name.clone() });
                             } else if state.zone_progression.fighting_boss {
                                 // Overworld boss defeated
                                 let result = state
@@ -215,7 +221,7 @@ pub fn update_combat(
                             } else {
                                 // Record the kill for boss spawn tracking (boss flag set if threshold reached)
                                 state.zone_progression.record_kill();
-                                events.push(CombatEvent::EnemyDied { xp_gained });
+                                events.push(CombatEvent::EnemyDied { xp_gained, enemy_name });
                             }
                         }
                     }
