@@ -15,7 +15,7 @@ use std::env;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let config = parse_args(&args);
+    let (config, show_level_curve) = parse_args(&args);
 
     println!("╔═══════════════════════════════════════════════════════════════╗");
     println!("║              QUEST BALANCE SIMULATOR                          ║");
@@ -43,6 +43,11 @@ fn main() {
 
     println!("{}", report.to_text());
 
+    // Show detailed level curve if requested
+    if show_level_curve {
+        println!("{}", report.level_curve_text());
+    }
+
     // Optionally save JSON report
     if args.iter().any(|a| a == "--json") {
         let json = report.to_json();
@@ -55,8 +60,9 @@ fn main() {
     }
 }
 
-fn parse_args(args: &[String]) -> SimConfig {
+fn parse_args(args: &[String]) -> (SimConfig, bool) {
     let mut config = SimConfig::default();
+    let mut show_level_curve = false;
 
     let mut i = 1;
     while i < args.len() {
@@ -97,6 +103,9 @@ fn parse_args(args: &[String]) -> SimConfig {
                     }
                 }
             }
+            "--level-curve" => {
+                show_level_curve = true;
+            }
             "-v" | "--verbose" => {
                 config.verbosity = 2;
             }
@@ -115,7 +124,7 @@ fn parse_args(args: &[String]) -> SimConfig {
         i += 1;
     }
 
-    config
+    (config, show_level_curve)
 }
 
 fn print_help() {
@@ -131,6 +140,7 @@ fn print_help() {
     println!("    -t, --ticks <T>     Max ticks per run (default: 1,000,000)");
     println!("    --no-loot           Disable loot simulation");
     println!("    --prestige <R>      Simulate prestige to rank R");
+    println!("    --level-curve       Show detailed level-up pacing");
     println!("    -v, --verbose       Verbose output");
     println!("    --json              Save JSON report");
     println!("    --quick             Quick test (100 runs to zone 5)");
@@ -142,4 +152,6 @@ fn print_help() {
     println!("    cargo run --bin simulate -- -n 100 -z 5    # 100 runs to zone 5");
     println!("    cargo run --bin simulate -- --seed 42      # Reproducible");
     println!("    cargo run --bin simulate -- --quick        # Quick balance check");
+    println!("    cargo run --bin simulate -- --prestige 3   # Prestige to rank 3");
+    println!("    cargo run --bin simulate -- --full --level-curve  # Full with level pacing");
 }

@@ -7,6 +7,16 @@ use crate::core::progression::{can_access_zone, max_zone_for_prestige, Progressi
 use crate::zones::get_all_zones;
 use crate::zones::{get_zone, Zone};
 
+/// Tracks a single prestige cycle's metrics.
+#[derive(Debug, Clone, Default)]
+pub struct PrestigeCycle {
+    pub rank: u32,
+    pub ticks_to_complete: u64,
+    pub final_level: u32,
+    pub total_deaths: u64,
+    pub total_kills: u64,
+}
+
 /// XP required to level up - uses shared balance config.
 pub fn xp_for_level(level: u32) -> u64 {
     xp_required_for_level(level)
@@ -43,10 +53,22 @@ pub struct SimProgression {
     pub zone_entries: Vec<u64>, // Ticks when entering each zone
     pub zone_deaths: Vec<u64>,  // Deaths per zone
     pub zone_kills: Vec<u64>,   // Kills per zone
+
+    // Level-up pacing tracking
+    pub level_up_ticks: Vec<u64>, // Tick count when each level was reached (index = level)
+
+    // Prestige tracking
+    pub prestige_transitions: Vec<PrestigeCycle>, // Metrics for each completed prestige cycle
+    cycle_start_tick: u64,                        // Tick when current prestige cycle started
+    cycle_start_deaths: u64,                      // Deaths when current prestige cycle started
+    cycle_start_kills: u64,                       // Kills when current prestige cycle started
 }
 
 impl SimProgression {
     pub fn new() -> Self {
+        let mut level_up_ticks = vec![0u64; 101]; // Index 0-100 for levels
+        level_up_ticks[1] = 0; // Start at level 1, tick 0
+
         Self {
             player_level: 1,
             current_xp: 0,
@@ -62,6 +84,11 @@ impl SimProgression {
             zone_entries: vec![0; 11], // Index 0 unused, 1-10 for zones
             zone_deaths: vec![0; 11],
             zone_kills: vec![0; 11],
+            level_up_ticks,
+            prestige_transitions: Vec::new(),
+            cycle_start_tick: 0,
+            cycle_start_deaths: 0,
+            cycle_start_kills: 0,
         }
     }
 
@@ -73,7 +100,18 @@ impl SimProgression {
             self.current_xp -= self.xp_to_next_level;
             self.player_level += 1;
             self.xp_to_next_level = xp_for_level(self.player_level);
+
+            // Record tick when this level was reached
+            if (self.player_level as usize) < self.level_up_ticks.len() {
+                self.level_up_ticks[self.player_level as usize] = self.total_ticks;
+            }
         }
+    }
+
+    /// Add XP with tick tracking for level-up pacing.
+    pub fn add_xp_at_tick(&mut self, xp: u64, current_tick: u64) {
+        self.total_ticks = current_tick;
+        self.add_xp(xp);
     }
 
     /// Record a kill with simulation tracking.
@@ -123,16 +161,59 @@ impl SimProgression {
         self.player_level >= get_next_prestige_tier(self.prestige_rank).required_level
     }
 
-    /// Perform prestige reset.
+    /// Perform prestige reset, recording the completed cycle.
     pub fn prestige(&mut self) {
+        // Record the completed cycle before resetting
+        let cycle = PrestigeCycle {
+            rank: self.prestige_rank,
+            ticks_to_complete: self.total_ticks - self.cycle_start_tick,
+            final_level: self.player_level,
+            total_deaths: self.total_deaths - self.cycle_start_deaths,
+            total_kills: self.total_kills - self.cycle_start_kills,
+        };
+        self.prestige_transitions.push(cycle);
+
+        // Update prestige rank
         self.prestige_rank += 1;
+
+        // Reset cycle tracking for new prestige
+        self.cycle_start_tick = self.total_ticks;
+        self.cycle_start_deaths = self.total_deaths;
+        self.cycle_start_kills = self.total_kills;
+
+        // Reset progression
         self.player_level = 1;
         self.current_xp = 0;
         self.xp_to_next_level = xp_for_level(1);
         self.current_zone = 1;
         self.current_subzone = 1;
         self.kills_in_subzone = 0;
+
+        // Reset level-up tracking for new prestige cycle
+        self.level_up_ticks = vec![0u64; 101];
+        self.level_up_ticks[1] = self.total_ticks;
+
+        // Reset zone tracking for new cycle
+        self.zone_entries = vec![0; 11];
+        self.zone_entries[1] = self.total_ticks;
+        self.zone_deaths = vec![0; 11];
+        self.zone_kills = vec![0; 11];
         // Keep equipment through prestige (in real game)
+    }
+
+    /// Record final prestige cycle when simulation ends (if not already recorded).
+    pub fn finalize_prestige_cycle(&mut self) {
+        // Only record if we made progress in this cycle
+        if self.total_ticks > self.cycle_start_tick {
+            let cycle = PrestigeCycle {
+                rank: self.prestige_rank,
+                ticks_to_complete: self.total_ticks - self.cycle_start_tick,
+                final_level: self.player_level,
+                total_deaths: self.total_deaths - self.cycle_start_deaths,
+                total_kills: self.total_kills - self.cycle_start_kills,
+            };
+            self.prestige_transitions.push(cycle);
+        }
     }
 }
 
@@ -219,6 +300,12 @@ pub struct RunStats {
     pub zone_deaths: Vec<u64>,
     pub zone_kills: Vec<u64>,
     pub ticks_per_zone: Vec<u64>,
+
+    // Level-up pacing
+    pub level_up_ticks: Vec<u64>,
+
+    // Prestige cycles
+    pub prestige_cycles: Vec<PrestigeCycle>,
 }
 
 #[cfg(test)]

@@ -1,7 +1,20 @@
 //! Simulation report generation.
 
-use super::progression_sim::RunStats;
+use super::progression_sim::{PrestigeCycle, RunStats};
 use std::collections::HashMap;
+
+/// Format a number with thousand separators.
+fn format_with_commas(n: u64) -> String {
+    let s = n.to_string();
+    let mut result = String::new();
+    for (i, c) in s.chars().rev().enumerate() {
+        if i > 0 && i % 3 == 0 {
+            result.push(',');
+        }
+        result.push(c);
+    }
+    result.chars().rev().collect()
+}
 
 /// Aggregated results from multiple simulation runs.
 #[derive(Debug, Clone)]
@@ -35,6 +48,47 @@ pub struct SimReport {
 
     // Individual run stats for detailed analysis
     pub run_stats: Vec<RunStats>,
+
+    // Level pacing analysis
+    pub level_pacing: LevelPacingAnalysis,
+
+    // Difficulty wall detection
+    pub difficulty_walls: Vec<DifficultyWall>,
+
+    // Prestige progression summary
+    pub prestige_summary: Vec<PrestigeCycleSummary>,
+
+    // Flag to show detailed level curve
+    pub show_level_curve: bool,
+}
+
+/// Analysis of level-up pacing.
+#[derive(Debug, Clone, Default)]
+pub struct LevelPacingAnalysis {
+    /// Average ticks per level for ranges: 1-10, 11-25, 26-50, 51-100
+    pub avg_ticks_per_range: Vec<(String, f64)>,
+    /// Level where significant slowdown occurs (>2x slower than previous range)
+    pub slowdown_level: Option<u32>,
+    /// Slowdown multiplier
+    pub slowdown_multiplier: f64,
+}
+
+/// Represents a difficulty wall between zones.
+#[derive(Debug, Clone)]
+pub struct DifficultyWall {
+    pub from_zone: u32,
+    pub to_zone: u32,
+    pub from_death_rate: f64,
+    pub to_death_rate: f64,
+}
+
+/// Summary of a prestige cycle across all runs.
+#[derive(Debug, Clone, Default)]
+pub struct PrestigeCycleSummary {
+    pub rank: u32,
+    pub avg_ticks: f64,
+    pub avg_deaths: f64,
+    pub improvement_pct: f64, // Improvement over previous cycle
 }
 
 impl SimReport {
@@ -113,6 +167,16 @@ impl SimReport {
                 / num_runs as f64;
         }
 
+        // Calculate level pacing analysis
+        let level_pacing = Self::analyze_level_pacing(&runs);
+
+        // Detect difficulty walls
+        let difficulty_walls =
+            Self::detect_difficulty_walls(&avg_deaths_per_zone, &avg_kills_per_zone);
+
+        // Summarize prestige progression
+        let prestige_summary = Self::summarize_prestige(&runs);
+
         Self {
             num_runs,
             runs_completed,
@@ -133,7 +197,174 @@ impl SimReport {
             avg_kills_per_zone,
             avg_ticks_per_zone,
             run_stats: runs,
+            level_pacing,
+            difficulty_walls,
+            prestige_summary,
+            show_level_curve: false,
         }
+    }
+
+    /// Analyze level-up pacing from run data.
+    fn analyze_level_pacing(runs: &[RunStats]) -> LevelPacingAnalysis {
+        if runs.is_empty() {
+            return LevelPacingAnalysis::default();
+        }
+
+        // Aggregate level-up ticks across all runs
+        let mut level_ticks: Vec<Vec<u64>> = vec![Vec::new(); 101];
+
+        for run in runs {
+            for level in 2..=run.final_level.min(100) {
+                let level_idx = level as usize;
+                if level_idx < run.level_up_ticks.len() {
+                    let current_tick = run.level_up_ticks[level_idx];
+                    let prev_tick = if level_idx > 1 {
+                        run.level_up_ticks[level_idx - 1]
+                    } else {
+                        0
+                    };
+                    if current_tick > prev_tick {
+                        level_ticks[level_idx].push(current_tick - prev_tick);
+                    }
+                }
+            }
+        }
+
+        // Calculate averages for ranges
+        let ranges = [
+            ("Levels  1-10", 2, 10),
+            ("Levels 11-25", 11, 25),
+            ("Levels 26-50", 26, 50),
+            ("Levels 51-100", 51, 100),
+        ];
+
+        let mut avg_ticks_per_range = Vec::new();
+        let mut prev_avg = 0.0;
+        let mut slowdown_level = None;
+        let mut slowdown_multiplier = 1.0;
+
+        for (label, start, end) in ranges {
+            let mut total_ticks = 0u64;
+            let mut count = 0u64;
+
+            for level in start..=end {
+                if level < level_ticks.len() {
+                    for &ticks in &level_ticks[level] {
+                        total_ticks += ticks;
+                        count += 1;
+                    }
+                }
+            }
+
+            let avg = if count > 0 {
+                total_ticks as f64 / count as f64
+            } else {
+                0.0
+            };
+
+            if avg > 0.0 {
+                avg_ticks_per_range.push((label.to_string(), avg));
+
+                // Check for slowdown (>2x slower than previous range)
+                if prev_avg > 0.0 && avg / prev_avg > 2.0 && slowdown_level.is_none() {
+                    slowdown_level = Some(start as u32);
+                    slowdown_multiplier = avg / prev_avg;
+                }
+                prev_avg = avg;
+            }
+        }
+
+        LevelPacingAnalysis {
+            avg_ticks_per_range,
+            slowdown_level,
+            slowdown_multiplier,
+        }
+    }
+
+    /// Detect difficulty walls between zones.
+    fn detect_difficulty_walls(
+        avg_deaths_per_zone: &[f64],
+        avg_kills_per_zone: &[f64],
+    ) -> Vec<DifficultyWall> {
+        let mut walls = Vec::new();
+
+        // Calculate death rate per zone (deaths / kills as percentage)
+        let mut death_rates: Vec<f64> = vec![0.0; 11];
+        for zone in 1..=10 {
+            let deaths = avg_deaths_per_zone.get(zone).copied().unwrap_or(0.0);
+            let kills = avg_kills_per_zone.get(zone).copied().unwrap_or(0.0);
+            death_rates[zone] = if kills > 0.0 {
+                (deaths / kills) * 100.0
+            } else {
+                0.0
+            };
+        }
+
+        // Check for walls (>20% jump between adjacent zones)
+        for zone in 1..10 {
+            let from_rate = death_rates[zone];
+            let to_rate = death_rates[zone + 1];
+
+            // Only flag if there's actual data and a significant jump
+            if from_rate > 0.0 && to_rate > 0.0 && (to_rate - from_rate) > 20.0 {
+                walls.push(DifficultyWall {
+                    from_zone: zone as u32,
+                    to_zone: (zone + 1) as u32,
+                    from_death_rate: from_rate,
+                    to_death_rate: to_rate,
+                });
+            }
+        }
+
+        walls
+    }
+
+    /// Summarize prestige progression across all runs.
+    fn summarize_prestige(runs: &[RunStats]) -> Vec<PrestigeCycleSummary> {
+        if runs.is_empty() {
+            return Vec::new();
+        }
+
+        // Group cycles by prestige rank
+        let mut cycles_by_rank: HashMap<u32, Vec<&PrestigeCycle>> = HashMap::new();
+
+        for run in runs {
+            for cycle in &run.prestige_cycles {
+                cycles_by_rank.entry(cycle.rank).or_default().push(cycle);
+            }
+        }
+
+        // Calculate averages per rank
+        let mut summaries: Vec<PrestigeCycleSummary> = Vec::new();
+        let max_rank = cycles_by_rank.keys().max().copied().unwrap_or(0);
+
+        let mut prev_avg_ticks = 0.0;
+
+        for rank in 0..=max_rank {
+            if let Some(cycles) = cycles_by_rank.get(&rank) {
+                let avg_ticks =
+                    cycles.iter().map(|c| c.ticks_to_complete as f64).sum::<f64>() / cycles.len() as f64;
+                let avg_deaths =
+                    cycles.iter().map(|c| c.total_deaths as f64).sum::<f64>() / cycles.len() as f64;
+
+                let improvement_pct = if prev_avg_ticks > 0.0 {
+                    ((prev_avg_ticks - avg_ticks) / prev_avg_ticks) * 100.0
+                } else {
+                    0.0
+                };
+
+                summaries.push(PrestigeCycleSummary {
+                    rank,
+                    avg_ticks,
+                    avg_deaths,
+                    improvement_pct,
+                });
+
+                prev_avg_ticks = avg_ticks;
+            }
+        }
+
+        summaries
     }
 
     /// Generate a text report.
@@ -230,6 +461,53 @@ impl SimReport {
         report.push_str(&format!("  Median Deaths: {}\n", median_deaths));
         report.push_str(&format!("  Max Deaths:    {}\n\n", max_deaths));
 
+        // Level Pacing section
+        if !self.level_pacing.avg_ticks_per_range.is_empty() {
+            report.push_str("── LEVEL PACING ─────────────────────────────────────────────────\n");
+            for (label, avg_ticks) in &self.level_pacing.avg_ticks_per_range {
+                report.push_str(&format!("  {}:   avg {:.0} ticks/level\n", label, avg_ticks));
+            }
+            if let Some(slowdown_level) = self.level_pacing.slowdown_level {
+                report.push_str(&format!(
+                    "  ⚠️ Leveling slowdown at level {}+ ({:.1}x slower)\n",
+                    slowdown_level, self.level_pacing.slowdown_multiplier
+                ));
+            }
+            report.push('\n');
+        }
+
+        // Difficulty Walls section
+        if !self.difficulty_walls.is_empty() {
+            report.push_str("── DIFFICULTY WALLS ─────────────────────────────────────────────\n");
+            for wall in &self.difficulty_walls {
+                report.push_str(&format!(
+                    "  ⚠️ Wall at Zone {}→{}: death rate {:.0}% → {:.0}%\n",
+                    wall.from_zone, wall.to_zone, wall.from_death_rate, wall.to_death_rate
+                ));
+            }
+            report.push('\n');
+        }
+
+        // Prestige Progression section
+        if !self.prestige_summary.is_empty() {
+            report.push_str("── PRESTIGE PROGRESSION ─────────────────────────────────────────\n");
+            for summary in &self.prestige_summary {
+                let ticks_formatted = format_with_commas(summary.avg_ticks as u64);
+                if summary.improvement_pct > 0.0 {
+                    report.push_str(&format!(
+                        "  P{}: {} ticks to Z10, {:.0} deaths ({:.0}% faster)\n",
+                        summary.rank, ticks_formatted, summary.avg_deaths, summary.improvement_pct
+                    ));
+                } else {
+                    report.push_str(&format!(
+                        "  P{}: {} ticks to Z10, {:.0} deaths\n",
+                        summary.rank, ticks_formatted, summary.avg_deaths
+                    ));
+                }
+            }
+            report.push('\n');
+        }
+
         report.push_str("── BALANCE ASSESSMENT ───────────────────────────────────────────\n");
         let completion_rate = (self.runs_completed as f64 / self.num_runs as f64) * 100.0;
         let death_rating = if self.avg_total_deaths < 5.0 {
@@ -274,6 +552,50 @@ impl SimReport {
         report.push_str("\n═══════════════════════════════════════════════════════════════\n");
 
         report
+    }
+
+    /// Generate detailed level curve output.
+    pub fn level_curve_text(&self) -> String {
+        let mut output = String::new();
+        output.push_str("── DETAILED LEVEL CURVE ─────────────────────────────────────────\n");
+
+        if self.run_stats.is_empty() {
+            output.push_str("  No run data available.\n");
+            return output;
+        }
+
+        // Calculate per-level average ticks
+        let mut level_ticks: Vec<Vec<u64>> = vec![Vec::new(); 101];
+
+        for run in &self.run_stats {
+            for level in 2..=run.final_level.min(100) {
+                let level_idx = level as usize;
+                if level_idx < run.level_up_ticks.len() {
+                    let current_tick = run.level_up_ticks[level_idx];
+                    let prev_tick = if level_idx > 1 {
+                        run.level_up_ticks[level_idx - 1]
+                    } else {
+                        0
+                    };
+                    if current_tick > prev_tick {
+                        level_ticks[level_idx].push(current_tick - prev_tick);
+                    }
+                }
+            }
+        }
+
+        output.push_str("  Level   Avg Ticks   Samples\n");
+        output.push_str("  ─────   ─────────   ───────\n");
+
+        for level in 2..=100 {
+            if !level_ticks[level].is_empty() {
+                let avg = level_ticks[level].iter().sum::<u64>() as f64 / level_ticks[level].len() as f64;
+                let samples = level_ticks[level].len();
+                output.push_str(&format!("  {:5}   {:9.0}   {:7}\n", level, avg, samples));
+            }
+        }
+
+        output
     }
 
     /// Generate a JSON report for further analysis.
@@ -336,6 +658,8 @@ mod tests {
                 zone_deaths: vec![0; 11],
                 zone_kills: vec![0; 11],
                 ticks_per_zone: vec![0; 11],
+                level_up_ticks: vec![0; 101],
+                prestige_cycles: Vec::new(),
             },
             RunStats {
                 final_level: 45,
@@ -352,6 +676,8 @@ mod tests {
                 zone_deaths: vec![0; 11],
                 zone_kills: vec![0; 11],
                 ticks_per_zone: vec![0; 11],
+                level_up_ticks: vec![0; 101],
+                prestige_cycles: Vec::new(),
             },
         ];
 

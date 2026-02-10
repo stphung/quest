@@ -71,10 +71,11 @@ fn simulate_single_run(config: &SimConfig, rng: &mut impl Rng) -> RunStats {
         }
 
         // Check for prestige opportunity
-        // Only prestige when: at max zone for current prestige AND can prestige AND want to continue
+        // Prestige when: cleared zone 10 boss (at_prestige_wall with zone 10) AND can prestige AND want to continue
         let at_prestige_wall = progression.at_max_zone_for_prestige();
+        let cleared_zone_10 = progression.current_zone >= 10 && at_prestige_wall;
         if config.simulate_prestige
-            && at_prestige_wall
+            && cleared_zone_10
             && progression.can_prestige()
             && progression.prestige_rank < config.target_prestige
         {
@@ -121,11 +122,11 @@ fn simulate_single_run(config: &SimConfig, rng: &mut impl Rng) -> RunStats {
         // Each tick represents ~1.5 seconds of game time (attack interval)
         // Passive XP = ticks * 15 (15 game ticks per combat tick at 100ms each)
         let passive_xp = combat_result.ticks_elapsed as u64 * 15;
-        progression.add_xp(passive_xp);
+        progression.add_xp_at_tick(passive_xp, ticks);
 
         if combat_result.player_won {
-            // Bonus XP for kill
-            progression.add_xp(combat_result.xp_gained as u64);
+            // Bonus XP for kill (with tick tracking for level-up pacing)
+            progression.add_xp_at_tick(combat_result.xp_gained as u64, ticks);
             progression.record_kill_sim(combat_result.was_boss, ticks);
 
             // Level up player if needed
@@ -189,6 +190,9 @@ fn simulate_single_run(config: &SimConfig, rng: &mut impl Rng) -> RunStats {
         }
     }
 
+    // Finalize the last prestige cycle
+    progression.finalize_prestige_cycle();
+
     RunStats {
         final_level: progression.player_level,
         final_zone: progression.current_zone,
@@ -204,6 +208,8 @@ fn simulate_single_run(config: &SimConfig, rng: &mut impl Rng) -> RunStats {
         zone_deaths: progression.zone_deaths,
         zone_kills: progression.zone_kills,
         ticks_per_zone,
+        level_up_ticks: progression.level_up_ticks,
+        prestige_cycles: progression.prestige_transitions,
     }
 }
 
