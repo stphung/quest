@@ -48,9 +48,12 @@ pub fn draw_ui_with_update(
     let size = frame.size();
 
     // Check if we should show the challenge notification banner
+    // Don't show during fishing/dungeon since Tab would interrupt those activities
     let show_challenge_banner = !game_state.challenge_menu.challenges.is_empty()
         && !game_state.challenge_menu.is_open
-        && game_state.active_minigame.is_none();
+        && game_state.active_minigame.is_none()
+        && game_state.active_fishing.is_none()
+        && game_state.active_dungeon.is_none();
 
     // Split vertically: optional banner at top, main content below
     let main_area = if show_challenge_banner {
