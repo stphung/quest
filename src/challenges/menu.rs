@@ -15,6 +15,7 @@ use super::morris::logic::start_morris_game;
 use super::morris::MorrisDifficulty;
 use super::rune::{RuneDifficulty, RuneGame};
 use super::ActiveMinigame;
+use crate::core::constants::CHALLENGE_DISCOVERY_CHANCE;
 use crate::core::game_state::GameState;
 use rand::Rng;
 
@@ -321,9 +322,7 @@ impl DifficultyInfo for GoDifficulty {
     }
 }
 
-/// Chance per tick to discover any challenge (~2 hour average)
-/// At 10 ticks/sec, 0.000014 chance/tick ≈ 71,429 ticks ≈ 2 hours average
-pub const CHALLENGE_DISCOVERY_CHANCE: f64 = 0.000014;
+// CHALLENGE_DISCOVERY_CHANCE is imported from core::constants
 
 /// Entry in the challenge distribution table
 struct ChallengeWeight {

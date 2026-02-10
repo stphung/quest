@@ -35,12 +35,12 @@ pub fn distribute_level_up_points(state: &mut GameState) -> Vec<AttributeType> {
     let cap = state.get_attribute_cap();
     let mut increased = Vec::new();
 
-    let mut points = 3;
+    let mut points = LEVEL_UP_ATTRIBUTE_POINTS;
     let mut attempts = 0;
     let max_attempts = 100; // Prevent infinite loop
 
     while points > 0 && attempts < max_attempts {
-        let attr_index = rng.gen_range(0..6);
+        let attr_index = rng.gen_range(0..NUM_ATTRIBUTES);
         let attr = AttributeType::all()[attr_index];
 
         if state.attributes.get(attr) < cap {
@@ -260,8 +260,7 @@ fn spawn_dungeon_enemy(state: &mut GameState) {
     state.combat_state.attack_timer = 0.0;
 }
 
-/// Flat chance to discover a dungeon after killing an enemy (2%)
-const DUNGEON_DISCOVERY_CHANCE: f64 = 0.02;
+// DUNGEON_DISCOVERY_CHANCE is imported from constants via `use super::constants::*`
 
 /// Attempts to discover a dungeon after killing an enemy
 /// Returns true if a dungeon was discovered and entered

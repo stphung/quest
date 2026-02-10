@@ -141,7 +141,8 @@ impl GameState {
     }
 
     pub fn get_attribute_cap(&self) -> u32 {
-        20 + (self.prestige_rank * 5)
+        crate::core::constants::BASE_ATTRIBUTE_CAP
+            + (self.prestige_rank * crate::core::constants::ATTRIBUTE_CAP_PER_PRESTIGE)
     }
 }
 

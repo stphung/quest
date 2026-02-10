@@ -4,11 +4,9 @@
 //! covering edge cases and prestige tier transitions.
 
 use quest::achievements::Achievements;
+use quest::core::KILLS_FOR_BOSS;
 use quest::zones::get_all_zones;
 use quest::zones::{BossDefeatResult, ZoneProgression};
-
-/// Number of kills needed before boss spawns (matches the constant in progression.rs)
-const KILLS_FOR_BOSS: u32 = 10;
 
 // ============================================================================
 // Unit test gaps (functions not directly tested)
