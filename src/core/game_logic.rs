@@ -1,7 +1,3 @@
-use super::balance::{
-    distribute_level_up_points as distribute_points, PRESTIGE_MULT_PER_CHA_MOD, XP_CURVE_BASE,
-    XP_CURVE_EXPONENT, XP_MULT_PER_WIS_MOD,
-};
 use super::constants::*;
 use super::game_state::GameState;
 use crate::character::attributes::AttributeType;
@@ -15,32 +11,48 @@ use crate::zones::get_zone;
 use chrono::Utc;
 use rand::Rng;
 
-/// Calculates the XP required to reach the next level.
-/// Uses shared balance constants.
+/// Calculates the XP required to reach the next level
 pub fn xp_for_next_level(level: u32) -> u64 {
     (XP_CURVE_BASE * f64::powf(level as f64, XP_CURVE_EXPONENT)) as u64
 }
 
-/// Calculates the prestige multiplier for XP gains including CHA bonus.
-/// Uses shared balance constants.
+/// Calculates the prestige multiplier for XP gains including CHA bonus
 pub fn prestige_multiplier(rank: u32, cha_modifier: i32) -> f64 {
     let base = crate::character::prestige::get_prestige_tier(rank).multiplier;
-    base + (cha_modifier as f64 * PRESTIGE_MULT_PER_CHA_MOD)
+    base + (cha_modifier as f64 * 0.1)
 }
 
-/// Calculates the XP gained per tick based on prestige rank and WIS.
-/// Uses shared balance constants.
+/// Calculates the XP gained per tick based on prestige rank and WIS
 pub fn xp_gain_per_tick(prestige_rank: u32, wis_modifier: i32, cha_modifier: i32) -> f64 {
     let prestige_mult = prestige_multiplier(prestige_rank, cha_modifier);
-    let wis_mult = 1.0 + (wis_modifier as f64 * XP_MULT_PER_WIS_MOD);
+    let wis_mult = 1.0 + (wis_modifier as f64 * 0.05);
     BASE_XP_PER_TICK * prestige_mult * wis_mult
 }
 
-/// Distributes 3 attribute points randomly among non-capped attributes.
-/// Uses shared balance function.
+/// Distributes 3 attribute points randomly among non-capped attributes
 pub fn distribute_level_up_points(state: &mut GameState) -> Vec<AttributeType> {
     let mut rng = rand::thread_rng();
-    distribute_points(&mut state.attributes, state.prestige_rank, &mut rng)
+    let cap = state.get_attribute_cap();
+    let mut increased = Vec::new();
+
+    let mut points = 3;
+    let mut attempts = 0;
+    let max_attempts = 100; // Prevent infinite loop
+
+    while points > 0 && attempts < max_attempts {
+        let attr_index = rng.gen_range(0..6);
+        let attr = AttributeType::all()[attr_index];
+
+        if state.attributes.get(attr) < cap {
+            state.attributes.increment(attr);
+            increased.push(attr);
+            points -= 1;
+        }
+
+        attempts += 1;
+    }
+
+    increased
 }
 
 /// Applies XP to the character and processes any level-ups
