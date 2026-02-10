@@ -102,14 +102,6 @@ pub struct SimReport {
     // Death breakdown
     pub avg_boss_deaths: f64,
     pub avg_regular_deaths: f64,
-
-    // ── Fishing/Dungeon analysis ──────────────────────────────────────────
-    pub avg_dungeons_completed: f64,
-    pub avg_dungeon_rooms_cleared: f64,
-    pub avg_dungeon_xp_gained: f64,
-    pub avg_fish_caught: f64,
-    pub avg_fishing_xp_gained: f64,
-    pub avg_legendary_fish: f64,
 }
 
 /// Analysis of level-up pacing.
@@ -272,20 +264,6 @@ impl SimReport {
         let avg_regular_deaths =
             runs.iter().map(|r| r.regular_deaths as f64).sum::<f64>() / num_runs as f64;
 
-        // Fishing/Dungeon analysis
-        let avg_dungeons_completed =
-            runs.iter().map(|r| r.dungeons_completed as f64).sum::<f64>() / num_runs as f64;
-        let avg_dungeon_rooms_cleared =
-            runs.iter().map(|r| r.dungeon_rooms_cleared as f64).sum::<f64>() / num_runs as f64;
-        let avg_dungeon_xp_gained =
-            runs.iter().map(|r| r.dungeon_xp_gained as f64).sum::<f64>() / num_runs as f64;
-        let avg_fish_caught =
-            runs.iter().map(|r| r.fish_caught as f64).sum::<f64>() / num_runs as f64;
-        let avg_fishing_xp_gained =
-            runs.iter().map(|r| r.fishing_xp_gained as f64).sum::<f64>() / num_runs as f64;
-        let avg_legendary_fish =
-            runs.iter().map(|r| r.legendary_fish_caught as f64).sum::<f64>() / num_runs as f64;
-
         Self {
             num_runs,
             runs_completed,
@@ -317,13 +295,6 @@ impl SimReport {
             xp_from_passive_percent,
             avg_boss_deaths,
             avg_regular_deaths,
-            // Fishing/Dungeon
-            avg_dungeons_completed,
-            avg_dungeon_rooms_cleared,
-            avg_dungeon_xp_gained,
-            avg_fish_caught,
-            avg_fishing_xp_gained,
-            avg_legendary_fish,
         }
     }
 
@@ -577,40 +548,6 @@ impl SimReport {
             "  XP from Passive:     {:.1}%\n\n",
             self.xp_from_passive_percent
         ));
-
-        // Fishing/Dungeon section (only show if there's activity)
-        if self.avg_dungeons_completed > 0.0 || self.avg_fish_caught > 0.0 {
-            report.push_str("── FISHING & DUNGEONS ───────────────────────────────────────────\n");
-            if self.avg_dungeons_completed > 0.0 {
-                report.push_str(&format!(
-                    "  Dungeons Completed:  {:.1}\n",
-                    self.avg_dungeons_completed
-                ));
-                report.push_str(&format!(
-                    "  Dungeon Rooms:       {:.1}\n",
-                    self.avg_dungeon_rooms_cleared
-                ));
-                report.push_str(&format!(
-                    "  Dungeon XP:          {}\n",
-                    format_with_commas(self.avg_dungeon_xp_gained as u64)
-                ));
-            }
-            if self.avg_fish_caught > 0.0 {
-                report.push_str(&format!(
-                    "  Fish Caught:         {:.1}\n",
-                    self.avg_fish_caught
-                ));
-                report.push_str(&format!(
-                    "  Fishing XP:          {}\n",
-                    format_with_commas(self.avg_fishing_xp_gained as u64)
-                ));
-                report.push_str(&format!(
-                    "  Legendary Fish:      {:.2}\n",
-                    self.avg_legendary_fish
-                ));
-            }
-            report.push('\n');
-        }
 
         if self.avg_wall_percent > 0.1 {
             report.push_str("── PRESTIGE WALL ANALYSIS ───────────────────────────────────────\n");
@@ -917,12 +854,6 @@ mod tests {
                 xp_from_passive: 5000,
                 boss_deaths: 2,
                 regular_deaths: 13,
-                dungeons_completed: 2,
-                dungeon_rooms_cleared: 20,
-                dungeon_xp_gained: 5000,
-                fish_caught: 10,
-                fishing_xp_gained: 1000,
-                legendary_fish_caught: 1,
             },
             RunStats {
                 final_level: 45,
@@ -949,12 +880,6 @@ mod tests {
                 xp_from_passive: 4500,
                 boss_deaths: 3,
                 regular_deaths: 17,
-                dungeons_completed: 1,
-                dungeon_rooms_cleared: 15,
-                dungeon_xp_gained: 3000,
-                fish_caught: 8,
-                fishing_xp_gained: 800,
-                legendary_fish_caught: 0,
             },
         ];
 
@@ -962,9 +887,6 @@ mod tests {
         assert_eq!(report.num_runs, 2);
         assert_eq!(report.runs_completed, 2);
         assert!((report.avg_final_level - 47.5).abs() < 0.1);
-        // Verify fishing/dungeon stats
-        assert!((report.avg_dungeons_completed - 1.5).abs() < 0.1);
-        assert!((report.avg_fish_caught - 9.0).abs() < 0.1);
     }
 
     #[test]
