@@ -670,8 +670,6 @@ mod tests {
 
     #[test]
     fn test_resolve_combat_tick_respects_damage_bonus() {
-        let mut state = GameState::new("Test Hero".to_string(), 0);
-
         // Run many trials with and without bonus to compare average damage
         let trials = 100;
         let mut damage_no_bonus = 0u32;

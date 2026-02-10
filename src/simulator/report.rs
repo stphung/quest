@@ -384,6 +384,7 @@ impl SimReport {
 
         // Calculate death rate per zone (deaths / kills as percentage)
         let mut death_rates: Vec<f64> = vec![0.0; 11];
+        #[allow(clippy::needless_range_loop)]
         for zone in 1..=10 {
             let deaths = avg_deaths_per_zone.get(zone).copied().unwrap_or(0.0);
             let kills = avg_kills_per_zone.get(zone).copied().unwrap_or(0.0);
@@ -764,6 +765,7 @@ impl SimReport {
         output.push_str("  Level   Time       Ticks     Samples\n");
         output.push_str("  ─────   ────       ─────     ───────\n");
 
+        #[allow(clippy::needless_range_loop)]
         for level in 2..=100 {
             if !level_ticks[level].is_empty() {
                 let avg =
