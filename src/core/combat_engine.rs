@@ -566,11 +566,11 @@ fn calculate_kill_xp(
 
 /// Advance zone/subzone after killing a boss.
 fn advance_after_boss_kill(state: &mut GameState) {
-    // Reset kill counter
-    state.zone_progression.kills_in_subzone = 0;
-
     let zone_id = state.zone_progression.current_zone_id;
     let subzone_id = state.zone_progression.current_subzone_id;
+
+    // Record boss defeat (tracks in defeated_bosses list)
+    state.zone_progression.defeat_boss(zone_id, subzone_id);
 
     // Get max subzones for current zone
     let max_subzones = get_zone(zone_id)
