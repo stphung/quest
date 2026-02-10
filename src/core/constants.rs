@@ -1,7 +1,6 @@
 pub const TICK_INTERVAL_MS: u64 = 100;
 pub const BASE_XP_PER_TICK: f64 = 1.0;
-pub const XP_CURVE_BASE: f64 = 100.0;
-pub const XP_CURVE_EXPONENT: f64 = 1.5;
+// XP_CURVE_BASE and XP_CURVE_EXPONENT moved to balance.rs
 pub const OFFLINE_MULTIPLIER: f64 = 0.25;
 pub const MAX_OFFLINE_SECONDS: i64 = 7 * 24 * 60 * 60;
 pub const AUTOSAVE_INTERVAL_SECONDS: u64 = 30;

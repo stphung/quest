@@ -1,4 +1,7 @@
 use crate::character::derived_stats::DerivedStats;
+use crate::core::combat_math::{
+    apply_damage, calculate_damage_reflection, calculate_damage_taken, calculate_player_attack,
+};
 use crate::core::constants::*;
 use crate::core::game_state::GameState;
 use crate::dungeon::types::RoomType;
@@ -124,19 +127,19 @@ pub fn update_combat(
 
             // Enemy still attacks back (see below)
         } else {
-            // Player attacks normally
-            // Apply Armory bonus: +% damage
-            let base_damage = derived.total_damage();
-            let mut damage = (base_damage as f64 * (1.0 + haven.damage_percent / 100.0)) as u32;
-            let mut was_crit = false;
+            // Player attacks normally using shared combat math
+            // Haven bonuses: Armory (+% damage), Watchtower (+% crit chance)
+            let damage_multiplier = 1.0 + haven.damage_percent / 100.0;
+            let bonus_crit = haven.crit_chance_percent as u32;
 
-            // Roll for crit (apply Watchtower bonus: +% crit chance)
-            let total_crit_chance = derived.crit_chance_percent + haven.crit_chance_percent as u32;
-            let crit_roll = rand::thread_rng().gen_range(0..100);
-            if crit_roll < total_crit_chance {
-                damage = (damage as f64 * derived.crit_multiplier) as u32;
-                was_crit = true;
-            }
+            let attack_result = calculate_player_attack(
+                &derived,
+                bonus_crit,
+                damage_multiplier,
+                &mut rand::thread_rng(),
+            );
+            let damage = attack_result.damage;
+            let was_crit = attack_result.is_crit;
 
             // Roll for double strike (War Room bonus)
             let double_strike_roll = rand::thread_rng().gen::<f64>() * 100.0;
@@ -230,25 +233,21 @@ pub fn update_combat(
             }
         }
 
-        // Enemy attacks back
+        // Enemy attacks back using shared combat math
         if let Some(enemy) = state.combat_state.current_enemy.as_mut() {
-            let enemy_damage = enemy.damage.saturating_sub(derived.defense);
-            state.combat_state.player_current_hp = state
-                .combat_state
-                .player_current_hp
-                .saturating_sub(enemy_damage);
+            let enemy_damage = calculate_damage_taken(enemy.damage, derived.defense);
+            state.combat_state.player_current_hp =
+                apply_damage(state.combat_state.player_current_hp, enemy_damage);
 
             events.push(CombatEvent::EnemyAttack {
                 damage: enemy_damage,
             });
 
-            // Damage reflection: reflect percentage of damage taken back to attacker
-            if derived.damage_reflection_percent > 0.0 && enemy_damage > 0 {
-                let reflected =
-                    (enemy_damage as f64 * derived.damage_reflection_percent / 100.0) as u32;
-                if reflected > 0 {
-                    enemy.take_damage(reflected);
-                }
+            // Damage reflection using shared function
+            let reflected =
+                calculate_damage_reflection(enemy_damage, derived.damage_reflection_percent);
+            if reflected > 0 {
+                enemy.take_damage(reflected);
             }
 
             // Check if player died
