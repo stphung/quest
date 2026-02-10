@@ -28,7 +28,7 @@ use chrono::{Local, Utc};
 use core::constants::*;
 use core::game_logic::*;
 use core::game_state::*;
-use core::{CombatBonuses, CombatLoop, GameLoop, TickResult};
+use core::{CombatBonuses, CombatEngine, GameLoop, TickResult};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
@@ -122,7 +122,7 @@ fn main() -> io::Result<()> {
     let mut select_screen = CharacterSelectScreen::new();
     let mut delete_screen = CharacterDeleteScreen::new();
     let mut rename_screen = CharacterRenameScreen::new();
-    let mut combat_loop: Option<CombatLoop> = None;
+    let mut combat_engine: Option<CombatEngine> = None;
     let mut pending_offline_report: Option<core::game_logic::OfflineReport> = None;
     let mut pending_haven_offline_bonus: Option<f64> = None;
 
@@ -487,7 +487,7 @@ fn main() -> io::Result<()> {
                                             }
                                         }
 
-                                        combat_loop = Some(CombatLoop::from_state(state));
+                                        combat_engine = Some(CombatEngine::from_state(state));
                                         current_screen = Screen::Game;
                                     }
                                     Err(e) => {
@@ -617,9 +617,9 @@ fn main() -> io::Result<()> {
 
             Screen::Game => {
                 // Take core game (it should always be Some when we're in Game screen)
-                let mut game = combat_loop
+                let mut game = combat_engine
                     .take()
-                    .expect("CombatLoop should be initialized when entering Game screen");
+                    .expect("CombatEngine should be initialized when entering Game screen");
 
                 // Run the game loop
                 let mut last_tick = Instant::now();
@@ -843,7 +843,7 @@ fn main() -> io::Result<()> {
                                         // Save achievements when quitting to character select
                                         achievements::save_achievements(&global_achievements)?;
                                     }
-                                    combat_loop = None;
+                                    combat_engine = None;
                                     current_screen = Screen::CharacterSelect;
                                     break;
                                 }
@@ -982,17 +982,17 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-/// Processes overworld combat using CombatLoop's combat_tick.
+/// Processes overworld combat using CombatEngine's combat_tick.
 /// Handles attack timing, applies bonuses, and generates visual effects from TickResult.
 fn process_overworld_combat(
-    combat_loop: &mut CombatLoop,
+    combat_engine: &mut CombatEngine,
     delta_time: f64,
     haven: &haven::Haven,
     global_achievements: &mut achievements::Achievements,
 ) {
     use crate::character::derived_stats::DerivedStats;
 
-    let state = combat_loop.state_mut();
+    let state = combat_engine.state_mut();
 
     // Handle HP regeneration first
     if state.combat_state.is_regenerating {
@@ -1030,7 +1030,7 @@ fn process_overworld_combat(
     }
     state.combat_state.attack_timer = 0.0;
 
-    // Build combat bonuses from Haven and set on CombatLoop
+    // Build combat bonuses from Haven and set on CombatEngine
     let bonuses = CombatBonuses {
         damage_percent: haven.get_bonus(haven::HavenBonusType::DamagePercent),
         crit_chance: haven.get_bonus(haven::HavenBonusType::CritChancePercent) as u32,
@@ -1038,14 +1038,14 @@ fn process_overworld_combat(
         item_rarity_percent: haven.get_bonus(haven::HavenBonusType::ItemRarityPercent),
         xp_gain_percent: haven.get_bonus(haven::HavenBonusType::XpGainPercent),
     };
-    combat_loop.set_bonuses(bonuses);
+    combat_engine.set_bonuses(bonuses);
 
-    // Execute combat using CombatLoop's combat_tick
+    // Execute combat using CombatEngine's combat_tick
     let mut rng = rand::thread_rng();
-    let result = combat_loop.combat_tick(&mut rng);
+    let result = combat_engine.combat_tick(&mut rng);
 
     // Convert TickResult to visual effects and combat log entries
-    process_tick_result(combat_loop.state_mut(), &result, global_achievements);
+    process_tick_result(combat_engine.state_mut(), &result, global_achievements);
 }
 
 /// Converts a TickResult into visual effects and combat log entries.
@@ -1175,7 +1175,7 @@ fn process_tick_result(
 /// Processes a single game tick, updating combat and stats.
 /// Returns Some(encounter_number) if a Storm Leviathan encounter occurred during fishing.
 fn game_tick(
-    combat_loop: &mut CombatLoop,
+    combat_engine: &mut CombatEngine,
     tick_counter: &mut u32,
     haven: &haven::Haven,
     global_achievements: &mut achievements::Achievements,
@@ -1190,7 +1190,7 @@ fn game_tick(
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
 
     // Get mutable access to game state
-    let game_state = combat_loop.state_mut();
+    let game_state = combat_engine.state_mut();
 
     // Process chess AI thinking
     // Process AI thinking for active minigame
@@ -1687,36 +1687,36 @@ fn game_tick(
             }
         }
     } else {
-        // Overworld combat uses CombatLoop's combat_tick for game logic
-        // This separates the game logic (in CombatLoop) from UI concerns (here)
+        // Overworld combat uses CombatEngine's combat_tick for game logic
+        // This separates the game logic (in CombatEngine) from UI concerns (here)
         // Note: We're done with game_state in this branch - release the borrow
         let _ = game_state;
-        process_overworld_combat(combat_loop, delta_time, haven, global_achievements);
+        process_overworld_combat(combat_engine, delta_time, haven, global_achievements);
     }
 
     // Update visual effects
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
-    combat_loop
+    combat_engine
         .state_mut()
         .combat_state
         .visual_effects
         .retain_mut(|effect| effect.update(delta_time));
 
     // Spawn enemy if needed
-    spawn_enemy_if_needed(combat_loop.state_mut());
+    spawn_enemy_if_needed(combat_engine.state_mut());
 
     // Update play_time_seconds
     // Each tick is 100ms (TICK_INTERVAL_MS), so 10 ticks = 1 second
     *tick_counter += 1;
     if *tick_counter >= 10 {
-        combat_loop.state_mut().play_time_seconds += 1;
+        combat_engine.state_mut().play_time_seconds += 1;
         *tick_counter = 0;
     }
 
     // Log any newly unlocked achievements to combat log
     for id in global_achievements.take_newly_unlocked() {
         if let Some(def) = achievements::get_achievement_def(id) {
-            combat_loop.state_mut().combat_state.add_log_entry(
+            combat_engine.state_mut().combat_state.add_log_entry(
                 format!("🏆 Achievement Unlocked: {}", def.name),
                 false,
                 true,
