@@ -590,10 +590,7 @@ mod tests {
             }
         }
 
-        assert!(
-            saw_boss,
-            "Should have encountered a boss within 500 ticks"
-        );
+        assert!(saw_boss, "Should have encountered a boss within 500 ticks");
     }
 
     #[test]
