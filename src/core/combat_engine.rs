@@ -28,6 +28,8 @@ use crate::core::combat_math::*;
 use crate::core::game_logic::{apply_tick_xp, spawn_enemy_if_needed, xp_gain_per_tick};
 use crate::items::drops::{try_drop_from_boss, try_drop_from_mob};
 use crate::items::scoring::auto_equip_if_better;
+use crate::zones;
+use crate::zones::BossDefeatResult;
 use crate::zones::get_zone;
 use rand::Rng;
 
@@ -494,7 +496,8 @@ pub fn resolve_combat_tick(
         // Handle zone/subzone advancement for boss kills
         if result.was_boss {
             let old_zone = state.zone_progression.current_zone_id;
-            advance_after_boss_kill(state, achievements);
+            let boss_result = advance_after_boss_kill(state, achievements);
+            result.boss_defeat_result = Some(boss_result);
             if state.zone_progression.current_zone_id > old_zone {
                 result.zone_advanced = true;
                 result.new_zone = state.zone_progression.current_zone_id;
@@ -586,7 +589,10 @@ fn calculate_kill_xp(
 /// Handles special cases:
 /// - Zone 10 completion: unlocks Zone 11 (The Expanse) and triggers StormsEnd achievement
 /// - Zone 11 completion: cycles back to Zone 11 Subzone 1 (infinite endgame zone)
-fn advance_after_boss_kill(state: &mut GameState, achievements: &mut Achievements) {
+fn advance_after_boss_kill(
+    state: &mut GameState,
+    achievements: &mut Achievements,
+) -> BossDefeatResult {
     use crate::achievements::AchievementId;
 
     let zone_id = state.zone_progression.current_zone_id;
@@ -594,6 +600,11 @@ fn advance_after_boss_kill(state: &mut GameState, achievements: &mut Achievement
 
     // Record boss defeat (tracks in defeated_bosses list)
     state.zone_progression.defeat_boss(zone_id, subzone_id);
+
+    // Get zone info for result
+    let zone_name = get_zone(zone_id)
+        .map(|z| z.name.to_string())
+        .unwrap_or_else(|| "Unknown".to_string());
 
     // Get max subzones for current zone
     let max_subzones = get_zone(zone_id)
@@ -607,16 +618,16 @@ fn advance_after_boss_kill(state: &mut GameState, achievements: &mut Achievement
         if zone_id == 11 {
             state.zone_progression.current_subzone_id = 1;
             state.zone_progression.kills_in_subzone = 0;
-            return;
+            return BossDefeatResult::ExpanseCycle;
         }
 
-        // Zone 10 completion - unlock Zone 11 and award StormsEnd achievement
+        // Zone 10 completion - unlock Zone 11 and StormsEnd achievement
         if zone_id == 10 {
             achievements.unlock(AchievementId::StormsEnd, None);
             state.zone_progression.unlock_zone(11);
             state.zone_progression.current_zone_id = 11;
             state.zone_progression.current_subzone_id = 1;
-            return;
+            return BossDefeatResult::StormsEnd;
         }
 
         // Normal zone advancement (zones 1-9)
@@ -624,11 +635,26 @@ fn advance_after_boss_kill(state: &mut GameState, achievements: &mut Achievement
         if next_zone <= 10 && can_access_zone(state.prestige_rank, next_zone) {
             state.zone_progression.current_zone_id = next_zone;
             state.zone_progression.current_subzone_id = 1;
+            return BossDefeatResult::ZoneComplete {
+                old_zone: zone_name,
+                new_zone_id: next_zone,
+            };
         }
+
         // At prestige wall - stay in current zone
-    } else {
-        // Advance to next subzone within the same zone
-        state.zone_progression.current_subzone_id += 1;
+        let next_prestige = get_zone(next_zone)
+            .map(|z| z.prestige_requirement)
+            .unwrap_or(0);
+        return BossDefeatResult::ZoneCompleteButGated {
+            zone_name,
+            required_prestige: next_prestige,
+        };
+    }
+
+    // Advance to next subzone within the same zone
+    state.zone_progression.current_subzone_id += 1;
+    BossDefeatResult::SubzoneComplete {
+        new_subzone_id: state.zone_progression.current_subzone_id,
     }
 }
 
@@ -1184,6 +1210,169 @@ mod tests {
     }
 
     // ==========================================================================
+    // Tests for boss defeat result tracking
+    // ==========================================================================
+
+    #[test]
+    fn test_resolve_combat_tick_returns_boss_defeat_result() {
+        // This test verifies that boss defeats return a BossDefeatResult
+        // which is needed for proper achievement tracking (fixes zone completion bug)
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        let bonuses = CombatBonuses::default();
+        let mut achievements = Achievements::default();
+        let mut rng = rand::thread_rng();
+
+        // Set up a boss fight at subzone 3 of zone 1 (the final subzone)
+        state.zone_progression.current_zone_id = 1;
+        state.zone_progression.current_subzone_id = 3; // Final subzone of zone 1
+        state.zone_progression.fighting_boss = true;
+        state.zone_progression.kills_in_subzone = 10;
+
+        // Spawn a very weak boss
+        state.combat_state.current_enemy = Some(crate::combat::types::Enemy::new(
+            "Zone 1 Boss".to_string(),
+            1, // 1 HP = instant kill
+            1,
+        ));
+
+        let result = resolve_combat_tick(&mut state, &bonuses, &mut achievements, &mut rng);
+
+        // Should have won and got a boss defeat result
+        assert!(result.player_won, "Should defeat the boss");
+        assert!(result.was_boss, "Should be a boss kill");
+        assert!(
+            result.boss_defeat_result.is_some(),
+            "Should have a boss defeat result for achievement tracking"
+        );
+
+        // The result should indicate zone completion
+        let boss_result = result.boss_defeat_result.unwrap();
+        match boss_result {
+            BossDefeatResult::ZoneComplete { old_zone, new_zone_id } => {
+                assert_eq!(old_zone, "Meadow", "Should complete Meadow zone");
+                assert_eq!(new_zone_id, 2, "Should advance to zone 2");
+            }
+            other => {
+                panic!("Expected ZoneComplete, got {:?}", other);
+            }
+        }
+
+        // State should have advanced
+        assert_eq!(
+            state.zone_progression.current_zone_id, 2,
+            "Should have advanced to zone 2"
+        );
+        assert!(result.zone_advanced, "zone_advanced flag should be set");
+    }
+
+    #[test]
+    fn test_resolve_combat_tick_subzone_complete_result() {
+        // Test that defeating a non-final subzone boss returns SubzoneComplete
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        let bonuses = CombatBonuses::default();
+        let mut achievements = Achievements::default();
+        let mut rng = rand::thread_rng();
+
+        // Set up a boss fight at subzone 1 of zone 1 (not the final subzone)
+        state.zone_progression.current_zone_id = 1;
+        state.zone_progression.current_subzone_id = 1;
+        state.zone_progression.fighting_boss = true;
+        state.zone_progression.kills_in_subzone = 10;
+
+        // Spawn a very weak boss
+        state.combat_state.current_enemy = Some(crate::combat::types::Enemy::new(
+            "Subzone Boss".to_string(),
+            1, // 1 HP = instant kill
+            1,
+        ));
+
+        let result = resolve_combat_tick(&mut state, &bonuses, &mut achievements, &mut rng);
+
+        assert!(result.player_won, "Should defeat the boss");
+        assert!(
+            result.boss_defeat_result.is_some(),
+            "Should have a boss defeat result"
+        );
+
+        let boss_result = result.boss_defeat_result.unwrap();
+        match boss_result {
+            BossDefeatResult::SubzoneComplete { new_subzone_id } => {
+                assert_eq!(new_subzone_id, 2, "Should advance to subzone 2");
+            }
+            other => {
+                panic!("Expected SubzoneComplete, got {:?}", other);
+            }
+        }
+
+        // Should have advanced to subzone 2, not zone 2
+        assert_eq!(
+            state.zone_progression.current_zone_id, 1,
+            "Should still be in zone 1"
+        );
+        assert_eq!(
+            state.zone_progression.current_subzone_id, 2,
+            "Should be in subzone 2"
+        );
+        assert!(
+            !result.zone_advanced,
+            "zone_advanced should be false for subzone advancement"
+        );
+    }
+
+    #[test]
+    fn test_resolve_combat_tick_zone10_storms_end() {
+        // Test that defeating Zone 10 final boss returns StormsEnd
+        use crate::achievements::AchievementId;
+
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        let bonuses = CombatBonuses::default();
+        let mut achievements = Achievements::default();
+        let mut rng = rand::thread_rng();
+
+        // Set up Zone 10 final boss fight
+        state.zone_progression.current_zone_id = 10;
+        state.zone_progression.current_subzone_id = 4; // Final subzone
+        state.zone_progression.fighting_boss = true;
+        state.zone_progression.unlock_zone(10);
+        state.prestige_rank = 20;
+
+        // Player needs Stormbreaker to damage the boss
+        achievements.unlock(AchievementId::TheStormbreaker, None);
+
+        // Spawn a very weak boss
+        state.combat_state.current_enemy = Some(crate::combat::types::Enemy::new(
+            "The Undying Storm".to_string(),
+            1, // 1 HP = instant kill
+            1,
+        ));
+
+        let result = resolve_combat_tick(&mut state, &bonuses, &mut achievements, &mut rng);
+
+        assert!(result.player_won, "Should defeat the boss");
+        assert!(
+            result.boss_defeat_result.is_some(),
+            "Should have a boss defeat result"
+        );
+
+        let boss_result = result.boss_defeat_result.unwrap();
+        assert!(
+            matches!(boss_result, BossDefeatResult::StormsEnd),
+            "Expected StormsEnd result, got {:?}",
+            boss_result
+        );
+
+        // Zone 11 should be unlocked
+        assert!(
+            state.zone_progression.is_zone_unlocked(11),
+            "Zone 11 should be unlocked"
+        );
+        assert_eq!(
+            state.zone_progression.current_zone_id, 11,
+            "Should advance to Zone 11"
+        );
+    }
+
+    // ==========================================================================
     // Tests for damage reflection in tick() mode (simulation)
     // ==========================================================================
 
@@ -1311,5 +1500,144 @@ mod tests {
             result.player_won,
             "Enemy should die from player attack + damage reflection"
         );
+    }
+
+    // ==========================================================================
+    // Tests for Zone 10/11 progression (advance_after_boss_kill)
+    // ==========================================================================
+
+    #[test]
+    fn test_zone_10_completion_unlocks_zone_11() {
+        use crate::achievements::AchievementId;
+
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        let bonuses = CombatBonuses::default();
+        let mut achievements = Achievements::default();
+        let mut rng = rand::thread_rng();
+
+        // Set up Zone 10 final boss fight with Stormbreaker
+        state.zone_progression.current_zone_id = 10;
+        state.zone_progression.current_subzone_id = 4; // Final subzone
+        state.zone_progression.fighting_boss = true;
+        state.zone_progression.unlock_zone(10);
+        state.prestige_rank = 20;
+
+        // Unlock Stormbreaker so we can actually defeat the boss
+        achievements.unlock(AchievementId::TheStormbreaker, None);
+
+        // Spawn a very weak "boss" that player can one-shot
+        state.combat_state.current_enemy = Some(crate::combat::types::Enemy::new(
+            "The Undying Storm".to_string(),
+            1, // 1 HP = instant kill
+            1,
+        ));
+
+        let result = resolve_combat_tick(&mut state, &bonuses, &mut achievements, &mut rng);
+
+        assert!(result.player_won, "Should defeat the Zone 10 boss");
+        assert!(result.was_boss, "Should recognize as boss fight");
+
+        // Zone 11 should be unlocked
+        assert!(
+            state.zone_progression.is_zone_unlocked(11),
+            "Zone 11 (The Expanse) should be unlocked after Zone 10 completion"
+        );
+
+        // Should have advanced to Zone 11, Subzone 1
+        assert_eq!(
+            state.zone_progression.current_zone_id, 11,
+            "Should advance to Zone 11"
+        );
+        assert_eq!(
+            state.zone_progression.current_subzone_id, 1,
+            "Should start at subzone 1 of Zone 11"
+        );
+
+        // StormsEnd achievement should be unlocked
+        assert!(
+            achievements.is_unlocked(AchievementId::StormsEnd),
+            "StormsEnd achievement should be unlocked"
+        );
+    }
+
+    #[test]
+    fn test_zone_11_cycles_back_to_subzone_1() {
+        use crate::achievements::AchievementId;
+
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        let bonuses = CombatBonuses::default();
+        let mut achievements = Achievements::default();
+        let mut rng = rand::thread_rng();
+
+        // Set up Zone 11 final boss fight
+        state.zone_progression.current_zone_id = 11;
+        state.zone_progression.current_subzone_id = 4; // Final subzone of The Expanse
+        state.zone_progression.fighting_boss = true;
+        state.zone_progression.unlock_zone(11);
+        state.prestige_rank = 20;
+
+        // Stormbreaker needed to have reached Zone 11
+        achievements.unlock(AchievementId::TheStormbreaker, None);
+        achievements.unlock(AchievementId::StormsEnd, None);
+
+        // Spawn a very weak "boss" that player can one-shot
+        state.combat_state.current_enemy = Some(crate::combat::types::Enemy::new(
+            "Avatar of Infinity".to_string(),
+            1, // 1 HP = instant kill
+            1,
+        ));
+
+        let result = resolve_combat_tick(&mut state, &bonuses, &mut achievements, &mut rng);
+
+        assert!(result.player_won, "Should defeat the Zone 11 boss");
+        assert!(result.was_boss, "Should recognize as boss fight");
+
+        // Should stay in Zone 11 but cycle back to Subzone 1
+        assert_eq!(
+            state.zone_progression.current_zone_id, 11,
+            "Should remain in Zone 11 (The Expanse)"
+        );
+        assert_eq!(
+            state.zone_progression.current_subzone_id, 1,
+            "Should cycle back to subzone 1"
+        );
+
+        // Kills should be reset
+        assert_eq!(
+            state.zone_progression.kills_in_subzone, 0,
+            "Kills should be reset after Zone 11 boss"
+        );
+
+        // Boss defeat should be recorded
+        assert!(
+            state.zone_progression.is_boss_defeated(11, 4),
+            "Zone 11 boss defeat should be recorded"
+        );
+    }
+
+    #[test]
+    fn test_zone_advancement_updates_result_new_zone() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        let bonuses = CombatBonuses::default();
+        let mut achievements = Achievements::default();
+        let mut rng = rand::thread_rng();
+
+        // Set up Zone 1 final boss fight
+        state.zone_progression.current_zone_id = 1;
+        state.zone_progression.current_subzone_id = 3; // Final subzone of Meadow
+        state.zone_progression.fighting_boss = true;
+
+        // Spawn a very weak "boss" that player can one-shot
+        state.combat_state.current_enemy = Some(crate::combat::types::Enemy::new(
+            "Sporeling Queen".to_string(),
+            1, // 1 HP = instant kill
+            1,
+        ));
+
+        let result = resolve_combat_tick(&mut state, &bonuses, &mut achievements, &mut rng);
+
+        assert!(result.player_won, "Should defeat the Zone 1 boss");
+        assert!(result.zone_advanced, "Should advance to next zone");
+        assert_eq!(result.new_zone, 2, "Should advance to Zone 2 (Dark Forest)");
     }
 }

@@ -5,6 +5,7 @@
 
 use crate::core::game_state::GameState;
 use crate::items::Item;
+use crate::zones::BossDefeatResult;
 use rand::Rng;
 
 /// Result of one game tick - captures everything that happened.
@@ -45,6 +46,8 @@ pub struct TickResult {
     pub zone_advanced: bool,
     /// New zone (if advanced)
     pub new_zone: u32,
+    /// Result of boss defeat (for achievement tracking)
+    pub boss_defeat_result: Option<BossDefeatResult>,
     /// Item dropped
     pub loot_dropped: Option<Item>,
     /// Item was equipped (upgrade)

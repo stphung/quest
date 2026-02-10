@@ -613,6 +613,36 @@ mod tests {
     }
 
     #[test]
+    fn test_travel_to_resets_combat_state() {
+        let mut prog = ZoneProgression::new();
+
+        // Simulate being mid-fight with accumulated kills
+        prog.kills_in_subzone = 5;
+        prog.fighting_boss = true;
+
+        // Travel to a different zone
+        assert!(prog.travel_to(2, 1));
+
+        // Kill tracking should be reset
+        assert_eq!(
+            prog.kills_in_subzone, 0,
+            "kills_in_subzone should reset when traveling"
+        );
+        assert!(
+            !prog.fighting_boss,
+            "fighting_boss should reset when traveling"
+        );
+
+        // Same zone, different subzone should also reset
+        prog.kills_in_subzone = 7;
+        prog.fighting_boss = true;
+        prog.defeat_boss(2, 1); // Unlock subzone 2
+        assert!(prog.travel_to(2, 2));
+        assert_eq!(prog.kills_in_subzone, 0);
+        assert!(!prog.fighting_boss);
+    }
+
+    #[test]
     fn test_current_location_names() {
         let prog = ZoneProgression::new();
         let (zone, subzone) = prog.current_location_names();

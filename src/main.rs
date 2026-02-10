@@ -1163,8 +1163,81 @@ fn process_tick_result(
             }
         }
 
-        // Log zone advancement
-        if result.zone_advanced {
+        // Handle boss defeat result for achievements and zone completion tracking
+        if let Some(ref boss_result) = result.boss_defeat_result {
+            use zones::BossDefeatResult;
+            match boss_result {
+                BossDefeatResult::ZoneComplete { old_zone, new_zone_id } => {
+                    // Track zone completion achievement
+                    if let Some(zone) = zones::get_all_zones().iter().find(|z| z.name == *old_zone)
+                    {
+                        global_achievements.on_zone_fully_cleared(
+                            zone.id,
+                            Some(&game_state.character_name),
+                        );
+                    }
+                    // Log advancement
+                    if let Some(new_zone) = zones::get_zone(*new_zone_id) {
+                        game_state.combat_state.add_log_entry(
+                            format!("👑 {} conquered! Advancing to {}!", old_zone, new_zone.name),
+                            false,
+                            true,
+                        );
+                    }
+                }
+                BossDefeatResult::ZoneCompleteButGated {
+                    zone_name,
+                    required_prestige,
+                } => {
+                    // Track zone completion achievement even if gated
+                    if let Some(zone) =
+                        zones::get_all_zones().iter().find(|z| z.name == *zone_name)
+                    {
+                        global_achievements.on_zone_fully_cleared(
+                            zone.id,
+                            Some(&game_state.character_name),
+                        );
+                    }
+                    game_state.combat_state.add_log_entry(
+                        format!(
+                            "👑 {} conquered! Next zone requires Prestige {}.",
+                            zone_name, required_prestige
+                        ),
+                        false,
+                        true,
+                    );
+                }
+                BossDefeatResult::StormsEnd => {
+                    // Zone 10 completed - track both achievements
+                    global_achievements
+                        .on_zone_fully_cleared(10, Some(&game_state.character_name));
+                    global_achievements.on_storms_end(Some(&game_state.character_name));
+                    game_state.combat_state.add_log_entry(
+                        "👑 All zones conquered! You have completed the game!".to_string(),
+                        false,
+                        true,
+                    );
+                }
+                BossDefeatResult::ExpanseCycle => {
+                    // Zone 11 cycle completed
+                    global_achievements
+                        .on_zone_fully_cleared(11, Some(&game_state.character_name));
+                    game_state.combat_state.add_log_entry(
+                        "👑 The Endless defeated! The Expanse cycles anew...".to_string(),
+                        false,
+                        true,
+                    );
+                }
+                BossDefeatResult::SubzoneComplete { .. } => {
+                    // Just moving to next subzone, no zone achievement
+                    // Log handled by zone_advanced check below
+                }
+                BossDefeatResult::WeaponRequired { .. } => {
+                    // Shouldn't happen here (checked earlier), but handle gracefully
+                }
+            }
+        } else if result.zone_advanced {
+            // Fallback for zone advancement without boss_defeat_result (backwards compat)
             if let Some(zone) = zones::get_zone(result.new_zone) {
                 game_state.combat_state.add_log_entry(
                     format!("👑 Advancing to {}!", zone.name),
