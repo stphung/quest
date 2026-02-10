@@ -17,7 +17,8 @@
 //! The `resolve_combat_tick()` function is also exported for backward compatibility.
 
 use super::balance::KILLS_PER_BOSS;
-use super::game_loop::{GameLoop, TickResult};
+use super::game_logic::try_discover_dungeon;
+use super::game_loop::{FishCatch, GameLoop, TickResult};
 use super::game_state::GameState;
 use super::progression::{can_access_zone, max_zone_for_prestige};
 use crate::character::derived_stats::DerivedStats;
@@ -25,6 +26,10 @@ use crate::character::prestige::{can_prestige as check_can_prestige, perform_pre
 use crate::combat::types::{generate_enemy_for_current_zone, generate_subzone_boss, Enemy};
 use crate::core::combat_math::*;
 use crate::core::game_logic::{apply_tick_xp, spawn_enemy_if_needed, xp_gain_per_tick};
+use crate::dungeon::logic as dungeon_logic;
+use crate::dungeon::types::RoomType;
+use crate::fishing::logic as fishing_logic;
+use crate::fishing::types::FishingPhase;
 use crate::items::drops::{try_drop_from_boss, try_drop_from_mob};
 use crate::items::scoring::auto_equip_if_better;
 use crate::zones::get_zone;
@@ -198,12 +203,162 @@ impl CoreGame {
         let ticks = if is_boss { 400.0 } else { 300.0 };
         (base_xp * ticks) as u64
     }
+
+    /// Process a fishing session tick for simulation.
+    ///
+    /// Simplified fishing for simulation:
+    /// - Auto-completes fishing phases (casting → waiting → reeling)
+    /// - Catches fish and awards XP
+    /// - Ends session when spot is depleted
+    fn process_fishing_tick(&mut self, rng: &mut impl Rng, result: &mut TickResult) {
+        // Use default Haven bonuses for simulation (no Haven in pure simulation)
+        let haven = fishing_logic::HavenFishingBonuses::default();
+        let fishing_result = fishing_logic::tick_fishing_with_haven_result(&mut self.state, rng, &haven);
+
+        // Check if we caught a fish (session was in Reeling phase and completed)
+        if let Some(session) = &self.state.active_fishing {
+            // The tick_fishing function handles phase transitions
+            // If we're back in Casting phase after Reeling, we caught a fish
+            if session.phase == FishingPhase::Casting && !session.fish_caught.is_empty() {
+                // Get the last caught fish
+                if let Some(last_fish) = session.fish_caught.last() {
+                    result.fishing_catch = Some(FishCatch {
+                        fish_name: last_fish.name.clone(),
+                        rarity: last_fish.rarity,
+                        xp_gained: last_fish.xp_reward as u64,
+                        item_dropped: None, // Items are tracked separately
+                    });
+                }
+            }
+        }
+
+        // Check if session ended (active_fishing is None after tick)
+        if self.state.active_fishing.is_none() && !fishing_result.messages.is_empty() {
+            // Session completed - fishing spot depleted
+            // XP was already awarded during the fishing tick
+        }
+    }
+
+    /// Process a dungeon exploration tick for simulation.
+    ///
+    /// Simplified dungeon for simulation:
+    /// - Auto-navigates toward boss (always moves forward)
+    /// - Auto-defeats enemies in combat rooms
+    /// - Collects treasure and XP
+    /// - Completes dungeon when boss is defeated
+    fn process_dungeon_tick(&mut self, _rng: &mut impl Rng, result: &mut TickResult) {
+        // Simulate dungeon time passage (0.1s per tick)
+        let delta_time = 0.1;
+
+        // Process dungeon update
+        let events = dungeon_logic::update_dungeon(&mut self.state, delta_time);
+
+        for event in &events {
+            match event {
+                dungeon_logic::DungeonEvent::EnteredRoom { room_type, .. } => {
+                    // Auto-complete rooms
+                    match room_type {
+                        RoomType::Combat => {
+                            // Auto-defeat combat enemies
+                            if let Some(dungeon) = &mut self.state.active_dungeon {
+                                dungeon_logic::on_room_enemy_defeated(dungeon);
+                                result.dungeon_room_cleared = true;
+
+                                // Award combat XP
+                                let xp = self.calculate_kill_xp(false);
+                                let (levelups, _) = apply_tick_xp(&mut self.state, xp as f64);
+                                result.dungeon_xp_gained += xp;
+                                result.xp_gained += xp;
+                                if levelups > 0 {
+                                    result.leveled_up = true;
+                                    result.new_level = self.state.character_level;
+                                }
+                            }
+                        }
+                        RoomType::Elite => {
+                            // Auto-defeat elite and get key
+                            if let Some(dungeon) = &mut self.state.active_dungeon {
+                                dungeon_logic::on_elite_defeated(dungeon);
+                                result.dungeon_room_cleared = true;
+
+                                // Award elite XP (1.5x normal)
+                                let xp = (self.calculate_kill_xp(false) as f64 * 1.5) as u64;
+                                let (levelups, _) = apply_tick_xp(&mut self.state, xp as f64);
+                                result.dungeon_xp_gained += xp;
+                                result.xp_gained += xp;
+                                if levelups > 0 {
+                                    result.leveled_up = true;
+                                    result.new_level = self.state.character_level;
+                                }
+                            }
+                        }
+                        RoomType::Boss => {
+                            // Boss defeated - complete dungeon
+                            if let Some(dungeon) = &self.state.active_dungeon {
+                                // Calculate boss XP
+                                let boss_xp = dungeon_logic::calculate_boss_xp_reward(dungeon.size);
+                                result.dungeon_xp_gained += boss_xp;
+                                result.xp_gained += boss_xp;
+                                let (levelups, _) = apply_tick_xp(&mut self.state, boss_xp as f64);
+                                if levelups > 0 {
+                                    result.leveled_up = true;
+                                    result.new_level = self.state.character_level;
+                                }
+                            }
+                            // Mark as completed and clear dungeon
+                            dungeon_logic::on_boss_defeated(&mut self.state);
+                            result.dungeon_completed = true;
+                            result.dungeon_room_cleared = true;
+                        }
+                        RoomType::Treasure => {
+                            // Auto-collect treasure
+                            if let Some((item, equipped)) = dungeon_logic::on_treasure_room_entered(&mut self.state) {
+                                result.dungeon_items_found.push(item.clone());
+                                if equipped {
+                                    result.loot_equipped = true;
+                                }
+                            }
+                            result.dungeon_room_cleared = true;
+                        }
+                        RoomType::Entrance => {
+                            // Nothing to do for entrance
+                        }
+                    }
+                }
+                dungeon_logic::DungeonEvent::DungeonComplete { xp_earned, .. } => {
+                    result.dungeon_completed = true;
+                    result.dungeon_xp_gained += *xp_earned;
+                }
+                dungeon_logic::DungeonEvent::DungeonFailed => {
+                    // Player died in dungeon - handled elsewhere
+                }
+                _ => {}
+            }
+        }
+    }
 }
 
 impl GameLoop for CoreGame {
     fn tick(&mut self, rng: &mut impl Rng) -> TickResult {
         let mut result = TickResult::default();
 
+        // Priority 1: Process active dungeon
+        if self.state.active_dungeon.is_some() {
+            self.process_dungeon_tick(rng, &mut result);
+            result.can_prestige = self.can_prestige();
+            result.at_prestige_wall = self.at_prestige_wall();
+            return result;
+        }
+
+        // Priority 2: Process active fishing
+        if self.state.active_fishing.is_some() {
+            self.process_fishing_tick(rng, &mut result);
+            result.can_prestige = self.can_prestige();
+            result.at_prestige_wall = self.at_prestige_wall();
+            return result;
+        }
+
+        // Priority 3: Normal combat
         // Spawn enemy if needed
         if self.current_enemy.is_none() {
             self.spawn_enemy(rng);
@@ -268,6 +423,17 @@ impl GameLoop for CoreGame {
                 if self.advance_zone() && self.current_zone() > old_zone {
                     result.zone_advanced = true;
                     result.new_zone = self.current_zone();
+                }
+            }
+
+            // Try dungeon discovery (2% per kill) - checked after each kill like main.rs
+            if try_discover_dungeon(&mut self.state) {
+                result.discovered_dungeon = true;
+            } else if self.state.active_fishing.is_none() {
+                // Try fishing discovery (5% per kill when not in dungeon/fishing)
+                // Per main.rs pattern: fishing is checked after kill if dungeon wasn't discovered
+                if fishing_logic::try_discover_fishing(&mut self.state, rng).is_some() {
+                    result.discovered_fishing = true;
                 }
             }
 
@@ -579,8 +745,9 @@ mod tests {
         let mut rng = rand::thread_rng();
 
         // Kill enough enemies to reach boss
+        // Higher tick count needed now that fishing/dungeon can interrupt combat
         let mut saw_boss = false;
-        for _ in 0..5000 {
+        for _ in 0..20_000 {
             let result = game.tick(&mut rng);
             if result.was_boss && result.player_won {
                 saw_boss = true;
@@ -590,7 +757,7 @@ mod tests {
 
         assert!(
             saw_boss,
-            "Should have encountered and defeated a boss within 5000 ticks"
+            "Should have encountered and defeated a boss within 20000 ticks"
         );
     }
 

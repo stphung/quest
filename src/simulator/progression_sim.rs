@@ -65,6 +65,20 @@ pub struct RunStats {
     // Death breakdown
     pub boss_deaths: u64,
     pub regular_deaths: u64,
+
+    // ── Fishing/Dungeon stats ─────────────────────────────────────────────
+    /// Total dungeons completed
+    pub dungeons_completed: u64,
+    /// Total dungeon rooms cleared
+    pub dungeon_rooms_cleared: u64,
+    /// Total XP earned from dungeons
+    pub dungeon_xp_gained: u64,
+    /// Total fish caught
+    pub fish_caught: u64,
+    /// Total XP earned from fishing
+    pub fishing_xp_gained: u64,
+    /// Legendary fish caught
+    pub legendary_fish_caught: u64,
 }
 
 #[cfg(test)]

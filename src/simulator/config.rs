@@ -18,6 +18,9 @@ pub struct SimConfig {
     /// Target prestige rank to reach
     pub target_prestige: u32,
 
+    /// Starting prestige rank (to test balance at different progression points)
+    pub starting_prestige: u32,
+
     /// Whether to simulate item drops and equipment
     pub simulate_loot: bool,
 
@@ -36,6 +39,7 @@ impl Default for SimConfig {
             max_ticks_per_run: 1_000_000,
             target_zone: 10,
             target_prestige: 0,
+            starting_prestige: 0,
             simulate_loot: true,
             simulate_prestige: false,
             verbosity: 1,

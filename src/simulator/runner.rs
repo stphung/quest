@@ -103,6 +103,14 @@ struct SimStats {
     regular_deaths: u64,
     cycle_boss_deaths: u64,
     cycle_regular_deaths: u64,
+
+    // ── Fishing/Dungeon stats ─────────────────────────────────────────────
+    dungeons_completed: u64,
+    dungeon_rooms_cleared: u64,
+    dungeon_xp_gained: u64,
+    fish_caught: u64,
+    fishing_xp_gained: u64,
+    legendary_fish_caught: u64,
 }
 
 impl SimStats {
@@ -147,6 +155,13 @@ impl SimStats {
             regular_deaths: 0,
             cycle_boss_deaths: 0,
             cycle_regular_deaths: 0,
+            // Fishing/Dungeon stats
+            dungeons_completed: 0,
+            dungeon_rooms_cleared: 0,
+            dungeon_xp_gained: 0,
+            fish_caught: 0,
+            fishing_xp_gained: 0,
+            legendary_fish_caught: 0,
         }
     }
 
@@ -255,6 +270,24 @@ impl SimStats {
                 self.loot_stats.record_drop(item, result.loot_equipped);
             }
         }
+
+        // Track fishing
+        if let Some(ref catch) = result.fishing_catch {
+            self.fish_caught += 1;
+            self.fishing_xp_gained += catch.xp_gained;
+            if catch.rarity == crate::fishing::types::FishRarity::Legendary {
+                self.legendary_fish_caught += 1;
+            }
+        }
+
+        // Track dungeons
+        if result.dungeon_room_cleared {
+            self.dungeon_rooms_cleared += 1;
+        }
+        if result.dungeon_completed {
+            self.dungeons_completed += 1;
+        }
+        self.dungeon_xp_gained += result.dungeon_xp_gained;
     }
 
     /// Record a prestige transition.
@@ -343,6 +376,11 @@ fn simulate_single_run(config: &SimConfig, rng: &mut ChaCha8Rng) -> RunStats {
     // Create CoreGame - this is the shared game engine
     let mut core_game = CoreGame::new("SimPlayer".to_string());
 
+    // Set starting prestige if configured
+    if config.starting_prestige > 0 {
+        core_game.state_mut().prestige_rank = config.starting_prestige;
+    }
+
     // Create stats tracker
     let mut stats = SimStats::new();
 
@@ -425,6 +463,13 @@ fn simulate_single_run(config: &SimConfig, rng: &mut ChaCha8Rng) -> RunStats {
         // Death breakdown
         boss_deaths: stats.boss_deaths,
         regular_deaths: stats.regular_deaths,
+        // Fishing/Dungeon stats
+        dungeons_completed: stats.dungeons_completed,
+        dungeon_rooms_cleared: stats.dungeon_rooms_cleared,
+        dungeon_xp_gained: stats.dungeon_xp_gained,
+        fish_caught: stats.fish_caught,
+        fishing_xp_gained: stats.fishing_xp_gained,
+        legendary_fish_caught: stats.legendary_fish_caught,
     }
 }
 
