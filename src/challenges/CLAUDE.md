@@ -2,6 +2,20 @@
 
 This module contains player-controlled challenge minigames. Challenges are discovered randomly during gameplay (requires P1+) and appear in the challenge menu for the player to accept or decline.
 
+## Shared Types (`mod.rs`)
+
+All 6 minigames share these types defined in `challenges/mod.rs`:
+
+- **`ChallengeDifficulty`** — Novice, Apprentice, Journeyman, Master (4-tier system with `ALL`, `from_index()`, `name()`, `to_str()`)
+- **`ChallengeResult`** — Win, Loss, Draw, Forfeit
+- **`MinigameInput`** — Up, Down, Left, Right, Primary, Secondary, Cancel, Other
+- **`ActiveMinigame`** — Enum wrapping all 6 game structs
+- **`MinigameWinInfo`** — Returned on win for achievement tracking
+
+Two shared functions handle game lifecycle:
+- **`start_minigame(state, challenge_type, difficulty)`** — Creates game and sets `active_minigame`
+- **`apply_minigame_result(state)`** — Extracts result, grants rewards (XP, prestige, fishing ranks), logs entries, clears game
+
 ## Adding a New Challenge
 
 ### 1. Module Structure
@@ -11,7 +25,7 @@ Create a new subdirectory with three files:
 ```
 src/challenges/newgame/
 ├── mod.rs      # Public exports
-├── types.rs    # Data structures (Game, Difficulty, Result enums)
+├── types.rs    # Game struct, game-specific helper functions
 └── logic.rs    # Game logic, input processing, AI
 ```
 
@@ -21,70 +35,67 @@ Optional additional files for complex AI:
 
 ### 2. Required Types (`types.rs`)
 
-```rust
-/// Difficulty levels (typically 4)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum NewGameDifficulty {
-    Novice,
-    Apprentice,
-    Journeyman,
-    Master,
-}
+Games use the shared `ChallengeDifficulty` and `ChallengeResult` from `mod.rs`. No per-game difficulty or result enums needed.
 
-/// Game result
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NewGameResult {
-    Win,
-    Loss,
-    Draw,     // Optional, if applicable
-}
+```rust
+use crate::challenges::{ChallengeDifficulty, ChallengeResult};
 
 /// Main game state
 #[derive(Debug, Clone)]
 pub struct NewGameGame {
-    pub difficulty: NewGameDifficulty,
-    pub game_result: Option<NewGameResult>,
+    pub difficulty: ChallengeDifficulty,
+    pub game_result: Option<ChallengeResult>,
     pub ai_thinking: bool,
     pub ai_think_ticks: u32,
     pub forfeit_pending: bool,
     pub cursor: (usize, usize),  // If applicable
     // ... game-specific fields
 }
+
+impl NewGameGame {
+    pub fn new(difficulty: ChallengeDifficulty) -> Self {
+        // Map difficulty to game-specific params (board size, AI depth, etc.)
+        let board_size = match difficulty {
+            ChallengeDifficulty::Novice => 9,
+            // ...
+        };
+        Self { difficulty, game_result: None, /* ... */ }
+    }
+
+    /// Game-specific difficulty params as methods on the game struct
+    pub fn search_depth(&self) -> i32 { /* ... */ }
+    pub fn random_move_chance(&self) -> f64 { /* ... */ }
+}
 ```
 
 ### 3. Required Logic (`logic.rs`)
 
+Games use the shared `MinigameInput` enum — no per-game input enum needed.
+
 ```rust
-/// UI-agnostic input enum
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NewGameInput {
-    Up, Down, Left, Right,
-    Select,   // Enter
-    Cancel,   // Esc (also triggers forfeit)
-    Other,
-}
+use crate::challenges::{ChallengeResult, MinigameInput};
 
-/// Start a new game
-pub fn start_newgame_game(difficulty: NewGameDifficulty) -> ActiveMinigame {
-    ActiveMinigame::NewGame(NewGameGame::new(difficulty))
-}
-
-/// Process player input
-pub fn process_input(game: &mut NewGameGame, input: NewGameInput) {
-    // Handle forfeit_pending state first
-    // Then handle normal input
-}
-
-/// Apply game result to GameState (rewards/penalties)
-pub fn apply_game_result(state: &mut GameState) {
-    // Extract result, clear active_minigame, apply rewards
+/// Process player input (uses shared MinigameInput)
+pub fn process_input(game: &mut NewGameGame, input: MinigameInput) -> bool {
+    if game.ai_thinking { return false; }
+    match input {
+        MinigameInput::Up => { /* move cursor */ }
+        MinigameInput::Primary => { /* select/place/submit */ }
+        MinigameInput::Secondary => { /* game-specific: pass, flag, clear */ }
+        MinigameInput::Cancel => { /* forfeit flow */ }
+        MinigameInput::Other => { game.forfeit_pending = false; }
+        // ...
+    }
+    true
 }
 
 /// Tick the game (for AI moves, timers)
-pub fn tick_game(game: &mut NewGameGame) {
+pub fn process_ai_thinking(game: &mut NewGameGame, rng: &mut impl Rng) -> bool {
     // Handle AI thinking delay, then make AI move
 }
 ```
+
+**Note:** `start_newgame_game()` and `apply_game_result()` are NOT needed per-game. The shared `start_minigame()` and `apply_minigame_result()` in `mod.rs` handle all games.
 
 ### 4. Integrate with Menu System (`menu.rs`)
 
@@ -96,16 +107,19 @@ pub enum ChallengeType {
 }
 ```
 
-2. Implement `DifficultyInfo` trait for your difficulty enum:
+2. Add reward data to `ChallengeType::reward()`:
 ```rust
-impl DifficultyInfo for NewGameDifficulty {
-    fn name(&self) -> &'static str { ... }
-    fn reward(&self) -> ChallengeReward { ... }
-    fn extra_info(&self) -> Option<String> { None }
-}
+(ChallengeType::NewGame, ChallengeDifficulty::Novice) => ChallengeReward {
+    prestige_ranks: 1, xp_percent: 0, fishing_ranks: 0,
+},
+// ... other difficulties
 ```
 
-3. Add to `ActiveMinigame` enum in `mod.rs`:
+3. Add flavor text to `ChallengeType::result_flavor()` for all 4 result variants.
+
+4. Add `game_type_str()`, `log_icon()`, and optionally `difficulty_extra_info()` cases.
+
+5. Add to `ActiveMinigame` enum in `mod.rs`:
 ```rust
 pub enum ActiveMinigame {
     // ...
@@ -113,81 +127,57 @@ pub enum ActiveMinigame {
 }
 ```
 
-4. Wire up in `menu.rs`:
-   - `create_challenge()` - creates Challenge with difficulties
-   - `accept_selected_challenge()` - starts the game
-   - Discovery weights in `CHALLENGE_WEIGHTS`
+6. Add to `start_minigame()` and `apply_minigame_result()` match arms in `mod.rs`.
+
+7. Wire up discovery in `menu.rs`:
+   - `create_challenge()` - creates PendingChallenge
+   - Discovery weights in `CHALLENGE_TABLE`
 
 ### 5. Add UI Scene (`src/ui/newgame_scene.rs`)
 
-Use shared components from `game_common.rs`:
+Use shared components from `game_common.rs`. Game-over rendering uses `ChallengeResult` and `ChallengeType::reward()` for reward display:
 
 ```rust
 use super::game_common::{
-    create_game_layout,
-    render_forfeit_status_bar,
-    render_game_over_overlay,
-    render_info_panel_frame,
-    render_status_bar,
-    render_thinking_status_bar,
+    create_game_layout, render_forfeit_status_bar, render_game_over_overlay,
+    render_info_panel_frame, render_status_bar, render_thinking_status_bar,
     GameResultType,
 };
+use crate::challenges::ChallengeResult;
 
 pub fn render_newgame_scene(frame: &mut Frame, area: Rect, game: &NewGameGame) {
-    // 1. Check for game over overlay first
     if game.game_result.is_some() {
         render_game_over(frame, area, game);
         return;
     }
-
-    // 2. Create layout (title, border_color, content_height, info_panel_width)
     let layout = create_game_layout(frame, area, " Title ", Color::Cyan, 15, 22);
-
-    // 3. Render components
     render_board(frame, layout.content, game);
     render_status_bar_content(frame, layout.status_bar, game);
     render_info_panel(frame, layout.info_panel, game);
 }
 
-fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &NewGameGame) {
-    // AI thinking state
-    if game.ai_thinking {
-        render_thinking_status_bar(frame, area, "Opponent is thinking...");
-        return;
-    }
-
-    // Forfeit confirmation
-    if render_forfeit_status_bar(frame, area, game.forfeit_pending) {
-        return;
-    }
-
-    // Normal controls
-    render_status_bar(frame, area, "Your turn", Color::White, &[
-        ("[Arrows]", "Move"),
-        ("[Enter]", "Select"),
-        ("[Esc]", "Forfeit"),
-    ]);
+fn render_game_over(frame: &mut Frame, area: Rect, game: &NewGameGame) {
+    use crate::challenges::menu::ChallengeType;
+    let result = game.game_result.unwrap();
+    let reward = match result {
+        ChallengeResult::Win => ChallengeType::NewGame.reward(game.difficulty).description(),
+        _ => "No penalty incurred.".to_string(),
+    };
+    // ... render with render_game_over_overlay()
 }
 ```
 
 ### 6. Wire Up Input Handling (`src/input.rs`)
 
-Add case to `handle_minigame()`:
+The unified `handle_minigame()` handles key→`MinigameInput` mapping for all games. Add your game's dispatch case:
 
 ```rust
 ActiveMinigame::NewGame(game) => {
-    if game.game_result.is_some() {
-        apply_newgame_result(state);
-        return InputResult::Continue;
-    }
-    let input = match key.code {
-        KeyCode::Up => NewGameInput::Up,
-        // ... map all inputs
-        _ => NewGameInput::Other,
-    };
-    process_newgame_input(game, input);
+    newgame::logic::process_input(game, input);
 }
 ```
+
+The game-over check and `apply_minigame_result()` call are handled uniformly for all games — no per-game code needed.
 
 ### 7. Add to Debug Menu (`src/utils/debug_menu.rs`)
 
@@ -224,11 +214,12 @@ fn trigger_newgame_challenge(state: &mut GameState) -> &'static str {
 
 ### Forfeit Flow
 1. First Esc press: set `forfeit_pending = true`
-2. Second Esc: confirm forfeit, set result
+2. Second Esc: confirm forfeit, set result to `ChallengeResult::Forfeit`
 3. Any other key: cancel forfeit (`forfeit_pending = false`)
 4. Use `render_forfeit_status_bar` for consistent UI
 
 ### Rewards (`ChallengeReward`)
+Defined per game+difficulty in `ChallengeType::reward()`:
 ```rust
 ChallengeReward {
     prestige_ranks: 1,  // Direct prestige gain
@@ -256,7 +247,7 @@ Haven's discovery boost room increases the base discovery chance.
 
 ## Achievement Integration
 
-Winning a minigame emits a `MinigameWinInfo` (defined in `mod.rs`) with `game_type` and `difficulty` strings. The achievement system in `src/achievements/` tracks wins per game type and difficulty level. When adding a new challenge, ensure `MinigameWinInfo` values are emitted in `apply_game_result()`.
+Winning a minigame returns `Some(MinigameWinInfo)` from `apply_minigame_result()` with `game_type` and `difficulty` strings. The achievement system in `src/achievements/` tracks wins per game type and difficulty level. When adding a new challenge, ensure the `game_type_str()` method on `ChallengeType` returns the correct string.
 
 ## Existing Challenges
 

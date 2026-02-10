@@ -121,7 +121,8 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 
 ### Challenge Minigames (`src/challenges/`) — [detailed docs](src/challenges/CLAUDE.md)
 
-- `menu.rs` — Generic challenge menu system (pending challenges, extensible challenge types)
+- `mod.rs` — Shared enums (`ChallengeDifficulty`, `ChallengeResult`, `MinigameInput`), `ActiveMinigame` enum, unified `start_minigame()` and `apply_minigame_result()` functions
+- `menu.rs` — Challenge menu system, `ChallengeType` with reward tables, flavor text, and discovery weights
 - `chess/` — Chess minigame (4 difficulty levels: Novice→Master, ~500-1350 ELO), requires P1+
 - `go/` — Go (Territory Control) on 9×9 board, MCTS AI with heuristics (500-20k simulations), requires P1+
 - `morris/` — Nine Men's Morris (board layout, mill detection, phases), requires P1+
@@ -146,13 +147,14 @@ Account-level achievement system that persists across characters. 5 categories (
 
 ### Input Handling (`src/input.rs`)
 
-Routes keyboard input to the appropriate handler based on current game state. Dispatches to minigame input handlers, character management flows, haven overlay, and debug menu.
+Routes keyboard input to the appropriate handler based on current game state. Dispatches to minigame input handlers, character management flows, haven overlay, and debug menu. Minigame input uses a unified key→`MinigameInput` mapping with a single dispatch to per-game `process_input()` functions.
 
 ### Utilities (`src/utils/`)
 
 - `build_info.rs` — Build metadata (commit, date) embedded at compile time
 - `updater.rs` — Self-update from GitHub releases (30min check interval ±5min jitter)
 - `debug_menu.rs` — Debug menu for testing discoveries (activate with `--debug` flag, toggle with backtick). Options: trigger dungeons, fishing, all 6 challenge types, Haven discovery
+- `persistence.rs` — Generic JSON save/load helpers (`load_json_or_default<T>()`, `save_json<T>()`), used by haven and achievements
 
 ### UI (`src/ui/`) — [detailed docs](src/ui/CLAUDE.md)
 
@@ -192,7 +194,7 @@ module/
 ```
 
 ### Difficulty Tiers
-All challenge minigames use 4 difficulty levels: Novice, Apprentice, Journeyman, Master.
+All challenge minigames use the shared `ChallengeDifficulty` enum (Novice, Apprentice, Journeyman, Master) defined in `challenges/mod.rs`. Game-specific difficulty parameters (search depth, board size, etc.) are methods on the game struct.
 
 ### Forfeit Pattern
 All interactive minigames: first Esc sets `forfeit_pending`, second Esc confirms, any other key cancels.
@@ -263,7 +265,8 @@ quest/
 │   │   ├── names.rs         # Name generation
 │   │   └── scoring.rs       # Auto-equip scoring
 │   ├── challenges/          # Challenge minigames [CLAUDE.md]
-│   │   ├── menu.rs          # Challenge menu
+│   │   ├── mod.rs           # Shared enums, start/apply functions
+│   │   ├── menu.rs          # Challenge menu, rewards, flavor text
 │   │   ├── chess/           # Chess minigame
 │   │   ├── go/              # Go (Territory Control)
 │   │   ├── morris/          # Nine Men's Morris
@@ -280,6 +283,7 @@ quest/
 │   ├── utils/               # Utilities
 │   │   ├── build_info.rs    # Build metadata
 │   │   ├── updater.rs       # Self-update
+│   │   ├── persistence.rs   # Generic JSON save/load
 │   │   └── debug_menu.rs    # Debug menu
 │   └── ui/                  # UI components [CLAUDE.md]
 │       ├── game_common.rs   # Shared minigame layout
