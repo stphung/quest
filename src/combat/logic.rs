@@ -251,9 +251,77 @@ pub fn update_combat(
                 calculate_damage_reflection(enemy_damage, derived.damage_reflection_percent);
             if reflected > 0 {
                 enemy.take_damage(reflected);
+
+                // Check if enemy died from reflection (player wins even if both die)
+                if !enemy.is_alive() {
+                    let enemy_name = enemy.name.clone();
+                    let wis_mod = state
+                        .attributes
+                        .modifier(crate::character::attributes::AttributeType::Wisdom);
+                    let cha_mod = state
+                        .attributes
+                        .modifier(crate::character::attributes::AttributeType::Charisma);
+                    let xp_gained = crate::core::game_logic::combat_kill_xp(
+                        crate::core::game_logic::xp_gain_per_tick(
+                            state.prestige_rank,
+                            wis_mod,
+                            cha_mod,
+                        ),
+                        haven.xp_gain_percent,
+                    );
+
+                    // Track if this was a boss-level kill
+                    let dungeon_room_type = state
+                        .active_dungeon
+                        .as_ref()
+                        .and_then(|d| d.current_room())
+                        .map(|r| r.room_type);
+                    let is_boss_kill = matches!(
+                        dungeon_room_type,
+                        Some(RoomType::Elite) | Some(RoomType::Boss)
+                    ) || (state.active_dungeon.is_none()
+                        && state.zone_progression.fighting_boss);
+
+                    match dungeon_room_type {
+                        Some(RoomType::Elite) => {
+                            events.push(CombatEvent::EliteDefeated {
+                                xp_gained,
+                                enemy_name: enemy_name.clone(),
+                            });
+                        }
+                        Some(RoomType::Boss) => {
+                            events.push(CombatEvent::BossDefeated {
+                                xp_gained,
+                                enemy_name: enemy_name.clone(),
+                            });
+                        }
+                        _ => {
+                            if state.active_dungeon.is_some() {
+                                events.push(CombatEvent::EnemyDied {
+                                    xp_gained,
+                                    enemy_name: enemy_name.clone(),
+                                });
+                            } else if state.zone_progression.fighting_boss {
+                                let result = state
+                                    .zone_progression
+                                    .on_boss_defeated(state.prestige_rank, achievements);
+                                events.push(CombatEvent::SubzoneBossDefeated { xp_gained, result });
+                            } else {
+                                state.zone_progression.record_kill();
+                                events.push(CombatEvent::EnemyDied { xp_gained, enemy_name });
+                            }
+                        }
+                    }
+
+                    achievements.on_enemy_killed(is_boss_kill, Some(&state.character_name));
+                    state.combat_state.current_enemy = None;
+                    state.combat_state.is_regenerating = true;
+                    state.combat_state.regen_timer = 0.0;
+                    return events;
+                }
             }
 
-            // Check if player died
+            // Check if player died (only if enemy is still alive)
             if !state.combat_state.is_player_alive() {
                 // Check if we're in a dungeon
                 let in_dungeon = state.active_dungeon.is_some();

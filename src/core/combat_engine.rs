@@ -294,6 +294,34 @@ impl GameLoop for CombatEngine {
                 if reflected > 0 {
                     let enemy = self.current_enemy.as_mut().unwrap();
                     enemy.current_hp = enemy.current_hp.saturating_sub(reflected);
+
+                    // Check if enemy died from reflection (player wins even if both die)
+                    if enemy.current_hp == 0 {
+                        result.player_won = true;
+                        self.kills_in_subzone += 1;
+                        self.state.session_kills += 1;
+
+                        let xp = self.calculate_kill_xp(result.was_boss);
+                        let (levelups, _) = apply_tick_xp(&mut self.state, xp as f64);
+                        result.xp_gained = xp;
+                        if levelups > 0 {
+                            result.leveled_up = true;
+                            result.new_level = self.state.character_level;
+                        }
+
+                        if result.was_boss {
+                            let old_zone = self.current_zone();
+                            if self.advance_zone() && self.current_zone() > old_zone {
+                                result.zone_advanced = true;
+                                result.new_zone = self.current_zone();
+                            }
+                        }
+
+                        self.current_enemy = None;
+                        result.can_prestige = self.can_prestige();
+                        result.at_prestige_wall = self.at_prestige_wall();
+                        return result;
+                    }
                 }
             }
 
@@ -527,10 +555,63 @@ pub fn resolve_combat_tick(
         // Damage reflection: reflect percentage of damage taken back to attacker
         if derived.damage_reflection_percent > 0.0 && damage_taken > 0 {
             let reflected =
-                (damage_taken as f64 * derived.damage_reflection_percent / 100.0) as u32;
+                calculate_damage_reflection(damage_taken, derived.damage_reflection_percent);
             if reflected > 0 {
                 if let Some(enemy) = state.combat_state.current_enemy.as_mut() {
                     enemy.current_hp = enemy.current_hp.saturating_sub(reflected);
+
+                    // Check if enemy died from reflection (player wins even if both die)
+                    if enemy.current_hp == 0 {
+                        result.player_won = true;
+                        result.enemy_name = Some(enemy_name.clone());
+
+                        // Calculate XP with bonuses
+                        let base_xp = calculate_kill_xp(
+                            state.prestige_rank,
+                            &state.attributes,
+                            result.was_boss,
+                        );
+                        let xp_with_bonus =
+                            (base_xp as f64 * (1.0 + bonuses.xp_gain_percent / 100.0)) as u64;
+                        result.xp_gained = xp_with_bonus;
+
+                        // Apply XP and check for level up
+                        let (levelups, _) = apply_tick_xp(state, xp_with_bonus as f64);
+                        if levelups > 0 {
+                            result.leveled_up = true;
+                            result.new_level = state.character_level;
+                        }
+
+                        // Record kill for progression (non-boss only)
+                        if !result.was_boss {
+                            state.zone_progression.record_kill();
+                        }
+
+                        // Handle zone/subzone advancement for boss kills
+                        if result.was_boss {
+                            let old_zone = state.zone_progression.current_zone_id;
+                            let boss_result = advance_after_boss_kill(state, achievements);
+                            result.boss_defeat_result = Some(boss_result);
+                            if state.zone_progression.current_zone_id > old_zone {
+                                result.zone_advanced = true;
+                                result.new_zone = state.zone_progression.current_zone_id;
+                            }
+                        }
+
+                        achievements.on_enemy_killed(result.was_boss, Some(&state.character_name));
+
+                        state.combat_state.current_enemy = None;
+                        if result.was_boss {
+                            state.zone_progression.fighting_boss = false;
+                        }
+                        state.combat_state.is_regenerating = true;
+                        state.combat_state.regen_timer = 0.0;
+
+                        result.can_prestige = check_can_prestige(state);
+                        result.at_prestige_wall = state.zone_progression.current_zone_id
+                            >= max_zone_for_prestige(state.prestige_rank);
+                        return result;
+                    }
                 }
             }
         }

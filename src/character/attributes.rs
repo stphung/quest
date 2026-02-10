@@ -81,7 +81,8 @@ impl Attributes {
     /// Adds another Attributes' values to this one (for equipment bonuses).
     pub fn add(&mut self, other: &Attributes) {
         for attr in AttributeType::all() {
-            self.values[attr.index()] += other.get(attr);
+            self.values[attr.index()] =
+                self.values[attr.index()].saturating_add(other.get(attr));
         }
     }
 
