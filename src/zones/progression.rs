@@ -391,12 +391,25 @@ impl ZoneProgression {
         self.defeated_bosses.clear();
 
         // Recalculate unlocked zones based on new prestige rank
+        // Note: Zone 11 (The Expanse) is special - it's only unlocked by the
+        // StormsEnd achievement, not by prestige level. We preserve it if already unlocked.
+        let had_zone_11 = self.is_zone_unlocked(11);
         let zones = get_all_zones();
         self.unlocked_zones = zones
             .iter()
-            .filter(|z| z.prestige_requirement <= new_prestige_rank)
+            .filter(|z| {
+                // Zone 11 is special: only unlocked via achievement, not prestige
+                if z.id == 11 {
+                    return false;
+                }
+                z.prestige_requirement <= new_prestige_rank
+            })
             .map(|z| z.id)
             .collect();
+        // Preserve Zone 11 unlock if player had already completed the game
+        if had_zone_11 {
+            self.unlocked_zones.push(11);
+        }
         self.unlocked_zones.sort();
     }
 
@@ -593,6 +606,55 @@ mod tests {
         assert!(prog.is_zone_unlocked(3));
         assert!(prog.is_zone_unlocked(4));
         assert!(!prog.is_zone_unlocked(5)); // Needs P10
+    }
+
+    #[test]
+    fn test_reset_for_prestige_zone11_not_unlocked() {
+        // Bug fix test: Zone 11 (The Expanse) should NOT be unlocked by prestige reset.
+        // It is a special zone only unlocked by the StormsEnd achievement.
+        let mut prog = ZoneProgression::new();
+
+        // Zone 11 should not be unlocked initially
+        assert!(
+            !prog.is_zone_unlocked(11),
+            "Zone 11 should not be unlocked initially"
+        );
+
+        // Reset with very high prestige rank
+        prog.reset_for_prestige(25);
+
+        // Zone 11 should STILL not be unlocked (requires achievement, not prestige)
+        assert!(
+            !prog.is_zone_unlocked(11),
+            "Zone 11 should NOT be unlocked by prestige reset - it requires StormsEnd achievement"
+        );
+
+        // Even P0 should not unlock Zone 11
+        prog.reset_for_prestige(0);
+        assert!(
+            !prog.is_zone_unlocked(11),
+            "Zone 11 should not be unlocked even at P0"
+        );
+    }
+
+    #[test]
+    fn test_reset_for_prestige_preserves_zone11_if_unlocked() {
+        // If player had already unlocked Zone 11 (via StormsEnd achievement),
+        // it should be preserved after prestige reset.
+        let mut prog = ZoneProgression::new();
+
+        // Simulate completing Zone 10 and unlocking Zone 11
+        prog.unlock_zone(11);
+        assert!(prog.is_zone_unlocked(11));
+
+        // Reset for prestige
+        prog.reset_for_prestige(20);
+
+        // Zone 11 should still be unlocked (preserved)
+        assert!(
+            prog.is_zone_unlocked(11),
+            "Zone 11 should be preserved after prestige reset if already unlocked"
+        );
     }
 
     #[test]
