@@ -5,7 +5,9 @@
 pub mod balance;
 pub mod combat_math;
 pub mod constants;
+pub mod core_game;
 pub mod game_logic;
+pub mod game_loop;
 pub mod game_state;
 pub mod progression;
 
