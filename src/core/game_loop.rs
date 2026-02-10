@@ -8,6 +8,9 @@ use crate::items::Item;
 use rand::Rng;
 
 /// Result of one game tick - captures everything that happened.
+///
+/// This struct is used to communicate game events to the UI layer,
+/// allowing separation between game logic and visual presentation.
 #[derive(Debug, Clone, Default)]
 pub struct TickResult {
     /// Combat happened this tick
@@ -18,6 +21,14 @@ pub struct TickResult {
     pub player_died: bool,
     /// Was fighting a boss
     pub was_boss: bool,
+    /// Damage dealt by player this tick
+    pub damage_dealt: u32,
+    /// Whether the attack was a critical hit
+    pub was_crit: bool,
+    /// Damage taken by player this tick
+    pub damage_taken: u32,
+    /// Name of the enemy fought/killed
+    pub enemy_name: Option<String>,
     /// XP gained this tick
     pub xp_gained: u64,
     /// Player leveled up

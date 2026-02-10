@@ -28,6 +28,7 @@ use chrono::{Local, Utc};
 use core::constants::*;
 use core::game_logic::*;
 use core::game_state::*;
+use core::{resolve_combat_tick, CombatBonuses, TickResult};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
@@ -976,6 +977,196 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
+/// Processes overworld combat using CoreGame's resolve_combat_tick.
+/// Handles attack timing, applies bonuses, and generates visual effects from TickResult.
+fn process_overworld_combat(
+    game_state: &mut GameState,
+    delta_time: f64,
+    haven: &haven::Haven,
+    global_achievements: &mut achievements::Achievements,
+) {
+    use crate::character::derived_stats::DerivedStats;
+
+    // Handle HP regeneration first
+    if game_state.combat_state.is_regenerating {
+        let derived =
+            DerivedStats::calculate_derived_stats(&game_state.attributes, &game_state.equipment);
+        let haven_regen_percent = haven.get_bonus(haven::HavenBonusType::HpRegenPercent);
+        let haven_regen_delay = haven.get_bonus(haven::HavenBonusType::HpRegenDelayReduction);
+
+        let total_regen_mult = derived.hp_regen_multiplier * (1.0 + haven_regen_percent / 100.0);
+        let base_duration = HP_REGEN_DURATION_SECONDS * (1.0 - haven_regen_delay / 100.0);
+        let effective_duration = base_duration / total_regen_mult;
+
+        game_state.combat_state.regen_timer += delta_time;
+
+        if game_state.combat_state.regen_timer >= effective_duration {
+            game_state.combat_state.player_current_hp = game_state.combat_state.player_max_hp;
+            game_state.combat_state.is_regenerating = false;
+            game_state.combat_state.regen_timer = 0.0;
+        } else {
+            let progress = game_state.combat_state.regen_timer / effective_duration;
+            let start_hp = game_state.combat_state.player_current_hp;
+            let target_hp = game_state.combat_state.player_max_hp;
+            game_state.combat_state.player_current_hp =
+                start_hp + ((target_hp - start_hp) as f64 * progress) as u32;
+        }
+        return;
+    }
+
+    // Check attack timer
+    let derived =
+        DerivedStats::calculate_derived_stats(&game_state.attributes, &game_state.equipment);
+    let effective_attack_interval = ATTACK_INTERVAL_SECONDS / derived.attack_speed_multiplier;
+
+    game_state.combat_state.attack_timer += delta_time;
+    if game_state.combat_state.attack_timer < effective_attack_interval {
+        return; // Not time to attack yet
+    }
+    game_state.combat_state.attack_timer = 0.0;
+
+    // Build combat bonuses from Haven
+    let bonuses = CombatBonuses {
+        damage_percent: haven.get_bonus(haven::HavenBonusType::DamagePercent),
+        crit_chance: haven.get_bonus(haven::HavenBonusType::CritChancePercent) as u32,
+        drop_rate_percent: haven.get_bonus(haven::HavenBonusType::DropRatePercent),
+        item_rarity_percent: haven.get_bonus(haven::HavenBonusType::ItemRarityPercent),
+        xp_gain_percent: haven.get_bonus(haven::HavenBonusType::XpGainPercent),
+    };
+
+    // Execute combat using CoreGame logic
+    let mut rng = rand::thread_rng();
+    let result = resolve_combat_tick(game_state, &bonuses, &mut rng);
+
+    // Convert TickResult to visual effects and combat log entries
+    process_tick_result(game_state, &result, global_achievements);
+}
+
+/// Converts a TickResult into visual effects and combat log entries.
+fn process_tick_result(
+    game_state: &mut GameState,
+    result: &TickResult,
+    global_achievements: &mut achievements::Achievements,
+) {
+    if !result.had_combat {
+        return;
+    }
+
+    // Player attack
+    if result.damage_dealt > 0 {
+        let message = if result.was_crit {
+            format!("💥 CRITICAL HIT for {} damage!", result.damage_dealt)
+        } else {
+            format!("⚔ You hit for {} damage", result.damage_dealt)
+        };
+        game_state
+            .combat_state
+            .add_log_entry(message, result.was_crit, true);
+
+        // Visual effects
+        let damage_effect = ui::combat_effects::VisualEffect::new(
+            ui::combat_effects::EffectType::DamageNumber {
+                value: result.damage_dealt,
+                is_crit: result.was_crit,
+            },
+            0.8,
+        );
+        game_state.combat_state.visual_effects.push(damage_effect);
+
+        let flash_effect = ui::combat_effects::VisualEffect::new(
+            ui::combat_effects::EffectType::AttackFlash,
+            0.2,
+        );
+        game_state.combat_state.visual_effects.push(flash_effect);
+
+        let impact_effect = ui::combat_effects::VisualEffect::new(
+            ui::combat_effects::EffectType::HitImpact,
+            0.3,
+        );
+        game_state.combat_state.visual_effects.push(impact_effect);
+    }
+
+    // Enemy attack
+    if result.damage_taken > 0 {
+        if let Some(ref enemy_name) = result.enemy_name {
+            let message = format!("🛡 {} hits you for {} damage", enemy_name, result.damage_taken);
+            game_state.combat_state.add_log_entry(message, false, false);
+        }
+    }
+
+    // Enemy defeated
+    if result.player_won {
+        if let Some(ref enemy_name) = result.enemy_name {
+            let message = format!("✨ {} defeated! +{} XP", enemy_name, result.xp_gained);
+            game_state.combat_state.add_log_entry(message, false, true);
+        }
+
+        game_state.session_kills += 1;
+
+        // Track level up achievement
+        if result.leveled_up {
+            global_achievements.on_level_up(result.new_level, Some(&game_state.character_name));
+        }
+
+        // Handle loot display
+        if let Some(ref item) = result.loot_dropped {
+            let icon = if result.was_boss { "👑" } else { "🎁" };
+            game_state.add_recent_drop(
+                item.display_name.clone(),
+                item.rarity,
+                result.loot_equipped,
+                icon,
+                item.slot_name().to_string(),
+                item.stat_summary(),
+            );
+        }
+
+        // Try dungeon/fishing discovery
+        if try_discover_dungeon(game_state) {
+            game_state.combat_state.add_log_entry(
+                "🌀 You notice a dark passage leading underground...".to_string(),
+                false,
+                true,
+            );
+        } else if game_state.active_fishing.is_none() {
+            let mut rng = rand::thread_rng();
+            if let Some(message) = fishing::logic::try_discover_fishing(game_state, &mut rng) {
+                game_state
+                    .combat_state
+                    .add_log_entry(format!("🎣 {}", message), false, true);
+            }
+        }
+
+        // Log zone advancement
+        if result.zone_advanced {
+            if let Some(zone) = zones::get_zone(result.new_zone) {
+                game_state.combat_state.add_log_entry(
+                    format!("👑 Advancing to {}!", zone.name),
+                    false,
+                    true,
+                );
+            }
+        }
+    }
+
+    // Player died
+    if result.player_died {
+        if result.was_boss {
+            game_state.combat_state.add_log_entry(
+                "💀 You died! Boss encounter reset.".to_string(),
+                false,
+                false,
+            );
+        } else {
+            game_state.combat_state.add_log_entry(
+                "💀 You died! Regenerating...".to_string(),
+                false,
+                false,
+            );
+        }
+    }
+}
+
 /// Processes a single game tick, updating combat and stats.
 /// Returns Some(encounter_number) if a Storm Leviathan encounter occurred during fishing.
 fn game_tick(
@@ -1195,144 +1386,111 @@ fn game_tick(
         return fishing_result.leviathan_encounter; // Skip combat processing while fishing
     }
 
-    // Build Haven combat bonuses
-    let haven_combat = combat::logic::HavenCombatBonuses {
-        hp_regen_percent: haven.get_bonus(haven::HavenBonusType::HpRegenPercent),
-        hp_regen_delay_reduction: haven.get_bonus(haven::HavenBonusType::HpRegenDelayReduction),
-        damage_percent: haven.get_bonus(haven::HavenBonusType::DamagePercent),
-        crit_chance_percent: haven.get_bonus(haven::HavenBonusType::CritChancePercent),
-        double_strike_chance: haven.get_bonus(haven::HavenBonusType::DoubleStrikeChance),
-        xp_gain_percent: haven.get_bonus(haven::HavenBonusType::XpGainPercent),
-    };
-    let combat_events = update_combat(game_state, delta_time, &haven_combat, global_achievements);
+    // Combat processing - use different engines for overworld vs dungeon
+    if game_state.active_dungeon.is_some() {
+        // Dungeon combat uses the full update_combat with special handling for
+        // elites, bosses, and dungeon-specific events
+        let haven_combat = combat::logic::HavenCombatBonuses {
+            hp_regen_percent: haven.get_bonus(haven::HavenBonusType::HpRegenPercent),
+            hp_regen_delay_reduction: haven.get_bonus(haven::HavenBonusType::HpRegenDelayReduction),
+            damage_percent: haven.get_bonus(haven::HavenBonusType::DamagePercent),
+            crit_chance_percent: haven.get_bonus(haven::HavenBonusType::CritChancePercent),
+            double_strike_chance: haven.get_bonus(haven::HavenBonusType::DoubleStrikeChance),
+            xp_gain_percent: haven.get_bonus(haven::HavenBonusType::XpGainPercent),
+        };
+        let combat_events = update_combat(game_state, delta_time, &haven_combat, global_achievements);
 
-    // Process combat events
-    for event in combat_events {
-        use combat::logic::CombatEvent;
-        match event {
-            CombatEvent::PlayerAttackBlocked { weapon_needed } => {
-                // Attack blocked - boss requires legendary weapon
-                let message = format!("🚫 {} required to damage this foe!", weapon_needed);
-                game_state.combat_state.add_log_entry(message, false, true);
-            }
-            CombatEvent::PlayerAttack { damage, was_crit } => {
-                // Add to combat log
-                let message = if was_crit {
-                    format!("💥 CRITICAL HIT for {} damage!", damage)
-                } else {
-                    format!("⚔ You hit for {} damage", damage)
-                };
-                game_state
-                    .combat_state
-                    .add_log_entry(message, was_crit, true);
-
-                // Spawn damage number effect
-                let damage_effect = ui::combat_effects::VisualEffect::new(
-                    ui::combat_effects::EffectType::DamageNumber {
-                        value: damage,
-                        is_crit: was_crit,
-                    },
-                    0.8,
-                );
-                game_state.combat_state.visual_effects.push(damage_effect);
-
-                // Spawn attack flash
-                let flash_effect = ui::combat_effects::VisualEffect::new(
-                    ui::combat_effects::EffectType::AttackFlash,
-                    0.2,
-                );
-                game_state.combat_state.visual_effects.push(flash_effect);
-
-                // Spawn impact effect
-                let impact_effect = ui::combat_effects::VisualEffect::new(
-                    ui::combat_effects::EffectType::HitImpact,
-                    0.3,
-                );
-                game_state.combat_state.visual_effects.push(impact_effect);
-            }
-            CombatEvent::EnemyAttack { damage } => {
-                // Add enemy attack to combat log
-                if let Some(enemy) = &game_state.combat_state.current_enemy {
-                    let message = format!("🛡 {} hits you for {} damage", enemy.name, damage);
-                    game_state.combat_state.add_log_entry(message, false, false);
-                }
-            }
-            CombatEvent::EnemyDied { xp_gained } => {
-                // Add to combat log
-                if let Some(enemy) = &game_state.combat_state.current_enemy {
-                    let message = format!("✨ {} defeated! +{} XP", enemy.name, xp_gained);
+        // Process dungeon combat events
+        for event in combat_events {
+            use combat::logic::CombatEvent;
+            match event {
+                CombatEvent::PlayerAttackBlocked { weapon_needed } => {
+                    let message = format!("🚫 {} required to damage this foe!", weapon_needed);
                     game_state.combat_state.add_log_entry(message, false, true);
                 }
-                let level_before = game_state.character_level;
-                apply_tick_xp(game_state, xp_gained as f64);
-                if game_state.character_level > level_before {
-                    global_achievements
-                        .on_level_up(game_state.character_level, Some(&game_state.character_name));
-                }
-                game_state.session_kills += 1;
+                CombatEvent::PlayerAttack { damage, was_crit } => {
+                    let message = if was_crit {
+                        format!("💥 CRITICAL HIT for {} damage!", damage)
+                    } else {
+                        format!("⚔ You hit for {} damage", damage)
+                    };
+                    game_state.combat_state.add_log_entry(message, was_crit, true);
 
-                // Track XP in dungeon if active and mark room cleared
-                dungeon::logic::add_dungeon_xp(game_state, xp_gained);
-                if let Some(dungeon) = &mut game_state.active_dungeon {
-                    dungeon::logic::on_room_enemy_defeated(dungeon);
-                }
-
-                // Try to drop item
-                use items::drops::{try_drop_from_boss, try_drop_from_mob};
-                use items::scoring::auto_equip_if_better;
-
-                let zone_id = game_state.zone_progression.current_zone_id as usize;
-                let was_boss = game_state.zone_progression.fighting_boss;
-                let is_final_zone = zone_id == 10;
-
-                let dropped_item = if was_boss {
-                    // Boss always drops an item, can drop legendaries
-                    Some(try_drop_from_boss(zone_id, is_final_zone))
-                } else {
-                    // Normal mobs use haven bonuses, capped at Epic
-                    let haven_drop_rate = haven.get_bonus(haven::HavenBonusType::DropRatePercent);
-                    let haven_rarity = haven.get_bonus(haven::HavenBonusType::ItemRarityPercent);
-                    try_drop_from_mob(game_state, zone_id, haven_drop_rate, haven_rarity)
-                };
-
-                if let Some(item) = dropped_item {
-                    let item_name = item.display_name.clone();
-                    let rarity = item.rarity;
-                    let slot = item.slot_name().to_string();
-                    let stats = item.stat_summary();
-                    let icon = if was_boss { "👑" } else { "🎁" };
-                    let equipped = auto_equip_if_better(item, game_state);
-                    game_state.add_recent_drop(item_name, rarity, equipped, icon, slot, stats);
-                }
-
-                // Try to discover dungeon (only when not in a dungeon)
-                let discovered_dungeon =
-                    game_state.active_dungeon.is_none() && try_discover_dungeon(game_state);
-                if discovered_dungeon {
-                    game_state.combat_state.add_log_entry(
-                        "🌀 You notice a dark passage leading underground...".to_string(),
-                        false,
-                        true,
+                    // Visual effects
+                    let damage_effect = ui::combat_effects::VisualEffect::new(
+                        ui::combat_effects::EffectType::DamageNumber {
+                            value: damage,
+                            is_crit: was_crit,
+                        },
+                        0.8,
                     );
-                }
+                    game_state.combat_state.visual_effects.push(damage_effect);
 
-                // Try to discover fishing spot (only when not in dungeon and not already fishing)
-                if !discovered_dungeon
-                    && game_state.active_dungeon.is_none()
-                    && game_state.active_fishing.is_none()
-                {
-                    let mut rng = rand::thread_rng();
-                    if let Some(message) =
-                        fishing::logic::try_discover_fishing(game_state, &mut rng)
-                    {
-                        game_state.combat_state.add_log_entry(
-                            format!("🎣 {}", message),
-                            false,
-                            true,
-                        );
+                    let flash_effect = ui::combat_effects::VisualEffect::new(
+                        ui::combat_effects::EffectType::AttackFlash,
+                        0.2,
+                    );
+                    game_state.combat_state.visual_effects.push(flash_effect);
+
+                    let impact_effect = ui::combat_effects::VisualEffect::new(
+                        ui::combat_effects::EffectType::HitImpact,
+                        0.3,
+                    );
+                    game_state.combat_state.visual_effects.push(impact_effect);
+                }
+                CombatEvent::EnemyAttack { damage } => {
+                    if let Some(enemy) = &game_state.combat_state.current_enemy {
+                        let message = format!("🛡 {} hits you for {} damage", enemy.name, damage);
+                        game_state.combat_state.add_log_entry(message, false, false);
                     }
                 }
-            }
+                CombatEvent::EnemyDied { xp_gained } => {
+                    if let Some(enemy) = &game_state.combat_state.current_enemy {
+                        let message = format!("✨ {} defeated! +{} XP", enemy.name, xp_gained);
+                        game_state.combat_state.add_log_entry(message, false, true);
+                    }
+                    let level_before = game_state.character_level;
+                    apply_tick_xp(game_state, xp_gained as f64);
+                    if game_state.character_level > level_before {
+                        global_achievements.on_level_up(
+                            game_state.character_level,
+                            Some(&game_state.character_name),
+                        );
+                    }
+                    game_state.session_kills += 1;
+
+                    // Track XP in dungeon and mark room cleared
+                    dungeon::logic::add_dungeon_xp(game_state, xp_gained);
+                    if let Some(dungeon) = &mut game_state.active_dungeon {
+                        dungeon::logic::on_room_enemy_defeated(dungeon);
+                    }
+
+                    // Handle loot drops
+                    use items::drops::{try_drop_from_boss, try_drop_from_mob};
+                    use items::scoring::auto_equip_if_better;
+
+                    let zone_id = game_state.zone_progression.current_zone_id as usize;
+                    let was_boss = game_state.zone_progression.fighting_boss;
+                    let is_final_zone = zone_id == 10;
+
+                    let dropped_item = if was_boss {
+                        Some(try_drop_from_boss(zone_id, is_final_zone))
+                    } else {
+                        let haven_drop_rate = haven.get_bonus(haven::HavenBonusType::DropRatePercent);
+                        let haven_rarity = haven.get_bonus(haven::HavenBonusType::ItemRarityPercent);
+                        try_drop_from_mob(game_state, zone_id, haven_drop_rate, haven_rarity)
+                    };
+
+                    if let Some(item) = dropped_item {
+                        let item_name = item.display_name.clone();
+                        let rarity = item.rarity;
+                        let slot = item.slot_name().to_string();
+                        let stats = item.stat_summary();
+                        let icon = if was_boss { "👑" } else { "🎁" };
+                        let equipped = auto_equip_if_better(item, game_state);
+                        game_state.add_recent_drop(item_name, rarity, equipped, icon, slot, stats);
+                    }
+                }
             CombatEvent::EliteDefeated { xp_gained } => {
                 // Elite defeated - give key
                 if let Some(enemy) = &game_state.combat_state.current_enemy {
@@ -1500,8 +1658,13 @@ fn game_tick(
                 };
                 game_state.combat_state.add_log_entry(message, false, true);
             }
-            _ => {}
+                _ => {}
+            }
         }
+    } else {
+        // Overworld combat uses CoreGame's resolve_combat_tick for game logic
+        // This separates the game logic (in CoreGame) from UI concerns (here)
+        process_overworld_combat(game_state, delta_time, haven, global_achievements);
     }
 
     // Update visual effects

@@ -1,7 +1,18 @@
 //! Core game engine implementing GameLoop trait.
 //!
-//! This is the shared game logic that both the interactive game and
-//! simulator can use for consistent behavior.
+//! This module provides two ways to use the game logic:
+//!
+//! 1. **CoreGame struct** - A self-contained game engine for simulation/testing.
+//!    Owns its GameState and manages all combat internally. Best for:
+//!    - Running thousands of ticks for balance testing
+//!    - Offline progression simulation
+//!    - Unit tests
+//!
+//! 2. **resolve_combat_tick() function** - Executes one combat round on an existing
+//!    GameState. Best for the interactive game where:
+//!    - External timing controls when combat happens
+//!    - Visual effects and combat logs need to be generated
+//!    - Dungeons/fishing/minigames pause normal combat
 
 use super::balance::KILLS_PER_BOSS;
 use super::game_loop::{GameLoop, TickResult};
@@ -11,7 +22,7 @@ use crate::character::derived_stats::DerivedStats;
 use crate::character::prestige::{can_prestige as check_can_prestige, perform_prestige};
 use crate::combat::types::{generate_enemy_for_current_zone, generate_subzone_boss, Enemy};
 use crate::core::combat_math::*;
-use crate::core::game_logic::{apply_tick_xp, xp_gain_per_tick};
+use crate::core::game_logic::{apply_tick_xp, spawn_enemy_if_needed, xp_gain_per_tick};
 use crate::items::drops::{try_drop_from_boss, try_drop_from_mob};
 use crate::items::scoring::auto_equip_if_better;
 use crate::zones::get_zone;
@@ -19,8 +30,11 @@ use rand::Rng;
 
 /// Core game engine that implements the GameLoop trait.
 ///
-/// Encapsulates all game state and combat tracking needed for
-/// executing game ticks deterministically with a provided RNG.
+/// This struct owns its GameState and is designed for simulation use cases
+/// where we need to run many ticks quickly without UI updates.
+///
+/// For the interactive game with timing-based combat, use `resolve_combat_tick()`
+/// instead, which operates on an external GameState.
 pub struct CoreGame {
     state: GameState,
     current_enemy: Option<Enemy>,
@@ -266,6 +280,213 @@ impl GameLoop for CoreGame {
     }
 }
 
+// =============================================================================
+// Standalone combat resolution for interactive game
+// =============================================================================
+
+/// Configuration for combat resolution bonuses (from Haven, etc.)
+#[derive(Debug, Clone, Default)]
+pub struct CombatBonuses {
+    /// Bonus damage percentage (e.g., 10.0 = +10%)
+    pub damage_percent: f64,
+    /// Bonus crit chance (flat, e.g., 5 = +5% crit)
+    pub crit_chance: u32,
+    /// Bonus drop rate percentage
+    pub drop_rate_percent: f64,
+    /// Bonus item rarity percentage
+    pub item_rarity_percent: f64,
+    /// Bonus XP gain percentage
+    pub xp_gain_percent: f64,
+}
+
+/// Resolves one combat tick for an existing GameState.
+///
+/// This function is designed for the interactive game where:
+/// - External timing controls when combat happens (attack_timer)
+/// - The caller handles visual effects, combat logs, etc.
+/// - Dungeons/fishing/minigames are handled separately
+///
+/// Call this when the attack timer has elapsed and the player should attack.
+///
+/// # Arguments
+/// * `state` - The game state to modify
+/// * `bonuses` - Combat bonuses from Haven, etc.
+/// * `rng` - Random number generator
+///
+/// # Returns
+/// A TickResult describing what happened (damage dealt, enemy killed, etc.)
+pub fn resolve_combat_tick(
+    state: &mut GameState,
+    bonuses: &CombatBonuses,
+    rng: &mut impl Rng,
+) -> TickResult {
+    let mut result = TickResult::default();
+
+    // Don't do combat if regenerating
+    if state.combat_state.is_regenerating {
+        return result;
+    }
+
+    // Spawn enemy if needed (uses GameState's combat_state.current_enemy)
+    spawn_enemy_if_needed(state);
+
+    // No combat if no enemy
+    if state.combat_state.current_enemy.is_none() {
+        return result;
+    }
+
+    result.had_combat = true;
+    result.was_boss = state.zone_progression.fighting_boss;
+
+    // Calculate player attack
+    let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+    let damage_multiplier = 1.0 + bonuses.damage_percent / 100.0;
+    let attack = calculate_player_attack(&derived, bonuses.crit_chance, damage_multiplier, rng);
+
+    result.damage_dealt = attack.damage;
+    result.was_crit = attack.is_crit;
+
+    // Player attacks enemy
+    let enemy = state.combat_state.current_enemy.as_mut().unwrap();
+    let enemy_name = enemy.name.clone();
+    enemy.current_hp = enemy.current_hp.saturating_sub(attack.damage);
+
+    if enemy.current_hp == 0 {
+        // Enemy died - player won!
+        result.player_won = true;
+        result.enemy_name = Some(enemy_name);
+
+        // Calculate XP with bonuses
+        let base_xp = calculate_kill_xp(state.prestige_rank, &state.attributes, result.was_boss);
+        let xp_with_bonus = (base_xp as f64 * (1.0 + bonuses.xp_gain_percent / 100.0)) as u64;
+        result.xp_gained = xp_with_bonus;
+
+        // Apply XP and check for level up
+        let _level_before = state.character_level;
+        let (levelups, _) = apply_tick_xp(state, xp_with_bonus as f64);
+        if levelups > 0 {
+            result.leveled_up = true;
+            result.new_level = state.character_level;
+        }
+
+        // Handle loot drops
+        let zone_id = state.zone_progression.current_zone_id as usize;
+        let is_final_zone = zone_id == 10;
+
+        if result.was_boss {
+            // Boss always drops an item
+            let item = try_drop_from_boss(zone_id, is_final_zone);
+            result.loot_dropped = Some(item.clone());
+            if auto_equip_if_better(item, state) {
+                result.loot_equipped = true;
+            }
+        } else {
+            // Regular mob has chance to drop
+            if let Some(item) = try_drop_from_mob(
+                state,
+                zone_id,
+                bonuses.drop_rate_percent,
+                bonuses.item_rarity_percent,
+            ) {
+                result.loot_dropped = Some(item.clone());
+                if auto_equip_if_better(item, state) {
+                    result.loot_equipped = true;
+                }
+            }
+        }
+
+        // Handle zone/subzone advancement for boss kills
+        if result.was_boss {
+            let old_zone = state.zone_progression.current_zone_id;
+            advance_after_boss_kill(state);
+            if state.zone_progression.current_zone_id > old_zone {
+                result.zone_advanced = true;
+                result.new_zone = state.zone_progression.current_zone_id;
+            }
+        }
+
+        // Clear enemy
+        state.combat_state.current_enemy = None;
+        state.zone_progression.fighting_boss = false;
+    } else {
+        // Enemy survives - attacks back
+        let damage_taken = calculate_damage_taken(enemy.damage, derived.defense);
+        result.damage_taken = damage_taken;
+
+        state.combat_state.player_current_hp =
+            apply_damage(state.combat_state.player_current_hp, damage_taken);
+
+        if state.combat_state.player_current_hp == 0 {
+            // Player died
+            result.player_died = true;
+
+            // Reset boss progress on death
+            if result.was_boss {
+                state.zone_progression.fighting_boss = false;
+                state.zone_progression.kills_in_subzone = 0;
+            }
+
+            // Start regeneration
+            state.combat_state.is_regenerating = true;
+            state.combat_state.regen_timer = 0.0;
+
+            // Clear enemy
+            state.combat_state.current_enemy = None;
+        }
+    }
+
+    // Update prestige status
+    result.can_prestige = check_can_prestige(state);
+    result.at_prestige_wall =
+        state.zone_progression.current_zone_id >= max_zone_for_prestige(state.prestige_rank);
+
+    result
+}
+
+/// Calculate XP for killing an enemy.
+fn calculate_kill_xp(
+    prestige_rank: u32,
+    attributes: &crate::character::attributes::Attributes,
+    is_boss: bool,
+) -> u64 {
+    use crate::character::attributes::AttributeType;
+
+    let wis_mod = attributes.modifier(AttributeType::Wisdom);
+    let cha_mod = attributes.modifier(AttributeType::Charisma);
+    let base_xp = xp_gain_per_tick(prestige_rank, wis_mod, cha_mod);
+
+    // Boss gives more XP
+    let ticks = if is_boss { 400.0 } else { 300.0 };
+    (base_xp * ticks) as u64
+}
+
+/// Advance zone/subzone after killing a boss.
+fn advance_after_boss_kill(state: &mut GameState) {
+    // Reset kill counter
+    state.zone_progression.kills_in_subzone = 0;
+
+    let zone_id = state.zone_progression.current_zone_id;
+    let subzone_id = state.zone_progression.current_subzone_id;
+
+    // Get max subzones for current zone
+    let max_subzones = get_zone(zone_id)
+        .map(|z| z.subzones.len() as u32)
+        .unwrap_or(3);
+
+    if subzone_id >= max_subzones {
+        // Try to advance to next zone
+        let next_zone = zone_id + 1;
+        if next_zone <= 10 && can_access_zone(state.prestige_rank, next_zone) {
+            state.zone_progression.current_zone_id = next_zone;
+            state.zone_progression.current_subzone_id = 1;
+        }
+        // At prestige wall - stay in current zone
+    } else {
+        // Advance to next subzone
+        state.zone_progression.current_subzone_id += 1;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -346,5 +567,178 @@ mod tests {
         let game = CoreGame::from_state(state);
 
         assert_eq!(game.state().character_name, "Loaded Hero");
+    }
+
+    // ==========================================================================
+    // Tests for resolve_combat_tick (used by interactive game)
+    // ==========================================================================
+
+    #[test]
+    fn test_resolve_combat_tick_spawns_enemy() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        let bonuses = CombatBonuses::default();
+        let mut rng = rand::thread_rng();
+
+        // First call should spawn an enemy and do combat
+        let result = resolve_combat_tick(&mut state, &bonuses, &mut rng);
+
+        assert!(result.had_combat);
+        // Enemy should be spawned (either killed or still alive)
+        assert!(result.player_won || state.combat_state.current_enemy.is_some());
+    }
+
+    #[test]
+    fn test_resolve_combat_tick_skips_when_regenerating() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        state.combat_state.is_regenerating = true;
+        let bonuses = CombatBonuses::default();
+        let mut rng = rand::thread_rng();
+
+        let result = resolve_combat_tick(&mut state, &bonuses, &mut rng);
+
+        assert!(!result.had_combat, "Should not have combat while regenerating");
+        assert!(state.combat_state.current_enemy.is_none());
+    }
+
+    #[test]
+    fn test_resolve_combat_tick_grants_xp_on_kill() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        let bonuses = CombatBonuses::default();
+        let mut rng = rand::thread_rng();
+
+        // Run until we get a kill
+        let mut total_xp = 0u64;
+        for _ in 0..100 {
+            let result = resolve_combat_tick(&mut state, &bonuses, &mut rng);
+            total_xp += result.xp_gained;
+            if result.xp_gained > 0 {
+                break;
+            }
+        }
+
+        assert!(total_xp > 0, "Should have gained XP from a kill");
+    }
+
+    #[test]
+    fn test_resolve_combat_tick_respects_damage_bonus() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+
+        // Run many trials with and without bonus to compare average damage
+        let trials = 100;
+        let mut damage_no_bonus = 0u32;
+        let mut damage_with_bonus = 0u32;
+
+        let no_bonus = CombatBonuses::default();
+        let with_bonus = CombatBonuses {
+            damage_percent: 100.0, // +100% damage
+            ..CombatBonuses::default()
+        };
+
+        for _ in 0..trials {
+            let mut state_a = GameState::new("A".to_string(), 0);
+            let mut state_b = GameState::new("B".to_string(), 0);
+            let mut rng = rand::thread_rng();
+
+            let result_a = resolve_combat_tick(&mut state_a, &no_bonus, &mut rng);
+            let result_b = resolve_combat_tick(&mut state_b, &with_bonus, &mut rng);
+
+            damage_no_bonus += result_a.damage_dealt;
+            damage_with_bonus += result_b.damage_dealt;
+        }
+
+        // With +100% damage, average should be roughly 2x
+        // Allow some variance due to random damage rolls
+        let ratio = damage_with_bonus as f64 / damage_no_bonus as f64;
+        assert!(
+            ratio > 1.5 && ratio < 2.5,
+            "Damage bonus should roughly double damage, got ratio {:.2}",
+            ratio
+        );
+    }
+
+    #[test]
+    fn test_resolve_combat_tick_respects_xp_bonus() {
+        // Run until we get kills and compare XP with/without bonus
+        let trials = 50;
+        let mut xp_no_bonus = 0u64;
+        let mut xp_with_bonus = 0u64;
+
+        let no_bonus = CombatBonuses::default();
+        let with_bonus = CombatBonuses {
+            xp_gain_percent: 50.0, // +50% XP
+            ..CombatBonuses::default()
+        };
+
+        for _ in 0..trials {
+            let mut state_a = GameState::new("A".to_string(), 0);
+            let mut state_b = GameState::new("B".to_string(), 0);
+            let mut rng = rand::thread_rng();
+
+            // Get a kill for each
+            for _ in 0..100 {
+                let result_a = resolve_combat_tick(&mut state_a, &no_bonus, &mut rng);
+                if result_a.xp_gained > 0 {
+                    xp_no_bonus += result_a.xp_gained;
+                    break;
+                }
+            }
+            for _ in 0..100 {
+                let result_b = resolve_combat_tick(&mut state_b, &with_bonus, &mut rng);
+                if result_b.xp_gained > 0 {
+                    xp_with_bonus += result_b.xp_gained;
+                    break;
+                }
+            }
+        }
+
+        // With +50% XP, average should be ~1.5x
+        let ratio = xp_with_bonus as f64 / xp_no_bonus as f64;
+        assert!(
+            ratio > 1.3 && ratio < 1.7,
+            "XP bonus should increase XP by ~50%, got ratio {:.2}",
+            ratio
+        );
+    }
+
+    #[test]
+    fn test_resolve_combat_tick_returns_damage_info() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        let bonuses = CombatBonuses::default();
+        let mut rng = rand::thread_rng();
+
+        // Get a combat result
+        let result = resolve_combat_tick(&mut state, &bonuses, &mut rng);
+
+        assert!(result.had_combat);
+        assert!(result.damage_dealt > 0, "Should have dealt some damage");
+    }
+
+    #[test]
+    fn test_resolve_combat_tick_player_death_starts_regen() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        let bonuses = CombatBonuses::default();
+        let mut rng = rand::thread_rng();
+
+        // Run until player dies
+        let mut saw_death = false;
+        for _ in 0..1000 {
+            let result = resolve_combat_tick(&mut state, &bonuses, &mut rng);
+            if result.player_died {
+                saw_death = true;
+                break;
+            }
+        }
+
+        if saw_death {
+            assert!(
+                state.combat_state.is_regenerating,
+                "Player death should trigger regeneration"
+            );
+            assert!(
+                state.combat_state.current_enemy.is_none(),
+                "Enemy should be cleared on player death"
+            );
+        }
+        // If no death in 1000 ticks, that's OK - player is just winning
     }
 }
