@@ -58,13 +58,13 @@ Enemies are generated based on the current zone/subzone:
 - Boss defined in `zones/data.rs` with specific stats
 - Defeating boss advances to next subzone
 - Death to boss resets kill counter (must kill 10 more)
-- Zone 10 final boss requires Stormbreaker weapon (weapon gate in `zones/progression.rs`)
+- Zone 10 final boss requires Stormbreaker weapon (checked via `TheStormbreaker` achievement in `zones/progression.rs`)
 
 ## Integration Points
 
 - **Core** (`core/game_logic.rs`): Drives the combat tick, manages state transitions
 - **Character** (`character/derived_stats.rs`): Player damage, defense, HP, crit stats
-- **Items** (`items/drops.rs`): Item drop roll after enemy kill
+- **Items** (`items/drops.rs`): Mob drops via `try_drop_from_mob()`, boss drops via `try_drop_from_boss()`
 - **Zones** (`zones/progression.rs`): Enemy generation parameters, boss definitions
 - **Dungeon** (`dungeon/logic.rs`): Dungeon room combat with room-specific enemies
 - **UI** (`ui/combat_scene.rs`): HP bars, enemy sprites, visual effects
