@@ -27,7 +27,7 @@ Six core RPG attributes stored as `u32` values:
 
 **Modifier formula**: `(value - 10) / 2` (integer division, minimum 0)
 
-**Attribute caps**: Base 10 + (5 x prestige_rank). Enforced in `attributes.rs`.
+**Attribute caps**: `10 + (5 × prestige_rank)`. Enforced in `attributes.rs`.
 
 ### `DerivedStats` (`derived_stats.rs`)
 Combat stats calculated from attributes. Recalculated whenever attributes change:
@@ -35,11 +35,10 @@ Combat stats calculated from attributes. Recalculated whenever attributes change
 - XP multiplier (from WIS), prestige multiplier (from CHA)
 
 ### `PrestigeTier` (`prestige.rs`)
-Named tiers from Bronze through Eternal with compounding 1.5x XP multipliers:
-- Bronze (P1): 1.5x
-- Silver (P2): 2.25x
-- Gold (P3): 3.375x
-- And so on...
+Named tiers from Bronze through Eternal with diminishing-returns XP multipliers.
+
+**Formula**: `multiplier = 1.0 + 0.5 × rank^0.7`
+- P0: 1.0x, P1 (Bronze): 1.5x, P5: ~2.7x, P10: ~3.5x, P20: ~5.1x, P100: ~13.3x
 
 ## Character Persistence (`manager.rs`)
 
