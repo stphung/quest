@@ -1079,23 +1079,22 @@ fn process_tick_result(
         );
         game_state.combat_state.visual_effects.push(damage_effect);
 
-        let flash_effect = ui::combat_effects::VisualEffect::new(
-            ui::combat_effects::EffectType::AttackFlash,
-            0.2,
-        );
+        let flash_effect =
+            ui::combat_effects::VisualEffect::new(ui::combat_effects::EffectType::AttackFlash, 0.2);
         game_state.combat_state.visual_effects.push(flash_effect);
 
-        let impact_effect = ui::combat_effects::VisualEffect::new(
-            ui::combat_effects::EffectType::HitImpact,
-            0.3,
-        );
+        let impact_effect =
+            ui::combat_effects::VisualEffect::new(ui::combat_effects::EffectType::HitImpact, 0.3);
         game_state.combat_state.visual_effects.push(impact_effect);
     }
 
     // Enemy attack
     if result.damage_taken > 0 {
         if let Some(ref enemy_name) = result.enemy_name {
-            let message = format!("🛡 {} hits you for {} damage", enemy_name, result.damage_taken);
+            let message = format!(
+                "🛡 {} hits you for {} damage",
+                enemy_name, result.damage_taken
+            );
             game_state.combat_state.add_log_entry(message, false, false);
         }
     }
@@ -1411,7 +1410,8 @@ fn game_tick(
             double_strike_chance: haven.get_bonus(haven::HavenBonusType::DoubleStrikeChance),
             xp_gain_percent: haven.get_bonus(haven::HavenBonusType::XpGainPercent),
         };
-        let combat_events = update_combat(game_state, delta_time, &haven_combat, global_achievements);
+        let combat_events =
+            update_combat(game_state, delta_time, &haven_combat, global_achievements);
 
         // Process dungeon combat events
         for event in combat_events {
@@ -1427,7 +1427,9 @@ fn game_tick(
                     } else {
                         format!("⚔ You hit for {} damage", damage)
                     };
-                    game_state.combat_state.add_log_entry(message, was_crit, true);
+                    game_state
+                        .combat_state
+                        .add_log_entry(message, was_crit, true);
 
                     // Visual effects
                     let damage_effect = ui::combat_effects::VisualEffect::new(
@@ -1489,8 +1491,10 @@ fn game_tick(
                     let dropped_item = if was_boss {
                         Some(try_drop_from_boss(zone_id, is_final_zone))
                     } else {
-                        let haven_drop_rate = haven.get_bonus(haven::HavenBonusType::DropRatePercent);
-                        let haven_rarity = haven.get_bonus(haven::HavenBonusType::ItemRarityPercent);
+                        let haven_drop_rate =
+                            haven.get_bonus(haven::HavenBonusType::DropRatePercent);
+                        let haven_rarity =
+                            haven.get_bonus(haven::HavenBonusType::ItemRarityPercent);
                         try_drop_from_mob(game_state, zone_id, haven_drop_rate, haven_rarity)
                     };
 
@@ -1504,173 +1508,181 @@ fn game_tick(
                         game_state.add_recent_drop(item_name, rarity, equipped, icon, slot, stats);
                     }
                 }
-            CombatEvent::EliteDefeated { xp_gained } => {
-                // Elite defeated - give key
-                if let Some(enemy) = &game_state.combat_state.current_enemy {
-                    let message = format!("⚔️ {} defeated! +{} XP", enemy.name, xp_gained);
-                    game_state.combat_state.add_log_entry(message, false, true);
-                }
-                let level_before = game_state.character_level;
-                apply_tick_xp(game_state, xp_gained as f64);
-                if game_state.character_level > level_before {
-                    global_achievements
-                        .on_level_up(game_state.character_level, Some(&game_state.character_name));
-                }
-                dungeon::logic::add_dungeon_xp(game_state, xp_gained);
+                CombatEvent::EliteDefeated { xp_gained } => {
+                    // Elite defeated - give key
+                    if let Some(enemy) = &game_state.combat_state.current_enemy {
+                        let message = format!("⚔️ {} defeated! +{} XP", enemy.name, xp_gained);
+                        game_state.combat_state.add_log_entry(message, false, true);
+                    }
+                    let level_before = game_state.character_level;
+                    apply_tick_xp(game_state, xp_gained as f64);
+                    if game_state.character_level > level_before {
+                        global_achievements.on_level_up(
+                            game_state.character_level,
+                            Some(&game_state.character_name),
+                        );
+                    }
+                    dungeon::logic::add_dungeon_xp(game_state, xp_gained);
 
-                // Give key
-                if let Some(dungeon) = &mut game_state.active_dungeon {
-                    let events = on_elite_defeated(dungeon);
-                    for event in events {
-                        if matches!(event, dungeon::logic::DungeonEvent::FoundKey) {
-                            game_state.combat_state.add_log_entry(
-                                "🗝️ Found the dungeon key!".to_string(),
-                                false,
-                                true,
-                            );
+                    // Give key
+                    if let Some(dungeon) = &mut game_state.active_dungeon {
+                        let events = on_elite_defeated(dungeon);
+                        for event in events {
+                            if matches!(event, dungeon::logic::DungeonEvent::FoundKey) {
+                                game_state.combat_state.add_log_entry(
+                                    "🗝️ Found the dungeon key!".to_string(),
+                                    false,
+                                    true,
+                                );
+                            }
                         }
                     }
                 }
-            }
-            CombatEvent::BossDefeated { xp_gained } => {
-                // Boss defeated - complete dungeon
-                if let Some(enemy) = &game_state.combat_state.current_enemy {
-                    let message = format!("👑 {} vanquished! +{} XP", enemy.name, xp_gained);
+                CombatEvent::BossDefeated { xp_gained } => {
+                    // Boss defeated - complete dungeon
+                    if let Some(enemy) = &game_state.combat_state.current_enemy {
+                        let message = format!("👑 {} vanquished! +{} XP", enemy.name, xp_gained);
+                        game_state.combat_state.add_log_entry(message, false, true);
+                    }
+                    let level_before = game_state.character_level;
+                    apply_tick_xp(game_state, xp_gained as f64);
+
+                    // Calculate boss bonus XP (copy values before mutable borrow)
+                    let (bonus_xp, total_xp, items) =
+                        if let Some(dungeon) = &game_state.active_dungeon {
+                            let bonus = dungeon::logic::calculate_boss_xp_reward(dungeon.size);
+                            let total = dungeon.xp_earned + xp_gained + bonus;
+                            let item_count = dungeon.collected_items.len();
+                            (bonus, total, item_count)
+                        } else {
+                            (0, xp_gained, 0)
+                        };
+
+                    apply_tick_xp(game_state, bonus_xp as f64);
+                    if game_state.character_level > level_before {
+                        global_achievements.on_level_up(
+                            game_state.character_level,
+                            Some(&game_state.character_name),
+                        );
+                    }
+
+                    // Track dungeon completion for achievements
+                    global_achievements.on_dungeon_completed(Some(&game_state.character_name));
+
+                    let message = format!(
+                        "🏆 Dungeon Complete! +{} bonus XP ({} total, {} items)",
+                        bonus_xp, total_xp, items
+                    );
                     game_state.combat_state.add_log_entry(message, false, true);
+
+                    // Clear dungeon
+                    let _events = on_boss_defeated(game_state);
                 }
-                let level_before = game_state.character_level;
-                apply_tick_xp(game_state, xp_gained as f64);
-
-                // Calculate boss bonus XP (copy values before mutable borrow)
-                let (bonus_xp, total_xp, items) = if let Some(dungeon) = &game_state.active_dungeon
-                {
-                    let bonus = dungeon::logic::calculate_boss_xp_reward(dungeon.size);
-                    let total = dungeon.xp_earned + xp_gained + bonus;
-                    let item_count = dungeon.collected_items.len();
-                    (bonus, total, item_count)
-                } else {
-                    (0, xp_gained, 0)
-                };
-
-                apply_tick_xp(game_state, bonus_xp as f64);
-                if game_state.character_level > level_before {
-                    global_achievements
-                        .on_level_up(game_state.character_level, Some(&game_state.character_name));
+                CombatEvent::PlayerDiedInDungeon => {
+                    // Died in dungeon - exit without prestige loss
+                    game_state.combat_state.add_log_entry(
+                        "💀 You fell in the dungeon... (escaped without prestige loss)".to_string(),
+                        false,
+                        false,
+                    );
                 }
-
-                // Track dungeon completion for achievements
-                global_achievements.on_dungeon_completed(Some(&game_state.character_name));
-
-                let message = format!(
-                    "🏆 Dungeon Complete! +{} bonus XP ({} total, {} items)",
-                    bonus_xp, total_xp, items
-                );
-                game_state.combat_state.add_log_entry(message, false, true);
-
-                // Clear dungeon
-                let _events = on_boss_defeated(game_state);
-            }
-            CombatEvent::PlayerDiedInDungeon => {
-                // Died in dungeon - exit without prestige loss
-                game_state.combat_state.add_log_entry(
-                    "💀 You fell in the dungeon... (escaped without prestige loss)".to_string(),
-                    false,
-                    false,
-                );
-            }
-            CombatEvent::PlayerDied => {
-                // Add to combat log
-                game_state.combat_state.add_log_entry(
-                    "💀 You died! Boss encounter reset.".to_string(),
-                    false,
-                    false,
-                );
-            }
-            CombatEvent::SubzoneBossDefeated { xp_gained, result } => {
-                use zones::BossDefeatResult;
-                // Apply XP from boss kill
-                let level_before = game_state.character_level;
-                apply_tick_xp(game_state, xp_gained as f64);
-                if game_state.character_level > level_before {
-                    global_achievements
-                        .on_level_up(game_state.character_level, Some(&game_state.character_name));
+                CombatEvent::PlayerDied => {
+                    // Add to combat log
+                    game_state.combat_state.add_log_entry(
+                        "💀 You died! Boss encounter reset.".to_string(),
+                        false,
+                        false,
+                    );
                 }
-                game_state.session_kills += 1;
+                CombatEvent::SubzoneBossDefeated { xp_gained, result } => {
+                    use zones::BossDefeatResult;
+                    // Apply XP from boss kill
+                    let level_before = game_state.character_level;
+                    apply_tick_xp(game_state, xp_gained as f64);
+                    if game_state.character_level > level_before {
+                        global_achievements.on_level_up(
+                            game_state.character_level,
+                            Some(&game_state.character_name),
+                        );
+                    }
+                    game_state.session_kills += 1;
 
-                // Track zone fully cleared for achievements
-                match &result {
-                    BossDefeatResult::ZoneComplete { old_zone, .. }
-                    | BossDefeatResult::ZoneCompleteButGated {
-                        zone_name: old_zone,
-                        ..
-                    } => {
-                        // Get zone ID from the old zone name
-                        if let Some(zone) =
-                            zones::get_all_zones().iter().find(|z| z.name == *old_zone)
-                        {
+                    // Track zone fully cleared for achievements
+                    match &result {
+                        BossDefeatResult::ZoneComplete { old_zone, .. }
+                        | BossDefeatResult::ZoneCompleteButGated {
+                            zone_name: old_zone,
+                            ..
+                        } => {
+                            // Get zone ID from the old zone name
+                            if let Some(zone) =
+                                zones::get_all_zones().iter().find(|z| z.name == *old_zone)
+                            {
+                                global_achievements.on_zone_fully_cleared(
+                                    zone.id,
+                                    Some(&game_state.character_name),
+                                );
+                            }
+                        }
+                        BossDefeatResult::StormsEnd => {
+                            // Zone 10 (Storm Citadel) completed
                             global_achievements
-                                .on_zone_fully_cleared(zone.id, Some(&game_state.character_name));
+                                .on_zone_fully_cleared(10, Some(&game_state.character_name));
+                            global_achievements.on_storms_end(Some(&game_state.character_name));
                         }
+                        BossDefeatResult::ExpanseCycle => {
+                            // Zone 11 (The Expanse) cycle completed
+                            global_achievements
+                                .on_zone_fully_cleared(11, Some(&game_state.character_name));
+                        }
+                        _ => {}
                     }
-                    BossDefeatResult::StormsEnd => {
-                        // Zone 10 (Storm Citadel) completed
-                        global_achievements
-                            .on_zone_fully_cleared(10, Some(&game_state.character_name));
-                        global_achievements.on_storms_end(Some(&game_state.character_name));
-                    }
-                    BossDefeatResult::ExpanseCycle => {
-                        // Zone 11 (The Expanse) cycle completed
-                        global_achievements
-                            .on_zone_fully_cleared(11, Some(&game_state.character_name));
-                    }
-                    _ => {}
-                }
 
-                // Log based on result
-                let message = match &result {
-                    BossDefeatResult::SubzoneComplete { .. } => {
-                        format!("👑 Boss defeated! +{} XP — Moving to next area.", xp_gained)
-                    }
-                    BossDefeatResult::ZoneComplete {
-                        old_zone,
-                        new_zone_id,
-                    } => {
-                        let new_zone = zones::get_zone(*new_zone_id)
-                            .map(|z| z.name)
-                            .unwrap_or("???");
-                        format!(
-                            "👑 {} conquered! +{} XP — Advancing to {}!",
-                            old_zone, xp_gained, new_zone
-                        )
-                    }
-                    BossDefeatResult::ZoneCompleteButGated {
-                        zone_name,
-                        required_prestige,
-                    } => {
-                        format!(
-                            "👑 {} conquered! +{} XP — Next zone requires Prestige {}.",
-                            zone_name, xp_gained, required_prestige
-                        )
-                    }
-                    BossDefeatResult::StormsEnd => {
-                        format!(
-                            "👑 All zones conquered! +{} XP — You have completed the game!",
-                            xp_gained
-                        )
-                    }
-                    BossDefeatResult::WeaponRequired { .. } => {
-                        // Already handled by PlayerAttackBlocked
-                        continue;
-                    }
-                    BossDefeatResult::ExpanseCycle => {
-                        format!(
-                            "👑 The Endless defeated! +{} XP — The Expanse cycles anew...",
-                            xp_gained
-                        )
-                    }
-                };
-                game_state.combat_state.add_log_entry(message, false, true);
-            }
+                    // Log based on result
+                    let message = match &result {
+                        BossDefeatResult::SubzoneComplete { .. } => {
+                            format!("👑 Boss defeated! +{} XP — Moving to next area.", xp_gained)
+                        }
+                        BossDefeatResult::ZoneComplete {
+                            old_zone,
+                            new_zone_id,
+                        } => {
+                            let new_zone = zones::get_zone(*new_zone_id)
+                                .map(|z| z.name)
+                                .unwrap_or("???");
+                            format!(
+                                "👑 {} conquered! +{} XP — Advancing to {}!",
+                                old_zone, xp_gained, new_zone
+                            )
+                        }
+                        BossDefeatResult::ZoneCompleteButGated {
+                            zone_name,
+                            required_prestige,
+                        } => {
+                            format!(
+                                "👑 {} conquered! +{} XP — Next zone requires Prestige {}.",
+                                zone_name, xp_gained, required_prestige
+                            )
+                        }
+                        BossDefeatResult::StormsEnd => {
+                            format!(
+                                "👑 All zones conquered! +{} XP — You have completed the game!",
+                                xp_gained
+                            )
+                        }
+                        BossDefeatResult::WeaponRequired { .. } => {
+                            // Already handled by PlayerAttackBlocked
+                            continue;
+                        }
+                        BossDefeatResult::ExpanseCycle => {
+                            format!(
+                                "👑 The Endless defeated! +{} XP — The Expanse cycles anew...",
+                                xp_gained
+                            )
+                        }
+                    };
+                    game_state.combat_state.add_log_entry(message, false, true);
+                }
                 _ => {}
             }
         }

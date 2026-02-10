@@ -342,8 +342,11 @@ impl SimReport {
 
         for rank in 0..=max_rank {
             if let Some(cycles) = cycles_by_rank.get(&rank) {
-                let avg_ticks =
-                    cycles.iter().map(|c| c.ticks_to_complete as f64).sum::<f64>() / cycles.len() as f64;
+                let avg_ticks = cycles
+                    .iter()
+                    .map(|c| c.ticks_to_complete as f64)
+                    .sum::<f64>()
+                    / cycles.len() as f64;
                 let avg_deaths =
                     cycles.iter().map(|c| c.total_deaths as f64).sum::<f64>() / cycles.len() as f64;
 
@@ -465,7 +468,10 @@ impl SimReport {
         if !self.level_pacing.avg_ticks_per_range.is_empty() {
             report.push_str("── LEVEL PACING ─────────────────────────────────────────────────\n");
             for (label, avg_ticks) in &self.level_pacing.avg_ticks_per_range {
-                report.push_str(&format!("  {}:   avg {:.0} ticks/level\n", label, avg_ticks));
+                report.push_str(&format!(
+                    "  {}:   avg {:.0} ticks/level\n",
+                    label, avg_ticks
+                ));
             }
             if let Some(slowdown_level) = self.level_pacing.slowdown_level {
                 report.push_str(&format!(
@@ -589,7 +595,8 @@ impl SimReport {
 
         for level in 2..=100 {
             if !level_ticks[level].is_empty() {
-                let avg = level_ticks[level].iter().sum::<u64>() as f64 / level_ticks[level].len() as f64;
+                let avg =
+                    level_ticks[level].iter().sum::<u64>() as f64 / level_ticks[level].len() as f64;
                 let samples = level_ticks[level].len();
                 output.push_str(&format!("  {:5}   {:9.0}   {:7}\n", level, avg, samples));
             }

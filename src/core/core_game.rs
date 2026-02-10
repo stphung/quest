@@ -114,14 +114,19 @@ impl CoreGame {
 
     /// Spawn an enemy appropriate for the current zone/subzone.
     fn spawn_enemy(&mut self, _rng: &mut impl Rng) {
-        let derived = DerivedStats::calculate_derived_stats(&self.state.attributes, &self.state.equipment);
+        let derived =
+            DerivedStats::calculate_derived_stats(&self.state.attributes, &self.state.equipment);
         let player_hp = derived.max_hp;
         let player_damage = derived.total_damage();
 
         let enemy = if self.should_fight_boss() {
             // Spawn boss
             if let Some(zone) = get_zone(self.current_zone()) {
-                if let Some(subzone) = zone.subzones.iter().find(|s| s.id == self.current_subzone()) {
+                if let Some(subzone) = zone
+                    .subzones
+                    .iter()
+                    .find(|s| s.id == self.current_subzone())
+                {
                     generate_subzone_boss(&zone, subzone, player_hp, player_damage)
                 } else {
                     generate_enemy_for_current_zone(
@@ -212,7 +217,8 @@ impl GameLoop for CoreGame {
         result.had_combat = true;
         result.was_boss = self.should_fight_boss();
 
-        let derived = DerivedStats::calculate_derived_stats(&self.state.attributes, &self.state.equipment);
+        let derived =
+            DerivedStats::calculate_derived_stats(&self.state.attributes, &self.state.equipment);
         let attack = calculate_attack_simple(&derived, rng);
 
         // Player attacks enemy
@@ -582,7 +588,10 @@ mod tests {
             }
         }
 
-        assert!(saw_boss, "Should have encountered and defeated a boss within 5000 ticks");
+        assert!(
+            saw_boss,
+            "Should have encountered and defeated a boss within 5000 ticks"
+        );
     }
 
     #[test]
@@ -633,7 +642,10 @@ mod tests {
 
         let result = resolve_combat_tick(&mut state, &bonuses, &mut rng);
 
-        assert!(!result.had_combat, "Should not have combat while regenerating");
+        assert!(
+            !result.had_combat,
+            "Should not have combat while regenerating"
+        );
         assert!(state.combat_state.current_enemy.is_none());
     }
 
