@@ -197,27 +197,30 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &MinesweeperGame) {
 }
 
 fn render_minesweeper_game_over(frame: &mut Frame, area: Rect, game: &MinesweeperGame) {
+    use crate::challenges::menu::ChallengeType;
+
     let result = game.game_result.as_ref().unwrap();
 
     let (result_type, title, message, reward) = match result {
-        ChallengeResult::Win => {
-            let prestige = match game.difficulty {
-                crate::challenges::ChallengeDifficulty::Novice => 1,
-                crate::challenges::ChallengeDifficulty::Apprentice => 2,
-                crate::challenges::ChallengeDifficulty::Journeyman => 3,
-                crate::challenges::ChallengeDifficulty::Master => 5,
-            };
-            (
-                GameResultType::Win,
-                ":: AREA SECURED! ::",
-                "You detected all the traps!",
-                format!("+{} Prestige Ranks", prestige),
-            )
-        }
-        ChallengeResult::Loss | ChallengeResult::Forfeit => (
+        ChallengeResult::Win => (
+            GameResultType::Win,
+            ":: AREA SECURED! ::",
+            "You detected all the traps!",
+            ChallengeType::Minesweeper
+                .reward(game.difficulty)
+                .description()
+                .replace("Win: ", ""),
+        ),
+        ChallengeResult::Loss => (
             GameResultType::Loss,
             "TRAP TRIGGERED!",
             "You stepped on a hidden trap.",
+            "No penalty incurred.".to_string(),
+        ),
+        ChallengeResult::Forfeit => (
+            GameResultType::Loss,
+            "RETREAT",
+            "You withdrew from the minefield.",
             "No penalty incurred.".to_string(),
         ),
         ChallengeResult::Draw => (

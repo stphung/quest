@@ -218,10 +218,9 @@ fn render_gomoku_game_over(frame: &mut Frame, area: Rect, game: &GomokuGame) {
     let result = game.game_result.as_ref().unwrap();
     let (result_type, title, message) = match result {
         ChallengeResult::Win => (GameResultType::Win, "VICTORY!", "Five in a row!"),
-        ChallengeResult::Loss | ChallengeResult::Forfeit => {
-            (GameResultType::Loss, "DEFEAT", "Opponent got five in a row")
-        }
+        ChallengeResult::Loss => (GameResultType::Loss, "DEFEAT", "Opponent got five in a row"),
         ChallengeResult::Draw => (GameResultType::Draw, "DRAW", "Board full, no winner"),
+        ChallengeResult::Forfeit => (GameResultType::Loss, "FORFEIT", "You conceded the game."),
     };
 
     let reward = match result {

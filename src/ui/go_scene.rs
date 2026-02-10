@@ -256,10 +256,13 @@ fn render_go_game_over(frame: &mut Frame, area: Rect, game: &GoGame) {
 
     let (result_type, title, message) = match result {
         ChallengeResult::Win => (GameResultType::Win, "VICTORY!", score_msg),
-        ChallengeResult::Loss | ChallengeResult::Forfeit => {
-            (GameResultType::Loss, "DEFEAT", score_msg)
-        }
+        ChallengeResult::Loss => (GameResultType::Loss, "DEFEAT", score_msg.clone()),
         ChallengeResult::Draw => (GameResultType::Draw, "DRAW", score_msg),
+        ChallengeResult::Forfeit => (
+            GameResultType::Loss,
+            "FORFEIT",
+            "You conceded the game.".to_string(),
+        ),
     };
 
     let reward = match result {

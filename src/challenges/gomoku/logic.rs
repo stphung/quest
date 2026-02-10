@@ -18,7 +18,7 @@ pub fn process_input(game: &mut GomokuGame, input: MinigameInput) -> bool {
     if game.forfeit_pending {
         match input {
             MinigameInput::Cancel => {
-                game.game_result = Some(ChallengeResult::Loss);
+                game.game_result = Some(ChallengeResult::Forfeit);
             }
             _ => {
                 game.forfeit_pending = false;
@@ -865,7 +865,7 @@ mod ai_tests {
         // Second Esc confirms forfeit
         process_input(&mut game, MinigameInput::Cancel);
 
-        assert_eq!(game.game_result, Some(ChallengeResult::Loss));
+        assert_eq!(game.game_result, Some(ChallengeResult::Forfeit));
     }
 
     #[test]

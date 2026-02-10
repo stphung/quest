@@ -234,28 +234,35 @@ fn render_rune_game_over(frame: &mut Frame, area: Rect, game: &RuneGame) {
 
     let result = game.game_result.as_ref().unwrap();
 
+    let code: String = game
+        .secret_code
+        .iter()
+        .map(|&idx| RUNE_SYMBOLS[idx].to_string())
+        .collect::<Vec<_>>()
+        .join(" ");
+
     let (result_type, title, message, reward) = match result {
         ChallengeResult::Win => (
             GameResultType::Win,
             ":: RUNES DECIPHERED! ::",
             "You cracked the ancient code!".to_string(),
-            ChallengeType::Rune.reward(game.difficulty).description(),
+            ChallengeType::Rune
+                .reward(game.difficulty)
+                .description()
+                .replace("Win: ", ""),
         ),
-        ChallengeResult::Loss | ChallengeResult::Draw | ChallengeResult::Forfeit => {
-            // Build the code string to show in message
-            let code: String = game
-                .secret_code
-                .iter()
-                .map(|&idx| RUNE_SYMBOLS[idx].to_string())
-                .collect::<Vec<_>>()
-                .join(" ");
-            (
-                GameResultType::Loss,
-                "RUNES REMAIN HIDDEN",
-                format!("The code was: {}", code),
-                "No penalty incurred.".to_string(),
-            )
-        }
+        ChallengeResult::Loss | ChallengeResult::Draw => (
+            GameResultType::Loss,
+            "RUNES REMAIN HIDDEN",
+            format!("The code was: {}", code),
+            "No penalty incurred.".to_string(),
+        ),
+        ChallengeResult::Forfeit => (
+            GameResultType::Loss,
+            "RUNES REMAIN HIDDEN",
+            format!("The code was: {}", code),
+            "No penalty incurred.".to_string(),
+        ),
     };
 
     render_game_over_overlay(frame, area, result_type, title, &message, &reward);

@@ -459,14 +459,27 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
     }
 
     // Unified key → MinigameInput mapping
+    // 'f' is Secondary for Minesweeper (flag) and Rune (clear guess)
+    // 'p' is Secondary for Go (pass)
+    // Other games treat these as Other (clears forfeit pending)
+    let is_f = matches!(key.code, KeyCode::Char('f') | KeyCode::Char('F'));
+    let is_p = matches!(key.code, KeyCode::Char('p') | KeyCode::Char('P'));
     let input = match key.code {
         KeyCode::Up => MinigameInput::Up,
         KeyCode::Down => MinigameInput::Down,
         KeyCode::Left => MinigameInput::Left,
         KeyCode::Right => MinigameInput::Right,
         KeyCode::Enter => MinigameInput::Primary,
-        KeyCode::Char('f') | KeyCode::Char('F') => MinigameInput::Secondary,
-        KeyCode::Char('p') | KeyCode::Char('P') => MinigameInput::Secondary,
+        _ if is_f => match state.active_minigame.as_ref() {
+            Some(ActiveMinigame::Minesweeper(_) | ActiveMinigame::Rune(_)) => {
+                MinigameInput::Secondary
+            }
+            _ => MinigameInput::Other,
+        },
+        _ if is_p => match state.active_minigame.as_ref() {
+            Some(ActiveMinigame::Go(_)) => MinigameInput::Secondary,
+            _ => MinigameInput::Other,
+        },
         KeyCode::Esc => MinigameInput::Cancel,
         _ => MinigameInput::Other,
     };

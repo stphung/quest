@@ -149,11 +149,11 @@ pub fn apply_minigame_result(
     let icon = challenge_type.log_icon();
 
     if won {
-        // XP reward
+        // XP reward (floor of 100 XP when xp_percent > 0)
         let xp_gained = if reward.xp_percent > 0 {
             let xp_for_level =
                 crate::core::game_logic::xp_for_next_level(state.character_level.max(1));
-            let xp = (xp_for_level * reward.xp_percent as u64) / 100;
+            let xp = ((xp_for_level * reward.xp_percent as u64) / 100).max(100);
             state.character_xp += xp;
             xp
         } else {
@@ -187,7 +187,7 @@ pub fn apply_minigame_result(
                     icon, reward.prestige_ranks, old_prestige, state.prestige_rank
                 ),
                 false,
-                false,
+                true,
             );
         }
         if fishing_rank_up {
@@ -199,13 +199,13 @@ pub fn apply_minigame_result(
                     state.fishing.rank_name()
                 ),
                 false,
-                false,
+                true,
             );
         }
         if xp_gained > 0 {
             state
                 .combat_state
-                .add_log_entry(format!("{} +{} XP", icon, xp_gained), false, false);
+                .add_log_entry(format!("{} +{} XP", icon, xp_gained), false, true);
         }
     } else {
         // Loss/Draw/Forfeit
