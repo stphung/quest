@@ -535,10 +535,10 @@ impl Achievements {
     }
 
     /// Called when a zone is fully cleared (all subzones completed).
+    /// For zones 1-10, only increments counter if achievement is newly unlocked.
+    /// For zone 11 (The Expanse), increments cycle counter and checks milestones.
     pub fn on_zone_fully_cleared(&mut self, zone_id: u32, character_name: Option<&str>) {
         let char_name = character_name.map(|s| s.to_string());
-
-        self.zones_fully_cleared += 1;
 
         // Zone 11 (The Expanse) has cycle-based achievements
         if zone_id == 11 {
@@ -576,7 +576,10 @@ impl Achievements {
         };
 
         if let Some(id) = achievement {
-            self.unlock(id, char_name);
+            // Only increment counter if this is a NEW unlock (not a sync/reload)
+            if self.unlock(id, char_name) {
+                self.zones_fully_cleared += 1;
+            }
         }
     }
 
@@ -769,6 +772,8 @@ impl Achievements {
     }
 
     /// Syncs zone completion achievements based on defeated bosses.
+    /// Note: Skips zone 11 (The Expanse) since cycles are tracked during gameplay,
+    /// not on load (to prevent counter inflation on every session start).
     fn sync_zone_completions(
         &mut self,
         defeated_bosses: &[(u32, u32)],
@@ -779,6 +784,12 @@ impl Achievements {
         let zones = get_all_zones();
 
         for zone in zones.iter() {
+            // Skip zone 11 - Expanse cycles are tracked during actual gameplay,
+            // syncing here would inflate the cycle counter on every load
+            if zone.id == 11 {
+                continue;
+            }
+
             // Check if all subzones in this zone have been completed
             let total_subzones = zone.subzones.len() as u32;
             let completed_subzones = (1..=total_subzones)
