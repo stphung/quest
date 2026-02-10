@@ -23,7 +23,9 @@ use super::progression::{can_access_zone, max_zone_for_prestige};
 use crate::achievements::Achievements;
 use crate::character::derived_stats::DerivedStats;
 use crate::character::prestige::{can_prestige as check_can_prestige, perform_prestige};
-use crate::combat::types::{generate_enemy_for_current_zone, generate_subzone_boss, Enemy};
+use crate::combat::types::{
+    generate_boss_enemy, generate_enemy_for_current_zone, generate_subzone_boss, Enemy,
+};
 use crate::core::combat_math::*;
 use crate::core::game_logic::{apply_tick_xp, spawn_enemy_if_needed, xp_gain_per_tick};
 use crate::items::drops::{try_drop_from_boss, try_drop_from_mob};
@@ -137,20 +139,12 @@ impl CombatEngine {
                 {
                     generate_subzone_boss(&zone, subzone, player_hp, player_damage)
                 } else {
-                    generate_enemy_for_current_zone(
-                        self.current_zone(),
-                        self.current_subzone(),
-                        player_hp,
-                        player_damage,
-                    )
+                    // Subzone not found - fallback to generic boss
+                    generate_boss_enemy(player_hp, player_damage)
                 }
             } else {
-                generate_enemy_for_current_zone(
-                    self.current_zone(),
-                    self.current_subzone(),
-                    player_hp,
-                    player_damage,
-                )
+                // Zone not found - fallback to generic boss
+                generate_boss_enemy(player_hp, player_damage)
             }
         } else {
             // Spawn regular enemy
