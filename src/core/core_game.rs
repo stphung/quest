@@ -1,18 +1,20 @@
 //! Core game engine implementing GameLoop trait.
 //!
-//! This module provides two ways to use the game logic:
+//! This module provides CoreGame as the central game engine:
 //!
-//! 1. **CoreGame struct** - A self-contained game engine for simulation/testing.
-//!    Owns its GameState and manages all combat internally. Best for:
-//!    - Running thousands of ticks for balance testing
-//!    - Offline progression simulation
-//!    - Unit tests
+//! **CoreGame struct** - The main game engine that owns GameState and manages
+//! all game logic. It provides two modes of operation:
 //!
-//! 2. **resolve_combat_tick() function** - Executes one combat round on an existing
-//!    GameState. Best for the interactive game where:
+//! 1. **Simulation mode** (`tick()`) - Self-contained combat for balance testing
+//!    and offline progression. Manages its own enemy/kills tracking.
+//!
+//! 2. **Interactive mode** (`combat_tick()`) - Works with GameState's timing-based
+//!    combat system. Used by main.rs for the actual game where:
 //!    - External timing controls when combat happens
 //!    - Visual effects and combat logs need to be generated
-//!    - Dungeons/fishing/minigames pause normal combat
+//!    - Haven bonuses apply
+//!
+//! The `resolve_combat_tick()` function is also exported for backward compatibility.
 
 use super::balance::KILLS_PER_BOSS;
 use super::game_loop::{GameLoop, TickResult};
@@ -30,15 +32,17 @@ use rand::Rng;
 
 /// Core game engine that implements the GameLoop trait.
 ///
-/// This struct owns its GameState and is designed for simulation use cases
-/// where we need to run many ticks quickly without UI updates.
-///
-/// For the interactive game with timing-based combat, use `resolve_combat_tick()`
-/// instead, which operates on an external GameState.
+/// This struct owns its GameState and is the central game engine.
+/// Use `tick()` for simulation mode or `combat_tick()` for interactive mode
+/// with Haven bonuses.
 pub struct CoreGame {
     state: GameState,
+    /// Internal enemy for simulation mode (tick())
     current_enemy: Option<Enemy>,
+    /// Internal kill counter for simulation mode (tick())
     kills_in_subzone: u32,
+    /// Combat bonuses from Haven (used by combat_tick())
+    bonuses: CombatBonuses,
 }
 
 impl CoreGame {
@@ -48,6 +52,7 @@ impl CoreGame {
             state: GameState::new(player_name, chrono::Utc::now().timestamp()),
             current_enemy: None,
             kills_in_subzone: 0,
+            bonuses: CombatBonuses::default(),
         }
     }
 
@@ -57,7 +62,39 @@ impl CoreGame {
             state,
             current_enemy: None,
             kills_in_subzone: 0,
+            bonuses: CombatBonuses::default(),
         }
+    }
+
+    /// Set combat bonuses from Haven for interactive mode.
+    ///
+    /// These bonuses are applied when using `combat_tick()`.
+    pub fn set_bonuses(&mut self, bonuses: CombatBonuses) {
+        self.bonuses = bonuses;
+    }
+
+    /// Get the current combat bonuses.
+    pub fn bonuses(&self) -> &CombatBonuses {
+        &self.bonuses
+    }
+
+    /// Execute one combat tick in interactive mode.
+    ///
+    /// This uses the state's timing-based combat system (GameState.combat_state)
+    /// and applies Haven bonuses. Use this for the interactive game.
+    ///
+    /// Unlike `tick()`, this:
+    /// - Respects `is_regenerating` flag
+    /// - Uses `state.combat_state.current_enemy` for enemies
+    /// - Applies combat bonuses from Haven
+    ///
+    /// # Arguments
+    /// * `rng` - Random number generator
+    ///
+    /// # Returns
+    /// A TickResult describing what happened
+    pub fn combat_tick(&mut self, rng: &mut impl Rng) -> TickResult {
+        resolve_combat_tick(&mut self.state, &self.bonuses, rng)
     }
 
     /// Get the current zone ID.

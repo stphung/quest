@@ -28,7 +28,7 @@ use chrono::{Local, Utc};
 use core::constants::*;
 use core::game_logic::*;
 use core::game_state::*;
-use core::{resolve_combat_tick, CombatBonuses, TickResult};
+use core::{CombatBonuses, CoreGame, GameLoop, TickResult};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
@@ -122,7 +122,7 @@ fn main() -> io::Result<()> {
     let mut select_screen = CharacterSelectScreen::new();
     let mut delete_screen = CharacterDeleteScreen::new();
     let mut rename_screen = CharacterRenameScreen::new();
-    let mut game_state: Option<GameState> = None;
+    let mut core_game: Option<CoreGame> = None;
     let mut pending_offline_report: Option<core::game_logic::OfflineReport> = None;
     let mut pending_haven_offline_bonus: Option<f64> = None;
 
@@ -487,7 +487,7 @@ fn main() -> io::Result<()> {
                                             }
                                         }
 
-                                        game_state = Some(state);
+                                        core_game = Some(CoreGame::from_state(state));
                                         current_screen = Screen::Game;
                                     }
                                     Err(e) => {
@@ -616,10 +616,10 @@ fn main() -> io::Result<()> {
             }
 
             Screen::Game => {
-                // Take game state (it should always be Some when we're in Game screen)
-                let mut state = game_state
+                // Take core game (it should always be Some when we're in Game screen)
+                let mut game = core_game
                     .take()
-                    .expect("Game state should be initialized when entering Game screen");
+                    .expect("CoreGame should be initialized when entering Game screen");
 
                 // Run the game loop
                 let mut last_tick = Instant::now();
@@ -664,7 +664,7 @@ fn main() -> io::Result<()> {
                     terminal.draw(|frame| {
                         draw_ui_with_update(
                             frame,
-                            &state,
+                            game.state(),
                             update_info.as_ref(),
                             update_expanded,
                             update_check_completed,
@@ -677,7 +677,7 @@ fn main() -> io::Result<()> {
                         }
                         // Draw prestige confirmation overlay if active
                         if matches!(overlay, GameOverlay::PrestigeConfirm) {
-                            ui::prestige_confirm::draw_prestige_confirm(frame, &state);
+                            ui::prestige_confirm::draw_prestige_confirm(frame, game.state());
                         }
                         // Draw Haven discovery modal if active
                         if matches!(overlay, GameOverlay::HavenDiscovery) {
@@ -700,7 +700,7 @@ fn main() -> io::Result<()> {
                             ui::haven_scene::render_vault_selection(
                                 frame,
                                 frame.size(),
-                                &state,
+                                game.state(),
                                 haven.vault_tier(),
                                 selected_index,
                                 selected_slots,
@@ -730,7 +730,7 @@ fn main() -> io::Result<()> {
                                 frame.size(),
                                 &haven,
                                 haven_ui.selected_room,
-                                state.prestige_rank,
+                                game.state().prestige_rank,
                                 &global_achievements,
                             );
                             match haven_ui.confirmation {
@@ -741,7 +741,7 @@ fn main() -> io::Result<()> {
                                         frame.size(),
                                         room,
                                         &haven,
-                                        state.prestige_rank,
+                                        game.state().prestige_rank,
                                     );
                                 }
                                 input::HavenConfirmation::Forge => {
@@ -749,7 +749,7 @@ fn main() -> io::Result<()> {
                                         frame,
                                         frame.size(),
                                         &global_achievements,
-                                        state.prestige_rank,
+                                        game.state().prestige_rank,
                                     );
                                 }
                                 input::HavenConfirmation::None => {}
@@ -787,11 +787,11 @@ fn main() -> io::Result<()> {
                                 continue;
                             }
                             // Track prestige rank before input to detect prestige
-                            let prestige_before = state.prestige_rank;
+                            let prestige_before = game.state().prestige_rank;
 
                             let result = input::handle_game_input(
                                 key_event,
-                                &mut state,
+                                game.state_mut(),
                                 &mut haven,
                                 &mut haven_ui,
                                 &mut overlay,
@@ -806,22 +806,24 @@ fn main() -> io::Result<()> {
                             let mut achievements_changed = false;
 
                             // Check if prestige occurred and track achievement
-                            if state.prestige_rank > prestige_before {
-                                global_achievements
-                                    .on_prestige(state.prestige_rank, Some(&state.character_name));
+                            if game.state().prestige_rank > prestige_before {
+                                global_achievements.on_prestige(
+                                    game.state().prestige_rank,
+                                    Some(&game.state().character_name),
+                                );
                                 achievements_changed = true;
                             }
 
                             // Check if a minigame win occurred
-                            if let Some(ref win_info) = state.last_minigame_win {
+                            if let Some(ref win_info) = game.state().last_minigame_win {
                                 global_achievements.on_minigame_won(
                                     win_info.game_type,
                                     win_info.difficulty,
-                                    Some(&state.character_name),
+                                    Some(&game.state().character_name),
                                 );
                                 achievements_changed = true;
                                 // Clear the win info after processing
-                                state.last_minigame_win = None;
+                                game.state_mut().last_minigame_win = None;
                             }
 
                             // Save achievements if any changed (skip in debug mode)
@@ -837,24 +839,24 @@ fn main() -> io::Result<()> {
                                 InputResult::Continue => {}
                                 InputResult::QuitToSelect => {
                                     if !debug_mode {
-                                        character_manager.save_character(&state)?;
+                                        character_manager.save_character(game.state())?;
                                         // Save achievements when quitting to character select
                                         achievements::save_achievements(&global_achievements)?;
                                     }
-                                    game_state = None;
+                                    core_game = None;
                                     current_screen = Screen::CharacterSelect;
                                     break;
                                 }
                                 InputResult::NeedsSave => {
                                     if !debug_mode {
-                                        let _ = character_manager.save_character(&state);
+                                        let _ = character_manager.save_character(game.state());
                                         last_save_instant = Some(Instant::now());
                                         last_save_time = Some(Local::now());
                                     }
                                 }
                                 InputResult::NeedsSaveAll => {
                                     if !debug_mode {
-                                        let _ = character_manager.save_character(&state);
+                                        let _ = character_manager.save_character(game.state());
                                         // Only save Haven if it has been discovered
                                         if haven.discovered {
                                             haven::save_haven(&haven).ok();
@@ -875,7 +877,7 @@ fn main() -> io::Result<()> {
                         // Skip game ticks while Leviathan modal is showing
                         if !matches!(overlay, GameOverlay::LeviathanEncounter { .. }) {
                             let leviathan_encounter = game_tick(
-                                &mut state,
+                                &mut game,
                                 &mut tick_counter,
                                 &haven,
                                 &mut global_achievements,
@@ -891,20 +893,23 @@ fn main() -> io::Result<()> {
 
                         // Haven discovery check (independent roll, once per tick)
                         if !haven.discovered
-                            && state.prestige_rank >= 10
-                            && state.active_dungeon.is_none()
-                            && state.active_fishing.is_none()
-                            && state.active_minigame.is_none()
+                            && game.state().prestige_rank >= 10
+                            && game.state().active_dungeon.is_none()
+                            && game.state().active_fishing.is_none()
+                            && game.state().active_minigame.is_none()
                         {
                             let mut rng = rand::thread_rng();
-                            if haven::try_discover_haven(&mut haven, state.prestige_rank, &mut rng)
-                            {
+                            if haven::try_discover_haven(
+                                &mut haven,
+                                game.state().prestige_rank,
+                                &mut rng,
+                            ) {
                                 if !debug_mode {
                                     haven::save_haven(&haven).ok();
                                 }
                                 // Track Haven discovery achievement
                                 global_achievements
-                                    .on_haven_discovered(Some(&state.character_name));
+                                    .on_haven_discovered(Some(&game.state().character_name));
                                 if !debug_mode {
                                     if let Err(e) =
                                         achievements::save_achievements(&global_achievements)
@@ -939,7 +944,7 @@ fn main() -> io::Result<()> {
                     if !debug_mode
                         && last_autosave.elapsed() >= Duration::from_secs(AUTOSAVE_INTERVAL_SECONDS)
                     {
-                        character_manager.save_character(&state)?;
+                        character_manager.save_character(game.state())?;
                         // Only save Haven if it has been discovered
                         if haven.discovered {
                             haven::save_haven(&haven)?;
@@ -977,20 +982,21 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-/// Processes overworld combat using CoreGame's resolve_combat_tick.
+/// Processes overworld combat using CoreGame's combat_tick.
 /// Handles attack timing, applies bonuses, and generates visual effects from TickResult.
 fn process_overworld_combat(
-    game_state: &mut GameState,
+    core_game: &mut CoreGame,
     delta_time: f64,
     haven: &haven::Haven,
     global_achievements: &mut achievements::Achievements,
 ) {
     use crate::character::derived_stats::DerivedStats;
 
+    let state = core_game.state_mut();
+
     // Handle HP regeneration first
-    if game_state.combat_state.is_regenerating {
-        let derived =
-            DerivedStats::calculate_derived_stats(&game_state.attributes, &game_state.equipment);
+    if state.combat_state.is_regenerating {
+        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
         let haven_regen_percent = haven.get_bonus(haven::HavenBonusType::HpRegenPercent);
         let haven_regen_delay = haven.get_bonus(haven::HavenBonusType::HpRegenDelayReduction);
 
@@ -998,34 +1004,33 @@ fn process_overworld_combat(
         let base_duration = HP_REGEN_DURATION_SECONDS * (1.0 - haven_regen_delay / 100.0);
         let effective_duration = base_duration / total_regen_mult;
 
-        game_state.combat_state.regen_timer += delta_time;
+        state.combat_state.regen_timer += delta_time;
 
-        if game_state.combat_state.regen_timer >= effective_duration {
-            game_state.combat_state.player_current_hp = game_state.combat_state.player_max_hp;
-            game_state.combat_state.is_regenerating = false;
-            game_state.combat_state.regen_timer = 0.0;
+        if state.combat_state.regen_timer >= effective_duration {
+            state.combat_state.player_current_hp = state.combat_state.player_max_hp;
+            state.combat_state.is_regenerating = false;
+            state.combat_state.regen_timer = 0.0;
         } else {
-            let progress = game_state.combat_state.regen_timer / effective_duration;
-            let start_hp = game_state.combat_state.player_current_hp;
-            let target_hp = game_state.combat_state.player_max_hp;
-            game_state.combat_state.player_current_hp =
+            let progress = state.combat_state.regen_timer / effective_duration;
+            let start_hp = state.combat_state.player_current_hp;
+            let target_hp = state.combat_state.player_max_hp;
+            state.combat_state.player_current_hp =
                 start_hp + ((target_hp - start_hp) as f64 * progress) as u32;
         }
         return;
     }
 
     // Check attack timer
-    let derived =
-        DerivedStats::calculate_derived_stats(&game_state.attributes, &game_state.equipment);
+    let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
     let effective_attack_interval = ATTACK_INTERVAL_SECONDS / derived.attack_speed_multiplier;
 
-    game_state.combat_state.attack_timer += delta_time;
-    if game_state.combat_state.attack_timer < effective_attack_interval {
+    state.combat_state.attack_timer += delta_time;
+    if state.combat_state.attack_timer < effective_attack_interval {
         return; // Not time to attack yet
     }
-    game_state.combat_state.attack_timer = 0.0;
+    state.combat_state.attack_timer = 0.0;
 
-    // Build combat bonuses from Haven
+    // Build combat bonuses from Haven and set on CoreGame
     let bonuses = CombatBonuses {
         damage_percent: haven.get_bonus(haven::HavenBonusType::DamagePercent),
         crit_chance: haven.get_bonus(haven::HavenBonusType::CritChancePercent) as u32,
@@ -1033,13 +1038,14 @@ fn process_overworld_combat(
         item_rarity_percent: haven.get_bonus(haven::HavenBonusType::ItemRarityPercent),
         xp_gain_percent: haven.get_bonus(haven::HavenBonusType::XpGainPercent),
     };
+    core_game.set_bonuses(bonuses);
 
-    // Execute combat using CoreGame logic
+    // Execute combat using CoreGame's combat_tick
     let mut rng = rand::thread_rng();
-    let result = resolve_combat_tick(game_state, &bonuses, &mut rng);
+    let result = core_game.combat_tick(&mut rng);
 
     // Convert TickResult to visual effects and combat log entries
-    process_tick_result(game_state, &result, global_achievements);
+    process_tick_result(core_game.state_mut(), &result, global_achievements);
 }
 
 /// Converts a TickResult into visual effects and combat log entries.
@@ -1170,7 +1176,7 @@ fn process_tick_result(
 /// Processes a single game tick, updating combat and stats.
 /// Returns Some(encounter_number) if a Storm Leviathan encounter occurred during fishing.
 fn game_tick(
-    game_state: &mut GameState,
+    core_game: &mut CoreGame,
     tick_counter: &mut u32,
     haven: &haven::Haven,
     global_achievements: &mut achievements::Achievements,
@@ -1183,6 +1189,9 @@ fn game_tick(
 
     // Each tick is 100ms = 0.1 seconds
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
+
+    // Get mutable access to game state
+    let game_state = core_game.state_mut();
 
     // Process chess AI thinking
     // Process AI thinking for active minigame
@@ -1387,7 +1396,11 @@ fn game_tick(
     }
 
     // Combat processing - use different engines for overworld vs dungeon
-    if game_state.active_dungeon.is_some() {
+    // Check dungeon status before releasing the borrow
+    let in_dungeon = game_state.active_dungeon.is_some();
+
+    if in_dungeon {
+        // Re-borrow for dungeon combat (game_state is still valid here)
         // Dungeon combat uses the full update_combat with special handling for
         // elites, bosses, and dungeon-specific events
         let haven_combat = combat::logic::HavenCombatBonuses {
@@ -1662,33 +1675,36 @@ fn game_tick(
             }
         }
     } else {
-        // Overworld combat uses CoreGame's resolve_combat_tick for game logic
+        // Overworld combat uses CoreGame's combat_tick for game logic
         // This separates the game logic (in CoreGame) from UI concerns (here)
-        process_overworld_combat(game_state, delta_time, haven, global_achievements);
+        // Note: We're done with game_state in this branch - release the borrow
+        let _ = game_state;
+        process_overworld_combat(core_game, delta_time, haven, global_achievements);
     }
 
     // Update visual effects
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
-    game_state
+    core_game
+        .state_mut()
         .combat_state
         .visual_effects
         .retain_mut(|effect| effect.update(delta_time));
 
     // Spawn enemy if needed
-    spawn_enemy_if_needed(game_state);
+    spawn_enemy_if_needed(core_game.state_mut());
 
     // Update play_time_seconds
     // Each tick is 100ms (TICK_INTERVAL_MS), so 10 ticks = 1 second
     *tick_counter += 1;
     if *tick_counter >= 10 {
-        game_state.play_time_seconds += 1;
+        core_game.state_mut().play_time_seconds += 1;
         *tick_counter = 0;
     }
 
     // Log any newly unlocked achievements to combat log
     for id in global_achievements.take_newly_unlocked() {
         if let Some(def) = achievements::get_achievement_def(id) {
-            game_state.combat_state.add_log_entry(
+            core_game.state_mut().combat_state.add_log_entry(
                 format!("🏆 Achievement Unlocked: {}", def.name),
                 false,
                 true,
