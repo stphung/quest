@@ -262,7 +262,7 @@ fn test_combat_to_prestige_full_loop() {
 
         // Apply XP from kills (mimics main.rs game loop)
         for event in &events {
-            if let CombatEvent::EnemyDied { xp_gained }
+            if let CombatEvent::EnemyDied { xp_gained, .. }
             | CombatEvent::SubzoneBossDefeated { xp_gained, .. } = event
             {
                 apply_tick_xp(&mut state, *xp_gained as f64);

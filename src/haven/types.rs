@@ -442,6 +442,12 @@ impl Haven {
         self.room_tier(HavenRoomId::Vault)
     }
 
+    /// Get the number of vault slots available (based on bonus values, not tier)
+    /// T0=0, T1=1, T2=3, T3=5 slots
+    pub fn vault_slots(&self) -> u8 {
+        self.get_bonus(HavenBonusType::VaultSlots) as u8
+    }
+
     /// Get the bonus value for a specific bonus type
     pub fn get_bonus(&self, bonus_type: HavenBonusType) -> f64 {
         HavenRoomId::ALL
@@ -499,7 +505,7 @@ impl Haven {
             double_fish_chance: self.get_bonus(HavenBonusType::DoubleFishChance),
             item_rarity_percent: self.get_bonus(HavenBonusType::ItemRarityPercent),
             hp_regen_delay_reduction: self.get_bonus(HavenBonusType::HpRegenDelayReduction),
-            vault_slots: self.vault_tier(),
+            vault_slots: self.vault_slots(),
             max_fishing_rank_bonus: self.fishing_rank_bonus(),
             has_storm_forge: self.has_storm_forge(),
         }
@@ -1111,4 +1117,55 @@ mod tests {
         haven.build_room(HavenRoomId::Vault);
         assert_eq!(haven.vault_tier(), 3);
     }
+
+    #[test]
+    fn test_vault_slots_returns_bonus_values_not_tier() {
+        // Bug fix test: vault_slots() must return bonus values (1, 3, 5), NOT tier numbers (1, 2, 3)
+        let mut haven = Haven::new();
+        assert_eq!(haven.vault_slots(), 0);
+
+        // Build path to Vault
+        haven.build_room(HavenRoomId::Hearthstone);
+        haven.build_room(HavenRoomId::Bedroom);
+        haven.build_room(HavenRoomId::Garden);
+        haven.build_room(HavenRoomId::Library);
+        haven.build_room(HavenRoomId::FishingDock);
+        haven.build_room(HavenRoomId::Workshop);
+
+        // Vault T1 = 1 slot
+        haven.build_room(HavenRoomId::Vault);
+        assert_eq!(haven.vault_tier(), 1);
+        assert_eq!(haven.vault_slots(), 1);
+
+        // Vault T2 = 3 slots (NOT 2!)
+        haven.build_room(HavenRoomId::Vault);
+        assert_eq!(haven.vault_tier(), 2);
+        assert_eq!(haven.vault_slots(), 3, "Vault T2 should give 3 slots, not tier 2");
+
+        // Vault T3 = 5 slots (NOT 3!)
+        haven.build_room(HavenRoomId::Vault);
+        assert_eq!(haven.vault_tier(), 3);
+        assert_eq!(haven.vault_slots(), 5, "Vault T3 should give 5 slots, not tier 3");
+    }
+
+    #[test]
+    fn test_compute_bonuses_vault_slots_correct() {
+        let mut haven = Haven::new();
+        haven.build_room(HavenRoomId::Hearthstone);
+        haven.build_room(HavenRoomId::Bedroom);
+        haven.build_room(HavenRoomId::Garden);
+        haven.build_room(HavenRoomId::Library);
+        haven.build_room(HavenRoomId::FishingDock);
+        haven.build_room(HavenRoomId::Workshop);
+
+        haven.build_room(HavenRoomId::Vault);
+        assert_eq!(haven.compute_bonuses().vault_slots, 1);
+
+        haven.build_room(HavenRoomId::Vault);
+        assert_eq!(haven.compute_bonuses().vault_slots, 3, "T2 compute_bonuses should return 3");
+
+        haven.build_room(HavenRoomId::Vault);
+        assert_eq!(haven.compute_bonuses().vault_slots, 5, "T3 compute_bonuses should return 5");
+    }
+
 }

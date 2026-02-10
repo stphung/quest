@@ -379,7 +379,7 @@ fn handle_vault_selection(
                 if state.equipment.get(slot).is_some() {
                     if let Some(pos) = selected_slots.iter().position(|s| *s == slot) {
                         selected_slots.remove(pos);
-                    } else if selected_slots.len() < haven.vault_tier() as usize {
+                    } else if selected_slots.len() < haven.vault_slots() as usize {
                         selected_slots.push(slot);
                     }
                 }

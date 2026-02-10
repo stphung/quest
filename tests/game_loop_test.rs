@@ -197,7 +197,7 @@ fn test_enemy_death_grants_xp() {
     for _ in 0..1000 {
         let events = simulate_tick(&mut state);
         for event in events {
-            if let CombatEvent::EnemyDied { xp_gained } = event {
+            if let CombatEvent::EnemyDied { xp_gained, .. } = event {
                 // Apply XP like main.rs does
                 apply_tick_xp(&mut state, xp_gained as f64);
                 xp_from_kill = xp_gained;
@@ -475,7 +475,7 @@ fn test_zone_advancement_subzone_to_subzone() {
         let events = simulate_tick(&mut state);
         for event in &events {
             match event {
-                CombatEvent::EnemyDied { xp_gained } => {
+                CombatEvent::EnemyDied { xp_gained, .. } => {
                     apply_tick_xp(&mut state, *xp_gained as f64);
                 }
                 CombatEvent::SubzoneBossDefeated { xp_gained, result } => {
@@ -535,7 +535,7 @@ fn test_zone_advancement_full_zone_clear() {
             let events = simulate_tick(&mut state);
             for event in &events {
                 match event {
-                    CombatEvent::EnemyDied { xp_gained } => {
+                    CombatEvent::EnemyDied { xp_gained, .. } => {
                         apply_tick_xp(&mut state, *xp_gained as f64);
                     }
                     CombatEvent::SubzoneBossDefeated { xp_gained, result } => {

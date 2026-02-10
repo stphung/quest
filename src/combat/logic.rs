@@ -1131,7 +1131,7 @@ mod tests {
         );
 
         let xp_event = events.iter().find_map(|e| match e {
-            CombatEvent::EnemyDied { xp_gained } => Some(*xp_gained),
+            CombatEvent::EnemyDied { xp_gained, .. } => Some(*xp_gained),
             _ => None,
         });
 
@@ -2135,7 +2135,7 @@ mod tests {
         );
 
         let xp_gained = events.iter().find_map(|e| match e {
-            CombatEvent::EnemyDied { xp_gained } => Some(*xp_gained),
+            CombatEvent::EnemyDied { xp_gained, .. } => Some(*xp_gained),
             _ => None,
         });
 
@@ -2182,7 +2182,7 @@ mod tests {
         );
 
         let xp_gained = events.iter().find_map(|e| match e {
-            CombatEvent::EliteDefeated { xp_gained } => Some(*xp_gained),
+            CombatEvent::EliteDefeated { xp_gained, .. } => Some(*xp_gained),
             _ => None,
         });
 
@@ -2232,7 +2232,7 @@ mod tests {
         );
 
         let xp_gained = events.iter().find_map(|e| match e {
-            CombatEvent::BossDefeated { xp_gained } => Some(*xp_gained),
+            CombatEvent::BossDefeated { xp_gained, .. } => Some(*xp_gained),
             _ => None,
         });
 
