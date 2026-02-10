@@ -76,6 +76,33 @@ struct SimStats {
     // Current state tracking
     current_zone: u32,
     current_level: u32,
+
+    // Combat timing analysis
+    total_combat_ticks: u64,
+    total_regen_ticks: u64,
+    fight_count: u64,
+    in_combat: bool,
+    combat_start_tick: u64,
+    regen_start_tick: u64,
+
+    // Per-cycle combat timing
+    cycle_combat_ticks: u64,
+    cycle_regen_ticks: u64,
+    cycle_fight_count: u64,
+
+    // Prestige wall tracking
+    ticks_at_zone_cap: u64,
+    cycle_ticks_at_zone_cap: u64,
+
+    // XP source breakdown
+    xp_from_kills: u64,
+    xp_from_passive: u64,
+
+    // Death breakdown
+    boss_deaths: u64,
+    regular_deaths: u64,
+    cycle_boss_deaths: u64,
+    cycle_regular_deaths: u64,
 }
 
 impl SimStats {
@@ -99,14 +126,62 @@ impl SimStats {
             loot_stats: LootStats::default(),
             current_zone: 1,
             current_level: 1,
+            // Combat timing
+            total_combat_ticks: 0,
+            total_regen_ticks: 0,
+            fight_count: 0,
+            in_combat: false,
+            combat_start_tick: 0,
+            regen_start_tick: 0,
+            cycle_combat_ticks: 0,
+            cycle_regen_ticks: 0,
+            cycle_fight_count: 0,
+            // Prestige wall tracking
+            ticks_at_zone_cap: 0,
+            cycle_ticks_at_zone_cap: 0,
+            // XP source breakdown
+            xp_from_kills: 0,
+            xp_from_passive: 0,
+            // Death breakdown
+            boss_deaths: 0,
+            regular_deaths: 0,
+            cycle_boss_deaths: 0,
+            cycle_regular_deaths: 0,
         }
     }
 
     /// Process a tick result and update statistics.
-    fn process_tick(&mut self, result: &TickResult, current_tick: u64) {
+    fn process_tick(&mut self, result: &TickResult, current_tick: u64, at_zone_cap: bool) {
+        // Track combat timing
+        if result.had_combat {
+            if !self.in_combat {
+                // Starting a new fight
+                self.in_combat = true;
+                self.combat_start_tick = current_tick;
+                // If we were regenerating, record regen time
+                if self.regen_start_tick > 0 {
+                    let regen_duration = current_tick - self.regen_start_tick;
+                    self.total_regen_ticks += regen_duration;
+                    self.cycle_regen_ticks += regen_duration;
+                    self.regen_start_tick = 0;
+                }
+            }
+        }
+
         // Track kills
         if result.player_won {
             self.total_kills += 1;
+            self.fight_count += 1;
+            self.cycle_fight_count += 1;
+
+            // Record combat duration
+            if self.combat_start_tick > 0 {
+                let combat_duration = current_tick - self.combat_start_tick + 1;
+                self.total_combat_ticks += combat_duration;
+                self.cycle_combat_ticks += combat_duration;
+            }
+            self.in_combat = false;
+            self.regen_start_tick = current_tick; // Start regen timer
 
             if self.current_zone <= 10 {
                 self.zone_kills[self.current_zone as usize] += 1;
@@ -117,13 +192,42 @@ impl SimStats {
             }
         }
 
-        // Track deaths
+        // Track deaths (boss vs regular)
         if result.player_died {
             self.total_deaths += 1;
+
+            if result.was_boss {
+                self.boss_deaths += 1;
+                self.cycle_boss_deaths += 1;
+            } else {
+                self.regular_deaths += 1;
+                self.cycle_regular_deaths += 1;
+            }
+
+            // Reset combat state on death
+            self.in_combat = false;
+            self.regen_start_tick = current_tick;
 
             if self.current_zone <= 10 {
                 self.zone_deaths[self.current_zone as usize] += 1;
             }
+        }
+
+        // Track XP sources
+        if result.xp_gained > 0 {
+            if result.player_won {
+                // XP from kill
+                self.xp_from_kills += result.xp_gained;
+            } else {
+                // Passive tick XP
+                self.xp_from_passive += result.xp_gained;
+            }
+        }
+
+        // Track time at prestige wall (zone cap)
+        if at_zone_cap {
+            self.ticks_at_zone_cap += 1;
+            self.cycle_ticks_at_zone_cap += 1;
         }
 
         // Track level ups
@@ -161,6 +265,12 @@ impl SimStats {
             final_level,
             total_deaths: self.total_deaths - self.cycle_start_deaths,
             total_kills: self.total_kills - self.cycle_start_kills,
+            total_combat_ticks: self.cycle_combat_ticks,
+            total_regen_ticks: self.cycle_regen_ticks,
+            fight_count: self.cycle_fight_count,
+            ticks_at_zone_cap: self.cycle_ticks_at_zone_cap,
+            boss_deaths: self.cycle_boss_deaths,
+            regular_deaths: self.cycle_regular_deaths,
         };
         self.prestige_cycles.push(cycle);
 
@@ -179,6 +289,16 @@ impl SimStats {
         self.zone_kills = vec![0; 11];
         self.current_zone = 1;
         self.current_level = 1;
+
+        // Reset cycle-specific counters
+        self.cycle_combat_ticks = 0;
+        self.cycle_regen_ticks = 0;
+        self.cycle_fight_count = 0;
+        self.cycle_ticks_at_zone_cap = 0;
+        self.cycle_boss_deaths = 0;
+        self.cycle_regular_deaths = 0;
+        self.in_combat = false;
+        self.regen_start_tick = current_tick;
     }
 
     /// Finalize the last prestige cycle.
@@ -190,6 +310,12 @@ impl SimStats {
                 final_level,
                 total_deaths: self.total_deaths - self.cycle_start_deaths,
                 total_kills: self.total_kills - self.cycle_start_kills,
+                total_combat_ticks: self.cycle_combat_ticks,
+                total_regen_ticks: self.cycle_regen_ticks,
+                fight_count: self.cycle_fight_count,
+                ticks_at_zone_cap: self.cycle_ticks_at_zone_cap,
+                boss_deaths: self.cycle_boss_deaths,
+                regular_deaths: self.cycle_regular_deaths,
             };
             self.prestige_cycles.push(cycle);
         }
@@ -228,6 +354,9 @@ fn simulate_single_run(config: &SimConfig, rng: &mut ChaCha8Rng) -> RunStats {
         let current_zone = state.zone_progression.current_zone_id;
         let current_prestige = state.prestige_rank;
 
+        // Check if at zone cap for prestige wall tracking
+        let at_zone_cap = core_game.at_prestige_wall();
+
         // Check termination conditions
         if current_zone >= config.target_zone as u32
             && (!config.simulate_prestige || current_prestige >= config.target_prestige)
@@ -241,7 +370,7 @@ fn simulate_single_run(config: &SimConfig, rng: &mut ChaCha8Rng) -> RunStats {
 
         // Check for prestige opportunity before ticking
         if config.simulate_prestige
-            && core_game.at_prestige_wall()
+            && at_zone_cap
             && core_game.can_prestige()
             && current_prestige < config.target_prestige
         {
@@ -254,7 +383,7 @@ fn simulate_single_run(config: &SimConfig, rng: &mut ChaCha8Rng) -> RunStats {
         let result = core_game.tick(rng);
 
         // Process the result to update stats
-        stats.process_tick(&result, ticks);
+        stats.process_tick(&result, ticks, at_zone_cap);
 
         ticks += 1;
     }
@@ -284,6 +413,18 @@ fn simulate_single_run(config: &SimConfig, rng: &mut ChaCha8Rng) -> RunStats {
         ticks_per_zone,
         level_up_ticks: stats.level_up_ticks,
         prestige_cycles: stats.prestige_cycles,
+        // Combat timing analysis
+        total_combat_ticks: stats.total_combat_ticks,
+        total_regen_ticks: stats.total_regen_ticks,
+        fight_count: stats.fight_count,
+        // Prestige wall analysis
+        ticks_at_zone_cap: stats.ticks_at_zone_cap,
+        // XP source breakdown
+        xp_from_kills: stats.xp_from_kills,
+        xp_from_passive: stats.xp_from_passive,
+        // Death breakdown
+        boss_deaths: stats.boss_deaths,
+        regular_deaths: stats.regular_deaths,
     }
 }
 

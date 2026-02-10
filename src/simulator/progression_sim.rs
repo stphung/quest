@@ -13,6 +13,15 @@ pub struct PrestigeCycle {
     pub final_level: u32,
     pub total_deaths: u64,
     pub total_kills: u64,
+    // Combat timing
+    pub total_combat_ticks: u64,
+    pub total_regen_ticks: u64,
+    pub fight_count: u64,
+    // Prestige wall time
+    pub ticks_at_zone_cap: u64,
+    // Death breakdown
+    pub boss_deaths: u64,
+    pub regular_deaths: u64,
 }
 
 /// Statistics for a single simulation run.
@@ -40,6 +49,22 @@ pub struct RunStats {
 
     // Prestige cycles
     pub prestige_cycles: Vec<PrestigeCycle>,
+
+    // Combat timing analysis
+    pub total_combat_ticks: u64,
+    pub total_regen_ticks: u64,
+    pub fight_count: u64,
+
+    // Prestige wall analysis
+    pub ticks_at_zone_cap: u64,
+
+    // XP source breakdown
+    pub xp_from_kills: u64,
+    pub xp_from_passive: u64,
+
+    // Death breakdown
+    pub boss_deaths: u64,
+    pub regular_deaths: u64,
 }
 
 #[cfg(test)]

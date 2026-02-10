@@ -16,6 +16,33 @@ fn format_with_commas(n: u64) -> String {
     result.chars().rev().collect()
 }
 
+/// Convert ticks to human-readable time string.
+/// 10 ticks = 1 second.
+pub fn ticks_to_time_str(ticks: u64) -> String {
+    let total_seconds = ticks / 10;
+    let hours = total_seconds / 3600;
+    let minutes = (total_seconds % 3600) / 60;
+    let seconds = total_seconds % 60;
+
+    if hours > 0 {
+        format!("~{}h {}m", hours, minutes)
+    } else if minutes > 0 {
+        format!("~{}m {}s", minutes, seconds)
+    } else {
+        format!("~{}s", seconds)
+    }
+}
+
+/// Convert ticks to seconds (as float for precision).
+fn ticks_to_seconds(ticks: u64) -> f64 {
+    ticks as f64 / 10.0
+}
+
+/// Calculate theoretical prestige speedup multiplier.
+fn theoretical_prestige_mult(rank: u32) -> f64 {
+    1.0 + 0.5 * (rank as f64).powf(0.7)
+}
+
 /// Aggregated results from multiple simulation runs.
 #[derive(Debug, Clone)]
 pub struct SimReport {
@@ -60,6 +87,21 @@ pub struct SimReport {
 
     // Flag to show detailed level curve
     pub show_level_curve: bool,
+
+    // Combat timing analysis
+    pub avg_fight_duration_ticks: f64,
+    pub avg_combat_percent: f64,
+
+    // Prestige wall analysis
+    pub avg_wall_percent: f64,
+
+    // XP source breakdown
+    pub xp_from_kills_percent: f64,
+    pub xp_from_passive_percent: f64,
+
+    // Death breakdown
+    pub avg_boss_deaths: f64,
+    pub avg_regular_deaths: f64,
 }
 
 /// Analysis of level-up pacing.
@@ -177,6 +219,51 @@ impl SimReport {
         // Summarize prestige progression
         let prestige_summary = Self::summarize_prestige(&runs);
 
+        // Combat timing analysis
+        let total_combat_ticks: u64 = runs.iter().map(|r| r.total_combat_ticks).sum();
+        let total_fights: u64 = runs.iter().map(|r| r.fight_count).sum();
+        let avg_fight_duration_ticks = if total_fights > 0 {
+            total_combat_ticks as f64 / total_fights as f64
+        } else {
+            0.0
+        };
+
+        let total_ticks_all_runs: u64 = runs.iter().map(|r| r.total_ticks).sum();
+        let avg_combat_percent = if total_ticks_all_runs > 0 {
+            (total_combat_ticks as f64 / total_ticks_all_runs as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        // Prestige wall analysis
+        let total_wall_ticks: u64 = runs.iter().map(|r| r.ticks_at_zone_cap).sum();
+        let avg_wall_percent = if total_ticks_all_runs > 0 {
+            (total_wall_ticks as f64 / total_ticks_all_runs as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        // XP source breakdown
+        let total_xp_from_kills: u64 = runs.iter().map(|r| r.xp_from_kills).sum();
+        let total_xp_from_passive: u64 = runs.iter().map(|r| r.xp_from_passive).sum();
+        let total_xp = total_xp_from_kills + total_xp_from_passive;
+        let xp_from_kills_percent = if total_xp > 0 {
+            (total_xp_from_kills as f64 / total_xp as f64) * 100.0
+        } else {
+            0.0
+        };
+        let xp_from_passive_percent = if total_xp > 0 {
+            (total_xp_from_passive as f64 / total_xp as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        // Death breakdown
+        let avg_boss_deaths =
+            runs.iter().map(|r| r.boss_deaths as f64).sum::<f64>() / num_runs as f64;
+        let avg_regular_deaths =
+            runs.iter().map(|r| r.regular_deaths as f64).sum::<f64>() / num_runs as f64;
+
         Self {
             num_runs,
             runs_completed,
@@ -201,6 +288,13 @@ impl SimReport {
             difficulty_walls,
             prestige_summary,
             show_level_curve: false,
+            avg_fight_duration_ticks,
+            avg_combat_percent,
+            avg_wall_percent,
+            xp_from_kills_percent,
+            xp_from_passive_percent,
+            avg_boss_deaths,
+            avg_regular_deaths,
         }
     }
 
@@ -398,11 +492,12 @@ impl SimReport {
             self.avg_total_kills
         ));
         report.push_str(&format!(
-            "  Avg Total Deaths:    {:.1}\n",
-            self.avg_total_deaths
+            "  Avg Total Deaths:    {:.1} (Boss: {:.1}, Regular: {:.1})\n",
+            self.avg_total_deaths, self.avg_boss_deaths, self.avg_regular_deaths
         ));
         report.push_str(&format!(
-            "  Avg Ticks to Clear:  {:.0}\n\n",
+            "  Avg Time to Clear:   {} ({:.0} ticks)\n\n",
+            ticks_to_time_str(self.avg_ticks_to_complete as u64),
             self.avg_ticks_to_complete
         ));
 
@@ -424,6 +519,48 @@ impl SimReport {
             self.avg_final_ilvl
         ));
 
+        report.push_str("── COMBAT TIMING ────────────────────────────────────────────────\n");
+        let avg_fight_seconds = ticks_to_seconds(self.avg_fight_duration_ticks as u64);
+        let fight_rating = if avg_fight_seconds < 5.0 {
+            "FAST (under 5s)"
+        } else if avg_fight_seconds <= 10.0 {
+            "TARGET (5-10s)"
+        } else {
+            "SLOW (over 10s)"
+        };
+        report.push_str(&format!(
+            "  Avg Fight Duration:  {:.1}s ({} ticks) — {}\n",
+            avg_fight_seconds,
+            self.avg_fight_duration_ticks as u64,
+            fight_rating
+        ));
+        report.push_str(&format!(
+            "  Time in Combat:      {:.1}%\n\n",
+            self.avg_combat_percent
+        ));
+
+        report.push_str("── XP SOURCES ───────────────────────────────────────────────────\n");
+        report.push_str(&format!(
+            "  XP from Kills:       {:.1}%\n",
+            self.xp_from_kills_percent
+        ));
+        report.push_str(&format!(
+            "  XP from Passive:     {:.1}%\n\n",
+            self.xp_from_passive_percent
+        ));
+
+        if self.avg_wall_percent > 0.1 {
+            report.push_str("── PRESTIGE WALL ANALYSIS ───────────────────────────────────────\n");
+            report.push_str(&format!(
+                "  Time at Zone Cap:    {:.1}% of run\n",
+                self.avg_wall_percent
+            ));
+            if self.avg_wall_percent > 20.0 {
+                report.push_str("  ⚠️  Significant grind at prestige gate (>20% at cap)\n");
+            }
+            report.push('\n');
+        }
+
         report.push_str("── ZONE COMPLETION ──────────────────────────────────────────────\n");
         for zone in 1..=10 {
             let reached = self.zone_distribution.get(&zone).copied().unwrap_or(0);
@@ -435,8 +572,8 @@ impl SimReport {
         report.push('\n');
 
         report.push_str("── PER-ZONE BREAKDOWN ───────────────────────────────────────────\n");
-        report.push_str("  Zone   Deaths    Kills    Ticks    Deaths/Kill\n");
-        report.push_str("  ────   ──────    ─────    ─────    ───────────\n");
+        report.push_str("  Zone   Deaths    Kills    Time         Deaths/Kill\n");
+        report.push_str("  ────   ──────    ─────    ────         ───────────\n");
         for zone in 1..=10 {
             let deaths = self.avg_deaths_per_zone[zone];
             let kills = self.avg_kills_per_zone[zone];
@@ -445,8 +582,12 @@ impl SimReport {
 
             if kills > 0.0 {
                 report.push_str(&format!(
-                    "  {:4}   {:6.1}   {:6.0}   {:6.0}   {:.3}\n",
-                    zone, deaths, kills, ticks, deaths_per_kill
+                    "  {:4}   {:6.1}   {:6.0}   {:10}   {:.3}\n",
+                    zone,
+                    deaths,
+                    kills,
+                    ticks_to_time_str(ticks as u64),
+                    deaths_per_kill
                 ));
             }
         }
@@ -468,9 +609,10 @@ impl SimReport {
         if !self.level_pacing.avg_ticks_per_range.is_empty() {
             report.push_str("── LEVEL PACING ─────────────────────────────────────────────────\n");
             for (label, avg_ticks) in &self.level_pacing.avg_ticks_per_range {
+                let time_str = ticks_to_time_str(*avg_ticks as u64);
                 report.push_str(&format!(
-                    "  {}:   avg {:.0} ticks/level\n",
-                    label, avg_ticks
+                    "  {}:   {} ({:.0} ticks) per level\n",
+                    label, time_str, avg_ticks
                 ));
             }
             if let Some(slowdown_level) = self.level_pacing.slowdown_level {
@@ -497,17 +639,48 @@ impl SimReport {
         // Prestige Progression section
         if !self.prestige_summary.is_empty() {
             report.push_str("── PRESTIGE PROGRESSION ─────────────────────────────────────────\n");
+
+            // Get P0 time for speedup comparison
+            let p0_ticks = self
+                .prestige_summary
+                .iter()
+                .find(|s| s.rank == 0)
+                .map(|s| s.avg_ticks)
+                .unwrap_or(1.0);
+
             for summary in &self.prestige_summary {
-                let ticks_formatted = format_with_commas(summary.avg_ticks as u64);
-                if summary.improvement_pct > 0.0 {
+                let time_str = ticks_to_time_str(summary.avg_ticks as u64);
+
+                // Calculate actual vs theoretical speedup
+                let actual_speedup = if summary.rank > 0 && p0_ticks > 0.0 {
+                    p0_ticks / summary.avg_ticks
+                } else {
+                    1.0
+                };
+                let theoretical = theoretical_prestige_mult(summary.rank);
+
+                if summary.rank == 0 {
                     report.push_str(&format!(
-                        "  P{}: {} ticks to Z10, {:.0} deaths ({:.0}% faster)\n",
-                        summary.rank, ticks_formatted, summary.avg_deaths, summary.improvement_pct
+                        "  P{}: {} to Z10, {:.0} deaths (baseline)\n",
+                        summary.rank, time_str, summary.avg_deaths
                     ));
                 } else {
+                    let speedup_diff = actual_speedup - theoretical;
+                    let speedup_indicator = if speedup_diff.abs() < 0.1 {
+                        "✓"
+                    } else if speedup_diff < 0.0 {
+                        "⚠️"
+                    } else {
+                        "+"
+                    };
                     report.push_str(&format!(
-                        "  P{}: {} ticks to Z10, {:.0} deaths\n",
-                        summary.rank, ticks_formatted, summary.avg_deaths
+                        "  P{}: {} to Z10, {:.0} deaths — {:.2}x actual vs {:.2}x theory {}\n",
+                        summary.rank,
+                        time_str,
+                        summary.avg_deaths,
+                        actual_speedup,
+                        theoretical,
+                        speedup_indicator
                     ));
                 }
             }
@@ -590,15 +763,21 @@ impl SimReport {
             }
         }
 
-        output.push_str("  Level   Avg Ticks   Samples\n");
-        output.push_str("  ─────   ─────────   ───────\n");
+        output.push_str("  Level   Time       Ticks     Samples\n");
+        output.push_str("  ─────   ────       ─────     ───────\n");
 
         for level in 2..=100 {
             if !level_ticks[level].is_empty() {
                 let avg =
                     level_ticks[level].iter().sum::<u64>() as f64 / level_ticks[level].len() as f64;
                 let samples = level_ticks[level].len();
-                output.push_str(&format!("  {:5}   {:9.0}   {:7}\n", level, avg, samples));
+                output.push_str(&format!(
+                    "  {:5}   {:10} {:9.0}   {:7}\n",
+                    level,
+                    ticks_to_time_str(avg as u64),
+                    avg,
+                    samples
+                ));
             }
         }
 
@@ -667,6 +846,14 @@ mod tests {
                 ticks_per_zone: vec![0; 11],
                 level_up_ticks: vec![0; 101],
                 prestige_cycles: Vec::new(),
+                total_combat_ticks: 5000,
+                total_regen_ticks: 2000,
+                fight_count: 500,
+                ticks_at_zone_cap: 0,
+                xp_from_kills: 10000,
+                xp_from_passive: 5000,
+                boss_deaths: 2,
+                regular_deaths: 13,
             },
             RunStats {
                 final_level: 45,
@@ -685,6 +872,14 @@ mod tests {
                 ticks_per_zone: vec![0; 11],
                 level_up_ticks: vec![0; 101],
                 prestige_cycles: Vec::new(),
+                total_combat_ticks: 4500,
+                total_regen_ticks: 1800,
+                fight_count: 450,
+                ticks_at_zone_cap: 0,
+                xp_from_kills: 9000,
+                xp_from_passive: 4500,
+                boss_deaths: 3,
+                regular_deaths: 17,
             },
         ];
 
@@ -692,5 +887,25 @@ mod tests {
         assert_eq!(report.num_runs, 2);
         assert_eq!(report.runs_completed, 2);
         assert!((report.avg_final_level - 47.5).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_ticks_to_time_str() {
+        assert_eq!(ticks_to_time_str(0), "~0s");
+        assert_eq!(ticks_to_time_str(10), "~1s");
+        assert_eq!(ticks_to_time_str(100), "~10s");
+        assert_eq!(ticks_to_time_str(600), "~1m 0s");
+        assert_eq!(ticks_to_time_str(2000), "~3m 20s");
+        assert_eq!(ticks_to_time_str(36000), "~1h 0m");
+    }
+
+    #[test]
+    fn test_theoretical_prestige_mult() {
+        // P0 = 1.0
+        assert!((theoretical_prestige_mult(0) - 1.0).abs() < 0.01);
+        // P1 = 1.5
+        assert!((theoretical_prestige_mult(1) - 1.5).abs() < 0.01);
+        // P5 = 1.0 + 0.5 * 5^0.7 ≈ 2.54
+        assert!((theoretical_prestige_mult(5) - 2.54).abs() < 0.1);
     }
 }
