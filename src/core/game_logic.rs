@@ -3,11 +3,10 @@ use super::game_state::GameState;
 use crate::character::attributes::AttributeType;
 use crate::character::derived_stats::DerivedStats;
 use crate::combat::types::{
-    generate_boss_enemy, generate_elite_enemy, generate_enemy, generate_enemy_for_current_zone,
-    generate_subzone_boss,
+    generate_boss_enemy, generate_boss_for_current_zone, generate_elite_enemy, generate_enemy,
+    generate_enemy_for_current_zone,
 };
 use crate::dungeon::types::RoomType;
-use crate::zones::get_zone;
 use chrono::Utc;
 use rand::Rng;
 
@@ -200,19 +199,13 @@ pub fn spawn_enemy_if_needed(state: &mut GameState) {
             // Normal overworld combat - use zone-based enemy generation
             let derived =
                 DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
-            let total_damage = derived.total_damage();
 
+            let zone_id = state.zone_progression.current_zone_id;
+            let subzone_id = state.zone_progression.current_subzone_id;
             let enemy = if state.zone_progression.fighting_boss {
-                // Spawn the subzone boss
-                spawn_subzone_boss(state, derived.max_hp, total_damage)
+                generate_boss_for_current_zone(zone_id, subzone_id, derived.max_hp)
             } else {
-                // Spawn regular zone enemy
-                generate_enemy_for_current_zone(
-                    state.zone_progression.current_zone_id,
-                    state.zone_progression.current_subzone_id,
-                    derived.max_hp,
-                    total_damage,
-                )
+                generate_enemy_for_current_zone(zone_id, subzone_id, derived.max_hp)
             };
             state.combat_state.current_enemy = Some(enemy);
             state.combat_state.attack_timer = 0.0;
@@ -220,29 +213,9 @@ pub fn spawn_enemy_if_needed(state: &mut GameState) {
     }
 }
 
-/// Spawns the current subzone's boss
-fn spawn_subzone_boss(
-    state: &GameState,
-    player_max_hp: u32,
-    player_damage: u32,
-) -> crate::combat::types::Enemy {
-    let zone_id = state.zone_progression.current_zone_id;
-    let subzone_id = state.zone_progression.current_subzone_id;
-
-    if let Some(zone) = get_zone(zone_id) {
-        if let Some(subzone) = zone.subzones.iter().find(|s| s.id == subzone_id) {
-            return generate_subzone_boss(&zone, subzone, player_max_hp, player_damage);
-        }
-    }
-
-    // Fallback - shouldn't happen
-    generate_boss_enemy(player_max_hp, player_damage)
-}
-
 /// Spawns a dungeon enemy based on the current room type
 fn spawn_dungeon_enemy(state: &mut GameState) {
     let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
-    let total_damage = derived.total_damage();
 
     let room_type = state
         .active_dungeon
@@ -251,9 +224,9 @@ fn spawn_dungeon_enemy(state: &mut GameState) {
         .map(|r| r.room_type);
 
     let enemy = match room_type {
-        Some(RoomType::Elite) => generate_elite_enemy(derived.max_hp, total_damage),
-        Some(RoomType::Boss) => generate_boss_enemy(derived.max_hp, total_damage),
-        _ => generate_enemy(derived.max_hp, total_damage),
+        Some(RoomType::Elite) => generate_elite_enemy(derived.max_hp),
+        Some(RoomType::Boss) => generate_boss_enemy(derived.max_hp),
+        _ => generate_enemy(derived.max_hp),
     };
 
     state.combat_state.current_enemy = Some(enemy);
@@ -802,7 +775,6 @@ mod tests {
         // Elite enemies (1.5x multiplier) should on average have higher stats
         // than regular enemies for the same player stats
         let player_hp = 200;
-        let player_dmg = 30;
         let samples = 300;
 
         let mut regular_hp_sum: f64 = 0.0;
@@ -811,8 +783,8 @@ mod tests {
         let mut elite_dmg_sum: f64 = 0.0;
 
         for _ in 0..samples {
-            let regular = crate::combat::types::generate_enemy(player_hp, player_dmg);
-            let elite = crate::combat::types::generate_elite_enemy(player_hp, player_dmg);
+            let regular = crate::combat::types::generate_enemy(player_hp);
+            let elite = crate::combat::types::generate_elite_enemy(player_hp);
             regular_hp_sum += regular.max_hp as f64;
             elite_hp_sum += elite.max_hp as f64;
             regular_dmg_sum += regular.damage as f64;
@@ -849,7 +821,6 @@ mod tests {
         // Boss enemies (2.0x multiplier) should on average have higher stats
         // than elite enemies (1.5x multiplier)
         let player_hp = 200;
-        let player_dmg = 30;
         let samples = 300;
 
         let mut elite_hp_sum: f64 = 0.0;
@@ -858,8 +829,8 @@ mod tests {
         let mut boss_dmg_sum: f64 = 0.0;
 
         for _ in 0..samples {
-            let elite = crate::combat::types::generate_elite_enemy(player_hp, player_dmg);
-            let boss = crate::combat::types::generate_boss_enemy(player_hp, player_dmg);
+            let elite = crate::combat::types::generate_elite_enemy(player_hp);
+            let boss = crate::combat::types::generate_boss_enemy(player_hp);
             elite_hp_sum += elite.max_hp as f64;
             boss_hp_sum += boss.max_hp as f64;
             elite_dmg_sum += elite.damage as f64;
@@ -892,15 +863,14 @@ mod tests {
         // Enemies should scale with player max HP
         let low_hp = 50;
         let high_hp = 500;
-        let player_dmg = 20;
         let samples = 200;
 
         let mut low_hp_sum: f64 = 0.0;
         let mut high_hp_sum: f64 = 0.0;
 
         for _ in 0..samples {
-            let low = crate::combat::types::generate_enemy(low_hp, player_dmg);
-            let high = crate::combat::types::generate_enemy(high_hp, player_dmg);
+            let low = crate::combat::types::generate_enemy(low_hp);
+            let high = crate::combat::types::generate_enemy(high_hp);
             low_hp_sum += low.max_hp as f64;
             high_hp_sum += high.max_hp as f64;
         }
@@ -924,15 +894,14 @@ mod tests {
         // Enemy damage is based on player_max_hp / 7.0 (for 5-10 second fights)
         let low_hp = 50;
         let high_hp = 500;
-        let player_dmg = 20;
         let samples = 200;
 
         let mut low_dmg_sum: f64 = 0.0;
         let mut high_dmg_sum: f64 = 0.0;
 
         for _ in 0..samples {
-            let low = crate::combat::types::generate_enemy(low_hp, player_dmg);
-            let high = crate::combat::types::generate_enemy(high_hp, player_dmg);
+            let low = crate::combat::types::generate_enemy(low_hp);
+            let high = crate::combat::types::generate_enemy(high_hp);
             low_dmg_sum += low.damage as f64;
             high_dmg_sum += high.damage as f64;
         }

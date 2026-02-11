@@ -1512,7 +1512,6 @@ fn game_tick(
                 };
                 game_state.combat_state.add_log_entry(message, false, true);
             }
-            _ => {}
         }
     }
 

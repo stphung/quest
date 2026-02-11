@@ -23,7 +23,6 @@ pub struct HavenCombatBonuses {
     pub xp_gain_percent: f64,
 }
 
-#[allow(dead_code)]
 pub enum CombatEvent {
     PlayerAttack {
         damage: u32,
@@ -55,7 +54,6 @@ pub enum CombatEvent {
         xp_gained: u64,
         result: BossDefeatResult,
     },
-    None,
 }
 
 /// Updates combat state, returns events that occurred
@@ -298,6 +296,49 @@ mod tests {
     };
     use super::*;
     use crate::achievements::Achievements;
+
+    // =========================================================================
+    // Test Helpers
+    // =========================================================================
+
+    /// Forces a combat tick by setting the attack timer and calling update_combat.
+    fn force_combat_tick(
+        state: &mut GameState,
+        haven: &HavenCombatBonuses,
+        achievements: &mut Achievements,
+    ) -> Vec<CombatEvent> {
+        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        update_combat(state, 0.1, haven, achievements)
+    }
+
+    /// Asserts that at least one event matching the predicate exists.
+    fn assert_has_event(events: &[CombatEvent], name: &str, pred: impl Fn(&CombatEvent) -> bool) {
+        assert!(events.iter().any(pred), "Expected {name} event");
+    }
+
+    /// Asserts that no event matching the predicate exists.
+    fn assert_no_event(events: &[CombatEvent], name: &str, pred: impl Fn(&CombatEvent) -> bool) {
+        assert!(!events.iter().any(pred), "Unexpected {name} event");
+    }
+
+    /// Asserts XP is within the expected combat kill range for the given state.
+    fn assert_xp_in_combat_range(state: &GameState, xp: u64, label: &str) {
+        let xp_per_tick = crate::core::game_logic::xp_gain_per_tick(
+            state.prestige_rank,
+            state
+                .attributes
+                .modifier(crate::character::attributes::AttributeType::Wisdom),
+            state
+                .attributes
+                .modifier(crate::character::attributes::AttributeType::Charisma),
+        );
+        let min_xp = (xp_per_tick * COMBAT_XP_MIN_TICKS as f64) as u64;
+        let max_xp = (xp_per_tick * COMBAT_XP_MAX_TICKS as f64) as u64;
+        assert!(
+            xp >= min_xp && xp <= max_xp,
+            "{label} XP {xp} should be in range [{min_xp}, {max_xp}]",
+        );
+    }
 
     #[test]
     fn test_update_combat_no_enemy() {
@@ -982,15 +1023,14 @@ mod tests {
     fn test_elite_enemy_has_150_percent_stats() {
         // Run multiple generations and verify elite stats are roughly 1.5x base
         let player_hp = 200;
-        let player_dmg = 50;
 
         let mut base_hp_sum: f64 = 0.0;
         let mut elite_hp_sum: f64 = 0.0;
         let samples = 500;
 
         for _ in 0..samples {
-            let base = generate_enemy(player_hp, player_dmg);
-            let elite = generate_elite_enemy(player_hp, player_dmg);
+            let base = generate_enemy(player_hp);
+            let elite = generate_elite_enemy(player_hp);
             base_hp_sum += base.max_hp as f64;
             elite_hp_sum += elite.max_hp as f64;
         }
@@ -1010,15 +1050,14 @@ mod tests {
     #[test]
     fn test_boss_enemy_has_200_percent_stats() {
         let player_hp = 200;
-        let player_dmg = 50;
 
         let mut base_hp_sum: f64 = 0.0;
         let mut boss_hp_sum: f64 = 0.0;
         let samples = 500;
 
         for _ in 0..samples {
-            let base = generate_enemy(player_hp, player_dmg);
-            let boss = generate_boss_enemy(player_hp, player_dmg);
+            let base = generate_enemy(player_hp);
+            let boss = generate_boss_enemy(player_hp);
             base_hp_sum += base.max_hp as f64;
             boss_hp_sum += boss.max_hp as f64;
         }
@@ -1040,14 +1079,13 @@ mod tests {
         use crate::zones::get_all_zones;
         let zones = get_all_zones();
         let player_hp = 200;
-        let player_dmg = 50;
         let samples = 300;
 
         // Zone 1 average HP
         let zone1 = &zones[0];
         let mut z1_hp: f64 = 0.0;
         for _ in 0..samples {
-            let e = generate_zone_enemy(zone1, &zone1.subzones[0], player_hp, player_dmg);
+            let e = generate_zone_enemy(zone1, &zone1.subzones[0], player_hp);
             z1_hp += e.max_hp as f64;
         }
 
@@ -1055,7 +1093,7 @@ mod tests {
         let zone10 = &zones[9];
         let mut z10_hp: f64 = 0.0;
         for _ in 0..samples {
-            let e = generate_zone_enemy(zone10, &zone10.subzones[0], player_hp, player_dmg);
+            let e = generate_zone_enemy(zone10, &zone10.subzones[0], player_hp);
             z10_hp += e.max_hp as f64;
         }
 
@@ -1873,40 +1911,25 @@ mod tests {
 
     #[test]
     fn test_dungeon_combat_kills_do_not_affect_zone_progression() {
-        let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut state = setup_dungeon_with_room_type(RoomType::Combat);
         let mut achievements = Achievements::default();
-
-        // Put player in a dungeon
-        state.active_dungeon = Some(crate::dungeon::generation::generate_dungeon(1, 0));
-
-        // Set up a weak enemy the player can kill
         state.combat_state.current_enemy = Some(Enemy::new("Goblin".to_string(), 1, 1));
         state.combat_state.player_current_hp = 1000;
-
         let initial_kills = state.zone_progression.kills_in_subzone;
 
-        // Force an attack that kills the enemy
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(
+        let events = force_combat_tick(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
 
-        // Should emit EnemyDied, not SubzoneBossDefeated
-        let enemy_died = events
-            .iter()
-            .any(|e| matches!(e, CombatEvent::EnemyDied { .. }));
-        assert!(enemy_died, "Should emit EnemyDied for dungeon combat kill");
-
-        // Zone progression kill counter should NOT have incremented
+        assert_has_event(&events, "EnemyDied", |e| {
+            matches!(e, CombatEvent::EnemyDied { .. })
+        });
         assert_eq!(
             state.zone_progression.kills_in_subzone, initial_kills,
             "Dungeon kills should not increment zone kill counter"
         );
-
-        // Boss should not have spawned
         assert!(
             !state.zone_progression.fighting_boss,
             "Dungeon kills should not trigger zone boss"
@@ -1917,44 +1940,26 @@ mod tests {
     // Dungeon Combat Event Emission Tests
     // =========================================================================
 
-    /// Helper: creates a GameState with an active dungeon and positions the player
-    /// in a room of the specified type. Returns the state ready for combat testing.
+    /// Helper: creates a GameState with a minimal deterministic dungeon
+    /// where the player is in a room of the specified type.
     fn setup_dungeon_with_room_type(room_type: RoomType) -> GameState {
-        use crate::dungeon::types::RoomState;
+        use crate::dungeon::types::{Dungeon, DungeonSize, Room, RoomState};
 
         let mut state = GameState::new("Dungeon Tester".to_string(), 0);
-        let dungeon = crate::dungeon::generation::generate_dungeon(1, 0);
-        state.active_dungeon = Some(dungeon);
+        state.character_level = 10;
 
-        let dungeon = state.active_dungeon.as_mut().unwrap();
-        let grid_size = dungeon.size.grid_size();
+        let mut dungeon = Dungeon::new(DungeonSize::Small);
+        let pos = (2, 2);
 
-        // Find a room of the requested type
-        let mut target_pos = None;
-        for y in 0..grid_size {
-            for x in 0..grid_size {
-                if let Some(room) = dungeon.get_room(x, y) {
-                    if room.room_type == room_type {
-                        target_pos = Some((x, y));
-                        break;
-                    }
-                }
-            }
-            if target_pos.is_some() {
-                break;
-            }
-        }
-
-        let pos = target_pos.unwrap_or_else(|| {
-            panic!("Generated dungeon has no {:?} room", room_type);
-        });
-
-        // Move player to that room and mark it as Current
-        if let Some(room) = dungeon.get_room_mut(pos.0, pos.1) {
-            room.state = RoomState::Current;
-        }
+        let mut room = Room::new(room_type, pos);
+        room.state = RoomState::Current;
+        dungeon.grid[pos.1][pos.0] = Some(room);
         dungeon.player_position = pos;
+        dungeon.entrance_position = pos;
+        dungeon.boss_position = pos;
+        dungeon.current_room_cleared = false;
 
+        state.active_dungeon = Some(dungeon);
         state
     }
 
@@ -1962,394 +1967,224 @@ mod tests {
     fn test_dungeon_combat_room_kill_emits_enemy_died() {
         let mut state = setup_dungeon_with_room_type(RoomType::Combat);
         let mut achievements = Achievements::default();
-
-        // Set up a weak enemy the player can one-shot
         state.combat_state.current_enemy = Some(Enemy::new("Goblin".to_string(), 1, 0));
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        let events = update_combat(
+        let events = force_combat_tick(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
 
-        // Must emit EnemyDied
-        let enemy_died = events
-            .iter()
-            .any(|e| matches!(e, CombatEvent::EnemyDied { .. }));
-        assert!(enemy_died, "Combat room kill should emit EnemyDied");
-
-        // Must NOT emit SubzoneBossDefeated, EliteDefeated, or BossDefeated
-        let has_subzone_boss = events
-            .iter()
-            .any(|e| matches!(e, CombatEvent::SubzoneBossDefeated { .. }));
-        let has_elite = events
-            .iter()
-            .any(|e| matches!(e, CombatEvent::EliteDefeated { .. }));
-        let has_boss = events
-            .iter()
-            .any(|e| matches!(e, CombatEvent::BossDefeated { .. }));
-
-        assert!(
-            !has_subzone_boss,
-            "Dungeon combat room kill must not emit SubzoneBossDefeated"
-        );
-        assert!(
-            !has_elite,
-            "Dungeon combat room kill must not emit EliteDefeated"
-        );
-        assert!(
-            !has_boss,
-            "Dungeon combat room kill must not emit BossDefeated"
-        );
+        assert_has_event(&events, "EnemyDied", |e| {
+            matches!(e, CombatEvent::EnemyDied { .. })
+        });
+        assert_no_event(&events, "SubzoneBossDefeated", |e| {
+            matches!(e, CombatEvent::SubzoneBossDefeated { .. })
+        });
+        assert_no_event(&events, "EliteDefeated", |e| {
+            matches!(e, CombatEvent::EliteDefeated { .. })
+        });
+        assert_no_event(&events, "BossDefeated", |e| {
+            matches!(e, CombatEvent::BossDefeated { .. })
+        });
     }
 
     #[test]
     fn test_dungeon_elite_room_kill_emits_elite_defeated() {
         let mut state = setup_dungeon_with_room_type(RoomType::Elite);
         let mut achievements = Achievements::default();
-
-        // Set up a weak enemy the player can one-shot
         state.combat_state.current_enemy = Some(Enemy::new("Elite Guard".to_string(), 1, 0));
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        let events = update_combat(
+        let events = force_combat_tick(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
 
-        // Must emit EliteDefeated
-        let has_elite = events
-            .iter()
-            .any(|e| matches!(e, CombatEvent::EliteDefeated { .. }));
-        assert!(has_elite, "Elite room kill should emit EliteDefeated");
-
-        // Must NOT emit EnemyDied, SubzoneBossDefeated, or BossDefeated
-        let has_enemy_died = events
-            .iter()
-            .any(|e| matches!(e, CombatEvent::EnemyDied { .. }));
-        let has_subzone_boss = events
-            .iter()
-            .any(|e| matches!(e, CombatEvent::SubzoneBossDefeated { .. }));
-        let has_boss = events
-            .iter()
-            .any(|e| matches!(e, CombatEvent::BossDefeated { .. }));
-
-        assert!(!has_enemy_died, "Elite room kill must not emit EnemyDied");
-        assert!(
-            !has_subzone_boss,
-            "Elite room kill must not emit SubzoneBossDefeated"
-        );
-        assert!(!has_boss, "Elite room kill must not emit BossDefeated");
+        assert_has_event(&events, "EliteDefeated", |e| {
+            matches!(e, CombatEvent::EliteDefeated { .. })
+        });
+        assert_no_event(&events, "EnemyDied", |e| {
+            matches!(e, CombatEvent::EnemyDied { .. })
+        });
+        assert_no_event(&events, "SubzoneBossDefeated", |e| {
+            matches!(e, CombatEvent::SubzoneBossDefeated { .. })
+        });
+        assert_no_event(&events, "BossDefeated", |e| {
+            matches!(e, CombatEvent::BossDefeated { .. })
+        });
     }
 
     #[test]
     fn test_dungeon_boss_room_kill_emits_boss_defeated() {
         let mut state = setup_dungeon_with_room_type(RoomType::Boss);
         let mut achievements = Achievements::default();
-
-        // Set up a weak enemy the player can one-shot
         state.combat_state.current_enemy = Some(Enemy::new("Dungeon Boss".to_string(), 1, 0));
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        let events = update_combat(
+        let events = force_combat_tick(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
 
-        // Must emit BossDefeated
-        let has_boss = events
-            .iter()
-            .any(|e| matches!(e, CombatEvent::BossDefeated { .. }));
-        assert!(has_boss, "Boss room kill should emit BossDefeated");
-
-        // Must NOT emit EnemyDied, SubzoneBossDefeated, or EliteDefeated
-        let has_enemy_died = events
-            .iter()
-            .any(|e| matches!(e, CombatEvent::EnemyDied { .. }));
-        let has_subzone_boss = events
-            .iter()
-            .any(|e| matches!(e, CombatEvent::SubzoneBossDefeated { .. }));
-        let has_elite = events
-            .iter()
-            .any(|e| matches!(e, CombatEvent::EliteDefeated { .. }));
-
-        assert!(!has_enemy_died, "Boss room kill must not emit EnemyDied");
-        assert!(
-            !has_subzone_boss,
-            "Boss room kill must not emit SubzoneBossDefeated"
-        );
-        assert!(!has_elite, "Boss room kill must not emit EliteDefeated");
+        assert_has_event(&events, "BossDefeated", |e| {
+            matches!(e, CombatEvent::BossDefeated { .. })
+        });
+        assert_no_event(&events, "EnemyDied", |e| {
+            matches!(e, CombatEvent::EnemyDied { .. })
+        });
+        assert_no_event(&events, "SubzoneBossDefeated", |e| {
+            matches!(e, CombatEvent::SubzoneBossDefeated { .. })
+        });
+        assert_no_event(&events, "EliteDefeated", |e| {
+            matches!(e, CombatEvent::EliteDefeated { .. })
+        });
     }
 
     #[test]
     fn test_dungeon_combat_room_kill_xp_in_valid_range() {
         let mut state = setup_dungeon_with_room_type(RoomType::Combat);
         let mut achievements = Achievements::default();
-
         state.combat_state.current_enemy = Some(Enemy::new("Goblin".to_string(), 1, 0));
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        let events = update_combat(
+        let events = force_combat_tick(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
 
-        let xp_gained = events.iter().find_map(|e| match e {
-            CombatEvent::EnemyDied { xp_gained } => Some(*xp_gained),
-            _ => None,
-        });
-
-        assert!(xp_gained.is_some(), "Should have EnemyDied event with XP");
-        let xp = xp_gained.unwrap();
+        let xp = events
+            .iter()
+            .find_map(|e| match e {
+                CombatEvent::EnemyDied { xp_gained } => Some(*xp_gained),
+                _ => None,
+            })
+            .expect("Should have EnemyDied event with XP");
         assert!(xp > 0, "XP gained should be positive");
-
-        // Verify XP is within combat kill XP range
-        let xp_per_tick = crate::core::game_logic::xp_gain_per_tick(
-            state.prestige_rank,
-            state
-                .attributes
-                .modifier(crate::character::attributes::AttributeType::Wisdom),
-            state
-                .attributes
-                .modifier(crate::character::attributes::AttributeType::Charisma),
-        );
-        let min_xp = (xp_per_tick * COMBAT_XP_MIN_TICKS as f64) as u64;
-        let max_xp = (xp_per_tick * COMBAT_XP_MAX_TICKS as f64) as u64;
-        assert!(
-            xp >= min_xp && xp <= max_xp,
-            "Dungeon combat XP {} should be in range [{}, {}]",
-            xp,
-            min_xp,
-            max_xp
-        );
+        assert_xp_in_combat_range(&state, xp, "Dungeon combat");
     }
 
     #[test]
     fn test_dungeon_elite_room_kill_xp_in_valid_range() {
         let mut state = setup_dungeon_with_room_type(RoomType::Elite);
         let mut achievements = Achievements::default();
-
         state.combat_state.current_enemy = Some(Enemy::new("Elite Guard".to_string(), 1, 0));
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        let events = update_combat(
+        let events = force_combat_tick(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
 
-        let xp_gained = events.iter().find_map(|e| match e {
-            CombatEvent::EliteDefeated { xp_gained } => Some(*xp_gained),
-            _ => None,
-        });
-
-        assert!(
-            xp_gained.is_some(),
-            "Should have EliteDefeated event with XP"
-        );
-        let xp = xp_gained.unwrap();
+        let xp = events
+            .iter()
+            .find_map(|e| match e {
+                CombatEvent::EliteDefeated { xp_gained } => Some(*xp_gained),
+                _ => None,
+            })
+            .expect("Should have EliteDefeated event with XP");
         assert!(xp > 0, "Elite XP gained should be positive");
-
-        // Verify XP is within combat kill XP range (same formula for all dungeon kills)
-        let xp_per_tick = crate::core::game_logic::xp_gain_per_tick(
-            state.prestige_rank,
-            state
-                .attributes
-                .modifier(crate::character::attributes::AttributeType::Wisdom),
-            state
-                .attributes
-                .modifier(crate::character::attributes::AttributeType::Charisma),
-        );
-        let min_xp = (xp_per_tick * COMBAT_XP_MIN_TICKS as f64) as u64;
-        let max_xp = (xp_per_tick * COMBAT_XP_MAX_TICKS as f64) as u64;
-        assert!(
-            xp >= min_xp && xp <= max_xp,
-            "Dungeon elite XP {} should be in range [{}, {}]",
-            xp,
-            min_xp,
-            max_xp
-        );
+        assert_xp_in_combat_range(&state, xp, "Dungeon elite");
     }
 
     #[test]
     fn test_dungeon_boss_room_kill_xp_in_valid_range() {
         let mut state = setup_dungeon_with_room_type(RoomType::Boss);
         let mut achievements = Achievements::default();
-
         state.combat_state.current_enemy = Some(Enemy::new("Dungeon Boss".to_string(), 1, 0));
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        let events = update_combat(
+        let events = force_combat_tick(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
 
-        let xp_gained = events.iter().find_map(|e| match e {
-            CombatEvent::BossDefeated { xp_gained } => Some(*xp_gained),
-            _ => None,
-        });
-
-        assert!(
-            xp_gained.is_some(),
-            "Should have BossDefeated event with XP"
-        );
-        let xp = xp_gained.unwrap();
+        let xp = events
+            .iter()
+            .find_map(|e| match e {
+                CombatEvent::BossDefeated { xp_gained } => Some(*xp_gained),
+                _ => None,
+            })
+            .expect("Should have BossDefeated event with XP");
         assert!(xp > 0, "Boss XP gained should be positive");
-
-        // Same XP formula applies to all dungeon kill types
-        let xp_per_tick = crate::core::game_logic::xp_gain_per_tick(
-            state.prestige_rank,
-            state
-                .attributes
-                .modifier(crate::character::attributes::AttributeType::Wisdom),
-            state
-                .attributes
-                .modifier(crate::character::attributes::AttributeType::Charisma),
-        );
-        let min_xp = (xp_per_tick * COMBAT_XP_MIN_TICKS as f64) as u64;
-        let max_xp = (xp_per_tick * COMBAT_XP_MAX_TICKS as f64) as u64;
-        assert!(
-            xp >= min_xp && xp <= max_xp,
-            "Dungeon boss XP {} should be in range [{}, {}]",
-            xp,
-            min_xp,
-            max_xp
-        );
+        assert_xp_in_combat_range(&state, xp, "Dungeon boss");
     }
 
     #[test]
     fn test_player_died_in_dungeon_emits_correct_event_and_exits() {
         let mut state = setup_dungeon_with_room_type(RoomType::Combat);
         let mut achievements = Achievements::default();
-
-        // Low HP so player dies from the enemy counter-attack
         state.combat_state.player_current_hp = 1;
         state.combat_state.current_enemy = Some(Enemy::new("Deadly Mob".to_string(), 100, 50));
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        let events = update_combat(
+        let events = force_combat_tick(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
 
-        // Must emit PlayerDiedInDungeon
-        let died_in_dungeon = events
-            .iter()
-            .any(|e| matches!(e, CombatEvent::PlayerDiedInDungeon));
-        assert!(
-            died_in_dungeon,
-            "Player dying in dungeon should emit PlayerDiedInDungeon"
-        );
-
-        // Must NOT emit PlayerDied (overworld death event)
-        let died_normal = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
-        assert!(
-            !died_normal,
-            "Player dying in dungeon must not emit PlayerDied"
-        );
-
-        // Dungeon should be cleared (exited)
-        assert!(
-            state.active_dungeon.is_none(),
-            "Dungeon should be None after player death"
-        );
-
-        // Player HP should be fully restored
+        assert_has_event(&events, "PlayerDiedInDungeon", |e| {
+            matches!(e, CombatEvent::PlayerDiedInDungeon)
+        });
+        assert_no_event(&events, "PlayerDied", |e| {
+            matches!(e, CombatEvent::PlayerDied)
+        });
+        assert!(state.active_dungeon.is_none());
         assert_eq!(
-            state.combat_state.player_current_hp, state.combat_state.player_max_hp,
-            "Player HP should be restored after dungeon death"
+            state.combat_state.player_current_hp,
+            state.combat_state.player_max_hp
         );
-
-        // Enemy should be cleared (not reset)
-        assert!(
-            state.combat_state.current_enemy.is_none(),
-            "Enemy should be cleared after dungeon death"
-        );
+        assert!(state.combat_state.current_enemy.is_none());
     }
 
     #[test]
     fn test_dungeon_elite_kill_does_not_affect_zone_progression() {
         let mut state = setup_dungeon_with_room_type(RoomType::Elite);
         let mut achievements = Achievements::default();
-
         let initial_kills = state.zone_progression.kills_in_subzone;
-        let initial_fighting_boss = state.zone_progression.fighting_boss;
-
         state.combat_state.current_enemy = Some(Enemy::new("Elite Guard".to_string(), 1, 0));
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        update_combat(
+        force_combat_tick(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
 
-        assert_eq!(
-            state.zone_progression.kills_in_subzone, initial_kills,
-            "Elite dungeon kill should not increment zone kill counter"
-        );
-        assert_eq!(
-            state.zone_progression.fighting_boss, initial_fighting_boss,
-            "Elite dungeon kill should not trigger zone boss"
-        );
+        assert_eq!(state.zone_progression.kills_in_subzone, initial_kills);
+        assert!(!state.zone_progression.fighting_boss);
     }
 
     #[test]
     fn test_dungeon_boss_kill_does_not_affect_zone_progression() {
         let mut state = setup_dungeon_with_room_type(RoomType::Boss);
         let mut achievements = Achievements::default();
-
         let initial_kills = state.zone_progression.kills_in_subzone;
-        let initial_fighting_boss = state.zone_progression.fighting_boss;
-
         state.combat_state.current_enemy = Some(Enemy::new("Dungeon Boss".to_string(), 1, 0));
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        update_combat(
+        force_combat_tick(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
 
-        assert_eq!(
-            state.zone_progression.kills_in_subzone, initial_kills,
-            "Dungeon boss kill should not increment zone kill counter"
-        );
-        assert_eq!(
-            state.zone_progression.fighting_boss, initial_fighting_boss,
-            "Dungeon boss kill should not trigger zone boss"
-        );
+        assert_eq!(state.zone_progression.kills_in_subzone, initial_kills);
+        assert!(!state.zone_progression.fighting_boss);
     }
 
     #[test]
@@ -2358,49 +2193,26 @@ mod tests {
         // in a dungeon, dungeon event logic should take priority.
         let mut state = setup_dungeon_with_room_type(RoomType::Combat);
         let mut achievements = Achievements::default();
-
-        // Simulate an overworld boss fight being active (should be ignored in dungeon)
         state.zone_progression.fighting_boss = true;
         state.zone_progression.kills_in_subzone = 10;
-
         state.combat_state.current_enemy = Some(Enemy::new("Goblin".to_string(), 1, 0));
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        let events = update_combat(
+        let events = force_combat_tick(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
 
-        // Should emit EnemyDied (dungeon path), NOT SubzoneBossDefeated (overworld path)
-        let enemy_died = events
-            .iter()
-            .any(|e| matches!(e, CombatEvent::EnemyDied { .. }));
-        let subzone_boss = events
-            .iter()
-            .any(|e| matches!(e, CombatEvent::SubzoneBossDefeated { .. }));
-
-        assert!(
-            enemy_died,
-            "Dungeon kill should emit EnemyDied even when overworld boss flag is set"
-        );
-        assert!(
-            !subzone_boss,
-            "Dungeon kill must not emit SubzoneBossDefeated"
-        );
-
-        // Overworld boss state should remain unchanged
-        assert!(
-            state.zone_progression.fighting_boss,
-            "Dungeon kill should not modify overworld fighting_boss flag"
-        );
-        assert_eq!(
-            state.zone_progression.kills_in_subzone, 10,
-            "Dungeon kill should not modify overworld kills_in_subzone"
-        );
+        assert_has_event(&events, "EnemyDied", |e| {
+            matches!(e, CombatEvent::EnemyDied { .. })
+        });
+        assert_no_event(&events, "SubzoneBossDefeated", |e| {
+            matches!(e, CombatEvent::SubzoneBossDefeated { .. })
+        });
+        assert!(state.zone_progression.fighting_boss);
+        assert_eq!(state.zone_progression.kills_in_subzone, 10);
     }
 
     #[test]
@@ -2408,22 +2220,16 @@ mod tests {
         let mut state = setup_dungeon_with_room_type(RoomType::Combat);
         let mut achievements = Achievements::default();
         state.prestige_rank = 7;
-
         state.combat_state.player_current_hp = 1;
         state.combat_state.current_enemy = Some(Enemy::new("Deadly Mob".to_string(), 100, 50));
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        update_combat(
+        force_combat_tick(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
 
-        assert_eq!(
-            state.prestige_rank, 7,
-            "Prestige rank should be preserved after dungeon death"
-        );
+        assert_eq!(state.prestige_rank, 7);
     }
 
     #[test]
@@ -2432,44 +2238,27 @@ mod tests {
         // present, the fallback path should emit EnemyDied (not a special event)
         let mut state = setup_dungeon_with_room_type(RoomType::Entrance);
         let mut achievements = Achievements::default();
-
         state.combat_state.current_enemy = Some(Enemy::new("Straggler".to_string(), 1, 0));
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        let events = update_combat(
+        let events = force_combat_tick(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
 
-        // Entrance falls through the match to the `_` arm which checks active_dungeon
-        let enemy_died = events
-            .iter()
-            .any(|e| matches!(e, CombatEvent::EnemyDied { .. }));
-        assert!(
-            enemy_died,
-            "Kill in dungeon entrance room should emit EnemyDied"
-        );
-
-        // Verify no other kill-related events
-        let has_elite = events
-            .iter()
-            .any(|e| matches!(e, CombatEvent::EliteDefeated { .. }));
-        let has_boss = events
-            .iter()
-            .any(|e| matches!(e, CombatEvent::BossDefeated { .. }));
-        let has_subzone = events
-            .iter()
-            .any(|e| matches!(e, CombatEvent::SubzoneBossDefeated { .. }));
-
-        assert!(!has_elite, "Entrance kill must not emit EliteDefeated");
-        assert!(!has_boss, "Entrance kill must not emit BossDefeated");
-        assert!(
-            !has_subzone,
-            "Entrance kill must not emit SubzoneBossDefeated"
-        );
+        assert_has_event(&events, "EnemyDied", |e| {
+            matches!(e, CombatEvent::EnemyDied { .. })
+        });
+        assert_no_event(&events, "EliteDefeated", |e| {
+            matches!(e, CombatEvent::EliteDefeated { .. })
+        });
+        assert_no_event(&events, "BossDefeated", |e| {
+            matches!(e, CombatEvent::BossDefeated { .. })
+        });
+        assert_no_event(&events, "SubzoneBossDefeated", |e| {
+            matches!(e, CombatEvent::SubzoneBossDefeated { .. })
+        });
     }
 }

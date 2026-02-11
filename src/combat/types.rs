@@ -55,16 +55,12 @@ pub fn generate_enemy_name() -> String {
     format!("{}{} {}", prefix, root, suffix)
 }
 
-pub fn generate_enemy(player_max_hp: u32, _player_damage: u32) -> Enemy {
-    generate_enemy_with_multiplier(player_max_hp, _player_damage, 1.0)
+pub fn generate_enemy(player_max_hp: u32) -> Enemy {
+    generate_enemy_with_multiplier(player_max_hp, 1.0)
 }
 
 /// Generates an enemy with a stat multiplier (for dungeon elites/bosses)
-pub fn generate_enemy_with_multiplier(
-    player_max_hp: u32,
-    _player_damage: u32,
-    stat_multiplier: f64,
-) -> Enemy {
+pub fn generate_enemy_with_multiplier(player_max_hp: u32, stat_multiplier: f64) -> Enemy {
     let mut rng = rand::thread_rng();
 
     let name = generate_enemy_name();
@@ -81,15 +77,15 @@ pub fn generate_enemy_with_multiplier(
 }
 
 /// Generates a dungeon elite enemy (150% stats, guards the key)
-pub fn generate_elite_enemy(player_max_hp: u32, player_damage: u32) -> Enemy {
-    let mut enemy = generate_enemy_with_multiplier(player_max_hp, player_damage, 1.5);
+pub fn generate_elite_enemy(player_max_hp: u32) -> Enemy {
+    let mut enemy = generate_enemy_with_multiplier(player_max_hp, 1.5);
     enemy.name = format!("Elite {}", enemy.name);
     enemy
 }
 
 /// Generates a dungeon boss enemy (200% stats)
-pub fn generate_boss_enemy(player_max_hp: u32, player_damage: u32) -> Enemy {
-    let mut enemy = generate_enemy_with_multiplier(player_max_hp, player_damage, 2.0);
+pub fn generate_boss_enemy(player_max_hp: u32) -> Enemy {
+    let mut enemy = generate_enemy_with_multiplier(player_max_hp, 2.0);
     enemy.name = format!("Boss {}", enemy.name);
     enemy
 }
@@ -141,16 +137,7 @@ pub fn generate_zone_enemy_name(zone_id: u32) -> String {
 }
 
 /// Generates an enemy scaled for the current zone and subzone
-pub fn generate_zone_enemy(
-    zone: &Zone,
-    subzone: &Subzone,
-    player_max_hp: u32,
-    _player_damage: u32,
-) -> Enemy {
-    let mut rng = rand::thread_rng();
-
-    let name = generate_zone_enemy_name(zone.id);
-
+pub fn generate_zone_enemy(zone: &Zone, subzone: &Subzone, player_max_hp: u32) -> Enemy {
     // Base scaling from zone (10% per zone level)
     let zone_multiplier = 1.0 + (zone.id as f64 - 1.0) * 0.1;
 
@@ -159,26 +146,14 @@ pub fn generate_zone_enemy(
 
     let total_multiplier = zone_multiplier * subzone_multiplier;
 
-    // Enemy HP: 80-120% of player HP, scaled by zone/subzone
-    let hp_variance = rng.gen_range(0.8..1.2);
-    let max_hp = ((player_max_hp as f64 * hp_variance * total_multiplier) as u32).max(10);
-
-    // Enemy damage calculated for 5-10 second fights, scaled
-    let damage_variance = rng.gen_range(0.8..1.2);
-    let damage = ((player_max_hp as f64 / 7.0 * damage_variance * total_multiplier) as u32).max(1);
-
-    Enemy::new(name, max_hp, damage)
+    let mut enemy = generate_enemy_with_multiplier(player_max_hp, total_multiplier);
+    enemy.name = generate_zone_enemy_name(zone.id);
+    enemy
 }
 
 /// Generates a subzone boss with the boss's actual name
-#[allow(dead_code)] // Will be used when boss combat is fully integrated
-pub fn generate_subzone_boss(
-    zone: &Zone,
-    subzone: &Subzone,
-    player_max_hp: u32,
-    player_damage: u32,
-) -> Enemy {
-    let base_enemy = generate_zone_enemy(zone, subzone, player_max_hp, player_damage);
+pub fn generate_subzone_boss(zone: &Zone, subzone: &Subzone, player_max_hp: u32) -> Enemy {
+    let base_enemy = generate_zone_enemy(zone, subzone, player_max_hp);
 
     // Zone bosses are stronger than regular subzone bosses
     let (hp_mult, dmg_mult) = if subzone.boss.is_zone_boss {
@@ -196,19 +171,25 @@ pub fn generate_subzone_boss(
 }
 
 /// Generates an enemy for the player's current zone and subzone
-pub fn generate_enemy_for_current_zone(
-    zone_id: u32,
-    subzone_id: u32,
-    player_max_hp: u32,
-    player_damage: u32,
-) -> Enemy {
+pub fn generate_enemy_for_current_zone(zone_id: u32, subzone_id: u32, player_max_hp: u32) -> Enemy {
     if let Some(zone) = get_zone(zone_id) {
         if let Some(subzone) = zone.subzones.iter().find(|s| s.id == subzone_id) {
-            return generate_zone_enemy(&zone, subzone, player_max_hp, player_damage);
+            return generate_zone_enemy(&zone, subzone, player_max_hp);
         }
     }
     // Fallback to generic enemy if zone/subzone not found
-    generate_enemy(player_max_hp, player_damage)
+    generate_enemy(player_max_hp)
+}
+
+/// Generates the subzone boss for the given zone/subzone, with fallback
+pub fn generate_boss_for_current_zone(zone_id: u32, subzone_id: u32, player_max_hp: u32) -> Enemy {
+    if let Some(zone) = get_zone(zone_id) {
+        if let Some(subzone) = zone.subzones.iter().find(|s| s.id == subzone_id) {
+            return generate_subzone_boss(&zone, subzone, player_max_hp);
+        }
+    }
+    // Fallback - shouldn't happen
+    generate_boss_enemy(player_max_hp)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -332,7 +313,7 @@ mod tests {
 
     #[test]
     fn test_generate_enemy() {
-        let enemy = generate_enemy(50, 10);
+        let enemy = generate_enemy(50);
         assert!(!enemy.name.is_empty());
         assert!(enemy.max_hp >= 10);
         assert!(enemy.damage >= 1);
@@ -364,7 +345,7 @@ mod tests {
 
     #[test]
     fn test_generate_elite_enemy() {
-        let enemy = generate_elite_enemy(100, 20);
+        let enemy = generate_elite_enemy(100);
         assert!(enemy.name.starts_with("Elite "));
         // Elite should have ~150% HP (with variance)
         assert!(enemy.max_hp >= 100); // At least base HP
@@ -372,7 +353,7 @@ mod tests {
 
     #[test]
     fn test_generate_boss_enemy() {
-        let enemy = generate_boss_enemy(100, 20);
+        let enemy = generate_boss_enemy(100);
         assert!(enemy.name.starts_with("Boss "));
         // Boss should have ~200% HP (with variance)
         assert!(enemy.max_hp >= 120); // At least 1.2x base HP
@@ -398,7 +379,7 @@ mod tests {
         let zone1 = &zones[0];
         let subzone1 = &zone1.subzones[0];
 
-        let enemy = generate_zone_enemy(zone1, subzone1, 100, 20);
+        let enemy = generate_zone_enemy(zone1, subzone1, 100);
         assert!(!enemy.name.is_empty());
         assert!(enemy.max_hp >= 10);
         assert!(enemy.damage >= 1);
@@ -412,11 +393,11 @@ mod tests {
 
         // Zone 1, subzone 1 - should be baseline
         let zone1 = &zones[0];
-        let enemy1 = generate_zone_enemy(zone1, &zone1.subzones[0], 100, 20);
+        let enemy1 = generate_zone_enemy(zone1, &zone1.subzones[0], 100);
 
         // Zone 5, subzone 1 - should be scaled up (40% more from zone)
         let zone5 = &zones[4];
-        let enemy5 = generate_zone_enemy(zone5, &zone5.subzones[0], 100, 20);
+        let enemy5 = generate_zone_enemy(zone5, &zone5.subzones[0], 100);
 
         // On average, zone 5 enemies should be stronger (with variance this may not always hold)
         // So we just check both are valid
@@ -433,13 +414,13 @@ mod tests {
 
         // Test regular subzone boss (subzone 1)
         let subzone1 = &zone1.subzones[0];
-        let boss1 = generate_subzone_boss(zone1, subzone1, 100, 20);
+        let boss1 = generate_subzone_boss(zone1, subzone1, 100);
         assert_eq!(boss1.name, "Field Guardian");
         assert!(!subzone1.boss.is_zone_boss);
 
         // Test zone boss (subzone 3 - Sporeling Queen)
         let subzone3 = &zone1.subzones[2];
-        let zone_boss = generate_subzone_boss(zone1, subzone3, 100, 20);
+        let zone_boss = generate_subzone_boss(zone1, subzone3, 100);
         assert_eq!(zone_boss.name, "Sporeling Queen");
         assert!(subzone3.boss.is_zone_boss);
 
@@ -449,12 +430,12 @@ mod tests {
 
     #[test]
     fn test_generate_enemy_for_current_zone() {
-        let enemy = generate_enemy_for_current_zone(1, 1, 100, 20);
+        let enemy = generate_enemy_for_current_zone(1, 1, 100);
         assert!(!enemy.name.is_empty());
         assert!(enemy.max_hp >= 10);
 
         // Test fallback for invalid zone
-        let fallback = generate_enemy_for_current_zone(999, 1, 100, 20);
+        let fallback = generate_enemy_for_current_zone(999, 1, 100);
         assert!(!fallback.name.is_empty());
     }
 }
