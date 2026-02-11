@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use super::types::{AffixType, AttributeBonuses, Item};
 use crate::core::game_state::GameState;
 
@@ -9,12 +8,14 @@ pub fn score_item(item: &Item, game_state: &GameState) -> f64 {
     let weights = calculate_attribute_weights(game_state);
 
     // Score attributes
-    score += item.attributes.str as f64 * weights.str as f64;
-    score += item.attributes.dex as f64 * weights.dex as f64;
-    score += item.attributes.con as f64 * weights.con as f64;
-    score += item.attributes.int as f64 * weights.int as f64;
-    score += item.attributes.wis as f64 * weights.wis as f64;
-    score += item.attributes.cha as f64 * weights.cha as f64;
+    for (item_val, weight) in item
+        .attributes
+        .as_array()
+        .iter()
+        .zip(weights.as_array().iter())
+    {
+        score += *item_val as f64 * *weight as f64;
+    }
 
     // Score affixes with different weights
     for affix in &item.affixes {

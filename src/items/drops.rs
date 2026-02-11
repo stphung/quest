@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use super::generation::generate_item;
 use super::types::{EquipmentSlot, Item, Rarity};
 use crate::core::constants::{
@@ -143,41 +142,6 @@ pub fn roll_random_slot(rng: &mut impl Rng) -> EquipmentSlot {
         6 => EquipmentSlot::Ring,
         _ => unreachable!(),
     }
-}
-
-// ============================================================================
-// Legacy compatibility functions
-// ============================================================================
-
-/// Legacy function - redirects to try_drop_from_mob with zone 1.
-/// Kept for backwards compatibility with existing callers.
-pub fn try_drop_item(game_state: &GameState) -> Option<Item> {
-    try_drop_from_mob(game_state, 1, 0.0, 0.0)
-}
-
-/// Legacy function - redirects to try_drop_from_mob.
-/// Kept for backwards compatibility with existing callers.
-pub fn try_drop_item_with_haven(
-    game_state: &GameState,
-    haven_drop_rate_percent: f64,
-    haven_rarity_percent: f64,
-) -> Option<Item> {
-    // Use zone 1 as default - callers should migrate to try_drop_from_mob
-    try_drop_from_mob(game_state, 1, haven_drop_rate_percent, haven_rarity_percent)
-}
-
-/// Legacy rarity roll - redirects to mob rarity (no legendaries).
-pub fn roll_rarity(prestige_rank: u32, rng: &mut impl Rng) -> Rarity {
-    roll_rarity_for_mob(prestige_rank, 0.0, rng)
-}
-
-/// Legacy rarity roll with haven - redirects to mob rarity (no legendaries).
-pub fn roll_rarity_with_haven(
-    prestige_rank: u32,
-    haven_rarity_percent: f64,
-    rng: &mut impl Rng,
-) -> Rarity {
-    roll_rarity_for_mob(prestige_rank, haven_rarity_percent, rng)
 }
 
 #[cfg(test)]
@@ -379,18 +343,5 @@ mod tests {
             common_no_bonus,
             common_with_bonus
         );
-    }
-
-    #[test]
-    fn test_legacy_functions_work() {
-        let game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
-
-        // Legacy functions should not panic
-        let _ = try_drop_item(&game_state);
-        let _ = try_drop_item_with_haven(&game_state, 10.0, 10.0);
-
-        let mut rng = rand::thread_rng();
-        let _ = roll_rarity(5, &mut rng);
-        let _ = roll_rarity_with_haven(5, 10.0, &mut rng);
     }
 }

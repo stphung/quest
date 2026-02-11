@@ -11,7 +11,7 @@ use crate::character::prestige::get_prestige_tier;
 use crate::core::constants::{BASE_MAX_FISHING_RANK, FISHING_DISCOVERY_CHANCE, MAX_FISHING_RANK};
 use crate::core::game_state::GameState;
 use crate::items::generation as item_generation;
-use crate::items::{EquipmentSlot, Rarity};
+use crate::items::{ilvl_for_zone, roll_random_slot, Rarity};
 use rand::Rng;
 
 /// Apply timer reduction from Garden bonus
@@ -276,19 +276,10 @@ fn try_fishing_item_drop(
         };
 
         // Random equipment slot
-        let slots = [
-            EquipmentSlot::Weapon,
-            EquipmentSlot::Armor,
-            EquipmentSlot::Helmet,
-            EquipmentSlot::Gloves,
-            EquipmentSlot::Boots,
-            EquipmentSlot::Amulet,
-            EquipmentSlot::Ring,
-        ];
-        let slot = slots[rng.gen_range(0..slots.len())];
+        let slot = roll_random_slot(rng);
 
         // Item level based on zone
-        let ilvl = (zone_id as u32) * 10;
+        let ilvl = ilvl_for_zone(zone_id);
 
         Some(item_generation::generate_item(slot, item_rarity, ilvl))
     } else {

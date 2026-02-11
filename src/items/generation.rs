@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use super::names::generate_display_name;
 use super::types::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
 use crate::core::constants::{ILVL_SCALING_BASE, ILVL_SCALING_DIVISOR};

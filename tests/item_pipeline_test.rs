@@ -5,7 +5,7 @@
 
 use quest::character::attributes::AttributeType;
 use quest::core::constants::{ITEM_DROP_BASE_CHANCE, ITEM_DROP_MAX_CHANCE};
-use quest::items::drops::{drop_chance_for_prestige, roll_rarity, try_drop_item};
+use quest::items::drops::{drop_chance_for_prestige, roll_rarity_for_mob, try_drop_from_mob};
 use quest::items::generation::generate_item;
 use quest::items::scoring::{auto_equip_if_better, score_item};
 use quest::items::types::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
@@ -79,7 +79,7 @@ fn test_try_drop_item_frequency_at_prestige_zero() {
     let game_state = GameState::new("Drop Test".to_string(), 0);
     let trials = 5000;
     let drops: usize = (0..trials)
-        .filter(|_| try_drop_item(&game_state).is_some())
+        .filter(|_| try_drop_from_mob(&game_state, 1, 0.0, 0.0).is_some())
         .count();
 
     // Expected: 15% = 750 out of 5000, allow wide margin for randomness
@@ -99,13 +99,13 @@ fn test_try_drop_item_frequency_increases_with_prestige() {
     let mut state_p0 = GameState::new("P0".to_string(), 0);
     state_p0.prestige_rank = 0;
     let drops_p0: usize = (0..trials)
-        .filter(|_| try_drop_item(&state_p0).is_some())
+        .filter(|_| try_drop_from_mob(&state_p0, 1, 0.0, 0.0).is_some())
         .count();
 
     let mut state_p5 = GameState::new("P5".to_string(), 0);
     state_p5.prestige_rank = 5;
     let drops_p5: usize = (0..trials)
-        .filter(|_| try_drop_item(&state_p5).is_some())
+        .filter(|_| try_drop_from_mob(&state_p5, 1, 0.0, 0.0).is_some())
         .count();
 
     assert!(
@@ -794,7 +794,7 @@ fn test_roll_rarity_covers_all_mob_tiers() {
     let mut seen = std::collections::HashSet::new();
 
     for _ in 0..10_000 {
-        let rarity = roll_rarity(0, &mut rng);
+        let rarity = roll_rarity_for_mob(0, 0.0, &mut rng);
         seen.insert(format!("{:?}", rarity));
         if seen.len() == 4 {
             break;
@@ -822,10 +822,10 @@ fn test_roll_rarity_prestige_bonus_shifts_toward_higher_tiers() {
     let mut common_p10 = 0usize;
 
     for _ in 0..trials {
-        if roll_rarity(0, &mut rng) == Rarity::Common {
+        if roll_rarity_for_mob(0, 0.0, &mut rng) == Rarity::Common {
             common_p0 += 1;
         }
-        if roll_rarity(10, &mut rng) == Rarity::Common {
+        if roll_rarity_for_mob(10, 0.0, &mut rng) == Rarity::Common {
             common_p10 += 1;
         }
     }
@@ -994,7 +994,7 @@ fn test_pipeline_prestige_produces_better_average_scores() {
         let n = 500;
         let sum: f64 = (0..n)
             .map(|_| {
-                let rarity = roll_rarity(gs.prestige_rank, &mut rng);
+                let rarity = roll_rarity_for_mob(gs.prestige_rank, 0.0, &mut rng);
                 let item = generate_item(EquipmentSlot::Weapon, rarity, 10);
                 score_item(&item, gs)
             })
@@ -1023,7 +1023,7 @@ fn test_try_drop_item_produces_valid_equippable_items() {
     let mut items_equipped = 0;
     // Run many trials to collect some actual drops
     for _ in 0..1000 {
-        if let Some(item) = try_drop_item(&game_state) {
+        if let Some(item) = try_drop_from_mob(&game_state, 1, 0.0, 0.0) {
             // Verify basic item validity
             assert!(!item.display_name.is_empty());
             assert!(item.attributes.total() > 0);
