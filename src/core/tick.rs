@@ -6,8 +6,6 @@
 //! presentation layer (main.rs) can update the UI without game logic depending
 //! on any UI types.
 
-#![allow(dead_code)] // Types are used via lib.rs; main.rs will use them after integration
-
 use crate::achievements::Achievements;
 use crate::challenges::menu::ChallengeType;
 use crate::challenges::ActiveMinigame;
@@ -39,6 +37,7 @@ use rand::Rng;
 /// visual effects, and UI state changes. The game logic layer never
 /// touches UI types directly.
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Fields are part of the public API contract; main.rs matches with `..`
 pub enum TickEvent {
     // ── Combat ──────────────────────────────────────────────────
     /// Player attacked an enemy.
