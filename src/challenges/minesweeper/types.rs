@@ -26,30 +26,9 @@ pub enum MinesweeperDifficulty {
     Master,     // 16x20, 60 mines
 }
 
+difficulty_enum_impl!(MinesweeperDifficulty);
+
 impl MinesweeperDifficulty {
-    pub const ALL: [MinesweeperDifficulty; 4] = [
-        MinesweeperDifficulty::Novice,
-        MinesweeperDifficulty::Apprentice,
-        MinesweeperDifficulty::Journeyman,
-        MinesweeperDifficulty::Master,
-    ];
-
-    pub fn from_index(index: usize) -> Self {
-        Self::ALL
-            .get(index)
-            .copied()
-            .unwrap_or(MinesweeperDifficulty::Novice)
-    }
-
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::Novice => "Novice",
-            Self::Apprentice => "Apprentice",
-            Self::Journeyman => "Journeyman",
-            Self::Master => "Master",
-        }
-    }
-
     /// Returns (height, width) for the grid.
     pub fn grid_size(&self) -> (usize, usize) {
         match self {

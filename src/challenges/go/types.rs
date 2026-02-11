@@ -39,21 +39,9 @@ pub enum GoDifficulty {
     Master,     // 20,000 simulations
 }
 
+difficulty_enum_impl!(GoDifficulty);
+
 impl GoDifficulty {
-    pub const ALL: [GoDifficulty; 4] = [
-        GoDifficulty::Novice,
-        GoDifficulty::Apprentice,
-        GoDifficulty::Journeyman,
-        GoDifficulty::Master,
-    ];
-
-    pub fn from_index(index: usize) -> Self {
-        Self::ALL
-            .get(index)
-            .copied()
-            .unwrap_or(GoDifficulty::Novice)
-    }
-
     pub fn simulation_count(&self) -> u32 {
         match self {
             Self::Novice => 500,
@@ -69,15 +57,6 @@ impl GoDifficulty {
             Self::Apprentice => 2,
             Self::Journeyman => 3,
             Self::Master => 5,
-        }
-    }
-
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::Novice => "Novice",
-            Self::Apprentice => "Apprentice",
-            Self::Journeyman => "Journeyman",
-            Self::Master => "Master",
         }
     }
 }

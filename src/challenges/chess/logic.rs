@@ -77,7 +77,8 @@ fn process_cancel(game: &mut ChessGame) {
     }
 }
 
-/// Start a chess game with the selected difficulty
+/// Start a chess game with the selected difficulty (used in integration tests)
+#[allow(dead_code)]
 pub fn start_chess_game(state: &mut GameState, difficulty: ChessDifficulty) {
     state.active_minigame = Some(ActiveMinigame::Chess(Box::new(ChessGame::new(difficulty))));
     state.challenge_menu.close();
@@ -222,87 +223,57 @@ pub fn check_game_over(game: &mut ChessGame) {
 /// Returns Some(MinigameWinInfo) if the player won, None otherwise.
 pub fn apply_game_result(state: &mut GameState) -> Option<crate::challenges::MinigameWinInfo> {
     use crate::challenges::menu::DifficultyInfo;
-    use crate::challenges::MinigameWinInfo;
+    use crate::challenges::{apply_challenge_rewards, GameResultInfo};
 
     let game = match state.active_minigame.as_ref() {
         Some(ActiveMinigame::Chess(g)) => g,
         _ => return None,
     };
     let result = game.game_result?;
-    let reward = game.difficulty.reward();
-    let old_prestige = state.prestige_rank;
     let difficulty = game.difficulty;
+    let reward = difficulty.reward();
 
+    // Chess-specific stats tracking
     state.chess_stats.games_played += 1;
 
-    let won = match result {
+    let (won, loss_message) = match result {
         ChessResult::Win => {
             state.chess_stats.games_won += 1;
-            state.prestige_rank += reward.prestige_ranks;
             state.chess_stats.prestige_earned += reward.prestige_ranks;
-
-            // Combat log entries
-            state.combat_state.add_log_entry(
-                "♟ Checkmate! You defeated the mysterious figure.".to_string(),
-                false,
-                true,
-            );
-            if reward.prestige_ranks > 0 {
-                state.combat_state.add_log_entry(
-                    format!(
-                        "♟ +{} Prestige Ranks (P{} → P{})",
-                        reward.prestige_ranks, old_prestige, state.prestige_rank
-                    ),
-                    false,
-                    true,
-                );
-            }
-            true
+            (true, "")
         }
         ChessResult::Loss => {
             state.chess_stats.games_lost += 1;
-            state.combat_state.add_log_entry(
-                "♟ The mysterious figure nods respectfully and vanishes.".to_string(),
+            (
                 false,
-                true,
-            );
-            false
+                "The mysterious figure nods respectfully and vanishes.",
+            )
         }
         ChessResult::Forfeit => {
             state.chess_stats.games_lost += 1;
-            state.combat_state.add_log_entry(
-                "♟ You concede the game. The figure disappears without a word.".to_string(),
+            (
                 false,
-                true,
-            );
-            false
+                "You concede the game. The figure disappears without a word.",
+            )
         }
         ChessResult::Draw => {
             state.chess_stats.games_drawn += 1;
-            state.combat_state.add_log_entry(
-                "♟ The figure smiles knowingly and fades away.".to_string(),
-                false,
-                true,
-            );
-            false
+            (false, "The figure smiles knowingly and fades away.")
         }
     };
 
-    state.active_minigame = None;
-
-    if won {
-        Some(MinigameWinInfo {
+    apply_challenge_rewards(
+        state,
+        GameResultInfo {
+            won,
             game_type: "chess",
-            difficulty: match difficulty {
-                ChessDifficulty::Novice => "novice",
-                ChessDifficulty::Apprentice => "apprentice",
-                ChessDifficulty::Journeyman => "journeyman",
-                ChessDifficulty::Master => "master",
-            },
-        })
-    } else {
-        None
-    }
+            difficulty_str: difficulty.difficulty_str(),
+            reward,
+            icon: "♟",
+            win_message: "Checkmate! You defeated the mysterious figure.",
+            loss_message,
+        },
+    )
 }
 
 #[cfg(test)]

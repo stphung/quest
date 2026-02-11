@@ -32,36 +32,15 @@ pub enum GomokuDifficulty {
     Master,     // depth 5
 }
 
+difficulty_enum_impl!(GomokuDifficulty);
+
 impl GomokuDifficulty {
-    pub const ALL: [GomokuDifficulty; 4] = [
-        GomokuDifficulty::Novice,
-        GomokuDifficulty::Apprentice,
-        GomokuDifficulty::Journeyman,
-        GomokuDifficulty::Master,
-    ];
-
-    pub fn from_index(index: usize) -> Self {
-        Self::ALL
-            .get(index)
-            .copied()
-            .unwrap_or(GomokuDifficulty::Novice)
-    }
-
     pub fn search_depth(&self) -> i32 {
         match self {
             Self::Novice => 2,
             Self::Apprentice => 3,
             Self::Journeyman => 4,
             Self::Master => 5,
-        }
-    }
-
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::Novice => "Novice",
-            Self::Apprentice => "Apprentice",
-            Self::Journeyman => "Journeyman",
-            Self::Master => "Master",
         }
     }
 }

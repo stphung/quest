@@ -15,33 +15,9 @@ pub enum RuneDifficulty {
     Master,
 }
 
+difficulty_enum_impl!(RuneDifficulty);
+
 impl RuneDifficulty {
-    pub const ALL: [RuneDifficulty; 4] = [
-        RuneDifficulty::Novice,
-        RuneDifficulty::Apprentice,
-        RuneDifficulty::Journeyman,
-        RuneDifficulty::Master,
-    ];
-
-    pub fn from_index(index: usize) -> Self {
-        match index {
-            0 => Self::Novice,
-            1 => Self::Apprentice,
-            2 => Self::Journeyman,
-            3 => Self::Master,
-            _ => Self::Novice,
-        }
-    }
-
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::Novice => "Novice",
-            Self::Apprentice => "Apprentice",
-            Self::Journeyman => "Journeyman",
-            Self::Master => "Master",
-        }
-    }
-
     pub fn num_runes(&self) -> usize {
         match self {
             Self::Novice => 5,

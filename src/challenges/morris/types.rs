@@ -113,21 +113,9 @@ pub enum MorrisDifficulty {
     Master,     // depth 3
 }
 
+difficulty_enum_impl!(MorrisDifficulty);
+
 impl MorrisDifficulty {
-    pub const ALL: [MorrisDifficulty; 4] = [
-        MorrisDifficulty::Novice,
-        MorrisDifficulty::Apprentice,
-        MorrisDifficulty::Journeyman,
-        MorrisDifficulty::Master,
-    ];
-
-    pub fn from_index(index: usize) -> Self {
-        Self::ALL
-            .get(index)
-            .copied()
-            .unwrap_or(MorrisDifficulty::Novice)
-    }
-
     pub fn search_depth(&self) -> i32 {
         match self {
             Self::Novice => 2,
@@ -152,15 +140,6 @@ impl MorrisDifficulty {
             Self::Apprentice => 100,
             Self::Journeyman => 150,
             Self::Master => 200,
-        }
-    }
-
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::Novice => "Novice",
-            Self::Apprentice => "Apprentice",
-            Self::Journeyman => "Journeyman",
-            Self::Master => "Master",
         }
     }
 }

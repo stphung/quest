@@ -4,15 +4,11 @@
 //! Challenge discovery uses a single roll per tick. On success, a weighted distribution
 //! table determines which challenge type appears.
 
-use super::chess::logic::start_chess_game;
-use super::chess::ChessDifficulty;
-use super::go::logic::start_go_game;
-use super::go::GoDifficulty;
-use super::gomoku::logic::start_gomoku_game;
-use super::gomoku::GomokuDifficulty;
+use super::chess::{ChessDifficulty, ChessGame};
+use super::go::{GoDifficulty, GoGame};
+use super::gomoku::{GomokuDifficulty, GomokuGame};
 use super::minesweeper::{MinesweeperDifficulty, MinesweeperGame};
-use super::morris::logic::start_morris_game;
-use super::morris::MorrisDifficulty;
+use super::morris::{MorrisDifficulty, MorrisGame};
 use super::rune::{RuneDifficulty, RuneGame};
 use super::ActiveMinigame;
 use crate::core::constants::CHALLENGE_DISCOVERY_CHANCE;
@@ -71,36 +67,34 @@ fn accept_selected_challenge(state: &mut GameState) {
     let difficulty_index = state.challenge_menu.selected_difficulty;
 
     if let Some(challenge) = state.challenge_menu.take_selected() {
-        match challenge.challenge_type {
+        let minigame = match challenge.challenge_type {
             ChallengeType::Chess => {
-                let difficulty = ChessDifficulty::from_index(difficulty_index);
-                start_chess_game(state, difficulty);
+                let d = ChessDifficulty::from_index(difficulty_index);
+                ActiveMinigame::Chess(Box::new(ChessGame::new(d)))
             }
             ChallengeType::Morris => {
-                let difficulty = MorrisDifficulty::from_index(difficulty_index);
-                start_morris_game(state, difficulty);
+                let d = MorrisDifficulty::from_index(difficulty_index);
+                ActiveMinigame::Morris(MorrisGame::new(d))
             }
             ChallengeType::Gomoku => {
-                let difficulty = GomokuDifficulty::from_index(difficulty_index);
-                start_gomoku_game(state, difficulty);
+                let d = GomokuDifficulty::from_index(difficulty_index);
+                ActiveMinigame::Gomoku(GomokuGame::new(d))
             }
             ChallengeType::Minesweeper => {
-                let difficulty = MinesweeperDifficulty::from_index(difficulty_index);
-                state.active_minigame = Some(ActiveMinigame::Minesweeper(MinesweeperGame::new(
-                    difficulty,
-                )));
-                state.challenge_menu.close();
+                let d = MinesweeperDifficulty::from_index(difficulty_index);
+                ActiveMinigame::Minesweeper(MinesweeperGame::new(d))
             }
             ChallengeType::Rune => {
-                let difficulty = RuneDifficulty::from_index(difficulty_index);
-                state.active_minigame = Some(ActiveMinigame::Rune(RuneGame::new(difficulty)));
-                state.challenge_menu.close();
+                let d = RuneDifficulty::from_index(difficulty_index);
+                ActiveMinigame::Rune(RuneGame::new(d))
             }
             ChallengeType::Go => {
-                let difficulty = GoDifficulty::from_index(difficulty_index);
-                start_go_game(state, difficulty);
+                let d = GoDifficulty::from_index(difficulty_index);
+                ActiveMinigame::Go(GoGame::new(d))
             }
-        }
+        };
+        state.active_minigame = Some(minigame);
+        state.challenge_menu.close();
     }
 }
 
@@ -162,6 +156,17 @@ pub trait DifficultyInfo {
     /// Optional extra info shown between name and reward (e.g., "~500 ELO")
     fn extra_info(&self) -> Option<String> {
         None
+    }
+
+    /// Lowercase difficulty name for achievement tracking (e.g., "novice", "master")
+    fn difficulty_str(&self) -> &'static str {
+        match self.name() {
+            "Novice" => "novice",
+            "Apprentice" => "apprentice",
+            "Journeyman" => "journeyman",
+            "Master" => "master",
+            _ => "novice",
+        }
     }
 }
 
@@ -1086,5 +1091,32 @@ mod tests {
             discoveries_no_bonus,
             discoveries_with_bonus
         );
+    }
+
+    // =========================================================================
+    // DifficultyInfo::difficulty_str() Tests
+    // =========================================================================
+
+    #[test]
+    fn test_difficulty_str_all_types() {
+        use super::super::chess::ChessDifficulty;
+        use super::super::go::GoDifficulty;
+        use super::super::gomoku::GomokuDifficulty;
+        use super::super::minesweeper::MinesweeperDifficulty;
+        use super::super::morris::MorrisDifficulty;
+        use super::super::rune::RuneDifficulty;
+
+        // Verify all 6 difficulty types produce correct lowercase strings
+        for (i, expected) in ["novice", "apprentice", "journeyman", "master"]
+            .iter()
+            .enumerate()
+        {
+            assert_eq!(ChessDifficulty::ALL[i].difficulty_str(), *expected);
+            assert_eq!(GomokuDifficulty::ALL[i].difficulty_str(), *expected);
+            assert_eq!(MorrisDifficulty::ALL[i].difficulty_str(), *expected);
+            assert_eq!(MinesweeperDifficulty::ALL[i].difficulty_str(), *expected);
+            assert_eq!(RuneDifficulty::ALL[i].difficulty_str(), *expected);
+            assert_eq!(GoDifficulty::ALL[i].difficulty_str(), *expected);
+        }
     }
 }

@@ -168,102 +168,33 @@ pub fn apply_game_result(
     state: &mut crate::core::game_state::GameState,
 ) -> Option<crate::challenges::MinigameWinInfo> {
     use crate::challenges::menu::DifficultyInfo;
-    use crate::challenges::MinigameWinInfo;
+    use crate::challenges::{apply_challenge_rewards, GameResultInfo};
 
     let game = match state.active_minigame.as_ref() {
         Some(ActiveMinigame::Rune(g)) => g,
         _ => return None,
     };
     let result = game.game_result?;
-    let reward = game.difficulty.reward();
-    let old_prestige = state.prestige_rank;
     let difficulty = game.difficulty;
+    let reward = difficulty.reward();
 
-    let won = match result {
-        RuneResult::Win => {
-            // XP reward
-            let xp_gained = if reward.xp_percent > 0 {
-                let xp_for_level =
-                    crate::core::game_logic::xp_for_next_level(state.character_level.max(1));
-                let xp = (xp_for_level * reward.xp_percent as u64) / 100;
-                state.character_xp += xp;
-                xp
-            } else {
-                0
-            };
-
-            // Prestige reward
-            state.prestige_rank += reward.prestige_ranks;
-
-            // Fishing rank reward (capped at 30, preserves fish progress)
-            let fishing_rank_up = if reward.fishing_ranks > 0 && state.fishing.rank < 30 {
-                state.fishing.rank = (state.fishing.rank + reward.fishing_ranks).min(30);
-                true
-            } else {
-                false
-            };
-
-            // Combat log entries
-            state.combat_state.add_log_entry(
-                "\u{16B1} The runes glow with approval! Code deciphered.".to_string(),
-                false,
-                true,
-            );
-            if reward.prestige_ranks > 0 {
-                state.combat_state.add_log_entry(
-                    format!(
-                        "\u{16B1} +{} Prestige Ranks (P{} \u{2192} P{})",
-                        reward.prestige_ranks, old_prestige, state.prestige_rank
-                    ),
-                    false,
-                    true,
-                );
-            }
-            if fishing_rank_up {
-                state.combat_state.add_log_entry(
-                    format!(
-                        "\u{16B1} Fishing rank up! Now rank {}: {}",
-                        state.fishing.rank,
-                        state.fishing.rank_name()
-                    ),
-                    false,
-                    true,
-                );
-            }
-            if xp_gained > 0 {
-                state.combat_state.add_log_entry(
-                    format!("\u{16B1} +{} XP", xp_gained),
-                    false,
-                    true,
-                );
-            }
-            true
-        }
-        RuneResult::Loss => {
-            state.combat_state.add_log_entry(
-                "\u{16B1} The tablet fades. The code remains a mystery.".to_string(),
-                false,
-                true,
-            );
-            false
-        }
+    let (won, loss_message) = match result {
+        RuneResult::Win => (true, ""),
+        RuneResult::Loss => (false, "The tablet fades. The code remains a mystery."),
     };
 
-    state.active_minigame = None;
-
-    if won {
-        Some(MinigameWinInfo {
+    apply_challenge_rewards(
+        state,
+        GameResultInfo {
+            won,
             game_type: "rune",
-            difficulty: match difficulty {
-                RuneDifficulty::Novice => "novice",
-                RuneDifficulty::Apprentice => "apprentice",
-                RuneDifficulty::Journeyman => "journeyman",
-                RuneDifficulty::Master => "master",
-            },
-        })
-    } else {
-        None
-    }
+            difficulty_str: difficulty.difficulty_str(),
+            reward,
+            icon: "\u{16B1}",
+            win_message: "The runes glow with approval! Code deciphered.",
+            loss_message,
+        },
+    )
 }
 
 #[cfg(test)]

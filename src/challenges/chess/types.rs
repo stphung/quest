@@ -12,21 +12,9 @@ pub enum ChessDifficulty {
     Master,     // 3-ply search, ~1350 ELO
 }
 
+difficulty_enum_impl!(ChessDifficulty);
+
 impl ChessDifficulty {
-    pub const ALL: [ChessDifficulty; 4] = [
-        ChessDifficulty::Novice,
-        ChessDifficulty::Apprentice,
-        ChessDifficulty::Journeyman,
-        ChessDifficulty::Master,
-    ];
-
-    pub fn from_index(index: usize) -> Self {
-        Self::ALL
-            .get(index)
-            .copied()
-            .unwrap_or(ChessDifficulty::Novice)
-    }
-
     pub fn search_depth(&self) -> i32 {
         match self {
             Self::Novice => 1,
@@ -58,15 +46,6 @@ impl ChessDifficulty {
             Self::Apprentice => 800,
             Self::Journeyman => 1100,
             Self::Master => 1350,
-        }
-    }
-
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::Novice => "Novice",
-            Self::Apprentice => "Apprentice",
-            Self::Journeyman => "Journeyman",
-            Self::Master => "Master",
         }
     }
 }
