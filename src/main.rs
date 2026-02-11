@@ -879,65 +879,37 @@ fn main() -> io::Result<()> {
                     if last_tick.elapsed() >= Duration::from_millis(TICK_INTERVAL_MS) {
                         // Skip game ticks while Leviathan modal is showing
                         if !matches!(overlay, GameOverlay::LeviathanEncounter { .. }) {
-                            let leviathan_encounter = game_tick(
+                            let tick_result = game_tick(
                                 &mut state,
                                 &mut tick_counter,
-                                &haven,
+                                &mut haven,
                                 &mut global_achievements,
                                 debug_mode,
                             );
 
                             // Show Leviathan encounter modal if one occurred
-                            if let Some(encounter_number) = leviathan_encounter {
+                            if let Some(encounter_number) = tick_result.leviathan_encounter {
                                 overlay = GameOverlay::LeviathanEncounter { encounter_number };
+                            }
+
+                            // Haven was discovered — save and show overlay
+                            if tick_result.haven_changed && !debug_mode {
+                                haven::save_haven(&haven).ok();
+                            }
+                            if tick_result.haven_discovered {
+                                overlay = GameOverlay::HavenDiscovery;
+                            }
+
+                            // Show achievement modal if ready (only when no overlay active)
+                            if matches!(overlay, GameOverlay::None)
+                                && !tick_result.achievement_modal_ready.is_empty()
+                            {
+                                overlay = GameOverlay::AchievementUnlocked {
+                                    achievements: tick_result.achievement_modal_ready,
+                                };
                             }
                         }
                         last_tick = Instant::now();
-
-                        // Haven discovery check (independent roll, once per tick)
-                        if !haven.discovered
-                            && state.prestige_rank >= 10
-                            && state.active_dungeon.is_none()
-                            && state.active_fishing.is_none()
-                            && state.active_minigame.is_none()
-                        {
-                            let mut rng = rand::thread_rng();
-                            if haven::try_discover_haven(&mut haven, state.prestige_rank, &mut rng)
-                            {
-                                if !debug_mode {
-                                    haven::save_haven(&haven).ok();
-                                }
-                                // Track Haven discovery achievement
-                                global_achievements
-                                    .on_haven_discovered(Some(&state.character_name));
-                                if !debug_mode {
-                                    if let Err(e) =
-                                        achievements::save_achievements(&global_achievements)
-                                    {
-                                        eprintln!("Failed to save achievements: {}", e);
-                                    }
-                                }
-                                overlay = GameOverlay::HavenDiscovery;
-                            }
-                        }
-
-                        // Check if achievement modal is ready to show
-                        // Only show if no other overlay is active
-                        if matches!(overlay, GameOverlay::None)
-                            && global_achievements.is_modal_ready()
-                        {
-                            let achievements = global_achievements.take_modal_queue();
-                            if !achievements.is_empty() {
-                                overlay = GameOverlay::AchievementUnlocked { achievements };
-                            }
-                        }
-
-                        // Save achievements immediately when any are newly unlocked
-                        if !debug_mode && !global_achievements.newly_unlocked.is_empty() {
-                            if let Err(e) = achievements::save_achievements(&global_achievements) {
-                                eprintln!("Failed to save achievements: {}", e);
-                            }
-                        }
                     }
 
                     // Auto-save every 30 seconds (skip in debug mode)
@@ -982,15 +954,27 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
+/// Result of the main.rs game_tick bridge function.
+struct BridgeTickResult {
+    /// Storm Leviathan encounter number (1-10), if one occurred.
+    leviathan_encounter: Option<u8>,
+    /// True if Haven state was modified and should be persisted.
+    haven_changed: bool,
+    /// True if the Haven was just discovered this tick.
+    haven_discovered: bool,
+    /// Achievement IDs ready to be shown in a modal overlay.
+    achievement_modal_ready: Vec<achievements::AchievementId>,
+}
+
 /// Processes a single game tick, updating combat and stats.
-/// Returns Some(encounter_number) if a Storm Leviathan encounter occurred during fishing.
+/// Maps TickEvents to combat log entries and visual effects.
 fn game_tick(
     game_state: &mut GameState,
     tick_counter: &mut u32,
-    haven: &haven::Haven,
+    haven: &mut haven::Haven,
     global_achievements: &mut achievements::Achievements,
     debug_mode: bool,
-) -> Option<u8> {
+) -> BridgeTickResult {
     use core::tick::TickEvent;
 
     // Run the extracted game logic tick
@@ -1005,6 +989,7 @@ fn game_tick(
     );
 
     // Map TickEvents to UI mutations (combat log, visual effects, etc.)
+    let mut haven_discovered = false;
     for event in &result.events {
         match event {
             TickEvent::PlayerAttack {
@@ -1116,6 +1101,9 @@ fn game_tick(
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
             }
+            TickEvent::HavenDiscovered => {
+                haven_discovered = true;
+            }
             TickEvent::LeveledUp { .. } => {
                 // Level-up state changes are handled inside game_tick
             }
@@ -1136,5 +1124,10 @@ fn game_tick(
         .visual_effects
         .retain_mut(|effect| effect.update(delta_time));
 
-    result.leviathan_encounter
+    BridgeTickResult {
+        leviathan_encounter: result.leviathan_encounter,
+        haven_changed: result.haven_changed,
+        haven_discovered,
+        achievement_modal_ready: result.achievement_modal_ready,
+    }
 }

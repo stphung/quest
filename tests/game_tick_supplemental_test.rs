@@ -55,7 +55,7 @@ fn tick(
     ach: &mut Achievements,
     r: &mut ChaCha8Rng,
 ) -> Vec<TickEvent> {
-    game_tick(state, tc, &Haven::default(), ach, false, r).events
+    game_tick(state, tc, &mut Haven::default(), ach, false, r).events
 }
 
 fn has<F: Fn(&TickEvent) -> bool>(events: &[TickEvent], f: F) -> bool {
@@ -112,7 +112,7 @@ fn test_storm_leviathan_achievement_via_game_tick() {
         let result = game_tick(
             &mut state,
             &mut tc,
-            &Haven::default(),
+            &mut Haven::default(),
             &mut ach,
             false,
             &mut r,
@@ -231,7 +231,7 @@ fn test_dungeon_boss_completion_triggers_achievement() {
         let result = game_tick(
             &mut state,
             &mut tc,
-            &Haven::default(),
+            &mut Haven::default(),
             &mut ach,
             false,
             &mut r,
