@@ -580,8 +580,7 @@ fn handle_base_game(
 mod tests {
     use super::*;
     use crate::challenges::{
-        ActiveMinigame, ChallengeDifficulty, GoGame, MinesweeperGame, MinigameInput, MorrisGame,
-        RuneGame,
+        ActiveMinigame, ChallengeDifficulty, GoGame, MinesweeperGame, MorrisGame, RuneGame,
     };
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -589,143 +588,172 @@ mod tests {
         KeyEvent::new(code, KeyModifiers::NONE)
     }
 
-    /// Extract MinigameInput from the key mapping logic for a given game and key.
-    /// This duplicates the mapping logic from handle_minigame to test it in isolation.
-    fn map_key_for_game(state: &GameState, key: KeyEvent) -> MinigameInput {
-        let is_f = matches!(key.code, KeyCode::Char('f') | KeyCode::Char('F'));
-        let is_p = matches!(key.code, KeyCode::Char('p') | KeyCode::Char('P'));
-        match key.code {
-            KeyCode::Up => MinigameInput::Up,
-            KeyCode::Down => MinigameInput::Down,
-            KeyCode::Left => MinigameInput::Left,
-            KeyCode::Right => MinigameInput::Right,
-            KeyCode::Enter => MinigameInput::Primary,
-            _ if is_f => match state.active_minigame.as_ref() {
-                Some(ActiveMinigame::Minesweeper(_) | ActiveMinigame::Rune(_)) => {
-                    MinigameInput::Secondary
-                }
-                _ => MinigameInput::Other,
-            },
-            _ if is_p => match state.active_minigame.as_ref() {
-                Some(ActiveMinigame::Go(_)) => MinigameInput::Secondary,
-                _ => MinigameInput::Other,
-            },
-            KeyCode::Esc => MinigameInput::Cancel,
-            _ => MinigameInput::Other,
+    // ========== 'f' key tests ==========
+
+    #[test]
+    fn test_f_key_flags_in_minesweeper() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_minigame = Some(ActiveMinigame::Minesweeper(MinesweeperGame::new(
+            ChallengeDifficulty::Novice,
+        )));
+
+        handle_minigame(make_key(KeyCode::Char('f')), &mut state);
+
+        // 'f' should toggle flag on cursor cell
+        if let Some(ActiveMinigame::Minesweeper(g)) = &state.active_minigame {
+            assert_eq!(g.flags_placed, 1, "'f' should toggle flag in Minesweeper");
+        } else {
+            panic!("Game should still be active");
         }
     }
 
     #[test]
-    fn test_f_key_is_secondary_for_minesweeper() {
-        let mut state = GameState::new("Test".to_string(), 0);
-        state.active_minigame = Some(ActiveMinigame::Minesweeper(MinesweeperGame::new(
-            ChallengeDifficulty::Novice,
-        )));
-        assert_eq!(
-            map_key_for_game(&state, make_key(KeyCode::Char('f'))),
-            MinigameInput::Secondary
-        );
-    }
-
-    #[test]
-    fn test_f_key_is_secondary_for_rune() {
+    fn test_f_key_clears_guess_in_rune() {
         let mut state = GameState::new("Test".to_string(), 0);
         state.active_minigame = Some(ActiveMinigame::Rune(RuneGame::new(
             ChallengeDifficulty::Novice,
         )));
-        assert_eq!(
-            map_key_for_game(&state, make_key(KeyCode::Char('f'))),
-            MinigameInput::Secondary
-        );
+
+        // First set a guess value using Up key, then verify 'f' clears it
+        handle_minigame(make_key(KeyCode::Up), &mut state);
+        if let Some(ActiveMinigame::Rune(g)) = &state.active_minigame {
+            assert!(g.current_guess[0].is_some(), "Up should set a guess value");
+        }
+
+        handle_minigame(make_key(KeyCode::Char('f')), &mut state);
+        if let Some(ActiveMinigame::Rune(g)) = &state.active_minigame {
+            assert!(
+                g.current_guess[0].is_none(),
+                "'f' should clear guess in Rune"
+            );
+        } else {
+            panic!("Game should still be active");
+        }
     }
 
     #[test]
-    fn test_f_key_is_other_for_go() {
+    fn test_f_key_does_not_pass_in_go() {
         let mut state = GameState::new("Test".to_string(), 0);
         state.active_minigame = Some(ActiveMinigame::Go(GoGame::new(ChallengeDifficulty::Novice)));
-        assert_eq!(
-            map_key_for_game(&state, make_key(KeyCode::Char('f'))),
-            MinigameInput::Other,
-            "'f' should NOT trigger Secondary (pass) in Go"
-        );
+
+        handle_minigame(make_key(KeyCode::Char('f')), &mut state);
+
+        // 'f' should NOT trigger a pass in Go
+        if let Some(ActiveMinigame::Go(g)) = &state.active_minigame {
+            assert_eq!(g.consecutive_passes, 0, "'f' should NOT trigger pass in Go");
+            assert!(g.last_move.is_none(), "'f' should be no-op in Go");
+        } else {
+            panic!("Game should still be active");
+        }
     }
 
     #[test]
-    fn test_f_key_is_other_for_morris() {
+    fn test_f_key_does_not_affect_morris() {
         let mut state = GameState::new("Test".to_string(), 0);
         state.active_minigame = Some(ActiveMinigame::Morris(MorrisGame::new(
             ChallengeDifficulty::Novice,
         )));
-        assert_eq!(
-            map_key_for_game(&state, make_key(KeyCode::Char('f'))),
-            MinigameInput::Other
-        );
+
+        // Set forfeit_pending to verify 'f' clears it (mapped as Other)
+        if let Some(ActiveMinigame::Morris(g)) = &mut state.active_minigame {
+            g.forfeit_pending = true;
+        }
+        handle_minigame(make_key(KeyCode::Char('f')), &mut state);
+        if let Some(ActiveMinigame::Morris(g)) = &state.active_minigame {
+            assert!(
+                !g.forfeit_pending,
+                "'f' should clear forfeit_pending as Other in Morris"
+            );
+        }
     }
 
+    // ========== 'p' key tests ==========
+
     #[test]
-    fn test_p_key_is_secondary_for_go() {
+    fn test_p_key_passes_in_go() {
         let mut state = GameState::new("Test".to_string(), 0);
         state.active_minigame = Some(ActiveMinigame::Go(GoGame::new(ChallengeDifficulty::Novice)));
-        assert_eq!(
-            map_key_for_game(&state, make_key(KeyCode::Char('p'))),
-            MinigameInput::Secondary
-        );
+
+        handle_minigame(make_key(KeyCode::Char('p')), &mut state);
+
+        // 'p' should trigger a pass in Go
+        if let Some(ActiveMinigame::Go(g)) = &state.active_minigame {
+            assert_eq!(g.consecutive_passes, 1, "'p' should trigger pass in Go");
+        } else {
+            panic!("Game should still be active");
+        }
     }
 
     #[test]
-    fn test_p_key_is_other_for_minesweeper() {
+    fn test_p_key_does_not_flag_in_minesweeper() {
         let mut state = GameState::new("Test".to_string(), 0);
         state.active_minigame = Some(ActiveMinigame::Minesweeper(MinesweeperGame::new(
             ChallengeDifficulty::Novice,
         )));
-        assert_eq!(
-            map_key_for_game(&state, make_key(KeyCode::Char('p'))),
-            MinigameInput::Other,
-            "'p' should NOT trigger Secondary (flag) in Minesweeper"
-        );
+
+        handle_minigame(make_key(KeyCode::Char('p')), &mut state);
+
+        // 'p' should NOT toggle flag in Minesweeper
+        if let Some(ActiveMinigame::Minesweeper(g)) = &state.active_minigame {
+            assert_eq!(
+                g.flags_placed, 0,
+                "'p' should NOT toggle flag in Minesweeper"
+            );
+        } else {
+            panic!("Game should still be active");
+        }
     }
 
     #[test]
-    fn test_p_key_is_other_for_rune() {
+    fn test_p_key_does_not_clear_guess_in_rune() {
         let mut state = GameState::new("Test".to_string(), 0);
         state.active_minigame = Some(ActiveMinigame::Rune(RuneGame::new(
             ChallengeDifficulty::Novice,
         )));
-        assert_eq!(
-            map_key_for_game(&state, make_key(KeyCode::Char('p'))),
-            MinigameInput::Other,
-            "'p' should NOT trigger Secondary (clear guess) in Rune"
-        );
+
+        // First set a guess value
+        handle_minigame(make_key(KeyCode::Up), &mut state);
+        if let Some(ActiveMinigame::Rune(g)) = &state.active_minigame {
+            assert!(g.current_guess[0].is_some(), "Up should set a guess");
+        }
+
+        // 'p' should NOT clear the guess
+        handle_minigame(make_key(KeyCode::Char('p')), &mut state);
+        if let Some(ActiveMinigame::Rune(g)) = &state.active_minigame {
+            assert!(
+                g.current_guess[0].is_some(),
+                "'p' should NOT clear guess in Rune"
+            );
+        }
     }
 
+    // ========== Common key tests ==========
+
     #[test]
-    fn test_common_keys_work_for_all_games() {
+    fn test_arrow_keys_move_cursor_in_go() {
         let mut state = GameState::new("Test".to_string(), 0);
         state.active_minigame = Some(ActiveMinigame::Go(GoGame::new(ChallengeDifficulty::Novice)));
 
-        assert_eq!(
-            map_key_for_game(&state, make_key(KeyCode::Up)),
-            MinigameInput::Up
-        );
-        assert_eq!(
-            map_key_for_game(&state, make_key(KeyCode::Down)),
-            MinigameInput::Down
-        );
-        assert_eq!(
-            map_key_for_game(&state, make_key(KeyCode::Left)),
-            MinigameInput::Left
-        );
-        assert_eq!(
-            map_key_for_game(&state, make_key(KeyCode::Right)),
-            MinigameInput::Right
-        );
-        assert_eq!(
-            map_key_for_game(&state, make_key(KeyCode::Enter)),
-            MinigameInput::Primary
-        );
-        assert_eq!(
-            map_key_for_game(&state, make_key(KeyCode::Esc)),
-            MinigameInput::Cancel
-        );
+        let initial_cursor = if let Some(ActiveMinigame::Go(g)) = &state.active_minigame {
+            g.cursor
+        } else {
+            panic!();
+        };
+
+        handle_minigame(make_key(KeyCode::Down), &mut state);
+        if let Some(ActiveMinigame::Go(g)) = &state.active_minigame {
+            assert_eq!(g.cursor.0, initial_cursor.0 + 1, "Down should move cursor");
+        }
+    }
+
+    #[test]
+    fn test_esc_sets_forfeit_pending() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_minigame = Some(ActiveMinigame::Go(GoGame::new(ChallengeDifficulty::Novice)));
+
+        handle_minigame(make_key(KeyCode::Esc), &mut state);
+        if let Some(ActiveMinigame::Go(g)) = &state.active_minigame {
+            assert!(g.forfeit_pending, "Esc should set forfeit_pending");
+        }
     }
 }
