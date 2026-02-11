@@ -1,7 +1,5 @@
 //! Achievement system types and data structures.
 
-#![allow(dead_code)] // Will be used when integrated with UI
-
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -263,11 +261,6 @@ impl Achievements {
         self.pending_notifications.len()
     }
 
-    /// Take all pending notifications (clears the list and returns them).
-    pub fn take_pending_notifications(&mut self) -> Vec<AchievementId> {
-        std::mem::take(&mut self.pending_notifications)
-    }
-
     /// Clear pending notifications (call when user views achievements).
     pub fn clear_pending_notifications(&mut self) {
         self.pending_notifications.clear();
@@ -328,17 +321,21 @@ impl Achievements {
         (self.unlocked_count() as f32 / total as f32) * 100.0
     }
 
+    /// Convenience wrapper: unlock with an `Option<&str>` name (avoids repeated `.map(|s| s.to_string())`).
+    fn unlock_with_name(&mut self, id: AchievementId, character_name: Option<&str>) -> bool {
+        self.unlock(id, character_name.map(|s| s.to_string()))
+    }
+
     /// Helper to check and unlock milestones. Checks all milestones in order.
-    /// Used to consolidate repeated milestone checking patterns.
     fn check_milestones(
         &mut self,
         current: u64,
         milestones: &[(u64, AchievementId)],
-        char_name: Option<String>,
+        character_name: Option<&str>,
     ) {
         for &(threshold, achievement_id) in milestones {
             if current >= threshold {
-                self.unlock(achievement_id, char_name.clone());
+                self.unlock_with_name(achievement_id, character_name);
             }
         }
     }
@@ -346,18 +343,12 @@ impl Achievements {
     /// Get count of unlocked/total by category.
     pub fn count_by_category(&self, category: AchievementCategory) -> (usize, usize) {
         use super::data::ALL_ACHIEVEMENTS;
-
-        let category_achievements: Vec<_> = ALL_ACHIEVEMENTS
+        ALL_ACHIEVEMENTS
             .iter()
             .filter(|a| a.category == category)
-            .collect();
-
-        let unlocked = category_achievements
-            .iter()
-            .filter(|a| self.is_unlocked(a.id))
-            .count();
-
-        (unlocked, category_achievements.len())
+            .fold((0, 0), |(unlocked, total), a| {
+                (unlocked + self.is_unlocked(a.id) as usize, total + 1)
+            })
     }
 
     // =========================================================================
@@ -367,45 +358,34 @@ impl Achievements {
     /// Called when the Storm Leviathan is caught.
     /// Unlocks the StormLeviathan achievement (required for Stormbreaker).
     pub fn on_storm_leviathan_caught(&mut self, character_name: Option<&str>) {
-        self.unlock(
-            AchievementId::StormLeviathan,
-            character_name.map(|s| s.to_string()),
-        );
+        self.unlock_with_name(AchievementId::StormLeviathan, character_name);
     }
 
     /// Called when fishing rank changes.
     /// Unlocks FishermanI/II/III achievements at milestones.
     pub fn on_fishing_rank_up(&mut self, new_rank: u32, character_name: Option<&str>) {
-        let char_name = character_name.map(|s| s.to_string());
-
         // Update highest rank
         if new_rank > self.highest_fishing_rank {
             self.highest_fishing_rank = new_rank;
         }
 
-        // Check for milestone unlocks
-        if new_rank >= 10 {
-            self.unlock(AchievementId::FishermanI, char_name.clone());
-        }
-        if new_rank >= 20 {
-            self.unlock(AchievementId::FishermanII, char_name.clone());
-        }
-        if new_rank >= 30 {
-            self.unlock(AchievementId::FishermanIII, char_name.clone());
-        }
-        if new_rank >= 40 {
-            self.unlock(AchievementId::FishermanIV, char_name);
-        }
+        self.check_milestones(
+            new_rank as u64,
+            &[
+                (10, AchievementId::FishermanI),
+                (20, AchievementId::FishermanII),
+                (30, AchievementId::FishermanIII),
+                (40, AchievementId::FishermanIV),
+            ],
+            character_name,
+        );
     }
 
     /// Called when a fish is caught.
     /// Unlocks fish catching milestone achievements.
     pub fn on_fish_caught(&mut self, character_name: Option<&str>) {
-        let char_name = character_name.map(|s| s.to_string());
-
         self.total_fish_caught += 1;
 
-        // Fish catching milestones
         self.check_milestones(
             self.total_fish_caught,
             &[
@@ -415,7 +395,7 @@ impl Achievements {
                 (10000, AchievementId::FishCatcherIII),
                 (100000, AchievementId::FishCatcherIV),
             ],
-            char_name,
+            character_name,
         );
     }
 
@@ -426,11 +406,8 @@ impl Achievements {
     /// Called when an enemy is killed.
     /// Unlocks kill and boss milestone achievements.
     pub fn on_enemy_killed(&mut self, is_boss: bool, character_name: Option<&str>) {
-        let char_name = character_name.map(|s| s.to_string());
-
         self.total_kills += 1;
 
-        // Slayer milestones: 100, 500, 1K, 5K, 10K, 50K, 100K, 500K, 1M
         self.check_milestones(
             self.total_kills,
             &[
@@ -444,14 +421,12 @@ impl Achievements {
                 (500000, AchievementId::SlayerVIII),
                 (1000000, AchievementId::SlayerIX),
             ],
-            char_name.clone(),
+            character_name,
         );
 
-        // Track boss kills
         if is_boss {
             self.total_bosses_defeated += 1;
 
-            // Boss hunter milestones: 1, 10, 50, 100, 500, 1K, 5K, 10K
             self.check_milestones(
                 self.total_bosses_defeated,
                 &[
@@ -464,7 +439,7 @@ impl Achievements {
                     (5000, AchievementId::BossHunterVII),
                     (10000, AchievementId::BossHunterVIII),
                 ],
-                char_name,
+                character_name,
             );
         }
     }
@@ -476,14 +451,10 @@ impl Achievements {
     /// Called when the character levels up.
     /// Unlocks level milestone achievements.
     pub fn on_level_up(&mut self, new_level: u32, character_name: Option<&str>) {
-        let char_name = character_name.map(|s| s.to_string());
-
-        // Update highest level
         if new_level > self.highest_level {
             self.highest_level = new_level;
         }
 
-        // Level milestones
         self.check_milestones(
             new_level as u64,
             &[
@@ -499,21 +470,17 @@ impl Achievements {
                 (1000, AchievementId::Level1000),
                 (1500, AchievementId::Level1500),
             ],
-            char_name,
+            character_name,
         );
     }
 
     /// Called when the character prestiges.
     /// Unlocks prestige milestone achievements.
     pub fn on_prestige(&mut self, new_rank: u32, character_name: Option<&str>) {
-        let char_name = character_name.map(|s| s.to_string());
-
-        // Update highest prestige
         if new_rank > self.highest_prestige_rank {
             self.highest_prestige_rank = new_rank;
         }
 
-        // Prestige milestones (including first prestige)
         self.check_milestones(
             new_rank as u64,
             &[
@@ -530,60 +497,53 @@ impl Achievements {
                 (90, AchievementId::PrestigeXC),
                 (100, AchievementId::Eternal),
             ],
-            char_name,
+            character_name,
         );
     }
 
     /// Called when a zone is fully cleared (all subzones completed).
     pub fn on_zone_fully_cleared(&mut self, zone_id: u32, character_name: Option<&str>) {
-        let char_name = character_name.map(|s| s.to_string());
-
         self.zones_fully_cleared += 1;
 
         // Zone 11 (The Expanse) has cycle-based achievements
         if zone_id == 11 {
             self.expanse_cycles_completed += 1;
-
-            // Expanse cycle milestones: 1, 100, 1K, 10K
-            if self.expanse_cycles_completed >= 1 {
-                self.unlock(AchievementId::ExpanseCycleI, char_name.clone());
-            }
-            if self.expanse_cycles_completed >= 100 {
-                self.unlock(AchievementId::ExpanseCycleII, char_name.clone());
-            }
-            if self.expanse_cycles_completed >= 1000 {
-                self.unlock(AchievementId::ExpanseCycleIII, char_name.clone());
-            }
-            if self.expanse_cycles_completed >= 10000 {
-                self.unlock(AchievementId::ExpanseCycleIV, char_name);
-            }
+            self.check_milestones(
+                self.expanse_cycles_completed,
+                &[
+                    (1, AchievementId::ExpanseCycleI),
+                    (100, AchievementId::ExpanseCycleII),
+                    (1000, AchievementId::ExpanseCycleIII),
+                    (10000, AchievementId::ExpanseCycleIV),
+                ],
+                character_name,
+            );
             return;
         }
 
         // Individual zone completion achievements (zones 1-10)
         let achievement = match zone_id {
-            1 => Some(AchievementId::Zone1Complete),   // Meadow
-            2 => Some(AchievementId::Zone2Complete),   // Dark Forest
-            3 => Some(AchievementId::Zone3Complete),   // Mountain Pass
-            4 => Some(AchievementId::Zone4Complete),   // Ancient Ruins
-            5 => Some(AchievementId::Zone5Complete),   // Volcanic Wastes
-            6 => Some(AchievementId::Zone6Complete),   // Frozen Tundra
-            7 => Some(AchievementId::Zone7Complete),   // Crystal Caverns
-            8 => Some(AchievementId::Zone8Complete),   // Sunken Kingdom
-            9 => Some(AchievementId::Zone9Complete),   // Floating Isles
-            10 => Some(AchievementId::Zone10Complete), // Storm Citadel
+            1 => Some(AchievementId::Zone1Complete),
+            2 => Some(AchievementId::Zone2Complete),
+            3 => Some(AchievementId::Zone3Complete),
+            4 => Some(AchievementId::Zone4Complete),
+            5 => Some(AchievementId::Zone5Complete),
+            6 => Some(AchievementId::Zone6Complete),
+            7 => Some(AchievementId::Zone7Complete),
+            8 => Some(AchievementId::Zone8Complete),
+            9 => Some(AchievementId::Zone9Complete),
+            10 => Some(AchievementId::Zone10Complete),
             _ => None,
         };
 
         if let Some(id) = achievement {
-            self.unlock(id, char_name);
+            self.unlock_with_name(id, character_name);
         }
     }
 
     /// Called when the game is completed (Zone 10 boss defeated with Stormbreaker).
     pub fn on_storms_end(&mut self, character_name: Option<&str>) {
-        let char_name = character_name.map(|s| s.to_string());
-        self.unlock(AchievementId::StormsEnd, char_name);
+        self.unlock_with_name(AchievementId::StormsEnd, character_name);
     }
 
     // =========================================================================
@@ -593,11 +553,8 @@ impl Achievements {
     /// Called when a dungeon is completed.
     /// Unlocks dungeon completion milestone achievements.
     pub fn on_dungeon_completed(&mut self, character_name: Option<&str>) {
-        let char_name = character_name.map(|s| s.to_string());
-
         self.total_dungeons_completed += 1;
 
-        // Dungeon completion milestones
         self.check_milestones(
             self.total_dungeons_completed,
             &[
@@ -609,7 +566,7 @@ impl Achievements {
                 (5000, AchievementId::DungeonMasterV),
                 (10000, AchievementId::DungeonMasterVI),
             ],
-            char_name,
+            character_name,
         );
     }
 
@@ -626,38 +583,30 @@ impl Achievements {
         difficulty: &str,
         character_name: Option<&str>,
     ) {
-        let char_name = character_name.map(|s| s.to_string());
-
         self.total_minigame_wins += 1;
 
         // Game-specific achievements based on difficulty
         let achievement = match (game_type, difficulty) {
-            // Chess
             ("chess", "novice") => Some(AchievementId::ChessNovice),
             ("chess", "apprentice") => Some(AchievementId::ChessApprentice),
             ("chess", "journeyman") => Some(AchievementId::ChessJourneyman),
             ("chess", "master") => Some(AchievementId::ChessMaster),
-            // Morris
             ("morris", "novice") => Some(AchievementId::MorrisNovice),
             ("morris", "apprentice") => Some(AchievementId::MorrisApprentice),
             ("morris", "journeyman") => Some(AchievementId::MorrisJourneyman),
             ("morris", "master") => Some(AchievementId::MorrisMaster),
-            // Gomoku
             ("gomoku", "novice") => Some(AchievementId::GomokuNovice),
             ("gomoku", "apprentice") => Some(AchievementId::GomokuApprentice),
             ("gomoku", "journeyman") => Some(AchievementId::GomokuJourneyman),
             ("gomoku", "master") => Some(AchievementId::GomokuMaster),
-            // Minesweeper
             ("minesweeper", "novice") => Some(AchievementId::MinesweeperNovice),
             ("minesweeper", "apprentice") => Some(AchievementId::MinesweeperApprentice),
             ("minesweeper", "journeyman") => Some(AchievementId::MinesweeperJourneyman),
             ("minesweeper", "master") => Some(AchievementId::MinesweeperMaster),
-            // Rune
             ("rune", "novice") => Some(AchievementId::RuneNovice),
             ("rune", "apprentice") => Some(AchievementId::RuneApprentice),
             ("rune", "journeyman") => Some(AchievementId::RuneJourneyman),
             ("rune", "master") => Some(AchievementId::RuneMaster),
-            // Go
             ("go", "novice") => Some(AchievementId::GoNovice),
             ("go", "apprentice") => Some(AchievementId::GoApprentice),
             ("go", "journeyman") => Some(AchievementId::GoJourneyman),
@@ -666,12 +615,12 @@ impl Achievements {
         };
 
         if let Some(id) = achievement {
-            self.unlock(id, char_name.clone());
+            self.unlock_with_name(id, character_name);
         }
 
         // Grand Champion - 100 total wins
         if self.total_minigame_wins >= 100 {
-            self.unlock(AchievementId::GrandChampion, char_name);
+            self.unlock_with_name(AchievementId::GrandChampion, character_name);
         }
 
         // Update progress tracking
@@ -688,34 +637,22 @@ impl Achievements {
 
     /// Called when Haven is first discovered.
     pub fn on_haven_discovered(&mut self, character_name: Option<&str>) {
-        self.unlock(
-            AchievementId::HavenDiscovered,
-            character_name.map(|s| s.to_string()),
-        );
+        self.unlock_with_name(AchievementId::HavenDiscovered, character_name);
     }
 
     /// Called when all Haven rooms reach Tier 1.
     pub fn on_haven_all_t1(&mut self, character_name: Option<&str>) {
-        self.unlock(
-            AchievementId::HavenBuilderI,
-            character_name.map(|s| s.to_string()),
-        );
+        self.unlock_with_name(AchievementId::HavenBuilderI, character_name);
     }
 
     /// Called when all Haven rooms reach Tier 2.
     pub fn on_haven_all_t2(&mut self, character_name: Option<&str>) {
-        self.unlock(
-            AchievementId::HavenBuilderII,
-            character_name.map(|s| s.to_string()),
-        );
+        self.unlock_with_name(AchievementId::HavenBuilderII, character_name);
     }
 
     /// Called when all Haven rooms reach Tier 3.
     pub fn on_haven_architect(&mut self, character_name: Option<&str>) {
-        self.unlock(
-            AchievementId::HavenArchitect,
-            character_name.map(|s| s.to_string()),
-        );
+        self.unlock_with_name(AchievementId::HavenArchitect, character_name);
     }
 
     // =========================================================================
@@ -1413,41 +1350,6 @@ mod tests {
     }
 
     #[test]
-    fn test_sync_from_haven_discovered() {
-        use std::collections::HashMap;
-
-        let mut achievements = Achievements::default();
-        let room_tiers: HashMap<crate::haven::types::HavenRoomId, u8> = HashMap::new();
-
-        achievements.sync_from_haven(true, &room_tiers, Some("Hero"));
-
-        assert!(achievements.is_unlocked(AchievementId::HavenDiscovered));
-        assert!(!achievements.is_unlocked(AchievementId::HavenBuilderI));
-    }
-
-    #[test]
-    fn test_sync_from_haven_all_t1() {
-        use crate::haven::types::HavenRoomId;
-        use std::collections::HashMap;
-
-        let mut achievements = Achievements::default();
-        let mut room_tiers: HashMap<HavenRoomId, u8> = HashMap::new();
-
-        // Set all buildable rooms to T1 (exclude StormForge which has max T1)
-        for room in HavenRoomId::ALL.iter() {
-            if *room != HavenRoomId::StormForge {
-                room_tiers.insert(*room, 1);
-            }
-        }
-
-        achievements.sync_from_haven(true, &room_tiers, Some("Hero"));
-
-        assert!(achievements.is_unlocked(AchievementId::HavenDiscovered));
-        assert!(achievements.is_unlocked(AchievementId::HavenBuilderI));
-        assert!(!achievements.is_unlocked(AchievementId::HavenBuilderII));
-    }
-
-    #[test]
     fn test_sync_does_not_overwrite_higher_counters() {
         // Pre-set a higher fish count in achievements
         let mut achievements = Achievements {
@@ -1526,14 +1428,22 @@ mod tests {
     // Haven Sync Achievement Tests
     // =========================================================================
 
+    /// Build a HashMap of Haven room tiers for testing.
+    /// Sets all buildable rooms (excluding StormForge) to the given tier.
+    fn build_haven_tiers(tier: u8) -> HashMap<crate::haven::types::HavenRoomId, u8> {
+        use crate::haven::types::HavenRoomId;
+        HavenRoomId::ALL
+            .iter()
+            .filter(|r| **r != HavenRoomId::StormForge)
+            .map(|r| (*r, tier))
+            .collect()
+    }
+
     #[test]
     fn test_haven_sync_discovered() {
-        use std::collections::HashMap;
-
         let mut achievements = Achievements::default();
-        let room_tiers: HashMap<crate::haven::types::HavenRoomId, u8> = HashMap::new();
+        let room_tiers = HashMap::new();
 
-        // Sync with discovered Haven
         achievements.sync_from_haven(true, &room_tiers, Some("Hero"));
 
         assert!(achievements.is_unlocked(AchievementId::HavenDiscovered));
@@ -1541,18 +1451,8 @@ mod tests {
 
     #[test]
     fn test_haven_sync_builder_i() {
-        use crate::haven::types::HavenRoomId;
-        use std::collections::HashMap;
-
         let mut achievements = Achievements::default();
-        let mut room_tiers: HashMap<HavenRoomId, u8> = HashMap::new();
-
-        // Set all buildable rooms to T1 (exclude StormForge which only has T1)
-        for room in HavenRoomId::ALL.iter() {
-            if *room != HavenRoomId::StormForge {
-                room_tiers.insert(*room, 1);
-            }
-        }
+        let room_tiers = build_haven_tiers(1);
 
         achievements.sync_from_haven(true, &room_tiers, Some("Hero"));
 
@@ -1563,18 +1463,8 @@ mod tests {
 
     #[test]
     fn test_haven_sync_builder_ii() {
-        use crate::haven::types::HavenRoomId;
-        use std::collections::HashMap;
-
         let mut achievements = Achievements::default();
-        let mut room_tiers: HashMap<HavenRoomId, u8> = HashMap::new();
-
-        // Set all buildable rooms to T2
-        for room in HavenRoomId::ALL.iter() {
-            if *room != HavenRoomId::StormForge {
-                room_tiers.insert(*room, 2);
-            }
-        }
+        let room_tiers = build_haven_tiers(2);
 
         achievements.sync_from_haven(true, &room_tiers, Some("Hero"));
 
@@ -1586,20 +1476,96 @@ mod tests {
     #[test]
     fn test_haven_sync_architect() {
         use crate::haven::types::HavenRoomId;
-        use std::collections::HashMap;
-
         let mut achievements = Achievements::default();
-        let mut room_tiers: HashMap<HavenRoomId, u8> = HashMap::new();
-
-        // Set all rooms to their max tier
-        for room in HavenRoomId::ALL.iter() {
-            room_tiers.insert(*room, room.max_tier());
-        }
+        let room_tiers: HashMap<HavenRoomId, u8> = HavenRoomId::ALL
+            .iter()
+            .map(|r| (*r, r.max_tier()))
+            .collect();
 
         achievements.sync_from_haven(true, &room_tiers, Some("Hero"));
 
         assert!(achievements.is_unlocked(AchievementId::HavenBuilderI));
         assert!(achievements.is_unlocked(AchievementId::HavenBuilderII));
         assert!(achievements.is_unlocked(AchievementId::HavenArchitect));
+    }
+
+    // =========================================================================
+    // Fishing Rank Achievement Tests
+    // =========================================================================
+
+    #[test]
+    fn test_fishing_rank_milestones() {
+        let mut achievements = Achievements::default();
+
+        // Rank 9 — no achievements yet
+        achievements.on_fishing_rank_up(9, Some("Hero"));
+        assert!(!achievements.is_unlocked(AchievementId::FishermanI));
+
+        // Rank 10 unlocks FishermanI
+        achievements.on_fishing_rank_up(10, Some("Hero"));
+        assert!(achievements.is_unlocked(AchievementId::FishermanI));
+        assert!(!achievements.is_unlocked(AchievementId::FishermanII));
+
+        // Rank 20 unlocks FishermanII
+        achievements.on_fishing_rank_up(20, Some("Hero"));
+        assert!(achievements.is_unlocked(AchievementId::FishermanII));
+        assert!(!achievements.is_unlocked(AchievementId::FishermanIII));
+
+        // Rank 30 unlocks FishermanIII
+        achievements.on_fishing_rank_up(30, Some("Hero"));
+        assert!(achievements.is_unlocked(AchievementId::FishermanIII));
+        assert!(!achievements.is_unlocked(AchievementId::FishermanIV));
+
+        // Rank 40 unlocks FishermanIV
+        achievements.on_fishing_rank_up(40, Some("Hero"));
+        assert!(achievements.is_unlocked(AchievementId::FishermanIV));
+    }
+
+    #[test]
+    fn test_fishing_rank_tracks_highest() {
+        let mut achievements = Achievements::default();
+
+        achievements.on_fishing_rank_up(15, Some("Hero"));
+        assert_eq!(achievements.highest_fishing_rank, 15);
+
+        // Lower rank should not decrease the highest
+        achievements.on_fishing_rank_up(10, Some("Hero"));
+        assert_eq!(achievements.highest_fishing_rank, 15);
+
+        // Higher rank should update
+        achievements.on_fishing_rank_up(25, Some("Hero"));
+        assert_eq!(achievements.highest_fishing_rank, 25);
+    }
+
+    // =========================================================================
+    // Count by Category Tests
+    // =========================================================================
+
+    #[test]
+    fn test_count_by_category_empty() {
+        let achievements = Achievements::default();
+        let (unlocked, total) = achievements.count_by_category(AchievementCategory::Combat);
+        assert_eq!(unlocked, 0);
+        assert!(total > 0);
+    }
+
+    #[test]
+    fn test_count_by_category_partial_unlock() {
+        let mut achievements = Achievements {
+            total_kills: 99,
+            ..Default::default()
+        };
+
+        // Unlock some combat achievements
+        achievements.on_enemy_killed(false, Some("Hero")); // 100 kills → SlayerI
+        achievements.on_enemy_killed(true, Some("Hero")); // 1 boss → BossHunterI
+
+        let (unlocked, total) = achievements.count_by_category(AchievementCategory::Combat);
+        assert_eq!(unlocked, 2); // SlayerI + BossHunterI
+        assert!(total > 2);
+
+        // Other categories unaffected
+        let (level_unlocked, _) = achievements.count_by_category(AchievementCategory::Level);
+        assert_eq!(level_unlocked, 0);
     }
 }
