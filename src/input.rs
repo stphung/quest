@@ -575,3 +575,157 @@ fn handle_base_game(
         _ => InputResult::Continue,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::challenges::{
+        ActiveMinigame, ChallengeDifficulty, GoGame, MinesweeperGame, MinigameInput, MorrisGame,
+        RuneGame,
+    };
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+    fn make_key(code: KeyCode) -> KeyEvent {
+        KeyEvent::new(code, KeyModifiers::NONE)
+    }
+
+    /// Extract MinigameInput from the key mapping logic for a given game and key.
+    /// This duplicates the mapping logic from handle_minigame to test it in isolation.
+    fn map_key_for_game(state: &GameState, key: KeyEvent) -> MinigameInput {
+        let is_f = matches!(key.code, KeyCode::Char('f') | KeyCode::Char('F'));
+        let is_p = matches!(key.code, KeyCode::Char('p') | KeyCode::Char('P'));
+        match key.code {
+            KeyCode::Up => MinigameInput::Up,
+            KeyCode::Down => MinigameInput::Down,
+            KeyCode::Left => MinigameInput::Left,
+            KeyCode::Right => MinigameInput::Right,
+            KeyCode::Enter => MinigameInput::Primary,
+            _ if is_f => match state.active_minigame.as_ref() {
+                Some(ActiveMinigame::Minesweeper(_) | ActiveMinigame::Rune(_)) => {
+                    MinigameInput::Secondary
+                }
+                _ => MinigameInput::Other,
+            },
+            _ if is_p => match state.active_minigame.as_ref() {
+                Some(ActiveMinigame::Go(_)) => MinigameInput::Secondary,
+                _ => MinigameInput::Other,
+            },
+            KeyCode::Esc => MinigameInput::Cancel,
+            _ => MinigameInput::Other,
+        }
+    }
+
+    #[test]
+    fn test_f_key_is_secondary_for_minesweeper() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_minigame = Some(ActiveMinigame::Minesweeper(MinesweeperGame::new(
+            ChallengeDifficulty::Novice,
+        )));
+        assert_eq!(
+            map_key_for_game(&state, make_key(KeyCode::Char('f'))),
+            MinigameInput::Secondary
+        );
+    }
+
+    #[test]
+    fn test_f_key_is_secondary_for_rune() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_minigame = Some(ActiveMinigame::Rune(RuneGame::new(
+            ChallengeDifficulty::Novice,
+        )));
+        assert_eq!(
+            map_key_for_game(&state, make_key(KeyCode::Char('f'))),
+            MinigameInput::Secondary
+        );
+    }
+
+    #[test]
+    fn test_f_key_is_other_for_go() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_minigame = Some(ActiveMinigame::Go(GoGame::new(ChallengeDifficulty::Novice)));
+        assert_eq!(
+            map_key_for_game(&state, make_key(KeyCode::Char('f'))),
+            MinigameInput::Other,
+            "'f' should NOT trigger Secondary (pass) in Go"
+        );
+    }
+
+    #[test]
+    fn test_f_key_is_other_for_morris() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_minigame = Some(ActiveMinigame::Morris(MorrisGame::new(
+            ChallengeDifficulty::Novice,
+        )));
+        assert_eq!(
+            map_key_for_game(&state, make_key(KeyCode::Char('f'))),
+            MinigameInput::Other
+        );
+    }
+
+    #[test]
+    fn test_p_key_is_secondary_for_go() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_minigame = Some(ActiveMinigame::Go(GoGame::new(ChallengeDifficulty::Novice)));
+        assert_eq!(
+            map_key_for_game(&state, make_key(KeyCode::Char('p'))),
+            MinigameInput::Secondary
+        );
+    }
+
+    #[test]
+    fn test_p_key_is_other_for_minesweeper() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_minigame = Some(ActiveMinigame::Minesweeper(MinesweeperGame::new(
+            ChallengeDifficulty::Novice,
+        )));
+        assert_eq!(
+            map_key_for_game(&state, make_key(KeyCode::Char('p'))),
+            MinigameInput::Other,
+            "'p' should NOT trigger Secondary (flag) in Minesweeper"
+        );
+    }
+
+    #[test]
+    fn test_p_key_is_other_for_rune() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_minigame = Some(ActiveMinigame::Rune(RuneGame::new(
+            ChallengeDifficulty::Novice,
+        )));
+        assert_eq!(
+            map_key_for_game(&state, make_key(KeyCode::Char('p'))),
+            MinigameInput::Other,
+            "'p' should NOT trigger Secondary (clear guess) in Rune"
+        );
+    }
+
+    #[test]
+    fn test_common_keys_work_for_all_games() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_minigame = Some(ActiveMinigame::Go(GoGame::new(ChallengeDifficulty::Novice)));
+
+        assert_eq!(
+            map_key_for_game(&state, make_key(KeyCode::Up)),
+            MinigameInput::Up
+        );
+        assert_eq!(
+            map_key_for_game(&state, make_key(KeyCode::Down)),
+            MinigameInput::Down
+        );
+        assert_eq!(
+            map_key_for_game(&state, make_key(KeyCode::Left)),
+            MinigameInput::Left
+        );
+        assert_eq!(
+            map_key_for_game(&state, make_key(KeyCode::Right)),
+            MinigameInput::Right
+        );
+        assert_eq!(
+            map_key_for_game(&state, make_key(KeyCode::Enter)),
+            MinigameInput::Primary
+        );
+        assert_eq!(
+            map_key_for_game(&state, make_key(KeyCode::Esc)),
+            MinigameInput::Cancel
+        );
+    }
+}

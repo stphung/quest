@@ -745,6 +745,35 @@ mod tests {
     }
 
     #[test]
+    fn test_forfeit_double_esc() {
+        let mut game = GoGame::new(ChallengeDifficulty::Novice);
+
+        // First Esc sets pending
+        process_input(&mut game, MinigameInput::Cancel);
+        assert!(game.forfeit_pending);
+        assert!(game.game_result.is_none());
+
+        // Second Esc confirms forfeit
+        process_input(&mut game, MinigameInput::Cancel);
+        assert!(!game.forfeit_pending);
+        assert_eq!(game.game_result, Some(ChallengeResult::Forfeit));
+    }
+
+    #[test]
+    fn test_forfeit_cancelled_by_other_key() {
+        let mut game = GoGame::new(ChallengeDifficulty::Novice);
+
+        // First Esc sets pending
+        process_input(&mut game, MinigameInput::Cancel);
+        assert!(game.forfeit_pending);
+
+        // Any other key cancels forfeit
+        process_input(&mut game, MinigameInput::Other);
+        assert!(!game.forfeit_pending);
+        assert!(game.game_result.is_none());
+    }
+
+    #[test]
     fn test_calculate_score_with_territory() {
         let mut board = [[None; BOARD_SIZE]; BOARD_SIZE];
         // Create a small enclosed black territory in corner

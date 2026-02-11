@@ -1116,4 +1116,238 @@ mod tests {
             discoveries_with_bonus
         );
     }
+
+    // =========================================================================
+    // Go start from menu (was missing)
+    // =========================================================================
+
+    #[test]
+    fn test_process_input_select_starts_go_game() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.challenge_menu.add_challenge(PendingChallenge {
+            challenge_type: ChallengeType::Go,
+            title: "Go Challenge".to_string(),
+            icon: "◉",
+            description: "Test".to_string(),
+        });
+        state.challenge_menu.open();
+        state.challenge_menu.open_detail();
+
+        process_input(&mut state, MenuInput::Select);
+
+        assert!(matches!(state.active_minigame, Some(ActiveMinigame::Go(_))));
+        assert!(!state.challenge_menu.is_open);
+    }
+
+    // =========================================================================
+    // ChallengeType::reward() value tests
+    // =========================================================================
+
+    #[test]
+    fn test_go_reward_values() {
+        use crate::challenges::ChallengeDifficulty::*;
+        let r = ChallengeType::Go.reward(Novice);
+        assert_eq!(r.prestige_ranks, 1);
+        assert_eq!(r.xp_percent, 0);
+        assert_eq!(r.fishing_ranks, 0);
+
+        let r = ChallengeType::Go.reward(Apprentice);
+        assert_eq!(r.prestige_ranks, 2);
+
+        let r = ChallengeType::Go.reward(Journeyman);
+        assert_eq!(r.prestige_ranks, 3);
+
+        let r = ChallengeType::Go.reward(Master);
+        assert_eq!(r.prestige_ranks, 5);
+    }
+
+    #[test]
+    fn test_morris_reward_values() {
+        use crate::challenges::ChallengeDifficulty::*;
+        let r = ChallengeType::Morris.reward(Novice);
+        assert_eq!(r.prestige_ranks, 0);
+        assert_eq!(r.xp_percent, 50);
+        assert_eq!(r.fishing_ranks, 0);
+
+        let r = ChallengeType::Morris.reward(Apprentice);
+        assert_eq!(r.xp_percent, 100);
+        assert_eq!(r.fishing_ranks, 0);
+
+        let r = ChallengeType::Morris.reward(Journeyman);
+        assert_eq!(r.xp_percent, 150);
+        assert_eq!(r.fishing_ranks, 0);
+
+        let r = ChallengeType::Morris.reward(Master);
+        assert_eq!(r.xp_percent, 200);
+        assert_eq!(r.fishing_ranks, 1);
+    }
+
+    #[test]
+    fn test_minesweeper_reward_values() {
+        use crate::challenges::ChallengeDifficulty::*;
+        let r = ChallengeType::Minesweeper.reward(Novice);
+        assert_eq!(r.prestige_ranks, 0);
+        assert_eq!(r.xp_percent, 50);
+
+        let r = ChallengeType::Minesweeper.reward(Apprentice);
+        assert_eq!(r.xp_percent, 75);
+
+        let r = ChallengeType::Minesweeper.reward(Journeyman);
+        assert_eq!(r.xp_percent, 100);
+
+        let r = ChallengeType::Minesweeper.reward(Master);
+        assert_eq!(r.prestige_ranks, 1);
+        assert_eq!(r.xp_percent, 200);
+    }
+
+    // =========================================================================
+    // ChallengeType::game_type_str() tests
+    // =========================================================================
+
+    #[test]
+    fn test_game_type_str() {
+        assert_eq!(ChallengeType::Chess.game_type_str(), "chess");
+        assert_eq!(ChallengeType::Go.game_type_str(), "go");
+        assert_eq!(ChallengeType::Morris.game_type_str(), "morris");
+        assert_eq!(ChallengeType::Gomoku.game_type_str(), "gomoku");
+        assert_eq!(ChallengeType::Minesweeper.game_type_str(), "minesweeper");
+        assert_eq!(ChallengeType::Rune.game_type_str(), "rune");
+    }
+
+    // =========================================================================
+    // ChallengeType::result_flavor() tests
+    // =========================================================================
+
+    #[test]
+    fn test_result_flavor_returns_non_empty() {
+        use crate::challenges::ChallengeResult;
+        let types = [
+            ChallengeType::Chess,
+            ChallengeType::Go,
+            ChallengeType::Morris,
+            ChallengeType::Gomoku,
+            ChallengeType::Minesweeper,
+            ChallengeType::Rune,
+        ];
+        let results = [
+            ChallengeResult::Win,
+            ChallengeResult::Loss,
+            ChallengeResult::Draw,
+            ChallengeResult::Forfeit,
+        ];
+        for ct in &types {
+            for result in &results {
+                let text = ct.result_flavor(*result);
+                assert!(
+                    !text.is_empty(),
+                    "{:?} {:?} should have non-empty flavor text",
+                    ct,
+                    result
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_result_flavor_win_differs_from_loss() {
+        use crate::challenges::ChallengeResult;
+        let types = [
+            ChallengeType::Chess,
+            ChallengeType::Go,
+            ChallengeType::Morris,
+            ChallengeType::Gomoku,
+            ChallengeType::Minesweeper,
+            ChallengeType::Rune,
+        ];
+        for ct in &types {
+            let win = ct.result_flavor(ChallengeResult::Win);
+            let loss = ct.result_flavor(ChallengeResult::Loss);
+            assert_ne!(win, loss, "{:?} win and loss flavor should differ", ct);
+        }
+    }
+
+    // =========================================================================
+    // ChallengeType::difficulty_extra_info() tests
+    // =========================================================================
+
+    #[test]
+    fn test_difficulty_extra_info_chess_elo() {
+        use crate::challenges::ChallengeDifficulty::*;
+        assert_eq!(
+            ChallengeType::Chess.difficulty_extra_info(Novice),
+            Some("~500 ELO".to_string())
+        );
+        assert_eq!(
+            ChallengeType::Chess.difficulty_extra_info(Apprentice),
+            Some("~800 ELO".to_string())
+        );
+        assert_eq!(
+            ChallengeType::Chess.difficulty_extra_info(Journeyman),
+            Some("~1100 ELO".to_string())
+        );
+        assert_eq!(
+            ChallengeType::Chess.difficulty_extra_info(Master),
+            Some("~1350 ELO".to_string())
+        );
+    }
+
+    #[test]
+    fn test_difficulty_extra_info_go_sims() {
+        use crate::challenges::ChallengeDifficulty::*;
+        assert_eq!(
+            ChallengeType::Go.difficulty_extra_info(Novice),
+            Some("500 sims".to_string())
+        );
+        assert_eq!(
+            ChallengeType::Go.difficulty_extra_info(Master),
+            Some("20000 sims".to_string())
+        );
+    }
+
+    #[test]
+    fn test_difficulty_extra_info_minesweeper_grid() {
+        use crate::challenges::ChallengeDifficulty::*;
+        assert_eq!(
+            ChallengeType::Minesweeper.difficulty_extra_info(Novice),
+            Some("9x9, 10 traps".to_string())
+        );
+        assert_eq!(
+            ChallengeType::Minesweeper.difficulty_extra_info(Master),
+            Some("20x16, 60 traps".to_string())
+        );
+    }
+
+    #[test]
+    fn test_difficulty_extra_info_rune_config() {
+        use crate::challenges::ChallengeDifficulty::*;
+        assert_eq!(
+            ChallengeType::Rune.difficulty_extra_info(Novice),
+            Some("5 runes, 3 slots".to_string())
+        );
+        assert_eq!(
+            ChallengeType::Rune.difficulty_extra_info(Journeyman),
+            Some("6 runes, 4 slots, dupes".to_string())
+        );
+        assert_eq!(
+            ChallengeType::Rune.difficulty_extra_info(Master),
+            Some("8 runes, 5 slots, dupes".to_string())
+        );
+    }
+
+    #[test]
+    fn test_difficulty_extra_info_none_for_morris_gomoku() {
+        use crate::challenges::ChallengeDifficulty::*;
+        for diff in ChallengeDifficulty::ALL {
+            assert_eq!(
+                ChallengeType::Morris.difficulty_extra_info(diff),
+                None,
+                "Morris should have no extra info"
+            );
+            assert_eq!(
+                ChallengeType::Gomoku.difficulty_extra_info(diff),
+                None,
+                "Gomoku should have no extra info"
+            );
+        }
+    }
 }
