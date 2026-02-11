@@ -5,7 +5,9 @@
 use super::generation::reveal_adjacent_rooms;
 use super::types::{Dungeon, DungeonSize, RoomState, RoomType};
 use crate::core::game_state::GameState;
-use crate::items::{generate_item, roll_random_slot, roll_rarity, Item, Rarity};
+use crate::items::{
+    generate_item, ilvl_for_zone, roll_random_slot, roll_rarity_for_mob, Item, Rarity,
+};
 use rand::Rng;
 use std::collections::{HashSet, VecDeque};
 
@@ -341,11 +343,11 @@ pub fn generate_treasure_item(prestige_rank: u32, zone_id: usize, rarity_boost: 
     let slot = roll_random_slot(&mut rng);
 
     // Roll rarity with boost based on dungeon tier
-    let base_rarity = roll_rarity(prestige_rank, &mut rng);
+    let base_rarity = roll_rarity_for_mob(prestige_rank, 0.0, &mut rng);
     let boosted_rarity = boost_rarity(base_rarity, rarity_boost);
 
     // Item level based on zone
-    let ilvl = (zone_id as u32) * 10;
+    let ilvl = ilvl_for_zone(zone_id);
 
     generate_item(slot, boosted_rarity, ilvl)
 }

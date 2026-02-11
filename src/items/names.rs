@@ -1,16 +1,15 @@
-#![allow(dead_code)]
 use super::types::{AffixType, EquipmentSlot, Item, Rarity};
 use rand::Rng;
 
-pub fn get_base_name(slot: EquipmentSlot) -> Vec<&'static str> {
+pub fn get_base_name(slot: EquipmentSlot) -> &'static [&'static str] {
     match slot {
-        EquipmentSlot::Weapon => vec!["Sword", "Axe", "Mace", "Dagger", "Greatsword", "Spear"],
-        EquipmentSlot::Armor => vec!["Leather Armor", "Chain Mail", "Plate Mail", "Scale Mail"],
-        EquipmentSlot::Helmet => vec!["Cap", "Helm", "Crown", "Coif"],
-        EquipmentSlot::Gloves => vec!["Gloves", "Gauntlets", "Mitts", "Handwraps"],
-        EquipmentSlot::Boots => vec!["Boots", "Greaves", "Shoes", "Sabatons"],
-        EquipmentSlot::Amulet => vec!["Amulet", "Pendant", "Necklace", "Talisman"],
-        EquipmentSlot::Ring => vec!["Ring", "Band", "Circle", "Loop"],
+        EquipmentSlot::Weapon => &["Sword", "Axe", "Mace", "Dagger", "Greatsword", "Spear"],
+        EquipmentSlot::Armor => &["Leather Armor", "Chain Mail", "Plate Mail", "Scale Mail"],
+        EquipmentSlot::Helmet => &["Cap", "Helm", "Crown", "Coif"],
+        EquipmentSlot::Gloves => &["Gloves", "Gauntlets", "Mitts", "Handwraps"],
+        EquipmentSlot::Boots => &["Boots", "Greaves", "Shoes", "Sabatons"],
+        EquipmentSlot::Amulet => &["Amulet", "Pendant", "Necklace", "Talisman"],
+        EquipmentSlot::Ring => &["Ring", "Band", "Circle", "Loop"],
     }
 }
 
@@ -417,8 +416,8 @@ mod tests {
 
         for i in 0..slots.len() {
             for j in (i + 1)..slots.len() {
-                let names_i: HashSet<_> = get_base_name(slots[i]).into_iter().collect();
-                let names_j: HashSet<_> = get_base_name(slots[j]).into_iter().collect();
+                let names_i: HashSet<_> = get_base_name(slots[i]).iter().collect();
+                let names_j: HashSet<_> = get_base_name(slots[j]).iter().collect();
 
                 let overlap: Vec<_> = names_i.intersection(&names_j).collect();
                 assert!(

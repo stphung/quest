@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use super::types::{EquipmentSlot, Item};
 use serde::{Deserialize, Serialize};
 

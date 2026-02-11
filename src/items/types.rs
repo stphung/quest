@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -10,6 +9,20 @@ pub enum EquipmentSlot {
     Boots,
     Amulet,
     Ring,
+}
+
+impl EquipmentSlot {
+    pub fn name(&self) -> &'static str {
+        match self {
+            EquipmentSlot::Weapon => "Weapon",
+            EquipmentSlot::Armor => "Armor",
+            EquipmentSlot::Helmet => "Helmet",
+            EquipmentSlot::Gloves => "Gloves",
+            EquipmentSlot::Boots => "Boots",
+            EquipmentSlot::Amulet => "Amulet",
+            EquipmentSlot::Ring => "Ring",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -56,8 +69,14 @@ impl AttributeBonuses {
         }
     }
 
+    #[allow(dead_code)] // Used by integration tests
     pub fn total(&self) -> u32 {
         self.str + self.dex + self.con + self.int + self.wis + self.cha
+    }
+
+    /// Returns all six attribute values as an array in order: STR, DEX, CON, INT, WIS, CHA.
+    pub fn as_array(&self) -> [u32; 6] {
+        [self.str, self.dex, self.con, self.int, self.wis, self.cha]
     }
 
     /// Converts to an Attributes struct with base 0 values plus these bonuses.
@@ -115,29 +134,15 @@ fn default_ilvl() -> u32 {
 impl Item {
     /// Returns a short stat summary string like "+8 STR +3 DEX +Crit"
     pub fn stat_summary(&self) -> String {
+        const ATTR_LABELS: [&str; 6] = ["STR", "DEX", "CON", "INT", "WIS", "CHA"];
         let mut parts = Vec::new();
 
-        // Attribute bonuses (only non-zero)
-        if self.attributes.str > 0 {
-            parts.push(format!("+{} STR", self.attributes.str));
-        }
-        if self.attributes.dex > 0 {
-            parts.push(format!("+{} DEX", self.attributes.dex));
-        }
-        if self.attributes.con > 0 {
-            parts.push(format!("+{} CON", self.attributes.con));
-        }
-        if self.attributes.int > 0 {
-            parts.push(format!("+{} INT", self.attributes.int));
-        }
-        if self.attributes.wis > 0 {
-            parts.push(format!("+{} WIS", self.attributes.wis));
-        }
-        if self.attributes.cha > 0 {
-            parts.push(format!("+{} CHA", self.attributes.cha));
+        for (value, label) in self.attributes.as_array().iter().zip(ATTR_LABELS.iter()) {
+            if *value > 0 {
+                parts.push(format!("+{} {}", value, label));
+            }
         }
 
-        // Affix short names
         for affix in &self.affixes {
             let label = match affix.affix_type {
                 AffixType::DamagePercent => format!("+{:.0}% Dmg", affix.value),
@@ -158,15 +163,7 @@ impl Item {
 
     /// Returns the slot name as a string
     pub fn slot_name(&self) -> &'static str {
-        match self.slot {
-            EquipmentSlot::Weapon => "Weapon",
-            EquipmentSlot::Armor => "Armor",
-            EquipmentSlot::Helmet => "Helmet",
-            EquipmentSlot::Gloves => "Gloves",
-            EquipmentSlot::Boots => "Boots",
-            EquipmentSlot::Amulet => "Amulet",
-            EquipmentSlot::Ring => "Ring",
-        }
+        self.slot.name()
     }
 }
 
