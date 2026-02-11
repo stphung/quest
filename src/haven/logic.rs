@@ -44,7 +44,7 @@ pub fn can_forge_stormbreaker(
 ) -> (bool, bool, bool) {
     use crate::achievements::AchievementId;
     let has_leviathan = achievements.is_unlocked(AchievementId::StormLeviathan);
-    let has_prestige = prestige_rank >= 25;
+    let has_prestige = prestige_rank >= tier_cost(HavenRoomId::StormForge, 1);
     let can_forge = has_leviathan && has_prestige;
     (has_leviathan, has_prestige, can_forge)
 }
@@ -56,10 +56,7 @@ pub fn try_discover_haven<R: Rng>(haven: &mut Haven, prestige_rank: u32, rng: &m
         return false;
     }
     let chance = haven_discovery_chance(prestige_rank);
-    if chance <= 0.0 {
-        return false;
-    }
-    if rng.gen::<f64>() < chance {
+    if chance > 0.0 && rng.gen::<f64>() < chance {
         haven.discovered = true;
         return true;
     }
@@ -81,11 +78,11 @@ pub fn haven_save_path() -> io::Result<PathBuf> {
 pub fn load_haven() -> Haven {
     let path = match haven_save_path() {
         Ok(p) => p,
-        Err(_) => return Haven::new(),
+        Err(_) => return Haven::default(),
     };
     match fs::read_to_string(&path) {
         Ok(json) => serde_json::from_str(&json).unwrap_or_default(),
-        Err(_) => Haven::new(),
+        Err(_) => Haven::default(),
     }
 }
 
@@ -104,7 +101,7 @@ mod tests {
 
     #[test]
     fn test_can_afford_basic() {
-        let haven = Haven::new();
+        let haven = Haven::default();
         // Hearthstone T1 costs 1 prestige rank
         assert!(can_afford(HavenRoomId::Hearthstone, &haven, 1));
         assert!(!can_afford(HavenRoomId::Hearthstone, &haven, 0));
@@ -112,7 +109,7 @@ mod tests {
 
     #[test]
     fn test_can_afford_tier_2() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         haven.build_room(HavenRoomId::Hearthstone); // T1
                                                     // Hearthstone T2 costs 2 prestige ranks (depth 0: 1/2/3)
         assert!(can_afford(HavenRoomId::Hearthstone, &haven, 2));
@@ -121,7 +118,7 @@ mod tests {
 
     #[test]
     fn test_can_afford_maxed_room() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         haven.build_room(HavenRoomId::Hearthstone);
         haven.build_room(HavenRoomId::Hearthstone);
         haven.build_room(HavenRoomId::Hearthstone); // T3
@@ -130,7 +127,7 @@ mod tests {
 
     #[test]
     fn test_try_build_room_success() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         let mut prestige = 10u32;
         let result = try_build_room(HavenRoomId::Hearthstone, &mut haven, &mut prestige);
         assert_eq!(result, Some((1, 1)));
@@ -140,7 +137,7 @@ mod tests {
 
     #[test]
     fn test_try_build_room_insufficient_funds() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         let mut prestige = 0u32;
         let result = try_build_room(HavenRoomId::Hearthstone, &mut haven, &mut prestige);
         assert!(result.is_none());
@@ -149,7 +146,7 @@ mod tests {
 
     #[test]
     fn test_try_build_room_locked() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         let mut prestige = 100u32;
         // Armory is locked (Hearthstone not built)
         let result = try_build_room(HavenRoomId::Armory, &mut haven, &mut prestige);
@@ -159,7 +156,7 @@ mod tests {
 
     #[test]
     fn test_try_discover_haven_below_p10() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         let mut rng = rand::thread_rng();
         // Below P10, should never discover
         for _ in 0..100_000 {
@@ -169,15 +166,17 @@ mod tests {
 
     #[test]
     fn test_try_discover_haven_already_discovered() {
-        let mut haven = Haven::new();
-        haven.discovered = true;
+        let mut haven = Haven {
+            discovered: true,
+            ..Default::default()
+        };
         let mut rng = rand::thread_rng();
         assert!(!try_discover_haven(&mut haven, 20, &mut rng));
     }
 
     #[test]
     fn test_try_discover_haven_eventually_succeeds() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         let mut rng = rand::thread_rng();
         let mut discovered = false;
         for _ in 0..1_000_000 {
@@ -192,7 +191,7 @@ mod tests {
 
     #[test]
     fn test_build_full_branch_costs() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         let mut prestige = 200u32;
         let initial_p = prestige;
 
@@ -216,7 +215,7 @@ mod tests {
 
     #[test]
     fn test_tokens_deducted_on_successful_build() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         let mut prestige = 10u32;
 
         // Build Hearthstone T1 costs 1 token
@@ -237,7 +236,7 @@ mod tests {
 
     #[test]
     fn test_tokens_not_deducted_on_failed_build() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         let mut prestige = 5u32;
 
         // Try to build locked room - should fail, no deduction
@@ -258,7 +257,7 @@ mod tests {
 
     #[test]
     fn test_insufficient_tokens_prevents_build() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         let mut prestige = 0u32;
 
         // Can't afford anything with 0 tokens
@@ -270,7 +269,7 @@ mod tests {
 
     #[test]
     fn test_exact_token_amount_allows_build() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         let mut prestige = 1u32; // Exactly enough for T1 Hearthstone
 
         assert!(can_afford(HavenRoomId::Hearthstone, &haven, prestige));
@@ -282,7 +281,7 @@ mod tests {
 
     #[test]
     fn test_build_fishing_branch_costs() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         let mut prestige = 200u32;
         let initial_p = prestige;
 
@@ -302,7 +301,7 @@ mod tests {
 
     #[test]
     fn test_upgrade_costs_more_than_initial_build() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
 
         // T1 costs less than T2 costs less than T3
         let t1_cost = super::tier_cost(HavenRoomId::Hearthstone, 1);
@@ -346,8 +345,10 @@ mod tests {
     fn test_multi_prestige_token_accumulation() {
         // Simulate earning tokens across multiple prestiges
         let mut total_earned = 0u32;
-        let mut haven = Haven::new();
-        haven.discovered = true;
+        let _haven = Haven {
+            discovered: true,
+            ..Default::default()
+        };
 
         // Each prestige earns 1 token
         for prestige_count in 1..=20 {
@@ -366,7 +367,7 @@ mod tests {
 
     #[test]
     fn test_can_afford_respects_current_tier() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         let prestige = 2u32;
 
         // Can afford T1 (costs 1)
@@ -391,7 +392,7 @@ mod tests {
 
     #[test]
     fn test_discovery_requires_p10() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         let mut rng = rand::thread_rng();
 
         // P0-P9 cannot discover Haven
@@ -406,7 +407,7 @@ mod tests {
 
     #[test]
     fn test_building_order_matters() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         let mut prestige = 100u32;
 
         // Cannot build Watchtower before its prerequisites
@@ -427,7 +428,7 @@ mod tests {
 
     #[test]
     fn test_capstone_building_order_matters() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         let mut prestige = 100u32;
 
         // Cannot build WarRoom (capstone) before BOTH parents
@@ -473,7 +474,7 @@ mod tests {
 
     #[test]
     fn test_storm_forge_requires_both_capstones() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
 
         // Build complete tree to WarRoom
         haven.build_room(HavenRoomId::Hearthstone);
@@ -501,7 +502,7 @@ mod tests {
 
     #[test]
     fn test_storm_forge_cannot_build_without_25_prestige() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         let mut prestige = 24u32; // One short of required
 
         // Build full tree to unlock StormForge
@@ -515,7 +516,7 @@ mod tests {
 
     #[test]
     fn test_storm_forge_can_build_with_exactly_25_prestige() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         let mut prestige = 25u32; // Exactly the required amount
 
         // Build full tree to unlock StormForge
@@ -531,7 +532,7 @@ mod tests {
 
     #[test]
     fn test_storm_forge_built_grants_access() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
 
         assert!(!haven.has_storm_forge());
 
@@ -544,7 +545,7 @@ mod tests {
 
     #[test]
     fn test_storm_forge_cannot_upgrade_past_tier_1() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
 
         // Build StormForge
         build_full_tree_to_capstones(&mut haven);

@@ -110,36 +110,6 @@ impl HavenRoomId {
         }
     }
 
-    /// Child rooms that this room unlocks when built to T1+.
-    #[allow(dead_code)] // Will be used for UI graph rendering
-    pub fn children(&self) -> &'static [HavenRoomId] {
-        match self {
-            HavenRoomId::Hearthstone => &[HavenRoomId::Armory, HavenRoomId::Bedroom],
-            HavenRoomId::Armory => &[HavenRoomId::TrainingYard, HavenRoomId::TrophyHall],
-            HavenRoomId::TrainingYard => &[HavenRoomId::Watchtower],
-            HavenRoomId::TrophyHall => &[HavenRoomId::AlchemyLab],
-            HavenRoomId::Watchtower => &[HavenRoomId::WarRoom],
-            HavenRoomId::AlchemyLab => &[HavenRoomId::WarRoom],
-            HavenRoomId::WarRoom => &[HavenRoomId::StormForge],
-            HavenRoomId::Bedroom => &[HavenRoomId::Garden, HavenRoomId::Library],
-            HavenRoomId::Garden => &[HavenRoomId::FishingDock],
-            HavenRoomId::Library => &[HavenRoomId::Workshop],
-            HavenRoomId::FishingDock => &[HavenRoomId::Vault],
-            HavenRoomId::Workshop => &[HavenRoomId::Vault],
-            HavenRoomId::Vault => &[HavenRoomId::StormForge],
-            HavenRoomId::StormForge => &[],
-        }
-    }
-
-    /// Whether this room is a capstone (requires two parents)
-    #[allow(dead_code)] // Will be used for UI styling
-    pub fn is_capstone(&self) -> bool {
-        matches!(
-            self,
-            HavenRoomId::WarRoom | HavenRoomId::Vault | HavenRoomId::StormForge
-        )
-    }
-
     /// Get the depth of this room in the tree (0 = root, 4 = capstones, 5 = StormForge)
     pub fn depth(&self) -> u8 {
         match self {
@@ -219,7 +189,6 @@ pub fn tier_cost(room: HavenRoomId, tier: u8) -> u32 {
 
 /// Bonus type that a room provides
 #[derive(Debug, Clone, Copy, PartialEq)]
-#[allow(dead_code)] // MaxFishingRank will be used in fishing logic
 pub enum HavenBonusType {
     DamagePercent,
     XpGainPercent,
@@ -234,7 +203,6 @@ pub enum HavenBonusType {
     ItemRarityPercent,
     HpRegenDelayReduction,
     VaultSlots,
-    MaxFishingRank,   // FishingDock T4 bonus
     StormForgeAccess, // StormForge enables forging
 }
 
@@ -346,37 +314,19 @@ impl HavenRoomId {
                 value,
                 if value > 1.0 { "s" } else { "" }
             ),
-            HavenBonusType::MaxFishingRank => format!("+{:.0} Max Fishing Rank", value),
             HavenBonusType::StormForgeAccess => "Stormbreaker forging enabled".to_string(),
         }
     }
 }
 
 /// Account-level Haven state, saved to ~/.quest/haven.json
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Haven {
     pub discovered: bool,
     pub rooms: HashMap<HavenRoomId, u8>,
 }
 
-impl Default for Haven {
-    fn default() -> Self {
-        let mut rooms = HashMap::new();
-        for room in HavenRoomId::ALL {
-            rooms.insert(room, 0);
-        }
-        Haven {
-            discovered: false,
-            rooms,
-        }
-    }
-}
-
 impl Haven {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Get the tier of a room (0 = unbuilt, 1-3)
     pub fn room_tier(&self, room: HavenRoomId) -> u8 {
         *self.rooms.get(&room).unwrap_or(&0)
@@ -465,58 +415,13 @@ pub fn haven_discovery_chance(prestige_rank: u32) -> f64 {
         + (prestige_rank - HAVEN_MIN_PRESTIGE_RANK) as f64 * HAVEN_DISCOVERY_RANK_BONUS
 }
 
-/// Pre-computed Haven bonuses for efficient access during gameplay
-#[derive(Debug, Clone, Default)]
-#[allow(dead_code)] // Will be used for bonus application in follow-up PR
-pub struct HavenBonuses {
-    pub damage_percent: f64,
-    pub xp_gain_percent: f64,
-    pub drop_rate_percent: f64,
-    pub crit_chance_percent: f64,
-    pub hp_regen_percent: f64,
-    pub double_strike_chance: f64,
-    pub offline_xp_percent: f64,
-    pub challenge_discovery_percent: f64,
-    pub fishing_timer_reduction: f64,
-    pub double_fish_chance: f64,
-    pub item_rarity_percent: f64,
-    pub hp_regen_delay_reduction: f64,
-    pub vault_slots: u8,
-    pub max_fishing_rank_bonus: u32,
-    pub has_storm_forge: bool,
-}
-
-impl Haven {
-    /// Compute all bonuses from the current Haven state
-    #[allow(dead_code)] // Will be used for bonus application in follow-up PR
-    pub fn compute_bonuses(&self) -> HavenBonuses {
-        HavenBonuses {
-            damage_percent: self.get_bonus(HavenBonusType::DamagePercent),
-            xp_gain_percent: self.get_bonus(HavenBonusType::XpGainPercent),
-            drop_rate_percent: self.get_bonus(HavenBonusType::DropRatePercent),
-            crit_chance_percent: self.get_bonus(HavenBonusType::CritChancePercent),
-            hp_regen_percent: self.get_bonus(HavenBonusType::HpRegenPercent),
-            double_strike_chance: self.get_bonus(HavenBonusType::DoubleStrikeChance),
-            offline_xp_percent: self.get_bonus(HavenBonusType::OfflineXpPercent),
-            challenge_discovery_percent: self.get_bonus(HavenBonusType::ChallengeDiscoveryPercent),
-            fishing_timer_reduction: self.get_bonus(HavenBonusType::FishingTimerReduction),
-            double_fish_chance: self.get_bonus(HavenBonusType::DoubleFishChance),
-            item_rarity_percent: self.get_bonus(HavenBonusType::ItemRarityPercent),
-            hp_regen_delay_reduction: self.get_bonus(HavenBonusType::HpRegenDelayReduction),
-            vault_slots: self.vault_tier(),
-            max_fishing_rank_bonus: self.fishing_rank_bonus(),
-            has_storm_forge: self.has_storm_forge(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_new_haven_all_rooms_unbuilt() {
-        let haven = Haven::new();
+        let haven = Haven::default();
         assert!(!haven.discovered);
         assert_eq!(haven.rooms_built(), 0);
         assert_eq!(haven.total_rooms(), 14); // 13 original + StormForge
@@ -528,20 +433,16 @@ mod tests {
     #[test]
     fn test_hearthstone_is_root() {
         assert!(HavenRoomId::Hearthstone.parents().is_empty());
-        assert_eq!(
-            HavenRoomId::Hearthstone.children(),
-            &[HavenRoomId::Armory, HavenRoomId::Bedroom]
-        );
     }
 
     #[test]
     fn test_capstone_requires_two_parents() {
-        assert!(HavenRoomId::WarRoom.is_capstone());
+        assert_eq!(HavenRoomId::WarRoom.parents().len(), 2);
         assert_eq!(
             HavenRoomId::WarRoom.parents(),
             &[HavenRoomId::Watchtower, HavenRoomId::AlchemyLab]
         );
-        assert!(HavenRoomId::Vault.is_capstone());
+        assert_eq!(HavenRoomId::Vault.parents().len(), 2);
         assert_eq!(
             HavenRoomId::Vault.parents(),
             &[HavenRoomId::FishingDock, HavenRoomId::Workshop]
@@ -550,7 +451,7 @@ mod tests {
 
     #[test]
     fn test_hearthstone_unlocked_by_default() {
-        let haven = Haven::new();
+        let haven = Haven::default();
         assert!(haven.is_room_unlocked(HavenRoomId::Hearthstone));
         assert!(!haven.is_room_unlocked(HavenRoomId::Armory));
         assert!(!haven.is_room_unlocked(HavenRoomId::Bedroom));
@@ -558,7 +459,7 @@ mod tests {
 
     #[test]
     fn test_building_hearthstone_unlocks_children() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         haven.build_room(HavenRoomId::Hearthstone);
         assert_eq!(haven.room_tier(HavenRoomId::Hearthstone), 1);
         assert!(haven.is_room_unlocked(HavenRoomId::Armory));
@@ -568,14 +469,14 @@ mod tests {
 
     #[test]
     fn test_cannot_build_locked_room() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         assert!(!haven.can_build(HavenRoomId::Armory));
         assert!(haven.build_room(HavenRoomId::Armory).is_none());
     }
 
     #[test]
     fn test_cannot_build_past_tier_3() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         haven.build_room(HavenRoomId::Hearthstone); // T1
         haven.build_room(HavenRoomId::Hearthstone); // T2
         haven.build_room(HavenRoomId::Hearthstone); // T3
@@ -586,7 +487,7 @@ mod tests {
 
     #[test]
     fn test_capstone_requires_both_parents() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         haven.build_room(HavenRoomId::Hearthstone);
         haven.build_room(HavenRoomId::Armory);
         haven.build_room(HavenRoomId::TrainingYard);
@@ -638,7 +539,7 @@ mod tests {
 
     #[test]
     fn test_rooms_built_count() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         assert_eq!(haven.rooms_built(), 0);
         haven.build_room(HavenRoomId::Hearthstone);
         assert_eq!(haven.rooms_built(), 1);
@@ -668,8 +569,10 @@ mod tests {
 
     #[test]
     fn test_serde_roundtrip() {
-        let mut haven = Haven::new();
-        haven.discovered = true;
+        let mut haven = Haven {
+            discovered: true,
+            ..Default::default()
+        };
         haven.build_room(HavenRoomId::Hearthstone);
         haven.build_room(HavenRoomId::Hearthstone); // T2
         haven.build_room(HavenRoomId::Armory);
@@ -685,7 +588,7 @@ mod tests {
 
     #[test]
     fn test_get_bonus_from_haven() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         assert_eq!(haven.get_bonus(HavenBonusType::DamagePercent), 0.0);
         haven.build_room(HavenRoomId::Hearthstone);
         haven.build_room(HavenRoomId::Armory);
@@ -694,7 +597,7 @@ mod tests {
 
     #[test]
     fn test_full_combat_branch_buildable() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         // Build full combat branch
         assert!(haven.build_room(HavenRoomId::Hearthstone).is_some());
         assert!(haven.build_room(HavenRoomId::Armory).is_some());
@@ -704,30 +607,6 @@ mod tests {
         assert!(haven.build_room(HavenRoomId::AlchemyLab).is_some());
         assert!(haven.build_room(HavenRoomId::WarRoom).is_some());
         assert_eq!(haven.rooms_built(), 7);
-    }
-
-    #[test]
-    fn test_compute_bonuses() {
-        let mut haven = Haven::new();
-        let bonuses = haven.compute_bonuses();
-
-        // Empty haven has no bonuses
-        assert_eq!(bonuses.damage_percent, 0.0);
-        assert_eq!(bonuses.xp_gain_percent, 0.0);
-        assert_eq!(bonuses.vault_slots, 0);
-
-        // Build some rooms
-        haven.build_room(HavenRoomId::Hearthstone); // +25% Offline XP
-        haven.build_room(HavenRoomId::Armory); // +5% DMG
-
-        let bonuses = haven.compute_bonuses();
-        assert_eq!(bonuses.damage_percent, 5.0);
-        assert_eq!(bonuses.offline_xp_percent, 25.0);
-
-        // Upgrade Armory to T2
-        haven.build_room(HavenRoomId::Armory); // +10% DMG now
-        let bonuses = haven.compute_bonuses();
-        assert_eq!(bonuses.damage_percent, 10.0);
     }
 
     // =========================================================================
@@ -816,7 +695,7 @@ mod tests {
 
     #[test]
     fn test_full_fishing_branch_buildable() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         // Build full fishing/utility branch to Vault capstone
         assert!(haven.build_room(HavenRoomId::Hearthstone).is_some());
         assert!(haven.build_room(HavenRoomId::Bedroom).is_some());
@@ -830,7 +709,7 @@ mod tests {
 
     #[test]
     fn test_complete_haven_all_rooms_buildable() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
 
         // Build entire tree in dependency order
         // Root
@@ -865,7 +744,7 @@ mod tests {
 
     #[test]
     fn test_max_all_rooms_to_max_tier() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
 
         // Build all rooms to their max tier
         for _ in 0..3 {
@@ -949,7 +828,7 @@ mod tests {
 
     #[test]
     fn test_partial_token_spending_preserves_progress() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
 
         // Build Hearthstone T1 (cost 1)
         haven.build_room(HavenRoomId::Hearthstone);
@@ -973,7 +852,7 @@ mod tests {
 
     #[test]
     fn test_cannot_build_child_before_parent() {
-        let haven = Haven::new();
+        let haven = Haven::default();
         // TrainingYard requires Armory, which requires Hearthstone
         assert!(!haven.is_room_unlocked(HavenRoomId::TrainingYard));
         assert!(!haven.can_build(HavenRoomId::TrainingYard));
@@ -981,7 +860,7 @@ mod tests {
 
     #[test]
     fn test_capstone_not_unlocked_with_only_one_parent() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
 
         // Build path to Watchtower only
         haven.build_room(HavenRoomId::Hearthstone);
@@ -997,7 +876,7 @@ mod tests {
 
     #[test]
     fn test_building_returns_new_tier() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         assert_eq!(haven.build_room(HavenRoomId::Hearthstone), Some(1));
         assert_eq!(haven.build_room(HavenRoomId::Hearthstone), Some(2));
         assert_eq!(haven.build_room(HavenRoomId::Hearthstone), Some(3));
@@ -1017,9 +896,6 @@ mod tests {
         assert_eq!(HavenRoomId::WarRoom.parents().len(), 2);
         assert_eq!(HavenRoomId::Vault.parents().len(), 2);
         assert_eq!(HavenRoomId::StormForge.parents().len(), 2);
-
-        // Verify StormForge (ultimate capstone) has no children
-        assert!(HavenRoomId::StormForge.children().is_empty());
     }
 
     #[test]
@@ -1057,44 +933,8 @@ mod tests {
     }
 
     #[test]
-    fn test_compute_bonuses_all_fields() {
-        let mut haven = Haven::new();
-
-        // Build one room of each bonus type to T1
-        haven.build_room(HavenRoomId::Hearthstone); // Offline XP
-        haven.build_room(HavenRoomId::Armory); // Damage
-        haven.build_room(HavenRoomId::Bedroom); // Regen Delay
-        haven.build_room(HavenRoomId::TrainingYard); // XP Gain
-        haven.build_room(HavenRoomId::Garden); // Fishing Timer
-        haven.build_room(HavenRoomId::TrophyHall); // Drop Rate
-        haven.build_room(HavenRoomId::Library); // Challenge Discovery
-        haven.build_room(HavenRoomId::Watchtower); // Crit
-        haven.build_room(HavenRoomId::FishingDock); // Double Fish
-        haven.build_room(HavenRoomId::AlchemyLab); // HP Regen
-        haven.build_room(HavenRoomId::Workshop); // Item Rarity
-        haven.build_room(HavenRoomId::WarRoom); // Double Strike
-        haven.build_room(HavenRoomId::Vault); // Vault Slots
-
-        let bonuses = haven.compute_bonuses();
-
-        assert_eq!(bonuses.offline_xp_percent, 25.0);
-        assert_eq!(bonuses.damage_percent, 5.0);
-        assert_eq!(bonuses.hp_regen_delay_reduction, 15.0);
-        assert_eq!(bonuses.xp_gain_percent, 5.0);
-        assert_eq!(bonuses.fishing_timer_reduction, 10.0);
-        assert_eq!(bonuses.drop_rate_percent, 5.0);
-        assert_eq!(bonuses.challenge_discovery_percent, 20.0);
-        assert_eq!(bonuses.crit_chance_percent, 5.0);
-        assert_eq!(bonuses.double_fish_chance, 25.0);
-        assert_eq!(bonuses.hp_regen_percent, 25.0);
-        assert_eq!(bonuses.item_rarity_percent, 10.0);
-        assert_eq!(bonuses.double_strike_chance, 10.0);
-        assert_eq!(bonuses.vault_slots, 1);
-    }
-
-    #[test]
     fn test_vault_tier_convenience_method() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         assert_eq!(haven.vault_tier(), 0);
 
         // Build path to Vault

@@ -33,5 +33,5 @@ pub use combat::{CombatState, Enemy};
 pub use core::{GameState, TICK_INTERVAL_MS};
 pub use dungeon::{Dungeon, Room, RoomType};
 pub use fishing::{FishRarity, FishingSession};
-pub use haven::{Haven, HavenBonusType, HavenBonuses, HavenRoomId};
+pub use haven::{Haven, HavenBonusType, HavenRoomId};
 pub use items::{Equipment, EquipmentSlot, Item, Rarity};

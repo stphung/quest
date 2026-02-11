@@ -324,7 +324,7 @@ mod tests {
 
     #[test]
     fn test_trigger_haven_discovery() {
-        let mut haven = Haven::new();
+        let mut haven = Haven::default();
         assert!(!haven.discovered);
 
         let msg = trigger_haven_discovery(&mut haven);
