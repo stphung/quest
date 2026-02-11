@@ -12,12 +12,6 @@ mod ui;
 mod utils;
 mod zones;
 
-use challenges::chess::logic::process_ai_thinking;
-use challenges::go::process_go_ai;
-use challenges::gomoku::logic::process_ai_thinking as process_gomoku_ai;
-use challenges::menu::try_discover_challenge_with_haven;
-use challenges::morris::logic::process_ai_thinking as process_morris_ai;
-use challenges::ActiveMinigame;
 use character::input::{
     process_creation_input, process_delete_input, process_rename_input, process_select_input,
     CreationInput, CreationResult, DeleteInput, DeleteResult, RenameInput, RenameResult,
@@ -997,252 +991,36 @@ fn game_tick(
     global_achievements: &mut achievements::Achievements,
     debug_mode: bool,
 ) -> Option<u8> {
-    use combat::logic::update_combat;
-    use dungeon::logic::{
-        on_boss_defeated, on_elite_defeated, on_treasure_room_entered, update_dungeon,
-    };
+    use core::tick::TickEvent;
 
-    // Each tick is 100ms = 0.1 seconds
-    let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
-
-    // Process chess AI thinking
-    // Process AI thinking for active minigame
-    match &mut game_state.active_minigame {
-        Some(ActiveMinigame::Chess(chess_game)) => {
-            let mut rng = rand::thread_rng();
-            process_ai_thinking(chess_game, &mut rng);
-        }
-        Some(ActiveMinigame::Morris(morris_game)) => {
-            let mut rng = rand::thread_rng();
-            process_morris_ai(morris_game, &mut rng);
-        }
-        Some(ActiveMinigame::Gomoku(gomoku_game)) => {
-            let mut rng = rand::thread_rng();
-            process_gomoku_ai(gomoku_game, &mut rng);
-        }
-        Some(ActiveMinigame::Go(go_game)) => {
-            let mut rng = rand::thread_rng();
-            process_go_ai(go_game, &mut rng);
-        }
-        _ => {}
-    }
-
-    // Try challenge discovery (single roll, weighted table picks which type)
-    {
-        let mut rng = rand::thread_rng();
-        let haven_discovery = haven.get_bonus(haven::HavenBonusType::ChallengeDiscoveryPercent);
-        if let Some(challenge_type) =
-            try_discover_challenge_with_haven(game_state, &mut rng, haven_discovery)
-        {
-            let icon = challenge_type.icon();
-            let flavor = challenge_type.discovery_flavor();
-            game_state
-                .combat_state
-                .add_log_entry(format!("{} {}", icon, flavor), false, true);
-            game_state.combat_state.add_log_entry(
-                format!("{} Press [Tab] to view pending challenges", icon),
-                false,
-                true,
-            );
-        }
-    }
-
-    // Sync player max HP with derived stats (ensures equipment changes are reflected)
-    let derived = character::derived_stats::DerivedStats::calculate_derived_stats(
-        &game_state.attributes,
-        &game_state.equipment,
+    // Run the extracted game logic tick
+    let mut rng = rand::thread_rng();
+    let result = core::tick::game_tick(
+        game_state,
+        tick_counter,
+        haven,
+        global_achievements,
+        debug_mode,
+        &mut rng,
     );
-    game_state.combat_state.update_max_hp(derived.max_hp);
 
-    // Update dungeon exploration if in a dungeon
-    if game_state.active_dungeon.is_some() {
-        let dungeon_events = update_dungeon(game_state, delta_time);
-        for event in dungeon_events {
-            use dungeon::logic::DungeonEvent;
-            match event {
-                DungeonEvent::EnteredRoom { room_type, .. } => {
-                    let message = format!("🚪 Entered {:?} room", room_type);
-                    game_state.combat_state.add_log_entry(message, false, true);
-
-                    // Handle treasure room
-                    if room_type == crate::dungeon::RoomType::Treasure {
-                        if let Some((item, equipped)) = on_treasure_room_entered(game_state) {
-                            let status = if equipped {
-                                "Equipped!"
-                            } else {
-                                "Kept current gear"
-                            };
-                            let message = format!("💎 Found: {} [{}]", item.display_name, status);
-                            game_state.combat_state.add_log_entry(message, false, true);
-                        }
-                    }
-                }
-                DungeonEvent::FoundKey => {
-                    game_state.combat_state.add_log_entry(
-                        "🗝️ Found the dungeon key!".to_string(),
-                        false,
-                        true,
-                    );
-                }
-                DungeonEvent::BossUnlocked => {
-                    game_state.combat_state.add_log_entry(
-                        "👹 The boss room is now unlocked!".to_string(),
-                        false,
-                        true,
-                    );
-                }
-                DungeonEvent::DungeonComplete {
-                    xp_earned,
-                    items_collected,
-                } => {
-                    let message = format!(
-                        "🏆 Dungeon Complete! +{} XP, {} items found",
-                        xp_earned, items_collected
-                    );
-                    game_state.combat_state.add_log_entry(message, false, true);
-                }
-                DungeonEvent::DungeonFailed => {
-                    game_state.combat_state.add_log_entry(
-                        "💀 Escaped the dungeon... (no prestige lost)".to_string(),
-                        false,
-                        false,
-                    );
-                }
-                _ => {}
-            }
-        }
-    }
-
-    // Update fishing if active (mutually exclusive with combat)
-    if game_state.active_fishing.is_some() {
-        let mut rng = rand::thread_rng();
-        let haven_fishing = fishing::logic::HavenFishingBonuses {
-            timer_reduction_percent: haven.get_bonus(haven::HavenBonusType::FishingTimerReduction),
-            double_fish_chance_percent: haven.get_bonus(haven::HavenBonusType::DoubleFishChance),
-            max_fishing_rank_bonus: haven.fishing_rank_bonus(),
-        };
-        let fishing_result =
-            fishing::logic::tick_fishing_with_haven_result(game_state, &mut rng, &haven_fishing);
-
-        // Check if Storm Leviathan was caught - unlock achievement
-        if fishing_result.caught_storm_leviathan {
-            global_achievements.on_storm_leviathan_caught(Some(&game_state.character_name));
-            if !debug_mode {
-                if let Err(e) = achievements::save_achievements(global_achievements) {
-                    eprintln!("Failed to save achievements: {}", e);
-                }
-            }
-        }
-
-        let fishing_messages = fishing_result.messages;
-        for message in &fishing_messages {
-            game_state
-                .combat_state
-                .add_log_entry(format!("🎣 {}", message), false, true);
-
-            // Track fish catches and fishing item finds in recent gains
-            if message.contains("Caught") {
-                // Parse rarity from "[Rarity]" in message
-                let rarity = if message.contains("[Legendary]") {
-                    items::types::Rarity::Legendary
-                } else if message.contains("[Epic]") {
-                    items::types::Rarity::Epic
-                } else if message.contains("[Rare]") {
-                    items::types::Rarity::Rare
-                } else if message.contains("[Uncommon]") {
-                    items::types::Rarity::Magic
-                } else {
-                    items::types::Rarity::Common
-                };
-                // Extract fish name (between "Caught " and " [")
-                let fish_name = message
-                    .split("Caught ")
-                    .nth(1)
-                    .and_then(|s| s.split(" [").next())
-                    .unwrap_or("Fish")
-                    .to_string();
-                game_state.add_recent_drop(
-                    fish_name,
-                    rarity,
-                    false,
-                    "🐟",
-                    String::new(),
-                    String::new(),
-                );
-            } else if message.contains("Found item:") {
-                let item_name = message
-                    .split("Found item: ")
-                    .nth(1)
-                    .map(|s| s.trim_end_matches('!'))
-                    .unwrap_or("Item")
-                    .to_string();
-                game_state.add_recent_drop(
-                    item_name,
-                    items::types::Rarity::Rare,
-                    false,
-                    "📦",
-                    String::new(),
-                    String::new(),
-                );
-            }
-        }
-
-        // Check for fishing rank up (capped by Haven Fishing Dock tier)
-        let max_rank = fishing::logic::get_max_fishing_rank(haven_fishing.max_fishing_rank_bonus);
-        if let Some(rank_msg) =
-            fishing::logic::check_rank_up_with_max(&mut game_state.fishing, max_rank)
-        {
-            game_state
-                .combat_state
-                .add_log_entry(format!("🎣 {}", rank_msg), false, true);
-        }
-
-        // Update play_time_seconds while fishing
-        *tick_counter += 1;
-        if *tick_counter >= 10 {
-            game_state.play_time_seconds += 1;
-            *tick_counter = 0;
-        }
-
-        return fishing_result.leviathan_encounter; // Skip combat processing while fishing
-    }
-
-    // Build Haven combat bonuses
-    let haven_combat = combat::logic::HavenCombatBonuses {
-        hp_regen_percent: haven.get_bonus(haven::HavenBonusType::HpRegenPercent),
-        hp_regen_delay_reduction: haven.get_bonus(haven::HavenBonusType::HpRegenDelayReduction),
-        damage_percent: haven.get_bonus(haven::HavenBonusType::DamagePercent),
-        crit_chance_percent: haven.get_bonus(haven::HavenBonusType::CritChancePercent),
-        double_strike_chance: haven.get_bonus(haven::HavenBonusType::DoubleStrikeChance),
-        xp_gain_percent: haven.get_bonus(haven::HavenBonusType::XpGainPercent),
-    };
-    let combat_events = update_combat(game_state, delta_time, &haven_combat, global_achievements);
-
-    // Process combat events
-    for event in combat_events {
-        use combat::logic::CombatEvent;
+    // Map TickEvents to UI mutations (combat log, visual effects, etc.)
+    for event in &result.events {
         match event {
-            CombatEvent::PlayerAttackBlocked { weapon_needed } => {
-                // Attack blocked - boss requires legendary weapon
-                let message = format!("🚫 {} required to damage this foe!", weapon_needed);
-                game_state.combat_state.add_log_entry(message, false, true);
-            }
-            CombatEvent::PlayerAttack { damage, was_crit } => {
-                // Add to combat log
-                let message = if was_crit {
-                    format!("💥 CRITICAL HIT for {} damage!", damage)
-                } else {
-                    format!("⚔ You hit for {} damage", damage)
-                };
+            TickEvent::PlayerAttack {
+                damage,
+                was_crit,
+                message,
+            } => {
                 game_state
                     .combat_state
-                    .add_log_entry(message, was_crit, true);
+                    .add_log_entry(message.clone(), *was_crit, true);
 
                 // Spawn damage number effect
                 let damage_effect = ui::combat_effects::VisualEffect::new(
                     ui::combat_effects::EffectType::DamageNumber {
-                        value: damage,
-                        is_crit: was_crit,
+                        value: *damage,
+                        is_crit: *was_crit,
                     },
                     0.8,
                 );
@@ -1262,287 +1040,101 @@ fn game_tick(
                 );
                 game_state.combat_state.visual_effects.push(impact_effect);
             }
-            CombatEvent::EnemyAttack { damage } => {
-                // Add enemy attack to combat log
-                if let Some(enemy) = &game_state.combat_state.current_enemy {
-                    let message = format!("🛡 {} hits you for {} damage", enemy.name, damage);
-                    game_state.combat_state.add_log_entry(message, false, false);
-                }
+            TickEvent::PlayerAttackBlocked { message, .. } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, true);
             }
-            CombatEvent::EnemyDied { xp_gained } => {
-                // Add to combat log
-                if let Some(enemy) = &game_state.combat_state.current_enemy {
-                    let message = format!("✨ {} defeated! +{} XP", enemy.name, xp_gained);
-                    game_state.combat_state.add_log_entry(message, false, true);
-                }
-                let level_before = game_state.character_level;
-                apply_tick_xp(game_state, xp_gained as f64);
-                if game_state.character_level > level_before {
-                    global_achievements
-                        .on_level_up(game_state.character_level, Some(&game_state.character_name));
-                }
-                game_state.session_kills += 1;
-
-                // Track XP in dungeon if active and mark room cleared
-                dungeon::logic::add_dungeon_xp(game_state, xp_gained);
-                if let Some(dungeon) = &mut game_state.active_dungeon {
-                    dungeon::logic::on_room_enemy_defeated(dungeon);
-                }
-
-                // Try to drop item
-                use items::drops::{try_drop_from_boss, try_drop_from_mob};
-                use items::scoring::auto_equip_if_better;
-
-                let zone_id = game_state.zone_progression.current_zone_id as usize;
-                let was_boss = game_state.zone_progression.fighting_boss;
-                let is_final_zone = zone_id == 10;
-
-                let dropped_item = if was_boss {
-                    // Boss always drops an item, can drop legendaries
-                    Some(try_drop_from_boss(zone_id, is_final_zone))
-                } else {
-                    // Normal mobs use haven bonuses, capped at Epic
-                    let haven_drop_rate = haven.get_bonus(haven::HavenBonusType::DropRatePercent);
-                    let haven_rarity = haven.get_bonus(haven::HavenBonusType::ItemRarityPercent);
-                    try_drop_from_mob(game_state, zone_id, haven_drop_rate, haven_rarity)
-                };
-
-                if let Some(item) = dropped_item {
-                    let item_name = item.display_name.clone();
-                    let rarity = item.rarity;
-                    let slot = item.slot_name().to_string();
-                    let stats = item.stat_summary();
-                    let icon = if was_boss { "👑" } else { "🎁" };
-                    let equipped = auto_equip_if_better(item, game_state);
-                    game_state.add_recent_drop(item_name, rarity, equipped, icon, slot, stats);
-                }
-
-                // Try to discover dungeon (only when not in a dungeon)
-                let discovered_dungeon =
-                    game_state.active_dungeon.is_none() && try_discover_dungeon(game_state);
-                if discovered_dungeon {
-                    game_state.combat_state.add_log_entry(
-                        "🌀 You notice a dark passage leading underground...".to_string(),
-                        false,
-                        true,
-                    );
-                }
-
-                // Try to discover fishing spot (only when not in dungeon and not already fishing)
-                if !discovered_dungeon
-                    && game_state.active_dungeon.is_none()
-                    && game_state.active_fishing.is_none()
-                {
-                    let mut rng = rand::thread_rng();
-                    if let Some(message) =
-                        fishing::logic::try_discover_fishing(game_state, &mut rng)
-                    {
-                        game_state.combat_state.add_log_entry(
-                            format!("🎣 {}", message),
-                            false,
-                            true,
-                        );
-                    }
-                }
+            TickEvent::EnemyAttack { message, .. } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, false);
             }
-            CombatEvent::EliteDefeated { xp_gained } => {
-                // Elite defeated - give key
-                if let Some(enemy) = &game_state.combat_state.current_enemy {
-                    let message = format!("⚔️ {} defeated! +{} XP", enemy.name, xp_gained);
-                    game_state.combat_state.add_log_entry(message, false, true);
-                }
-                let level_before = game_state.character_level;
-                apply_tick_xp(game_state, xp_gained as f64);
-                if game_state.character_level > level_before {
-                    global_achievements
-                        .on_level_up(game_state.character_level, Some(&game_state.character_name));
-                }
-                dungeon::logic::add_dungeon_xp(game_state, xp_gained);
-
-                // Give key
-                if let Some(dungeon) = &mut game_state.active_dungeon {
-                    let events = on_elite_defeated(dungeon);
-                    for event in events {
-                        if matches!(event, dungeon::logic::DungeonEvent::FoundKey) {
-                            game_state.combat_state.add_log_entry(
-                                "🗝️ Found the dungeon key!".to_string(),
-                                false,
-                                true,
-                            );
-                        }
-                    }
-                }
+            TickEvent::EnemyDefeated { message, .. } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, true);
             }
-            CombatEvent::BossDefeated { xp_gained } => {
-                // Boss defeated - complete dungeon
-                if let Some(enemy) = &game_state.combat_state.current_enemy {
-                    let message = format!("👑 {} vanquished! +{} XP", enemy.name, xp_gained);
-                    game_state.combat_state.add_log_entry(message, false, true);
-                }
-                let level_before = game_state.character_level;
-                apply_tick_xp(game_state, xp_gained as f64);
-
-                // Calculate boss bonus XP (copy values before mutable borrow)
-                let (bonus_xp, total_xp, items) = if let Some(dungeon) = &game_state.active_dungeon
-                {
-                    let bonus = dungeon::logic::calculate_boss_xp_reward(dungeon.size);
-                    let total = dungeon.xp_earned + xp_gained + bonus;
-                    let item_count = dungeon.collected_items.len();
-                    (bonus, total, item_count)
-                } else {
-                    (0, xp_gained, 0)
-                };
-
-                apply_tick_xp(game_state, bonus_xp as f64);
-                if game_state.character_level > level_before {
-                    global_achievements
-                        .on_level_up(game_state.character_level, Some(&game_state.character_name));
-                }
-
-                // Track dungeon completion for achievements
-                global_achievements.on_dungeon_completed(Some(&game_state.character_name));
-
-                let message = format!(
-                    "🏆 Dungeon Complete! +{} bonus XP ({} total, {} items)",
-                    bonus_xp, total_xp, items
-                );
-                game_state.combat_state.add_log_entry(message, false, true);
-
-                // Clear dungeon
-                let _events = on_boss_defeated(game_state);
+            TickEvent::PlayerDied { message } | TickEvent::PlayerDiedInDungeon { message } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, false);
             }
-            CombatEvent::PlayerDiedInDungeon => {
-                // Died in dungeon - exit without prestige loss
-                game_state.combat_state.add_log_entry(
-                    "💀 You fell in the dungeon... (escaped without prestige loss)".to_string(),
-                    false,
-                    false,
-                );
+            TickEvent::ItemDropped { .. } => {
+                // Item drops and recent_drops tracking are handled inside game_tick
             }
-            CombatEvent::PlayerDied => {
-                // Add to combat log
-                game_state.combat_state.add_log_entry(
-                    "💀 You died! Boss encounter reset.".to_string(),
-                    false,
-                    false,
-                );
+            TickEvent::SubzoneBossDefeated { message, .. } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, true);
             }
-            CombatEvent::SubzoneBossDefeated { xp_gained, result } => {
-                use zones::BossDefeatResult;
-                // Apply XP from boss kill
-                let level_before = game_state.character_level;
-                apply_tick_xp(game_state, xp_gained as f64);
-                if game_state.character_level > level_before {
-                    global_achievements
-                        .on_level_up(game_state.character_level, Some(&game_state.character_name));
-                }
-                game_state.session_kills += 1;
-
-                // Track zone fully cleared for achievements
-                match &result {
-                    BossDefeatResult::ZoneComplete { old_zone, .. }
-                    | BossDefeatResult::ZoneCompleteButGated {
-                        zone_name: old_zone,
-                        ..
-                    } => {
-                        // Get zone ID from the old zone name
-                        if let Some(zone) =
-                            zones::get_all_zones().iter().find(|z| z.name == *old_zone)
-                        {
-                            global_achievements
-                                .on_zone_fully_cleared(zone.id, Some(&game_state.character_name));
-                        }
-                    }
-                    BossDefeatResult::StormsEnd => {
-                        // Zone 10 (Storm Citadel) completed
-                        global_achievements
-                            .on_zone_fully_cleared(10, Some(&game_state.character_name));
-                        global_achievements.on_storms_end(Some(&game_state.character_name));
-                    }
-                    BossDefeatResult::ExpanseCycle => {
-                        // Zone 11 (The Expanse) cycle completed
-                        global_achievements
-                            .on_zone_fully_cleared(11, Some(&game_state.character_name));
-                    }
-                    _ => {}
-                }
-
-                // Log based on result
-                let message = match &result {
-                    BossDefeatResult::SubzoneComplete { .. } => {
-                        format!("👑 Boss defeated! +{} XP — Moving to next area.", xp_gained)
-                    }
-                    BossDefeatResult::ZoneComplete {
-                        old_zone,
-                        new_zone_id,
-                    } => {
-                        let new_zone = zones::get_zone(*new_zone_id)
-                            .map(|z| z.name)
-                            .unwrap_or("???");
-                        format!(
-                            "👑 {} conquered! +{} XP — Advancing to {}!",
-                            old_zone, xp_gained, new_zone
-                        )
-                    }
-                    BossDefeatResult::ZoneCompleteButGated {
-                        zone_name,
-                        required_prestige,
-                    } => {
-                        format!(
-                            "👑 {} conquered! +{} XP — Next zone requires Prestige {}.",
-                            zone_name, xp_gained, required_prestige
-                        )
-                    }
-                    BossDefeatResult::StormsEnd => {
-                        format!(
-                            "👑 All zones conquered! +{} XP — You have completed the game!",
-                            xp_gained
-                        )
-                    }
-                    BossDefeatResult::WeaponRequired { .. } => {
-                        // Already handled by PlayerAttackBlocked
-                        continue;
-                    }
-                    BossDefeatResult::ExpanseCycle => {
-                        format!(
-                            "👑 The Endless defeated! +{} XP — The Expanse cycles anew...",
-                            xp_gained
-                        )
-                    }
-                };
-                game_state.combat_state.add_log_entry(message, false, true);
+            TickEvent::DungeonRoomEntered { message, .. }
+            | TickEvent::DungeonTreasureFound { message, .. }
+            | TickEvent::DungeonKeyFound { message }
+            | TickEvent::DungeonBossUnlocked { message }
+            | TickEvent::DungeonBossDefeated { message, .. }
+            | TickEvent::DungeonEliteDefeated { message, .. }
+            | TickEvent::DungeonCompleted { message, .. } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, true);
+            }
+            TickEvent::DungeonFailed { message } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, false);
+            }
+            TickEvent::FishingMessage { message }
+            | TickEvent::FishCaught { message, .. }
+            | TickEvent::FishingItemFound { message, .. }
+            | TickEvent::FishingRankUp { message } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, true);
+            }
+            TickEvent::StormLeviathanCaught => {
+                // Achievement persistence handled below via achievements_changed flag
+            }
+            TickEvent::ChallengeDiscovered {
+                message, follow_up, ..
+            } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, true);
+                game_state
+                    .combat_state
+                    .add_log_entry(follow_up.clone(), false, true);
+            }
+            TickEvent::DungeonDiscovered { message }
+            | TickEvent::FishingSpotDiscovered { message } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, true);
+            }
+            TickEvent::AchievementUnlocked { message, .. } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, true);
+            }
+            TickEvent::LeveledUp { .. } => {
+                // Level-up state changes are handled inside game_tick
             }
         }
     }
 
-    // Update visual effects
+    // Persist achievements to disk if any were unlocked
+    if result.achievements_changed && !debug_mode {
+        if let Err(e) = achievements::save_achievements(global_achievements) {
+            eprintln!("Failed to save achievements: {}", e);
+        }
+    }
+
+    // Update visual effects (UI-only, not part of game logic)
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
     game_state
         .combat_state
         .visual_effects
         .retain_mut(|effect| effect.update(delta_time));
 
-    // Spawn enemy if needed
-    spawn_enemy_if_needed(game_state);
-
-    // Update play_time_seconds
-    // Each tick is 100ms (TICK_INTERVAL_MS), so 10 ticks = 1 second
-    *tick_counter += 1;
-    if *tick_counter >= 10 {
-        game_state.play_time_seconds += 1;
-        *tick_counter = 0;
-    }
-
-    // Log any newly unlocked achievements to combat log
-    for id in global_achievements.take_newly_unlocked() {
-        if let Some(def) = achievements::get_achievement_def(id) {
-            game_state.combat_state.add_log_entry(
-                format!("🏆 Achievement Unlocked: {}", def.name),
-                false,
-                true,
-            );
-        }
-    }
-
-    None
+    result.leviathan_encounter
 }

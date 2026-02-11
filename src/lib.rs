@@ -30,7 +30,7 @@ pub use challenges::{
 };
 pub use character::{Attributes, DerivedStats, PrestigeTier};
 pub use combat::{CombatState, Enemy};
-pub use core::{GameState, TICK_INTERVAL_MS};
+pub use core::{GameState, TickEvent, TickResult, TICK_INTERVAL_MS};
 pub use dungeon::{Dungeon, Room, RoomType};
 pub use fishing::{FishRarity, FishingSession};
 pub use haven::{Haven, HavenBonusType, HavenBonuses, HavenRoomId};
