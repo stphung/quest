@@ -75,7 +75,8 @@ fn process_cancel(game: &mut MorrisGame) {
     }
 }
 
-/// Start a morris game with the selected difficulty
+/// Start a morris game with the selected difficulty (used in tests)
+#[allow(dead_code)]
 pub fn start_morris_game(state: &mut GameState, difficulty: MorrisDifficulty) {
     state.active_minigame = Some(ActiveMinigame::Morris(MorrisGame::new(difficulty)));
     state.challenge_menu.close();
@@ -736,91 +737,34 @@ fn count_mobility(game: &MorrisGame, player: Player) -> i32 {
 /// Returns Some(MinigameWinInfo) if the player won, None otherwise.
 pub fn apply_game_result(state: &mut GameState) -> Option<crate::challenges::MinigameWinInfo> {
     use crate::challenges::menu::DifficultyInfo;
-    use crate::challenges::MinigameWinInfo;
+    use crate::challenges::{apply_challenge_rewards, GameResultInfo};
 
     let game = match state.active_minigame.as_ref() {
         Some(ActiveMinigame::Morris(g)) => g,
         _ => return None,
     };
     let result = game.game_result?;
-    let reward = game.difficulty.reward();
     let difficulty = game.difficulty;
+    let reward = difficulty.reward();
 
-    let won = match result {
-        MorrisResult::Win => {
-            // XP reward
-            let xp_for_level =
-                crate::core::game_logic::xp_for_next_level(state.character_level.max(1));
-            let xp_gained = (xp_for_level as f64 * reward.xp_percent as f64 / 100.0) as u64;
-            let xp_gained = xp_gained.max(100); // Floor of 100 XP
-            state.character_xp += xp_gained;
-
-            // Fishing rank reward (capped at 30, preserves fish progress)
-            let fishing_rank_up = if reward.fishing_ranks > 0 && state.fishing.rank < 30 {
-                state.fishing.rank = (state.fishing.rank + reward.fishing_ranks).min(30);
-                true
-            } else {
-                false
-            };
-
-            // Prestige reward (if any)
-            state.prestige_rank += reward.prestige_ranks;
-
-            // Combat log entries
-            state.combat_state.add_log_entry(
-                "○ Victory! The sage bows with respect.".to_string(),
-                false,
-                true,
-            );
-            state
-                .combat_state
-                .add_log_entry(format!("○ +{} XP", xp_gained), false, true);
-            if fishing_rank_up {
-                state.combat_state.add_log_entry(
-                    format!(
-                        "○ Fishing rank up! Now rank {}: {}",
-                        state.fishing.rank,
-                        state.fishing.rank_name()
-                    ),
-                    false,
-                    true,
-                );
-            }
-            true
-        }
-        MorrisResult::Loss => {
-            state.combat_state.add_log_entry(
-                "○ The sage nods knowingly and departs.".to_string(),
-                false,
-                true,
-            );
-            false
-        }
-        MorrisResult::Forfeit => {
-            state.combat_state.add_log_entry(
-                "○ You concede. The sage gathers their stones quietly.".to_string(),
-                false,
-                true,
-            );
-            false
-        }
+    let (won, loss_message) = match result {
+        MorrisResult::Win => (true, ""),
+        MorrisResult::Loss => (false, "The sage nods knowingly and departs."),
+        MorrisResult::Forfeit => (false, "You concede. The sage gathers their stones quietly."),
     };
 
-    state.active_minigame = None;
-
-    if won {
-        Some(MinigameWinInfo {
+    apply_challenge_rewards(
+        state,
+        GameResultInfo {
+            won,
             game_type: "morris",
-            difficulty: match difficulty {
-                MorrisDifficulty::Novice => "novice",
-                MorrisDifficulty::Apprentice => "apprentice",
-                MorrisDifficulty::Journeyman => "journeyman",
-                MorrisDifficulty::Master => "master",
-            },
-        })
-    } else {
-        None
-    }
+            difficulty_str: difficulty.difficulty_str(),
+            reward,
+            icon: "\u{25CB}",
+            win_message: "Victory! The sage bows with respect.",
+            loss_message,
+        },
+    )
 }
 
 #[cfg(test)]

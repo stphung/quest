@@ -57,12 +57,6 @@ pub fn process_input(game: &mut GomokuGame, input: GomokuInput) -> bool {
     true
 }
 
-/// Start a gomoku game with the selected difficulty
-pub fn start_gomoku_game(state: &mut GameState, difficulty: GomokuDifficulty) {
-    state.active_minigame = Some(ActiveMinigame::Gomoku(GomokuGame::new(difficulty)));
-    state.challenge_menu.close();
-}
-
 /// Directions to check for lines: (row_delta, col_delta)
 const DIRECTIONS: [(i32, i32); 4] = [
     (0, 1),  // Horizontal
@@ -734,89 +728,34 @@ pub fn find_best_move<R: Rng>(game: &GomokuGame, rng: &mut R) -> Option<(usize, 
 /// Returns Some(MinigameWinInfo) if the player won, None otherwise.
 pub fn apply_game_result(state: &mut GameState) -> Option<crate::challenges::MinigameWinInfo> {
     use crate::challenges::menu::DifficultyInfo;
-    use crate::challenges::MinigameWinInfo;
+    use crate::challenges::{apply_challenge_rewards, GameResultInfo};
 
     let game = match state.active_minigame.as_ref() {
         Some(ActiveMinigame::Gomoku(g)) => g,
         _ => return None,
     };
     let result = game.game_result?;
-    let reward = game.difficulty.reward();
-    let old_prestige = state.prestige_rank;
     let difficulty = game.difficulty;
+    let reward = difficulty.reward();
 
-    let won = match result {
-        GomokuResult::Win => {
-            // XP reward
-            let xp_gained = if reward.xp_percent > 0 {
-                let xp_for_level =
-                    crate::core::game_logic::xp_for_next_level(state.character_level.max(1));
-                let xp = (xp_for_level * reward.xp_percent as u64) / 100;
-                state.character_xp += xp;
-                xp
-            } else {
-                0
-            };
-
-            // Prestige reward
-            state.prestige_rank += reward.prestige_ranks;
-
-            // Combat log entries
-            state.combat_state.add_log_entry(
-                "◎ Victory! The strategist bows in defeat.".to_string(),
-                false,
-                true,
-            );
-            if reward.prestige_ranks > 0 {
-                state.combat_state.add_log_entry(
-                    format!(
-                        "◎ +{} Prestige Ranks (P{} → P{})",
-                        reward.prestige_ranks, old_prestige, state.prestige_rank
-                    ),
-                    false,
-                    false,
-                );
-            }
-            if xp_gained > 0 {
-                state
-                    .combat_state
-                    .add_log_entry(format!("◎ +{} XP", xp_gained), false, false);
-            }
-            true
-        }
-        GomokuResult::Loss => {
-            state.combat_state.add_log_entry(
-                "◎ The strategist nods respectfully and departs.".to_string(),
-                false,
-                true,
-            );
-            false
-        }
-        GomokuResult::Draw => {
-            state.combat_state.add_log_entry(
-                "◎ A rare draw. The strategist seems impressed.".to_string(),
-                false,
-                true,
-            );
-            false
-        }
+    let (won, loss_message) = match result {
+        GomokuResult::Win => (true, ""),
+        GomokuResult::Loss => (false, "The strategist nods respectfully and departs."),
+        GomokuResult::Draw => (false, "A rare draw. The strategist seems impressed."),
     };
 
-    state.active_minigame = None;
-
-    if won {
-        Some(MinigameWinInfo {
+    apply_challenge_rewards(
+        state,
+        GameResultInfo {
+            won,
             game_type: "gomoku",
-            difficulty: match difficulty {
-                GomokuDifficulty::Novice => "novice",
-                GomokuDifficulty::Apprentice => "apprentice",
-                GomokuDifficulty::Journeyman => "journeyman",
-                GomokuDifficulty::Master => "master",
-            },
-        })
-    } else {
-        None
-    }
+            difficulty_str: difficulty.difficulty_str(),
+            reward,
+            icon: "◎",
+            win_message: "Victory! The strategist bows in defeat.",
+            loss_message,
+        },
+    )
 }
 
 /// Process AI thinking (called each tick).

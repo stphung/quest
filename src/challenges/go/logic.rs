@@ -421,7 +421,7 @@ pub fn apply_go_result(
     state: &mut crate::core::game_state::GameState,
 ) -> Option<crate::challenges::MinigameWinInfo> {
     use crate::challenges::menu::DifficultyInfo;
-    use crate::challenges::MinigameWinInfo;
+    use crate::challenges::{apply_challenge_rewards, GameResultInfo};
 
     let game = match state.active_minigame.as_ref() {
         Some(ActiveMinigame::Go(g)) => g,
@@ -429,69 +429,26 @@ pub fn apply_go_result(
     };
     let result = game.game_result?;
     let difficulty = game.difficulty;
-    let old_prestige = state.prestige_rank;
+    let reward = difficulty.reward();
 
-    let won = match result {
-        GoResult::Win => {
-            let reward = difficulty.reward();
-            state.prestige_rank += reward.prestige_ranks;
-            // Add to combat log
-            state.combat_state.add_log_entry(
-                "◉ Victory! The master bows in respect.".to_string(),
-                false,
-                true,
-            );
-            if reward.prestige_ranks > 0 {
-                state.combat_state.add_log_entry(
-                    format!(
-                        "◉ +{} Prestige Ranks (P{} → P{})",
-                        reward.prestige_ranks, old_prestige, state.prestige_rank
-                    ),
-                    false,
-                    false,
-                );
-            }
-            true
-        }
-        GoResult::Loss => {
-            state.combat_state.add_log_entry(
-                "◉ The master nods thoughtfully and departs.".to_string(),
-                false,
-                true,
-            );
-            false
-        }
-        GoResult::Draw => {
-            state.combat_state.add_log_entry(
-                "◉ A rare tie. The master seems impressed.".to_string(),
-                false,
-                true,
-            );
-            false
-        }
+    let (won, loss_message) = match result {
+        GoResult::Win => (true, ""),
+        GoResult::Loss => (false, "The master nods thoughtfully and departs."),
+        GoResult::Draw => (false, "A rare tie. The master seems impressed."),
     };
 
-    state.active_minigame = None;
-
-    if won {
-        Some(MinigameWinInfo {
+    apply_challenge_rewards(
+        state,
+        GameResultInfo {
+            won,
             game_type: "go",
-            difficulty: match difficulty {
-                GoDifficulty::Novice => "novice",
-                GoDifficulty::Apprentice => "apprentice",
-                GoDifficulty::Journeyman => "journeyman",
-                GoDifficulty::Master => "master",
-            },
-        })
-    } else {
-        None
-    }
-}
-
-/// Start a new Go game with the selected difficulty.
-pub fn start_go_game(state: &mut crate::core::game_state::GameState, difficulty: GoDifficulty) {
-    state.active_minigame = Some(ActiveMinigame::Go(GoGame::new(difficulty)));
-    state.challenge_menu.close();
+            difficulty_str: difficulty.difficulty_str(),
+            reward,
+            icon: "◉",
+            win_message: "Victory! The master bows in respect.",
+            loss_message,
+        },
+    )
 }
 
 /// Process human move at cursor position.

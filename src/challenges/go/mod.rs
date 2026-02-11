@@ -8,6 +8,6 @@ pub mod types;
 
 pub use logic::{
     apply_go_result, calculate_score, get_legal_moves, is_legal_move, make_move, process_go_ai,
-    process_human_move, process_human_pass, process_input, start_go_game, GoInput,
+    process_human_move, process_human_pass, process_input, GoInput,
 };
 pub use types::*;

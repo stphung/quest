@@ -281,85 +281,36 @@ pub fn handle_first_click<R: Rng>(game: &mut MinesweeperGame, row: usize, col: u
 pub fn apply_game_result(
     state: &mut crate::core::game_state::GameState,
 ) -> Option<crate::challenges::MinigameWinInfo> {
-    use super::super::MinesweeperResult;
     use crate::challenges::menu::DifficultyInfo;
-    use crate::challenges::MinigameWinInfo;
+    use crate::challenges::{apply_challenge_rewards, GameResultInfo};
 
     let game = match state.active_minigame.as_ref() {
         Some(ActiveMinigame::Minesweeper(g)) => g,
         _ => return None,
     };
     let result = game.game_result?;
-    let reward = game.difficulty.reward();
-    let old_prestige = state.prestige_rank;
     let difficulty = game.difficulty;
+    let reward = difficulty.reward();
 
-    let won = match result {
-        MinesweeperResult::Win => {
-            // XP reward
-            let xp_gained = if reward.xp_percent > 0 {
-                let xp_for_level =
-                    crate::core::game_logic::xp_for_next_level(state.character_level.max(1));
-                let xp = (xp_for_level * reward.xp_percent as u64) / 100;
-                state.character_xp += xp;
-                xp
-            } else {
-                0
-            };
-
-            // Prestige reward
-            state.prestige_rank += reward.prestige_ranks;
-
-            // Combat log entries
-            state.combat_state.add_log_entry(
-                "\u{26A0} All traps identified! The scout salutes you.".to_string(),
-                false,
-                true,
-            );
-            if reward.prestige_ranks > 0 {
-                state.combat_state.add_log_entry(
-                    format!(
-                        "\u{26A0} +{} Prestige Ranks (P{} \u{2192} P{})",
-                        reward.prestige_ranks, old_prestige, state.prestige_rank
-                    ),
-                    false,
-                    true,
-                );
-            }
-            if xp_gained > 0 {
-                state.combat_state.add_log_entry(
-                    format!("\u{26A0} +{} XP", xp_gained),
-                    false,
-                    true,
-                );
-            }
-            true
-        }
-        MinesweeperResult::Loss => {
-            state.combat_state.add_log_entry(
-                "\u{26A0} A trap detonates! The scout pulls you to safety.".to_string(),
-                false,
-                true,
-            );
-            false
+    let (won, loss_message) = match result {
+        super::super::MinesweeperResult::Win => (true, ""),
+        super::super::MinesweeperResult::Loss => {
+            (false, "A trap detonates! The scout pulls you to safety.")
         }
     };
 
-    state.active_minigame = None;
-
-    if won {
-        Some(MinigameWinInfo {
+    apply_challenge_rewards(
+        state,
+        GameResultInfo {
+            won,
             game_type: "minesweeper",
-            difficulty: match difficulty {
-                super::super::MinesweeperDifficulty::Novice => "novice",
-                super::super::MinesweeperDifficulty::Apprentice => "apprentice",
-                super::super::MinesweeperDifficulty::Journeyman => "journeyman",
-                super::super::MinesweeperDifficulty::Master => "master",
-            },
-        })
-    } else {
-        None
-    }
+            difficulty_str: difficulty.difficulty_str(),
+            reward,
+            icon: "\u{26A0}",
+            win_message: "All traps identified! The scout salutes you.",
+            loss_message,
+        },
+    )
 }
 
 #[cfg(test)]
