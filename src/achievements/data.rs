@@ -1,7 +1,5 @@
 //! Static achievement definitions.
 
-#![allow(dead_code)] // Will be used when integrated with UI
-
 use super::types::{AchievementCategory, AchievementDef, AchievementId};
 
 /// All achievement definitions in display order.

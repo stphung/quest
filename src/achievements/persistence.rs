@@ -1,7 +1,5 @@
 //! Achievement persistence (load/save to disk).
 
-#![allow(dead_code)] // Will be used when integrated with main.rs
-
 use super::types::Achievements;
 use std::fs;
 use std::io;
