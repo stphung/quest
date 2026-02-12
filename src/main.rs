@@ -957,23 +957,23 @@ fn main() -> io::Result<()> {
                         last_tick = Instant::now();
                     }
 
-                    // Auto-save every 30 seconds (skip in debug mode)
-                    if !debug_mode
-                        && last_autosave.elapsed() >= Duration::from_secs(AUTOSAVE_INTERVAL_SECONDS)
-                    {
-                        character_manager.save_character(&state)?;
+                    // Auto-save every 30 seconds
+                    if last_autosave.elapsed() >= Duration::from_secs(AUTOSAVE_INTERVAL_SECONDS) {
                         // Sync in-memory last_save_time so suspension detection
                         // only counts actual suspension time, not active play time
                         state.last_save_time = Utc::now().timestamp();
-                        // Only save Haven if it has been discovered
-                        if haven.discovered {
-                            haven::save_haven(&haven)?;
-                        }
-                        // Save achievements (global, shared across characters)
-                        achievements::save_achievements(&global_achievements)?;
                         last_autosave = Instant::now();
-                        last_save_instant = Some(Instant::now());
                         last_save_time = Some(Local::now());
+
+                        // Skip file I/O in debug mode
+                        if !debug_mode {
+                            character_manager.save_character(&state)?;
+                            if haven.discovered {
+                                haven::save_haven(&haven)?;
+                            }
+                            achievements::save_achievements(&global_achievements)?;
+                            last_save_instant = Some(Instant::now());
+                        }
                     }
 
                     // Periodic update check (every ~30 minutes with jitter)
