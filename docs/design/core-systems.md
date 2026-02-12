@@ -32,7 +32,8 @@ On level up, 3 attribute points are randomly distributed among non-capped attrib
 ### Attribute Caps
 
 ```
-cap = 20 + (prestige_rank * 5)
+cap = BASE_ATTRIBUTE_CAP + (prestige_rank * ATTRIBUTE_CAP_PER_PRESTIGE)
+    = 20 + (prestige_rank * 5)
 ```
 
 | Prestige | Cap |
@@ -41,6 +42,7 @@ cap = 20 + (prestige_rank * 5)
 | P1 | 25 |
 | P5 | 45 |
 | P10 | 70 |
+| P20 | 120 |
 
 ## Derived Stats
 
@@ -297,10 +299,10 @@ Weapon, Armor, Helmet, Gloves, Boots, Amulet, Ring.
 - Haven Trophy Hall bonus: multiplicative on base chance
 - Maximum total: 25% (reached at P10 without Haven, earlier with Haven)
 
-**Rarity distribution** (base at P0):
-- Common: 55%, Magic: 30%, Rare: 12%, Epic: 2.5%, Legendary: 0.5%
+**Mob rarity distribution** (base at P0):
+- Common: 60%, Magic: 28%, Rare: 10%, Epic: 2%, Legendary: never (mob drops cannot be Legendary)
 - Prestige bonus for rarity: +1%/rank, capped at 10%. Haven Workshop bonus: up to 25%. Both shift weight away from Common toward higher rarities
-- Common floor: never drops below 10%
+- Common floor: never drops below 20%
 
 ### Affix Types (9)
 
@@ -347,6 +349,91 @@ Individual JSON files per character stored in `~/.quest/`. Maximum 3 characters.
 - Names sanitized to lowercase with underscores for filenames
 - Leading/trailing whitespace trimmed
 
+## Tick Architecture
+
+The game runs a 100ms tick loop. Each tick calls `game_tick()` in `src/core/tick.rs`, which orchestrates all game systems and returns a `TickResult`.
+
+### game_tick() Signature
+
+```rust
+pub fn game_tick<R: Rng>(
+    state: &mut GameState,
+    tick_counter: &mut u32,
+    haven: &mut Haven,
+    achievements: &mut Achievements,
+    debug_mode: bool,
+    rng: &mut R,
+) -> TickResult
+```
+
+Generic `<R: Rng>` allows seeded RNG in tests (`ChaCha8Rng`) and `thread_rng()` in production.
+
+### TickEvent and TickResult
+
+`TickEvent` is an enum with 25+ variants describing everything that can happen in a single tick. The presentation layer (`main.rs` via `tick_events.rs`) maps these to combat log entries and visual effects. Game logic never touches UI types.
+
+```rust
+pub struct TickResult {
+    pub events: Vec<TickEvent>,
+    pub leviathan_encounter: Option<u8>,
+    pub achievements_changed: bool,
+    pub haven_changed: bool,
+    pub achievement_modal_ready: Vec<AchievementId>,
+}
+```
+
+**TickEvent categories**:
+- Combat: `PlayerAttack`, `EnemyAttack`, `EnemyDefeated`, `PlayerDied`, `PlayerDiedInDungeon`
+- Items: `ItemDropped` (rarity, slot, stats, equipped flag, from_boss flag)
+- Zones: `SubzoneBossDefeated` (with `BossDefeatResult`)
+- Dungeon: room entry, treasure, keys, boss unlock, completion, failure
+- Fishing: messages, catches, item drops, rank-ups, Storm Leviathan
+- Discovery: challenges, dungeons, fishing spots, Haven
+- Progress: `LeveledUp`, `AchievementUnlocked`
+
+### Processing Stages
+
+| Stage | What it does |
+|-------|-------------|
+| 1. Challenge AI | Ticks AI thinking for active Chess, Morris, Gomoku, or Go games |
+| 2. Challenge discovery | Rolls for new challenge discovery (P1+ required, Haven bonus applied) |
+| 3. Sync player HP | Recalculates DerivedStats and updates player_max_hp |
+| 4. Dungeon exploration | Processes room entry, treasure, keys, boss unlock, completion/failure |
+| 5. Fishing | If fishing active: ticks session, handles catches/items/rank-ups/Leviathan, **returns early** (skips combat) |
+| 6. Combat | Maps CombatEvent to TickEvent, applies XP, handles kills/deaths, processes item drops and discoveries |
+| 7. Enemy spawn | Spawns enemy if no enemy and not regenerating |
+| 8. Play time | Increments tick counter; at 10 ticks, increments play_time_seconds |
+| 9. Achievement collection | Drains newly unlocked achievements into TickResult.events |
+| 10. Haven discovery | Rolls for Haven discovery (P10+, no active content) |
+| 11. Achievement modal | Checks if 500ms accumulation window has elapsed for modal display |
+
+**Important**: Stage 5 (fishing) returns early, skipping stages 6-7. Fishing and combat are mutually exclusive.
+
+### Event Mapping (tick_events.rs)
+
+`src/tick_events.rs` is a binary-only module (not part of `lib.rs`) that bridges pure game-logic events to UI types. It maps `TickEvent` variants to `add_log_entry()` calls and `VisualEffect` spawns. This keeps `tick.rs` free of UI imports while keeping `main.rs` focused on the game loop.
+
+## Offline Progression Module
+
+Offline progression is implemented in `src/core/offline.rs` as a self-contained module:
+
+```rust
+pub fn calculate_offline_xp(
+    elapsed_seconds: i64,
+    prestige_rank: u32,
+    wis_modifier: i32,
+    cha_modifier: i32,
+    haven_offline_xp_percent: f64,
+) -> f64
+
+pub fn process_offline_progression(
+    state: &mut GameState,
+    haven_offline_xp_percent: f64,
+) -> OfflineReport
+```
+
+`OfflineReport` contains elapsed_seconds, total_level_ups, xp_gained, level_before/after, and effective rates. Re-exported from `game_logic.rs` for backwards compatibility.
+
 ## Key Constants
 
 | Constant | Value |
@@ -365,5 +452,9 @@ Individual JSON files per character stored in `~/.quest/`. Maximum 3 characters.
 | Base XP per tick | 1.0 |
 | Combat XP per kill | 200-400 ticks |
 | Dungeon discovery | 2% per kill |
-| Fishing discovery | 5% per tick |
+| Fishing discovery | 5% per kill |
 | Challenge discovery | 0.000014/tick (~2hr avg) |
+| Haven discovery base | 0.000014/tick (P10+) |
+| Haven discovery rank bonus | +0.000007/tick per rank above 10 |
+| Prestige mult formula | `1.0 + 0.5 * rank^0.7` |
+| Base max fishing rank | 30 (40 with Fishing Dock T4) |
