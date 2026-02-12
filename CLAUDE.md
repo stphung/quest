@@ -315,9 +315,8 @@ quest/
 │   └── ...                              # Chess, fishing, dungeon, prestige, items, etc.
 ├── .github/workflows/       # CI/CD pipeline
 ├── scripts/                 # Quality checks
-├── docs/design/             # Consolidated design documents
+├── docs/                    # System design, balance, decisions, and per-system design docs
 ├── docs/archive/            # Original dated design documents
-├── docs/DECISIONS.md        # Key design decisions and rationale
 ├── Makefile                 # Dev helpers
 └── CLAUDE.md                # This file
 ```

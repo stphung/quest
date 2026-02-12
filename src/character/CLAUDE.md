@@ -27,7 +27,7 @@ Six core RPG attributes stored as `u32` values:
 
 **Modifier formula**: `(value - 10) / 2` (integer division, minimum 0)
 
-**Attribute caps**: `10 + (5 × prestige_rank)`. Enforced in `attributes.rs`.
+**Attribute caps**: `20 + (5 × prestige_rank)`. Enforced in `attributes.rs`.
 
 ### `DerivedStats` (`derived_stats.rs`)
 Combat stats calculated from attributes. Recalculated whenever attributes change:
@@ -59,7 +59,7 @@ Characters are saved as individual JSON files in `~/.quest/`:
 
 On level-up (handled in `core/game_logic.rs`):
 1. +3 random attribute points distributed among STR, DEX, CON, INT, WIS, CHA
-2. Points respect attribute caps (base 10 + 5 per prestige rank)
+2. Points respect attribute caps (base 20 + 5 per prestige rank)
 3. Derived stats are recalculated
 
 XP curve: `100 * level^1.5` (XP needed for next level)
@@ -70,7 +70,7 @@ XP curve: `100 * level^1.5` (XP needed for next level)
 2. Confirmation dialog shown (`ui/prestige_confirm.rs`)
 3. `perform_prestige()` resets: level → 1, XP → 0, zone → first, attributes → base
 4. Preserves: prestige_rank (incremented), equipment, achievements, haven
-5. New attribute cap = 10 + (5 * new_prestige_rank)
+5. New attribute cap = 20 + (5 * new_prestige_rank)
 
 ## Input Handling (`input.rs`)
 
