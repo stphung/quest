@@ -706,7 +706,7 @@ fn main() -> io::Result<()> {
                                 frame,
                                 frame.size(),
                                 &state,
-                                haven.vault_tier(),
+                                haven.get_bonus(haven::HavenBonusType::VaultSlots) as u8,
                                 selected_index,
                                 selected_slots,
                             );
