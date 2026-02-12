@@ -128,7 +128,8 @@ pub fn spawn_enemy_if_needed(state: &mut GameState) {
                 generate_enemy_for_current_zone(zone_id, subzone_id, derived.max_hp)
             };
             state.combat_state.current_enemy = Some(enemy);
-            state.combat_state.attack_timer = 0.0;
+            state.combat_state.player_attack_timer = 0.0;
+            state.combat_state.enemy_attack_timer = 0.0;
         }
     }
 }
@@ -150,7 +151,8 @@ fn spawn_dungeon_enemy(state: &mut GameState) {
     };
 
     state.combat_state.current_enemy = Some(enemy);
-    state.combat_state.attack_timer = 0.0;
+    state.combat_state.player_attack_timer = 0.0;
+    state.combat_state.enemy_attack_timer = 0.0;
 }
 
 // DUNGEON_DISCOVERY_CHANCE is imported from constants via `use super::constants::*`
@@ -853,10 +855,11 @@ mod tests {
     }
 
     #[test]
-    fn test_spawn_dungeon_enemy_resets_attack_timer() {
-        // When a new dungeon enemy is spawned, the attack timer should be reset to 0
+    fn test_spawn_dungeon_enemy_resets_attack_timers() {
+        // When a new dungeon enemy is spawned, both attack timers should be reset to 0
         let mut state = setup_dungeon_with_room_type(RoomType::Combat);
-        state.combat_state.attack_timer = 5.0; // Non-zero
+        state.combat_state.player_attack_timer = 5.0; // Non-zero
+        state.combat_state.enemy_attack_timer = 3.0; // Non-zero
 
         spawn_enemy_if_needed(&mut state);
 
@@ -865,8 +868,12 @@ mod tests {
             "Should have spawned enemy"
         );
         assert_eq!(
-            state.combat_state.attack_timer, 0.0,
-            "Attack timer should be reset to 0 on new enemy spawn"
+            state.combat_state.player_attack_timer, 0.0,
+            "Player attack timer should be reset to 0 on new enemy spawn"
+        );
+        assert_eq!(
+            state.combat_state.enemy_attack_timer, 0.0,
+            "Enemy attack timer should be reset to 0 on new enemy spawn"
         );
     }
 }
