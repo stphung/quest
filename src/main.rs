@@ -487,6 +487,9 @@ fn main() -> io::Result<()> {
                                                 pending_offline_report = Some(report);
                                             }
                                         }
+                                        // Always sync last_save_time on load so suspension
+                                        // detection doesn't false-trigger from a stale value
+                                        state.last_save_time = Utc::now().timestamp();
 
                                         game_state = Some(state);
                                         current_screen = Screen::Game;
