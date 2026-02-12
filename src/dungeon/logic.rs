@@ -1,7 +1,5 @@
 //! Dungeon navigation and auto-exploration logic.
 
-#![allow(dead_code)]
-
 use super::generation::reveal_adjacent_rooms;
 use super::types::{Dungeon, DungeonSize, RoomState, RoomType};
 use crate::core::game_state::GameState;
@@ -19,6 +17,7 @@ pub const ROOM_TRAVEL_INTERVAL: f64 = 0.8;
 
 /// Events that can occur during dungeon exploration
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum DungeonEvent {
     /// Player moved to a new room
     EnteredRoom {
@@ -116,8 +115,7 @@ pub fn find_next_room(dungeon: &Dungeon) -> Option<(usize, usize)> {
     }
 
     // Find nearest unexplored (revealed but not cleared) room
-    let mut best_target: Option<(usize, usize)> = None;
-    let mut best_distance = usize::MAX;
+    let mut best_path: Option<Vec<(usize, usize)>> = None;
 
     let grid_size = dungeon.size.grid_size();
     for y in 0..grid_size {
@@ -131,9 +129,11 @@ pub fn find_next_room(dungeon: &Dungeon) -> Option<(usize, usize)> {
                     }
 
                     if let Some(path) = find_path_to(dungeon, current, (x, y)) {
-                        if path.len() < best_distance {
-                            best_distance = path.len();
-                            best_target = Some((x, y));
+                        let is_shorter = best_path
+                            .as_ref()
+                            .is_none_or(|best| path.len() < best.len());
+                        if is_shorter {
+                            best_path = Some(path);
                         }
                     }
                 }
@@ -141,16 +141,8 @@ pub fn find_next_room(dungeon: &Dungeon) -> Option<(usize, usize)> {
         }
     }
 
-    // Return first step toward target
-    if let Some(target) = best_target {
-        if let Some(path) = find_path_to(dungeon, current, target) {
-            if path.len() > 1 {
-                return Some(path[1]);
-            }
-        }
-    }
-
-    None
+    // Return first step along the shortest path
+    best_path.and_then(|path| if path.len() > 1 { Some(path[1]) } else { None })
 }
 
 /// BFS pathfinding between two positions
@@ -318,6 +310,7 @@ pub fn on_boss_defeated(state: &mut GameState) -> Vec<DungeonEvent> {
 }
 
 /// Called when player dies in dungeon
+#[allow(dead_code)]
 pub fn on_player_died_in_dungeon(state: &mut GameState) -> Vec<DungeonEvent> {
     let events = vec![DungeonEvent::DungeonFailed];
 
@@ -379,6 +372,7 @@ pub fn add_dungeon_xp(state: &mut GameState, xp: u64) {
 }
 
 /// Adds an item to the dungeon collected items
+#[allow(dead_code)]
 pub fn collect_dungeon_item(state: &mut GameState, item: Item) {
     if let Some(dungeon) = &mut state.active_dungeon {
         dungeon.collected_items.push(item);
@@ -413,6 +407,7 @@ pub fn on_treasure_room_entered(state: &mut GameState) -> Option<(Item, bool)> {
 }
 
 /// Checks if the current room needs combat resolution
+#[allow(dead_code)]
 pub fn current_room_needs_combat(dungeon: &Dungeon) -> bool {
     if let Some(room) = dungeon.current_room() {
         matches!(
@@ -425,6 +420,7 @@ pub fn current_room_needs_combat(dungeon: &Dungeon) -> bool {
 }
 
 /// Gets the stat multiplier for the current room's enemy
+#[allow(dead_code)]
 pub fn get_enemy_stat_multiplier(dungeon: &Dungeon) -> f64 {
     if let Some(room) = dungeon.current_room() {
         match room.room_type {
@@ -441,6 +437,19 @@ pub fn get_enemy_stat_multiplier(dungeon: &Dungeon) -> f64 {
 mod tests {
     use super::super::generation::generate_dungeon;
     use super::*;
+
+    /// Finds the first room of the given type in the dungeon.
+    fn find_room_of_type(dungeon: &Dungeon, room_type: RoomType) -> Option<(usize, usize)> {
+        let grid_size = dungeon.size.grid_size();
+        (0..grid_size)
+            .flat_map(|y| (0..grid_size).map(move |x| (x, y)))
+            .find(|&(x, y)| {
+                dungeon
+                    .get_room(x, y)
+                    .map(|r| r.room_type == room_type)
+                    .unwrap_or(false)
+            })
+    }
 
     #[test]
     fn test_find_path_same_position() {
@@ -863,18 +872,7 @@ mod tests {
     fn test_move_to_treasure_room_auto_clears() {
         let mut dungeon = generate_dungeon(10, 0);
 
-        // Find a treasure room
-        let grid_size = dungeon.size.grid_size();
-        let treasure_pos = (0..grid_size)
-            .flat_map(|y| (0..grid_size).map(move |x| (x, y)))
-            .find(|&(x, y)| {
-                dungeon
-                    .get_room(x, y)
-                    .map(|r| r.room_type == RoomType::Treasure)
-                    .unwrap_or(false)
-            });
-
-        if let Some(pos) = treasure_pos {
+        if let Some(pos) = find_room_of_type(&dungeon, RoomType::Treasure) {
             // Make it revealed so we can move there
             if let Some(room) = dungeon.get_room_mut(pos.0, pos.1) {
                 room.state = RoomState::Revealed;
@@ -894,18 +892,7 @@ mod tests {
     fn test_move_to_elite_room_starts_combat() {
         let mut dungeon = generate_dungeon(10, 0);
 
-        // Find an elite room
-        let grid_size = dungeon.size.grid_size();
-        let elite_pos = (0..grid_size)
-            .flat_map(|y| (0..grid_size).map(move |x| (x, y)))
-            .find(|&(x, y)| {
-                dungeon
-                    .get_room(x, y)
-                    .map(|r| r.room_type == RoomType::Elite)
-                    .unwrap_or(false)
-            });
-
-        if let Some(pos) = elite_pos {
+        if let Some(pos) = find_room_of_type(&dungeon, RoomType::Elite) {
             if let Some(room) = dungeon.get_room_mut(pos.0, pos.1) {
                 room.state = RoomState::Revealed;
             }
@@ -1072,18 +1059,7 @@ mod tests {
     fn test_current_room_needs_combat_for_combat_room() {
         let mut dungeon = generate_dungeon(10, 0);
 
-        // Move to a combat room
-        let grid_size = dungeon.size.grid_size();
-        let combat_pos = (0..grid_size)
-            .flat_map(|y| (0..grid_size).map(move |x| (x, y)))
-            .find(|&(x, y)| {
-                dungeon
-                    .get_room(x, y)
-                    .map(|r| r.room_type == RoomType::Combat && r.state != RoomState::Cleared)
-                    .unwrap_or(false)
-            });
-
-        if let Some(pos) = combat_pos {
+        if let Some(pos) = find_room_of_type(&dungeon, RoomType::Combat) {
             if let Some(room) = dungeon.get_room_mut(pos.0, pos.1) {
                 room.state = RoomState::Current;
             }
@@ -1097,18 +1073,7 @@ mod tests {
     fn test_current_room_needs_combat_false_for_treasure() {
         let mut dungeon = generate_dungeon(10, 0);
 
-        // Find a treasure room
-        let grid_size = dungeon.size.grid_size();
-        let treasure_pos = (0..grid_size)
-            .flat_map(|y| (0..grid_size).map(move |x| (x, y)))
-            .find(|&(x, y)| {
-                dungeon
-                    .get_room(x, y)
-                    .map(|r| r.room_type == RoomType::Treasure)
-                    .unwrap_or(false)
-            });
-
-        if let Some(pos) = treasure_pos {
+        if let Some(pos) = find_room_of_type(&dungeon, RoomType::Treasure) {
             if let Some(room) = dungeon.get_room_mut(pos.0, pos.1) {
                 room.state = RoomState::Current;
             }
@@ -1180,17 +1145,7 @@ mod tests {
         let mut dungeon = generate_dungeon(10, 0);
 
         // Find and move to elite room
-        let grid_size = dungeon.size.grid_size();
-        let elite_pos = (0..grid_size)
-            .flat_map(|y| (0..grid_size).map(move |x| (x, y)))
-            .find(|&(x, y)| {
-                dungeon
-                    .get_room(x, y)
-                    .map(|r| r.room_type == RoomType::Elite)
-                    .unwrap_or(false)
-            });
-
-        if let Some(pos) = elite_pos {
+        if let Some(pos) = find_room_of_type(&dungeon, RoomType::Elite) {
             if let Some(room) = dungeon.get_room_mut(pos.0, pos.1) {
                 room.state = RoomState::Current;
             }

@@ -5,6 +5,7 @@
 pub mod constants;
 pub mod game_logic;
 pub mod game_state;
+pub mod offline;
 pub mod tick;
 
 pub use constants::*;

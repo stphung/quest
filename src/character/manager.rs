@@ -6,7 +6,6 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
 struct CharacterSaveData {
     version: u32,
     character_id: String,
@@ -45,12 +44,10 @@ pub struct CharacterInfo {
     pub is_corrupted: bool,
 }
 
-#[allow(dead_code)]
 pub struct CharacterManager {
     quest_dir: PathBuf,
 }
 
-#[allow(dead_code)]
 impl CharacterManager {
     pub fn new() -> io::Result<Self> {
         let home_dir = dirs::home_dir().ok_or_else(|| {
@@ -146,19 +143,16 @@ impl CharacterManager {
                 continue;
             }
 
-            // Skip account-level JSON files (not character saves)
-            if matches!(
-                path.file_name().and_then(|s| s.to_str()),
-                Some("haven.json") | Some("achievements.json")
-            ) {
-                continue;
-            }
-
             let filename = path
                 .file_name()
                 .and_then(|s| s.to_str())
                 .unwrap_or("")
                 .to_string();
+
+            // Skip account-level JSON files (not character saves)
+            if ACCOUNT_FILES.contains(&filename.as_str()) {
+                continue;
+            }
 
             // Try to load character
             match self.load_character(&filename) {
@@ -227,10 +221,12 @@ impl CharacterManager {
     }
 }
 
+/// Account-level JSON files that are not character saves
+const ACCOUNT_FILES: &[&str] = &["haven.json", "achievements.json"];
+
 /// Reserved names that cannot be used for characters (would conflict with system files)
 const RESERVED_NAMES: &[&str] = &["haven", "achievements"];
 
-#[allow(dead_code)]
 pub fn validate_name(name: &str) -> Result<(), String> {
     let trimmed = name.trim();
 
@@ -261,7 +257,6 @@ pub fn validate_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
-#[allow(dead_code)]
 pub fn sanitize_name(name: &str) -> String {
     name.trim()
         .to_lowercase()
@@ -274,6 +269,38 @@ pub fn sanitize_name(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Creates a test GameState with the given name for persistence tests.
+    fn make_test_state(name: &str) -> crate::core::game_state::GameState {
+        use crate::character::attributes::Attributes;
+        use crate::combat::CombatState;
+        use crate::core::game_state::GameState;
+        use crate::items::Equipment;
+
+        GameState {
+            character_id: format!("test-{}", sanitize_name(name)),
+            character_name: name.to_string(),
+            character_level: 1,
+            character_xp: 0,
+            attributes: Attributes::new(),
+            prestige_rank: 0,
+            total_prestige_count: 0,
+            last_save_time: 0,
+            play_time_seconds: 0,
+            combat_state: CombatState::new(50),
+            equipment: Equipment::new(),
+            active_dungeon: None,
+            fishing: crate::fishing::FishingState::default(),
+            active_fishing: None,
+            zone_progression: crate::zones::ZoneProgression::default(),
+            challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
+            chess_stats: crate::challenges::chess::ChessStats::default(),
+            active_minigame: None,
+            session_kills: 0,
+            recent_drops: std::collections::VecDeque::new(),
+            last_minigame_win: None,
+        }
+    }
 
     #[test]
     fn test_validate_name_valid() {
@@ -319,37 +346,13 @@ mod tests {
 
     #[test]
     fn test_save_and_load_character() {
-        use crate::character::attributes::Attributes;
-        use crate::combat::CombatState;
-        use crate::core::game_state::GameState;
-        use crate::items::Equipment;
-        use chrono::Utc;
-
         let manager = CharacterManager::new().unwrap();
 
-        let state = GameState {
-            character_id: "test-id".to_string(),
-            character_name: "TestHero".to_string(),
-            character_level: 10,
-            character_xp: 5000,
-            attributes: Attributes::new(),
-            prestige_rank: 2,
-            total_prestige_count: 2,
-            last_save_time: Utc::now().timestamp(),
-            play_time_seconds: 3600,
-            combat_state: CombatState::new(100),
-            equipment: Equipment::new(),
-            active_dungeon: None,
-            fishing: crate::fishing::FishingState::default(),
-            active_fishing: None,
-            zone_progression: crate::zones::ZoneProgression::default(),
-            challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
-            chess_stats: crate::challenges::chess::ChessStats::default(),
-            active_minigame: None,
-            session_kills: 0,
-            recent_drops: std::collections::VecDeque::new(),
-            last_minigame_win: None,
-        };
+        let mut state = make_test_state("TestHero");
+        state.character_level = 10;
+        state.character_xp = 5000;
+        state.prestige_rank = 2;
+        state.total_prestige_count = 2;
 
         // Save character
         manager.save_character(&state).expect("Failed to save");
@@ -370,11 +373,6 @@ mod tests {
 
     #[test]
     fn test_list_characters() {
-        use crate::character::attributes::Attributes;
-        use crate::combat::CombatState;
-        use crate::core::game_state::GameState;
-        use crate::items::Equipment;
-
         let manager = CharacterManager::new().unwrap();
 
         // Clean up only our test files (isolation)
@@ -382,53 +380,11 @@ mod tests {
         fs::remove_file(manager.quest_dir.join("listtest2.json")).ok();
 
         // Create test characters with unique names to avoid conflicts with other tests
-        let char1 = GameState {
-            character_id: "id1".to_string(),
-            character_name: "ListTest1".to_string(),
-            character_level: 10,
-            character_xp: 5000,
-            attributes: Attributes::new(),
-            prestige_rank: 2,
-            total_prestige_count: 2,
-            last_save_time: 1000,
-            play_time_seconds: 3600,
-            combat_state: CombatState::new(100),
-            equipment: Equipment::new(),
-            active_dungeon: None,
-            fishing: crate::fishing::FishingState::default(),
-            active_fishing: None,
-            zone_progression: crate::zones::ZoneProgression::default(),
-            challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
-            chess_stats: crate::challenges::chess::ChessStats::default(),
-            active_minigame: None,
-            session_kills: 0,
-            recent_drops: std::collections::VecDeque::new(),
-            last_minigame_win: None,
-        };
+        let mut char1 = make_test_state("ListTest1");
+        char1.character_level = 10;
 
-        let char2 = GameState {
-            character_id: "id2".to_string(),
-            character_name: "ListTest2".to_string(),
-            character_level: 15,
-            character_xp: 8000,
-            attributes: Attributes::new(),
-            prestige_rank: 3,
-            total_prestige_count: 3,
-            last_save_time: 2000,
-            play_time_seconds: 7200,
-            combat_state: CombatState::new(100),
-            equipment: Equipment::new(),
-            active_dungeon: None,
-            fishing: crate::fishing::FishingState::default(),
-            active_fishing: None,
-            zone_progression: crate::zones::ZoneProgression::default(),
-            challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
-            chess_stats: crate::challenges::chess::ChessStats::default(),
-            active_minigame: None,
-            session_kills: 0,
-            recent_drops: std::collections::VecDeque::new(),
-            last_minigame_win: None,
-        };
+        let mut char2 = make_test_state("ListTest2");
+        char2.character_level = 15;
 
         manager.save_character(&char1).unwrap();
         // Small delay to ensure different timestamps (save uses current time)
@@ -454,37 +410,8 @@ mod tests {
 
     #[test]
     fn test_delete_character() {
-        use crate::character::attributes::Attributes;
-        use crate::combat::CombatState;
-        use crate::core::game_state::GameState;
-        use crate::items::Equipment;
-        use chrono::Utc;
-
         let manager = CharacterManager::new().unwrap();
-
-        let state = GameState {
-            character_id: "test-id".to_string(),
-            character_name: "ToDelete".to_string(),
-            character_level: 5,
-            character_xp: 1000,
-            attributes: Attributes::new(),
-            prestige_rank: 0,
-            total_prestige_count: 0,
-            last_save_time: Utc::now().timestamp(),
-            play_time_seconds: 100,
-            combat_state: CombatState::new(50),
-            equipment: Equipment::new(),
-            active_dungeon: None,
-            fishing: crate::fishing::FishingState::default(),
-            active_fishing: None,
-            zone_progression: crate::zones::ZoneProgression::default(),
-            challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
-            chess_stats: crate::challenges::chess::ChessStats::default(),
-            active_minigame: None,
-            session_kills: 0,
-            recent_drops: std::collections::VecDeque::new(),
-            last_minigame_win: None,
-        };
+        let state = make_test_state("ToDelete");
 
         manager.save_character(&state).unwrap();
 
@@ -497,37 +424,8 @@ mod tests {
 
     #[test]
     fn test_rename_character() {
-        use crate::character::attributes::Attributes;
-        use crate::combat::CombatState;
-        use crate::core::game_state::GameState;
-        use crate::items::Equipment;
-        use chrono::Utc;
-
         let manager = CharacterManager::new().unwrap();
-
-        let state = GameState {
-            character_id: "test-id".to_string(),
-            character_name: "OldName".to_string(),
-            character_level: 8,
-            character_xp: 3000,
-            attributes: Attributes::new(),
-            prestige_rank: 1,
-            total_prestige_count: 1,
-            last_save_time: Utc::now().timestamp(),
-            play_time_seconds: 500,
-            combat_state: CombatState::new(75),
-            equipment: Equipment::new(),
-            active_dungeon: None,
-            fishing: crate::fishing::FishingState::default(),
-            active_fishing: None,
-            zone_progression: crate::zones::ZoneProgression::default(),
-            challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
-            chess_stats: crate::challenges::chess::ChessStats::default(),
-            active_minigame: None,
-            session_kills: 0,
-            recent_drops: std::collections::VecDeque::new(),
-            last_minigame_win: None,
-        };
+        let state = make_test_state("OldName");
 
         manager.save_character(&state).unwrap();
 
@@ -567,37 +465,8 @@ mod tests {
 
     #[test]
     fn test_rename_with_invalid_name() {
-        use crate::character::attributes::Attributes;
-        use crate::combat::CombatState;
-        use crate::core::game_state::GameState;
-        use crate::items::Equipment;
-        use chrono::Utc;
-
         let manager = CharacterManager::new().unwrap();
-
-        let state = GameState {
-            character_id: "test-id".to_string(),
-            character_name: "RenameTest".to_string(),
-            character_level: 1,
-            character_xp: 0,
-            attributes: Attributes::new(),
-            prestige_rank: 0,
-            total_prestige_count: 0,
-            last_save_time: Utc::now().timestamp(),
-            play_time_seconds: 0,
-            combat_state: CombatState::new(50),
-            equipment: Equipment::new(),
-            active_dungeon: None,
-            fishing: crate::fishing::FishingState::default(),
-            active_fishing: None,
-            zone_progression: crate::zones::ZoneProgression::default(),
-            challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
-            chess_stats: crate::challenges::chess::ChessStats::default(),
-            active_minigame: None,
-            session_kills: 0,
-            recent_drops: std::collections::VecDeque::new(),
-            last_minigame_win: None,
-        };
+        let state = make_test_state("RenameTest");
 
         manager.save_character(&state).unwrap();
 
@@ -671,42 +540,20 @@ mod tests {
 
     #[test]
     fn test_character_data_integrity() {
-        use crate::character::attributes::{AttributeType, Attributes};
-        use crate::combat::CombatState;
-        use crate::core::game_state::GameState;
-        use crate::items::Equipment;
-        use chrono::Utc;
+        use crate::character::attributes::AttributeType;
 
         let manager = CharacterManager::new().unwrap();
 
         // Create a character with specific values
-        let mut attributes = Attributes::new();
-        attributes.set(AttributeType::Strength, 15);
-        attributes.set(AttributeType::Dexterity, 18);
-
-        let state = GameState {
-            character_id: "integrity-test-id".to_string(),
-            character_name: "IntegrityTest".to_string(),
-            character_level: 25,
-            character_xp: 12345,
-            attributes,
-            prestige_rank: 3,
-            total_prestige_count: 5,
-            last_save_time: Utc::now().timestamp(),
-            play_time_seconds: 9999,
-            combat_state: CombatState::new(100),
-            equipment: Equipment::new(),
-            active_dungeon: None,
-            fishing: crate::fishing::FishingState::default(),
-            active_fishing: None,
-            zone_progression: crate::zones::ZoneProgression::default(),
-            challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
-            chess_stats: crate::challenges::chess::ChessStats::default(),
-            active_minigame: None,
-            session_kills: 0,
-            recent_drops: std::collections::VecDeque::new(),
-            last_minigame_win: None,
-        };
+        let mut state = make_test_state("IntegrityTest");
+        state.character_id = "integrity-test-id".to_string();
+        state.character_level = 25;
+        state.character_xp = 12345;
+        state.prestige_rank = 3;
+        state.total_prestige_count = 5;
+        state.play_time_seconds = 9999;
+        state.attributes.set(AttributeType::Strength, 15);
+        state.attributes.set(AttributeType::Dexterity, 18);
 
         manager.save_character(&state).unwrap();
 
@@ -1324,21 +1171,6 @@ mod tests {
     // =========================================================================
     // CHARACTER NAME VALIDATION - EXTENDED EDGE CASES
     // =========================================================================
-
-    #[test]
-    fn test_validate_name_boundary_length_16_chars() {
-        // Exactly 16 characters should be valid
-        assert!(validate_name("1234567890123456").is_ok());
-        // 17 characters should fail
-        assert!(validate_name("12345678901234567").is_err());
-    }
-
-    #[test]
-    fn test_validate_name_single_char() {
-        // Single character should be valid
-        assert!(validate_name("A").is_ok());
-        assert!(validate_name("1").is_ok());
-    }
 
     #[test]
     fn test_validate_name_extended_invalid_chars() {

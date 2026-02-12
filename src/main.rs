@@ -8,6 +8,7 @@ mod fishing;
 mod haven;
 mod input;
 mod items;
+mod tick_events;
 mod ui;
 mod utils;
 mod zones;
@@ -32,6 +33,7 @@ use rand::Rng;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 use std::time::{Duration, Instant};
+use tick_events::apply_tick_events;
 use ui::achievement_browser_scene::AchievementBrowserState;
 use ui::character_creation::CharacterCreationScreen;
 use ui::character_delete::CharacterDeleteScreen;
@@ -97,6 +99,232 @@ fn jittered_update_interval() -> Duration {
     let jitter = rng.gen_range(0..=2 * UPDATE_CHECK_JITTER_SECONDS);
     let interval = UPDATE_CHECK_INTERVAL_SECONDS - UPDATE_CHECK_JITTER_SECONDS + jitter;
     Duration::from_secs(interval)
+}
+
+/// Show update notification with changelog at startup, then wait for keypress.
+fn show_startup_update_notification(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    update_info: &UpdateInfo,
+) -> io::Result<()> {
+    terminal.draw(|frame| {
+        let area = frame.size();
+        let block = ratatui::widgets::Block::default()
+            .borders(ratatui::widgets::Borders::ALL)
+            .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Yellow))
+            .title(" Update Available ");
+
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
+        let mut text = vec![
+            ratatui::text::Line::from(""),
+            ratatui::text::Line::from(format!(
+                "  New version: {} ({})",
+                update_info.new_version, update_info.new_commit
+            )),
+            ratatui::text::Line::from(""),
+        ];
+
+        if !update_info.changelog.is_empty() {
+            text.push(ratatui::text::Line::from("  What's new:"));
+            for entry in update_info.changelog.iter().take(15) {
+                text.push(ratatui::text::Line::from(format!("    • {}", entry)));
+            }
+            if update_info.changelog.len() > 15 {
+                text.push(ratatui::text::Line::from(format!(
+                    "    ...and {} more",
+                    update_info.changelog.len() - 15
+                )));
+            }
+            text.push(ratatui::text::Line::from(""));
+        }
+
+        text.push(ratatui::text::Line::from(
+            "  Run 'quest update' to install.",
+        ));
+        text.push(ratatui::text::Line::from(""));
+        text.push(ratatui::text::Line::from("  Press any key to continue..."));
+
+        let paragraph =
+            ratatui::widgets::Paragraph::new(text).alignment(ratatui::layout::Alignment::Left);
+
+        frame.render_widget(paragraph, inner);
+    })?;
+
+    // Wait for keypress (max 5 seconds)
+    let _ = event::poll(Duration::from_secs(5));
+    if event::poll(Duration::from_millis(0))? {
+        let _ = event::read()?;
+    }
+    Ok(())
+}
+
+/// Draw all game overlays on top of the main game UI.
+#[allow(clippy::too_many_arguments)]
+fn draw_game_overlays(
+    frame: &mut ratatui::Frame,
+    state: &GameState,
+    overlay: &GameOverlay,
+    haven: &haven::Haven,
+    haven_ui: &HavenUiState,
+    global_achievements: &achievements::Achievements,
+    debug_mode: bool,
+    debug_menu: &utils::debug_menu::DebugMenu,
+    last_save_instant: Option<Instant>,
+    last_save_time: Option<chrono::DateTime<chrono::Local>>,
+) {
+    let area = frame.size();
+    match overlay {
+        GameOverlay::OfflineWelcome { report } => {
+            ui::game_common::render_offline_welcome(frame, area, report);
+        }
+        GameOverlay::PrestigeConfirm => {
+            ui::prestige_confirm::draw_prestige_confirm(frame, state);
+        }
+        GameOverlay::HavenDiscovery => {
+            ui::haven_scene::render_haven_discovery_modal(frame, area);
+        }
+        GameOverlay::AchievementUnlocked { ref achievements } => {
+            ui::achievement_browser_scene::render_achievement_unlocked_modal(
+                frame,
+                area,
+                achievements,
+            );
+        }
+        GameOverlay::VaultSelection {
+            selected_index,
+            ref selected_slots,
+        } => {
+            ui::haven_scene::render_vault_selection(
+                frame,
+                area,
+                state,
+                haven.get_bonus(haven::HavenBonusType::VaultSlots) as u8,
+                *selected_index,
+                selected_slots,
+            );
+        }
+        GameOverlay::Achievements { browser } => {
+            ui::achievement_browser_scene::render_achievement_browser(
+                frame,
+                area,
+                global_achievements,
+                browser,
+            );
+        }
+        GameOverlay::LeviathanEncounter { encounter_number } => {
+            ui::fishing_scene::render_leviathan_encounter_modal(frame, area, *encounter_number);
+        }
+        GameOverlay::None => {}
+    }
+
+    // Haven screen overlay
+    if haven_ui.showing {
+        ui::haven_scene::render_haven_tree(
+            frame,
+            area,
+            haven,
+            haven_ui.selected_room,
+            state.prestige_rank,
+            global_achievements,
+        );
+        match haven_ui.confirmation {
+            input::HavenConfirmation::Build => {
+                let room = haven::HavenRoomId::ALL[haven_ui.selected_room];
+                ui::haven_scene::render_build_confirmation(
+                    frame,
+                    area,
+                    room,
+                    haven,
+                    state.prestige_rank,
+                );
+            }
+            input::HavenConfirmation::Forge => {
+                ui::haven_scene::render_forge_confirmation(
+                    frame,
+                    area,
+                    global_achievements,
+                    state.prestige_rank,
+                );
+            }
+            input::HavenConfirmation::None => {}
+        }
+    }
+
+    // Debug indicator / save indicator
+    if debug_mode {
+        ui::debug_menu_scene::render_debug_indicator(frame, area);
+        if debug_menu.is_open {
+            ui::debug_menu_scene::render_debug_menu(frame, area, debug_menu);
+        }
+    } else {
+        let is_saving = last_save_instant
+            .map(|t| t.elapsed() < Duration::from_secs(1))
+            .unwrap_or(false);
+        ui::debug_menu_scene::render_save_indicator(frame, area, is_saving, last_save_time);
+    }
+}
+
+/// Log synced achievements to the combat log after loading a character.
+fn log_synced_achievements(
+    state: &mut GameState,
+    global_achievements: &mut achievements::Achievements,
+) {
+    let synced_count = global_achievements.pending_count();
+    if synced_count > 0 {
+        if synced_count == 1 {
+            if let Some(id) = global_achievements.pending_notifications.first() {
+                if let Some(def) = achievements::get_achievement_def(*id) {
+                    state.combat_state.add_log_entry(
+                        format!("\u{1f3c6} Achievement Unlocked: {}", def.name),
+                        false,
+                        true,
+                    );
+                }
+            }
+        } else {
+            state.combat_state.add_log_entry(
+                format!(
+                    "\u{1f3c6} {} achievements synced from progress!",
+                    synced_count
+                ),
+                false,
+                true,
+            );
+        }
+        global_achievements.newly_unlocked.clear();
+    }
+}
+
+/// Track achievements that may have changed from input handling (prestige, minigame wins).
+fn track_input_achievements(
+    state: &mut GameState,
+    global_achievements: &mut achievements::Achievements,
+    prestige_before: u32,
+    debug_mode: bool,
+) {
+    let mut achievements_changed = false;
+
+    if state.prestige_rank > prestige_before {
+        global_achievements.on_prestige(state.prestige_rank, Some(&state.character_name));
+        achievements_changed = true;
+    }
+
+    if let Some(ref win_info) = state.last_minigame_win {
+        global_achievements.on_minigame_won(
+            win_info.game_type,
+            win_info.difficulty,
+            Some(&state.character_name),
+        );
+        achievements_changed = true;
+        state.last_minigame_win = None;
+    }
+
+    if achievements_changed && !debug_mode {
+        if let Err(e) = achievements::save_achievements(global_achievements) {
+            eprintln!("Failed to save achievements: {}", e);
+        }
+    }
 }
 
 fn main() -> io::Result<()> {
@@ -182,58 +410,7 @@ fn main() -> io::Result<()> {
 
     // Show update notification if available
     if let Ok(Some(update_info)) = update_available.join() {
-        // Draw notification with changelog
-        terminal.draw(|frame| {
-            let area = frame.size();
-            let block = ratatui::widgets::Block::default()
-                .borders(ratatui::widgets::Borders::ALL)
-                .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Yellow))
-                .title(" Update Available ");
-
-            let inner = block.inner(area);
-            frame.render_widget(block, area);
-
-            let mut text = vec![
-                ratatui::text::Line::from(""),
-                ratatui::text::Line::from(format!(
-                    "  New version: {} ({})",
-                    update_info.new_version, update_info.new_commit
-                )),
-                ratatui::text::Line::from(""),
-            ];
-
-            // Add changelog if available (max 15 entries)
-            if !update_info.changelog.is_empty() {
-                text.push(ratatui::text::Line::from("  What's new:"));
-                for entry in update_info.changelog.iter().take(15) {
-                    text.push(ratatui::text::Line::from(format!("    • {}", entry)));
-                }
-                if update_info.changelog.len() > 15 {
-                    text.push(ratatui::text::Line::from(format!(
-                        "    ...and {} more",
-                        update_info.changelog.len() - 15
-                    )));
-                }
-                text.push(ratatui::text::Line::from(""));
-            }
-
-            text.push(ratatui::text::Line::from(
-                "  Run 'quest update' to install.",
-            ));
-            text.push(ratatui::text::Line::from(""));
-            text.push(ratatui::text::Line::from("  Press any key to continue..."));
-
-            let paragraph =
-                ratatui::widgets::Paragraph::new(text).alignment(ratatui::layout::Alignment::Left);
-
-            frame.render_widget(paragraph, inner);
-        })?;
-
-        // Wait for keypress (max 5 seconds)
-        let _ = event::poll(Duration::from_secs(5));
-        if event::poll(Duration::from_millis(0))? {
-            let _ = event::read()?;
-        }
+        show_startup_update_notification(&mut terminal, &update_info)?;
     }
 
     // Main loop
@@ -439,42 +616,10 @@ fn main() -> io::Result<()> {
                                             Some(&state.character_name),
                                         );
 
-                                        // Log synced achievements (batch message if multiple)
-                                        let synced_count = global_achievements.pending_count();
-                                        if synced_count > 0 {
-                                            if synced_count == 1 {
-                                                // Single achievement - show the name
-                                                if let Some(id) = global_achievements
-                                                    .pending_notifications
-                                                    .first()
-                                                {
-                                                    if let Some(def) =
-                                                        achievements::get_achievement_def(*id)
-                                                    {
-                                                        state.combat_state.add_log_entry(
-                                                            format!(
-                                                                "🏆 Achievement Unlocked: {}",
-                                                                def.name
-                                                            ),
-                                                            false,
-                                                            true,
-                                                        );
-                                                    }
-                                                }
-                                            } else {
-                                                // Multiple achievements - show count
-                                                state.combat_state.add_log_entry(
-                                                    format!(
-                                                        "🏆 {} achievements synced from progress!",
-                                                        synced_count
-                                                    ),
-                                                    false,
-                                                    true,
-                                                );
-                                            }
-                                            // Clear newly_unlocked since we handled logging here
-                                            global_achievements.newly_unlocked.clear();
-                                        }
+                                        log_synced_achievements(
+                                            &mut state,
+                                            &mut global_achievements,
+                                        );
 
                                         // Process offline progression
                                         let current_time = Utc::now().timestamp();
@@ -674,112 +819,18 @@ fn main() -> io::Result<()> {
                             haven.discovered,
                             &global_achievements,
                         );
-                        // Draw offline welcome overlay if active
-                        if let GameOverlay::OfflineWelcome { report } = &overlay {
-                            ui::game_common::render_offline_welcome(frame, frame.size(), report);
-                        }
-                        // Draw prestige confirmation overlay if active
-                        if matches!(overlay, GameOverlay::PrestigeConfirm) {
-                            ui::prestige_confirm::draw_prestige_confirm(frame, &state);
-                        }
-                        // Draw Haven discovery modal if active
-                        if matches!(overlay, GameOverlay::HavenDiscovery) {
-                            ui::haven_scene::render_haven_discovery_modal(frame, frame.size());
-                        }
-                        // Draw Achievement unlocked modal if active
-                        if let GameOverlay::AchievementUnlocked { ref achievements } = overlay {
-                            ui::achievement_browser_scene::render_achievement_unlocked_modal(
-                                frame,
-                                frame.size(),
-                                achievements,
-                            );
-                        }
-                        // Draw Vault selection screen if active
-                        if let GameOverlay::VaultSelection {
-                            selected_index,
-                            ref selected_slots,
-                        } = overlay
-                        {
-                            ui::haven_scene::render_vault_selection(
-                                frame,
-                                frame.size(),
-                                &state,
-                                haven.get_bonus(haven::HavenBonusType::VaultSlots) as u8,
-                                selected_index,
-                                selected_slots,
-                            );
-                        }
-                        // Draw Achievement browser if active
-                        if let GameOverlay::Achievements { browser } = &overlay {
-                            ui::achievement_browser_scene::render_achievement_browser(
-                                frame,
-                                frame.size(),
-                                &global_achievements,
-                                browser,
-                            );
-                        }
-                        // Draw Leviathan encounter modal if active
-                        if let GameOverlay::LeviathanEncounter { encounter_number } = overlay {
-                            ui::fishing_scene::render_leviathan_encounter_modal(
-                                frame,
-                                frame.size(),
-                                encounter_number,
-                            );
-                        }
-                        // Draw Haven screen if active
-                        if haven_ui.showing {
-                            ui::haven_scene::render_haven_tree(
-                                frame,
-                                frame.size(),
-                                &haven,
-                                haven_ui.selected_room,
-                                state.prestige_rank,
-                                &global_achievements,
-                            );
-                            match haven_ui.confirmation {
-                                input::HavenConfirmation::Build => {
-                                    let room = haven::HavenRoomId::ALL[haven_ui.selected_room];
-                                    ui::haven_scene::render_build_confirmation(
-                                        frame,
-                                        frame.size(),
-                                        room,
-                                        &haven,
-                                        state.prestige_rank,
-                                    );
-                                }
-                                input::HavenConfirmation::Forge => {
-                                    ui::haven_scene::render_forge_confirmation(
-                                        frame,
-                                        frame.size(),
-                                        &global_achievements,
-                                        state.prestige_rank,
-                                    );
-                                }
-                                input::HavenConfirmation::None => {}
-                            }
-                        }
-                        // Draw debug indicator and menu if in debug mode, otherwise save indicator
-                        if debug_mode {
-                            ui::debug_menu_scene::render_debug_indicator(frame, frame.size());
-                            if debug_menu.is_open {
-                                ui::debug_menu_scene::render_debug_menu(
-                                    frame,
-                                    frame.size(),
-                                    &debug_menu,
-                                );
-                            }
-                        } else {
-                            // Show save indicator (spinner for 1s after save, then timestamp)
-                            let is_saving = last_save_instant
-                                .map(|t| t.elapsed() < Duration::from_secs(1))
-                                .unwrap_or(false);
-                            ui::debug_menu_scene::render_save_indicator(
-                                frame,
-                                frame.size(),
-                                is_saving,
-                                last_save_time,
-                            );
-                        }
+                        draw_game_overlays(
+                            frame,
+                            &state,
+                            &overlay,
+                            &haven,
+                            &haven_ui,
+                            &global_achievements,
+                            debug_mode,
+                            &debug_menu,
+                            last_save_instant,
+                            last_save_time,
+                        );
                     })?;
 
                     // Poll for input (50ms non-blocking)
@@ -805,36 +856,12 @@ fn main() -> io::Result<()> {
                                 update_expanded,
                             );
 
-                            // Track achievements for state changes
-                            let mut achievements_changed = false;
-
-                            // Check if prestige occurred and track achievement
-                            if state.prestige_rank > prestige_before {
-                                global_achievements
-                                    .on_prestige(state.prestige_rank, Some(&state.character_name));
-                                achievements_changed = true;
-                            }
-
-                            // Check if a minigame win occurred
-                            if let Some(ref win_info) = state.last_minigame_win {
-                                global_achievements.on_minigame_won(
-                                    win_info.game_type,
-                                    win_info.difficulty,
-                                    Some(&state.character_name),
-                                );
-                                achievements_changed = true;
-                                // Clear the win info after processing
-                                state.last_minigame_win = None;
-                            }
-
-                            // Save achievements if any changed (skip in debug mode)
-                            if achievements_changed && !debug_mode {
-                                if let Err(e) =
-                                    achievements::save_achievements(&global_achievements)
-                                {
-                                    eprintln!("Failed to save achievements: {}", e);
-                                }
-                            }
+                            track_input_achievements(
+                                &mut state,
+                                &mut global_achievements,
+                                prestige_before,
+                                debug_mode,
+                            );
 
                             match result {
                                 InputResult::Continue => {}
@@ -1000,131 +1027,4 @@ fn main() -> io::Result<()> {
     println!("Goodbye!");
 
     Ok(())
-}
-
-/// Maps tick events to combat log entries and visual effects.
-/// Returns true if the HavenDiscovered event was present.
-fn apply_tick_events(game_state: &mut GameState, events: &[core::tick::TickEvent]) -> bool {
-    use core::tick::TickEvent;
-    let mut haven_discovered = false;
-    for event in events {
-        match event {
-            TickEvent::PlayerAttack {
-                damage,
-                was_crit,
-                message,
-            } => {
-                game_state
-                    .combat_state
-                    .add_log_entry(message.clone(), *was_crit, true);
-
-                // Spawn damage number effect
-                let damage_effect = ui::combat_effects::VisualEffect::new(
-                    ui::combat_effects::EffectType::DamageNumber {
-                        value: *damage,
-                        is_crit: *was_crit,
-                    },
-                    0.8,
-                );
-                game_state.combat_state.visual_effects.push(damage_effect);
-
-                // Spawn attack flash
-                let flash_effect = ui::combat_effects::VisualEffect::new(
-                    ui::combat_effects::EffectType::AttackFlash,
-                    0.2,
-                );
-                game_state.combat_state.visual_effects.push(flash_effect);
-
-                // Spawn impact effect
-                let impact_effect = ui::combat_effects::VisualEffect::new(
-                    ui::combat_effects::EffectType::HitImpact,
-                    0.3,
-                );
-                game_state.combat_state.visual_effects.push(impact_effect);
-            }
-            TickEvent::PlayerAttackBlocked { message, .. } => {
-                game_state
-                    .combat_state
-                    .add_log_entry(message.clone(), false, true);
-            }
-            TickEvent::EnemyAttack { message, .. } => {
-                game_state
-                    .combat_state
-                    .add_log_entry(message.clone(), false, false);
-            }
-            TickEvent::EnemyDefeated { message, .. } => {
-                game_state
-                    .combat_state
-                    .add_log_entry(message.clone(), false, true);
-            }
-            TickEvent::PlayerDied { message } | TickEvent::PlayerDiedInDungeon { message } => {
-                game_state
-                    .combat_state
-                    .add_log_entry(message.clone(), false, false);
-            }
-            TickEvent::ItemDropped { .. } => {
-                // Item drops and recent_drops tracking are handled inside game_tick
-            }
-            TickEvent::SubzoneBossDefeated { message, .. } => {
-                game_state
-                    .combat_state
-                    .add_log_entry(message.clone(), false, true);
-            }
-            TickEvent::DungeonRoomEntered { message, .. }
-            | TickEvent::DungeonTreasureFound { message, .. }
-            | TickEvent::DungeonKeyFound { message }
-            | TickEvent::DungeonBossUnlocked { message }
-            | TickEvent::DungeonBossDefeated { message, .. }
-            | TickEvent::DungeonEliteDefeated { message, .. }
-            | TickEvent::DungeonCompleted { message, .. } => {
-                game_state
-                    .combat_state
-                    .add_log_entry(message.clone(), false, true);
-            }
-            TickEvent::DungeonFailed { message } => {
-                game_state
-                    .combat_state
-                    .add_log_entry(message.clone(), false, false);
-            }
-            TickEvent::FishingMessage { message }
-            | TickEvent::FishCaught { message, .. }
-            | TickEvent::FishingItemFound { message, .. }
-            | TickEvent::FishingRankUp { message } => {
-                game_state
-                    .combat_state
-                    .add_log_entry(message.clone(), false, true);
-            }
-            TickEvent::StormLeviathanCaught => {
-                // Achievement persistence handled by achievements_changed flag at call site
-            }
-            TickEvent::ChallengeDiscovered {
-                message, follow_up, ..
-            } => {
-                game_state
-                    .combat_state
-                    .add_log_entry(message.clone(), false, true);
-                game_state
-                    .combat_state
-                    .add_log_entry(follow_up.clone(), false, true);
-            }
-            TickEvent::DungeonDiscovered { message }
-            | TickEvent::FishingSpotDiscovered { message } => {
-                game_state
-                    .combat_state
-                    .add_log_entry(message.clone(), false, true);
-            }
-            TickEvent::AchievementUnlocked { message, .. } => {
-                game_state
-                    .combat_state
-                    .add_log_entry(message.clone(), false, true);
-            }
-            TickEvent::HavenDiscovered => {
-                haven_discovered = true;
-            }
-            TickEvent::LeveledUp { .. } => {
-                // Level-up state changes are handled inside game_tick
-            }
-        }
-    }
-    haven_discovered
 }
