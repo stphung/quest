@@ -557,20 +557,23 @@ fn render_morris_game_over(
             )
         }
         MorrisResult::Loss => {
-            // Determine loss reason from game state
-            let msg = if game.pieces_on_board.0 < 3 {
-                "Reduced to fewer than 3 pieces"
+            if game.forfeit_pending {
+                (
+                    GameResultType::Forfeit,
+                    "FORFEIT",
+                    "You conceded the game",
+                    String::new(),
+                )
             } else {
-                "No legal moves remaining"
-            };
-            (GameResultType::Loss, "DEFEAT", msg, String::new())
+                // Determine loss reason from game state
+                let msg = if game.pieces_on_board.0 < 3 {
+                    "Reduced to fewer than 3 pieces"
+                } else {
+                    "No legal moves remaining"
+                };
+                (GameResultType::Loss, "DEFEAT", msg, String::new())
+            }
         }
-        MorrisResult::Forfeit => (
-            GameResultType::Forfeit,
-            "FORFEIT",
-            "You conceded the game",
-            String::new(),
-        ),
     };
 
     // Render banner at bottom of content area

@@ -258,7 +258,7 @@ pub fn game_tick<R: Rng>(
             crate::challenges::gomoku::logic::process_ai_thinking(game, rng);
         }
         Some(ActiveMinigame::Go(game)) => {
-            crate::challenges::go::process_go_ai(game, rng);
+            crate::challenges::go::process_ai_thinking(game, rng);
         }
         _ => {}
     }

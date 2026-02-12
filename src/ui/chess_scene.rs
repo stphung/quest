@@ -370,18 +370,23 @@ fn render_chess_game_over(frame: &mut Frame, area: Rect, game: &ChessGame) {
             "Checkmate!",
             format!("+{} Prestige Ranks", prestige),
         ),
-        ChessResult::Loss => (GameResultType::Loss, "DEFEAT", "Checkmate", String::new()),
+        ChessResult::Loss => {
+            if game.forfeit_pending {
+                (
+                    GameResultType::Forfeit,
+                    "FORFEIT",
+                    "You conceded",
+                    String::new(),
+                )
+            } else {
+                (GameResultType::Loss, "DEFEAT", "Checkmate", String::new())
+            }
+        }
         ChessResult::Draw => (
             GameResultType::Draw,
             "DRAW",
             "Stalemate",
             "+5000 XP".to_string(),
-        ),
-        ChessResult::Forfeit => (
-            GameResultType::Forfeit,
-            "FORFEIT",
-            "You conceded",
-            String::new(),
         ),
     };
 

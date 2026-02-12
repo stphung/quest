@@ -66,7 +66,6 @@ pub enum ChessResult {
     Win,
     Loss,
     Draw,
-    Forfeit,
 }
 
 /// Active chess game session (transient, not saved)
@@ -702,8 +701,8 @@ mod tests {
     #[test]
     fn test_forfeit_result_sets_game_over() {
         let mut game = ChessGame::new(ChessDifficulty::Novice);
-        game.game_result = Some(ChessResult::Forfeit);
-        assert_eq!(game.game_result, Some(ChessResult::Forfeit));
+        game.game_result = Some(ChessResult::Loss);
+        assert_eq!(game.game_result, Some(ChessResult::Loss));
     }
 
     #[test]

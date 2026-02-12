@@ -495,7 +495,7 @@ pub fn process_human_pass(game: &mut GoGame) -> bool {
 }
 
 /// Process AI turn (called each tick while ai_thinking is true).
-pub fn process_go_ai<R: rand::Rng>(game: &mut GoGame, rng: &mut R) {
+pub fn process_ai_thinking<R: rand::Rng>(game: &mut GoGame, rng: &mut R) {
     if !game.ai_thinking || game.game_result.is_some() {
         return;
     }
