@@ -208,7 +208,14 @@ pub struct CombatState {
     pub current_enemy: Option<Enemy>,
     pub player_current_hp: u32,
     pub player_max_hp: u32,
-    pub attack_timer: f64,
+    /// Player's independent attack timer. Accumulates delta_time each tick.
+    /// Player attacks when this reaches the effective player attack interval.
+    #[serde(alias = "attack_timer")]
+    pub player_attack_timer: f64,
+    /// Enemy's independent attack timer. Accumulates delta_time each tick.
+    /// Enemy attacks when this reaches the effective enemy attack interval.
+    #[serde(default)]
+    pub enemy_attack_timer: f64,
     pub regen_timer: f64,
     pub is_regenerating: bool,
     #[serde(skip)]
@@ -229,7 +236,8 @@ impl CombatState {
             current_enemy: None,
             player_current_hp: player_max_hp,
             player_max_hp,
-            attack_timer: 0.0,
+            player_attack_timer: 0.0,
+            enemy_attack_timer: 0.0,
             regen_timer: 0.0,
             is_regenerating: false,
             visual_effects: Vec::new(),

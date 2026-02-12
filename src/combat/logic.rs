@@ -2,6 +2,7 @@ use crate::character::derived_stats::DerivedStats;
 use crate::core::constants::*;
 use crate::core::game_state::GameState;
 use crate::dungeon::types::RoomType;
+use crate::zones::get_all_zones;
 use rand::Rng;
 
 use crate::zones::BossDefeatResult;
@@ -56,6 +57,40 @@ pub enum CombatEvent {
     },
 }
 
+/// Calculates the effective enemy attack interval for the current encounter.
+/// Uses fixed constants per enemy tier (game design doc values).
+pub fn effective_enemy_attack_interval(state: &GameState) -> f64 {
+    // Check dungeon room type first
+    if let Some(dungeon) = &state.active_dungeon {
+        if let Some(room) = dungeon.current_room() {
+            return match room.room_type {
+                RoomType::Boss => ENEMY_DUNGEON_BOSS_ATTACK_INTERVAL_SECONDS,
+                RoomType::Elite => ENEMY_DUNGEON_ELITE_ATTACK_INTERVAL_SECONDS,
+                _ => ENEMY_ATTACK_INTERVAL_SECONDS,
+            };
+        }
+    }
+
+    // Overworld boss
+    if state.zone_progression.fighting_boss {
+        // Check if this is a zone boss (last subzone of the zone)
+        let zones = get_all_zones();
+        let is_zone_boss = zones
+            .iter()
+            .find(|z| z.id == state.zone_progression.current_zone_id)
+            .is_some_and(|zone| {
+                state.zone_progression.current_subzone_id == zone.subzones.len() as u32
+            });
+        if is_zone_boss {
+            return ENEMY_ZONE_BOSS_ATTACK_INTERVAL_SECONDS;
+        }
+        return ENEMY_BOSS_ATTACK_INTERVAL_SECONDS;
+    }
+
+    // Normal mob
+    ENEMY_ATTACK_INTERVAL_SECONDS
+}
+
 /// Updates combat state, returns events that occurred
 /// `haven` contains all Haven bonuses that affect combat
 /// `achievements` is used to check for Stormbreaker achievement (Zone 10 boss)
@@ -102,16 +137,23 @@ pub fn update_combat(
         return events;
     }
 
-    // Update attack timer
-    state.combat_state.attack_timer += delta_time;
+    // --- Phase 1: Accumulate both timers ---
+    state.combat_state.player_attack_timer += delta_time;
+    state.combat_state.enemy_attack_timer += delta_time;
 
     let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
 
     // Attack speed multiplier: higher = faster attacks
-    let effective_attack_interval = ATTACK_INTERVAL_SECONDS / derived.attack_speed_multiplier;
+    let player_interval = ATTACK_INTERVAL_SECONDS / derived.attack_speed_multiplier;
+    let enemy_interval = effective_enemy_attack_interval(state);
 
-    if state.combat_state.attack_timer >= effective_attack_interval {
-        state.combat_state.attack_timer = 0.0;
+    // --- Phase 2: Determine who attacks this tick ---
+    let player_attacks = state.combat_state.player_attack_timer >= player_interval;
+    let enemy_attacks = state.combat_state.enemy_attack_timer >= enemy_interval;
+
+    // --- Phase 3: Player attack (if ready) ---
+    if player_attacks {
+        state.combat_state.player_attack_timer = 0.0;
 
         // Check if boss requires a weapon we don't have
         if let Some(weapon_name) = state.zone_progression.boss_weapon_blocked(achievements) {
@@ -119,8 +161,6 @@ pub fn update_combat(
             events.push(CombatEvent::PlayerAttackBlocked {
                 weapon_needed: weapon_name.to_string(),
             });
-
-            // Enemy still attacks back (see below)
         } else {
             // Player attacks normally
             // Apply Armory bonus: +% damage
@@ -220,6 +260,7 @@ pub fn update_combat(
 
                     // Remove enemy and start regeneration
                     state.combat_state.current_enemy = None;
+                    state.combat_state.enemy_attack_timer = 0.0;
                     state.combat_state.is_regenerating = true;
                     state.combat_state.regen_timer = 0.0;
 
@@ -227,8 +268,12 @@ pub fn update_combat(
                 }
             }
         }
+    }
 
-        // Enemy attacks back
+    // --- Phase 4: Enemy attack (if ready) ---
+    if enemy_attacks {
+        state.combat_state.enemy_attack_timer = 0.0;
+
         if let Some(enemy) = state.combat_state.current_enemy.as_mut() {
             let enemy_damage = enemy.damage.saturating_sub(derived.defense);
             state.combat_state.player_current_hp = state
@@ -249,6 +294,66 @@ pub fn update_combat(
                 }
             }
 
+            // Check if reflection killed the enemy
+            if !enemy.is_alive() {
+                let wis_mod = state
+                    .attributes
+                    .modifier(crate::character::attributes::AttributeType::Wisdom);
+                let cha_mod = state
+                    .attributes
+                    .modifier(crate::character::attributes::AttributeType::Charisma);
+                let xp_gained = crate::core::game_logic::combat_kill_xp(
+                    crate::core::game_logic::xp_gain_per_tick(
+                        state.prestige_rank,
+                        wis_mod,
+                        cha_mod,
+                    ),
+                    haven.xp_gain_percent,
+                );
+
+                let dungeon_room_type = state
+                    .active_dungeon
+                    .as_ref()
+                    .and_then(|d| d.current_room())
+                    .map(|r| r.room_type);
+
+                let is_boss_kill = matches!(
+                    dungeon_room_type,
+                    Some(RoomType::Elite) | Some(RoomType::Boss)
+                ) || (state.active_dungeon.is_none()
+                    && state.zone_progression.fighting_boss);
+
+                match dungeon_room_type {
+                    Some(RoomType::Elite) => {
+                        events.push(CombatEvent::EliteDefeated { xp_gained });
+                    }
+                    Some(RoomType::Boss) => {
+                        events.push(CombatEvent::BossDefeated { xp_gained });
+                    }
+                    _ => {
+                        if state.active_dungeon.is_some() {
+                            events.push(CombatEvent::EnemyDied { xp_gained });
+                        } else if state.zone_progression.fighting_boss {
+                            let result = state
+                                .zone_progression
+                                .on_boss_defeated(state.prestige_rank, achievements);
+                            events.push(CombatEvent::SubzoneBossDefeated { xp_gained, result });
+                        } else {
+                            state.zone_progression.record_kill();
+                            events.push(CombatEvent::EnemyDied { xp_gained });
+                        }
+                    }
+                }
+
+                achievements.on_enemy_killed(is_boss_kill, Some(&state.character_name));
+
+                state.combat_state.current_enemy = None;
+                state.combat_state.is_regenerating = true;
+                state.combat_state.regen_timer = 0.0;
+
+                return events;
+            }
+
             // Check if player died
             if !state.combat_state.is_player_alive() {
                 // Check if we're in a dungeon
@@ -265,6 +370,10 @@ pub fn update_combat(
 
                 // Reset player HP (in dungeon or not)
                 state.combat_state.player_current_hp = state.combat_state.player_max_hp;
+
+                // Reset both timers on player death
+                state.combat_state.player_attack_timer = 0.0;
+                state.combat_state.enemy_attack_timer = 0.0;
 
                 // Reset enemy HP if we're not in dungeon (normal combat continues)
                 if !in_dungeon {
@@ -301,13 +410,36 @@ mod tests {
     // Test Helpers
     // =========================================================================
 
-    /// Forces a combat tick by setting the attack timer and calling update_combat.
-    fn force_combat_tick(
+    /// Forces a player attack by setting the player timer, suppressing enemy attack.
+    fn force_player_attack(
         state: &mut GameState,
         haven: &HavenCombatBonuses,
         achievements: &mut Achievements,
     ) -> Vec<CombatEvent> {
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = 0.0;
+        update_combat(state, 0.1, haven, achievements)
+    }
+
+    /// Forces an enemy attack by setting the enemy timer, suppressing player attack.
+    fn force_enemy_attack(
+        state: &mut GameState,
+        haven: &HavenCombatBonuses,
+        achievements: &mut Achievements,
+    ) -> Vec<CombatEvent> {
+        state.combat_state.player_attack_timer = 0.0;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
+        update_combat(state, 0.1, haven, achievements)
+    }
+
+    /// Forces both player and enemy to attack in the same tick.
+    fn force_both_attacks(
+        state: &mut GameState,
+        haven: &HavenCombatBonuses,
+        achievements: &mut Achievements,
+    ) -> Vec<CombatEvent> {
+        state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         update_combat(state, 0.1, haven, achievements)
     }
 
@@ -368,14 +500,14 @@ mod tests {
         );
         assert_eq!(events.len(), 0);
 
-        // Enough time for attack
+        // Enough time for player attack (1.5s total), but not enemy (needs 2.0s)
         let events = update_combat(
             &mut state,
             1.0,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
-        assert!(events.len() >= 2); // Player attack + enemy attack
+        assert!(!events.is_empty()); // Player attack (enemy not yet at 2.0s)
     }
 
     #[test]
@@ -385,11 +517,9 @@ mod tests {
         state.combat_state.player_current_hp = 1;
         state.combat_state.current_enemy = Some(Enemy::new("Test".to_string(), 100, 50));
 
-        // Force an attack
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(
+        // Force both attacks (need enemy to attack to kill player)
+        let events = force_both_attacks(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
@@ -416,11 +546,9 @@ mod tests {
         state.combat_state.player_current_hp = 10;
         state.combat_state.current_enemy = Some(Enemy::new("Test".to_string(), 1, 5));
 
-        // Force attack to kill enemy
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(
+        // Force player attack to kill enemy
+        let events = force_player_attack(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
@@ -460,11 +588,9 @@ mod tests {
         state.active_dungeon = Some(crate::dungeon::generation::generate_dungeon(1, 0));
         assert!(state.active_dungeon.is_some());
 
-        // Force an attack that kills player
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(
+        // Force both attacks (need enemy to attack to kill player)
+        let events = force_both_attacks(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
@@ -504,11 +630,9 @@ mod tests {
         state.combat_state.current_enemy =
             Some(Enemy::new("Eternal Storm".to_string(), enemy_hp, 10));
 
-        // Force an attack
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(
+        // Force player attack (blocked, but we only check player side)
+        let events = force_player_attack(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
@@ -537,11 +661,9 @@ mod tests {
         let player_hp = state.combat_state.player_current_hp;
         state.combat_state.current_enemy = Some(Enemy::new("Eternal Storm".to_string(), 100, 10));
 
-        // Force an attack
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(
+        // Force both attacks (enemy attacks independently now)
+        let events = force_both_attacks(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
@@ -571,11 +693,9 @@ mod tests {
         state.combat_state.player_current_hp = 1;
         state.combat_state.current_enemy = Some(Enemy::new("Eternal Storm".to_string(), 100, 50));
 
-        // Force an attack
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(
+        // Force both attacks (enemy kills player)
+        let events = force_both_attacks(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
@@ -607,11 +727,9 @@ mod tests {
         state.combat_state.current_enemy =
             Some(Enemy::new("Test".to_string(), 100, enemy_base_damage));
 
-        // Force an attack
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        update_combat(
+        // Force both attacks (need enemy to attack to test defense)
+        force_both_attacks(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
@@ -638,11 +756,9 @@ mod tests {
         // Enemy damage lower than defense (5 < 10)
         state.combat_state.current_enemy = Some(Enemy::new("Weak".to_string(), 100, 5));
 
-        // Force an attack
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        update_combat(
+        // Force both attacks (need enemy to attack to test defense)
+        force_both_attacks(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
@@ -664,11 +780,9 @@ mod tests {
         // Weak enemy that will die in one hit
         state.combat_state.current_enemy = Some(Enemy::new("Boss".to_string(), 1, 5));
 
-        // Force an attack
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(
+        // Force player attack to kill boss
+        let events = force_player_attack(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
@@ -693,11 +807,9 @@ mod tests {
         // Weak enemy
         state.combat_state.current_enemy = Some(Enemy::new("Mob".to_string(), 1, 5));
 
-        // Force an attack to kill
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(
+        // Force player attack to kill
+        let events = force_player_attack(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
@@ -721,8 +833,9 @@ mod tests {
         state.combat_state.player_current_hp = 10;
         state.combat_state.current_enemy = Some(Enemy::new("Test".to_string(), 100, 50));
 
-        // Even with attack timer ready, should not attack while regenerating
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        // Even with both timers ready, should not attack while regenerating
+        state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         let events = update_combat(
             &mut state,
             0.1,
@@ -776,11 +889,9 @@ mod tests {
         state.combat_state.player_current_hp = 1;
         state.combat_state.current_enemy = Some(Enemy::new("Regular Boss".to_string(), 100, 50));
 
-        // Force an attack
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(
+        // Force both attacks (enemy kills player)
+        let events = force_both_attacks(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
@@ -815,7 +926,7 @@ mod tests {
 
         // Give enemy enough HP to survive
         state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
         let events = update_combat(
             &mut state,
             0.1,
@@ -856,7 +967,7 @@ mod tests {
             s.attributes
                 .set(crate::character::attributes::AttributeType::Dexterity, 0);
             s.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 100000, 0));
-            s.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+            s.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
             let events = update_combat(
                 &mut s,
                 0.1,
@@ -895,7 +1006,7 @@ mod tests {
         let expected_damage = derived.total_damage(); // 15 + 11 = 26
 
         state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
         let events = update_combat(
             &mut state,
             0.1,
@@ -931,10 +1042,9 @@ mod tests {
             Some(Enemy::new("Attacker".to_string(), 10000, enemy_base_damage));
         let initial_hp = state.combat_state.player_current_hp;
 
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        update_combat(
+        // Force enemy attack to test damage reduction
+        force_enemy_attack(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
@@ -973,10 +1083,8 @@ mod tests {
 
         // Simulate up to 20 attack cycles
         for _ in 0..20 {
-            state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-            let events = update_combat(
+            let events = force_both_attacks(
                 &mut state,
-                0.1,
                 &HavenCombatBonuses::default(),
                 &mut achievements,
             );
@@ -1136,7 +1244,7 @@ mod tests {
 
         // Weak enemy that dies in one hit
         state.combat_state.current_enemy = Some(Enemy::new("Weak".to_string(), 1, 0));
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
         let events = update_combat(
             &mut state,
             0.1,
@@ -1217,15 +1325,14 @@ mod tests {
         let initial_hp = state.combat_state.player_current_hp;
         // Enemy with damage less than defense
         state.combat_state.current_enemy = Some(Enemy::new("Weak".to_string(), 10000, 5));
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        update_combat(
+        // Force both attacks so enemy actually attacks
+        force_both_attacks(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
 
-        // Player should take zero damage from the enemy
+        // Player should take zero damage from the enemy (defense >= enemy damage)
         assert_eq!(state.combat_state.player_current_hp, initial_hp);
     }
 
@@ -1241,10 +1348,9 @@ mod tests {
         enemy.take_damage(30); // Reduce to 70 HP
         state.combat_state.current_enemy = Some(enemy);
 
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(
+        // Force both attacks (enemy kills player)
+        let events = force_both_attacks(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
@@ -1273,11 +1379,9 @@ mod tests {
         state.combat_state.player_current_hp = 1;
         state.combat_state.current_enemy = Some(Enemy::new("Boss".to_string(), 100, 50));
 
-        // Force an attack
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(
+        // Force both attacks (enemy kills player)
+        let events = force_both_attacks(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
@@ -1323,7 +1427,7 @@ mod tests {
         let expected_crit_damage = (base_damage as f64 * 3.0) as u32; // 3x with +100%
 
         state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
         let mut achievements = Achievements::default();
         let events = update_combat(
             &mut state,
@@ -1372,7 +1476,7 @@ mod tests {
 
         // With 50% attack speed, effective interval is 1.5 / 1.5 = 1.0 seconds
         // So attack should trigger at 1.0 seconds instead of 1.5
-        state.combat_state.attack_timer = 1.0;
+        state.combat_state.player_attack_timer = 1.0;
         let events = update_combat(
             &mut state,
             0.1,
@@ -1393,7 +1497,7 @@ mod tests {
         state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
 
         // Without attack speed bonus, 1.0 seconds is not enough (need 1.5)
-        state.combat_state.attack_timer = 1.0;
+        state.combat_state.player_attack_timer = 1.0;
         let events = update_combat(
             &mut state,
             0.1,
@@ -1571,11 +1675,9 @@ mod tests {
             enemy_max_hp,
             enemy_damage,
         ));
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
-
-        update_combat(
+        // Force both attacks (enemy attacks -> reflection triggers)
+        force_both_attacks(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
@@ -1622,12 +1724,11 @@ mod tests {
         state.combat_state.current_enemy = Some(Enemy::new("Suicidal".to_string(), 5, 100));
         state.combat_state.player_current_hp = 1000; // Survive the hit
         state.combat_state.player_max_hp = 1000;
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
         let mut achievements = Achievements::default();
-        let events = update_combat(
+        // Force both attacks - player kills enemy outright (5 HP < player damage)
+        let events = force_both_attacks(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
@@ -1672,12 +1773,11 @@ mod tests {
         // Enemy deals 0 damage, so player takes 0 damage, so 0 is reflected
         state.combat_state.current_enemy =
             Some(Enemy::new("Pacifist".to_string(), enemy_max_hp, 0));
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
 
         let initial_player_hp = state.combat_state.player_current_hp;
-        update_combat(
+        // Force both attacks (enemy attacks with 0 damage, no reflection)
+        force_both_attacks(
             &mut state,
-            0.1,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
@@ -1708,7 +1808,7 @@ mod tests {
 
         // Create an enemy with lots of HP
         state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
 
         // First, attack with no Haven bonus
         let events_no_bonus = update_combat(
@@ -1730,7 +1830,7 @@ mod tests {
 
         // Reset enemy and attack with +50% damage bonus
         state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
 
         let haven = HavenCombatBonuses {
             damage_percent: 50.0,
@@ -1771,7 +1871,7 @@ mod tests {
             let mut achievements = Achievements::default();
             state.attributes.set(AttributeType::Dexterity, 0); // Base 0% crit
             state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
-            state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+            state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
 
             let events = update_combat(
                 &mut state,
@@ -1792,7 +1892,7 @@ mod tests {
             let mut achievements = Achievements::default();
             state.attributes.set(AttributeType::Dexterity, 0);
             state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
-            state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+            state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
 
             let haven = HavenCombatBonuses {
                 crit_chance_percent: 20.0, // +20% crit
@@ -1830,7 +1930,7 @@ mod tests {
             let mut achievements = Achievements::default();
             state.attributes.set(AttributeType::Dexterity, 0);
             state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
-            state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+            state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
 
             let haven = HavenCombatBonuses {
                 double_strike_chance: 35.0, // +35% double strike (T3 War Room)
@@ -1887,7 +1987,7 @@ mod tests {
         let mut achievements = Achievements::default();
         state.attributes.set(AttributeType::Dexterity, 0);
         state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
-        state.combat_state.attack_timer = ATTACK_INTERVAL_SECONDS;
+        state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
 
         let haven = HavenCombatBonuses {
             damage_percent: 25.0,
@@ -1917,7 +2017,7 @@ mod tests {
         state.combat_state.player_current_hp = 1000;
         let initial_kills = state.zone_progression.kills_in_subzone;
 
-        let events = force_combat_tick(
+        let events = force_player_attack(
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -1971,7 +2071,7 @@ mod tests {
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
 
-        let events = force_combat_tick(
+        let events = force_player_attack(
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -1999,7 +2099,7 @@ mod tests {
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
 
-        let events = force_combat_tick(
+        let events = force_player_attack(
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -2027,7 +2127,7 @@ mod tests {
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
 
-        let events = force_combat_tick(
+        let events = force_player_attack(
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -2055,7 +2155,7 @@ mod tests {
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
 
-        let events = force_combat_tick(
+        let events = force_player_attack(
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -2080,7 +2180,7 @@ mod tests {
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
 
-        let events = force_combat_tick(
+        let events = force_player_attack(
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -2105,7 +2205,7 @@ mod tests {
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
 
-        let events = force_combat_tick(
+        let events = force_player_attack(
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -2129,7 +2229,7 @@ mod tests {
         state.combat_state.player_current_hp = 1;
         state.combat_state.current_enemy = Some(Enemy::new("Deadly Mob".to_string(), 100, 50));
 
-        let events = force_combat_tick(
+        let events = force_both_attacks(
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -2158,7 +2258,7 @@ mod tests {
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
 
-        force_combat_tick(
+        force_player_attack(
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -2177,7 +2277,7 @@ mod tests {
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
 
-        force_combat_tick(
+        force_player_attack(
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -2199,7 +2299,7 @@ mod tests {
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
 
-        let events = force_combat_tick(
+        let events = force_player_attack(
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -2223,7 +2323,7 @@ mod tests {
         state.combat_state.player_current_hp = 1;
         state.combat_state.current_enemy = Some(Enemy::new("Deadly Mob".to_string(), 100, 50));
 
-        force_combat_tick(
+        force_both_attacks(
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -2242,7 +2342,7 @@ mod tests {
         state.combat_state.player_current_hp = 1000;
         state.combat_state.player_max_hp = 1000;
 
-        let events = force_combat_tick(
+        let events = force_player_attack(
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -2260,5 +2360,333 @@ mod tests {
         assert_no_event(&events, "SubzoneBossDefeated", |e| {
             matches!(e, CombatEvent::SubzoneBossDefeated { .. })
         });
+    }
+
+    // =========================================================================
+    // Decoupled Attack Timer Tests
+    // =========================================================================
+
+    #[test]
+    fn test_enemy_attacks_independently_of_player() {
+        // Only enemy timer fires; player timer stays below threshold.
+        // Should see EnemyAttack but NOT PlayerAttack.
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        state.combat_state.current_enemy = Some(Enemy::new("Mob".to_string(), 10000, 10));
+        let initial_hp = state.combat_state.player_current_hp;
+
+        let events = force_enemy_attack(
+            &mut state,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
+
+        assert_has_event(&events, "EnemyAttack", |e| {
+            matches!(e, CombatEvent::EnemyAttack { .. })
+        });
+        assert_no_event(&events, "PlayerAttack", |e| {
+            matches!(e, CombatEvent::PlayerAttack { .. })
+        });
+        // Player should have taken damage
+        assert!(state.combat_state.player_current_hp < initial_hp);
+    }
+
+    #[test]
+    fn test_player_attacks_independently_of_enemy() {
+        // Only player timer fires; enemy timer stays below threshold.
+        // Should see PlayerAttack but NOT EnemyAttack.
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        state.combat_state.current_enemy = Some(Enemy::new("Mob".to_string(), 10000, 10));
+        let initial_hp = state.combat_state.player_current_hp;
+
+        let events = force_player_attack(
+            &mut state,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
+
+        assert_has_event(&events, "PlayerAttack", |e| {
+            matches!(e, CombatEvent::PlayerAttack { .. })
+        });
+        assert_no_event(&events, "EnemyAttack", |e| {
+            matches!(e, CombatEvent::EnemyAttack { .. })
+        });
+        // Player should NOT have taken damage (enemy didn't attack)
+        assert_eq!(state.combat_state.player_current_hp, initial_hp);
+    }
+
+    #[test]
+    fn test_both_timers_fire_player_goes_first() {
+        // Both timers fire on the same tick. Player's attack kills the enemy.
+        // Enemy should NOT get to attack (player advantage).
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        // Weak enemy that dies in one hit
+        state.combat_state.current_enemy = Some(Enemy::new("Weak".to_string(), 1, 50));
+        let initial_hp = state.combat_state.player_current_hp;
+
+        let events = force_both_attacks(
+            &mut state,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
+
+        // Player should have attacked
+        assert_has_event(&events, "PlayerAttack", |e| {
+            matches!(e, CombatEvent::PlayerAttack { .. })
+        });
+        // Enemy died
+        assert_has_event(&events, "EnemyDied", |e| {
+            matches!(e, CombatEvent::EnemyDied { .. })
+        });
+        // Enemy should NOT have attacked (died before getting a turn)
+        assert_no_event(&events, "EnemyAttack", |e| {
+            matches!(e, CombatEvent::EnemyAttack { .. })
+        });
+        // Player HP should be unchanged
+        assert_eq!(state.combat_state.player_current_hp, initial_hp);
+    }
+
+    #[test]
+    fn test_both_timers_fire_enemy_survives_attacks_back() {
+        // Both timers fire on the same tick. Enemy survives player's attack.
+        // Should see PlayerAttack THEN EnemyAttack, in that order.
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        // Tough enemy that survives
+        state.combat_state.current_enemy = Some(Enemy::new("Tough".to_string(), 10000, 10));
+        let initial_hp = state.combat_state.player_current_hp;
+
+        let events = force_both_attacks(
+            &mut state,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
+
+        assert_has_event(&events, "PlayerAttack", |e| {
+            matches!(e, CombatEvent::PlayerAttack { .. })
+        });
+        assert_has_event(&events, "EnemyAttack", |e| {
+            matches!(e, CombatEvent::EnemyAttack { .. })
+        });
+
+        // Verify ordering: PlayerAttack appears before EnemyAttack
+        let player_idx = events
+            .iter()
+            .position(|e| matches!(e, CombatEvent::PlayerAttack { .. }))
+            .unwrap();
+        let enemy_idx = events
+            .iter()
+            .position(|e| matches!(e, CombatEvent::EnemyAttack { .. }))
+            .unwrap();
+        assert!(
+            player_idx < enemy_idx,
+            "PlayerAttack (idx {}) should come before EnemyAttack (idx {})",
+            player_idx,
+            enemy_idx
+        );
+
+        // Player should have taken damage from enemy attack
+        assert!(state.combat_state.player_current_hp < initial_hp);
+    }
+
+    #[test]
+    fn test_enemy_attack_interval_boss_faster() {
+        // Subzone boss should use ENEMY_BOSS_ATTACK_INTERVAL_SECONDS (1.8s)
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        state.zone_progression.current_zone_id = 1;
+        state.zone_progression.current_subzone_id = 1; // Not the last subzone
+        state.zone_progression.fighting_boss = true;
+
+        let interval = effective_enemy_attack_interval(&state);
+        assert!(
+            (interval - ENEMY_BOSS_ATTACK_INTERVAL_SECONDS).abs() < f64::EPSILON,
+            "Subzone boss interval should be {}, got {}",
+            ENEMY_BOSS_ATTACK_INTERVAL_SECONDS,
+            interval
+        );
+    }
+
+    #[test]
+    fn test_enemy_attack_interval_zone_boss() {
+        // Zone boss (last subzone of a zone) uses ENEMY_ZONE_BOSS_ATTACK_INTERVAL_SECONDS (1.5s)
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        // Zone 1 has 3 subzones, so subzone_id 3 is the zone boss
+        state.zone_progression.current_zone_id = 1;
+        state.zone_progression.current_subzone_id = 3;
+        state.zone_progression.fighting_boss = true;
+
+        let interval = effective_enemy_attack_interval(&state);
+        assert!(
+            (interval - ENEMY_ZONE_BOSS_ATTACK_INTERVAL_SECONDS).abs() < f64::EPSILON,
+            "Zone boss interval should be {}, got {}",
+            ENEMY_ZONE_BOSS_ATTACK_INTERVAL_SECONDS,
+            interval
+        );
+    }
+
+    #[test]
+    fn test_enemy_attack_interval_dungeon_elite() {
+        // Dungeon elite uses ENEMY_DUNGEON_ELITE_ATTACK_INTERVAL_SECONDS (1.6s)
+        let state = setup_dungeon_with_room_type(RoomType::Elite);
+
+        let interval = effective_enemy_attack_interval(&state);
+        assert!(
+            (interval - ENEMY_DUNGEON_ELITE_ATTACK_INTERVAL_SECONDS).abs() < f64::EPSILON,
+            "Dungeon elite interval should be {}, got {}",
+            ENEMY_DUNGEON_ELITE_ATTACK_INTERVAL_SECONDS,
+            interval
+        );
+    }
+
+    #[test]
+    fn test_enemy_attack_interval_dungeon_boss() {
+        // Dungeon boss uses ENEMY_DUNGEON_BOSS_ATTACK_INTERVAL_SECONDS (1.4s)
+        let state = setup_dungeon_with_room_type(RoomType::Boss);
+
+        let interval = effective_enemy_attack_interval(&state);
+        assert!(
+            (interval - ENEMY_DUNGEON_BOSS_ATTACK_INTERVAL_SECONDS).abs() < f64::EPSILON,
+            "Dungeon boss interval should be {}, got {}",
+            ENEMY_DUNGEON_BOSS_ATTACK_INTERVAL_SECONDS,
+            interval
+        );
+    }
+
+    #[test]
+    fn test_enemy_attack_interval_normal_mob() {
+        // Normal mob uses ENEMY_ATTACK_INTERVAL_SECONDS (2.0s)
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        state.zone_progression.fighting_boss = false;
+
+        let interval = effective_enemy_attack_interval(&state);
+        assert!(
+            (interval - ENEMY_ATTACK_INTERVAL_SECONDS).abs() < f64::EPSILON,
+            "Normal mob interval should be {}, got {}",
+            ENEMY_ATTACK_INTERVAL_SECONDS,
+            interval
+        );
+    }
+
+    #[test]
+    fn test_enemy_timer_resets_on_new_enemy_spawn() {
+        // After killing an enemy, entering regen, and spawning a new enemy,
+        // enemy_attack_timer should be 0.0
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        state.combat_state.current_enemy = Some(Enemy::new("Weak".to_string(), 1, 0));
+
+        // Kill the enemy
+        force_player_attack(
+            &mut state,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
+        assert!(state.combat_state.is_regenerating);
+        assert_eq!(state.combat_state.enemy_attack_timer, 0.0);
+
+        // Complete regen
+        update_combat(
+            &mut state,
+            HP_REGEN_DURATION_SECONDS,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
+        assert!(!state.combat_state.is_regenerating);
+
+        // Simulate spawning a new enemy (as game_logic does)
+        state.combat_state.current_enemy = Some(Enemy::new("New Mob".to_string(), 100, 5));
+        state.combat_state.player_attack_timer = 0.0;
+        state.combat_state.enemy_attack_timer = 0.0;
+
+        assert_eq!(state.combat_state.player_attack_timer, 0.0);
+        assert_eq!(state.combat_state.enemy_attack_timer, 0.0);
+    }
+
+    #[test]
+    fn test_both_timers_reset_on_player_death() {
+        // After death, both timers should be 0.0
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        state.combat_state.player_current_hp = 1;
+        state.combat_state.current_enemy = Some(Enemy::new("Killer".to_string(), 10000, 50));
+
+        force_both_attacks(
+            &mut state,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
+
+        assert_eq!(
+            state.combat_state.player_attack_timer, 0.0,
+            "Player timer should reset to 0.0 after death"
+        );
+        assert_eq!(
+            state.combat_state.enemy_attack_timer, 0.0,
+            "Enemy timer should reset to 0.0 after death"
+        );
+    }
+
+    #[test]
+    fn test_regen_blocks_both_timers() {
+        // During regen, neither timer should advance
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        state.combat_state.is_regenerating = true;
+        state.combat_state.regen_timer = 0.0;
+        state.combat_state.player_current_hp = 10;
+        state.combat_state.player_max_hp = 100;
+        state.combat_state.current_enemy = Some(Enemy::new("Mob".to_string(), 100, 10));
+
+        // Set both timers to known values
+        state.combat_state.player_attack_timer = 0.5;
+        state.combat_state.enemy_attack_timer = 0.3;
+
+        // Tick during regen
+        update_combat(
+            &mut state,
+            0.5,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
+
+        // Timers should NOT have advanced (regen blocks combat)
+        assert!(
+            (state.combat_state.player_attack_timer - 0.5).abs() < f64::EPSILON,
+            "Player timer should not advance during regen, got {}",
+            state.combat_state.player_attack_timer
+        );
+        assert!(
+            (state.combat_state.enemy_attack_timer - 0.3).abs() < f64::EPSILON,
+            "Enemy timer should not advance during regen, got {}",
+            state.combat_state.enemy_attack_timer
+        );
+    }
+
+    #[test]
+    fn test_old_save_migration_attack_timer() {
+        // JSON with old "attack_timer" key should load into player_attack_timer
+        // and enemy_attack_timer should default to 0.0
+        let json = serde_json::json!({
+            "current_enemy": null,
+            "player_current_hp": 50,
+            "player_max_hp": 50,
+            "attack_timer": 1.2,
+            "regen_timer": 0.0,
+            "is_regenerating": false
+        });
+
+        let loaded: CombatState = serde_json::from_value(json).unwrap();
+        assert!(
+            (loaded.player_attack_timer - 1.2).abs() < f64::EPSILON,
+            "Old attack_timer should map to player_attack_timer, got {}",
+            loaded.player_attack_timer
+        );
+        assert!(
+            (loaded.enemy_attack_timer - 0.0).abs() < f64::EPSILON,
+            "Missing enemy_attack_timer should default to 0.0, got {}",
+            loaded.enemy_attack_timer
+        );
     }
 }
