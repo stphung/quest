@@ -628,6 +628,37 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         icon: "›",
     },
     // ═══════════════════════════════════════════════════════════════
+    // CHALLENGE ACHIEVEMENTS - DINO RUN
+    // ═══════════════════════════════════════════════════════════════
+    AchievementDef {
+        id: AchievementId::DinoRunNovice,
+        name: "Sprint Novice",
+        description: "Win Gauntlet Run on Novice difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "!",
+    },
+    AchievementDef {
+        id: AchievementId::DinoRunApprentice,
+        name: "Sprint Apprentice",
+        description: "Win Gauntlet Run on Apprentice difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "!",
+    },
+    AchievementDef {
+        id: AchievementId::DinoRunJourneyman,
+        name: "Sprint Journeyman",
+        description: "Win Gauntlet Run on Journeyman difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "!",
+    },
+    AchievementDef {
+        id: AchievementId::DinoRunMaster,
+        name: "Sprint Master",
+        description: "Win Gauntlet Run on Master difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "!",
+    },
+    // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - META
     // ═══════════════════════════════════════════════════════════════
     AchievementDef {

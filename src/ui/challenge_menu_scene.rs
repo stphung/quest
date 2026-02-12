@@ -1,6 +1,7 @@
 //! Challenge menu UI rendering.
 
 use crate::challenges::chess::ChessDifficulty;
+use crate::challenges::dino::DinoRunDifficulty;
 use crate::challenges::flappy::FlappyBirdDifficulty;
 use crate::challenges::go::GoDifficulty;
 use crate::challenges::gomoku::GomokuDifficulty;
@@ -162,6 +163,14 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
                 frame,
                 chunks[2],
                 &FlappyBirdDifficulty::ALL,
+                menu.selected_difficulty,
+            );
+        }
+        ChallengeType::DinoRun => {
+            render_difficulty_selector(
+                frame,
+                chunks[2],
+                &DinoRunDifficulty::ALL,
                 menu.selected_difficulty,
             );
         }

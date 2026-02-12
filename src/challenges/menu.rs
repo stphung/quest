@@ -5,6 +5,7 @@
 //! table determines which challenge type appears.
 
 use super::chess::{ChessDifficulty, ChessGame};
+use super::dino::{DinoRunDifficulty, DinoRunGame};
 use super::flappy::{FlappyBirdDifficulty, FlappyBirdGame};
 use super::go::{GoDifficulty, GoGame};
 use super::gomoku::{GomokuDifficulty, GomokuGame};
@@ -96,6 +97,10 @@ fn accept_selected_challenge(state: &mut GameState) {
             ChallengeType::FlappyBird => {
                 let d = FlappyBirdDifficulty::from_index(difficulty_index);
                 ActiveMinigame::FlappyBird(FlappyBirdGame::new(d))
+            }
+            ChallengeType::DinoRun => {
+                let d = DinoRunDifficulty::from_index(difficulty_index);
+                ActiveMinigame::DinoRun(DinoRunGame::new(d))
             }
         };
         state.active_minigame = Some(minigame);
@@ -372,6 +377,10 @@ const CHALLENGE_TABLE: &[ChallengeWeight] = &[
         challenge_type: ChallengeType::Go,
         weight: 10, // ~8% - rare complex strategy
     },
+    ChallengeWeight {
+        challenge_type: ChallengeType::DinoRun,
+        weight: 20, // ~13% - moderate, action game novelty
+    },
 ];
 
 /// A single pending challenge in the menu
@@ -393,6 +402,7 @@ pub enum ChallengeType {
     Minesweeper,
     Rune,
     Go,
+    DinoRun,
 }
 
 impl ChallengeType {
@@ -406,6 +416,7 @@ impl ChallengeType {
             ChallengeType::Minesweeper => "\u{26A0}", // ⚠
             ChallengeType::Rune => "ᚱ",
             ChallengeType::Go => "◉",
+            ChallengeType::DinoRun => "!",
         }
     }
 
@@ -421,6 +432,9 @@ impl ChallengeType {
             }
             ChallengeType::Rune => "A glowing stone tablet materializes before you...",
             ChallengeType::Go => "An ancient master beckons from beneath a gnarled tree...",
+            ChallengeType::DinoRun => {
+                "The ground trembles as a hidden corridor reveals a deadly obstacle course..."
+            }
         }
     }
 }
@@ -638,6 +652,17 @@ pub fn create_challenge(ct: &ChallengeType) -> PendingChallenge {
                 forming a grid of intersections. 'Black and white stones,' they say, \
                 'placed one by one. Surround territory, capture enemies. The simplest \
                 rules hide the deepest strategy. Shall we play?'"
+                .to_string(),
+        },
+        ChallengeType::DinoRun => PendingChallenge {
+            challenge_type: ChallengeType::DinoRun,
+            title: "Gauntlet Run".to_string(),
+            icon: "!",
+            description: "The ground trembles as a hidden corridor reveals a deadly obstacle \
+                course. Ancient traps line the narrow passage\u{2014}jagged rocks, towering \
+                cacti, and stalactites hanging low enough to graze your head. A faded \
+                inscription reads: 'Only the swift survive the Gauntlet. Jump the low, \
+                duck the high, and pray your reflexes hold.'"
                 .to_string(),
         },
     }

@@ -9,6 +9,7 @@ mod combat_3d;
 pub mod combat_effects;
 mod combat_scene;
 pub mod debug_menu_scene;
+pub mod dino_scene;
 pub mod dungeon_map;
 mod enemy_sprites;
 pub mod fishing_scene;
@@ -224,6 +225,9 @@ fn draw_right_content(frame: &mut Frame, area: Rect, game_state: &GameState) {
         }
         Some(ActiveMinigame::FlappyBird(game)) => {
             flappy_scene::render_flappy_scene(frame, area, game);
+        }
+        Some(ActiveMinigame::DinoRun(game)) => {
+            dino_scene::render_dino_scene(frame, area, game);
         }
         None => {
             if game_state.challenge_menu.is_open {

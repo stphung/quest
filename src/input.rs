@@ -5,6 +5,9 @@
 use crate::challenges::chess::logic::{
     apply_game_result as apply_chess_result, process_input as process_chess_input, ChessInput,
 };
+use crate::challenges::dino::logic::{
+    apply_game_result as apply_dino_result, process_input as process_dino_input, DinoRunInput,
+};
 use crate::challenges::flappy::logic::{
     apply_game_result as apply_flappy_result, process_input as process_flappy_input,
     FlappyBirdInput,
@@ -579,6 +582,19 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
                     _ => FlappyBirdInput::Other,
                 };
                 process_flappy_input(flappy_game, input);
+            }
+            ActiveMinigame::DinoRun(dino_game) => {
+                if dino_game.game_result.is_some() {
+                    state.last_minigame_win = apply_dino_result(state);
+                    return InputResult::Continue;
+                }
+                let input = match key.code {
+                    KeyCode::Char(' ') | KeyCode::Up => DinoRunInput::Jump,
+                    KeyCode::Down => DinoRunInput::Duck,
+                    KeyCode::Esc => DinoRunInput::Forfeit,
+                    _ => DinoRunInput::Other,
+                };
+                process_dino_input(dino_game, input);
             }
         }
     }

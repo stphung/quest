@@ -916,17 +916,24 @@ fn main() -> io::Result<()> {
                         }
                     }
 
-                    // Flappy Bird real-time tick (~30 FPS)
+                    // Real-time minigame tick (~30 FPS)
                     if realtime_mode {
                         let dt = last_flappy_frame.elapsed();
                         if dt >= Duration::from_millis(REALTIME_FRAME_MS) {
-                            if let Some(challenges::ActiveMinigame::FlappyBird(ref mut game)) =
-                                state.active_minigame
-                            {
-                                challenges::flappy::logic::tick_flappy_bird(
-                                    game,
-                                    dt.as_millis() as u64,
-                                );
+                            match state.active_minigame {
+                                Some(challenges::ActiveMinigame::FlappyBird(ref mut game)) => {
+                                    challenges::flappy::logic::tick_flappy_bird(
+                                        game,
+                                        dt.as_millis() as u64,
+                                    );
+                                }
+                                Some(challenges::ActiveMinigame::DinoRun(ref mut game)) => {
+                                    challenges::dino::logic::tick_dino_run(
+                                        game,
+                                        dt.as_millis() as u64,
+                                    );
+                                }
+                                _ => {}
                             }
                             last_flappy_frame = Instant::now();
                         }
@@ -1066,5 +1073,6 @@ fn is_realtime_minigame(state: &GameState) -> bool {
     matches!(
         state.active_minigame,
         Some(challenges::ActiveMinigame::FlappyBird(_))
+            | Some(challenges::ActiveMinigame::DinoRun(_))
     )
 }
