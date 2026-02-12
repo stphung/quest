@@ -53,19 +53,36 @@ Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Cross
 
 Larger modules have their own `CLAUDE.md` with implementation patterns, integration points, and extension guides:
 
+- [`src/core/CLAUDE.md`](src/core/CLAUDE.md) — Game tick engine, XP/leveling, offline progression, constants
 - [`src/challenges/CLAUDE.md`](src/challenges/CLAUDE.md) — Adding new minigames (step-by-step checklist)
 - [`src/items/CLAUDE.md`](src/items/CLAUDE.md) — Item generation pipeline, scoring, drop rates
 - [`src/character/CLAUDE.md`](src/character/CLAUDE.md) — Attributes, prestige, persistence
 - [`src/combat/CLAUDE.md`](src/combat/CLAUDE.md) — Combat state machine, enemy generation
 - [`src/dungeon/CLAUDE.md`](src/dungeon/CLAUDE.md) — Procedural generation, room system
+- [`src/fishing/CLAUDE.md`](src/fishing/CLAUDE.md) — Fishing sessions, ranks, Storm Leviathan
+- [`src/zones/CLAUDE.md`](src/zones/CLAUDE.md) — Zone tiers, progression, weapon gates
 - [`src/haven/CLAUDE.md`](src/haven/CLAUDE.md) — Account-level base building, bonus system
+- [`src/achievements/CLAUDE.md`](src/achievements/CLAUDE.md) — Achievement tracking, persistence
 - [`src/ui/CLAUDE.md`](src/ui/CLAUDE.md) — Shared game layout components, color conventions
 
 ### Core Module (`src/core/`)
 
 - `game_state.rs` — Main character state struct (level, XP, prestige, combat state, equipment)
 - `game_logic.rs` — XP curve (`100 × level^1.5`), leveling (+3 random attribute points), enemy spawning, offline progression
+- `tick.rs` — Per-tick game engine: `game_tick<R: Rng>()` with 9 processing stages, returns `TickResult` with `Vec<TickEvent>` (25+ variants). Zero UI imports, zero file I/O — fully decoupled from rendering
 - `constants.rs` — Game balance constants (tick rate, attack interval, XP rates, item drop rates, update check jitter)
+
+### Simulator (`src/bin/simulator.rs`)
+
+Headless game balance simulator that calls the same `game_tick()` code with no UI and no tick delay. Useful for testing game balance across prestige levels and time horizons.
+
+```bash
+cargo run --release --bin simulator -- --ticks 36000 --seed 42 --prestige 10 --runs 3
+```
+
+CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FILE`, `--quiet`
+
+**Limitation:** Only exercises the combat/zone progression loop. Interactive systems (dungeons, fishing, challenges, haven) are discovered but never activated (no player input). See issue #141 for auto-play policies.
 
 ### Character Module (`src/character/`) — [detailed docs](src/character/CLAUDE.md)
 
@@ -231,10 +248,13 @@ quest/
 │   ├── main.rs              # Entry point, game loop, input handling
 │   ├── lib.rs               # Library crate for testing
 │   ├── input.rs             # Keyboard input routing
+│   ├── bin/
+│   │   └── simulator.rs     # Headless game balance simulator
 │   ├── core/                # Core game systems
 │   │   ├── constants.rs     # Game balance constants
 │   │   ├── game_logic.rs    # XP, leveling, spawning
-│   │   └── game_state.rs    # Main game state
+│   │   ├── game_state.rs    # Main game state
+│   │   └── tick.rs          # Per-tick game engine (game_tick)
 │   ├── character/           # Character system [CLAUDE.md]
 │   │   ├── attributes.rs    # 6 RPG attributes
 │   │   ├── derived_stats.rs # Stats from attributes
@@ -288,7 +308,11 @@ quest/
 │       ├── combat_3d.rs     # 3D dungeon renderer
 │       ├── *_scene.rs       # Various game scenes
 │       └── character_*.rs   # Character management UI
-├── tests/                   # Integration tests
+├── tests/                   # Integration tests (13 test files, 963+ tests)
+│   ├── game_loop_orchestration_test.rs  # 36 behavior-locking tests for game_tick
+│   ├── tick_integration_test.rs         # Tick module integration tests
+│   ├── zone_progression_test.rs         # Zone advancement tests
+│   └── ...                              # Chess, fishing, dungeon, prestige, items, etc.
 ├── .github/workflows/       # CI/CD pipeline
 ├── scripts/                 # Quality checks
 ├── docs/design/             # Consolidated design documents
@@ -300,4 +324,4 @@ quest/
 
 ## Dependencies
 
-Ratatui 0.26, Crossterm 0.27, Serde (JSON), Rand, Chrono, Directories, Chess-engine 0.1
+Ratatui 0.26, Crossterm 0.27, Serde (JSON), Rand, Rand_chacha (seeded RNG for simulator), Chrono, Directories, Chess-engine 0.1
