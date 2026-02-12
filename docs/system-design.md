@@ -908,9 +908,9 @@ quest/
 ├── .github/workflows/       # CI/CD pipeline
 ├── scripts/                 # Quality checks (ci-checks.sh)
 ├── docs/                    # Design documents
-│   ├── SYSTEM_DESIGN.md     # This file
-│   ├── BALANCING.md         # Game balance guide
-│   ├── DECISIONS.md         # Design decision log
+│   ├── system-design.md     # This file
+│   ├── balancing.md         # Game balance guide
+│   ├── decisions.md         # Design decision log
 │   └── design/              # Detailed system designs
 ├── Makefile                 # Dev helpers
 └── CLAUDE.md                # Project-level AI guide
@@ -934,4 +934,4 @@ Each major module has its own `CLAUDE.md` with implementation patterns, integrat
 
 ---
 
-*For detailed per-system design docs, see the companion files in `docs/`. For historical design decisions and rationale, see `docs/DECISIONS.md`.*
+*For detailed per-system design docs, see the companion files in `docs/`. For historical design decisions and rationale, see `docs/decisions.md`.*
