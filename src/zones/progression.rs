@@ -105,28 +105,6 @@ impl ZoneProgression {
         }
     }
 
-    /// Legacy version for backwards compatibility.
-    /// Uses the has_stormbreaker flag instead of achievements.
-    #[deprecated(note = "Use boss_weapon_blocked with achievements parameter instead")]
-    pub fn boss_weapon_blocked_legacy(&self) -> Option<&'static str> {
-        if !self.fighting_boss {
-            return None;
-        }
-
-        let zones = get_all_zones();
-        let zone = zones.iter().find(|z| z.id == self.current_zone_id)?;
-
-        // Only the zone's final boss requires the weapon
-        let is_zone_boss = self.current_subzone_id == zone.subzones.len() as u32;
-        let needs_weapon = zone.requires_weapon && is_zone_boss && !self.has_stormbreaker;
-
-        if needs_weapon {
-            zone.weapon_name
-        } else {
-            None
-        }
-    }
-
     /// Checks if a boss has been defeated.
     pub fn is_boss_defeated(&self, zone_id: u32, subzone_id: u32) -> bool {
         self.defeated_bosses.contains(&(zone_id, subzone_id))
@@ -251,57 +229,6 @@ impl ZoneProgression {
         }
 
         // Advance to next subzone
-        self.advance_to_next_subzone();
-        BossDefeatResult::SubzoneComplete {
-            new_subzone_id: self.current_subzone_id,
-        }
-    }
-
-    /// Legacy version for backwards compatibility (uses has_stormbreaker flag).
-    #[deprecated(note = "Use on_boss_defeated with achievements parameter instead")]
-    #[allow(dead_code)]
-    pub fn on_boss_defeated_legacy(&mut self, prestige_rank: u32) -> BossDefeatResult {
-        let zone_id = self.current_zone_id;
-        let subzone_id = self.current_subzone_id;
-
-        let zones = get_all_zones();
-        let Some(zone) = zones.iter().find(|z| z.id == zone_id) else {
-            return BossDefeatResult::SubzoneComplete {
-                new_subzone_id: self.current_subzone_id,
-            };
-        };
-
-        let is_zone_boss = subzone_id == zone.subzones.len() as u32;
-
-        // Check for Zone 10 final boss weapon requirement
-        if zone.requires_weapon && is_zone_boss && !self.has_stormbreaker {
-            self.fighting_boss = false;
-            self.kills_in_subzone = 0;
-            return BossDefeatResult::WeaponRequired {
-                weapon_name: zone.weapon_name.unwrap_or("legendary weapon").to_string(),
-            };
-        }
-
-        self.defeat_boss(zone_id, subzone_id);
-
-        if is_zone_boss {
-            if self.advance_to_next_zone(prestige_rank) {
-                return BossDefeatResult::ZoneComplete {
-                    old_zone: zone.name.to_string(),
-                    new_zone_id: self.current_zone_id,
-                };
-            }
-
-            let next_zone = zones.iter().find(|z| z.id == zone_id + 1);
-            if let Some(next) = next_zone {
-                return BossDefeatResult::ZoneCompleteButGated {
-                    zone_name: zone.name.to_string(),
-                    required_prestige: next.prestige_requirement,
-                };
-            }
-            return BossDefeatResult::StormsEnd;
-        }
-
         self.advance_to_next_subzone();
         BossDefeatResult::SubzoneComplete {
             new_subzone_id: self.current_subzone_id,

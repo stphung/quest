@@ -229,6 +229,7 @@ pub fn tick_fishing_with_haven_result(
 /// 3. **Reeling** (1-2s) - Fish is biting, reeling in
 ///
 /// `haven` contains Haven bonuses for fishing
+#[allow(dead_code)]
 pub fn tick_fishing_with_haven(
     state: &mut GameState,
     rng: &mut impl Rng,
