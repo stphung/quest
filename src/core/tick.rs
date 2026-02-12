@@ -6,8 +6,6 @@
 //! presentation layer (main.rs) can update the UI without game logic depending
 //! on any UI types.
 
-#![allow(dead_code)] // Types are used via lib.rs; main.rs will use them after integration
-
 use crate::achievements::Achievements;
 use crate::challenges::menu::ChallengeType;
 use crate::challenges::ActiveMinigame;
@@ -39,6 +37,7 @@ use rand::Rng;
 /// visual effects, and UI state changes. The game logic layer never
 /// touches UI types directly.
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Fields are part of the public API contract; main.rs matches with `..`
 pub enum TickEvent {
     // ── Combat ──────────────────────────────────────────────────
     /// Player attacked an enemy.
@@ -174,6 +173,9 @@ pub enum TickEvent {
     /// A fishing spot was discovered after killing an enemy.
     FishingSpotDiscovered { message: String },
 
+    /// The Haven was discovered (P10+ idle roll).
+    HavenDiscovered,
+
     // ── Achievements ────────────────────────────────────────────
     /// An achievement was unlocked during this tick.
     AchievementUnlocked { name: String, message: String },
@@ -197,6 +199,14 @@ pub struct TickResult {
     /// True if achievements were modified and should be persisted to disk.
     /// The presentation layer is responsible for the actual IO.
     pub achievements_changed: bool,
+
+    /// True if Haven state was modified (discovery) and should be persisted.
+    pub haven_changed: bool,
+
+    /// Achievement IDs ready to be shown in a modal overlay.
+    /// Populated when the 500ms accumulation window has elapsed.
+    /// Empty if no modal is ready or another overlay is already active.
+    pub achievement_modal_ready: Vec<crate::achievements::AchievementId>,
 }
 
 /// Processes a single 100ms game tick.
@@ -208,9 +218,9 @@ pub struct TickResult {
 /// - `state` — Mutable game state (character, combat, zones, equipment, etc.)
 /// - `tick_counter` — Counts ticks for play-time tracking (10 ticks = 1 second).
 ///   Caller owns this counter across ticks.
-/// - `haven` — Read-only Haven state for bonus calculations.
+/// - `haven` — Mutable Haven state for bonus calculations and discovery.
 /// - `achievements` — Mutable achievement state for unlock tracking.
-/// - `debug_mode` — When true, suppresses achievement-save signals.
+/// - `debug_mode` — When true, suppresses achievement/haven-save signals.
 /// - `rng` — Random number generator (any `impl Rng`). Pass
 ///   `&mut rand::thread_rng()` in production, or a seeded
 ///   `rand_chacha::ChaCha8Rng` in tests for deterministic behavior.
@@ -222,11 +232,13 @@ pub struct TickResult {
 /// - Creating `VisualEffect` objects for [`TickEvent::PlayerAttack`] events
 /// - Updating `visual_effects` lifetimes
 /// - Persisting achievements to disk when `achievements_changed` is true
+/// - Persisting Haven to disk when `haven_changed` is true
 /// - Showing the Leviathan encounter modal when `leviathan_encounter` is `Some`
+/// - Showing achievement modal overlay when `achievement_modal_ready` is non-empty
 pub fn game_tick<R: Rng>(
     state: &mut GameState,
     tick_counter: &mut u32,
-    haven: &Haven,
+    haven: &mut Haven,
     achievements: &mut Achievements,
     debug_mode: bool,
     rng: &mut R,
@@ -702,6 +714,29 @@ pub fn game_tick<R: Rng>(
     // ── 9. Collect achievement notifications ────────────────────
     collect_achievement_events(achievements, &mut result);
 
+    // ── 10. Haven discovery check ────────────────────────────────
+    // Independent roll per tick, only when eligible (P10+, no active content)
+    if !haven.discovered
+        && state.prestige_rank >= 10
+        && state.active_dungeon.is_none()
+        && state.active_fishing.is_none()
+        && state.active_minigame.is_none()
+        && crate::haven::try_discover_haven(haven, state.prestige_rank, rng)
+    {
+        // Track Haven discovery achievement
+        achievements.on_haven_discovered(Some(&state.character_name));
+        result.events.push(TickEvent::HavenDiscovered);
+        result.haven_changed = true;
+        if !debug_mode {
+            result.achievements_changed = true;
+        }
+    }
+
+    // ── 11. Achievement modal accumulation ────────────────────────
+    if achievements.is_modal_ready() {
+        result.achievement_modal_ready = achievements.take_modal_queue();
+    }
+
     result
 }
 
@@ -824,14 +859,14 @@ mod tests {
     fn test_game_tick_returns_empty_result_for_idle_state() {
         let mut state = GameState::new("Test".to_string(), 0);
         let mut tick_counter = 0u32;
-        let haven = Haven::default();
+        let mut haven = Haven::default();
         let mut achievements = Achievements::default();
         let mut rng = test_rng();
 
         let result = game_tick(
             &mut state,
             &mut tick_counter,
-            &haven,
+            &mut haven,
             &mut achievements,
             false,
             &mut rng,
@@ -849,7 +884,7 @@ mod tests {
     fn test_game_tick_increments_play_time() {
         let mut state = GameState::new("Time Test".to_string(), 0);
         let mut tick_counter = 0u32;
-        let haven = Haven::default();
+        let mut haven = Haven::default();
         let mut achievements = Achievements::default();
         let mut rng = test_rng();
 
@@ -859,7 +894,7 @@ mod tests {
             game_tick(
                 &mut state,
                 &mut tick_counter,
-                &haven,
+                &mut haven,
                 &mut achievements,
                 false,
                 &mut rng,
@@ -874,7 +909,7 @@ mod tests {
     fn test_game_tick_spawns_enemy() {
         let mut state = GameState::new("Spawn Test".to_string(), 0);
         let mut tick_counter = 0u32;
-        let haven = Haven::default();
+        let mut haven = Haven::default();
         let mut achievements = Achievements::default();
         let mut rng = test_rng();
 
@@ -883,7 +918,7 @@ mod tests {
         game_tick(
             &mut state,
             &mut tick_counter,
-            &haven,
+            &mut haven,
             &mut achievements,
             false,
             &mut rng,
@@ -904,7 +939,7 @@ mod tests {
         state.combat_state.player_current_hp = state.combat_state.player_max_hp;
 
         let mut tick_counter = 0u32;
-        let haven = Haven::default();
+        let mut haven = Haven::default();
         let mut achievements = Achievements::default();
         let mut rng = test_rng();
 
@@ -913,7 +948,7 @@ mod tests {
             let result = game_tick(
                 &mut state,
                 &mut tick_counter,
-                &haven,
+                &mut haven,
                 &mut achievements,
                 false,
                 &mut rng,

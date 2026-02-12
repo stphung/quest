@@ -35,7 +35,7 @@ fn create_strong_character(name: &str) -> GameState {
 fn run_ticks(
     state: &mut GameState,
     tick_counter: &mut u32,
-    haven: &Haven,
+    haven: &mut Haven,
     achievements: &mut Achievements,
     rng: &mut ChaCha8Rng,
     count: usize,
@@ -52,7 +52,7 @@ fn run_ticks(
 fn run_until<F>(
     state: &mut GameState,
     tick_counter: &mut u32,
-    haven: &Haven,
+    haven: &mut Haven,
     achievements: &mut Achievements,
     rng: &mut ChaCha8Rng,
     max_ticks: usize,
@@ -81,14 +81,14 @@ where
 fn test_game_tick_returns_tick_result() {
     let mut state = GameState::new("Basic Test".to_string(), 0);
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
     let result = game_tick(
         &mut state,
         &mut tick_counter,
-        &haven,
+        &mut haven,
         &mut achievements,
         false,
         &mut rng,
@@ -103,7 +103,7 @@ fn test_game_tick_returns_tick_result() {
 fn test_game_tick_spawns_enemy_on_first_tick() {
     let mut state = GameState::new("Spawn Test".to_string(), 0);
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
@@ -112,7 +112,7 @@ fn test_game_tick_spawns_enemy_on_first_tick() {
     game_tick(
         &mut state,
         &mut tick_counter,
-        &haven,
+        &mut haven,
         &mut achievements,
         false,
         &mut rng,
@@ -128,14 +128,14 @@ fn test_game_tick_spawns_enemy_on_first_tick() {
 fn test_game_tick_increments_tick_counter() {
     let mut state = GameState::new("Counter Test".to_string(), 0);
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
     game_tick(
         &mut state,
         &mut tick_counter,
-        &haven,
+        &mut haven,
         &mut achievements,
         false,
         &mut rng,
@@ -148,7 +148,7 @@ fn test_game_tick_increments_tick_counter() {
 fn test_game_tick_play_time_after_10_ticks() {
     let mut state = GameState::new("Play Time Test".to_string(), 0);
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
@@ -158,7 +158,7 @@ fn test_game_tick_play_time_after_10_ticks() {
         game_tick(
             &mut state,
             &mut tick_counter,
-            &haven,
+            &mut haven,
             &mut achievements,
             false,
             &mut rng,
@@ -173,7 +173,7 @@ fn test_game_tick_play_time_after_10_ticks() {
 fn test_game_tick_play_time_not_incremented_before_10_ticks() {
     let mut state = GameState::new("Play Time Partial".to_string(), 0);
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
@@ -183,7 +183,7 @@ fn test_game_tick_play_time_not_incremented_before_10_ticks() {
         game_tick(
             &mut state,
             &mut tick_counter,
-            &haven,
+            &mut haven,
             &mut achievements,
             false,
             &mut rng,
@@ -202,14 +202,14 @@ fn test_game_tick_play_time_not_incremented_before_10_ticks() {
 fn test_game_tick_produces_player_attack_events() {
     let mut state = create_strong_character("Attack Event Test");
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
     let (events, found) = run_until(
         &mut state,
         &mut tick_counter,
-        &haven,
+        &mut haven,
         &mut achievements,
         &mut rng,
         5000,
@@ -234,14 +234,14 @@ fn test_game_tick_produces_player_attack_events() {
 fn test_game_tick_produces_enemy_defeated_event() {
     let mut state = create_strong_character("Enemy Defeat Event Test");
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
     let (events, found) = run_until(
         &mut state,
         &mut tick_counter,
-        &haven,
+        &mut haven,
         &mut achievements,
         &mut rng,
         5000,
@@ -269,7 +269,7 @@ fn test_game_tick_produces_enemy_defeated_event() {
 fn test_game_tick_applies_xp_on_enemy_defeat() {
     let mut state = create_strong_character("XP Apply Test");
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
@@ -278,7 +278,7 @@ fn test_game_tick_applies_xp_on_enemy_defeat() {
     let (_events, found) = run_until(
         &mut state,
         &mut tick_counter,
-        &haven,
+        &mut haven,
         &mut achievements,
         &mut rng,
         5000,
@@ -296,7 +296,7 @@ fn test_game_tick_applies_xp_on_enemy_defeat() {
 fn test_game_tick_increments_session_kills() {
     let mut state = create_strong_character("Session Kill Test");
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
@@ -305,7 +305,7 @@ fn test_game_tick_increments_session_kills() {
     let (_events, found) = run_until(
         &mut state,
         &mut tick_counter,
-        &haven,
+        &mut haven,
         &mut achievements,
         &mut rng,
         5000,
@@ -323,14 +323,14 @@ fn test_game_tick_increments_session_kills() {
 fn test_game_tick_produces_enemy_attack_events() {
     let mut state = GameState::new("Enemy Attack Test".to_string(), 0);
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
     let (events, found) = run_until(
         &mut state,
         &mut tick_counter,
-        &haven,
+        &mut haven,
         &mut achievements,
         &mut rng,
         5000,
@@ -365,14 +365,14 @@ fn test_game_tick_level_up_event_on_sufficient_xp() {
     state.character_xp = xp_needed - 1;
 
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
     let (events, found) = run_until(
         &mut state,
         &mut tick_counter,
-        &haven,
+        &mut haven,
         &mut achievements,
         &mut rng,
         5000,
@@ -397,7 +397,7 @@ fn test_game_tick_level_up_event_on_sufficient_xp() {
 fn test_game_tick_can_produce_item_dropped_event() {
     let mut state = create_strong_character("Item Drop Event Test");
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
@@ -405,7 +405,7 @@ fn test_game_tick_can_produce_item_dropped_event() {
     let events = run_ticks(
         &mut state,
         &mut tick_counter,
-        &haven,
+        &mut haven,
         &mut achievements,
         &mut rng,
         50_000,
@@ -438,14 +438,14 @@ fn test_game_tick_can_produce_item_dropped_event() {
 fn test_game_tick_item_drop_updates_recent_drops() {
     let mut state = create_strong_character("Recent Drops Event Test");
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
     let events = run_ticks(
         &mut state,
         &mut tick_counter,
-        &haven,
+        &mut haven,
         &mut achievements,
         &mut rng,
         50_000,
@@ -471,7 +471,7 @@ fn test_game_tick_item_drop_updates_recent_drops() {
 fn test_game_tick_subzone_boss_defeated_event() {
     let mut state = create_strong_character("Boss Defeat Event Test");
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
@@ -481,7 +481,7 @@ fn test_game_tick_subzone_boss_defeated_event() {
     let (events, found) = run_until(
         &mut state,
         &mut tick_counter,
-        &haven,
+        &mut haven,
         &mut achievements,
         &mut rng,
         100_000,
@@ -520,7 +520,7 @@ fn test_game_tick_subzone_boss_defeated_event() {
 fn test_game_tick_fishing_produces_events() {
     let mut state = GameState::new("Fishing Event Test".to_string(), 0);
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
@@ -541,7 +541,7 @@ fn test_game_tick_fishing_produces_events() {
         let result = game_tick(
             &mut state,
             &mut tick_counter,
-            &haven,
+            &mut haven,
             &mut achievements,
             false,
             &mut rng,
@@ -576,7 +576,7 @@ fn test_game_tick_fishing_produces_events() {
 fn test_game_tick_fishing_skips_combat() {
     let mut state = create_strong_character("Fishing No Combat Test");
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
@@ -605,7 +605,7 @@ fn test_game_tick_fishing_skips_combat() {
     let result = game_tick(
         &mut state,
         &mut tick_counter,
-        &haven,
+        &mut haven,
         &mut achievements,
         false,
         &mut rng,
@@ -643,7 +643,7 @@ fn test_game_tick_fishing_skips_combat() {
 fn test_game_tick_fishing_still_tracks_play_time() {
     let mut state = GameState::new("Fishing Time Test".to_string(), 0);
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
@@ -663,7 +663,7 @@ fn test_game_tick_fishing_still_tracks_play_time() {
         game_tick(
             &mut state,
             &mut tick_counter,
-            &haven,
+            &mut haven,
             &mut achievements,
             false,
             &mut rng,
@@ -681,7 +681,7 @@ fn test_game_tick_fishing_still_tracks_play_time() {
 fn test_game_tick_fish_caught_event_has_rarity() {
     let mut state = GameState::new("Fish Rarity Test".to_string(), 0);
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
@@ -700,7 +700,7 @@ fn test_game_tick_fish_caught_event_has_rarity() {
         let result = game_tick(
             &mut state,
             &mut tick_counter,
-            &haven,
+            &mut haven,
             &mut achievements,
             false,
             &mut rng,
@@ -736,7 +736,7 @@ fn test_game_tick_dungeon_room_entered_event() {
     let mut state = GameState::new("Dungeon Room Event Test".to_string(), 0);
     state.character_level = 10;
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
@@ -747,7 +747,7 @@ fn test_game_tick_dungeon_room_entered_event() {
     let (events, found) = run_until(
         &mut state,
         &mut tick_counter,
-        &haven,
+        &mut haven,
         &mut achievements,
         &mut rng,
         5000,
@@ -778,7 +778,7 @@ fn test_game_tick_dungeon_failed_event_on_death() {
     state.combat_state.player_max_hp = 1;
 
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
@@ -792,7 +792,7 @@ fn test_game_tick_dungeon_failed_event_on_death() {
         let result = game_tick(
             &mut state,
             &mut tick_counter,
-            &haven,
+            &mut haven,
             &mut achievements,
             false,
             &mut rng,
@@ -828,7 +828,7 @@ fn test_game_tick_dungeon_failed_event_on_death() {
 fn test_game_tick_can_discover_dungeon() {
     let mut state = create_strong_character("Dungeon Discovery Event Test");
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
@@ -836,7 +836,7 @@ fn test_game_tick_can_discover_dungeon() {
     let events = run_ticks(
         &mut state,
         &mut tick_counter,
-        &haven,
+        &mut haven,
         &mut achievements,
         &mut rng,
         50_000,
@@ -860,14 +860,14 @@ fn test_game_tick_challenge_discovery_requires_prestige() {
     let mut state = GameState::new("Challenge No Prestige Test".to_string(), 0);
     state.prestige_rank = 0; // P0 cannot discover challenges
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
     let events = run_ticks(
         &mut state,
         &mut tick_counter,
-        &haven,
+        &mut haven,
         &mut achievements,
         &mut rng,
         1000,
@@ -903,14 +903,14 @@ fn test_game_tick_achievement_event_on_level_milestone() {
     state.character_xp = xp_for_next_level(9) - 1;
 
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
     let (events, found) = run_until(
         &mut state,
         &mut tick_counter,
-        &haven,
+        &mut haven,
         &mut achievements,
         &mut rng,
         10_000,
@@ -941,7 +941,7 @@ fn test_game_tick_achievements_changed_flag() {
     state.character_xp = xp_for_next_level(9) - 1;
 
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
@@ -950,7 +950,7 @@ fn test_game_tick_achievements_changed_flag() {
         let result = game_tick(
             &mut state,
             &mut tick_counter,
-            &haven,
+            &mut haven,
             &mut achievements,
             false,
             &mut rng,
@@ -976,7 +976,7 @@ fn test_game_tick_debug_mode_suppresses_achievement_save() {
     state.character_xp = xp_for_next_level(9) - 1;
 
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
@@ -987,7 +987,7 @@ fn test_game_tick_debug_mode_suppresses_achievement_save() {
         let _result = game_tick(
             &mut state,
             &mut tick_counter,
-            &haven,
+            &mut haven,
             &mut achievements,
             true, // debug_mode = true
             &mut rng,
@@ -1004,7 +1004,7 @@ fn test_game_tick_debug_mode_suppresses_achievement_save() {
 fn test_simulator_100_ticks_produces_progression() {
     let mut state = create_strong_character("Simulator Test");
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
@@ -1014,7 +1014,7 @@ fn test_simulator_100_ticks_produces_progression() {
     let events = run_ticks(
         &mut state,
         &mut tick_counter,
-        &haven,
+        &mut haven,
         &mut achievements,
         &mut rng,
         5000,
@@ -1055,7 +1055,7 @@ fn test_simulator_rng_param_is_used_for_challenge_ai() {
     // and discovery — we verify it doesn't panic and produces valid state.
     let mut state = create_strong_character("RNG Usage Test");
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = ChaCha8Rng::seed_from_u64(12345);
 
@@ -1063,7 +1063,7 @@ fn test_simulator_rng_param_is_used_for_challenge_ai() {
         let result = game_tick(
             &mut state,
             &mut tick_counter,
-            &haven,
+            &mut haven,
             &mut achievements,
             false,
             &mut rng,
@@ -1088,7 +1088,7 @@ fn test_simulator_different_seeds_produce_different_results() {
     let run_simulation = |seed: u64| -> u64 {
         let mut state = create_strong_character("Seed Variation Test");
         let mut tick_counter = 0u32;
-        let haven = Haven::default();
+        let mut haven = Haven::default();
         let mut achievements = Achievements::default();
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
 
@@ -1096,7 +1096,7 @@ fn test_simulator_different_seeds_produce_different_results() {
             game_tick(
                 &mut state,
                 &mut tick_counter,
-                &haven,
+                &mut haven,
                 &mut achievements,
                 false,
                 &mut rng,
@@ -1125,7 +1125,7 @@ fn test_simulator_different_seeds_produce_different_results() {
 fn test_game_tick_syncs_max_hp_with_attributes() {
     let mut state = GameState::new("HP Sync Test".to_string(), 0);
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
@@ -1139,7 +1139,7 @@ fn test_game_tick_syncs_max_hp_with_attributes() {
     game_tick(
         &mut state,
         &mut tick_counter,
-        &haven,
+        &mut haven,
         &mut achievements,
         false,
         &mut rng,
@@ -1167,7 +1167,7 @@ fn test_tick_result_default_is_empty() {
 fn test_game_tick_returns_events_in_chronological_order() {
     let mut state = create_strong_character("Event Order Test");
     let mut tick_counter = 0u32;
-    let haven = Haven::default();
+    let mut haven = Haven::default();
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
@@ -1176,7 +1176,7 @@ fn test_game_tick_returns_events_in_chronological_order() {
         let result = game_tick(
             &mut state,
             &mut tick_counter,
-            &haven,
+            &mut haven,
             &mut achievements,
             false,
             &mut rng,
