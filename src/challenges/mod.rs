@@ -31,6 +31,7 @@ macro_rules! difficulty_enum_impl {
 }
 
 pub mod chess;
+pub mod flappy;
 pub mod go;
 pub mod gomoku;
 pub mod menu;
@@ -39,6 +40,7 @@ pub mod morris;
 pub mod rune;
 
 pub use chess::{ChessDifficulty, ChessGame, ChessResult};
+pub use flappy::{FlappyBirdDifficulty, FlappyBirdGame, FlappyBirdResult};
 pub use go::{GoDifficulty, GoGame, GoMove, GoResult, Stone, BOARD_SIZE as GO_BOARD_SIZE};
 pub use gomoku::{GomokuDifficulty, GomokuGame, GomokuResult, Player as GomokuPlayer, BOARD_SIZE};
 pub use menu::*;
@@ -52,6 +54,7 @@ pub use rune::{FeedbackMark, RuneDifficulty, RuneGame, RuneResult, RUNE_SYMBOLS}
 #[derive(Debug, Clone)]
 pub enum ActiveMinigame {
     Chess(Box<ChessGame>),
+    FlappyBird(FlappyBirdGame),
     Morris(MorrisGame),
     Gomoku(GomokuGame),
     Minesweeper(MinesweeperGame),

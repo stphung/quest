@@ -597,6 +597,37 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         icon: "🟤",
     },
     // ═══════════════════════════════════════════════════════════════
+    // CHALLENGE ACHIEVEMENTS - FLAPPY BIRD
+    // ═══════════════════════════════════════════════════════════════
+    AchievementDef {
+        id: AchievementId::FlappyNovice,
+        name: "Skyward Novice",
+        description: "Win Skyward Gauntlet on Novice difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "◆",
+    },
+    AchievementDef {
+        id: AchievementId::FlappyApprentice,
+        name: "Skyward Apprentice",
+        description: "Win Skyward Gauntlet on Apprentice difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "◆",
+    },
+    AchievementDef {
+        id: AchievementId::FlappyJourneyman,
+        name: "Skyward Journeyman",
+        description: "Win Skyward Gauntlet on Journeyman difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "◆",
+    },
+    AchievementDef {
+        id: AchievementId::FlappyMaster,
+        name: "Skyward Master",
+        description: "Win Skyward Gauntlet on Master difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "›",
+    },
+    // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - META
     // ═══════════════════════════════════════════════════════════════
     AchievementDef {
