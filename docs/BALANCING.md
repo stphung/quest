@@ -389,9 +389,9 @@ const COMBAT_XP_MAX_TICKS: u32 = 400;
 
 // Combat
 const ATTACK_INTERVAL_SECONDS: f64 = 1.5;
-const HP_REGEN_SECONDS: f64 = 2.5;
-const BASE_CRIT_CHANCE: f64 = 0.05;
-const CRIT_MULTIPLIER: f64 = 2.0;
+const HP_REGEN_DURATION_SECONDS: f64 = 2.5;
+const BASE_CRIT_CHANCE_PERCENT: u32 = 5;  // 5% base crit
+const BASE_CRIT_MULTIPLIER: f64 = 2.0;
 
 // Items
 const ITEM_DROP_BASE_CHANCE: f64 = 0.15;
