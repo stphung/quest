@@ -12,6 +12,7 @@ pub mod debug_menu_scene;
 pub mod dungeon_map;
 mod enemy_sprites;
 pub mod fishing_scene;
+pub mod flappy_scene;
 pub mod game_common;
 pub mod go_scene;
 pub mod gomoku_scene;
@@ -220,6 +221,9 @@ fn draw_right_content(frame: &mut Frame, area: Rect, game_state: &GameState) {
         }
         Some(ActiveMinigame::Go(game)) => {
             go_scene::render_go_scene(frame, area, game);
+        }
+        Some(ActiveMinigame::Flappy(game)) => {
+            flappy_scene::render_flappy(frame, area, game);
         }
         None => {
             if game_state.challenge_menu.is_open {

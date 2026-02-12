@@ -23,10 +23,10 @@ mod ui;
 // Re-export commonly used types at crate root for convenience
 pub use achievements::{AchievementCategory, AchievementId, Achievements};
 pub use challenges::{
-    ActiveMinigame, ChessDifficulty, ChessGame, ChessResult, GoDifficulty, GoGame, GoResult,
-    GomokuDifficulty, GomokuGame, GomokuResult, MinesweeperDifficulty, MinesweeperGame,
-    MinesweeperResult, MorrisDifficulty, MorrisGame, MorrisPhase, MorrisResult, RuneDifficulty,
-    RuneGame, RuneResult,
+    ActiveMinigame, ChessDifficulty, ChessGame, ChessResult, FlappyDifficulty, FlappyGame,
+    FlappyResult, GoDifficulty, GoGame, GoResult, GomokuDifficulty, GomokuGame, GomokuResult,
+    MinesweeperDifficulty, MinesweeperGame, MinesweeperResult, MorrisDifficulty, MorrisGame,
+    MorrisPhase, MorrisResult, RuneDifficulty, RuneGame, RuneResult,
 };
 pub use character::{Attributes, DerivedStats, PrestigeTier};
 pub use combat::{CombatState, Enemy};

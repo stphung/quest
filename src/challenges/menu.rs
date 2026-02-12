@@ -5,6 +5,7 @@
 //! table determines which challenge type appears.
 
 use super::chess::{ChessDifficulty, ChessGame};
+use super::flappy::{FlappyDifficulty, FlappyGame};
 use super::go::{GoDifficulty, GoGame};
 use super::gomoku::{GomokuDifficulty, GomokuGame};
 use super::minesweeper::{MinesweeperDifficulty, MinesweeperGame};
@@ -91,6 +92,10 @@ fn accept_selected_challenge(state: &mut GameState) {
             ChallengeType::Go => {
                 let d = GoDifficulty::from_index(difficulty_index);
                 ActiveMinigame::Go(GoGame::new(d))
+            }
+            ChallengeType::Flappy => {
+                let d = FlappyDifficulty::from_index(difficulty_index);
+                ActiveMinigame::Flappy(FlappyGame::new(d))
             }
         };
         state.active_minigame = Some(minigame);
@@ -327,6 +332,43 @@ impl DifficultyInfo for GoDifficulty {
     }
 }
 
+impl DifficultyInfo for FlappyDifficulty {
+    fn name(&self) -> &'static str {
+        FlappyDifficulty::name(self)
+    }
+
+    fn reward(&self) -> ChallengeReward {
+        match self {
+            FlappyDifficulty::Novice => ChallengeReward {
+                xp_percent: 50,
+                ..Default::default()
+            },
+            FlappyDifficulty::Apprentice => ChallengeReward {
+                xp_percent: 100,
+                ..Default::default()
+            },
+            FlappyDifficulty::Journeyman => ChallengeReward {
+                prestige_ranks: 1,
+                xp_percent: 50,
+                ..Default::default()
+            },
+            FlappyDifficulty::Master => ChallengeReward {
+                prestige_ranks: 2,
+                xp_percent: 100,
+                ..Default::default()
+            },
+        }
+    }
+
+    fn extra_info(&self) -> Option<String> {
+        Some(format!(
+            "Gap {}, pass {} pipes",
+            self.gap_size(),
+            self.target_score()
+        ))
+    }
+}
+
 // CHALLENGE_DISCOVERY_CHANCE is imported from core::constants
 
 /// Entry in the challenge distribution table
@@ -361,7 +403,11 @@ const CHALLENGE_TABLE: &[ChallengeWeight] = &[
     },
     ChallengeWeight {
         challenge_type: ChallengeType::Go,
-        weight: 10, // ~9% - rare complex strategy
+        weight: 10, // ~8% - rare complex strategy
+    },
+    ChallengeWeight {
+        challenge_type: ChallengeType::Flappy,
+        weight: 15, // ~12% - action minigame
     },
 ];
 
@@ -383,6 +429,7 @@ pub enum ChallengeType {
     Minesweeper,
     Rune,
     Go,
+    Flappy,
 }
 
 impl ChallengeType {
@@ -395,6 +442,7 @@ impl ChallengeType {
             ChallengeType::Minesweeper => "\u{26A0}", // ⚠
             ChallengeType::Rune => "ᚱ",
             ChallengeType::Go => "◉",
+            ChallengeType::Flappy => "🐦",
         }
     }
 
@@ -409,6 +457,7 @@ impl ChallengeType {
             }
             ChallengeType::Rune => "A glowing stone tablet materializes before you...",
             ChallengeType::Go => "An ancient master beckons from beneath a gnarled tree...",
+            ChallengeType::Flappy => "A mechanical bird whirs to life on a crumbling parapet...",
         }
     }
 }
@@ -617,6 +666,16 @@ pub fn create_challenge(ct: &ChallengeType) -> PendingChallenge {
                 rules hide the deepest strategy. Shall we play?'"
                 .to_string(),
         },
+        ChallengeType::Flappy => PendingChallenge {
+            challenge_type: ChallengeType::Flappy,
+            title: "Flappy Bird: Gauntlet Run".to_string(),
+            icon: "🐦",
+            description: "A mechanical bird whirs to life on a crumbling parapet, its brass \
+                wings clicking in the wind. 'Guide me through the pillars,' it chirps, \
+                gears spinning. 'One flap at a time\u{2014}but beware, gravity is \
+                merciless and the gaps grow narrow. How far can we fly?'"
+                .to_string(),
+        },
     }
 }
 
@@ -643,6 +702,7 @@ mod tests {
         assert!(!ChallengeType::Minesweeper.icon().is_empty());
         assert!(!ChallengeType::Rune.icon().is_empty());
         assert!(!ChallengeType::Go.icon().is_empty());
+        assert!(!ChallengeType::Flappy.icon().is_empty());
     }
 
     #[test]
@@ -653,6 +713,7 @@ mod tests {
         assert!(!ChallengeType::Minesweeper.discovery_flavor().is_empty());
         assert!(!ChallengeType::Rune.discovery_flavor().is_empty());
         assert!(!ChallengeType::Go.discovery_flavor().is_empty());
+        assert!(!ChallengeType::Flappy.discovery_flavor().is_empty());
     }
 
     #[test]
@@ -664,6 +725,7 @@ mod tests {
             ChallengeType::Minesweeper.icon(),
             ChallengeType::Rune.icon(),
             ChallengeType::Go.icon(),
+            ChallengeType::Flappy.icon(),
         ];
         // Check all pairs are different
         for i in 0..icons.len() {
@@ -1046,6 +1108,27 @@ mod tests {
         assert!(!state.challenge_menu.is_open);
     }
 
+    #[test]
+    fn test_process_input_select_starts_flappy_game() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.challenge_menu.add_challenge(PendingChallenge {
+            challenge_type: ChallengeType::Flappy,
+            title: "Flappy Challenge".to_string(),
+            icon: "🐦",
+            description: "Test".to_string(),
+        });
+        state.challenge_menu.open();
+        state.challenge_menu.open_detail();
+
+        process_input(&mut state, MenuInput::Select);
+
+        assert!(matches!(
+            state.active_minigame,
+            Some(ActiveMinigame::Flappy(_))
+        ));
+        assert!(!state.challenge_menu.is_open);
+    }
+
     // =========================================================================
     // Haven Discovery Bonus Tests
     // =========================================================================
@@ -1100,13 +1183,14 @@ mod tests {
     #[test]
     fn test_difficulty_str_all_types() {
         use super::super::chess::ChessDifficulty;
+        use super::super::flappy::FlappyDifficulty;
         use super::super::go::GoDifficulty;
         use super::super::gomoku::GomokuDifficulty;
         use super::super::minesweeper::MinesweeperDifficulty;
         use super::super::morris::MorrisDifficulty;
         use super::super::rune::RuneDifficulty;
 
-        // Verify all 6 difficulty types produce correct lowercase strings
+        // Verify all 7 difficulty types produce correct lowercase strings
         for (i, expected) in ["novice", "apprentice", "journeyman", "master"]
             .iter()
             .enumerate()
@@ -1117,6 +1201,7 @@ mod tests {
             assert_eq!(MinesweeperDifficulty::ALL[i].difficulty_str(), *expected);
             assert_eq!(RuneDifficulty::ALL[i].difficulty_str(), *expected);
             assert_eq!(GoDifficulty::ALL[i].difficulty_str(), *expected);
+            assert_eq!(FlappyDifficulty::ALL[i].difficulty_str(), *expected);
         }
     }
 }

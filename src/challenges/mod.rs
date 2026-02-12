@@ -1,4 +1,4 @@
-//! Challenge minigames: Chess, Gomoku, Minesweeper, Morris, Rune, Go.
+//! Challenge minigames: Chess, Gomoku, Minesweeper, Morris, Rune, Go, Flappy.
 
 #![allow(unused_imports)]
 
@@ -31,6 +31,7 @@ macro_rules! difficulty_enum_impl {
 }
 
 pub mod chess;
+pub mod flappy;
 pub mod go;
 pub mod gomoku;
 pub mod menu;
@@ -39,6 +40,7 @@ pub mod morris;
 pub mod rune;
 
 pub use chess::{ChessDifficulty, ChessGame, ChessResult};
+pub use flappy::{FlappyDifficulty, FlappyGame, FlappyResult};
 pub use go::{GoDifficulty, GoGame, GoMove, GoResult, Stone, BOARD_SIZE as GO_BOARD_SIZE};
 pub use gomoku::{GomokuDifficulty, GomokuGame, GomokuResult, Player as GomokuPlayer, BOARD_SIZE};
 pub use menu::*;
@@ -57,12 +59,13 @@ pub enum ActiveMinigame {
     Minesweeper(MinesweeperGame),
     Rune(RuneGame),
     Go(GoGame),
+    Flappy(FlappyGame),
 }
 
 /// Information about a minigame win for achievement tracking.
 #[derive(Debug, Clone)]
 pub struct MinigameWinInfo {
-    /// The type of game: "chess", "morris", "gomoku", "minesweeper", "rune", "go"
+    /// The type of game: "chess", "morris", "gomoku", "minesweeper", "rune", "go", "flappy"
     pub game_type: &'static str,
     /// The difficulty level: "novice", "apprentice", "journeyman", "master"
     pub difficulty: &'static str,
