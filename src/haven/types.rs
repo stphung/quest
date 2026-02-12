@@ -503,7 +503,7 @@ impl Haven {
             double_fish_chance: self.get_bonus(HavenBonusType::DoubleFishChance),
             item_rarity_percent: self.get_bonus(HavenBonusType::ItemRarityPercent),
             hp_regen_delay_reduction: self.get_bonus(HavenBonusType::HpRegenDelayReduction),
-            vault_slots: self.vault_tier(),
+            vault_slots: self.get_bonus(HavenBonusType::VaultSlots) as u8,
             max_fishing_rank_bonus: self.fishing_rank_bonus(),
             has_storm_forge: self.has_storm_forge(),
         }
@@ -1114,5 +1114,101 @@ mod tests {
 
         haven.build_room(HavenRoomId::Vault);
         assert_eq!(haven.vault_tier(), 3);
+    }
+
+    // =========================================================================
+    // Vault Slot Count Bug Regression Tests
+    // =========================================================================
+
+    /// Helper: build a Haven with Vault at the given tier (1-3)
+    fn haven_with_vault_at_tier(tier: u8) -> Haven {
+        let mut haven = Haven::new();
+        // Build prerequisite path to Vault
+        haven.build_room(HavenRoomId::Hearthstone);
+        haven.build_room(HavenRoomId::Bedroom);
+        haven.build_room(HavenRoomId::Garden);
+        haven.build_room(HavenRoomId::Library);
+        haven.build_room(HavenRoomId::FishingDock);
+        haven.build_room(HavenRoomId::Workshop);
+        for _ in 0..tier {
+            haven.build_room(HavenRoomId::Vault);
+        }
+        assert_eq!(haven.vault_tier(), tier);
+        haven
+    }
+
+    #[test]
+    fn test_vault_bonus_value_matches_slot_count_t1() {
+        // T1 Vault should preserve 1 item
+        assert_eq!(HavenRoomId::Vault.bonus_value(1), 1.0);
+    }
+
+    #[test]
+    fn test_vault_bonus_value_matches_slot_count_t2() {
+        // T2 Vault should preserve 3 items (NOT 2)
+        assert_eq!(HavenRoomId::Vault.bonus_value(2), 3.0);
+    }
+
+    #[test]
+    fn test_vault_bonus_value_matches_slot_count_t3() {
+        // T3 Vault should preserve 5 items (NOT 3)
+        assert_eq!(HavenRoomId::Vault.bonus_value(3), 5.0);
+    }
+
+    #[test]
+    fn test_compute_bonuses_vault_slots_t1() {
+        let haven = haven_with_vault_at_tier(1);
+        let bonuses = haven.compute_bonuses();
+        // T1 Vault: 1 item preserved
+        assert_eq!(
+            bonuses.vault_slots, 1,
+            "compute_bonuses vault_slots at T1 should be 1"
+        );
+    }
+
+    #[test]
+    fn test_compute_bonuses_vault_slots_t2() {
+        let haven = haven_with_vault_at_tier(2);
+        let bonuses = haven.compute_bonuses();
+        // T2 Vault: 3 items preserved (NOT 2)
+        assert_eq!(
+            bonuses.vault_slots, 3,
+            "compute_bonuses vault_slots at T2 should be 3, not the raw tier (2)"
+        );
+    }
+
+    #[test]
+    fn test_compute_bonuses_vault_slots_t3() {
+        let haven = haven_with_vault_at_tier(3);
+        let bonuses = haven.compute_bonuses();
+        // T3 Vault: 5 items preserved (NOT 3)
+        assert_eq!(
+            bonuses.vault_slots, 5,
+            "compute_bonuses vault_slots at T3 should be 5, not the raw tier (3)"
+        );
+    }
+
+    #[test]
+    fn test_compute_bonuses_vault_slots_unbuilt() {
+        let haven = Haven::new();
+        let bonuses = haven.compute_bonuses();
+        assert_eq!(bonuses.vault_slots, 0, "Unbuilt vault should have 0 slots");
+    }
+
+    #[test]
+    fn test_get_bonus_returns_vault_slot_count_not_tier() {
+        let haven = haven_with_vault_at_tier(2);
+        let vault_bonus = haven.get_bonus(HavenBonusType::VaultSlots);
+        assert_eq!(
+            vault_bonus, 3.0,
+            "get_bonus(VaultSlots) at T2 should return 3.0, not 2.0"
+        );
+
+        let haven = haven_with_vault_at_tier(3);
+        let vault_bonus = haven.get_bonus(HavenBonusType::VaultSlots);
+        assert_eq!(
+            vault_bonus, 5.0,
+            "get_bonus(VaultSlots) at T3 should return 5.0, not 3.0"
+        );
     }
 }

@@ -1009,4 +1009,120 @@ mod tests {
             "Attack timer should be reset to 0 on new enemy spawn"
         );
     }
+
+    // =========================================================================
+    // Offline XP Suspension Detection Tests
+    // =========================================================================
+
+    #[test]
+    fn test_process_offline_progression_updates_last_save_time() {
+        let mut state = GameState::new("Suspend Test".to_string(), 0);
+
+        // Set last_save_time to 2 hours ago
+        let two_hours_ago = chrono::Utc::now().timestamp() - 7200;
+        state.last_save_time = two_hours_ago;
+
+        let _report = process_offline_progression(&mut state, 0.0);
+
+        // After processing, last_save_time should be updated to approximately now
+        let now = chrono::Utc::now().timestamp();
+        assert!(
+            (state.last_save_time - now).abs() <= 2,
+            "last_save_time should be updated to current time after processing, \
+             got delta of {} seconds",
+            (state.last_save_time - now).abs()
+        );
+        assert!(
+            state.last_save_time > two_hours_ago,
+            "last_save_time should advance past the old value"
+        );
+    }
+
+    #[test]
+    fn test_process_offline_progression_zero_elapsed_returns_default() {
+        let mut state = GameState::new("Zero Elapsed Test".to_string(), 0);
+
+        // Set last_save_time to exactly now (zero elapsed)
+        state.last_save_time = chrono::Utc::now().timestamp();
+
+        let report = process_offline_progression(&mut state, 0.0);
+
+        assert_eq!(
+            report.xp_gained, 0,
+            "Zero elapsed time should produce no XP"
+        );
+        assert_eq!(
+            report.total_level_ups, 0,
+            "Zero elapsed time should produce no level ups"
+        );
+    }
+
+    #[test]
+    fn test_process_offline_progression_negative_elapsed_returns_default() {
+        let mut state = GameState::new("Negative Elapsed Test".to_string(), 0);
+
+        // Set last_save_time to the future (negative elapsed)
+        state.last_save_time = chrono::Utc::now().timestamp() + 3600;
+
+        let report = process_offline_progression(&mut state, 0.0);
+
+        assert_eq!(
+            report.xp_gained, 0,
+            "Negative elapsed time should produce no XP"
+        );
+        assert_eq!(
+            report.total_level_ups, 0,
+            "Negative elapsed time should produce no level ups"
+        );
+        assert_eq!(
+            report.elapsed_seconds, 0,
+            "Negative elapsed should report 0 elapsed seconds in default report"
+        );
+    }
+
+    #[test]
+    fn test_calculate_offline_xp_very_small_elapsed_produces_nonzero() {
+        // Even 1 second of offline time should produce some XP
+        let xp = calculate_offline_xp(1, 0, 0, 0, 0.0);
+
+        assert!(
+            xp > 0.0,
+            "1 second offline should produce non-zero XP, got {}",
+            xp
+        );
+    }
+
+    #[test]
+    fn test_last_save_time_sync_prevents_double_counting() {
+        let mut state = GameState::new("Double Count Test".to_string(), 0);
+
+        // Set last_save_time to 1 hour ago
+        state.last_save_time = chrono::Utc::now().timestamp() - 3600;
+
+        // First call: should process the full hour of offline time
+        let report1 = process_offline_progression(&mut state, 0.0);
+        assert!(
+            report1.xp_gained > 0,
+            "First call should gain XP from the 1-hour gap"
+        );
+
+        // Capture the updated last_save_time
+        let updated_save_time = state.last_save_time;
+        let now = chrono::Utc::now().timestamp();
+        assert!(
+            (updated_save_time - now).abs() <= 2,
+            "last_save_time should be synced to current time after first call"
+        );
+
+        // Second call immediately after: should gain zero or near-zero XP
+        // because last_save_time was just synced
+        let report2 = process_offline_progression(&mut state, 0.0);
+        assert!(
+            report2.xp_gained < report1.xp_gained / 100,
+            "Second immediate call should gain negligible XP (got {} vs first call {}), \
+             last_save_time sync should prevent double-counting",
+            report2.xp_gained,
+            report1.xp_gained
+        );
+    }
 }

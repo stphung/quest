@@ -40,6 +40,47 @@ use ui::character_select::CharacterSelectScreen;
 use ui::draw_ui_with_update;
 use utils::updater::UpdateInfo;
 
+/// Process offline XP and add combat log entries. Returns the report if XP was gained.
+fn apply_offline_xp(state: &mut GameState, haven: &haven::Haven) -> Option<OfflineReport> {
+    let haven_offline_bonus = haven.get_bonus(haven::HavenBonusType::OfflineXpPercent);
+    let report = process_offline_progression(state, haven_offline_bonus);
+    if report.xp_gained > 0 {
+        let hours = report.elapsed_seconds / 3600;
+        let minutes = (report.elapsed_seconds % 3600) / 60;
+        let away_str = if hours > 0 {
+            format!("{}h {}m", hours, minutes)
+        } else {
+            format!("{}m", minutes)
+        };
+        state.combat_state.add_log_entry(
+            format!("☀️ Welcome back! ({} away)", away_str),
+            false,
+            true,
+        );
+        state.combat_state.add_log_entry(
+            format!(
+                "⚔️ +{} XP gained offline",
+                ui::game_common::format_number_short(report.xp_gained)
+            ),
+            false,
+            true,
+        );
+        if report.total_level_ups > 0 {
+            state.combat_state.add_log_entry(
+                format!(
+                    "📈 Leveled up {} times! ({} → {})",
+                    report.total_level_ups, report.level_before, report.level_after,
+                ),
+                false,
+                true,
+            );
+        }
+        Some(report)
+    } else {
+        None
+    }
+}
+
 enum Screen {
     CharacterSelect,
     CharacterCreation,
@@ -128,7 +169,6 @@ fn main() -> io::Result<()> {
     let mut rename_screen = CharacterRenameScreen::new();
     let mut game_state: Option<GameState> = None;
     let mut pending_offline_report: Option<core::game_logic::OfflineReport> = None;
-    let mut pending_haven_offline_bonus: Option<f64> = None;
 
     let mut haven_ui = HavenUiState::new();
     let mut achievement_browser = AchievementBrowserState::new();
@@ -441,52 +481,9 @@ fn main() -> io::Result<()> {
                                         let elapsed_seconds = current_time - state.last_save_time;
 
                                         if elapsed_seconds > 60 {
-                                            let haven_offline_bonus = haven
-                                                .get_bonus(haven::HavenBonusType::OfflineXpPercent);
-                                            let report = process_offline_progression(
-                                                &mut state,
-                                                haven_offline_bonus,
-                                            );
-                                            if report.xp_gained > 0 {
-                                                // Enhanced combat log entries
-                                                let hours = report.elapsed_seconds / 3600;
-                                                let minutes = (report.elapsed_seconds % 3600) / 60;
-                                                let away_str = if hours > 0 {
-                                                    format!("{}h {}m", hours, minutes)
-                                                } else {
-                                                    format!("{}m", minutes)
-                                                };
-                                                state.combat_state.add_log_entry(
-                                                    format!("☀️ Welcome back! ({} away)", away_str),
-                                                    false,
-                                                    true,
-                                                );
-                                                state.combat_state.add_log_entry(
-                                                    format!(
-                                                        "⚔️ +{} XP gained offline",
-                                                        ui::game_common::format_number_short(
-                                                            report.xp_gained
-                                                        )
-                                                    ),
-                                                    false,
-                                                    true,
-                                                );
-                                                if report.total_level_ups > 0 {
-                                                    state.combat_state.add_log_entry(
-                                                        format!(
-                                                            "📈 Leveled up {} times! ({} → {})",
-                                                            report.total_level_ups,
-                                                            report.level_before,
-                                                            report.level_after,
-                                                        ),
-                                                        false,
-                                                        true,
-                                                    );
-                                                }
-
-                                                // Store report and haven bonus for welcome overlay
-                                                pending_haven_offline_bonus =
-                                                    Some(haven_offline_bonus);
+                                            if let Some(report) =
+                                                apply_offline_xp(&mut state, &haven)
+                                            {
                                                 pending_offline_report = Some(report);
                                             }
                                         }
@@ -632,8 +629,6 @@ fn main() -> io::Result<()> {
                 let mut next_update_check_interval = jittered_update_interval();
                 let mut tick_counter: u32 = 0;
                 let mut overlay = if let Some(report) = pending_offline_report.take() {
-                    // Haven bonus already included in report from process_offline_progression
-                    let _ = pending_haven_offline_bonus.take(); // Clear unused bonus
                     GameOverlay::OfflineWelcome { report }
                 } else {
                     GameOverlay::None
@@ -706,7 +701,7 @@ fn main() -> io::Result<()> {
                                 frame,
                                 frame.size(),
                                 &state,
-                                haven.vault_tier(),
+                                haven.get_bonus(haven::HavenBonusType::VaultSlots) as u8,
                                 selected_index,
                                 selected_slots,
                             );
@@ -875,6 +870,36 @@ fn main() -> io::Result<()> {
                         }
                     }
 
+                    // Detect process suspension (laptop lid close/open).
+                    // Compare wall-clock time against last_save_time to detect
+                    // time gaps from OS-level process suspension (SIGTSTP/SIGSTOP).
+                    // Autosave runs every 30s and syncs last_save_time, so a gap
+                    // > 60s means the process was suspended.
+                    {
+                        let elapsed_since_save = Utc::now().timestamp() - state.last_save_time;
+                        if elapsed_since_save > 60
+                            && !matches!(overlay, GameOverlay::OfflineWelcome { .. })
+                        {
+                            if let Some(report) = apply_offline_xp(&mut state, &haven) {
+                                overlay = GameOverlay::OfflineWelcome { report };
+                            }
+                            // Reset tick timers to prevent stale Instant from
+                            // causing a burst of catch-up ticks or immediate autosave
+                            last_tick = Instant::now();
+                            last_autosave = Instant::now();
+                            // Immediate save with updated last_save_time
+                            if !debug_mode {
+                                character_manager.save_character(&state)?;
+                                if haven.discovered {
+                                    haven::save_haven(&haven).ok();
+                                }
+                                achievements::save_achievements(&global_achievements).ok();
+                                last_save_instant = Some(Instant::now());
+                                last_save_time = Some(Local::now());
+                            }
+                        }
+                    }
+
                     // Game tick every 100ms
                     if last_tick.elapsed() >= Duration::from_millis(TICK_INTERVAL_MS) {
                         if !matches!(overlay, GameOverlay::LeviathanEncounter { .. }) {
@@ -934,6 +959,9 @@ fn main() -> io::Result<()> {
                         && last_autosave.elapsed() >= Duration::from_secs(AUTOSAVE_INTERVAL_SECONDS)
                     {
                         character_manager.save_character(&state)?;
+                        // Sync in-memory last_save_time so suspension detection
+                        // only counts actual suspension time, not active play time
+                        state.last_save_time = Utc::now().timestamp();
                         // Only save Haven if it has been discovered
                         if haven.discovered {
                             haven::save_haven(&haven)?;
