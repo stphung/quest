@@ -149,7 +149,6 @@ impl MorrisDifficulty {
 pub enum MorrisResult {
     Win,
     Loss,
-    Forfeit,
 }
 
 /// Game phase in Nine Men's Morris
@@ -705,7 +704,6 @@ mod tests {
     fn test_morris_result_variants() {
         assert_eq!(MorrisResult::Win, MorrisResult::Win);
         assert_eq!(MorrisResult::Loss, MorrisResult::Loss);
-        assert_eq!(MorrisResult::Forfeit, MorrisResult::Forfeit);
         assert_ne!(MorrisResult::Win, MorrisResult::Loss);
     }
 

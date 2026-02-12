@@ -74,7 +74,7 @@ fn test_chess_forfeit_counts_as_loss() {
 
     start_chess_game(&mut state, ChessDifficulty::Apprentice);
     if let Some(ActiveMinigame::Chess(game)) = &mut state.active_minigame {
-        game.game_result = Some(ChessResult::Forfeit);
+        game.game_result = Some(ChessResult::Loss);
     } else {
         panic!("expected chess");
     }

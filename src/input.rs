@@ -524,7 +524,7 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
                     KeyCode::Left => ChessInput::Left,
                     KeyCode::Right => ChessInput::Right,
                     KeyCode::Enter => ChessInput::Select,
-                    KeyCode::Esc => ChessInput::Cancel,
+                    KeyCode::Esc => ChessInput::Forfeit,
                     _ => ChessInput::Other,
                 };
                 process_chess_input(chess_game, input);
@@ -540,7 +540,7 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
                     KeyCode::Left => MorrisInput::Left,
                     KeyCode::Right => MorrisInput::Right,
                     KeyCode::Enter => MorrisInput::Select,
-                    KeyCode::Esc => MorrisInput::Cancel,
+                    KeyCode::Esc => MorrisInput::Forfeit,
                     _ => MorrisInput::Other,
                 };
                 process_morris_input(morris_game, input);

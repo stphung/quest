@@ -13,8 +13,8 @@ pub enum ChessInput {
     Down,
     Left,
     Right,
-    Select, // Enter - select piece or move
-    Cancel, // Esc - clear selection or forfeit
+    Select,  // Enter - select piece or move
+    Forfeit, // Esc - clear selection or forfeit
     Other,
 }
 
@@ -35,7 +35,7 @@ pub fn process_input(game: &mut ChessGame, input: ChessInput) -> bool {
         ChessInput::Select => {
             process_select(game);
         }
-        ChessInput::Cancel => {
+        ChessInput::Forfeit => {
             process_cancel(game);
         }
         ChessInput::Other => {
@@ -68,7 +68,7 @@ fn process_select(game: &mut ChessGame) {
 /// Process Esc key: clear selection or initiate/confirm forfeit.
 fn process_cancel(game: &mut ChessGame) {
     if game.forfeit_pending {
-        game.game_result = Some(ChessResult::Forfeit);
+        game.game_result = Some(ChessResult::Loss);
     } else if game.selected_square.is_some() {
         game.clear_selection();
         game.forfeit_pending = false;
@@ -124,10 +124,10 @@ pub fn apply_move_to_board(
     }
 }
 
-/// Process AI thinking tick, returns true if AI made a move
-pub fn process_ai_thinking<R: Rng>(game: &mut ChessGame, rng: &mut R) -> bool {
+/// Process AI thinking tick.
+pub fn process_ai_thinking<R: Rng>(game: &mut ChessGame, rng: &mut R) {
     if !game.ai_thinking {
-        return false;
+        return;
     }
 
     game.ai_think_ticks += 1;
@@ -163,10 +163,7 @@ pub fn process_ai_thinking<R: Rng>(game: &mut ChessGame, rng: &mut R) -> bool {
         game.ai_thinking = false;
         game.ai_think_ticks = 0;
         check_game_over(game);
-        return true;
     }
-
-    false
 }
 
 /// Extract from/to squares from a Move
@@ -247,13 +244,6 @@ pub fn apply_game_result(state: &mut GameState) -> Option<crate::challenges::Min
             (
                 false,
                 "The mysterious figure nods respectfully and vanishes.",
-            )
-        }
-        ChessResult::Forfeit => {
-            state.chess_stats.games_lost += 1;
-            (
-                false,
-                "You concede the game. The figure disappears without a word.",
             )
         }
         ChessResult::Draw => {
@@ -496,7 +486,7 @@ mod tests {
         state.prestige_rank = 5;
 
         let mut game = ChessGame::new(ChessDifficulty::Novice);
-        game.game_result = Some(ChessResult::Forfeit);
+        game.game_result = Some(ChessResult::Loss);
         state.active_minigame = Some(ActiveMinigame::Chess(Box::new(game)));
 
         let processed = apply_game_result(&mut state);
@@ -567,7 +557,7 @@ mod tests {
         assert!(game.selected_square.is_some());
 
         // Cancel should clear selection
-        process_input(&mut game, ChessInput::Cancel);
+        process_input(&mut game, ChessInput::Forfeit);
 
         assert!(game.selected_square.is_none());
         assert!(!game.forfeit_pending);
@@ -578,7 +568,7 @@ mod tests {
         let mut game = ChessGame::new(ChessDifficulty::Novice);
 
         // No piece selected, first Esc sets pending
-        process_input(&mut game, ChessInput::Cancel);
+        process_input(&mut game, ChessInput::Forfeit);
 
         assert!(game.forfeit_pending);
         assert!(game.game_result.is_none());
@@ -589,13 +579,13 @@ mod tests {
         let mut game = ChessGame::new(ChessDifficulty::Novice);
 
         // First Esc sets pending
-        process_input(&mut game, ChessInput::Cancel);
+        process_input(&mut game, ChessInput::Forfeit);
         assert!(game.forfeit_pending);
 
         // Second Esc confirms forfeit
-        process_input(&mut game, ChessInput::Cancel);
+        process_input(&mut game, ChessInput::Forfeit);
 
-        assert_eq!(game.game_result, Some(ChessResult::Forfeit));
+        assert_eq!(game.game_result, Some(ChessResult::Loss));
     }
 
     #[test]
@@ -603,7 +593,7 @@ mod tests {
         let mut game = ChessGame::new(ChessDifficulty::Novice);
 
         // First Esc sets pending
-        process_input(&mut game, ChessInput::Cancel);
+        process_input(&mut game, ChessInput::Forfeit);
         assert!(game.forfeit_pending);
 
         // Any other key cancels forfeit

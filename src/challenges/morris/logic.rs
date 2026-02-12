@@ -30,8 +30,8 @@ pub enum MorrisInput {
     Down,
     Left,
     Right,
-    Select, // Enter - select piece, place, move, or capture
-    Cancel, // Esc - clear selection or forfeit
+    Select,  // Enter - select piece, place, move, or capture
+    Forfeit, // Esc - clear selection or forfeit
     Other,
 }
 
@@ -52,7 +52,7 @@ pub fn process_input(game: &mut MorrisGame, input: MorrisInput) -> bool {
         MorrisInput::Select => {
             process_human_enter(game);
         }
-        MorrisInput::Cancel => {
+        MorrisInput::Forfeit => {
             process_cancel(game);
         }
         MorrisInput::Other => {
@@ -66,7 +66,7 @@ pub fn process_input(game: &mut MorrisGame, input: MorrisInput) -> bool {
 /// Process Esc key: clear selection or initiate/confirm forfeit.
 fn process_cancel(game: &mut MorrisGame) {
     if game.forfeit_pending {
-        game.game_result = Some(MorrisResult::Forfeit);
+        game.game_result = Some(MorrisResult::Loss);
     } else if game.selected_position.is_some() {
         game.clear_selection();
         game.forfeit_pending = false;
@@ -502,10 +502,10 @@ fn check_win_condition(game: &mut MorrisGame) {
     }
 }
 
-/// Process AI thinking tick, returns true if AI made a move
-pub fn process_ai_thinking<R: Rng>(game: &mut MorrisGame, rng: &mut R) -> bool {
+/// Process AI thinking tick.
+pub fn process_ai_thinking<R: Rng>(game: &mut MorrisGame, rng: &mut R) {
     if !game.ai_thinking {
-        return false;
+        return;
     }
 
     game.ai_think_ticks += 1;
@@ -526,15 +526,12 @@ pub fn process_ai_thinking<R: Rng>(game: &mut MorrisGame, rng: &mut R) -> bool {
         if game.must_capture && game.current_player == Player::Ai {
             game.ai_think_ticks = 0;
             game.ai_pending_move = None; // Will compute capture on next tick
-            return true;
+            return;
         }
 
         game.ai_thinking = false;
         game.ai_think_ticks = 0;
-        return true;
     }
-
-    false
 }
 
 /// Calculate variable AI thinking time in ticks (1-3 seconds at 100ms/tick)
@@ -634,7 +631,6 @@ fn evaluate_board(game: &MorrisGame) -> i32 {
         return match result {
             MorrisResult::Win => -10000, // Human wins = bad for AI
             MorrisResult::Loss => 10000, // Human loses = good for AI
-            MorrisResult::Forfeit => 10000,
         };
     }
 
@@ -747,10 +743,16 @@ pub fn apply_game_result(state: &mut GameState) -> Option<crate::challenges::Min
     let difficulty = game.difficulty;
     let reward = difficulty.reward();
 
+    let forfeit = game.forfeit_pending;
     let (won, loss_message) = match result {
         MorrisResult::Win => (true, ""),
-        MorrisResult::Loss => (false, "The sage nods knowingly and departs."),
-        MorrisResult::Forfeit => (false, "You concede. The sage gathers their stones quietly."),
+        MorrisResult::Loss => {
+            if forfeit {
+                (false, "You concede. The sage gathers their stones quietly.")
+            } else {
+                (false, "The sage nods knowingly and departs.")
+            }
+        }
     };
 
     apply_challenge_rewards(
@@ -1285,7 +1287,8 @@ mod tests {
         let mut state = GameState::new("Test".to_string(), 0);
 
         let mut game = MorrisGame::new(MorrisDifficulty::Novice);
-        game.game_result = Some(MorrisResult::Forfeit);
+        game.game_result = Some(MorrisResult::Loss);
+        game.forfeit_pending = true;
         state.active_minigame = Some(ActiveMinigame::Morris(game));
 
         let old_xp = state.character_xp;
@@ -1384,9 +1387,10 @@ mod tests {
         game.ai_thinking = false;
         let mut rng = rand::thread_rng();
 
-        let moved = process_ai_thinking(&mut game, &mut rng);
+        process_ai_thinking(&mut game, &mut rng);
 
-        assert!(!moved);
+        // Should remain not thinking
+        assert!(!game.ai_thinking);
     }
 
     #[test]
@@ -1399,9 +1403,9 @@ mod tests {
         let mut rng = rand::thread_rng();
 
         // First tick should compute the move
-        let moved = process_ai_thinking(&mut game, &mut rng);
+        process_ai_thinking(&mut game, &mut rng);
 
-        assert!(!moved); // Should not have applied yet
+        assert!(game.ai_thinking); // Should still be thinking (waiting for delay)
         assert!(game.ai_pending_move.is_some());
         assert!(game.ai_think_target >= 10);
     }
@@ -1548,7 +1552,7 @@ mod tests {
         let mut game = MorrisGame::new(MorrisDifficulty::Novice);
         assert!(!game.forfeit_pending);
 
-        process_input(&mut game, MorrisInput::Cancel);
+        process_input(&mut game, MorrisInput::Forfeit);
 
         assert!(game.forfeit_pending);
     }
@@ -1558,9 +1562,9 @@ mod tests {
         let mut game = MorrisGame::new(MorrisDifficulty::Novice);
         game.forfeit_pending = true;
 
-        process_input(&mut game, MorrisInput::Cancel);
+        process_input(&mut game, MorrisInput::Forfeit);
 
-        assert_eq!(game.game_result, Some(MorrisResult::Forfeit));
+        assert_eq!(game.game_result, Some(MorrisResult::Loss));
     }
 
     #[test]
@@ -1569,7 +1573,7 @@ mod tests {
         game.phase = MorrisPhase::Moving;
         game.selected_position = Some(5);
 
-        process_input(&mut game, MorrisInput::Cancel);
+        process_input(&mut game, MorrisInput::Forfeit);
 
         // Should clear selection, not initiate forfeit
         assert!(game.selected_position.is_none());
@@ -1605,7 +1609,7 @@ mod tests {
         assert!(process_input(&mut game, MorrisInput::Select));
 
         let mut game = MorrisGame::new(MorrisDifficulty::Novice);
-        assert!(process_input(&mut game, MorrisInput::Cancel));
+        assert!(process_input(&mut game, MorrisInput::Forfeit));
 
         let mut game = MorrisGame::new(MorrisDifficulty::Novice);
         assert!(process_input(&mut game, MorrisInput::Other));
