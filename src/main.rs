@@ -782,6 +782,7 @@ fn main() -> io::Result<()> {
                     GameOverlay::None
                 };
                 let mut debug_menu = utils::debug_menu::DebugMenu::new();
+                let mut last_flappy_frame = Instant::now();
 
                 // Save indicator state (for non-debug mode)
                 let mut last_save_instant: Option<Instant> = None;
@@ -794,7 +795,7 @@ fn main() -> io::Result<()> {
                 let mut update_check_handle: Option<std::thread::JoinHandle<Option<UpdateInfo>>> =
                     Some(std::thread::spawn(utils::updater::check_update_info));
 
-                loop {
+                'game_loop: loop {
                     // Check if background update check completed
                     if let Some(handle) = update_check_handle.take() {
                         if handle.is_finished() {
@@ -833,11 +834,22 @@ fn main() -> io::Result<()> {
                         );
                     })?;
 
-                    // Poll for input (50ms non-blocking)
-                    if event::poll(Duration::from_millis(50))? {
+                    // Adaptive polling: non-blocking drain in realtime mode, 50ms block otherwise
+                    let realtime_mode = is_realtime_minigame(&state);
+                    let poll_duration = if realtime_mode {
+                        Duration::ZERO
+                    } else {
+                        Duration::from_millis(50)
+                    };
+
+                    // Drain all available events (critical for responsive input at 30+ FPS)
+                    while event::poll(poll_duration)? {
                         if let Event::Key(key_event) = event::read()? {
                             // Only handle key press events (ignore release/repeat)
                             if key_event.kind != KeyEventKind::Press {
+                                if !realtime_mode {
+                                    break;
+                                }
                                 continue;
                             }
                             // Track prestige rank before input to detect prestige
@@ -873,7 +885,7 @@ fn main() -> io::Result<()> {
                                     }
                                     game_state = None;
                                     current_screen = Screen::CharacterSelect;
-                                    break;
+                                    break 'game_loop;
                                 }
                                 InputResult::NeedsSave => {
                                     if !debug_mode {
@@ -897,6 +909,26 @@ fn main() -> io::Result<()> {
                                     update_expanded = !update_expanded;
                                 }
                             }
+                        }
+                        // Normal mode: process one event per frame. Realtime: drain all.
+                        if !realtime_mode {
+                            break;
+                        }
+                    }
+
+                    // Flappy Bird real-time tick (~30 FPS)
+                    if realtime_mode {
+                        let dt = last_flappy_frame.elapsed();
+                        if dt >= Duration::from_millis(REALTIME_FRAME_MS) {
+                            if let Some(challenges::ActiveMinigame::FlappyBird(ref mut game)) =
+                                state.active_minigame
+                            {
+                                challenges::flappy::logic::tick_flappy_bird(
+                                    game,
+                                    dt.as_millis() as u64,
+                                );
+                            }
+                            last_flappy_frame = Instant::now();
                         }
                     }
 
@@ -1027,4 +1059,12 @@ fn main() -> io::Result<()> {
     println!("Goodbye!");
 
     Ok(())
+}
+
+/// Returns true if the active minigame requires real-time (high FPS) updates.
+fn is_realtime_minigame(state: &GameState) -> bool {
+    matches!(
+        state.active_minigame,
+        Some(challenges::ActiveMinigame::FlappyBird(_))
+    )
 }

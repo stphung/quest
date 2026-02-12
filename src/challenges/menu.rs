@@ -5,6 +5,7 @@
 //! table determines which challenge type appears.
 
 use super::chess::{ChessDifficulty, ChessGame};
+use super::flappy::{FlappyBirdDifficulty, FlappyBirdGame};
 use super::go::{GoDifficulty, GoGame};
 use super::gomoku::{GomokuDifficulty, GomokuGame};
 use super::minesweeper::{MinesweeperDifficulty, MinesweeperGame};
@@ -91,6 +92,10 @@ fn accept_selected_challenge(state: &mut GameState) {
             ChallengeType::Go => {
                 let d = GoDifficulty::from_index(difficulty_index);
                 ActiveMinigame::Go(GoGame::new(d))
+            }
+            ChallengeType::FlappyBird => {
+                let d = FlappyBirdDifficulty::from_index(difficulty_index);
+                ActiveMinigame::FlappyBird(FlappyBirdGame::new(d))
             }
         };
         state.active_minigame = Some(minigame);
@@ -356,12 +361,16 @@ const CHALLENGE_TABLE: &[ChallengeWeight] = &[
         weight: 15, // ~14% - less common
     },
     ChallengeWeight {
+        challenge_type: ChallengeType::FlappyBird,
+        weight: 20, // ~15% - moderate, action game novelty
+    },
+    ChallengeWeight {
         challenge_type: ChallengeType::Chess,
-        weight: 10, // ~9% - rare complex strategy
+        weight: 10, // ~8% - rare complex strategy
     },
     ChallengeWeight {
         challenge_type: ChallengeType::Go,
-        weight: 10, // ~9% - rare complex strategy
+        weight: 10, // ~8% - rare complex strategy
     },
 ];
 
@@ -378,6 +387,7 @@ pub struct PendingChallenge {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ChallengeType {
     Chess,
+    FlappyBird,
     Morris,
     Gomoku,
     Minesweeper,
@@ -390,6 +400,7 @@ impl ChallengeType {
     pub fn icon(&self) -> &'static str {
         match self {
             ChallengeType::Chess => "♟",
+            ChallengeType::FlappyBird => ">",
             ChallengeType::Morris => "\u{25CB}", // ○
             ChallengeType::Gomoku => "◎",
             ChallengeType::Minesweeper => "\u{26A0}", // ⚠
@@ -402,6 +413,7 @@ impl ChallengeType {
     pub fn discovery_flavor(&self) -> &'static str {
         match self {
             ChallengeType::Chess => "A mysterious figure steps from the shadows...",
+            ChallengeType::FlappyBird => "A tiny clockwork bird whirs to life on a nearby ledge...",
             ChallengeType::Morris => "A cloaked stranger approaches with a weathered board...",
             ChallengeType::Gomoku => "A wandering strategist places a worn board before you...",
             ChallengeType::Minesweeper => {
@@ -606,6 +618,17 @@ pub fn create_challenge(ct: &ChallengeType) -> PendingChallenge {
                 false leads. Prove your logic worthy of ancient knowledge.'"
                 .to_string(),
         },
+        ChallengeType::FlappyBird => PendingChallenge {
+            challenge_type: ChallengeType::FlappyBird,
+            title: "Skyward Gauntlet".to_string(),
+            icon: ">",
+            description: "A tiny clockwork bird sits on a moss-covered ledge, its brass wings \
+                twitching. As you approach, it springs to life, darting between a series of \
+                crumbling stone pillars. A runic inscription glows beneath it: \"Guide the \
+                Skyward Vessel through the gauntlet. Prove your reflexes worthy of a true \
+                adventurer.\" The bird hovers expectantly, waiting for your command."
+                .to_string(),
+        },
         ChallengeType::Go => PendingChallenge {
             challenge_type: ChallengeType::Go,
             title: "Go: Territory Control".to_string(),
@@ -638,6 +661,7 @@ mod tests {
     #[test]
     fn test_challenge_type_icon_returns_non_empty() {
         assert!(!ChallengeType::Chess.icon().is_empty());
+        assert!(!ChallengeType::FlappyBird.icon().is_empty());
         assert!(!ChallengeType::Morris.icon().is_empty());
         assert!(!ChallengeType::Gomoku.icon().is_empty());
         assert!(!ChallengeType::Minesweeper.icon().is_empty());
@@ -648,6 +672,7 @@ mod tests {
     #[test]
     fn test_challenge_type_discovery_flavor_returns_non_empty() {
         assert!(!ChallengeType::Chess.discovery_flavor().is_empty());
+        assert!(!ChallengeType::FlappyBird.discovery_flavor().is_empty());
         assert!(!ChallengeType::Morris.discovery_flavor().is_empty());
         assert!(!ChallengeType::Gomoku.discovery_flavor().is_empty());
         assert!(!ChallengeType::Minesweeper.discovery_flavor().is_empty());
@@ -659,6 +684,7 @@ mod tests {
     fn test_challenge_type_icons_are_unique() {
         let icons = [
             ChallengeType::Chess.icon(),
+            ChallengeType::FlappyBird.icon(),
             ChallengeType::Morris.icon(),
             ChallengeType::Gomoku.icon(),
             ChallengeType::Minesweeper.icon(),
@@ -1100,13 +1126,14 @@ mod tests {
     #[test]
     fn test_difficulty_str_all_types() {
         use super::super::chess::ChessDifficulty;
+        use super::super::flappy::FlappyBirdDifficulty;
         use super::super::go::GoDifficulty;
         use super::super::gomoku::GomokuDifficulty;
         use super::super::minesweeper::MinesweeperDifficulty;
         use super::super::morris::MorrisDifficulty;
         use super::super::rune::RuneDifficulty;
 
-        // Verify all 6 difficulty types produce correct lowercase strings
+        // Verify all 7 difficulty types produce correct lowercase strings
         for (i, expected) in ["novice", "apprentice", "journeyman", "master"]
             .iter()
             .enumerate()
@@ -1117,6 +1144,7 @@ mod tests {
             assert_eq!(MinesweeperDifficulty::ALL[i].difficulty_str(), *expected);
             assert_eq!(RuneDifficulty::ALL[i].difficulty_str(), *expected);
             assert_eq!(GoDifficulty::ALL[i].difficulty_str(), *expected);
+            assert_eq!(FlappyBirdDifficulty::ALL[i].difficulty_str(), *expected);
         }
     }
 }

@@ -5,6 +5,10 @@
 use crate::challenges::chess::logic::{
     apply_game_result as apply_chess_result, process_input as process_chess_input, ChessInput,
 };
+use crate::challenges::flappy::logic::{
+    apply_game_result as apply_flappy_result, process_input as process_flappy_input,
+    FlappyBirdInput,
+};
 use crate::challenges::go::{apply_go_result, process_input as process_go_input, GoInput};
 use crate::challenges::gomoku::logic::{
     apply_game_result as apply_gomoku_result, process_input as process_gomoku_input, GomokuInput,
@@ -563,6 +567,18 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
                     _ => GoInput::Other,
                 };
                 process_go_input(go_game, input);
+            }
+            ActiveMinigame::FlappyBird(flappy_game) => {
+                if flappy_game.game_result.is_some() {
+                    state.last_minigame_win = apply_flappy_result(state);
+                    return InputResult::Continue;
+                }
+                let input = match key.code {
+                    KeyCode::Char(' ') | KeyCode::Up => FlappyBirdInput::Flap,
+                    KeyCode::Esc => FlappyBirdInput::Forfeit,
+                    _ => FlappyBirdInput::Other,
+                };
+                process_flappy_input(flappy_game, input);
             }
         }
     }
