@@ -934,4 +934,4 @@ Each major module has its own `CLAUDE.md` with implementation patterns, integrat
 
 ---
 
-*This document consolidates the design specifications from `docs/design/`. For historical design decisions and rationale, see `docs/DECISIONS.md`.*
+*For detailed per-system design docs, see the companion files in `docs/`. For historical design decisions and rationale, see `docs/DECISIONS.md`.*
