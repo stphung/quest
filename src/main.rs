@@ -877,30 +877,47 @@ fn main() -> io::Result<()> {
 
                     // Game tick every 100ms
                     if last_tick.elapsed() >= Duration::from_millis(TICK_INTERVAL_MS) {
-                        // Skip game ticks while Leviathan modal is showing
                         if !matches!(overlay, GameOverlay::LeviathanEncounter { .. }) {
-                            let tick_result = game_tick(
+                            let mut rng = rand::thread_rng();
+                            let tick_result = core::tick::game_tick(
                                 &mut state,
                                 &mut tick_counter,
                                 &mut haven,
                                 &mut global_achievements,
                                 debug_mode,
+                                &mut rng,
                             );
 
-                            // Show Leviathan encounter modal if one occurred
+                            let haven_discovered =
+                                apply_tick_events(&mut state, &tick_result.events);
+
+                            // Update visual effect lifetimes
+                            let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
+                            state
+                                .combat_state
+                                .visual_effects
+                                .retain_mut(|effect| effect.update(delta_time));
+
+                            // Persist achievements if changed
+                            if tick_result.achievements_changed && !debug_mode {
+                                if let Err(e) =
+                                    achievements::save_achievements(&global_achievements)
+                                {
+                                    eprintln!("Failed to save achievements: {}", e);
+                                }
+                            }
+
                             if let Some(encounter_number) = tick_result.leviathan_encounter {
                                 overlay = GameOverlay::LeviathanEncounter { encounter_number };
                             }
 
-                            // Haven was discovered — save and show overlay
                             if tick_result.haven_changed && !debug_mode {
                                 haven::save_haven(&haven).ok();
                             }
-                            if tick_result.haven_discovered {
+                            if haven_discovered {
                                 overlay = GameOverlay::HavenDiscovery;
                             }
 
-                            // Show achievement modal if ready (only when no overlay active)
                             if matches!(overlay, GameOverlay::None)
                                 && !tick_result.achievement_modal_ready.is_empty()
                             {
@@ -954,43 +971,12 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-/// Result of the main.rs game_tick bridge function.
-struct BridgeTickResult {
-    /// Storm Leviathan encounter number (1-10), if one occurred.
-    leviathan_encounter: Option<u8>,
-    /// True if Haven state was modified and should be persisted.
-    haven_changed: bool,
-    /// True if the Haven was just discovered this tick.
-    haven_discovered: bool,
-    /// Achievement IDs ready to be shown in a modal overlay.
-    achievement_modal_ready: Vec<achievements::AchievementId>,
-}
-
-/// Processes a single game tick, updating combat and stats.
-/// Maps TickEvents to combat log entries and visual effects.
-fn game_tick(
-    game_state: &mut GameState,
-    tick_counter: &mut u32,
-    haven: &mut haven::Haven,
-    global_achievements: &mut achievements::Achievements,
-    debug_mode: bool,
-) -> BridgeTickResult {
+/// Maps tick events to combat log entries and visual effects.
+/// Returns true if the HavenDiscovered event was present.
+fn apply_tick_events(game_state: &mut GameState, events: &[core::tick::TickEvent]) -> bool {
     use core::tick::TickEvent;
-
-    // Run the extracted game logic tick
-    let mut rng = rand::thread_rng();
-    let result = core::tick::game_tick(
-        game_state,
-        tick_counter,
-        haven,
-        global_achievements,
-        debug_mode,
-        &mut rng,
-    );
-
-    // Map TickEvents to UI mutations (combat log, visual effects, etc.)
     let mut haven_discovered = false;
-    for event in &result.events {
+    for event in events {
         match event {
             TickEvent::PlayerAttack {
                 damage,
@@ -1078,7 +1064,7 @@ fn game_tick(
                     .add_log_entry(message.clone(), false, true);
             }
             TickEvent::StormLeviathanCaught => {
-                // Achievement persistence handled below via achievements_changed flag
+                // Achievement persistence handled by achievements_changed flag at call site
             }
             TickEvent::ChallengeDiscovered {
                 message, follow_up, ..
@@ -1109,25 +1095,5 @@ fn game_tick(
             }
         }
     }
-
-    // Persist achievements to disk if any were unlocked
-    if result.achievements_changed && !debug_mode {
-        if let Err(e) = achievements::save_achievements(global_achievements) {
-            eprintln!("Failed to save achievements: {}", e);
-        }
-    }
-
-    // Update visual effects (UI-only, not part of game logic)
-    let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
-    game_state
-        .combat_state
-        .visual_effects
-        .retain_mut(|effect| effect.update(delta_time));
-
-    BridgeTickResult {
-        leviathan_encounter: result.leviathan_encounter,
-        haven_changed: result.haven_changed,
-        haven_discovered,
-        achievement_modal_ready: result.achievement_modal_ready,
-    }
+    haven_discovered
 }
