@@ -10,8 +10,8 @@ A random fishing minigame with persistent ranking that survives prestige. Provid
 
 ### Discovery and Sessions
 
-- **Discovery chance**: 5% per tick during overworld combat (not in dungeon/minigame)
-- **Mutual exclusivity**: Dungeon checked first, then fishing
+- **Discovery chance**: 5% per kill during overworld combat (not in dungeon/minigame)
+- **Mutual exclusivity**: Dungeon checked first, then fishing (both rolled inside `process_discoveries()` after each kill)
 - **Session length**: 3-8 fish (random)
 - **Automation**: Fully automatic, no player input required
 - **Session end**: "Fishing spot depleted" — returns to combat
@@ -242,13 +242,13 @@ The StormForge is the ultimate Haven room that enables forging the Stormbreaker 
 
 ### Bonus Injection
 
-Haven bonuses are passed as explicit parameters to game systems rather than accessed globally. This keeps modules decoupled. Bonuses are computed when a character is loaded, not recalculated every tick.
+Haven bonuses are passed as explicit parameters to game systems rather than accessed globally. This keeps modules decoupled. Bonuses are computed per-tick from the Haven state and passed into the relevant functions (e.g., `HavenCombatBonuses`, `HavenFishingBonuses`). Changes to Haven state are signaled via `TickResult.haven_changed`, and the presentation layer (main.rs) handles persistence.
 
 ## Achievement System
 
 ### Overview
 
-Account-level achievement system that persists across all characters. Stored in `~/.quest/achievements.json`.
+Account-level achievement system that persists across all characters. Stored in `~/.quest/achievements.json`. Achievement tracking is driven by `on_*` event handlers called from `tick.rs` during game processing. Newly unlocked achievements are emitted as `TickEvent::AchievementUnlocked` events and collected by `collect_achievement_events()`. The `achievements_changed` flag in `TickResult` signals when the file needs to be saved.
 
 ### Categories (5)
 

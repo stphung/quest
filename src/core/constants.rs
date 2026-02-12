@@ -56,5 +56,8 @@ pub const HAVEN_MIN_PRESTIGE_RANK: u32 = 10;
 pub const BASE_MAX_FISHING_RANK: u32 = 30;
 pub const MAX_FISHING_RANK: u32 = 40;
 
+// Real-time minigame frame rate
+pub const REALTIME_FRAME_MS: u64 = 16; // ~60 FPS for action games
+
 // Zone progression
 pub const KILLS_FOR_BOSS: u32 = 10;

@@ -24,9 +24,18 @@ This document describes the 6 challenge minigames as implemented. All challenges
 
 All challenges use 4 difficulty levels: Novice, Apprentice, Journeyman, Master. Higher difficulties provide better rewards.
 
-### Forfeit Pattern
+### Forfeit Pattern (Standardized)
 
-All interactive minigames: first Esc sets `forfeit_pending`, second Esc confirms forfeit, any other key cancels.
+All interactive minigames use a consistent forfeit flow:
+1. First Esc press: sets `forfeit_pending = true`
+2. Second Esc press: confirms forfeit, sets game result to `Loss` (not a separate `Forfeit` variant)
+3. Any other key: cancels forfeit (`forfeit_pending = false`)
+4. UI uses `render_forfeit_status_bar()` from `game_common.rs` for consistent display
+5. The game-over overlay checks `forfeit_pending` on a `Loss` result to display "Forfeit" vs "Defeat"
+
+### AI Thinking Convention (Standardized)
+
+All games with AI opponents use `process_ai_thinking()` as the function name in their respective `logic.rs` files (not game-specific names like `process_go_ai` or `tick_chess`). This is called from `tick.rs` stage 1 (Challenge AI processing).
 
 ### Reward Summary
 

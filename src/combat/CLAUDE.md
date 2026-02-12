@@ -62,7 +62,8 @@ Enemies are generated based on the current zone/subzone:
 
 ## Integration Points
 
-- **Core** (`core/game_logic.rs`): Drives the combat tick, manages state transitions
+- **Core** (`core/tick.rs`): Drives the per-tick game loop including combat processing
+- **Core** (`core/game_logic.rs`): Enemy spawning, XP calculation, level-up logic
 - **Character** (`character/derived_stats.rs`): Player damage, defense, HP, crit stats
 - **Items** (`items/drops.rs`): Mob drops via `try_drop_from_mob()`, boss drops via `try_drop_from_boss()`
 - **Zones** (`zones/progression.rs`): Enemy generation parameters, boss definitions

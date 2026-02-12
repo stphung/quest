@@ -31,11 +31,11 @@ pub enum NewGameDifficulty {
     Master,
 }
 
-/// Game result
+/// Game result (forfeit maps to Loss, not a separate variant)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NewGameResult {
     Win,
-    Loss,
+    Loss,     // Also used for forfeits (UI checks forfeit_pending flag)
     Draw,     // Optional, if applicable
 }
 
@@ -60,7 +60,7 @@ pub struct NewGameGame {
 pub enum NewGameInput {
     Up, Down, Left, Right,
     Select,   // Enter
-    Cancel,   // Esc (also triggers forfeit)
+    Forfeit,  // Esc (triggers forfeit flow)
     Other,
 }
 
@@ -224,9 +224,13 @@ fn trigger_newgame_challenge(state: &mut GameState) -> &'static str {
 
 ### Forfeit Flow
 1. First Esc press: set `forfeit_pending = true`
-2. Second Esc: confirm forfeit, set result
+2. Second Esc: confirm forfeit, set result to `Loss` (not a separate Forfeit variant)
 3. Any other key: cancel forfeit (`forfeit_pending = false`)
 4. Use `render_forfeit_status_bar` for consistent UI
+5. UI checks `forfeit_pending` flag on Loss result to display "Forfeit" vs "Defeat"
+
+### AI Thinking
+All games with AI use a standardized `process_ai_thinking()` function name (not game-specific names like `process_go_ai`).
 
 ### Rewards (`ChallengeReward`)
 ```rust

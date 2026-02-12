@@ -113,3 +113,54 @@ Not all challenges are equally discoverable:
 **Decision**: Haven discovery uses its own RNG roll per tick, independent from challenge discovery.
 
 **Rationale**: Haven requires P10+ (much later than challenges at P1+). Sharing the RNG roll with challenges would mean Haven competes with challenge discovery, potentially delaying one or the other. Separate rolls mean a P10+ player can discover both Haven and challenges independently.
+
+## game_tick() Extraction to core/tick.rs
+
+**Decision**: Extract the per-tick orchestration function from main.rs into `src/core/tick.rs`, returning a `TickResult` struct with `Vec<TickEvent>` instead of mutating UI state directly.
+
+**Rationale**: The game loop was tightly coupled to the terminal UI — game logic called `add_log_entry()` and created `VisualEffect` objects directly. Extracting `game_tick()` into a pure-logic module enables:
+- Headless simulation (the `simulator` binary reuses the exact same function)
+- Testable game logic without terminal dependencies
+- Clear separation: tick.rs has zero `ui::` imports
+
+**Key choices**:
+- **Generic `<R: Rng>`** instead of `&mut dyn Rng` because `rand::Rng` is not dyn-compatible. Production passes `&mut thread_rng()`, tests use seeded `ChaCha8Rng`.
+- **Pre-formatted messages** in TickEvent variants (with unicode escapes) rather than raw data. The presentation layer uses them directly.
+- **`achievements_changed` / `haven_changed` flags** signal when IO (disk save) is needed, keeping file I/O in main.rs.
+- **Fishing early return**: fishing and combat are mutually exclusive within a tick (stage 5 returns early, skipping stages 6-7).
+
+## tick_events.rs Extraction from main.rs
+
+**Decision**: Extract the TickEvent-to-UI mapping code from main.rs into `src/tick_events.rs`.
+
+**Rationale**: After `game_tick()` returns a `TickResult`, main.rs still needed ~130 lines of match arms to convert `TickEvent` variants into combat log entries and visual effects. This bridge code is binary-only (not part of `lib.rs`) because it imports UI types (`VisualEffect`, `EffectType`). Extracting it into its own module keeps main.rs focused on the game loop, input handling, and screen management.
+
+## offline.rs Extraction from game_logic.rs
+
+**Decision**: Extract offline progression functions (`calculate_offline_xp`, `process_offline_progression`, `OfflineReport`) from `game_logic.rs` into `src/core/offline.rs`.
+
+**Rationale**: Offline progression is a self-contained subsystem with its own types and test suite. Extracting it reduces `game_logic.rs` size and makes the offline XP formula easier to find, test, and modify independently. Re-exports in `game_logic.rs` maintain backwards compatibility.
+
+## Challenge Standardization: Forfeit Pattern and AI Naming
+
+**Decision**: All interactive minigames use the same forfeit pattern (first Esc sets `forfeit_pending`, second Esc confirms, any other key cancels) and all AI games use `process_ai_thinking()` as the function name.
+
+**Rationale**: Before standardization, each minigame had slightly different forfeit handling and AI function names (e.g., `process_go_ai`, `tick_chess`). Consistent patterns make it easier to add new minigames — the `challenges/CLAUDE.md` checklist documents the exact template.
+
+## Debug Mode Autosave Fix: Always Sync last_save_time
+
+**Decision**: In the autosave timer, always sync `state.last_save_time = Utc::now().timestamp()` regardless of debug mode. Only skip the file I/O (`save_character()`, `save_haven()`) in debug mode.
+
+**Rationale**: Previously, debug mode skipped the entire autosave block, including the `last_save_time` sync. This caused the suspension detection system (which checks wall-clock time vs `last_save_time`) to false-trigger after ~60 seconds of debug play, showing an incorrect offline XP report. The fix separates the in-memory timestamp sync from the file I/O skip.
+
+## Headless Game Simulator for Balance Testing
+
+**Decision**: Add a `src/bin/simulator.rs` binary that runs the game tick loop headlessly, collecting metrics for game balance analysis.
+
+**Rationale**: Balance testing previously required playing the game manually or writing one-off test harnesses. The simulator reuses the exact same `game_tick()` function, ensuring perfect fidelity with the real game. It supports:
+- Configurable tick count, RNG seed, starting prestige
+- Multi-run aggregation with min/avg/max statistics
+- CSV time-series export for graphing progression curves
+- Verbose per-tick event logging for debugging
+
+This enables systematic balance validation: "does a P0 character reach Zone 2 in 1 hour?" or "what's the item drop distribution over 10,000 ticks across 100 seeds?"

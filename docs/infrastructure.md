@@ -120,6 +120,48 @@ All backups kept permanently. Manual cleanup by user.
 - `flate2` — Gzip decompression
 - `tar` — Tar archive extraction
 
+## Headless Game Simulator
+
+### Overview
+
+A separate binary (`src/bin/simulator.rs`) that runs the game tick loop without any UI, collecting metrics for game balance analysis. Uses the exact same `game_tick()` function as the real game, ensuring perfect fidelity.
+
+### Usage
+
+```bash
+cargo run --bin simulator -- [OPTIONS]
+```
+
+### Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--ticks N` | 36000 | Ticks to simulate (36000 = 1 hour game time) |
+| `--seed N` | 42 | RNG seed for reproducibility |
+| `--prestige N` | 0 | Starting prestige rank |
+| `--runs N` | 1 | Number of runs with incrementing seeds |
+| `--verbose` | off | Per-tick event logging |
+| `--csv FILE` | none | Write time-series CSV (snapshot every 100 ticks) |
+| `--quiet` | off | Only final summary line |
+
+### Tracked Metrics
+
+- Combat: kills, deaths, boss kills, crits, total XP
+- Items: drops by rarity, equipped count, boss drops
+- Progression: level milestones (tick at which each level was reached), zone entry times
+- Fishing: fish caught, rank-ups, final rank
+- Dungeons: discovered, completed, failed
+- Achievements: total unlocked, Haven discovery
+- Deaths per zone (for balance tuning)
+
+### Multi-Run Aggregation
+
+With `--runs N`, the simulator runs N simulations with incrementing seeds and produces an aggregate report with min/avg/max for all metrics, plus a final zone distribution across runs.
+
+### CSV Output
+
+The `--csv` option writes a time-series with columns: tick, game_time_s, level, xp, zone_id, subzone_id, prestige_rank, total_kills, total_deaths, fishing_rank, items_found. Useful for graphing progression curves.
+
 ## Debug Menu
 
 ### Activation
@@ -153,6 +195,20 @@ Each option calls existing generation functions to bypass the normal RNG discove
 
 Yellow border popup overlay, centered on screen. Matches challenge menu styling.
 
+### Debug Mode Behavior
+
+When `--debug` is active:
+- **Saves disabled**: File I/O (`save_character()`, `save_haven()`, `save_achievements()`) is skipped
+- **`last_save_time` always synced**: The in-memory `state.last_save_time = Utc::now().timestamp()` is updated every autosave cycle regardless of debug mode, preventing the suspension detection system from false-triggering
+- **Save signals suppressed**: `TickResult.achievements_changed` and `haven_changed` flags are suppressed in `tick.rs` when `debug_mode` is true
+
+### Suspension Detection
+
+The game detects OS-level process suspension (e.g., laptop lid close/open):
+- Autosave syncs `last_save_time` every 30 seconds
+- Each frame checks if `Utc::now() - last_save_time > 60s`
+- If gap detected: shows offline XP welcome screen (via `process_offline_progression()`), resets tick/autosave timers, and immediately saves
+
 ## Storage Layout
 
 ```
@@ -178,3 +234,4 @@ Yellow border popup overlay, centered on screen. Matches challenge menu styling.
 | chess-engine | 0.1 | Chess minigame AI |
 | ureq | - | HTTP client for auto-update |
 | flate2 / tar | - | Archive extraction for updates |
+| rand_chacha | - | Seedable RNG for simulator and tests |
