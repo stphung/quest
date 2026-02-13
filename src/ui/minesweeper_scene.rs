@@ -2,7 +2,7 @@
 
 use super::game_common::{
     create_game_layout, render_forfeit_status_bar, render_game_over_overlay,
-    render_info_panel_frame, render_status_bar, GameResultType,
+    render_info_panel_frame, render_minigame_too_small, render_status_bar, GameResultType,
 };
 use crate::challenges::minesweeper::{Cell, MinesweeperGame, MinesweeperResult};
 use ratatui::{
@@ -14,15 +14,27 @@ use ratatui::{
 };
 
 /// Render the minesweeper game scene.
-pub fn render_minesweeper(frame: &mut Frame, area: Rect, game: &MinesweeperGame) {
+pub fn render_minesweeper(
+    frame: &mut Frame,
+    area: Rect,
+    game: &MinesweeperGame,
+    ctx: &super::responsive::LayoutContext,
+) {
     // Game over overlay
     if game.game_result.is_some() {
         render_minesweeper_game_over(frame, area, game);
         return;
     }
 
+    const MIN_WIDTH: u16 = 22;
+    const MIN_HEIGHT: u16 = 13;
+    if area.width < MIN_WIDTH || area.height < MIN_HEIGHT {
+        render_minigame_too_small(frame, area, "Trap Detection", MIN_WIDTH, MIN_HEIGHT);
+        return;
+    }
+
     // Use shared layout
-    let layout = create_game_layout(frame, area, " Trap Detection ", Color::Yellow, 10, 24);
+    let layout = create_game_layout(frame, area, " Trap Detection ", Color::Yellow, 10, 24, ctx);
 
     render_grid(frame, layout.content, game);
     render_status_bar_content(frame, layout.status_bar, game);

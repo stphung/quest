@@ -12,6 +12,7 @@ pub struct DerivedStats {
     pub attack_speed_multiplier: f64,
     pub hp_regen_multiplier: f64,
     pub damage_reflection_percent: f64,
+    #[allow(dead_code)]
     pub xp_multiplier: f64,
 }
 

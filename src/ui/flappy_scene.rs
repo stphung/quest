@@ -5,7 +5,7 @@
 
 use super::game_common::{
     create_game_layout, render_forfeit_status_bar, render_game_over_overlay,
-    render_info_panel_frame, render_status_bar, GameResultType,
+    render_info_panel_frame, render_minigame_too_small, render_status_bar, GameResultType,
 };
 use crate::challenges::flappy::types::{
     FlappyBirdGame, FlappyBirdResult, BIRD_COL, GAME_HEIGHT, GAME_WIDTH, PIPE_WIDTH,
@@ -31,15 +31,35 @@ const GROUND_CHAR: char = '▓';
 const GROUND_SUB: char = '░';
 
 /// Render the Flappy Bird game scene.
-pub fn render_flappy_scene(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
+pub fn render_flappy_scene(
+    frame: &mut Frame,
+    area: Rect,
+    game: &FlappyBirdGame,
+    ctx: &super::responsive::LayoutContext,
+) {
     // Game over overlay takes priority
     if game.game_result.is_some() {
         render_flappy_game_over(frame, area, game);
         return;
     }
 
+    const MIN_WIDTH: u16 = 30;
+    const MIN_HEIGHT: u16 = 12;
+    if area.width < MIN_WIDTH || area.height < MIN_HEIGHT {
+        render_minigame_too_small(frame, area, "Skyward Gauntlet", MIN_WIDTH, MIN_HEIGHT);
+        return;
+    }
+
     // Create standardized layout
-    let layout = create_game_layout(frame, area, " Skyward Gauntlet ", Color::LightCyan, 15, 18);
+    let layout = create_game_layout(
+        frame,
+        area,
+        " Skyward Gauntlet ",
+        Color::LightCyan,
+        15,
+        18,
+        ctx,
+    );
 
     // Render the play field
     render_play_field(frame, layout.content, game);

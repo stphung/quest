@@ -87,6 +87,7 @@ pub fn render_achievement_browser(
     area: Rect,
     achievements: &Achievements,
     ui_state: &AchievementBrowserState,
+    _ctx: &super::responsive::LayoutContext,
 ) {
     frame.render_widget(Clear, area);
 
@@ -303,6 +304,7 @@ pub fn render_achievement_unlocked_modal(
     frame: &mut Frame,
     area: Rect,
     achievements: &[AchievementId],
+    _ctx: &super::responsive::LayoutContext,
 ) {
     if achievements.is_empty() {
         return;
@@ -310,21 +312,16 @@ pub fn render_achievement_unlocked_modal(
 
     let is_single = achievements.len() == 1;
     let modal_height = if is_single {
-        9 // Single achievement with description
+        9u16.min(area.height.saturating_sub(4))
     } else {
-        (6 + achievements.len()).min(20) as u16 // List format, capped at 20
+        ((6 + achievements.len()).min(20) as u16).min(area.height.saturating_sub(4))
     };
-    let modal_width = 50;
+    let modal_width = 50u16.min(area.width.saturating_sub(4));
 
     // Center the modal
     let x = area.x + (area.width.saturating_sub(modal_width)) / 2;
     let y = area.y + (area.height.saturating_sub(modal_height)) / 2;
-    let modal_area = Rect::new(
-        x,
-        y,
-        modal_width.min(area.width),
-        modal_height.min(area.height),
-    );
+    let modal_area = Rect::new(x, y, modal_width, modal_height);
 
     frame.render_widget(Clear, modal_area);
 

@@ -2,7 +2,8 @@
 
 use super::game_common::{
     create_game_layout, render_forfeit_status_bar, render_game_over_banner,
-    render_info_panel_frame, render_status_bar, render_thinking_status_bar, GameResultType,
+    render_info_panel_frame, render_minigame_too_small, render_status_bar,
+    render_thinking_status_bar, GameResultType,
 };
 use crate::challenges::gomoku::{GomokuGame, Player, BOARD_SIZE};
 use ratatui::{
@@ -14,15 +15,27 @@ use ratatui::{
 };
 
 /// Render the Gomoku game scene.
-pub fn render_gomoku_scene(frame: &mut Frame, area: Rect, game: &GomokuGame) {
+pub fn render_gomoku_scene(
+    frame: &mut Frame,
+    area: Rect,
+    game: &GomokuGame,
+    ctx: &super::responsive::LayoutContext,
+) {
     // Game over overlay
     if game.game_result.is_some() {
-        render_gomoku_game_over(frame, area, game);
+        render_gomoku_game_over(frame, area, game, ctx);
+        return;
+    }
+
+    const MIN_WIDTH: u16 = 31;
+    const MIN_HEIGHT: u16 = 18;
+    if area.width < MIN_WIDTH || area.height < MIN_HEIGHT {
+        render_minigame_too_small(frame, area, "Gomoku", MIN_WIDTH, MIN_HEIGHT);
         return;
     }
 
     // Use shared layout
-    let layout = create_game_layout(frame, area, " Gomoku ", Color::Cyan, 15, 22);
+    let layout = create_game_layout(frame, area, " Gomoku ", Color::Cyan, 15, 22, ctx);
 
     render_board(frame, layout.content, game);
     render_status_bar_content(frame, layout.status_bar, game);
@@ -201,7 +214,12 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &GomokuGame) {
     frame.render_widget(text, inner);
 }
 
-fn render_gomoku_game_over(frame: &mut Frame, area: Rect, game: &GomokuGame) {
+fn render_gomoku_game_over(
+    frame: &mut Frame,
+    area: Rect,
+    game: &GomokuGame,
+    ctx: &super::responsive::LayoutContext,
+) {
     use crate::challenges::menu::DifficultyInfo;
     use ratatui::widgets::Clear;
 
@@ -209,7 +227,7 @@ fn render_gomoku_game_over(frame: &mut Frame, area: Rect, game: &GomokuGame) {
     frame.render_widget(Clear, area);
 
     // Create layout matching normal game (but without status bar interaction)
-    let layout = create_game_layout(frame, area, " Gomoku ", Color::Cyan, 15, 22);
+    let layout = create_game_layout(frame, area, " Gomoku ", Color::Cyan, 15, 22, ctx);
 
     // Render board with winning line highlighted
     render_board_with_highlight(frame, layout.content, game, true);

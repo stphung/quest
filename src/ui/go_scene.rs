@@ -2,7 +2,8 @@
 
 use super::game_common::{
     create_game_layout, render_forfeit_status_bar, render_game_over_banner,
-    render_info_panel_frame, render_status_bar, render_thinking_status_bar, GameResultType,
+    render_info_panel_frame, render_minigame_too_small, render_status_bar,
+    render_thinking_status_bar, GameResultType,
 };
 use crate::challenges::go::{GoGame, GoMove, GoResult, Stone, BOARD_SIZE};
 use crate::challenges::menu::DifficultyInfo;
@@ -15,15 +16,27 @@ use ratatui::{
 };
 
 /// Render the Go game scene.
-pub fn render_go_scene(frame: &mut Frame, area: Rect, game: &GoGame) {
+pub fn render_go_scene(
+    frame: &mut Frame,
+    area: Rect,
+    game: &GoGame,
+    ctx: &super::responsive::LayoutContext,
+) {
     // Game over overlay
     if game.game_result.is_some() {
-        render_go_game_over(frame, area, game);
+        render_go_game_over(frame, area, game, ctx);
+        return;
+    }
+
+    const MIN_WIDTH: u16 = 27;
+    const MIN_HEIGHT: u16 = 14;
+    if area.width < MIN_WIDTH || area.height < MIN_HEIGHT {
+        render_minigame_too_small(frame, area, "Go", MIN_WIDTH, MIN_HEIGHT);
         return;
     }
 
     // Use shared layout - Go board needs width for box drawing chars
-    let layout = create_game_layout(frame, area, " Go ", Color::Green, 11, 24);
+    let layout = create_game_layout(frame, area, " Go ", Color::Green, 11, 24, ctx);
 
     render_board(frame, layout.content, game);
     render_status_bar_content(frame, layout.status_bar, game);
@@ -234,7 +247,12 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &GoGame) {
     frame.render_widget(para, inner);
 }
 
-fn render_go_game_over(frame: &mut Frame, area: Rect, game: &GoGame) {
+fn render_go_game_over(
+    frame: &mut Frame,
+    area: Rect,
+    game: &GoGame,
+    ctx: &super::responsive::LayoutContext,
+) {
     use crate::challenges::go::logic::calculate_score;
     use ratatui::widgets::Clear;
 
@@ -242,7 +260,7 @@ fn render_go_game_over(frame: &mut Frame, area: Rect, game: &GoGame) {
     frame.render_widget(Clear, area);
 
     // Create layout matching normal game
-    let layout = create_game_layout(frame, area, " Go ", Color::Green, 11, 24);
+    let layout = create_game_layout(frame, area, " Go ", Color::Green, 11, 24, ctx);
 
     // Render board and info panel (territory will be visible)
     render_board(frame, layout.content, game);

@@ -2,7 +2,7 @@
 
 use super::game_common::{
     create_game_layout, render_forfeit_status_bar, render_game_over_overlay,
-    render_info_panel_frame, render_status_bar, GameResultType,
+    render_info_panel_frame, render_minigame_too_small, render_status_bar, GameResultType,
 };
 use crate::challenges::rune::{FeedbackMark, RuneGame, RuneResult, RUNE_SYMBOLS};
 use ratatui::{
@@ -14,15 +14,35 @@ use ratatui::{
 };
 
 /// Render the rune deciphering game scene.
-pub fn render_rune(frame: &mut Frame, area: Rect, game: &RuneGame) {
+pub fn render_rune(
+    frame: &mut Frame,
+    area: Rect,
+    game: &RuneGame,
+    ctx: &super::responsive::LayoutContext,
+) {
     // Game over overlay
     if game.game_result.is_some() {
         render_rune_game_over(frame, area, game);
         return;
     }
 
+    const MIN_WIDTH: u16 = 26;
+    const MIN_HEIGHT: u16 = 10;
+    if area.width < MIN_WIDTH || area.height < MIN_HEIGHT {
+        render_minigame_too_small(frame, area, "Rune Deciphering", MIN_WIDTH, MIN_HEIGHT);
+        return;
+    }
+
     // Use shared layout
-    let layout = create_game_layout(frame, area, " Rune Deciphering ", Color::Magenta, 6, 22);
+    let layout = create_game_layout(
+        frame,
+        area,
+        " Rune Deciphering ",
+        Color::Magenta,
+        6,
+        22,
+        ctx,
+    );
 
     render_grid(frame, layout.content, game);
     render_status_bar_content(frame, layout.status_bar, game);

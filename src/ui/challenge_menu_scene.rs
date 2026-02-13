@@ -18,7 +18,12 @@ use ratatui::{
 };
 
 /// Render the challenge menu (list view or detail view)
-pub fn render_challenge_menu(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
+pub fn render_challenge_menu(
+    frame: &mut Frame,
+    area: Rect,
+    menu: &ChallengeMenu,
+    _ctx: &super::responsive::LayoutContext,
+) {
     frame.render_widget(Clear, area);
 
     if menu.viewing_detail && !menu.challenges.is_empty() {

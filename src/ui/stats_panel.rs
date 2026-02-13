@@ -1,3 +1,4 @@
+use super::responsive::{LayoutContext, SizeTier};
 use crate::character::attributes::AttributeType;
 use crate::character::derived_stats::DerivedStats;
 use crate::character::prestige::{get_adventurer_rank, get_prestige_tier};
@@ -30,35 +31,55 @@ fn format_affix(affix: &Affix) -> String {
 }
 
 /// Draws the stats panel
-pub fn draw_stats_panel(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    // Main vertical layout: header, prestige, attributes, derived stats, equipment
-    // Zone info is now drawn in the right panel
-    // Footer is drawn full-width at the bottom by the parent layout
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(4),  // Header + XP bar
-            Constraint::Length(7),  // Prestige info + fishing rank + fishing bar
-            Constraint::Length(14), // Attributes (6 attributes + borders)
-            Constraint::Length(6),  // Derived stats (condensed)
-            Constraint::Min(16),    // Equipment section (grows to fit)
-        ])
-        .split(area);
+pub fn draw_stats_panel(
+    frame: &mut Frame,
+    area: Rect,
+    game_state: &GameState,
+    ctx: &LayoutContext,
+) {
+    match ctx.height_tier {
+        SizeTier::XL => {
+            // Full layout: header(4) + prestige(5) + fishing(4) + attrs(8) + equip(rest)
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(4), // Header + XP bar
+                    Constraint::Length(5), // Prestige info (rank, multiplier, resets)
+                    Constraint::Length(4), // Fishing rank + progress bar
+                    Constraint::Length(8), // Attributes (6 attrs × 1 row + 2 borders)
+                    Constraint::Min(0),    // Equipment section (takes remaining space)
+                ])
+                .split(area);
 
-    // Draw header with character info
-    draw_header(frame, chunks[0], game_state);
+            draw_header(frame, chunks[0], game_state);
+            draw_prestige_info(frame, chunks[1], game_state);
+            draw_fishing_panel(frame, chunks[2], game_state);
+            draw_attributes(frame, chunks[3], game_state);
+            draw_equipment_section(frame, chunks[4], game_state);
+        }
+        SizeTier::L => {
+            // Condensed: header(4) + prestige(5) + fishing(4) + attrs_compact(5) + equip_names(rest)
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(4),
+                    Constraint::Length(5),
+                    Constraint::Length(4),
+                    Constraint::Length(5), // 3 pairs + 2 borders
+                    Constraint::Min(0),
+                ])
+                .split(area);
 
-    // Draw prestige info (below header)
-    draw_prestige_info(frame, chunks[1], game_state);
-
-    // Draw attributes with progress bars
-    draw_attributes(frame, chunks[2], game_state);
-
-    // Draw derived stats
-    draw_derived_stats(frame, chunks[3], game_state);
-
-    // Draw equipment section
-    draw_equipment_section(frame, chunks[4], game_state);
+            draw_header(frame, chunks[0], game_state);
+            draw_prestige_info(frame, chunks[1], game_state);
+            draw_fishing_panel(frame, chunks[2], game_state);
+            draw_attributes_compact(frame, chunks[3], game_state);
+            draw_equipment_names_only(frame, chunks[4], game_state);
+        }
+        _ => {
+            // M and S don't use stats panel (handled by stacked layout in Phase 3)
+        }
+    }
 }
 
 /// Draws the header with character level, XP bar, and play time
@@ -118,12 +139,13 @@ fn draw_header(frame: &mut Frame, area: Rect, game_state: &GameState) {
             .constraints([Constraint::Length(1), Constraint::Length(1)])
             .split(inner);
 
-        let header_paragraph = Paragraph::new(header_text).alignment(Alignment::Center);
+        let header_paragraph = Paragraph::new(header_text);
         frame.render_widget(header_paragraph, inner_chunks[0]);
         frame.render_widget(xp_gauge, inner_chunks[1]);
     } else if inner.height == 1 {
-        // Only room for XP bar - prioritize progress visibility
-        frame.render_widget(xp_gauge, inner);
+        // Only room for one line — show level
+        let header_paragraph = Paragraph::new(header_text);
+        frame.render_widget(header_paragraph, inner);
     }
 }
 
@@ -176,6 +198,7 @@ pub(super) fn draw_zone_info(
     game_state: &GameState,
     zone_completion: &ZoneCompletionStatus,
     achievements: &crate::achievements::Achievements,
+    _ctx: &LayoutContext,
 ) {
     use crate::zones::get_all_zones;
 
@@ -325,145 +348,41 @@ fn draw_attributes(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let inner = attrs_block.inner(area);
     frame.render_widget(attrs_block, area);
 
-    // Layout for 6 attribute rows
-    let attr_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(2), // STR
-            Constraint::Length(2), // DEX
-            Constraint::Length(2), // CON
-            Constraint::Length(2), // INT
-            Constraint::Length(2), // WIS
-            Constraint::Length(2), // CHA
-        ])
-        .split(inner);
-
     let cap = game_state.get_attribute_cap();
 
-    // Draw each attribute
-    for (i, attr_type) in AttributeType::all().iter().enumerate() {
-        if i < attr_chunks.len() {
-            draw_attribute_row(frame, attr_chunks[i], game_state, *attr_type, cap);
-        }
+    let mut lines = Vec::new();
+    for attr_type in AttributeType::all() {
+        let value = game_state.attributes.get(attr_type);
+        let modifier = game_state.attributes.modifier(attr_type);
+        let (color, emoji) = match attr_type {
+            AttributeType::Strength => (Color::Red, "💪"),
+            AttributeType::Dexterity => (Color::Green, "🏃"),
+            AttributeType::Constitution => (Color::Magenta, "❤️"),
+            AttributeType::Intelligence => (Color::Blue, "🧠"),
+            AttributeType::Wisdom => (Color::Cyan, "👁️"),
+            AttributeType::Charisma => (Color::Yellow, "✨"),
+        };
+        let mod_str = format_modifier(modifier);
+
+        lines.push(Line::from(vec![
+            Span::styled(
+                format!("{} {}: ", emoji, attr_type.abbrev()),
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!("{:2}", value),
+                Style::default().fg(color).add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(format!(" ({:>3}) ", mod_str)),
+            Span::styled(
+                format!("[Cap: {}]", cap),
+                Style::default().fg(Color::DarkGray),
+            ),
+        ]));
     }
-}
 
-/// Draws a single attribute row
-fn draw_attribute_row(
-    frame: &mut Frame,
-    area: Rect,
-    game_state: &GameState,
-    attr_type: AttributeType,
-    cap: u32,
-) {
-    let value = game_state.attributes.get(attr_type);
-    let modifier = game_state.attributes.modifier(attr_type);
-
-    // Choose color and emoji based on attribute type
-    let (color, emoji) = match attr_type {
-        AttributeType::Strength => (Color::Red, "💪"),
-        AttributeType::Dexterity => (Color::Green, "🏃"),
-        AttributeType::Constitution => (Color::Magenta, "❤️"),
-        AttributeType::Intelligence => (Color::Blue, "🧠"),
-        AttributeType::Wisdom => (Color::Cyan, "👁️"),
-        AttributeType::Charisma => (Color::Yellow, "✨"),
-    };
-
-    // Format modifier with sign
-    let mod_str = if modifier >= 0 {
-        format!("+{}", modifier)
-    } else {
-        format!("{}", modifier)
-    };
-
-    let text = vec![Line::from(vec![
-        Span::styled(
-            format!("{} {}: ", emoji, attr_type.abbrev()),
-            Style::default().add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(
-            format!("{:2}", value),
-            Style::default().fg(color).add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(format!(" ({:>3}) ", mod_str)),
-        Span::styled(
-            format!("[Cap: {}]", cap),
-            Style::default().fg(Color::DarkGray),
-        ),
-    ])];
-
-    let paragraph = Paragraph::new(text);
-    frame.render_widget(paragraph, area);
-}
-
-/// Draws derived stats calculated from attributes
-fn draw_derived_stats(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    let derived =
-        DerivedStats::calculate_derived_stats(&game_state.attributes, &game_state.equipment);
-
-    let stats_block = Block::default()
-        .borders(Borders::ALL)
-        .title("Derived Stats");
-
-    let inner = stats_block.inner(area);
-    frame.render_widget(stats_block, area);
-
-    let stats_text = vec![
-        Line::from(vec![
-            Span::styled("💚 Max HP: ", Style::default().add_modifier(Modifier::BOLD)),
-            Span::styled(
-                format!("{}", derived.max_hp),
-                Style::default().fg(Color::Green),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "⚔️ Physical: ",
-                Style::default().add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                format!("{}", derived.physical_damage),
-                Style::default().fg(Color::Red),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled("🔮 Magic: ", Style::default().add_modifier(Modifier::BOLD)),
-            Span::styled(
-                format!("{}", derived.magic_damage),
-                Style::default().fg(Color::Blue),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "🛡️ Defense: ",
-                Style::default().add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                format!("{}", derived.defense),
-                Style::default().fg(Color::Yellow),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled("💥 Crit: ", Style::default().add_modifier(Modifier::BOLD)),
-            Span::styled(
-                format!("{}%", derived.crit_chance_percent),
-                Style::default().fg(Color::Cyan),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "📈 XP Mult: ",
-                Style::default().add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                format!("{:.2}x", derived.xp_multiplier),
-                Style::default().fg(Color::Magenta),
-            ),
-        ]),
-    ];
-
-    let stats_paragraph = Paragraph::new(stats_text);
-    frame.render_widget(stats_paragraph, inner);
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, inner);
 }
 
 /// Draws prestige information with CHA bonus
@@ -512,23 +431,22 @@ fn draw_prestige_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
                 Style::default().fg(Color::Magenta),
             ),
         ]),
-        Line::from(vec![
-            Span::styled(
-                "🎣 Fishing: ",
-                Style::default().add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                format!(
-                    "{} ({})",
-                    game_state.fishing.rank_name(),
-                    game_state.fishing.rank
-                ),
-                Style::default().fg(Color::Cyan),
-            ),
-        ]),
     ];
 
-    // Fishing progress bar
+    // Show as many lines as fit, rank first
+    let lines_to_show = inner.height as usize;
+    let truncated: Vec<Line> = prestige_text.into_iter().take(lines_to_show).collect();
+    let prestige_paragraph = Paragraph::new(truncated);
+    frame.render_widget(prestige_paragraph, inner);
+}
+
+/// Draws the fishing panel with rank and progress bar.
+fn draw_fishing_panel(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    let block = Block::default().borders(Borders::ALL).title("Fishing");
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
     let fish_required = FishingState::fish_required_for_rank(game_state.fishing.rank);
     let fish_progress = game_state.fishing.fish_toward_next_rank;
     let fish_ratio = if fish_required > 0 {
@@ -537,8 +455,19 @@ fn draw_prestige_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
         0.0
     };
 
-    let fish_label = format!("{}/{}", fish_progress, fish_required);
+    let rank_line = Line::from(vec![
+        Span::styled("🎣 Rank: ", Style::default().add_modifier(Modifier::BOLD)),
+        Span::styled(
+            format!(
+                "{} ({})",
+                game_state.fishing.rank_name(),
+                game_state.fishing.rank
+            ),
+            Style::default().fg(Color::Cyan),
+        ),
+    ]);
 
+    let fish_label = format!("{}/{}", fish_progress, fish_required);
     let fish_gauge = Gauge::default()
         .gauge_style(
             Style::default()
@@ -548,20 +477,19 @@ fn draw_prestige_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
         .label(fish_label)
         .ratio(fish_ratio);
 
-    // Render based on available height
-    if inner.height >= 5 {
-        // Full layout: 4 lines of text + 1 line for progress bar
+    if inner.height >= 2 {
         let inner_chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(4), Constraint::Length(1)])
+            .constraints([Constraint::Length(1), Constraint::Length(1)])
             .split(inner);
 
-        let prestige_paragraph = Paragraph::new(prestige_text);
-        frame.render_widget(prestige_paragraph, inner_chunks[0]);
+        let rank_paragraph = Paragraph::new(rank_line);
+        frame.render_widget(rank_paragraph, inner_chunks[0]);
         frame.render_widget(fish_gauge, inner_chunks[1]);
     } else if inner.height >= 1 {
-        // Limited space: show fishing bar only
-        frame.render_widget(fish_gauge, inner);
+        // Only room for one line — show rank
+        let rank_paragraph = Paragraph::new(rank_line);
+        frame.render_widget(rank_paragraph, inner);
     }
 }
 
@@ -670,6 +598,346 @@ fn draw_equipment_section(frame: &mut Frame, area: Rect, game_state: &GameState)
 
     let equipment_paragraph = Paragraph::new(lines);
     frame.render_widget(equipment_paragraph, inner);
+}
+
+/// Draws attributes in a compact 2-column layout (L tier).
+/// 3 rows: STR/INT, DEX/WIS, CON/CHA with modifiers.
+fn draw_attributes_compact(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    let attrs_block = Block::default().borders(Borders::ALL).title("Attributes");
+    let inner = attrs_block.inner(area);
+    frame.render_widget(attrs_block, area);
+
+    let cap = game_state.get_attribute_cap();
+
+    // Pair attributes: STR/INT, DEX/WIS, CON/CHA
+    let pairs = [
+        (AttributeType::Strength, AttributeType::Intelligence),
+        (AttributeType::Dexterity, AttributeType::Wisdom),
+        (AttributeType::Constitution, AttributeType::Charisma),
+    ];
+
+    let mut lines = Vec::new();
+    for (left, right) in &pairs {
+        let l_val = game_state.attributes.get(*left);
+        let l_mod = game_state.attributes.modifier(*left);
+        let r_val = game_state.attributes.get(*right);
+        let r_mod = game_state.attributes.modifier(*right);
+
+        let l_color = attr_color(*left);
+        let r_color = attr_color(*right);
+
+        let l_mod_str = format_modifier(l_mod);
+        let r_mod_str = format_modifier(r_mod);
+
+        lines.push(Line::from(vec![
+            Span::styled(
+                format!("{}: ", left.abbrev()),
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(format!("{:2}", l_val), Style::default().fg(l_color)),
+            Span::raw(format!(" ({:>3})  ", l_mod_str)),
+            Span::styled(
+                format!("{}: ", right.abbrev()),
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(format!("{:2}", r_val), Style::default().fg(r_color)),
+            Span::raw(format!(" ({:>3})  ", r_mod_str)),
+            Span::styled(
+                format!("[Cap:{}]", cap),
+                Style::default().fg(Color::DarkGray),
+            ),
+        ]));
+    }
+
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, inner);
+}
+
+/// Draws equipment with name + rarity color only, one line per slot (L tier).
+fn draw_equipment_names_only(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    let block = Block::default().borders(Borders::ALL).title("Equipment");
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let mut lines = Vec::new();
+
+    let slots = [
+        (game_state.equipment.weapon.as_ref(), "Weapon"),
+        (game_state.equipment.armor.as_ref(), "Armor"),
+        (game_state.equipment.helmet.as_ref(), "Helmet"),
+        (game_state.equipment.gloves.as_ref(), "Gloves"),
+        (game_state.equipment.boots.as_ref(), "Boots"),
+        (game_state.equipment.amulet.as_ref(), "Amulet"),
+        (game_state.equipment.ring.as_ref(), "Ring"),
+    ];
+
+    for (item, slot_label) in &slots {
+        if let Some(item) = item {
+            let rarity_color = match item.rarity {
+                Rarity::Common => Color::White,
+                Rarity::Magic => Color::Blue,
+                Rarity::Rare => Color::Yellow,
+                Rarity::Epic => Color::Magenta,
+                Rarity::Legendary => Color::LightRed,
+            };
+
+            let item_name = if item.display_name.len() > 20 {
+                format!("{}...", &item.display_name[..17])
+            } else {
+                item.display_name.clone()
+            };
+
+            lines.push(Line::from(vec![
+                Span::styled(
+                    format!("{:>6}: ", slot_label),
+                    Style::default().add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(item_name, Style::default().fg(rarity_color)),
+                Span::raw(" "),
+                Span::styled(
+                    format!("[{}]", item.rarity.name()),
+                    Style::default().fg(rarity_color),
+                ),
+            ]));
+        } else {
+            lines.push(Line::from(vec![
+                Span::styled(
+                    format!("{:>6}: ", slot_label),
+                    Style::default().add_modifier(Modifier::BOLD),
+                ),
+                Span::styled("[Empty]", Style::default().fg(Color::DarkGray)),
+            ]));
+        }
+    }
+
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, inner);
+}
+
+/// Draws a compact stats bar for M tier: single line with name, level, prestige, zone.
+/// Format: "Hero Lv.42 | P:12 Gold 2.80x | Zone 3: Mountain (2/3)"
+pub(super) fn draw_compact_stats_bar(
+    frame: &mut Frame,
+    area: Rect,
+    game_state: &GameState,
+    _ctx: &LayoutContext,
+) {
+    use crate::zones::get_all_zones;
+
+    let tier = get_prestige_tier(game_state.prestige_rank);
+    let effective_multiplier =
+        DerivedStats::prestige_multiplier(tier.multiplier, &game_state.attributes);
+
+    let zones = get_all_zones();
+    let prog = &game_state.zone_progression;
+    let zone_name = zones
+        .iter()
+        .find(|z| z.id == prog.current_zone_id)
+        .map(|z| z.name)
+        .unwrap_or("???");
+    let total_subzones = zones
+        .iter()
+        .find(|z| z.id == prog.current_zone_id)
+        .map(|z| z.subzones.len())
+        .unwrap_or(0);
+
+    let spans = vec![
+        Span::styled(
+            format!(" {} ", game_state.character_name),
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!("Lv.{}", game_state.character_level),
+            Style::default().fg(Color::Cyan),
+        ),
+        Span::styled(" | ", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            format!(
+                "P:{} {} {:.2}x",
+                game_state.prestige_rank, tier.name, effective_multiplier
+            ),
+            Style::default().fg(Color::Yellow),
+        ),
+        Span::styled(" | ", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            format!(
+                "Zone {}: {} ({}/{})",
+                prog.current_zone_id, zone_name, prog.current_subzone_id, total_subzones
+            ),
+            Style::default().fg(Color::Green),
+        ),
+    ];
+
+    let paragraph = Paragraph::new(Line::from(spans));
+    frame.render_widget(paragraph, area);
+}
+
+/// Draws all 6 attributes on a single line for M tier.
+/// Format: "STR:24 DEX:18 CON:21 INT:15 WIS:12 CHA:16"
+pub(super) fn draw_attributes_single_line(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    let mut spans = Vec::new();
+
+    for (i, attr_type) in AttributeType::all().iter().enumerate() {
+        if i > 0 {
+            spans.push(Span::raw(" "));
+        }
+        let value = game_state.attributes.get(*attr_type);
+        let color = attr_color(*attr_type);
+        spans.push(Span::styled(
+            format!("{}:", attr_type.abbrev()),
+            Style::default().add_modifier(Modifier::BOLD),
+        ));
+        spans.push(Span::styled(
+            format!("{}", value),
+            Style::default().fg(color),
+        ));
+    }
+
+    let paragraph = Paragraph::new(Line::from(spans)).alignment(Alignment::Center);
+    frame.render_widget(paragraph, area);
+}
+
+/// Draws a compact XP bar for M/S tier (borderless, single line).
+pub(super) fn draw_xp_bar_compact(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    let xp_needed = xp_for_next_level(game_state.character_level);
+    let xp_ratio = if xp_needed > 0 {
+        (game_state.character_xp as f64 / xp_needed as f64).min(1.0)
+    } else {
+        0.0
+    };
+
+    let xp_label = format!(
+        "XP: {}/{} ({:.1}%)",
+        game_state.character_xp,
+        xp_needed,
+        xp_ratio * 100.0
+    );
+
+    let xp_gauge = Gauge::default()
+        .gauge_style(
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )
+        .label(xp_label)
+        .ratio(xp_ratio);
+
+    frame.render_widget(xp_gauge, area);
+}
+
+/// Draws a compact footer for M tier (1 row, no borders).
+/// Format: "[Esc]Quit [P]Prestige [H]Haven [A]Ach [Tab]Chall"
+pub(super) fn draw_footer_compact(
+    frame: &mut Frame,
+    area: Rect,
+    game_state: &GameState,
+    haven_discovered: bool,
+    pending_achievements: usize,
+) {
+    use crate::character::prestige::can_prestige;
+
+    let can_prestige_now = can_prestige(game_state);
+    let prestige_span = if can_prestige_now {
+        Span::styled(
+            "[P]Prestige!",
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        )
+    } else {
+        Span::styled("[P]Prestige", Style::default().fg(Color::DarkGray))
+    };
+
+    let haven_span = if haven_discovered {
+        Span::styled(" [H]Haven", Style::default().fg(Color::Cyan))
+    } else {
+        Span::raw("")
+    };
+
+    let ach_span = if pending_achievements > 0 {
+        Span::styled(
+            format!(" [A]Ach({})", pending_achievements),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )
+    } else {
+        Span::styled(" [A]Ach", Style::default().fg(Color::Magenta))
+    };
+
+    let challenge_count = game_state.challenge_menu.challenges.len();
+    let challenge_span = if challenge_count > 0 {
+        Span::styled(
+            format!(" [Tab]Chall({})", challenge_count),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )
+    } else {
+        Span::raw("")
+    };
+
+    let line = Line::from(vec![
+        Span::styled("[Esc]Quit", Style::default().fg(Color::Red)),
+        Span::raw(" "),
+        prestige_span,
+        haven_span,
+        ach_span,
+        challenge_span,
+    ]);
+
+    let paragraph = Paragraph::new(line).alignment(Alignment::Center);
+    frame.render_widget(paragraph, area);
+}
+
+/// Draws a minimal footer for S tier (1 row, minimal keybindings).
+/// Format: "Esc:Quit P:Prestige Tab:More"
+pub(super) fn draw_footer_minimal(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    use crate::character::prestige::can_prestige;
+
+    let can_prestige_now = can_prestige(game_state);
+    let prestige_span = if can_prestige_now {
+        Span::styled(
+            " P:Prestige!",
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        )
+    } else {
+        Span::styled(" P:Prestige", Style::default().fg(Color::DarkGray))
+    };
+
+    let line = Line::from(vec![
+        Span::styled("Esc:Quit", Style::default().fg(Color::Red)),
+        prestige_span,
+        Span::styled(" Tab:More", Style::default().fg(Color::DarkGray)),
+    ]);
+
+    let paragraph = Paragraph::new(line).alignment(Alignment::Center);
+    frame.render_widget(paragraph, area);
+}
+
+/// Returns the display color for an attribute type.
+fn attr_color(attr_type: AttributeType) -> Color {
+    match attr_type {
+        AttributeType::Strength => Color::Red,
+        AttributeType::Dexterity => Color::Green,
+        AttributeType::Constitution => Color::Magenta,
+        AttributeType::Intelligence => Color::Blue,
+        AttributeType::Wisdom => Color::Cyan,
+        AttributeType::Charisma => Color::Yellow,
+    }
+}
+
+/// Formats a modifier value with a sign prefix.
+fn format_modifier(modifier: i32) -> String {
+    if modifier >= 0 {
+        format!("+{}", modifier)
+    } else {
+        format!("{}", modifier)
+    }
 }
 
 /// Formats play time as "Xmo Xw Xd Xh Xm Xs"
@@ -785,6 +1053,7 @@ pub fn draw_footer(
     update_check_completed: bool,
     haven_discovered: bool,
     pending_achievements: usize,
+    _ctx: &LayoutContext,
 ) {
     use crate::character::prestige::can_prestige;
     use crate::utils::build_info::{BUILD_COMMIT, BUILD_DATE};

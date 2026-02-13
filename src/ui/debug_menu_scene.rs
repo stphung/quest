@@ -10,7 +10,12 @@ use ratatui::{
 };
 
 /// Render the debug menu overlay
-pub fn render_debug_menu(frame: &mut Frame, area: Rect, menu: &DebugMenu) {
+pub fn render_debug_menu(
+    frame: &mut Frame,
+    area: Rect,
+    menu: &DebugMenu,
+    _ctx: &super::responsive::LayoutContext,
+) {
     // Center the menu
     let menu_width = 35;
     let menu_height = (DEBUG_OPTIONS.len() + 4) as u16; // options + border + help
@@ -70,7 +75,11 @@ pub fn render_debug_menu(frame: &mut Frame, area: Rect, menu: &DebugMenu) {
 }
 
 /// Render the debug mode indicator (shows saves are disabled)
-pub fn render_debug_indicator(frame: &mut Frame, area: Rect) {
+pub fn render_debug_indicator(
+    frame: &mut Frame,
+    area: Rect,
+    _ctx: &super::responsive::LayoutContext,
+) {
     let text = "[DEBUG] Saves disabled";
     let indicator = Paragraph::new(Line::from(text)).style(
         Style::default()
@@ -98,6 +107,7 @@ pub fn render_save_indicator(
     area: Rect,
     is_saving: bool,
     last_save_time: Option<chrono::DateTime<chrono::Local>>,
+    _ctx: &super::responsive::LayoutContext,
 ) {
     use super::throbber::spinner_char;
 
