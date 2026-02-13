@@ -77,7 +77,7 @@ pub const ZONE_ENEMY_STATS: [(u32, u32, u32, u32, u32, u32); 11] = [
     (575, 54, 78, 11, 35, 6),  // Zone 8: Sunken Kingdom
     (685, 63, 92, 13, 43, 6),  // Zone 9: Floating Isles
     (810, 72, 109, 14, 52, 7), // Zone 10: Storm Citadel
-    (935, 81, 123, 17, 60, 7), // Zone 11: The Expanse
+    (5000, 400, 500, 80, 250, 30), // Zone 11: The Expanse (endgame wall)
 ];
 
 // Boss multipliers: (hp_mult, dmg_mult, def_mult)
