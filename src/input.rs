@@ -24,6 +24,9 @@ use crate::challenges::morris::logic::{
 use crate::challenges::rune::logic::{
     apply_game_result as apply_rune_result, process_input as process_rune_input, RuneInput,
 };
+use crate::challenges::snake::logic::{
+    apply_game_result as apply_snake_result, process_input as process_snake_input, SnakeInput,
+};
 use crate::challenges::ActiveMinigame;
 use crate::character::prestige::{can_prestige, get_prestige_tier, perform_prestige};
 use crate::core::game_logic::OfflineReport;
@@ -579,6 +582,22 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
                     _ => FlappyBirdInput::Other,
                 };
                 process_flappy_input(flappy_game, input);
+            }
+            ActiveMinigame::Snake(snake_game) => {
+                if snake_game.game_result.is_some() {
+                    state.last_minigame_win = apply_snake_result(state);
+                    return InputResult::Continue;
+                }
+                let input = match key.code {
+                    KeyCode::Up => SnakeInput::Up,
+                    KeyCode::Down => SnakeInput::Down,
+                    KeyCode::Left => SnakeInput::Left,
+                    KeyCode::Right => SnakeInput::Right,
+                    KeyCode::Char(' ') => SnakeInput::Select,
+                    KeyCode::Esc => SnakeInput::Forfeit,
+                    _ => SnakeInput::Other,
+                };
+                process_snake_input(snake_game, input);
             }
         }
     }

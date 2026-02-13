@@ -11,6 +11,8 @@ use super::gomoku::{GomokuDifficulty, GomokuGame};
 use super::minesweeper::{MinesweeperDifficulty, MinesweeperGame};
 use super::morris::{MorrisDifficulty, MorrisGame};
 use super::rune::{RuneDifficulty, RuneGame};
+use super::snake::logic::start_snake_game;
+use super::snake::SnakeDifficulty;
 use super::ActiveMinigame;
 use crate::core::constants::CHALLENGE_DISCOVERY_CHANCE;
 use crate::core::game_state::GameState;
@@ -96,6 +98,10 @@ fn accept_selected_challenge(state: &mut GameState) {
             ChallengeType::FlappyBird => {
                 let d = FlappyBirdDifficulty::from_index(difficulty_index);
                 ActiveMinigame::FlappyBird(FlappyBirdGame::new(d))
+            }
+            ChallengeType::Snake => {
+                let d = SnakeDifficulty::from_index(difficulty_index);
+                start_snake_game(d)
             }
         };
         state.active_minigame = Some(minigame);
@@ -372,6 +378,10 @@ const CHALLENGE_TABLE: &[ChallengeWeight] = &[
         challenge_type: ChallengeType::Go,
         weight: 10, // ~8% - rare complex strategy
     },
+    ChallengeWeight {
+        challenge_type: ChallengeType::Snake,
+        weight: 20, // ~13% - moderate, action game alongside Flappy Bird
+    },
 ];
 
 /// A single pending challenge in the menu
@@ -393,6 +403,7 @@ pub enum ChallengeType {
     Minesweeper,
     Rune,
     Go,
+    Snake,
 }
 
 impl ChallengeType {
@@ -406,6 +417,7 @@ impl ChallengeType {
             ChallengeType::Minesweeper => "\u{26A0}", // ⚠
             ChallengeType::Rune => "ᚱ",
             ChallengeType::Go => "◉",
+            ChallengeType::Snake => "~",
         }
     }
 
@@ -421,6 +433,9 @@ impl ChallengeType {
             }
             ChallengeType::Rune => "A glowing stone tablet materializes before you...",
             ChallengeType::Go => "An ancient master beckons from beneath a gnarled tree...",
+            ChallengeType::Snake => {
+                "A serpentine trail of glowing runes appears on the dungeon floor..."
+            }
         }
     }
 }
@@ -640,6 +655,16 @@ pub fn create_challenge(ct: &ChallengeType) -> PendingChallenge {
                 rules hide the deepest strategy. Shall we play?'"
                 .to_string(),
         },
+        ChallengeType::Snake => PendingChallenge {
+            challenge_type: ChallengeType::Snake,
+            title: "Serpent's Path".to_string(),
+            icon: "~",
+            description: "A serpentine trail of glowing runes slithers across the dungeon floor. \
+                As you step closer, they coil into a grid of ancient symbols. A spectral voice \
+                hisses: \"Guide the serpent through the maze. Feed it, grow it, but beware your \
+                own trail. The path is narrow, and the serpent is hungry.\""
+                .to_string(),
+        },
     }
 }
 
@@ -667,6 +692,7 @@ mod tests {
         assert!(!ChallengeType::Minesweeper.icon().is_empty());
         assert!(!ChallengeType::Rune.icon().is_empty());
         assert!(!ChallengeType::Go.icon().is_empty());
+        assert!(!ChallengeType::Snake.icon().is_empty());
     }
 
     #[test]
@@ -678,6 +704,7 @@ mod tests {
         assert!(!ChallengeType::Minesweeper.discovery_flavor().is_empty());
         assert!(!ChallengeType::Rune.discovery_flavor().is_empty());
         assert!(!ChallengeType::Go.discovery_flavor().is_empty());
+        assert!(!ChallengeType::Snake.discovery_flavor().is_empty());
     }
 
     #[test]
@@ -690,6 +717,7 @@ mod tests {
             ChallengeType::Minesweeper.icon(),
             ChallengeType::Rune.icon(),
             ChallengeType::Go.icon(),
+            ChallengeType::Snake.icon(),
         ];
         // Check all pairs are different
         for i in 0..icons.len() {
@@ -1132,8 +1160,9 @@ mod tests {
         use super::super::minesweeper::MinesweeperDifficulty;
         use super::super::morris::MorrisDifficulty;
         use super::super::rune::RuneDifficulty;
+        use super::super::snake::SnakeDifficulty;
 
-        // Verify all 7 difficulty types produce correct lowercase strings
+        // Verify all 8 difficulty types produce correct lowercase strings
         for (i, expected) in ["novice", "apprentice", "journeyman", "master"]
             .iter()
             .enumerate()
@@ -1145,6 +1174,7 @@ mod tests {
             assert_eq!(RuneDifficulty::ALL[i].difficulty_str(), *expected);
             assert_eq!(GoDifficulty::ALL[i].difficulty_str(), *expected);
             assert_eq!(FlappyBirdDifficulty::ALL[i].difficulty_str(), *expected);
+            assert_eq!(SnakeDifficulty::ALL[i].difficulty_str(), *expected);
         }
     }
 }

@@ -22,6 +22,7 @@ pub mod minesweeper_scene;
 pub mod morris_scene;
 pub mod prestige_confirm;
 pub mod rune_scene;
+pub mod snake_scene;
 mod stats_panel;
 mod throbber;
 
@@ -224,6 +225,9 @@ fn draw_right_content(frame: &mut Frame, area: Rect, game_state: &GameState) {
         }
         Some(ActiveMinigame::FlappyBird(game)) => {
             flappy_scene::render_flappy_scene(frame, area, game);
+        }
+        Some(ActiveMinigame::Snake(game)) => {
+            snake_scene::render_snake_scene(frame, area, game);
         }
         None => {
             if game_state.challenge_menu.is_open {
