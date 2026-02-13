@@ -47,6 +47,7 @@ pub fn process_input(game: &mut LanderGame, input: LanderInput) {
                 game.forfeit_pending = false;
             } else {
                 game.thrusting = true;
+                game.thrust_hold_ticks = INPUT_HOLD_TICKS;
             }
         }
         LanderInput::RotateLeftOn => {
@@ -54,6 +55,7 @@ pub fn process_input(game: &mut LanderGame, input: LanderInput) {
                 game.forfeit_pending = false;
             } else {
                 game.rotating_left = true;
+                game.rotate_left_hold_ticks = INPUT_HOLD_TICKS;
             }
         }
         LanderInput::RotateRightOn => {
@@ -61,6 +63,7 @@ pub fn process_input(game: &mut LanderGame, input: LanderInput) {
                 game.forfeit_pending = false;
             } else {
                 game.rotating_right = true;
+                game.rotate_right_hold_ticks = INPUT_HOLD_TICKS;
             }
         }
         LanderInput::Forfeit => {
@@ -83,10 +86,10 @@ pub fn process_input(game: &mut LanderGame, input: LanderInput) {
 /// `dt_ms` is milliseconds since last call. Internally steps physics in
 /// 16ms increments (~60 FPS). Returns true if the game state changed.
 ///
-/// Input flags (`thrusting`, `rotating_left`, `rotating_right`) are cleared
-/// after each call. Terminal environments only produce key-press events (no
-/// key-release), so we treat each press as a single-frame impulse. Terminal
-/// key-repeat provides the "hold" behavior naturally.
+/// Input flags (`thrusting`, `rotating_left`, `rotating_right`) persist for
+/// `INPUT_HOLD_TICKS` physics steps after each key press. This bridges the
+/// gap between terminal key-repeat events (~500ms initial delay) so holding
+/// a key feels continuous.
 pub fn tick_lander(game: &mut LanderGame, dt_ms: u64) -> bool {
     if game.game_result.is_some() {
         return false;
@@ -113,12 +116,6 @@ pub fn tick_lander(game: &mut LanderGame, dt_ms: u64) -> bool {
             break;
         }
     }
-
-    // Clear input flags after processing physics. Terminal key-repeat will
-    // re-set them on the next key event if still held.
-    game.thrusting = false;
-    game.rotating_left = false;
-    game.rotating_right = false;
 
     changed
 }
@@ -160,6 +157,26 @@ fn step_physics(game: &mut LanderGame) {
     // Decrement flame animation timer
     if game.flame_timer > 0 {
         game.flame_timer -= 1;
+    }
+
+    // Decay hold timers -- clear input flags when timer expires
+    if game.thrust_hold_ticks > 0 {
+        game.thrust_hold_ticks -= 1;
+        if game.thrust_hold_ticks == 0 {
+            game.thrusting = false;
+        }
+    }
+    if game.rotate_left_hold_ticks > 0 {
+        game.rotate_left_hold_ticks -= 1;
+        if game.rotate_left_hold_ticks == 0 {
+            game.rotating_left = false;
+        }
+    }
+    if game.rotate_right_hold_ticks > 0 {
+        game.rotate_right_hold_ticks -= 1;
+        if game.rotate_right_hold_ticks == 0 {
+            game.rotating_right = false;
+        }
     }
 
     // Apply gravity (positive = downward)
@@ -363,10 +380,12 @@ mod tests {
 
         process_input(&mut game, LanderInput::ThrustOn);
         assert!(game.thrusting);
+        assert_eq!(game.thrust_hold_ticks, INPUT_HOLD_TICKS);
 
-        // tick_lander clears thrust flag (impulse model for terminal input)
+        // Thrust persists across ticks via hold timer
         tick_lander(&mut game, PHYSICS_TICK_MS);
-        assert!(!game.thrusting);
+        assert!(game.thrusting);
+        assert!(game.thrust_hold_ticks < INPUT_HOLD_TICKS);
     }
 
     #[test]
@@ -377,16 +396,15 @@ mod tests {
 
         process_input(&mut game, LanderInput::RotateLeftOn);
         assert!(game.rotating_left);
+        assert_eq!(game.rotate_left_hold_ticks, INPUT_HOLD_TICKS);
 
-        // tick_lander clears rotation flags (impulse model for terminal input)
+        // Rotation persists across ticks via hold timer
         tick_lander(&mut game, PHYSICS_TICK_MS);
-        assert!(!game.rotating_left);
+        assert!(game.rotating_left);
 
         process_input(&mut game, LanderInput::RotateRightOn);
         assert!(game.rotating_right);
-
-        tick_lander(&mut game, PHYSICS_TICK_MS);
-        assert!(!game.rotating_right);
+        assert_eq!(game.rotate_right_hold_ticks, INPUT_HOLD_TICKS);
     }
 
     #[test]
@@ -469,16 +487,19 @@ mod tests {
         let mut game = started_game(LanderDifficulty::Novice);
         game.angle = 0.0; // Upright
 
-        // Run several ticks with thrust (re-set flag each tick to simulate key hold)
+        // Activate thrust via input (sets hold timer)
+        process_input(&mut game, LanderInput::ThrustOn);
+
+        // Run several ticks -- hold timer keeps thrust active
         for _ in 0..10 {
-            game.thrusting = true;
             tick_lander(&mut game, PHYSICS_TICK_MS);
+            if game.game_result.is_some() {
+                break;
+            }
         }
 
-        // With upright thrust, vy should be less than pure gravity would give
-        // Pure gravity after 10 ticks: 10 * 0.003 = 0.03
-        // With thrust: each tick also subtracts THRUST_POWER (0.012)
-        // Net per tick: 0.003 - 0.012 = -0.009
+        // With upright thrust, vy should be negative (thrust overpowers gravity)
+        // Novice gravity: 0.002, thrust: 0.02 → net per tick: 0.002 - 0.02 = -0.018
         assert!(
             game.vy < 0.0,
             "Full thrust should overpower gravity, vy={}",
@@ -502,6 +523,7 @@ mod tests {
         let mut game = started_game(LanderDifficulty::Novice);
         game.fuel = 0.0;
         game.thrusting = true;
+        game.thrust_hold_ticks = INPUT_HOLD_TICKS;
         game.vy = 0.0;
 
         tick_lander(&mut game, PHYSICS_TICK_MS);
@@ -528,10 +550,10 @@ mod tests {
     fn test_rotation_clamped() {
         let mut game = started_game(LanderDifficulty::Novice);
         game.angle = 1.0;
+        game.rotating_right = true;
+        game.rotate_right_hold_ticks = 100; // Enough to cover the loop
 
-        // Run many ticks with continuous rotation (re-set flag each tick)
         for _ in 0..100 {
-            game.rotating_right = true;
             tick_lander(&mut game, PHYSICS_TICK_MS);
             if game.game_result.is_some() {
                 break;
@@ -868,10 +890,11 @@ mod tests {
     fn test_fuel_cannot_go_negative() {
         let mut game = started_game(LanderDifficulty::Novice);
         game.fuel = 0.1; // Almost empty
+        game.thrusting = true;
+        game.thrust_hold_ticks = INPUT_HOLD_TICKS;
 
-        // Run several ticks with continuous thrust to deplete fuel
+        // Run several ticks -- hold timer keeps thrust active
         for _ in 0..10 {
-            game.thrusting = true;
             tick_lander(&mut game, PHYSICS_TICK_MS);
             if game.game_result.is_some() {
                 break;

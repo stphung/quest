@@ -38,13 +38,18 @@ pub const MAX_LANDING_VX: f64 = 0.04;
 pub const MAX_LANDING_ANGLE: f64 = 0.26;
 
 /// Thrust acceleration magnitude per physics tick.
-pub const THRUST_POWER: f64 = 0.012;
+pub const THRUST_POWER: f64 = 0.02;
 
 /// Rotation speed in radians per physics tick.
 pub const ROTATION_SPEED: f64 = 0.04;
 
 /// Fuel consumption per physics tick while thrusting.
 pub const FUEL_BURN_RATE: f64 = 0.15;
+
+/// Physics ticks to hold an input flag after a key press (~200ms).
+/// Bridges the gap between terminal key-repeat events so holding a key
+/// feels continuous rather than stuttery.
+pub const INPUT_HOLD_TICKS: u32 = 12;
 
 /// Thrust flame animation duration in physics ticks.
 pub const FLAME_ANIM_TICKS: u32 = 4;
@@ -53,10 +58,10 @@ impl LanderDifficulty {
     /// Gravity acceleration (downward velocity increase per 16ms tick).
     pub fn gravity(&self) -> f64 {
         match self {
-            Self::Novice => 0.003,
-            Self::Apprentice => 0.0045,
-            Self::Journeyman => 0.006,
-            Self::Master => 0.0075,
+            Self::Novice => 0.002,
+            Self::Apprentice => 0.003,
+            Self::Journeyman => 0.004,
+            Self::Master => 0.005,
         }
     }
 
@@ -184,6 +189,12 @@ pub struct LanderGame {
     pub rotating_left: bool,
     /// True while the player is holding right rotation.
     pub rotating_right: bool,
+    /// Remaining physics ticks before clearing thrust flag.
+    pub thrust_hold_ticks: u32,
+    /// Remaining physics ticks before clearing rotate-left flag.
+    pub rotate_left_hold_ticks: u32,
+    /// Remaining physics ticks before clearing rotate-right flag.
+    pub rotate_right_hold_ticks: u32,
     /// Ticks remaining to show flame animation.
     pub flame_timer: u32,
 
@@ -226,6 +237,9 @@ impl LanderGame {
             thrusting: false,
             rotating_left: false,
             rotating_right: false,
+            thrust_hold_ticks: 0,
+            rotate_left_hold_ticks: 0,
+            rotate_right_hold_ticks: 0,
             flame_timer: 0,
 
             terrain,
