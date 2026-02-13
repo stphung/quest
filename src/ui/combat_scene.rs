@@ -100,7 +100,7 @@ fn draw_combat_compact(frame: &mut Frame, area: Rect, game_state: &GameState) {
 }
 
 /// Draws the player HP bar (borderless, single line)
-fn draw_player_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
+pub(super) fn draw_player_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let hp_ratio = game_state.combat_state.player_current_hp as f64
         / game_state.combat_state.player_max_hp as f64;
 
@@ -118,7 +118,7 @@ fn draw_player_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
 }
 
 /// Draws the enemy HP bar (borderless, single line) with zone-aware coloring
-fn draw_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
+pub(super) fn draw_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
     if let Some(enemy) = &game_state.combat_state.current_enemy {
         let hp_ratio = enemy.current_hp as f64 / enemy.max_hp as f64;
 
@@ -167,7 +167,7 @@ fn draw_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
 }
 
 /// Draws the combat status information with DPS
-fn draw_combat_status(frame: &mut Frame, area: Rect, game_state: &GameState) {
+pub(super) fn draw_combat_status(frame: &mut Frame, area: Rect, game_state: &GameState) {
     use super::throbber::{spinner_char, waiting_message};
     use crate::character::derived_stats::DerivedStats;
 
