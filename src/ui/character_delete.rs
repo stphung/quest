@@ -1,5 +1,6 @@
 use crate::character::manager::CharacterInfo;
 use crate::character::prestige::get_prestige_tier;
+use crate::ui::responsive::SizeTier;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -23,7 +24,21 @@ impl CharacterDeleteScreen {
         }
     }
 
-    pub fn draw(&self, f: &mut Frame, area: Rect, character: &CharacterInfo) {
+    pub fn draw(
+        &self,
+        f: &mut Frame,
+        area: Rect,
+        character: &CharacterInfo,
+        ctx: &super::responsive::LayoutContext,
+    ) {
+        match ctx.tier {
+            SizeTier::S | SizeTier::TooSmall => self.draw_small(f, area, character),
+            SizeTier::M => self.draw_medium(f, area, character),
+            _ => self.draw_large(f, area, character),
+        }
+    }
+
+    fn draw_large(&self, f: &mut Frame, area: Rect, character: &CharacterInfo) {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .margin(2)
@@ -50,23 +65,7 @@ impl CharacterDeleteScreen {
         self.draw_character_details(f, chunks[2], character);
 
         // Warning box
-        let warning_lines = vec![
-            Line::from(Span::styled(
-                "⚠ WARNING ⚠",
-                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-            )),
-            Line::from(""),
-            Line::from("This action is PERMANENT and IRREVERSIBLE."),
-            Line::from("All progress will be lost forever."),
-        ];
-        let warning_widget = Paragraph::new(warning_lines)
-            .alignment(Alignment::Center)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
-            );
-        f.render_widget(warning_widget, chunks[4]);
+        self.render_warning_box(f, chunks[4]);
 
         // Input label
         let label = Paragraph::new(format!(
@@ -84,6 +83,142 @@ impl CharacterDeleteScreen {
             height: 3,
         };
 
+        self.render_input_field(f, input_area);
+
+        // Controls
+        let controls = Paragraph::new("[Enter] Confirm Delete    [Esc] Cancel")
+            .alignment(Alignment::Center)
+            .style(Style::default().fg(Color::Gray));
+        f.render_widget(controls, chunks[8]);
+    }
+
+    fn draw_medium(&self, f: &mut Frame, area: Rect, character: &CharacterInfo) {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(1)
+            .constraints([
+                Constraint::Length(2), // Title
+                Constraint::Min(0),    // Character details
+                Constraint::Length(4), // Warning
+                Constraint::Length(4), // Input label + field
+                Constraint::Length(2), // Controls
+            ])
+            .split(area);
+
+        // Title
+        let title = Paragraph::new("Delete Character")
+            .style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
+            .alignment(Alignment::Center);
+        f.render_widget(title, chunks[0]);
+
+        // Character details
+        self.draw_character_details(f, chunks[1], character);
+
+        // Warning (compact)
+        self.render_warning_box(f, chunks[2]);
+
+        // Input label
+        let label = Paragraph::new(format!("Type '{}' to confirm:", character.character_name))
+            .alignment(Alignment::Center);
+        f.render_widget(label, chunks[3]);
+
+        // Input field
+        let input_area = Rect {
+            x: chunks[3].x + (chunks[3].width.saturating_sub(50)) / 2,
+            y: chunks[3].y + 1,
+            width: 50.min(chunks[3].width),
+            height: 3,
+        };
+
+        self.render_input_field(f, input_area);
+
+        // Controls
+        let controls = Paragraph::new("[Enter] Delete    [Esc] Cancel")
+            .alignment(Alignment::Center)
+            .style(Style::default().fg(Color::Gray));
+        f.render_widget(controls, chunks[4]);
+    }
+
+    fn draw_small(&self, f: &mut Frame, area: Rect, character: &CharacterInfo) {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .horizontal_margin(1)
+            .vertical_margin(0)
+            .constraints([
+                Constraint::Length(1), // Title
+                Constraint::Length(2), // Character info (compact)
+                Constraint::Length(1), // Warning
+                Constraint::Length(1), // Input label
+                Constraint::Length(3), // Input field
+                Constraint::Min(0),    // Filler
+                Constraint::Length(1), // Controls
+            ])
+            .split(area);
+
+        // Title
+        let title = Paragraph::new("Delete Character")
+            .style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
+            .alignment(Alignment::Center);
+        f.render_widget(title, chunks[0]);
+
+        // Compact character info (no border)
+        let prestige_name = get_prestige_tier(character.prestige_rank).name;
+        let info_lines = vec![
+            Line::from(Span::styled(
+                &character.character_name,
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )),
+            Line::from(format!("Lv{} {}", character.character_level, prestige_name)),
+        ];
+        let info_widget = Paragraph::new(info_lines).alignment(Alignment::Center);
+        f.render_widget(info_widget, chunks[1]);
+
+        // Warning (single line)
+        let warning = Paragraph::new(Span::styled(
+            "PERMANENT! All progress lost.",
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+        ))
+        .alignment(Alignment::Center);
+        f.render_widget(warning, chunks[2]);
+
+        // Input label
+        let label = Paragraph::new(format!("Type '{}' to confirm:", character.character_name))
+            .alignment(Alignment::Center);
+        f.render_widget(label, chunks[3]);
+
+        // Input field
+        self.render_input_field(f, chunks[4]);
+
+        // Controls
+        let controls = Paragraph::new("[Enter] Delete  [Esc] Cancel")
+            .alignment(Alignment::Center)
+            .style(Style::default().fg(Color::Gray));
+        f.render_widget(controls, chunks[6]);
+    }
+
+    fn render_warning_box(&self, f: &mut Frame, area: Rect) {
+        let warning_lines = vec![
+            Line::from(Span::styled(
+                "⚠ WARNING ⚠",
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            )),
+            Line::from(""),
+            Line::from("This action is PERMANENT and IRREVERSIBLE."),
+            Line::from("All progress will be lost forever."),
+        ];
+        let warning_widget = Paragraph::new(warning_lines)
+            .alignment(Alignment::Center)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+            );
+        f.render_widget(warning_widget, area);
+    }
+
+    fn render_input_field(&self, f: &mut Frame, area: Rect) {
         let input_text = {
             let char_count = self.confirmation_input.chars().count();
             if self.cursor_position < char_count {
@@ -100,13 +235,7 @@ impl CharacterDeleteScreen {
             .block(Block::default().borders(Borders::ALL))
             .style(Style::default().fg(Color::White))
             .alignment(Alignment::Center);
-        f.render_widget(input_widget, input_area);
-
-        // Controls
-        let controls = Paragraph::new("[Enter] Confirm Delete    [Esc] Cancel")
-            .alignment(Alignment::Center)
-            .style(Style::default().fg(Color::Gray));
-        f.render_widget(controls, chunks[8]);
+        f.render_widget(input_widget, area);
     }
 
     fn draw_character_details(&self, f: &mut Frame, area: Rect, character: &CharacterInfo) {

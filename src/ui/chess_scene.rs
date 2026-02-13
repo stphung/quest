@@ -2,7 +2,8 @@
 
 use super::game_common::{
     create_game_layout, render_forfeit_status_bar, render_game_over_banner,
-    render_info_panel_frame, render_status_bar, render_thinking_status_bar, GameResultType,
+    render_info_panel_frame, render_minigame_too_small, render_status_bar,
+    render_thinking_status_bar, GameResultType,
 };
 use crate::challenges::chess::{ChessGame, ChessResult};
 use ratatui::{
@@ -14,15 +15,27 @@ use ratatui::{
 };
 
 /// Render the chess game scene
-pub fn render_chess_scene(frame: &mut Frame, area: Rect, game: &ChessGame) {
+pub fn render_chess_scene(
+    frame: &mut Frame,
+    area: Rect,
+    game: &ChessGame,
+    ctx: &super::responsive::LayoutContext,
+) {
     // Check for game over - show board with banner
     if game.game_result.is_some() {
-        render_chess_game_over(frame, area, game);
+        render_chess_game_over(frame, area, game, ctx);
+        return;
+    }
+
+    const MIN_WIDTH: u16 = 45;
+    const MIN_HEIGHT: u16 = 22;
+    if area.width < MIN_WIDTH || area.height < MIN_HEIGHT {
+        render_minigame_too_small(frame, area, "Chess", MIN_WIDTH, MIN_HEIGHT);
         return;
     }
 
     // Use shared layout (content needs 19 lines: 1 for move history + 18 for board)
-    let layout = create_game_layout(frame, area, " Chess ", Color::Cyan, 19, 22);
+    let layout = create_game_layout(frame, area, " Chess ", Color::Cyan, 19, 22, ctx);
 
     // Split content area: move history on top, board below
     let content_chunks = Layout::default()
@@ -344,14 +357,19 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &ChessGame) {
     frame.render_widget(text, inner);
 }
 
-fn render_chess_game_over(frame: &mut Frame, area: Rect, game: &ChessGame) {
+fn render_chess_game_over(
+    frame: &mut Frame,
+    area: Rect,
+    game: &ChessGame,
+    ctx: &super::responsive::LayoutContext,
+) {
     use ratatui::widgets::Clear;
 
     // First render the board showing checkmate position
     frame.render_widget(Clear, area);
 
     // Create layout matching normal game
-    let layout = create_game_layout(frame, area, " Chess ", Color::Cyan, 19, 22);
+    let layout = create_game_layout(frame, area, " Chess ", Color::Cyan, 19, 22, ctx);
 
     // Split content area: move history on top, board below
     let content_chunks = Layout::default()

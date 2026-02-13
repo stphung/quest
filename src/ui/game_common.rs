@@ -9,6 +9,8 @@ use ratatui::{
     Frame,
 };
 
+use super::responsive::{LayoutContext, SizeTier};
+
 /// Layout areas returned by `create_game_layout`.
 pub struct GameLayout {
     /// Main content area (board/grid) - top left, inside outer border
@@ -48,6 +50,7 @@ pub fn create_game_layout(
     border_color: Color,
     content_min_height: u16,
     info_panel_width: u16,
+    ctx: &LayoutContext,
 ) -> GameLayout {
     frame.render_widget(Clear, area);
 
@@ -60,10 +63,20 @@ pub fn create_game_layout(
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
+    // Hide info panel when width tier is below L to give the board full width
+    let effective_info_width = if ctx.width_tier >= SizeTier::L {
+        info_panel_width
+    } else {
+        0
+    };
+
     // Horizontal split: content area (left) | info panel (right)
     let h_chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Min(20), Constraint::Length(info_panel_width)])
+        .constraints([
+            Constraint::Min(20),
+            Constraint::Length(effective_info_width),
+        ])
         .split(inner);
 
     // Left side: content (top) + status bar (bottom 2 lines)
@@ -307,7 +320,12 @@ pub fn render_info_panel_frame(frame: &mut Frame, area: Rect) -> Rect {
 }
 
 /// Render the "Welcome Back" overlay for offline progression.
-pub fn render_offline_welcome(frame: &mut Frame, area: Rect, report: &OfflineReport) {
+pub fn render_offline_welcome(
+    frame: &mut Frame,
+    area: Rect,
+    report: &OfflineReport,
+    _ctx: &super::responsive::LayoutContext,
+) {
     // Centered modal box
     let modal_width = 44u16;
     let modal_height = if report.level_before < report.level_after {
@@ -448,4 +466,50 @@ pub fn render_forfeit_status_bar(frame: &mut Frame, area: Rect, forfeit_pending:
         FORFEIT_CONTROLS,
     );
     true
+}
+
+/// Render a "terminal too small" message for a minigame that cannot fit.
+///
+/// Shows the game name, required vs actual dimensions, and a forfeit hint.
+pub fn render_minigame_too_small(
+    frame: &mut Frame,
+    area: Rect,
+    game_name: &str,
+    min_width: u16,
+    min_height: u16,
+) {
+    frame.render_widget(Clear, area);
+    let lines = vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            format!("{} in progress", game_name),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Terminal too small to display board.",
+            Style::default().fg(Color::White),
+        )),
+        Line::from(Span::styled(
+            format!(
+                "Need: {}x{}   Have: {}x{}",
+                min_width, min_height, area.width, area.height
+            ),
+            Style::default().fg(Color::DarkGray),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Please resize your terminal.",
+            Style::default().fg(Color::White),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            "[Esc] Forfeit",
+            Style::default().fg(Color::DarkGray),
+        )),
+    ];
+    let text = Paragraph::new(lines).alignment(Alignment::Center);
+    frame.render_widget(text, area);
 }

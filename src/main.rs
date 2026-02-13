@@ -172,23 +172,25 @@ fn draw_game_overlays(
     debug_menu: &utils::debug_menu::DebugMenu,
     last_save_instant: Option<Instant>,
     last_save_time: Option<chrono::DateTime<chrono::Local>>,
+    ctx: &ui::responsive::LayoutContext,
 ) {
     let area = frame.size();
     match overlay {
         GameOverlay::OfflineWelcome { report } => {
-            ui::game_common::render_offline_welcome(frame, area, report);
+            ui::game_common::render_offline_welcome(frame, area, report, ctx);
         }
         GameOverlay::PrestigeConfirm => {
-            ui::prestige_confirm::draw_prestige_confirm(frame, state);
+            ui::prestige_confirm::draw_prestige_confirm(frame, state, ctx);
         }
         GameOverlay::HavenDiscovery => {
-            ui::haven_scene::render_haven_discovery_modal(frame, area);
+            ui::haven_scene::render_haven_discovery_modal(frame, area, ctx);
         }
         GameOverlay::AchievementUnlocked { ref achievements } => {
             ui::achievement_browser_scene::render_achievement_unlocked_modal(
                 frame,
                 area,
                 achievements,
+                ctx,
             );
         }
         GameOverlay::VaultSelection {
@@ -202,6 +204,7 @@ fn draw_game_overlays(
                 haven.get_bonus(haven::HavenBonusType::VaultSlots) as u8,
                 *selected_index,
                 selected_slots,
+                ctx,
             );
         }
         GameOverlay::Achievements { browser } => {
@@ -210,10 +213,16 @@ fn draw_game_overlays(
                 area,
                 global_achievements,
                 browser,
+                ctx,
             );
         }
         GameOverlay::LeviathanEncounter { encounter_number } => {
-            ui::fishing_scene::render_leviathan_encounter_modal(frame, area, *encounter_number);
+            ui::fishing_scene::render_leviathan_encounter_modal(
+                frame,
+                area,
+                *encounter_number,
+                ctx,
+            );
         }
         GameOverlay::None => {}
     }
@@ -227,6 +236,7 @@ fn draw_game_overlays(
             haven_ui.selected_room,
             state.prestige_rank,
             global_achievements,
+            ctx,
         );
         match haven_ui.confirmation {
             input::HavenConfirmation::Build => {
@@ -237,6 +247,7 @@ fn draw_game_overlays(
                     room,
                     haven,
                     state.prestige_rank,
+                    ctx,
                 );
             }
             input::HavenConfirmation::Forge => {
@@ -245,6 +256,7 @@ fn draw_game_overlays(
                     area,
                     global_achievements,
                     state.prestige_rank,
+                    ctx,
                 );
             }
             input::HavenConfirmation::None => {}
@@ -253,15 +265,15 @@ fn draw_game_overlays(
 
     // Debug indicator / save indicator
     if debug_mode {
-        ui::debug_menu_scene::render_debug_indicator(frame, area);
+        ui::debug_menu_scene::render_debug_indicator(frame, area, ctx);
         if debug_menu.is_open {
-            ui::debug_menu_scene::render_debug_menu(frame, area, debug_menu);
+            ui::debug_menu_scene::render_debug_menu(frame, area, debug_menu, ctx);
         }
     } else {
         let is_saving = last_save_instant
             .map(|t| t.elapsed() < Duration::from_secs(1))
             .unwrap_or(false);
-        ui::debug_menu_scene::render_save_indicator(frame, area, is_saving, last_save_time);
+        ui::debug_menu_scene::render_save_indicator(frame, area, is_saving, last_save_time, ctx);
     }
 }
 
@@ -420,7 +432,8 @@ fn main() -> io::Result<()> {
                 // Draw character creation screen
                 terminal.draw(|f| {
                     let area = f.size();
-                    creation_screen.draw(f, area);
+                    let ctx = ui::responsive::LayoutContext::from_frame(f);
+                    creation_screen.draw(f, area, &ctx);
                 })?;
 
                 // Handle input
@@ -464,7 +477,8 @@ fn main() -> io::Result<()> {
                 // Draw character select screen (includes Haven tree visualization)
                 terminal.draw(|f| {
                     let area = f.size();
-                    select_screen.draw(f, area, &characters, &haven);
+                    let ctx = ui::responsive::LayoutContext::from_frame(f);
+                    select_screen.draw(f, area, &characters, &haven, &ctx);
                     // Draw Haven management overlay if open
                     if haven_ui.showing {
                         ui::haven_scene::render_haven_tree(
@@ -474,6 +488,7 @@ fn main() -> io::Result<()> {
                             haven_ui.selected_room,
                             0, // No character selected, so prestige rank = 0
                             &global_achievements,
+                            &ctx,
                         );
                     }
                     // Draw achievement browser overlay if open
@@ -483,6 +498,7 @@ fn main() -> io::Result<()> {
                             area,
                             &global_achievements,
                             &achievement_browser,
+                            &ctx,
                         );
                     }
                 })?;
@@ -678,7 +694,8 @@ fn main() -> io::Result<()> {
                 // Draw delete confirmation screen
                 terminal.draw(|f| {
                     let area = f.size();
-                    delete_screen.draw(f, area, selected_character);
+                    let ctx = ui::responsive::LayoutContext::from_frame(f);
+                    delete_screen.draw(f, area, selected_character, &ctx);
                 })?;
 
                 // Handle input
@@ -729,7 +746,8 @@ fn main() -> io::Result<()> {
                 // Draw rename screen
                 terminal.draw(|f| {
                     let area = f.size();
-                    rename_screen.draw(f, area, selected_character);
+                    let ctx = ui::responsive::LayoutContext::from_frame(f);
+                    rename_screen.draw(f, area, selected_character, &ctx);
                 })?;
 
                 // Handle input
@@ -811,6 +829,7 @@ fn main() -> io::Result<()> {
 
                     // Draw UI
                     terminal.draw(|frame| {
+                        let ctx = ui::responsive::LayoutContext::from_frame(frame);
                         draw_ui_with_update(
                             frame,
                             &state,
@@ -831,6 +850,7 @@ fn main() -> io::Result<()> {
                             &debug_menu,
                             last_save_instant,
                             last_save_time,
+                            &ctx,
                         );
                     })?;
 

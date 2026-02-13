@@ -41,6 +41,7 @@ pub fn render_fishing_scene(
     area: Rect,
     session: &FishingSession,
     fishing_state: &FishingState,
+    _ctx: &super::responsive::LayoutContext,
 ) {
     // Main vertical layout (recent catches now shown in the Loot panel)
     let chunks = Layout::default()
@@ -347,7 +348,12 @@ const LEVIATHAN_ENCOUNTERS: [LeviathanEncounterData; 10] = [
 ///
 /// This modal appears when the player encounters the Leviathan during fishing.
 /// The encounter number (1-10) determines which stage of the hunt is shown.
-pub fn render_leviathan_encounter_modal(frame: &mut Frame, area: Rect, encounter_number: u8) {
+pub fn render_leviathan_encounter_modal(
+    frame: &mut Frame,
+    area: Rect,
+    encounter_number: u8,
+    _ctx: &super::responsive::LayoutContext,
+) {
     if encounter_number == 0 || encounter_number > 10 {
         return;
     }

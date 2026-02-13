@@ -2,6 +2,7 @@ use crate::character::manager::CharacterInfo;
 use crate::character::prestige::get_prestige_tier;
 use crate::haven::{Haven, HavenRoomId};
 use crate::items::types::EquipmentSlot;
+use crate::ui::responsive::SizeTier;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -21,7 +22,28 @@ impl CharacterSelectScreen {
         Self { selected_index: 0 }
     }
 
-    pub fn draw(&self, f: &mut Frame, area: Rect, characters: &[CharacterInfo], haven: &Haven) {
+    pub fn draw(
+        &self,
+        f: &mut Frame,
+        area: Rect,
+        characters: &[CharacterInfo],
+        haven: &Haven,
+        ctx: &super::responsive::LayoutContext,
+    ) {
+        match ctx.tier {
+            SizeTier::S | SizeTier::TooSmall => {
+                self.draw_small(f, area, characters, haven);
+            }
+            SizeTier::M => {
+                self.draw_medium(f, area, characters, haven);
+            }
+            _ => {
+                self.draw_large(f, area, characters, haven);
+            }
+        }
+    }
+
+    fn draw_large(&self, f: &mut Frame, area: Rect, characters: &[CharacterInfo], haven: &Haven) {
         // Only show Haven section if discovered (keep it secret otherwise!)
         let constraints = if haven.discovered {
             vec![
@@ -78,36 +100,192 @@ impl CharacterSelectScreen {
         };
 
         // Controls
+        self.draw_controls(f, chunks[controls_idx], characters, haven, false);
+    }
+
+    fn draw_medium(&self, f: &mut Frame, area: Rect, characters: &[CharacterInfo], haven: &Haven) {
+        // M tier: reduced margins, no Haven tree, compact layout
+        let constraints = vec![
+            Constraint::Length(2), // Title
+            Constraint::Min(0),    // Main content
+            Constraint::Length(3), // Controls
+        ];
+
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(1)
+            .constraints(constraints)
+            .split(area);
+
+        // Title
+        let title = Paragraph::new("Select Your Hero")
+            .style(
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .alignment(Alignment::Center);
+        f.render_widget(title, chunks[0]);
+
+        // Main content - split horizontally with less space for details
+        let main_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Percentage(40), // Character list
+                Constraint::Percentage(60), // Details panel
+            ])
+            .split(chunks[1]);
+
+        // Draw character list
+        self.draw_character_list(f, main_chunks[0], characters);
+
+        // Draw character details
+        self.draw_character_details(f, main_chunks[1], characters);
+
+        // Controls (compact)
+        self.draw_controls(f, chunks[2], characters, haven, true);
+    }
+
+    fn draw_small(&self, f: &mut Frame, area: Rect, characters: &[CharacterInfo], haven: &Haven) {
+        // S tier: minimal list view, no details panel, no Haven tree
+        let constraints = vec![
+            Constraint::Length(1), // Title
+            Constraint::Min(0),    // Character list only
+            Constraint::Length(2), // Controls
+        ];
+
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .horizontal_margin(1)
+            .vertical_margin(0)
+            .constraints(constraints)
+            .split(area);
+
+        // Title
+        let title = Paragraph::new("Select Your Hero")
+            .style(
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .alignment(Alignment::Center);
+        f.render_widget(title, chunks[0]);
+
+        // Character list only (no details panel)
+        self.draw_character_list_compact(f, chunks[1], characters);
+
+        // Compact controls
+        self.draw_controls(f, chunks[2], characters, haven, true);
+    }
+
+    fn draw_controls(
+        &self,
+        f: &mut Frame,
+        area: Rect,
+        characters: &[CharacterInfo],
+        haven: &Haven,
+        compact: bool,
+    ) {
         let new_button = if characters.len() >= 3 {
             "[N] New (Max 3)"
         } else {
             "[N] New"
         };
-        let mut control_lines = vec![Line::from(format!(
-            "[Enter] Play    [R] Rename    [D] Delete    {}    [Esc] Quit",
-            new_button
-        ))];
-        // Second row: Achievements always shown, Haven only if discovered
-        let mut second_row_spans = vec![Span::styled(
-            "[A] Achievements",
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        )];
-        if haven.discovered {
-            second_row_spans.push(Span::raw("    "));
-            second_row_spans.push(Span::styled(
-                "[H] Haven",
+
+        if compact {
+            // Single-line or two tight lines
+            let mut control_lines = vec![Line::from(format!(
+                "[Enter] Play  [R] Rename  [D] Del  {}  [Esc] Quit",
+                new_button
+            ))];
+            let mut second_row_spans = vec![Span::styled(
+                "[A] Achv",
                 Style::default()
                     .fg(Color::Yellow)
                     .add_modifier(Modifier::BOLD),
-            ));
+            )];
+            if haven.discovered {
+                second_row_spans.push(Span::raw("  "));
+                second_row_spans.push(Span::styled(
+                    "[H] Haven",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ));
+            }
+            control_lines.push(Line::from(second_row_spans));
+            let controls = Paragraph::new(control_lines)
+                .alignment(Alignment::Center)
+                .style(Style::default().fg(Color::Gray));
+            f.render_widget(controls, area);
+        } else {
+            let mut control_lines = vec![Line::from(format!(
+                "[Enter] Play    [R] Rename    [D] Delete    {}    [Esc] Quit",
+                new_button
+            ))];
+            let mut second_row_spans = vec![Span::styled(
+                "[A] Achievements",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )];
+            if haven.discovered {
+                second_row_spans.push(Span::raw("    "));
+                second_row_spans.push(Span::styled(
+                    "[H] Haven",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ));
+            }
+            control_lines.push(Line::from(second_row_spans));
+            let controls = Paragraph::new(control_lines)
+                .alignment(Alignment::Center)
+                .style(Style::default().fg(Color::Gray));
+            f.render_widget(controls, area);
         }
-        control_lines.push(Line::from(second_row_spans));
-        let controls = Paragraph::new(control_lines)
-            .alignment(Alignment::Center)
-            .style(Style::default().fg(Color::Gray));
-        f.render_widget(controls, chunks[controls_idx]);
+    }
+
+    fn draw_character_list_compact(&self, f: &mut Frame, area: Rect, characters: &[CharacterInfo]) {
+        // S tier: simple list with no borders, no spacing between entries
+        if characters.is_empty() {
+            let empty_message = Paragraph::new("No characters. Press [N] to create.")
+                .style(Style::default().fg(Color::Gray))
+                .alignment(Alignment::Center);
+            f.render_widget(empty_message, area);
+            return;
+        }
+
+        let mut lines = Vec::new();
+
+        for (i, character) in characters.iter().enumerate() {
+            let is_selected = i == self.selected_index;
+            let marker = if is_selected { ">" } else { " " };
+
+            let prestige_name = get_prestige_tier(character.prestige_rank).name;
+
+            let text = if character.is_corrupted {
+                format!("{} {} (CORRUPTED)", marker, character.filename)
+            } else {
+                format!(
+                    "{} {} Lv{} {}",
+                    marker, character.character_name, character.character_level, prestige_name
+                )
+            };
+
+            let style = if is_selected {
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            };
+
+            lines.push(Line::from(Span::styled(text, style)));
+        }
+
+        let list_widget = Paragraph::new(lines);
+        f.render_widget(list_widget, area);
     }
 
     fn draw_character_list(&self, f: &mut Frame, area: Rect, characters: &[CharacterInfo]) {

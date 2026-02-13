@@ -7,7 +7,7 @@
 
 use super::game_common::{
     create_game_layout, render_forfeit_status_bar, render_game_over_overlay,
-    render_info_panel_frame, render_status_bar, GameResultType,
+    render_info_panel_frame, render_minigame_too_small, render_status_bar, GameResultType,
 };
 use crate::challenges::menu::DifficultyInfo;
 use crate::challenges::snake::types::{SnakeGame, SnakeResult};
@@ -36,13 +36,33 @@ const BODY_DIM: (f64, f64, f64) = (20.0, 80.0, 20.0);
 const EMPTY_BG: Color = Color::Rgb(12, 12, 18);
 
 /// Render the Snake game scene.
-pub fn render_snake_scene(frame: &mut Frame, area: Rect, game: &SnakeGame) {
+pub fn render_snake_scene(
+    frame: &mut Frame,
+    area: Rect,
+    game: &SnakeGame,
+    ctx: &super::responsive::LayoutContext,
+) {
     if game.game_result.is_some() {
         render_snake_game_over(frame, area, game);
         return;
     }
 
-    let layout = create_game_layout(frame, area, " Serpent's Path ", Color::LightGreen, 20, 16);
+    const MIN_WIDTH: u16 = 28;
+    const MIN_HEIGHT: u16 = 16;
+    if area.width < MIN_WIDTH || area.height < MIN_HEIGHT {
+        render_minigame_too_small(frame, area, "Serpent's Path", MIN_WIDTH, MIN_HEIGHT);
+        return;
+    }
+
+    let layout = create_game_layout(
+        frame,
+        area,
+        " Serpent's Path ",
+        Color::LightGreen,
+        20,
+        16,
+        ctx,
+    );
 
     render_play_field(frame, layout.content, game);
 

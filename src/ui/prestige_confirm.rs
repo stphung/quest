@@ -9,7 +9,11 @@ use ratatui::{
 };
 
 /// Draws the prestige confirmation dialog as an overlay
-pub fn draw_prestige_confirm(frame: &mut Frame, game_state: &GameState) {
+pub fn draw_prestige_confirm(
+    frame: &mut Frame,
+    game_state: &GameState,
+    _ctx: &super::responsive::LayoutContext,
+) {
     let size = frame.size();
 
     // Calculate dialog size and position (centered)

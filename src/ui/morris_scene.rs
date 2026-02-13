@@ -2,7 +2,8 @@
 
 use super::game_common::{
     create_game_layout, render_forfeit_status_bar, render_game_over_banner,
-    render_info_panel_frame, render_status_bar, render_thinking_status_bar, GameResultType,
+    render_info_panel_frame, render_minigame_too_small, render_status_bar,
+    render_thinking_status_bar, GameResultType,
 };
 use crate::challenges::morris::{
     MorrisGame, MorrisMove, MorrisPhase, MorrisResult, Player, ADJACENCIES,
@@ -16,7 +17,13 @@ use ratatui::{
 };
 
 /// Render the Nine Men's Morris game scene
-pub fn render_morris_scene(frame: &mut Frame, area: Rect, game: &MorrisGame, character_level: u32) {
+pub fn render_morris_scene(
+    frame: &mut Frame,
+    area: Rect,
+    game: &MorrisGame,
+    character_level: u32,
+    ctx: &super::responsive::LayoutContext,
+) {
     // Check for game over - show board with banner
     if game.game_result.is_some() {
         let xp_for_level = crate::core::game_logic::xp_for_next_level(character_level.max(1));
@@ -24,12 +31,19 @@ pub fn render_morris_scene(frame: &mut Frame, area: Rect, game: &MorrisGame, cha
             (xp_for_level as f64 * game.difficulty.reward_xp_percent() as f64 / 100.0) as u64;
         let xp_reward = xp_reward.max(100);
         let is_master = game.difficulty == crate::challenges::morris::MorrisDifficulty::Master;
-        render_morris_game_over(frame, area, game, xp_reward, is_master);
+        render_morris_game_over(frame, area, game, xp_reward, is_master, ctx);
+        return;
+    }
+
+    const MIN_WIDTH: u16 = 27;
+    const MIN_HEIGHT: u16 = 16;
+    if area.width < MIN_WIDTH || area.height < MIN_HEIGHT {
+        render_minigame_too_small(frame, area, "Nine Men's Morris", MIN_WIDTH, MIN_HEIGHT);
         return;
     }
 
     // Use shared layout
-    let layout = create_game_layout(frame, area, " Nine Men's Morris ", Color::Cyan, 13, 24);
+    let layout = create_game_layout(frame, area, " Nine Men's Morris ", Color::Cyan, 13, 24, ctx);
 
     render_board(frame, layout.content, game, false);
     render_status(frame, layout.status_bar, game);
@@ -528,6 +542,7 @@ fn render_morris_game_over(
     game: &MorrisGame,
     xp_reward: u64,
     is_master: bool,
+    ctx: &super::responsive::LayoutContext,
 ) {
     use ratatui::widgets::Clear;
 
@@ -535,7 +550,7 @@ fn render_morris_game_over(
     frame.render_widget(Clear, area);
 
     // Create layout matching normal game
-    let layout = create_game_layout(frame, area, " Nine Men's Morris ", Color::Cyan, 13, 24);
+    let layout = create_game_layout(frame, area, " Nine Men's Morris ", Color::Cyan, 13, 24, ctx);
 
     // Render board with last move highlighted
     render_board(frame, layout.content, game, true);

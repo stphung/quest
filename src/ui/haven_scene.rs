@@ -13,7 +13,12 @@ use ratatui::{
 
 /// Render a small Haven status indicator (for character select screen)
 #[allow(dead_code)] // May be used for compact display mode later
-pub fn render_haven_indicator(frame: &mut Frame, area: Rect, haven: &Haven) {
+pub fn render_haven_indicator(
+    frame: &mut Frame,
+    area: Rect,
+    haven: &Haven,
+    _ctx: &super::responsive::LayoutContext,
+) {
     if !haven.discovered {
         return; // Don't show anything if Haven not discovered
     }
@@ -47,6 +52,7 @@ pub fn render_haven_tree(
     selected_room: usize,
     prestige_rank: u32,
     achievements: &crate::achievements::Achievements,
+    _ctx: &super::responsive::LayoutContext,
 ) {
     frame.render_widget(Clear, area);
 
@@ -424,18 +430,17 @@ fn render_room_detail(
 }
 
 /// Render the Haven discovery modal
-pub fn render_haven_discovery_modal(frame: &mut Frame, area: Rect) {
+pub fn render_haven_discovery_modal(
+    frame: &mut Frame,
+    area: Rect,
+    _ctx: &super::responsive::LayoutContext,
+) {
     // Center the modal
-    let modal_width = 50;
-    let modal_height = 7;
+    let modal_width = 50u16.min(area.width.saturating_sub(4));
+    let modal_height = 7u16.min(area.height.saturating_sub(4));
     let x = area.x + (area.width.saturating_sub(modal_width)) / 2;
     let y = area.y + (area.height.saturating_sub(modal_height)) / 2;
-    let modal_area = Rect::new(
-        x,
-        y,
-        modal_width.min(area.width),
-        modal_height.min(area.height),
-    );
+    let modal_area = Rect::new(x, y, modal_width, modal_height);
 
     frame.render_widget(Clear, modal_area);
 
@@ -476,18 +481,14 @@ pub fn render_build_confirmation(
     room: HavenRoomId,
     haven: &Haven,
     prestige_rank: u32,
+    _ctx: &super::responsive::LayoutContext,
 ) {
     // Center the modal
-    let modal_width = 45;
-    let modal_height = 9;
+    let modal_width = 45u16.min(area.width.saturating_sub(4));
+    let modal_height = 9u16.min(area.height.saturating_sub(4));
     let x = area.x + (area.width.saturating_sub(modal_width)) / 2;
     let y = area.y + (area.height.saturating_sub(modal_height)) / 2;
-    let modal_area = Rect::new(
-        x,
-        y,
-        modal_width.min(area.width),
-        modal_height.min(area.height),
-    );
+    let modal_area = Rect::new(x, y, modal_width, modal_height);
 
     frame.render_widget(Clear, modal_area);
 
@@ -549,18 +550,14 @@ pub fn render_forge_confirmation(
     area: Rect,
     achievements: &crate::achievements::Achievements,
     prestige_rank: u32,
+    _ctx: &super::responsive::LayoutContext,
 ) {
     // Center the modal
-    let modal_width = 50;
-    let modal_height = 12;
+    let modal_width = 50u16.min(area.width.saturating_sub(4));
+    let modal_height = 12u16.min(area.height.saturating_sub(4));
     let x = area.x + (area.width.saturating_sub(modal_width)) / 2;
     let y = area.y + (area.height.saturating_sub(modal_height)) / 2;
-    let modal_area = Rect::new(
-        x,
-        y,
-        modal_width.min(area.width),
-        modal_height.min(area.height),
-    );
+    let modal_area = Rect::new(x, y, modal_width, modal_height);
 
     frame.render_widget(Clear, modal_area);
 
@@ -646,6 +643,7 @@ pub fn render_vault_selection(
     vault_slots: u8,
     selected_index: usize,
     selected_items: &[EquipmentSlot],
+    _ctx: &super::responsive::LayoutContext,
 ) {
     frame.render_widget(Clear, area);
 

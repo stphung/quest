@@ -1,3 +1,4 @@
+use super::responsive::{LayoutContext, SizeTier};
 use crate::combat::logic::effective_enemy_attack_interval;
 use crate::core::constants::ATTACK_INTERVAL_SECONDS;
 use crate::core::game_state::GameState;
@@ -13,7 +14,31 @@ use super::combat_3d::render_combat_3d;
 use super::enemy_sprites::zone_palette;
 
 /// Draws the combat scene with 3D first-person view
-pub fn draw_combat_scene(frame: &mut Frame, area: Rect, game_state: &GameState) {
+pub fn draw_combat_scene(
+    frame: &mut Frame,
+    area: Rect,
+    game_state: &GameState,
+    ctx: &LayoutContext,
+) {
+    match ctx.tier {
+        SizeTier::M => {
+            // Compact: no 3D sprite, just HP bars + status, with border
+            draw_combat_compact(frame, area, game_state);
+        }
+        SizeTier::S => {
+            // Minimal: no border, no sprite — HP bars handled by S layout directly
+            // When called from S layout, just show combat status
+            draw_combat_status(frame, area, game_state);
+        }
+        _ => {
+            // Full layout with 3D sprite (XL/L)
+            draw_combat_full(frame, area, game_state);
+        }
+    }
+}
+
+/// Full combat scene with 3D sprite (XL/L tier).
+fn draw_combat_full(frame: &mut Frame, area: Rect, game_state: &GameState) {
     // Single outer border wrapping everything
     let outer_block = Block::default()
         .borders(Borders::ALL)
@@ -46,6 +71,31 @@ pub fn draw_combat_scene(frame: &mut Frame, area: Rect, game_state: &GameState) 
 
     // Draw combat status
     draw_combat_status(frame, chunks[3], game_state);
+}
+
+/// Compact combat scene for M tier: HP bars + status, no 3D sprite.
+fn draw_combat_compact(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    let outer_block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Red))
+        .title(" Combat ");
+
+    let inner = outer_block.inner(area);
+    frame.render_widget(outer_block, area);
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1), // Player HP
+            Constraint::Length(1), // Enemy HP
+            Constraint::Length(1), // Status
+            Constraint::Min(0),    // Remaining space (unused)
+        ])
+        .split(inner);
+
+    draw_player_hp(frame, chunks[0], game_state);
+    draw_enemy_hp(frame, chunks[1], game_state);
+    draw_combat_status(frame, chunks[2], game_state);
 }
 
 /// Draws the player HP bar (borderless, single line)
