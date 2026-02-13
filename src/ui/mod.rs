@@ -133,19 +133,19 @@ fn draw_xl_l_layout(
         Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(stats_height),       // Main content (stats + right panel)
-                Constraint::Min(6),                    // Full-width Loot + Combat (grows)
-                Constraint::Length(12),                // Update drawer panel (taller for changelog)
-                Constraint::Length(3),                 // Full-width footer
+                Constraint::Length(stats_height), // Main content (stats + right panel)
+                Constraint::Min(6),               // Full-width Loot + Combat (grows)
+                Constraint::Length(12),           // Update drawer panel (taller for changelog)
+                Constraint::Length(3),            // Full-width footer
             ])
             .split(main_area)
     } else {
         Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(stats_height),       // Main content (stats + right panel)
-                Constraint::Min(6),                    // Full-width Loot + Combat (grows)
-                Constraint::Length(3),                 // Full-width footer
+                Constraint::Length(stats_height), // Main content (stats + right panel)
+                Constraint::Min(6),               // Full-width Loot + Combat (grows)
+                Constraint::Length(3),            // Full-width footer
             ])
             .split(main_area)
     };

@@ -456,10 +456,7 @@ fn draw_fishing_panel(frame: &mut Frame, area: Rect, game_state: &GameState) {
     };
 
     let rank_line = Line::from(vec![
-        Span::styled(
-            "🎣 Rank: ",
-            Style::default().add_modifier(Modifier::BOLD),
-        ),
+        Span::styled("🎣 Rank: ", Style::default().add_modifier(Modifier::BOLD)),
         Span::styled(
             format!(
                 "{} ({})",
