@@ -93,6 +93,26 @@ These states are managed in `main.rs` and rendered by corresponding `ui/characte
 6. Update scoring weights in `items/scoring.rs`
 7. Update UI display in `ui/stats_panel.rs`
 
+### `PrestigeCombatBonuses` (`prestige.rs`)
+
+Flat combat bonuses computed from prestige rank, applied during combat each tick:
+
+```rust
+#[derive(Debug, Clone, Copy, Default)]
+pub struct PrestigeCombatBonuses {
+    pub flat_damage: u32,    // Added after Haven % bonus, before enemy defense
+    pub flat_defense: u32,   // Added to DEX-based defense
+    pub crit_chance: f64,    // Added to DEX-based crit (capped at 15%)
+    pub flat_hp: u32,        // Added to combat max HP (not DerivedStats)
+}
+```
+
+Computed via `PrestigeCombatBonuses::from_rank(rank)` using power-law formulas from `core/constants.rs`:
+- `flat_damage = floor(5.0 * rank^0.7)` -- P5: 15, P10: 25, P20: 40
+- `flat_defense = floor(3.0 * rank^0.6)` -- P5: 7, P10: 11, P20: 18
+- `crit_chance = min(rank * 0.5, 15.0)` -- P10: 5%, P20: 10%, P30: 15%
+- `flat_hp = floor(15.0 * rank^0.6)` -- P5: 39, P10: 59, P20: 90
+
 ### Adding a New Prestige Benefit
 1. Add the benefit logic in `prestige.rs` (or relevant module)
 2. Apply it during `perform_prestige()` or in derived stat calculation

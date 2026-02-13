@@ -70,7 +70,7 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 - `game_state.rs` — Main character state struct (level, XP, prestige, combat state, equipment)
 - `game_logic.rs` — XP curve (`100 × level^1.5`), leveling (+3 random attribute points), enemy spawning, offline progression
 - `tick.rs` — Per-tick game engine: `game_tick<R: Rng>()` with 9 processing stages, returns `TickResult` with `Vec<TickEvent>` (25+ variants). Zero UI imports, zero file I/O — fully decoupled from rendering
-- `constants.rs` — Game balance constants (tick rate, attack interval, XP rates, item drop rates, update check jitter)
+- `constants.rs` — Game balance constants (tick rate, attack intervals, XP rates, item drop rates, zone enemy stats, boss multipliers, prestige combat bonuses, update check jitter)
 
 ### Simulator (`src/bin/simulator.rs`)
 
@@ -80,7 +80,7 @@ Headless game balance simulator that calls the same `game_tick()` code with no U
 cargo run --release --bin simulator -- --ticks 36000 --seed 42 --prestige 10 --runs 3
 ```
 
-CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FILE`, `--quiet`
+CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FILE`, `--quiet`, `--stormbreaker` (force-unlocks TheStormbreaker achievement for Zone 10+ testing)
 
 **Limitation:** Only exercises the combat/zone progression loop. Interactive systems (dungeons, fishing, challenges, haven) are discovered but never activated (no player input). See issue #141 for auto-play policies.
 
@@ -88,19 +88,19 @@ CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FI
 
 - `attributes.rs` — 6 RPG attributes (STR, DEX, CON, INT, WIS, CHA), modifier = `(value - 10) / 2`
 - `derived_stats.rs` — Combat stats calculated from attributes (HP, damage, defense, crit, XP mult)
-- `prestige.rs` — Prestige tiers (Bronze→Eternal) with XP multipliers (`1+0.5×rank^0.7`, diminishing returns) and attribute cap increases (`10+rank×5`)
+- `prestige.rs` — Prestige tiers (Bronze→Eternal) with XP multipliers (`1+0.5×rank^0.7`, diminishing returns), attribute cap increases (`10+rank×5`), and `PrestigeCombatBonuses` (flat damage/defense/crit/HP from rank)
 - `manager.rs` — Character CRUD operations (create, delete, rename), JSON save/load in ~/.quest/, name validation
 - `input.rs` — Character selection, creation, deletion, renaming input handling and UI states
 
 ### Combat Module (`src/combat/`) — [detailed docs](src/combat/CLAUDE.md)
 
-- `types.rs` — Enemy generation and combat state machine
-- `logic.rs` — Turn-based combat mechanics, damage calculation, event emission
+- `types.rs` — Enemy struct (with defense field), zone-based enemy generators, combat state machine
+- `logic.rs` — Turn-based combat mechanics with prestige bonuses, damage pipeline (Haven % -> prestige flat -> enemy defense -> crit), event emission
 
 ### Zone System (`src/zones/`)
 
-- `data.rs` — 10 zones with 3-4 subzones each, prestige requirements, boss definitions
-- `progression.rs` — Zone/subzone progression state, kill tracking (10 kills → boss spawn), weapon gates
+- `data.rs` — 11 zones with 3-4 subzones each, prestige requirements, boss definitions
+- `progression.rs` — Zone/subzone progression state, kill tracking (10 kills → boss spawn, 5 kills to retry after boss death), weapon gates
 
 **Zone Tiers:**
 - P0: Meadow, Dark Forest (3 subzones each)
@@ -108,6 +108,7 @@ CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FI
 - P10: Volcanic Wastes, Frozen Tundra (4 subzones each)
 - P15: Crystal Caverns, Sunken Kingdom (4 subzones each)
 - P20: Floating Isles, Storm Citadel (4 subzones each, Zone 10 requires Stormbreaker)
+- Post-game: The Expanse (Zone 11, 4 subzones, cycles infinitely, endgame difficulty wall)
 
 ### Dungeon Module (`src/dungeon/`) — [detailed docs](src/dungeon/CLAUDE.md)
 
@@ -145,6 +146,8 @@ CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FI
 - `gomoku/` — Gomoku (Five in a Row) on 15×15 board, minimax AI (depth 2-5)
 - `minesweeper/` — Trap Detection, 4 difficulties (9×9 to 20×16)
 - `rune/` — Rune Deciphering (Mastermind-style deduction), 4 difficulties
+- `flappy/` — Flappy Bird (real-time ~60 FPS side-scroller, pipe obstacles, gravity physics)
+- `snake/` — Snake (real-time ~60 FPS, growing snake, food collection on grid)
 
 ### Haven Module (`src/haven/`) — [detailed docs](src/haven/CLAUDE.md)
 
@@ -169,7 +172,7 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 
 - `build_info.rs` — Build metadata (commit, date) embedded at compile time
 - `updater.rs` — Self-update from GitHub releases (30min check interval ±5min jitter)
-- `debug_menu.rs` — Debug menu for testing discoveries (activate with `--debug` flag, toggle with backtick). Options: trigger dungeons, fishing, all 6 challenge types, Haven discovery
+- `debug_menu.rs` — Debug menu for testing discoveries (activate with `--debug` flag, toggle with backtick). Options: trigger dungeons, fishing, all 8 challenge types, Haven discovery
 
 ### UI (`src/ui/`) — [detailed docs](src/ui/CLAUDE.md)
 
@@ -187,7 +190,7 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 - `prestige_confirm.rs` — Prestige confirmation dialog
 - `achievement_browser_scene.rs` — Achievement browsing and tracking
 - `challenge_menu_scene.rs` — Challenge menu list/detail view
-- `chess_scene.rs`, `go_scene.rs`, `morris_scene.rs`, `gomoku_scene.rs`, `minesweeper_scene.rs`, `rune_scene.rs` — Minigame UIs
+- `chess_scene.rs`, `go_scene.rs`, `morris_scene.rs`, `gomoku_scene.rs`, `minesweeper_scene.rs`, `rune_scene.rs`, `flappy_scene.rs`, `snake_scene.rs` — Minigame UIs
 - `debug_menu_scene.rs` — Debug menu overlay
 - `throbber.rs` — Shared spinner animations and atmospheric messages
 - `character_select.rs`, `character_creation.rs`, `character_delete.rs`, `character_rename.rs` — Character management UI
@@ -229,16 +232,21 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 - Mob item drop rate: 15% base + 1% per prestige rank (capped at 25%), max rarity Epic
 - Boss item drops: Guaranteed, can include Legendary (5% normal boss, 10% Zone 10 final boss)
 - Item level: ilvl = zone_id × 10 (Zone 1 = ilvl 10, Zone 10 = ilvl 100)
-- Boss spawn: After 10 kills in subzone
+- Boss spawn: After 10 kills in subzone (5 kills to retry after boss death)
 - Haven discovery: requires P10+, base chance 0.000014/tick + 0.000007 per rank above 10
 - Challenge discovery: ~2hr avg per challenge (requires P1+)
 
 ## Combat Mechanics
 
-- **Death to Boss**: Resets encounter (fighting_boss=false, kills_in_subzone=0) but preserves prestige
+- **Enemy scaling**: Static zone-based stats from `ZONE_ENEMY_STATS` table (not player-HP-based). Each zone has `(base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)` tuples; subzone depth adds incremental stats
+- **Prestige combat bonuses**: `PrestigeCombatBonuses::from_rank()` provides flat damage, flat defense, crit chance, and flat HP that scale with prestige rank via power-law formulas
+- **Damage pipeline**: base damage → Haven Armory % → prestige flat damage → enemy defense → min 1 → crit (2x)
+- **Enemy attack intervals**: Vary by tier (2.0s normal, 1.8s boss, 1.5s zone boss, 1.6s dungeon elite, 1.4s dungeon boss)
+- **Death to Boss**: Sets `kills_in_subzone = KILLS_FOR_BOSS - KILLS_FOR_BOSS_RETRY` (only 5 more kills to retry), preserves prestige
 - **Death in Dungeon**: Exits dungeon, no prestige loss
 - **Weapon Gates**: Zone 10 final boss requires Stormbreaker (checked via TheStormbreaker achievement)
 - **Stormbreaker Path**: Max fishing rank → catch Storm Leviathan (10 encounters) → build Storm Forge in Haven → forge Stormbreaker
+- **Zone 11 (The Expanse)**: Endgame wall with ~6.2x HP, ~4.6x DMG, ~4.8x DEF over Zone 10. Requires very high prestige (P50+) to farm comfortably
 
 ## Project Structure
 
@@ -289,7 +297,9 @@ quest/
 │   │   ├── morris/          # Nine Men's Morris
 │   │   ├── gomoku/          # Gomoku (Five in a Row)
 │   │   ├── minesweeper/     # Trap Detection
-│   │   └── rune/            # Rune Deciphering
+│   │   ├── rune/            # Rune Deciphering
+│   │   ├── flappy/          # Flappy Bird (real-time action)
+│   │   └── snake/           # Snake (real-time action)
 │   ├── haven/               # Haven base building [CLAUDE.md]
 │   │   ├── types.rs         # Room definitions, bonuses
 │   │   └── logic.rs         # Construction, upgrades

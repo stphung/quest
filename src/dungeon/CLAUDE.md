@@ -30,11 +30,15 @@ src/dungeon/
 ### `Dungeon` (`types.rs`)
 ```rust
 pub struct Dungeon {
-    pub rooms: Vec<Vec<Option<Room>>>,  // 2D grid, None = no room
     pub size: DungeonSize,
-    pub player_pos: (usize, usize),
+    pub grid: Vec<Vec<Option<Room>>>,   // 2D grid, None = no room
+    pub player_position: (usize, usize),
+    pub entrance_position: (usize, usize),
+    pub boss_position: (usize, usize),
     pub has_key: bool,
     pub boss_defeated: bool,
+    #[serde(default)]
+    pub zone_id: u32,                   // Zone where dungeon was discovered (for enemy scaling)
 }
 ```
 
@@ -48,13 +52,19 @@ pub struct Dungeon {
 
 ## Generation Algorithm (`generation.rs`)
 
-1. Place Entrance at center of grid
-2. Use random walk / branching to carve out connected rooms
-3. Assign room types based on probability distribution (Combat 60%, Treasure 20%, Elite 15%, Boss 5%)
-4. Ensure exactly one Elite and one Boss room per dungeon
-5. Boss room placed far from entrance
-6. Set connections between adjacent rooms (up/right/down/left booleans)
-7. Entrance and adjacent rooms start Revealed; all others Hidden
+```rust
+pub fn generate_dungeon(level: u32, prestige_rank: u32, zone_id: u32) -> Dungeon
+```
+
+1. Roll dungeon size from level and prestige rank
+2. Place Entrance at center of grid
+3. Use random walk / branching to carve out connected rooms
+4. Assign room types based on probability distribution (Combat 60%, Treasure 20%, Elite 15%, Boss 5%)
+5. Ensure exactly one Elite and one Boss room per dungeon
+6. Boss room placed far from entrance
+7. Set connections between adjacent rooms (up/right/down/left booleans)
+8. Entrance and adjacent rooms start Revealed; all others Hidden
+9. Store `zone_id` on the Dungeon for enemy scaling
 
 ## Navigation & Clearing (`logic.rs`)
 
@@ -76,11 +86,11 @@ pub struct Dungeon {
 
 ## Integration Points
 
-- **Combat**: Dungeon combat uses the same `combat/logic.rs` system with dungeon-specific enemies
+- **Combat**: Dungeon combat uses the same `combat/logic.rs` system with zone-scaled enemies via `generate_dungeon_enemy(zone_id)`, `generate_dungeon_elite(zone_id)`, `generate_dungeon_boss(zone_id)`
 - **Items**: Treasure rooms use `items/drops.rs` for guaranteed drops
 - **UI**: `ui/dungeon_map.rs` renders the top-down minimap; `ui/combat_3d.rs` renders first-person view
-- **Game State**: Active dungeon stored in `GameState.dungeon: Option<Dungeon>`
-- **Spawning**: Dungeon enemies are level-scaled based on current zone
+- **Game State**: Active dungeon stored in `GameState.active_dungeon: Option<Dungeon>`
+- **Spawning**: Dungeon enemies scale based on `dungeon.zone_id` (the zone where the dungeon was discovered)
 
 ## Adding a New Room Type
 

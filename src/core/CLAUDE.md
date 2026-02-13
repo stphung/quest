@@ -134,10 +134,10 @@ pub fn game_tick<R: Rng>(
 |-------|-------------|
 | 1. Challenge AI | Ticks AI thinking for active Chess, Morris, Gomoku, or Go games |
 | 2. Challenge discovery | Rolls for new challenge discovery (P1+ required, Haven bonus applied) |
-| 3. Sync player HP | Recalculates `DerivedStats` and updates `combat_state.player_max_hp` |
+| 3. Sync player HP | Recalculates `DerivedStats`, computes `PrestigeCombatBonuses::from_rank()`, applies `flat_hp` to `combat_state.player_max_hp` |
 | 4. Dungeon exploration | Calls `update_dungeon()`, processes room entry, treasure, keys, boss unlock, completion/failure |
 | 5. Fishing | If fishing active: ticks session, handles catches/items/rank-ups/Leviathan, updates play time, **returns early** (skips combat) |
-| 6. Combat | Calls `update_combat()`, maps `CombatEvent` to `TickEvent`, applies XP, handles kills/deaths, processes item drops and discoveries |
+| 6. Combat | Calls `update_combat(state, dt, haven, prestige_bonuses, achievements)`, maps `CombatEvent` to `TickEvent`, applies XP, handles kills/deaths, processes item drops and discoveries |
 | 7. Enemy spawn | Calls `spawn_enemy_if_needed()` if no enemy and not regenerating |
 | 8. Play time | Increments tick counter; at 10 ticks, increments `play_time_seconds` |
 | 9. Achievement collection | Drains newly unlocked achievements into `TickResult.events` |
@@ -179,9 +179,9 @@ Offline XP formula: `(elapsed_seconds / 5.0) * 0.25 * xp_per_kill * (1 + haven_b
 
 | Function | Signature | Purpose |
 |----------|-----------|---------|
-| `spawn_enemy_if_needed` | `(state)` | Spawns zone or dungeon enemy if no enemy and not regenerating |
-| `spawn_dungeon_enemy` | `(state)` (private) | Spawns Combat/Elite/Boss enemy based on current room type |
-| `try_discover_dungeon` | `(state) -> bool` | 2% chance per call, generates dungeon scaled to level and prestige |
+| `spawn_enemy_if_needed` | `(state)` | Spawns zone or dungeon enemy if no enemy and not regenerating. Uses zone-based generators (`generate_enemy_for_current_zone`, `generate_boss_for_current_zone`) |
+| `spawn_dungeon_enemy` | `(state)` (private) | Spawns Combat/Elite/Boss enemy via `generate_dungeon_enemy(zone_id)`, `generate_dungeon_elite(zone_id)`, `generate_dungeon_boss(zone_id)` |
+| `try_discover_dungeon` | `(state) -> bool` | 2% chance per call, generates dungeon via `generate_dungeon(level, prestige_rank, zone_id)` |
 
 ## Constants (`constants.rs`)
 
@@ -231,17 +231,56 @@ Offline XP formula: `(elapsed_seconds / 5.0) * 0.25 * xp_per_kill * (1 + haven_b
 | `HAVEN_DISCOVERY_RANK_BONUS` | 0.000007 | Per rank above 10 |
 | `HAVEN_MIN_PRESTIGE_RANK` | 10 | |
 
-### Zone/Fishing
+### Zone Enemy Stats
+| Constant | Value | Notes |
+|----------|-------|-------|
+| `ZONE_ENEMY_STATS` | `[(u32,u32,u32,u32,u32,u32); 11]` | Per-zone `(base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)`. Index 0=Zone 1, Index 10=Zone 11. Steps are per-subzone-depth increments above depth 1 |
+
+Zone 11 (The Expanse) is an endgame wall: `(5000, 400, 500, 80, 250, 30)` — roughly 6.2x HP, 4.6x DMG, 4.8x DEF over Zone 10.
+
+### Boss Multipliers
+| Constant | Value | Notes |
+|----------|-------|-------|
+| `SUBZONE_BOSS_MULTIPLIERS` | `(3.0, 1.5, 1.8)` | (HP, DMG, DEF) multipliers |
+| `ZONE_BOSS_MULTIPLIERS` | `(5.0, 1.8, 2.5)` | |
+| `DUNGEON_ELITE_MULTIPLIERS` | `(2.2, 1.5, 1.6)` | |
+| `DUNGEON_BOSS_MULTIPLIERS` | `(3.5, 1.8, 2.0)` | |
+
+### Prestige Combat Bonuses
+| Constant | Value | Notes |
+|----------|-------|-------|
+| `PRESTIGE_FLAT_DAMAGE_FACTOR` | 5.0 | `floor(5.0 * rank^0.7)` |
+| `PRESTIGE_FLAT_DAMAGE_EXPONENT` | 0.7 | |
+| `PRESTIGE_FLAT_DEFENSE_FACTOR` | 3.0 | `floor(3.0 * rank^0.6)` |
+| `PRESTIGE_FLAT_DEFENSE_EXPONENT` | 0.6 | |
+| `PRESTIGE_CRIT_PER_RANK` | 0.5 | +0.5% per rank |
+| `PRESTIGE_CRIT_CAP` | 15.0 | Max bonus crit % |
+| `PRESTIGE_FLAT_HP_FACTOR` | 15.0 | `floor(15.0 * rank^0.6)` |
+| `PRESTIGE_FLAT_HP_EXPONENT` | 0.6 | |
+
+### Enemy Attack Intervals
+| Constant | Value | Notes |
+|----------|-------|-------|
+| `ENEMY_ATTACK_INTERVAL_SECONDS` | 2.0 | Normal mobs |
+| `ENEMY_BOSS_ATTACK_INTERVAL_SECONDS` | 1.8 | Subzone bosses |
+| `ENEMY_ZONE_BOSS_ATTACK_INTERVAL_SECONDS` | 1.5 | Zone bosses |
+| `ENEMY_DUNGEON_ELITE_ATTACK_INTERVAL_SECONDS` | 1.6 | Dungeon elites |
+| `ENEMY_DUNGEON_BOSS_ATTACK_INTERVAL_SECONDS` | 1.4 | Dungeon bosses |
+
+### Zone Progression / Fishing
 | Constant | Value | Notes |
 |----------|-------|-------|
 | `KILLS_FOR_BOSS` | 10 | Kills per subzone before boss |
+| `KILLS_FOR_BOSS_RETRY` | 5 | Kills needed to retry after boss death |
 | `BASE_MAX_FISHING_RANK` | 30 | Without Haven |
 | `MAX_FISHING_RANK` | 40 | With Fishing Dock T4 |
 
 ## Integration Points
 
 ### tick.rs depends on (inputs)
-- **combat** (`combat::logic`): `update_combat()` returns `Vec<CombatEvent>`, `HavenCombatBonuses` struct
+- **combat** (`combat::logic`): `update_combat(state, dt, haven, prestige_bonuses, achievements)` returns `Vec<CombatEvent>`, `HavenCombatBonuses` struct
+- **character** (`character::prestige`): `PrestigeCombatBonuses::from_rank()` — computed each tick for combat bonuses
+- **character** (`character::derived_stats`): `DerivedStats::calculate_derived_stats()`
 - **dungeon** (`dungeon::logic`): `update_dungeon()`, `on_room_enemy_defeated()`, `on_elite_defeated()`, `on_boss_defeated()`, `add_dungeon_xp()`, `calculate_boss_xp_reward()`, `on_treasure_room_entered()`
 - **fishing** (`fishing::logic`): `tick_fishing_with_haven_result()`, `check_rank_up_with_max()`, `get_max_fishing_rank()`, `HavenFishingBonuses` struct
 - **challenges** (`challenges::*::logic`): `process_ai_thinking()` per game type, `try_discover_challenge_with_haven()`
@@ -249,12 +288,11 @@ Offline XP formula: `(elapsed_seconds / 5.0) * 0.25 * xp_per_kill * (1 + haven_b
 - **achievements** (`achievements`): `Achievements` with `on_*()` tracking methods
 - **items** (`items::drops`): `try_drop_from_mob()`, `try_drop_from_boss()`; (`items::scoring`): `auto_equip_if_better()`
 - **zones** (`zones`): `BossDefeatResult`, `get_zone()`, `get_all_zones()`
-- **character** (`character::derived_stats`): `DerivedStats::calculate_derived_stats()`
 
 ### game_logic.rs depends on
 - **character**: `Attributes`, `AttributeType`, `DerivedStats`, `prestige::get_prestige_tier()`
-- **combat**: `generate_enemy()`, `generate_boss_enemy()`, `generate_elite_enemy()`, zone-specific generators
-- **dungeon**: `generate_dungeon()`, `RoomType`
+- **combat**: `generate_enemy_for_current_zone()`, `generate_boss_for_current_zone()`, `generate_dungeon_enemy()`, `generate_dungeon_elite()`, `generate_dungeon_boss()`
+- **dungeon**: `generate_dungeon(level, prestige_rank, zone_id)`, `RoomType`
 - **zones**: `ZoneProgression`
 
 ### Other modules depend on core

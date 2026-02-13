@@ -30,6 +30,8 @@ src/ui/
 ├── gomoku_scene.rs           # Gomoku board with cursor
 ├── minesweeper_scene.rs      # Minesweeper grid with game-over overlay
 ├── rune_scene.rs             # Rune Deciphering with guess history
+├── flappy_scene.rs           # Flappy Bird side-scroller with pipe obstacles
+├── snake_scene.rs            # Snake game with grid and growing snake
 │
 ├── character_select.rs       # Character list with preview panel
 ├── character_creation.rs     # Name input with real-time validation
