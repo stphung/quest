@@ -67,16 +67,16 @@ pub const KILLS_FOR_BOSS_RETRY: u32 = 5;
 // Index 0 = Zone 1, Index 10 = Zone 11 (The Expanse)
 // hp_step/dmg_step/def_step are per-subzone depth increments above depth 1
 pub const ZONE_ENEMY_STATS: [(u32, u32, u32, u32, u32, u32); 11] = [
-    (55, 9, 7, 2, 0, 0),       // Zone 1: Meadow
-    (90, 14, 13, 3, 2, 1),     // Zone 2: Dark Forest
-    (160, 22, 22, 4, 6, 2),    // Zone 3: Mountain Pass
-    (215, 27, 31, 6, 10, 3),   // Zone 4: Ancient Ruins
-    (305, 32, 42, 7, 16, 3),   // Zone 5: Volcanic Wastes
-    (380, 40, 53, 8, 22, 4),   // Zone 6: Frozen Tundra
-    (485, 45, 67, 10, 29, 4),  // Zone 7: Crystal Caverns
-    (575, 54, 78, 11, 35, 6),  // Zone 8: Sunken Kingdom
-    (685, 63, 92, 13, 43, 6),  // Zone 9: Floating Isles
-    (810, 72, 109, 14, 52, 7), // Zone 10: Storm Citadel
+    (55, 9, 7, 2, 0, 0),           // Zone 1: Meadow
+    (90, 14, 13, 3, 2, 1),         // Zone 2: Dark Forest
+    (160, 22, 22, 4, 6, 2),        // Zone 3: Mountain Pass
+    (215, 27, 31, 6, 10, 3),       // Zone 4: Ancient Ruins
+    (305, 32, 42, 7, 16, 3),       // Zone 5: Volcanic Wastes
+    (380, 40, 53, 8, 22, 4),       // Zone 6: Frozen Tundra
+    (485, 45, 67, 10, 29, 4),      // Zone 7: Crystal Caverns
+    (575, 54, 78, 11, 35, 6),      // Zone 8: Sunken Kingdom
+    (685, 63, 92, 13, 43, 6),      // Zone 9: Floating Isles
+    (810, 72, 109, 14, 52, 7),     // Zone 10: Storm Citadel
     (5000, 400, 500, 80, 250, 30), // Zone 11: The Expanse (endgame wall)
 ];
 
