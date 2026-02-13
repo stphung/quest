@@ -38,6 +38,7 @@ pub mod menu;
 pub mod minesweeper;
 pub mod morris;
 pub mod rune;
+pub mod snake;
 
 pub use chess::{ChessDifficulty, ChessGame, ChessResult};
 pub use flappy::{FlappyBirdDifficulty, FlappyBirdGame, FlappyBirdResult};
@@ -49,6 +50,7 @@ pub use morris::{
     MorrisDifficulty, MorrisGame, MorrisPhase, MorrisResult, Player as MorrisPlayer, ADJACENCIES,
 };
 pub use rune::{FeedbackMark, RuneDifficulty, RuneGame, RuneResult, RUNE_SYMBOLS};
+pub use snake::{SnakeDifficulty, SnakeGame, SnakeResult};
 
 /// A currently active challenge minigame. Only one can be active at a time.
 #[derive(Debug, Clone)]
@@ -60,6 +62,7 @@ pub enum ActiveMinigame {
     Minesweeper(MinesweeperGame),
     Rune(RuneGame),
     Go(GoGame),
+    Snake(SnakeGame),
 }
 
 /// Information about a minigame win for achievement tracking.

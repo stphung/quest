@@ -138,6 +138,11 @@ pub enum AchievementId {
     FlappyApprentice,
     FlappyJourneyman,
     FlappyMaster,
+    // Challenge achievements - Snake
+    SnakeNovice,
+    SnakeApprentice,
+    SnakeJourneyman,
+    SnakeMaster,
     // Challenge achievements - Meta
     GrandChampion,
 
@@ -620,6 +625,10 @@ impl Achievements {
             ("flappy_bird", "apprentice") => Some(AchievementId::FlappyApprentice),
             ("flappy_bird", "journeyman") => Some(AchievementId::FlappyJourneyman),
             ("flappy_bird", "master") => Some(AchievementId::FlappyMaster),
+            ("snake", "novice") => Some(AchievementId::SnakeNovice),
+            ("snake", "apprentice") => Some(AchievementId::SnakeApprentice),
+            ("snake", "journeyman") => Some(AchievementId::SnakeJourneyman),
+            ("snake", "master") => Some(AchievementId::SnakeMaster),
             _ => None,
         };
 

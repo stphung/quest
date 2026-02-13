@@ -628,6 +628,37 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         icon: "›",
     },
     // ═══════════════════════════════════════════════════════════════
+    // CHALLENGE ACHIEVEMENTS - SNAKE
+    // ═══════════════════════════════════════════════════════════════
+    AchievementDef {
+        id: AchievementId::SnakeNovice,
+        name: "Snake Novice",
+        description: "Win Snake on Novice difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "~",
+    },
+    AchievementDef {
+        id: AchievementId::SnakeApprentice,
+        name: "Snake Apprentice",
+        description: "Win Snake on Apprentice difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "~",
+    },
+    AchievementDef {
+        id: AchievementId::SnakeJourneyman,
+        name: "Snake Journeyman",
+        description: "Win Snake on Journeyman difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "~",
+    },
+    AchievementDef {
+        id: AchievementId::SnakeMaster,
+        name: "Snake Master",
+        description: "Win Snake on Master difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "~",
+    },
+    // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - META
     // ═══════════════════════════════════════════════════════════════
     AchievementDef {

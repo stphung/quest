@@ -928,6 +928,11 @@ fn main() -> io::Result<()> {
                                     dt.as_millis() as u64,
                                 );
                             }
+                            if let Some(challenges::ActiveMinigame::Snake(ref mut game)) =
+                                state.active_minigame
+                            {
+                                challenges::snake::logic::tick_snake(game, dt.as_millis() as u64);
+                            }
                             last_flappy_frame = Instant::now();
                         }
                     }
@@ -1066,5 +1071,6 @@ fn is_realtime_minigame(state: &GameState) -> bool {
     matches!(
         state.active_minigame,
         Some(challenges::ActiveMinigame::FlappyBird(_))
+            | Some(challenges::ActiveMinigame::Snake(_))
     )
 }
