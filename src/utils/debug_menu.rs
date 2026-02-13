@@ -13,6 +13,7 @@ pub const DEBUG_OPTIONS: &[&str] = &[
     "Trigger Dungeon",
     "Trigger Fishing",
     "Trigger Chess Challenge",
+    "Trigger Chess Puzzle Challenge",
     "Trigger Morris Challenge",
     "Trigger Gomoku Challenge",
     "Trigger Minesweeper Challenge",
@@ -69,13 +70,14 @@ impl DebugMenu {
             0 => trigger_dungeon(state),
             1 => trigger_fishing(state),
             2 => trigger_chess_challenge(state),
-            3 => trigger_morris_challenge(state),
-            4 => trigger_gomoku_challenge(state),
-            5 => trigger_minesweeper_challenge(state),
-            6 => trigger_rune_challenge(state),
-            7 => trigger_go_challenge(state),
-            8 => trigger_flappy_challenge(state),
-            9 => trigger_haven_discovery(haven),
+            3 => trigger_chess_puzzle_challenge(state),
+            4 => trigger_morris_challenge(state),
+            5 => trigger_gomoku_challenge(state),
+            6 => trigger_minesweeper_challenge(state),
+            7 => trigger_rune_challenge(state),
+            8 => trigger_go_challenge(state),
+            9 => trigger_flappy_challenge(state),
+            10 => trigger_haven_discovery(haven),
             _ => "Unknown option",
         };
         self.close();
@@ -111,6 +113,19 @@ fn trigger_chess_challenge(state: &mut GameState) -> &'static str {
         .challenge_menu
         .add_challenge(create_challenge(&ChallengeType::Chess));
     "Chess challenge added!"
+}
+
+fn trigger_chess_puzzle_challenge(state: &mut GameState) -> &'static str {
+    if state
+        .challenge_menu
+        .has_challenge(&ChallengeType::ChessPuzzle)
+    {
+        return "Chess Puzzle challenge already pending!";
+    }
+    state
+        .challenge_menu
+        .add_challenge(create_challenge(&ChallengeType::ChessPuzzle));
+    "Chess Puzzle challenge added!"
 }
 
 fn trigger_morris_challenge(state: &mut GameState) -> &'static str {
@@ -208,16 +223,18 @@ mod tests {
         menu.navigate_down();
         menu.navigate_down();
         menu.navigate_down();
-        assert_eq!(menu.selected_index, 9);
+        menu.navigate_down();
+        assert_eq!(menu.selected_index, 10);
 
         // Can't go past end
         menu.navigate_down();
-        assert_eq!(menu.selected_index, 9);
+        assert_eq!(menu.selected_index, 10);
 
         menu.navigate_up();
-        assert_eq!(menu.selected_index, 8);
+        assert_eq!(menu.selected_index, 9);
 
         // Can't go before start
+        menu.navigate_up();
         menu.navigate_up();
         menu.navigate_up();
         menu.navigate_up();
@@ -275,6 +292,20 @@ mod tests {
         // Can't add duplicate
         let msg = trigger_chess_challenge(&mut state);
         assert_eq!(msg, "Chess challenge already pending!");
+    }
+
+    #[test]
+    fn test_trigger_chess_puzzle_challenge() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let msg = trigger_chess_puzzle_challenge(&mut state);
+        assert_eq!(msg, "Chess Puzzle challenge added!");
+        assert!(state
+            .challenge_menu
+            .has_challenge(&ChallengeType::ChessPuzzle));
+
+        // Can't add duplicate
+        let msg = trigger_chess_puzzle_challenge(&mut state);
+        assert_eq!(msg, "Chess Puzzle challenge already pending!");
     }
 
     #[test]

@@ -5,6 +5,7 @@
 //! table determines which challenge type appears.
 
 use super::chess::{ChessDifficulty, ChessGame};
+use super::chess_puzzle::{ChessPuzzleDifficulty, ChessPuzzleGame};
 use super::flappy::{FlappyBirdDifficulty, FlappyBirdGame};
 use super::go::{GoDifficulty, GoGame};
 use super::gomoku::{GomokuDifficulty, GomokuGame};
@@ -96,6 +97,12 @@ fn accept_selected_challenge(state: &mut GameState) {
             ChallengeType::FlappyBird => {
                 let d = FlappyBirdDifficulty::from_index(difficulty_index);
                 ActiveMinigame::FlappyBird(FlappyBirdGame::new(d))
+            }
+            ChallengeType::ChessPuzzle => {
+                let d = ChessPuzzleDifficulty::from_index(difficulty_index);
+                let mut game = ChessPuzzleGame::new(d);
+                super::chess_puzzle::logic::setup_current_puzzle(&mut game);
+                ActiveMinigame::ChessPuzzle(Box::new(game))
             }
         };
         state.active_minigame = Some(minigame);
@@ -332,6 +339,19 @@ impl DifficultyInfo for GoDifficulty {
     }
 }
 
+impl DifficultyInfo for ChessPuzzleDifficulty {
+    fn name(&self) -> &'static str {
+        ChessPuzzleDifficulty::name(self)
+    }
+
+    fn reward(&self) -> ChallengeReward {
+        ChallengeReward {
+            prestige_ranks: self.reward_prestige(),
+            ..Default::default()
+        }
+    }
+}
+
 // CHALLENGE_DISCOVERY_CHANCE is imported from core::constants
 
 /// Entry in the challenge distribution table
@@ -372,6 +392,10 @@ const CHALLENGE_TABLE: &[ChallengeWeight] = &[
         challenge_type: ChallengeType::Go,
         weight: 10, // ~8% - rare complex strategy
     },
+    ChallengeWeight {
+        challenge_type: ChallengeType::ChessPuzzle,
+        weight: 10, // ~7% - rare tactical puzzles
+    },
 ];
 
 /// A single pending challenge in the menu
@@ -387,6 +411,7 @@ pub struct PendingChallenge {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ChallengeType {
     Chess,
+    ChessPuzzle,
     FlappyBird,
     Morris,
     Gomoku,
@@ -400,6 +425,7 @@ impl ChallengeType {
     pub fn icon(&self) -> &'static str {
         match self {
             ChallengeType::Chess => "♟",
+            ChallengeType::ChessPuzzle => "\u{265E}",
             ChallengeType::FlappyBird => ">",
             ChallengeType::Morris => "\u{25CB}", // ○
             ChallengeType::Gomoku => "◎",
@@ -413,6 +439,9 @@ impl ChallengeType {
     pub fn discovery_flavor(&self) -> &'static str {
         match self {
             ChallengeType::Chess => "A mysterious figure steps from the shadows...",
+            ChallengeType::ChessPuzzle => {
+                "A dusty tome of chess puzzles materializes on a nearby ledge..."
+            }
             ChallengeType::FlappyBird => "A tiny clockwork bird whirs to life on a nearby ledge...",
             ChallengeType::Morris => "A cloaked stranger approaches with a weathered board...",
             ChallengeType::Gomoku => "A wandering strategist places a worn board before you...",
@@ -629,6 +658,16 @@ pub fn create_challenge(ct: &ChallengeType) -> PendingChallenge {
                 adventurer.\" The bird hovers expectantly, waiting for your command."
                 .to_string(),
         },
+        ChallengeType::ChessPuzzle => PendingChallenge {
+            challenge_type: ChallengeType::ChessPuzzle,
+            title: "Chess Puzzles: The Puzzle Master".to_string(),
+            icon: "\u{265E}",
+            description: "A robed figure appears carrying a leather-bound book of \
+                chess positions. 'Each page holds a tactical challenge,' they explain, \
+                'checkmates to find, forks to exploit, pins to discover. Solve enough \
+                puzzles, and knowledge of tactics shall be your reward.'"
+                .to_string(),
+        },
         ChallengeType::Go => PendingChallenge {
             challenge_type: ChallengeType::Go,
             title: "Go: Territory Control".to_string(),
@@ -661,6 +700,7 @@ mod tests {
     #[test]
     fn test_challenge_type_icon_returns_non_empty() {
         assert!(!ChallengeType::Chess.icon().is_empty());
+        assert!(!ChallengeType::ChessPuzzle.icon().is_empty());
         assert!(!ChallengeType::FlappyBird.icon().is_empty());
         assert!(!ChallengeType::Morris.icon().is_empty());
         assert!(!ChallengeType::Gomoku.icon().is_empty());
@@ -672,6 +712,7 @@ mod tests {
     #[test]
     fn test_challenge_type_discovery_flavor_returns_non_empty() {
         assert!(!ChallengeType::Chess.discovery_flavor().is_empty());
+        assert!(!ChallengeType::ChessPuzzle.discovery_flavor().is_empty());
         assert!(!ChallengeType::FlappyBird.discovery_flavor().is_empty());
         assert!(!ChallengeType::Morris.discovery_flavor().is_empty());
         assert!(!ChallengeType::Gomoku.discovery_flavor().is_empty());
@@ -684,6 +725,7 @@ mod tests {
     fn test_challenge_type_icons_are_unique() {
         let icons = [
             ChallengeType::Chess.icon(),
+            ChallengeType::ChessPuzzle.icon(),
             ChallengeType::FlappyBird.icon(),
             ChallengeType::Morris.icon(),
             ChallengeType::Gomoku.icon(),
@@ -1126,6 +1168,7 @@ mod tests {
     #[test]
     fn test_difficulty_str_all_types() {
         use super::super::chess::ChessDifficulty;
+        use super::super::chess_puzzle::ChessPuzzleDifficulty;
         use super::super::flappy::FlappyBirdDifficulty;
         use super::super::go::GoDifficulty;
         use super::super::gomoku::GomokuDifficulty;
@@ -1133,12 +1176,13 @@ mod tests {
         use super::super::morris::MorrisDifficulty;
         use super::super::rune::RuneDifficulty;
 
-        // Verify all 7 difficulty types produce correct lowercase strings
+        // Verify all 8 difficulty types produce correct lowercase strings
         for (i, expected) in ["novice", "apprentice", "journeyman", "master"]
             .iter()
             .enumerate()
         {
             assert_eq!(ChessDifficulty::ALL[i].difficulty_str(), *expected);
+            assert_eq!(ChessPuzzleDifficulty::ALL[i].difficulty_str(), *expected);
             assert_eq!(GomokuDifficulty::ALL[i].difficulty_str(), *expected);
             assert_eq!(MorrisDifficulty::ALL[i].difficulty_str(), *expected);
             assert_eq!(MinesweeperDifficulty::ALL[i].difficulty_str(), *expected);

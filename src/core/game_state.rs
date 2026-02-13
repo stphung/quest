@@ -1,4 +1,5 @@
 use crate::challenges::chess::ChessStats;
+use crate::challenges::chess_puzzle::ChessPuzzleStats;
 use crate::challenges::menu::ChallengeMenu;
 use crate::challenges::ActiveMinigame;
 use crate::challenges::MinigameWinInfo;
@@ -86,6 +87,9 @@ pub struct GameState {
     /// Persistent chess stats (survives prestige, saved to disk)
     #[serde(default)]
     pub chess_stats: ChessStats,
+    /// Persistent chess puzzle stats (survives prestige, saved to disk)
+    #[serde(default)]
+    pub chess_puzzle_stats: ChessPuzzleStats,
     /// Active challenge minigame (transient, not saved)
     #[serde(skip)]
     pub active_minigame: Option<ActiveMinigame>,
@@ -127,6 +131,7 @@ impl GameState {
             zone_progression: ZoneProgression::new(),
             challenge_menu: ChallengeMenu::new(),
             chess_stats: ChessStats::default(),
+            chess_puzzle_stats: ChessPuzzleStats::default(),
             active_minigame: None,
             session_kills: 0,
             recent_drops: VecDeque::with_capacity(5),

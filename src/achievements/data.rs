@@ -597,6 +597,37 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         icon: "🟤",
     },
     // ═══════════════════════════════════════════════════════════════
+    // CHALLENGE ACHIEVEMENTS - CHESS PUZZLE
+    // ═══════════════════════════════════════════════════════════════
+    AchievementDef {
+        id: AchievementId::ChessPuzzleNovice,
+        name: "Puzzle Novice",
+        description: "Win Chess Puzzles on Novice difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "\u{265E}",
+    },
+    AchievementDef {
+        id: AchievementId::ChessPuzzleApprentice,
+        name: "Puzzle Apprentice",
+        description: "Win Chess Puzzles on Apprentice difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "\u{265E}",
+    },
+    AchievementDef {
+        id: AchievementId::ChessPuzzleJourneyman,
+        name: "Puzzle Journeyman",
+        description: "Win Chess Puzzles on Journeyman difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "\u{265E}",
+    },
+    AchievementDef {
+        id: AchievementId::ChessPuzzleMaster,
+        name: "Puzzle Master",
+        description: "Win Chess Puzzles on Master difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "\u{265E}",
+    },
+    // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - FLAPPY BIRD
     // ═══════════════════════════════════════════════════════════════
     AchievementDef {

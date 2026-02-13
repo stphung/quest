@@ -5,6 +5,10 @@
 use crate::challenges::chess::logic::{
     apply_game_result as apply_chess_result, process_input as process_chess_input, ChessInput,
 };
+use crate::challenges::chess_puzzle::logic::{
+    apply_game_result as apply_chess_puzzle_result, process_input as process_chess_puzzle_input,
+    ChessPuzzleInput,
+};
 use crate::challenges::flappy::logic::{
     apply_game_result as apply_flappy_result, process_input as process_flappy_input,
     FlappyBirdInput,
@@ -534,6 +538,22 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
                     _ => ChessInput::Other,
                 };
                 process_chess_input(chess_game, input);
+            }
+            ActiveMinigame::ChessPuzzle(chess_puzzle_game) => {
+                if chess_puzzle_game.game_result.is_some() {
+                    state.last_minigame_win = apply_chess_puzzle_result(state);
+                    return InputResult::Continue;
+                }
+                let input = match key.code {
+                    KeyCode::Up => ChessPuzzleInput::Up,
+                    KeyCode::Down => ChessPuzzleInput::Down,
+                    KeyCode::Left => ChessPuzzleInput::Left,
+                    KeyCode::Right => ChessPuzzleInput::Right,
+                    KeyCode::Enter => ChessPuzzleInput::Select,
+                    KeyCode::Esc => ChessPuzzleInput::Forfeit,
+                    _ => ChessPuzzleInput::Other,
+                };
+                process_chess_puzzle_input(chess_puzzle_game, input);
             }
             ActiveMinigame::Morris(morris_game) => {
                 if morris_game.game_result.is_some() {

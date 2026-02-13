@@ -133,6 +133,11 @@ pub enum AchievementId {
     GoApprentice,
     GoJourneyman,
     GoMaster,
+    // Challenge achievements - Chess Puzzle
+    ChessPuzzleNovice,
+    ChessPuzzleApprentice,
+    ChessPuzzleJourneyman,
+    ChessPuzzleMaster,
     // Challenge achievements - Flappy Bird
     FlappyNovice,
     FlappyApprentice,
@@ -616,6 +621,10 @@ impl Achievements {
             ("go", "apprentice") => Some(AchievementId::GoApprentice),
             ("go", "journeyman") => Some(AchievementId::GoJourneyman),
             ("go", "master") => Some(AchievementId::GoMaster),
+            ("chess_puzzle", "novice") => Some(AchievementId::ChessPuzzleNovice),
+            ("chess_puzzle", "apprentice") => Some(AchievementId::ChessPuzzleApprentice),
+            ("chess_puzzle", "journeyman") => Some(AchievementId::ChessPuzzleJourneyman),
+            ("chess_puzzle", "master") => Some(AchievementId::ChessPuzzleMaster),
             ("flappy_bird", "novice") => Some(AchievementId::FlappyNovice),
             ("flappy_bird", "apprentice") => Some(AchievementId::FlappyApprentice),
             ("flappy_bird", "journeyman") => Some(AchievementId::FlappyJourneyman),

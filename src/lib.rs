@@ -23,8 +23,9 @@ mod ui;
 // Re-export commonly used types at crate root for convenience
 pub use achievements::{AchievementCategory, AchievementId, Achievements};
 pub use challenges::{
-    ActiveMinigame, ChessDifficulty, ChessGame, ChessResult, FlappyBirdDifficulty, FlappyBirdGame,
-    FlappyBirdResult, GoDifficulty, GoGame, GoResult, GomokuDifficulty, GomokuGame, GomokuResult,
+    ActiveMinigame, ChessDifficulty, ChessGame, ChessPuzzleDifficulty, ChessPuzzleGame,
+    ChessPuzzleResult, ChessResult, FlappyBirdDifficulty, FlappyBirdGame, FlappyBirdResult,
+    GoDifficulty, GoGame, GoResult, GomokuDifficulty, GomokuGame, GomokuResult,
     MinesweeperDifficulty, MinesweeperGame, MinesweeperResult, MorrisDifficulty, MorrisGame,
     MorrisPhase, MorrisResult, RuneDifficulty, RuneGame, RuneResult,
 };

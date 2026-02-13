@@ -260,6 +260,10 @@ pub fn game_tick<R: Rng>(
         Some(ActiveMinigame::Go(game)) => {
             crate::challenges::go::process_ai_thinking(game, rng);
         }
+        Some(ActiveMinigame::ChessPuzzle(game)) => {
+            crate::challenges::chess_puzzle::logic::process_ai_thinking(game);
+            crate::challenges::chess_puzzle::logic::tick_feedback(game);
+        }
         _ => {}
     }
 

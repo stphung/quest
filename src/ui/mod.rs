@@ -4,6 +4,7 @@ pub mod character_creation;
 pub mod character_delete;
 pub mod character_rename;
 pub mod character_select;
+pub mod chess_puzzle_scene;
 pub mod chess_scene;
 mod combat_3d;
 pub mod combat_effects;
@@ -218,6 +219,9 @@ fn draw_right_content(frame: &mut Frame, area: Rect, game_state: &GameState) {
         }
         Some(ActiveMinigame::Chess(game)) => {
             chess_scene::render_chess_scene(frame, area, game);
+        }
+        Some(ActiveMinigame::ChessPuzzle(game)) => {
+            chess_puzzle_scene::render_chess_puzzle_scene(frame, area, game);
         }
         Some(ActiveMinigame::Go(game)) => {
             go_scene::render_go_scene(frame, area, game);
