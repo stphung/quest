@@ -39,41 +39,41 @@ pub fn draw_stats_panel(
 ) {
     match ctx.height_tier {
         SizeTier::XL => {
-            // Full layout: header(4) + prestige(7) + attrs(14) + derived(6) + equip(min 16)
+            // Full layout: header(4) + prestige(5) + fishing(4) + attrs(8) + equip(rest)
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
-                    Constraint::Length(4),  // Header + XP bar
-                    Constraint::Length(7),  // Prestige info + fishing rank + fishing bar
-                    Constraint::Length(14), // Attributes (6 attributes + borders)
-                    Constraint::Length(6),  // Derived stats
-                    Constraint::Min(16),    // Equipment section (grows to fit)
+                    Constraint::Length(4), // Header + XP bar
+                    Constraint::Length(5), // Prestige info (rank, multiplier, resets)
+                    Constraint::Length(4), // Fishing rank + progress bar
+                    Constraint::Length(8), // Attributes (6 attrs × 1 row + 2 borders)
+                    Constraint::Min(0),    // Equipment section (takes remaining space)
                 ])
                 .split(area);
 
             draw_header(frame, chunks[0], game_state);
             draw_prestige_info(frame, chunks[1], game_state);
-            draw_attributes(frame, chunks[2], game_state);
-            draw_derived_stats(frame, chunks[3], game_state);
+            draw_fishing_panel(frame, chunks[2], game_state);
+            draw_attributes(frame, chunks[3], game_state);
             draw_equipment_section(frame, chunks[4], game_state);
         }
         SizeTier::L => {
-            // Condensed: header(4) + prestige(5) + attrs_compact(4) + derived_compact(3) + equip_names(min 9)
+            // Condensed: header(4) + prestige(5) + fishing(4) + attrs_compact(5) + equip_names(rest)
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
                     Constraint::Length(4),
                     Constraint::Length(5),
                     Constraint::Length(4),
-                    Constraint::Length(3),
-                    Constraint::Min(9),
+                    Constraint::Length(5), // 3 pairs + 2 borders
+                    Constraint::Min(0),
                 ])
                 .split(area);
 
             draw_header(frame, chunks[0], game_state);
             draw_prestige_info(frame, chunks[1], game_state);
-            draw_attributes_compact(frame, chunks[2], game_state);
-            draw_derived_stats_compact(frame, chunks[3], game_state);
+            draw_fishing_panel(frame, chunks[2], game_state);
+            draw_attributes_compact(frame, chunks[3], game_state);
             draw_equipment_names_only(frame, chunks[4], game_state);
         }
         _ => {
@@ -139,12 +139,13 @@ fn draw_header(frame: &mut Frame, area: Rect, game_state: &GameState) {
             .constraints([Constraint::Length(1), Constraint::Length(1)])
             .split(inner);
 
-        let header_paragraph = Paragraph::new(header_text).alignment(Alignment::Center);
+        let header_paragraph = Paragraph::new(header_text);
         frame.render_widget(header_paragraph, inner_chunks[0]);
         frame.render_widget(xp_gauge, inner_chunks[1]);
     } else if inner.height == 1 {
-        // Only room for XP bar - prioritize progress visibility
-        frame.render_widget(xp_gauge, inner);
+        // Only room for one line — show level
+        let header_paragraph = Paragraph::new(header_text);
+        frame.render_widget(header_paragraph, inner);
     }
 }
 
@@ -347,145 +348,41 @@ fn draw_attributes(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let inner = attrs_block.inner(area);
     frame.render_widget(attrs_block, area);
 
-    // Layout for 6 attribute rows
-    let attr_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(2), // STR
-            Constraint::Length(2), // DEX
-            Constraint::Length(2), // CON
-            Constraint::Length(2), // INT
-            Constraint::Length(2), // WIS
-            Constraint::Length(2), // CHA
-        ])
-        .split(inner);
-
     let cap = game_state.get_attribute_cap();
 
-    // Draw each attribute
-    for (i, attr_type) in AttributeType::all().iter().enumerate() {
-        if i < attr_chunks.len() {
-            draw_attribute_row(frame, attr_chunks[i], game_state, *attr_type, cap);
-        }
+    let mut lines = Vec::new();
+    for attr_type in AttributeType::all() {
+        let value = game_state.attributes.get(attr_type);
+        let modifier = game_state.attributes.modifier(attr_type);
+        let (color, emoji) = match attr_type {
+            AttributeType::Strength => (Color::Red, "💪"),
+            AttributeType::Dexterity => (Color::Green, "🏃"),
+            AttributeType::Constitution => (Color::Magenta, "❤️"),
+            AttributeType::Intelligence => (Color::Blue, "🧠"),
+            AttributeType::Wisdom => (Color::Cyan, "👁️"),
+            AttributeType::Charisma => (Color::Yellow, "✨"),
+        };
+        let mod_str = format_modifier(modifier);
+
+        lines.push(Line::from(vec![
+            Span::styled(
+                format!("{} {}: ", emoji, attr_type.abbrev()),
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!("{:2}", value),
+                Style::default().fg(color).add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(format!(" ({:>3}) ", mod_str)),
+            Span::styled(
+                format!("[Cap: {}]", cap),
+                Style::default().fg(Color::DarkGray),
+            ),
+        ]));
     }
-}
 
-/// Draws a single attribute row
-fn draw_attribute_row(
-    frame: &mut Frame,
-    area: Rect,
-    game_state: &GameState,
-    attr_type: AttributeType,
-    cap: u32,
-) {
-    let value = game_state.attributes.get(attr_type);
-    let modifier = game_state.attributes.modifier(attr_type);
-
-    // Choose color and emoji based on attribute type
-    let (color, emoji) = match attr_type {
-        AttributeType::Strength => (Color::Red, "💪"),
-        AttributeType::Dexterity => (Color::Green, "🏃"),
-        AttributeType::Constitution => (Color::Magenta, "❤️"),
-        AttributeType::Intelligence => (Color::Blue, "🧠"),
-        AttributeType::Wisdom => (Color::Cyan, "👁️"),
-        AttributeType::Charisma => (Color::Yellow, "✨"),
-    };
-
-    // Format modifier with sign
-    let mod_str = if modifier >= 0 {
-        format!("+{}", modifier)
-    } else {
-        format!("{}", modifier)
-    };
-
-    let text = vec![Line::from(vec![
-        Span::styled(
-            format!("{} {}: ", emoji, attr_type.abbrev()),
-            Style::default().add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(
-            format!("{:2}", value),
-            Style::default().fg(color).add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(format!(" ({:>3}) ", mod_str)),
-        Span::styled(
-            format!("[Cap: {}]", cap),
-            Style::default().fg(Color::DarkGray),
-        ),
-    ])];
-
-    let paragraph = Paragraph::new(text);
-    frame.render_widget(paragraph, area);
-}
-
-/// Draws derived stats calculated from attributes
-fn draw_derived_stats(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    let derived =
-        DerivedStats::calculate_derived_stats(&game_state.attributes, &game_state.equipment);
-
-    let stats_block = Block::default()
-        .borders(Borders::ALL)
-        .title("Derived Stats");
-
-    let inner = stats_block.inner(area);
-    frame.render_widget(stats_block, area);
-
-    let stats_text = vec![
-        Line::from(vec![
-            Span::styled("💚 Max HP: ", Style::default().add_modifier(Modifier::BOLD)),
-            Span::styled(
-                format!("{}", derived.max_hp),
-                Style::default().fg(Color::Green),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "⚔️ Physical: ",
-                Style::default().add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                format!("{}", derived.physical_damage),
-                Style::default().fg(Color::Red),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled("🔮 Magic: ", Style::default().add_modifier(Modifier::BOLD)),
-            Span::styled(
-                format!("{}", derived.magic_damage),
-                Style::default().fg(Color::Blue),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "🛡️ Defense: ",
-                Style::default().add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                format!("{}", derived.defense),
-                Style::default().fg(Color::Yellow),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled("💥 Crit: ", Style::default().add_modifier(Modifier::BOLD)),
-            Span::styled(
-                format!("{}%", derived.crit_chance_percent),
-                Style::default().fg(Color::Cyan),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "📈 XP Mult: ",
-                Style::default().add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                format!("{:.2}x", derived.xp_multiplier),
-                Style::default().fg(Color::Magenta),
-            ),
-        ]),
-    ];
-
-    let stats_paragraph = Paragraph::new(stats_text);
-    frame.render_widget(stats_paragraph, inner);
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, inner);
 }
 
 /// Draws prestige information with CHA bonus
@@ -534,23 +431,22 @@ fn draw_prestige_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
                 Style::default().fg(Color::Magenta),
             ),
         ]),
-        Line::from(vec![
-            Span::styled(
-                "🎣 Fishing: ",
-                Style::default().add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                format!(
-                    "{} ({})",
-                    game_state.fishing.rank_name(),
-                    game_state.fishing.rank
-                ),
-                Style::default().fg(Color::Cyan),
-            ),
-        ]),
     ];
 
-    // Fishing progress bar
+    // Show as many lines as fit, rank first
+    let lines_to_show = inner.height as usize;
+    let truncated: Vec<Line> = prestige_text.into_iter().take(lines_to_show).collect();
+    let prestige_paragraph = Paragraph::new(truncated);
+    frame.render_widget(prestige_paragraph, inner);
+}
+
+/// Draws the fishing panel with rank and progress bar.
+fn draw_fishing_panel(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    let block = Block::default().borders(Borders::ALL).title("Fishing");
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
     let fish_required = FishingState::fish_required_for_rank(game_state.fishing.rank);
     let fish_progress = game_state.fishing.fish_toward_next_rank;
     let fish_ratio = if fish_required > 0 {
@@ -559,8 +455,22 @@ fn draw_prestige_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
         0.0
     };
 
-    let fish_label = format!("{}/{}", fish_progress, fish_required);
+    let rank_line = Line::from(vec![
+        Span::styled(
+            "🎣 Rank: ",
+            Style::default().add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!(
+                "{} ({})",
+                game_state.fishing.rank_name(),
+                game_state.fishing.rank
+            ),
+            Style::default().fg(Color::Cyan),
+        ),
+    ]);
 
+    let fish_label = format!("{}/{}", fish_progress, fish_required);
     let fish_gauge = Gauge::default()
         .gauge_style(
             Style::default()
@@ -570,20 +480,19 @@ fn draw_prestige_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
         .label(fish_label)
         .ratio(fish_ratio);
 
-    // Render based on available height
-    if inner.height >= 5 {
-        // Full layout: 4 lines of text + 1 line for progress bar
+    if inner.height >= 2 {
         let inner_chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(4), Constraint::Length(1)])
+            .constraints([Constraint::Length(1), Constraint::Length(1)])
             .split(inner);
 
-        let prestige_paragraph = Paragraph::new(prestige_text);
-        frame.render_widget(prestige_paragraph, inner_chunks[0]);
+        let rank_paragraph = Paragraph::new(rank_line);
+        frame.render_widget(rank_paragraph, inner_chunks[0]);
         frame.render_widget(fish_gauge, inner_chunks[1]);
     } else if inner.height >= 1 {
-        // Limited space: show fishing bar only
-        frame.render_widget(fish_gauge, inner);
+        // Only room for one line — show rank
+        let rank_paragraph = Paragraph::new(rank_line);
+        frame.render_widget(rank_paragraph, inner);
     }
 }
 
@@ -742,64 +651,6 @@ fn draw_attributes_compact(frame: &mut Frame, area: Rect, game_state: &GameState
             ),
         ]));
     }
-
-    let paragraph = Paragraph::new(lines);
-    frame.render_widget(paragraph, inner);
-}
-
-/// Draws derived stats in a compact 2-row inline format (L tier).
-fn draw_derived_stats_compact(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    let derived =
-        DerivedStats::calculate_derived_stats(&game_state.attributes, &game_state.equipment);
-
-    let block = Block::default().borders(Borders::ALL).title("Stats");
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-
-    let total_damage = derived.physical_damage + derived.magic_damage;
-    // Approximate DPS: total damage / attack interval (1.5s base), adjusted by attack speed
-    let dps = (total_damage as f64 * derived.attack_speed_multiplier / 1.5) as u32;
-
-    let lines = vec![Line::from(vec![
-        Span::styled("HP:", Style::default().add_modifier(Modifier::BOLD)),
-        Span::styled(
-            format!("{}", derived.max_hp),
-            Style::default().fg(Color::Green),
-        ),
-        Span::raw(" "),
-        Span::styled("Phys:", Style::default().add_modifier(Modifier::BOLD)),
-        Span::styled(
-            format!("{}", derived.physical_damage),
-            Style::default().fg(Color::Red),
-        ),
-        Span::raw(" "),
-        Span::styled("Mag:", Style::default().add_modifier(Modifier::BOLD)),
-        Span::styled(
-            format!("{}", derived.magic_damage),
-            Style::default().fg(Color::Blue),
-        ),
-        Span::raw(" "),
-        Span::styled("Def:", Style::default().add_modifier(Modifier::BOLD)),
-        Span::styled(
-            format!("{}", derived.defense),
-            Style::default().fg(Color::Yellow),
-        ),
-        Span::raw(" "),
-        Span::styled("Crit:", Style::default().add_modifier(Modifier::BOLD)),
-        Span::styled(
-            format!("{}%", derived.crit_chance_percent),
-            Style::default().fg(Color::Cyan),
-        ),
-        Span::raw(" "),
-        Span::styled("XP:", Style::default().add_modifier(Modifier::BOLD)),
-        Span::styled(
-            format!("{:.2}x", derived.xp_multiplier),
-            Style::default().fg(Color::Magenta),
-        ),
-        Span::raw(" "),
-        Span::styled("DPS:", Style::default().add_modifier(Modifier::BOLD)),
-        Span::styled(format!("{}", dps), Style::default().fg(Color::White)),
-    ])];
 
     let paragraph = Paragraph::new(lines);
     frame.render_widget(paragraph, inner);

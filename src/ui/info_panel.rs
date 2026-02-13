@@ -9,6 +9,16 @@ use ratatui::{
     Frame,
 };
 
+/// Safely truncate a string to fit within `max_width` bytes, respecting char boundaries.
+fn truncate_to_width(s: &str, max_width: usize) -> String {
+    if s.len() <= max_width {
+        return s.to_string();
+    }
+    let limit = max_width.saturating_sub(3); // room for "…" (3 bytes UTF-8)
+    let boundary = s.floor_char_boundary(limit);
+    format!("{}…", &s[..boundary])
+}
+
 /// Draws the full-width bottom section: loot (left) and combat log (right) side by side
 pub fn draw_info_panel(frame: &mut Frame, area: Rect, game_state: &GameState, ctx: &LayoutContext) {
     match ctx.tier {
@@ -74,11 +84,7 @@ fn draw_combat_log(frame: &mut Frame, area: Rect, game_state: &GameState) {
 
         // Truncate long messages to fit panel width
         let max_width = inner.width as usize;
-        let msg = if entry.message.len() > max_width {
-            format!("{}…", &entry.message[..max_width.saturating_sub(1)])
-        } else {
-            entry.message.clone()
-        };
+        let msg = truncate_to_width(&entry.message, max_width);
 
         lines.push(Line::from(vec![Span::styled(
             msg,
@@ -232,11 +238,7 @@ fn draw_loot_combat_compact(frame: &mut Frame, area: Rect, game_state: &GameStat
                 Color::Red
             };
 
-            let msg = if entry.message.len() > max_width {
-                format!("{}…", &entry.message[..max_width.saturating_sub(1)])
-            } else {
-                entry.message.clone()
-            };
+            let msg = truncate_to_width(&entry.message, max_width);
 
             lines.push(Line::from(Span::styled(msg, Style::default().fg(color))));
         }
@@ -270,11 +272,7 @@ pub(super) fn draw_merged_feed(frame: &mut Frame, area: Rect, game_state: &GameS
                 } else {
                     Color::Red
                 };
-                let msg = if entry.message.len() > max_width {
-                    format!("{}…", &entry.message[..max_width.saturating_sub(1)])
-                } else {
-                    entry.message.clone()
-                };
+                let msg = truncate_to_width(&entry.message, max_width);
                 lines.push(Line::from(Span::styled(msg, Style::default().fg(color))));
                 next_is_combat = false;
                 continue;
@@ -312,11 +310,7 @@ pub(super) fn draw_merged_feed(frame: &mut Frame, area: Rect, game_state: &GameS
             } else {
                 Color::Red
             };
-            let msg = if entry.message.len() > max_width {
-                format!("{}…", &entry.message[..max_width.saturating_sub(1)])
-            } else {
-                entry.message.clone()
-            };
+            let msg = truncate_to_width(&entry.message, max_width);
             lines.push(Line::from(Span::styled(msg, Style::default().fg(color))));
             continue;
         }

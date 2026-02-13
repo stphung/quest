@@ -73,7 +73,7 @@ fn draw_combat_full(frame: &mut Frame, area: Rect, game_state: &GameState) {
     draw_combat_status(frame, chunks[3], game_state);
 }
 
-/// Compact combat scene for M tier: HP bars + status, no 3D sprite.
+/// Compact combat scene for M tier: HP bars + sprite + status.
 fn draw_combat_compact(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let outer_block = Block::default()
         .borders(Borders::ALL)
@@ -87,15 +87,16 @@ fn draw_combat_compact(frame: &mut Frame, area: Rect, game_state: &GameState) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(1), // Player HP
+            Constraint::Min(3),    // Sprite (uses whatever space is available)
             Constraint::Length(1), // Enemy HP
             Constraint::Length(1), // Status
-            Constraint::Min(0),    // Remaining space (unused)
         ])
         .split(inner);
 
     draw_player_hp(frame, chunks[0], game_state);
-    draw_enemy_hp(frame, chunks[1], game_state);
-    draw_combat_status(frame, chunks[2], game_state);
+    render_combat_3d(frame, chunks[1], game_state);
+    draw_enemy_hp(frame, chunks[2], game_state);
+    draw_combat_status(frame, chunks[3], game_state);
 }
 
 /// Draws the player HP bar (borderless, single line)

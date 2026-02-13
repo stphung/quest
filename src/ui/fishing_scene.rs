@@ -10,7 +10,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Gauge, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear, Paragraph, Wrap},
     Frame,
 };
 
@@ -40,7 +40,7 @@ pub fn render_fishing_scene(
     frame: &mut Frame,
     area: Rect,
     session: &FishingSession,
-    fishing_state: &FishingState,
+    _fishing_state: &FishingState,
     _ctx: &super::responsive::LayoutContext,
 ) {
     // Main vertical layout (recent catches now shown in the Loot panel)
@@ -50,7 +50,6 @@ pub fn render_fishing_scene(
             Constraint::Length(3), // Header with spot name
             Constraint::Min(6),    // Water animation area
             Constraint::Length(4), // Catch progress + phase status
-            Constraint::Length(5), // Rank info and progress bar
         ])
         .split(area);
 
@@ -62,9 +61,6 @@ pub fn render_fishing_scene(
 
     // Draw catch progress
     draw_catch_progress(frame, chunks[2], session);
-
-    // Draw rank info and progress
-    draw_rank_info(frame, chunks[3], fishing_state);
 }
 
 /// Draws the header with fishing spot name.
@@ -209,67 +205,6 @@ fn draw_catch_progress(frame: &mut Frame, area: Rect, session: &FishingSession) 
         .alignment(Alignment::Center);
 
     frame.render_widget(progress_paragraph, area);
-}
-
-/// Draws the fishing rank info and progress bar.
-fn draw_rank_info(frame: &mut Frame, area: Rect, fishing_state: &FishingState) {
-    let rank_block = Block::default()
-        .borders(Borders::ALL)
-        .title(" Fishing Rank ");
-
-    let inner = rank_block.inner(area);
-    frame.render_widget(rank_block, area);
-
-    // Split inner area for rank name and progress bar
-    let inner_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(1), // Rank name
-            Constraint::Length(1), // Progress bar
-        ])
-        .split(inner);
-
-    // Draw rank name
-    let rank_name = fishing_state.rank_name();
-    let rank_text = vec![Line::from(vec![
-        Span::styled("Rank: ", Style::default().add_modifier(Modifier::BOLD)),
-        Span::styled(
-            rank_name,
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(" "),
-        Span::styled(
-            format!("({})", fishing_state.rank),
-            Style::default().fg(Color::Yellow),
-        ),
-    ])];
-
-    let rank_paragraph = Paragraph::new(rank_text);
-    frame.render_widget(rank_paragraph, inner_chunks[0]);
-
-    // Draw progress bar
-    let required = FishingState::fish_required_for_rank(fishing_state.rank);
-    let progress = fishing_state.fish_toward_next_rank;
-    let ratio = if required > 0 {
-        (progress as f64 / required as f64).min(1.0)
-    } else {
-        0.0
-    };
-
-    let progress_label = format!("{}/{}", progress, required);
-
-    let gauge = Gauge::default()
-        .gauge_style(
-            Style::default()
-                .fg(Color::Blue)
-                .add_modifier(Modifier::BOLD),
-        )
-        .label(progress_label)
-        .ratio(ratio);
-
-    frame.render_widget(gauge, inner_chunks[1]);
 }
 
 /// Data for each Storm Leviathan encounter stage.

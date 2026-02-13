@@ -120,20 +120,21 @@ fn draw_xl_l_layout(
     // Determine if we need space for update drawer
     let show_update_drawer = update_expanded && update_info.is_some();
 
-    // Info panel height: condensed at L tier to save vertical space
-    let info_panel_height = if ctx.height_tier >= SizeTier::XL {
-        8
+    // Stats panel needs a fixed height: header(4)+prestige(5)+fishing(4)+attrs(8) = 21 + equip ~16
+    // At L tier: header(4)+prestige(5)+fishing(4)+attrs(5) = 18 + equip ~9
+    let stats_height: u16 = if ctx.height_tier >= SizeTier::XL {
+        37 // 21 fixed + 16 equipment
     } else {
-        6
+        27 // 18 fixed + 9 equipment
     };
 
-    // Split vertically: main content, full-width info panels, optional update drawer, footer
+    // Split vertically: fixed stats area, growing info panels, optional update drawer, footer
     let v_chunks = if show_update_drawer {
         Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Min(0),                    // Main content (stats + right panel)
-                Constraint::Length(info_panel_height), // Full-width Loot + Combat
+                Constraint::Length(stats_height),       // Main content (stats + right panel)
+                Constraint::Min(6),                    // Full-width Loot + Combat (grows)
                 Constraint::Length(12),                // Update drawer panel (taller for changelog)
                 Constraint::Length(3),                 // Full-width footer
             ])
@@ -142,8 +143,8 @@ fn draw_xl_l_layout(
         Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Min(0),                    // Main content (stats + right panel)
-                Constraint::Length(info_panel_height), // Full-width Loot + Combat
+                Constraint::Length(stats_height),       // Main content (stats + right panel)
+                Constraint::Min(6),                    // Full-width Loot + Combat (grows)
                 Constraint::Length(3),                 // Full-width footer
             ])
             .split(main_area)
