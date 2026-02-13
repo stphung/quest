@@ -13,6 +13,9 @@ use crate::challenges::go::{apply_go_result, process_input as process_go_input, 
 use crate::challenges::gomoku::logic::{
     apply_game_result as apply_gomoku_result, process_input as process_gomoku_input, GomokuInput,
 };
+use crate::challenges::lander::logic::{
+    apply_game_result as apply_lander_result, process_input as process_lander_input, LanderInput,
+};
 use crate::challenges::menu::{process_input as process_menu_input, MenuInput};
 use crate::challenges::minesweeper::logic::{
     apply_game_result as apply_minesweeper_result, process_input as process_minesweeper_input,
@@ -598,6 +601,20 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
                     _ => SnakeInput::Other,
                 };
                 process_snake_input(snake_game, input);
+            }
+            ActiveMinigame::Lander(lander_game) => {
+                if lander_game.game_result.is_some() {
+                    state.last_minigame_win = apply_lander_result(state);
+                    return InputResult::Continue;
+                }
+                let input = match key.code {
+                    KeyCode::Char(' ') | KeyCode::Up => LanderInput::ThrustOn,
+                    KeyCode::Left => LanderInput::RotateLeftOn,
+                    KeyCode::Right => LanderInput::RotateRightOn,
+                    KeyCode::Esc => LanderInput::Forfeit,
+                    _ => LanderInput::Other,
+                };
+                process_lander_input(lander_game, input);
             }
         }
     }

@@ -34,6 +34,7 @@ pub mod chess;
 pub mod flappy;
 pub mod go;
 pub mod gomoku;
+pub mod lander;
 pub mod menu;
 pub mod minesweeper;
 pub mod morris;
@@ -44,6 +45,7 @@ pub use chess::{ChessDifficulty, ChessGame, ChessResult};
 pub use flappy::{FlappyBirdDifficulty, FlappyBirdGame, FlappyBirdResult};
 pub use go::{GoDifficulty, GoGame, GoMove, GoResult, Stone, BOARD_SIZE as GO_BOARD_SIZE};
 pub use gomoku::{GomokuDifficulty, GomokuGame, GomokuResult, Player as GomokuPlayer, BOARD_SIZE};
+pub use lander::{LanderDifficulty, LanderGame, LanderResult};
 pub use menu::*;
 pub use minesweeper::{MinesweeperDifficulty, MinesweeperGame, MinesweeperResult};
 pub use morris::{
@@ -63,6 +65,7 @@ pub enum ActiveMinigame {
     Rune(RuneGame),
     Go(GoGame),
     Snake(SnakeGame),
+    Lander(Box<LanderGame>),
 }
 
 /// Information about a minigame win for achievement tracking.

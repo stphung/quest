@@ -8,6 +8,8 @@ use super::chess::{ChessDifficulty, ChessGame};
 use super::flappy::{FlappyBirdDifficulty, FlappyBirdGame};
 use super::go::{GoDifficulty, GoGame};
 use super::gomoku::{GomokuDifficulty, GomokuGame};
+use super::lander::logic::start_lander_game;
+use super::lander::LanderDifficulty;
 use super::minesweeper::{MinesweeperDifficulty, MinesweeperGame};
 use super::morris::{MorrisDifficulty, MorrisGame};
 use super::rune::{RuneDifficulty, RuneGame};
@@ -102,6 +104,10 @@ fn accept_selected_challenge(state: &mut GameState) {
             ChallengeType::Snake => {
                 let d = SnakeDifficulty::from_index(difficulty_index);
                 start_snake_game(d)
+            }
+            ChallengeType::Lander => {
+                let d = LanderDifficulty::from_index(difficulty_index);
+                start_lander_game(d)
             }
         };
         state.active_minigame = Some(minigame);
@@ -382,6 +388,10 @@ const CHALLENGE_TABLE: &[ChallengeWeight] = &[
         challenge_type: ChallengeType::Snake,
         weight: 20, // ~13% - moderate, action game alongside Flappy Bird
     },
+    ChallengeWeight {
+        challenge_type: ChallengeType::Lander,
+        weight: 20, // ~13% - moderate, action game
+    },
 ];
 
 /// A single pending challenge in the menu
@@ -404,6 +414,7 @@ pub enum ChallengeType {
     Rune,
     Go,
     Snake,
+    Lander,
 }
 
 impl ChallengeType {
@@ -418,6 +429,7 @@ impl ChallengeType {
             ChallengeType::Rune => "ᚱ",
             ChallengeType::Go => "◉",
             ChallengeType::Snake => "~",
+            ChallengeType::Lander => "^",
         }
     }
 
@@ -435,6 +447,9 @@ impl ChallengeType {
             ChallengeType::Go => "An ancient master beckons from beneath a gnarled tree...",
             ChallengeType::Snake => {
                 "A serpentine trail of glowing runes appears on the dungeon floor..."
+            }
+            ChallengeType::Lander => {
+                "A strange metal craft sits atop a rocky ledge, humming with energy..."
             }
         }
     }
@@ -665,6 +680,17 @@ pub fn create_challenge(ct: &ChallengeType) -> PendingChallenge {
                 own trail. The path is narrow, and the serpent is hungry.\""
                 .to_string(),
         },
+        ChallengeType::Lander => PendingChallenge {
+            challenge_type: ChallengeType::Lander,
+            title: "Lunar Descent".to_string(),
+            icon: "^",
+            description: "A strange metal craft perches on a rocky ledge, its hull scarred by \
+                countless descents. Ancient instruments flicker to life as you approach. \
+                A ghostly voice crackles: \"Pilot this vessel to the landing pad below. \
+                Control your thrust and rotation carefully\u{2014}fuel is limited, and the \
+                terrain is unforgiving.\""
+                .to_string(),
+        },
     }
 }
 
@@ -693,6 +719,7 @@ mod tests {
         assert!(!ChallengeType::Rune.icon().is_empty());
         assert!(!ChallengeType::Go.icon().is_empty());
         assert!(!ChallengeType::Snake.icon().is_empty());
+        assert!(!ChallengeType::Lander.icon().is_empty());
     }
 
     #[test]
@@ -705,6 +732,7 @@ mod tests {
         assert!(!ChallengeType::Rune.discovery_flavor().is_empty());
         assert!(!ChallengeType::Go.discovery_flavor().is_empty());
         assert!(!ChallengeType::Snake.discovery_flavor().is_empty());
+        assert!(!ChallengeType::Lander.discovery_flavor().is_empty());
     }
 
     #[test]
@@ -718,6 +746,7 @@ mod tests {
             ChallengeType::Rune.icon(),
             ChallengeType::Go.icon(),
             ChallengeType::Snake.icon(),
+            ChallengeType::Lander.icon(),
         ];
         // Check all pairs are different
         for i in 0..icons.len() {
@@ -1157,12 +1186,13 @@ mod tests {
         use super::super::flappy::FlappyBirdDifficulty;
         use super::super::go::GoDifficulty;
         use super::super::gomoku::GomokuDifficulty;
+        use super::super::lander::LanderDifficulty;
         use super::super::minesweeper::MinesweeperDifficulty;
         use super::super::morris::MorrisDifficulty;
         use super::super::rune::RuneDifficulty;
         use super::super::snake::SnakeDifficulty;
 
-        // Verify all 8 difficulty types produce correct lowercase strings
+        // Verify all 9 difficulty types produce correct lowercase strings
         for (i, expected) in ["novice", "apprentice", "journeyman", "master"]
             .iter()
             .enumerate()
@@ -1175,6 +1205,7 @@ mod tests {
             assert_eq!(GoDifficulty::ALL[i].difficulty_str(), *expected);
             assert_eq!(FlappyBirdDifficulty::ALL[i].difficulty_str(), *expected);
             assert_eq!(SnakeDifficulty::ALL[i].difficulty_str(), *expected);
+            assert_eq!(LanderDifficulty::ALL[i].difficulty_str(), *expected);
         }
     }
 }
