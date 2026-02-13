@@ -10,7 +10,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::Paragraph,
+    widgets::{Paragraph, Wrap},
     Frame,
 };
 
@@ -314,7 +314,7 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &ChessPuzzleGame) {
         ]),
     ];
 
-    let text = Paragraph::new(lines);
+    let text = Paragraph::new(lines).wrap(Wrap { trim: true });
     frame.render_widget(text, inner);
 }
 
