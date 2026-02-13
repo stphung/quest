@@ -740,7 +740,7 @@ fn test_game_tick_dungeon_room_entered_event() {
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
-    let dungeon = generate_dungeon(state.character_level, state.prestige_rank);
+    let dungeon = generate_dungeon(state.character_level, state.prestige_rank, 1);
     state.active_dungeon = Some(dungeon);
 
     // Run ticks until we get a room entry event
@@ -782,7 +782,7 @@ fn test_game_tick_dungeon_failed_event_on_death() {
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
-    let dungeon = generate_dungeon(state.character_level, state.prestige_rank);
+    let dungeon = generate_dungeon(state.character_level, state.prestige_rank, 1);
     state.active_dungeon = Some(dungeon);
 
     // Run ticks — with 1 HP, should die quickly if entering combat room

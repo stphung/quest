@@ -1420,7 +1420,7 @@ fn test_haven_discovery_via_game_tick_blocked_during_dungeon() {
     for seed in 0..10_000u64 {
         let mut state = fresh_state();
         state.prestige_rank = 15;
-        state.active_dungeon = Some(generate_dungeon(10, 0));
+        state.active_dungeon = Some(generate_dungeon(10, 0, 1));
         let mut tc = 0u32;
         let mut haven = Haven::default();
         let mut ach = Achievements::default();

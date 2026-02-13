@@ -10,6 +10,7 @@ use crate::achievements::Achievements;
 use crate::challenges::menu::ChallengeType;
 use crate::challenges::ActiveMinigame;
 use crate::character::derived_stats::DerivedStats;
+use crate::character::prestige::PrestigeCombatBonuses;
 use crate::combat::logic::{update_combat, CombatEvent, HavenCombatBonuses};
 use crate::core::constants::TICK_INTERVAL_MS;
 use crate::core::game_logic::{apply_tick_xp, spawn_enemy_if_needed, try_discover_dungeon};
@@ -458,7 +459,19 @@ pub fn game_tick<R: Rng>(
         double_strike_chance: haven.get_bonus(HavenBonusType::DoubleStrikeChance),
         xp_gain_percent: haven.get_bonus(HavenBonusType::XpGainPercent),
     };
-    let combat_events = update_combat(state, delta_time, &haven_combat, achievements);
+    let prestige_combat = PrestigeCombatBonuses::from_rank(state.prestige_rank);
+    // Apply prestige flat HP bonus to combat max HP (not in DerivedStats to avoid enemy scaling)
+    if prestige_combat.flat_hp > 0 {
+        let boosted_max = derived.max_hp + prestige_combat.flat_hp;
+        state.combat_state.update_max_hp(boosted_max);
+    }
+    let combat_events = update_combat(
+        state,
+        delta_time,
+        &haven_combat,
+        &prestige_combat,
+        achievements,
+    );
 
     for event in combat_events {
         match event {

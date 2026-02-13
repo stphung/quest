@@ -293,14 +293,14 @@ mod tests {
 
     #[test]
     fn test_dungeon_map_widget_creation() {
-        let dungeon = generate_dungeon(10, 0);
+        let dungeon = generate_dungeon(10, 0, 1);
         let widget = DungeonMapWidget::new(&dungeon, 0.0);
         assert!((widget.blink_phase - 0.0).abs() < 0.01);
     }
 
     #[test]
     fn test_room_display_unvisited() {
-        let dungeon = generate_dungeon(10, 0);
+        let dungeon = generate_dungeon(10, 0, 1);
         let widget = DungeonMapWidget::new(&dungeon, 0.0);
         // Unvisited rooms (Hidden or Revealed) show as unexplored
         let (sym, _style) = widget.room_display(RoomType::Combat, RoomState::Hidden, false);
@@ -311,7 +311,7 @@ mod tests {
 
     #[test]
     fn test_room_display_current_blink() {
-        let dungeon = generate_dungeon(10, 0);
+        let dungeon = generate_dungeon(10, 0, 1);
 
         // Blink visible (phase < 0.5)
         let widget = DungeonMapWidget::new(&dungeon, 0.25);
@@ -326,7 +326,7 @@ mod tests {
 
     #[test]
     fn test_dungeon_status_widget() {
-        let dungeon = generate_dungeon(10, 0);
+        let dungeon = generate_dungeon(10, 0, 1);
         let _widget = DungeonStatusWidget::new(&dungeon);
         // Widget creation should not panic
     }

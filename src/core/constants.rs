@@ -61,3 +61,37 @@ pub const REALTIME_FRAME_MS: u64 = 16; // ~60 FPS for action games
 
 // Zone progression
 pub const KILLS_FOR_BOSS: u32 = 10;
+pub const KILLS_FOR_BOSS_RETRY: u32 = 5;
+
+// Zone enemy base stats: (base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)
+// Index 0 = Zone 1, Index 10 = Zone 11 (The Expanse)
+// hp_step/dmg_step/def_step are per-subzone depth increments above depth 1
+pub const ZONE_ENEMY_STATS: [(u32, u32, u32, u32, u32, u32); 11] = [
+    (55, 9, 7, 2, 0, 0),           // Zone 1: Meadow
+    (90, 14, 13, 3, 2, 1),         // Zone 2: Dark Forest
+    (160, 22, 22, 4, 6, 2),        // Zone 3: Mountain Pass
+    (215, 27, 31, 6, 10, 3),       // Zone 4: Ancient Ruins
+    (305, 32, 42, 7, 16, 3),       // Zone 5: Volcanic Wastes
+    (380, 40, 53, 8, 22, 4),       // Zone 6: Frozen Tundra
+    (485, 45, 67, 10, 29, 4),      // Zone 7: Crystal Caverns
+    (575, 54, 78, 11, 35, 6),      // Zone 8: Sunken Kingdom
+    (685, 63, 92, 13, 43, 6),      // Zone 9: Floating Isles
+    (810, 72, 109, 14, 52, 7),     // Zone 10: Storm Citadel
+    (5000, 400, 500, 80, 250, 30), // Zone 11: The Expanse (endgame wall)
+];
+
+// Boss multipliers: (hp_mult, dmg_mult, def_mult)
+pub const SUBZONE_BOSS_MULTIPLIERS: (f64, f64, f64) = (3.0, 1.5, 1.8);
+pub const ZONE_BOSS_MULTIPLIERS: (f64, f64, f64) = (5.0, 1.8, 2.5);
+pub const DUNGEON_ELITE_MULTIPLIERS: (f64, f64, f64) = (2.2, 1.5, 1.6);
+pub const DUNGEON_BOSS_MULTIPLIERS: (f64, f64, f64) = (3.5, 1.8, 2.0);
+
+// Prestige combat bonus formulas
+pub const PRESTIGE_FLAT_DAMAGE_FACTOR: f64 = 5.0;
+pub const PRESTIGE_FLAT_DAMAGE_EXPONENT: f64 = 0.7;
+pub const PRESTIGE_FLAT_DEFENSE_FACTOR: f64 = 3.0;
+pub const PRESTIGE_FLAT_DEFENSE_EXPONENT: f64 = 0.6;
+pub const PRESTIGE_CRIT_PER_RANK: f64 = 0.5;
+pub const PRESTIGE_CRIT_CAP: f64 = 15.0;
+pub const PRESTIGE_FLAT_HP_FACTOR: f64 = 15.0;
+pub const PRESTIGE_FLAT_HP_EXPONENT: f64 = 0.6;

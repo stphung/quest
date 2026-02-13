@@ -89,7 +89,12 @@ fn trigger_dungeon(state: &mut GameState) -> &'static str {
     if state.active_dungeon.is_some() {
         return "Already in a dungeon!";
     }
-    state.active_dungeon = Some(generate_dungeon(state.character_level, state.prestige_rank));
+    let zone_id = state.zone_progression.current_zone_id;
+    state.active_dungeon = Some(generate_dungeon(
+        state.character_level,
+        state.prestige_rank,
+        zone_id,
+    ));
     "Dungeon discovered!"
 }
 

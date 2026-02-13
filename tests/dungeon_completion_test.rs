@@ -51,7 +51,7 @@ fn test_complete_dungeon_run() {
     state.character_level = 10;
 
     // Generate a dungeon
-    let dungeon = generate_dungeon(state.character_level, state.prestige_rank);
+    let dungeon = generate_dungeon(state.character_level, state.prestige_rank, 1);
     state.active_dungeon = Some(dungeon);
 
     // Verify dungeon structure
@@ -181,7 +181,7 @@ fn test_complete_dungeon_run() {
 #[test]
 fn test_dungeon_enemy_stat_multipliers() {
     let mut state = GameState::new("Test Hero".to_string(), 0);
-    state.active_dungeon = Some(generate_dungeon(10, 0));
+    state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
     let dungeon = state.active_dungeon.as_mut().unwrap();
 
@@ -222,7 +222,7 @@ fn test_dungeon_enemy_stat_multipliers() {
 #[test]
 fn test_elite_grants_key_for_boss() {
     let mut state = GameState::new("Key Seeker".to_string(), 0);
-    state.active_dungeon = Some(generate_dungeon(10, 0));
+    state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
     let dungeon = state.active_dungeon.as_mut().unwrap();
 
@@ -250,7 +250,7 @@ fn test_dungeon_death_safe_exit() {
     let mut state = GameState::new("Doomed Hero".to_string(), 0);
     state.prestige_rank = 5; // Should be preserved
 
-    state.active_dungeon = Some(generate_dungeon(10, 0));
+    state.active_dungeon = Some(generate_dungeon(10, 0, 1));
     assert!(state.active_dungeon.is_some());
 
     // Simulate death
@@ -281,7 +281,7 @@ fn test_dungeon_size_scaling() {
     // - Random variation: ±1 tier
 
     // Low prestige, low level - expect Small with possible Medium (20% chance)
-    let dungeon_p0 = generate_dungeon(10, 0);
+    let dungeon_p0 = generate_dungeon(10, 0, 1);
     assert!(
         dungeon_p0.size == DungeonSize::Small || dungeon_p0.size == DungeonSize::Medium,
         "Prestige 0, level 10 should get Small or Medium (got {:?})",
@@ -292,7 +292,7 @@ fn test_dungeon_size_scaling() {
     // Actually generated several dungeons to verify scaling
     let mut found_larger = false;
     for _ in 0..10 {
-        let dungeon = generate_dungeon(10, 5);
+        let dungeon = generate_dungeon(10, 5, 1);
         if dungeon.size != DungeonSize::Small {
             found_larger = true;
             break;
@@ -311,7 +311,7 @@ fn test_treasure_room_rewards() {
     state.character_level = 20;
     state.prestige_rank = 3;
 
-    state.active_dungeon = Some(generate_dungeon(20, 3));
+    state.active_dungeon = Some(generate_dungeon(20, 3, 1));
 
     // Simulate entering treasure room
     let result = on_treasure_room_entered(&mut state);
@@ -338,7 +338,7 @@ fn test_treasure_room_rewards() {
 fn test_dungeon_room_distribution() {
     // Generate several dungeons and verify structure
     for _ in 0..10 {
-        let dungeon = generate_dungeon(10, 0);
+        let dungeon = generate_dungeon(10, 0, 1);
 
         // Must have exactly one entrance
         assert_eq!(count_rooms_of_type(&dungeon, RoomType::Entrance), 1);
@@ -369,7 +369,7 @@ fn test_dungeon_pathfinding_completeness() {
     // So we test by revealing all rooms first
 
     for _ in 0..5 {
-        let mut dungeon = generate_dungeon(10, 0);
+        let mut dungeon = generate_dungeon(10, 0, 1);
 
         // Reveal all rooms for testing reachability
         let grid_size = dungeon.size.grid_size();
@@ -408,7 +408,7 @@ fn test_dungeon_pathfinding_completeness() {
 #[test]
 fn test_dungeon_xp_tracking() {
     let mut state = GameState::new("XP Tracker".to_string(), 0);
-    state.active_dungeon = Some(generate_dungeon(10, 0));
+    state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
     // Add XP from various sources
     add_dungeon_xp(&mut state, 100);
@@ -423,7 +423,7 @@ fn test_dungeon_xp_tracking() {
 #[test]
 fn test_dungeon_item_collection() {
     let mut state = GameState::new("Collector".to_string(), 0);
-    state.active_dungeon = Some(generate_dungeon(10, 0));
+    state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
     // Collect some items
     let item1 = generate_item(EquipmentSlot::Weapon, Rarity::Rare, 10);
@@ -440,7 +440,7 @@ fn test_dungeon_item_collection() {
 #[test]
 fn test_boss_defeat_completion_report() {
     let mut state = GameState::new("Boss Slayer".to_string(), 0);
-    state.active_dungeon = Some(generate_dungeon(10, 0));
+    state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
     // Simulate dungeon progress
     add_dungeon_xp(&mut state, 1500);

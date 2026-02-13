@@ -205,7 +205,7 @@ mod tests {
         assert!(!game_state.is_in_dungeon());
 
         // Set an active dungeon
-        game_state.active_dungeon = Some(crate::dungeon::generation::generate_dungeon(1, 0));
+        game_state.active_dungeon = Some(crate::dungeon::generation::generate_dungeon(1, 0, 1));
 
         assert!(game_state.is_in_dungeon());
     }

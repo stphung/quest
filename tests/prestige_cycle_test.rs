@@ -4,7 +4,9 @@
 
 use quest::achievements::Achievements;
 use quest::character::attributes::AttributeType;
-use quest::character::prestige::{can_prestige, get_prestige_tier, perform_prestige};
+use quest::character::prestige::{
+    can_prestige, get_prestige_tier, perform_prestige, PrestigeCombatBonuses,
+};
 use quest::core::game_logic::{apply_tick_xp, xp_for_next_level};
 use quest::GameState;
 
@@ -257,6 +259,7 @@ fn test_combat_to_prestige_full_loop() {
             &mut state,
             delta_time,
             &HavenCombatBonuses::default(),
+            &PrestigeCombatBonuses::default(),
             &mut achievements,
         );
 
@@ -336,6 +339,7 @@ fn test_combat_to_prestige_full_loop() {
             &mut state,
             delta_time,
             &HavenCombatBonuses::default(),
+            &PrestigeCombatBonuses::default(),
             &mut achievements,
         );
         for event in &events {

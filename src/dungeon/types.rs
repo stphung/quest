@@ -244,6 +244,13 @@ pub struct Dungeon {
     /// Whether currently traveling through cleared rooms (for UI display)
     #[serde(skip)]
     pub is_traveling: bool,
+    /// Zone where dungeon was discovered (for enemy scaling)
+    #[serde(default = "default_dungeon_zone")]
+    pub zone_id: u32,
+}
+
+fn default_dungeon_zone() -> u32 {
+    1
 }
 
 impl Dungeon {
@@ -262,6 +269,7 @@ impl Dungeon {
             rooms_cleared: 0,
             current_room_cleared: true, // Entrance starts cleared
             is_traveling: false,
+            zone_id: 1,
         }
     }
 

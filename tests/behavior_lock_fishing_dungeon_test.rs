@@ -439,7 +439,7 @@ fn test_fishing_phase_state_machine_full_cycle() {
 fn test_dungeon_update_produces_entered_room_events() {
     // Behavior: update_dungeon produces EnteredRoom events (line 1063)
     let mut state = create_test_state();
-    state.active_dungeon = Some(generate_dungeon(10, 0));
+    state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
     // Set room as cleared so we can move
     if let Some(dungeon) = &mut state.active_dungeon {
@@ -464,7 +464,7 @@ fn test_dungeon_update_produces_entered_room_events() {
 fn test_dungeon_blocks_movement_during_combat() {
     // Behavior: current_room_cleared must be true to move (dungeon/logic.rs line 56)
     let mut state = create_test_state();
-    state.active_dungeon = Some(generate_dungeon(10, 0));
+    state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
     if let Some(dungeon) = &mut state.active_dungeon {
         dungeon.current_room_cleared = false;
@@ -488,7 +488,7 @@ fn test_dungeon_no_events_when_no_active_dungeon() {
 #[test]
 fn test_dungeon_elite_defeated_gives_key() {
     // Behavior: on_elite_defeated gives key and produces FoundKey event (line 1362-1374)
-    let mut dungeon = generate_dungeon(10, 0);
+    let mut dungeon = generate_dungeon(10, 0, 1);
     assert!(!dungeon.has_key);
 
     let events = on_elite_defeated(&mut dungeon);
@@ -509,7 +509,7 @@ fn test_dungeon_elite_defeated_gives_key() {
 #[test]
 fn test_dungeon_elite_defeated_key_only_once() {
     // Behavior: second elite kill doesn't give another key
-    let mut dungeon = generate_dungeon(10, 0);
+    let mut dungeon = generate_dungeon(10, 0, 1);
 
     let events1 = on_elite_defeated(&mut dungeon);
     assert!(events1.iter().any(|e| matches!(e, DungeonEvent::FoundKey)));
@@ -525,7 +525,7 @@ fn test_dungeon_elite_defeated_key_only_once() {
 fn test_dungeon_boss_defeated_clears_dungeon_and_reports() {
     // Behavior: on_boss_defeated produces DungeonComplete and clears dungeon (lines 1376-1413)
     let mut state = create_test_state();
-    state.active_dungeon = Some(generate_dungeon(10, 0));
+    state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
     if let Some(dungeon) = &mut state.active_dungeon {
         dungeon.xp_earned = 5000;
@@ -561,7 +561,7 @@ fn test_dungeon_player_death_clears_dungeon_no_prestige_loss() {
     // Behavior: PlayerDiedInDungeon clears dungeon, emits DungeonFailed (lines 1414-1421)
     let mut state = create_test_state();
     state.prestige_rank = 5;
-    state.active_dungeon = Some(generate_dungeon(10, 0));
+    state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
     let events = quest::dungeon::logic::on_player_died_in_dungeon(&mut state);
 
@@ -576,7 +576,7 @@ fn test_dungeon_player_death_clears_dungeon_no_prestige_loss() {
 fn test_dungeon_treasure_room_gives_item() {
     // Behavior: EnteredRoom with Treasure type triggers on_treasure_room_entered (line 1068-1078)
     let mut state = create_test_state();
-    state.active_dungeon = Some(generate_dungeon(10, 0));
+    state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
     // on_treasure_room_entered generates an item and auto-equips if better
     let result = on_treasure_room_entered(&mut state);
@@ -589,7 +589,7 @@ fn test_dungeon_treasure_room_gives_item() {
 #[test]
 fn test_dungeon_room_enemy_defeated_marks_cleared() {
     // Behavior: on_room_enemy_defeated sets current_room_cleared (line 1288-1290)
-    let mut dungeon = generate_dungeon(10, 0);
+    let mut dungeon = generate_dungeon(10, 0, 1);
     dungeon.current_room_cleared = false;
 
     on_room_enemy_defeated(&mut dungeon);
@@ -604,7 +604,7 @@ fn test_dungeon_room_enemy_defeated_marks_cleared() {
 fn test_dungeon_xp_tracked_during_combat() {
     // Behavior: XP from kills is tracked in dungeon.xp_earned (line 1287)
     let mut state = create_test_state();
-    state.active_dungeon = Some(generate_dungeon(10, 0));
+    state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
     quest::dungeon::logic::add_dungeon_xp(&mut state, 500);
     quest::dungeon::logic::add_dungeon_xp(&mut state, 300);
@@ -617,7 +617,7 @@ fn test_dungeon_xp_tracked_during_combat() {
 fn test_dungeon_timer_accumulates_before_move() {
     // Behavior: move_timer accumulates delta_time until ROOM_MOVE_INTERVAL (line 61-82)
     let mut state = create_test_state();
-    state.active_dungeon = Some(generate_dungeon(10, 0));
+    state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
     if let Some(dungeon) = &mut state.active_dungeon {
         dungeon.current_room_cleared = true;
@@ -663,7 +663,7 @@ fn test_challenge_discovery_blocked_during_dungeon() {
     let mut rng = create_seeded_rng(42);
     let mut state = create_test_state();
     state.prestige_rank = 1;
-    state.active_dungeon = Some(generate_dungeon(10, 0));
+    state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
     for _ in 0..1000 {
         assert!(

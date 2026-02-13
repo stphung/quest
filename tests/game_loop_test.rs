@@ -5,6 +5,7 @@
 
 use quest::achievements::Achievements;
 use quest::character::derived_stats::DerivedStats;
+use quest::character::prestige::PrestigeCombatBonuses;
 use quest::combat::logic::{update_combat, CombatEvent, HavenCombatBonuses};
 use quest::core::game_logic::{
     process_offline_progression, spawn_enemy_if_needed, xp_for_next_level,
@@ -34,6 +35,7 @@ fn simulate_tick(state: &mut GameState) -> Vec<CombatEvent> {
         state,
         delta_time,
         &default_haven_bonuses(),
+        &PrestigeCombatBonuses::default(),
         &mut achievements,
     )
 }

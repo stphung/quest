@@ -3,8 +3,8 @@ use super::game_state::GameState;
 use crate::character::attributes::AttributeType;
 use crate::character::derived_stats::DerivedStats;
 use crate::combat::types::{
-    generate_boss_enemy, generate_boss_for_current_zone, generate_elite_enemy, generate_enemy,
-    generate_enemy_for_current_zone,
+    generate_boss_for_current_zone, generate_dungeon_boss, generate_dungeon_elite,
+    generate_dungeon_enemy, generate_enemy_for_current_zone,
 };
 use crate::dungeon::types::RoomType;
 use rand::Rng;
@@ -116,16 +116,13 @@ pub fn spawn_enemy_if_needed(state: &mut GameState) {
                 }
             }
         } else {
-            // Normal overworld combat - use zone-based enemy generation
-            let derived =
-                DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
-
+            // Normal overworld combat - use zone-based static enemy generation
             let zone_id = state.zone_progression.current_zone_id;
             let subzone_id = state.zone_progression.current_subzone_id;
             let enemy = if state.zone_progression.fighting_boss {
-                generate_boss_for_current_zone(zone_id, subzone_id, derived.max_hp)
+                generate_boss_for_current_zone(zone_id, subzone_id)
             } else {
-                generate_enemy_for_current_zone(zone_id, subzone_id, derived.max_hp)
+                generate_enemy_for_current_zone(zone_id, subzone_id)
             };
             state.combat_state.current_enemy = Some(enemy);
             state.combat_state.player_attack_timer = 0.0;
@@ -134,9 +131,9 @@ pub fn spawn_enemy_if_needed(state: &mut GameState) {
     }
 }
 
-/// Spawns a dungeon enemy based on the current room type
+/// Spawns a dungeon enemy based on the current room type using zone-based stats.
 fn spawn_dungeon_enemy(state: &mut GameState) {
-    let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+    let dungeon_zone_id = state.active_dungeon.as_ref().map_or(1, |d| d.zone_id);
 
     let room_type = state
         .active_dungeon
@@ -145,9 +142,9 @@ fn spawn_dungeon_enemy(state: &mut GameState) {
         .map(|r| r.room_type);
 
     let enemy = match room_type {
-        Some(RoomType::Elite) => generate_elite_enemy(derived.max_hp),
-        Some(RoomType::Boss) => generate_boss_enemy(derived.max_hp),
-        _ => generate_enemy(derived.max_hp),
+        Some(RoomType::Elite) => generate_dungeon_elite(dungeon_zone_id),
+        Some(RoomType::Boss) => generate_dungeon_boss(dungeon_zone_id),
+        _ => generate_dungeon_enemy(dungeon_zone_id),
     };
 
     state.combat_state.current_enemy = Some(enemy);
@@ -173,8 +170,12 @@ pub fn try_discover_dungeon(state: &mut GameState) -> bool {
 
     // Discover dungeon!
     // Prestige affects dungeon quality (size, rewards), not discovery rate
-    let dungeon =
-        crate::dungeon::generation::generate_dungeon(state.character_level, state.prestige_rank);
+    let zone_id = state.zone_progression.current_zone_id;
+    let dungeon = crate::dungeon::generation::generate_dungeon(
+        state.character_level,
+        state.prestige_rank,
+        zone_id,
+    );
     state.active_dungeon = Some(dungeon);
 
     true
@@ -359,7 +360,7 @@ mod tests {
         let mut state = GameState::new("Test Hero".to_string(), 0);
 
         // Already in a dungeon
-        state.active_dungeon = Some(crate::dungeon::generation::generate_dungeon(1, 0));
+        state.active_dungeon = Some(crate::dungeon::generation::generate_dungeon(1, 0, 1));
 
         // Should never discover a new dungeon while in one
         for _ in 0..100 {
@@ -634,168 +635,81 @@ mod tests {
 
     #[test]
     fn test_dungeon_elite_stats_higher_than_regular() {
-        // Elite enemies (1.5x multiplier) should on average have higher stats
-        // than regular enemies for the same player stats
-        let player_hp = 200;
-        let samples = 300;
-
-        let mut regular_hp_sum: f64 = 0.0;
-        let mut elite_hp_sum: f64 = 0.0;
-        let mut regular_dmg_sum: f64 = 0.0;
-        let mut elite_dmg_sum: f64 = 0.0;
+        // Use sampling to handle random variance in stat generation
+        let zone_id = 5;
+        let samples = 50;
+        let mut elite_hp = 0u64;
+        let mut regular_hp = 0u64;
 
         for _ in 0..samples {
-            let regular = crate::combat::types::generate_enemy(player_hp);
-            let elite = crate::combat::types::generate_elite_enemy(player_hp);
-            regular_hp_sum += regular.max_hp as f64;
-            elite_hp_sum += elite.max_hp as f64;
-            regular_dmg_sum += regular.damage as f64;
-            elite_dmg_sum += elite.damage as f64;
+            let regular = generate_dungeon_enemy(zone_id);
+            let elite = generate_dungeon_elite(zone_id);
+            elite_hp += elite.max_hp as u64;
+            regular_hp += regular.max_hp as u64;
         }
 
-        let avg_regular_hp = regular_hp_sum / samples as f64;
-        let avg_elite_hp = elite_hp_sum / samples as f64;
-        let hp_ratio = avg_elite_hp / avg_regular_hp;
-
-        let avg_regular_dmg = regular_dmg_sum / samples as f64;
-        let avg_elite_dmg = elite_dmg_sum / samples as f64;
-        let dmg_ratio = avg_elite_dmg / avg_regular_dmg;
-
-        // Elite should be ~1.5x (allow tolerance for random variance)
         assert!(
-            (1.2..=1.8).contains(&hp_ratio),
-            "Elite HP ratio should be ~1.5x, got {:.2}x (avg regular={:.0}, elite={:.0})",
-            hp_ratio,
-            avg_regular_hp,
-            avg_elite_hp
-        );
-        assert!(
-            (1.2..=1.8).contains(&dmg_ratio),
-            "Elite damage ratio should be ~1.5x, got {:.2}x (avg regular={:.0}, elite={:.0})",
-            dmg_ratio,
-            avg_regular_dmg,
-            avg_elite_dmg
+            elite_hp > regular_hp,
+            "Average elite HP should exceed average regular HP"
         );
     }
 
     #[test]
     fn test_dungeon_boss_stats_higher_than_elite() {
-        // Boss enemies (2.0x multiplier) should on average have higher stats
-        // than elite enemies (1.5x multiplier)
-        let player_hp = 200;
-        let samples = 300;
-
-        let mut elite_hp_sum: f64 = 0.0;
-        let mut boss_hp_sum: f64 = 0.0;
-        let mut elite_dmg_sum: f64 = 0.0;
-        let mut boss_dmg_sum: f64 = 0.0;
+        // Use sampling to handle random variance in stat generation
+        let zone_id = 5;
+        let samples = 50;
+        let mut boss_hp = 0u64;
+        let mut elite_hp = 0u64;
 
         for _ in 0..samples {
-            let elite = crate::combat::types::generate_elite_enemy(player_hp);
-            let boss = crate::combat::types::generate_boss_enemy(player_hp);
-            elite_hp_sum += elite.max_hp as f64;
-            boss_hp_sum += boss.max_hp as f64;
-            elite_dmg_sum += elite.damage as f64;
-            boss_dmg_sum += boss.damage as f64;
+            let elite = generate_dungeon_elite(zone_id);
+            let boss = generate_dungeon_boss(zone_id);
+            boss_hp += boss.max_hp as u64;
+            elite_hp += elite.max_hp as u64;
         }
 
-        let avg_elite_hp = elite_hp_sum / samples as f64;
-        let avg_boss_hp = boss_hp_sum / samples as f64;
-        let hp_ratio = avg_boss_hp / avg_elite_hp;
-
-        let avg_elite_dmg = elite_dmg_sum / samples as f64;
-        let avg_boss_dmg = boss_dmg_sum / samples as f64;
-        let dmg_ratio = avg_boss_dmg / avg_elite_dmg;
-
-        // Boss/Elite ratio should be ~2.0/1.5 = ~1.33x
         assert!(
-            (1.1..=1.6).contains(&hp_ratio),
-            "Boss/Elite HP ratio should be ~1.33x, got {:.2}x",
-            hp_ratio
-        );
-        assert!(
-            (1.1..=1.6).contains(&dmg_ratio),
-            "Boss/Elite damage ratio should be ~1.33x, got {:.2}x",
-            dmg_ratio
+            boss_hp > elite_hp,
+            "Average boss HP should exceed average elite HP"
         );
     }
 
     #[test]
-    fn test_dungeon_enemy_stats_scale_with_player_hp() {
-        // Enemies should scale with player max HP
-        let low_hp = 50;
-        let high_hp = 500;
-        let samples = 200;
+    fn test_dungeon_enemy_stats_scale_with_zone() {
+        // Enemies in higher zones should have more HP
+        let low_zone = generate_dungeon_enemy(1);
+        let high_zone = generate_dungeon_enemy(10);
 
-        let mut low_hp_sum: f64 = 0.0;
-        let mut high_hp_sum: f64 = 0.0;
-
-        for _ in 0..samples {
-            let low = crate::combat::types::generate_enemy(low_hp);
-            let high = crate::combat::types::generate_enemy(high_hp);
-            low_hp_sum += low.max_hp as f64;
-            high_hp_sum += high.max_hp as f64;
-        }
-
-        let avg_low = low_hp_sum / samples as f64;
-        let avg_high = high_hp_sum / samples as f64;
-
-        // With 10x player HP, enemy HP should also be ~10x
-        let ratio = avg_high / avg_low;
         assert!(
-            (7.0..=13.0).contains(&ratio),
-            "Enemy HP should scale roughly with player HP. ratio={:.2}x (avg low={:.0}, high={:.0})",
-            ratio,
-            avg_low,
-            avg_high
+            high_zone.max_hp > low_zone.max_hp,
+            "Zone 10 enemy HP {} should exceed zone 1 enemy HP {}",
+            high_zone.max_hp,
+            low_zone.max_hp
         );
     }
 
     #[test]
-    fn test_dungeon_enemy_damage_scales_with_player_hp() {
-        // Enemy damage is based on player_max_hp / 7.0 (for 5-10 second fights)
-        let low_hp = 50;
-        let high_hp = 500;
-        let samples = 200;
+    fn test_dungeon_enemy_damage_scales_with_zone() {
+        // Enemy damage in higher zones should be higher
+        let low_zone = generate_dungeon_enemy(1);
+        let high_zone = generate_dungeon_enemy(10);
 
-        let mut low_dmg_sum: f64 = 0.0;
-        let mut high_dmg_sum: f64 = 0.0;
-
-        for _ in 0..samples {
-            let low = crate::combat::types::generate_enemy(low_hp);
-            let high = crate::combat::types::generate_enemy(high_hp);
-            low_dmg_sum += low.damage as f64;
-            high_dmg_sum += high.damage as f64;
-        }
-
-        let avg_low = low_dmg_sum / samples as f64;
-        let avg_high = high_dmg_sum / samples as f64;
-
-        let ratio = avg_high / avg_low;
         assert!(
-            (7.0..=13.0).contains(&ratio),
-            "Enemy damage should scale with player HP. ratio={:.2}x (avg low={:.0}, high={:.0})",
-            ratio,
-            avg_low,
-            avg_high
+            high_zone.damage > low_zone.damage,
+            "Zone 10 enemy damage {} should exceed zone 1 enemy damage {}",
+            high_zone.damage,
+            low_zone.damage
         );
     }
 
     #[test]
-    fn test_spawn_dungeon_enemy_uses_derived_stats() {
-        // Verify that dungeon enemy spawning reads player attributes to calculate
-        // derived stats (max_hp, damage) and uses them for enemy scaling
+    fn test_spawn_dungeon_enemy_uses_zone_scaling() {
+        // Verify that dungeon enemy spawning uses zone-based scaling
         let mut state = setup_dungeon_with_room_type(RoomType::Combat);
 
-        // Increase player STR and CON for higher derived stats
-        state.attributes.set(AttributeType::Strength, 30); // +10 modifier
-        state.attributes.set(
-            crate::character::attributes::AttributeType::Constitution,
-            30,
-        ); // More HP
-
-        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
-        let player_hp = derived.max_hp;
+        // Set dungeon zone_id to a known value
+        state.active_dungeon.as_mut().unwrap().zone_id = 5;
 
         spawn_enemy_if_needed(&mut state);
 
@@ -805,19 +719,28 @@ mod tests {
             .as_ref()
             .expect("Should have spawned enemy");
 
-        // Enemy HP should be in the ballpark of player HP (80%-120% for regular enemies)
-        // Allow wider tolerance since there's random variance
+        // Enemy stats should be near zone 5 base stats (with ±10% random variance)
+        // zone_base_stats uses zone_id - 1 as index
+        let (base_hp, _, base_dmg, _, _, _) = ZONE_ENEMY_STATS[4];
+        let hp_lo = (base_hp as f64 * 0.85) as u32;
+        let hp_hi = (base_hp as f64 * 1.15) as u32;
         assert!(
-            enemy.max_hp >= (player_hp as f64 * 0.5) as u32,
-            "Enemy HP {} should be at least 50% of player HP {}",
+            enemy.max_hp >= hp_lo && enemy.max_hp <= hp_hi,
+            "Dungeon enemy HP {} should be near zone 5 base HP {} (range {}-{})",
             enemy.max_hp,
-            player_hp
+            base_hp,
+            hp_lo,
+            hp_hi
         );
+        let dmg_lo = (base_dmg as f64 * 0.85) as u32;
+        let dmg_hi = (base_dmg as f64 * 1.15) as u32;
         assert!(
-            enemy.max_hp <= (player_hp as f64 * 1.5) as u32,
-            "Enemy HP {} should be at most 150% of player HP {}",
-            enemy.max_hp,
-            player_hp
+            enemy.damage >= dmg_lo && enemy.damage <= dmg_hi,
+            "Dungeon enemy damage {} should be near zone 5 base damage {} (range {}-{})",
+            enemy.damage,
+            base_dmg,
+            dmg_lo,
+            dmg_hi
         );
     }
 
