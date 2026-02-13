@@ -102,6 +102,11 @@ fn render_board(frame: &mut Frame, area: Rect, game: &ChessGame) {
             let is_last_move = highlight_color.is_some();
 
             let piece_char = get_piece_at(&game.board, file, rank);
+            let piece_base_color = if is_player_piece(&game.board, file, rank) {
+                PLAYER_PIECE_COLOR
+            } else {
+                AI_PIECE_COLOR
+            };
 
             // Build square content
             let (content, fg_color) = if is_cursor {
@@ -114,7 +119,7 @@ fn render_board(frame: &mut Frame, area: Rect, game: &ChessGame) {
                     }
                 } else {
                     piece_char
-                        .map(piece_color)
+                        .map(|_| piece_base_color)
                         .unwrap_or(Color::Rgb(100, 100, 100))
                 };
                 match piece_char {
@@ -131,7 +136,7 @@ fn render_board(frame: &mut Frame, area: Rect, game: &ChessGame) {
             } else if is_legal_destination {
                 // Legal move indicator: pink dot or piece
                 match piece_char {
-                    Some(c) => (format!(" {}  ", c), piece_color(c)),
+                    Some(c) => (format!(" {}  ", c), piece_base_color),
                     None => (" ·  ".to_string(), Color::Rgb(200, 100, 200)),
                 }
             } else if is_last_move {
@@ -149,7 +154,7 @@ fn render_board(frame: &mut Frame, area: Rect, game: &ChessGame) {
             } else {
                 // Normal square
                 match piece_char {
-                    Some(c) => (format!(" {}  ", c), piece_color(c)),
+                    Some(c) => (format!(" {}  ", c), piece_base_color),
                     None => ("    ".to_string(), Color::Reset),
                 }
             };
@@ -323,15 +328,15 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &ChessGame) {
         Line::from(vec![
             Span::styled("You: ", Style::default().fg(Color::White)),
             Span::styled(
-                "♚♛♜♝♞♟",
+                "K Q R B N P",
                 Style::default()
-                    .fg(Color::White)
+                    .fg(PLAYER_PIECE_COLOR)
                     .add_modifier(Modifier::BOLD),
             ),
         ]),
         Line::from(vec![
             Span::styled("Foe: ", Style::default().fg(Color::Gray)),
-            Span::styled("♔♕♖♗♘♙", Style::default().fg(Color::Rgb(140, 140, 140))),
+            Span::styled("K Q R B N P", Style::default().fg(AI_PIECE_COLOR)),
         ]),
     ];
 
@@ -401,39 +406,33 @@ fn render_chess_game_over(frame: &mut Frame, area: Rect, game: &ChessGame) {
     );
 }
 
-/// Get color for a piece character (white pieces are bright, black pieces are dim)
-fn piece_color(c: char) -> Color {
-    // chess-engine swaps Unicode symbols: Black symbols (hollow) are used for White pieces
-    if matches!(c, '\u{265A}'..='\u{265F}') {
-        Color::White
-    } else {
-        Color::Rgb(140, 140, 140)
-    }
+/// Check if the piece at a square belongs to the player (White).
+fn is_player_piece(board: &chess_engine::Board, file: u8, rank: u8) -> bool {
+    use chess_engine::{Color as ChessColor, Position};
+
+    let position = Position::new(rank as i32, file as i32);
+    board
+        .get_piece(position)
+        .map(|p| p.get_color() == ChessColor::White)
+        .unwrap_or(false)
 }
 
-/// Get the piece character at a specific square from the chess-engine Board
+const PLAYER_PIECE_COLOR: Color = Color::White;
+const AI_PIECE_COLOR: Color = Color::LightRed;
+
+/// Get the piece character at a specific square from the chess-engine Board.
+/// Both sides use uppercase letters (K Q R B N P), differentiated by color.
 fn get_piece_at(board: &chess_engine::Board, file: u8, rank: u8) -> Option<char> {
-    use chess_engine::{Color as ChessColor, Piece, Position};
+    use chess_engine::{Piece, Position};
 
     let position = Position::new(rank as i32, file as i32);
 
-    board.get_piece(position).map(|piece| {
-        // Note: chess-engine swaps Unicode symbols:
-        // - Color::White pieces display with filled symbols (normally black in Unicode)
-        // - Color::Black pieces display with hollow symbols (normally white in Unicode)
-        match piece {
-            Piece::King(ChessColor::White, _) => '\u{265A}', // Black king symbol for white
-            Piece::Queen(ChessColor::White, _) => '\u{265B}', // Black queen symbol for white
-            Piece::Rook(ChessColor::White, _) => '\u{265C}', // Black rook symbol for white
-            Piece::Bishop(ChessColor::White, _) => '\u{265D}', // Black bishop symbol for white
-            Piece::Knight(ChessColor::White, _) => '\u{265E}', // Black knight symbol for white
-            Piece::Pawn(ChessColor::White, _) => '\u{265F}', // Black pawn symbol for white
-            Piece::King(ChessColor::Black, _) => '\u{2654}', // White king symbol for black
-            Piece::Queen(ChessColor::Black, _) => '\u{2655}', // White queen symbol for black
-            Piece::Rook(ChessColor::Black, _) => '\u{2656}', // White rook symbol for black
-            Piece::Bishop(ChessColor::Black, _) => '\u{2657}', // White bishop symbol for black
-            Piece::Knight(ChessColor::Black, _) => '\u{2658}', // White knight symbol for black
-            Piece::Pawn(ChessColor::Black, _) => '\u{2659}', // White pawn symbol for black
-        }
+    board.get_piece(position).map(|piece| match piece {
+        Piece::King(_, _) => 'K',
+        Piece::Queen(_, _) => 'Q',
+        Piece::Rook(_, _) => 'R',
+        Piece::Bishop(_, _) => 'B',
+        Piece::Knight(_, _) => 'N',
+        Piece::Pawn(_, _) => 'P',
     })
 }
