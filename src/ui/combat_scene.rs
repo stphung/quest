@@ -10,6 +10,7 @@ use ratatui::{
 };
 
 use super::combat_3d::render_combat_3d;
+use super::enemy_sprites::zone_palette;
 
 /// Draws the combat scene with 3D first-person view
 pub fn draw_combat_scene(frame: &mut Frame, area: Rect, game_state: &GameState) {
@@ -65,15 +66,28 @@ fn draw_player_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
     frame.render_widget(gauge, area);
 }
 
-/// Draws the enemy HP bar (borderless, single line)
+/// Draws the enemy HP bar (borderless, single line) with zone-aware coloring
 fn draw_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
     if let Some(enemy) = &game_state.combat_state.current_enemy {
         let hp_ratio = enemy.current_hp as f64 / enemy.max_hp as f64;
 
         let label = format!("{}: {}/{}", enemy.name, enemy.current_hp, enemy.max_hp);
 
+        let is_boss = game_state.zone_progression.fighting_boss;
+        let is_dungeon_boss = enemy.name.starts_with("Boss ");
+        let hp_color = if is_boss || is_dungeon_boss {
+            Color::LightRed
+        } else {
+            let zone_id = game_state
+                .active_dungeon
+                .as_ref()
+                .map(|d| d.zone_id)
+                .unwrap_or(game_state.zone_progression.current_zone_id);
+            zone_palette(zone_id).primary
+        };
+
         let gauge = Gauge::default()
-            .gauge_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
+            .gauge_style(Style::default().fg(hp_color).add_modifier(Modifier::BOLD))
             .label(label)
             .ratio(hp_ratio);
 
