@@ -125,7 +125,7 @@ impl ZoneProgression {
         // Check if previous zone's final boss is defeated (if not first zone)
         if zone.id > 1 {
             let prev_zone_id = zone.id - 1;
-            if let Some(prev_zone) = get_all_zones().into_iter().find(|z| z.id == prev_zone_id) {
+            if let Some(prev_zone) = get_all_zones().iter().find(|z| z.id == prev_zone_id) {
                 let last_subzone_id = prev_zone.subzones.len() as u32;
                 if !self.is_boss_defeated(prev_zone_id, last_subzone_id) {
                     return false;

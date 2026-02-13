@@ -93,12 +93,14 @@ pub fn effective_enemy_attack_interval(state: &GameState) -> f64 {
 }
 
 /// Updates combat state, returns events that occurred
+/// `derived` contains pre-computed derived stats (avoids redundant recalculation)
 /// `haven` contains all Haven bonuses that affect combat
 /// `prestige_bonuses` contains flat combat bonuses from prestige rank
 /// `achievements` is used to check for Stormbreaker achievement (Zone 10 boss)
 pub fn update_combat(
     state: &mut GameState,
     delta_time: f64,
+    derived: &DerivedStats,
     haven: &HavenCombatBonuses,
     prestige_bonuses: &PrestigeCombatBonuses,
     achievements: &mut crate::achievements::Achievements,
@@ -108,10 +110,8 @@ pub fn update_combat(
     // Handle regeneration after enemy death
     if state.combat_state.is_regenerating {
         // HP regen multiplier: higher = faster regen (equipment + haven bonus)
-        let regen_derived =
-            DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
         let total_regen_multiplier =
-            regen_derived.hp_regen_multiplier * (1.0 + haven.hp_regen_percent / 100.0);
+            derived.hp_regen_multiplier * (1.0 + haven.hp_regen_percent / 100.0);
 
         // Apply Bedroom bonus: reduce base regen duration
         let base_regen_duration =
@@ -143,8 +143,6 @@ pub fn update_combat(
     // --- Phase 1: Accumulate both timers ---
     state.combat_state.player_attack_timer += delta_time;
     state.combat_state.enemy_attack_timer += delta_time;
-
-    let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
 
     // Attack speed multiplier: higher = faster attacks
     let player_interval = ATTACK_INTERVAL_SECONDS / derived.attack_speed_multiplier;
@@ -432,6 +430,23 @@ mod tests {
         PrestigeCombatBonuses::default()
     }
 
+    /// Computes DerivedStats for the given state (test helper).
+    fn derived(state: &GameState) -> DerivedStats {
+        DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment)
+    }
+
+    /// Test wrapper for update_combat that computes DerivedStats internally.
+    fn update_combat_test(
+        state: &mut GameState,
+        delta_time: f64,
+        haven: &HavenCombatBonuses,
+        prestige_bonuses: &PrestigeCombatBonuses,
+        achievements: &mut Achievements,
+    ) -> Vec<CombatEvent> {
+        let d = derived(state);
+        update_combat(state, delta_time, &d, haven, prestige_bonuses, achievements)
+    }
+
     /// Forces a player attack by setting the player timer, suppressing enemy attack.
     fn force_player_attack(
         state: &mut GameState,
@@ -440,7 +455,8 @@ mod tests {
     ) -> Vec<CombatEvent> {
         state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
         state.combat_state.enemy_attack_timer = 0.0;
-        update_combat(state, 0.1, haven, &default_prestige(), achievements)
+        let d = derived(state);
+        update_combat(state, 0.1, &d, haven, &default_prestige(), achievements)
     }
 
     /// Forces an enemy attack by setting the enemy timer, suppressing player attack.
@@ -451,7 +467,8 @@ mod tests {
     ) -> Vec<CombatEvent> {
         state.combat_state.player_attack_timer = 0.0;
         state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
-        update_combat(state, 0.1, haven, &default_prestige(), achievements)
+        let d = derived(state);
+        update_combat(state, 0.1, &d, haven, &default_prestige(), achievements)
     }
 
     /// Forces both player and enemy to attack in the same tick.
@@ -462,7 +479,8 @@ mod tests {
     ) -> Vec<CombatEvent> {
         state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
         state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
-        update_combat(state, 0.1, haven, &default_prestige(), achievements)
+        let d = derived(state);
+        update_combat(state, 0.1, &d, haven, &default_prestige(), achievements)
     }
 
     /// Asserts that at least one event matching the predicate exists.
@@ -498,7 +516,7 @@ mod tests {
     fn test_update_combat_no_enemy() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
-        let events = update_combat(
+        let events = update_combat_test(
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -515,7 +533,7 @@ mod tests {
         state.combat_state.current_enemy = Some(Enemy::new("Test".to_string(), 100, 5));
 
         // Not enough time passed
-        let events = update_combat(
+        let events = update_combat_test(
             &mut state,
             0.5,
             &HavenCombatBonuses::default(),
@@ -525,7 +543,7 @@ mod tests {
         assert_eq!(events.len(), 0);
 
         // Enough time for player attack (1.5s total), but not enemy (needs 2.0s)
-        let events = update_combat(
+        let events = update_combat_test(
             &mut state,
             1.0,
             &HavenCombatBonuses::default(),
@@ -589,7 +607,7 @@ mod tests {
         assert!(state.combat_state.current_enemy.is_none());
 
         // Update to complete regen
-        update_combat(
+        update_combat_test(
             &mut state,
             HP_REGEN_DURATION_SECONDS,
             &HavenCombatBonuses::default(),
@@ -865,7 +883,7 @@ mod tests {
         // Even with both timers ready, should not attack while regenerating
         state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
         state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(
+        let events = update_combat_test(
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -891,7 +909,7 @@ mod tests {
         state.combat_state.player_max_hp = 100;
 
         // Partial regen (half duration)
-        update_combat(
+        update_combat_test(
             &mut state,
             HP_REGEN_DURATION_SECONDS / 2.0,
             &HavenCombatBonuses::default(),
@@ -961,7 +979,7 @@ mod tests {
         // Give enemy enough HP to survive
         state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
         state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(
+        let events = update_combat_test(
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -1003,7 +1021,7 @@ mod tests {
                 .set(crate::character::attributes::AttributeType::Dexterity, 0);
             s.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 100000, 0));
             s.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
-            let events = update_combat(
+            let events = update_combat_test(
                 &mut s,
                 0.1,
                 &HavenCombatBonuses::default(),
@@ -1043,7 +1061,7 @@ mod tests {
 
         state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
         state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(
+        let events = update_combat_test(
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -1145,7 +1163,7 @@ mod tests {
 
             // If regenerating, complete regen before next turn
             if state.combat_state.is_regenerating {
-                update_combat(
+                update_combat_test(
                     &mut state,
                     HP_REGEN_DURATION_SECONDS,
                     &HavenCombatBonuses::default(),
@@ -1274,7 +1292,7 @@ mod tests {
         // Weak enemy that dies in one hit
         state.combat_state.current_enemy = Some(Enemy::new("Weak".to_string(), 1, 0));
         state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
-        let events = update_combat(
+        let events = update_combat_test(
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -1459,7 +1477,7 @@ mod tests {
         state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
         state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
         let mut achievements = Achievements::default();
-        let events = update_combat(
+        let events = update_combat_test(
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -1508,7 +1526,7 @@ mod tests {
         // With 50% attack speed, effective interval is 1.5 / 1.5 = 1.0 seconds
         // So attack should trigger at 1.0 seconds instead of 1.5
         state.combat_state.player_attack_timer = 1.0;
-        let events = update_combat(
+        let events = update_combat_test(
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -1530,7 +1548,7 @@ mod tests {
 
         // Without attack speed bonus, 1.0 seconds is not enough (need 1.5)
         state.combat_state.player_attack_timer = 1.0;
-        let events = update_combat(
+        let events = update_combat_test(
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -1575,7 +1593,7 @@ mod tests {
 
         // With +100% regen (2x multiplier), duration is 2.5 / 2 = 1.25 seconds
         // After 1.25 seconds, should be fully healed
-        update_combat(
+        update_combat_test(
             &mut state,
             1.25,
             &HavenCombatBonuses::default(),
@@ -1598,7 +1616,7 @@ mod tests {
         state.combat_state.player_max_hp = 100;
 
         // Without regen bonus, 1.25 seconds is not enough (need 2.5)
-        update_combat(
+        update_combat_test(
             &mut state,
             1.25,
             &HavenCombatBonuses::default(),
@@ -1627,7 +1645,7 @@ mod tests {
             hp_regen_percent: 100.0,
             ..Default::default()
         };
-        update_combat(
+        update_combat_test(
             &mut state,
             1.25,
             &haven,
@@ -1675,7 +1693,7 @@ mod tests {
             ..Default::default()
         };
         let mut achievements = Achievements::default();
-        update_combat(
+        update_combat_test(
             &mut state,
             0.84,
             &haven,
@@ -1859,7 +1877,7 @@ mod tests {
         state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
 
         // First, attack with no Haven bonus
-        let events_no_bonus = update_combat(
+        let events_no_bonus = update_combat_test(
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -1885,7 +1903,7 @@ mod tests {
             damage_percent: 50.0,
             ..Default::default()
         };
-        let events_with_bonus = update_combat(
+        let events_with_bonus = update_combat_test(
             &mut state,
             0.1,
             &haven,
@@ -1928,7 +1946,7 @@ mod tests {
             state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
             state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
 
-            let events = update_combat(
+            let events = update_combat_test(
                 &mut state,
                 0.1,
                 &HavenCombatBonuses::default(),
@@ -1954,7 +1972,7 @@ mod tests {
                 crit_chance_percent: 20.0, // +20% crit
                 ..Default::default()
             };
-            let events = update_combat(
+            let events = update_combat_test(
                 &mut state,
                 0.1,
                 &haven,
@@ -1998,7 +2016,7 @@ mod tests {
                 double_strike_chance: 35.0, // +35% double strike (T3 War Room)
                 ..Default::default()
             };
-            let events = update_combat(
+            let events = update_combat_test(
                 &mut state,
                 0.1,
                 &haven,
@@ -2040,7 +2058,7 @@ mod tests {
             hp_regen_delay_reduction: 50.0,
             ..Default::default()
         };
-        update_combat(
+        update_combat_test(
             &mut state,
             1.25,
             &haven,
@@ -2072,7 +2090,7 @@ mod tests {
             xp_gain_percent: 20.0,
         };
 
-        let events = update_combat(
+        let events = update_combat_test(
             &mut state,
             0.1,
             &haven,
@@ -2667,7 +2685,7 @@ mod tests {
         assert_eq!(state.combat_state.enemy_attack_timer, 0.0);
 
         // Complete regen
-        update_combat(
+        update_combat_test(
             &mut state,
             HP_REGEN_DURATION_SECONDS,
             &HavenCombatBonuses::default(),
@@ -2725,7 +2743,7 @@ mod tests {
         state.combat_state.enemy_attack_timer = 0.3;
 
         // Tick during regen
-        update_combat(
+        update_combat_test(
             &mut state,
             0.5,
             &HavenCombatBonuses::default(),

@@ -465,9 +465,11 @@ pub fn haven_discovery_chance(prestige_rank: u32) -> f64 {
         + (prestige_rank - HAVEN_MIN_PRESTIGE_RANK) as f64 * HAVEN_DISCOVERY_RANK_BONUS
 }
 
-/// Pre-computed Haven bonuses for efficient access during gameplay
+/// Pre-computed Haven bonuses for efficient access during gameplay.
+/// Computed once per tick via `Haven::compute_bonuses()` instead of
+/// calling `get_bonus()` per bonus type (which iterates all 14 rooms each time).
 #[derive(Debug, Clone, Default)]
-#[allow(dead_code)] // Will be used for bonus application in follow-up PR
+#[allow(dead_code)] // Some fields consumed outside tick.rs (offline, vault, storm forge)
 pub struct HavenBonuses {
     pub damage_percent: f64,
     pub xp_gain_percent: f64,
@@ -483,12 +485,13 @@ pub struct HavenBonuses {
     pub hp_regen_delay_reduction: f64,
     pub vault_slots: u8,
     pub max_fishing_rank_bonus: u32,
+    #[allow(dead_code)]
     pub has_storm_forge: bool,
 }
 
 impl Haven {
-    /// Compute all bonuses from the current Haven state
-    #[allow(dead_code)] // Will be used for bonus application in follow-up PR
+    /// Compute all bonuses from the current Haven state.
+    /// Called once per tick to avoid repeated iteration over all 14 rooms.
     pub fn compute_bonuses(&self) -> HavenBonuses {
         HavenBonuses {
             damage_percent: self.get_bonus(HavenBonusType::DamagePercent),

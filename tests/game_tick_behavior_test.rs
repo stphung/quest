@@ -68,6 +68,7 @@ fn simulate_combat_tick(
     update_combat(
         state,
         delta_time,
+        &derived,
         &default_haven_bonuses(),
         &PrestigeCombatBonuses::default(),
         achievements,
@@ -875,9 +876,11 @@ fn test_haven_combat_bonuses_passed_to_update_combat() {
     assert!(state.combat_state.current_enemy.is_some());
 
     // Run combat with haven bonuses
+    let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
     let events = update_combat(
         &mut state,
         delta_time,
+        &derived,
         &haven_combat,
         &PrestigeCombatBonuses::default(),
         &mut achievements,

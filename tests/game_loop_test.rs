@@ -34,6 +34,7 @@ fn simulate_tick(state: &mut GameState) -> Vec<CombatEvent> {
     update_combat(
         state,
         delta_time,
+        &derived,
         &default_haven_bonuses(),
         &PrestigeCombatBonuses::default(),
         &mut achievements,

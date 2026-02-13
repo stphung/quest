@@ -258,6 +258,7 @@ fn test_combat_to_prestige_full_loop() {
         let events = update_combat(
             &mut state,
             delta_time,
+            &derived,
             &HavenCombatBonuses::default(),
             &PrestigeCombatBonuses::default(),
             &mut achievements,
@@ -338,6 +339,7 @@ fn test_combat_to_prestige_full_loop() {
         let events = update_combat(
             &mut state,
             delta_time,
+            &derived,
             &HavenCombatBonuses::default(),
             &PrestigeCombatBonuses::default(),
             &mut achievements,
