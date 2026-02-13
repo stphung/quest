@@ -1,4 +1,5 @@
 use crate::character::derived_stats::DerivedStats;
+use crate::character::prestige::PrestigeCombatBonuses;
 use crate::core::constants::*;
 use crate::core::game_state::GameState;
 use crate::dungeon::types::RoomType;
@@ -93,11 +94,13 @@ pub fn effective_enemy_attack_interval(state: &GameState) -> f64 {
 
 /// Updates combat state, returns events that occurred
 /// `haven` contains all Haven bonuses that affect combat
+/// `prestige_bonuses` contains flat combat bonuses from prestige rank
 /// `achievements` is used to check for Stormbreaker achievement (Zone 10 boss)
 pub fn update_combat(
     state: &mut GameState,
     delta_time: f64,
     haven: &HavenCombatBonuses,
+    prestige_bonuses: &PrestigeCombatBonuses,
     achievements: &mut crate::achievements::Achievements,
 ) -> Vec<CombatEvent> {
     let mut events = Vec::new();
@@ -163,13 +166,25 @@ pub fn update_combat(
             });
         } else {
             // Player attacks normally
-            // Apply Armory bonus: +% damage
+            // 1. Base damage from DerivedStats (STR/INT + equipment)
             let base_damage = derived.total_damage();
-            let mut damage = (base_damage as f64 * (1.0 + haven.damage_percent / 100.0)) as u32;
+            // 2. Apply Haven Armory multiplier: +% damage
+            let haven_damage = (base_damage as f64 * (1.0 + haven.damage_percent / 100.0)) as u32;
+            // 3. Apply prestige flat damage (added after Haven %, before crit)
+            let pre_crit_damage = haven_damage + prestige_bonuses.flat_damage;
+            // 4. Apply enemy defense: min damage floor of 1
+            let enemy_def = state
+                .combat_state
+                .current_enemy
+                .as_ref()
+                .map_or(0, |e| e.defense);
+            let mut damage = pre_crit_damage.saturating_sub(enemy_def).max(1);
             let mut was_crit = false;
 
-            // Roll for crit (apply Watchtower bonus: +% crit chance)
-            let total_crit_chance = derived.crit_chance_percent + haven.crit_chance_percent as u32;
+            // Roll for crit (base + Haven Watchtower + prestige crit)
+            let total_crit_chance = derived.crit_chance_percent
+                + haven.crit_chance_percent as u32
+                + prestige_bonuses.crit_chance as u32;
             let crit_roll = rand::thread_rng().gen_range(0..100);
             if crit_roll < total_crit_chance {
                 damage = (damage as f64 * derived.crit_multiplier) as u32;
@@ -275,7 +290,8 @@ pub fn update_combat(
         state.combat_state.enemy_attack_timer = 0.0;
 
         if let Some(enemy) = state.combat_state.current_enemy.as_mut() {
-            let enemy_damage = enemy.damage.saturating_sub(derived.defense);
+            let total_defense = derived.defense + prestige_bonuses.flat_defense;
+            let enemy_damage = enemy.damage.saturating_sub(total_defense).max(1);
             state.combat_state.player_current_hp = state
                 .combat_state
                 .player_current_hp
@@ -379,9 +395,11 @@ pub fn update_combat(
                 if !in_dungeon {
                     // Check if we died to a boss
                     if state.zone_progression.fighting_boss {
-                        // Reset boss encounter - go back to fighting regular enemies
+                        // Reset boss encounter but preserve kill counter
+                        // Boss respawns after KILLS_FOR_BOSS_RETRY kills (reduced penalty)
                         state.zone_progression.fighting_boss = false;
-                        state.zone_progression.kills_in_subzone = 0;
+                        state.zone_progression.kills_in_subzone =
+                            KILLS_FOR_BOSS.saturating_sub(KILLS_FOR_BOSS_RETRY);
                         state.combat_state.current_enemy = None;
                     } else if let Some(enemy) = state.combat_state.current_enemy.as_mut() {
                         enemy.reset_hp();
@@ -400,7 +418,7 @@ pub fn update_combat(
 #[cfg(test)]
 mod tests {
     use super::super::types::{
-        generate_boss_enemy, generate_elite_enemy, generate_enemy, generate_zone_enemy,
+        generate_dungeon_boss, generate_dungeon_elite, generate_dungeon_enemy, generate_zone_enemy,
         CombatState, Enemy,
     };
     use super::*;
@@ -410,6 +428,10 @@ mod tests {
     // Test Helpers
     // =========================================================================
 
+    fn default_prestige() -> PrestigeCombatBonuses {
+        PrestigeCombatBonuses::default()
+    }
+
     /// Forces a player attack by setting the player timer, suppressing enemy attack.
     fn force_player_attack(
         state: &mut GameState,
@@ -418,7 +440,7 @@ mod tests {
     ) -> Vec<CombatEvent> {
         state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
         state.combat_state.enemy_attack_timer = 0.0;
-        update_combat(state, 0.1, haven, achievements)
+        update_combat(state, 0.1, haven, &default_prestige(), achievements)
     }
 
     /// Forces an enemy attack by setting the enemy timer, suppressing player attack.
@@ -429,7 +451,7 @@ mod tests {
     ) -> Vec<CombatEvent> {
         state.combat_state.player_attack_timer = 0.0;
         state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
-        update_combat(state, 0.1, haven, achievements)
+        update_combat(state, 0.1, haven, &default_prestige(), achievements)
     }
 
     /// Forces both player and enemy to attack in the same tick.
@@ -440,7 +462,7 @@ mod tests {
     ) -> Vec<CombatEvent> {
         state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
         state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
-        update_combat(state, 0.1, haven, achievements)
+        update_combat(state, 0.1, haven, &default_prestige(), achievements)
     }
 
     /// Asserts that at least one event matching the predicate exists.
@@ -480,6 +502,7 @@ mod tests {
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
+            &default_prestige(),
             &mut achievements,
         );
         assert_eq!(events.len(), 0);
@@ -496,6 +519,7 @@ mod tests {
             &mut state,
             0.5,
             &HavenCombatBonuses::default(),
+            &default_prestige(),
             &mut achievements,
         );
         assert_eq!(events.len(), 0);
@@ -505,6 +529,7 @@ mod tests {
             &mut state,
             1.0,
             &HavenCombatBonuses::default(),
+            &default_prestige(),
             &mut achievements,
         );
         assert!(!events.is_empty()); // Player attack (enemy not yet at 2.0s)
@@ -568,6 +593,7 @@ mod tests {
             &mut state,
             HP_REGEN_DURATION_SECONDS,
             &HavenCombatBonuses::default(),
+            &default_prestige(),
             &mut achievements,
         );
         assert_eq!(
@@ -585,7 +611,7 @@ mod tests {
         state.combat_state.current_enemy = Some(Enemy::new("Test".to_string(), 100, 50));
 
         // Put player in a dungeon
-        state.active_dungeon = Some(crate::dungeon::generation::generate_dungeon(1, 0));
+        state.active_dungeon = Some(crate::dungeon::generation::generate_dungeon(1, 0, 1));
         assert!(state.active_dungeon.is_some());
 
         // Force both attacks (need enemy to attack to kill player)
@@ -704,9 +730,12 @@ mod tests {
         let died = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
         assert!(died);
 
-        // Boss encounter should be reset
+        // Boss encounter should be reset with retry mechanic
         assert!(!state.zone_progression.fighting_boss);
-        assert_eq!(state.zone_progression.kills_in_subzone, 0);
+        assert_eq!(
+            state.zone_progression.kills_in_subzone,
+            KILLS_FOR_BOSS.saturating_sub(KILLS_FOR_BOSS_RETRY)
+        );
 
         // Enemy should be cleared (not reset)
         assert!(state.combat_state.current_enemy.is_none());
@@ -743,7 +772,7 @@ mod tests {
     }
 
     #[test]
-    fn test_defense_can_reduce_damage_to_zero() {
+    fn test_defense_reduces_damage_to_minimum_floor() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
 
@@ -763,8 +792,8 @@ mod tests {
             &mut achievements,
         );
 
-        // Player should take no damage (5 - 10 = 0 via saturating_sub)
-        assert_eq!(state.combat_state.player_current_hp, initial_hp);
+        // Player should take minimum 1 damage (min damage floor)
+        assert_eq!(state.combat_state.player_current_hp, initial_hp - 1);
     }
 
     #[test]
@@ -840,6 +869,7 @@ mod tests {
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
+            &default_prestige(),
             &mut achievements,
         );
 
@@ -865,6 +895,7 @@ mod tests {
             &mut state,
             HP_REGEN_DURATION_SECONDS / 2.0,
             &HavenCombatBonuses::default(),
+            &default_prestige(),
             &mut achievements,
         );
 
@@ -900,9 +931,12 @@ mod tests {
         let died = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
         assert!(died);
 
-        // Boss encounter should be reset
+        // Boss encounter should be reset with retry mechanic
         assert!(!state.zone_progression.fighting_boss);
-        assert_eq!(state.zone_progression.kills_in_subzone, 0);
+        assert_eq!(
+            state.zone_progression.kills_in_subzone,
+            KILLS_FOR_BOSS.saturating_sub(KILLS_FOR_BOSS_RETRY)
+        );
 
         // Enemy should be cleared
         assert!(state.combat_state.current_enemy.is_none());
@@ -931,6 +965,7 @@ mod tests {
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
+            &default_prestige(),
             &mut achievements,
         );
 
@@ -972,6 +1007,7 @@ mod tests {
                 &mut s,
                 0.1,
                 &HavenCombatBonuses::default(),
+                &default_prestige(),
                 &mut achievements,
             );
 
@@ -1011,6 +1047,7 @@ mod tests {
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
+            &default_prestige(),
             &mut achievements,
         );
 
@@ -1112,6 +1149,7 @@ mod tests {
                     &mut state,
                     HP_REGEN_DURATION_SECONDS,
                     &HavenCombatBonuses::default(),
+                    &default_prestige(),
                     &mut achievements,
                 );
             }
@@ -1128,57 +1166,60 @@ mod tests {
     }
 
     #[test]
-    fn test_elite_enemy_has_150_percent_stats() {
-        // Run multiple generations and verify elite stats are roughly 1.5x base
-        let player_hp = 200;
-
-        let mut base_hp_sum: f64 = 0.0;
-        let mut elite_hp_sum: f64 = 0.0;
-        let samples = 500;
+    fn test_dungeon_elite_has_higher_stats_than_regular() {
+        // Use sampling to handle random variance in stat generation
+        let zone_id = 5;
+        let samples = 50;
+        let mut elite_hp_sum = 0u64;
+        let mut regular_hp_sum = 0u64;
+        let mut elite_dmg_sum = 0u64;
+        let mut regular_dmg_sum = 0u64;
 
         for _ in 0..samples {
-            let base = generate_enemy(player_hp);
-            let elite = generate_elite_enemy(player_hp);
-            base_hp_sum += base.max_hp as f64;
-            elite_hp_sum += elite.max_hp as f64;
+            let regular = generate_dungeon_enemy(zone_id);
+            let elite = generate_dungeon_elite(zone_id);
+            elite_hp_sum += elite.max_hp as u64;
+            regular_hp_sum += regular.max_hp as u64;
+            elite_dmg_sum += elite.damage as u64;
+            regular_dmg_sum += regular.damage as u64;
         }
 
-        let avg_base = base_hp_sum / samples as f64;
-        let avg_elite = elite_hp_sum / samples as f64;
-        let ratio = avg_elite / avg_base;
-
-        // Should be approximately 1.5x (allow 20% tolerance for random variance)
         assert!(
-            (1.2..=1.8).contains(&ratio),
-            "Elite HP ratio should be ~1.5x, got {:.2}x",
-            ratio
+            elite_hp_sum > regular_hp_sum,
+            "Average elite HP should exceed average regular HP"
+        );
+        assert!(
+            elite_dmg_sum > regular_dmg_sum,
+            "Average elite damage should exceed average regular damage"
         );
     }
 
     #[test]
-    fn test_boss_enemy_has_200_percent_stats() {
-        let player_hp = 200;
-
-        let mut base_hp_sum: f64 = 0.0;
-        let mut boss_hp_sum: f64 = 0.0;
-        let samples = 500;
+    fn test_dungeon_boss_has_higher_stats_than_elite() {
+        // Use sampling to handle random variance in stat generation
+        let zone_id = 5;
+        let samples = 50;
+        let mut boss_hp_sum = 0u64;
+        let mut elite_hp_sum = 0u64;
+        let mut boss_dmg_sum = 0u64;
+        let mut elite_dmg_sum = 0u64;
 
         for _ in 0..samples {
-            let base = generate_enemy(player_hp);
-            let boss = generate_boss_enemy(player_hp);
-            base_hp_sum += base.max_hp as f64;
-            boss_hp_sum += boss.max_hp as f64;
+            let elite = generate_dungeon_elite(zone_id);
+            let boss = generate_dungeon_boss(zone_id);
+            boss_hp_sum += boss.max_hp as u64;
+            elite_hp_sum += elite.max_hp as u64;
+            boss_dmg_sum += boss.damage as u64;
+            elite_dmg_sum += elite.damage as u64;
         }
 
-        let avg_base = base_hp_sum / samples as f64;
-        let avg_boss = boss_hp_sum / samples as f64;
-        let ratio = avg_boss / avg_base;
-
-        // Should be approximately 2.0x (allow 20% tolerance)
         assert!(
-            (1.6..=2.4).contains(&ratio),
-            "Boss HP ratio should be ~2.0x, got {:.2}x",
-            ratio
+            boss_hp_sum > elite_hp_sum,
+            "Average boss HP should exceed average elite HP"
+        );
+        assert!(
+            boss_dmg_sum > elite_dmg_sum,
+            "Average boss damage should exceed average elite damage"
         );
     }
 
@@ -1186,34 +1227,22 @@ mod tests {
     fn test_zone_scaling_increases_enemy_stats() {
         use crate::zones::get_all_zones;
         let zones = get_all_zones();
-        let player_hp = 200;
-        let samples = 300;
 
-        // Zone 1 average HP
+        // Zone 1 HP (static, no sampling needed)
         let zone1 = &zones[0];
-        let mut z1_hp: f64 = 0.0;
-        for _ in 0..samples {
-            let e = generate_zone_enemy(zone1, &zone1.subzones[0], player_hp);
-            z1_hp += e.max_hp as f64;
-        }
+        let e1 = generate_zone_enemy(zone1, &zone1.subzones[0]);
+        let z1_hp = e1.max_hp;
 
-        // Zone 10 average HP
+        // Zone 10 HP
         let zone10 = &zones[9];
-        let mut z10_hp: f64 = 0.0;
-        for _ in 0..samples {
-            let e = generate_zone_enemy(zone10, &zone10.subzones[0], player_hp);
-            z10_hp += e.max_hp as f64;
-        }
+        let e10 = generate_zone_enemy(zone10, &zone10.subzones[0]);
+        let z10_hp = e10.max_hp;
 
-        let avg_z1 = z1_hp / samples as f64;
-        let avg_z10 = z10_hp / samples as f64;
-
-        // Zone 10 multiplier: 1.0 + (10-1)*0.1 = 1.9x
         assert!(
-            avg_z10 > avg_z1 * 1.4,
-            "Zone 10 enemies should be significantly stronger than zone 1 (z1={:.0}, z10={:.0})",
-            avg_z1,
-            avg_z10
+            z10_hp > z1_hp * 10,
+            "Zone 10 enemies should be significantly stronger than zone 1 (z1={}, z10={})",
+            z1_hp,
+            z10_hp
         );
     }
 
@@ -1249,6 +1278,7 @@ mod tests {
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
+            &default_prestige(),
             &mut achievements,
         );
 
@@ -1311,8 +1341,8 @@ mod tests {
     }
 
     #[test]
-    fn test_enemy_zero_damage_with_high_defense() {
-        // When defense >= enemy damage, player takes 0 damage
+    fn test_enemy_min_damage_with_high_defense() {
+        // When defense >= enemy damage, player takes minimum 1 damage (min floor)
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
         state
@@ -1332,8 +1362,8 @@ mod tests {
             &mut achievements,
         );
 
-        // Player should take zero damage from the enemy (defense >= enemy damage)
-        assert_eq!(state.combat_state.player_current_hp, initial_hp);
+        // Player should take minimum 1 damage (min damage floor)
+        assert_eq!(state.combat_state.player_current_hp, initial_hp - 1);
     }
 
     #[test]
@@ -1433,6 +1463,7 @@ mod tests {
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
+            &default_prestige(),
             &mut achievements,
         );
 
@@ -1481,6 +1512,7 @@ mod tests {
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
+            &default_prestige(),
             &mut achievements,
         );
 
@@ -1502,6 +1534,7 @@ mod tests {
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
+            &default_prestige(),
             &mut achievements,
         );
 
@@ -1546,6 +1579,7 @@ mod tests {
             &mut state,
             1.25,
             &HavenCombatBonuses::default(),
+            &default_prestige(),
             &mut achievements,
         );
 
@@ -1568,6 +1602,7 @@ mod tests {
             &mut state,
             1.25,
             &HavenCombatBonuses::default(),
+            &default_prestige(),
             &mut achievements,
         );
 
@@ -1592,7 +1627,13 @@ mod tests {
             hp_regen_percent: 100.0,
             ..Default::default()
         };
-        update_combat(&mut state, 1.25, &haven, &mut achievements);
+        update_combat(
+            &mut state,
+            1.25,
+            &haven,
+            &default_prestige(),
+            &mut achievements,
+        );
 
         assert_eq!(state.combat_state.player_current_hp, 100);
         assert!(!state.combat_state.is_regenerating);
@@ -1634,7 +1675,13 @@ mod tests {
             ..Default::default()
         };
         let mut achievements = Achievements::default();
-        update_combat(&mut state, 0.84, &haven, &mut achievements);
+        update_combat(
+            &mut state,
+            0.84,
+            &haven,
+            &default_prestige(),
+            &mut achievements,
+        );
 
         assert_eq!(state.combat_state.player_current_hp, 100);
         assert!(!state.combat_state.is_regenerating);
@@ -1770,25 +1817,26 @@ mod tests {
         state.equipment.set(EquipmentSlot::Armor, Some(armor));
 
         let enemy_max_hp = 1000;
-        // Enemy deals 0 damage, so player takes 0 damage, so 0 is reflected
+        // Enemy deals 0 base damage, but min floor means 1 damage dealt
         state.combat_state.current_enemy =
             Some(Enemy::new("Pacifist".to_string(), enemy_max_hp, 0));
 
         let initial_player_hp = state.combat_state.player_current_hp;
-        // Force both attacks (enemy attacks with 0 damage, no reflection)
+        // Force both attacks (enemy attacks with min floor 1 damage, reflection triggers)
         force_both_attacks(
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
         );
 
-        // Player took no damage
-        assert_eq!(state.combat_state.player_current_hp, initial_player_hp);
+        // Player took 1 damage (min floor)
+        assert_eq!(state.combat_state.player_current_hp, initial_player_hp - 1);
 
-        // Enemy should only take player attack damage, no reflection (0 damage = 0 reflected)
+        // Enemy takes player attack damage + 1 reflected (100% of 1 damage)
         let enemy = state.combat_state.current_enemy.as_ref().unwrap();
         let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
-        let expected_hp = enemy_max_hp - derived.total_damage();
+        let reflected = 1u32; // 100% of 1 min-floor damage
+        let expected_hp = enemy_max_hp - derived.total_damage() - reflected;
         assert_eq!(enemy.current_hp, expected_hp);
     }
 
@@ -1815,6 +1863,7 @@ mod tests {
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
+            &default_prestige(),
             &mut achievements,
         );
         let damage_no_bonus = events_no_bonus
@@ -1836,7 +1885,13 @@ mod tests {
             damage_percent: 50.0,
             ..Default::default()
         };
-        let events_with_bonus = update_combat(&mut state, 0.1, &haven, &mut achievements);
+        let events_with_bonus = update_combat(
+            &mut state,
+            0.1,
+            &haven,
+            &default_prestige(),
+            &mut achievements,
+        );
         let damage_with_bonus = events_with_bonus
             .iter()
             .find_map(|e| {
@@ -1877,6 +1932,7 @@ mod tests {
                 &mut state,
                 0.1,
                 &HavenCombatBonuses::default(),
+                &default_prestige(),
                 &mut achievements,
             );
             if events
@@ -1898,7 +1954,13 @@ mod tests {
                 crit_chance_percent: 20.0, // +20% crit
                 ..Default::default()
             };
-            let events = update_combat(&mut state, 0.1, &haven, &mut achievements);
+            let events = update_combat(
+                &mut state,
+                0.1,
+                &haven,
+                &default_prestige(),
+                &mut achievements,
+            );
             if events
                 .iter()
                 .any(|e| matches!(e, CombatEvent::PlayerAttack { was_crit: true, .. }))
@@ -1936,7 +1998,13 @@ mod tests {
                 double_strike_chance: 35.0, // +35% double strike (T3 War Room)
                 ..Default::default()
             };
-            let events = update_combat(&mut state, 0.1, &haven, &mut achievements);
+            let events = update_combat(
+                &mut state,
+                0.1,
+                &haven,
+                &default_prestige(),
+                &mut achievements,
+            );
 
             // Count PlayerAttack events (should be 2 if double strike procs)
             let attack_count = events
@@ -1972,7 +2040,13 @@ mod tests {
             hp_regen_delay_reduction: 50.0,
             ..Default::default()
         };
-        update_combat(&mut state, 1.25, &haven, &mut achievements);
+        update_combat(
+            &mut state,
+            1.25,
+            &haven,
+            &default_prestige(),
+            &mut achievements,
+        );
 
         assert_eq!(state.combat_state.player_current_hp, 100);
         assert!(!state.combat_state.is_regenerating);
@@ -1998,7 +2072,13 @@ mod tests {
             xp_gain_percent: 20.0,
         };
 
-        let events = update_combat(&mut state, 0.1, &haven, &mut achievements);
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &haven,
+            &default_prestige(),
+            &mut achievements,
+        );
 
         // Should have at least one attack
         assert!(
@@ -2591,6 +2671,7 @@ mod tests {
             &mut state,
             HP_REGEN_DURATION_SECONDS,
             &HavenCombatBonuses::default(),
+            &default_prestige(),
             &mut achievements,
         );
         assert!(!state.combat_state.is_regenerating);
@@ -2648,6 +2729,7 @@ mod tests {
             &mut state,
             0.5,
             &HavenCombatBonuses::default(),
+            &default_prestige(),
             &mut achievements,
         );
 

@@ -453,7 +453,7 @@ mod tests {
 
     #[test]
     fn test_find_path_same_position() {
-        let dungeon = generate_dungeon(10, 0);
+        let dungeon = generate_dungeon(10, 0, 1);
         let pos = dungeon.player_position;
         let path = find_path_to(&dungeon, pos, pos);
         assert!(path.is_some());
@@ -462,7 +462,7 @@ mod tests {
 
     #[test]
     fn test_find_path_to_adjacent() {
-        let dungeon = generate_dungeon(10, 0);
+        let dungeon = generate_dungeon(10, 0, 1);
         let pos = dungeon.player_position;
         let neighbors = dungeon.get_connected_neighbors(pos.0, pos.1);
 
@@ -475,7 +475,7 @@ mod tests {
 
     #[test]
     fn test_find_next_room_from_start() {
-        let dungeon = generate_dungeon(10, 0);
+        let dungeon = generate_dungeon(10, 0, 1);
         // From entrance, there should be a next room to explore
         let next = find_next_room(&dungeon);
         assert!(next.is_some());
@@ -483,7 +483,7 @@ mod tests {
 
     #[test]
     fn test_move_to_room_updates_state() {
-        let mut dungeon = generate_dungeon(10, 0);
+        let mut dungeon = generate_dungeon(10, 0, 1);
         let start_pos = dungeon.player_position;
         let neighbors = dungeon.get_connected_neighbors(start_pos.0, start_pos.1);
 
@@ -508,7 +508,7 @@ mod tests {
 
     #[test]
     fn test_on_elite_defeated_gives_key() {
-        let mut dungeon = generate_dungeon(10, 0);
+        let mut dungeon = generate_dungeon(10, 0, 1);
         assert!(!dungeon.has_key);
 
         let events = on_elite_defeated(&mut dungeon);
@@ -519,7 +519,7 @@ mod tests {
 
     #[test]
     fn test_get_enemy_stat_multiplier() {
-        let dungeon = generate_dungeon(10, 0);
+        let dungeon = generate_dungeon(10, 0, 1);
         // Default room (entrance) should have 1.0 multiplier
         let mult = get_enemy_stat_multiplier(&dungeon);
         assert!((mult - 1.0).abs() < 0.01);
@@ -571,7 +571,7 @@ mod tests {
 
     #[test]
     fn test_cleared_room_no_combat_on_reentry() {
-        let mut dungeon = generate_dungeon(10, 0);
+        let mut dungeon = generate_dungeon(10, 0, 1);
         let start_pos = dungeon.player_position;
 
         // Find an adjacent combat room
@@ -632,7 +632,7 @@ mod tests {
     #[test]
     fn test_update_dungeon_room_not_cleared_blocks_movement() {
         let mut state = GameState::new("Test".to_string(), 0);
-        state.active_dungeon = Some(generate_dungeon(10, 0));
+        state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
         // Set room as not cleared (in combat)
         if let Some(dungeon) = &mut state.active_dungeon {
@@ -649,7 +649,7 @@ mod tests {
     #[test]
     fn test_update_dungeon_timer_accumulation() {
         let mut state = GameState::new("Test".to_string(), 0);
-        state.active_dungeon = Some(generate_dungeon(10, 0));
+        state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
         // Ensure room is cleared so we can move
         if let Some(dungeon) = &mut state.active_dungeon {
@@ -669,7 +669,7 @@ mod tests {
     #[test]
     fn test_update_dungeon_moves_after_interval() {
         let mut state = GameState::new("Test".to_string(), 0);
-        state.active_dungeon = Some(generate_dungeon(10, 0));
+        state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
         if let Some(dungeon) = &mut state.active_dungeon {
             dungeon.current_room_cleared = true;
@@ -696,7 +696,7 @@ mod tests {
     #[test]
     fn test_update_dungeon_traveling_uses_faster_interval() {
         let mut state = GameState::new("Test".to_string(), 0);
-        state.active_dungeon = Some(generate_dungeon(10, 0));
+        state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
         // Manually set up a scenario where next room is cleared
         if let Some(dungeon) = &mut state.active_dungeon {
@@ -726,7 +726,7 @@ mod tests {
 
     #[test]
     fn test_find_next_room_prioritizes_boss_with_key() {
-        let mut dungeon = generate_dungeon(10, 0);
+        let mut dungeon = generate_dungeon(10, 0, 1);
         dungeon.has_key = true;
 
         // Clear path to boss by marking all rooms EXCEPT boss as Cleared
@@ -791,7 +791,7 @@ mod tests {
 
     #[test]
     fn test_find_next_room_skips_boss_without_key() {
-        let mut dungeon = generate_dungeon(10, 0);
+        let mut dungeon = generate_dungeon(10, 0, 1);
         dungeon.has_key = false;
 
         // Make boss the only revealed room
@@ -822,7 +822,7 @@ mod tests {
 
     #[test]
     fn test_find_next_room_returns_none_when_fully_explored() {
-        let mut dungeon = generate_dungeon(10, 0);
+        let mut dungeon = generate_dungeon(10, 0, 1);
         dungeon.has_key = true; // Even with key
 
         // Mark ALL rooms as cleared
@@ -845,7 +845,7 @@ mod tests {
 
     #[test]
     fn test_find_path_returns_none_for_unreachable() {
-        let dungeon = generate_dungeon(10, 0);
+        let dungeon = generate_dungeon(10, 0, 1);
 
         // Try to find path to a position that's definitely not a room
         let path = find_path_to(&dungeon, (0, 0), (99, 99));
@@ -855,7 +855,7 @@ mod tests {
 
     #[test]
     fn test_find_path_through_multiple_rooms() {
-        let dungeon = generate_dungeon(10, 0);
+        let dungeon = generate_dungeon(10, 0, 1);
         let boss_pos = dungeon.boss_position;
 
         // Path to boss should be longer than 2 for most dungeons
@@ -870,7 +870,7 @@ mod tests {
 
     #[test]
     fn test_move_to_treasure_room_auto_clears() {
-        let mut dungeon = generate_dungeon(10, 0);
+        let mut dungeon = generate_dungeon(10, 0, 1);
 
         if let Some(pos) = find_room_of_type(&dungeon, RoomType::Treasure) {
             // Make it revealed so we can move there
@@ -890,7 +890,7 @@ mod tests {
 
     #[test]
     fn test_move_to_elite_room_starts_combat() {
-        let mut dungeon = generate_dungeon(10, 0);
+        let mut dungeon = generate_dungeon(10, 0, 1);
 
         if let Some(pos) = find_room_of_type(&dungeon, RoomType::Elite) {
             if let Some(room) = dungeon.get_room_mut(pos.0, pos.1) {
@@ -908,7 +908,7 @@ mod tests {
 
     #[test]
     fn test_move_to_boss_room_starts_combat() {
-        let mut dungeon = generate_dungeon(10, 0);
+        let mut dungeon = generate_dungeon(10, 0, 1);
         let boss_pos = dungeon.boss_position;
 
         if let Some(room) = dungeon.get_room_mut(boss_pos.0, boss_pos.1) {
@@ -925,7 +925,7 @@ mod tests {
 
     #[test]
     fn test_move_to_room_increments_rooms_cleared() {
-        let mut dungeon = generate_dungeon(10, 0);
+        let mut dungeon = generate_dungeon(10, 0, 1);
         let initial_cleared = dungeon.rooms_cleared;
 
         let neighbors =
@@ -941,7 +941,7 @@ mod tests {
 
     #[test]
     fn test_backtracking_does_not_double_count_rooms() {
-        let mut dungeon = generate_dungeon(10, 0);
+        let mut dungeon = generate_dungeon(10, 0, 1);
         let start_pos = dungeon.player_position;
 
         let neighbors = dungeon.get_connected_neighbors(start_pos.0, start_pos.1);
@@ -993,7 +993,7 @@ mod tests {
     #[test]
     fn test_on_boss_defeated_clears_dungeon() {
         let mut state = GameState::new("Test".to_string(), 0);
-        state.active_dungeon = Some(generate_dungeon(10, 0));
+        state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
         // Set some XP and items
         if let Some(dungeon) = &mut state.active_dungeon {
@@ -1012,7 +1012,7 @@ mod tests {
     #[test]
     fn test_on_boss_defeated_reports_xp_and_items() {
         let mut state = GameState::new("Test".to_string(), 0);
-        state.active_dungeon = Some(generate_dungeon(10, 0));
+        state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
         if let Some(dungeon) = &mut state.active_dungeon {
             dungeon.xp_earned = 5000;
@@ -1043,7 +1043,7 @@ mod tests {
     #[test]
     fn test_on_player_died_clears_dungeon() {
         let mut state = GameState::new("Test".to_string(), 0);
-        state.active_dungeon = Some(generate_dungeon(10, 0));
+        state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
         let events = on_player_died_in_dungeon(&mut state);
 
@@ -1057,7 +1057,7 @@ mod tests {
 
     #[test]
     fn test_current_room_needs_combat_for_combat_room() {
-        let mut dungeon = generate_dungeon(10, 0);
+        let mut dungeon = generate_dungeon(10, 0, 1);
 
         if let Some(pos) = find_room_of_type(&dungeon, RoomType::Combat) {
             if let Some(room) = dungeon.get_room_mut(pos.0, pos.1) {
@@ -1071,7 +1071,7 @@ mod tests {
 
     #[test]
     fn test_current_room_needs_combat_false_for_treasure() {
-        let mut dungeon = generate_dungeon(10, 0);
+        let mut dungeon = generate_dungeon(10, 0, 1);
 
         if let Some(pos) = find_room_of_type(&dungeon, RoomType::Treasure) {
             if let Some(room) = dungeon.get_room_mut(pos.0, pos.1) {
@@ -1088,7 +1088,7 @@ mod tests {
     #[test]
     fn test_add_dungeon_xp_accumulates() {
         let mut state = GameState::new("Test".to_string(), 0);
-        state.active_dungeon = Some(generate_dungeon(10, 0));
+        state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
         add_dungeon_xp(&mut state, 100);
         add_dungeon_xp(&mut state, 250);
@@ -1109,7 +1109,7 @@ mod tests {
     #[test]
     fn test_collect_dungeon_item_adds_to_list() {
         let mut state = GameState::new("Test".to_string(), 0);
-        state.active_dungeon = Some(generate_dungeon(10, 0));
+        state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
         let item =
             crate::items::generate_item(crate::items::EquipmentSlot::Weapon, Rarity::Magic, 10);
@@ -1124,7 +1124,7 @@ mod tests {
 
     #[test]
     fn test_on_elite_defeated_only_gives_key_once() {
-        let mut dungeon = generate_dungeon(10, 0);
+        let mut dungeon = generate_dungeon(10, 0, 1);
 
         // First elite defeat
         let events1 = on_elite_defeated(&mut dungeon);
@@ -1142,7 +1142,7 @@ mod tests {
 
     #[test]
     fn test_get_enemy_stat_multiplier_elite() {
-        let mut dungeon = generate_dungeon(10, 0);
+        let mut dungeon = generate_dungeon(10, 0, 1);
 
         // Find and move to elite room
         if let Some(pos) = find_room_of_type(&dungeon, RoomType::Elite) {
@@ -1158,7 +1158,7 @@ mod tests {
 
     #[test]
     fn test_get_enemy_stat_multiplier_boss() {
-        let mut dungeon = generate_dungeon(10, 0);
+        let mut dungeon = generate_dungeon(10, 0, 1);
         let boss_pos = dungeon.boss_position;
 
         if let Some(room) = dungeon.get_room_mut(boss_pos.0, boss_pos.1) {

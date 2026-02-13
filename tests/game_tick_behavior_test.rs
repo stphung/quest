@@ -19,6 +19,7 @@
 use quest::achievements::Achievements;
 use quest::character::attributes::AttributeType;
 use quest::character::derived_stats::DerivedStats;
+use quest::character::prestige::PrestigeCombatBonuses;
 use quest::combat::logic::{update_combat, CombatEvent, HavenCombatBonuses};
 use quest::core::game_logic::{
     apply_tick_xp, spawn_enemy_if_needed, try_discover_dungeon, xp_for_next_level,
@@ -64,7 +65,13 @@ fn simulate_combat_tick(
     spawn_enemy_if_needed(state);
 
     // Update combat (game_tick line 1219)
-    update_combat(state, delta_time, &default_haven_bonuses(), achievements)
+    update_combat(
+        state,
+        delta_time,
+        &default_haven_bonuses(),
+        &PrestigeCombatBonuses::default(),
+        achievements,
+    )
 }
 
 /// Run combat ticks until an enemy dies, returning the XP gained
@@ -307,7 +314,7 @@ fn test_dungeon_discovery_blocked_while_in_dungeon() {
     let mut state = GameState::new("Dungeon Block Test".to_string(), 0);
 
     // Put player in a dungeon
-    let dungeon = generate_dungeon(state.character_level, state.prestige_rank);
+    let dungeon = generate_dungeon(state.character_level, state.prestige_rank, 1);
     state.active_dungeon = Some(dungeon);
 
     // game_tick checks active_dungeon.is_none() before trying (line 1322)
@@ -508,7 +515,7 @@ fn test_dungeon_tick_produces_events() {
     state.character_level = 10;
 
     // Generate and enter a dungeon
-    let dungeon = generate_dungeon(state.character_level, state.prestige_rank);
+    let dungeon = generate_dungeon(state.character_level, state.prestige_rank, 1);
     state.active_dungeon = Some(dungeon);
 
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
@@ -539,7 +546,7 @@ fn test_dungeon_treasure_room_gives_item() {
     state.character_level = 10;
 
     // Generate a dungeon
-    let dungeon = generate_dungeon(state.character_level, state.prestige_rank);
+    let dungeon = generate_dungeon(state.character_level, state.prestige_rank, 1);
     state.active_dungeon = Some(dungeon);
 
     // Navigate to a treasure room (simulate game_tick treasure handling, line 1068-1078)
@@ -590,7 +597,7 @@ fn test_dungeon_elite_gives_key() {
     let mut state = GameState::new("Dungeon Key Test".to_string(), 0);
     state.character_level = 10;
 
-    let dungeon = generate_dungeon(state.character_level, state.prestige_rank);
+    let dungeon = generate_dungeon(state.character_level, state.prestige_rank, 1);
     state.active_dungeon = Some(dungeon);
 
     // game_tick calls on_elite_defeated when elite dies (line 1364)
@@ -611,7 +618,7 @@ fn test_dungeon_boss_defeat_clears_dungeon() {
     let mut state = GameState::new("Dungeon Boss Test".to_string(), 0);
     state.character_level = 10;
 
-    let dungeon = generate_dungeon(state.character_level, state.prestige_rank);
+    let dungeon = generate_dungeon(state.character_level, state.prestige_rank, 1);
     state.active_dungeon = Some(dungeon);
 
     // Give the key
@@ -753,7 +760,7 @@ fn test_enemy_does_not_spawn_in_non_combat_dungeon_room() {
     let mut state = GameState::new("Dungeon Room Spawn Test".to_string(), 0);
     state.character_level = 10;
 
-    let dungeon = generate_dungeon(state.character_level, state.prestige_rank);
+    let dungeon = generate_dungeon(state.character_level, state.prestige_rank, 1);
     state.active_dungeon = Some(dungeon);
 
     // Player starts at entrance — no enemy should spawn there
@@ -868,7 +875,13 @@ fn test_haven_combat_bonuses_passed_to_update_combat() {
     assert!(state.combat_state.current_enemy.is_some());
 
     // Run combat with haven bonuses
-    let events = update_combat(&mut state, delta_time, &haven_combat, &mut achievements);
+    let events = update_combat(
+        &mut state,
+        delta_time,
+        &haven_combat,
+        &PrestigeCombatBonuses::default(),
+        &mut achievements,
+    );
 
     // Verify combat ran (may or may not produce events depending on timer)
     // The important thing is the function accepts and uses haven bonuses
@@ -907,7 +920,7 @@ fn test_dungeon_combat_room_cleared_after_kill() {
     let mut state = create_strong_character("Dungeon Room Clear Test");
     state.character_level = 10;
 
-    let dungeon = generate_dungeon(state.character_level, state.prestige_rank);
+    let dungeon = generate_dungeon(state.character_level, state.prestige_rank, 1);
     state.active_dungeon = Some(dungeon);
 
     // Find a combat room and simulate clearing it

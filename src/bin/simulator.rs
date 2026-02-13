@@ -36,6 +36,7 @@ struct SimConfig {
     verbose: bool,
     csv_path: Option<String>,
     quiet: bool,
+    stormbreaker: bool,
 }
 
 impl Default for SimConfig {
@@ -48,6 +49,7 @@ impl Default for SimConfig {
             verbose: false,
             csv_path: None,
             quiet: false,
+            stormbreaker: false,
         }
     }
 }
@@ -80,6 +82,7 @@ fn parse_args() -> SimConfig {
                 config.csv_path = Some(args[i].clone());
             }
             "--quiet" => config.quiet = true,
+            "--stormbreaker" => config.stormbreaker = true,
             "--help" | "-h" => {
                 print_usage();
                 std::process::exit(0);
@@ -109,6 +112,7 @@ fn print_usage() {
          \x20 --verbose       Per-tick event logging\n\
          \x20 --csv FILE      Write time-series CSV\n\
          \x20 --quiet         Only final summary line\n\
+         \x20 --stormbreaker  Unlock Stormbreaker achievement (access Zone 10 boss)\n\
          \x20 --help, -h      Show this help"
     );
 }
@@ -302,6 +306,16 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
 
     let mut haven = Haven::default();
     let mut achievements = Achievements::default();
+
+    // Force-unlock Stormbreaker achievement if requested
+    if config.stormbreaker {
+        use quest::achievements::AchievementId;
+        achievements.unlock(
+            AchievementId::TheStormbreaker,
+            Some("Simulator".to_string()),
+        );
+    }
+
     let mut rng = ChaCha8Rng::seed_from_u64(seed);
     let mut tick_counter: u32 = 0;
     let mut stats = SimStats::default();
@@ -734,12 +748,13 @@ fn main() {
 
     if !config.quiet {
         eprintln!(
-            "Quest Simulator: {} ticks ({}) x {} run(s), seed={}, prestige=P{}",
+            "Quest Simulator: {} ticks ({}) x {} run(s), seed={}, prestige=P{}, stormbreaker={}",
             config.ticks,
             ticks_to_time(config.ticks),
             config.runs,
             config.seed,
             config.prestige,
+            config.stormbreaker,
         );
     }
 

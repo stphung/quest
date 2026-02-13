@@ -170,7 +170,7 @@ fn test_challenge_discovery_blocked_during_dungeon_via_game_tick() {
     for seed in 0..10_000u64 {
         let mut state = fresh();
         state.prestige_rank = 1;
-        state.active_dungeon = Some(generate_dungeon(10, 0));
+        state.active_dungeon = Some(generate_dungeon(10, 0, 1));
         let mut tc = 0u32;
         let mut ach = Achievements::default();
         let mut r = rng(seed);
@@ -218,7 +218,7 @@ fn test_challenge_discovery_blocked_during_active_minigame_via_game_tick() {
 #[test]
 fn test_dungeon_boss_completion_triggers_achievement() {
     let mut state = strong();
-    state.active_dungeon = Some(generate_dungeon(10, 0));
+    state.active_dungeon = Some(generate_dungeon(10, 0, 1));
     if let Some(dungeon) = &mut state.active_dungeon {
         dungeon.has_key = true;
     }
@@ -388,7 +388,7 @@ fn test_player_death_in_overworld_emits_event() {
 fn test_player_death_in_dungeon_preserves_prestige() {
     let mut state = fresh();
     state.prestige_rank = 5;
-    state.active_dungeon = Some(generate_dungeon(10, 0));
+    state.active_dungeon = Some(generate_dungeon(10, 0, 1));
     let mut tc = 0u32;
     let mut ach = Achievements::default();
     let mut r = rng(42);

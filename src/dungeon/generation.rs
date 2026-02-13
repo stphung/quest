@@ -11,10 +11,12 @@ use super::types::{
 use rand::seq::SliceRandom;
 use rand::Rng;
 
-/// Generates a complete dungeon with rooms and connections
-pub fn generate_dungeon(level: u32, prestige_rank: u32) -> Dungeon {
+/// Generates a complete dungeon with rooms and connections.
+/// `zone_id` is the zone where the dungeon was discovered, used for enemy scaling.
+pub fn generate_dungeon(level: u32, prestige_rank: u32, zone_id: u32) -> Dungeon {
     let size = DungeonSize::roll_from_progression(level, prestige_rank);
     let mut dungeon = Dungeon::new(size);
+    dungeon.zone_id = zone_id;
     let mut rng = rand::thread_rng();
 
     // Generate maze structure (without extra connections yet)
@@ -379,7 +381,7 @@ mod tests {
     #[test]
     fn test_generate_dungeon_low_level() {
         // Low level can roll Small or Medium (±1 from expected Small)
-        let dungeon = generate_dungeon(10, 0);
+        let dungeon = generate_dungeon(10, 0, 1);
 
         // Should have rooms within valid range for rolled size
         let (min, max) = dungeon.size.room_count_range();
@@ -416,7 +418,7 @@ mod tests {
     #[test]
     fn test_generate_dungeon_mid_level() {
         // Mid level can roll Small, Medium, or Large (±1 from expected Medium)
-        let dungeon = generate_dungeon(50, 0);
+        let dungeon = generate_dungeon(50, 0, 1);
 
         let (min, max) = dungeon.size.room_count_range();
         let room_count = dungeon.room_count();
@@ -432,7 +434,7 @@ mod tests {
     #[test]
     fn test_generate_dungeon_high_level() {
         // High level can roll Medium, Large, or Epic (±1 from expected Large)
-        let dungeon = generate_dungeon(100, 0);
+        let dungeon = generate_dungeon(100, 0, 1);
 
         let (min, max) = dungeon.size.room_count_range();
         let room_count = dungeon.room_count();
@@ -447,20 +449,20 @@ mod tests {
 
     #[test]
     fn test_player_starts_at_entrance() {
-        let dungeon = generate_dungeon(10, 0);
+        let dungeon = generate_dungeon(10, 0, 1);
         assert_eq!(dungeon.player_position, dungeon.entrance_position);
     }
 
     #[test]
     fn test_entrance_room_state() {
-        let dungeon = generate_dungeon(10, 0);
+        let dungeon = generate_dungeon(10, 0, 1);
         let entrance = dungeon.current_room().unwrap();
         assert_eq!(entrance.state, RoomState::Current);
     }
 
     #[test]
     fn test_adjacent_rooms_revealed() {
-        let dungeon = generate_dungeon(10, 0);
+        let dungeon = generate_dungeon(10, 0, 1);
         let entrance_pos = dungeon.entrance_position;
         let neighbors = dungeon.get_connected_neighbors(entrance_pos.0, entrance_pos.1);
 
@@ -473,7 +475,7 @@ mod tests {
 
     #[test]
     fn test_has_elite_room() {
-        let dungeon = generate_dungeon(10, 0);
+        let dungeon = generate_dungeon(10, 0, 1);
 
         let has_elite = dungeon.grid.iter().any(|row| {
             row.iter().any(|r| {
@@ -488,7 +490,7 @@ mod tests {
 
     #[test]
     fn test_has_treasure_rooms() {
-        let dungeon = generate_dungeon(50, 0); // Medium dungeon for more rooms
+        let dungeon = generate_dungeon(50, 0, 1); // Medium dungeon for more rooms
 
         let treasure_count = dungeon.grid.iter().fold(0, |acc, row| {
             acc + row
@@ -511,7 +513,7 @@ mod tests {
     fn test_boss_is_dead_end() {
         // Test multiple dungeons to ensure boss is always in a dead end
         for _ in 0..10 {
-            let dungeon = generate_dungeon(50, 0);
+            let dungeon = generate_dungeon(50, 0, 1);
             let boss_pos = dungeon.boss_position;
             let connections = connection_count(&dungeon, boss_pos.0, boss_pos.1);
 
@@ -527,7 +529,7 @@ mod tests {
     fn test_elite_not_adjacent_to_entrance() {
         // Test that elite (key) room requires some exploration
         for _ in 0..10 {
-            let dungeon = generate_dungeon(50, 0);
+            let dungeon = generate_dungeon(50, 0, 1);
 
             // Find elite room position
             let mut elite_pos = None;
@@ -590,7 +592,7 @@ mod tests {
     fn test_all_rooms_reachable_from_entrance() {
         // Test multiple dungeons of various sizes
         for _ in 0..20 {
-            let dungeon = generate_dungeon(50, 0);
+            let dungeon = generate_dungeon(50, 0, 1);
 
             // Count total rooms
             let grid_size = dungeon.size.grid_size();
@@ -619,7 +621,7 @@ mod tests {
     #[test]
     fn test_boss_reachable_from_entrance() {
         for _ in 0..20 {
-            let dungeon = generate_dungeon(50, 0);
+            let dungeon = generate_dungeon(50, 0, 1);
             let reachable = find_reachable_rooms(&dungeon, dungeon.entrance_position);
 
             assert!(
@@ -634,7 +636,7 @@ mod tests {
     #[test]
     fn test_elite_reachable_from_entrance() {
         for _ in 0..20 {
-            let dungeon = generate_dungeon(50, 0);
+            let dungeon = generate_dungeon(50, 0, 1);
 
             // Find elite room
             let grid_size = dungeon.size.grid_size();
@@ -675,7 +677,7 @@ mod tests {
 
         for (level, prestige) in test_cases {
             for _ in 0..5 {
-                let dungeon = generate_dungeon(level, prestige);
+                let dungeon = generate_dungeon(level, prestige, 1);
 
                 // Verify basic structure
                 assert!(
