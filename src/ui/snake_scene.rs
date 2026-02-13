@@ -106,7 +106,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &SnakeGame) {
 
     // ── Layout dimensions ───────────────────────────────────────
     let content_rows = grid_h.div_ceil(2); // 2 game rows per terminal row
-    // 1 terminal column per game cell (half-blocks correct the vertical aspect)
+                                           // 1 terminal column per game cell (half-blocks correct the vertical aspect)
     let render_w = ((grid_w + 2) as u16).min(area.width);
     let inner_w = render_w as usize - 2; // chars between left/right border
 
@@ -150,8 +150,16 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &SnakeGame) {
     for term_row in 0..content_rows {
         let top_gy = term_row * 2;
         let bot_gy = term_row * 2 + 1;
-        let top_row = if top_gy < grid_h { &pixels[top_gy] } else { &empty_row };
-        let bot_row = if bot_gy < grid_h { &pixels[bot_gy] } else { &empty_row };
+        let top_row = if top_gy < grid_h {
+            &pixels[top_gy]
+        } else {
+            &empty_row
+        };
+        let bot_row = if bot_gy < grid_h {
+            &pixels[bot_gy]
+        } else {
+            &empty_row
+        };
 
         let mut spans: Vec<Span> = Vec::new();
 
@@ -290,10 +298,7 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &SnakeGame) {
                 .add_modifier(Modifier::BOLD),
         )),
         Line::from(vec![
-            Span::styled(
-                format!(" {FULL_BLOCK} "),
-                Style::default().fg(HEAD_COLOR),
-            ),
+            Span::styled(format!(" {FULL_BLOCK} "), Style::default().fg(HEAD_COLOR)),
             Span::styled("Head", Style::default().fg(Color::DarkGray)),
         ]),
         Line::from(vec![
