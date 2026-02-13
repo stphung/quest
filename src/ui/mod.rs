@@ -500,44 +500,19 @@ fn draw_right_content(frame: &mut Frame, area: Rect, game_state: &GameState, ctx
     }
 }
 
-/// Draws the dungeon view with map and combat
+/// Draws the dungeon view with combat HUD overlay on the map.
+/// Instead of splitting into separate dungeon map + combat panels,
+/// combat info (HP bars, status) is rendered inside the dungeon panel.
 fn draw_dungeon_view(
     frame: &mut Frame,
     area: Rect,
     game_state: &GameState,
     dungeon: &crate::dungeon::types::Dungeon,
-    ctx: &LayoutContext,
-) {
-    // Dungeon map needs 2 rows per grid cell + 3 for border + status line
-    let grid_size = dungeon.size.grid_size() as u16;
-    let map_height = grid_size * 2 + 3;
-
-    // Split: dungeon map gets what it needs, combat gets the rest
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Min(map_height), // Dungeon map (sized to fit)
-            Constraint::Min(5),          // Combat scene (whatever remains)
-        ])
-        .split(area);
-
-    // Draw dungeon map
-    draw_dungeon_panel(frame, chunks[0], dungeon, ctx);
-
-    // Draw combat scene
-    combat_scene::draw_combat_scene(frame, chunks[1], game_state, ctx);
-}
-
-/// Draws the dungeon map panel
-fn draw_dungeon_panel(
-    frame: &mut Frame,
-    area: Rect,
-    dungeon: &crate::dungeon::types::Dungeon,
     _ctx: &LayoutContext,
 ) {
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    // Create border
+    // Single border wrapping everything
     let block = Block::default()
         .title(" Dungeon ")
         .borders(Borders::ALL)
@@ -546,18 +521,24 @@ fn draw_dungeon_panel(
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    // Split inner area for status and map
+    // Layout: player HP, dungeon status, map, enemy HP, combat status
     let inner_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1), // Status line
-            Constraint::Min(0),    // Map
+            Constraint::Length(1), // Player HP
+            Constraint::Length(1), // Dungeon status line
+            Constraint::Min(0),    // Map (fills remaining space)
+            Constraint::Length(1), // Enemy HP
+            Constraint::Length(1), // Combat status
         ])
         .split(inner);
 
-    // Draw status
+    // Player HP bar
+    combat_scene::draw_player_hp(frame, inner_chunks[0], game_state);
+
+    // Dungeon status (size, rooms cleared, key)
     let status_widget = dungeon_map::DungeonStatusWidget::new(dungeon);
-    frame.render_widget(status_widget, inner_chunks[0]);
+    frame.render_widget(status_widget, inner_chunks[1]);
 
     // Calculate blink phase (0.5 second cycle)
     let millis = SystemTime::now()
@@ -566,7 +547,13 @@ fn draw_dungeon_panel(
         .as_millis();
     let blink_phase = (millis % 500) as f64 / 500.0;
 
-    // Draw map
+    // Dungeon map
     let map_widget = dungeon_map::DungeonMapWidget::new(dungeon, blink_phase);
-    frame.render_widget(map_widget, inner_chunks[1]);
+    frame.render_widget(map_widget, inner_chunks[2]);
+
+    // Enemy HP bar
+    combat_scene::draw_enemy_hp(frame, inner_chunks[3], game_state);
+
+    // Combat status (timers, DPS)
+    combat_scene::draw_combat_status(frame, inner_chunks[4], game_state);
 }
