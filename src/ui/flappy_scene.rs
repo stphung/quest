@@ -30,6 +30,53 @@ const PIPE_EDGE_R: char = '▌';
 const GROUND_CHAR: char = '▓';
 const GROUND_SUB: char = '░';
 
+fn lerp_channel(start: u8, end: u8, t: f64) -> u8 {
+    let t = t.clamp(0.0, 1.0);
+    (start as f64 + (end as f64 - start as f64) * t).round() as u8
+}
+
+fn lerp_rgb(start: (u8, u8, u8), end: (u8, u8, u8), t: f64) -> (u8, u8, u8) {
+    (
+        lerp_channel(start.0, end.0, t),
+        lerp_channel(start.1, end.1, t),
+        lerp_channel(start.2, end.2, t),
+    )
+}
+
+fn sky_color(row: usize, ground_row: usize, dusk: f64) -> Color {
+    let height_t = if ground_row == 0 {
+        0.0
+    } else {
+        row as f64 / ground_row as f64
+    };
+
+    let top_day = (120, 196, 255);
+    let mid_day = (155, 214, 255);
+    let low_day = (208, 236, 255);
+
+    let top_dusk = (30, 48, 92);
+    let mid_dusk = (62, 76, 128);
+    let low_dusk = (122, 106, 140);
+
+    let top = lerp_rgb(top_day, top_dusk, dusk);
+    let mid = lerp_rgb(mid_day, mid_dusk, dusk);
+    let low = lerp_rgb(low_day, low_dusk, dusk);
+
+    let rgb = if height_t < 0.45 {
+        lerp_rgb(top, mid, height_t / 0.45)
+    } else {
+        lerp_rgb(mid, low, (height_t - 0.45) / 0.55)
+    };
+    Color::Rgb(rgb.0, rgb.1, rgb.2)
+}
+
+fn star_hash(row: usize, col: usize) -> u32 {
+    let seed = (row as u32)
+        .wrapping_mul(1664525)
+        .wrapping_add((col as u32).wrapping_mul(1013904223));
+    seed ^ (seed >> 13)
+}
+
 /// Render the Flappy Bird game scene.
 pub fn render_flappy_scene(
     frame: &mut Frame,
@@ -109,59 +156,175 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
 
     let y_scale = render_height as f64 / GAME_HEIGHT as f64;
     let x_scale = render_width as f64 / GAME_WIDTH as f64;
+    let ground_row = (render_height - 1) as usize;
+    let dusk = ((game.tick_count as f64 * 0.004).sin() * 0.5 + 0.5).powf(1.15);
 
-    // ── Background: sparse clouds for depth ─────────────────────────
-    // Deterministic clouds based on tick_count for gentle drift
-    let cloud_offset = (game.tick_count as f64 * 0.03) % render_width as f64;
-    for &(base_x, y, pattern) in &[
-        (12.0_f64, 1u16, "~~"),
-        (35.0, 2, "~~~"),
-        (8.0, 4, "~"),
-        (28.0, 3, "~~"),
-        (45.0, 1, "~"),
+    // ── Sky gradient + celestial body ───────────────────────────────
+    for (row, row_cells) in buffer.iter_mut().enumerate().take(ground_row) {
+        let bg = sky_color(row, ground_row, dusk);
+        for cell in row_cells.iter_mut().take(render_width as usize) {
+            cell.bg = bg;
+        }
+    }
+
+    let orb_col = ((render_width as f64 * 0.74) + (game.tick_count as f64 * 0.025).sin() * 4.0)
+        .round() as i32;
+    let orb_row =
+        ((ground_row as f64 * 0.20) + (game.tick_count as f64 * 0.02).sin()).round() as i32;
+    let (orb_char, orb_color) = if dusk < 0.56 {
+        ('●', Color::Rgb(255, 228, 148))
+    } else {
+        ('◑', Color::Rgb(232, 237, 255))
+    };
+    for (dx, dy, ch, fg) in [
+        (0, 0, orb_char, orb_color),
+        (-1, 0, '·', Color::Rgb(240, 226, 176)),
+        (1, 0, '·', Color::Rgb(240, 226, 176)),
+        (0, -1, '·', Color::Rgb(234, 220, 172)),
+        (0, 1, '·', Color::Rgb(234, 220, 172)),
     ] {
-        let cx = ((base_x - cloud_offset).rem_euclid(render_width as f64)) as usize;
-        let ry = (y as f64 * y_scale).round() as usize;
-        if ry < render_height as usize - 1 {
-            for (i, ch) in pattern.chars().enumerate() {
-                let col = (cx + i) % render_width as usize;
-                if buffer[ry][col].ch == ' ' {
-                    buffer[ry][col] = Cell {
-                        ch,
-                        fg: Color::Rgb(60, 60, 80),
-                        bg: Color::Reset,
+        let col = orb_col + dx;
+        let row = orb_row + dy;
+        if row >= 0 && (row as usize) < ground_row && col >= 0 && col < render_width as i32 {
+            buffer[row as usize][col as usize] = Cell {
+                ch,
+                fg,
+                bg: buffer[row as usize][col as usize].bg,
+            };
+        }
+    }
+
+    // ── Stars + layered clouds ──────────────────────────────────────
+    if dusk > 0.25 {
+        let twinkle_tick = (game.tick_count / 6) as usize;
+        for (row, row_cells) in buffer
+            .iter_mut()
+            .enumerate()
+            .take(ground_row.saturating_sub(2))
+        {
+            for (col, cell) in row_cells.iter_mut().enumerate().take(render_width as usize) {
+                if star_hash(row, col).is_multiple_of(97) && cell.ch == ' ' {
+                    let bright =
+                        star_hash(row + twinkle_tick, col + twinkle_tick).is_multiple_of(3);
+                    *cell = Cell {
+                        ch: if bright { '*' } else { '.' },
+                        fg: if bright {
+                            Color::Rgb(245, 245, 255)
+                        } else {
+                            Color::Rgb(185, 190, 230)
+                        },
+                        bg: cell.bg,
                     };
                 }
             }
         }
     }
 
-    // ── Ground (last two rows for depth) ────────────────────────────
-    let ground_row = (render_height - 1) as usize;
-    for cell in buffer[ground_row].iter_mut().take(render_width as usize) {
+    for &(base_x, y, speed, pattern, shade) in &[
+        (4.0_f64, 2.0_f64, 0.018_f64, "~~", 140u8),
+        (20.0, 3.0, 0.022, "~~~", 135),
+        (36.0, 1.0, 0.028, "~~~~", 128),
+        (14.0, 5.0, 0.012, "~ ~", 122),
+        (43.0, 4.0, 0.017, "~~", 126),
+    ] {
+        let drift = (game.tick_count as f64 * speed) % render_width as f64;
+        let cx = ((base_x - drift).rem_euclid(render_width as f64)) as usize;
+        let ry = (y * y_scale).round() as usize;
+        if ry < ground_row {
+            for (i, ch) in pattern.chars().enumerate() {
+                if ch == ' ' {
+                    continue;
+                }
+                let col = (cx + i) % render_width as usize;
+                if buffer[ry][col].ch == ' ' {
+                    let tint = lerp_channel(shade, 205, 1.0 - dusk);
+                    buffer[ry][col] = Cell {
+                        ch,
+                        fg: Color::Rgb(tint, tint, tint.saturating_add(6)),
+                        bg: buffer[ry][col].bg,
+                    };
+                }
+            }
+        }
+    }
+
+    // ── Distant cliffs for depth ────────────────────────────────────
+    let horizon = ground_row.saturating_sub(1);
+    let mut col = 0usize;
+    while col < render_width as usize {
+        let far_h = (1.0 + ((col as f64 * 0.27 + game.tick_count as f64 * 0.006).sin() + 1.0) * 1.4)
+            .round() as i32;
+        let near_h = (1.0
+            + ((col as f64 * 0.16 + game.tick_count as f64 * 0.011 + 1.7).sin() + 1.0) * 1.8)
+            .round() as i32;
+
+        for (height, ch, color) in [
+            (
+                far_h,
+                '░',
+                Color::Rgb(
+                    lerp_channel(86, 62, dusk),
+                    lerp_channel(112, 88, dusk),
+                    lerp_channel(130, 118, dusk),
+                ),
+            ),
+            (
+                near_h,
+                '▒',
+                Color::Rgb(
+                    lerp_channel(72, 54, dusk),
+                    lerp_channel(96, 72, dusk),
+                    lerp_channel(110, 98, dusk),
+                ),
+            ),
+        ] {
+            let top = horizon as i32 - height;
+            for row in top.max(0)..=horizon as i32 {
+                let row = row as usize;
+                if row < ground_row && buffer[row][col].ch == ' ' {
+                    buffer[row][col] = Cell {
+                        ch,
+                        fg: color,
+                        bg: buffer[row][col].bg,
+                    };
+                }
+            }
+        }
+        col += 1;
+    }
+
+    // ── Ground layers ───────────────────────────────────────────────
+    for (i, cell) in buffer[ground_row]
+        .iter_mut()
+        .enumerate()
+        .take(render_width as usize)
+    {
         *cell = Cell {
-            ch: GROUND_CHAR,
-            fg: Color::Rgb(80, 60, 40),
-            bg: Color::Rgb(40, 30, 20),
+            ch: if (i + (game.tick_count as usize / 2)).is_multiple_of(4) {
+                GROUND_SUB
+            } else {
+                GROUND_CHAR
+            },
+            fg: Color::Rgb(98, 74, 52),
+            bg: Color::Rgb(52, 38, 28),
         };
     }
     if ground_row > 0 {
-        // Sub-ground accent row
         for (i, cell) in buffer[ground_row - 1]
             .iter_mut()
             .enumerate()
             .take(render_width as usize)
         {
-            if cell.ch == ' ' {
-                // Sparse grass/dirt texture
-                if i % 4 == 0 {
-                    *cell = Cell {
-                        ch: GROUND_SUB,
-                        fg: Color::Rgb(60, 80, 40),
-                        bg: Color::Reset,
-                    };
-                }
-            }
+            let bg = cell.bg;
+            *cell = Cell {
+                ch: if (i + game.tick_count as usize).is_multiple_of(6) {
+                    '┬'
+                } else {
+                    GROUND_SUB
+                },
+                fg: Color::Rgb(86, 120, 64),
+                bg,
+            };
         }
     }
 
@@ -189,33 +352,72 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
                     continue;
                 }
 
+                let backdrop = buffer_row[col].bg;
                 let (ch, fg, bg) = if row + 1 == gap_top_row && gap_top_row > 0 {
                     // Cap at bottom of top pipe
                     if is_edge {
-                        (PIPE_CAP_TOP, Color::Rgb(40, 120, 40), Color::Reset)
+                        (
+                            PIPE_CAP_TOP,
+                            Color::Rgb(54, 126, 54),
+                            Color::Rgb(36, 92, 38),
+                        )
                     } else {
-                        (PIPE_CAP_TOP, Color::Rgb(60, 160, 60), Color::Reset)
+                        (
+                            PIPE_CAP_TOP,
+                            Color::Rgb(82, 188, 82),
+                            Color::Rgb(46, 120, 48),
+                        )
                     }
                 } else if row == gap_bottom_row && gap_bottom_row < ground_row {
                     // Cap at top of bottom pipe
                     if is_edge {
-                        (PIPE_CAP_BOT, Color::Rgb(40, 120, 40), Color::Reset)
+                        (
+                            PIPE_CAP_BOT,
+                            Color::Rgb(54, 126, 54),
+                            Color::Rgb(36, 92, 38),
+                        )
                     } else {
-                        (PIPE_CAP_BOT, Color::Rgb(60, 160, 60), Color::Reset)
+                        (
+                            PIPE_CAP_BOT,
+                            Color::Rgb(82, 188, 82),
+                            Color::Rgb(46, 120, 48),
+                        )
                     }
                 } else if is_edge {
                     // Pipe edges (slightly darker)
                     (
                         if dx < 0 { PIPE_EDGE_L } else { PIPE_EDGE_R },
-                        Color::Rgb(40, 120, 40),
-                        Color::Rgb(30, 80, 30),
+                        Color::Rgb(48, 130, 50),
+                        Color::Rgb(34, 88, 36),
                     )
                 } else {
                     // Pipe body
-                    (PIPE_BODY, Color::Rgb(50, 150, 50), Color::Rgb(40, 120, 40))
+                    let texture = (row + col + (game.tick_count as usize / 3)).is_multiple_of(6);
+                    let highlight_band = dx.abs() <= (pipe_half_w / 2).max(1);
+                    (
+                        if texture { '▓' } else { PIPE_BODY },
+                        if highlight_band {
+                            Color::Rgb(92, 206, 90)
+                        } else {
+                            Color::Rgb(68, 168, 68)
+                        },
+                        if highlight_band {
+                            Color::Rgb(54, 132, 56)
+                        } else {
+                            Color::Rgb(44, 112, 46)
+                        },
+                    )
                 };
 
-                buffer_row[col] = Cell { ch, fg, bg };
+                buffer_row[col] = Cell {
+                    ch,
+                    fg,
+                    bg: if matches!(bg, Color::Reset) {
+                        backdrop
+                    } else {
+                        bg
+                    },
+                };
             }
         }
     }
@@ -227,31 +429,62 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
 
     // Show flap visuals immediately when queued (don't wait for physics tick)
     let is_flapping = game.flap_timer > 0 || game.flap_queued;
+    let rising_fast = game.bird_velocity < -0.35;
+    let falling_fast = game.bird_velocity > 0.5;
 
-    // Bird is 3 chars: body + beak
-    let (body, beak) = if is_flapping {
-        ('◇', '›') // flapping: diamond body + beak
+    let (wing, body, beak) = if is_flapping {
+        ('╱', '◉', '>')
+    } else if rising_fast {
+        ('╲', '◉', '>')
+    } else if falling_fast {
+        ('╱', '●', '>')
     } else {
-        ('◆', '›') // normal: filled diamond + beak
+        ('─', '●', '>')
     };
 
-    // Bird color pulses subtly on flap
     let bird_color = if is_flapping {
-        Color::Rgb(255, 240, 100) // bright yellow flash on flap
+        Color::Rgb(255, 242, 124)
+    } else if rising_fast {
+        Color::Rgb(255, 224, 102)
     } else {
-        Color::Yellow
+        Color::Rgb(248, 204, 72)
     };
 
     if bird_row >= 0 && bird_row < (render_height as i32 - 1) {
         let row = bird_row as usize;
+        let shadow_row = (bird_row + 1).min(render_height as i32 - 1) as usize;
+
+        for (idx, trail_col) in [bird_col - 2, bird_col - 3].iter().enumerate() {
+            if *trail_col >= 0 && *trail_col < render_width as i32 {
+                let col = *trail_col as usize;
+                if buffer[row][col].ch == ' ' {
+                    buffer[row][col] = Cell {
+                        ch: if idx == 0 { '·' } else { '.' },
+                        fg: Color::Rgb(220, 196, 98),
+                        bg: buffer[row][col].bg,
+                    };
+                }
+            }
+        }
+
+        if bird_col >= 0 && bird_col < render_width as i32 {
+            let col = bird_col as usize;
+            if buffer[shadow_row][col].ch == ' ' {
+                buffer[shadow_row][col] = Cell {
+                    ch: '.',
+                    fg: Color::Rgb(70, 74, 82),
+                    bg: buffer[shadow_row][col].bg,
+                };
+            }
+        }
+
         // Wing/tail
         if bird_col >= 1 && (bird_col - 1) < render_width as i32 {
             let col = (bird_col - 1) as usize;
-            let wing = if is_flapping { '/' } else { '-' };
             buffer[row][col] = Cell {
                 ch: wing,
                 fg: bird_color,
-                bg: Color::Reset,
+                bg: buffer[row][col].bg,
             };
         }
         // Body
@@ -259,7 +492,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
             buffer[row][bird_col as usize] = Cell {
                 ch: body,
                 fg: bird_color,
-                bg: Color::Reset,
+                bg: buffer[row][bird_col as usize].bg,
             };
         }
         // Beak
@@ -267,8 +500,8 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
         if beak_col >= 0 && beak_col < render_width as i32 {
             buffer[row][beak_col as usize] = Cell {
                 ch: beak,
-                fg: Color::Rgb(255, 160, 50), // orange beak
-                bg: Color::Reset,
+                fg: Color::Rgb(255, 170, 68),
+                bg: buffer[row][beak_col as usize].bg,
             };
         }
     }
@@ -278,14 +511,22 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
     let label = "Score: ";
     let total_len = label.len() + score_text.len();
     let score_start = (render_width as usize).saturating_sub(total_len + 1);
+    let plate_start = score_start.saturating_sub(1);
+    let plate_end = (score_start + total_len + 1).min(render_width as usize);
+
+    for row_cells in buffer.iter_mut().take(render_height.min(2) as usize) {
+        for cell in row_cells.iter_mut().take(plate_end).skip(plate_start) {
+            cell.bg = Color::Rgb(18, 26, 44);
+        }
+    }
 
     for (i, ch) in label.chars().enumerate() {
         let col = score_start + i;
         if col < render_width as usize {
             buffer[0][col] = Cell {
                 ch,
-                fg: Color::DarkGray,
-                bg: Color::Reset,
+                fg: Color::Rgb(150, 170, 192),
+                bg: buffer[0][col].bg,
             };
         }
     }
@@ -295,7 +536,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
             buffer[0][col] = Cell {
                 ch,
                 fg: Color::White,
-                bg: Color::Reset,
+                bg: buffer[0][col].bg,
             };
         }
     }
@@ -314,24 +555,30 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
         if bar_start > 0 {
             buffer[1][bar_start - 1] = Cell {
                 ch: '[',
-                fg: Color::DarkGray,
-                bg: Color::Reset,
+                fg: Color::Rgb(150, 170, 192),
+                bg: buffer[1][bar_start - 1].bg,
             };
         }
         for i in 0..bar_width {
             let col = bar_start + i;
             if col < render_width as usize {
                 if i < filled {
+                    let progress_t = if bar_width <= 1 {
+                        0.0
+                    } else {
+                        i as f64 / (bar_width - 1) as f64
+                    };
+                    let fill = lerp_rgb((90, 218, 255), (124, 255, 170), progress_t);
                     buffer[1][col] = Cell {
                         ch: '█',
-                        fg: Color::LightCyan,
-                        bg: Color::Reset,
+                        fg: Color::Rgb(fill.0, fill.1, fill.2),
+                        bg: buffer[1][col].bg,
                     };
                 } else {
                     buffer[1][col] = Cell {
                         ch: '░',
-                        fg: Color::Rgb(50, 50, 60),
-                        bg: Color::Reset,
+                        fg: Color::Rgb(82, 96, 116),
+                        bg: buffer[1][col].bg,
                     };
                 }
             }
@@ -340,8 +587,8 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
         if bracket_col < render_width as usize {
             buffer[1][bracket_col] = Cell {
                 ch: ']',
-                fg: Color::DarkGray,
-                bg: Color::Reset,
+                fg: Color::Rgb(150, 170, 192),
+                bg: buffer[1][bracket_col].bg,
             };
         }
     }
@@ -442,7 +689,7 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
                 .add_modifier(Modifier::BOLD),
         )),
         Line::from(vec![
-            Span::styled(" ◆› ", Style::default().fg(Color::Yellow)),
+            Span::styled(" ◉> ", Style::default().fg(Color::Yellow)),
             Span::styled("Bird", Style::default().fg(Color::DarkGray)),
         ]),
         Line::from(vec![
