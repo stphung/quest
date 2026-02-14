@@ -805,6 +805,8 @@ fn main() -> io::Result<()> {
                 };
                 let mut debug_menu = utils::debug_menu::DebugMenu::new();
                 let mut last_flappy_frame = Instant::now();
+                let mut prev_overlay_was_fullscreen =
+                    matches!(overlay, GameOverlay::Achievements { .. });
 
                 // Save indicator state (for non-debug mode)
                 let mut last_save_instant: Option<Instant> = None;
@@ -829,6 +831,16 @@ fn main() -> io::Result<()> {
                             // Not finished yet, put it back
                             update_check_handle = Some(handle);
                         }
+                    }
+
+                    // Force full terminal redraw when transitioning to/from a
+                    // fullscreen overlay. The game UI uses emoji/wide characters
+                    // that can desync ratatui's internal buffer from the actual
+                    // terminal state; clearing resyncs them.
+                    let overlay_is_fullscreen = matches!(overlay, GameOverlay::Achievements { .. });
+                    if overlay_is_fullscreen != prev_overlay_was_fullscreen {
+                        terminal.clear()?;
+                        prev_overlay_was_fullscreen = overlay_is_fullscreen;
                     }
 
                     // Draw UI

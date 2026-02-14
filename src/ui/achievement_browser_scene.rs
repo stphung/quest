@@ -150,14 +150,8 @@ fn render_category_tabs(
         let new_count = achievements.count_recently_unlocked_by_category(cat);
         if new_count > 0 {
             spans.push(Span::styled(
-                format!(" {} ({}/{}) ", cat.name(), unlocked, total),
+                format!(" {} ({}/{}) +{} ", cat.name(), unlocked, total, new_count),
                 style,
-            ));
-            spans.push(Span::styled(
-                format!("\u{2022}{} ", new_count),
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
             ));
         } else {
             spans.push(Span::styled(
@@ -195,11 +189,11 @@ fn render_achievement_list(
             let is_new = achievements.is_recently_unlocked(def.id);
 
             let prefix = if is_selected && is_new {
-                ">\u{2605}"
+                ">*"
             } else if is_selected {
                 "> "
             } else if is_new {
-                " \u{2605}"
+                " *"
             } else {
                 "  "
             };
@@ -305,7 +299,7 @@ fn render_achievement_detail(
 
             if achievements.is_recently_unlocked(def.id) {
                 lines.push(Line::from(Span::styled(
-                    "\u{2605} Recently unlocked!",
+                    "* Recently unlocked!",
                     Style::default()
                         .fg(Color::Yellow)
                         .add_modifier(Modifier::BOLD),
