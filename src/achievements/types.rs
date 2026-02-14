@@ -231,6 +231,10 @@ pub struct Achievements {
     #[serde(skip)]
     pub modal_queue: Vec<AchievementId>,
 
+    /// Achievements recently unlocked — visible as "NEW" badges in browser (not persisted)
+    #[serde(skip)]
+    pub recently_unlocked: Vec<AchievementId>,
+
     /// When the accumulation window started (first achievement unlocked)
     #[serde(skip)]
     pub accumulation_start: Option<std::time::Instant>,
@@ -273,7 +277,34 @@ impl Achievements {
 
     /// Clear pending notifications (call when user views achievements).
     pub fn clear_pending_notifications(&mut self) {
-        self.pending_notifications.clear();
+        self.recently_unlocked
+            .append(&mut self.pending_notifications);
+    }
+
+    /// Clear recently unlocked list (call when achievement browser closes).
+    #[allow(dead_code)] // Will be used by achievement browser UI
+    pub fn clear_recently_unlocked(&mut self) {
+        self.recently_unlocked.clear();
+    }
+
+    /// Check if an achievement was recently unlocked (for NEW badge in browser).
+    #[allow(dead_code)] // Will be used by achievement browser UI
+    pub fn is_recently_unlocked(&self, id: AchievementId) -> bool {
+        self.recently_unlocked.contains(&id)
+    }
+
+    /// Count recently unlocked achievements in a category (for tab badges).
+    #[allow(dead_code)] // Will be used by achievement browser UI
+    pub fn count_recently_unlocked_by_category(&self, category: AchievementCategory) -> usize {
+        use super::data::ALL_ACHIEVEMENTS;
+        self.recently_unlocked
+            .iter()
+            .filter(|id| {
+                ALL_ACHIEVEMENTS
+                    .iter()
+                    .any(|a| a.id == **id && a.category == category)
+            })
+            .count()
     }
 
     /// Take newly unlocked achievements for logging (clears the list).
@@ -1585,5 +1616,74 @@ mod tests {
         // Other categories unaffected
         let (level_unlocked, _) = achievements.count_by_category(AchievementCategory::Level);
         assert_eq!(level_unlocked, 0);
+    }
+
+    // =========================================================================
+    // Recently Unlocked Tests
+    // =========================================================================
+
+    #[test]
+    fn test_clear_pending_moves_to_recently_unlocked() {
+        let mut achievements = Achievements::default();
+        achievements.unlock(AchievementId::SlayerI, Some("Hero".to_string()));
+        achievements.unlock(AchievementId::BossHunterI, Some("Hero".to_string()));
+
+        assert_eq!(achievements.pending_count(), 2);
+        assert!(achievements.recently_unlocked.is_empty());
+
+        achievements.clear_pending_notifications();
+
+        assert_eq!(achievements.pending_count(), 0);
+        assert_eq!(achievements.recently_unlocked.len(), 2);
+        assert!(achievements.is_recently_unlocked(AchievementId::SlayerI));
+        assert!(achievements.is_recently_unlocked(AchievementId::BossHunterI));
+    }
+
+    #[test]
+    fn test_clear_recently_unlocked() {
+        let mut achievements = Achievements::default();
+        achievements.unlock(AchievementId::SlayerI, Some("Hero".to_string()));
+        achievements.clear_pending_notifications();
+
+        assert!(!achievements.recently_unlocked.is_empty());
+
+        achievements.clear_recently_unlocked();
+        assert!(achievements.recently_unlocked.is_empty());
+        assert!(!achievements.is_recently_unlocked(AchievementId::SlayerI));
+    }
+
+    #[test]
+    fn test_count_recently_unlocked_by_category() {
+        let mut achievements = Achievements::default();
+        achievements.unlock(AchievementId::SlayerI, Some("Hero".to_string()));
+        achievements.unlock(AchievementId::BossHunterI, Some("Hero".to_string()));
+        achievements.unlock(AchievementId::Level10, Some("Hero".to_string()));
+
+        achievements.clear_pending_notifications();
+
+        assert_eq!(
+            achievements.count_recently_unlocked_by_category(AchievementCategory::Combat),
+            2
+        );
+        assert_eq!(
+            achievements.count_recently_unlocked_by_category(AchievementCategory::Level),
+            1
+        );
+        assert_eq!(
+            achievements.count_recently_unlocked_by_category(AchievementCategory::Progression),
+            0
+        );
+    }
+
+    #[test]
+    fn test_recently_unlocked_not_serialized() {
+        let mut achievements = Achievements::default();
+        achievements.unlock(AchievementId::SlayerI, Some("Hero".to_string()));
+        achievements.clear_pending_notifications();
+
+        let json = serde_json::to_string(&achievements).unwrap();
+        let loaded: Achievements = serde_json::from_str(&json).unwrap();
+
+        assert!(loaded.recently_unlocked.is_empty());
     }
 }
