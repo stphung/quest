@@ -47,7 +47,7 @@ make fmt               # Applies rustfmt to all code
 
 ## Architecture
 
-Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui + Crossterm.
+Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui (with Crossterm backend).
 
 ### Module Documentation
 
@@ -146,8 +146,8 @@ CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FI
 - `gomoku/` — Gomoku (Five in a Row) on 15×15 board, minimax AI (depth 2-5)
 - `minesweeper/` — Trap Detection, 4 difficulties (9×9 to 20×16)
 - `rune/` — Rune Deciphering (Mastermind-style deduction), 4 difficulties
-- `flappy/` — Flappy Bird (real-time ~60 FPS side-scroller, pipe obstacles, gravity physics)
-- `snake/` — Snake (real-time ~60 FPS, growing snake, food collection on grid)
+- `snake/` — Serpent's Path (Snake) on 26×26 grid, 4 difficulties (Novice 10 food/200ms, Master 25 food/90ms), real-time ~60 FPS
+- `flappy/` — Skyward Gauntlet (Flappy Bird) on 50×18 area, 4 difficulties, gravity/flap physics, pipe obstacles with gap sizes (7→4 rows), real-time ~60 FPS
 
 ### Haven Module (`src/haven/`) — [detailed docs](src/haven/CLAUDE.md)
 
@@ -190,7 +190,8 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 - `prestige_confirm.rs` — Prestige confirmation dialog
 - `achievement_browser_scene.rs` — Achievement browsing and tracking
 - `challenge_menu_scene.rs` — Challenge menu list/detail view
-- `chess_scene.rs`, `go_scene.rs`, `morris_scene.rs`, `gomoku_scene.rs`, `minesweeper_scene.rs`, `rune_scene.rs`, `flappy_scene.rs`, `snake_scene.rs` — Minigame UIs
+- `responsive.rs` — Responsive layout with 5 size tiers (TooSmall/S/M/L/XL)
+- `chess_scene.rs`, `go_scene.rs`, `morris_scene.rs`, `gomoku_scene.rs`, `minesweeper_scene.rs`, `rune_scene.rs`, `snake_scene.rs`, `flappy_scene.rs` — Minigame UIs
 - `debug_menu_scene.rs` — Debug menu overlay
 - `throbber.rs` — Shared spinner animations and atmospheric messages
 - `character_select.rs`, `character_creation.rs`, `character_delete.rs`, `character_rename.rs` — Character management UI
@@ -223,7 +224,8 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 ## Key Constants
 
 - Tick interval: 100ms (10 ticks/sec)
-- Attack interval: 1.5s
+- Player attack interval: 1.5s
+- Enemy attack intervals: normal 2.0s, subzone boss 1.8s, zone boss 1.5s, dungeon elite 1.6s, dungeon boss 1.4s
 - HP regen after kill: 2.5s
 - Autosave: every 30s
 - Update check: every 30min ±5min jitter
@@ -298,8 +300,8 @@ quest/
 │   │   ├── gomoku/          # Gomoku (Five in a Row)
 │   │   ├── minesweeper/     # Trap Detection
 │   │   ├── rune/            # Rune Deciphering
-│   │   ├── flappy/          # Flappy Bird (real-time action)
-│   │   └── snake/           # Snake (real-time action)
+│   │   ├── snake/           # Serpent's Path (Snake)
+│   │   └── flappy/          # Skyward Gauntlet (Flappy Bird)
 │   ├── haven/               # Haven base building [CLAUDE.md]
 │   │   ├── types.rs         # Room definitions, bonuses
 │   │   └── logic.rs         # Construction, upgrades
@@ -313,12 +315,15 @@ quest/
 │   │   └── debug_menu.rs    # Debug menu
 │   └── ui/                  # UI components [CLAUDE.md]
 │       ├── game_common.rs   # Shared minigame layout
+│       ├── responsive.rs    # Responsive layout tiers
 │       ├── stats_panel.rs   # Character stats
 │       ├── combat_scene.rs  # Combat view
 │       ├── combat_3d.rs     # 3D dungeon renderer
+│       ├── snake_scene.rs   # Snake UI
+│       ├── flappy_scene.rs  # Flappy Bird UI
 │       ├── *_scene.rs       # Various game scenes
 │       └── character_*.rs   # Character management UI
-├── tests/                   # Integration tests (13 test files, 963+ tests)
+├── tests/                   # Integration tests (14 test files, 1,163+ tests)
 │   ├── game_loop_orchestration_test.rs  # 36 behavior-locking tests for game_tick
 │   ├── tick_integration_test.rs         # Tick module integration tests
 │   ├── zone_progression_test.rs         # Zone advancement tests
@@ -333,4 +338,4 @@ quest/
 
 ## Dependencies
 
-Ratatui 0.26, Crossterm 0.27, Serde (JSON), Rand, Rand_chacha (seeded RNG for simulator), Chrono, Directories, Chess-engine 0.1
+Ratatui 0.30, Serde (JSON), Rand 0.10, Rand_chacha 0.10 (seeded RNG for simulator), Chrono, Directories, Chess-engine 0.1, ureq 3.2, flate2 1.1, zip 7.4
