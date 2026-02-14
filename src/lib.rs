@@ -25,8 +25,9 @@ pub use achievements::{AchievementCategory, AchievementId, Achievements};
 pub use challenges::{
     ActiveMinigame, ChessDifficulty, ChessGame, ChessResult, FlappyBirdDifficulty, FlappyBirdGame,
     FlappyBirdResult, GoDifficulty, GoGame, GoResult, GomokuDifficulty, GomokuGame, GomokuResult,
-    MinesweeperDifficulty, MinesweeperGame, MinesweeperResult, MorrisDifficulty, MorrisGame,
-    MorrisPhase, MorrisResult, RuneDifficulty, RuneGame, RuneResult,
+    JezzballDifficulty, JezzballGame, JezzballResult, MinesweeperDifficulty, MinesweeperGame,
+    MinesweeperResult, MorrisDifficulty, MorrisGame, MorrisPhase, MorrisResult, RuneDifficulty,
+    RuneGame, RuneResult,
 };
 pub use character::{Attributes, DerivedStats, PrestigeTier};
 pub use combat::{CombatState, Enemy};

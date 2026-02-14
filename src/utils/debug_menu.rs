@@ -19,6 +19,7 @@ pub const DEBUG_OPTIONS: &[&str] = &[
     "Trigger Rune Challenge",
     "Trigger Go Challenge",
     "Trigger Flappy Bird Challenge",
+    "Trigger JezzBall Challenge",
     "Trigger Snake Challenge",
     "Trigger Haven Discovery",
 ];
@@ -76,8 +77,9 @@ impl DebugMenu {
             6 => trigger_rune_challenge(state),
             7 => trigger_go_challenge(state),
             8 => trigger_flappy_challenge(state),
-            9 => trigger_snake_challenge(state),
-            10 => trigger_haven_discovery(haven),
+            9 => trigger_jezzball_challenge(state),
+            10 => trigger_snake_challenge(state),
+            11 => trigger_haven_discovery(haven),
             _ => "Unknown option",
         };
         self.close();
@@ -196,6 +198,16 @@ fn trigger_snake_challenge(state: &mut GameState) -> &'static str {
     "Snake challenge added!"
 }
 
+fn trigger_jezzball_challenge(state: &mut GameState) -> &'static str {
+    if state.challenge_menu.has_challenge(&ChallengeType::Jezzball) {
+        return "JezzBall challenge already pending!";
+    }
+    state
+        .challenge_menu
+        .add_challenge(create_challenge(&ChallengeType::Jezzball));
+    "JezzBall challenge added!"
+}
+
 fn trigger_haven_discovery(haven: &mut Haven) -> &'static str {
     if haven.discovered {
         return "Haven already discovered!";
@@ -226,16 +238,18 @@ mod tests {
         menu.navigate_down();
         menu.navigate_down();
         menu.navigate_down();
-        assert_eq!(menu.selected_index, 10);
+        menu.navigate_down();
+        assert_eq!(menu.selected_index, 11);
 
         // Can't go past end
         menu.navigate_down();
-        assert_eq!(menu.selected_index, 10);
+        assert_eq!(menu.selected_index, 11);
 
         menu.navigate_up();
-        assert_eq!(menu.selected_index, 9);
+        assert_eq!(menu.selected_index, 10);
 
         // Can't go before start
+        menu.navigate_up();
         menu.navigate_up();
         menu.navigate_up();
         menu.navigate_up();
@@ -369,6 +383,18 @@ mod tests {
         // Can't add duplicate
         let msg = trigger_flappy_challenge(&mut state);
         assert_eq!(msg, "Flappy Bird challenge already pending!");
+    }
+
+    #[test]
+    fn test_trigger_jezzball_challenge() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let msg = trigger_jezzball_challenge(&mut state);
+        assert_eq!(msg, "JezzBall challenge added!");
+        assert!(state.challenge_menu.has_challenge(&ChallengeType::Jezzball));
+
+        // Can't add duplicate
+        let msg = trigger_jezzball_challenge(&mut state);
+        assert_eq!(msg, "JezzBall challenge already pending!");
     }
 
     #[test]
