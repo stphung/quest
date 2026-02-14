@@ -7,6 +7,7 @@ Terminal UI rendering using Ratatui + Crossterm. All rendering is separated from
 ```
 src/ui/
 ├── mod.rs                    # Main draw_ui_with_update(), layout coordinator
+├── responsive.rs             # Responsive layout: SizeTier enum, LayoutContext, size thresholds
 ├── game_common.rs            # Shared minigame layout components (IMPORTANT)
 ├── stats_panel.rs            # Left panel: character stats, attributes, equipment
 ├── info_panel.rs             # Full-width Loot + Combat log panels
@@ -24,14 +25,14 @@ src/ui/
 ├── debug_menu_scene.rs       # Debug menu overlay
 │
 ├── challenge_menu_scene.rs   # Challenge menu list/detail view
-├── chess_scene.rs            # Chess board with move history
+├── chess_scene.rs            # Chess board with letter notation (K/Q/R/B/N/P)
 ├── go_scene.rs               # Go board with territory display
 ├── morris_scene.rs           # Nine Men's Morris with help panel
 ├── gomoku_scene.rs           # Gomoku board with cursor
 ├── minesweeper_scene.rs      # Minesweeper grid with game-over overlay
 ├── rune_scene.rs             # Rune Deciphering with guess history
-├── flappy_scene.rs           # Flappy Bird side-scroller with pipe obstacles
-├── snake_scene.rs            # Snake game with grid and growing snake
+├── flappy_scene.rs           # Flappy Bird side-scroller (cyan border, pipe obstacles, bird)
+├── snake_scene.rs            # Snake game (green border, 26×26 grid, body gradient, food)
 │
 ├── character_select.rs       # Character list with preview panel
 ├── character_creation.rs     # Name input with real-time validation
@@ -39,9 +40,27 @@ src/ui/
 └── character_rename.rs       # Rename with validation
 ```
 
-## Main Layout (`mod.rs`)
+## Responsive Layout (`responsive.rs`)
 
-The main game screen is laid out as:
+Terminal size is classified into 5 tiers, computed once per frame in a `LayoutContext`:
+
+| Tier | Min Size | Layout |
+|------|----------|--------|
+| TooSmall | < 40×16 | Error message ("Terminal too small") |
+| S (Small) | 40×16+ | Single-column, text-only combat |
+| M (Medium) | 60×24+ | Stacked single-column with compact stats bar |
+| L (Large) | 80×30+ | 2-column (stats left 50%, activity right 50%) |
+| XL (Extra Large) | 120×40+ | 2-column with taller stats and equipment panels |
+
+`LayoutContext` tracks independent `width_tier` and `height_tier` plus an effective `tier = min(width, height)`. Raw `cols`/`rows` are also available for fine-grained decisions.
+
+Layout dispatch in `draw_ui_with_update()`:
+- **XL/L**: `draw_xl_l_layout()` — full 2-column with zone info, info panels, footer, optional update drawer
+- **M**: `draw_m_layout()` — compact stats bar + optional attributes + XP bar + full-width activity + compact info + footer
+- **S**: `draw_s_layout()` — minimal text: status line + XP + player HP + enemy HP + combat status + merged feed + footer. Special activities (minigames, fishing, dungeons) get nearly full screen.
+
+## Main Layout (XL/L tiers)
+
 ```
 ┌──────────────────────────────────────────────┐
 │ [Challenge Banner - 1 line, if pending]      │
@@ -57,6 +76,10 @@ The main game screen is laid out as:
 ```
 
 When a minigame is active, the right panel is replaced by the minigame scene.
+
+## Combat HUD in Dungeons
+
+When a dungeon is active, the right panel renders a single "Dungeon" panel with player/enemy HP bars, dungeon status, the map, and combat status all integrated inside one bordered block (no separate combat panel split).
 
 ## Shared Game Components (`game_common.rs`)
 
