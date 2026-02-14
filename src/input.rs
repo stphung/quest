@@ -144,6 +144,7 @@ pub fn handle_game_input(
     if let GameOverlay::Achievements { ref mut browser } = overlay {
         match key.code {
             KeyCode::Esc | KeyCode::Char('a') | KeyCode::Char('A') => {
+                achievements.clear_recently_unlocked();
                 *overlay = GameOverlay::None;
             }
             KeyCode::Left => browser.prev_category(),

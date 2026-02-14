@@ -282,7 +282,6 @@ impl Achievements {
     }
 
     /// Clear recently unlocked list (call when achievement browser closes).
-    #[allow(dead_code)] // Will be used by achievement browser UI
     pub fn clear_recently_unlocked(&mut self) {
         self.recently_unlocked.clear();
     }

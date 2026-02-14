@@ -525,7 +525,10 @@ fn main() -> io::Result<()> {
                                 KeyCode::Right | KeyCode::Char('.') | KeyCode::Char('>') => {
                                     achievement_browser.next_category()
                                 }
-                                KeyCode::Esc => achievement_browser.close(),
+                                KeyCode::Esc => {
+                                    global_achievements.clear_recently_unlocked();
+                                    achievement_browser.close();
+                                }
                                 _ => {}
                             }
                             continue;
@@ -569,6 +572,7 @@ fn main() -> io::Result<()> {
 
                         // Handle achievement browser shortcut
                         if matches!(key_event.code, KeyCode::Char('a') | KeyCode::Char('A')) {
+                            global_achievements.clear_pending_notifications();
                             achievement_browser.open();
                             continue;
                         }
