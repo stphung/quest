@@ -1,7 +1,7 @@
 //! Minesweeper game logic for mine placement and cell counting.
 
 use rand::seq::SliceRandom;
-use rand::Rng;
+use rand::{Rng, RngExt};
 
 use super::{MinesweeperGame, MinesweeperResult};
 use crate::challenges::ActiveMinigame;

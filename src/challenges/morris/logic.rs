@@ -6,7 +6,7 @@ use super::{
 };
 use crate::challenges::ActiveMinigame;
 use crate::core::game_state::GameState;
-use rand::Rng;
+use rand::{Rng, RngExt};
 
 /// Undo information for reversing a move during search.
 /// This avoids expensive game.clone() in minimax.
@@ -536,7 +536,7 @@ pub fn process_ai_thinking<R: Rng>(game: &mut MorrisGame, rng: &mut R) {
 
 /// Calculate variable AI thinking time in ticks (1-3 seconds at 100ms/tick)
 pub fn calculate_think_ticks<R: Rng>(rng: &mut R) -> u32 {
-    rng.gen_range(10..=30)
+    rng.random_range(10..=30)
 }
 
 /// Get the best AI move based on difficulty
@@ -547,8 +547,8 @@ pub fn get_ai_move<R: Rng>(game: &MorrisGame, rng: &mut R) -> Option<MorrisMove>
     }
 
     // Random move chance for Novice
-    if rng.gen::<f64>() < game.difficulty.random_move_chance() {
-        let idx = rng.gen_range(0..legal_moves.len());
+    if rng.random::<f64>() < game.difficulty.random_move_chance() {
+        let idx = rng.random_range(0..legal_moves.len());
         return Some(legal_moves[idx]);
     }
 
@@ -1005,7 +1005,7 @@ mod tests {
     #[test]
     fn test_ai_returns_legal_move() {
         let game = MorrisGame::new(MorrisDifficulty::Novice);
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         let legal_moves = get_legal_moves(&game);
         let ai_move = get_ai_move(&game, &mut rng);
@@ -1017,7 +1017,7 @@ mod tests {
 
     #[test]
     fn test_ai_different_difficulties() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         for difficulty in MorrisDifficulty::ALL {
             let mut game = MorrisGame::new(difficulty);
@@ -1332,7 +1332,7 @@ mod tests {
 
     #[test]
     fn test_calculate_think_ticks_range() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         for _ in 0..100 {
             let ticks = calculate_think_ticks(&mut rng);
@@ -1385,7 +1385,7 @@ mod tests {
     fn test_process_ai_thinking_not_thinking() {
         let mut game = MorrisGame::new(MorrisDifficulty::Novice);
         game.ai_thinking = false;
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         process_ai_thinking(&mut game, &mut rng);
 
@@ -1400,7 +1400,7 @@ mod tests {
         game.ai_thinking = true;
         game.ai_think_ticks = 0;
         game.ai_pending_move = None;
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         // First tick should compute the move
         process_ai_thinking(&mut game, &mut rng);

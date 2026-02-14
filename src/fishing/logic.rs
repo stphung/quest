@@ -16,7 +16,7 @@ use crate::core::constants::{
 use crate::core::game_state::GameState;
 use crate::items::generation as item_generation;
 use crate::items::{ilvl_for_zone, roll_random_slot, Rarity};
-use rand::Rng;
+use rand::{Rng, RngExt};
 
 /// Apply timer reduction from Garden bonus
 fn apply_timer_reduction(base_ticks: u32, reduction_percent: f64) -> u32 {
@@ -106,7 +106,7 @@ pub fn tick_fishing_with_haven_result(
             FishingPhase::Reeling => {
                 // Catch the fish!
                 // Check for double fish (Fishing Dock bonus)
-                let double_fish_roll = rng.gen::<f64>() * 100.0;
+                let double_fish_roll = rng.random::<f64>() * 100.0;
                 let fish_count = if double_fish_roll < haven.double_fish_chance_percent {
                     2
                 } else {
@@ -265,7 +265,7 @@ fn try_fishing_item_drop(
         FishRarity::Legendary => FISHING_DROP_CHANCE_LEGENDARY,
     };
 
-    if rng.gen::<f64>() < drop_chance {
+    if rng.random::<f64>() < drop_chance {
         // Generate item with rarity matching fish rarity
         let item_rarity = match rarity {
             FishRarity::Common => Rarity::Common,
@@ -305,7 +305,7 @@ pub fn try_discover_fishing(state: &mut GameState, rng: &mut impl Rng) -> Option
     }
 
     // 5% discovery chance
-    if rng.gen::<f64>() >= FISHING_DISCOVERY_CHANCE {
+    if rng.random::<f64>() >= FISHING_DISCOVERY_CHANCE {
         return None;
     }
 

@@ -23,13 +23,13 @@ use chrono::{Local, Utc};
 use core::constants::*;
 use core::game_logic::*;
 use core::game_state::*;
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
-use crossterm::terminal::{
+use input::{GameOverlay, HavenUiState, InputResult};
+use rand::RngExt;
+use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use ratatui::crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
-use crossterm::ExecutableCommand;
-use input::{GameOverlay, HavenUiState, InputResult};
-use rand::Rng;
+use ratatui::crossterm::ExecutableCommand;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 use std::time::{Duration, Instant};
@@ -95,8 +95,8 @@ enum Screen {
 /// Jitter spreads checks across [base - jitter, base + jitter] to avoid
 /// simultaneous API requests from many clients.
 fn jittered_update_interval() -> Duration {
-    let mut rng = rand::thread_rng();
-    let jitter = rng.gen_range(0..=2 * UPDATE_CHECK_JITTER_SECONDS);
+    let mut rng = rand::rng();
+    let jitter = rng.random_range(0..=2 * UPDATE_CHECK_JITTER_SECONDS);
     let interval = UPDATE_CHECK_INTERVAL_SECONDS - UPDATE_CHECK_JITTER_SECONDS + jitter;
     Duration::from_secs(interval)
 }
@@ -107,7 +107,7 @@ fn show_startup_update_notification(
     update_info: &UpdateInfo,
 ) -> io::Result<()> {
     terminal.draw(|frame| {
-        let area = frame.size();
+        let area = frame.area();
         let block = ratatui::widgets::Block::default()
             .borders(ratatui::widgets::Borders::ALL)
             .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Yellow))
@@ -174,7 +174,7 @@ fn draw_game_overlays(
     last_save_time: Option<chrono::DateTime<chrono::Local>>,
     ctx: &ui::responsive::LayoutContext,
 ) {
-    let area = frame.size();
+    let area = frame.area();
     match overlay {
         GameOverlay::OfflineWelcome { report } => {
             ui::game_common::render_offline_welcome(frame, area, report, ctx);
@@ -431,7 +431,7 @@ fn main() -> io::Result<()> {
             Screen::CharacterCreation => {
                 // Draw character creation screen
                 terminal.draw(|f| {
-                    let area = f.size();
+                    let area = f.area();
                     let ctx = ui::responsive::LayoutContext::from_frame(f);
                     creation_screen.draw(f, area, &ctx);
                 })?;
@@ -476,7 +476,7 @@ fn main() -> io::Result<()> {
 
                 // Draw character select screen (includes Haven tree visualization)
                 terminal.draw(|f| {
-                    let area = f.size();
+                    let area = f.area();
                     let ctx = ui::responsive::LayoutContext::from_frame(f);
                     select_screen.draw(f, area, &characters, &haven, &ctx);
                     // Draw Haven management overlay if open
@@ -693,7 +693,7 @@ fn main() -> io::Result<()> {
 
                 // Draw delete confirmation screen
                 terminal.draw(|f| {
-                    let area = f.size();
+                    let area = f.area();
                     let ctx = ui::responsive::LayoutContext::from_frame(f);
                     delete_screen.draw(f, area, selected_character, &ctx);
                 })?;
@@ -745,7 +745,7 @@ fn main() -> io::Result<()> {
 
                 // Draw rename screen
                 terminal.draw(|f| {
-                    let area = f.size();
+                    let area = f.area();
                     let ctx = ui::responsive::LayoutContext::from_frame(f);
                     rename_screen.draw(f, area, selected_character, &ctx);
                 })?;
@@ -990,7 +990,7 @@ fn main() -> io::Result<()> {
                     // Game tick every 100ms
                     if last_tick.elapsed() >= Duration::from_millis(TICK_INTERVAL_MS) {
                         if !matches!(overlay, GameOverlay::LeviathanEncounter { .. }) {
-                            let mut rng = rand::thread_rng();
+                            let mut rng = rand::rng();
                             let tick_result = core::tick::game_tick(
                                 &mut state,
                                 &mut tick_counter,

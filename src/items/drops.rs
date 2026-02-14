@@ -2,7 +2,7 @@ use super::generation::generate_item;
 use super::types::{EquipmentSlot, Item, Rarity};
 use crate::core::constants::*;
 use crate::core::game_state::GameState;
-use rand::Rng;
+use rand::{Rng, RngExt};
 
 pub fn drop_chance_for_prestige(prestige_rank: u32) -> f64 {
     let chance = ITEM_DROP_BASE_CHANCE + (prestige_rank as f64 * ITEM_DROP_PRESTIGE_BONUS);
@@ -24,14 +24,14 @@ pub fn try_drop_from_mob(
     haven_drop_rate_percent: f64,
     haven_rarity_percent: f64,
 ) -> Option<Item> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     // Apply Trophy Hall bonus to drop chance
     let base_chance = drop_chance_for_prestige(game_state.prestige_rank);
     let drop_chance =
         (base_chance * (1.0 + haven_drop_rate_percent / 100.0)).min(ITEM_DROP_MAX_CHANCE);
 
-    if rng.gen::<f64>() > drop_chance {
+    if rng.random::<f64>() > drop_chance {
         return None;
     }
 
@@ -50,7 +50,7 @@ pub fn try_drop_from_mob(
 /// Bosses always drop an item and can drop Legendaries.
 /// Haven bonuses do NOT apply to boss drops (fixed rates).
 pub fn try_drop_from_boss(zone_id: usize, is_final_zone: bool) -> Item {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     // Roll rarity with boss drop table
     let rarity = roll_rarity_for_boss(is_final_zone, &mut rng);
@@ -70,7 +70,7 @@ pub fn roll_rarity_for_mob(
     haven_rarity_percent: f64,
     rng: &mut impl Rng,
 ) -> Rarity {
-    let roll = rng.gen::<f64>();
+    let roll = rng.random::<f64>();
 
     // Prestige gives a small bonus per rank, capped
     let prestige_bonus = (prestige_rank as f64 * MOB_RARITY_PRESTIGE_BONUS_PER_RANK)
@@ -102,7 +102,7 @@ pub fn roll_rarity_for_mob(
 /// Roll rarity for boss drops - can include Legendary.
 /// Fixed rates, no Haven/prestige bonuses.
 pub fn roll_rarity_for_boss(is_final_zone: bool, rng: &mut impl Rng) -> Rarity {
-    let roll = rng.gen::<f64>();
+    let roll = rng.random::<f64>();
 
     if is_final_zone {
         // Zone 10 final boss: 20% Magic, 40% Rare, 30% Epic, 10% Legendary
@@ -130,7 +130,7 @@ pub fn roll_rarity_for_boss(is_final_zone: bool, rng: &mut impl Rng) -> Rarity {
 }
 
 pub fn roll_random_slot(rng: &mut impl Rng) -> EquipmentSlot {
-    match rng.gen_range(0..NUM_EQUIPMENT_SLOTS) {
+    match rng.random_range(0..NUM_EQUIPMENT_SLOTS) {
         0 => EquipmentSlot::Weapon,
         1 => EquipmentSlot::Armor,
         2 => EquipmentSlot::Helmet,
@@ -156,7 +156,7 @@ mod tests {
 
     #[test]
     fn test_mob_drops_never_legendary() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         // Roll 10000 times - should never get legendary
         for _ in 0..10000 {
@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn test_boss_can_drop_legendary() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut found_legendary = false;
 
         // Normal boss has 5% legendary rate
@@ -186,7 +186,7 @@ mod tests {
 
     #[test]
     fn test_final_boss_higher_legendary_rate() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let trials = 10000;
 
         let mut normal_legendaries = 0;
@@ -212,7 +212,7 @@ mod tests {
 
     #[test]
     fn test_boss_never_drops_common() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         for _ in 0..1000 {
             let rarity = roll_rarity_for_boss(false, &mut rng);
@@ -229,7 +229,7 @@ mod tests {
 
     #[test]
     fn test_mob_distribution_base() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let trials = 10000;
 
         let mut common = 0;
@@ -292,7 +292,7 @@ mod tests {
 
     #[test]
     fn test_roll_random_slot_all_slots_reachable() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut slots_seen = std::collections::HashSet::new();
 
         for _ in 0..500 {
@@ -319,7 +319,7 @@ mod tests {
 
     #[test]
     fn test_haven_bonuses_affect_mob_drops() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let trials = 10000;
 
         let mut common_no_bonus = 0;

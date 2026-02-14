@@ -1,5 +1,5 @@
 use super::types::{AffixType, EquipmentSlot, Item, Rarity};
-use rand::Rng;
+use rand::RngExt;
 
 pub fn get_base_name(slot: EquipmentSlot) -> &'static [&'static str] {
     match slot {
@@ -50,9 +50,9 @@ pub fn get_affix_suffix(affix_type: AffixType) -> &'static str {
 }
 
 pub fn generate_display_name(item: &Item) -> String {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let base_names = get_base_name(item.slot);
-    let base = base_names[rng.gen_range(0..base_names.len())];
+    let base = base_names[rng.random_range(0..base_names.len())];
 
     match item.rarity {
         Rarity::Common => base.to_string(),
@@ -63,7 +63,7 @@ pub fn generate_display_name(item: &Item) -> String {
         Rarity::Rare | Rarity::Epic | Rarity::Legendary => {
             // Use first affix for naming (if any)
             if let Some(first_affix) = item.affixes.first() {
-                let use_prefix = rng.gen_bool(0.5);
+                let use_prefix = rng.random_bool(0.5);
                 if use_prefix {
                     let prefix = get_affix_prefix(first_affix.affix_type);
                     format!("{} {}", prefix, base)

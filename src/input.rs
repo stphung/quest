@@ -35,7 +35,7 @@ use crate::haven;
 use crate::haven::Haven;
 use crate::items;
 use crate::utils::debug_menu::DebugMenu;
-use crossterm::event::{KeyCode, KeyEvent};
+use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 /// Haven confirmation dialog state
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -485,7 +485,7 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
                     KeyCode::Esc => RuneInput::Forfeit,
                     _ => RuneInput::Other,
                 };
-                let mut rng = rand::thread_rng();
+                let mut rng = rand::rng();
                 process_rune_input(rune_game, input, &mut rng);
             }
             ActiveMinigame::Minesweeper(minesweeper_game) => {
@@ -503,7 +503,7 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
                     KeyCode::Esc => MinesweeperInput::Forfeit,
                     _ => MinesweeperInput::Other,
                 };
-                let mut rng = rand::thread_rng();
+                let mut rng = rand::rng();
                 process_minesweeper_input(minesweeper_game, input, &mut rng);
             }
             ActiveMinigame::Gomoku(gomoku_game) => {

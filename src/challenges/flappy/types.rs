@@ -2,7 +2,7 @@
 //!
 //! A real-time action minigame where the player guides a bird through pipe gaps.
 
-use rand::Rng;
+use rand::{Rng, RngExt};
 use serde::{Deserialize, Serialize};
 
 /// Difficulty levels for Flappy Bird.
@@ -218,7 +218,7 @@ impl FlappyBirdGame {
         // Gap center constrained between rows 3 and 14 so gap never clips ceiling/ground.
         let min_center = 3 + half_gap;
         let max_center = 14u16.saturating_sub(half_gap).max(min_center);
-        let gap_center = rng.gen_range(min_center..=max_center);
+        let gap_center = rng.random_range(min_center..=max_center);
 
         self.pipes.push(Pipe {
             x: self.next_pipe_x,
@@ -302,7 +302,7 @@ mod tests {
     #[test]
     fn test_spawn_pipe() {
         let mut game = FlappyBirdGame::new(FlappyBirdDifficulty::Novice);
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let initial_next = game.next_pipe_x;
 
         game.spawn_pipe(&mut rng);

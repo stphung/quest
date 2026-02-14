@@ -105,7 +105,7 @@ fn trigger_fishing(state: &mut GameState) -> &'static str {
     if state.active_dungeon.is_some() {
         return "Cannot fish while in dungeon!";
     }
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     state.active_fishing = Some(generate_fishing_session(&mut rng));
     "Fishing spot found!"
 }

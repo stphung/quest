@@ -16,7 +16,7 @@ use super::snake::SnakeDifficulty;
 use super::ActiveMinigame;
 use crate::core::constants::CHALLENGE_DISCOVERY_CHANCE;
 use crate::core::game_state::GameState;
-use rand::Rng;
+use rand::{Rng, RngExt};
 
 /// Input actions for the Challenge Menu (UI-agnostic).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -540,7 +540,7 @@ pub fn try_discover_challenge_with_haven<R: Rng>(
     let discovery_chance = CHALLENGE_DISCOVERY_CHANCE * (1.0 + haven_discovery_percent / 100.0);
 
     // Single roll for any challenge
-    if rng.gen::<f64>() >= discovery_chance {
+    if rng.random::<f64>() >= discovery_chance {
         return None;
     }
 
@@ -555,7 +555,7 @@ pub fn try_discover_challenge_with_haven<R: Rng>(
     }
 
     let total_weight: u32 = eligible.iter().map(|e| e.weight).sum();
-    let mut roll = rng.gen_range(0..total_weight);
+    let mut roll = rng.random_range(0..total_weight);
 
     for entry in &eligible {
         if roll < entry.weight {

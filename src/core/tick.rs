@@ -32,7 +32,7 @@ use crate::items::drops::{try_drop_from_boss, try_drop_from_mob};
 use crate::items::scoring::auto_equip_if_better;
 use crate::items::types::Rarity;
 use crate::zones::BossDefeatResult;
-use rand::Rng;
+use rand::{Rng, RngExt};
 
 /// A single event produced by a game tick.
 ///
@@ -225,7 +225,7 @@ pub struct TickResult {
 /// - `achievements` — Mutable achievement state for unlock tracking.
 /// - `debug_mode` — When true, suppresses achievement/haven-save signals.
 /// - `rng` — Random number generator (any `impl Rng`). Pass
-///   `&mut rand::thread_rng()` in production, or a seeded
+///   `&mut rand::rng()` in production, or a seeded
 ///   `rand_chacha::ChaCha8Rng` in tests for deterministic behavior.
 ///
 /// # Returns

@@ -94,7 +94,7 @@ fn draw_xl_l_layout(
     haven_discovered: bool,
     achievements: &crate::achievements::Achievements,
 ) {
-    let size = frame.size();
+    let size = frame.area();
 
     // Check if we should show the challenge notification banner
     let show_challenge_banner = !game_state.challenge_menu.challenges.is_empty()
@@ -204,7 +204,7 @@ fn draw_m_layout(
     haven_discovered: bool,
     achievements: &crate::achievements::Achievements,
 ) {
-    let area = frame.size();
+    let area = frame.area();
     let show_attrs = ctx.rows >= 26;
 
     let mut constraints = vec![
@@ -265,7 +265,7 @@ fn draw_s_layout(
     game_state: &GameState,
     achievements: &crate::achievements::Achievements,
 ) {
-    let area = frame.size();
+    let area = frame.area();
 
     // Check if a minigame or special view is active — if so, give it all the space
     let has_special_activity = game_state.active_minigame.is_some()

@@ -4,7 +4,7 @@ use super::types::*;
 use crate::challenges::menu::{ChallengeReward, DifficultyInfo};
 use crate::challenges::{ActiveMinigame, GameResultInfo, MinigameWinInfo};
 use crate::core::game_state::GameState;
-use rand::Rng;
+use rand::RngExt;
 
 /// Physics tick interval in milliseconds (~60 FPS).
 const PHYSICS_TICK_MS: u64 = 16;
@@ -136,7 +136,7 @@ fn step_physics(game: &mut FlappyBirdGame) {
     // We need to move next_pipe_x left along with pipes, then spawn when it enters the screen.
     game.next_pipe_x -= game.pipe_speed;
     if game.next_pipe_x <= GAME_WIDTH as f64 {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         game.spawn_pipe(&mut rng);
     }
 

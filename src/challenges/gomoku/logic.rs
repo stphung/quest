@@ -3,8 +3,8 @@
 use super::{GomokuDifficulty, GomokuGame, GomokuResult, Player, BOARD_SIZE};
 use crate::challenges::ActiveMinigame;
 use crate::core::game_state::GameState;
-use rand::seq::SliceRandom;
-use rand::Rng;
+use rand::seq::IndexedRandom;
+use rand::{Rng, RngExt};
 
 /// Input actions for the Gomoku game (UI-agnostic).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -806,7 +806,7 @@ mod ai_tests {
         game.board[7][5] = Some(Player::Ai);
         game.board[7][6] = Some(Player::Ai);
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let best = find_best_move(&game, &mut rng);
         assert!(
             best == Some((7, 2)) || best == Some((7, 7)),
@@ -823,7 +823,7 @@ mod ai_tests {
         game.board[7][5] = Some(Player::Human);
         game.board[7][6] = Some(Player::Human);
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let best = find_best_move(&game, &mut rng);
         assert!(
             best == Some((7, 2)) || best == Some((7, 7)),
@@ -1022,7 +1022,7 @@ mod ai_tests {
         game.ai_thinking = true;
         game.ai_think_ticks = 0;
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         // First tick should NOT make a move (delay not met)
         process_ai_thinking(&mut game, &mut rng);
 
@@ -1046,7 +1046,7 @@ mod ai_tests {
         game.ai_thinking = true;
         game.ai_think_ticks = 0;
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         // Tick enough times for AI to make its move (Novice: 5 + 2*2 = 9 ticks min)
         for _ in 0..20 {
             process_ai_thinking(&mut game, &mut rng);
@@ -1073,7 +1073,7 @@ mod ai_tests {
         let mut game = GomokuGame::new(GomokuDifficulty::Novice);
         game.ai_thinking = false;
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         process_ai_thinking(&mut game, &mut rng);
 
         // Nothing should change
@@ -1087,7 +1087,7 @@ mod ai_tests {
         game.ai_thinking = true;
         game.game_result = Some(GomokuResult::Win);
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for _ in 0..20 {
             process_ai_thinking(&mut game, &mut rng);
         }
@@ -1110,7 +1110,7 @@ mod ai_tests {
         game.ai_thinking = true;
         game.ai_think_ticks = 0;
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for _ in 0..20 {
             process_ai_thinking(&mut game, &mut rng);
             if !game.ai_thinking {
@@ -1137,7 +1137,7 @@ mod ai_tests {
         assert_eq!(game.current_player, Player::Ai);
 
         // AI thinks and places
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for _ in 0..20 {
             process_ai_thinking(&mut game, &mut rng);
             if !game.ai_thinking {

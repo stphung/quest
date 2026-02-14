@@ -1,12 +1,12 @@
 use super::names::generate_display_name;
 use super::types::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
 use crate::core::constants::{ILVL_SCALING_BASE, ILVL_SCALING_DIVISOR};
-use rand::Rng;
+use rand::{Rng, RngExt};
 
 /// Generate an item with the given slot, rarity, and item level.
 /// ilvl determines stat scaling: ilvl 10 (zone 1) to ilvl 100 (zone 10).
 pub fn generate_item(slot: EquipmentSlot, rarity: Rarity, ilvl: u32) -> Item {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     // Generate attribute bonuses based on rarity and ilvl
     let attributes = generate_attributes(rarity, ilvl, &mut rng);
@@ -49,15 +49,15 @@ fn generate_attributes(rarity: Rarity, ilvl: u32, rng: &mut impl Rng) -> Attribu
     let multiplier = ilvl_multiplier(ilvl);
 
     // Pick a random number of attributes to boost (1-3)
-    let num_attrs = rng.gen_range(1..=3);
+    let num_attrs = rng.random_range(1..=3);
     let mut attrs = AttributeBonuses::new();
 
     for _ in 0..num_attrs {
-        let base_value = rng.gen_range(base_min..=base_max) as f64;
+        let base_value = rng.random_range(base_min..=base_max) as f64;
         let scaled_value = (base_value * multiplier).round() as u32;
         let value = scaled_value.max(1); // Minimum 1
 
-        match rng.gen_range(0..6) {
+        match rng.random_range(0..6) {
             0 => attrs.str += value,
             1 => attrs.dex += value,
             2 => attrs.con += value,
@@ -75,9 +75,9 @@ fn generate_affixes(rarity: Rarity, ilvl: u32, rng: &mut impl Rng) -> Vec<Affix>
     let count = match rarity {
         Rarity::Common => 0,
         Rarity::Magic => 1,
-        Rarity::Rare => rng.gen_range(2..=3),
-        Rarity::Epic => rng.gen_range(3..=4),
-        Rarity::Legendary => rng.gen_range(4..=5),
+        Rarity::Rare => rng.random_range(2..=3),
+        Rarity::Epic => rng.random_range(3..=4),
+        Rarity::Legendary => rng.random_range(4..=5),
     };
 
     let mut affixes = Vec::new();
@@ -94,7 +94,7 @@ fn generate_affixes(rarity: Rarity, ilvl: u32, rng: &mut impl Rng) -> Vec<Affix>
     ];
 
     for _ in 0..count {
-        let affix_type = all_affix_types[rng.gen_range(0..all_affix_types.len())];
+        let affix_type = all_affix_types[rng.random_range(0..all_affix_types.len())];
         let value = generate_affix_value(affix_type, rarity, ilvl, rng);
         affixes.push(Affix { affix_type, value });
     }
@@ -129,7 +129,7 @@ fn generate_affix_value(
                 Rarity::Epic => (30.0, 50.0),
                 Rarity::Legendary => (50.0, 80.0),
             };
-            let base = rng.gen_range(hp_min..=hp_max);
+            let base = rng.random_range(hp_min..=hp_max);
             (base * multiplier).round()
         }
         AffixType::CritMultiplier => {
@@ -141,12 +141,12 @@ fn generate_affix_value(
                 Rarity::Epic => (0.15, 0.25),
                 Rarity::Legendary => (0.2, 0.35),
             };
-            let base = rng.gen_range(cm_min..=cm_max);
+            let base = rng.random_range(cm_min..=cm_max);
             ((base * multiplier) * 100.0).round() / 100.0 // Round to 2 decimals
         }
         _ => {
             // Percentage affixes
-            let base = rng.gen_range(base_min..=base_max);
+            let base = rng.random_range(base_min..=base_max);
             (base * multiplier).round()
         }
     }

@@ -2,7 +2,7 @@
 
 use super::types::{haven_discovery_chance, tier_cost, Haven, HavenRoomId};
 use crate::core::constants::STORMBREAKER_PRESTIGE_REQUIREMENT;
-use rand::Rng;
+use rand::{Rng, RngExt};
 use std::fs;
 use std::io;
 use std::path::PathBuf;
@@ -60,7 +60,7 @@ pub fn try_discover_haven<R: Rng>(haven: &mut Haven, prestige_rank: u32, rng: &m
     if chance <= 0.0 {
         return false;
     }
-    if rng.gen::<f64>() < chance {
+    if rng.random::<f64>() < chance {
         haven.discovered = true;
         return true;
     }
@@ -161,7 +161,7 @@ mod tests {
     #[test]
     fn test_try_discover_haven_below_p10() {
         let mut haven = Haven::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         // Below P10, should never discover
         for _ in 0..100_000 {
             assert!(!try_discover_haven(&mut haven, 9, &mut rng));
@@ -172,14 +172,14 @@ mod tests {
     fn test_try_discover_haven_already_discovered() {
         let mut haven = Haven::new();
         haven.discovered = true;
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         assert!(!try_discover_haven(&mut haven, 20, &mut rng));
     }
 
     #[test]
     fn test_try_discover_haven_eventually_succeeds() {
         let mut haven = Haven::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut discovered = false;
         for _ in 0..1_000_000 {
             if try_discover_haven(&mut haven, 10, &mut rng) {
@@ -393,7 +393,7 @@ mod tests {
     #[test]
     fn test_discovery_requires_p10() {
         let mut haven = Haven::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         // P0-P9 cannot discover Haven
         for p in 0..10 {

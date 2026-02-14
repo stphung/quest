@@ -10,7 +10,7 @@ use crate::core::constants::{
     FISH_RARITY_COMMON_FLOOR,
 };
 use crate::items::Item;
-use rand::Rng;
+use rand::{Rng, RngExt};
 
 /// Fishing spot names for session generation.
 pub const SPOT_NAMES: [&str; 8] = [
@@ -84,7 +84,7 @@ pub fn roll_fish_rarity(rank: u32, rng: &mut impl Rng) -> FishRarity {
     chances[0] = chances[0].max(FISH_RARITY_COMMON_FLOOR);
 
     // Roll a number from 0.0 to 100.0
-    let roll: f64 = rng.gen_range(0.0..100.0);
+    let roll: f64 = rng.random_range(0.0..100.0);
 
     // Determine rarity based on cumulative chances (check rarest first)
     let mut cumulative = 100.0;
@@ -143,10 +143,10 @@ fn get_xp_range(rarity: FishRarity) -> (u32, u32) {
 /// - Legendary: 3000-5000
 pub fn generate_fish(rarity: FishRarity, rng: &mut impl Rng) -> CaughtFish {
     let names = get_fish_names(rarity);
-    let name = names[rng.gen_range(0..names.len())].to_string();
+    let name = names[rng.random_range(0..names.len())].to_string();
 
     let (min_xp, max_xp) = get_xp_range(rarity);
-    let xp_reward = rng.gen_range(min_xp..=max_xp);
+    let xp_reward = rng.random_range(min_xp..=max_xp);
 
     CaughtFish {
         name,
@@ -212,8 +212,8 @@ pub fn generate_fish_with_rank(
 
     // After 10 encounters, chance to catch
     if leviathan_encounters >= LEVIATHAN_REQUIRED_ENCOUNTERS {
-        if rng.gen::<f64>() < LEVIATHAN_CATCH_CHANCE {
-            let xp_reward = rng.gen_range(STORM_LEVIATHAN_XP.0..=STORM_LEVIATHAN_XP.1);
+        if rng.random::<f64>() < LEVIATHAN_CATCH_CHANCE {
+            let xp_reward = rng.random_range(STORM_LEVIATHAN_XP.0..=STORM_LEVIATHAN_XP.1);
             return (
                 CaughtFish {
                     name: STORM_LEVIATHAN.to_string(),
@@ -228,7 +228,7 @@ pub fn generate_fish_with_rank(
 
     // Progressive encounter roll
     let encounter_chance = LEVIATHAN_ENCOUNTER_CHANCES[leviathan_encounters as usize];
-    if rng.gen::<f64>() < encounter_chance {
+    if rng.random::<f64>() < encounter_chance {
         let fish = generate_fish(rarity, rng);
         return (
             fish,
@@ -261,32 +261,32 @@ pub const REELING_TICKS_MAX: u32 = 30; // 3.0s maximum reel (fighter!)
 /// - fish_caught and items_found start empty
 /// - Starts in Casting phase
 pub fn generate_fishing_session(rng: &mut impl Rng) -> FishingSession {
-    let spot_name = SPOT_NAMES[rng.gen_range(0..SPOT_NAMES.len())].to_string();
-    let total_fish = rng.gen_range(FISHING_SESSION_MIN_FISH..=FISHING_SESSION_MAX_FISH);
+    let spot_name = SPOT_NAMES[rng.random_range(0..SPOT_NAMES.len())].to_string();
+    let total_fish = rng.random_range(FISHING_SESSION_MIN_FISH..=FISHING_SESSION_MAX_FISH);
 
     FishingSession {
         spot_name,
         total_fish,
         fish_caught: Vec::new(),
         items_found: Vec::<Item>::new(),
-        ticks_remaining: rng.gen_range(CASTING_TICKS_MIN..=CASTING_TICKS_MAX),
+        ticks_remaining: rng.random_range(CASTING_TICKS_MIN..=CASTING_TICKS_MAX),
         phase: FishingPhase::Casting,
     }
 }
 
 /// Returns random ticks for the casting phase.
 pub fn roll_casting_ticks(rng: &mut impl Rng) -> u32 {
-    rng.gen_range(CASTING_TICKS_MIN..=CASTING_TICKS_MAX)
+    rng.random_range(CASTING_TICKS_MIN..=CASTING_TICKS_MAX)
 }
 
 /// Returns random ticks for the waiting (bite) phase.
 pub fn roll_waiting_ticks(rng: &mut impl Rng) -> u32 {
-    rng.gen_range(WAITING_TICKS_MIN..=WAITING_TICKS_MAX)
+    rng.random_range(WAITING_TICKS_MIN..=WAITING_TICKS_MAX)
 }
 
 /// Returns random ticks for the reeling phase.
 pub fn roll_reeling_ticks(rng: &mut impl Rng) -> u32 {
-    rng.gen_range(REELING_TICKS_MIN..=REELING_TICKS_MAX)
+    rng.random_range(REELING_TICKS_MIN..=REELING_TICKS_MAX)
 }
 
 #[cfg(test)]
