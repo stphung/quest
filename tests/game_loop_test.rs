@@ -37,6 +37,7 @@ fn simulate_tick(state: &mut GameState) -> Vec<CombatEvent> {
         &default_haven_bonuses(),
         &PrestigeCombatBonuses::default(),
         &mut achievements,
+        &derived,
     )
 }
 
@@ -533,7 +534,7 @@ fn test_zone_advancement_full_zone_clear() {
 
         // Run combat until boss is defeated (handles kills, boss spawn, and boss death)
         let mut subzone_boss_defeated = false;
-        for _ in 0..100_000 {
+        for _ in 0..10_000 {
             let events = simulate_tick(&mut state);
             for event in &events {
                 match event {

@@ -473,6 +473,7 @@ pub fn game_tick<R: Rng>(
         &haven_combat,
         &prestige_combat,
         achievements,
+        &derived,
     );
 
     for event in combat_events {

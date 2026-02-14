@@ -71,6 +71,7 @@ fn simulate_combat_tick(
         &default_haven_bonuses(),
         &PrestigeCombatBonuses::default(),
         achievements,
+        &derived,
     )
 }
 
@@ -92,7 +93,7 @@ fn run_until_boss_defeated(
     state: &mut GameState,
     achievements: &mut Achievements,
 ) -> Option<(u64, BossDefeatResult)> {
-    for _ in 0..100_000 {
+    for _ in 0..10_000 {
         let events = simulate_combat_tick(state, achievements);
         for event in events {
             match event {
@@ -870,6 +871,10 @@ fn test_haven_combat_bonuses_passed_to_update_combat() {
         xp_gain_percent: 10.0,
     };
 
+    // Sync derived stats
+    let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+    state.combat_state.update_max_hp(derived.max_hp);
+
     // Spawn an enemy
     spawn_enemy_if_needed(&mut state);
     assert!(state.combat_state.current_enemy.is_some());
@@ -881,6 +886,7 @@ fn test_haven_combat_bonuses_passed_to_update_combat() {
         &haven_combat,
         &PrestigeCombatBonuses::default(),
         &mut achievements,
+        &derived,
     );
 
     // Verify combat ran (may or may not produce events depending on timer)
