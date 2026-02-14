@@ -1,6 +1,6 @@
 # Development helpers for Quest
 
-.PHONY: check fmt lint test build audit all clean install setup
+.PHONY: check fmt lint test build audit all clean install setup coverage coverage-html coverage-check
 
 # Run all PR checks locally (uses same script as CI)
 check:
@@ -41,6 +41,20 @@ audit:
 # Run the game
 run:
 	@cargo run
+
+# Test coverage summary (requires: cargo install cargo-llvm-cov)
+coverage:
+	@cargo llvm-cov --lib --summary-only
+
+# Test coverage HTML report (opens in browser)
+coverage-html:
+	@cargo llvm-cov --lib --html --open
+
+# Enforce ≥90% line coverage on game logic (excludes UI, updater, build_info)
+coverage-check:
+	@cargo llvm-cov --lib --summary-only --quiet \
+		--ignore-filename-regex "(ui/|utils/updater|utils/build_info|tick_events)" \
+		--fail-under-lines 90
 
 # Clean build artifacts
 clean:
