@@ -1169,4 +1169,338 @@ mod tests {
         let mult = get_enemy_stat_multiplier(&dungeon);
         assert!((mult - 2.0).abs() < 0.01);
     }
+
+    // =========================================================================
+    // COMPLEX PATHFINDING TESTS
+    // =========================================================================
+
+    #[test]
+    fn test_pathfinding_in_large_dungeon() {
+        // Large = 9x9 grid. Reveal all rooms so BFS can traverse them.
+        let mut dungeon = generate_dungeon(100, 0, 1);
+        let entrance = dungeon.entrance_position;
+        let boss = dungeon.boss_position;
+
+        // Reveal all rooms so pathfinding can traverse them
+        let grid_size = dungeon.size.grid_size();
+        for y in 0..grid_size {
+            for x in 0..grid_size {
+                if let Some(room) = dungeon.get_room_mut(x, y) {
+                    if room.state == RoomState::Hidden {
+                        room.state = RoomState::Revealed;
+                    }
+                }
+            }
+        }
+
+        let path = find_path_to(&dungeon, entrance, boss);
+        assert!(
+            path.is_some(),
+            "Path from entrance {:?} to boss {:?} should exist in Large dungeon",
+            entrance,
+            boss
+        );
+
+        let path = path.unwrap();
+        assert!(
+            path.len() >= 2,
+            "Path should have at least 2 steps, got {}",
+            path.len()
+        );
+        assert_eq!(path[0], entrance);
+        assert_eq!(*path.last().unwrap(), boss);
+    }
+
+    #[test]
+    fn test_pathfinding_in_epic_dungeon() {
+        // Epic = 11x11 grid, prestige 6+. Reveal all rooms for BFS.
+        let mut dungeon = generate_dungeon(100, 6, 1);
+        let entrance = dungeon.entrance_position;
+        let boss = dungeon.boss_position;
+
+        let grid_size = dungeon.size.grid_size();
+        for y in 0..grid_size {
+            for x in 0..grid_size {
+                if let Some(room) = dungeon.get_room_mut(x, y) {
+                    if room.state == RoomState::Hidden {
+                        room.state = RoomState::Revealed;
+                    }
+                }
+            }
+        }
+
+        let path = find_path_to(&dungeon, entrance, boss);
+        assert!(
+            path.is_some(),
+            "Path from entrance to boss should exist in Epic dungeon"
+        );
+        let path = path.unwrap();
+        assert_eq!(path[0], entrance);
+        assert_eq!(*path.last().unwrap(), boss);
+    }
+
+    #[test]
+    fn test_pathfinding_prefers_unexplored_rooms() {
+        let dungeon = generate_dungeon(10, 0, 1);
+        let entrance = dungeon.entrance_position;
+
+        // find_next_room from entrance should find a Revealed room
+        let next = find_next_room(&dungeon);
+        if let Some(next_pos) = next {
+            let room = dungeon.get_room(next_pos.0, next_pos.1).unwrap();
+            assert_eq!(
+                room.state,
+                RoomState::Revealed,
+                "find_next_room should prefer Revealed (unexplored) rooms"
+            );
+            // It should NOT be the entrance
+            assert_ne!(next_pos, entrance);
+        }
+    }
+
+    #[test]
+    fn test_pathfinding_through_cleared_rooms_to_revealed() {
+        let mut dungeon = generate_dungeon(10, 0, 1);
+
+        // Move to first adjacent room and clear it
+        let neighbors =
+            dungeon.get_connected_neighbors(dungeon.player_position.0, dungeon.player_position.1);
+        if neighbors.is_empty() {
+            return;
+        }
+
+        let first_pos = neighbors[0];
+        move_to_room(&mut dungeon, first_pos);
+        on_room_enemy_defeated(&mut dungeon);
+
+        // find_next_room should still find rooms (might need to travel through cleared rooms)
+        let next = find_next_room(&dungeon);
+        assert!(
+            next.is_some(),
+            "Should find next room to explore after clearing one room"
+        );
+    }
+
+    // =========================================================================
+    // DUNGEON SIZE WITH PRESTIGE
+    // =========================================================================
+
+    #[test]
+    fn test_small_dungeon_properties() {
+        let dungeon = generate_dungeon(10, 0, 1);
+        // Low level + P0 => Small or Medium (±1 variation)
+        let (min, max) = dungeon.size.room_count_range();
+        let rooms = dungeon.room_count();
+        assert!(
+            (min..=max).contains(&rooms),
+            "Room count {} not in range {}-{} for {:?}",
+            rooms,
+            min,
+            max,
+            dungeon.size
+        );
+    }
+
+    #[test]
+    fn test_dungeon_size_deterministic_small() {
+        let size = DungeonSize::from_progression(10, 0);
+        assert_eq!(size, DungeonSize::Small);
+        assert_eq!(size.grid_size(), 5);
+    }
+
+    #[test]
+    fn test_dungeon_size_deterministic_medium() {
+        let size = DungeonSize::from_progression(50, 0);
+        assert_eq!(size, DungeonSize::Medium);
+        assert_eq!(size.grid_size(), 7);
+    }
+
+    #[test]
+    fn test_dungeon_size_deterministic_large() {
+        let size = DungeonSize::from_progression(100, 0);
+        assert_eq!(size, DungeonSize::Large);
+        assert_eq!(size.grid_size(), 9);
+    }
+
+    #[test]
+    fn test_dungeon_size_deterministic_epic() {
+        let size = DungeonSize::from_progression(10, 6);
+        assert_eq!(size, DungeonSize::Epic);
+        assert_eq!(size.grid_size(), 11);
+    }
+
+    // =========================================================================
+    // ROOM TYPE INTERACTIONS
+    // =========================================================================
+
+    #[test]
+    fn test_elite_key_then_boss_unlock_flow() {
+        let mut dungeon = generate_dungeon(10, 0, 1);
+
+        // Initially no key
+        assert!(!dungeon.has_key);
+        assert!(!dungeon.is_boss_unlocked());
+
+        // Defeat elite gives key
+        let events = on_elite_defeated(&mut dungeon);
+        assert!(dungeon.has_key);
+        assert!(dungeon.is_boss_unlocked());
+        assert!(events.iter().any(|e| matches!(e, DungeonEvent::FoundKey)));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, DungeonEvent::BossUnlocked)));
+    }
+
+    #[test]
+    fn test_boss_xp_reward_scales_with_size() {
+        // Sample many rewards to verify ordering
+        let mut small_total = 0u64;
+        let mut medium_total = 0u64;
+        let mut large_total = 0u64;
+        let mut epic_total = 0u64;
+        let samples = 100;
+
+        for _ in 0..samples {
+            small_total += calculate_boss_xp_reward(DungeonSize::Small);
+            medium_total += calculate_boss_xp_reward(DungeonSize::Medium);
+            large_total += calculate_boss_xp_reward(DungeonSize::Large);
+            epic_total += calculate_boss_xp_reward(DungeonSize::Epic);
+        }
+
+        assert!(
+            small_total < medium_total,
+            "Small avg XP should be less than Medium"
+        );
+        assert!(
+            medium_total < large_total,
+            "Medium avg XP should be less than Large"
+        );
+        assert!(
+            large_total < epic_total,
+            "Large avg XP should be less than Epic"
+        );
+    }
+
+    #[test]
+    fn test_calculate_boss_xp_reward_epic() {
+        let xp = calculate_boss_xp_reward(DungeonSize::Epic);
+        assert!((8000..=12000).contains(&xp));
+    }
+
+    // =========================================================================
+    // PLAYER DEATH EDGE CASES
+    // =========================================================================
+
+    #[test]
+    fn test_death_in_dungeon_exits_cleanly() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_dungeon = Some(generate_dungeon(10, 0, 1));
+        state.prestige_rank = 5;
+
+        let events = on_player_died_in_dungeon(&mut state);
+
+        assert!(state.active_dungeon.is_none());
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, DungeonEvent::DungeonFailed)));
+        // Prestige rank preserved (safe death)
+        assert_eq!(state.prestige_rank, 5);
+    }
+
+    #[test]
+    fn test_death_on_boss_room_exits() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_dungeon = Some(generate_dungeon(10, 0, 1));
+
+        // Move player to boss room
+        if let Some(dungeon) = &mut state.active_dungeon {
+            let boss_pos = dungeon.boss_position;
+            dungeon.player_position = boss_pos;
+        }
+
+        let events = on_player_died_in_dungeon(&mut state);
+        assert!(state.active_dungeon.is_none());
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, DungeonEvent::DungeonFailed)));
+    }
+
+    #[test]
+    fn test_dungeon_state_fully_cleaned_after_death() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_dungeon = Some(generate_dungeon(10, 0, 1));
+
+        // Accumulate some dungeon state
+        if let Some(dungeon) = &mut state.active_dungeon {
+            dungeon.xp_earned = 5000;
+            dungeon.rooms_cleared = 10;
+            dungeon.has_key = true;
+        }
+
+        on_player_died_in_dungeon(&mut state);
+
+        // active_dungeon should be None - all dungeon state is gone
+        assert!(state.active_dungeon.is_none());
+    }
+
+    // =========================================================================
+    // AUTO-EXPLORATION BEHAVIOR
+    // =========================================================================
+
+    #[test]
+    fn test_update_dungeon_does_not_move_before_explore_interval() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_dungeon = Some(generate_dungeon(10, 0, 1));
+
+        if let Some(dungeon) = &mut state.active_dungeon {
+            dungeon.current_room_cleared = true;
+            dungeon.move_timer = 0.0;
+        }
+
+        let start_pos = state.active_dungeon.as_ref().unwrap().player_position;
+
+        // Tick with less than ROOM_MOVE_INTERVAL (2.5s) - should NOT move
+        let events = update_dungeon(&mut state, 1.0);
+        assert!(events.is_empty());
+        assert_eq!(
+            state.active_dungeon.as_ref().unwrap().player_position,
+            start_pos
+        );
+    }
+
+    #[test]
+    fn test_room_state_transitions() {
+        let mut dungeon = generate_dungeon(10, 0, 1);
+        let entrance = dungeon.entrance_position;
+
+        // Entrance should be Current
+        let entrance_room = dungeon.get_room(entrance.0, entrance.1).unwrap();
+        assert_eq!(entrance_room.state, RoomState::Current);
+
+        // Adjacent rooms should be Revealed (not Hidden, not Cleared)
+        let neighbors = dungeon.get_connected_neighbors(entrance.0, entrance.1);
+        for &(nx, ny) in &neighbors {
+            let room = dungeon.get_room(nx, ny).unwrap();
+            assert_eq!(
+                room.state,
+                RoomState::Revealed,
+                "Room at ({nx},{ny}) adjacent to entrance should be Revealed"
+            );
+        }
+
+        // Move to first neighbor
+        if let Some(&first_neighbor) = neighbors.first() {
+            move_to_room(&mut dungeon, first_neighbor);
+
+            // Old room (entrance) should now be Cleared
+            let old = dungeon.get_room(entrance.0, entrance.1).unwrap();
+            assert_eq!(old.state, RoomState::Cleared);
+
+            // New room should be Current
+            let new = dungeon
+                .get_room(first_neighbor.0, first_neighbor.1)
+                .unwrap();
+            assert_eq!(new.state, RoomState::Current);
+        }
+    }
 }

@@ -1044,4 +1044,387 @@ mod tests {
             double_fish_count
         );
     }
+
+    // =========================================================================
+    // STORM LEVIATHAN HUNT PROGRESSION TESTS
+    // =========================================================================
+
+    #[test]
+    fn test_leviathan_encounter_tracked_in_fishing_tick() {
+        // At rank 40 with legendary catches, leviathan encounters should be recorded
+        // via tick_fishing_with_haven_result
+        let haven = HavenFishingBonuses::default();
+        let mut encountered = false;
+
+        for seed in 0u64..5000 {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            let mut state = create_test_game_state();
+            state.fishing.rank = 40;
+            state.fishing.leviathan_encounters = 0;
+
+            let session = FishingSession {
+                spot_name: "Deep Sea".to_string(),
+                total_fish: 100,
+                fish_caught: Vec::new(),
+                items_found: Vec::new(),
+                ticks_remaining: 1,
+                phase: FishingPhase::Reeling,
+            };
+            state.active_fishing = Some(session);
+
+            let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven);
+
+            if let Some(enc) = result.leviathan_encounter {
+                assert_eq!(enc, 1, "First encounter should be number 1");
+                assert_eq!(
+                    state.fishing.leviathan_encounters, 1,
+                    "State should track encounter"
+                );
+                encountered = true;
+                break;
+            }
+        }
+
+        assert!(
+            encountered,
+            "Should encounter Leviathan at least once in 5000 seeds at rank 40"
+        );
+    }
+
+    #[test]
+    fn test_leviathan_no_encounter_below_rank_40() {
+        let haven = HavenFishingBonuses::default();
+
+        for seed in 0u64..1000 {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            let mut state = create_test_game_state();
+            state.fishing.rank = 30; // Below 40
+            state.fishing.leviathan_encounters = 0;
+
+            let session = FishingSession {
+                spot_name: "Lake".to_string(),
+                total_fish: 100,
+                fish_caught: Vec::new(),
+                items_found: Vec::new(),
+                ticks_remaining: 1,
+                phase: FishingPhase::Reeling,
+            };
+            state.active_fishing = Some(session);
+
+            let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven);
+
+            assert!(
+                result.leviathan_encounter.is_none(),
+                "Should never encounter Leviathan below rank 40 (seed {})",
+                seed
+            );
+            assert!(
+                !result.caught_storm_leviathan,
+                "Should never catch Leviathan below rank 40"
+            );
+        }
+    }
+
+    #[test]
+    fn test_leviathan_caught_via_fishing_tick() {
+        let haven = HavenFishingBonuses::default();
+        let mut caught = false;
+
+        for seed in 0u64..10000 {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            let mut state = create_test_game_state();
+            state.fishing.rank = 40;
+            state.fishing.leviathan_encounters = 10; // All encounters done
+
+            let session = FishingSession {
+                spot_name: "Deep Sea".to_string(),
+                total_fish: 100,
+                fish_caught: Vec::new(),
+                items_found: Vec::new(),
+                ticks_remaining: 1,
+                phase: FishingPhase::Reeling,
+            };
+            state.active_fishing = Some(session);
+
+            let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven);
+
+            if result.caught_storm_leviathan {
+                assert!(
+                    result
+                        .messages
+                        .iter()
+                        .any(|m| m.contains("STORM LEVIATHAN")),
+                    "Catch message should mention Storm Leviathan"
+                );
+                caught = true;
+                break;
+            }
+        }
+
+        assert!(
+            caught,
+            "Should catch Leviathan eventually at rank 40 with 10 encounters (25% chance)"
+        );
+    }
+
+    // =========================================================================
+    // ITEM DROP FROM FISHING TESTS
+    // =========================================================================
+
+    #[test]
+    fn test_fishing_item_drop_rates_by_rarity() {
+        let trials = 5000;
+
+        for (rarity, expected_rate, tolerance) in [
+            (FishRarity::Common, 0.05, 0.02),
+            (FishRarity::Uncommon, 0.05, 0.02),
+            (FishRarity::Rare, 0.15, 0.03),
+            (FishRarity::Epic, 0.35, 0.04),
+            (FishRarity::Legendary, 0.75, 0.04),
+        ] {
+            let mut drops = 0;
+            for seed in 0..trials {
+                let mut rng = ChaCha8Rng::seed_from_u64(seed);
+                if try_fishing_item_drop(rarity, 1, &mut rng).is_some() {
+                    drops += 1;
+                }
+            }
+            let actual_rate = drops as f64 / trials as f64;
+            assert!(
+                (actual_rate - expected_rate).abs() < tolerance,
+                "{:?} drop rate {:.3} should be near {:.3} (tolerance {:.3})",
+                rarity,
+                actual_rate,
+                expected_rate,
+                tolerance
+            );
+        }
+    }
+
+    #[test]
+    fn test_fishing_item_drop_rarity_matches_fish_rarity() {
+        // Verify that the item rarity mapping is correct
+        for (fish_rarity, expected_item_rarity) in [
+            (FishRarity::Common, Rarity::Common),
+            (FishRarity::Uncommon, Rarity::Magic),
+            (FishRarity::Rare, Rarity::Rare),
+            (FishRarity::Epic, Rarity::Epic),
+            (FishRarity::Legendary, Rarity::Legendary),
+        ] {
+            // Try many seeds until we get a drop, then check its rarity
+            for seed in 0u64..10000 {
+                let mut rng = ChaCha8Rng::seed_from_u64(seed);
+                if let Some(item) = try_fishing_item_drop(fish_rarity, 5, &mut rng) {
+                    assert_eq!(
+                        item.rarity, expected_item_rarity,
+                        "{:?} fish should produce {:?} items, got {:?}",
+                        fish_rarity, expected_item_rarity, item.rarity
+                    );
+                    break;
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_fishing_item_drop_uses_zone_ilvl() {
+        // Items from fishing should use ilvl_for_zone(zone_id)
+        for zone_id in [1, 5, 10] {
+            let expected_ilvl = crate::items::ilvl_for_zone(zone_id);
+            // Use legendary rarity for high drop chance (75%)
+            for seed in 0u64..100 {
+                let mut rng = ChaCha8Rng::seed_from_u64(seed);
+                if let Some(item) = try_fishing_item_drop(FishRarity::Legendary, zone_id, &mut rng)
+                {
+                    assert_eq!(
+                        item.ilvl, expected_ilvl,
+                        "Item ilvl should match zone {} ilvl {}",
+                        zone_id, expected_ilvl
+                    );
+                    break;
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // RANK SYSTEM EDGE CASE TESTS
+    // =========================================================================
+
+    #[test]
+    fn test_get_max_fishing_rank_without_haven() {
+        assert_eq!(
+            get_max_fishing_rank(0),
+            BASE_MAX_FISHING_RANK,
+            "Without Haven bonus, max rank should be 30"
+        );
+    }
+
+    #[test]
+    fn test_get_max_fishing_rank_with_haven_t4() {
+        assert_eq!(
+            get_max_fishing_rank(10),
+            MAX_FISHING_RANK,
+            "With Fishing Dock T4 (+10), max rank should be 40"
+        );
+    }
+
+    #[test]
+    fn test_get_max_fishing_rank_capped_at_40() {
+        assert_eq!(
+            get_max_fishing_rank(100),
+            MAX_FISHING_RANK,
+            "Max rank should be capped at 40 even with large bonus"
+        );
+    }
+
+    #[test]
+    fn test_check_rank_up_with_max_limits_progression() {
+        let mut fishing_state = FishingState {
+            rank: 30,
+            total_fish_caught: 50000,
+            fish_toward_next_rank: 4000, // Enough for rank 31 (requires 4000)
+            legendary_catches: 100,
+            leviathan_encounters: 0,
+        };
+
+        // With max_rank=30, should NOT rank up past 30
+        let result = check_rank_up_with_max(&mut fishing_state, 30);
+        assert!(result.is_none(), "Should not rank up past max_rank=30");
+        assert_eq!(fishing_state.rank, 30);
+
+        // With max_rank=40 (Haven bonus), should rank up
+        let result = check_rank_up_with_max(&mut fishing_state, 40);
+        assert!(result.is_some(), "Should rank up to 31 with max_rank=40");
+        assert_eq!(fishing_state.rank, 31);
+    }
+
+    #[test]
+    fn test_rank_up_at_all_tier_boundaries() {
+        // Test that rank-up works correctly at each tier boundary
+        let tier_boundaries = [
+            (5, 6, 100),    // Novice -> Apprentice
+            (10, 11, 200),  // Apprentice -> Journeyman
+            (15, 16, 400),  // Journeyman -> Expert
+            (20, 21, 800),  // Expert -> Master
+            (25, 26, 1500), // Master -> Grandmaster
+        ];
+
+        for (from_rank, to_rank, required) in tier_boundaries {
+            let mut fishing_state = FishingState {
+                rank: from_rank,
+                total_fish_caught: 100000,
+                fish_toward_next_rank: required,
+                legendary_catches: 0,
+                leviathan_encounters: 0,
+            };
+
+            let result = check_rank_up_with_max(&mut fishing_state, 40);
+            assert!(
+                result.is_some(),
+                "Should rank up from {} to {} with {} fish",
+                from_rank,
+                to_rank,
+                required
+            );
+            assert_eq!(
+                fishing_state.rank, to_rank,
+                "Rank should advance from {} to {}",
+                from_rank, to_rank
+            );
+            assert_eq!(
+                fishing_state.fish_toward_next_rank, 0,
+                "Progress should reset exactly at threshold"
+            );
+        }
+    }
+
+    // =========================================================================
+    // SESSION EDGE CASE TESTS
+    // =========================================================================
+
+    #[test]
+    fn test_double_fish_can_complete_session() {
+        // If double fish is triggered on the last fish, session should end correctly
+        let mut caught_double_on_last = false;
+
+        for seed in 0u64..2000 {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            let mut state = create_test_game_state();
+
+            // Session with 2 total fish and 1 already caught — double fish should finish it
+            let session = FishingSession {
+                spot_name: "Small Pond".to_string(),
+                total_fish: 2,
+                fish_caught: Vec::new(), // 0 caught, need 2
+                items_found: Vec::new(),
+                ticks_remaining: 1,
+                phase: FishingPhase::Reeling,
+            };
+            state.active_fishing = Some(session);
+
+            let haven = HavenFishingBonuses {
+                timer_reduction_percent: 0.0,
+                double_fish_chance_percent: 100.0, // Guarantee double fish
+                max_fishing_rank_bonus: 0,
+            };
+
+            let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven);
+
+            // With 100% double fish and 2 total needed, should complete in one catch
+            if state.active_fishing.is_none() {
+                assert!(
+                    result.messages.iter().any(|m| m.contains("depleted")),
+                    "Should have completion message"
+                );
+                assert!(
+                    result.messages.iter().any(|m| m.contains("DOUBLE")),
+                    "Should have double fish marker"
+                );
+                caught_double_on_last = true;
+                break;
+            }
+        }
+
+        assert!(
+            caught_double_on_last,
+            "Double fish should be able to complete a session"
+        );
+    }
+
+    #[test]
+    fn test_fishing_tick_result_messages_contain_rarity() {
+        let haven = HavenFishingBonuses::default();
+        let mut rng = create_test_rng();
+        let mut state = create_test_game_state();
+
+        let session = FishingSession {
+            spot_name: "Lake".to_string(),
+            total_fish: 100,
+            fish_caught: Vec::new(),
+            items_found: Vec::new(),
+            ticks_remaining: 1,
+            phase: FishingPhase::Reeling,
+        };
+        state.active_fishing = Some(session);
+
+        let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven);
+
+        // Catch message should contain one of the rarity names
+        let catch_msg = result
+            .messages
+            .iter()
+            .find(|m| m.contains("Caught"))
+            .expect("Should have a catch message");
+        let has_rarity = catch_msg.contains("Common")
+            || catch_msg.contains("Uncommon")
+            || catch_msg.contains("Rare")
+            || catch_msg.contains("Epic")
+            || catch_msg.contains("Legendary");
+        assert!(
+            has_rarity,
+            "Catch message should contain rarity: {}",
+            catch_msg
+        );
+    }
 }
