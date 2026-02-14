@@ -34,6 +34,16 @@ cargo audit --deny yanked --quiet
 echo "✅ Audit passed"
 echo ""
 
+# Coverage check (requires cargo-llvm-cov — installed in CI, optional locally)
+if command -v cargo-llvm-cov &> /dev/null; then
+    echo "📊 5/5 Checking game logic coverage (≥90% lines)..."
+    cargo llvm-cov --lib --summary-only --quiet \
+        --ignore-filename-regex "(ui/|utils/updater|utils/build_info|tick_events)" \
+        --fail-under-lines 90
+    echo "✅ Coverage check passed"
+    echo ""
+fi
+
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "✅ All CI checks passed!"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
