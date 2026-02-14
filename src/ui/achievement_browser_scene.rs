@@ -147,10 +147,24 @@ fn render_category_tabs(
             Style::default().fg(Color::DarkGray)
         };
 
-        spans.push(Span::styled(
-            format!(" {} ({}/{}) ", cat.name(), unlocked, total),
-            style,
-        ));
+        let new_count = achievements.count_recently_unlocked_by_category(cat);
+        if new_count > 0 {
+            spans.push(Span::styled(
+                format!(" {} ({}/{}) ", cat.name(), unlocked, total),
+                style,
+            ));
+            spans.push(Span::styled(
+                format!("\u{2022}{} ", new_count),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ));
+        } else {
+            spans.push(Span::styled(
+                format!(" {} ({}/{}) ", cat.name(), unlocked, total),
+                style,
+            ));
+        }
     }
 
     let tabs = Paragraph::new(Line::from(spans)).alignment(Alignment::Center);
@@ -178,8 +192,17 @@ fn render_achievement_list(
         .map(|(i, def)| {
             let is_unlocked = achievements.is_unlocked(def.id);
             let is_selected = i == ui_state.selected_index;
+            let is_new = achievements.is_recently_unlocked(def.id);
 
-            let prefix = if is_selected { "> " } else { "  " };
+            let prefix = if is_selected && is_new {
+                ">\u{2605}"
+            } else if is_selected {
+                "> "
+            } else if is_new {
+                " \u{2605}"
+            } else {
+                "  "
+            };
             let checkmark = if is_unlocked { "[X] " } else { "[ ] " };
 
             let style = if is_unlocked {
@@ -190,8 +213,16 @@ fn render_achievement_list(
                 Style::default().fg(Color::DarkGray)
             };
 
+            let prefix_style = if is_new {
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                style
+            };
+
             ListItem::new(Line::from(vec![
-                Span::styled(prefix, style),
+                Span::styled(prefix, prefix_style),
                 Span::styled(
                     checkmark,
                     if is_unlocked {
@@ -269,6 +300,15 @@ fn render_achievement_detail(
                 lines.push(Line::from(Span::styled(
                     format!("    By: {}", char_name),
                     Style::default().fg(Color::DarkGray),
+                )));
+            }
+
+            if achievements.is_recently_unlocked(def.id) {
+                lines.push(Line::from(Span::styled(
+                    "\u{2605} Recently unlocked!",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
                 )));
             }
         }
