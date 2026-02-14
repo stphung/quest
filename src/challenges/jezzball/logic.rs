@@ -478,11 +478,12 @@ impl DifficultyInfo for JezzballDifficulty {
                 ..Default::default()
             },
             JezzballDifficulty::Journeyman => ChallengeReward {
+                prestige_ranks: 1,
                 xp_percent: 100,
                 ..Default::default()
             },
             JezzballDifficulty::Master => ChallengeReward {
-                prestige_ranks: 1,
+                prestige_ranks: 2,
                 xp_percent: 100,
                 ..Default::default()
             },
@@ -753,9 +754,17 @@ mod tests {
             }
         );
         assert_eq!(
-            JezzballDifficulty::Master.reward(),
+            JezzballDifficulty::Journeyman.reward(),
             ChallengeReward {
                 prestige_ranks: 1,
+                xp_percent: 100,
+                ..Default::default()
+            }
+        );
+        assert_eq!(
+            JezzballDifficulty::Master.reward(),
+            ChallengeReward {
+                prestige_ranks: 2,
                 xp_percent: 100,
                 ..Default::default()
             }
