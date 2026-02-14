@@ -83,6 +83,7 @@ fn apply_offline_xp(state: &mut GameState, haven: &haven::Haven) -> Option<Offli
     }
 }
 
+#[derive(Clone, Copy, PartialEq)]
 enum Screen {
     CharacterSelect,
     CharacterCreation,
@@ -425,8 +426,14 @@ fn main() -> io::Result<()> {
         show_startup_update_notification(&mut terminal, &update_info)?;
     }
 
-    // Main loop
+    // Main loop — clear terminal on screen transitions to prevent
+    // stale cells from wide characters (emoji) in the ratatui diff.
+    let mut prev_screen = current_screen;
     loop {
+        if current_screen != prev_screen {
+            terminal.clear()?;
+            prev_screen = current_screen;
+        }
         match current_screen {
             Screen::CharacterCreation => {
                 // Draw character creation screen
@@ -525,7 +532,10 @@ fn main() -> io::Result<()> {
                                 KeyCode::Right | KeyCode::Char('.') | KeyCode::Char('>') => {
                                     achievement_browser.next_category()
                                 }
-                                KeyCode::Esc => achievement_browser.close(),
+                                KeyCode::Esc => {
+                                    global_achievements.clear_recently_unlocked();
+                                    achievement_browser.close();
+                                }
                                 _ => {}
                             }
                             continue;
@@ -569,6 +579,7 @@ fn main() -> io::Result<()> {
 
                         // Handle achievement browser shortcut
                         if matches!(key_event.code, KeyCode::Char('a') | KeyCode::Char('A')) {
+                            global_achievements.clear_pending_notifications();
                             achievement_browser.open();
                             continue;
                         }
@@ -801,6 +812,8 @@ fn main() -> io::Result<()> {
                 };
                 let mut debug_menu = utils::debug_menu::DebugMenu::new();
                 let mut last_flappy_frame = Instant::now();
+                let mut prev_overlay_was_fullscreen =
+                    matches!(overlay, GameOverlay::Achievements { .. });
 
                 // Save indicator state (for non-debug mode)
                 let mut last_save_instant: Option<Instant> = None;
@@ -825,6 +838,16 @@ fn main() -> io::Result<()> {
                             // Not finished yet, put it back
                             update_check_handle = Some(handle);
                         }
+                    }
+
+                    // Force full terminal redraw when transitioning to/from a
+                    // fullscreen overlay. The game UI uses emoji/wide characters
+                    // that can desync ratatui's internal buffer from the actual
+                    // terminal state; clearing resyncs them.
+                    let overlay_is_fullscreen = matches!(overlay, GameOverlay::Achievements { .. });
+                    if overlay_is_fullscreen != prev_overlay_was_fullscreen {
+                        terminal.clear()?;
+                        prev_overlay_was_fullscreen = overlay_is_fullscreen;
                     }
 
                     // Draw UI
