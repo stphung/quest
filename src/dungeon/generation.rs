@@ -11,8 +11,8 @@ use super::types::{
 use crate::core::constants::{
     DUNGEON_EXTRA_CONNECTION_CHANCE, DUNGEON_MIN_BOSS_DISTANCE, DUNGEON_MIN_ELITE_DISTANCE,
 };
-use rand::seq::SliceRandom;
-use rand::Rng;
+use rand::seq::{IndexedRandom, SliceRandom};
+use rand::{Rng, RngExt};
 
 /// Generates a complete dungeon with rooms and connections.
 /// `zone_id` is the zone where the dungeon was discovered, used for enemy scaling.
@@ -20,7 +20,7 @@ pub fn generate_dungeon(level: u32, prestige_rank: u32, zone_id: u32) -> Dungeon
     let size = DungeonSize::roll_from_progression(level, prestige_rank);
     let mut dungeon = Dungeon::new(size);
     dungeon.zone_id = zone_id;
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     // Generate maze structure (without extra connections yet)
     generate_maze(&mut dungeon);
@@ -48,10 +48,10 @@ pub fn generate_dungeon(level: u32, prestige_rank: u32, zone_id: u32) -> Dungeon
 fn generate_maze(dungeon: &mut Dungeon) {
     let grid_size = dungeon.size.grid_size();
     let (min_rooms, max_rooms) = dungeon.size.room_count_range();
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     // Target room count
-    let target_rooms = rng.gen_range(min_rooms..=max_rooms);
+    let target_rooms = rng.random_range(min_rooms..=max_rooms);
 
     // Start from center of grid
     let start_x = grid_size / 2;
@@ -166,7 +166,7 @@ fn add_extra_connections(dungeon: &mut Dungeon, rng: &mut impl Rng) {
                             .map(|r| r.connections[dir_idx])
                             .unwrap_or(false);
 
-                        if !already_connected && rng.gen::<f64>() < extra_connection_chance {
+                        if !already_connected && rng.random::<f64>() < extra_connection_chance {
                             let opposite_dir = opposite_direction(dir_idx);
 
                             if let Some(room) = dungeon.get_room_mut(x, y) {
@@ -209,7 +209,7 @@ fn find_dead_ends(dungeon: &Dungeon) -> Vec<(usize, usize)> {
 
 /// Places special rooms (entrance, boss, elite, treasure)
 fn place_special_rooms(dungeon: &mut Dungeon) {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     // Collect all room positions
     let mut room_positions: Vec<(usize, usize)> = Vec::new();

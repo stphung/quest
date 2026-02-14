@@ -4,7 +4,7 @@
 
 use super::{FeedbackMark, RuneDifficulty, RuneGame, RuneGuess, RuneResult};
 use crate::challenges::ActiveMinigame;
-use rand::Rng;
+use rand::{Rng, RngExt};
 
 /// Input actions for the Rune game (UI-agnostic).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,13 +59,13 @@ pub fn process_input<R: Rng>(game: &mut RuneGame, input: RuneInput, rng: &mut R)
 pub fn generate_code<R: Rng>(game: &mut RuneGame, rng: &mut R) {
     if game.allow_duplicates {
         game.secret_code = (0..game.num_slots)
-            .map(|_| rng.gen_range(0..game.num_runes))
+            .map(|_| rng.random_range(0..game.num_runes))
             .collect();
     } else {
         // Sample without replacement using Fisher-Yates partial shuffle
         let mut pool: Vec<usize> = (0..game.num_runes).collect();
         for i in 0..game.num_slots {
-            let j = rng.gen_range(i..pool.len());
+            let j = rng.random_range(i..pool.len());
             pool.swap(i, j);
         }
         game.secret_code = pool[..game.num_slots].to_vec();

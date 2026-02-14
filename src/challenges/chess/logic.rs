@@ -4,7 +4,7 @@ use super::{ChessDifficulty, ChessGame, ChessResult};
 use crate::challenges::ActiveMinigame;
 use crate::core::game_state::GameState;
 use chess_engine::Evaluate;
-use rand::Rng;
+use rand::{Rng, RngExt};
 
 /// Input actions for the Chess game (UI-agnostic).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -86,7 +86,7 @@ pub fn start_chess_game(state: &mut GameState, difficulty: ChessDifficulty) {
 
 /// Calculate variable AI thinking time in ticks (1.5-6s range at 100ms/tick)
 pub fn calculate_think_ticks<R: Rng>(board: &chess_engine::Board, rng: &mut R) -> u32 {
-    let base_ticks = rng.gen_range(15..40); // 1.5-4s base
+    let base_ticks = rng.random_range(15..40); // 1.5-4s base
     let legal_moves = board.get_legal_moves();
     let complexity_bonus = (legal_moves.len() / 5) as u32;
     base_ticks + complexity_bonus
@@ -104,8 +104,8 @@ pub fn get_ai_move<R: Rng>(
     }
 
     // Random move for Novice difficulty
-    if rng.gen::<f64>() < difficulty.random_move_chance() {
-        let idx = rng.gen_range(0..legal_moves.len());
+    if rng.random::<f64>() < difficulty.random_move_chance() {
+        let idx = rng.random_range(0..legal_moves.len());
         return legal_moves[idx];
     }
 
@@ -326,7 +326,7 @@ mod tests {
     #[test]
     fn test_ai_makes_legal_move() {
         let board = chess_engine::Board::default();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         let ai_move = get_ai_move(&board, ChessDifficulty::Novice, &mut rng);
 
@@ -341,7 +341,7 @@ mod tests {
     #[test]
     fn test_ai_move_different_difficulties() {
         let board = chess_engine::Board::default();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         // All difficulties should return legal moves
         for difficulty in ChessDifficulty::ALL {

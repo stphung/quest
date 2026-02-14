@@ -2,7 +2,7 @@
 
 use super::logic::{get_legal_moves, is_legal_move, make_move};
 use super::types::{GoDifficulty, GoGame, GoMove, GoResult, Stone, BOARD_SIZE};
-use rand::Rng;
+use rand::{Rng, RngExt};
 
 /// UCT exploration constant
 const UCT_C: f64 = 1.4;
@@ -85,7 +85,7 @@ pub fn mcts_best_move<R: Rng>(game: &GoGame, rng: &mut R) -> GoMove {
 
         // Expansion: add a new child if possible
         if !nodes[node_idx].untried_moves.is_empty() && game_clone.game_result.is_none() {
-            let mv_idx = rng.gen_range(0..nodes[node_idx].untried_moves.len());
+            let mv_idx = rng.random_range(0..nodes[node_idx].untried_moves.len());
             let mv = nodes[node_idx].untried_moves.swap_remove(mv_idx);
 
             let current_player = game_clone.current_player;
@@ -189,8 +189,8 @@ fn fast_random_move<R: Rng>(game: &GoGame, rng: &mut R) -> Option<GoMove> {
     let max_attempts = empty_count.min(10);
 
     for _ in 0..max_attempts {
-        let row = rng.gen_range(0..BOARD_SIZE);
-        let col = rng.gen_range(0..BOARD_SIZE);
+        let row = rng.random_range(0..BOARD_SIZE);
+        let col = rng.random_range(0..BOARD_SIZE);
 
         if game.board[row][col].is_none() && is_legal_move(game, row, col) {
             return Some(GoMove::Place(row, col));
@@ -247,7 +247,7 @@ mod tests {
     #[test]
     fn test_mcts_returns_move() {
         let game = GoGame::new(GoDifficulty::Novice);
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mv = mcts_best_move(&game, &mut rng);
         // Should return some move (likely a placement, not pass on empty board)
         match mv {
@@ -269,7 +269,7 @@ mod tests {
         game.board[4][5] = Some(Stone::Black);
         game.current_player = Stone::White;
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mv = mcts_best_move(&game, &mut rng);
 
         // Should not play at (4,4) - it's suicide

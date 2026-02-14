@@ -140,7 +140,9 @@ impl Widget for DungeonMapWidget<'_> {
                     let rx = screen_x;
                     let ry = screen_y;
                     if rx + 1 < area.x + area.width && ry < area.y + area.height {
-                        buf.get_mut(rx, ry).set_symbol(sym).set_style(style);
+                        if let Some(cell) = buf.cell_mut((rx, ry)) {
+                            cell.set_symbol(sym).set_style(style);
+                        }
                     }
 
                     // Render corridors (always show full dungeon layout)
@@ -151,9 +153,10 @@ impl Widget for DungeonMapWidget<'_> {
                         if room.connections[DIR_RIGHT] {
                             let cx = screen_x + 2;
                             if cx + 1 < area.x + area.width && ry < area.y + area.height {
-                                buf.get_mut(cx, ry)
-                                    .set_symbol(symbols::H_CORRIDOR)
-                                    .set_style(corridor_style);
+                                if let Some(cell) = buf.cell_mut((cx, ry)) {
+                                    cell.set_symbol(symbols::H_CORRIDOR)
+                                        .set_style(corridor_style);
+                                }
                             }
                         }
 
@@ -161,9 +164,10 @@ impl Widget for DungeonMapWidget<'_> {
                         if room.connections[DIR_DOWN] {
                             let cy = screen_y + 1;
                             if rx + 1 < area.x + area.width && cy < area.y + area.height {
-                                buf.get_mut(rx, cy)
-                                    .set_symbol(symbols::V_CORRIDOR)
-                                    .set_style(corridor_style);
+                                if let Some(cell) = buf.cell_mut((rx, cy)) {
+                                    cell.set_symbol(symbols::V_CORRIDOR)
+                                        .set_style(corridor_style);
+                                }
                             }
                         }
                     }
@@ -238,7 +242,9 @@ impl Widget for DungeonStatusWidget<'_> {
                 Style::default().fg(Color::White)
             };
 
-            buf.get_mut(x + i as u16, y).set_char(ch).set_style(style);
+            if let Some(cell) = buf.cell_mut((x + i as u16, y)) {
+                cell.set_char(ch).set_style(style);
+            }
         }
     }
 }
@@ -266,9 +272,10 @@ impl Widget for DungeonLegendWidget {
             }
 
             // Render symbol (emoji, 2 cells wide)
-            buf.get_mut(area.x, y)
-                .set_symbol(sym)
-                .set_style(Style::default().fg(color).add_modifier(Modifier::BOLD));
+            if let Some(cell) = buf.cell_mut((area.x, y)) {
+                cell.set_symbol(sym)
+                    .set_style(Style::default().fg(color).add_modifier(Modifier::BOLD));
+            }
 
             // Render label (offset by 3 to account for emoji width + space)
             let label_start = area.x + 3;
@@ -276,9 +283,10 @@ impl Widget for DungeonLegendWidget {
                 if label_start + i as u16 >= area.x + area.width {
                     break;
                 }
-                buf.get_mut(label_start + i as u16, y)
-                    .set_char(c)
-                    .set_style(Style::default().fg(Color::White));
+                if let Some(cell) = buf.cell_mut((label_start + i as u16, y)) {
+                    cell.set_char(c)
+                        .set_style(Style::default().fg(Color::White));
+                }
             }
 
             y += 1;

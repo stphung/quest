@@ -128,9 +128,10 @@ fn fetch_latest_release() -> Result<GitHubRelease, Box<dyn Error>> {
     );
 
     let response: GitHubRelease = ureq::get(&url)
-        .set("User-Agent", "quest-updater")
+        .header("User-Agent", "quest-updater")
         .call()?
-        .into_json()?;
+        .into_body()
+        .read_json()?;
 
     Ok(response)
 }
@@ -143,9 +144,10 @@ fn fetch_changelog(from: &str, to: &str) -> Result<Vec<ChangelogEntry>, Box<dyn 
     );
 
     let response: GitHubCompare = ureq::get(&url)
-        .set("User-Agent", "quest-updater")
+        .header("User-Agent", "quest-updater")
         .call()?
-        .into_json()?;
+        .into_body()
+        .read_json()?;
 
     let entries: Vec<ChangelogEntry> = response
         .commits
@@ -262,14 +264,18 @@ pub fn download_file(
     dest: &Path,
     progress_callback: impl Fn(u64, u64),
 ) -> Result<(), Box<dyn Error>> {
-    let response = ureq::get(url).set("User-Agent", "quest-updater").call()?;
+    let response = ureq::get(url)
+        .header("User-Agent", "quest-updater")
+        .call()?;
 
     let total_size: u64 = response
-        .header("Content-Length")
+        .headers()
+        .get("Content-Length")
+        .and_then(|s| s.to_str().ok())
         .and_then(|s| s.parse().ok())
         .unwrap_or(0);
 
-    let mut reader = response.into_reader();
+    let mut reader = response.into_body().into_reader();
     let mut file = File::create(dest)?;
     let mut downloaded: u64 = 0;
     let mut buffer = [0u8; 8192];

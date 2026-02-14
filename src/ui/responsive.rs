@@ -47,7 +47,7 @@ pub struct LayoutContext {
 impl LayoutContext {
     /// Create a LayoutContext from the current frame dimensions.
     pub fn from_frame(frame: &Frame) -> Self {
-        let size = frame.size();
+        let size = frame.area();
         Self::from_size(size.width, size.height)
     }
 
@@ -83,7 +83,7 @@ fn classify(val: u16, xl: u16, l: u16, m: u16, s: u16) -> SizeTier {
 
 /// Render a "terminal too small" message when below minimum size (40x16).
 pub fn render_too_small(frame: &mut Frame, ctx: &LayoutContext) {
-    let area = frame.size();
+    let area = frame.area();
     frame.render_widget(Clear, area);
 
     let lines = vec![

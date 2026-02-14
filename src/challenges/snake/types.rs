@@ -2,7 +2,7 @@
 //!
 //! A real-time action minigame where the player guides a snake to eat food and grow.
 
-use rand::Rng;
+use rand::{Rng, RngExt};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
@@ -187,8 +187,8 @@ impl SnakeGame {
 /// Find a random empty cell for food (not occupied by the snake).
 pub fn spawn_food<R: Rng>(game: &SnakeGame, rng: &mut R) -> Position {
     loop {
-        let x = rng.gen_range(0..game.grid_width);
-        let y = rng.gen_range(0..game.grid_height);
+        let x = rng.random_range(0..game.grid_width);
+        let y = rng.random_range(0..game.grid_height);
         let pos = Position { x, y };
         if !game.snake.contains(&pos) {
             return pos;
@@ -202,7 +202,7 @@ mod tests {
 
     #[test]
     fn test_new_game_defaults() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let game = SnakeGame::new(SnakeDifficulty::Novice, &mut rng);
         assert_eq!(game.difficulty, SnakeDifficulty::Novice);
         assert!(game.game_result.is_none());
@@ -220,7 +220,7 @@ mod tests {
 
     #[test]
     fn test_snake_initial_position() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let game = SnakeGame::new(SnakeDifficulty::Novice, &mut rng);
         let head = game.snake[0];
         assert_eq!(head.x, 13); // grid_width/2
@@ -232,7 +232,7 @@ mod tests {
 
     #[test]
     fn test_food_not_on_snake() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let game = SnakeGame::new(SnakeDifficulty::Novice, &mut rng);
         assert!(!game.snake.contains(&game.food));
     }
@@ -293,7 +293,7 @@ mod tests {
 
     #[test]
     fn test_spawn_food_avoids_snake() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let game = SnakeGame::new(SnakeDifficulty::Novice, &mut rng);
         for _ in 0..100 {
             let food = spawn_food(&game, &mut rng);

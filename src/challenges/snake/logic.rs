@@ -19,7 +19,7 @@ pub enum SnakeInput {
 
 /// Start a new snake game at the given difficulty.
 pub fn start_snake_game(difficulty: SnakeDifficulty) -> ActiveMinigame {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     ActiveMinigame::Snake(SnakeGame::new(difficulty, &mut rng))
 }
 
@@ -179,7 +179,7 @@ fn step_snake(game: &mut SnakeGame) {
         }
 
         // Spawn new food
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         game.food = spawn_food(game, &mut rng);
     } else {
         // Normal move: remove tail
@@ -285,7 +285,7 @@ mod tests {
 
     /// Create a game that has already been started (skips the "Press Space" screen).
     fn started_game(difficulty: SnakeDifficulty) -> SnakeGame {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut game = SnakeGame::new(difficulty, &mut rng);
         game.waiting_to_start = false;
         game
@@ -293,7 +293,7 @@ mod tests {
 
     #[test]
     fn test_waiting_to_start_blocks_input() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut game = SnakeGame::new(SnakeDifficulty::Novice, &mut rng);
         assert!(game.waiting_to_start);
 
@@ -312,7 +312,7 @@ mod tests {
 
     #[test]
     fn test_waiting_to_start_blocks_physics() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut game = SnakeGame::new(SnakeDifficulty::Novice, &mut rng);
         let head_before = game.snake[0];
 
@@ -628,7 +628,7 @@ mod tests {
         state.character_level = 5;
         let initial_xp = state.character_xp;
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut game = SnakeGame::new(SnakeDifficulty::Apprentice, &mut rng);
         game.game_result = Some(SnakeResult::Win);
         game.score = 15;
@@ -648,7 +648,7 @@ mod tests {
         let mut state = GameState::new("Test".to_string(), 0);
         let initial_xp = state.character_xp;
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut game = SnakeGame::new(SnakeDifficulty::Novice, &mut rng);
         game.game_result = Some(SnakeResult::Loss);
         state.active_minigame = Some(ActiveMinigame::Snake(game));

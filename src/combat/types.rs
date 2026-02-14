@@ -1,4 +1,4 @@
-use rand::Rng;
+use rand::RngExt;
 use serde::{Deserialize, Serialize};
 
 use crate::core::constants::*;
@@ -51,7 +51,7 @@ impl Enemy {
 }
 
 pub fn generate_enemy_name() -> String {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     let prefixes = [
         "Grizz", "Sav", "Dark", "Blood", "Bone", "Shadow", "Fel", "Dire", "Wild", "Grim",
@@ -63,9 +63,9 @@ pub fn generate_enemy_name() -> String {
         "Orc", "Troll", "Drake", "Crusher", "Render", "Maw", "Beast", "Fiend", "Horror", "Terror",
     ];
 
-    let prefix = prefixes[rng.gen_range(0..prefixes.len())];
-    let root = roots[rng.gen_range(0..roots.len())];
-    let suffix = suffixes[rng.gen_range(0..suffixes.len())];
+    let prefix = prefixes[rng.random_range(0..prefixes.len())];
+    let root = roots[rng.random_range(0..roots.len())];
+    let suffix = suffixes[rng.random_range(0..suffixes.len())];
 
     format!("{}{} {}", prefix, root, suffix)
 }
@@ -80,7 +80,7 @@ fn zone_base_stats(zone_id: u32) -> (u32, u32, u32, u32, u32, u32) {
 /// Calculates enemy stats for a given zone and subzone depth (1-based).
 /// Returns (hp, damage, defense) with variance applied.
 fn calc_zone_enemy_stats(zone_id: u32, subzone_depth: u32) -> (u32, u32, u32) {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let (base_hp, hp_step, base_dmg, dmg_step, base_def, def_step) = zone_base_stats(zone_id);
 
     let depth_offset = subzone_depth.saturating_sub(1);
@@ -88,8 +88,8 @@ fn calc_zone_enemy_stats(zone_id: u32, subzone_depth: u32) -> (u32, u32, u32) {
     let raw_dmg = base_dmg + depth_offset * dmg_step;
     let raw_def = base_def + depth_offset * def_step;
 
-    let hp_var = rng.gen_range(ENEMY_STAT_VARIANCE_MIN..ENEMY_STAT_VARIANCE_MAX);
-    let dmg_var = rng.gen_range(ENEMY_STAT_VARIANCE_MIN..ENEMY_STAT_VARIANCE_MAX);
+    let hp_var = rng.random_range(ENEMY_STAT_VARIANCE_MIN..ENEMY_STAT_VARIANCE_MAX);
+    let dmg_var = rng.random_range(ENEMY_STAT_VARIANCE_MIN..ENEMY_STAT_VARIANCE_MAX);
 
     let hp = ((raw_hp as f64) * hp_var).max(1.0) as u32;
     let damage = ((raw_dmg as f64) * dmg_var).max(1.0) as u32;
@@ -166,12 +166,12 @@ fn get_zone_enemy_suffixes(zone_id: u32) -> &'static [&'static str] {
 
 /// Generates a zone-themed enemy name
 pub fn generate_zone_enemy_name(zone_id: u32) -> String {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let prefixes = get_zone_enemy_prefixes(zone_id);
     let suffixes = get_zone_enemy_suffixes(zone_id);
 
-    let prefix = prefixes[rng.gen_range(0..prefixes.len())];
-    let suffix = suffixes[rng.gen_range(0..suffixes.len())];
+    let prefix = prefixes[rng.random_range(0..prefixes.len())];
+    let suffix = suffixes[rng.random_range(0..suffixes.len())];
 
     format!("{} {}", prefix, suffix)
 }

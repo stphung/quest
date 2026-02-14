@@ -7,7 +7,7 @@ use crate::combat::types::{
     generate_dungeon_enemy, generate_enemy_for_current_zone,
 };
 use crate::dungeon::types::RoomType;
-use rand::Rng;
+use rand::RngExt;
 
 // Re-export offline progression types for backwards compatibility
 pub use super::offline::{calculate_offline_xp, process_offline_progression, OfflineReport};
@@ -32,7 +32,7 @@ pub fn xp_gain_per_tick(prestige_rank: u32, wis_modifier: i32, cha_modifier: i32
 
 /// Distributes 3 attribute points randomly among non-capped attributes
 pub fn distribute_level_up_points(state: &mut GameState) -> Vec<AttributeType> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let cap = state.get_attribute_cap();
     let mut increased = Vec::new();
 
@@ -41,7 +41,7 @@ pub fn distribute_level_up_points(state: &mut GameState) -> Vec<AttributeType> {
     let max_attempts = LEVEL_UP_MAX_DISTRIBUTION_ATTEMPTS;
 
     while points > 0 && attempts < max_attempts {
-        let attr_index = rng.gen_range(0..NUM_ATTRIBUTES);
+        let attr_index = rng.random_range(0..NUM_ATTRIBUTES);
         let attr = AttributeType::all()[attr_index];
 
         if state.attributes.get(attr) < cap {
@@ -90,7 +90,7 @@ pub fn apply_tick_xp(state: &mut GameState, xp_gain: f64) -> (u32, Vec<Attribute
 /// Calculates XP bonus from killing an enemy
 /// `haven_xp_gain_percent` is the Training Yard bonus (0.0 if not built)
 pub fn combat_kill_xp(passive_xp_rate: f64, haven_xp_gain_percent: f64) -> u64 {
-    let ticks = rand::thread_rng().gen_range(COMBAT_XP_MIN_TICKS..=COMBAT_XP_MAX_TICKS);
+    let ticks = rand::rng().random_range(COMBAT_XP_MIN_TICKS..=COMBAT_XP_MAX_TICKS);
     let base_xp = passive_xp_rate * ticks as f64;
     // Apply Haven Training Yard bonus
     (base_xp * (1.0 + haven_xp_gain_percent / 100.0)) as u64
@@ -162,9 +162,9 @@ pub fn try_discover_dungeon(state: &mut GameState) -> bool {
         return false;
     }
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
-    if rng.gen::<f64>() >= DUNGEON_DISCOVERY_CHANCE {
+    if rng.random::<f64>() >= DUNGEON_DISCOVERY_CHANCE {
         return false;
     }
 

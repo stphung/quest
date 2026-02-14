@@ -181,13 +181,13 @@ impl DungeonSize {
     /// Rolls a dungeon size based on progression
     /// Size can vary ±1 from the expected tier for variety
     pub fn roll_from_progression(level: u32, prestige_rank: u32) -> Self {
-        use rand::Rng;
-        let mut rng = rand::thread_rng();
+        use rand::RngExt;
+        let mut rng = rand::rng();
 
         let expected_tier = Self::base_tier(level, prestige_rank);
 
         // Roll variation: 20% chance -1, 60% chance same, 20% chance +1
-        let roll: f64 = rng.gen();
+        let roll: f64 = rng.random();
         let variation: i32 = if roll < DUNGEON_SIZE_VARIATION_DOWN {
             -1 // Smaller dungeon
         } else if roll < DUNGEON_SIZE_VARIATION_UP {

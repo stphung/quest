@@ -4,7 +4,7 @@ use crate::core::constants::*;
 use crate::core::game_state::GameState;
 use crate::dungeon::types::RoomType;
 use crate::zones::get_all_zones;
-use rand::Rng;
+use rand::RngExt;
 
 use crate::zones::BossDefeatResult;
 
@@ -183,14 +183,14 @@ pub fn update_combat(
             let total_crit_chance = derived.crit_chance_percent
                 + haven.crit_chance_percent as u32
                 + prestige_bonuses.crit_chance as u32;
-            let crit_roll = rand::thread_rng().gen_range(0..100);
+            let crit_roll = rand::rng().random_range(0..100);
             if crit_roll < total_crit_chance {
                 damage = (damage as f64 * derived.crit_multiplier) as u32;
                 was_crit = true;
             }
 
             // Roll for double strike (War Room bonus)
-            let double_strike_roll = rand::thread_rng().gen::<f64>() * 100.0;
+            let double_strike_roll = rand::rng().random::<f64>() * 100.0;
             let num_strikes = if double_strike_roll < haven.double_strike_chance {
                 2
             } else {

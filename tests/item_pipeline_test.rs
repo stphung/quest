@@ -790,7 +790,7 @@ fn test_full_pipeline_equip_all_seven_slots_from_drops() {
 fn test_roll_rarity_covers_all_mob_tiers() {
     // Over enough rolls, all 4 mob rarity tiers should appear (no Legendary from mobs)
     // Legendary only drops from bosses now
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut seen = std::collections::HashSet::new();
 
     for _ in 0..10_000 {
@@ -815,7 +815,7 @@ fn test_roll_rarity_covers_all_mob_tiers() {
 
 #[test]
 fn test_roll_rarity_prestige_bonus_shifts_toward_higher_tiers() {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let trials = 20_000;
 
     let mut common_p0 = 0usize;
@@ -990,7 +990,7 @@ fn test_pipeline_prestige_produces_better_average_scores() {
     game_state_p10.prestige_rank = 10;
 
     let avg_score = |gs: &GameState| -> f64 {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let n = 500;
         let sum: f64 = (0..n)
             .map(|_| {
