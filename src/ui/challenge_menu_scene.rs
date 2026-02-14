@@ -4,6 +4,7 @@ use crate::challenges::chess::ChessDifficulty;
 use crate::challenges::flappy::FlappyBirdDifficulty;
 use crate::challenges::go::GoDifficulty;
 use crate::challenges::gomoku::GomokuDifficulty;
+use crate::challenges::lander::LanderDifficulty;
 use crate::challenges::menu::{ChallengeMenu, ChallengeType, DifficultyInfo};
 use crate::challenges::minesweeper::MinesweeperDifficulty;
 use crate::challenges::morris::MorrisDifficulty;
@@ -176,6 +177,14 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
                 frame,
                 chunks[2],
                 &SnakeDifficulty::ALL,
+                menu.selected_difficulty,
+            );
+        }
+        ChallengeType::Lander => {
+            render_difficulty_selector(
+                frame,
+                chunks[2],
+                &LanderDifficulty::ALL,
                 menu.selected_difficulty,
             );
         }

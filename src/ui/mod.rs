@@ -18,6 +18,7 @@ pub mod go_scene;
 pub mod gomoku_scene;
 pub mod haven_scene;
 mod info_panel;
+pub mod lander_scene;
 pub mod minesweeper_scene;
 pub mod morris_scene;
 pub mod prestige_confirm;
@@ -480,6 +481,9 @@ fn draw_right_content(frame: &mut Frame, area: Rect, game_state: &GameState, ctx
         }
         Some(ActiveMinigame::Snake(game)) => {
             snake_scene::render_snake_scene(frame, area, game, ctx);
+        }
+        Some(ActiveMinigame::Lander(game)) => {
+            lander_scene::render_lander_scene(frame, area, game, ctx);
         }
         None => {
             if game_state.challenge_menu.is_open {
