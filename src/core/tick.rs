@@ -12,7 +12,9 @@ use crate::challenges::ActiveMinigame;
 use crate::character::derived_stats::DerivedStats;
 use crate::character::prestige::PrestigeCombatBonuses;
 use crate::combat::logic::{update_combat, CombatEvent, HavenCombatBonuses};
-use crate::core::constants::TICK_INTERVAL_MS;
+use crate::core::constants::{
+    FINAL_ZONE_ID, HAVEN_MIN_PRESTIGE_RANK, TICKS_PER_SECOND, TICK_INTERVAL_MS,
+};
 use crate::core::game_logic::{apply_tick_xp, spawn_enemy_if_needed, try_discover_dungeon};
 use crate::core::game_state::GameState;
 use crate::dungeon::logic::{
@@ -440,7 +442,7 @@ pub fn game_tick<R: Rng>(
 
         // Update play time while fishing
         *tick_counter += 1;
-        if *tick_counter >= 10 {
+        if *tick_counter >= TICKS_PER_SECOND {
             state.play_time_seconds += 1;
             *tick_counter = 0;
         }
@@ -719,7 +721,7 @@ pub fn game_tick<R: Rng>(
 
     // ── 8. Update play time ─────────────────────────────────────
     *tick_counter += 1;
-    if *tick_counter >= 10 {
+    if *tick_counter >= TICKS_PER_SECOND {
         state.play_time_seconds += 1;
         *tick_counter = 0;
     }
@@ -730,7 +732,7 @@ pub fn game_tick<R: Rng>(
     // ── 10. Haven discovery check ────────────────────────────────
     // Independent roll per tick, only when eligible (P10+, no active content)
     if !haven.discovered
-        && state.prestige_rank >= 10
+        && state.prestige_rank >= HAVEN_MIN_PRESTIGE_RANK
         && state.active_dungeon.is_none()
         && state.active_fishing.is_none()
         && state.active_minigame.is_none()
@@ -771,7 +773,7 @@ fn collect_achievement_events(achievements: &mut Achievements, result: &mut Tick
 fn process_item_drop(state: &mut GameState, haven: &Haven, result: &mut TickResult) {
     let zone_id = state.zone_progression.current_zone_id as usize;
     let was_boss = state.zone_progression.fighting_boss;
-    let is_final_zone = zone_id == 10;
+    let is_final_zone = zone_id == FINAL_ZONE_ID as usize;
 
     let dropped_item = if was_boss {
         Some(try_drop_from_boss(zone_id, is_final_zone))

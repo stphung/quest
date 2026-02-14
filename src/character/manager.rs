@@ -5,6 +5,8 @@ use std::path::PathBuf;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
+use crate::core::constants::{CHARACTER_NAME_MAX_LENGTH, SAVE_FILE_VERSION};
+
 #[derive(Clone, Serialize, Deserialize)]
 struct CharacterSaveData {
     version: u32,
@@ -68,7 +70,7 @@ impl CharacterManager {
         // Previously this used state.last_save_time which was only updated on load,
         // allowing players to accumulate offline XP during active play sessions.
         let save_data = CharacterSaveData {
-            version: 2,
+            version: SAVE_FILE_VERSION,
             character_id: state.character_id.clone(),
             character_name: state.character_name.clone(),
             character_level: state.character_level,
@@ -234,8 +236,11 @@ pub fn validate_name(name: &str) -> Result<(), String> {
         return Err("Name cannot be empty".to_string());
     }
 
-    if trimmed.len() > 16 {
-        return Err("Name must be 16 characters or less".to_string());
+    if trimmed.len() > CHARACTER_NAME_MAX_LENGTH {
+        return Err(format!(
+            "Name must be {} characters or less",
+            CHARACTER_NAME_MAX_LENGTH
+        ));
     }
 
     let valid_chars = trimmed

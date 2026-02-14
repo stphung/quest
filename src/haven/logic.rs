@@ -1,6 +1,7 @@
 //! Haven build/upgrade logic and persistence.
 
 use super::types::{haven_discovery_chance, tier_cost, Haven, HavenRoomId};
+use crate::core::constants::STORMBREAKER_PRESTIGE_REQUIREMENT;
 use rand::Rng;
 use std::fs;
 use std::io;
@@ -44,7 +45,7 @@ pub fn can_forge_stormbreaker(
 ) -> (bool, bool, bool) {
     use crate::achievements::AchievementId;
     let has_leviathan = achievements.is_unlocked(AchievementId::StormLeviathan);
-    let has_prestige = prestige_rank >= 25;
+    let has_prestige = prestige_rank >= STORMBREAKER_PRESTIGE_REQUIREMENT;
     let can_forge = has_leviathan && has_prestige;
     (has_leviathan, has_prestige, can_forge)
 }

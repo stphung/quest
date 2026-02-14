@@ -106,7 +106,7 @@ impl GameState {
         use uuid::Uuid;
 
         let attributes = Attributes::new();
-        let combat_state = CombatState::new(50); // Base HP
+        let combat_state = CombatState::new(crate::core::constants::BASE_HP as u32);
         let equipment = Equipment::new();
 
         Self {
