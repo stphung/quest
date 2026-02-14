@@ -2,6 +2,8 @@
 
 #![allow(dead_code)]
 
+use std::sync::LazyLock;
+
 /// Represents a zone in the game world.
 #[derive(Debug, Clone)]
 pub struct Zone {
@@ -33,8 +35,8 @@ pub struct SubzoneBoss {
     pub is_zone_boss: bool,
 }
 
-/// Returns all zones in the game (zones 1-10).
-pub fn get_all_zones() -> Vec<Zone> {
+/// All zones in the game, initialized once on first access.
+static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
     vec![
         // Tier 1: Nature's Edge (P0) - 3 subzones each
         Zone {
@@ -524,17 +526,23 @@ pub fn get_all_zones() -> Vec<Zone> {
             ],
         },
     ]
+});
+
+/// Returns all zones in the game (zones 1-11).
+/// Returns a static slice reference — no allocation on each call.
+pub fn get_all_zones() -> &'static [Zone] {
+    &ALL_ZONES
 }
 
 /// Gets a zone by its ID.
-pub fn get_zone(zone_id: u32) -> Option<Zone> {
-    get_all_zones().into_iter().find(|z| z.id == zone_id)
+pub fn get_zone(zone_id: u32) -> Option<&'static Zone> {
+    get_all_zones().iter().find(|z| z.id == zone_id)
 }
 
 /// Gets a subzone within a zone.
-pub fn get_subzone(zone_id: u32, subzone_id: u32) -> Option<(Zone, Subzone)> {
+pub fn get_subzone(zone_id: u32, subzone_id: u32) -> Option<(&'static Zone, &'static Subzone)> {
     let zone = get_zone(zone_id)?;
-    let subzone = zone.subzones.iter().find(|s| s.id == subzone_id)?.clone();
+    let subzone = zone.subzones.iter().find(|s| s.id == subzone_id)?;
     Some((zone, subzone))
 }
 
@@ -605,7 +613,7 @@ mod tests {
         let zones = get_all_zones();
 
         // Check that last subzone of each zone has is_zone_boss = true
-        for zone in &zones {
+        for zone in zones {
             let last_subzone = zone.subzones.last().unwrap();
             assert!(
                 last_subzone.boss.is_zone_boss,

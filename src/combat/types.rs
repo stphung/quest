@@ -210,7 +210,7 @@ pub fn generate_subzone_boss(zone: &Zone, subzone: &Subzone) -> Enemy {
 pub fn generate_enemy_for_current_zone(zone_id: u32, subzone_id: u32) -> Enemy {
     if let Some(zone) = get_zone(zone_id) {
         if let Some(subzone) = zone.subzones.iter().find(|s| s.id == subzone_id) {
-            return generate_zone_enemy(&zone, subzone);
+            return generate_zone_enemy(zone, subzone);
         }
     }
     // Fallback: use zone 1, subzone 1 stats
@@ -222,7 +222,7 @@ pub fn generate_enemy_for_current_zone(zone_id: u32, subzone_id: u32) -> Enemy {
 pub fn generate_boss_for_current_zone(zone_id: u32, subzone_id: u32) -> Enemy {
     if let Some(zone) = get_zone(zone_id) {
         if let Some(subzone) = zone.subzones.iter().find(|s| s.id == subzone_id) {
-            return generate_subzone_boss(&zone, subzone);
+            return generate_subzone_boss(zone, subzone);
         }
     }
     // Fallback: zone boss with zone_id stats

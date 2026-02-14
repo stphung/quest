@@ -246,7 +246,7 @@ fn test_combat_to_prestige_full_loop() {
     let mut total_kills = 0u32;
     let target_level = 10;
 
-    for tick in 0..200_000 {
+    for tick in 0..20_000 {
         // Sync derived stats
         let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
         state.combat_state.update_max_hp(derived.max_hp);
@@ -261,6 +261,7 @@ fn test_combat_to_prestige_full_loop() {
             &HavenCombatBonuses::default(),
             &PrestigeCombatBonuses::default(),
             &mut achievements,
+            &derived,
         );
 
         // Apply XP from kills (mimics main.rs game loop)
@@ -341,6 +342,7 @@ fn test_combat_to_prestige_full_loop() {
             &HavenCombatBonuses::default(),
             &PrestigeCombatBonuses::default(),
             &mut achievements,
+            &derived,
         );
         for event in &events {
             if matches!(event, CombatEvent::EnemyDied { .. }) {

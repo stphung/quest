@@ -227,7 +227,7 @@ fn test_dungeon_boss_completion_triggers_achievement() {
     let mut r = rng(42);
 
     let mut all_events = Vec::new();
-    for _ in 0..100_000 {
+    for _ in 0..10_000 {
         let result = game_tick(
             &mut state,
             &mut tc,
@@ -473,7 +473,7 @@ fn test_subzone_boss_defeated_advances_zone() {
     assert_eq!(state.zone_progression.current_subzone_id, 1);
 
     let mut all_events = Vec::new();
-    for _ in 0..100_000 {
+    for _ in 0..10_000 {
         all_events.extend(tick(&mut state, &mut tc, &mut ach, &mut r));
         if has(&all_events, |e| {
             matches!(e, TickEvent::SubzoneBossDefeated { .. })

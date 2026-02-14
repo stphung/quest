@@ -484,7 +484,7 @@ fn test_game_tick_subzone_boss_defeated_event() {
         &mut haven,
         &mut achievements,
         &mut rng,
-        100_000,
+        10_000,
         |e| matches!(e, TickEvent::SubzoneBossDefeated { .. }),
     );
 
