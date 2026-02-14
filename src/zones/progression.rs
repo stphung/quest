@@ -821,4 +821,337 @@ mod tests {
         assert_eq!(prog.current_subzone_id, 1);
         assert!(prog.defeated_bosses.is_empty());
     }
+
+    // =========================================================================
+    // ZONE 11 EXPANSE CYCLING TESTS
+    // =========================================================================
+
+    #[test]
+    fn test_zone_11_expanse_boss_cycles_back() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        // Set up at Zone 11, final subzone (4), fighting boss
+        prog.current_zone_id = EXPANSE_ZONE_ID;
+        prog.current_subzone_id = 4;
+        prog.unlock_zone(EXPANSE_ZONE_ID);
+        prog.fighting_boss = true;
+
+        let result = prog.on_boss_defeated(20, &mut achievements);
+        assert_eq!(result, BossDefeatResult::ExpanseCycle);
+        assert_eq!(prog.current_zone_id, EXPANSE_ZONE_ID);
+        assert_eq!(prog.current_subzone_id, 1);
+        assert_eq!(prog.kills_in_subzone, 0);
+    }
+
+    #[test]
+    fn test_zone_11_multiple_cycles() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        prog.current_zone_id = EXPANSE_ZONE_ID;
+        prog.unlock_zone(EXPANSE_ZONE_ID);
+
+        for cycle in 0..3 {
+            // Clear subzones 1-3
+            for subzone in 1..=3 {
+                prog.current_subzone_id = subzone;
+                for _ in 0..KILLS_FOR_BOSS {
+                    prog.record_kill();
+                }
+                let result = prog.on_boss_defeated(20, &mut achievements);
+                assert!(
+                    matches!(result, BossDefeatResult::SubzoneComplete { .. }),
+                    "Cycle {cycle}, subzone {subzone}: expected SubzoneComplete, got {:?}",
+                    result
+                );
+            }
+
+            // Clear subzone 4 (zone boss) -> cycle
+            prog.current_subzone_id = 4;
+            for _ in 0..KILLS_FOR_BOSS {
+                prog.record_kill();
+            }
+            let result = prog.on_boss_defeated(20, &mut achievements);
+            assert_eq!(
+                result,
+                BossDefeatResult::ExpanseCycle,
+                "Cycle {cycle}: expected ExpanseCycle"
+            );
+            assert_eq!(prog.current_subzone_id, 1);
+        }
+    }
+
+    #[test]
+    fn test_zone_11_cycling_records_boss_defeats() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        prog.current_zone_id = EXPANSE_ZONE_ID;
+        prog.current_subzone_id = 4;
+        prog.unlock_zone(EXPANSE_ZONE_ID);
+        prog.fighting_boss = true;
+
+        prog.on_boss_defeated(20, &mut achievements);
+
+        // Boss defeat should be recorded (but the same boss can be defeated again)
+        assert!(prog.is_boss_defeated(EXPANSE_ZONE_ID, 4));
+    }
+
+    #[test]
+    fn test_prestige_reset_during_zone_11() {
+        let mut prog = ZoneProgression::new();
+
+        prog.current_zone_id = EXPANSE_ZONE_ID;
+        prog.current_subzone_id = 3;
+        prog.unlock_zone(EXPANSE_ZONE_ID);
+        prog.kills_in_subzone = 5;
+        prog.fighting_boss = false;
+
+        prog.reset_for_prestige(20);
+
+        assert_eq!(prog.current_zone_id, 1);
+        assert_eq!(prog.current_subzone_id, 1);
+        assert_eq!(prog.kills_in_subzone, 0);
+        assert!(prog.defeated_bosses.is_empty());
+    }
+
+    // =========================================================================
+    // WEAPON GATE EDGE CASES (ZONE 10 STORMBREAKER)
+    // =========================================================================
+
+    #[test]
+    fn test_weapon_gate_blocks_zone_10_final_boss_without_stormbreaker() {
+        let mut prog = ZoneProgression::new();
+        let achievements = Achievements::default();
+
+        prog.current_zone_id = 10;
+        prog.current_subzone_id = 4;
+        prog.unlock_zone(10);
+        prog.fighting_boss = true;
+
+        let blocked = prog.boss_weapon_blocked(&achievements);
+        assert_eq!(blocked, Some("Stormbreaker"));
+    }
+
+    #[test]
+    fn test_weapon_gate_allows_zone_10_final_boss_with_stormbreaker() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+        achievements.unlock(AchievementId::TheStormbreaker, None);
+
+        prog.current_zone_id = 10;
+        prog.current_subzone_id = 4;
+        prog.unlock_zone(10);
+        prog.fighting_boss = true;
+
+        let blocked = prog.boss_weapon_blocked(&achievements);
+        assert!(blocked.is_none());
+    }
+
+    #[test]
+    fn test_weapon_gate_does_not_apply_to_non_final_subzone() {
+        let mut prog = ZoneProgression::new();
+        let achievements = Achievements::default();
+
+        // Zone 10, subzone 3 (not the final subzone 4), no stormbreaker
+        prog.current_zone_id = 10;
+        prog.current_subzone_id = 3;
+        prog.unlock_zone(10);
+        prog.fighting_boss = true;
+
+        let blocked = prog.boss_weapon_blocked(&achievements);
+        assert!(blocked.is_none());
+    }
+
+    #[test]
+    fn test_weapon_gate_does_not_apply_to_other_zones() {
+        let mut prog = ZoneProgression::new();
+        let achievements = Achievements::default();
+
+        // Zone 5, final subzone (4), no stormbreaker - should not be blocked
+        prog.current_zone_id = 5;
+        prog.current_subzone_id = 4;
+        prog.unlock_zone(5);
+        prog.fighting_boss = true;
+
+        let blocked = prog.boss_weapon_blocked(&achievements);
+        assert!(blocked.is_none());
+    }
+
+    // =========================================================================
+    // PRESTIGE RESET EDGE CASES
+    // =========================================================================
+
+    #[test]
+    fn test_reset_for_prestige_p0_only_zones_1_2() {
+        let mut prog = ZoneProgression::new();
+        prog.current_zone_id = 3;
+        prog.defeat_boss(1, 1);
+        prog.unlock_zone(3);
+
+        prog.reset_for_prestige(0);
+
+        assert!(prog.is_zone_unlocked(1));
+        assert!(prog.is_zone_unlocked(2));
+        assert!(!prog.is_zone_unlocked(3));
+        assert!(!prog.is_zone_unlocked(5));
+    }
+
+    #[test]
+    fn test_reset_for_prestige_high_p25() {
+        let mut prog = ZoneProgression::new();
+        prog.reset_for_prestige(25);
+
+        // P25 should unlock zones with requirement <= 25
+        // P0: zones 1,2; P5: zones 3,4; P10: zones 5,6; P15: zones 7,8; P20: zones 9,10
+        for zone_id in 1..=10 {
+            assert!(
+                prog.is_zone_unlocked(zone_id),
+                "Zone {zone_id} should be unlocked at P25"
+            );
+        }
+        // Zone 11 is achievement-gated (P0 requirement) so it's also unlocked by prestige calc
+        assert!(prog.is_zone_unlocked(EXPANSE_ZONE_ID));
+    }
+
+    #[test]
+    fn test_reset_always_preserves_zone_1() {
+        let mut prog = ZoneProgression::new();
+
+        for prestige in [0, 1, 5, 10, 20, 50] {
+            prog.reset_for_prestige(prestige);
+            assert!(
+                prog.is_zone_unlocked(1),
+                "Zone 1 must always be unlocked at P{prestige}"
+            );
+            assert_eq!(prog.current_zone_id, 1);
+            assert_eq!(prog.current_subzone_id, 1);
+        }
+    }
+
+    #[test]
+    fn test_reset_from_mid_zone_clears_progress() {
+        let mut prog = ZoneProgression::new();
+
+        prog.current_zone_id = 5;
+        prog.current_subzone_id = 3;
+        prog.kills_in_subzone = 7;
+        prog.fighting_boss = true;
+        prog.defeat_boss(5, 1);
+        prog.defeat_boss(5, 2);
+
+        prog.reset_for_prestige(10);
+
+        assert_eq!(prog.current_zone_id, 1);
+        assert_eq!(prog.current_subzone_id, 1);
+        assert_eq!(prog.kills_in_subzone, 0);
+        assert!(!prog.fighting_boss);
+        assert!(prog.defeated_bosses.is_empty());
+    }
+
+    // =========================================================================
+    // ZONE BOUNDARY CONDITIONS
+    // =========================================================================
+
+    #[test]
+    fn test_cant_advance_past_last_subzone_without_boss_defeat() {
+        let mut prog = ZoneProgression::new();
+
+        // Zone 1 has 3 subzones. Set to subzone 3.
+        prog.current_subzone_id = 3;
+
+        // Without defeating the boss, can't advance
+        let advanced = prog.advance_to_next_subzone();
+        assert!(!advanced);
+        assert_eq!(prog.current_subzone_id, 3);
+    }
+
+    #[test]
+    fn test_travel_to_invalid_subzone() {
+        let mut prog = ZoneProgression::new();
+
+        // Zone 1 has 3 subzones, subzone 5 doesn't exist
+        // Can't travel to subzone 5 because boss of subzone 4 not defeated (and subzone 4 doesn't exist)
+        let result = prog.travel_to(1, 5);
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_travel_to_locked_zone() {
+        let mut prog = ZoneProgression::new();
+
+        // Zone 5 is not unlocked by default (needs P10)
+        let result = prog.travel_to(5, 1);
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_should_spawn_boss_at_exactly_10_kills() {
+        let mut prog = ZoneProgression::new();
+
+        // Record 9 kills - should not spawn
+        for _ in 0..9 {
+            prog.record_kill();
+        }
+        assert!(!prog.should_spawn_boss());
+        assert!(!prog.fighting_boss);
+
+        // 10th kill triggers boss
+        prog.record_kill();
+        // After record_kill sets fighting_boss=true, should_spawn_boss returns false
+        // because the condition is kills >= KILLS_FOR_BOSS && !fighting_boss
+        assert!(!prog.should_spawn_boss());
+        assert!(prog.fighting_boss);
+        assert_eq!(prog.kills_in_subzone, KILLS_FOR_BOSS);
+    }
+
+    // =========================================================================
+    // BOSSDEFEATRESULT VARIANTS
+    // =========================================================================
+
+    #[test]
+    fn test_storms_end_result_for_zone_10_final_boss() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+        achievements.unlock(AchievementId::TheStormbreaker, None);
+
+        // Set up at Zone 10, final subzone
+        prog.current_zone_id = 10;
+        prog.current_subzone_id = 4;
+        prog.unlock_zone(10);
+        prog.fighting_boss = true;
+        // Defeat all previous subzone bosses
+        prog.defeat_boss(10, 1);
+        prog.defeat_boss(10, 2);
+        prog.defeat_boss(10, 3);
+
+        let result = prog.on_boss_defeated(20, &mut achievements);
+        assert_eq!(result, BossDefeatResult::StormsEnd);
+        assert!(achievements.is_unlocked(AchievementId::StormsEnd));
+        assert!(prog.is_zone_unlocked(EXPANSE_ZONE_ID));
+        assert_eq!(prog.current_zone_id, EXPANSE_ZONE_ID);
+    }
+
+    #[test]
+    fn test_weapon_required_result_for_zone_10_without_stormbreaker() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        prog.current_zone_id = 10;
+        prog.current_subzone_id = 4;
+        prog.unlock_zone(10);
+        prog.fighting_boss = true;
+
+        let result = prog.on_boss_defeated(20, &mut achievements);
+        match result {
+            BossDefeatResult::WeaponRequired { weapon_name } => {
+                assert_eq!(weapon_name, "Stormbreaker");
+            }
+            _ => panic!("Expected WeaponRequired, got {:?}", result),
+        }
+        // Boss is NOT recorded as defeated
+        assert!(!prog.is_boss_defeated(10, 4));
+        assert!(!prog.fighting_boss);
+    }
 }

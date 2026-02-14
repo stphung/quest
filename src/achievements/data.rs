@@ -874,4 +874,434 @@ mod tests {
             assert_eq!(a.category, AchievementCategory::Combat);
         }
     }
+
+    #[test]
+    fn test_every_achievement_id_variant_has_definition() {
+        let all_ids: Vec<AchievementId> = vec![
+            AchievementId::SlayerI,
+            AchievementId::SlayerII,
+            AchievementId::SlayerIII,
+            AchievementId::SlayerIV,
+            AchievementId::SlayerV,
+            AchievementId::SlayerVI,
+            AchievementId::SlayerVII,
+            AchievementId::SlayerVIII,
+            AchievementId::SlayerIX,
+            AchievementId::BossHunterI,
+            AchievementId::BossHunterII,
+            AchievementId::BossHunterIII,
+            AchievementId::BossHunterIV,
+            AchievementId::BossHunterV,
+            AchievementId::BossHunterVI,
+            AchievementId::BossHunterVII,
+            AchievementId::BossHunterVIII,
+            AchievementId::Level10,
+            AchievementId::Level25,
+            AchievementId::Level50,
+            AchievementId::Level100,
+            AchievementId::Level150,
+            AchievementId::Level200,
+            AchievementId::Level250,
+            AchievementId::Level500,
+            AchievementId::Level750,
+            AchievementId::Level1000,
+            AchievementId::Level1500,
+            AchievementId::FirstPrestige,
+            AchievementId::PrestigeV,
+            AchievementId::PrestigeX,
+            AchievementId::PrestigeXV,
+            AchievementId::PrestigeXX,
+            AchievementId::PrestigeXXV,
+            AchievementId::PrestigeXXX,
+            AchievementId::PrestigeXL,
+            AchievementId::PrestigeL,
+            AchievementId::PrestigeLXX,
+            AchievementId::PrestigeXC,
+            AchievementId::Eternal,
+            AchievementId::Zone1Complete,
+            AchievementId::Zone2Complete,
+            AchievementId::Zone3Complete,
+            AchievementId::Zone4Complete,
+            AchievementId::Zone5Complete,
+            AchievementId::Zone6Complete,
+            AchievementId::Zone7Complete,
+            AchievementId::Zone8Complete,
+            AchievementId::Zone9Complete,
+            AchievementId::Zone10Complete,
+            AchievementId::TheStormbreaker,
+            AchievementId::StormsEnd,
+            AchievementId::ExpanseCycleI,
+            AchievementId::ExpanseCycleII,
+            AchievementId::ExpanseCycleIII,
+            AchievementId::ExpanseCycleIV,
+            AchievementId::ChessNovice,
+            AchievementId::ChessApprentice,
+            AchievementId::ChessJourneyman,
+            AchievementId::ChessMaster,
+            AchievementId::MorrisNovice,
+            AchievementId::MorrisApprentice,
+            AchievementId::MorrisJourneyman,
+            AchievementId::MorrisMaster,
+            AchievementId::GomokuNovice,
+            AchievementId::GomokuApprentice,
+            AchievementId::GomokuJourneyman,
+            AchievementId::GomokuMaster,
+            AchievementId::MinesweeperNovice,
+            AchievementId::MinesweeperApprentice,
+            AchievementId::MinesweeperJourneyman,
+            AchievementId::MinesweeperMaster,
+            AchievementId::RuneNovice,
+            AchievementId::RuneApprentice,
+            AchievementId::RuneJourneyman,
+            AchievementId::RuneMaster,
+            AchievementId::GoNovice,
+            AchievementId::GoApprentice,
+            AchievementId::GoJourneyman,
+            AchievementId::GoMaster,
+            AchievementId::FlappyNovice,
+            AchievementId::FlappyApprentice,
+            AchievementId::FlappyJourneyman,
+            AchievementId::FlappyMaster,
+            AchievementId::SnakeNovice,
+            AchievementId::SnakeApprentice,
+            AchievementId::SnakeJourneyman,
+            AchievementId::SnakeMaster,
+            AchievementId::GrandChampion,
+            AchievementId::GoneFishing,
+            AchievementId::FishermanI,
+            AchievementId::FishermanII,
+            AchievementId::FishermanIII,
+            AchievementId::FishermanIV,
+            AchievementId::StormLeviathan,
+            AchievementId::FishCatcherI,
+            AchievementId::FishCatcherII,
+            AchievementId::FishCatcherIII,
+            AchievementId::FishCatcherIV,
+            AchievementId::DungeonDiver,
+            AchievementId::DungeonMasterI,
+            AchievementId::DungeonMasterII,
+            AchievementId::DungeonMasterIII,
+            AchievementId::DungeonMasterIV,
+            AchievementId::DungeonMasterV,
+            AchievementId::DungeonMasterVI,
+            AchievementId::HavenDiscovered,
+            AchievementId::HavenBuilderI,
+            AchievementId::HavenBuilderII,
+            AchievementId::HavenArchitect,
+        ];
+
+        for id in &all_ids {
+            assert!(
+                get_achievement_def(*id).is_some(),
+                "AchievementId::{:?} has no definition in ALL_ACHIEVEMENTS",
+                id
+            );
+        }
+
+        assert_eq!(
+            all_ids.len(),
+            ALL_ACHIEVEMENTS.len(),
+            "Mismatch between AchievementId variants ({}) and ALL_ACHIEVEMENTS entries ({})",
+            all_ids.len(),
+            ALL_ACHIEVEMENTS.len()
+        );
+    }
+
+    #[test]
+    fn test_every_category_has_achievements() {
+        for category in AchievementCategory::ALL {
+            let achievements = get_achievements_by_category(category);
+            assert!(
+                !achievements.is_empty(),
+                "Category {:?} has no achievements",
+                category
+            );
+        }
+    }
+
+    #[test]
+    fn test_no_duplicate_names() {
+        use std::collections::HashSet;
+        let mut names = HashSet::new();
+        for achievement in ALL_ACHIEVEMENTS {
+            assert!(
+                names.insert(achievement.name),
+                "Duplicate achievement name: {:?}",
+                achievement.name
+            );
+        }
+    }
+
+    #[test]
+    fn test_no_empty_descriptions_or_names() {
+        for achievement in ALL_ACHIEVEMENTS {
+            assert!(
+                !achievement.name.is_empty(),
+                "Achievement {:?} has empty name",
+                achievement.id
+            );
+            assert!(
+                !achievement.description.is_empty(),
+                "Achievement {:?} has empty description",
+                achievement.id
+            );
+            assert!(
+                !achievement.icon.is_empty(),
+                "Achievement {:?} has empty icon",
+                achievement.id
+            );
+        }
+    }
+
+    #[test]
+    fn test_description_lengths_reasonable() {
+        for achievement in ALL_ACHIEVEMENTS {
+            assert!(
+                achievement.description.len() <= 200,
+                "Achievement {:?} description is too long ({} chars): {}",
+                achievement.id,
+                achievement.description.len(),
+                achievement.description
+            );
+            assert!(
+                achievement.name.len() <= 50,
+                "Achievement {:?} name is too long ({} chars): {}",
+                achievement.id,
+                achievement.name.len(),
+                achievement.name
+            );
+        }
+    }
+
+    #[test]
+    fn test_challenge_achievements_cover_all_game_types_and_difficulties() {
+        let game_types = [
+            (
+                "Chess",
+                vec![
+                    AchievementId::ChessNovice,
+                    AchievementId::ChessApprentice,
+                    AchievementId::ChessJourneyman,
+                    AchievementId::ChessMaster,
+                ],
+            ),
+            (
+                "Morris",
+                vec![
+                    AchievementId::MorrisNovice,
+                    AchievementId::MorrisApprentice,
+                    AchievementId::MorrisJourneyman,
+                    AchievementId::MorrisMaster,
+                ],
+            ),
+            (
+                "Gomoku",
+                vec![
+                    AchievementId::GomokuNovice,
+                    AchievementId::GomokuApprentice,
+                    AchievementId::GomokuJourneyman,
+                    AchievementId::GomokuMaster,
+                ],
+            ),
+            (
+                "Minesweeper",
+                vec![
+                    AchievementId::MinesweeperNovice,
+                    AchievementId::MinesweeperApprentice,
+                    AchievementId::MinesweeperJourneyman,
+                    AchievementId::MinesweeperMaster,
+                ],
+            ),
+            (
+                "Rune",
+                vec![
+                    AchievementId::RuneNovice,
+                    AchievementId::RuneApprentice,
+                    AchievementId::RuneJourneyman,
+                    AchievementId::RuneMaster,
+                ],
+            ),
+            (
+                "Go",
+                vec![
+                    AchievementId::GoNovice,
+                    AchievementId::GoApprentice,
+                    AchievementId::GoJourneyman,
+                    AchievementId::GoMaster,
+                ],
+            ),
+            (
+                "Flappy",
+                vec![
+                    AchievementId::FlappyNovice,
+                    AchievementId::FlappyApprentice,
+                    AchievementId::FlappyJourneyman,
+                    AchievementId::FlappyMaster,
+                ],
+            ),
+            (
+                "Snake",
+                vec![
+                    AchievementId::SnakeNovice,
+                    AchievementId::SnakeApprentice,
+                    AchievementId::SnakeJourneyman,
+                    AchievementId::SnakeMaster,
+                ],
+            ),
+        ];
+
+        for (game_name, ids) in &game_types {
+            assert_eq!(
+                ids.len(),
+                4,
+                "{} should have exactly 4 difficulty achievements",
+                game_name
+            );
+            for id in ids {
+                let def = get_achievement_def(*id);
+                assert!(
+                    def.is_some(),
+                    "{} achievement {:?} missing from definitions",
+                    game_name,
+                    id
+                );
+                let def = def.unwrap();
+                assert_eq!(
+                    def.category,
+                    AchievementCategory::Challenges,
+                    "{} achievement {:?} should be in Challenges category",
+                    game_name,
+                    id
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_zone_achievements_cover_all_ten_zones() {
+        let zone_ids = [
+            (1, AchievementId::Zone1Complete),
+            (2, AchievementId::Zone2Complete),
+            (3, AchievementId::Zone3Complete),
+            (4, AchievementId::Zone4Complete),
+            (5, AchievementId::Zone5Complete),
+            (6, AchievementId::Zone6Complete),
+            (7, AchievementId::Zone7Complete),
+            (8, AchievementId::Zone8Complete),
+            (9, AchievementId::Zone9Complete),
+            (10, AchievementId::Zone10Complete),
+        ];
+
+        for (zone_id, achievement_id) in zone_ids {
+            let def = get_achievement_def(achievement_id).unwrap_or_else(|| {
+                panic!("Zone {} achievement {:?} missing", zone_id, achievement_id)
+            });
+            assert_eq!(def.category, AchievementCategory::Progression);
+            assert!(
+                def.description.contains(&format!("Zone {}", zone_id)),
+                "Zone {} achievement description should mention Zone {}: got {:?}",
+                zone_id,
+                zone_id,
+                def.description
+            );
+        }
+    }
+
+    #[test]
+    fn test_slayer_milestone_descriptions_monotonically_increasing() {
+        let slayer_ids = [
+            AchievementId::SlayerI,
+            AchievementId::SlayerII,
+            AchievementId::SlayerIII,
+            AchievementId::SlayerIV,
+            AchievementId::SlayerV,
+            AchievementId::SlayerVI,
+            AchievementId::SlayerVII,
+            AchievementId::SlayerVIII,
+            AchievementId::SlayerIX,
+        ];
+
+        let mut prev_number = 0u64;
+        for id in slayer_ids {
+            let def = get_achievement_def(id).unwrap();
+            let number = extract_number_from_description(def.description);
+            assert!(
+                number > prev_number,
+                "Slayer milestones should be strictly increasing: {:?} ({}) <= {}",
+                id,
+                number,
+                prev_number
+            );
+            prev_number = number;
+        }
+    }
+
+    #[test]
+    fn test_boss_hunter_milestone_descriptions_monotonically_increasing() {
+        // BossHunterI is "Defeat your first boss" (no numeric milestone)
+        // BossHunterII onwards have increasing numeric milestones
+        let boss_ids = [
+            AchievementId::BossHunterII,
+            AchievementId::BossHunterIII,
+            AchievementId::BossHunterIV,
+            AchievementId::BossHunterV,
+            AchievementId::BossHunterVI,
+            AchievementId::BossHunterVII,
+            AchievementId::BossHunterVIII,
+        ];
+
+        let mut prev_number = 0u64;
+        for id in boss_ids {
+            let def = get_achievement_def(id).unwrap();
+            let number = extract_number_from_description(def.description);
+            assert!(
+                number > prev_number,
+                "BossHunter milestones should be strictly increasing: {:?} ({}) <= {}",
+                id,
+                number,
+                prev_number
+            );
+            prev_number = number;
+        }
+    }
+
+    #[test]
+    fn test_level_milestone_descriptions_monotonically_increasing() {
+        let level_ids = [
+            AchievementId::Level10,
+            AchievementId::Level25,
+            AchievementId::Level50,
+            AchievementId::Level100,
+            AchievementId::Level150,
+            AchievementId::Level200,
+            AchievementId::Level250,
+            AchievementId::Level500,
+            AchievementId::Level750,
+            AchievementId::Level1000,
+            AchievementId::Level1500,
+        ];
+
+        let mut prev_number = 0u64;
+        for id in level_ids {
+            let def = get_achievement_def(id).unwrap();
+            let number = extract_number_from_description(def.description);
+            assert!(
+                number > prev_number,
+                "Level milestones should be strictly increasing: {:?} ({}) <= {}",
+                id,
+                number,
+                prev_number
+            );
+            prev_number = number;
+        }
+    }
+
+    fn extract_number_from_description(desc: &str) -> u64 {
+        let cleaned: String = desc
+            .chars()
+            .filter(|c| c.is_ascii_digit() || *c == ',')
+            .collect();
+        let without_commas: String = cleaned.chars().filter(|c| *c != ',').collect();
+        without_commas.parse().unwrap_or(0)
+    }
 }

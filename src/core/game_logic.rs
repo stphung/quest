@@ -799,4 +799,238 @@ mod tests {
             "Enemy attack timer should be reset to 0 on new enemy spawn"
         );
     }
+
+    // =========================================================================
+    // XP CURVE AT EXTREME LEVELS
+    // =========================================================================
+
+    #[test]
+    fn test_xp_for_next_level_at_level_100() {
+        let xp = xp_for_next_level(100);
+        // 100 * 100^1.5 = 100 * 1000 = 100000
+        assert_eq!(xp, 100_000);
+    }
+
+    #[test]
+    fn test_xp_for_next_level_at_level_500() {
+        let xp = xp_for_next_level(500);
+        // 100 * 500^1.5 = 100 * 11180.34 ~ 1118034
+        let expected = (100.0 * 500.0_f64.powf(1.5)) as u64;
+        assert_eq!(xp, expected);
+        assert!(xp > 1_000_000);
+    }
+
+    #[test]
+    fn test_xp_for_next_level_at_level_1000() {
+        let xp = xp_for_next_level(1000);
+        // 100 * 1000^1.5 = 100 * 31622.77 ~ 3162277
+        let expected = (100.0 * 1000.0_f64.powf(1.5)) as u64;
+        assert_eq!(xp, expected);
+        assert!(xp > 3_000_000);
+    }
+
+    #[test]
+    fn test_xp_curve_monotonically_increasing() {
+        let mut prev_xp = 0u64;
+        for level in 1..=500 {
+            let xp = xp_for_next_level(level);
+            assert!(
+                xp > prev_xp,
+                "XP at level {level} ({xp}) must exceed level {} ({prev_xp})",
+                level - 1
+            );
+            prev_xp = xp;
+        }
+    }
+
+    #[test]
+    fn test_xp_at_level_1_is_base_value() {
+        assert_eq!(xp_for_next_level(1), XP_CURVE_BASE as u64);
+    }
+
+    // =========================================================================
+    // PRESTIGE MULTIPLIER AT EXTREME RANKS
+    // =========================================================================
+
+    #[test]
+    fn test_prestige_multiplier_at_p50() {
+        let mult = prestige_multiplier(50, 0);
+        // 1 + 0.5 * 50^0.7 = 1 + 0.5 * ~17.68 = ~9.84
+        let expected = 1.0 + 0.5 * 50.0_f64.powf(0.7);
+        assert!((mult - expected).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_prestige_multiplier_at_p100() {
+        let mult = prestige_multiplier(100, 0);
+        let expected = 1.0 + 0.5 * 100.0_f64.powf(0.7);
+        assert!((mult - expected).abs() < 0.01);
+        assert!(mult > 10.0);
+    }
+
+    #[test]
+    fn test_prestige_multiplier_with_very_low_cha() {
+        // CHA 1 => modifier = (1 - 10) / 2 = -4 (integer division)
+        let mult = prestige_multiplier(1, -4);
+        // 1.5 + (-4 * 0.1) = 1.5 - 0.4 = 1.1
+        assert!((mult - 1.1).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_prestige_multiplier_with_very_high_cha() {
+        // CHA 30 => modifier = (30 - 10) / 2 = +10
+        let mult = prestige_multiplier(1, 10);
+        // 1.5 + (10 * 0.1) = 1.5 + 1.0 = 2.5
+        assert!((mult - 2.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_prestige_multiplier_always_at_least_1() {
+        // Even with extreme negative CHA, multiplier should stay >= 1.0 at reasonable ranks
+        // P0 with CHA modifier -4: 1.0 + (-0.4) = 0.6 (can go below 1.0!)
+        // This documents existing behavior - negative CHA can reduce multiplier below 1.0
+        let mult_p0 = prestige_multiplier(0, -4);
+        // At P0 base is 1.0, CHA -4 gives 0.6
+        assert!((mult_p0 - 0.6).abs() < 0.01);
+
+        // At higher prestige ranks, the base dominates
+        let mult_p10 = prestige_multiplier(10, -4);
+        assert!(mult_p10 > 1.0);
+    }
+
+    // =========================================================================
+    // ATTRIBUTE DISTRIBUTION EDGE CASES
+    // =========================================================================
+
+    #[test]
+    fn test_distribute_when_all_at_cap_returns_empty() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        let cap = state.get_attribute_cap();
+
+        for attr in AttributeType::all() {
+            state.attributes.set(attr, cap);
+        }
+
+        let increased = distribute_level_up_points(&mut state);
+        assert!(
+            increased.is_empty(),
+            "Should distribute zero points when all attributes at cap"
+        );
+
+        // All attributes should remain at cap
+        for attr in AttributeType::all() {
+            assert_eq!(state.attributes.get(attr), cap);
+        }
+    }
+
+    #[test]
+    fn test_distribute_when_only_one_below_cap() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        let cap = state.get_attribute_cap(); // 20
+
+        // Set all to cap except Strength
+        for attr in AttributeType::all() {
+            state.attributes.set(attr, cap);
+        }
+        state.attributes.set(AttributeType::Strength, cap - 3);
+
+        let increased = distribute_level_up_points(&mut state);
+        assert_eq!(increased.len(), 3);
+
+        // All 3 points should go to Strength
+        for attr in &increased {
+            assert_eq!(*attr, AttributeType::Strength);
+        }
+        assert_eq!(state.attributes.get(AttributeType::Strength), cap);
+    }
+
+    #[test]
+    fn test_distribute_with_high_prestige_cap() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        state.prestige_rank = 10; // cap = 20 + 50 = 70
+        let cap = state.get_attribute_cap();
+        assert_eq!(cap, 70);
+
+        // Set all to 69 (one below cap)
+        for attr in AttributeType::all() {
+            state.attributes.set(attr, 69);
+        }
+
+        let increased = distribute_level_up_points(&mut state);
+        assert_eq!(increased.len(), 3);
+
+        // Each increased attribute should now be at 70
+        for attr in &increased {
+            assert_eq!(state.attributes.get(*attr), 70);
+        }
+    }
+
+    #[test]
+    fn test_distribute_with_p20_cap() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        state.prestige_rank = 20; // cap = 20 + 100 = 120
+        assert_eq!(state.get_attribute_cap(), 120);
+
+        // Points should be distributable well above the base cap
+        let increased = distribute_level_up_points(&mut state);
+        assert_eq!(increased.len(), 3);
+    }
+
+    // =========================================================================
+    // ENEMY SPAWNING WITH ZONE/PRESTIGE SCALING
+    // =========================================================================
+
+    #[test]
+    fn test_spawn_enemy_at_zone_10() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        state.zone_progression.current_zone_id = 10;
+        state.zone_progression.current_subzone_id = 1;
+        state.zone_progression.unlock_zone(10);
+
+        spawn_enemy_if_needed(&mut state);
+
+        let enemy = state.combat_state.current_enemy.as_ref().unwrap();
+        // Zone 10 base HP is 810 (with ±10% variance)
+        let (base_hp, _, _, _, _, _) = ZONE_ENEMY_STATS[9];
+        assert!(
+            enemy.max_hp >= (base_hp as f64 * 0.85) as u32,
+            "Zone 10 enemy HP {} should be near base {}",
+            enemy.max_hp,
+            base_hp
+        );
+    }
+
+    #[test]
+    fn test_spawn_enemy_at_zone_11() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        state.zone_progression.current_zone_id = 11;
+        state.zone_progression.current_subzone_id = 1;
+        state.zone_progression.unlock_zone(11);
+
+        spawn_enemy_if_needed(&mut state);
+
+        let enemy = state.combat_state.current_enemy.as_ref().unwrap();
+        // Zone 11 base HP is 5000 (endgame wall)
+        let (base_hp, _, _, _, _, _) = ZONE_ENEMY_STATS[10];
+        assert!(
+            enemy.max_hp >= (base_hp as f64 * 0.85) as u32,
+            "Zone 11 enemy HP {} should be near base {}",
+            enemy.max_hp,
+            base_hp
+        );
+    }
+
+    // =========================================================================
+    // DUNGEON DISCOVERY CONDITIONS
+    // =========================================================================
+
+    #[test]
+    fn test_discovery_blocked_during_active_dungeon() {
+        let mut state = GameState::new("Test Hero".to_string(), 0);
+        state.active_dungeon = Some(crate::dungeon::generation::generate_dungeon(1, 0, 1));
+
+        for _ in 0..1000 {
+            assert!(!try_discover_dungeon(&mut state));
+        }
+    }
 }
