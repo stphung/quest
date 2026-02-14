@@ -435,7 +435,7 @@ fn draw_right_panel(
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(4), // Zone info (always visible)
+            Constraint::Length(5), // Zone info (always visible, includes flavor text)
             Constraint::Min(10),   // Content (changes by activity)
         ])
         .split(area);

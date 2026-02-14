@@ -265,6 +265,16 @@ pub(super) fn draw_zone_info(
         boss_progress,
     ])];
 
+    // Add subzone flavor text
+    if let Some(sz) = subzone {
+        zone_lines.push(Line::from(vec![Span::styled(
+            sz.description,
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::ITALIC),
+        )]));
+    }
+
     // Add second line based on completion status
     match zone_completion {
         ZoneCompletionStatus::Gated {
