@@ -659,6 +659,37 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         icon: "~",
     },
     // ═══════════════════════════════════════════════════════════════
+    // CHALLENGE ACHIEVEMENTS - CONTAINMENT BREACH
+    // ═══════════════════════════════════════════════════════════════
+    AchievementDef {
+        id: AchievementId::ContainmentBreachNovice,
+        name: "Containment Breach Novice",
+        description: "Win Containment Breach on Novice difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "▣",
+    },
+    AchievementDef {
+        id: AchievementId::ContainmentBreachApprentice,
+        name: "Containment Breach Apprentice",
+        description: "Win Containment Breach on Apprentice difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "▣",
+    },
+    AchievementDef {
+        id: AchievementId::ContainmentBreachJourneyman,
+        name: "Containment Breach Journeyman",
+        description: "Win Containment Breach on Journeyman difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "▣",
+    },
+    AchievementDef {
+        id: AchievementId::ContainmentBreachMaster,
+        name: "Containment Breach Master",
+        description: "Win Containment Breach on Master difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "▣",
+    },
+    // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - META
     // ═══════════════════════════════════════════════════════════════
     AchievementDef {
@@ -966,6 +997,10 @@ mod tests {
             AchievementId::SnakeApprentice,
             AchievementId::SnakeJourneyman,
             AchievementId::SnakeMaster,
+            AchievementId::ContainmentBreachNovice,
+            AchievementId::ContainmentBreachApprentice,
+            AchievementId::ContainmentBreachJourneyman,
+            AchievementId::ContainmentBreachMaster,
             AchievementId::GrandChampion,
             AchievementId::GoneFishing,
             AchievementId::FishermanI,
@@ -1146,6 +1181,15 @@ mod tests {
                     AchievementId::SnakeApprentice,
                     AchievementId::SnakeJourneyman,
                     AchievementId::SnakeMaster,
+                ],
+            ),
+            (
+                "Containment Breach",
+                vec![
+                    AchievementId::ContainmentBreachNovice,
+                    AchievementId::ContainmentBreachApprentice,
+                    AchievementId::ContainmentBreachJourneyman,
+                    AchievementId::ContainmentBreachMaster,
                 ],
             ),
         ];

@@ -13,6 +13,10 @@ use crate::challenges::go::{apply_go_result, process_input as process_go_input, 
 use crate::challenges::gomoku::logic::{
     apply_game_result as apply_gomoku_result, process_input as process_gomoku_input, GomokuInput,
 };
+use crate::challenges::jezzball::logic::{
+    apply_game_result as apply_jezzball_result, process_input as process_jezzball_input,
+    JezzballInput,
+};
 use crate::challenges::menu::{process_input as process_menu_input, MenuInput};
 use crate::challenges::minesweeper::logic::{
     apply_game_result as apply_minesweeper_result, process_input as process_minesweeper_input,
@@ -583,6 +587,23 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
                     _ => FlappyBirdInput::Other,
                 };
                 process_flappy_input(flappy_game, input);
+            }
+            ActiveMinigame::Jezzball(jezzball_game) => {
+                if jezzball_game.game_result.is_some() {
+                    state.last_minigame_win = apply_jezzball_result(state);
+                    return InputResult::Continue;
+                }
+                let input = match key.code {
+                    KeyCode::Up => JezzballInput::Up,
+                    KeyCode::Down => JezzballInput::Down,
+                    KeyCode::Left => JezzballInput::Left,
+                    KeyCode::Right => JezzballInput::Right,
+                    KeyCode::Enter | KeyCode::Char(' ') => JezzballInput::Select,
+                    KeyCode::Char('x') | KeyCode::Char('X') => JezzballInput::ToggleOrientation,
+                    KeyCode::Esc => JezzballInput::Forfeit,
+                    _ => JezzballInput::Other,
+                };
+                process_jezzball_input(jezzball_game, input);
             }
             ActiveMinigame::Snake(snake_game) => {
                 if snake_game.game_result.is_some() {

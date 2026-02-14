@@ -18,6 +18,7 @@ pub mod go_scene;
 pub mod gomoku_scene;
 pub mod haven_scene;
 mod info_panel;
+pub mod jezzball_scene;
 pub mod minesweeper_scene;
 pub mod morris_scene;
 pub mod prestige_confirm;
@@ -477,6 +478,9 @@ fn draw_right_content(frame: &mut Frame, area: Rect, game_state: &GameState, ctx
         }
         Some(ActiveMinigame::FlappyBird(game)) => {
             flappy_scene::render_flappy_scene(frame, area, game, ctx);
+        }
+        Some(ActiveMinigame::Jezzball(game)) => {
+            jezzball_scene::render_jezzball_scene(frame, area, game, ctx);
         }
         Some(ActiveMinigame::Snake(game)) => {
             snake_scene::render_snake_scene(frame, area, game, ctx);

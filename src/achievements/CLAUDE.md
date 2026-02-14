@@ -22,7 +22,7 @@ Enum with 80+ variants covering all trackable milestones. Organized by domain:
 - **Level**: `Level10`..`Level1500` (11 milestones)
 - **Prestige**: `FirstPrestige`..`Eternal` (P1 to P100, 12 milestones)
 - **Zones**: `Zone1Complete`..`Zone10Complete`, `TheStormbreaker`, `StormsEnd`, `ExpanseCycleI`..`ExpanseCycleIV`
-- **Challenges**: 4 difficulties per game type (chess, morris, gomoku, minesweeper, rune, go, flappy_bird, snake) + `GrandChampion` (100 wins)
+- **Challenges**: 4 difficulties per game type (chess, morris, gomoku, minesweeper, rune, go, flappy_bird, snake, jezzball) + `GrandChampion` (100 wins)
 - **Fishing**: `GoneFishing`, `FishermanI`..`FishermanIV` (rank milestones), `FishCatcherI`..`FishCatcherIV` (catch counts), `StormLeviathan`
 - **Dungeons**: `DungeonDiver`, `DungeonMasterI`..`DungeonMasterVI`
 - **Haven**: `HavenDiscovered`, `HavenBuilderI`..`HavenBuilderII`, `HavenArchitect`
