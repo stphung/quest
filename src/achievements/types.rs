@@ -377,6 +377,7 @@ impl Achievements {
             if current >= threshold {
                 self.unlock_with_name(achievement_id, character_name);
             }
+            self.update_progress(achievement_id, current, threshold);
         }
     }
 
@@ -751,6 +752,9 @@ impl Achievements {
 
         // Sync zone completions based on defeated bosses
         self.sync_zone_completions(defeated_bosses, character_name);
+
+        // Refresh progress bars from current counters
+        self.refresh_progress();
     }
 
     /// Syncs zone completion achievements based on defeated bosses.
@@ -773,6 +777,72 @@ impl Achievements {
             // If all subzones are complete, unlock the zone achievement
             if completed_subzones == total_subzones {
                 self.on_zone_fully_cleared(zone.id, character_name);
+            }
+        }
+    }
+
+    /// Refresh progress entries from existing aggregate counters.
+    /// Called on load so progress bars display even for counters accumulated before this feature.
+    pub fn refresh_progress(&mut self) {
+        // Helper: update progress for all unachieved milestones in a series
+        let series: &[(u64, &[(u64, AchievementId)])] = &[
+            (
+                self.total_kills,
+                &[
+                    (100, AchievementId::SlayerI),
+                    (500, AchievementId::SlayerII),
+                    (1000, AchievementId::SlayerIII),
+                    (5000, AchievementId::SlayerIV),
+                    (10000, AchievementId::SlayerV),
+                    (50000, AchievementId::SlayerVI),
+                    (100000, AchievementId::SlayerVII),
+                    (500000, AchievementId::SlayerVIII),
+                    (1000000, AchievementId::SlayerIX),
+                ],
+            ),
+            (
+                self.total_bosses_defeated,
+                &[
+                    (1, AchievementId::BossHunterI),
+                    (10, AchievementId::BossHunterII),
+                    (50, AchievementId::BossHunterIII),
+                    (100, AchievementId::BossHunterIV),
+                    (500, AchievementId::BossHunterV),
+                    (1000, AchievementId::BossHunterVI),
+                    (5000, AchievementId::BossHunterVII),
+                    (10000, AchievementId::BossHunterVIII),
+                ],
+            ),
+            (
+                self.total_dungeons_completed,
+                &[
+                    (1, AchievementId::DungeonDiver),
+                    (10, AchievementId::DungeonMasterI),
+                    (50, AchievementId::DungeonMasterII),
+                    (100, AchievementId::DungeonMasterIII),
+                    (1000, AchievementId::DungeonMasterIV),
+                    (5000, AchievementId::DungeonMasterV),
+                    (10000, AchievementId::DungeonMasterVI),
+                ],
+            ),
+            (
+                self.total_fish_caught,
+                &[
+                    (10, AchievementId::FishCatcherI),
+                    (100, AchievementId::FishCatcherII),
+                    (500, AchievementId::FishCatcherIII),
+                    (1000, AchievementId::FishCatcherIV),
+                ],
+            ),
+            (
+                self.total_minigame_wins,
+                &[(100, AchievementId::GrandChampion)],
+            ),
+        ];
+
+        for (current, milestones) in series {
+            for &(threshold, achievement_id) in *milestones {
+                self.update_progress(achievement_id, *current, threshold);
             }
         }
     }

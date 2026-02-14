@@ -188,15 +188,7 @@ fn render_achievement_list(
             let is_selected = i == ui_state.selected_index;
             let is_new = achievements.is_recently_unlocked(def.id);
 
-            let prefix = if is_selected && is_new {
-                ">*"
-            } else if is_selected {
-                "> "
-            } else if is_new {
-                " *"
-            } else {
-                "  "
-            };
+            let prefix = if is_selected { "> " } else { "  " };
             let checkmark = if is_unlocked { "[X] " } else { "[ ] " };
 
             let style = if is_unlocked {
@@ -207,16 +199,8 @@ fn render_achievement_list(
                 Style::default().fg(Color::DarkGray)
             };
 
-            let prefix_style = if is_new {
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD)
-            } else {
-                style
-            };
-
-            ListItem::new(Line::from(vec![
-                Span::styled(prefix, prefix_style),
+            let mut spans = vec![
+                Span::styled(prefix, style),
                 Span::styled(
                     checkmark,
                     if is_unlocked {
@@ -227,7 +211,18 @@ fn render_achievement_list(
                 ),
                 Span::raw(format!("{} ", def.icon)),
                 Span::styled(def.name, style),
-            ]))
+            ];
+
+            if is_new {
+                spans.push(Span::styled(
+                    " [NEW]",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ));
+            }
+
+            ListItem::new(Line::from(spans))
         })
         .collect();
 
@@ -297,9 +292,23 @@ fn render_achievement_detail(
                 )));
             }
 
+            // Show completed progress bar for milestone achievements
+            if let Some(progress) = achievements.get_progress(def.id) {
+                let display_current = progress.target;
+                lines.push(Line::from(vec![
+                    Span::styled("    [", Style::default().fg(Color::DarkGray)),
+                    Span::styled("\u{2588}".repeat(20), Style::default().fg(Color::Green)),
+                    Span::styled("] ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!("{}/{}", display_current, progress.target),
+                        Style::default().fg(Color::Green),
+                    ),
+                ]));
+            }
+
             if achievements.is_recently_unlocked(def.id) {
                 lines.push(Line::from(Span::styled(
-                    "* Recently unlocked!",
+                    "[NEW] Recently unlocked!",
                     Style::default()
                         .fg(Color::Yellow)
                         .add_modifier(Modifier::BOLD),
@@ -320,12 +329,31 @@ fn render_achievement_detail(
                 0
             };
             lines.push(Line::from(Span::styled(
-                format!(
-                    "    Progress: {}/{} ({}%)",
-                    progress.current, progress.target, percent
-                ),
+                format!("    Progress: {}/{}", progress.current, progress.target),
                 Style::default().fg(Color::Yellow),
             )));
+
+            // Progress bar
+            let bar_width = 20usize;
+            let filled = if progress.target > 0 {
+                (progress.current as usize * bar_width / progress.target as usize).min(bar_width)
+            } else {
+                0
+            };
+            let empty = bar_width - filled;
+            lines.push(Line::from(vec![
+                Span::styled("    [", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    "\u{2588}".repeat(filled),
+                    Style::default().fg(Color::Yellow),
+                ),
+                Span::styled(
+                    "\u{2591}".repeat(empty),
+                    Style::default().fg(Color::DarkGray),
+                ),
+                Span::styled("] ", Style::default().fg(Color::DarkGray)),
+                Span::styled(format!("{}%", percent), Style::default().fg(Color::Yellow)),
+            ]));
         }
     }
 

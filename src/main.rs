@@ -392,6 +392,7 @@ fn main() -> io::Result<()> {
 
     // Load global achievements (shared across all characters)
     let mut global_achievements = achievements::load_achievements();
+    global_achievements.refresh_progress();
 
     // List existing characters
     let characters = character_manager.list_characters()?;
