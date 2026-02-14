@@ -31,10 +31,10 @@ impl JezzballDifficulty {
     /// Number of hazard orbs.
     pub fn ball_count(&self) -> usize {
         match self {
-            Self::Novice => 1,
-            Self::Apprentice => 2,
-            Self::Journeyman => 3,
-            Self::Master => 4,
+            Self::Novice => 2,
+            Self::Apprentice => 3,
+            Self::Journeyman => 4,
+            Self::Master => 5,
         }
     }
 
@@ -259,7 +259,7 @@ mod tests {
         assert_eq!(game.grid_height, 22);
         assert_eq!(game.cursor, Position { x: 17, y: 11 });
         assert_eq!(game.orientation, WallOrientation::Vertical);
-        assert_eq!(game.balls.len(), 1);
+        assert_eq!(game.balls.len(), 2);
         assert_eq!(game.target_percent, 60);
         assert_eq!(game.wall_step_ms, 70);
         assert_eq!(game.total_cells(), 748);
@@ -267,10 +267,10 @@ mod tests {
 
     #[test]
     fn test_difficulty_parameters() {
-        assert_eq!(JezzballDifficulty::Novice.ball_count(), 1);
-        assert_eq!(JezzballDifficulty::Apprentice.ball_count(), 2);
-        assert_eq!(JezzballDifficulty::Journeyman.ball_count(), 3);
-        assert_eq!(JezzballDifficulty::Master.ball_count(), 4);
+        assert_eq!(JezzballDifficulty::Novice.ball_count(), 2);
+        assert_eq!(JezzballDifficulty::Apprentice.ball_count(), 3);
+        assert_eq!(JezzballDifficulty::Journeyman.ball_count(), 4);
+        assert_eq!(JezzballDifficulty::Master.ball_count(), 5);
 
         assert_eq!(JezzballDifficulty::Novice.target_percent(), 60);
         assert_eq!(JezzballDifficulty::Master.target_percent(), 84);
