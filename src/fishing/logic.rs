@@ -8,7 +8,11 @@
 use super::generation::{self as fishing_generation, is_storm_leviathan, LeviathanResult};
 use super::types::{FishRarity, FishingPhase, FishingState};
 use crate::character::prestige::get_prestige_tier;
-use crate::core::constants::{BASE_MAX_FISHING_RANK, FISHING_DISCOVERY_CHANCE, MAX_FISHING_RANK};
+use crate::core::constants::{
+    BASE_MAX_FISHING_RANK, FISHING_DISCOVERY_CHANCE, FISHING_DROP_CHANCE_COMMON,
+    FISHING_DROP_CHANCE_EPIC, FISHING_DROP_CHANCE_LEGENDARY, FISHING_DROP_CHANCE_RARE,
+    FISHING_DROP_CHANCE_UNCOMMON, MAX_FISHING_RANK,
+};
 use crate::core::game_state::GameState;
 use crate::items::generation as item_generation;
 use crate::items::{ilvl_for_zone, roll_random_slot, Rarity};
@@ -20,12 +24,7 @@ fn apply_timer_reduction(base_ticks: u32, reduction_percent: f64) -> u32 {
     (reduced as u32).max(1) // Minimum 1 tick
 }
 
-/// Item drop chances by fish rarity (percentage)
-const DROP_CHANCE_COMMON: f64 = 0.05; // 5%
-const DROP_CHANCE_UNCOMMON: f64 = 0.05; // 5% (same as common)
-const DROP_CHANCE_RARE: f64 = 0.15; // 15%
-const DROP_CHANCE_EPIC: f64 = 0.35; // 35%
-const DROP_CHANCE_LEGENDARY: f64 = 0.75; // 75%
+// Item drop chances by fish rarity are defined in core::constants
 
 /// Haven bonuses that affect fishing
 #[derive(Debug, Clone, Default)]
@@ -259,11 +258,11 @@ fn try_fishing_item_drop(
     rng: &mut impl Rng,
 ) -> Option<crate::items::Item> {
     let drop_chance = match rarity {
-        FishRarity::Common => DROP_CHANCE_COMMON,
-        FishRarity::Uncommon => DROP_CHANCE_UNCOMMON,
-        FishRarity::Rare => DROP_CHANCE_RARE,
-        FishRarity::Epic => DROP_CHANCE_EPIC,
-        FishRarity::Legendary => DROP_CHANCE_LEGENDARY,
+        FishRarity::Common => FISHING_DROP_CHANCE_COMMON,
+        FishRarity::Uncommon => FISHING_DROP_CHANCE_UNCOMMON,
+        FishRarity::Rare => FISHING_DROP_CHANCE_RARE,
+        FishRarity::Epic => FISHING_DROP_CHANCE_EPIC,
+        FishRarity::Legendary => FISHING_DROP_CHANCE_LEGENDARY,
     };
 
     if rng.gen::<f64>() < drop_chance {

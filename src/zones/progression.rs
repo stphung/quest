@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use super::data::{get_all_zones, Zone};
 use crate::achievements::{AchievementId, Achievements};
 pub use crate::core::constants::KILLS_FOR_BOSS;
+use crate::core::constants::{EXPANSE_ZONE_ID, FINAL_ZONE_ID};
 
 /// Tracks the player's progression through zones and subzones.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -190,8 +191,8 @@ impl ZoneProgression {
         // Record the defeat
         self.defeat_boss(zone_id, subzone_id);
 
-        // Special handling for Zone 11 (The Expanse) - infinite cycling
-        if zone_id == 11 && is_zone_boss {
+        // Special handling for The Expanse - infinite cycling
+        if zone_id == EXPANSE_ZONE_ID && is_zone_boss {
             // Cycle back to subzone 1
             self.current_subzone_id = 1;
             self.kills_in_subzone = 0;
@@ -199,12 +200,12 @@ impl ZoneProgression {
         }
 
         if is_zone_boss {
-            // Zone 10 completion triggers StormsEnd achievement and unlocks Zone 11
-            if zone_id == 10 {
+            // Final zone completion triggers StormsEnd achievement and unlocks The Expanse
+            if zone_id == FINAL_ZONE_ID {
                 achievements.unlock(AchievementId::StormsEnd, None);
-                // Unlock Zone 11 (The Expanse) and advance to it
-                self.unlock_zone(11);
-                self.current_zone_id = 11;
+                // Unlock The Expanse and advance to it
+                self.unlock_zone(EXPANSE_ZONE_ID);
+                self.current_zone_id = EXPANSE_ZONE_ID;
                 self.current_subzone_id = 1;
                 return BossDefeatResult::StormsEnd;
             }

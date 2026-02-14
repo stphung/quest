@@ -88,8 +88,8 @@ fn calc_zone_enemy_stats(zone_id: u32, subzone_depth: u32) -> (u32, u32, u32) {
     let raw_dmg = base_dmg + depth_offset * dmg_step;
     let raw_def = base_def + depth_offset * def_step;
 
-    let hp_var = rng.gen_range(0.9..1.1);
-    let dmg_var = rng.gen_range(0.9..1.1);
+    let hp_var = rng.gen_range(ENEMY_STAT_VARIANCE_MIN..ENEMY_STAT_VARIANCE_MAX);
+    let dmg_var = rng.gen_range(ENEMY_STAT_VARIANCE_MIN..ENEMY_STAT_VARIANCE_MAX);
 
     let hp = ((raw_hp as f64) * hp_var).max(1.0) as u32;
     let damage = ((raw_dmg as f64) * dmg_var).max(1.0) as u32;
@@ -270,7 +270,7 @@ pub struct CombatState {
 
 impl Default for CombatState {
     fn default() -> Self {
-        Self::new(50) // Base HP for fresh character
+        Self::new(BASE_HP as u32)
     }
 }
 
@@ -285,13 +285,13 @@ impl CombatState {
             regen_timer: 0.0,
             is_regenerating: false,
             visual_effects: Vec::new(),
-            combat_log: VecDeque::with_capacity(10),
+            combat_log: VecDeque::with_capacity(COMBAT_LOG_CAPACITY),
         }
     }
 
     pub fn add_log_entry(&mut self, message: String, is_crit: bool, is_player_action: bool) {
         // Keep only the last 10 entries
-        if self.combat_log.len() >= 10 {
+        if self.combat_log.len() >= COMBAT_LOG_CAPACITY {
             self.combat_log.pop_front();
         }
         self.combat_log.push_back(CombatLogEntry {

@@ -5,6 +5,10 @@
 
 #![allow(dead_code)]
 
+use crate::core::constants::{
+    DUNGEON_LEVEL_TIER_LARGE, DUNGEON_LEVEL_TIER_MEDIUM, DUNGEON_PRESTIGE_PER_SIZE_TIER,
+    DUNGEON_SIZE_VARIATION_DOWN, DUNGEON_SIZE_VARIATION_UP,
+};
 use serde::{Deserialize, Serialize};
 
 /// Type of room in the dungeon
@@ -161,16 +165,16 @@ impl DungeonSize {
     /// Returns the "expected" tier - actual size is rolled in a range
     fn base_tier(level: u32, prestige_rank: u32) -> u32 {
         // Base size from level
-        let level_tier: u32 = if level >= 75 {
+        let level_tier: u32 = if level >= DUNGEON_LEVEL_TIER_LARGE {
             2 // Large
-        } else if level >= 25 {
+        } else if level >= DUNGEON_LEVEL_TIER_MEDIUM {
             1 // Medium
         } else {
             0 // Small
         };
 
-        // Prestige adds tiers (each 2 prestige ranks = +1 size tier)
-        let prestige_bonus = prestige_rank / 2;
+        // Prestige adds tiers
+        let prestige_bonus = prestige_rank / DUNGEON_PRESTIGE_PER_SIZE_TIER;
         level_tier + prestige_bonus
     }
 
@@ -184,9 +188,9 @@ impl DungeonSize {
 
         // Roll variation: 20% chance -1, 60% chance same, 20% chance +1
         let roll: f64 = rng.gen();
-        let variation: i32 = if roll < 0.2 {
+        let variation: i32 = if roll < DUNGEON_SIZE_VARIATION_DOWN {
             -1 // Smaller dungeon
-        } else if roll < 0.8 {
+        } else if roll < DUNGEON_SIZE_VARIATION_UP {
             0 // Expected size
         } else {
             1 // Larger dungeon (lucky!)

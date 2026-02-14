@@ -1,9 +1,6 @@
 use super::generation::generate_item;
 use super::types::{EquipmentSlot, Item, Rarity};
-use crate::core::constants::{
-    ITEM_DROP_BASE_CHANCE, ITEM_DROP_MAX_CHANCE, ITEM_DROP_PRESTIGE_BONUS,
-    MOB_RARITY_PRESTIGE_BONUS_CAP, MOB_RARITY_PRESTIGE_BONUS_PER_RANK, ZONE_ILVL_MULTIPLIER,
-};
+use crate::core::constants::*;
 use crate::core::game_state::GameState;
 use rand::Rng;
 
@@ -79,15 +76,16 @@ pub fn roll_rarity_for_mob(
     let prestige_bonus = (prestige_rank as f64 * MOB_RARITY_PRESTIGE_BONUS_PER_RANK)
         .min(MOB_RARITY_PRESTIGE_BONUS_CAP);
 
-    // Workshop bonus: shifts distribution toward higher rarities (max 25%)
-    let haven_bonus = (haven_rarity_percent / 100.0).min(0.25);
+    // Workshop bonus: shifts distribution toward higher rarities
+    let haven_bonus = (haven_rarity_percent / 100.0).min(MOB_RARITY_HAVEN_BONUS_CAP);
     let total_bonus = prestige_bonus + haven_bonus;
 
     // Mob distribution: 60% Common, 28% Magic, 10% Rare, 2% Epic, 0% Legendary
     // Bonuses shift Common down and spread across higher tiers.
-    let common_threshold = (0.60 - total_bonus).max(0.20); // Never go below 20% common
-    let magic_threshold = common_threshold + 0.28;
-    let rare_threshold = magic_threshold + 0.10 + total_bonus * 0.6;
+    let common_threshold = (MOB_RARITY_COMMON_BASE - total_bonus).max(MOB_RARITY_COMMON_FLOOR);
+    let magic_threshold = common_threshold + MOB_RARITY_MAGIC_BASE;
+    let rare_threshold =
+        magic_threshold + MOB_RARITY_RARE_BASE + total_bonus * MOB_RARITY_RARE_BONUS_SHARE;
     // Epic is the remainder (capped, no legendary)
 
     if roll < common_threshold {
@@ -108,22 +106,22 @@ pub fn roll_rarity_for_boss(is_final_zone: bool, rng: &mut impl Rng) -> Rarity {
 
     if is_final_zone {
         // Zone 10 final boss: 20% Magic, 40% Rare, 30% Epic, 10% Legendary
-        if roll < 0.20 {
+        if roll < BOSS_FINAL_MAGIC_THRESHOLD {
             Rarity::Magic
-        } else if roll < 0.60 {
+        } else if roll < BOSS_FINAL_RARE_THRESHOLD {
             Rarity::Rare
-        } else if roll < 0.90 {
+        } else if roll < BOSS_FINAL_EPIC_THRESHOLD {
             Rarity::Epic
         } else {
             Rarity::Legendary
         }
     } else {
         // Normal zone boss: 40% Magic, 35% Rare, 20% Epic, 5% Legendary
-        if roll < 0.40 {
+        if roll < BOSS_NORMAL_MAGIC_THRESHOLD {
             Rarity::Magic
-        } else if roll < 0.75 {
+        } else if roll < BOSS_NORMAL_RARE_THRESHOLD {
             Rarity::Rare
-        } else if roll < 0.95 {
+        } else if roll < BOSS_NORMAL_EPIC_THRESHOLD {
             Rarity::Epic
         } else {
             Rarity::Legendary
@@ -132,7 +130,7 @@ pub fn roll_rarity_for_boss(is_final_zone: bool, rng: &mut impl Rng) -> Rarity {
 }
 
 pub fn roll_random_slot(rng: &mut impl Rng) -> EquipmentSlot {
-    match rng.gen_range(0..7) {
+    match rng.gen_range(0..NUM_EQUIPMENT_SLOTS) {
         0 => EquipmentSlot::Weapon,
         1 => EquipmentSlot::Armor,
         2 => EquipmentSlot::Helmet,

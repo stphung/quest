@@ -8,6 +8,9 @@ use super::types::{
     Dungeon, DungeonSize, Room, RoomState, RoomType, DIR_DOWN, DIR_LEFT, DIR_OFFSETS, DIR_RIGHT,
     DIR_UP,
 };
+use crate::core::constants::{
+    DUNGEON_EXTRA_CONNECTION_CHANCE, DUNGEON_MIN_BOSS_DISTANCE, DUNGEON_MIN_ELITE_DISTANCE,
+};
 use rand::seq::SliceRandom;
 use rand::Rng;
 
@@ -128,7 +131,7 @@ fn opposite_direction(dir: usize) -> usize {
 /// Skips the boss room to ensure it remains a dead end
 fn add_extra_connections(dungeon: &mut Dungeon, rng: &mut impl Rng) {
     let grid_size = dungeon.size.grid_size();
-    let extra_connection_chance = 0.15; // 15% chance per possible connection
+    let extra_connection_chance = DUNGEON_EXTRA_CONNECTION_CHANCE;
     let boss_pos = dungeon.boss_position;
 
     for y in 0..grid_size {
@@ -294,7 +297,7 @@ fn place_special_rooms(dungeon: &mut Dungeon) {
     });
 
     // Filter out dead ends too close to entrance (within 2 steps)
-    let min_distance_from_entrance = 4; // squared distance of 2
+    let min_distance_from_entrance = DUNGEON_MIN_BOSS_DISTANCE;
     let viable_dead_ends: Vec<_> = dead_ends
         .iter()
         .filter(|&&pos| distance_squared(pos, entrance_pos) >= min_distance_from_entrance)
@@ -303,7 +306,7 @@ fn place_special_rooms(dungeon: &mut Dungeon) {
 
     // Minimum squared distance from entrance (2 = not orthogonally adjacent)
     // distance_squared: 1 = orthogonal, 2 = diagonal, 4 = 2 steps
-    let min_elite_distance = 1;
+    let min_elite_distance = DUNGEON_MIN_ELITE_DISTANCE;
 
     // Helper to find best position: furthest from entrance that meets minimum distance
     let find_best_pos = |positions: &[(usize, usize)]| -> Option<(usize, usize)> {

@@ -118,9 +118,12 @@ pub fn get_prestige_tier(rank: u32) -> PrestigeTier {
         16 => 190,
         17 => 200,
         18 => 210,
-        19 => 220,
-        // 20+: continues at +15 per rank
-        _ => 220 + (rank - 19) * 15,
+        19 => PRESTIGE_HIGH_RANK_BASE_LEVEL,
+        // 20+: continues at +PRESTIGE_HIGH_RANK_LEVEL_STEP per rank
+        _ => {
+            PRESTIGE_HIGH_RANK_BASE_LEVEL
+                + (rank - PRESTIGE_HIGH_RANK_THRESHOLD) * PRESTIGE_HIGH_RANK_LEVEL_STEP
+        }
     };
 
     PrestigeTier {
@@ -189,8 +192,8 @@ pub fn perform_prestige(state: &mut GameState) {
     // Clear any active minigame session
     state.active_minigame = None;
 
-    // Reset combat state with base HP (50 for fresh attributes)
-    state.combat_state = CombatState::new(50);
+    // Reset combat state with base HP for fresh attributes
+    state.combat_state = CombatState::new(BASE_HP as u32);
 
     // Increment prestige rank and total prestige count
     state.prestige_rank += 1;
