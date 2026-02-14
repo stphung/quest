@@ -46,7 +46,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
         Zone {
             id: 1,
             name: "Meadow",
-            description: "Rolling grasslands where wildflowers hide teeth. Many adventurers begin here — fewer leave than you'd think.",
+            description: "Rolling grasslands where wildflowers hide teeth. Many adventurers begin here. Fewer leave than you'd think.",
             prestige_requirement: 0,
             min_level: 1,
             max_level: 10,
@@ -173,7 +173,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
         Zone {
             id: 4,
             name: "Ancient Ruins",
-            description: "A civilization that mastered death — and was consumed by it. Their wards still flicker in the dark.",
+            description: "A civilization that mastered death and was consumed by it. Their wards still flicker in the dark.",
             prestige_requirement: 5,
             min_level: 40,
             max_level: 55,
@@ -256,7 +256,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 4,
                     name: "Magma Core",
-                    description: "The heart of the volcano. The heat here doesn't just burn — it thinks.",
+                    description: "The heart of the volcano. The heat here doesn't just burn. It thinks.",
                     depth: 4,
                     boss: SubzoneBoss {
                         name: "Infernal Titan",
@@ -373,7 +373,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
         Zone {
             id: 8,
             name: "Sunken Kingdom",
-            description: "A drowned empire that refused to die. The sea took their land but not their pride — or their army.",
+            description: "A drowned empire that refused to die. The sea took their land but not their pride, or their army.",
             prestige_requirement: 15,
             min_level: 100,
             max_level: 115,
@@ -426,7 +426,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
         Zone {
             id: 9,
             name: "Floating Isles",
-            description: "Shattered fragments of earth hang in an open sky. The ground fell away long ago — only the stubborn parts remain.",
+            description: "Shattered fragments of earth hang in an open sky. The ground fell away long ago. Only the stubborn parts remain.",
             prestige_requirement: 20,
             min_level: 115,
             max_level: 130,
@@ -518,7 +518,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 4,
                     name: "Apex Spire",
-                    description: "The highest point in the world. The storm is not weather — it is a will.",
+                    description: "The highest point in the world. The storm is not weather. It is a will.",
                     depth: 4,
                     boss: SubzoneBoss {
                         name: "The Undying Storm",
@@ -531,7 +531,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
         Zone {
             id: 11,
             name: "The Expanse",
-            description: "Beyond the storm lies what was always there — raw, unformed reality stretching past the edges of the world.",
+            description: "Beyond the storm lies what was always there. Raw, unformed reality stretching past the edges of the world.",
             prestige_requirement: 0, // Unlocked by achievement, not prestige
             min_level: 150,
             max_level: u32::MAX,
