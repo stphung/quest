@@ -97,13 +97,13 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(4), // Description (longer flavor text)
-            Constraint::Length(1), // Spacer
-            Constraint::Length(5), // Difficulty selector
-            Constraint::Length(1), // Spacer
-            Constraint::Length(1), // Outcomes (now single line)
-            Constraint::Min(0),    // Spacer
-            Constraint::Length(1), // Help
+            Constraint::Length(4),  // Description (longer flavor text)
+            Constraint::Length(1),  // Spacer
+            Constraint::Length(12), // Difficulty selector (title + 4 options × 3 lines - 1)
+            Constraint::Length(1),  // Spacer
+            Constraint::Length(1),  // Outcomes (now single line)
+            Constraint::Min(0),     // Spacer
+            Constraint::Length(1),  // Help
         ])
         .split(inner);
 
@@ -210,56 +210,71 @@ fn render_difficulty_selector<D: DifficultyInfo>(
     );
     frame.render_widget(title, Rect { height: 1, ..area });
 
-    let options_area = Rect {
-        y: area.y + 1,
-        height: area.height.saturating_sub(1),
-        ..area
-    };
+    // Each option uses 3 lines: name + reward + blank (last has no trailing blank)
+    for (i, diff) in options.iter().enumerate() {
+        let row_y = area.y + 1 + (i as u16) * 3;
+        if row_y + 1 >= area.y + area.height {
+            break;
+        }
 
-    let items: Vec<ListItem> = options
-        .iter()
-        .enumerate()
-        .map(|(i, diff)| {
-            let is_selected = i == selected;
-            let prefix = if is_selected { "> " } else { "  " };
+        let is_selected = i == selected;
+        let prefix = if is_selected { "> " } else { "  " };
 
-            let prefix_style = if is_selected {
-                Style::default().fg(Color::Cyan)
-            } else {
-                Style::default()
-            };
-            let name_style = if is_selected {
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD)
-            } else {
-                Style::default().fg(Color::White)
-            };
-            let reward_style = if is_selected {
-                Style::default().fg(Color::Yellow)
-            } else {
-                Style::default().fg(Color::Gray)
-            };
+        let prefix_style = if is_selected {
+            Style::default().fg(Color::Cyan)
+        } else {
+            Style::default()
+        };
+        let name_style = if is_selected {
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Cyan)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD)
+        };
+        let reward_style = if is_selected {
+            Style::default().fg(Color::Yellow)
+        } else {
+            Style::default().fg(Color::DarkGray)
+        };
 
-            let mut spans = vec![
-                Span::styled(prefix, prefix_style),
-                Span::styled(format!("{:<12}", diff.name()), name_style),
-            ];
+        // Line 1: difficulty name + extra info
+        let mut name_spans = vec![
+            Span::styled(prefix, prefix_style),
+            Span::styled(diff.name(), name_style),
+        ];
+        if let Some(extra) = diff.extra_info() {
+            name_spans.push(Span::styled(
+                format!("  {}", extra),
+                Style::default().fg(Color::DarkGray),
+            ));
+        }
+        let name_line = Paragraph::new(Line::from(name_spans));
+        let name_area = Rect {
+            x: area.x,
+            y: row_y,
+            width: area.width,
+            height: 1,
+        };
+        frame.render_widget(name_line, name_area);
 
-            // Add extra info if present (e.g., ELO for chess)
-            if let Some(extra) = diff.extra_info() {
-                spans.push(Span::styled(
-                    format!("{:<14}", extra),
-                    Style::default().fg(Color::DarkGray),
-                ));
-            }
-
-            spans.push(Span::styled(diff.reward().description(), reward_style));
-
-            ListItem::new(Line::from(spans))
-        })
-        .collect();
-
-    let list = List::new(items);
-    frame.render_widget(list, options_area);
+        // Line 2: reward (indented)
+        let reward_line = Paragraph::new(Line::from(vec![
+            Span::styled("    ", Style::default()),
+            Span::styled(
+                format!("Win: {}", diff.reward().description()),
+                reward_style,
+            ),
+        ]));
+        let reward_area = Rect {
+            x: area.x,
+            y: row_y + 1,
+            width: area.width,
+            height: 1,
+        };
+        frame.render_widget(reward_line, reward_area);
+    }
 }
