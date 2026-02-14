@@ -343,10 +343,7 @@ fn render_difficulty_selector<D: DifficultyInfo>(
         // Line 2: reward (indented)
         let reward_line = Paragraph::new(Line::from(vec![
             Span::styled("    ", Style::default()),
-            Span::styled(
-                format!("Win: {}", diff.reward().description()),
-                reward_style,
-            ),
+            Span::styled(diff.reward().description(), reward_style),
         ]));
         let reward_area = Rect {
             x: area.x,
