@@ -5,6 +5,10 @@
 #![allow(dead_code)]
 
 use super::types::{CaughtFish, FishRarity, FishingPhase, FishingSession};
+use crate::core::constants::{
+    FISHING_SESSION_MAX_FISH, FISHING_SESSION_MIN_FISH, FISH_RARITY_BONUS_INTERVAL,
+    FISH_RARITY_COMMON_FLOOR,
+};
 use crate::items::Item;
 use rand::Rng;
 
@@ -67,8 +71,8 @@ const RANK_BONUS_PER_5: [f64; 5] = [-2.0, 1.0, 0.5, 0.3, 0.2];
 /// Base chances: Common 60%, Uncommon 25%, Rare 10%, Epic 4%, Legendary 1%
 /// Every 5 ranks: -2% Common, +1% Uncommon, +0.5% Rare, +0.3% Epic, +0.2% Legendary
 pub fn roll_fish_rarity(rank: u32, rng: &mut impl Rng) -> FishRarity {
-    // Calculate how many bonus tiers we get (1 per 5 ranks, starting from rank 5)
-    let bonus_tiers = rank.saturating_sub(1) / 5;
+    // Calculate how many bonus tiers we get (1 per FISH_RARITY_BONUS_INTERVAL ranks)
+    let bonus_tiers = rank.saturating_sub(1) / FISH_RARITY_BONUS_INTERVAL;
 
     // Calculate adjusted chances
     let mut chances = BASE_CHANCES;
@@ -77,7 +81,7 @@ pub fn roll_fish_rarity(rank: u32, rng: &mut impl Rng) -> FishRarity {
     }
 
     // Ensure Common doesn't go below a minimum (prevents negative)
-    chances[0] = chances[0].max(10.0);
+    chances[0] = chances[0].max(FISH_RARITY_COMMON_FLOOR);
 
     // Roll a number from 0.0 to 100.0
     let roll: f64 = rng.gen_range(0.0..100.0);
@@ -258,7 +262,7 @@ pub const REELING_TICKS_MAX: u32 = 30; // 3.0s maximum reel (fighter!)
 /// - Starts in Casting phase
 pub fn generate_fishing_session(rng: &mut impl Rng) -> FishingSession {
     let spot_name = SPOT_NAMES[rng.gen_range(0..SPOT_NAMES.len())].to_string();
-    let total_fish = rng.gen_range(3..=8);
+    let total_fish = rng.gen_range(FISHING_SESSION_MIN_FISH..=FISHING_SESSION_MAX_FISH);
 
     FishingSession {
         spot_name,

@@ -95,3 +95,61 @@ pub const PRESTIGE_CRIT_PER_RANK: f64 = 0.5;
 pub const PRESTIGE_CRIT_CAP: f64 = 15.0;
 pub const PRESTIGE_FLAT_HP_FACTOR: f64 = 15.0;
 pub const PRESTIGE_FLAT_HP_EXPONENT: f64 = 0.6;
+
+// Derived stat formulas
+pub const BASE_HP: i32 = 50;
+pub const HP_PER_CON_MODIFIER: i32 = 10;
+pub const BASE_PHYSICAL_DAMAGE: i32 = 5;
+pub const BASE_MAGIC_DAMAGE: i32 = 5;
+pub const DAMAGE_PER_STR_MODIFIER: i32 = 2;
+pub const DAMAGE_PER_INT_MODIFIER: i32 = 2;
+pub const BASE_CRIT_CHANCE_PERCENT: i32 = 5;
+pub const XP_MULT_PER_WIS_MODIFIER: f64 = 0.05;
+pub const BASE_CRIT_MULTIPLIER: f64 = 2.0;
+pub const PRESTIGE_MULT_PER_CHA_MODIFIER: f64 = 0.1;
+pub const AFFIX_PERCENT_DIVISOR: f64 = 100.0;
+
+// Mob rarity distribution thresholds
+pub const MOB_RARITY_COMMON_BASE: f64 = 0.60;
+pub const MOB_RARITY_MAGIC_BASE: f64 = 0.28;
+pub const MOB_RARITY_RARE_BASE: f64 = 0.10;
+pub const MOB_RARITY_COMMON_FLOOR: f64 = 0.20;
+pub const MOB_RARITY_HAVEN_BONUS_CAP: f64 = 0.25;
+pub const MOB_RARITY_RARE_BONUS_SHARE: f64 = 0.6;
+
+// Boss rarity distribution (normal boss)
+pub const BOSS_NORMAL_MAGIC_THRESHOLD: f64 = 0.40;
+pub const BOSS_NORMAL_RARE_THRESHOLD: f64 = 0.75;
+pub const BOSS_NORMAL_EPIC_THRESHOLD: f64 = 0.95;
+// Boss rarity distribution (final zone boss)
+pub const BOSS_FINAL_MAGIC_THRESHOLD: f64 = 0.20;
+pub const BOSS_FINAL_RARE_THRESHOLD: f64 = 0.60;
+pub const BOSS_FINAL_EPIC_THRESHOLD: f64 = 0.90;
+
+// Fishing session
+pub const FISHING_SESSION_MIN_FISH: u32 = 3;
+pub const FISHING_SESSION_MAX_FISH: u32 = 8;
+pub const FISH_RARITY_COMMON_FLOOR: f64 = 10.0;
+pub const FISH_RARITY_BONUS_INTERVAL: u32 = 5;
+
+// Fishing item drop chances by fish rarity
+pub const FISHING_DROP_CHANCE_COMMON: f64 = 0.05;
+pub const FISHING_DROP_CHANCE_UNCOMMON: f64 = 0.05;
+pub const FISHING_DROP_CHANCE_RARE: f64 = 0.15;
+pub const FISHING_DROP_CHANCE_EPIC: f64 = 0.35;
+pub const FISHING_DROP_CHANCE_LEGENDARY: f64 = 0.75;
+
+// Prestige level requirements
+pub const PRESTIGE_HIGH_RANK_THRESHOLD: u32 = 19;
+pub const PRESTIGE_HIGH_RANK_BASE_LEVEL: u32 = 220;
+pub const PRESTIGE_HIGH_RANK_LEVEL_STEP: u32 = 15;
+
+// Dungeon progression
+pub const DUNGEON_LEVEL_TIER_MEDIUM: u32 = 25;
+pub const DUNGEON_LEVEL_TIER_LARGE: u32 = 75;
+pub const DUNGEON_PRESTIGE_PER_SIZE_TIER: u32 = 2;
+pub const DUNGEON_SIZE_VARIATION_DOWN: f64 = 0.2;
+pub const DUNGEON_SIZE_VARIATION_UP: f64 = 0.8;
+
+// Level-up point distribution
+pub const LEVEL_UP_MAX_DISTRIBUTION_ATTEMPTS: u32 = 100;

@@ -1,4 +1,5 @@
 use super::attributes::{AttributeType, Attributes};
+use crate::core::constants::*;
 use crate::items::Equipment;
 
 #[derive(Debug, Clone, Copy)]
@@ -44,23 +45,25 @@ impl DerivedStats {
         let int_mod = total_attrs.modifier(AttributeType::Intelligence);
         let wis_mod = total_attrs.modifier(AttributeType::Wisdom);
 
-        // Max HP = 50 + (CON_mod × 10)
-        let mut max_hp = (50 + con_mod * 10).max(1) as u32;
+        // Max HP = BASE_HP + (CON_mod × HP_PER_CON_MODIFIER)
+        let mut max_hp = (BASE_HP + con_mod * HP_PER_CON_MODIFIER).max(1) as u32;
 
-        // Physical Damage = 5 + (STR_mod × 2)
-        let mut physical_damage = (5 + str_mod * 2).max(1) as u32;
+        // Physical Damage = BASE_PHYSICAL_DAMAGE + (STR_mod × DAMAGE_PER_STR_MODIFIER)
+        let mut physical_damage =
+            (BASE_PHYSICAL_DAMAGE + str_mod * DAMAGE_PER_STR_MODIFIER).max(1) as u32;
 
-        // Magic Damage = 5 + (INT_mod × 2)
-        let mut magic_damage = (5 + int_mod * 2).max(1) as u32;
+        // Magic Damage = BASE_MAGIC_DAMAGE + (INT_mod × DAMAGE_PER_INT_MODIFIER)
+        let mut magic_damage =
+            (BASE_MAGIC_DAMAGE + int_mod * DAMAGE_PER_INT_MODIFIER).max(1) as u32;
 
         // Defense = 0 + (DEX_mod × 1)
         let mut defense = dex_mod.max(0) as u32;
 
-        // Crit Chance = 5% + (DEX_mod × 1%)
-        let mut crit_chance_percent = (5 + dex_mod).max(0) as u32;
+        // Crit Chance = BASE_CRIT_CHANCE_PERCENT + (DEX_mod × 1%)
+        let mut crit_chance_percent = (BASE_CRIT_CHANCE_PERCENT + dex_mod).max(0) as u32;
 
-        // XP Multiplier = 1.0 + (WIS_mod × 0.05)
-        let mut xp_multiplier = 1.0 + (wis_mod as f64 * 0.05);
+        // XP Multiplier = 1.0 + (WIS_mod × XP_MULT_PER_WIS_MODIFIER)
+        let mut xp_multiplier = 1.0 + (wis_mod as f64 * XP_MULT_PER_WIS_MODIFIER);
 
         // Apply equipment affixes as multipliers/bonuses
         let mut hp_bonus: f64 = 0.0;
@@ -77,15 +80,19 @@ impl DerivedStats {
             for affix in &item.affixes {
                 use crate::items::types::AffixType;
                 match affix.affix_type {
-                    AffixType::DamagePercent => damage_mult *= 1.0 + (affix.value / 100.0),
+                    AffixType::DamagePercent => {
+                        damage_mult *= 1.0 + (affix.value / AFFIX_PERCENT_DIVISOR)
+                    }
                     AffixType::CritChance => crit_bonus += affix.value,
                     AffixType::CritMultiplier => crit_mult_bonus += affix.value,
                     AffixType::AttackSpeed => attack_speed_bonus += affix.value,
                     AffixType::HPBonus => hp_bonus += affix.value,
-                    AffixType::DamageReduction => defense_mult *= 1.0 + (affix.value / 100.0),
+                    AffixType::DamageReduction => {
+                        defense_mult *= 1.0 + (affix.value / AFFIX_PERCENT_DIVISOR)
+                    }
                     AffixType::HPRegen => hp_regen_bonus += affix.value,
                     AffixType::DamageReflection => damage_reflection += affix.value,
-                    AffixType::XPGain => xp_mult *= 1.0 + (affix.value / 100.0),
+                    AffixType::XPGain => xp_mult *= 1.0 + (affix.value / AFFIX_PERCENT_DIVISOR),
                 }
             }
         }
@@ -98,14 +105,14 @@ impl DerivedStats {
         crit_chance_percent = (crit_chance_percent as f64 + crit_bonus) as u32;
         xp_multiplier *= xp_mult;
 
-        // Base crit multiplier is 2.0x, affix adds percentage (e.g., +50% means 2.5x)
-        let crit_multiplier = 2.0 + (crit_mult_bonus / 100.0);
+        // Base crit multiplier, affix adds percentage (e.g., +50% means 2.5x)
+        let crit_multiplier = BASE_CRIT_MULTIPLIER + (crit_mult_bonus / AFFIX_PERCENT_DIVISOR);
 
         // Attack speed: higher = faster attacks (1.0 = normal, 1.25 = 25% faster)
-        let attack_speed_multiplier = 1.0 + (attack_speed_bonus / 100.0);
+        let attack_speed_multiplier = 1.0 + (attack_speed_bonus / AFFIX_PERCENT_DIVISOR);
 
         // HP regen: higher = faster regen (1.0 = normal, 1.5 = 50% faster)
-        let hp_regen_multiplier = 1.0 + (hp_regen_bonus / 100.0);
+        let hp_regen_multiplier = 1.0 + (hp_regen_bonus / AFFIX_PERCENT_DIVISOR);
 
         // Damage reflection: percentage of damage taken reflected back to attacker
         let damage_reflection_percent = damage_reflection;
@@ -149,7 +156,7 @@ impl DerivedStats {
 
     pub fn prestige_multiplier(base_multiplier: f64, attrs: &Attributes) -> f64 {
         let cha_mod = attrs.modifier(AttributeType::Charisma);
-        base_multiplier + (cha_mod as f64 * 0.1)
+        base_multiplier + (cha_mod as f64 * PRESTIGE_MULT_PER_CHA_MODIFIER)
     }
 }
 
