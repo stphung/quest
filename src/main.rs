@@ -83,6 +83,7 @@ fn apply_offline_xp(state: &mut GameState, haven: &haven::Haven) -> Option<Offli
     }
 }
 
+#[derive(Clone, Copy, PartialEq)]
 enum Screen {
     CharacterSelect,
     CharacterCreation,
@@ -425,8 +426,14 @@ fn main() -> io::Result<()> {
         show_startup_update_notification(&mut terminal, &update_info)?;
     }
 
-    // Main loop
+    // Main loop — clear terminal on screen transitions to prevent
+    // stale cells from wide characters (emoji) in the ratatui diff.
+    let mut prev_screen = current_screen;
     loop {
+        if current_screen != prev_screen {
+            terminal.clear()?;
+            prev_screen = current_screen;
+        }
         match current_screen {
             Screen::CharacterCreation => {
                 // Draw character creation screen
