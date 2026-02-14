@@ -173,34 +173,55 @@ fn test_tick_event_player_died_in_dungeon() {
     let dungeon = generate_dungeon(state.character_level, state.prestige_rank, 1);
     state.active_dungeon = Some(dungeon);
 
-    let events = run_ticks_collecting(
-        &mut state,
-        &mut tick_counter,
-        &mut haven,
-        &mut achievements,
-        &mut rng,
-        10_000,
-    );
+    // Run ticks one at a time, stop after dungeon death/failure
+    let mut all_events = Vec::new();
+    let mut died_in_dungeon = false;
+    for _ in 0..10_000 {
+        let result = game_tick(
+            &mut state,
+            &mut tick_counter,
+            &mut haven,
+            &mut achievements,
+            false,
+            &mut rng,
+        );
+        for event in &result.events {
+            if matches!(
+                event,
+                TickEvent::PlayerDiedInDungeon { .. } | TickEvent::DungeonFailed { .. }
+            ) {
+                died_in_dungeon = true;
+            }
+        }
+        all_events.extend(result.events);
+        if died_in_dungeon {
+            break;
+        }
+    }
 
-    let dungeon_death = events
+    let dungeon_death = all_events
         .iter()
         .any(|e| matches!(e, TickEvent::PlayerDiedInDungeon { .. }));
 
-    let dungeon_failed = events
+    let dungeon_failed = all_events
         .iter()
         .any(|e| matches!(e, TickEvent::DungeonFailed { .. }));
 
     // Either PlayerDiedInDungeon or DungeonFailed should appear
-    if dungeon_death || dungeon_failed {
-        assert!(
-            state.active_dungeon.is_none(),
-            "Dungeon should be cleared after death"
-        );
-    }
+    assert!(
+        dungeon_death || dungeon_failed,
+        "Player with 1 HP should die in dungeon"
+    );
+
+    // Dungeon should be cleared immediately after death
+    assert!(
+        state.active_dungeon.is_none(),
+        "Dungeon should be cleared after death"
+    );
 
     // If we got a PlayerDiedInDungeon, verify the message mentions dungeon/escaped
     if dungeon_death {
-        let death_event = events
+        let death_event = all_events
             .iter()
             .find(|e| matches!(e, TickEvent::PlayerDiedInDungeon { .. }))
             .unwrap();
