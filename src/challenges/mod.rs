@@ -1,4 +1,4 @@
-//! Challenge minigames: Chess, Gomoku, Minesweeper, Morris, Rune, Go.
+//! Challenge minigames: Chess, Gomoku, Minesweeper, Morris, Rune, Go, JezzBall.
 
 #![allow(unused_imports)]
 
@@ -34,6 +34,7 @@ pub mod chess;
 pub mod flappy;
 pub mod go;
 pub mod gomoku;
+pub mod jezzball;
 pub mod menu;
 pub mod minesweeper;
 pub mod morris;
@@ -44,6 +45,10 @@ pub use chess::{ChessDifficulty, ChessGame, ChessResult};
 pub use flappy::{FlappyBirdDifficulty, FlappyBirdGame, FlappyBirdResult};
 pub use go::{GoDifficulty, GoGame, GoMove, GoResult, Stone, BOARD_SIZE as GO_BOARD_SIZE};
 pub use gomoku::{GomokuDifficulty, GomokuGame, GomokuResult, Player as GomokuPlayer, BOARD_SIZE};
+pub use jezzball::{
+    ActiveWall, Ball as JezzballBall, JezzballDifficulty, JezzballGame, JezzballResult,
+    Position as JezzballPosition, WallOrientation,
+};
 pub use menu::*;
 pub use minesweeper::{MinesweeperDifficulty, MinesweeperGame, MinesweeperResult};
 pub use morris::{
@@ -62,13 +67,14 @@ pub enum ActiveMinigame {
     Minesweeper(MinesweeperGame),
     Rune(RuneGame),
     Go(GoGame),
+    Jezzball(JezzballGame),
     Snake(SnakeGame),
 }
 
 /// Information about a minigame win for achievement tracking.
 #[derive(Debug, Clone)]
 pub struct MinigameWinInfo {
-    /// The type of game: "chess", "morris", "gomoku", "minesweeper", "rune", "go"
+    /// The type of game: "chess", "morris", "gomoku", "minesweeper", "rune", "go", etc.
     pub game_type: &'static str,
     /// The difficulty level: "novice", "apprentice", "journeyman", "master"
     pub difficulty: &'static str,

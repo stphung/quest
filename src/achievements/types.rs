@@ -143,6 +143,11 @@ pub enum AchievementId {
     SnakeApprentice,
     SnakeJourneyman,
     SnakeMaster,
+    // Challenge achievements - Containment Breach
+    ContainmentBreachNovice,
+    ContainmentBreachApprentice,
+    ContainmentBreachJourneyman,
+    ContainmentBreachMaster,
     // Challenge achievements - Meta
     GrandChampion,
 
@@ -616,7 +621,7 @@ impl Achievements {
     // =========================================================================
 
     /// Called when a minigame is won.
-    /// game_type: "chess", "morris", "gomoku", "minesweeper", "rune", "go"
+    /// game_type: "chess", "morris", "gomoku", "minesweeper", "rune", "go", "flappy_bird", "snake", "jezzball"
     /// difficulty: "novice", "apprentice", "journeyman", "master"
     pub fn on_minigame_won(
         &mut self,
@@ -660,6 +665,10 @@ impl Achievements {
             ("snake", "apprentice") => Some(AchievementId::SnakeApprentice),
             ("snake", "journeyman") => Some(AchievementId::SnakeJourneyman),
             ("snake", "master") => Some(AchievementId::SnakeMaster),
+            ("jezzball", "novice") => Some(AchievementId::ContainmentBreachNovice),
+            ("jezzball", "apprentice") => Some(AchievementId::ContainmentBreachApprentice),
+            ("jezzball", "journeyman") => Some(AchievementId::ContainmentBreachJourneyman),
+            ("jezzball", "master") => Some(AchievementId::ContainmentBreachMaster),
             _ => None,
         };
 

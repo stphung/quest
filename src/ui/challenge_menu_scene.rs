@@ -4,6 +4,7 @@ use crate::challenges::chess::ChessDifficulty;
 use crate::challenges::flappy::FlappyBirdDifficulty;
 use crate::challenges::go::GoDifficulty;
 use crate::challenges::gomoku::GomokuDifficulty;
+use crate::challenges::jezzball::JezzballDifficulty;
 use crate::challenges::menu::{ChallengeMenu, ChallengeType, DifficultyInfo};
 use crate::challenges::minesweeper::MinesweeperDifficulty;
 use crate::challenges::morris::MorrisDifficulty;
@@ -94,18 +95,41 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
+    // Split into body + help so body can flex while help stays anchored.
+    let outer_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(0), Constraint::Length(1)])
+        .split(inner);
+
+    const DIFFICULTY_HEIGHT: u16 = 12;
+    const TAIL_HEIGHT_WITHOUT_DIFFICULTY: u16 = 3; // spacer + spacer + outcomes
+
+    // Size description to actual wrapped text height so difficulty options sit
+    // directly below it, instead of being visually pinned near the bottom.
+    let wrapped_lines =
+        estimate_wrapped_line_count(&challenge.description, outer_chunks[0].width.max(1));
+    let max_desc_for_full_difficulty = outer_chunks[0]
+        .height
+        .saturating_sub(DIFFICULTY_HEIGHT + TAIL_HEIGHT_WITHOUT_DIFFICULTY)
+        .max(1);
+    let description_height = wrapped_lines.clamp(1, max_desc_for_full_difficulty);
+
+    let difficulty_height = DIFFICULTY_HEIGHT.min(
+        outer_chunks[0]
+            .height
+            .saturating_sub(description_height + TAIL_HEIGHT_WITHOUT_DIFFICULTY),
+    );
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(4),  // Description (longer flavor text)
-            Constraint::Length(1),  // Spacer
-            Constraint::Length(12), // Difficulty selector (title + 4 options × 3 lines - 1)
-            Constraint::Length(1),  // Spacer
-            Constraint::Length(1),  // Outcomes (now single line)
-            Constraint::Min(0),     // Spacer
-            Constraint::Length(1),  // Help
+            Constraint::Length(description_height), // Description wraps naturally
+            Constraint::Length(1),                  // Spacer
+            Constraint::Length(difficulty_height),  // Difficulty selector
+            Constraint::Length(1),                  // Spacer
+            Constraint::Length(1),                  // Outcomes
         ])
-        .split(inner);
+        .split(outer_chunks[0]);
 
     // Description (with text wrapping)
     let desc = Paragraph::new(challenge.description.clone())
@@ -171,6 +195,14 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
                 menu.selected_difficulty,
             );
         }
+        ChallengeType::Jezzball => {
+            render_difficulty_selector(
+                frame,
+                chunks[2],
+                &JezzballDifficulty::ALL,
+                menu.selected_difficulty,
+            );
+        }
         ChallengeType::Snake => {
             render_difficulty_selector(
                 frame,
@@ -193,7 +225,54 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
     // Help text
     let help = Paragraph::new("[↑/↓] Difficulty  [Enter] Play  [D] Walk away  [Esc] Back")
         .style(Style::default().fg(Color::DarkGray));
-    frame.render_widget(help, chunks[6]);
+    frame.render_widget(help, outer_chunks[1]);
+}
+
+/// Estimate wrapped line count for word-wrapped text in a fixed-width area.
+fn estimate_wrapped_line_count(text: &str, width: u16) -> u16 {
+    let width = usize::from(width.max(1));
+    let mut total_lines: usize = 0;
+
+    for raw_line in text.lines() {
+        if raw_line.trim().is_empty() {
+            total_lines += 1;
+            continue;
+        }
+
+        let mut current_len = 0usize;
+        for word in raw_line.split_whitespace() {
+            let word_len = word.len();
+
+            if current_len == 0 {
+                if word_len <= width {
+                    current_len = word_len;
+                } else {
+                    total_lines += word_len.div_ceil(width).saturating_sub(1);
+                    current_len = word_len % width;
+                    if current_len == 0 {
+                        current_len = width;
+                    }
+                }
+            } else if current_len + 1 + word_len <= width {
+                current_len += 1 + word_len;
+            } else {
+                total_lines += 1;
+                if word_len <= width {
+                    current_len = word_len;
+                } else {
+                    total_lines += word_len.div_ceil(width).saturating_sub(1);
+                    current_len = word_len % width;
+                    if current_len == 0 {
+                        current_len = width;
+                    }
+                }
+            }
+        }
+
+        total_lines += 1;
+    }
+
+    total_lines.max(1) as u16
 }
 
 /// Generic difficulty selector that works with any type implementing DifficultyInfo
@@ -264,10 +343,7 @@ fn render_difficulty_selector<D: DifficultyInfo>(
         // Line 2: reward (indented)
         let reward_line = Paragraph::new(Line::from(vec![
             Span::styled("    ", Style::default()),
-            Span::styled(
-                format!("Win: {}", diff.reward().description()),
-                reward_style,
-            ),
+            Span::styled(diff.reward().description(), reward_style),
         ]));
         let reward_area = Rect {
             x: area.x,

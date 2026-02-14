@@ -878,15 +878,21 @@ fn main() -> io::Result<()> {
                         );
                     })?;
 
-                    // Adaptive polling: non-blocking drain in realtime mode, 50ms block otherwise
+                    // Adaptive polling:
+                    // - Realtime minigames: block only until the next frame boundary to avoid
+                    //   busy-spinning and burning CPU between updates.
+                    // - Normal mode: 50ms block to keep idle CPU low while responsive.
                     let realtime_mode = is_realtime_minigame(&state);
-                    let poll_duration = if realtime_mode {
-                        Duration::ZERO
+                    let mut poll_duration = if realtime_mode {
+                        Duration::from_millis(REALTIME_FRAME_MS)
+                            .saturating_sub(last_flappy_frame.elapsed())
                     } else {
                         Duration::from_millis(50)
                     };
 
-                    // Drain all available events (critical for responsive input at 30+ FPS)
+                    // Drain available events.
+                    // In realtime mode, first poll may block until next frame; subsequent polls
+                    // are non-blocking so we can flush queued input quickly.
                     while event::poll(poll_duration)? {
                         if let Event::Key(key_event) = event::read()? {
                             // Only handle key press events (ignore release/repeat)
@@ -958,6 +964,7 @@ fn main() -> io::Result<()> {
                         if !realtime_mode {
                             break;
                         }
+                        poll_duration = Duration::ZERO;
                     }
 
                     // Flappy Bird real-time tick (~30 FPS)
@@ -976,6 +983,14 @@ fn main() -> io::Result<()> {
                                 state.active_minigame
                             {
                                 challenges::snake::logic::tick_snake(game, dt.as_millis() as u64);
+                            }
+                            if let Some(challenges::ActiveMinigame::Jezzball(ref mut game)) =
+                                state.active_minigame
+                            {
+                                challenges::jezzball::logic::tick_jezzball(
+                                    game,
+                                    dt.as_millis() as u64,
+                                );
                             }
                             last_flappy_frame = Instant::now();
                         }
@@ -1115,6 +1130,7 @@ fn is_realtime_minigame(state: &GameState) -> bool {
     matches!(
         state.active_minigame,
         Some(challenges::ActiveMinigame::FlappyBird(_))
+            | Some(challenges::ActiveMinigame::Jezzball(_))
             | Some(challenges::ActiveMinigame::Snake(_))
     )
 }
