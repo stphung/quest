@@ -436,8 +436,8 @@ pub fn render_haven_discovery_modal(
     _ctx: &super::responsive::LayoutContext,
 ) {
     // Center the modal
-    let modal_width = 50u16.min(area.width.saturating_sub(4));
-    let modal_height = 7u16.min(area.height.saturating_sub(4));
+    let modal_width = 52u16.min(area.width.saturating_sub(4));
+    let modal_height = 10u16.min(area.height.saturating_sub(4));
     let x = area.x + (area.width.saturating_sub(modal_width)) / 2;
     let y = area.y + (area.height.saturating_sub(modal_height)) / 2;
     let modal_area = Rect::new(x, y, modal_width, modal_height);
@@ -445,7 +445,7 @@ pub fn render_haven_discovery_modal(
     frame.render_widget(Clear, modal_area);
 
     let block = Block::default()
-        .title(" Discovery! ")
+        .title(" \u{25b6} New System Unlocked \u{25c0} ")
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Yellow));
 
@@ -455,18 +455,33 @@ pub fn render_haven_discovery_modal(
     let text = Paragraph::new(vec![
         Line::from(""),
         Line::from(Span::styled(
-            "🏠 You discovered a Haven!",
+            "\u{1f3e0} You discovered a Haven!",
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
         Line::from(Span::styled(
-            "Press [H] to visit and build your base.",
-            Style::default().fg(Color::White),
+            "Through the trees, a clearing opens up.",
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::ITALIC),
         )),
         Line::from(Span::styled(
-            "[Enter] to continue",
+            "Ancient stones hum with quiet power.",
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::ITALIC),
+        )),
+        Line::from(Span::styled(
+            "This place could become a stronghold.",
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::ITALIC),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Press [H] to visit. [Enter] to dismiss.",
             Style::default().fg(Color::DarkGray),
         )),
     ])
