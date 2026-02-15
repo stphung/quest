@@ -1,8 +1,8 @@
-//! Blacksmith UI rendering: equipment enhancement overlay with animations.
+//! Soulforge UI rendering: equipment enhancement overlay with animations.
 
 use crate::enhancement::{
-    enhancement_cost, enhancement_multiplier, fail_penalty, success_rate, BlacksmithPhase,
-    BlacksmithUiState, EnhancementProgress, MAX_ENHANCEMENT_LEVEL,
+    enhancement_cost, enhancement_multiplier, fail_penalty, success_rate, EnhancementProgress,
+    SoulforgePhase, SoulforgeUiState, MAX_ENHANCEMENT_LEVEL,
 };
 use crate::items::EquipmentSlot;
 use ratatui::{
@@ -35,11 +35,11 @@ fn level_color(level: u8) -> Color {
     }
 }
 
-/// Render the blacksmith overlay
-pub fn render_blacksmith(
+/// Render the soulforge overlay
+pub fn render_soulforge(
     frame: &mut Frame,
     area: Rect,
-    blacksmith_ui: &BlacksmithUiState,
+    soulforge_ui: &SoulforgeUiState,
     enhancement: &EnhancementProgress,
     prestige_rank: u32,
     _ctx: &super::responsive::LayoutContext,
@@ -54,7 +54,7 @@ pub fn render_blacksmith(
     frame.render_widget(Clear, overlay_area);
 
     let title = format!(
-        " \u{2692} The Blacksmith  [Prestige Ranks: {}] ",
+        " \u{2692} The Soulforge  [Prestige Ranks: {}] ",
         prestige_rank
     );
     let block = Block::default()
@@ -65,21 +65,21 @@ pub fn render_blacksmith(
     let inner = block.inner(overlay_area);
     frame.render_widget(block, overlay_area);
 
-    match blacksmith_ui.phase {
-        BlacksmithPhase::Menu => {
-            render_menu(frame, inner, blacksmith_ui, enhancement, prestige_rank);
+    match soulforge_ui.phase {
+        SoulforgePhase::Menu => {
+            render_menu(frame, inner, soulforge_ui, enhancement, prestige_rank);
         }
-        BlacksmithPhase::Confirming => {
-            render_confirming(frame, inner, blacksmith_ui, enhancement, prestige_rank);
+        SoulforgePhase::Confirming => {
+            render_confirming(frame, inner, soulforge_ui, enhancement, prestige_rank);
         }
-        BlacksmithPhase::Hammering => {
-            render_hammering(frame, inner, blacksmith_ui, enhancement);
+        SoulforgePhase::Hammering => {
+            render_hammering(frame, inner, soulforge_ui, enhancement);
         }
-        BlacksmithPhase::ResultSuccess => {
-            render_success(frame, inner, blacksmith_ui);
+        SoulforgePhase::ResultSuccess => {
+            render_success(frame, inner, soulforge_ui);
         }
-        BlacksmithPhase::ResultFailure => {
-            render_failure(frame, inner, blacksmith_ui);
+        SoulforgePhase::ResultFailure => {
+            render_failure(frame, inner, soulforge_ui);
         }
     }
 }
@@ -88,7 +88,7 @@ pub fn render_blacksmith(
 fn render_menu(
     frame: &mut Frame,
     area: Rect,
-    blacksmith_ui: &BlacksmithUiState,
+    soulforge_ui: &SoulforgeUiState,
     enhancement: &EnhancementProgress,
     prestige_rank: u32,
 ) {
@@ -107,7 +107,7 @@ fn render_menu(
         ])
         .split(area);
 
-    // Flavor text from the blacksmith
+    // Flavor text from the soulforge
     let flavor = Paragraph::new(
         "\u{201c}What I do here is forge the bond between warrior and \
          armament. The gear may change, but my work never fades. \
@@ -129,7 +129,7 @@ fn render_menu(
             break;
         }
         let row_area = Rect::new(slot_area.x, slot_area.y + i as u16, slot_area.width, 1);
-        let is_selected = i == blacksmith_ui.selected_slot;
+        let is_selected = i == soulforge_ui.selected_slot;
         let current_level = enhancement.level(i);
 
         let mut spans = Vec::new();
@@ -196,7 +196,7 @@ fn render_menu(
     }
 
     // Detail panel for selected slot
-    let selected_level = enhancement.level(blacksmith_ui.selected_slot);
+    let selected_level = enhancement.level(soulforge_ui.selected_slot);
     let detail_area = chunks[4];
 
     if selected_level >= MAX_ENHANCEMENT_LEVEL {
@@ -309,7 +309,7 @@ fn render_menu(
 fn render_confirming(
     frame: &mut Frame,
     area: Rect,
-    blacksmith_ui: &BlacksmithUiState,
+    soulforge_ui: &SoulforgeUiState,
     enhancement: &EnhancementProgress,
     prestige_rank: u32,
 ) {
@@ -322,7 +322,7 @@ fn render_confirming(
         ])
         .split(area);
 
-    let slot_index = blacksmith_ui.selected_slot;
+    let slot_index = soulforge_ui.selected_slot;
     let slot = SLOT_ORDER[slot_index];
     let current_level = enhancement.level(slot_index);
     let target_level = current_level + 1;
@@ -386,10 +386,10 @@ fn render_confirming(
 fn render_hammering(
     frame: &mut Frame,
     area: Rect,
-    blacksmith_ui: &BlacksmithUiState,
+    soulforge_ui: &SoulforgeUiState,
     enhancement: &EnhancementProgress,
 ) {
-    let tick = blacksmith_ui.animation_tick;
+    let tick = soulforge_ui.animation_tick;
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -436,7 +436,7 @@ fn render_hammering(
         &hammer_raised
     };
 
-    let slot_index = blacksmith_ui.selected_slot;
+    let slot_index = soulforge_ui.selected_slot;
     let slot = SLOT_ORDER[slot_index];
     let current_level = enhancement.level(slot_index);
     let item_display = format!("{} +{}", slot.name(), current_level);
@@ -533,8 +533,8 @@ fn render_hammering(
 }
 
 /// Render the success animation
-fn render_success(frame: &mut Frame, area: Rect, blacksmith_ui: &BlacksmithUiState) {
-    let tick = blacksmith_ui.animation_tick;
+fn render_success(frame: &mut Frame, area: Rect, soulforge_ui: &SoulforgeUiState) {
+    let tick = soulforge_ui.animation_tick;
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -545,7 +545,7 @@ fn render_success(frame: &mut Frame, area: Rect, blacksmith_ui: &BlacksmithUiSta
         ])
         .split(area);
 
-    let result = blacksmith_ui.last_result.as_ref().unwrap();
+    let result = soulforge_ui.last_result.as_ref().unwrap();
     let slot = SLOT_ORDER[result.slot_index];
     let item_name = slot.name();
 
@@ -611,8 +611,8 @@ fn render_success(frame: &mut Frame, area: Rect, blacksmith_ui: &BlacksmithUiSta
 }
 
 /// Render the failure animation
-fn render_failure(frame: &mut Frame, area: Rect, blacksmith_ui: &BlacksmithUiState) {
-    let tick = blacksmith_ui.animation_tick;
+fn render_failure(frame: &mut Frame, area: Rect, soulforge_ui: &SoulforgeUiState) {
+    let tick = soulforge_ui.animation_tick;
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -623,7 +623,7 @@ fn render_failure(frame: &mut Frame, area: Rect, blacksmith_ui: &BlacksmithUiSta
         ])
         .split(area);
 
-    let result = blacksmith_ui.last_result.as_ref().unwrap();
+    let result = soulforge_ui.last_result.as_ref().unwrap();
 
     // Shake offset for first 5 ticks
     let shake_offset = if tick < 5 {
@@ -669,8 +669,8 @@ fn render_failure(frame: &mut Frame, area: Rect, blacksmith_ui: &BlacksmithUiSta
     frame.render_widget(text, chunks[1]);
 }
 
-/// Render the Blacksmith discovery modal
-pub fn render_blacksmith_discovery_modal(
+/// Render the Soulforge discovery modal
+pub fn render_soulforge_discovery_modal(
     frame: &mut Frame,
     area: Rect,
     _ctx: &super::responsive::LayoutContext,
@@ -695,7 +695,7 @@ pub fn render_blacksmith_discovery_modal(
     let text = Paragraph::new(vec![
         Line::from(""),
         Line::from(Span::styled(
-            "\u{2692}\u{fe0f} A wandering Blacksmith has set up shop!",
+            "\u{2692}\u{fe0f} A wandering Soulforge has set up shop!",
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),

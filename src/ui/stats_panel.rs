@@ -689,7 +689,7 @@ pub(super) fn draw_footer_compact(
     area: Rect,
     game_state: &GameState,
     haven_discovered: bool,
-    blacksmith_discovered: bool,
+    soulforge_discovered: bool,
     pending_achievements: usize,
 ) {
     use crate::character::prestige::can_prestige;
@@ -712,7 +712,7 @@ pub(super) fn draw_footer_compact(
         Span::raw("")
     };
 
-    let blacksmith_span = if blacksmith_discovered {
+    let soulforge_span = if soulforge_discovered {
         Span::styled(" [B]Smith", Style::default().fg(Color::Yellow))
     } else {
         Span::raw("")
@@ -746,7 +746,7 @@ pub(super) fn draw_footer_compact(
         Span::raw(" "),
         prestige_span,
         haven_span,
-        blacksmith_span,
+        soulforge_span,
         ach_span,
         challenge_span,
     ]);
@@ -915,7 +915,7 @@ pub fn draw_footer(
     _update_expanded: bool,
     update_check_completed: bool,
     haven_discovered: bool,
-    blacksmith_discovered: bool,
+    soulforge_discovered: bool,
     pending_achievements: usize,
     _ctx: &LayoutContext,
 ) {
@@ -980,9 +980,9 @@ pub fn draw_footer(
         Span::raw("")
     };
 
-    // Build Blacksmith hint text
-    let blacksmith_text = if blacksmith_discovered {
-        Span::styled("    [B] Blacksmith", Style::default().fg(Color::Yellow))
+    // Build Soulforge hint text
+    let soulforge_text = if soulforge_discovered {
+        Span::styled("    [B] Soulforge", Style::default().fg(Color::Yellow))
     } else {
         Span::raw("")
     };
@@ -1005,7 +1005,7 @@ pub fn draw_footer(
             Span::raw("    "),
             prestige_text,
             haven_text,
-            blacksmith_text,
+            soulforge_text,
         ]),
         Line::from(vec![achievements_text, challenge_text, update_status_text]),
     ];

@@ -179,8 +179,8 @@ pub enum TickEvent {
     /// The Haven was discovered (P10+ idle roll).
     HavenDiscovered,
 
-    /// The Blacksmith was discovered (P15+ idle roll).
-    BlacksmithDiscovered,
+    /// The Soulforge was discovered (P15+ idle roll).
+    SoulforgeDiscovered,
 
     // ── Achievements ────────────────────────────────────────────
     /// An achievement was unlocked during this tick.
@@ -228,7 +228,7 @@ pub struct TickResult {
 /// - `tick_counter` — Counts ticks for play-time tracking (10 ticks = 1 second).
 ///   Caller owns this counter across ticks.
 /// - `haven` — Mutable Haven state for bonus calculations and discovery.
-/// - `enhancement` — Mutable Enhancement state for blacksmith discovery.
+/// - `enhancement` — Mutable Enhancement state for soulforge discovery.
 /// - `achievements` — Mutable achievement state for unlock tracking.
 /// - `debug_mode` — When true, suppresses achievement/haven-save signals.
 /// - `rng` — Random number generator (any `impl Rng`). Pass
@@ -765,18 +765,18 @@ pub fn game_tick<R: Rng>(
         }
     }
 
-    // ── 11. Blacksmith discovery check ────────────────────────────
+    // ── 11. Soulforge discovery check ────────────────────────────
     // Independent roll per tick, only when eligible (P15+, no active content)
     if !enhancement.discovered
-        && state.prestige_rank >= crate::enhancement::BLACKSMITH_MIN_PRESTIGE_RANK
+        && state.prestige_rank >= crate::enhancement::SOULFORGE_MIN_PRESTIGE_RANK
         && state.active_dungeon.is_none()
         && state.active_fishing.is_none()
         && state.active_minigame.is_none()
-        && crate::enhancement::try_discover_blacksmith(enhancement, state.prestige_rank, rng)
+        && crate::enhancement::try_discover_soulforge(enhancement, state.prestige_rank, rng)
     {
-        // Track Blacksmith discovery achievement
-        achievements.on_blacksmith_discovered(Some(&state.character_name));
-        result.events.push(TickEvent::BlacksmithDiscovered);
+        // Track Soulforge discovery achievement
+        achievements.on_soulforge_discovered(Some(&state.character_name));
+        result.events.push(TickEvent::SoulforgeDiscovered);
         result.enhancement_changed = true;
         if !debug_mode {
             result.achievements_changed = true;

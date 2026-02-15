@@ -79,14 +79,14 @@ impl HavenUiState {
     }
 }
 
-// Re-export blacksmith UI types from enhancement module
-pub use crate::enhancement::{BlacksmithPhase, BlacksmithUiState, EnhancementResult};
+// Re-export soulforge UI types from enhancement module
+pub use crate::enhancement::{EnhancementResult, SoulforgePhase, SoulforgeUiState};
 
 /// Game-screen overlay state. At most one is active at a time.
 pub enum GameOverlay {
     None,
     HavenDiscovery,
-    BlacksmithDiscovery,
+    SoulforgeDiscovery,
     PrestigeConfirm,
     VaultSelection {
         selected_index: usize,
@@ -129,7 +129,7 @@ pub fn handle_game_input(
     state: &mut GameState,
     haven: &mut Haven,
     haven_ui: &mut HavenUiState,
-    blacksmith_ui: &mut BlacksmithUiState,
+    soulforge_ui: &mut SoulforgeUiState,
     enhancement: &mut enhancement::EnhancementProgress,
     overlay: &mut GameOverlay,
     debug_menu: &mut DebugMenu,
@@ -173,9 +173,9 @@ pub fn handle_game_input(
         return handle_haven_discovery(key, overlay);
     }
 
-    // 1a. Blacksmith discovery modal (blocks all other input)
-    if matches!(overlay, GameOverlay::BlacksmithDiscovery) {
-        return handle_blacksmith_discovery(key, overlay);
+    // 1a. Soulforge discovery modal (blocks all other input)
+    if matches!(overlay, GameOverlay::SoulforgeDiscovery) {
+        return handle_soulforge_discovery(key, overlay);
     }
 
     // 1b. Achievement unlocked modal (blocks all other input)
@@ -188,9 +188,9 @@ pub fn handle_game_input(
         return handle_haven(key, state, haven, haven_ui, achievements);
     }
 
-    // 2.5. Blacksmith overlay
-    if blacksmith_ui.open {
-        return handle_blacksmith(key, blacksmith_ui, enhancement, state.prestige_rank);
+    // 2.5. Soulforge overlay
+    if soulforge_ui.open {
+        return handle_soulforge(key, soulforge_ui, enhancement, state.prestige_rank);
     }
 
     // 3. Vault item selection
@@ -236,7 +236,7 @@ pub fn handle_game_input(
         state,
         haven,
         haven_ui,
-        blacksmith_ui,
+        soulforge_ui,
         enhancement,
         overlay,
         achievements,
@@ -252,33 +252,33 @@ fn handle_haven_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> InputResu
     InputResult::Continue
 }
 
-fn handle_blacksmith_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
+fn handle_soulforge_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
     if matches!(key.code, KeyCode::Enter | KeyCode::Esc) {
         *overlay = GameOverlay::None;
     }
     InputResult::Continue
 }
 
-fn handle_blacksmith(
+fn handle_soulforge(
     key: KeyEvent,
-    blacksmith_ui: &mut BlacksmithUiState,
+    soulforge_ui: &mut SoulforgeUiState,
     enhancement: &enhancement::EnhancementProgress,
     prestige_rank: u32,
 ) -> InputResult {
-    match blacksmith_ui.phase {
-        BlacksmithPhase::Menu => match key.code {
+    match soulforge_ui.phase {
+        SoulforgePhase::Menu => match key.code {
             KeyCode::Up => {
-                blacksmith_ui.selected_slot = blacksmith_ui.selected_slot.saturating_sub(1);
+                soulforge_ui.selected_slot = soulforge_ui.selected_slot.saturating_sub(1);
                 InputResult::Continue
             }
             KeyCode::Down => {
-                if blacksmith_ui.selected_slot < 6 {
-                    blacksmith_ui.selected_slot += 1;
+                if soulforge_ui.selected_slot < 6 {
+                    soulforge_ui.selected_slot += 1;
                 }
                 InputResult::Continue
             }
             KeyCode::Enter => {
-                let slot_index = blacksmith_ui.selected_slot;
+                let slot_index = soulforge_ui.selected_slot;
                 let current_level = enhancement.level(slot_index);
 
                 // Check: level < max, can afford (slot enhancement is independent of equipped item)
@@ -286,20 +286,20 @@ fn handle_blacksmith(
                     let target_level = current_level + 1;
                     let cost = enhancement::enhancement_cost(target_level);
                     if prestige_rank >= cost {
-                        blacksmith_ui.phase = BlacksmithPhase::Confirming;
+                        soulforge_ui.phase = SoulforgePhase::Confirming;
                     }
                 }
                 InputResult::Continue
             }
             KeyCode::Esc => {
-                blacksmith_ui.close();
+                soulforge_ui.close();
                 InputResult::Continue
             }
             _ => InputResult::Continue,
         },
-        BlacksmithPhase::Confirming => match key.code {
+        SoulforgePhase::Confirming => match key.code {
             KeyCode::Enter => {
-                let slot_index = blacksmith_ui.selected_slot;
+                let slot_index = soulforge_ui.selected_slot;
                 let current_level = enhancement.level(slot_index);
                 let target_level = current_level + 1;
                 let cost = enhancement::enhancement_cost(target_level);
@@ -308,31 +308,31 @@ fn handle_blacksmith(
                 let mut rng = rand::rng();
                 let (success, new_level) = enhancement::roll_enhancement(current_level, &mut rng);
 
-                blacksmith_ui.last_result = Some(EnhancementResult {
+                soulforge_ui.last_result = Some(EnhancementResult {
                     slot_index,
                     success,
                     old_level: current_level,
                     new_level,
                     cost,
                 });
-                blacksmith_ui.phase = BlacksmithPhase::Hammering;
-                blacksmith_ui.animation_tick = 0;
+                soulforge_ui.phase = SoulforgePhase::Hammering;
+                soulforge_ui.animation_tick = 0;
 
                 InputResult::Continue
             }
             KeyCode::Esc => {
-                blacksmith_ui.phase = BlacksmithPhase::Menu;
+                soulforge_ui.phase = SoulforgePhase::Menu;
                 InputResult::Continue
             }
             _ => InputResult::Continue,
         },
-        BlacksmithPhase::Hammering => {
+        SoulforgePhase::Hammering => {
             // No input accepted during hammering animation
             InputResult::Continue
         }
-        BlacksmithPhase::ResultSuccess | BlacksmithPhase::ResultFailure => {
+        SoulforgePhase::ResultSuccess | SoulforgePhase::ResultFailure => {
             // Any key returns to menu
-            blacksmith_ui.phase = BlacksmithPhase::Menu;
+            soulforge_ui.phase = SoulforgePhase::Menu;
             InputResult::Continue
         }
     }
@@ -571,8 +571,8 @@ fn handle_debug_menu(
             // Show discovery modals (no save in debug mode)
             if msg == "Haven discovered!" {
                 *overlay = GameOverlay::HavenDiscovery;
-            } else if msg == "Blacksmith discovered!" {
-                *overlay = GameOverlay::BlacksmithDiscovery;
+            } else if msg == "Soulforge discovered!" {
+                *overlay = GameOverlay::SoulforgeDiscovery;
             }
         }
         KeyCode::Esc => debug_menu.close(),
@@ -754,7 +754,7 @@ fn handle_base_game(
     state: &mut GameState,
     haven: &Haven,
     haven_ui: &mut HavenUiState,
-    blacksmith_ui: &mut BlacksmithUiState,
+    soulforge_ui: &mut SoulforgeUiState,
     enhancement: &enhancement::EnhancementProgress,
     overlay: &mut GameOverlay,
     achievements: &mut crate::achievements::Achievements,
@@ -785,7 +785,7 @@ fn handle_base_game(
         }
         KeyCode::Char('b') | KeyCode::Char('B') => {
             if enhancement.discovered {
-                blacksmith_ui.open();
+                soulforge_ui.open();
             }
             InputResult::Continue
         }

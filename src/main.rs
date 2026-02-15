@@ -24,7 +24,7 @@ use chrono::{Local, Utc};
 use core::constants::*;
 use core::game_logic::*;
 use core::game_state::*;
-use input::{BlacksmithUiState, GameOverlay, HavenUiState, InputResult};
+use input::{GameOverlay, HavenUiState, InputResult, SoulforgeUiState};
 use rand::RngExt;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::crossterm::terminal::{
@@ -169,7 +169,7 @@ fn draw_game_overlays(
     overlay: &GameOverlay,
     haven: &haven::Haven,
     haven_ui: &HavenUiState,
-    blacksmith_ui: &BlacksmithUiState,
+    soulforge_ui: &SoulforgeUiState,
     enhancement: &enhancement::EnhancementProgress,
     global_achievements: &achievements::Achievements,
     debug_mode: bool,
@@ -189,8 +189,8 @@ fn draw_game_overlays(
         GameOverlay::HavenDiscovery => {
             ui::haven_scene::render_haven_discovery_modal(frame, area, ctx);
         }
-        GameOverlay::BlacksmithDiscovery => {
-            ui::blacksmith_scene::render_blacksmith_discovery_modal(frame, area, ctx);
+        GameOverlay::SoulforgeDiscovery => {
+            ui::soulforge_scene::render_soulforge_discovery_modal(frame, area, ctx);
         }
         GameOverlay::AchievementUnlocked { ref achievements } => {
             ui::achievement_browser_scene::render_achievement_unlocked_modal(
@@ -271,12 +271,12 @@ fn draw_game_overlays(
         }
     }
 
-    // Blacksmith overlay
-    if blacksmith_ui.open {
-        ui::blacksmith_scene::render_blacksmith(
+    // Soulforge overlay
+    if soulforge_ui.open {
+        ui::soulforge_scene::render_soulforge(
             frame,
             area,
-            blacksmith_ui,
+            soulforge_ui,
             enhancement,
             state.prestige_rank,
             ctx,
@@ -409,7 +409,7 @@ fn main() -> io::Result<()> {
     // Load account-level Haven state
     let mut haven = haven::load_haven();
 
-    // Load account-level Enhancement (blacksmith) state
+    // Load account-level Enhancement (soulforge) state
     let mut enhancement = enhancement::load_enhancement();
 
     // Load global achievements (shared across all characters)
@@ -435,7 +435,7 @@ fn main() -> io::Result<()> {
     let mut pending_offline_report: Option<core::game_logic::OfflineReport> = None;
 
     let mut haven_ui = HavenUiState::new();
-    let mut blacksmith_ui = BlacksmithUiState::new();
+    let mut soulforge_ui = SoulforgeUiState::new();
     let mut achievement_browser = AchievementBrowserState::new();
 
     // Setup terminal
@@ -533,12 +533,12 @@ fn main() -> io::Result<()> {
                             &ctx,
                         );
                     }
-                    // Draw Blacksmith overlay if open
-                    if blacksmith_ui.open {
-                        ui::blacksmith_scene::render_blacksmith(
+                    // Draw Soulforge overlay if open
+                    if soulforge_ui.open {
+                        ui::soulforge_scene::render_soulforge(
                             f,
                             area,
-                            &blacksmith_ui,
+                            &soulforge_ui,
                             &enhancement,
                             0,
                             &ctx,
@@ -552,20 +552,20 @@ fn main() -> io::Result<()> {
                         if key_event.kind != KeyEventKind::Press {
                             continue;
                         }
-                        // Handle Blacksmith overlay (blocks other input when open)
-                        if blacksmith_ui.open {
+                        // Handle Soulforge overlay (blocks other input when open)
+                        if soulforge_ui.open {
                             match key_event.code {
                                 KeyCode::Up => {
-                                    if blacksmith_ui.selected_slot > 0 {
-                                        blacksmith_ui.selected_slot -= 1;
+                                    if soulforge_ui.selected_slot > 0 {
+                                        soulforge_ui.selected_slot -= 1;
                                     }
                                 }
                                 KeyCode::Down => {
-                                    if blacksmith_ui.selected_slot < 6 {
-                                        blacksmith_ui.selected_slot += 1;
+                                    if soulforge_ui.selected_slot < 6 {
+                                        soulforge_ui.selected_slot += 1;
                                     }
                                 }
-                                KeyCode::Esc => blacksmith_ui.close(),
+                                KeyCode::Esc => soulforge_ui.close(),
                                 _ => {}
                             }
                             continue;
@@ -882,7 +882,7 @@ fn main() -> io::Result<()> {
                             &overlay,
                             &haven,
                             &haven_ui,
-                            &blacksmith_ui,
+                            &soulforge_ui,
                             &enhancement,
                             &global_achievements,
                             debug_mode,
@@ -925,7 +925,7 @@ fn main() -> io::Result<()> {
                                 &mut state,
                                 &mut haven,
                                 &mut haven_ui,
-                                &mut blacksmith_ui,
+                                &mut soulforge_ui,
                                 &mut enhancement,
                                 &mut overlay,
                                 &mut debug_menu,
@@ -1097,8 +1097,8 @@ fn main() -> io::Result<()> {
                             if tick_flags.haven_discovered {
                                 overlay = GameOverlay::HavenDiscovery;
                             }
-                            if tick_flags.blacksmith_discovered {
-                                overlay = GameOverlay::BlacksmithDiscovery;
+                            if tick_flags.soulforge_discovered {
+                                overlay = GameOverlay::SoulforgeDiscovery;
                             }
 
                             if matches!(overlay, GameOverlay::None)
@@ -1111,14 +1111,14 @@ fn main() -> io::Result<()> {
                         }
                         last_tick = Instant::now();
 
-                        // Advance blacksmith animation
-                        if blacksmith_ui.open {
-                            match blacksmith_ui.phase {
-                                input::BlacksmithPhase::Hammering => {
-                                    blacksmith_ui.animation_tick =
-                                        blacksmith_ui.animation_tick.saturating_add(1);
-                                    if blacksmith_ui.animation_tick >= 50 {
-                                        if let Some(ref result) = blacksmith_ui.last_result {
+                        // Advance soulforge animation
+                        if soulforge_ui.open {
+                            match soulforge_ui.phase {
+                                input::SoulforgePhase::Hammering => {
+                                    soulforge_ui.animation_tick =
+                                        soulforge_ui.animation_tick.saturating_add(1);
+                                    if soulforge_ui.animation_tick >= 50 {
+                                        if let Some(ref result) = soulforge_ui.last_result {
                                             // Apply cost and level change after animation
                                             state.prestige_rank -= result.cost;
                                             enhancement::apply_enhancement_result(
@@ -1134,12 +1134,12 @@ fn main() -> io::Result<()> {
                                                 Some(&state.character_name),
                                             );
 
-                                            blacksmith_ui.phase = if result.success {
-                                                input::BlacksmithPhase::ResultSuccess
+                                            soulforge_ui.phase = if result.success {
+                                                input::SoulforgePhase::ResultSuccess
                                             } else {
-                                                input::BlacksmithPhase::ResultFailure
+                                                input::SoulforgePhase::ResultFailure
                                             };
-                                            blacksmith_ui.animation_tick = 0;
+                                            soulforge_ui.animation_tick = 0;
 
                                             // Persist changes
                                             if !debug_mode {
@@ -1153,14 +1153,14 @@ fn main() -> io::Result<()> {
                                         }
                                     }
                                 }
-                                input::BlacksmithPhase::ResultSuccess => {
-                                    if blacksmith_ui.animation_tick < 20 {
-                                        blacksmith_ui.animation_tick += 1;
+                                input::SoulforgePhase::ResultSuccess => {
+                                    if soulforge_ui.animation_tick < 20 {
+                                        soulforge_ui.animation_tick += 1;
                                     }
                                 }
-                                input::BlacksmithPhase::ResultFailure => {
-                                    if blacksmith_ui.animation_tick < 15 {
-                                        blacksmith_ui.animation_tick += 1;
+                                input::SoulforgePhase::ResultFailure => {
+                                    if soulforge_ui.animation_tick < 15 {
+                                        soulforge_ui.animation_tick += 1;
                                     }
                                 }
                                 _ => {}

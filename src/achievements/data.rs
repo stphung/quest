@@ -862,9 +862,9 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
     // ENHANCEMENT ACHIEVEMENTS
     // ═══════════════════════════════════════════════════════════════
     AchievementDef {
-        id: AchievementId::BlacksmithDiscovered,
-        name: "Blacksmith Found",
-        description: "Discover the wandering Blacksmith",
+        id: AchievementId::SoulforgeDiscovered,
+        name: "Soulforge Found",
+        description: "Discover the wandering Soulforge",
         category: AchievementCategory::Progression,
         icon: "\u{2692}",
     },
@@ -1068,7 +1068,7 @@ mod tests {
             AchievementId::HavenBuilderI,
             AchievementId::HavenBuilderII,
             AchievementId::HavenArchitect,
-            AchievementId::BlacksmithDiscovered,
+            AchievementId::SoulforgeDiscovered,
             AchievementId::ApprenticeSmith,
             AchievementId::JourneymanSmith,
             AchievementId::MasterSmith,

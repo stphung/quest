@@ -11,14 +11,14 @@ use crate::ui::combat_effects::{EffectType, VisualEffect};
 /// Flags returned from apply_tick_events indicating which discovery overlays to show.
 pub struct TickEventFlags {
     pub haven_discovered: bool,
-    pub blacksmith_discovered: bool,
+    pub soulforge_discovered: bool,
 }
 
 /// Maps tick events to combat log entries and visual effects.
 /// Returns flags indicating which discovery events were present.
 pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> TickEventFlags {
     let mut haven_discovered = false;
-    let mut blacksmith_discovered = false;
+    let mut soulforge_discovered = false;
     for event in events {
         match event {
             TickEvent::PlayerAttack {
@@ -127,8 +127,8 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
             TickEvent::HavenDiscovered => {
                 haven_discovered = true;
             }
-            TickEvent::BlacksmithDiscovered => {
-                blacksmith_discovered = true;
+            TickEvent::SoulforgeDiscovered => {
+                soulforge_discovered = true;
             }
             TickEvent::LeveledUp { .. } => {
                 // Level-up state changes are handled inside game_tick
@@ -137,6 +137,6 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
     }
     TickEventFlags {
         haven_discovered,
-        blacksmith_discovered,
+        soulforge_discovered,
     }
 }

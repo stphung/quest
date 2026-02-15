@@ -1,10 +1,10 @@
 //! Enhancement system tests: types, logic, persistence roundtrip.
 
 use quest::enhancement::{
-    apply_enhancement_result, blacksmith_discovery_chance, enhancement_color_tier,
-    enhancement_cost, enhancement_multiplier, enhancement_prefix, fail_penalty, roll_enhancement,
-    success_rate, try_discover_blacksmith, EnhancementProgress, BLACKSMITH_MIN_PRESTIGE_RANK,
-    MAX_ENHANCEMENT_LEVEL,
+    apply_enhancement_result, enhancement_color_tier, enhancement_cost, enhancement_multiplier,
+    enhancement_prefix, fail_penalty, roll_enhancement, soulforge_discovery_chance, success_rate,
+    try_discover_soulforge, EnhancementProgress, MAX_ENHANCEMENT_LEVEL,
+    SOULFORGE_MIN_PRESTIGE_RANK,
 };
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
@@ -337,22 +337,22 @@ fn test_attempt_enhancement_failure_penalty_saturates_at_zero() {
 }
 
 // =========================================================================
-// blacksmith_discovery_chance()
+// soulforge_discovery_chance()
 // =========================================================================
 
 #[test]
-fn test_blacksmith_discovery_below_min_prestige() {
-    for rank in 0..BLACKSMITH_MIN_PRESTIGE_RANK {
+fn test_soulforge_discovery_below_min_prestige() {
+    for rank in 0..SOULFORGE_MIN_PRESTIGE_RANK {
         assert!(
-            blacksmith_discovery_chance(rank).abs() < f64::EPSILON,
+            soulforge_discovery_chance(rank).abs() < f64::EPSILON,
             "Rank {rank} should have 0 discovery chance"
         );
     }
 }
 
 #[test]
-fn test_blacksmith_discovery_at_min_prestige() {
-    let chance = blacksmith_discovery_chance(BLACKSMITH_MIN_PRESTIGE_RANK);
+fn test_soulforge_discovery_at_min_prestige() {
+    let chance = soulforge_discovery_chance(SOULFORGE_MIN_PRESTIGE_RANK);
     assert!(
         (chance - 0.000014).abs() < f64::EPSILON,
         "At min prestige, chance should equal base"
@@ -360,8 +360,8 @@ fn test_blacksmith_discovery_at_min_prestige() {
 }
 
 #[test]
-fn test_blacksmith_discovery_above_min_prestige() {
-    let chance = blacksmith_discovery_chance(BLACKSMITH_MIN_PRESTIGE_RANK + 5);
+fn test_soulforge_discovery_above_min_prestige() {
+    let chance = soulforge_discovery_chance(SOULFORGE_MIN_PRESTIGE_RANK + 5);
     let expected = 0.000014 + 5.0 * 0.000007;
     assert!(
         (chance - expected).abs() < f64::EPSILON,
@@ -370,40 +370,40 @@ fn test_blacksmith_discovery_above_min_prestige() {
 }
 
 // =========================================================================
-// try_discover_blacksmith()
+// try_discover_soulforge()
 // =========================================================================
 
 #[test]
-fn test_discover_blacksmith_below_prestige_always_fails() {
+fn test_discover_soulforge_below_prestige_always_fails() {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let mut ep = EnhancementProgress::new();
     for _ in 0..100_000 {
-        assert!(!try_discover_blacksmith(&mut ep, 14, &mut rng));
+        assert!(!try_discover_soulforge(&mut ep, 14, &mut rng));
     }
     assert!(!ep.discovered);
 }
 
 #[test]
-fn test_discover_blacksmith_eventually_succeeds() {
+fn test_discover_soulforge_eventually_succeeds() {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let mut ep = EnhancementProgress::new();
     let mut found = false;
     for _ in 0..1_000_000 {
-        if try_discover_blacksmith(&mut ep, 15, &mut rng) {
+        if try_discover_soulforge(&mut ep, 15, &mut rng) {
             found = true;
             break;
         }
     }
-    assert!(found, "Should discover blacksmith within 1M ticks at P15");
+    assert!(found, "Should discover soulforge within 1M ticks at P15");
     assert!(ep.discovered);
 }
 
 #[test]
-fn test_discover_blacksmith_already_discovered() {
+fn test_discover_soulforge_already_discovered() {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let mut ep = EnhancementProgress::new();
     ep.discovered = true;
-    assert!(!try_discover_blacksmith(&mut ep, 50, &mut rng));
+    assert!(!try_discover_soulforge(&mut ep, 50, &mut rng));
 }
 
 // =========================================================================
@@ -657,9 +657,9 @@ fn test_enhancement_achievements() {
     let mut achievements = Achievements::default();
     let char_name = Some("Test Hero");
 
-    // Blacksmith discovered
-    achievements.on_blacksmith_discovered(char_name);
-    assert!(achievements.is_unlocked(quest::achievements::AchievementId::BlacksmithDiscovered));
+    // Soulforge discovered
+    achievements.on_soulforge_discovered(char_name);
+    assert!(achievements.is_unlocked(quest::achievements::AchievementId::SoulforgeDiscovered));
 
     // +1 on any slot
     achievements.on_enhancement_upgraded(1, &[1, 0, 0, 0, 0, 0, 0], 1, char_name);

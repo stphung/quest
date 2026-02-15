@@ -1,5 +1,4 @@
 pub mod achievement_browser_scene;
-pub mod blacksmith_scene;
 pub mod challenge_menu_scene;
 pub mod character_creation;
 pub mod character_delete;
@@ -26,6 +25,7 @@ pub mod prestige_confirm;
 pub mod responsive;
 pub mod rune_scene;
 pub mod snake_scene;
+pub mod soulforge_scene;
 mod stats_panel;
 mod throbber;
 
@@ -51,7 +51,7 @@ pub fn draw_ui_with_update(
     update_expanded: bool,
     update_check_completed: bool,
     haven_discovered: bool,
-    blacksmith_discovered: bool,
+    soulforge_discovered: bool,
     achievements: &crate::achievements::Achievements,
     enhancement_levels: &[u8; 7],
 ) {
@@ -72,7 +72,7 @@ pub fn draw_ui_with_update(
                 update_expanded,
                 update_check_completed,
                 haven_discovered,
-                blacksmith_discovered,
+                soulforge_discovered,
                 achievements,
                 enhancement_levels,
             );
@@ -83,7 +83,7 @@ pub fn draw_ui_with_update(
                 &ctx,
                 game_state,
                 haven_discovered,
-                blacksmith_discovered,
+                soulforge_discovered,
                 achievements,
             );
         }
@@ -106,7 +106,7 @@ fn draw_xl_l_layout(
     update_expanded: bool,
     update_check_completed: bool,
     haven_discovered: bool,
-    blacksmith_discovered: bool,
+    soulforge_discovered: bool,
     achievements: &crate::achievements::Achievements,
     enhancement_levels: &[u8; 7],
 ) {
@@ -198,7 +198,7 @@ fn draw_xl_l_layout(
         update_expanded,
         update_check_completed,
         haven_discovered,
-        blacksmith_discovered,
+        soulforge_discovered,
         achievements.pending_count(),
         ctx,
     );
@@ -214,7 +214,7 @@ fn draw_m_layout(
     ctx: &LayoutContext,
     game_state: &GameState,
     haven_discovered: bool,
-    blacksmith_discovered: bool,
+    soulforge_discovered: bool,
     achievements: &crate::achievements::Achievements,
 ) {
     let area = frame.area();
@@ -266,7 +266,7 @@ fn draw_m_layout(
         chunks[idx],
         game_state,
         haven_discovered,
-        blacksmith_discovered,
+        soulforge_discovered,
         achievements.pending_count(),
     );
 }

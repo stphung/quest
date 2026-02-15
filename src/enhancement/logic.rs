@@ -35,15 +35,15 @@ pub fn apply_enhancement_result(
     }
 }
 
-pub fn blacksmith_discovery_chance(prestige_rank: u32) -> f64 {
-    if prestige_rank < BLACKSMITH_MIN_PRESTIGE_RANK {
+pub fn soulforge_discovery_chance(prestige_rank: u32) -> f64 {
+    if prestige_rank < SOULFORGE_MIN_PRESTIGE_RANK {
         return 0.0;
     }
-    BLACKSMITH_DISCOVERY_BASE_CHANCE
-        + (prestige_rank - BLACKSMITH_MIN_PRESTIGE_RANK) as f64 * BLACKSMITH_DISCOVERY_RANK_BONUS
+    SOULFORGE_DISCOVERY_BASE_CHANCE
+        + (prestige_rank - SOULFORGE_MIN_PRESTIGE_RANK) as f64 * SOULFORGE_DISCOVERY_RANK_BONUS
 }
 
-pub fn try_discover_blacksmith<R: Rng>(
+pub fn try_discover_soulforge<R: Rng>(
     enhancement: &mut EnhancementProgress,
     prestige_rank: u32,
     rng: &mut R,
@@ -51,7 +51,7 @@ pub fn try_discover_blacksmith<R: Rng>(
     if enhancement.discovered {
         return false;
     }
-    let chance = blacksmith_discovery_chance(prestige_rank);
+    let chance = soulforge_discovery_chance(prestige_rank);
     if chance <= 0.0 {
         return false;
     }

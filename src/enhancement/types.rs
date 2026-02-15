@@ -46,9 +46,9 @@ impl EnhancementProgress {
 }
 
 pub const MAX_ENHANCEMENT_LEVEL: u8 = 10;
-pub const BLACKSMITH_MIN_PRESTIGE_RANK: u32 = 15;
-pub const BLACKSMITH_DISCOVERY_BASE_CHANCE: f64 = 0.000014;
-pub const BLACKSMITH_DISCOVERY_RANK_BONUS: f64 = 0.000007;
+pub const SOULFORGE_MIN_PRESTIGE_RANK: u32 = 15;
+pub const SOULFORGE_DISCOVERY_BASE_CHANCE: f64 = 0.000014;
+pub const SOULFORGE_DISCOVERY_RANK_BONUS: f64 = 0.000007;
 
 pub const ENHANCEMENT_SUCCESS_RATES: [f64; 10] = [
     1.00, 1.00, 1.00, 1.00, // +1-4: 100%
@@ -132,13 +132,13 @@ pub fn enhancement_color_rgb(level: u8) -> (u8, u8, u8) {
     }
 }
 
-// --- Blacksmith UI state types ---
+// --- Soulforge UI state types ---
 // These live here (not in input.rs) so the UI module can access them from both
 // the binary and library crates.
 
-/// Blacksmith enhancement phase
+/// Soulforge enhancement phase
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BlacksmithPhase {
+pub enum SoulforgePhase {
     Menu,
     Confirming,
     Hammering,
@@ -155,27 +155,27 @@ pub struct EnhancementResult {
     pub cost: u32,
 }
 
-/// Blacksmith overlay state
-pub struct BlacksmithUiState {
+/// Soulforge overlay state
+pub struct SoulforgeUiState {
     pub open: bool,
     pub selected_slot: usize,
-    pub phase: BlacksmithPhase,
+    pub phase: SoulforgePhase,
     pub animation_tick: u8,
     pub last_result: Option<EnhancementResult>,
 }
 
-impl Default for BlacksmithUiState {
+impl Default for SoulforgeUiState {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl BlacksmithUiState {
+impl SoulforgeUiState {
     pub fn new() -> Self {
         Self {
             open: false,
             selected_slot: 0,
-            phase: BlacksmithPhase::Menu,
+            phase: SoulforgePhase::Menu,
             animation_tick: 0,
             last_result: None,
         }
@@ -184,14 +184,14 @@ impl BlacksmithUiState {
     pub fn open(&mut self) {
         self.open = true;
         self.selected_slot = 0;
-        self.phase = BlacksmithPhase::Menu;
+        self.phase = SoulforgePhase::Menu;
         self.animation_tick = 0;
         self.last_result = None;
     }
 
     pub fn close(&mut self) {
         self.open = false;
-        self.phase = BlacksmithPhase::Menu;
+        self.phase = SoulforgePhase::Menu;
         self.last_result = None;
     }
 }

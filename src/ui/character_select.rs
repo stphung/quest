@@ -54,18 +54,18 @@ impl CharacterSelectScreen {
         enhancement: &EnhancementProgress,
     ) {
         let show_haven = haven.discovered;
-        let show_blacksmith = enhancement.discovered;
-        let show_bottom = show_haven || show_blacksmith;
+        let show_soulforge = enhancement.discovered;
+        let show_bottom = show_haven || show_soulforge;
 
         // Bottom panel height: haven diamond is 13 lines + 2 border = 15,
-        // blacksmith is 9 lines + 2 border = 11. Use the taller one.
+        // soulforge is 9 lines + 2 border = 11. Use the taller one.
         let bottom_height = if show_haven { 15 } else { 11 };
 
         let constraints = if show_bottom {
             vec![
                 Constraint::Length(3),             // Title
                 Constraint::Min(0),                // Main content
-                Constraint::Length(bottom_height), // Haven + Blacksmith
+                Constraint::Length(bottom_height), // Haven + Soulforge
                 Constraint::Length(3),             // Controls
             ]
         } else {
@@ -107,16 +107,9 @@ impl CharacterSelectScreen {
         // Draw character details
         self.draw_character_details(f, main_chunks[1], characters);
 
-        // Draw bottom panels (Haven + Blacksmith)
+        // Draw bottom panels (Haven + Soulforge)
         let controls_idx = if show_bottom {
-            self.draw_bottom_panels(
-                f,
-                chunks[2],
-                haven,
-                enhancement,
-                show_haven,
-                show_blacksmith,
-            );
+            self.draw_bottom_panels(f, chunks[2], haven, enhancement, show_haven, show_soulforge);
             3
         } else {
             2
@@ -504,23 +497,23 @@ impl CharacterSelectScreen {
         haven: &Haven,
         enhancement: &EnhancementProgress,
         show_haven: bool,
-        show_blacksmith: bool,
+        show_soulforge: bool,
     ) {
-        match (show_haven, show_blacksmith) {
+        match (show_haven, show_soulforge) {
             (true, true) => {
-                // Side-by-side: haven left 60%, blacksmith right 40%
+                // Side-by-side: haven left 60%, soulforge right 40%
                 let panels = Layout::default()
                     .direction(Direction::Horizontal)
                     .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
                     .split(area);
                 self.draw_haven_tree_compact(f, panels[0], haven);
-                self.draw_blacksmith_summary(f, panels[1], enhancement);
+                self.draw_soulforge_summary(f, panels[1], enhancement);
             }
             (true, false) => {
                 self.draw_haven_tree_compact(f, area, haven);
             }
             (false, true) => {
-                self.draw_blacksmith_summary(f, area, enhancement);
+                self.draw_soulforge_summary(f, area, enhancement);
             }
             (false, false) => {} // Nothing to draw
         }
@@ -539,13 +532,8 @@ impl CharacterSelectScreen {
         f.render_widget(tree_widget, inner_area);
     }
 
-    fn draw_blacksmith_summary(
-        &self,
-        f: &mut Frame,
-        area: Rect,
-        enhancement: &EnhancementProgress,
-    ) {
-        let block = Block::default().borders(Borders::ALL).title("Blacksmith");
+    fn draw_soulforge_summary(&self, f: &mut Frame, area: Rect, enhancement: &EnhancementProgress) {
+        let block = Block::default().borders(Borders::ALL).title("Soulforge");
 
         let inner_area = block.inner(area);
         f.render_widget(block, area);

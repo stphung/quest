@@ -183,12 +183,12 @@ pub enum AchievementId {
     HavenArchitect, // All rooms at T3
 
     // Enhancement
-    BlacksmithDiscovered, // Discover the Blacksmith
-    ApprenticeSmith,      // Reach +1 on any slot
-    JourneymanSmith,      // Reach +5 on any slot
-    MasterSmith,          // Reach +10 on any slot
-    FullyEnhanced,        // Reach +10 on all 7 slots
-    PersistentHammering,  // 100 total enhancement attempts
+    SoulforgeDiscovered, // Discover the Soulforge
+    ApprenticeSmith,     // Reach +1 on any slot
+    JourneymanSmith,     // Reach +5 on any slot
+    MasterSmith,         // Reach +10 on any slot
+    FullyEnhanced,       // Reach +10 on all 7 slots
+    PersistentHammering, // 100 total enhancement attempts
 }
 
 /// Static definition of an achievement.
@@ -725,12 +725,12 @@ impl Achievements {
     }
 
     // =========================================================================
-    // Enhancement/Blacksmith Event Handlers
+    // Enhancement/Soulforge Event Handlers
     // =========================================================================
 
-    /// Called when the Blacksmith is first discovered.
-    pub fn on_blacksmith_discovered(&mut self, character_name: Option<&str>) {
-        self.unlock_with_name(AchievementId::BlacksmithDiscovered, character_name);
+    /// Called when the Soulforge is first discovered.
+    pub fn on_soulforge_discovered(&mut self, character_name: Option<&str>) {
+        self.unlock_with_name(AchievementId::SoulforgeDiscovered, character_name);
     }
 
     /// Called after an enhancement attempt completes (success or failure).
