@@ -145,7 +145,7 @@ fn step_physics(game: &mut JezzballGame, tick_ms: u64) -> bool {
     }
 
     if ball_hits_active_wall(game) {
-        game.game_result = Some(JezzballResult::Loss);
+        handle_collision(game);
         return true;
     }
 
@@ -158,7 +158,7 @@ fn step_physics(game: &mut JezzballGame, tick_ms: u64) -> bool {
             changed = true;
 
             if ball_hits_active_wall(game) {
-                game.game_result = Some(JezzballResult::Loss);
+                handle_collision(game);
                 return true;
             }
 
@@ -196,6 +196,16 @@ fn begin_wall(game: &mut JezzballGame) {
     game.wall_accumulated_ms = 0;
 
     if ball_hits_active_wall(game) {
+        handle_collision(game);
+    }
+}
+
+/// Handle a collision: consume a life and reset, or end the game.
+fn handle_collision(game: &mut JezzballGame) {
+    if game.lives > 0 {
+        game.lives -= 1;
+        game.reset_for_retry();
+    } else {
         game.game_result = Some(JezzballResult::Loss);
     }
 }
@@ -492,7 +502,7 @@ impl DifficultyInfo for JezzballDifficulty {
 
     fn extra_info(&self) -> Option<String> {
         Some(format!(
-            "{} balls, {}% target",
+            "{} balls, {}% target, 3 lives",
             self.ball_count(),
             self.target_percent()
         ))
@@ -529,7 +539,11 @@ pub fn apply_game_result(state: &mut GameState) -> Option<MinigameWinInfo> {
         );
     } else {
         state.combat_state.add_log_entry(
-            format!("▣ Containment failed at {:.0}% captured.", captured.floor()),
+            format!(
+                "▣ Containment failed at {:.0}% captured ({} lives used).",
+                captured.floor(),
+                MAX_LIVES
+            ),
             false,
             true,
         );
@@ -644,8 +658,26 @@ mod tests {
     }
 
     #[test]
-    fn test_start_wall_on_ball_cell_loses() {
+    fn test_start_wall_on_ball_cell_consumes_life() {
         let mut game = started_game(JezzballDifficulty::Novice);
+        game.cursor = Position {
+            x: game.balls[0].x.floor() as i16,
+            y: game.balls[0].y.floor() as i16,
+        };
+
+        process_input(&mut game, JezzballInput::Select);
+
+        // Should lose a life and reset, not end the game
+        assert!(game.game_result.is_none());
+        assert_eq!(game.lives, MAX_LIVES - 1);
+        assert!(game.waiting_to_start);
+        assert!(game.active_wall.is_none());
+    }
+
+    #[test]
+    fn test_collision_on_last_life_ends_game() {
+        let mut game = started_game(JezzballDifficulty::Novice);
+        game.lives = 0;
         game.cursor = Position {
             x: game.balls[0].x.floor() as i16,
             y: game.balls[0].y.floor() as i16,
