@@ -391,13 +391,13 @@ fn format_number(n: u64) -> String {
 }
 
 /// Create a stat line with dot-leaders: "  Label .... Value"
-fn stat_line<'a>(
-    label: &'a str,
-    value: &'a str,
+fn stat_line(
+    label: &str,
+    value: &str,
     label_style: Style,
     value_style: Style,
     width: u16,
-) -> Line<'a> {
+) -> Line<'static> {
     let w = width as usize;
     let label_len = label.len() + 2; // "  Label"
     let value_len = value.len();
@@ -431,17 +431,30 @@ fn render_stats_view(
         .constraints([Constraint::Percentage(45), Constraint::Percentage(55)])
         .split(inner);
 
-    render_stats_left_column(frame, columns[0], achievements, scroll_offset);
-    render_stats_right_column(frame, columns[1], achievements, scroll_offset);
+    // Build content for both columns
+    let left_lines = build_stats_left_lines(achievements, columns[0].width);
+    let right_lines = build_stats_right_lines(achievements, columns[1].width);
+
+    // Clamp scroll to the taller column's content minus visible area
+    let max_content = left_lines.len().max(right_lines.len());
+    let visible = inner.height as usize;
+    let max_scroll = max_content.saturating_sub(visible);
+    let scroll = scroll_offset.min(max_scroll);
+
+    // Render with clamped scroll
+    render_lines(frame, columns[0], left_lines, scroll);
+    render_lines(frame, columns[1], right_lines, scroll);
 }
 
-/// Render the left column: raw stats with dot-leaders.
-fn render_stats_left_column(
-    frame: &mut Frame,
-    area: Rect,
-    achievements: &Achievements,
-    scroll_offset: usize,
-) {
+/// Render a list of lines into an area with a scroll offset.
+fn render_lines(frame: &mut Frame, area: Rect, lines: Vec<Line>, scroll: usize) {
+    let visible: Vec<Line> = lines.into_iter().skip(scroll).collect();
+    let para = Paragraph::new(visible);
+    frame.render_widget(para, area);
+}
+
+/// Build the left column lines: raw stats with dot-leaders.
+fn build_stats_left_lines(achievements: &Achievements, width: u16) -> Vec<Line<'static>> {
     let section_style = Style::default()
         .fg(Color::White)
         .add_modifier(Modifier::BOLD);
@@ -461,7 +474,7 @@ fn render_stats_left_column(
     let prestige_tier = get_prestige_tier(achievements.highest_prestige_rank).name;
     let fishing_tier = fishing_tier_name(achievements.highest_fishing_rank);
 
-    let w = area.width as usize;
+    let w = width as usize;
 
     // Pre-compute formatted numbers to extend their lifetimes
     let total_kills_str = format_number(achievements.total_kills);
@@ -474,7 +487,7 @@ fn render_stats_left_column(
     let dungeons_completed_str = format_number(achievements.total_dungeons_completed);
     let minigame_wins_str = format_number(achievements.total_minigame_wins);
 
-    let mut lines: Vec<Line> = vec![
+    vec![
         // COMBAT section
         Line::from(Span::styled("COMBAT", section_style)),
         Line::from(Span::styled("\u{2500}".repeat(w), separator_style)),
@@ -483,21 +496,21 @@ fn render_stats_left_column(
             &total_kills_str,
             label_style,
             value_style,
-            area.width,
+            width,
         ),
         stat_line(
             "Boss Kills",
             &boss_kills_str,
             label_style,
             value_style,
-            area.width,
+            width,
         ),
         stat_line(
             "Kill/Boss Ratio",
             &kill_boss_ratio,
             label_style,
             value_style,
-            area.width,
+            width,
         ),
         Line::from(""),
         // PROGRESSION section
@@ -508,28 +521,28 @@ fn render_stats_left_column(
             &highest_level_str,
             label_style,
             value_style,
-            area.width,
+            width,
         ),
         stat_line(
             "Highest Prestige",
             &highest_prestige_str,
             label_style,
             value_style,
-            area.width,
+            width,
         ),
         stat_line(
             "Prestige Tier",
             prestige_tier,
             label_style,
             value_style,
-            area.width,
+            width,
         ),
         stat_line(
             "Expanse Cycles",
             &expanse_cycles_str,
             label_style,
             value_style,
-            area.width,
+            width,
         ),
         Line::from(""),
         // FISHING section
@@ -540,22 +553,16 @@ fn render_stats_left_column(
             &total_fish_str,
             label_style,
             value_style,
-            area.width,
+            width,
         ),
         stat_line(
             "Highest Rank",
             &highest_fishing_rank_str,
             label_style,
             value_style,
-            area.width,
+            width,
         ),
-        stat_line(
-            "Rank Tier",
-            fishing_tier,
-            label_style,
-            value_style,
-            area.width,
-        ),
+        stat_line("Rank Tier", fishing_tier, label_style, value_style, width),
         Line::from(""),
         // DUNGEONS & CHALLENGES section
         Line::from(Span::styled("DUNGEONS & CHALLENGES", section_style)),
@@ -565,35 +572,20 @@ fn render_stats_left_column(
             &dungeons_completed_str,
             label_style,
             value_style,
-            area.width,
+            width,
         ),
         stat_line(
             "Minigame Wins",
             &minigame_wins_str,
             label_style,
             value_style,
-            area.width,
+            width,
         ),
-    ];
-
-    // Apply scroll offset
-    if scroll_offset < lines.len() {
-        lines = lines.into_iter().skip(scroll_offset).collect();
-    } else {
-        lines.clear();
-    }
-
-    let para = Paragraph::new(lines);
-    frame.render_widget(para, area);
+    ]
 }
 
-/// Render the right column: zone checklist, challenge grid, achievement summary.
-fn render_stats_right_column(
-    frame: &mut Frame,
-    area: Rect,
-    achievements: &Achievements,
-    scroll_offset: usize,
-) {
+/// Build the right column lines: zone checklist, challenge grid, achievement summary.
+fn build_stats_right_lines(achievements: &Achievements, width: u16) -> Vec<Line<'static>> {
     let section_style = Style::default()
         .fg(Color::White)
         .add_modifier(Modifier::BOLD);
@@ -604,7 +596,7 @@ fn render_stats_right_column(
     // ZONES CLEARED section
     lines.push(Line::from(Span::styled("ZONES CLEARED", section_style)));
     lines.push(Line::from(Span::styled(
-        "\u{2500}".repeat(area.width as usize),
+        "\u{2500}".repeat(width as usize),
         separator_style,
     )));
 
@@ -650,7 +642,7 @@ fn render_stats_right_column(
         section_style,
     )));
     lines.push(Line::from(Span::styled(
-        "\u{2500}".repeat(area.width as usize),
+        "\u{2500}".repeat(width as usize),
         separator_style,
     )));
 
@@ -784,7 +776,7 @@ fn render_stats_right_column(
         ),
     ]));
     lines.push(Line::from(Span::styled(
-        "\u{2500}".repeat(area.width as usize),
+        "\u{2500}".repeat(width as usize),
         separator_style,
     )));
 
@@ -808,15 +800,7 @@ fn render_stats_right_column(
         ]));
     }
 
-    // Apply scroll offset
-    if scroll_offset < lines.len() {
-        lines = lines.into_iter().skip(scroll_offset).collect();
-    } else {
-        lines.clear();
-    }
-
-    let para = Paragraph::new(lines);
-    frame.render_widget(para, area);
+    lines
 }
 
 /// Render the achievement unlocked celebration modal.

@@ -15,7 +15,7 @@ uuid = { version = "1.21", features = ["v4", "serde"] }
 ureq = { version = "3.2", features = ["json"] }
 flate2 = "1.1"
 tar = "0.4"
-zip = { version = "7.4", default-features = false, features = ["deflate"] }
+zip = { version = "8.0", default-features = false, features = ["deflate"] }
 rand_chacha = "0.10"
 
 [dev-dependencies]
