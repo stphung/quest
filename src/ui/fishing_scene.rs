@@ -286,37 +286,39 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
     let hull = "_/___\\_";
     let hull_start = boat_center - (hull.len() as i32 / 2);
     for (idx, ch) in hull.chars().enumerate() {
-        put_cell(
-            &mut buffer,
-            boat_row,
-            hull_start + idx as i32,
-            ch,
-            if idx == 0 || idx + 1 == hull.len() {
-                Color::Rgb(154, 118, 86)
-            } else {
-                Color::Rgb(126, 92, 66)
-            },
-        );
+        let hull_fg = match idx {
+            0 | 6 => Color::Rgb(242, 176, 96),
+            1 | 5 => Color::Rgb(188, 118, 70),
+            _ => Color::Rgb(94, 58, 36),
+        };
+        put_cell(&mut buffer, boat_row, hull_start + idx as i32, ch, hull_fg);
     }
 
     let mast_x = boat_center;
     let mast_top = boat_row - 2;
     for y in mast_top..=boat_row {
-        put_cell(&mut buffer, y, mast_x, '|', Color::Rgb(170, 132, 92));
+        put_cell(&mut buffer, y, mast_x, '|', Color::Rgb(236, 180, 108));
     }
     put_cell(
         &mut buffer,
         mast_top + 1,
         mast_x + 1,
         '\\',
-        Color::Rgb(226, 236, 248),
+        Color::Rgb(255, 172, 96),
     );
     put_cell(
         &mut buffer,
         mast_top,
         mast_x + 2,
         '\\',
-        Color::Rgb(226, 236, 248),
+        Color::Rgb(255, 172, 96),
+    );
+    put_cell(
+        &mut buffer,
+        mast_top,
+        mast_x + 1,
+        '>',
+        Color::Rgb(255, 96, 72),
     );
 
     // Bobber and interaction response by fishing phase.
@@ -333,13 +335,22 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
         .round()
         .clamp((horizon + 1) as f64, (height.saturating_sub(2)) as f64) as i32;
 
+    // Draw a darker shadow first, then a bright main line for contrast on both sky and water.
+    draw_line(
+        &mut buffer,
+        mast_x + 1,
+        mast_top.max(0),
+        bobber_x + 1,
+        bobber_y,
+        Color::Rgb(38, 52, 78),
+    );
     draw_line(
         &mut buffer,
         mast_x,
         mast_top.max(0),
         bobber_x,
         bobber_y,
-        Color::Rgb(208, 210, 220),
+        Color::Rgb(255, 208, 122),
     );
     put_cell(&mut buffer, bobber_y, bobber_x, bobber_char, bobber_color);
 
