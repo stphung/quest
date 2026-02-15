@@ -9,6 +9,8 @@ use std::sync::LazyLock;
 pub struct Zone {
     pub id: u32,
     pub name: &'static str,
+    /// Short flavor text describing the zone's atmosphere and history.
+    pub description: &'static str,
     pub subzones: Vec<Subzone>,
     pub prestige_requirement: u32,
     pub min_level: u32,
@@ -24,6 +26,8 @@ pub struct Zone {
 pub struct Subzone {
     pub id: u32,
     pub name: &'static str,
+    /// Short flavor text describing this subzone.
+    pub description: &'static str,
     pub depth: u32,
     pub boss: SubzoneBoss,
 }
@@ -42,6 +46,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
         Zone {
             id: 1,
             name: "Meadow",
+            description: "Rolling grasslands where wildflowers hide teeth. Many adventurers begin here. Fewer leave than you'd think.",
             prestige_requirement: 0,
             min_level: 1,
             max_level: 10,
@@ -51,6 +56,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 1,
                     name: "Sunny Fields",
+                    description: "Tall grass sways in a warm breeze. The buzzing isn't all bees.",
                     depth: 1,
                     boss: SubzoneBoss {
                         name: "Field Guardian",
@@ -60,6 +66,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 2,
                     name: "Overgrown Thicket",
+                    description: "Thorned vines knot overhead, swallowing the path. Something breathes in the undergrowth.",
                     depth: 2,
                     boss: SubzoneBoss {
                         name: "Thicket Horror",
@@ -69,6 +76,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 3,
                     name: "Mushroom Caves",
+                    description: "Bioluminescent spores drift through damp air. The fungus down here has a will of its own.",
                     depth: 3,
                     boss: SubzoneBoss {
                         name: "Sporeling Queen",
@@ -80,6 +88,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
         Zone {
             id: 2,
             name: "Dark Forest",
+            description: "Ancient trees twist toward a sky they'll never reach. The canopy hasn't let sunlight through in centuries.",
             prestige_requirement: 0,
             min_level: 10,
             max_level: 25,
@@ -89,6 +98,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 1,
                     name: "Forest Edge",
+                    description: "The treeline stands like a wall. Past it, the birdsong stops.",
                     depth: 1,
                     boss: SubzoneBoss {
                         name: "Alpha Wolf",
@@ -98,6 +108,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 2,
                     name: "Twisted Woods",
+                    description: "The trees grow at wrong angles here, as if recoiling from something deeper in.",
                     depth: 2,
                     boss: SubzoneBoss {
                         name: "Corrupted Treant",
@@ -107,6 +118,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 3,
                     name: "Spider's Hollow",
+                    description: "Silk threads catch what little light remains. The webs are older than the trees.",
                     depth: 3,
                     boss: SubzoneBoss {
                         name: "Broodmother Arachne",
@@ -119,6 +131,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
         Zone {
             id: 3,
             name: "Mountain Pass",
+            description: "A trade route abandoned after the last war. Bandits and worse things have claimed the heights.",
             prestige_requirement: 5,
             min_level: 25,
             max_level: 40,
@@ -128,6 +141,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 1,
                     name: "Rocky Foothills",
+                    description: "Loose scree and overturned wagons mark where the road gave out.",
                     depth: 1,
                     boss: SubzoneBoss {
                         name: "Bandit King",
@@ -137,6 +151,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 2,
                     name: "Frozen Peaks",
+                    description: "The wind cuts like a blade up here. Frost-rimed bones jut from the snow.",
                     depth: 2,
                     boss: SubzoneBoss {
                         name: "Ice Giant",
@@ -146,6 +161,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 3,
                     name: "Dragon's Perch",
+                    description: "Claw marks score the clifftop stone. The air reeks of ozone and old fire.",
                     depth: 3,
                     boss: SubzoneBoss {
                         name: "Frost Wyrm",
@@ -157,6 +173,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
         Zone {
             id: 4,
             name: "Ancient Ruins",
+            description: "A civilization that mastered death and was consumed by it. Their wards still flicker in the dark.",
             prestige_requirement: 5,
             min_level: 40,
             max_level: 55,
@@ -166,6 +183,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 1,
                     name: "Outer Sanctum",
+                    description: "Crumbling pillars frame a courtyard where the dead stand guard over nothing.",
                     depth: 1,
                     boss: SubzoneBoss {
                         name: "Skeleton Lord",
@@ -175,6 +193,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 2,
                     name: "Sunken Temple",
+                    description: "The floor has collapsed into flooded corridors. Pale lights drift beneath the water.",
                     depth: 2,
                     boss: SubzoneBoss {
                         name: "Spectral Guardian",
@@ -184,6 +203,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 3,
                     name: "Sealed Catacombs",
+                    description: "Someone sealed these tombs from the outside. The scratching on the inner walls never stopped.",
                     depth: 3,
                     boss: SubzoneBoss {
                         name: "Lich King's Shade",
@@ -196,6 +216,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
         Zone {
             id: 5,
             name: "Volcanic Wastes",
+            description: "The earth split open here long ago and never healed. Ash falls like grey snow on a land that remembers fire.",
             prestige_requirement: 10,
             min_level: 55,
             max_level: 70,
@@ -205,6 +226,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 1,
                     name: "Scorched Badlands",
+                    description: "Cracked earth radiates heat. The horizon shimmers and lies.",
                     depth: 1,
                     boss: SubzoneBoss {
                         name: "Ash Walker Chief",
@@ -214,6 +236,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 2,
                     name: "Lava Rivers",
+                    description: "Molten channels carve the landscape into shrinking islands of stone.",
                     depth: 2,
                     boss: SubzoneBoss {
                         name: "Magma Serpent",
@@ -223,6 +246,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 3,
                     name: "Obsidian Fortress",
+                    description: "A stronghold forged from cooled lava. Its builders worship the thing that lives beneath.",
                     depth: 3,
                     boss: SubzoneBoss {
                         name: "Fire Giant Warlord",
@@ -232,6 +256,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 4,
                     name: "Magma Core",
+                    description: "The heart of the volcano. The heat here doesn't just burn. It thinks.",
                     depth: 4,
                     boss: SubzoneBoss {
                         name: "Infernal Titan",
@@ -243,6 +268,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
         Zone {
             id: 6,
             name: "Frozen Tundra",
+            description: "An endless white silence where the cold has a patience that outlasts everything.",
             prestige_requirement: 10,
             min_level: 70,
             max_level: 85,
@@ -252,6 +278,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 1,
                     name: "Snowbound Plains",
+                    description: "The snow is deep enough to swallow a horse. Howls carry for miles.",
                     depth: 1,
                     boss: SubzoneBoss {
                         name: "Dire Wolf Alpha",
@@ -261,6 +288,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 2,
                     name: "Glacier Maze",
+                    description: "Walls of blue ice shift when you aren't looking. The maze remembers its last visitors.",
                     depth: 2,
                     boss: SubzoneBoss {
                         name: "Ice Wraith Lord",
@@ -270,6 +298,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 3,
                     name: "Frozen Lake",
+                    description: "The ice is clear enough to see the bottom. Something down there sees you back.",
                     depth: 3,
                     boss: SubzoneBoss {
                         name: "Lake Horror",
@@ -279,6 +308,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 4,
                     name: "Permafrost Tomb",
+                    description: "A king was buried here in ice so cold it stopped time itself. He's still dreaming.",
                     depth: 4,
                     boss: SubzoneBoss {
                         name: "The Frozen One",
@@ -291,6 +321,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
         Zone {
             id: 7,
             name: "Crystal Caverns",
+            description: "The crystals sing at frequencies that rearrange thought. Miners went in for gems and came out as prophets.",
             prestige_requirement: 15,
             min_level: 85,
             max_level: 100,
@@ -300,6 +331,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 1,
                     name: "Glittering Tunnels",
+                    description: "Every surface reflects your torchlight a thousand times. Not all the reflections are yours.",
                     depth: 1,
                     boss: SubzoneBoss {
                         name: "Gem Golem",
@@ -309,6 +341,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 2,
                     name: "Prismatic Halls",
+                    description: "Light bends through crystal columns, splitting into colors that have no name.",
                     depth: 2,
                     boss: SubzoneBoss {
                         name: "Prism Elemental",
@@ -318,6 +351,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 3,
                     name: "Resonance Depths",
+                    description: "The hum of the crystals grows deafening. Step wrong and the harmonics will shatter bone.",
                     depth: 3,
                     boss: SubzoneBoss {
                         name: "Echo Wraith",
@@ -327,6 +361,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 4,
                     name: "Heart Crystal",
+                    description: "A single crystal the size of a cathedral pulses at the center of the earth.",
                     depth: 4,
                     boss: SubzoneBoss {
                         name: "Crystal Colossus",
@@ -338,6 +373,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
         Zone {
             id: 8,
             name: "Sunken Kingdom",
+            description: "A drowned empire that refused to die. The sea took their land but not their pride, or their army.",
             prestige_requirement: 15,
             min_level: 100,
             max_level: 115,
@@ -347,6 +383,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 1,
                     name: "Coral Gardens",
+                    description: "Living coral has overgrown marble streets. The anemones sway toward warm blood.",
                     depth: 1,
                     boss: SubzoneBoss {
                         name: "Merfolk Warlord",
@@ -356,6 +393,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 2,
                     name: "Drowned Streets",
+                    description: "Barnacle-crusted buildings line avenues where fish swim through broken windows.",
                     depth: 2,
                     boss: SubzoneBoss {
                         name: "Drowned Admiral",
@@ -365,6 +403,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 3,
                     name: "Abyssal Palace",
+                    description: "The pressure is crushing. The palace doors stand open, as if expecting guests.",
                     depth: 3,
                     boss: SubzoneBoss {
                         name: "Pressure Beast",
@@ -374,6 +413,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 4,
                     name: "Throne of Tides",
+                    description: "A throne of black coral sits at the lowest point of the world. Its occupant has been waiting.",
                     depth: 4,
                     boss: SubzoneBoss {
                         name: "The Drowned King",
@@ -386,6 +426,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
         Zone {
             id: 9,
             name: "Floating Isles",
+            description: "Shattered fragments of earth hang in an open sky. The ground fell away long ago. Only the stubborn parts remain.",
             prestige_requirement: 20,
             min_level: 115,
             max_level: 130,
@@ -395,6 +436,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 1,
                     name: "Cloud Docks",
+                    description: "Rotting airship moorings creak in the wind. The crews are long gone. The harpies aren't.",
                     depth: 1,
                     boss: SubzoneBoss {
                         name: "Harpy Matriarch",
@@ -404,6 +446,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 2,
                     name: "Sky Bridges",
+                    description: "Chains of ancient iron link the islands. The wind never stops trying to cut them.",
                     depth: 2,
                     boss: SubzoneBoss {
                         name: "Wind Elemental Lord",
@@ -413,6 +456,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 3,
                     name: "Stormfront",
+                    description: "Lightning arcs between the isles in rhythms that almost sound like language.",
                     depth: 3,
                     boss: SubzoneBoss {
                         name: "Storm Drake",
@@ -422,6 +466,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 4,
                     name: "Eye of the Storm",
+                    description: "Perfect stillness at the center of violence. The sky above is impossibly clear.",
                     depth: 4,
                     boss: SubzoneBoss {
                         name: "Tempest Lord",
@@ -433,6 +478,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
         Zone {
             id: 10,
             name: "Storm Citadel",
+            description: "A fortress built from living lightning, older than the sky itself. It was not made to be entered.",
             prestige_requirement: 20,
             min_level: 130,
             max_level: 150,
@@ -442,6 +488,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 1,
                     name: "Lightning Fields",
+                    description: "The ground crackles with each step. Static pulls at your blade like a living thing.",
                     depth: 1,
                     boss: SubzoneBoss {
                         name: "Spark Colossus",
@@ -451,6 +498,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 2,
                     name: "Thunder Halls",
+                    description: "Every footfall echoes as thunder. The Citadel's knights march in endless patrols.",
                     depth: 2,
                     boss: SubzoneBoss {
                         name: "Storm Knight Commander",
@@ -460,6 +508,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 3,
                     name: "Generator Core",
+                    description: "The machine that powers the storm. It has been running since before memory.",
                     depth: 3,
                     boss: SubzoneBoss {
                         name: "Core Warden",
@@ -469,6 +518,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 4,
                     name: "Apex Spire",
+                    description: "The highest point in the world. The storm is not weather. It is a will.",
                     depth: 4,
                     boss: SubzoneBoss {
                         name: "The Undying Storm",
@@ -481,6 +531,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
         Zone {
             id: 11,
             name: "The Expanse",
+            description: "Beyond the storm lies what was always there. Raw, unformed reality stretching past the edges of the world.",
             prestige_requirement: 0, // Unlocked by achievement, not prestige
             min_level: 150,
             max_level: u32::MAX,
@@ -490,6 +541,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 1,
                     name: "Void's Edge",
+                    description: "The last solid ground before everything dissolves into possibility.",
                     depth: 1,
                     boss: SubzoneBoss {
                         name: "Void Sentinel",
@@ -499,6 +551,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 2,
                     name: "Eternal Storm",
+                    description: "A storm with no beginning and no end. It was here before the Citadel learned to harness it.",
                     depth: 2,
                     boss: SubzoneBoss {
                         name: "Tempest Incarnate",
@@ -508,6 +561,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 3,
                     name: "Abyssal Rift",
+                    description: "A wound in reality that goes down forever. Things climb out of it that have no names yet.",
                     depth: 3,
                     boss: SubzoneBoss {
                         name: "Rift Behemoth",
@@ -517,6 +571,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 Subzone {
                     id: 4,
                     name: "The Endless",
+                    description: "There is nothing here but you and the infinite. It is enough.",
                     depth: 4,
                     boss: SubzoneBoss {
                         name: "Avatar of Infinity",

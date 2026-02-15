@@ -273,12 +273,13 @@ fn test_tick_event_dungeon_room_entered_has_room_type() {
                 !message.is_empty(),
                 "Room entry message should not be empty"
             );
-            // The message should contain the room type
-            let type_str = format!("{:?}", room_type);
+            // The message should be one of the narration lines for this room type
+            let narration = room_type.narration();
             assert!(
-                message.contains(&type_str),
-                "Message should mention room type {:?}",
-                room_type
+                narration.iter().any(|line| message.contains(line)),
+                "Message should contain narration for {:?}, got: {}",
+                room_type,
+                message
             );
         }
     }
