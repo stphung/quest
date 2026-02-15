@@ -126,6 +126,7 @@ impl CharacterManager {
             active_minigame: None,
             session_kills: 0,
             recent_drops: std::collections::VecDeque::new(),
+            loot_ticker: crate::core::game_state::LootTicker::new(),
             last_minigame_win: None,
         })
     }
@@ -303,6 +304,7 @@ mod tests {
             active_minigame: None,
             session_kills: 0,
             recent_drops: std::collections::VecDeque::new(),
+            loot_ticker: crate::core::game_state::LootTicker::new(),
             last_minigame_win: None,
         }
     }

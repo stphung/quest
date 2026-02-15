@@ -28,6 +28,78 @@ pub struct RecentDrop {
 /// Max number of recent drops to track
 const MAX_RECENT_DROPS: usize = 10;
 
+/// A single entry in the scrolling loot ticker.
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct TickerEntry {
+    /// Icon prefix (e.g., "\u{2694}" for sword, "\u{1F41F}" for fish)
+    pub icon: &'static str,
+    /// Pre-formatted display text (e.g., "[E] Shadowfang +8STR")
+    pub text: String,
+    /// Display color (rarity or event-type color)
+    pub color: ratatui::style::Color,
+    /// Whether to render bold
+    pub bold: bool,
+}
+
+/// Scrolling loot ticker state. Transient (not serialized).
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct LootTicker {
+    /// Recent events displayed in the ticker
+    pub entries: VecDeque<TickerEntry>,
+    /// Fractional scroll offset (integer part = character position)
+    pub scroll_offset: f64,
+    /// Remaining pause ticks when a new event arrives (0 = scrolling)
+    pub pause_ticks: u8,
+}
+
+/// Max entries in the ticker before oldest are evicted
+const TICKER_MAX_ENTRIES: usize = 30;
+
+/// Characters scrolled per tick (0.4 = ~4 chars/sec at 100ms ticks)
+#[allow(dead_code)]
+pub const TICKER_SCROLL_SPEED: f64 = 0.4;
+
+/// Ticks to pause scrolling when a new event arrives (5 = 500ms)
+#[allow(dead_code)]
+pub const TICKER_PAUSE_TICKS: u8 = 5;
+
+#[allow(dead_code)]
+impl LootTicker {
+    pub fn new() -> Self {
+        Self {
+            entries: VecDeque::with_capacity(TICKER_MAX_ENTRIES),
+            scroll_offset: 0.0,
+            pause_ticks: 0,
+        }
+    }
+
+    /// Add a new entry to the ticker. Evicts oldest if at capacity.
+    pub fn push(&mut self, entry: TickerEntry) {
+        if self.entries.len() >= TICKER_MAX_ENTRIES {
+            self.entries.pop_back();
+        }
+        self.entries.push_front(entry);
+        self.pause_ticks = TICKER_PAUSE_TICKS;
+    }
+
+    /// Advance the scroll offset by one tick. Call once per 100ms tick.
+    pub fn tick(&mut self) {
+        if self.pause_ticks > 0 {
+            self.pause_ticks -= 1;
+        } else {
+            self.scroll_offset += TICKER_SCROLL_SPEED;
+        }
+    }
+}
+
+impl Default for LootTicker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GameState {
     /// Record a recent gain (item drop, fish catch, etc.)
     pub fn add_recent_drop(
@@ -95,6 +167,10 @@ pub struct GameState {
     /// Recent item drops for display (transient, not saved)
     #[serde(skip)]
     pub recent_drops: VecDeque<RecentDrop>,
+    /// Scrolling loot ticker state (transient, not saved)
+    #[serde(skip)]
+    #[allow(dead_code)]
+    pub loot_ticker: LootTicker,
     /// Last minigame win info for achievement tracking (transient, not saved)
     #[serde(skip)]
     pub last_minigame_win: Option<MinigameWinInfo>,
@@ -130,6 +206,7 @@ impl GameState {
             active_minigame: None,
             session_kills: 0,
             recent_drops: VecDeque::with_capacity(5),
+            loot_ticker: LootTicker::new(),
             last_minigame_win: None,
         }
     }
@@ -492,5 +569,87 @@ mod tests {
         assert_eq!(loaded.fishing.rank, 1);
         assert_eq!(loaded.zone_progression.current_zone_id, 1);
         assert_eq!(loaded.chess_stats.games_played, 0);
+    }
+
+    #[test]
+    fn test_loot_ticker_new_is_empty() {
+        let ticker = LootTicker::new();
+        assert!(ticker.entries.is_empty());
+        assert_eq!(ticker.scroll_offset, 0.0);
+        assert_eq!(ticker.pause_ticks, 0);
+    }
+
+    #[test]
+    fn test_loot_ticker_push_adds_entry() {
+        let mut ticker = LootTicker::new();
+        ticker.push(TickerEntry {
+            icon: "\u{2694}",
+            text: "[R] Flamebrand".to_string(),
+            color: ratatui::style::Color::Yellow,
+            bold: false,
+        });
+        assert_eq!(ticker.entries.len(), 1);
+        assert_eq!(ticker.entries[0].text, "[R] Flamebrand");
+        assert_eq!(ticker.pause_ticks, TICKER_PAUSE_TICKS);
+    }
+
+    #[test]
+    fn test_loot_ticker_push_evicts_oldest() {
+        let mut ticker = LootTicker::new();
+        for i in 0..TICKER_MAX_ENTRIES + 5 {
+            ticker.push(TickerEntry {
+                icon: "",
+                text: format!("Item {i}"),
+                color: ratatui::style::Color::White,
+                bold: false,
+            });
+        }
+        assert_eq!(ticker.entries.len(), TICKER_MAX_ENTRIES);
+        // Most recent should be at front
+        assert_eq!(ticker.entries[0].text, "Item 34");
+    }
+
+    #[test]
+    fn test_loot_ticker_tick_advances_offset() {
+        let mut ticker = LootTicker::new();
+        assert_eq!(ticker.scroll_offset, 0.0);
+        ticker.tick();
+        assert!((ticker.scroll_offset - TICKER_SCROLL_SPEED).abs() < f64::EPSILON);
+        ticker.tick();
+        assert!((ticker.scroll_offset - 2.0 * TICKER_SCROLL_SPEED).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_loot_ticker_pause_on_new_entry() {
+        let mut ticker = LootTicker::new();
+        ticker.push(TickerEntry {
+            icon: "",
+            text: "Test".to_string(),
+            color: ratatui::style::Color::White,
+            bold: false,
+        });
+        assert_eq!(ticker.pause_ticks, TICKER_PAUSE_TICKS);
+        let offset_before = ticker.scroll_offset;
+        ticker.tick();
+        assert_eq!(ticker.scroll_offset, offset_before);
+        assert_eq!(ticker.pause_ticks, TICKER_PAUSE_TICKS - 1);
+    }
+
+    #[test]
+    fn test_loot_ticker_resumes_after_pause() {
+        let mut ticker = LootTicker::new();
+        ticker.push(TickerEntry {
+            icon: "",
+            text: "Test".to_string(),
+            color: ratatui::style::Color::White,
+            bold: false,
+        });
+        for _ in 0..TICKER_PAUSE_TICKS {
+            ticker.tick();
+        }
+        assert_eq!(ticker.pause_ticks, 0);
+        let offset_before = ticker.scroll_offset;
+        ticker.tick();
+        assert!(ticker.scroll_offset > offset_before);
     }
 }
