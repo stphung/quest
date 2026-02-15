@@ -324,7 +324,9 @@ pub fn game_tick<R: Rng>(
                 }
                 crate::dungeon::logic::DungeonEvent::BossUnlocked => {
                     result.events.push(TickEvent::DungeonBossUnlocked {
-                        message: "\u{1f479} Somewhere deep in the dungeon, a sealed door grinds open.".to_string(),
+                        message:
+                            "\u{1f479} Somewhere deep in the dungeon, a sealed door grinds open."
+                                .to_string(),
                     });
                 }
                 crate::dungeon::logic::DungeonEvent::DungeonComplete {
