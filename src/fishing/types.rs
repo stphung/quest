@@ -140,6 +140,21 @@ pub const RANK_NAMES: [&str; 40] = [
     "The Unchained",
 ];
 
+/// Returns the fishing tier name for a given rank.
+pub fn fishing_tier_name(rank: u32) -> &'static str {
+    match rank {
+        0 => "None",
+        1..=5 => "Novice",
+        6..=10 => "Apprentice",
+        11..=15 => "Journeyman",
+        16..=20 => "Expert",
+        21..=25 => "Master",
+        26..=30 => "Grandmaster",
+        31..=35 => "Mythic",
+        _ => "Transcendent",
+    }
+}
+
 impl FishingState {
     /// Returns the display name for the current fishing rank.
     pub fn rank_name(&self) -> &'static str {
@@ -325,6 +340,20 @@ mod tests {
         // Beyond max rank
         assert_eq!(FishingState::fish_required_for_rank(41), 250_000);
         assert_eq!(FishingState::fish_required_for_rank(100), 250_000);
+    }
+
+    #[test]
+    fn test_fishing_tier_name() {
+        assert_eq!(fishing_tier_name(0), "None");
+        assert_eq!(fishing_tier_name(1), "Novice");
+        assert_eq!(fishing_tier_name(5), "Novice");
+        assert_eq!(fishing_tier_name(6), "Apprentice");
+        assert_eq!(fishing_tier_name(15), "Journeyman");
+        assert_eq!(fishing_tier_name(20), "Expert");
+        assert_eq!(fishing_tier_name(25), "Master");
+        assert_eq!(fishing_tier_name(30), "Grandmaster");
+        assert_eq!(fishing_tier_name(35), "Mythic");
+        assert_eq!(fishing_tier_name(40), "Transcendent");
     }
 
     #[test]
