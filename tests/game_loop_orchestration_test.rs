@@ -18,6 +18,7 @@ use quest::achievements::{AchievementId, Achievements};
 use quest::character::attributes::AttributeType;
 use quest::character::derived_stats::DerivedStats;
 use quest::core::tick::{game_tick, TickEvent, TickResult};
+use quest::enhancement::EnhancementProgress;
 use quest::fishing::{FishingPhase, FishingSession};
 use quest::haven::{try_discover_haven, Haven};
 use quest::GameState;
@@ -65,7 +66,15 @@ fn run_game_tick(
     debug_mode: bool,
     rng: &mut ChaCha8Rng,
 ) -> TickResult {
-    game_tick(state, tc, haven, ach, debug_mode, rng)
+    game_tick(
+        state,
+        tc,
+        haven,
+        &mut EnhancementProgress::new(),
+        ach,
+        debug_mode,
+        rng,
+    )
 }
 
 // =============================================================================

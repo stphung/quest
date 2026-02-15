@@ -10,6 +10,7 @@ use quest::character::derived_stats::DerivedStats;
 use quest::core::game_logic::{spawn_enemy_if_needed, xp_for_next_level};
 use quest::core::tick::{game_tick, TickEvent, TickResult};
 use quest::dungeon::generation::generate_dungeon;
+use quest::enhancement::EnhancementProgress;
 use quest::fishing::FishingPhase;
 use quest::haven::Haven;
 use quest::GameState;
@@ -39,9 +40,18 @@ fn run_ticks_collecting(
     rng: &mut ChaCha8Rng,
     count: usize,
 ) -> Vec<TickEvent> {
+    let mut enhancement = EnhancementProgress::new();
     let mut all_events = Vec::new();
     for _ in 0..count {
-        let result = game_tick(state, tick_counter, haven, achievements, false, rng);
+        let result = game_tick(
+            state,
+            tick_counter,
+            haven,
+            &mut enhancement,
+            achievements,
+            false,
+            rng,
+        );
         all_events.extend(result.events);
     }
     all_events
@@ -55,9 +65,18 @@ fn run_ticks_collecting_results(
     rng: &mut ChaCha8Rng,
     count: usize,
 ) -> Vec<TickResult> {
+    let mut enhancement = EnhancementProgress::new();
     let mut all_results = Vec::new();
     for _ in 0..count {
-        let result = game_tick(state, tick_counter, haven, achievements, false, rng);
+        let result = game_tick(
+            state,
+            tick_counter,
+            haven,
+            &mut enhancement,
+            achievements,
+            false,
+            rng,
+        );
         all_results.push(result);
     }
     all_results
@@ -181,6 +200,7 @@ fn test_tick_event_player_died_in_dungeon() {
             &mut state,
             &mut tick_counter,
             &mut haven,
+            &mut EnhancementProgress::new(),
             &mut achievements,
             false,
             &mut rng,
@@ -378,6 +398,7 @@ fn test_tick_event_fish_caught_fields() {
             &mut state,
             &mut tick_counter,
             &mut haven,
+            &mut EnhancementProgress::new(),
             &mut achievements,
             false,
             &mut rng,
@@ -436,6 +457,7 @@ fn test_tick_event_fishing_message_for_phase_transitions() {
             &mut state,
             &mut tick_counter,
             &mut haven,
+            &mut EnhancementProgress::new(),
             &mut achievements,
             false,
             &mut rng,
@@ -489,6 +511,7 @@ fn test_play_time_increments_during_fishing_session() {
             &mut state,
             &mut tick_counter,
             &mut haven,
+            &mut EnhancementProgress::new(),
             &mut achievements,
             false,
             &mut rng,
@@ -621,6 +644,7 @@ fn test_haven_discovery_sets_haven_changed_and_achievements_changed() {
                 &mut state,
                 &mut tick_counter,
                 &mut haven,
+                &mut EnhancementProgress::new(),
                 &mut achievements,
                 false,
                 &mut rng,
@@ -742,7 +766,15 @@ fn test_challenge_discovered_event_has_type_and_messages() {
         let mut a = Achievements::default();
 
         for _ in 0..5_000 {
-            let result = game_tick(&mut test_state, &mut tc, &mut h, &mut a, false, &mut rng);
+            let result = game_tick(
+                &mut test_state,
+                &mut tc,
+                &mut h,
+                &mut EnhancementProgress::new(),
+                &mut a,
+                false,
+                &mut rng,
+            );
             for event in &result.events {
                 if let TickEvent::ChallengeDiscovered {
                     challenge_type,
@@ -867,6 +899,7 @@ fn test_leveled_up_event_on_enemy_defeat() {
             &mut state,
             &mut tick_counter,
             &mut haven,
+            &mut EnhancementProgress::new(),
             &mut achievements,
             false,
             &mut rng,
@@ -972,6 +1005,7 @@ fn test_item_dropped_event_from_boss() {
             &mut state,
             &mut tick_counter,
             &mut haven,
+            &mut EnhancementProgress::new(),
             &mut achievements,
             false,
             &mut rng,
@@ -1032,6 +1066,7 @@ fn test_subzone_boss_defeated_advances_progression() {
             &mut state,
             &mut tick_counter,
             &mut haven,
+            &mut EnhancementProgress::new(),
             &mut achievements,
             false,
             &mut rng,
@@ -1089,6 +1124,7 @@ fn test_achievement_unlocked_event_format() {
             &mut state,
             &mut tick_counter,
             &mut haven,
+            &mut EnhancementProgress::new(),
             &mut achievements,
             false,
             &mut rng,
@@ -1136,7 +1172,12 @@ fn test_debug_mode_suppresses_haven_and_achievement_save_on_storm_leviathan() {
     // Run in debug mode
     for _ in 0..100 {
         let result = game_tick(
-            &mut state, &mut tick, &mut h, &mut a, true, // debug_mode = true
+            &mut state,
+            &mut tick,
+            &mut h,
+            &mut EnhancementProgress::new(),
+            &mut a,
+            true, // debug_mode = true
             &mut rng,
         );
 
@@ -1167,6 +1208,7 @@ fn test_tick_result_achievement_modal_ready() {
             &mut state,
             &mut tick_counter,
             &mut haven,
+            &mut EnhancementProgress::new(),
             &mut achievements,
             false,
             &mut rng,
@@ -1208,6 +1250,7 @@ fn test_dungeon_boss_defeated_event_fields() {
             &mut state,
             &mut tick_counter,
             &mut haven,
+            &mut EnhancementProgress::new(),
             &mut achievements,
             false,
             &mut rng,
@@ -1271,6 +1314,7 @@ fn test_dungeon_elite_defeated_event() {
             &mut state,
             &mut tick_counter,
             &mut haven,
+            &mut EnhancementProgress::new(),
             &mut achievements,
             false,
             &mut rng,
@@ -1327,6 +1371,7 @@ fn test_prestige_flat_hp_applied_in_tick() {
         &mut state,
         &mut tick_counter,
         &mut haven,
+        &mut EnhancementProgress::new(),
         &mut achievements,
         false,
         &mut rng,
@@ -1359,6 +1404,7 @@ fn test_enemy_defeated_increments_session_kills_via_tick() {
             &mut state,
             &mut tick_counter,
             &mut haven,
+            &mut EnhancementProgress::new(),
             &mut achievements,
             false,
             &mut rng,

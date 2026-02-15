@@ -4,6 +4,7 @@ mod character;
 mod combat;
 mod core;
 mod dungeon;
+mod enhancement;
 mod fishing;
 mod haven;
 mod input;
@@ -184,6 +185,11 @@ fn draw_game_overlays(
             ui::prestige_confirm::draw_prestige_confirm(frame, state, ctx);
         }
         GameOverlay::HavenDiscovery => {
+            ui::haven_scene::render_haven_discovery_modal(frame, area, ctx);
+        }
+        GameOverlay::BlacksmithDiscovery => {
+            // Placeholder: reuse Haven discovery modal layout for now.
+            // A dedicated blacksmith discovery modal will be added in a later task.
             ui::haven_scene::render_haven_discovery_modal(frame, area, ctx);
         }
         GameOverlay::AchievementUnlocked { ref achievements } => {
@@ -389,6 +395,9 @@ fn main() -> io::Result<()> {
 
     // Load account-level Haven state
     let mut haven = haven::load_haven();
+
+    // Load account-level Enhancement (blacksmith) state
+    let mut enhancement = enhancement::load_enhancement();
 
     // Load global achievements (shared across all characters)
     let mut global_achievements = achievements::load_achievements();
@@ -932,6 +941,9 @@ fn main() -> io::Result<()> {
                                         character_manager.save_character(&state)?;
                                         // Save achievements when quitting to character select
                                         achievements::save_achievements(&global_achievements)?;
+                                        if enhancement.discovered {
+                                            enhancement::save_enhancement(&enhancement).ok();
+                                        }
                                     }
                                     game_state = None;
                                     current_screen = Screen::CharacterSelect;
@@ -950,6 +962,9 @@ fn main() -> io::Result<()> {
                                         // Only save Haven if it has been discovered
                                         if haven.discovered {
                                             haven::save_haven(&haven).ok();
+                                        }
+                                        if enhancement.discovered {
+                                            enhancement::save_enhancement(&enhancement).ok();
                                         }
                                         last_save_instant = Some(Instant::now());
                                         last_save_time = Some(Local::now());
@@ -1019,6 +1034,9 @@ fn main() -> io::Result<()> {
                                 if haven.discovered {
                                     haven::save_haven(&haven).ok();
                                 }
+                                if enhancement.discovered {
+                                    enhancement::save_enhancement(&enhancement).ok();
+                                }
                                 achievements::save_achievements(&global_achievements).ok();
                                 last_save_instant = Some(Instant::now());
                                 last_save_time = Some(Local::now());
@@ -1034,13 +1052,13 @@ fn main() -> io::Result<()> {
                                 &mut state,
                                 &mut tick_counter,
                                 &mut haven,
+                                &mut enhancement,
                                 &mut global_achievements,
                                 debug_mode,
                                 &mut rng,
                             );
 
-                            let haven_discovered =
-                                apply_tick_events(&mut state, &tick_result.events);
+                            let tick_flags = apply_tick_events(&mut state, &tick_result.events);
 
                             // Update visual effect lifetimes
                             let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
@@ -1065,8 +1083,14 @@ fn main() -> io::Result<()> {
                             if tick_result.haven_changed && !debug_mode {
                                 haven::save_haven(&haven).ok();
                             }
-                            if haven_discovered {
+                            if tick_result.enhancement_changed && !debug_mode {
+                                enhancement::save_enhancement(&enhancement).ok();
+                            }
+                            if tick_flags.haven_discovered {
                                 overlay = GameOverlay::HavenDiscovery;
+                            }
+                            if tick_flags.blacksmith_discovered {
+                                overlay = GameOverlay::BlacksmithDiscovery;
                             }
 
                             if matches!(overlay, GameOverlay::None)
@@ -1093,6 +1117,9 @@ fn main() -> io::Result<()> {
                             character_manager.save_character(&state)?;
                             if haven.discovered {
                                 haven::save_haven(&haven)?;
+                            }
+                            if enhancement.discovered {
+                                enhancement::save_enhancement(&enhancement).ok();
                             }
                             achievements::save_achievements(&global_achievements)?;
                             last_save_instant = Some(Instant::now());

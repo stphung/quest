@@ -81,6 +81,7 @@ impl HavenUiState {
 pub enum GameOverlay {
     None,
     HavenDiscovery,
+    BlacksmithDiscovery,
     PrestigeConfirm,
     VaultSelection {
         selected_index: usize,
@@ -165,6 +166,11 @@ pub fn handle_game_input(
         return handle_haven_discovery(key, overlay);
     }
 
+    // 1a. Blacksmith discovery modal (blocks all other input)
+    if matches!(overlay, GameOverlay::BlacksmithDiscovery) {
+        return handle_blacksmith_discovery(key, overlay);
+    }
+
     // 1b. Achievement unlocked modal (blocks all other input)
     if matches!(overlay, GameOverlay::AchievementUnlocked { .. }) {
         return handle_achievement_unlocked(key, overlay);
@@ -226,6 +232,13 @@ pub fn handle_game_input(
 }
 
 fn handle_haven_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
+    if matches!(key.code, KeyCode::Enter | KeyCode::Esc) {
+        *overlay = GameOverlay::None;
+    }
+    InputResult::Continue
+}
+
+fn handle_blacksmith_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
     if matches!(key.code, KeyCode::Enter | KeyCode::Esc) {
         *overlay = GameOverlay::None;
     }

@@ -20,6 +20,7 @@ use quest::character::attributes::AttributeType;
 use quest::character::derived_stats::DerivedStats;
 use quest::core::game_state::GameState;
 use quest::core::tick::{game_tick, TickEvent, TickResult};
+use quest::enhancement::EnhancementProgress;
 use quest::haven::Haven;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -305,6 +306,7 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
     state.combat_state.player_current_hp = derived.max_hp;
 
     let mut haven = Haven::default();
+    let mut enhancement = EnhancementProgress::new();
     let mut achievements = Achievements::default();
 
     // Force-unlock Stormbreaker achievement if requested
@@ -344,6 +346,7 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
             &mut state,
             &mut tick_counter,
             &mut haven,
+            &mut enhancement,
             &mut achievements,
             false,
             &mut rng,

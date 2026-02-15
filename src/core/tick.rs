@@ -179,6 +179,9 @@ pub enum TickEvent {
     /// The Haven was discovered (P10+ idle roll).
     HavenDiscovered,
 
+    /// The Blacksmith was discovered (P15+ idle roll).
+    BlacksmithDiscovered,
+
     // ── Achievements ────────────────────────────────────────────
     /// An achievement was unlocked during this tick.
     AchievementUnlocked { name: String, message: String },
@@ -206,6 +209,9 @@ pub struct TickResult {
     /// True if Haven state was modified (discovery) and should be persisted.
     pub haven_changed: bool,
 
+    /// True if Enhancement state was modified (discovery) and should be persisted.
+    pub enhancement_changed: bool,
+
     /// Achievement IDs ready to be shown in a modal overlay.
     /// Populated when the 500ms accumulation window has elapsed.
     /// Empty if no modal is ready or another overlay is already active.
@@ -222,6 +228,7 @@ pub struct TickResult {
 /// - `tick_counter` — Counts ticks for play-time tracking (10 ticks = 1 second).
 ///   Caller owns this counter across ticks.
 /// - `haven` — Mutable Haven state for bonus calculations and discovery.
+/// - `enhancement` — Mutable Enhancement state for blacksmith discovery.
 /// - `achievements` — Mutable achievement state for unlock tracking.
 /// - `debug_mode` — When true, suppresses achievement/haven-save signals.
 /// - `rng` — Random number generator (any `impl Rng`). Pass
@@ -236,12 +243,14 @@ pub struct TickResult {
 /// - Updating `visual_effects` lifetimes
 /// - Persisting achievements to disk when `achievements_changed` is true
 /// - Persisting Haven to disk when `haven_changed` is true
+/// - Persisting Enhancement to disk when `enhancement_changed` is true
 /// - Showing the Leviathan encounter modal when `leviathan_encounter` is `Some`
 /// - Showing achievement modal overlay when `achievement_modal_ready` is non-empty
 pub fn game_tick<R: Rng>(
     state: &mut GameState,
     tick_counter: &mut u32,
     haven: &mut Haven,
+    enhancement: &mut crate::enhancement::EnhancementProgress,
     achievements: &mut Achievements,
     debug_mode: bool,
     rng: &mut R,
@@ -752,7 +761,20 @@ pub fn game_tick<R: Rng>(
         }
     }
 
-    // ── 11. Achievement modal accumulation ────────────────────────
+    // ── 11. Blacksmith discovery check ────────────────────────────
+    // Independent roll per tick, only when eligible (P15+, no active content)
+    if !enhancement.discovered
+        && state.prestige_rank >= crate::enhancement::BLACKSMITH_MIN_PRESTIGE_RANK
+        && state.active_dungeon.is_none()
+        && state.active_fishing.is_none()
+        && state.active_minigame.is_none()
+        && crate::enhancement::try_discover_blacksmith(enhancement, state.prestige_rank, rng)
+    {
+        result.events.push(TickEvent::BlacksmithDiscovered);
+        result.enhancement_changed = true;
+    }
+
+    // ── 12. Achievement modal accumulation ────────────────────────
     if achievements.is_modal_ready() {
         result.achievement_modal_ready = achievements.take_modal_queue();
     }
@@ -867,6 +889,7 @@ fn process_zone_achievements(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enhancement::EnhancementProgress;
     use crate::haven::Haven;
     use rand::SeedableRng;
     use rand_chacha::ChaCha8Rng;
@@ -880,6 +903,7 @@ mod tests {
         let mut state = GameState::new("Test".to_string(), 0);
         let mut tick_counter = 0u32;
         let mut haven = Haven::default();
+        let mut enhancement = EnhancementProgress::new();
         let mut achievements = Achievements::default();
         let mut rng = test_rng();
 
@@ -887,6 +911,7 @@ mod tests {
             &mut state,
             &mut tick_counter,
             &mut haven,
+            &mut enhancement,
             &mut achievements,
             false,
             &mut rng,
@@ -905,6 +930,7 @@ mod tests {
         let mut state = GameState::new("Time Test".to_string(), 0);
         let mut tick_counter = 0u32;
         let mut haven = Haven::default();
+        let mut enhancement = EnhancementProgress::new();
         let mut achievements = Achievements::default();
         let mut rng = test_rng();
 
@@ -915,6 +941,7 @@ mod tests {
                 &mut state,
                 &mut tick_counter,
                 &mut haven,
+                &mut enhancement,
                 &mut achievements,
                 false,
                 &mut rng,
@@ -930,6 +957,7 @@ mod tests {
         let mut state = GameState::new("Spawn Test".to_string(), 0);
         let mut tick_counter = 0u32;
         let mut haven = Haven::default();
+        let mut enhancement = EnhancementProgress::new();
         let mut achievements = Achievements::default();
         let mut rng = test_rng();
 
@@ -939,6 +967,7 @@ mod tests {
             &mut state,
             &mut tick_counter,
             &mut haven,
+            &mut enhancement,
             &mut achievements,
             false,
             &mut rng,
@@ -960,6 +989,7 @@ mod tests {
 
         let mut tick_counter = 0u32;
         let mut haven = Haven::default();
+        let mut enhancement = EnhancementProgress::new();
         let mut achievements = Achievements::default();
         let mut rng = test_rng();
 
@@ -969,6 +999,7 @@ mod tests {
                 &mut state,
                 &mut tick_counter,
                 &mut haven,
+                &mut enhancement,
                 &mut achievements,
                 false,
                 &mut rng,
