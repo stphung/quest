@@ -136,13 +136,8 @@ fn draw_xl_l_layout(
     // Determine if we need space for update drawer
     let show_update_drawer = update_expanded && update_info.is_some();
 
-    // Stats panel needs a fixed height: header(4)+prestige(5)+fishing(4)+attrs(8) = 21 + equip ~16
-    // At L tier: header(4)+prestige(5)+fishing(4)+attrs(5) = 18 + equip ~9
-    let stats_height: u16 = if ctx.height_tier >= SizeTier::XL {
-        37 // 21 fixed + 16 equipment
-    } else {
-        27 // 18 fixed + 9 equipment
-    };
+    // Stats panel: header(4)+prestige(5)+fishing(4)+attrs(5) = 18 + equip ~9
+    let stats_height: u16 = 27;
 
     // Split vertically: fixed stats area, growing info panels, optional update drawer, footer
     let v_chunks = if show_update_drawer {

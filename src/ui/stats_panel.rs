@@ -5,7 +5,7 @@ use crate::character::prestige::{get_adventurer_rank, get_prestige_tier};
 use crate::core::game_logic::xp_for_next_level;
 use crate::core::game_state::GameState;
 use crate::fishing::types::FishingState;
-use crate::items::types::{Affix, AffixType, Rarity};
+use crate::items::types::Rarity;
 use crate::utils::updater::UpdateInfo;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -14,21 +14,6 @@ use ratatui::{
     widgets::{Block, Borders, Gauge, Paragraph, Wrap},
     Frame,
 };
-
-/// Formats an affix for display in the equipment panel.
-fn format_affix(affix: &Affix) -> String {
-    match affix.affix_type {
-        AffixType::DamagePercent => format!("+{:.0}% DMG", affix.value),
-        AffixType::CritChance => format!("+{:.0}% CRIT", affix.value),
-        AffixType::CritMultiplier => format!("+{:.0}% CritMult", affix.value),
-        AffixType::AttackSpeed => format!("+{:.0}% Speed", affix.value),
-        AffixType::HPBonus => format!("+{:.0} HP", affix.value),
-        AffixType::DamageReduction => format!("+{:.0}% DR", affix.value),
-        AffixType::HPRegen => format!("+{:.0}% Regen", affix.value),
-        AffixType::DamageReflection => format!("+{:.0}% Reflect", affix.value),
-        AffixType::XPGain => format!("+{:.0}% XP", affix.value),
-    }
-}
 
 /// Draws the stats panel
 pub fn draw_stats_panel(
@@ -39,27 +24,8 @@ pub fn draw_stats_panel(
     enhancement_levels: &[u8; 7],
 ) {
     match ctx.height_tier {
-        SizeTier::XL => {
-            // Full layout: header(4) + prestige(5) + fishing(4) + attrs(8) + equip(rest)
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Length(4), // Header + XP bar
-                    Constraint::Length(5), // Prestige info (rank, multiplier, resets)
-                    Constraint::Length(4), // Fishing rank + progress bar
-                    Constraint::Length(8), // Attributes (6 attrs × 1 row + 2 borders)
-                    Constraint::Min(0),    // Equipment section (takes remaining space)
-                ])
-                .split(area);
-
-            draw_header(frame, chunks[0], game_state);
-            draw_prestige_info(frame, chunks[1], game_state);
-            draw_fishing_panel(frame, chunks[2], game_state);
-            draw_attributes(frame, chunks[3], game_state);
-            draw_equipment_section(frame, chunks[4], game_state, enhancement_levels);
-        }
-        SizeTier::L => {
-            // Condensed: header(4) + prestige(5) + fishing(4) + attrs_compact(5) + equip_names(rest)
+        SizeTier::XL | SizeTier::L => {
+            // header(4) + prestige(5) + fishing(4) + attrs_compact(5) + equip_names(rest)
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
@@ -356,50 +322,6 @@ pub(super) fn draw_zone_info(
     frame.render_widget(zone_widget, area);
 }
 
-/// Draws all 6 attributes with their values and caps
-fn draw_attributes(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    let attrs_block = Block::default().borders(Borders::ALL).title("Attributes");
-
-    let inner = attrs_block.inner(area);
-    frame.render_widget(attrs_block, area);
-
-    let cap = game_state.get_attribute_cap();
-
-    let mut lines = Vec::new();
-    for attr_type in AttributeType::all() {
-        let value = game_state.attributes.get(attr_type);
-        let modifier = game_state.attributes.modifier(attr_type);
-        let (color, emoji) = match attr_type {
-            AttributeType::Strength => (Color::Red, "💪"),
-            AttributeType::Dexterity => (Color::Green, "🏃"),
-            AttributeType::Constitution => (Color::Magenta, "❤️"),
-            AttributeType::Intelligence => (Color::Blue, "🧠"),
-            AttributeType::Wisdom => (Color::Cyan, "👁️"),
-            AttributeType::Charisma => (Color::Yellow, "✨"),
-        };
-        let mod_str = format_modifier(modifier);
-
-        lines.push(Line::from(vec![
-            Span::styled(
-                format!("{} {}: ", emoji, attr_type.abbrev()),
-                Style::default().add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                format!("{:2}", value),
-                Style::default().fg(color).add_modifier(Modifier::BOLD),
-            ),
-            Span::raw(format!(" ({:>3}) ", mod_str)),
-            Span::styled(
-                format!("[Cap: {}]", cap),
-                Style::default().fg(Color::DarkGray),
-            ),
-        ]));
-    }
-
-    let paragraph = Paragraph::new(lines);
-    frame.render_widget(paragraph, inner);
-}
-
 /// Draws prestige information with CHA bonus
 fn draw_prestige_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let prestige_block = Block::default().borders(Borders::ALL).title("Prestige");
@@ -519,140 +441,7 @@ fn enhancement_style(level: u8) -> Style {
     }
 }
 
-/// Draws equipment section with all 7 equipment slots
-fn draw_equipment_section(
-    frame: &mut Frame,
-    area: Rect,
-    game_state: &GameState,
-    enhancement_levels: &[u8; 7],
-) {
-    let equipment_block = Block::default().borders(Borders::ALL).title("Equipment");
-
-    let inner = equipment_block.inner(area);
-    frame.render_widget(equipment_block, area);
-
-    let mut lines = Vec::new();
-
-    // Draw each equipment slot
-    use crate::items::EquipmentSlot;
-    let slot_order = [
-        EquipmentSlot::Weapon,
-        EquipmentSlot::Armor,
-        EquipmentSlot::Helmet,
-        EquipmentSlot::Gloves,
-        EquipmentSlot::Boots,
-        EquipmentSlot::Amulet,
-        EquipmentSlot::Ring,
-    ];
-    let slots: Vec<(Option<&crate::items::Item>, String)> = slot_order
-        .iter()
-        .map(|s| {
-            let pad = if s.icon_width() == 1 { "  " } else { " " };
-            (
-                game_state.equipment.get(*s).as_ref(),
-                format!("{}{}{}", s.icon(), pad, s.name()),
-            )
-        })
-        .collect();
-
-    for (idx, (item, slot_label)) in slots.into_iter().enumerate() {
-        if let Some(item) = item {
-            // Get rarity color
-            let rarity_color = match item.rarity {
-                Rarity::Common => Color::White,
-                Rarity::Magic => Color::Blue,
-                Rarity::Rare => Color::Yellow,
-                Rarity::Epic => Color::Magenta,
-                Rarity::Legendary => Color::LightRed,
-            };
-
-            // Enhancement prefix
-            let enh_level = enhancement_levels[idx];
-            let prefix = crate::enhancement::enhancement_prefix(enh_level);
-
-            // Line 1: icon, enhancement prefix, name, rarity, stars
-            let stars = "⭐".repeat(item.rarity as usize + 1);
-            let item_name = if item.display_name.len() > 28 {
-                format!("{}...", &item.display_name[..25])
-            } else {
-                item.display_name.clone()
-            };
-
-            let mut name_spans = vec![Span::raw(format!("{} ", slot_label))];
-            if !prefix.is_empty() {
-                name_spans.push(Span::styled(prefix, enhancement_style(enh_level)));
-            }
-            name_spans.push(Span::styled(
-                item_name,
-                Style::default().add_modifier(Modifier::BOLD),
-            ));
-            name_spans.push(Span::raw(" "));
-            name_spans.push(Span::styled(
-                format!("[{}]", item.rarity.name()),
-                Style::default().fg(rarity_color),
-            ));
-            name_spans.push(Span::raw(format!(" {}", stars)));
-
-            lines.push(Line::from(name_spans));
-
-            // Line 2: attribute bonuses with colored emojis
-            let attr_bonuses = [
-                (item.attributes.str, "💪", Color::Red),
-                (item.attributes.dex, "🏃", Color::Green),
-                (item.attributes.con, "❤️", Color::Magenta),
-                (item.attributes.int, "🧠", Color::Blue),
-                (item.attributes.wis, "👁️", Color::Cyan),
-                (item.attributes.cha, "✨", Color::Yellow),
-            ];
-
-            let mut attr_spans: Vec<Span> = vec![Span::raw("   ")];
-            let mut has_attrs = false;
-            for (value, emoji, color) in attr_bonuses {
-                if value > 0 {
-                    if has_attrs {
-                        attr_spans.push(Span::raw(" "));
-                    }
-                    attr_spans.push(Span::styled(
-                        format!("{}+{}", emoji, value),
-                        Style::default().fg(color),
-                    ));
-                    has_attrs = true;
-                }
-            }
-
-            if has_attrs {
-                lines.push(Line::from(attr_spans));
-            }
-
-            // Line 3: affixes (if any)
-            if !item.affixes.is_empty() {
-                let mut affix_spans: Vec<Span> = vec![Span::raw("   ")];
-                for (i, affix) in item.affixes.iter().enumerate() {
-                    if i > 0 {
-                        affix_spans.push(Span::styled(" ", Style::default()));
-                    }
-                    affix_spans.push(Span::styled(
-                        format_affix(affix),
-                        Style::default().fg(Color::Gray),
-                    ));
-                }
-                lines.push(Line::from(affix_spans));
-            }
-        } else {
-            // Empty slot
-            lines.push(Line::from(vec![
-                Span::raw(slot_label),
-                Span::raw(" "),
-                Span::styled("[Empty]", Style::default().fg(Color::DarkGray)),
-            ]));
-        }
-    }
-
-    let equipment_paragraph = Paragraph::new(lines);
-    frame.render_widget(equipment_paragraph, inner);
-}
-
-/// Draws attributes in a compact 2-column layout (L tier).
+/// Draws attributes in a compact 2-column layout.
 /// 3 rows: STR/INT, DEX/WIS, CON/CHA with modifiers.
 fn draw_attributes_compact(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let attrs_block = Block::default().borders(Borders::ALL).title("Attributes");
