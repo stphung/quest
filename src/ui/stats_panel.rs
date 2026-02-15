@@ -540,15 +540,26 @@ fn draw_equipment_section(
     let mut lines = Vec::new();
 
     // Draw each equipment slot
-    let slots = vec![
-        (game_state.equipment.weapon.as_ref(), "⚔️ Weapon"),
-        (game_state.equipment.armor.as_ref(), "🛡 Armor"),
-        (game_state.equipment.helmet.as_ref(), "🪖 Helmet"),
-        (game_state.equipment.gloves.as_ref(), "🧤 Gloves"),
-        (game_state.equipment.boots.as_ref(), "👢 Boots"),
-        (game_state.equipment.amulet.as_ref(), "📿 Amulet"),
-        (game_state.equipment.ring.as_ref(), "💍 Ring"),
+    use crate::items::EquipmentSlot;
+    let slot_order = [
+        EquipmentSlot::Weapon,
+        EquipmentSlot::Armor,
+        EquipmentSlot::Helmet,
+        EquipmentSlot::Gloves,
+        EquipmentSlot::Boots,
+        EquipmentSlot::Amulet,
+        EquipmentSlot::Ring,
     ];
+    let slots: Vec<(Option<&crate::items::Item>, String)> = slot_order
+        .iter()
+        .map(|s| {
+            let pad = if s.icon_width() == 1 { "  " } else { " " };
+            (
+                game_state.equipment.get(*s).as_ref(),
+                format!("{}{}{}", s.icon(), pad, s.name()),
+            )
+        })
+        .collect();
 
     for (idx, (item, slot_label)) in slots.into_iter().enumerate() {
         if let Some(item) = item {
@@ -713,17 +724,20 @@ fn draw_equipment_names_only(
 
     let mut lines = Vec::new();
 
-    let slots = [
-        (game_state.equipment.weapon.as_ref(), "Weapon"),
-        (game_state.equipment.armor.as_ref(), "Armor"),
-        (game_state.equipment.helmet.as_ref(), "Helmet"),
-        (game_state.equipment.gloves.as_ref(), "Gloves"),
-        (game_state.equipment.boots.as_ref(), "Boots"),
-        (game_state.equipment.amulet.as_ref(), "Amulet"),
-        (game_state.equipment.ring.as_ref(), "Ring"),
+    use crate::items::EquipmentSlot;
+    let slot_order = [
+        EquipmentSlot::Weapon,
+        EquipmentSlot::Armor,
+        EquipmentSlot::Helmet,
+        EquipmentSlot::Gloves,
+        EquipmentSlot::Boots,
+        EquipmentSlot::Amulet,
+        EquipmentSlot::Ring,
     ];
 
-    for (idx, (item, slot_label)) in slots.iter().enumerate() {
+    for (idx, slot_enum) in slot_order.iter().enumerate() {
+        let item = game_state.equipment.get(*slot_enum);
+        let slot_label = slot_enum.name();
         if let Some(item) = item {
             let rarity_color = match item.rarity {
                 Rarity::Common => Color::White,

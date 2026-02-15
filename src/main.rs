@@ -278,7 +278,6 @@ fn draw_game_overlays(
             area,
             blacksmith_ui,
             enhancement,
-            &state.equipment,
             state.prestige_rank,
             ctx,
         );
@@ -541,7 +540,6 @@ fn main() -> io::Result<()> {
                             area,
                             &blacksmith_ui,
                             &enhancement,
-                            &crate::items::Equipment::new(),
                             0,
                             &ctx,
                         );
@@ -1169,8 +1167,9 @@ fn main() -> io::Result<()> {
                         if blacksmith_ui.open {
                             match blacksmith_ui.phase {
                                 input::BlacksmithPhase::Hammering => {
-                                    blacksmith_ui.animation_tick += 1;
-                                    if blacksmith_ui.animation_tick >= 25 {
+                                    blacksmith_ui.animation_tick =
+                                        blacksmith_ui.animation_tick.saturating_add(1);
+                                    if blacksmith_ui.animation_tick >= 50 {
                                         if let Some(ref result) = blacksmith_ui.last_result {
                                             blacksmith_ui.phase = if result.success {
                                                 input::BlacksmithPhase::ResultSuccess

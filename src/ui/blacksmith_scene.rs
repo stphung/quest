@@ -4,7 +4,7 @@ use crate::enhancement::{
     enhancement_cost, enhancement_multiplier, fail_penalty, success_rate, BlacksmithPhase,
     BlacksmithUiState, EnhancementProgress, MAX_ENHANCEMENT_LEVEL,
 };
-use crate::items::{Equipment, EquipmentSlot};
+use crate::items::EquipmentSlot;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -22,19 +22,6 @@ const SLOT_ORDER: [EquipmentSlot; 7] = [
     EquipmentSlot::Amulet,
     EquipmentSlot::Ring,
 ];
-
-const SLOT_ICONS: [&str; 7] = [
-    "\u{2694}",  // Weapon: crossed swords
-    "\u{1f6e1}", // Armor: shield
-    "\u{26d1}",  // Helmet
-    "\u{1f9e4}", // Gloves
-    "\u{1f462}", // Boots
-    "\u{1f4bf}", // Amulet (disc)
-    "\u{1f48d}", // Ring
-];
-
-/// Terminal display width of each icon (text symbols = 1 cell, emoji = 2 cells)
-const SLOT_ICON_WIDTHS: [u8; 7] = [1, 1, 1, 2, 2, 2, 2];
 
 /// Enhancement level color based on tier
 fn level_color(level: u8) -> Color {
@@ -54,7 +41,6 @@ pub fn render_blacksmith(
     area: Rect,
     blacksmith_ui: &BlacksmithUiState,
     enhancement: &EnhancementProgress,
-    equipment: &Equipment,
     prestige_rank: u32,
     _ctx: &super::responsive::LayoutContext,
 ) {
@@ -81,30 +67,16 @@ pub fn render_blacksmith(
 
     match blacksmith_ui.phase {
         BlacksmithPhase::Menu => {
-            render_menu(
-                frame,
-                inner,
-                blacksmith_ui,
-                enhancement,
-                equipment,
-                prestige_rank,
-            );
+            render_menu(frame, inner, blacksmith_ui, enhancement, prestige_rank);
         }
         BlacksmithPhase::Confirming => {
-            render_confirming(
-                frame,
-                inner,
-                blacksmith_ui,
-                enhancement,
-                equipment,
-                prestige_rank,
-            );
+            render_confirming(frame, inner, blacksmith_ui, enhancement, prestige_rank);
         }
         BlacksmithPhase::Hammering => {
-            render_hammering(frame, inner, blacksmith_ui, enhancement, equipment);
+            render_hammering(frame, inner, blacksmith_ui, enhancement);
         }
         BlacksmithPhase::ResultSuccess => {
-            render_success(frame, inner, blacksmith_ui, enhancement, equipment);
+            render_success(frame, inner, blacksmith_ui);
         }
         BlacksmithPhase::ResultFailure => {
             render_failure(frame, inner, blacksmith_ui);
@@ -118,7 +90,6 @@ fn render_menu(
     area: Rect,
     blacksmith_ui: &BlacksmithUiState,
     enhancement: &EnhancementProgress,
-    equipment: &Equipment,
     prestige_rank: u32,
 ) {
     let chunks = Layout::default()
@@ -153,52 +124,30 @@ fn render_menu(
 
     // Equipment slot rows
     let slot_area = chunks[2];
-    for (i, (slot, icon)) in SLOT_ORDER.iter().zip(SLOT_ICONS.iter()).enumerate() {
+    for (i, slot) in SLOT_ORDER.iter().enumerate() {
         if i as u16 >= slot_area.height {
             break;
         }
         let row_area = Rect::new(slot_area.x, slot_area.y + i as u16, slot_area.width, 1);
         let is_selected = i == blacksmith_ui.selected_slot;
-        let item = equipment.get(*slot);
         let current_level = enhancement.level(i);
 
         let mut spans = Vec::new();
 
         // Selection indicator
         if is_selected {
-            spans.push(Span::styled(
-                "\u{25b6} ",
-                Style::default().fg(Color::Yellow),
-            ));
+            spans.push(Span::styled("> ", Style::default().fg(Color::Yellow)));
         } else {
             spans.push(Span::raw("  "));
         }
 
         // Slot icon (pad narrow icons to align with wide emoji)
-        let icon_pad = if SLOT_ICON_WIDTHS[i] == 1 { "  " } else { " " };
-        spans.push(Span::raw(format!("{}{}", icon, icon_pad)));
-
-        // Display name: item name if equipped, slot name if empty
-        let max_name_len = 18;
-        let (name, name_color) = if let Some(item_ref) = item.as_ref() {
-            let n = if item_ref.display_name.chars().count() > max_name_len {
-                let truncated: String = item_ref
-                    .display_name
-                    .chars()
-                    .take(max_name_len - 3)
-                    .collect();
-                format!("{}...", truncated)
-            } else {
-                format!("{:width$}", item_ref.display_name, width = max_name_len)
-            };
-            (n, Color::White)
-        } else {
-            (
-                format!("{:width$}", slot.name(), width = max_name_len),
-                Color::DarkGray,
-            )
-        };
-        spans.push(Span::styled(name, Style::default().fg(name_color)));
+        let icon_pad = if slot.icon_width() == 1 { "  " } else { " " };
+        spans.push(Span::raw(format!("{}{}", slot.icon(), icon_pad)));
+        spans.push(Span::styled(
+            format!("{:width$}", slot.name(), width = 8),
+            Style::default().fg(Color::White),
+        ));
         spans.push(Span::raw(" "));
 
         // Enhancement level and target (fixed-width for column alignment)
@@ -362,7 +311,6 @@ fn render_confirming(
     area: Rect,
     blacksmith_ui: &BlacksmithUiState,
     enhancement: &EnhancementProgress,
-    equipment: &Equipment,
     prestige_rank: u32,
 ) {
     let chunks = Layout::default()
@@ -381,19 +329,13 @@ fn render_confirming(
     let cost = enhancement_cost(target_level);
     let rate = success_rate(target_level);
 
-    let item_name = equipment
-        .get(slot)
-        .as_ref()
-        .map(|i| i.display_name.as_str())
-        .unwrap_or_else(|| slot.name());
-
     let bonus = enhancement_multiplier(target_level);
     let bonus_pct = (bonus - 1.0) * 100.0;
 
     let text = Paragraph::new(vec![
         Line::from(""),
         Line::from(Span::styled(
-            format!("Enhance {} to +{}?", item_name, target_level),
+            format!("Enhance {} to +{}?", slot.name(), target_level),
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
@@ -446,7 +388,6 @@ fn render_hammering(
     area: Rect,
     blacksmith_ui: &BlacksmithUiState,
     enhancement: &EnhancementProgress,
-    equipment: &Equipment,
 ) {
     let tick = blacksmith_ui.animation_tick;
 
@@ -455,13 +396,14 @@ fn render_hammering(
         .constraints([
             Constraint::Min(0),     // Top padding
             Constraint::Length(12), // Anvil area
-            Constraint::Length(1),  // Progress
+            Constraint::Length(1),  // Progress bar
+            Constraint::Length(1),  // Progress label
             Constraint::Min(0),     // Bottom padding
         ])
         .split(area);
 
-    // Determine if this is a strike tick
-    let is_strike = matches!(tick, 7 | 8 | 15 | 16 | 23 | 24);
+    // Determine if this is a strike tick (3 strikes across 50 ticks)
+    let is_strike = matches!(tick, 14..=16 | 30..=32 | 46..=48);
 
     // Hammer position: raised vs striking
     let hammer_raised = [
@@ -494,21 +436,10 @@ fn render_hammering(
         &hammer_raised
     };
 
-    // Get item name for display on anvil
     let slot_index = blacksmith_ui.selected_slot;
     let slot = SLOT_ORDER[slot_index];
     let current_level = enhancement.level(slot_index);
-    let item_name = equipment
-        .get(slot)
-        .as_ref()
-        .map(|i| i.display_name.clone())
-        .unwrap_or_else(|| slot.name().to_string());
-    let item_display = if item_name.chars().count() > 15 {
-        let truncated: String = item_name.chars().take(12).collect();
-        format!("{}..+{}", truncated, current_level)
-    } else {
-        format!("{} +{}", item_name, current_level)
-    };
+    let item_display = format!("{} +{}", slot.name(), current_level);
 
     // Build the visual
     let mut lines = Vec::new();
@@ -549,37 +480,60 @@ fn render_hammering(
     let visual = Paragraph::new(lines).alignment(Alignment::Center);
     frame.render_widget(visual, chunks[1]);
 
-    // Progress bar using characters
-    let progress = tick as f64 / 25.0;
-    let bar_width = area.width.saturating_sub(8) as usize;
-    let filled = (progress * bar_width as f64) as usize;
-    let empty = bar_width.saturating_sub(filled);
+    // Progress bar with smooth fractional fill
+    let progress = tick as f64 / 50.0;
+    let bar_width = area.width.saturating_sub(6) as usize;
+    let fill_exact = progress * bar_width as f64;
+    let full_cells = fill_exact as usize;
+    let fraction = fill_exact - full_cells as f64;
 
-    let progress_line = Line::from(vec![
+    // Fractional block characters: ▏▎▍▌▋▊▉█ (1/8 to 8/8)
+    const BLOCKS: [&str; 8] = [
+        "\u{258f}", "\u{258e}", "\u{258d}", "\u{258c}", "\u{258b}", "\u{258a}", "\u{2589}",
+        "\u{2588}",
+    ];
+
+    let mut bar_spans = vec![
         Span::styled("  [", Style::default().fg(Color::DarkGray)),
         Span::styled(
-            "\u{2588}".repeat(filled),
+            "\u{2588}".repeat(full_cells),
             Style::default().fg(Color::Yellow),
         ),
-        Span::styled(
-            "\u{2591}".repeat(empty),
+    ];
+
+    let partial_idx = (fraction * 8.0) as usize;
+    if partial_idx > 0 && full_cells < bar_width {
+        bar_spans.push(Span::styled(
+            BLOCKS[partial_idx - 1],
+            Style::default().fg(Color::Yellow),
+        ));
+        let empty = bar_width.saturating_sub(full_cells + 1);
+        bar_spans.push(Span::styled(
+            " ".repeat(empty),
             Style::default().fg(Color::DarkGray),
-        ),
-        Span::styled("] ", Style::default().fg(Color::DarkGray)),
-        Span::styled(item_display, Style::default().fg(Color::White)),
-    ]);
-    let progress_widget = Paragraph::new(progress_line);
-    frame.render_widget(progress_widget, chunks[2]);
+        ));
+    } else {
+        let empty = bar_width.saturating_sub(full_cells);
+        bar_spans.push(Span::styled(
+            " ".repeat(empty),
+            Style::default().fg(Color::DarkGray),
+        ));
+    }
+
+    bar_spans.push(Span::styled("]", Style::default().fg(Color::DarkGray)));
+    frame.render_widget(Paragraph::new(Line::from(bar_spans)), chunks[2]);
+
+    // Label below bar
+    let label = Paragraph::new(Span::styled(
+        item_display,
+        Style::default().fg(Color::White),
+    ))
+    .alignment(Alignment::Center);
+    frame.render_widget(label, chunks[3]);
 }
 
 /// Render the success animation
-fn render_success(
-    frame: &mut Frame,
-    area: Rect,
-    blacksmith_ui: &BlacksmithUiState,
-    _enhancement: &EnhancementProgress,
-    equipment: &Equipment,
-) {
+fn render_success(frame: &mut Frame, area: Rect, blacksmith_ui: &BlacksmithUiState) {
     let tick = blacksmith_ui.animation_tick;
 
     let chunks = Layout::default()
@@ -593,11 +547,7 @@ fn render_success(
 
     let result = blacksmith_ui.last_result.as_ref().unwrap();
     let slot = SLOT_ORDER[result.slot_index];
-    let item_name = equipment
-        .get(slot)
-        .as_ref()
-        .map(|i| i.display_name.as_str())
-        .unwrap_or_else(|| slot.name());
+    let item_name = slot.name();
 
     let bonus = enhancement_multiplier(result.new_level);
     let bonus_pct = (bonus - 1.0) * 100.0;
