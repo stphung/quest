@@ -29,6 +29,7 @@ pub mod snake_scene;
 pub mod soulforge_scene;
 mod stats_panel;
 mod throbber;
+pub mod ticker;
 
 use crate::challenges::ActiveMinigame;
 use crate::core::game_state::GameState;
