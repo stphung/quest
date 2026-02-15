@@ -514,6 +514,58 @@ Progressive 10-encounter hunt, only available at rank 40 on legendary fish catch
 
 ---
 
+## Enhancement / Soulforge System
+
+### Discovery
+
+- **Prestige gate**: P15+ (Transcendent tier)
+- **Discovery formula**: `chance = 0.000014 + (prestige_rank - 15) * 0.000007` (same shape as Haven)
+- **Average time**: ~2 hours at P15, faster at higher ranks
+
+### Enhancement Success Rates and Costs
+
+| Target | Success | Cost (PR) | Fail Penalty | Expected PR/Success |
+|--------|---------|-----------|-------------|---------------------|
+| +1 to +4 | 100% | 1 PR each | None | 1 PR |
+| +5 | 60% | 3 PR | -1 level | 5 PR |
+| +6 | 50% | 3 PR | -1 level | 6 PR |
+| +7 | 40% | 3 PR | -1 level | 7.5 PR |
+| +8 | 30% | 5 PR | -1 level | 16.7 PR |
+| +9 | 20% | 5 PR | -1 level | 25 PR |
+| +10 | 10% | 10 PR | -2 levels | 100 PR |
+
+**Key insight**: Levels +1 through +4 are safe (100% success, no penalty). The risk/reward curve steepens dramatically above +7. Reaching +10 on a single slot requires significant prestige investment due to the 10% success rate and -2 penalty on failure.
+
+### Cumulative Bonus Curve
+
+Each enhancement level provides a cumulative percentage bonus applied to the equipped item's effectiveness:
+
+| Level | Bonus | Multiplier |
+|-------|-------|-----------|
+| +0 | 0% | 1.00x |
+| +1-4 | +5%/+10%/+15%/+20% | 1.05x-1.20x |
+| +5-7 | +30%/+40%/+55% | 1.30x-1.55x |
+| +8-10 | +75%/+100%/+150% | 1.75x-2.50x |
+
+The bonus curve accelerates at higher levels, making the high-risk enhancements correspondingly more rewarding. A fully +10 slot provides 2.5x effectiveness.
+
+### Total PR Investment (7 Slots)
+
+Minimum PR to max all 7 slots to +10 (assuming perfect luck):
+- +1 to +4: 4 PR x 7 slots = 28 PR
+- +5 to +7: 9 PR x 7 slots = 63 PR
+- +8 to +9: 10 PR x 7 slots = 70 PR
+- +10: 10 PR x 7 slots = 70 PR
+- **Total minimum**: 231 PR (with 100% success)
+- **Expected total**: Much higher due to failure rates above +4
+
+### Balance Interactions
+
+- Enhancement costs prestige ranks (same currency as Haven), creating a resource competition
+- Enhancement bonuses are account-wide and persist across prestige resets
+- The Soulforge is gated behind P15+, ensuring players have established Haven before discovering enhancement
+- Failure penalties prevent deterministic progression and add strategic decisions about when to risk
+
 ## Combat System
 
 ### Timing Constants
@@ -609,8 +661,9 @@ total_xp = 180 * 1,316 * 2.0 = 473,760
 | Fishing spot | 5% per kill | Always | Blocked by active fishing/dungeon |
 | Challenge | 0.0014% per tick | P1+ required | ~2hr average; Haven Library boosts |
 | Haven | 0.0014% per tick + 0.0007% per rank above 10 | P10+ required | Only when no active content |
+| Soulforge | 0.0014% per tick + 0.0007% per rank above 15 | P15+ required | Only when no active content |
 
-Constants: `DUNGEON_DISCOVERY_CHANCE = 0.02`, `FISHING_DISCOVERY_CHANCE = 0.05`, `CHALLENGE_DISCOVERY_CHANCE = 0.000014`, `HAVEN_DISCOVERY_BASE_CHANCE = 0.000014`, `HAVEN_DISCOVERY_RANK_BONUS = 0.000007`
+Constants: `DUNGEON_DISCOVERY_CHANCE = 0.02`, `FISHING_DISCOVERY_CHANCE = 0.05`, `CHALLENGE_DISCOVERY_CHANCE = 0.000014`, `HAVEN_DISCOVERY_BASE_CHANCE = 0.000014`, `HAVEN_DISCOVERY_RANK_BONUS = 0.000007`, `SOULFORGE_DISCOVERY_BASE_CHANCE = 0.000014`, `SOULFORGE_DISCOVERY_RANK_BONUS = 0.000007`, `SOULFORGE_MIN_PRESTIGE_RANK = 15`
 
 ---
 
@@ -641,18 +694,21 @@ Exactly one Elite and one Boss room per dungeon.
 
 ## Challenge Minigames
 
-All challenges require P1+ to discover. Discovery is random (~2hr average per challenge). 6 challenge types with 4 difficulty levels each.
+All challenges require P1+ to discover. Discovery is random (~2hr average per challenge). 9 challenge types with 4 difficulty levels each.
 
 ### Discovery Weights
 
 | Challenge | Weight | ~Probability |
 |-----------|--------|--------------|
-| Minesweeper (Trap Detection) | 30 | 27% |
-| Rune (Rune Deciphering) | 25 | 23% |
-| Gomoku (Five in a Row) | 20 | 18% |
-| Morris (Nine Men's Morris) | 15 | 14% |
-| Chess | 10 | 9% |
-| Go (Territory Control) | 10 | 9% |
+| Rune (Rune Deciphering) | 30 | ~19% |
+| Minesweeper (Trap Detection) | 28 | ~18% |
+| Snake (Serpent's Path) | 22 | ~14% |
+| Flappy Bird (Skyward Gauntlet) | 20 | ~13% |
+| JezzBall (Containment Breach) | 18 | ~11% |
+| Gomoku (Five in a Row) | 15 | ~9% |
+| Morris (Nine Men's Morris) | 12 | ~8% |
+| Chess | 8 | ~5% |
+| Go (Territory Control) | 7 | ~4% |
 
 ### Challenge Rewards
 
@@ -709,6 +765,33 @@ All challenges require P1+ to discover. Discovery is random (~2hr average per ch
 | Apprentice | +50% level XP |
 | Journeyman | +1 Fish Rank, +75% level XP |
 | Master | +1 Prestige Rank, +2 Fish Ranks |
+
+**Snake** (Serpent's Path, 26x26 grid):
+
+| Difficulty | Reward |
+|------------|--------|
+| Novice | +25% level XP |
+| Apprentice | +75% level XP |
+| Journeyman | +100% level XP |
+| Master | +1 Prestige Rank, +100% level XP |
+
+**Flappy Bird** (Skyward Gauntlet, 50x18 area, 3 lives):
+
+| Difficulty | Reward |
+|------------|--------|
+| Novice | +50% level XP |
+| Apprentice | +100% level XP |
+| Journeyman | +1 Prestige Rank, +75% level XP |
+| Master | +2 Prestige Ranks, +150% level XP, +1 Fish Rank |
+
+**JezzBall** (Containment Breach, 34x22 grid, 3 lives):
+
+| Difficulty | Balls | Target | Reward |
+|------------|-------|--------|--------|
+| Novice | 2 | 60% | +25% level XP |
+| Apprentice | 3 | 70% | +75% level XP |
+| Journeyman | 4 | 78% | +1 Prestige Rank, +100% level XP |
+| Master | 5 | 84% | +2 Prestige Ranks, +100% level XP |
 
 ---
 
@@ -865,6 +948,11 @@ CHALLENGE_DISCOVERY_CHANCE: f64 = 0.000014;
 HAVEN_DISCOVERY_BASE_CHANCE: f64 = 0.000014;
 HAVEN_DISCOVERY_RANK_BONUS: f64 = 0.000007;
 HAVEN_MIN_PRESTIGE_RANK: u32 = 10;
+
+// Soulforge Discovery
+SOULFORGE_DISCOVERY_BASE_CHANCE: f64 = 0.000014;
+SOULFORGE_DISCOVERY_RANK_BONUS: f64 = 0.000007;
+SOULFORGE_MIN_PRESTIGE_RANK: u32 = 15;
 
 // Zone and Fishing
 KILLS_FOR_BOSS: u32 = 10;

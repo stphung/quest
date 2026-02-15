@@ -55,6 +55,10 @@ Quest is a terminal-based idle RPG built in Rust using Ratatui for UI rendering 
     ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
     │   Zones  │ │  Items   │ │  Haven   │ │Achievemts│
     └──────────┘ └──────────┘ └──────────┘ └──────────┘
+    ┌──────────┐
+    │Soulforge │
+    │(Enhance) │
+    └──────────┘
          │              │            │             │
          └──────────────┴────────────┴─────────────┘
                               │
@@ -89,7 +93,7 @@ Quest is a terminal-based idle RPG built in Rust using Ratatui for UI rendering 
 
 ## Core Game Loop
 
-The game runs at **10 ticks per second** (100ms intervals). Each tick is processed by `game_tick()` in `src/core/tick.rs`, which orchestrates all game systems through an 11-stage pipeline.
+The game runs at **10 ticks per second** (100ms intervals). Each tick is processed by `game_tick()` in `src/core/tick.rs`, which orchestrates all game systems through an 12-stage pipeline.
 
 ```
                     GAME TICK PIPELINE (core/tick.rs)
@@ -98,7 +102,7 @@ The game runs at **10 ticks per second** (100ms intervals). Each tick is process
     │  main.rs: Process Input → call game_tick() → Render     │
     └──────────────────────────┬──────────────────────────────┘
                                │
-               game_tick() 11-stage pipeline:
+               game_tick() 12-stage pipeline:
                                │
     ┌──────────────────────────┴──────────────────────────────┐
     │  1. Challenge AI        Tick AI thinking for active game │
@@ -111,7 +115,8 @@ The game runs at **10 ticks per second** (100ms intervals). Each tick is process
     │  8. Play Time           Increment tick/second counters  │
     │  9. Achievement Collect Drain newly unlocked into events│
     │ 10. Haven Discovery     Roll for Haven (P10+)           │
-    │ 11. Achievement Modal   Check 500ms accumulation window │
+    │ 11. Soulforge Discovery Roll for Soulforge (P15+)      │
+    │ 12. Achievement Modal   Check 500ms accumulation window │
     └─────────────────────────────────────────────────────────┘
                                │
                                ▼
@@ -145,7 +150,7 @@ The game runs at **10 ticks per second** (100ms intervals). Each tick is process
 - Zones: `SubzoneBossDefeated`
 - Dungeon: `DungeonRoomEntered`, `DungeonTreasureFound`, `DungeonKeyFound`, `DungeonBossUnlocked`, `DungeonBossDefeated`, `DungeonEliteDefeated`, `DungeonFailed`, `DungeonCompleted`
 - Fishing: `FishingMessage`, `FishCaught`, `FishingItemFound`, `FishingRankUp`, `StormLeviathanCaught`
-- Discovery: `ChallengeDiscovered`, `DungeonDiscovered`, `FishingSpotDiscovered`, `HavenDiscovered`
+- Discovery: `ChallengeDiscovered`, `DungeonDiscovered`, `FishingSpotDiscovered`, `HavenDiscovered`, `SoulforgeDiscovered`
 - Achievements: `AchievementUnlocked`
 - Level: `LeveledUp`
 
@@ -158,6 +163,7 @@ pub struct TickResult {
     pub leviathan_encounter: Option<u8>,
     pub achievements_changed: bool,
     pub haven_changed: bool,
+    pub enhancement_changed: bool,
     pub achievement_modal_ready: Vec<AchievementId>,
 }
 ```
@@ -534,7 +540,7 @@ Items are automatically equipped if they score higher than the current item usin
 - 0.000014 per tick (~2 hour average)
 - Requires P1+ (not in dungeon, fishing, or another minigame)
 - Haven Library bonus: up to +50%
-- Weighted distribution: Minesweeper (27%), Rune (23%), Gomoku (18%), Morris (14%), Chess (9%), Go (9%)
+- Weighted distribution: 9 challenge types with weights favoring quick games (Rune 30, Minesweeper 28, Snake 22, Flappy Bird 20, JezzBall 18, Gomoku 15, Morris 12, Chess 8, Go 7)
 
 ### Games & AI
 
@@ -546,6 +552,9 @@ Items are automatically equipped if they score higher than the current item usin
 | Morris | Minimax + alpha-beta (2-5 ply) | - |
 | Minesweeper | N/A (puzzle) | 9x9 to 20x16 |
 | Rune | N/A (deduction) | 60-32,768 combos |
+| Snake | N/A (action) | 10-25 food, 200-90ms |
+| Flappy Bird | N/A (action) | Gap 7-4 rows, 3 lives |
+| JezzBall | N/A (action) | 2-5 balls, 3 lives |
 
 All challenges use 4 difficulty levels: Novice, Apprentice, Journeyman, Master.
 
@@ -559,6 +568,9 @@ All challenges use 4 difficulty levels: Novice, Apprentice, Journeyman, Master.
 | Morris | +50% XP | +100% XP | +150% XP | +1 FR, +200% XP |
 | Minesweeper | +50% XP | +75% XP | +100% XP | +1 PR, +200% XP |
 | Rune | +25% XP | +50% XP | +1 FR, +75% XP | +1 PR, +2 FR |
+| Snake | +25% XP | +75% XP | +1 PR, +100% XP | +2 PR, +100% XP |
+| Flappy Bird | +25% XP | +75% XP | +1 PR, +100% XP | +2 PR, +100% XP |
+| JezzBall | +25% XP | +75% XP | +1 PR, +100% XP | +2 PR, +100% XP |
 
 PR = Prestige Rank, FR = Fishing Rank, XP% = percentage of current level's XP requirement.
 
@@ -759,6 +771,7 @@ Options: Trigger Dungeon, Fishing, all 6 Challenges, Haven Discovery.
 ├── <character>.json      # Character saves (max 3)
 ├── haven.json            # Haven state (account-level)
 ├── achievements.json     # Achievements (account-level)
+├── enhancement.json      # Soulforge enhancement state (account-level)
 └── backups/
     └── YYYY-MM-DD_HHMMSS/
         └── *.json        # Pre-update backups
@@ -778,6 +791,7 @@ Plain JSON with serde. No checksum -- relies on structural validation on load.
 | Fishing state | Per-character | Preserved |
 | Chess stats | Per-character | Preserved |
 | Haven | Account | Preserved |
+| Enhancement | Account | Preserved |
 | Achievements | Account | Preserved |
 
 ---
@@ -808,6 +822,11 @@ fn attribute_cap(prestige_rank: u32) -> u32 {
 // Haven discovery chance (P10+)
 fn haven_discovery_chance(prestige_rank: u32) -> f64 {
     0.000014 + (prestige_rank - 10) as f64 * 0.000007
+}
+
+// Soulforge discovery chance (P15+)
+fn soulforge_discovery_chance(prestige_rank: u32) -> f64 {
+    0.000014 + (prestige_rank - 15) as f64 * 0.000007
 }
 
 // Offline XP
@@ -871,10 +890,17 @@ quest/
 │   │   ├── morris/          # Nine Men's Morris
 │   │   ├── gomoku/          # Gomoku (Five in a Row)
 │   │   ├── minesweeper/     # Trap Detection
-│   │   └── rune/            # Rune Deciphering
+│   │   ├── rune/            # Rune Deciphering
+│   │   ├── snake/           # Serpent's Path (Snake)
+│   │   ├── flappy/          # Skyward Gauntlet (Flappy Bird)
+│   │   └── jezzball/        # Containment Breach (JezzBall)
 │   ├── haven/               # Haven base building
 │   │   ├── types.rs         # Room definitions, bonuses
 │   │   └── logic.rs         # Construction, upgrades
+│   ├── enhancement/         # Soulforge enhancement system
+│   │   ├── types.rs         # Enhancement progress, constants, success rates
+│   │   ├── logic.rs         # Enhancement rolls, discovery
+│   │   └── persistence.rs   # Save/load from ~/.quest/enhancement.json
 │   ├── achievements/        # Achievement system
 │   │   ├── types.rs         # AchievementId (80+ variants), Achievements state
 │   │   ├── data.rs          # Achievement database
@@ -899,7 +925,9 @@ quest/
 │       ├── achievement_browser_scene.rs # Achievement browser
 │       ├── challenge_menu_scene.rs # Challenge menu
 │       ├── chess_scene.rs, go_scene.rs, morris_scene.rs,
-│       │   gomoku_scene.rs, minesweeper_scene.rs, rune_scene.rs
+│       │   gomoku_scene.rs, minesweeper_scene.rs, rune_scene.rs,
+│       │   snake_scene.rs, flappy_scene.rs, jezzball_scene.rs
+│       ├── soulforge_scene.rs # Soulforge enhancement overlay
 │       ├── debug_menu_scene.rs # Debug overlay
 │       ├── throbber.rs      # Spinner animations
 │       └── character_select.rs, character_creation.rs,

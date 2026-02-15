@@ -1,6 +1,6 @@
 # Challenge Minigames Design
 
-This document describes the 6 challenge minigames as implemented. All challenges share a common framework: discovery via RNG, difficulty selection, prestige/XP rewards, and a forfeit pattern (double-Esc to quit).
+This document describes the 9 challenge minigames as implemented. All challenges share a common framework: discovery via RNG, difficulty selection, prestige/XP rewards, and a forfeit pattern (double-Esc to quit).
 
 ## Common Framework
 
@@ -13,12 +13,15 @@ This document describes the 6 challenge minigames as implemented. All challenges
 
 | Challenge | Weight | ~Probability |
 |-----------|--------|--------------|
-| Minesweeper | 30 | 27% |
-| Rune | 25 | 23% |
-| Gomoku | 20 | 18% |
-| Morris | 15 | 14% |
-| Chess | 10 | 9% |
-| Go | 10 | 9% |
+| Rune | 30 | ~19% |
+| Minesweeper | 28 | ~18% |
+| Snake | 22 | ~14% |
+| Flappy Bird | 20 | ~13% |
+| JezzBall | 18 | ~11% |
+| Gomoku | 15 | ~9% |
+| Morris | 12 | ~8% |
+| Chess | 8 | ~5% |
+| Go | 7 | ~4% |
 
 ### Difficulty Tiers
 
@@ -47,6 +50,9 @@ All games with AI opponents use `process_ai_thinking()` as the function name in 
 | Morris | +50% XP | +100% XP | +150% XP | +1 FR, +200% XP |
 | Minesweeper | +50% XP | +75% XP | +100% XP | +1 PR, +200% XP |
 | Rune | +25% XP | +50% XP | +1 FR, +75% XP | +1 PR, +2 FR |
+| Snake | +25% XP | +75% XP | +100% XP | +1 PR, +100% XP |
+| Flappy Bird | +50% XP | +100% XP | +1 PR, +75% XP | +2 PR, +150% XP, +1 FR |
+| JezzBall | +25% XP | +75% XP | +1 PR, +100% XP | +2 PR, +100% XP |
 
 PR = Prestige Rank, FR = Fishing Rank, XP% = percentage of current level's XP requirement.
 
@@ -284,6 +290,95 @@ Mastermind-style deduction puzzle:
 ### Controls
 
 Left/Right to move between slots, Up/Down to cycle runes, Enter to submit, F to clear guess, double-Esc to forfeit.
+
+---
+
+## Snake (Serpent's Path)
+
+**Theme**: "A serpentine trail of glowing runes slithers across the dungeon floor..."
+
+### Rules
+
+Classic snake mechanics: guide a growing serpent to collect food items while avoiding your own trail and the arena walls.
+
+- 26x26 grid
+- Real-time ~60 FPS
+- Eat food to grow and score
+- Collision with walls or own body ends the game
+
+### Difficulty
+
+| Difficulty | Food Target | Tick Speed | Reward |
+|------------|------------|------------|--------|
+| Novice | 10 | 200ms | +25% XP |
+| Apprentice | 15 | 150ms | +75% XP |
+| Journeyman | 20 | 120ms | +100% XP |
+| Master | 25 | 90ms | +1 PR, +100% XP |
+
+### Controls
+
+Arrow keys for direction, Space/Enter to start, double-Esc to forfeit.
+
+---
+
+## Flappy Bird (Skyward Gauntlet)
+
+**Theme**: "A tiny clockwork bird sits on a moss-covered ledge, its brass wings twitching..."
+
+### Rules
+
+Navigate a clockwork bird through a scrolling field of stone pillars. The bird is subject to gravity and the player taps to flap upward. Hitting a pillar or the ground/ceiling loses a life.
+
+- 50x18 play area
+- Real-time ~60 FPS
+- Gravity/flap physics
+- **3 lives** per attempt
+- Pass through a target number of pipe gaps to win
+
+### Difficulty
+
+| Difficulty | Gap Size | Pipes to Pass | Reward |
+|------------|----------|---------------|--------|
+| Novice | 7 rows | Varies | +50% XP |
+| Apprentice | 6 rows | Varies | +100% XP |
+| Journeyman | 5 rows | Varies | +1 PR, +75% XP |
+| Master | 4 rows | Varies | +2 PR, +150% XP, +1 FR |
+
+### Controls
+
+Space/Enter to flap, double-Esc to forfeit.
+
+---
+
+## JezzBall (Containment Breach)
+
+**Theme**: "A lattice of arcane force-lines flashes around you. Volatile orbs ricochet wildly within the chamber..."
+
+### Rules
+
+Split an arena by growing walls while avoiding bouncing hazard orbs. Capture enough territory to win.
+
+- 34x22 grid
+- Real-time ~60 FPS with ball physics
+- Player positions a cursor and places walls that grow outward from the pivot
+- Walls grow in both directions along the chosen axis (horizontal/vertical)
+- If a ball strikes a growing wall, the wall is destroyed and the player loses a life
+- Completed walls become permanent barriers; regions without balls are automatically captured
+- **3 lives** per attempt (wall hit consumes a life and resets the active wall)
+- Win by capturing the target percentage of the arena
+
+### Difficulty
+
+| Difficulty | Balls | Target % | Ball Speed | Wall Step | Reward |
+|------------|-------|----------|-----------|-----------|--------|
+| Novice | 2 | 60% | 6.0 c/s | 70ms | +25% XP |
+| Apprentice | 3 | 70% | 6.8 c/s | 60ms | +75% XP |
+| Journeyman | 4 | 78% | 7.6 c/s | 50ms | +1 PR, +100% XP |
+| Master | 5 | 84% | 8.4 c/s | 40ms | +2 PR, +100% XP |
+
+### Controls
+
+Arrow keys to move cursor, X to toggle wall orientation (horizontal/vertical), Space/Enter to start game or place wall, double-Esc to forfeit.
 
 ---
 

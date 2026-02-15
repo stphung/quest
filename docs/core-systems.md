@@ -378,6 +378,7 @@ pub struct TickResult {
     pub leviathan_encounter: Option<u8>,
     pub achievements_changed: bool,
     pub haven_changed: bool,
+    pub enhancement_changed: bool,
     pub achievement_modal_ready: Vec<AchievementId>,
 }
 ```
@@ -388,7 +389,7 @@ pub struct TickResult {
 - Zones: `SubzoneBossDefeated` (with `BossDefeatResult`)
 - Dungeon: room entry, treasure, keys, boss unlock, completion, failure
 - Fishing: messages, catches, item drops, rank-ups, Storm Leviathan
-- Discovery: challenges, dungeons, fishing spots, Haven
+- Discovery: challenges, dungeons, fishing spots, Haven, Soulforge
 - Progress: `LeveledUp`, `AchievementUnlocked`
 
 ### Processing Stages
@@ -405,7 +406,8 @@ pub struct TickResult {
 | 8. Play time | Increments tick counter; at 10 ticks, increments play_time_seconds |
 | 9. Achievement collection | Drains newly unlocked achievements into TickResult.events |
 | 10. Haven discovery | Rolls for Haven discovery (P10+, no active content) |
-| 11. Achievement modal | Checks if 500ms accumulation window has elapsed for modal display |
+| 11. Soulforge discovery | Rolls for Soulforge discovery (P15+, no active content) |
+| 12. Achievement modal | Checks if 500ms accumulation window has elapsed for modal display |
 
 **Important**: Stage 5 (fishing) returns early, skipping stages 6-7. Fishing and combat are mutually exclusive.
 
@@ -434,6 +436,66 @@ pub fn process_offline_progression(
 
 `OfflineReport` contains elapsed_seconds, total_level_ups, xp_gained, level_before/after, and effective rates. Re-exported from `game_logic.rs` for backwards compatibility.
 
+## Enhancement / Soulforge System
+
+### Overview
+
+Account-level equipment enhancement system that persists across all characters. Players enhance equipment slots (not individual items) by spending prestige ranks at the Soulforge. Enhancement levels provide cumulative damage/stat multipliers. Stored in `~/.quest/enhancement.json`.
+
+### Discovery
+
+- **Prestige gate**: Character must be P15+ (Transcendent tier)
+- **Discovery**: Independent RNG roll per tick, chance scales with prestige rank:
+  - `chance = 0.000014 + (prestige_rank - 15) * 0.000007`
+  - Uses the same formula shape as Haven discovery but gated at P15 instead of P10
+- **One-time**: Once discovered, accessible account-wide permanently via `[S]` key
+
+### Mechanics
+
+Enhancement operates on the 7 equipment slots (Weapon, Armor, Helmet, Gloves, Boots, Amulet, Ring). Each slot can be enhanced from +0 to +10. Enhancement levels are slot-based and persist across prestige resets and item changes.
+
+### Success Rates
+
+| Target Level | Success Rate | Cost (PR) | Fail Penalty |
+|-------------|-------------|-----------|-------------|
+| +1 to +4 | 100% | 1 PR each | None (safe) |
+| +5 | 60% | 3 PR | -1 level |
+| +6 | 50% | 3 PR | -1 level |
+| +7 | 40% | 3 PR | -1 level |
+| +8 | 30% | 5 PR | -1 level |
+| +9 | 20% | 5 PR | -1 level |
+| +10 | 10% | 10 PR | -2 levels |
+
+### Cumulative Bonus Multiplier
+
+| Level | Bonus | Multiplier |
+|-------|-------|-----------|
+| +0 | 0% | 1.00x |
+| +1 | +5% | 1.05x |
+| +2 | +10% | 1.10x |
+| +3 | +15% | 1.15x |
+| +4 | +20% | 1.20x |
+| +5 | +30% | 1.30x |
+| +6 | +40% | 1.40x |
+| +7 | +55% | 1.55x |
+| +8 | +75% | 1.75x |
+| +9 | +100% | 2.00x |
+| +10 | +150% | 2.50x |
+
+### Color Tiers
+
+| Level Range | Color | Display |
+|-------------|-------|---------|
+| +0 | Gray | No prefix |
+| +1 to +4 | White | "+N " prefix |
+| +5 to +7 | Yellow | "+N " prefix |
+| +8 to +9 | Magenta | "+N " prefix |
+| +10 | Gold | "+N " prefix |
+
+### Persistence
+
+Enhancement state (`EnhancementProgress`) is saved to `~/.quest/enhancement.json`. The `enhancement_changed` flag in `TickResult` signals when the file needs to be saved.
+
 ## Key Constants
 
 | Constant | Value |
@@ -456,5 +518,7 @@ pub fn process_offline_progression(
 | Challenge discovery | 0.000014/tick (~2hr avg) |
 | Haven discovery base | 0.000014/tick (P10+) |
 | Haven discovery rank bonus | +0.000007/tick per rank above 10 |
+| Soulforge discovery base | 0.000014/tick (P15+) |
+| Soulforge discovery rank bonus | +0.000007/tick per rank above 15 |
 | Prestige mult formula | `1.0 + 0.5 * rank^0.7` |
 | Base max fishing rank | 30 (40 with Fishing Dock T4) |
