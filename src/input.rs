@@ -217,7 +217,7 @@ pub fn handle_game_input(
             return InputResult::Continue;
         }
         if debug_menu.is_open {
-            return handle_debug_menu(key, state, haven, overlay, debug_menu);
+            return handle_debug_menu(key, state, haven, enhancement, overlay, debug_menu);
         }
     }
 
@@ -580,6 +580,7 @@ fn handle_debug_menu(
     key: KeyEvent,
     state: &mut GameState,
     haven: &mut Haven,
+    enhancement: &mut enhancement::EnhancementProgress,
     overlay: &mut GameOverlay,
     debug_menu: &mut DebugMenu,
 ) -> InputResult {
@@ -587,13 +588,15 @@ fn handle_debug_menu(
         KeyCode::Up => debug_menu.navigate_up(),
         KeyCode::Down => debug_menu.navigate_down(),
         KeyCode::Enter => {
-            let msg = debug_menu.trigger_selected(state, haven);
+            let msg = debug_menu.trigger_selected(state, haven, enhancement);
             state
                 .combat_state
                 .add_log_entry(format!("[DEBUG] {}", msg), false, true);
-            // Show Haven discovery modal if just discovered (no save in debug mode)
+            // Show discovery modals (no save in debug mode)
             if msg == "Haven discovered!" {
                 *overlay = GameOverlay::HavenDiscovery;
+            } else if msg == "Blacksmith discovered!" {
+                *overlay = GameOverlay::BlacksmithDiscovery;
             }
         }
         KeyCode::Esc => debug_menu.close(),
