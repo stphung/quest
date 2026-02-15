@@ -778,6 +778,9 @@ pub fn game_tick<R: Rng>(
         achievements.on_blacksmith_discovered(Some(&state.character_name));
         result.events.push(TickEvent::BlacksmithDiscovered);
         result.enhancement_changed = true;
+        if !debug_mode {
+            result.achievements_changed = true;
+        }
     }
 
     // ── 12. Achievement modal accumulation ────────────────────────
