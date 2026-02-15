@@ -298,7 +298,7 @@ fn render_menu(
 
     // Help
     let help = Paragraph::new(Line::from(Span::styled(
-        "\u{2191}\u{2193} Select  Enter Enhance  Esc Close",
+        "[\u{2191}\u{2193}] Select  [Enter] Enhance  [Esc] Close",
         Style::default().fg(Color::DarkGray),
     )));
     frame.render_widget(help, chunks[7]);
@@ -373,7 +373,7 @@ fn render_confirming(
         ]),
         Line::from(""),
         Line::from(Span::styled(
-            "Enter Confirm  Esc Cancel",
+            "[Enter] Confirm  [Esc] Cancel",
             Style::default().fg(Color::DarkGray),
         )),
     ])
