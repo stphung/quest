@@ -3,8 +3,6 @@
 //! Renders a 1-row horizontal ticker by computing a visible window
 //! into a virtual string built from concatenated TickerEntry spans.
 
-#![allow(dead_code)]
-
 use crate::core::game_state::LootTicker;
 use ratatui::{
     layout::Rect,

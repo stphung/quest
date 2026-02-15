@@ -31,7 +31,6 @@ const MAX_RECENT_DROPS: usize = 10;
 
 /// A single entry in the scrolling loot ticker.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct TickerEntry {
     /// Icon prefix (e.g., "\u{2694}" for sword, "\u{1F41F}" for fish)
     pub icon: &'static str,
@@ -45,7 +44,6 @@ pub struct TickerEntry {
 
 /// Scrolling loot ticker state. Transient (not serialized).
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct LootTicker {
     /// Recent events displayed in the ticker
     pub entries: VecDeque<TickerEntry>,
@@ -59,14 +57,11 @@ pub struct LootTicker {
 const TICKER_MAX_ENTRIES: usize = 30;
 
 /// Characters scrolled per tick (0.4 = ~4 chars/sec at 100ms ticks)
-#[allow(dead_code)]
 pub const TICKER_SCROLL_SPEED: f64 = 0.4;
 
 /// Ticks to pause scrolling when a new event arrives (5 = 500ms)
-#[allow(dead_code)]
 pub const TICKER_PAUSE_TICKS: u8 = 5;
 
-#[allow(dead_code)]
 impl LootTicker {
     pub fn new() -> Self {
         Self {
@@ -170,7 +165,6 @@ pub struct GameState {
     pub recent_drops: VecDeque<RecentDrop>,
     /// Scrolling loot ticker state (transient, not saved)
     #[serde(skip)]
-    #[allow(dead_code)]
     pub loot_ticker: LootTicker,
     /// Last minigame win info for achievement tracking (transient, not saved)
     #[serde(skip)]
