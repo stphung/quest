@@ -119,6 +119,19 @@ pub fn enhancement_color_tier(level: u8) -> u8 {
     }
 }
 
+/// Returns the RGB color for an enhancement level.
+/// 0=none(128,128,128), 1-4=white(255,255,255), 5-7=yellow(255,255,0),
+/// 8-9=magenta(255,0,255), 10=gold(255,215,0)
+pub fn enhancement_color_rgb(level: u8) -> (u8, u8, u8) {
+    match enhancement_color_tier(level) {
+        1 => (255, 255, 255), // White
+        2 => (255, 255, 0),   // Yellow
+        3 => (255, 0, 255),   // Magenta
+        4 => (255, 215, 0),   // Gold
+        _ => (128, 128, 128), // DarkGray
+    }
+}
+
 // --- Blacksmith UI state types ---
 // These live here (not in input.rs) so the UI module can access them from both
 // the binary and library crates.

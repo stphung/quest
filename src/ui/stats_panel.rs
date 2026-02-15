@@ -510,18 +510,12 @@ fn draw_fishing_panel(frame: &mut Frame, area: Rect, game_state: &GameState) {
 
 /// Returns the style for an enhancement prefix based on its color tier.
 fn enhancement_style(level: u8) -> Style {
-    match crate::enhancement::enhancement_color_tier(level) {
-        1 => Style::default().fg(Color::White),
-        2 => Style::default()
-            .fg(Color::Yellow)
-            .add_modifier(Modifier::BOLD),
-        3 => Style::default()
-            .fg(Color::Magenta)
-            .add_modifier(Modifier::BOLD),
-        4 => Style::default()
-            .fg(Color::Rgb(255, 215, 0))
-            .add_modifier(Modifier::BOLD),
-        _ => Style::default(),
+    let (r, g, b) = crate::enhancement::enhancement_color_rgb(level);
+    let tier = crate::enhancement::enhancement_color_tier(level);
+    let style = Style::default().fg(Color::Rgb(r, g, b));
+    match tier {
+        2..=4 => style.add_modifier(Modifier::BOLD),
+        _ => style,
     }
 }
 

@@ -596,62 +596,10 @@ fn main() -> io::Result<()> {
                             continue;
                         }
 
-                        // Handle Haven screen (blocks other input when open)
-                        if haven_ui.showing {
-                            if haven_ui.confirmation == input::HavenConfirmation::Build {
-                                match key_event.code {
-                                    KeyCode::Enter => {
-                                        // Note: Can't build from character select (no active character)
-                                        // Just close the confirmation
-                                        haven_ui.confirmation = input::HavenConfirmation::None;
-                                    }
-                                    KeyCode::Esc => {
-                                        haven_ui.confirmation = input::HavenConfirmation::None;
-                                    }
-                                    _ => {}
-                                }
-                            } else {
-                                match key_event.code {
-                                    KeyCode::Up => {
-                                        haven_ui.selected_room =
-                                            haven_ui.selected_room.saturating_sub(1);
-                                    }
-                                    KeyCode::Down => {
-                                        if haven_ui.selected_room + 1
-                                            < haven::HavenRoomId::ALL.len()
-                                        {
-                                            haven_ui.selected_room += 1;
-                                        }
-                                    }
-                                    KeyCode::Esc => {
-                                        haven_ui.close();
-                                    }
-                                    _ => {}
-                                }
-                            }
-                            continue;
-                        }
-
                         // Handle achievement browser shortcut
                         if matches!(key_event.code, KeyCode::Char('a') | KeyCode::Char('A')) {
                             global_achievements.clear_pending_notifications();
                             achievement_browser.open();
-                            continue;
-                        }
-
-                        // Handle Haven shortcut (if discovered)
-                        if matches!(key_event.code, KeyCode::Char('h') | KeyCode::Char('H'))
-                            && haven.discovered
-                        {
-                            haven_ui.open();
-                            continue;
-                        }
-
-                        // Handle Blacksmith shortcut (if discovered)
-                        if matches!(key_event.code, KeyCode::Char('b') | KeyCode::Char('B'))
-                            && enhancement.discovered
-                        {
-                            blacksmith_ui.open();
                             continue;
                         }
 

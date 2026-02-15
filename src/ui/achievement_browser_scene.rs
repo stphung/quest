@@ -840,13 +840,8 @@ fn build_stats_right_lines(
         let mut spans = Vec::new();
         for &(slot_idx, name) in pair {
             let level = enhancement.levels[slot_idx];
-            let color = match crate::enhancement::enhancement_color_tier(level) {
-                0 => Color::DarkGray,
-                1 => Color::White,
-                2 => Color::Yellow,
-                3 => Color::Magenta,
-                _ => Color::Rgb(255, 215, 0),
-            };
+            let (r, g, b) = crate::enhancement::enhancement_color_rgb(level);
+            let color = Color::Rgb(r, g, b);
             spans.push(Span::styled(
                 format!("  {:<8}+{:<3}", name, level),
                 Style::default().fg(color),
