@@ -92,13 +92,13 @@ fn test_success_rate_all_levels() {
             "Level +{lvl} should be 100%"
         );
     }
-    // +5: 70%, +6: 60%, +7: 50%
-    assert!((success_rate(5) - 0.70).abs() < f64::EPSILON);
-    assert!((success_rate(6) - 0.60).abs() < f64::EPSILON);
-    assert!((success_rate(7) - 0.50).abs() < f64::EPSILON);
-    // +8: 30%, +9: 15%, +10: 5%
-    assert!((success_rate(8) - 0.30).abs() < f64::EPSILON);
-    assert!((success_rate(9) - 0.15).abs() < f64::EPSILON);
+    // +5: 65%, +6: 50%, +7: 35%
+    assert!((success_rate(5) - 0.65).abs() < f64::EPSILON);
+    assert!((success_rate(6) - 0.50).abs() < f64::EPSILON);
+    assert!((success_rate(7) - 0.35).abs() < f64::EPSILON);
+    // +8: 20%, +9: 10%, +10: 5%
+    assert!((success_rate(8) - 0.20).abs() < f64::EPSILON);
+    assert!((success_rate(9) - 0.10).abs() < f64::EPSILON);
     assert!((success_rate(10) - 0.05).abs() < f64::EPSILON);
 }
 
