@@ -836,10 +836,9 @@ fn build_stats_right_lines(
     let slot_names = [
         "Weapon", "Armor", "Helmet", "Gloves", "Boots", "Amulet", "Ring",
     ];
-    for pair in slot_names.chunks(2) {
+    for pair in slot_names.iter().enumerate().collect::<Vec<_>>().chunks(2) {
         let mut spans = Vec::new();
-        for name in pair {
-            let slot_idx = slot_names.iter().position(|n| n == name).unwrap();
+        for &(slot_idx, name) in pair {
             let level = enhancement.levels[slot_idx];
             let color = match crate::enhancement::enhancement_color_tier(level) {
                 0 => Color::DarkGray,
