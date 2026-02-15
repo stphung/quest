@@ -1081,6 +1081,9 @@ fn main() -> io::Result<()> {
 
                             let tick_flags = apply_tick_events(&mut state, &tick_result.events);
 
+                            // Advance loot ticker scroll
+                            state.loot_ticker.tick();
+
                             // Update visual effect lifetimes
                             let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
                             state
