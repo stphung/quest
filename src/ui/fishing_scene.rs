@@ -5,6 +5,9 @@
 
 #![allow(dead_code)]
 
+use super::scene_fx::{
+    current_millis, draw_line, hash2d, lerp_channel, lerp_rgb, put_cell, render_buffer, SceneCell,
+};
 use crate::fishing::types::{FishingSession, FishingState};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -13,130 +16,6 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
     Frame,
 };
-use std::time::{SystemTime, UNIX_EPOCH};
-
-/// Per-cell render data for the fishing water scene.
-#[derive(Clone, Copy)]
-struct WaterCell {
-    ch: char,
-    fg: Color,
-    bg: Color,
-}
-
-impl Default for WaterCell {
-    fn default() -> Self {
-        Self {
-            ch: ' ',
-            fg: Color::Reset,
-            bg: Color::Reset,
-        }
-    }
-}
-
-fn lerp_channel(start: u8, end: u8, t: f64) -> u8 {
-    let t = t.clamp(0.0, 1.0);
-    (start as f64 + (end as f64 - start as f64) * t).round() as u8
-}
-
-fn lerp_rgb(start: (u8, u8, u8), end: (u8, u8, u8), t: f64) -> (u8, u8, u8) {
-    (
-        lerp_channel(start.0, end.0, t),
-        lerp_channel(start.1, end.1, t),
-        lerp_channel(start.2, end.2, t),
-    )
-}
-
-fn current_millis() -> u128 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis()
-}
-
-fn star_hash(row: usize, col: usize) -> u32 {
-    let seed = (row as u32)
-        .wrapping_mul(1664525)
-        .wrapping_add((col as u32).wrapping_mul(1013904223));
-    seed ^ (seed >> 13)
-}
-
-fn put_water_cell(buffer: &mut [Vec<WaterCell>], row: i32, col: i32, ch: char, fg: Color) {
-    if row < 0 || col < 0 {
-        return;
-    }
-    let row = row as usize;
-    let col = col as usize;
-    if row >= buffer.len() || col >= buffer[row].len() {
-        return;
-    }
-
-    let bg = buffer[row][col].bg;
-    buffer[row][col] = WaterCell { ch, fg, bg };
-}
-
-fn draw_line(buffer: &mut [Vec<WaterCell>], mut x0: i32, mut y0: i32, x1: i32, y1: i32, fg: Color) {
-    let dx = (x1 - x0).abs();
-    let sx = if x0 < x1 { 1 } else { -1 };
-    let dy = -(y1 - y0).abs();
-    let sy = if y0 < y1 { 1 } else { -1 };
-    let mut err = dx + dy;
-
-    let line_char = if (x1 - x0).abs() <= 1 {
-        '|'
-    } else if x1 > x0 {
-        '\\'
-    } else {
-        '/'
-    };
-
-    loop {
-        put_water_cell(buffer, y0, x0, line_char, fg);
-        if x0 == x1 && y0 == y1 {
-            break;
-        }
-        let e2 = 2 * err;
-        if e2 >= dy {
-            err += dy;
-            x0 += sx;
-        }
-        if e2 <= dx {
-            err += dx;
-            y0 += sy;
-        }
-    }
-}
-
-fn render_water_buffer(frame: &mut Frame, area: Rect, buffer: &[Vec<WaterCell>]) {
-    for (row, row_data) in buffer.iter().enumerate() {
-        let mut spans = Vec::new();
-        let mut current_fg = Color::Reset;
-        let mut current_bg = Color::Reset;
-        let mut current_text = String::new();
-
-        for cell in row_data {
-            if (cell.fg != current_fg || cell.bg != current_bg) && !current_text.is_empty() {
-                spans.push(Span::styled(
-                    std::mem::take(&mut current_text),
-                    Style::default().fg(current_fg).bg(current_bg),
-                ));
-            }
-
-            current_fg = cell.fg;
-            current_bg = cell.bg;
-            current_text.push(cell.ch);
-        }
-
-        if !current_text.is_empty() {
-            spans.push(Span::styled(
-                current_text,
-                Style::default().fg(current_fg).bg(current_bg),
-            ));
-        }
-
-        let row_area = Rect::new(area.x, area.y + row as u16, area.width, 1);
-        frame.render_widget(Paragraph::new(Line::from(spans)), row_area);
-    }
-}
 
 /// Renders the fishing scene UI.
 ///
@@ -219,7 +98,7 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
 
     let width = inner.width as usize;
     let height = inner.height as usize;
-    let mut buffer = vec![vec![WaterCell::default(); width]; height];
+    let mut buffer = vec![vec![SceneCell::default(); width]; height];
 
     let millis = current_millis() as f64;
     let wave_tick = millis / 110.0;
@@ -269,7 +148,7 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
         (0, -1, '·', Color::Rgb(236, 220, 170)),
         (0, 1, '·', Color::Rgb(236, 220, 170)),
     ] {
-        put_water_cell(&mut buffer, orb_row + dy, orb_col + dx, ch, fg);
+        put_cell(&mut buffer, orb_row + dy, orb_col + dx, ch, fg);
     }
 
     // Stars appear as dusk settles.
@@ -281,10 +160,9 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
             .take(horizon.saturating_sub(1))
         {
             for (col, cell) in row_cells.iter_mut().enumerate() {
-                if star_hash(row, col).is_multiple_of(97) && cell.ch == ' ' {
-                    let bright =
-                        star_hash(row + twinkle_tick, col + twinkle_tick).is_multiple_of(3);
-                    *cell = WaterCell {
+                if hash2d(row, col).is_multiple_of(97) && cell.ch == ' ' {
+                    let bright = hash2d(row + twinkle_tick, col + twinkle_tick).is_multiple_of(3);
+                    *cell = SceneCell {
                         ch: if bright { '*' } else { '.' },
                         fg: if bright {
                             Color::Rgb(244, 246, 255)
@@ -316,7 +194,7 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
             let col = (cx + i) % width;
             if buffer[row][col].ch == ' ' {
                 let tint = lerp_channel(shade, 208, 1.0 - dusk);
-                buffer[row][col] = WaterCell {
+                buffer[row][col] = SceneCell {
                     ch,
                     fg: Color::Rgb(tint, tint, tint.saturating_add(8)),
                     bg: buffer[row][col].bg,
@@ -354,7 +232,7 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
         ] {
             let top = horizon as i32 - height_delta;
             for row in top.max(0)..=horizon as i32 {
-                put_water_cell(&mut buffer, row, col as i32, ch, color);
+                put_cell(&mut buffer, row, col as i32, ch, color);
             }
         }
     }
@@ -389,7 +267,7 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
             if ch != ' ' {
                 let shimmer =
                     (((col as f64 * 0.09 + wave_tick * 0.19).sin() + 1.0) * 0.5 * 18.0) as u8;
-                *cell = WaterCell {
+                *cell = SceneCell {
                     ch,
                     fg: Color::Rgb(
                         crest.0.saturating_add(shimmer),
@@ -408,7 +286,7 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
     let hull = "_/___\\_";
     let hull_start = boat_center - (hull.len() as i32 / 2);
     for (idx, ch) in hull.chars().enumerate() {
-        put_water_cell(
+        put_cell(
             &mut buffer,
             boat_row,
             hull_start + idx as i32,
@@ -424,16 +302,16 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
     let mast_x = boat_center;
     let mast_top = boat_row - 2;
     for y in mast_top..=boat_row {
-        put_water_cell(&mut buffer, y, mast_x, '|', Color::Rgb(170, 132, 92));
+        put_cell(&mut buffer, y, mast_x, '|', Color::Rgb(170, 132, 92));
     }
-    put_water_cell(
+    put_cell(
         &mut buffer,
         mast_top + 1,
         mast_x + 1,
         '\\',
         Color::Rgb(226, 236, 248),
     );
-    put_water_cell(
+    put_cell(
         &mut buffer,
         mast_top,
         mast_x + 2,
@@ -463,7 +341,7 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
         bobber_y,
         Color::Rgb(208, 210, 220),
     );
-    put_water_cell(&mut buffer, bobber_y, bobber_x, bobber_char, bobber_color);
+    put_cell(&mut buffer, bobber_y, bobber_x, bobber_char, bobber_color);
 
     for ring in 1..=ripple_radius {
         let ch = if ring == 1 { 'o' } else { '.' };
@@ -482,7 +360,7 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
             (-ring, ring),
             (ring, ring),
         ] {
-            put_water_cell(&mut buffer, bobber_y + dy, bobber_x + dx, ch, fg);
+            put_cell(&mut buffer, bobber_y + dy, bobber_x + dx, ch, fg);
         }
     }
 
@@ -490,7 +368,7 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
         let splash_row = bobber_y - 1;
         let splash_x = bobber_x + if ((wave_tick as i32) & 1) == 0 { 4 } else { -4 };
         for (i, ch) in "<><".chars().enumerate() {
-            put_water_cell(
+            put_cell(
                 &mut buffer,
                 splash_row,
                 splash_x + i as i32,
@@ -499,7 +377,7 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
             );
         }
         for &(dx, dy, ch) in &[(-1, -1, '\''), (2, -1, '\''), (0, -2, '`')] {
-            put_water_cell(
+            put_cell(
                 &mut buffer,
                 splash_row + dy,
                 splash_x + dx,
@@ -509,7 +387,7 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
         }
     }
 
-    render_water_buffer(frame, inner, &buffer);
+    render_buffer(frame, inner, &buffer);
 }
 
 /// Draws the catch progress indicator with current phase.
