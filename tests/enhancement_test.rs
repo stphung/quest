@@ -103,14 +103,14 @@ fn test_success_rate_all_levels() {
             "Level +{lvl} should be 100%"
         );
     }
-    // +5: 65%, +6: 50%, +7: 35%
-    assert!((success_rate(5) - 0.65).abs() < f64::EPSILON);
+    // +5: 60%, +6: 50%, +7: 40%
+    assert!((success_rate(5) - 0.60).abs() < f64::EPSILON);
     assert!((success_rate(6) - 0.50).abs() < f64::EPSILON);
-    assert!((success_rate(7) - 0.35).abs() < f64::EPSILON);
-    // +8: 20%, +9: 10%, +10: 5%
-    assert!((success_rate(8) - 0.20).abs() < f64::EPSILON);
-    assert!((success_rate(9) - 0.10).abs() < f64::EPSILON);
-    assert!((success_rate(10) - 0.05).abs() < f64::EPSILON);
+    assert!((success_rate(7) - 0.40).abs() < f64::EPSILON);
+    // +8: 30%, +9: 20%, +10: 10%
+    assert!((success_rate(8) - 0.30).abs() < f64::EPSILON);
+    assert!((success_rate(9) - 0.20).abs() < f64::EPSILON);
+    assert!((success_rate(10) - 0.10).abs() < f64::EPSILON);
 }
 
 #[test]
@@ -163,10 +163,12 @@ fn test_fail_penalty_all_levels() {
     for lvl in 5..=7 {
         assert_eq!(fail_penalty(lvl), 1, "Level +{lvl} should have -1 penalty");
     }
-    // +8-10: -2
-    for lvl in 8..=10 {
-        assert_eq!(fail_penalty(lvl), 2, "Level +{lvl} should have -2 penalty");
+    // +8-9: -1
+    for lvl in 8..=9 {
+        assert_eq!(fail_penalty(lvl), 1, "Level +{lvl} should have -1 penalty");
     }
+    // +10: -2
+    assert_eq!(fail_penalty(10), 2, "Level +10 should have -2 penalty");
 }
 
 #[test]
@@ -297,15 +299,15 @@ fn test_attempt_enhancement_failure_penalty_minus_1() {
 
 #[test]
 fn test_attempt_enhancement_failure_penalty_minus_2() {
-    // At level 7, attempting +8 with 30% rate.
+    // At level 9, attempting +10 with 5% rate (only +10 has -2 penalty now).
     for seed in 0..1000u64 {
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
         let mut ep = EnhancementProgress::new();
-        ep.set_level(0, 7);
+        ep.set_level(0, 9);
         let result = attempt_enhancement(&mut ep, 0, &mut rng);
         if !result {
-            // Failure at +8 => penalty of 2, so level goes from 7 to 5
-            assert_eq!(ep.level(0), 5, "Failed +8 should drop from 7 to 5");
+            // Failure at +10 => penalty of 2, so level goes from 9 to 7
+            assert_eq!(ep.level(0), 7, "Failed +10 should drop from 9 to 7");
             assert_eq!(ep.total_failures, 1);
             return;
         }

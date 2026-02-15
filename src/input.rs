@@ -783,7 +783,7 @@ fn handle_base_game(
             }
             InputResult::Continue
         }
-        KeyCode::Char('b') | KeyCode::Char('B') => {
+        KeyCode::Char('s') | KeyCode::Char('S') => {
             if enhancement.discovered {
                 soulforge_ui.open();
             }

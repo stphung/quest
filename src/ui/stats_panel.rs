@@ -713,7 +713,7 @@ pub(super) fn draw_footer_compact(
     };
 
     let soulforge_span = if soulforge_discovered {
-        Span::styled(" [B]Smith", Style::default().fg(Color::Yellow))
+        Span::styled(" [S]oulforge", Style::default().fg(Color::Yellow))
     } else {
         Span::raw("")
     };
@@ -982,7 +982,7 @@ pub fn draw_footer(
 
     // Build Soulforge hint text
     let soulforge_text = if soulforge_discovered {
-        Span::styled("    [B] Soulforge", Style::default().fg(Color::Yellow))
+        Span::styled("    [S] Soulforge", Style::default().fg(Color::Yellow))
     } else {
         Span::raw("")
     };

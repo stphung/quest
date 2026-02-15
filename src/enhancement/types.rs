@@ -52,8 +52,8 @@ pub const SOULFORGE_DISCOVERY_RANK_BONUS: f64 = 0.000007;
 
 pub const ENHANCEMENT_SUCCESS_RATES: [f64; 10] = [
     1.00, 1.00, 1.00, 1.00, // +1-4: 100%
-    0.65, 0.50, 0.35, // +5-7: 65%, 50%, 35%
-    0.20, 0.10, 0.05, // +8-10: 20%, 10%, 5%
+    0.60, 0.50, 0.40, // +5-7: 60%, 50%, 40%
+    0.30, 0.20, 0.10, // +8-10: 30%, 20%, 10%
 ];
 
 pub const ENHANCEMENT_COSTS: [u32; 10] = [
@@ -66,7 +66,8 @@ pub const ENHANCEMENT_COSTS: [u32; 10] = [
 pub const ENHANCEMENT_FAIL_PENALTY: [u8; 10] = [
     0, 0, 0, 0, // +1-4: safe
     1, 1, 1, // +5-7: -1
-    2, 2, 2, // +8-10: -2
+    1, 1, // +8-9: -1
+    2, // +10: -2
 ];
 
 pub const ENHANCEMENT_CUMULATIVE_BONUS: [f64; 11] = [

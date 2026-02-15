@@ -864,7 +864,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
     AchievementDef {
         id: AchievementId::SoulforgeDiscovered,
         name: "Soulforge Found",
-        description: "Discover the wandering Soulforge",
+        description: "Uncover an ancient Soulforge",
         category: AchievementCategory::Progression,
         icon: "\u{2692}",
     },

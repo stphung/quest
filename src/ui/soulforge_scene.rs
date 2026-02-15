@@ -107,12 +107,11 @@ fn render_menu(
         ])
         .split(area);
 
-    // Flavor text from the soulforge
+    // Flavor text
     let flavor = Paragraph::new(
-        "\u{201c}What I do here is forge the bond between warrior and \
-         armament. The gear may change, but my work never fades. \
-         Push further and the craft grows perilous \u{2014} \
-         but the power grows faster.\u{201d}",
+        "Ancient runes pulse with forgotten power. \
+         This forge tempers the soul, not the steel. \
+         All that you wield will strike truer.",
     )
     .style(
         Style::default()
@@ -695,33 +694,33 @@ pub fn render_soulforge_discovery_modal(
     let text = Paragraph::new(vec![
         Line::from(""),
         Line::from(Span::styled(
-            "\u{2692}\u{fe0f} A wandering Soulforge has set up shop!",
+            "\u{2692}\u{fe0f} You've uncovered an ancient Soulforge!",
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
         Line::from(Span::styled(
-            "Sparks dance from a makeshift forge.",
+            "Ancient runes pulse with forgotten power.",
             Style::default()
                 .fg(Color::White)
                 .add_modifier(Modifier::ITALIC),
         )),
         Line::from(Span::styled(
-            "\"I enchant the soul, not the steel.",
+            "This forge tempers the soul, not the steel.",
             Style::default()
                 .fg(Color::White)
                 .add_modifier(Modifier::ITALIC),
         )),
         Line::from(Span::styled(
-            " Whatever you wield will strike truer.\"",
+            "All that you wield will strike truer.",
             Style::default()
                 .fg(Color::White)
                 .add_modifier(Modifier::ITALIC),
         )),
         Line::from(""),
         Line::from(Span::styled(
-            "Press [B] to visit. [Enter] to dismiss.",
+            "Press [S] to visit. [Enter] to dismiss.",
             Style::default().fg(Color::DarkGray),
         )),
     ])
