@@ -30,7 +30,9 @@ Six core RPG attributes stored as `u32` values:
 **Attribute caps**: `20 + (5 × prestige_rank)`. Enforced in `attributes.rs`.
 
 ### `DerivedStats` (`derived_stats.rs`)
-Combat stats calculated from attributes. Recalculated whenever attributes change:
+Combat stats calculated from attributes and enhancement levels. Recalculated whenever attributes or enhancements change:
+- `calculate_derived_stats(attrs, equipment, enhancement_levels: &[u8; 7])` takes per-slot enhancement levels
+- Enhancement multipliers scale equipment attribute bonuses and affix values per slot
 - Max HP, damage (physical + magic), defense, crit chance, crit multiplier
 - XP multiplier (from WIS), prestige multiplier (from CHA)
 

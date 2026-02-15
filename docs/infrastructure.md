@@ -187,7 +187,11 @@ When active, a `[DEBUG]` indicator shows in the UI corner.
 6. **Trigger Minesweeper Challenge** — Adds minesweeper to challenge menu
 7. **Trigger Rune Challenge** — Adds rune challenge to challenge menu
 8. **Trigger Go Challenge** — Adds go to challenge menu
-9. **Trigger Haven Discovery** — Discovers Haven immediately
+9. **Trigger Flappy Bird Challenge** — Adds flappy bird to challenge menu
+10. **Trigger JezzBall Challenge** — Adds jezzball to challenge menu
+11. **Trigger Snake Challenge** — Adds snake to challenge menu
+12. **Trigger Haven Discovery** — Discovers Haven immediately
+13. **Trigger Soulforge Discovery** — Discovers Soulforge immediately
 
 Each option calls existing generation functions to bypass the normal RNG discovery system. Useful for testing features without waiting for random events.
 
@@ -200,7 +204,7 @@ Yellow border popup overlay, centered on screen. Matches challenge menu styling.
 When `--debug` is active:
 - **Saves disabled**: File I/O (`save_character()`, `save_haven()`, `save_achievements()`) is skipped
 - **`last_save_time` always synced**: The in-memory `state.last_save_time = Utc::now().timestamp()` is updated every autosave cycle regardless of debug mode, preventing the suspension detection system from false-triggering
-- **Save signals suppressed**: `TickResult.achievements_changed` and `haven_changed` flags are suppressed in `tick.rs` when `debug_mode` is true
+- **Save signals suppressed**: `TickResult.achievements_changed`, `haven_changed`, and `enhancement_changed` flags are suppressed in `tick.rs` when `debug_mode` is true
 
 ### Suspension Detection
 
@@ -216,6 +220,7 @@ The game detects OS-level process suspension (e.g., laptop lid close/open):
 ├── <character_name>.json     # Character saves (max 3)
 ├── haven.json                # Haven state (account-level)
 ├── achievements.json         # Achievement state (account-level)
+├── enhancement.json          # Soulforge enhancement state (account-level)
 └── backups/
     └── YYYY-MM-DD_HHMMSS/   # Timestamped backup before update
         └── *.json

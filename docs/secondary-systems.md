@@ -263,7 +263,7 @@ Account-level achievement system that persists across all characters. Stored in 
 - FirstPrestige, then P5, P10, P15, P20, P25, P30, P40, P50, P70, P90, Eternal (P100)
 
 **Challenges:**
-- Per-game per-difficulty wins: ChessNovice through ChessMaster, MorrisNovice through MorrisMaster, etc. for all 6 challenge types
+- Per-game per-difficulty wins: ChessNovice through ChessMaster, MorrisNovice through MorrisMaster, etc. for all 9 challenge types (chess, morris, gomoku, minesweeper, rune, go, flappy_bird, snake, jezzball)
 - GrandChampion: 100 total minigame wins
 
 **Exploration:**
@@ -275,6 +275,19 @@ Account-level achievement system that persists across all characters. Stored in 
 
 **Haven:**
 - HavenDiscovered, HavenBuilderI (all T1), HavenBuilderII (all T2), HavenArchitect (all T3)
+
+**Enhancement/Soulforge:**
+- SoulforgeDiscovered: Uncover an ancient Soulforge
+- ApprenticeSmith: Enhance any equipment to +1
+- FullyTempered: Enhance all 7 equipment slots to +4
+- JourneymanSmith: Enhance any equipment to +5
+- SoulforgeAdept: Enhance any equipment to +6
+- SoulforgeSavant: Enhance any equipment to +7
+- SoulforgeMaster: Enhance any equipment to +8
+- SoulforgeGrandmaster: Enhance any equipment to +9
+- MasterSmith: Enhance any equipment to +10
+- SoulConvergence: Enhance all 7 equipment slots to +7
+- PersistentHammering: Attempt 100 enhancements
 
 **Fishing:**
 - FishermanI-IV: Ranks 10, 20, 30, 40

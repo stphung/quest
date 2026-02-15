@@ -164,3 +164,36 @@ Not all challenges are equally discoverable:
 - Verbose per-tick event logging for debugging
 
 This enables systematic balance validation: "does a P0 character reach Zone 2 in 1 hour?" or "what's the item drop distribution over 10,000 ticks across 100 seeds?"
+
+## Soulforge Enhancement System
+
+**Decision**: Add an account-level equipment enhancement system (Soulforge) that enhances slots (not individual items), gated behind P15+, with independent discovery RNG.
+
+**Key choices**:
+- **Slot-based enhancement** instead of item-based: Enhancement levels persist across prestige resets and item swaps. Since items are lost on prestige (except Vault), item-based enhancement would feel punishing. Slot-based enhancement means the investment carries forward permanently.
+- **Independent discovery at P15+**: The Soulforge uses its own RNG roll per tick (same formula as Haven: `0.000014 + (rank - 15) * 0.000007`). Gating at P15 ensures players have established their Haven before discovering enhancement, avoiding early resource competition.
+- **Prestige ranks as currency**: Same currency as Haven, creating meaningful resource allocation decisions between Haven upgrades and equipment enhancement.
+- **Escalating risk/reward**: Levels +1-4 are safe (100% success), while +5-10 have decreasing success rates and failure penalties (-1 or -2 levels). This creates a natural progression from safe investment to high-risk gambling, with the +10 level (10% success, -2 on failure) being a prestige sink for endgame players.
+- **Account-level persistence**: Stored in `~/.quest/enhancement.json` alongside Haven and achievements.
+
+## Containment Breach (JezzBall) Challenge
+
+**Decision**: Add a JezzBall-inspired real-time action minigame where players split an arena with growing walls while avoiding bouncing hazard orbs.
+
+**Key choices**:
+- **Wall-growing mechanic**: Walls expand from a pivot point in both directions along the chosen axis, creating a tense timing element. Players must judge when it's safe to place walls based on ball trajectories.
+- **3 lives system**: Rather than instant game-over on a single collision, players get 3 lives. When a ball hits a growing wall, the wall is destroyed, a life is consumed, and the game resets to a waiting state (preserving captured territory and ball positions). This matches Skyward Gauntlet's 3-life system and reduces frustration from single unlucky collisions.
+- **Area capture via flood fill**: When a wall completes (reaches existing barriers on both ends), regions not containing balls are automatically captured. This avoids complex territory calculation and provides satisfying visual feedback.
+- **Difficulty scaling via ball count and target**: Novice (2 balls, 60% target) to Master (5 balls, 84% target), with increasing ball speed and faster wall growth intervals.
+
+## Challenge Discovery Weight Rebalance
+
+**Decision**: Rebalance challenge discovery weights from the original 6-game distribution to accommodate 9 games (adding Snake, Flappy Bird, and JezzBall).
+
+**Original distribution** (6 games, total weight 110):
+- Minesweeper: 30, Rune: 25, Gomoku: 20, Morris: 15, Chess: 10, Go: 10
+
+**New distribution** (9 games, total weight 160):
+- Rune: 30, Minesweeper: 28, Snake: 22, Flappy Bird: 20, JezzBall: 18, Gomoku: 15, Morris: 12, Chess: 8, Go: 7
+
+**Rationale**: The rebalance follows the principle that quick, accessible games should appear more frequently. Action games (Snake, Flappy Bird, JezzBall) are placed in the middle tier since they offer moderate play sessions. Strategy games (Chess, Go) were reduced slightly to make room for the new entries while maintaining their "rare discovery" feel. Rune was promoted to the top weight as the fastest challenge (~2 minutes).

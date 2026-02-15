@@ -276,4 +276,5 @@ Winning a minigame emits a `MinigameWinInfo` (defined in `mod.rs`) with `game_ty
 | Rune | 4-6 slots | N/A (puzzle) | Mastermind-style feedback |
 | Go | 9x9 | MCTS | Captures, ko rule, territory scoring |
 | Snake (Serpent's Path) | 26×26 grid | N/A (action) | Real-time ~60 FPS, direction-based movement, 4 difficulties (Novice 10 food/200ms, Master 25 food/90ms), requires P1+ |
-| Flappy Bird (Skyward Gauntlet) | 50×18 area | N/A (action) | Real-time ~60 FPS, gravity/flap physics, pipe obstacles with gap sizes (7→4 rows), 4 difficulties, requires P1+ |
+| Flappy Bird (Skyward Gauntlet) | 50×18 area | N/A (action) | Real-time ~60 FPS, gravity/flap physics, pipe obstacles with gap sizes (7→4 rows), 3 lives, 4 difficulties, requires P1+ |
+| JezzBall (Containment Breach) | 34×22 grid | N/A (action) | Real-time ~60 FPS, ball physics, wall-building to capture area, 3 lives, 2-5 balls (Novice→Master), target 60-84%, 4 difficulties, requires P1+ |

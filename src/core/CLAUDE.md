@@ -95,7 +95,7 @@ Enum with 25+ variants describing everything that can happen in a single tick. T
 - **Zone Progression**: `SubzoneBossDefeated` (with `BossDefeatResult`)
 - **Dungeon**: `DungeonRoomEntered`, `DungeonTreasureFound`, `DungeonKeyFound`, `DungeonBossUnlocked`, `DungeonBossDefeated`, `DungeonEliteDefeated`, `DungeonFailed`, `DungeonCompleted`
 - **Fishing**: `FishingMessage`, `FishCaught`, `FishingItemFound`, `FishingRankUp`, `StormLeviathanCaught`
-- **Discovery**: `ChallengeDiscovered`, `DungeonDiscovered`, `FishingSpotDiscovered`, `HavenDiscovered`
+- **Discovery**: `ChallengeDiscovered`, `DungeonDiscovered`, `FishingSpotDiscovered`, `HavenDiscovered`, `SoulforgeDiscovered`
 - **Achievements**: `AchievementUnlocked`
 - **Level Up**: `LeveledUp`
 
@@ -109,6 +109,7 @@ pub struct TickResult {
     pub leviathan_encounter: Option<u8>,          // Encounter number 1-10
     pub achievements_changed: bool,                // Signal to persist to disk
     pub haven_changed: bool,                       // Signal to persist to disk
+    pub enhancement_changed: bool,                 // Signal to persist to disk
     pub achievement_modal_ready: Vec<AchievementId>, // Ready for overlay display
 }
 ```
@@ -120,6 +121,7 @@ pub fn game_tick<R: Rng>(
     state: &mut GameState,
     tick_counter: &mut u32,
     haven: &mut Haven,
+    enhancement: &mut crate::enhancement::EnhancementProgress,
     achievements: &mut Achievements,
     debug_mode: bool,
     rng: &mut R,
@@ -134,7 +136,7 @@ pub fn game_tick<R: Rng>(
 |-------|-------------|
 | 1. Challenge AI | Ticks AI thinking for active Chess, Morris, Gomoku, or Go games |
 | 2. Challenge discovery | Rolls for new challenge discovery (P1+ required, Haven bonus applied) |
-| 3. Sync player HP | Recalculates `DerivedStats`, computes `PrestigeCombatBonuses::from_rank()`, applies `flat_hp` to `combat_state.player_max_hp` |
+| 3. Sync player HP | Recalculates `DerivedStats` (with `enhancement.levels`), computes `PrestigeCombatBonuses::from_rank()`, applies `flat_hp` to `combat_state.player_max_hp` |
 | 4. Dungeon exploration | Calls `update_dungeon()`, processes room entry, treasure, keys, boss unlock, completion/failure |
 | 5. Fishing | If fishing active: ticks session, handles catches/items/rank-ups/Leviathan, updates play time, **returns early** (skips combat) |
 | 6. Combat | Calls `update_combat(state, dt, haven, prestige_bonuses, achievements)`, maps `CombatEvent` to `TickEvent`, applies XP, handles kills/deaths, processes item drops and discoveries |
@@ -142,7 +144,8 @@ pub fn game_tick<R: Rng>(
 | 8. Play time | Increments tick counter; at 10 ticks, increments `play_time_seconds` |
 | 9. Achievement collection | Drains newly unlocked achievements into `TickResult.events` |
 | 10. Haven discovery | Rolls for Haven discovery (P10+, no active content) |
-| 11. Achievement modal | Checks if 500ms accumulation window has elapsed for modal display |
+| 11. Soulforge discovery | Rolls for Soulforge discovery (P15+, no active content), emits `SoulforgeDiscovered`, sets `enhancement_changed` |
+| 12. Achievement modal | Checks if 500ms accumulation window has elapsed for modal display |
 
 **Important**: Stage 5 (fishing) returns early, skipping stages 6-7. Fishing and combat are mutually exclusive.
 
@@ -230,6 +233,9 @@ Offline XP formula: `(elapsed_seconds / 5.0) * 0.25 * xp_per_kill * (1 + haven_b
 | `HAVEN_DISCOVERY_BASE_CHANCE` | 0.000014 | Per tick |
 | `HAVEN_DISCOVERY_RANK_BONUS` | 0.000007 | Per rank above 10 |
 | `HAVEN_MIN_PRESTIGE_RANK` | 10 | |
+| `SOULFORGE_DISCOVERY_BASE_CHANCE` | 0.000014 | Per tick (in `enhancement/types.rs`) |
+| `SOULFORGE_DISCOVERY_RANK_BONUS` | 0.000007 | Per rank above 15 (in `enhancement/types.rs`) |
+| `SOULFORGE_MIN_PRESTIGE_RANK` | 15 | (in `enhancement/types.rs`) |
 
 ### Zone Enemy Stats
 | Constant | Value | Notes |
@@ -285,6 +291,7 @@ Zone 11 (The Expanse) is an endgame wall: `(5000, 400, 500, 80, 250, 30)` — ro
 - **fishing** (`fishing::logic`): `tick_fishing_with_haven_result()`, `check_rank_up_with_max()`, `get_max_fishing_rank()`, `HavenFishingBonuses` struct
 - **challenges** (`challenges::*::logic`): `process_ai_thinking()` per game type, `try_discover_challenge_with_haven()`
 - **haven** (`haven`): `Haven`, `HavenBonusType`, `try_discover_haven()`
+- **enhancement** (`enhancement`): `EnhancementProgress` with `levels` array for derived stats, `try_discover_soulforge()` for discovery
 - **achievements** (`achievements`): `Achievements` with `on_*()` tracking methods
 - **items** (`items::drops`): `try_drop_from_mob()`, `try_drop_from_boss()`; (`items::scoring`): `auto_equip_if_better()`
 - **zones** (`zones`): `BossDefeatResult`, `get_zone()`, `get_all_zones()`

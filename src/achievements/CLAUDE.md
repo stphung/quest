@@ -23,6 +23,7 @@ Enum with 80+ variants covering all trackable milestones. Organized by domain:
 - **Prestige**: `FirstPrestige`..`Eternal` (P1 to P100, 12 milestones)
 - **Zones**: `Zone1Complete`..`Zone10Complete`, `TheStormbreaker`, `StormsEnd`, `ExpanseCycleI`..`ExpanseCycleIV`
 - **Challenges**: 4 difficulties per game type (chess, morris, gomoku, minesweeper, rune, go, flappy_bird, snake, jezzball) + `GrandChampion` (100 wins)
+- **Enhancement**: `SoulforgeDiscovered`, `ApprenticeSmith` (+1), `FullyTempered` (+4 all), `JourneymanSmith` (+5), `SoulforgeAdept` (+6), `SoulforgeSavant` (+7), `SoulforgeMaster` (+8), `SoulforgeGrandmaster` (+9), `MasterSmith` (+10), `SoulConvergence` (+7 all)
 - **Fishing**: `GoneFishing`, `FishermanI`..`FishermanIV` (rank milestones), `FishCatcherI`..`FishCatcherIV` (catch counts), `StormLeviathan`
 - **Dungeons**: `DungeonDiver`, `DungeonMasterI`..`DungeonMasterVI`
 - **Haven**: `HavenDiscovered`, `HavenBuilderI`..`HavenBuilderII`, `HavenArchitect`
@@ -58,7 +59,7 @@ achievements.on_enemy_killed(is_boss, Some(&state.character_name));
 achievements.on_level_up(new_level, Some(&state.character_name));
 ```
 
-Event handlers: `on_enemy_killed`, `on_level_up`, `on_prestige`, `on_zone_fully_cleared`, `on_storms_end`, `on_dungeon_completed`, `on_minigame_won`, `on_fish_caught`, `on_fishing_rank_up`, `on_storm_leviathan_caught`, `on_haven_discovered`, `on_haven_all_t1`, `on_haven_all_t2`, `on_haven_architect`.
+Event handlers: `on_enemy_killed`, `on_level_up`, `on_prestige`, `on_zone_fully_cleared`, `on_storms_end`, `on_dungeon_completed`, `on_minigame_won`, `on_fish_caught`, `on_fishing_rank_up`, `on_storm_leviathan_caught`, `on_haven_discovered`, `on_haven_all_t1`, `on_haven_all_t2`, `on_haven_architect`, `on_soulforge_discovered`, `on_enhancement_upgraded`.
 
 ### Unlock Flow
 
