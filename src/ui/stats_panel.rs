@@ -11,7 +11,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Gauge, Paragraph},
+    widgets::{Block, Borders, Gauge, Paragraph, Wrap},
     Frame,
 };
 
@@ -275,6 +275,9 @@ pub(super) fn draw_zone_info(
         )]));
     }
 
+    // Blank line separator between flavor text and next-zone status
+    zone_lines.push(Line::from(""));
+
     // Add second line based on completion status
     match zone_completion {
         ZoneCompletionStatus::Gated {
@@ -346,6 +349,7 @@ pub(super) fn draw_zone_info(
                 .border_style(Style::default().fg(zone_color))
                 .title("Location"),
         )
+        .wrap(Wrap { trim: true })
         .alignment(Alignment::Center);
 
     frame.render_widget(zone_widget, area);
