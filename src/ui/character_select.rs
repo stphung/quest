@@ -553,20 +553,33 @@ impl CharacterSelectScreen {
             .enumerate()
             .map(|(i, slot)| {
                 let level = enhancement.level(i);
-                let level_cell = if level > 0 {
+                let (level_cell, power_cell) = if level > 0 {
                     let (r, g, b) = crate::enhancement::enhancement_color_rgb(level);
-                    Line::from(Span::styled(
-                        format!("+{}", level),
-                        Style::default().fg(Color::Rgb(r, g, b)),
-                    ))
+                    let color = Color::Rgb(r, g, b);
+                    let bonus_pct =
+                        (crate::enhancement::enhancement_multiplier(level) - 1.0) * 100.0;
+                    (
+                        Line::from(Span::styled(
+                            format!("+{}", level),
+                            Style::default().fg(color),
+                        )),
+                        Line::from(Span::styled(
+                            format!("(+{:.1}% Power)", bonus_pct),
+                            Style::default().fg(Color::Green),
+                        )),
+                    )
                 } else {
-                    Line::from(Span::styled("--", Style::default().fg(Color::DarkGray)))
+                    (
+                        Line::from(Span::styled("--", Style::default().fg(Color::DarkGray))),
+                        Line::from(""),
+                    )
                 };
 
                 Row::new(vec![
                     Line::from(format!(" {}", slot.icon())),
                     Line::from(slot.name().to_string()),
                     level_cell,
+                    power_cell,
                 ])
             })
             .collect();
@@ -576,7 +589,8 @@ impl CharacterSelectScreen {
             [
                 Constraint::Length(3), // Icon
                 Constraint::Length(8), // Name
-                Constraint::Min(3),    // Level
+                Constraint::Length(4), // Level
+                Constraint::Min(12),   // Power
             ],
         );
 

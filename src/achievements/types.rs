@@ -183,12 +183,17 @@ pub enum AchievementId {
     HavenArchitect, // All rooms at T3
 
     // Enhancement
-    SoulforgeDiscovered, // Discover the Soulforge
-    ApprenticeSmith,     // Reach +1 on any slot
-    JourneymanSmith,     // Reach +5 on any slot
-    MasterSmith,         // Reach +10 on any slot
-    FullyEnhanced,       // Reach +10 on all 7 slots
-    PersistentHammering, // 100 total enhancement attempts
+    SoulforgeDiscovered,  // Discover the Soulforge
+    ApprenticeSmith,      // Reach +1 on any slot
+    FullyTempered,        // Reach +4 on all 7 slots
+    JourneymanSmith,      // Reach +5 on any slot
+    SoulforgeAdept,       // Reach +6 on any slot
+    SoulforgeSavant,      // Reach +7 on any slot
+    SoulforgeMaster,      // Reach +8 on any slot
+    SoulforgeGrandmaster, // Reach +9 on any slot
+    MasterSmith,          // Reach +10 on any slot
+    SoulConvergence,      // Reach +7 on all 7 slots
+    PersistentHammering,  // 100 total enhancement attempts
 }
 
 /// Static definition of an achievement.
@@ -748,11 +753,26 @@ impl Achievements {
         if new_level >= 5 {
             self.unlock_with_name(AchievementId::JourneymanSmith, character_name);
         }
+        if new_level >= 6 {
+            self.unlock_with_name(AchievementId::SoulforgeAdept, character_name);
+        }
+        if new_level >= 7 {
+            self.unlock_with_name(AchievementId::SoulforgeSavant, character_name);
+        }
+        if new_level >= 8 {
+            self.unlock_with_name(AchievementId::SoulforgeMaster, character_name);
+        }
+        if new_level >= 9 {
+            self.unlock_with_name(AchievementId::SoulforgeGrandmaster, character_name);
+        }
         if new_level >= 10 {
             self.unlock_with_name(AchievementId::MasterSmith, character_name);
         }
-        if all_levels.iter().all(|&l| l >= 10) {
-            self.unlock_with_name(AchievementId::FullyEnhanced, character_name);
+        if all_levels.iter().all(|&l| l >= 4) {
+            self.unlock_with_name(AchievementId::FullyTempered, character_name);
+        }
+        if all_levels.iter().all(|&l| l >= 7) {
+            self.unlock_with_name(AchievementId::SoulConvergence, character_name);
         }
         if total_attempts >= 100 {
             self.unlock_with_name(AchievementId::PersistentHammering, character_name);

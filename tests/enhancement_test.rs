@@ -668,19 +668,39 @@ fn test_enhancement_achievements() {
     assert!(achievements.is_unlocked(quest::achievements::AchievementId::ApprenticeSmith));
     assert!(!achievements.is_unlocked(quest::achievements::AchievementId::JourneymanSmith));
 
+    // +4 on all slots
+    achievements.on_enhancement_upgraded(4, &[4, 4, 4, 4, 4, 4, 4], 7, char_name);
+    assert!(achievements.is_unlocked(quest::achievements::AchievementId::FullyTempered));
+
     // +5 on any slot
-    achievements.on_enhancement_upgraded(5, &[5, 0, 0, 0, 0, 0, 0], 10, char_name);
+    achievements.on_enhancement_upgraded(5, &[5, 4, 4, 4, 4, 4, 4], 10, char_name);
     assert!(achievements.is_unlocked(quest::achievements::AchievementId::JourneymanSmith));
-    assert!(!achievements.is_unlocked(quest::achievements::AchievementId::MasterSmith));
+
+    // +6 on any slot
+    achievements.on_enhancement_upgraded(6, &[6, 4, 4, 4, 4, 4, 4], 15, char_name);
+    assert!(achievements.is_unlocked(quest::achievements::AchievementId::SoulforgeAdept));
+
+    // +7 on any slot
+    achievements.on_enhancement_upgraded(7, &[7, 4, 4, 4, 4, 4, 4], 20, char_name);
+    assert!(achievements.is_unlocked(quest::achievements::AchievementId::SoulforgeSavant));
+    assert!(!achievements.is_unlocked(quest::achievements::AchievementId::SoulConvergence));
+
+    // +8 on any slot
+    achievements.on_enhancement_upgraded(8, &[8, 4, 4, 4, 4, 4, 4], 25, char_name);
+    assert!(achievements.is_unlocked(quest::achievements::AchievementId::SoulforgeMaster));
+
+    // +9 on any slot
+    achievements.on_enhancement_upgraded(9, &[9, 4, 4, 4, 4, 4, 4], 30, char_name);
+    assert!(achievements.is_unlocked(quest::achievements::AchievementId::SoulforgeGrandmaster));
 
     // +10 on one slot
-    achievements.on_enhancement_upgraded(10, &[10, 0, 0, 0, 0, 0, 0], 50, char_name);
+    achievements.on_enhancement_upgraded(10, &[10, 4, 4, 4, 4, 4, 4], 50, char_name);
     assert!(achievements.is_unlocked(quest::achievements::AchievementId::MasterSmith));
-    assert!(!achievements.is_unlocked(quest::achievements::AchievementId::FullyEnhanced));
+    assert!(!achievements.is_unlocked(quest::achievements::AchievementId::SoulConvergence));
 
-    // +10 on all slots
-    achievements.on_enhancement_upgraded(10, &[10, 10, 10, 10, 10, 10, 10], 99, char_name);
-    assert!(achievements.is_unlocked(quest::achievements::AchievementId::FullyEnhanced));
+    // +7 on all slots
+    achievements.on_enhancement_upgraded(7, &[7, 7, 7, 7, 7, 7, 7], 99, char_name);
+    assert!(achievements.is_unlocked(quest::achievements::AchievementId::SoulConvergence));
     assert!(!achievements.is_unlocked(quest::achievements::AchievementId::PersistentHammering));
 
     // 100 attempts
