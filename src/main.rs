@@ -655,6 +655,19 @@ fn main() -> io::Result<()> {
                                             Some(&state.character_name),
                                         );
 
+                                        // Retroactive enhancement/soulforge achievement sync
+                                        if enhancement.discovered {
+                                            global_achievements.on_soulforge_discovered(Some(
+                                                &state.character_name,
+                                            ));
+                                        }
+                                        global_achievements.on_enhancement_upgraded(
+                                            enhancement.highest_level_reached,
+                                            &enhancement.levels,
+                                            enhancement.total_attempts,
+                                            Some(&state.character_name),
+                                        );
+
                                         log_synced_achievements(
                                             &mut state,
                                             &mut global_achievements,
@@ -1133,6 +1146,36 @@ fn main() -> io::Result<()> {
                                                 enhancement.total_attempts,
                                                 Some(&state.character_name),
                                             );
+
+                                            const SLOTS: [crate::items::types::EquipmentSlot; 7] = [
+                                                crate::items::types::EquipmentSlot::Weapon,
+                                                crate::items::types::EquipmentSlot::Armor,
+                                                crate::items::types::EquipmentSlot::Helmet,
+                                                crate::items::types::EquipmentSlot::Gloves,
+                                                crate::items::types::EquipmentSlot::Boots,
+                                                crate::items::types::EquipmentSlot::Amulet,
+                                                crate::items::types::EquipmentSlot::Ring,
+                                            ];
+                                            let slot_name = SLOTS
+                                                .get(result.slot_index)
+                                                .map(|s| s.name())
+                                                .unwrap_or("Unknown");
+                                            if result.success {
+                                                state.combat_state.add_log_entry(
+                                                    format!(
+                                                        "\u{2692} {} enhanced to +{}!",
+                                                        slot_name, result.new_level
+                                                    ),
+                                                    false,
+                                                    true,
+                                                );
+                                            } else {
+                                                state.combat_state.add_log_entry(
+                                                    format!("\u{2692} Enhancement failed! {} dropped to +{}.", slot_name, result.new_level),
+                                                    false,
+                                                    true,
+                                                );
+                                            }
 
                                             soulforge_ui.phase = if result.success {
                                                 input::SoulforgePhase::ResultSuccess

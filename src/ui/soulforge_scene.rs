@@ -203,7 +203,10 @@ fn render_menu(
             Line::from(vec![
                 Span::styled("Bonus: ", Style::default().fg(Color::DarkGray)),
                 Span::styled(
-                    "+50.0% stats",
+                    format!(
+                        "+{:.1}% Power",
+                        (enhancement_multiplier(MAX_ENHANCEMENT_LEVEL) - 1.0) * 100.0
+                    ),
                     Style::default()
                         .fg(Color::Rgb(255, 215, 0))
                         .add_modifier(Modifier::BOLD),
@@ -356,7 +359,11 @@ fn render_confirming(
                 Style::default().fg(Color::Cyan),
             ),
             Span::styled(
-                format!(" ({} \u{2192} {})", prestige_rank, prestige_rank - cost),
+                format!(
+                    " ({} \u{2192} {})",
+                    prestige_rank,
+                    prestige_rank.saturating_sub(cost)
+                ),
                 Style::default().fg(Color::DarkGray),
             ),
         ]),
@@ -367,7 +374,7 @@ fn render_confirming(
                 Style::default().fg(level_color(target_level)),
             ),
             Span::styled(
-                format!(": +{:.1}% stats", bonus_pct),
+                format!(": +{:.1}% Power", bonus_pct),
                 Style::default().fg(Color::Green),
             ),
         ]),
