@@ -431,7 +431,7 @@ mod tests {
     }
 
     fn default_derived(state: &GameState) -> DerivedStats {
-        DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment)
+        DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7])
     }
 
     /// Forces a player attack by setting the player timer, suppressing enemy attack.
@@ -797,7 +797,8 @@ mod tests {
         );
 
         // Calculate expected damage reduction
-        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+        let derived =
+            DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
         let expected_damage = enemy_base_damage.saturating_sub(derived.defense);
         let actual_damage = initial_hp - state.combat_state.player_current_hp;
 
@@ -991,7 +992,8 @@ mod tests {
             .attributes
             .set(crate::character::attributes::AttributeType::Dexterity, 210);
 
-        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+        let derived =
+            DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
         assert!(derived.crit_chance_percent >= 100);
         let expected_crit_damage = derived.total_damage() * 2;
 
@@ -1029,7 +1031,8 @@ mod tests {
             .attributes
             .set(crate::character::attributes::AttributeType::Dexterity, 0);
 
-        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+        let derived =
+            DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
         assert_eq!(derived.crit_chance_percent, 0);
 
         // Run many attacks to confirm no crits
@@ -1078,7 +1081,8 @@ mod tests {
             16,
         ); // +3 mod => magic 11
 
-        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+        let derived =
+            DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
         let expected_damage = derived.total_damage(); // 15 + 11 = 26
 
         state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
@@ -1112,7 +1116,8 @@ mod tests {
             .attributes
             .set(crate::character::attributes::AttributeType::Dexterity, 16); // mod +3 => defense 3
 
-        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+        let derived =
+            DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
         assert_eq!(derived.defense, 3);
 
         let enemy_base_damage = 20;
@@ -1148,7 +1153,8 @@ mod tests {
             30,
         );
 
-        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+        let derived =
+            DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
         state.combat_state.player_max_hp = derived.max_hp;
         state.combat_state.player_current_hp = derived.max_hp;
 
@@ -1394,7 +1400,8 @@ mod tests {
             .attributes
             .set(crate::character::attributes::AttributeType::Dexterity, 40); // mod 15 => defense 15
 
-        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+        let derived =
+            DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
         assert!(derived.defense >= 15);
 
         let initial_hp = state.combat_state.player_current_hp;
@@ -1497,7 +1504,8 @@ mod tests {
         };
         state.equipment.set(EquipmentSlot::Weapon, Some(weapon));
 
-        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+        let derived =
+            DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
         let base_damage = derived.total_damage();
         let expected_crit_damage = (base_damage as f64 * 3.0) as u32; // 3x with +100%
 
@@ -1789,7 +1797,8 @@ mod tests {
 
         // Enemy should have taken reflected damage: 20 * 50% = 10
         let enemy = state.combat_state.current_enemy.as_ref().unwrap();
-        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+        let derived =
+            DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
         let player_damage = derived.total_damage();
         let reflected_damage = (enemy_damage as f64 * 0.5) as u32; // 50% reflection
 
@@ -1892,7 +1901,8 @@ mod tests {
 
         // Enemy takes player attack damage + 1 reflected (100% of 1 damage)
         let enemy = state.combat_state.current_enemy.as_ref().unwrap();
-        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+        let derived =
+            DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
         let reflected = 1u32; // 100% of 1 min-floor damage
         let expected_hp = enemy_max_hp - derived.total_damage() - reflected;
         assert_eq!(enemy.current_hp, expected_hp);

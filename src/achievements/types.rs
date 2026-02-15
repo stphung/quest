@@ -181,6 +181,14 @@ pub enum AchievementId {
     HavenBuilderI,  // All rooms at T1
     HavenBuilderII, // All rooms at T2
     HavenArchitect, // All rooms at T3
+
+    // Enhancement
+    BlacksmithDiscovered, // Discover the Blacksmith
+    ApprenticeSmith,      // Reach +1 on any slot
+    JourneymanSmith,      // Reach +5 on any slot
+    MasterSmith,          // Reach +10 on any slot
+    FullyEnhanced,        // Reach +10 on all 7 slots
+    PersistentHammering,  // 100 total enhancement attempts
 }
 
 /// Static definition of an achievement.
@@ -714,6 +722,41 @@ impl Achievements {
     /// Called when all Haven rooms reach Tier 3.
     pub fn on_haven_architect(&mut self, character_name: Option<&str>) {
         self.unlock_with_name(AchievementId::HavenArchitect, character_name);
+    }
+
+    // =========================================================================
+    // Enhancement/Blacksmith Event Handlers
+    // =========================================================================
+
+    /// Called when the Blacksmith is first discovered.
+    pub fn on_blacksmith_discovered(&mut self, character_name: Option<&str>) {
+        self.unlock_with_name(AchievementId::BlacksmithDiscovered, character_name);
+    }
+
+    /// Called after an enhancement attempt completes (success or failure).
+    /// Checks all enhancement-related achievement milestones.
+    pub fn on_enhancement_upgraded(
+        &mut self,
+        new_level: u8,
+        all_levels: &[u8; 7],
+        total_attempts: u32,
+        character_name: Option<&str>,
+    ) {
+        if new_level >= 1 {
+            self.unlock_with_name(AchievementId::ApprenticeSmith, character_name);
+        }
+        if new_level >= 5 {
+            self.unlock_with_name(AchievementId::JourneymanSmith, character_name);
+        }
+        if new_level >= 10 {
+            self.unlock_with_name(AchievementId::MasterSmith, character_name);
+        }
+        if all_levels.iter().all(|&l| l >= 10) {
+            self.unlock_with_name(AchievementId::FullyEnhanced, character_name);
+        }
+        if total_attempts >= 100 {
+            self.unlock_with_name(AchievementId::PersistentHammering, character_name);
+        }
     }
 
     // =========================================================================

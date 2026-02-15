@@ -248,7 +248,8 @@ fn test_combat_to_prestige_full_loop() {
 
     for tick in 0..20_000 {
         // Sync derived stats
-        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+        let derived =
+            DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
         state.combat_state.update_max_hp(derived.max_hp);
 
         // Spawn enemy
@@ -333,7 +334,8 @@ fn test_combat_to_prestige_full_loop() {
     // Phase 3: Verify post-prestige combat still works
     let mut post_prestige_kill = false;
     for _ in 0..2000 {
-        let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+        let derived =
+            DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
         state.combat_state.update_max_hp(derived.max_hp);
         spawn_enemy_if_needed(&mut state);
         let events = update_combat(

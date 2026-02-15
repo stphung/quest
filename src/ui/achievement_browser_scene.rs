@@ -8,6 +8,7 @@ use crate::achievements::{
     Achievements,
 };
 use crate::character::prestige::get_prestige_tier;
+use crate::enhancement::EnhancementProgress;
 use crate::fishing::types::fishing_tier_name;
 use crate::zones::get_all_zones;
 use ratatui::{
@@ -92,6 +93,7 @@ pub fn render_achievement_browser(
     area: Rect,
     achievements: &Achievements,
     ui_state: &AchievementBrowserState,
+    enhancement: &EnhancementProgress,
     _ctx: &super::responsive::LayoutContext,
 ) {
     frame.render_widget(Clear, area);
@@ -121,7 +123,13 @@ pub fn render_achievement_browser(
 
     // Content area: stats view or list+detail
     if ui_state.selected_category == AchievementCategory::Stats {
-        render_stats_view(frame, chunks[1], achievements, ui_state.selected_index);
+        render_stats_view(
+            frame,
+            chunks[1],
+            achievements,
+            enhancement,
+            ui_state.selected_index,
+        );
     } else {
         let content_chunks = Layout::default()
             .direction(Direction::Horizontal)
@@ -416,6 +424,7 @@ fn render_stats_view(
     frame: &mut Frame,
     area: Rect,
     achievements: &Achievements,
+    enhancement: &EnhancementProgress,
     scroll_offset: usize,
 ) {
     let block = Block::default()
@@ -436,8 +445,8 @@ fn render_stats_view(
         .split(inner);
 
     // Build content for both columns
-    let left_lines = build_stats_left_lines(achievements, columns[0].width);
-    let right_lines = build_stats_right_lines(achievements, columns[2].width);
+    let left_lines = build_stats_left_lines(achievements, enhancement, columns[0].width);
+    let right_lines = build_stats_right_lines(achievements, enhancement, columns[2].width);
 
     // Clamp scroll to the taller column's content minus visible area
     let max_content = left_lines.len().max(right_lines.len());
@@ -458,7 +467,11 @@ fn render_lines(frame: &mut Frame, area: Rect, lines: Vec<Line>, scroll: usize) 
 }
 
 /// Build the left column lines: raw stats with dot-leaders.
-fn build_stats_left_lines(achievements: &Achievements, width: u16) -> Vec<Line<'static>> {
+fn build_stats_left_lines(
+    achievements: &Achievements,
+    enhancement: &EnhancementProgress,
+    width: u16,
+) -> Vec<Line<'static>> {
     let section_style = Style::default()
         .fg(Color::White)
         .add_modifier(Modifier::BOLD);
@@ -491,7 +504,12 @@ fn build_stats_left_lines(achievements: &Achievements, width: u16) -> Vec<Line<'
     let dungeons_completed_str = format_number(achievements.total_dungeons_completed);
     let minigame_wins_str = format_number(achievements.total_minigame_wins);
 
-    vec![
+    let total_enhancement_attempts_str = format_number(enhancement.total_attempts as u64);
+    let total_enhancement_successes_str = format_number(enhancement.total_successes as u64);
+    let total_enhancement_failures_str = format_number(enhancement.total_failures as u64);
+    let highest_enhancement_str = format!("+{}", enhancement.highest_level_reached);
+
+    let mut lines = vec![
         // COMBAT section
         Line::from(Span::styled("COMBAT", section_style)),
         Line::from(Span::styled("\u{2500}".repeat(w), separator_style)),
@@ -585,11 +603,53 @@ fn build_stats_left_lines(achievements: &Achievements, width: u16) -> Vec<Line<'
             value_style,
             width,
         ),
-    ]
+    ];
+
+    // ENHANCEMENT section
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled("ENHANCEMENT", section_style)));
+    lines.push(Line::from(Span::styled(
+        "\u{2500}".repeat(w),
+        separator_style,
+    )));
+    lines.push(stat_line(
+        "Attempts",
+        &total_enhancement_attempts_str,
+        label_style,
+        value_style,
+        width,
+    ));
+    lines.push(stat_line(
+        "Successes",
+        &total_enhancement_successes_str,
+        label_style,
+        value_style,
+        width,
+    ));
+    lines.push(stat_line(
+        "Failures",
+        &total_enhancement_failures_str,
+        label_style,
+        value_style,
+        width,
+    ));
+    lines.push(stat_line(
+        "Highest Level",
+        &highest_enhancement_str,
+        label_style,
+        value_style,
+        width,
+    ));
+
+    lines
 }
 
 /// Build the right column lines: zone checklist, challenge grid, achievement summary.
-fn build_stats_right_lines(achievements: &Achievements, width: u16) -> Vec<Line<'static>> {
+fn build_stats_right_lines(
+    achievements: &Achievements,
+    enhancement: &EnhancementProgress,
+    width: u16,
+) -> Vec<Line<'static>> {
     let section_style = Style::default()
         .fg(Color::White)
         .add_modifier(Modifier::BOLD);
@@ -765,6 +825,30 @@ fn build_stats_right_lines(achievements: &Achievements, width: u16) -> Vec<Line<
         ),
     ]));
 
+    lines.push(Line::from(""));
+
+    // ENHANCEMENT section
+    lines.push(Line::from(Span::styled("ENHANCEMENT", section_style)));
+    lines.push(Line::from(Span::styled(
+        "\u{2500}".repeat(width as usize),
+        separator_style,
+    )));
+    let slot_names = [
+        "Weapon", "Armor", "Helmet", "Gloves", "Boots", "Amulet", "Ring",
+    ];
+    for pair in slot_names.iter().enumerate().collect::<Vec<_>>().chunks(2) {
+        let mut spans = Vec::new();
+        for &(slot_idx, name) in pair {
+            let level = enhancement.levels[slot_idx];
+            let (r, g, b) = crate::enhancement::enhancement_color_rgb(level);
+            let color = Color::Rgb(r, g, b);
+            spans.push(Span::styled(
+                format!("  {:<8}+{:<3}", name, level),
+                Style::default().fg(color),
+            ));
+        }
+        lines.push(Line::from(spans));
+    }
     lines.push(Line::from(""));
 
     // ACHIEVEMENTS section

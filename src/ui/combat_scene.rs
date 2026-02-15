@@ -174,8 +174,11 @@ pub(super) fn draw_combat_status(frame: &mut Frame, area: Rect, game_state: &Gam
     let spinner = spinner_char();
 
     // Calculate DPS for display
-    let derived =
-        DerivedStats::calculate_derived_stats(&game_state.attributes, &game_state.equipment);
+    let derived = DerivedStats::calculate_derived_stats(
+        &game_state.attributes,
+        &game_state.equipment,
+        &[0; 7],
+    );
     let base_dps = derived.total_damage() as f64 / ATTACK_INTERVAL_SECONDS;
     let effective_dps = base_dps
         * (1.0 + (derived.crit_chance_percent as f64 / 100.0) * (derived.crit_multiplier - 1.0));

@@ -1,5 +1,6 @@
 use crate::character::manager::CharacterInfo;
 use crate::character::prestige::get_prestige_tier;
+use crate::enhancement::EnhancementProgress;
 use crate::haven::{Haven, HavenRoomId};
 use crate::items::types::EquipmentSlot;
 use crate::ui::responsive::SizeTier;
@@ -7,7 +8,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Paragraph, Row, Table},
     Frame,
 };
 
@@ -28,35 +29,50 @@ impl CharacterSelectScreen {
         area: Rect,
         characters: &[CharacterInfo],
         haven: &Haven,
+        enhancement: &EnhancementProgress,
         ctx: &super::responsive::LayoutContext,
     ) {
         match ctx.tier {
             SizeTier::S | SizeTier::TooSmall => {
-                self.draw_small(f, area, characters, haven);
+                self.draw_small(f, area, characters, haven, enhancement);
             }
             SizeTier::M => {
-                self.draw_medium(f, area, characters, haven);
+                self.draw_medium(f, area, characters, haven, enhancement);
             }
             _ => {
-                self.draw_large(f, area, characters, haven);
+                self.draw_large(f, area, characters, haven, enhancement);
             }
         }
     }
 
-    fn draw_large(&self, f: &mut Frame, area: Rect, characters: &[CharacterInfo], haven: &Haven) {
-        // Only show Haven section if discovered (keep it secret otherwise!)
-        let constraints = if haven.discovered {
+    fn draw_large(
+        &self,
+        f: &mut Frame,
+        area: Rect,
+        characters: &[CharacterInfo],
+        haven: &Haven,
+        enhancement: &EnhancementProgress,
+    ) {
+        let show_haven = haven.discovered;
+        let show_blacksmith = enhancement.discovered;
+        let show_bottom = show_haven || show_blacksmith;
+
+        // Bottom panel height: haven diamond is 13 lines + 2 border = 15,
+        // blacksmith is 9 lines + 2 border = 11. Use the taller one.
+        let bottom_height = if show_haven { 15 } else { 11 };
+
+        let constraints = if show_bottom {
             vec![
-                Constraint::Length(3),  // Title
-                Constraint::Min(0),     // Main content
-                Constraint::Length(19), // Haven tree (17 lines + 2 for border) - includes StormForge
-                Constraint::Length(4),  // Controls (2 lines)
+                Constraint::Length(3),             // Title
+                Constraint::Min(0),                // Main content
+                Constraint::Length(bottom_height), // Haven + Blacksmith
+                Constraint::Length(3),             // Controls
             ]
         } else {
             vec![
                 Constraint::Length(3), // Title
                 Constraint::Min(0),    // Main content
-                Constraint::Length(4), // Controls (2 lines)
+                Constraint::Length(3), // Controls
             ]
         };
 
@@ -91,19 +107,33 @@ impl CharacterSelectScreen {
         // Draw character details
         self.draw_character_details(f, main_chunks[1], characters);
 
-        // Draw Haven tree (only if discovered)
-        let controls_idx = if haven.discovered {
-            self.draw_haven_tree(f, chunks[2], haven);
+        // Draw bottom panels (Haven + Blacksmith)
+        let controls_idx = if show_bottom {
+            self.draw_bottom_panels(
+                f,
+                chunks[2],
+                haven,
+                enhancement,
+                show_haven,
+                show_blacksmith,
+            );
             3
         } else {
             2
         };
 
         // Controls
-        self.draw_controls(f, chunks[controls_idx], characters, haven, false);
+        self.draw_controls(f, chunks[controls_idx], characters, false);
     }
 
-    fn draw_medium(&self, f: &mut Frame, area: Rect, characters: &[CharacterInfo], haven: &Haven) {
+    fn draw_medium(
+        &self,
+        f: &mut Frame,
+        area: Rect,
+        characters: &[CharacterInfo],
+        _haven: &Haven,
+        _enhancement: &EnhancementProgress,
+    ) {
         // M tier: reduced margins, no Haven tree, compact layout
         let constraints = vec![
             Constraint::Length(2), // Title
@@ -143,10 +173,17 @@ impl CharacterSelectScreen {
         self.draw_character_details(f, main_chunks[1], characters);
 
         // Controls (compact)
-        self.draw_controls(f, chunks[2], characters, haven, true);
+        self.draw_controls(f, chunks[2], characters, true);
     }
 
-    fn draw_small(&self, f: &mut Frame, area: Rect, characters: &[CharacterInfo], haven: &Haven) {
+    fn draw_small(
+        &self,
+        f: &mut Frame,
+        area: Rect,
+        characters: &[CharacterInfo],
+        _haven: &Haven,
+        _enhancement: &EnhancementProgress,
+    ) {
         // S tier: minimal list view, no details panel, no Haven tree
         let constraints = vec![
             Constraint::Length(1), // Title
@@ -175,7 +212,7 @@ impl CharacterSelectScreen {
         self.draw_character_list_compact(f, chunks[1], characters);
 
         // Compact controls
-        self.draw_controls(f, chunks[2], characters, haven, true);
+        self.draw_controls(f, chunks[2], characters, true);
     }
 
     fn draw_controls(
@@ -183,7 +220,6 @@ impl CharacterSelectScreen {
         f: &mut Frame,
         area: Rect,
         characters: &[CharacterInfo],
-        haven: &Haven,
         compact: bool,
     ) {
         let new_button = if characters.len() >= 3 {
@@ -193,52 +229,35 @@ impl CharacterSelectScreen {
         };
 
         if compact {
-            // Single-line or two tight lines
-            let mut control_lines = vec![Line::from(format!(
-                "[Enter] Play  [R] Rename  [D] Del  {}  [Esc] Quit",
-                new_button
-            ))];
-            let mut second_row_spans = vec![Span::styled(
-                "[A] Achv",
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            )];
-            if haven.discovered {
-                second_row_spans.push(Span::raw("  "));
-                second_row_spans.push(Span::styled(
-                    "[H] Haven",
+            let control_lines = vec![
+                Line::from(format!(
+                    "[Enter] Play  [R] Rename  [D] Del  {}  [Esc] Quit",
+                    new_button
+                )),
+                Line::from(Span::styled(
+                    "[A] Achv",
                     Style::default()
                         .fg(Color::Yellow)
                         .add_modifier(Modifier::BOLD),
-                ));
-            }
-            control_lines.push(Line::from(second_row_spans));
+                )),
+            ];
             let controls = Paragraph::new(control_lines)
                 .alignment(Alignment::Center)
                 .style(Style::default().fg(Color::Gray));
             f.render_widget(controls, area);
         } else {
-            let mut control_lines = vec![Line::from(format!(
-                "[Enter] Play    [R] Rename    [D] Delete    {}    [Esc] Quit",
-                new_button
-            ))];
-            let mut second_row_spans = vec![Span::styled(
-                "[A] Achievements",
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            )];
-            if haven.discovered {
-                second_row_spans.push(Span::raw("    "));
-                second_row_spans.push(Span::styled(
-                    "[H] Haven",
+            let control_lines = vec![
+                Line::from(format!(
+                    "[Enter] Play    [R] Rename    [D] Delete    {}    [Esc] Quit",
+                    new_button
+                )),
+                Line::from(Span::styled(
+                    "[A] Achievements",
                     Style::default()
                         .fg(Color::Yellow)
                         .add_modifier(Modifier::BOLD),
-                ));
-            }
-            control_lines.push(Line::from(second_row_spans));
+                )),
+            ];
             let controls = Paragraph::new(control_lines)
                 .alignment(Alignment::Center)
                 .style(Style::default().fg(Color::Gray));
@@ -441,22 +460,6 @@ impl CharacterSelectScreen {
         f.render_widget(details_widget, inner_area);
     }
 
-    fn draw_haven_tree(&self, f: &mut Frame, area: Rect, haven: &Haven) {
-        // Max tiers: 12 rooms × 3 tiers + FishingDock (4 tiers) + StormForge (1 tier) = 36 + 4 + 1 = 41
-        let block = Block::default().borders(Borders::ALL).title(format!(
-            "Haven ({}/41 tiers)",
-            self.count_haven_tiers(haven)
-        ));
-
-        let inner_area = block.inner(area);
-        f.render_widget(block, area);
-
-        // Build the diamond layout
-        let lines = self.build_haven_diamond(haven);
-        let tree_widget = Paragraph::new(lines).alignment(Alignment::Center);
-        f.render_widget(tree_widget, inner_area);
-    }
-
     fn count_haven_tiers(&self, haven: &Haven) -> u8 {
         HavenRoomId::ALL.iter().map(|r| haven.room_tier(*r)).sum()
     }
@@ -494,7 +497,106 @@ impl CharacterSelectScreen {
         }
     }
 
-    fn build_haven_diamond(&self, haven: &Haven) -> Vec<Line<'static>> {
+    fn draw_bottom_panels(
+        &self,
+        f: &mut Frame,
+        area: Rect,
+        haven: &Haven,
+        enhancement: &EnhancementProgress,
+        show_haven: bool,
+        show_blacksmith: bool,
+    ) {
+        match (show_haven, show_blacksmith) {
+            (true, true) => {
+                // Side-by-side: haven left 60%, blacksmith right 40%
+                let panels = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+                    .split(area);
+                self.draw_haven_tree_compact(f, panels[0], haven);
+                self.draw_blacksmith_summary(f, panels[1], enhancement);
+            }
+            (true, false) => {
+                self.draw_haven_tree_compact(f, area, haven);
+            }
+            (false, true) => {
+                self.draw_blacksmith_summary(f, area, enhancement);
+            }
+            (false, false) => {} // Nothing to draw
+        }
+    }
+
+    fn draw_haven_tree_compact(&self, f: &mut Frame, area: Rect, haven: &Haven) {
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(format!("Haven ({}/41)", self.count_haven_tiers(haven)));
+
+        let inner_area = block.inner(area);
+        f.render_widget(block, area);
+
+        let lines = self.build_haven_diamond_compact(haven);
+        let tree_widget = Paragraph::new(lines).alignment(Alignment::Center);
+        f.render_widget(tree_widget, inner_area);
+    }
+
+    fn draw_blacksmith_summary(
+        &self,
+        f: &mut Frame,
+        area: Rect,
+        enhancement: &EnhancementProgress,
+    ) {
+        let block = Block::default().borders(Borders::ALL).title("Blacksmith");
+
+        let inner_area = block.inner(area);
+        f.render_widget(block, area);
+
+        let slots = [
+            EquipmentSlot::Weapon,
+            EquipmentSlot::Armor,
+            EquipmentSlot::Helmet,
+            EquipmentSlot::Gloves,
+            EquipmentSlot::Boots,
+            EquipmentSlot::Amulet,
+            EquipmentSlot::Ring,
+        ];
+
+        let rows: Vec<Row> = slots
+            .iter()
+            .enumerate()
+            .map(|(i, slot)| {
+                let level = enhancement.level(i);
+                let level_cell = if level > 0 {
+                    let (r, g, b) = crate::enhancement::enhancement_color_rgb(level);
+                    Line::from(Span::styled(
+                        format!("+{}", level),
+                        Style::default().fg(Color::Rgb(r, g, b)),
+                    ))
+                } else {
+                    Line::from(Span::styled("--", Style::default().fg(Color::DarkGray)))
+                };
+
+                Row::new(vec![
+                    Line::from(format!(" {}", slot.icon())),
+                    Line::from(slot.name().to_string()),
+                    level_cell,
+                ])
+            })
+            .collect();
+
+        let table = Table::new(
+            rows,
+            [
+                Constraint::Length(3), // Icon
+                Constraint::Length(8), // Name
+                Constraint::Min(3),    // Level
+            ],
+        );
+
+        f.render_widget(table, inner_area);
+    }
+
+    /// Compact haven diamond — labels on same line as dots to save vertical space
+    fn build_haven_diamond_compact(&self, haven: &Haven) -> Vec<Line<'static>> {
         let hs = self.tier_dots(haven.room_tier(HavenRoomId::Hearthstone), 3);
         let arm = self.tier_dots(haven.room_tier(HavenRoomId::Armory), 3);
         let bed = self.tier_dots(haven.room_tier(HavenRoomId::Bedroom), 3);
@@ -511,29 +613,23 @@ impl CharacterSelectScreen {
         let frg = self.tier_dots(haven.room_tier(HavenRoomId::StormForge), 1);
 
         vec![
-            Line::from(format!("                       ♨ {}", hs)),
-            Line::from("                      Hearthstone"),
-            Line::from("                      ╱         ╲"),
-            Line::from(format!("               ⚔ {}            {} 🛏", arm, bed)),
-            Line::from("                Armory           Bedroom"),
-            Line::from("             ╱     ╲           ╱     ╲"),
+            Line::from(format!("              ♨ {} Hearthstone", hs)),
+            Line::from("             ╱         ╲"),
+            Line::from(format!("      ⚔ {} Armory    Bedroom {} 🛏", arm, bed)),
+            Line::from("        ╱     ╲        ╱     ╲"),
             Line::from(format!(
-                "        {}       {}     {}       {}",
+                "   {} Train  {} Trophy  {} Garden  {} Library",
                 trn, tph, gdn, lib
             )),
-            Line::from("       Train     Trophy  Garden    Library"),
-            Line::from("         │         │       │         │"),
+            Line::from("     │         │        │         │"),
             Line::from(format!(
-                "        {}       {}     {}      {}",
+                "   {} Watch  {} Alch   {} Dock   {} Workshop",
                 wtc, alc, dck, wks
             )),
-            Line::from("       Watch     Alchem   Dock    Workshop"),
-            Line::from("          ╲       ╱         ╲       ╱"),
-            Line::from(format!("           {} ⚔             🏦 {}", war, vlt)),
-            Line::from("          War Room            Vault"),
-            Line::from("                    ╲       ╱"),
-            Line::from(format!("                     {} ⚡", frg)),
-            Line::from("                   Storm Forge"),
+            Line::from("      ╲       ╱          ╲       ╱"),
+            Line::from(format!("       {} ⚔ WarRoom     Vault 🏦 {}", war, vlt)),
+            Line::from("              ╲          ╱"),
+            Line::from(format!("               {} ⚡ Storm Forge", frg)),
         ]
     }
 

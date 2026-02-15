@@ -5,6 +5,7 @@
 use crate::challenges::menu::{create_challenge, ChallengeType};
 use crate::core::game_state::GameState;
 use crate::dungeon::generation::generate_dungeon;
+use crate::enhancement::EnhancementProgress;
 use crate::fishing::generation::generate_fishing_session;
 use crate::haven::Haven;
 
@@ -22,6 +23,7 @@ pub const DEBUG_OPTIONS: &[&str] = &[
     "Trigger JezzBall Challenge",
     "Trigger Snake Challenge",
     "Trigger Haven Discovery",
+    "Trigger Blacksmith Discovery",
 ];
 
 /// Debug menu state
@@ -66,7 +68,12 @@ impl DebugMenu {
     }
 
     /// Trigger the selected debug action. Returns a message describing what happened.
-    pub fn trigger_selected(&mut self, state: &mut GameState, haven: &mut Haven) -> &'static str {
+    pub fn trigger_selected(
+        &mut self,
+        state: &mut GameState,
+        haven: &mut Haven,
+        enhancement: &mut EnhancementProgress,
+    ) -> &'static str {
         let msg = match self.selected_index {
             0 => trigger_dungeon(state),
             1 => trigger_fishing(state),
@@ -80,6 +87,7 @@ impl DebugMenu {
             9 => trigger_jezzball_challenge(state),
             10 => trigger_snake_challenge(state),
             11 => trigger_haven_discovery(haven),
+            12 => trigger_blacksmith_discovery(enhancement),
             _ => "Unknown option",
         };
         self.close();
@@ -216,6 +224,14 @@ fn trigger_haven_discovery(haven: &mut Haven) -> &'static str {
     "Haven discovered!"
 }
 
+fn trigger_blacksmith_discovery(enhancement: &mut EnhancementProgress) -> &'static str {
+    if enhancement.discovered {
+        return "Blacksmith already discovered!";
+    }
+    enhancement.discovered = true;
+    "Blacksmith discovered!"
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -239,16 +255,18 @@ mod tests {
         menu.navigate_down();
         menu.navigate_down();
         menu.navigate_down();
-        assert_eq!(menu.selected_index, 11);
+        menu.navigate_down();
+        assert_eq!(menu.selected_index, 12);
 
         // Can't go past end
         menu.navigate_down();
-        assert_eq!(menu.selected_index, 11);
+        assert_eq!(menu.selected_index, 12);
 
         menu.navigate_up();
-        assert_eq!(menu.selected_index, 10);
+        assert_eq!(menu.selected_index, 11);
 
         // Can't go before start
+        menu.navigate_up();
         menu.navigate_up();
         menu.navigate_up();
         menu.navigate_up();
@@ -421,5 +439,19 @@ mod tests {
         // Can't discover again
         let msg = trigger_haven_discovery(&mut haven);
         assert_eq!(msg, "Haven already discovered!");
+    }
+
+    #[test]
+    fn test_trigger_blacksmith_discovery() {
+        let mut enhancement = EnhancementProgress::new();
+        assert!(!enhancement.discovered);
+
+        let msg = trigger_blacksmith_discovery(&mut enhancement);
+        assert_eq!(msg, "Blacksmith discovered!");
+        assert!(enhancement.discovered);
+
+        // Can't discover again
+        let msg = trigger_blacksmith_discovery(&mut enhancement);
+        assert_eq!(msg, "Blacksmith already discovered!");
     }
 }
