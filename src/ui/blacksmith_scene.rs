@@ -33,6 +33,9 @@ const SLOT_ICONS: [&str; 7] = [
     "\u{1f48d}", // Ring
 ];
 
+/// Terminal display width of each icon (text symbols = 1 cell, emoji = 2 cells)
+const SLOT_ICON_WIDTHS: [u8; 7] = [1, 1, 1, 2, 2, 2, 2];
+
 /// Enhancement level color based on tier
 fn level_color(level: u8) -> Color {
     match level {
@@ -121,9 +124,8 @@ fn render_menu(
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3), // Flavor text
+            Constraint::Length(4), // Flavor text
             Constraint::Length(1), // Spacer
-            Constraint::Length(1), // Column header
             Constraint::Length(7), // Slot list (7 slots)
             Constraint::Length(1), // Spacer
             Constraint::Length(3), // Detail panel for selected slot
@@ -145,16 +147,8 @@ fn render_menu(
     .wrap(Wrap { trim: true });
     frame.render_widget(flavor, chunks[0]);
 
-    // Column header
-    //       "▶ " + icon + " " + name(20) + " " + level info
-    let header = Paragraph::new(Line::from(vec![Span::styled(
-        "     Equipment            Level      Rate",
-        Style::default().fg(Color::DarkGray),
-    )]));
-    frame.render_widget(header, chunks[2]);
-
     // Equipment slot rows
-    let slot_area = chunks[3];
+    let slot_area = chunks[2];
     for (i, (slot, icon)) in SLOT_ORDER.iter().zip(SLOT_ICONS.iter()).enumerate() {
         if i as u16 >= slot_area.height {
             break;
@@ -176,8 +170,9 @@ fn render_menu(
             spans.push(Span::raw("  "));
         }
 
-        // Slot icon
-        spans.push(Span::raw(format!("{} ", icon)));
+        // Slot icon (pad narrow icons to align with wide emoji)
+        let icon_pad = if SLOT_ICON_WIDTHS[i] == 1 { "  " } else { " " };
+        spans.push(Span::raw(format!("{}{}", icon, icon_pad)));
 
         // Display name: item name if equipped, slot name if empty
         let max_name_len = 18;
@@ -232,7 +227,7 @@ fn render_menu(
                 Color::Red
             };
             spans.push(Span::styled(
-                format!(" {:>3.0}%", rate * 100.0),
+                format!(" {:>3.0}% Success", rate * 100.0),
                 Style::default().fg(rate_color),
             ));
         }
@@ -249,7 +244,7 @@ fn render_menu(
 
     // Detail panel for selected slot
     let selected_level = enhancement.level(blacksmith_ui.selected_slot);
-    let detail_area = chunks[5];
+    let detail_area = chunks[4];
 
     if selected_level >= MAX_ENHANCEMENT_LEVEL {
         let detail = Paragraph::new(vec![
@@ -347,14 +342,14 @@ fn render_menu(
         ),
     ]);
     let stats = Paragraph::new(stats_line);
-    frame.render_widget(stats, chunks[7]);
+    frame.render_widget(stats, chunks[6]);
 
     // Help
     let help = Paragraph::new(Line::from(Span::styled(
         "\u{2191}\u{2193} Select  Enter Enhance  Esc Close",
         Style::default().fg(Color::DarkGray),
     )));
-    frame.render_widget(help, chunks[8]);
+    frame.render_widget(help, chunks[7]);
 }
 
 /// Render the confirmation phase
