@@ -97,9 +97,17 @@ fn render_well(frame: &mut Frame, area: Rect, game: &RunicShiftGame) {
     for row in 0..GRID_ROWS {
         let mut spans = Vec::new();
         let row_has_cursor = row == game.cursor_row;
+        let row_is_target_line = row == game.target_line_row;
 
         let danger_prefix = if row == 1 && game.has_danger() && danger_flash_on {
             Span::styled("!! ", Style::default().fg(Color::LightRed))
+        } else if row_is_target_line {
+            Span::styled(
+                "▼  ",
+                Style::default()
+                    .fg(Color::LightMagenta)
+                    .add_modifier(Modifier::BOLD),
+            )
         } else {
             Span::styled("   ", Style::default().fg(Color::DarkGray))
         };
@@ -108,6 +116,8 @@ fn render_well(frame: &mut Frame, area: Rect, game: &RunicShiftGame) {
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD)
+        } else if row_is_target_line {
+            Style::default().fg(Color::LightMagenta)
         } else {
             border_style
         };
@@ -432,6 +442,8 @@ fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &RunicShiftGam
 
 fn render_info_panel(frame: &mut Frame, area: Rect, game: &RunicShiftGame) {
     let inner = render_info_panel_frame(frame, area);
+    let below_count = game.runes_below_target_line();
+    let rows_to_clear = GRID_ROWS.saturating_sub(game.target_line_row);
 
     let rise_text = if game.clear_timer_ms > 0 {
         "Paused".to_string()
@@ -466,20 +478,28 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &RunicShiftGame) {
         ]),
         Line::from(""),
         Line::from(vec![
-            Span::styled("Clears: ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Goal: ", Style::default().fg(Color::DarkGray)),
             Span::styled(
-                game.clears.to_string(),
+                format!("Clear {} bottom rows", rows_to_clear),
+                Style::default().fg(Color::White),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("Below line: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                below_count.to_string(),
                 Style::default()
-                    .fg(Color::White)
+                    .fg(if below_count == 0 {
+                        Color::Green
+                    } else {
+                        Color::White
+                    })
                     .add_modifier(Modifier::BOLD),
             ),
         ]),
         Line::from(vec![
-            Span::styled("Target: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                game.target_clears.to_string(),
-                Style::default().fg(Color::White),
-            ),
+            Span::styled("Clears: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(game.clears.to_string(), Style::default().fg(Color::White)),
         ]),
         Line::from(""),
         Line::from(vec![
@@ -522,21 +542,26 @@ fn render_runic_shift_game_over(frame: &mut Frame, area: Rect, game: &RunicShift
             GameResultType::Win,
             "RUNE MASTERED!",
             format!(
-                "{} clears reached (target {}) - best chain x{}",
-                game.clears,
-                game.target_clears,
-                game.best_chain.max(1)
+                "Target line cleared - best chain x{} ({} clears)",
+                game.best_chain.max(1),
+                game.clears
             ),
         ),
         RunicShiftResult::Loss if game.forfeit_pending => (
             GameResultType::Forfeit,
             "CHALLENGE ABANDONED",
-            format!("You stepped away at {} clears.", game.clears),
+            format!(
+                "You stepped away with {} runes below the line.",
+                game.runes_below_target_line()
+            ),
         ),
         RunicShiftResult::Loss => (
             GameResultType::Loss,
             "RUNES OVERFLOW",
-            format!("Defeated at {} clears.", game.clears),
+            format!(
+                "{} runes remained below the line.",
+                game.runes_below_target_line()
+            ),
         ),
     };
 

@@ -152,13 +152,14 @@ impl RunicShiftDifficulty {
         }
     }
 
-    /// Target clear count for victory.
-    pub fn target_clears(&self) -> u32 {
+    /// First row index that belongs to the target zone (row 0 = top).
+    /// Win when all runes in rows `target_line_row..GRID_ROWS` are cleared.
+    pub fn target_line_row(&self) -> usize {
         match self {
-            Self::Novice => 30,
-            Self::Apprentice => 50,
-            Self::Journeyman => 75,
-            Self::Master => 100,
+            Self::Novice => 10,    // clear bottom 2 rows
+            Self::Apprentice => 9, // clear bottom 3 rows
+            Self::Journeyman => 8, // clear bottom 4 rows
+            Self::Master => 7,     // clear bottom 5 rows
         }
     }
 
@@ -218,9 +219,9 @@ pub struct RunicShiftGame {
     /// Flash cadence (ms) for clearing animation.
     pub clear_flash_ms: u64,
 
-    /// Total clears (includes chain bonuses).
+    /// Total clears (for stats only).
     pub clears: u32,
-    pub target_clears: u32,
+    pub target_line_row: usize,
     /// Current chain depth (1 during first clear, 2+ for true chain steps).
     pub current_chain: u32,
     /// Highest chain depth seen this run.
@@ -266,7 +267,7 @@ impl RunicShiftGame {
             clear_flash_ms: 100,
 
             clears: 0,
-            target_clears: difficulty.target_clears(),
+            target_line_row: difficulty.target_line_row(),
             current_chain: 0,
             best_chain: 0,
 
@@ -377,6 +378,24 @@ impl RunicShiftGame {
         RuneColor::ALL[rng.random_range(0..self.num_colors)]
     }
 
+    /// Number of runes currently in the target zone (at/under target line).
+    pub fn runes_below_target_line(&self) -> u32 {
+        let mut count = 0u32;
+        for row in self.target_line_row..GRID_ROWS {
+            for col in 0..GRID_COLS {
+                if self.grid[row][col].is_some() {
+                    count += 1;
+                }
+            }
+        }
+        count
+    }
+
+    /// True when the target zone is fully cleared.
+    pub fn target_zone_cleared(&self) -> bool {
+        self.runes_below_target_line() == 0
+    }
+
     /// True when any board animation is in progress.
     pub fn has_active_animation(&self) -> bool {
         self.board_animation.is_some()
@@ -391,13 +410,13 @@ mod tests {
     fn test_difficulty_parameters() {
         assert_eq!(RunicShiftDifficulty::Novice.num_colors(), 4);
         assert_eq!(RunicShiftDifficulty::Novice.rise_interval_ms(), 4000);
-        assert_eq!(RunicShiftDifficulty::Novice.target_clears(), 30);
+        assert_eq!(RunicShiftDifficulty::Novice.target_line_row(), 10);
         assert_eq!(RunicShiftDifficulty::Novice.starting_rows(), 5);
         assert_eq!(RunicShiftDifficulty::Novice.clear_duration_ms(), 400);
 
         assert_eq!(RunicShiftDifficulty::Master.num_colors(), 6);
         assert_eq!(RunicShiftDifficulty::Master.rise_interval_ms(), 1500);
-        assert_eq!(RunicShiftDifficulty::Master.target_clears(), 100);
+        assert_eq!(RunicShiftDifficulty::Master.target_line_row(), 7);
         assert_eq!(RunicShiftDifficulty::Master.starting_rows(), 8);
         assert_eq!(RunicShiftDifficulty::Master.clear_duration_ms(), 250);
     }
@@ -409,7 +428,7 @@ mod tests {
         assert!(game.game_result.is_none());
         assert!(game.waiting_to_start);
         assert_eq!(game.lives, MAX_LIVES);
-        assert_eq!(game.target_clears, 50);
+        assert_eq!(game.target_line_row, 9);
         assert_eq!(game.num_colors, 5);
         assert_eq!(game.cursor_col, 2);
         assert_eq!(game.cursor_row, GRID_ROWS - 2);
@@ -461,5 +480,19 @@ mod tests {
                 RuneColor::Fire | RuneColor::Water | RuneColor::Earth | RuneColor::Light
             )
         }));
+    }
+
+    #[test]
+    fn test_target_zone_helpers() {
+        let mut game = RunicShiftGame::new(RunicShiftDifficulty::Novice);
+        game.grid = [[None; GRID_COLS]; GRID_ROWS];
+        assert_eq!(game.target_line_row, 10);
+        assert_eq!(game.runes_below_target_line(), 0);
+        assert!(game.target_zone_cleared());
+
+        game.grid[10][3] = Some(Block::normal(RuneColor::Fire));
+        game.grid[11][1] = Some(Block::normal(RuneColor::Water));
+        assert_eq!(game.runes_below_target_line(), 2);
+        assert!(!game.target_zone_cleared());
     }
 }
