@@ -1201,25 +1201,25 @@ pub fn draw_footer(
     // Achievements hint (with pending count if any)
     let achievements_text = if pending_achievements > 0 {
         Span::styled(
-            format!("    [A] Achievements (🏆 {} new!)", pending_achievements),
+            format!("[A] Achievements (\u{1f3c6} {} new!)", pending_achievements),
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         )
     } else {
-        Span::styled("    [A] Achievements", Style::default().fg(Color::Magenta))
+        Span::styled("[A] Achievements", Style::default().fg(Color::Magenta))
     };
 
-    let footer_text = vec![Line::from(vec![
-        Span::styled("[Esc] Quit", Style::default().fg(Color::Red)),
-        Span::raw("    "),
-        prestige_text,
-        haven_text,
-        blacksmith_text,
-        achievements_text,
-        challenge_text,
-        update_status_text,
-    ])];
+    let footer_text = vec![
+        Line::from(vec![
+            Span::styled("[Esc] Quit", Style::default().fg(Color::Red)),
+            Span::raw("    "),
+            prestige_text,
+            haven_text,
+            blacksmith_text,
+        ]),
+        Line::from(vec![achievements_text, challenge_text, update_status_text]),
+    ];
 
     let footer = Paragraph::new(footer_text)
         .block(Block::default().borders(Borders::ALL).title(version_title))

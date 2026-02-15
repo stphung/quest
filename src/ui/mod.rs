@@ -152,7 +152,7 @@ fn draw_xl_l_layout(
                 Constraint::Length(stats_height), // Main content (stats + right panel)
                 Constraint::Min(6),               // Full-width Loot + Combat (grows)
                 Constraint::Length(12),           // Update drawer panel (taller for changelog)
-                Constraint::Length(3),            // Full-width footer
+                Constraint::Length(4),            // Full-width footer (2 rows)
             ])
             .split(main_area)
     } else {
@@ -161,7 +161,7 @@ fn draw_xl_l_layout(
             .constraints([
                 Constraint::Length(stats_height), // Main content (stats + right panel)
                 Constraint::Min(6),               // Full-width Loot + Combat (grows)
-                Constraint::Length(3),            // Full-width footer
+                Constraint::Length(4),            // Full-width footer (2 rows)
             ])
             .split(main_area)
     };
@@ -450,11 +450,13 @@ fn draw_right_panel(
 ) {
     let zone_completion = stats_panel::compute_zone_completion(game_state);
 
+    // At L tier, the right panel is narrower so zone lines wrap — give more height
+    let zone_height = if ctx.tier >= SizeTier::XL { 7 } else { 8 };
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(7), // Zone info (always visible, includes flavor text + wrap)
-            Constraint::Min(10),   // Content (changes by activity)
+            Constraint::Length(zone_height), // Zone info (includes flavor text + wrap)
+            Constraint::Min(10),             // Content (changes by activity)
         ])
         .split(area);
 
