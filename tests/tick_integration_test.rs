@@ -26,7 +26,8 @@ fn create_strong_character(name: &str) -> GameState {
     let mut state = GameState::new(name.to_string(), 0);
     state.attributes.set(AttributeType::Strength, 50);
     state.attributes.set(AttributeType::Intelligence, 50);
-    let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+    let derived =
+        DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
     state.combat_state.update_max_hp(derived.max_hp);
     state.combat_state.player_current_hp = state.combat_state.player_max_hp;
     state

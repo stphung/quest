@@ -430,3 +430,207 @@ fn test_deserialization_with_missing_fields_uses_defaults() {
     assert_eq!(ep.level(0), 1);
     assert_eq!(ep.total_attempts, 5);
 }
+
+// =========================================================================
+// Enhancement → DerivedStats integration
+// =========================================================================
+
+#[test]
+fn test_enhancement_multiplier_affects_derived_stats() {
+    use quest::character::attributes::Attributes;
+    use quest::character::derived_stats::DerivedStats;
+    use quest::items::{AttributeBonuses, Equipment, EquipmentSlot, Item, Rarity};
+
+    let attrs = Attributes::new();
+    let mut equipment = Equipment::new();
+
+    // Create a weapon with +4 STR
+    let weapon = Item {
+        slot: EquipmentSlot::Weapon,
+        rarity: Rarity::Common,
+        ilvl: 10,
+        base_name: "Sword".to_string(),
+        display_name: "Iron Sword".to_string(),
+        attributes: AttributeBonuses {
+            str: 4,
+            dex: 0,
+            con: 0,
+            int: 0,
+            wis: 0,
+            cha: 0,
+        },
+        affixes: vec![],
+    };
+    equipment.set(EquipmentSlot::Weapon, Some(weapon));
+
+    // Without enhancement
+    let stats_base = DerivedStats::calculate_derived_stats(&attrs, &equipment, &[0; 7]);
+
+    // With weapon at +10 (1.50x multiplier)
+    let mut levels = [0u8; 7];
+    levels[0] = 10; // Weapon slot
+    let stats_max = DerivedStats::calculate_derived_stats(&attrs, &equipment, &levels);
+
+    // With +10: str contribution = floor(4 * 1.50) = 6, total str = 16, mod = +3
+    // phys_dmg = 5 + 3*2 = 11
+    // Without: str contribution = 4, total str = 14, mod = +2
+    // phys_dmg = 5 + 2*2 = 9
+    assert!(
+        stats_max.physical_damage > stats_base.physical_damage,
+        "Enhancement at +10 should increase physical damage: {} vs {}",
+        stats_max.physical_damage,
+        stats_base.physical_damage
+    );
+}
+
+#[test]
+fn test_enhancement_multiplier_affects_affixes() {
+    use quest::character::attributes::Attributes;
+    use quest::character::derived_stats::DerivedStats;
+    use quest::items::{
+        Affix, AffixType, AttributeBonuses, Equipment, EquipmentSlot, Item, Rarity,
+    };
+
+    let attrs = Attributes::new();
+    let mut equipment = Equipment::new();
+
+    let weapon = Item {
+        slot: EquipmentSlot::Weapon,
+        rarity: Rarity::Rare,
+        ilvl: 10,
+        base_name: "Sword".to_string(),
+        display_name: "Epic Sword".to_string(),
+        attributes: AttributeBonuses::new(),
+        affixes: vec![Affix {
+            affix_type: AffixType::CritChance,
+            value: 10.0,
+        }],
+    };
+    equipment.set(EquipmentSlot::Weapon, Some(weapon));
+
+    let stats_base = DerivedStats::calculate_derived_stats(&attrs, &equipment, &[0; 7]);
+
+    let mut levels = [0u8; 7];
+    levels[0] = 10; // +10 weapon (1.50x)
+    let stats_enhanced = DerivedStats::calculate_derived_stats(&attrs, &equipment, &levels);
+
+    // Base crit: 5% base + 10.0 crit affix = 15
+    // Enhanced crit: 5% base + 10.0*1.5 = 15.0 crit affix = 20
+    assert!(
+        stats_enhanced.crit_chance_percent > stats_base.crit_chance_percent,
+        "Enhanced weapon should increase crit chance from affix: {} vs {}",
+        stats_enhanced.crit_chance_percent,
+        stats_base.crit_chance_percent
+    );
+}
+
+#[test]
+fn test_enhancement_zero_levels_no_change() {
+    use quest::character::attributes::Attributes;
+    use quest::character::derived_stats::DerivedStats;
+    use quest::items::{AttributeBonuses, Equipment, EquipmentSlot, Item, Rarity};
+
+    let attrs = Attributes::new();
+    let mut equipment = Equipment::new();
+
+    let weapon = Item {
+        slot: EquipmentSlot::Weapon,
+        rarity: Rarity::Common,
+        ilvl: 10,
+        base_name: "Sword".to_string(),
+        display_name: "Iron Sword".to_string(),
+        attributes: AttributeBonuses {
+            str: 5,
+            dex: 0,
+            con: 0,
+            int: 0,
+            wis: 0,
+            cha: 0,
+        },
+        affixes: vec![],
+    };
+    equipment.set(EquipmentSlot::Weapon, Some(weapon));
+
+    // With [0;7] enhancement levels, multiplier is 1.0 -- no change
+    let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment, &[0; 7]);
+
+    // STR: 10 + floor(5 * 1.0) = 15, mod = +2, phys_dmg = 5 + 2*2 = 9
+    assert_eq!(stats.physical_damage, 9);
+}
+
+#[test]
+fn test_enhancement_per_slot_independence() {
+    use quest::character::attributes::Attributes;
+    use quest::character::derived_stats::DerivedStats;
+    use quest::items::{AttributeBonuses, Equipment, EquipmentSlot, Item, Rarity};
+
+    let attrs = Attributes::new();
+    let mut equipment = Equipment::new();
+
+    // Weapon with +4 STR
+    let weapon = Item {
+        slot: EquipmentSlot::Weapon,
+        rarity: Rarity::Common,
+        ilvl: 10,
+        base_name: "Sword".to_string(),
+        display_name: "Sword".to_string(),
+        attributes: AttributeBonuses {
+            str: 4,
+            dex: 0,
+            con: 0,
+            int: 0,
+            wis: 0,
+            cha: 0,
+        },
+        affixes: vec![],
+    };
+    // Armor with +4 CON
+    let armor = Item {
+        slot: EquipmentSlot::Armor,
+        rarity: Rarity::Common,
+        ilvl: 10,
+        base_name: "Armor".to_string(),
+        display_name: "Armor".to_string(),
+        attributes: AttributeBonuses {
+            str: 0,
+            dex: 0,
+            con: 4,
+            int: 0,
+            wis: 0,
+            cha: 0,
+        },
+        affixes: vec![],
+    };
+    equipment.set(EquipmentSlot::Weapon, Some(weapon));
+    equipment.set(EquipmentSlot::Armor, Some(armor));
+
+    // Enhance only weapon to +10
+    let levels_weapon = [10, 0, 0, 0, 0, 0, 0];
+    let stats_weapon = DerivedStats::calculate_derived_stats(&attrs, &equipment, &levels_weapon);
+
+    // Enhance only armor to +10
+    let levels_armor = [0, 10, 0, 0, 0, 0, 0];
+    let stats_armor = DerivedStats::calculate_derived_stats(&attrs, &equipment, &levels_armor);
+
+    // Weapon enhancement should increase physical_damage but not max_hp (beyond base)
+    // Armor enhancement should increase max_hp but not physical_damage (beyond base)
+    let base_stats = DerivedStats::calculate_derived_stats(&attrs, &equipment, &[0; 7]);
+
+    assert!(
+        stats_weapon.physical_damage > base_stats.physical_damage,
+        "Weapon enhancement should increase phys damage"
+    );
+    assert_eq!(
+        stats_weapon.max_hp, base_stats.max_hp,
+        "Weapon enhancement should not affect HP"
+    );
+
+    assert!(
+        stats_armor.max_hp > base_stats.max_hp,
+        "Armor enhancement should increase HP"
+    );
+    assert_eq!(
+        stats_armor.physical_damage, base_stats.physical_damage,
+        "Armor enhancement should not affect phys damage"
+    );
+}

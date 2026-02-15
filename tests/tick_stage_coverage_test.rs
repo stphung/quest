@@ -26,7 +26,8 @@ fn create_strong_character(name: &str) -> GameState {
     state.attributes.set(AttributeType::Strength, 50);
     state.attributes.set(AttributeType::Intelligence, 50);
     state.attributes.set(AttributeType::Constitution, 30);
-    let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+    let derived =
+        DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
     state.combat_state.update_max_hp(derived.max_hp);
     state.combat_state.player_current_hp = state.combat_state.player_max_hp;
     state
@@ -1363,7 +1364,8 @@ fn test_prestige_flat_hp_applied_in_tick() {
     let mut rng = test_rng();
 
     // Get base max HP without prestige bonuses
-    let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+    let derived =
+        DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
     let base_max_hp = derived.max_hp;
 
     // Run one tick to apply prestige bonuses

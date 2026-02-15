@@ -41,7 +41,7 @@ fn strong_state() -> GameState {
     let mut s = fresh_state();
     s.attributes.set(AttributeType::Strength, 50);
     s.attributes.set(AttributeType::Intelligence, 50);
-    let d = DerivedStats::calculate_derived_stats(&s.attributes, &s.equipment);
+    let d = DerivedStats::calculate_derived_stats(&s.attributes, &s.equipment, &[0; 7]);
     s.combat_state.update_max_hp(d.max_hp);
     s.combat_state.player_current_hp = s.combat_state.player_max_hp;
     s

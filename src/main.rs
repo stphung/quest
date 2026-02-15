@@ -627,6 +627,7 @@ fn main() -> io::Result<()> {
                                         let derived = character::derived_stats::DerivedStats::calculate_derived_stats(
                                             &state.attributes,
                                             &state.equipment,
+                                            &enhancement.levels,
                                         );
                                         if let Some(enemy) = &state.combat_state.current_enemy {
                                             // Max possible enemy HP is 2.4x player HP (boss with max variance)

@@ -301,7 +301,8 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
     state.prestige_rank = config.prestige;
 
     // Recalculate derived stats after setting prestige to get correct HP/damage
-    let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+    let derived =
+        DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
     state.combat_state.player_max_hp = derived.max_hp;
     state.combat_state.player_current_hp = derived.max_hp;
 

@@ -82,9 +82,18 @@ impl Attributes {
     }
 
     /// Adds another Attributes' values to this one (for equipment bonuses).
+    #[allow(dead_code)]
     pub fn add(&mut self, other: &Attributes) {
         for attr in AttributeType::all() {
             self.values[attr.index()] += other.get(attr);
+        }
+    }
+
+    /// Add another attributes' values scaled by a multiplier.
+    /// Used by the enhancement system to scale item attribute contributions.
+    pub fn add_scaled(&mut self, other: &Attributes, multiplier: f64) {
+        for attr in AttributeType::all() {
+            self.values[attr.index()] += (other.get(attr) as f64 * multiplier).round() as u32;
         }
     }
 

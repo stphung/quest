@@ -58,7 +58,8 @@ fn simulate_combat_tick(
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
 
     // Sync max HP (game_tick line 1051-1055)
-    let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+    let derived =
+        DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
     state.combat_state.update_max_hp(derived.max_hp);
 
     // Spawn enemy if needed (game_tick line 1526)
@@ -115,7 +116,8 @@ fn create_strong_character(name: &str) -> GameState {
     let mut state = GameState::new(name.to_string(), 0);
     state.attributes.set(AttributeType::Strength, 50);
     state.attributes.set(AttributeType::Intelligence, 50);
-    let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+    let derived =
+        DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
     state.combat_state.update_max_hp(derived.max_hp);
     state.combat_state.player_current_hp = state.combat_state.player_max_hp;
     state
@@ -872,7 +874,8 @@ fn test_haven_combat_bonuses_passed_to_update_combat() {
     };
 
     // Sync derived stats
-    let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+    let derived =
+        DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
     state.combat_state.update_max_hp(derived.max_hp);
 
     // Spawn an enemy
@@ -1001,7 +1004,8 @@ fn test_max_hp_synced_every_tick() {
     let old_max_hp = state.combat_state.player_max_hp;
 
     // game_tick recalculates derived stats every tick (line 1051-1055)
-    let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+    let derived =
+        DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
     state.combat_state.update_max_hp(derived.max_hp);
 
     assert!(
