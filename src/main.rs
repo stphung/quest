@@ -1020,6 +1020,14 @@ fn main() -> io::Result<()> {
                             {
                                 challenges::snake::logic::tick_snake(game, dt.as_millis() as u64);
                             }
+                            if let Some(challenges::ActiveMinigame::RunicShift(ref mut game)) =
+                                state.active_minigame
+                            {
+                                challenges::runic_shift::logic::tick_runic_shift(
+                                    game,
+                                    dt.as_millis() as u64,
+                                );
+                            }
                             if let Some(challenges::ActiveMinigame::Jezzball(ref mut game)) =
                                 state.active_minigame
                             {
@@ -1266,5 +1274,6 @@ fn is_realtime_minigame(state: &GameState) -> bool {
         Some(challenges::ActiveMinigame::FlappyBird(_))
             | Some(challenges::ActiveMinigame::Jezzball(_))
             | Some(challenges::ActiveMinigame::Snake(_))
+            | Some(challenges::ActiveMinigame::RunicShift(_))
     )
 }

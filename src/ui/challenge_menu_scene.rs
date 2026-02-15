@@ -9,6 +9,7 @@ use crate::challenges::menu::{ChallengeMenu, ChallengeType, DifficultyInfo};
 use crate::challenges::minesweeper::MinesweeperDifficulty;
 use crate::challenges::morris::MorrisDifficulty;
 use crate::challenges::rune::RuneDifficulty;
+use crate::challenges::runic_shift::RunicShiftDifficulty;
 use crate::challenges::snake::SnakeDifficulty;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -192,6 +193,14 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
                 frame,
                 chunks[2],
                 &FlappyBirdDifficulty::ALL,
+                menu.selected_difficulty,
+            );
+        }
+        ChallengeType::RunicShift => {
+            render_difficulty_selector(
+                frame,
+                chunks[2],
+                &RunicShiftDifficulty::ALL,
                 menu.selected_difficulty,
             );
         }

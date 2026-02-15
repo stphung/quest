@@ -30,6 +30,10 @@ use crate::challenges::morris::logic::{
 use crate::challenges::rune::logic::{
     apply_game_result as apply_rune_result, process_input as process_rune_input, RuneInput,
 };
+use crate::challenges::runic_shift::logic::{
+    apply_game_result as apply_runic_shift_result, process_input as process_runic_shift_input,
+    RunicShiftInput,
+};
 use crate::challenges::snake::logic::{
     apply_game_result as apply_snake_result, process_input as process_snake_input, SnakeInput,
 };
@@ -729,6 +733,23 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
                     _ => SnakeInput::Other,
                 };
                 process_snake_input(snake_game, input);
+            }
+            ActiveMinigame::RunicShift(runic_shift_game) => {
+                if runic_shift_game.game_result.is_some() {
+                    state.last_minigame_win = apply_runic_shift_result(state);
+                    return InputResult::Continue;
+                }
+                let input = match key.code {
+                    KeyCode::Up => RunicShiftInput::Up,
+                    KeyCode::Down => RunicShiftInput::Down,
+                    KeyCode::Left => RunicShiftInput::Left,
+                    KeyCode::Right => RunicShiftInput::Right,
+                    KeyCode::Char(' ') => RunicShiftInput::Swap,
+                    KeyCode::Char('r') | KeyCode::Char('R') => RunicShiftInput::ManualRise,
+                    KeyCode::Esc => RunicShiftInput::Forfeit,
+                    _ => RunicShiftInput::Other,
+                };
+                process_runic_shift_input(runic_shift_game, input);
             }
         }
     }

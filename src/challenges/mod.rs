@@ -1,4 +1,4 @@
-//! Challenge minigames: Chess, Gomoku, Minesweeper, Morris, Rune, Go, JezzBall.
+//! Challenge minigames: Chess, Gomoku, Minesweeper, Morris, Rune, Runic Shift, Go, JezzBall.
 
 #![allow(unused_imports)]
 
@@ -39,6 +39,7 @@ pub mod menu;
 pub mod minesweeper;
 pub mod morris;
 pub mod rune;
+pub mod runic_shift;
 pub mod snake;
 
 pub use chess::{ChessDifficulty, ChessGame, ChessResult};
@@ -55,6 +56,11 @@ pub use morris::{
     MorrisDifficulty, MorrisGame, MorrisPhase, MorrisResult, Player as MorrisPlayer, ADJACENCIES,
 };
 pub use rune::{FeedbackMark, RuneDifficulty, RuneGame, RuneResult, RUNE_SYMBOLS};
+pub use runic_shift::{
+    Block as RunicShiftBlock, BlockState as RunicShiftBlockState, RuneColor, RunicShiftDifficulty,
+    RunicShiftGame, RunicShiftResult, GRID_COLS as RUNIC_SHIFT_GRID_COLS,
+    GRID_ROWS as RUNIC_SHIFT_GRID_ROWS,
+};
 pub use snake::{SnakeDifficulty, SnakeGame, SnakeResult};
 
 /// A currently active challenge minigame. Only one can be active at a time.
@@ -66,6 +72,7 @@ pub enum ActiveMinigame {
     Gomoku(GomokuGame),
     Minesweeper(MinesweeperGame),
     Rune(RuneGame),
+    RunicShift(RunicShiftGame),
     Go(GoGame),
     Jezzball(JezzballGame),
     Snake(SnakeGame),

@@ -24,6 +24,7 @@ pub mod morris_scene;
 pub mod prestige_confirm;
 pub mod responsive;
 pub mod rune_scene;
+pub mod runic_shift_scene;
 mod scene_fx;
 pub mod snake_scene;
 pub mod soulforge_scene;
@@ -486,6 +487,9 @@ fn draw_right_content(frame: &mut Frame, area: Rect, game_state: &GameState, ctx
         }
         Some(ActiveMinigame::Snake(game)) => {
             snake_scene::render_snake_scene(frame, area, game, ctx);
+        }
+        Some(ActiveMinigame::RunicShift(game)) => {
+            runic_shift_scene::render_runic_shift_scene(frame, area, game, ctx);
         }
         None => {
             if game_state.challenge_menu.is_open {
