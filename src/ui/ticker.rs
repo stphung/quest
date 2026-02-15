@@ -1,7 +1,8 @@
 //! Scrolling loot ticker renderer.
 //!
 //! Renders a 1-row horizontal ticker by computing a visible window
-//! into a virtual string built from concatenated TickerEntry spans.
+//! into a virtual character array built from concatenated TickerEntry spans.
+//! Uses char-based indexing to avoid multi-byte UTF-8 slicing panics.
 
 use crate::core::game_state::LootTicker;
 use ratatui::{
@@ -14,6 +15,12 @@ use ratatui::{
 
 /// Separator between ticker entries.
 const SEPARATOR: &str = " \u{00B7}\u{00B7}\u{00B7} ";
+
+/// A character with its associated style for the virtual ticker content.
+struct StyledChar {
+    ch: char,
+    style: Style,
+}
 
 /// Renders the scrolling loot ticker into a 1-row area.
 pub fn draw_ticker(frame: &mut Frame, area: Rect, ticker: &LootTicker) {
@@ -30,43 +37,49 @@ pub fn draw_ticker(frame: &mut Frame, area: Rect, ticker: &LootTicker) {
         return;
     }
 
-    // Build the virtual ticker content as a list of (text, style) segments.
-    // We iterate entries oldest-to-newest (back to front) so the ticker
-    // reads chronologically from left to right.
-    let segments = build_segments(ticker);
-
-    // Calculate total virtual width
-    let total_width: usize = segments.iter().map(|(text, _)| text.len()).sum();
-    if total_width == 0 {
+    let chars = build_chars(ticker);
+    if chars.is_empty() {
         return;
     }
 
     let visible_width = area.width as usize;
+    let offset = (ticker.scroll_offset as usize) % chars.len();
 
-    // Wrap the scroll offset within total_width for seamless looping
-    let offset = (ticker.scroll_offset as usize) % total_width;
-
-    // Extract the visible slice, handling wrap-around
-    let spans = extract_visible_spans(&segments, offset, visible_width, total_width);
-
+    let spans = extract_visible_spans(&chars, offset, visible_width);
     let line = Line::from(spans);
     frame.render_widget(Paragraph::new(line), area);
 }
 
-/// Builds a flat list of (text, style) segments from ticker entries.
+/// Builds a flat list of styled characters from ticker entries.
 /// Entries are iterated back-to-front (oldest first) for left-to-right chronology.
-fn build_segments(ticker: &LootTicker) -> Vec<(String, Style)> {
-    let mut segments = Vec::new();
+fn build_chars(ticker: &LootTicker) -> Vec<StyledChar> {
+    let mut chars = Vec::new();
     let sep_style = Style::default().fg(Color::DarkGray);
 
     for (i, entry) in ticker.entries.iter().rev().enumerate() {
+        // Add separator between entries
         if i > 0 {
-            segments.push((SEPARATOR.to_string(), sep_style));
+            for ch in SEPARATOR.chars() {
+                chars.push(StyledChar {
+                    ch,
+                    style: sep_style,
+                });
+            }
         }
 
         // Icon + space
         if !entry.icon.is_empty() {
-            segments.push((format!("{} ", entry.icon), Style::default().fg(entry.color)));
+            let icon_style = Style::default().fg(entry.color);
+            for ch in entry.icon.chars() {
+                chars.push(StyledChar {
+                    ch,
+                    style: icon_style,
+                });
+            }
+            chars.push(StyledChar {
+                ch: ' ',
+                style: icon_style,
+            });
         }
 
         // Main text
@@ -74,70 +87,66 @@ fn build_segments(ticker: &LootTicker) -> Vec<(String, Style)> {
         if entry.bold {
             style = style.add_modifier(Modifier::BOLD);
         }
-        segments.push((entry.text.clone(), style));
+        for ch in entry.text.chars() {
+            chars.push(StyledChar { ch, style });
+        }
     }
 
-    // Add trailing separator for seamless loop
-    if !segments.is_empty() {
-        segments.push((SEPARATOR.to_string(), sep_style));
+    // Trailing separator for seamless loop
+    if !chars.is_empty() {
+        for ch in SEPARATOR.chars() {
+            chars.push(StyledChar {
+                ch,
+                style: sep_style,
+            });
+        }
     }
 
-    segments
+    chars
 }
 
-/// Extracts visible Span slice from segments at the given offset.
-/// Handles wrap-around when offset + visible_width > total_width.
+/// Extracts visible Spans from the char array at the given offset.
+/// Handles wrap-around by indexing modulo total_len.
 fn extract_visible_spans(
-    segments: &[(String, Style)],
+    chars: &[StyledChar],
     offset: usize,
     visible_width: usize,
-    total_width: usize,
 ) -> Vec<Span<'static>> {
-    let mut spans = Vec::new();
-    let mut chars_emitted = 0;
+    if chars.is_empty() {
+        return Vec::new();
+    }
 
-    // We may need to traverse the segments twice for wrap-around
-    let mut global_pos = 0;
+    let total_len = chars.len();
+    let mut spans: Vec<Span<'static>> = Vec::new();
+    let mut current_text = String::new();
+    let mut current_style: Option<Style> = None;
 
-    // Find starting segment and offset within it
-    for pass in 0..2 {
-        for (text, style) in segments {
-            let seg_len = text.len();
-            let seg_start = global_pos;
-            let seg_end = seg_start + seg_len;
+    for i in 0..visible_width {
+        let idx = (offset + i) % total_len;
+        let sc = &chars[idx];
 
-            global_pos = seg_end;
-
-            // Current position in the virtual (possibly wrapped) space
-            let effective_start = seg_start + pass * total_width;
-            let effective_end = seg_end + pass * total_width;
-
-            let window_start = offset;
-            let window_end = offset + visible_width;
-
-            // Check if this segment overlaps with the visible window
-            if effective_end <= window_start || effective_start >= window_end {
-                continue;
+        match current_style {
+            Some(s) if s == sc.style => {
+                current_text.push(sc.ch);
             }
-
-            // Calculate the slice of this segment that's visible
-            let slice_start = window_start.saturating_sub(effective_start);
-            let remaining = visible_width - chars_emitted;
-            let slice_end = (seg_len).min(slice_start + remaining);
-
-            if slice_start < slice_end {
-                let visible_text = &text[slice_start..slice_end];
-                spans.push(Span::styled(visible_text.to_string(), *style));
-                chars_emitted += slice_end - slice_start;
-            }
-
-            if chars_emitted >= visible_width {
-                return spans;
+            _ => {
+                // Flush previous span
+                if let Some(s) = current_style {
+                    if !current_text.is_empty() {
+                        spans.push(Span::styled(std::mem::take(&mut current_text), s));
+                    }
+                }
+                current_text.push(sc.ch);
+                current_style = Some(sc.style);
             }
         }
+    }
 
-        // Reset for second pass (wrap-around)
-        global_pos = 0;
+    // Flush final span
+    if let Some(s) = current_style {
+        if !current_text.is_empty() {
+            spans.push(Span::styled(current_text, s));
+        }
     }
 
     spans
@@ -162,62 +171,125 @@ mod tests {
     }
 
     #[test]
-    fn test_build_segments_empty() {
+    fn test_build_chars_empty() {
         let ticker = LootTicker::new();
-        let segments = build_segments(&ticker);
-        assert!(segments.is_empty());
+        let chars = build_chars(&ticker);
+        assert!(chars.is_empty());
     }
 
     #[test]
-    fn test_build_segments_single_entry() {
-        let ticker = make_ticker(vec![("\u{2694}", "[R] Sword", Color::Yellow)]);
-        let segments = build_segments(&ticker);
-        // Should have: icon+space, text, trailing separator
-        assert_eq!(segments.len(), 3);
-        assert_eq!(segments[0].0, "\u{2694} ");
-        assert_eq!(segments[1].0, "[R] Sword");
-        assert_eq!(segments[2].0, SEPARATOR);
+    fn test_build_chars_single_entry_no_icon() {
+        let mut ticker = LootTicker::new();
+        ticker.push(TickerEntry {
+            icon: "",
+            text: "Hello".to_string(),
+            color: Color::White,
+            bold: false,
+        });
+        let chars = build_chars(&ticker);
+        // "Hello" + trailing separator " ··· "
+        let text: String = chars.iter().map(|sc| sc.ch).collect();
+        assert!(text.starts_with("Hello"));
+        assert!(text.ends_with(' ')); // trailing separator ends with space
     }
 
     #[test]
-    fn test_build_segments_multiple_entries() {
+    fn test_build_chars_with_icon() {
+        let ticker = make_ticker(vec![("\u{2694}", "Sword", Color::Yellow)]);
+        let chars = build_chars(&ticker);
+        let text: String = chars.iter().map(|sc| sc.ch).collect();
+        // Should contain: icon + space + text + trailing separator
+        assert!(text.starts_with("\u{2694} Sword"));
+    }
+
+    #[test]
+    fn test_build_chars_multiple_entries_have_separators() {
         let ticker = make_ticker(vec![
-            ("\u{2694}", "[R] Sword", Color::Yellow),
-            ("\u{1F41F}", "Trout [C]", Color::Gray),
+            ("", "First", Color::White),
+            ("", "Second", Color::White),
         ]);
-        let segments = build_segments(&ticker);
-        // icon, text, sep, icon, text, trailing_sep
-        assert_eq!(segments.len(), 6);
+        let chars = build_chars(&ticker);
+        let text: String = chars.iter().map(|sc| sc.ch).collect();
+        // Should contain both entries with separator between them
+        assert!(text.contains("First"));
+        assert!(text.contains("Second"));
+        assert!(text.contains("\u{00B7}\u{00B7}\u{00B7}"));
     }
 
     #[test]
     fn test_extract_visible_at_zero() {
-        let segments = vec![
-            ("Hello".to_string(), Style::default()),
-            (" World".to_string(), Style::default()),
-        ];
-        let spans = extract_visible_spans(&segments, 0, 5, 11);
+        let chars: Vec<StyledChar> = "Hello World"
+            .chars()
+            .map(|ch| StyledChar {
+                ch,
+                style: Style::default(),
+            })
+            .collect();
+        let spans = extract_visible_spans(&chars, 0, 5);
         let text: String = spans.iter().map(|s| s.content.as_ref()).collect();
         assert_eq!(text, "Hello");
     }
 
     #[test]
     fn test_extract_visible_with_offset() {
-        let segments = vec![
-            ("Hello".to_string(), Style::default()),
-            (" World".to_string(), Style::default()),
-        ];
-        let spans = extract_visible_spans(&segments, 5, 6, 11);
+        let chars: Vec<StyledChar> = "Hello World"
+            .chars()
+            .map(|ch| StyledChar {
+                ch,
+                style: Style::default(),
+            })
+            .collect();
+        let spans = extract_visible_spans(&chars, 6, 5);
         let text: String = spans.iter().map(|s| s.content.as_ref()).collect();
-        assert_eq!(text, " World");
+        assert_eq!(text, "World");
     }
 
     #[test]
     fn test_extract_visible_wraps_around() {
-        let segments = vec![("ABCDE".to_string(), Style::default())];
-        // Offset 3, width 4, total 5 -> should get "DE" + "AB"
-        let spans = extract_visible_spans(&segments, 3, 4, 5);
+        let chars: Vec<StyledChar> = "ABCDE"
+            .chars()
+            .map(|ch| StyledChar {
+                ch,
+                style: Style::default(),
+            })
+            .collect();
+        // Offset 3, width 4 -> "DE" + "AB"
+        let spans = extract_visible_spans(&chars, 3, 4);
         let text: String = spans.iter().map(|s| s.content.as_ref()).collect();
         assert_eq!(text, "DEAB");
+    }
+
+    #[test]
+    fn test_extract_visible_with_multibyte_chars() {
+        // This is the critical test - verify no panic with multi-byte chars
+        let chars: Vec<StyledChar> = "\u{2694} Sword \u{00B7}\u{00B7}\u{00B7} \u{1F41F} Fish"
+            .chars()
+            .map(|ch| StyledChar {
+                ch,
+                style: Style::default(),
+            })
+            .collect();
+        // Try various offsets to ensure no panics
+        for offset in 0..chars.len() {
+            let _ = extract_visible_spans(&chars, offset, 10);
+        }
+    }
+
+    #[test]
+    fn test_extract_visible_groups_same_style() {
+        let mut chars = Vec::new();
+        let style_a = Style::default().fg(Color::Red);
+        let style_b = Style::default().fg(Color::Blue);
+        for ch in "AAA".chars() {
+            chars.push(StyledChar { ch, style: style_a });
+        }
+        for ch in "BBB".chars() {
+            chars.push(StyledChar { ch, style: style_b });
+        }
+        let spans = extract_visible_spans(&chars, 0, 6);
+        // Should produce exactly 2 spans (one red, one blue), not 6
+        assert_eq!(spans.len(), 2);
+        assert_eq!(spans[0].content.as_ref(), "AAA");
+        assert_eq!(spans[1].content.as_ref(), "BBB");
     }
 }

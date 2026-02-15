@@ -8,6 +8,7 @@ use crate::core::game_state::{GameState, TickerEntry};
 use crate::core::tick::TickEvent;
 use crate::items::types::Rarity;
 use crate::ui::combat_effects::{EffectType, VisualEffect};
+use crate::zones::BossDefeatResult;
 use ratatui::style::Color;
 
 /// Flags returned from apply_tick_events indicating which discovery overlays to show.
@@ -103,10 +104,62 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     bold: matches!(rarity, Rarity::Epic | Rarity::Legendary),
                 });
             }
-            TickEvent::SubzoneBossDefeated { message, .. } => {
+            TickEvent::SubzoneBossDefeated {
+                message, result, ..
+            } => {
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
+                // Push zone advancement to ticker
+                match result {
+                    BossDefeatResult::SubzoneComplete { .. } => {
+                        game_state.loot_ticker.push(TickerEntry {
+                            icon: "\u{1F5FA}",
+                            text: "New Area!".to_string(),
+                            color: Color::Cyan,
+                            bold: false,
+                        });
+                    }
+                    BossDefeatResult::ZoneComplete {
+                        old_zone: _,
+                        new_zone_id,
+                    } => {
+                        let zone_name = crate::zones::get_zone(*new_zone_id)
+                            .map(|z| z.name)
+                            .unwrap_or("???");
+                        game_state.loot_ticker.push(TickerEntry {
+                            icon: "\u{1F5FA}",
+                            text: format!("Zone: {}!", zone_name),
+                            color: Color::Cyan,
+                            bold: true,
+                        });
+                    }
+                    BossDefeatResult::ZoneCompleteButGated { zone_name, .. } => {
+                        game_state.loot_ticker.push(TickerEntry {
+                            icon: "\u{1F5FA}",
+                            text: format!("{} Conquered!", zone_name),
+                            color: Color::Cyan,
+                            bold: true,
+                        });
+                    }
+                    BossDefeatResult::StormsEnd => {
+                        game_state.loot_ticker.push(TickerEntry {
+                            icon: "\u{1F5FA}",
+                            text: "All Zones Conquered!".to_string(),
+                            color: Color::Yellow,
+                            bold: true,
+                        });
+                    }
+                    BossDefeatResult::ExpanseCycle => {
+                        game_state.loot_ticker.push(TickerEntry {
+                            icon: "\u{1F5FA}",
+                            text: "Expanse Cycles!".to_string(),
+                            color: Color::Cyan,
+                            bold: false,
+                        });
+                    }
+                    _ => {} // WeaponRequired doesn't go to ticker
+                }
             }
             TickEvent::DungeonRoomEntered { message, .. }
             | TickEvent::DungeonTreasureFound { message, .. }
@@ -177,6 +230,12 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 game_state
                     .combat_state
                     .add_log_entry(follow_up.clone(), false, true);
+                game_state.loot_ticker.push(TickerEntry {
+                    icon: "\u{1F3B2}",
+                    text: "New Challenge!".to_string(),
+                    color: Color::Yellow,
+                    bold: true,
+                });
             }
             TickEvent::DungeonDiscovered { message } => {
                 game_state
