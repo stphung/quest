@@ -312,7 +312,7 @@ fn test_attempt_enhancement_failure_penalty_minus_2() {
             return;
         }
     }
-    panic!("Could not find a seed that fails at +8 within 1000 attempts");
+    panic!("Could not find a seed that fails at +10 within 1000 attempts");
 }
 
 #[test]
@@ -484,10 +484,8 @@ fn test_enhancement_multiplier_affects_derived_stats() {
     levels[0] = 10; // Weapon slot
     let stats_max = DerivedStats::calculate_derived_stats(&attrs, &equipment, &levels);
 
-    // With +10: str contribution = floor(4 * 1.50) = 6, total str = 16, mod = +3
-    // phys_dmg = 5 + 3*2 = 11
-    // Without: str contribution = 4, total str = 14, mod = +2
-    // phys_dmg = 5 + 2*2 = 9
+    // With +10 (2.50x multiplier): str contribution = round(4 * 2.50) = 10, total str = 20, mod = +5
+    // Without enhancement (1.0x): str contribution = 4, total str = 14, mod = +2
     assert!(
         stats_max.physical_damage > stats_base.physical_damage,
         "Enhancement at +10 should increase physical damage: {} vs {}",
@@ -740,4 +738,489 @@ fn test_full_enhancement_flow() {
     assert_eq!(enhancement.total_successes, 4);
     assert_eq!(enhancement.total_failures, 0);
     assert_eq!(enhancement.highest_level_reached, 4);
+}
+
+// =========================================================================
+// Persistence tests (without file I/O)
+// =========================================================================
+
+#[test]
+fn test_enhancement_save_path_returns_expected() {
+    use quest::enhancement::enhancement_save_path;
+
+    let path = enhancement_save_path().expect("Should return a valid path");
+    let path_str = path.to_str().expect("Path should be valid UTF-8");
+
+    // Verify the path ends with .quest/enhancement.json
+    assert!(
+        path_str.ends_with(".quest/enhancement.json"),
+        "Path should end with .quest/enhancement.json, got: {}",
+        path_str
+    );
+}
+
+#[test]
+fn test_save_path_is_absolute() {
+    use quest::enhancement::enhancement_save_path;
+
+    let path = enhancement_save_path().expect("Should return a valid path");
+    assert!(
+        path.is_absolute(),
+        "Enhancement save path should be absolute, got: {:?}",
+        path
+    );
+}
+
+#[test]
+fn test_corrupt_json_deserializes_to_default() {
+    // Test the pattern used in load_enhancement: unwrap_or_default()
+    let corrupt_json = "not valid json at all";
+    let result: EnhancementProgress = serde_json::from_str(corrupt_json).unwrap_or_default();
+
+    // Should fall back to default values
+    assert!(!result.discovered);
+    assert_eq!(result.levels, [0; 7]);
+    assert_eq!(result.total_attempts, 0);
+    assert_eq!(result.total_successes, 0);
+    assert_eq!(result.total_failures, 0);
+    assert_eq!(result.highest_level_reached, 0);
+}
+
+#[test]
+fn test_empty_json_object_fails_without_required_fields() {
+    // Test serde behavior with empty JSON object
+    // Without #[serde(default)] annotations, all fields are required
+    let empty_json = "{}";
+    let result: Result<EnhancementProgress, _> = serde_json::from_str(empty_json);
+
+    // Should fail because required fields are missing
+    assert!(
+        result.is_err(),
+        "Empty JSON should fail without all required fields"
+    );
+}
+
+#[test]
+fn test_partial_json_fails_without_all_fields() {
+    // Test JSON with only some fields
+    // Without #[serde(default)] annotations, all fields are required
+    let partial_json = r#"{"discovered":true,"levels":[3,2,1,0,0,0,0]}"#;
+    let result: Result<EnhancementProgress, _> = serde_json::from_str(partial_json);
+
+    // Should fail because not all required fields are present
+    assert!(
+        result.is_err(),
+        "Partial JSON should fail without all required fields"
+    );
+}
+
+#[test]
+fn test_extra_fields_in_json_ignored() {
+    // Test forward compatibility: JSON with unknown extra fields should be ignored
+    let json_with_extras = r#"{
+        "discovered":true,
+        "levels":[5,0,0,0,0,0,0],
+        "total_attempts":10,
+        "total_successes":8,
+        "total_failures":2,
+        "highest_level_reached":5,
+        "future_field_1":"ignored",
+        "future_field_2":999
+    }"#;
+    let result: EnhancementProgress =
+        serde_json::from_str(json_with_extras).expect("Should deserialize with extra fields");
+
+    // Known fields should be preserved
+    assert!(result.discovered);
+    assert_eq!(result.levels[0], 5);
+    assert_eq!(result.total_attempts, 10);
+    assert_eq!(result.total_successes, 8);
+    assert_eq!(result.total_failures, 2);
+    assert_eq!(result.highest_level_reached, 5);
+}
+
+#[test]
+fn test_json_pretty_format() {
+    // Verify serde_json::to_string_pretty() produces valid JSON that roundtrips
+    let mut ep = EnhancementProgress::new();
+    ep.discovered = true;
+    ep.set_level(0, 7);
+    ep.total_attempts = 15;
+    ep.total_successes = 10;
+    ep.total_failures = 5;
+
+    let pretty_json = serde_json::to_string_pretty(&ep).expect("Should serialize to pretty JSON");
+
+    // Verify it's valid JSON by deserializing
+    let restored: EnhancementProgress =
+        serde_json::from_str(&pretty_json).expect("Pretty JSON should be valid");
+
+    assert_eq!(restored.discovered, ep.discovered);
+    assert_eq!(restored.levels, ep.levels);
+    assert_eq!(restored.total_attempts, ep.total_attempts);
+    assert_eq!(restored.total_successes, ep.total_successes);
+    assert_eq!(restored.total_failures, ep.total_failures);
+    assert_eq!(restored.highest_level_reached, ep.highest_level_reached);
+
+    // Verify it's actually pretty-formatted (has newlines and indentation)
+    assert!(
+        pretty_json.contains('\n'),
+        "Pretty JSON should contain newlines"
+    );
+    assert!(
+        pretty_json.contains("  "),
+        "Pretty JSON should contain indentation"
+    );
+}
+
+#[test]
+fn test_json_field_names_stable() {
+    // Verify specific JSON field names are present (important for save file compatibility)
+    let mut ep = EnhancementProgress::new();
+    ep.discovered = true;
+    ep.set_level(0, 3);
+    ep.set_level(2, 5);
+    ep.total_attempts = 20;
+    ep.total_successes = 12;
+    ep.total_failures = 8;
+
+    let json = serde_json::to_string(&ep).expect("Should serialize");
+
+    // Verify all expected field names are present
+    assert!(
+        json.contains("\"discovered\""),
+        "JSON should contain 'discovered' field"
+    );
+    assert!(
+        json.contains("\"levels\""),
+        "JSON should contain 'levels' field"
+    );
+    assert!(
+        json.contains("\"total_attempts\""),
+        "JSON should contain 'total_attempts' field"
+    );
+    assert!(
+        json.contains("\"total_successes\""),
+        "JSON should contain 'total_successes' field"
+    );
+    assert!(
+        json.contains("\"total_failures\""),
+        "JSON should contain 'total_failures' field"
+    );
+    assert!(
+        json.contains("\"highest_level_reached\""),
+        "JSON should contain 'highest_level_reached' field"
+    );
+
+    // Verify field values
+    assert!(
+        json.contains("\"discovered\":true"),
+        "discovered should be true"
+    );
+    assert!(
+        json.contains("[3,0,5,0,0,0,0]"),
+        "levels array should match"
+    );
+    assert!(
+        json.contains("\"total_attempts\":20"),
+        "total_attempts should be 20"
+    );
+    assert!(
+        json.contains("\"total_successes\":12"),
+        "total_successes should be 12"
+    );
+    assert!(
+        json.contains("\"total_failures\":8"),
+        "total_failures should be 8"
+    );
+    assert!(
+        json.contains("\"highest_level_reached\":5"),
+        "highest_level_reached should be 5"
+    );
+}
+
+// =========================================================================
+// Additional logic.rs tests
+// =========================================================================
+
+#[test]
+fn test_roll_enhancement_direct_success() {
+    // Call roll_enhancement directly at level 0 (attempting +1, 100% rate)
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    let (success, new_level) = roll_enhancement(0, &mut rng);
+    assert!(success, "Attempting +1 should always succeed");
+    assert_eq!(new_level, 1, "New level should be 1");
+}
+
+#[test]
+fn test_roll_enhancement_direct_at_max() {
+    // Call roll_enhancement at MAX_ENHANCEMENT_LEVEL
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    let (success, new_level) = roll_enhancement(MAX_ENHANCEMENT_LEVEL, &mut rng);
+    assert!(!success, "Cannot enhance beyond MAX level");
+    assert_eq!(
+        new_level, MAX_ENHANCEMENT_LEVEL,
+        "Level should remain at MAX"
+    );
+}
+
+#[test]
+fn test_roll_enhancement_fail_drops_level() {
+    // At level 4, attempting +5 (60% rate, penalty -1)
+    // We need to find a seed that fails
+    for seed in 0..1000u64 {
+        let mut rng = ChaCha8Rng::seed_from_u64(seed);
+        let (success, new_level) = roll_enhancement(4, &mut rng);
+        if !success {
+            // Failed at +5, penalty is 1, so level drops from 4 to 3
+            assert_eq!(new_level, 3, "Failed +5 should drop from 4 to 3");
+            return;
+        }
+    }
+    panic!("Could not find a seed that fails at +5 within 1000 attempts");
+}
+
+#[test]
+fn test_apply_enhancement_result_success_counters() {
+    let mut ep = EnhancementProgress::new();
+    apply_enhancement_result(&mut ep, 0, 1, true);
+
+    assert_eq!(ep.level(0), 1, "Level should be updated");
+    assert_eq!(ep.total_attempts, 1, "Attempts should increment");
+    assert_eq!(ep.total_successes, 1, "Successes should increment");
+    assert_eq!(ep.total_failures, 0, "Failures should remain 0");
+}
+
+#[test]
+fn test_apply_enhancement_result_failure_counters() {
+    let mut ep = EnhancementProgress::new();
+    ep.set_level(0, 4);
+    apply_enhancement_result(&mut ep, 0, 3, false);
+
+    assert_eq!(ep.level(0), 3, "Level should be updated to penalty value");
+    assert_eq!(ep.total_attempts, 1, "Attempts should increment");
+    assert_eq!(ep.total_successes, 0, "Successes should remain 0");
+    assert_eq!(ep.total_failures, 1, "Failures should increment");
+}
+
+#[test]
+fn test_apply_enhancement_result_out_of_bounds_slot() {
+    let mut ep = EnhancementProgress::new();
+    ep.set_level(0, 5);
+
+    // Apply to invalid slot 99
+    apply_enhancement_result(&mut ep, 99, 10, true);
+
+    // Slot 0 should remain unchanged
+    assert_eq!(ep.level(0), 5, "Valid slot should remain unchanged");
+    // Counters should still increment (result is tracked regardless of slot validity)
+    assert_eq!(ep.total_attempts, 1, "Attempts should increment");
+    assert_eq!(ep.total_successes, 1, "Successes should increment");
+}
+
+#[test]
+fn test_soulforge_discovery_chance_increases_with_rank() {
+    let chance_p15 = soulforge_discovery_chance(SOULFORGE_MIN_PRESTIGE_RANK);
+    let chance_p20 = soulforge_discovery_chance(SOULFORGE_MIN_PRESTIGE_RANK + 5);
+
+    assert!(
+        chance_p20 > chance_p15,
+        "Discovery chance should increase with prestige rank: P20={} vs P15={}",
+        chance_p20,
+        chance_p15
+    );
+}
+
+#[test]
+fn test_try_discover_soulforge_at_exactly_min_prestige() {
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    let mut ep = EnhancementProgress::new();
+    let mut discovered = false;
+
+    // At exactly P15, discovery should be possible
+    for _ in 0..1_000_000 {
+        if try_discover_soulforge(&mut ep, SOULFORGE_MIN_PRESTIGE_RANK, &mut rng) {
+            discovered = true;
+            break;
+        }
+    }
+
+    assert!(
+        discovered,
+        "Should be able to discover soulforge at exactly min prestige rank (P15)"
+    );
+    assert!(ep.discovered);
+}
+
+// =========================================================================
+// Additional types.rs tests
+// =========================================================================
+
+#[test]
+fn test_enhancement_color_rgb_all_tiers() {
+    use quest::enhancement::enhancement_color_rgb;
+
+    // Tier 0: gray (no enhancement)
+    assert_eq!(
+        enhancement_color_rgb(0),
+        (128, 128, 128),
+        "Level 0 should be gray"
+    );
+
+    // Tier 1: white (levels 1-4)
+    assert_eq!(
+        enhancement_color_rgb(1),
+        (255, 255, 255),
+        "Level 1 should be white"
+    );
+    assert_eq!(
+        enhancement_color_rgb(3),
+        (255, 255, 255),
+        "Level 3 should be white"
+    );
+
+    // Tier 2: yellow (levels 5-7)
+    assert_eq!(
+        enhancement_color_rgb(5),
+        (255, 255, 0),
+        "Level 5 should be yellow"
+    );
+    assert_eq!(
+        enhancement_color_rgb(6),
+        (255, 255, 0),
+        "Level 6 should be yellow"
+    );
+
+    // Tier 3: magenta (levels 8-9)
+    assert_eq!(
+        enhancement_color_rgb(8),
+        (255, 0, 255),
+        "Level 8 should be magenta"
+    );
+    assert_eq!(
+        enhancement_color_rgb(9),
+        (255, 0, 255),
+        "Level 9 should be magenta"
+    );
+
+    // Tier 4: gold (level 10+)
+    assert_eq!(
+        enhancement_color_rgb(10),
+        (255, 215, 0),
+        "Level 10 should be gold"
+    );
+}
+
+#[test]
+fn test_enhancement_multiplier_all_levels() {
+    // Test all 11 multiplier values from level 0 to 10
+    let expected = [
+        (0, 1.00),  // 0% bonus
+        (1, 1.05),  // +5%
+        (2, 1.10),  // +10%
+        (3, 1.15),  // +15%
+        (4, 1.20),  // +20%
+        (5, 1.30),  // +30%
+        (6, 1.40),  // +40%
+        (7, 1.55),  // +55%
+        (8, 1.75),  // +75%
+        (9, 2.00),  // +100%
+        (10, 2.50), // +150%
+    ];
+
+    for (level, expected_mult) in expected {
+        let actual = enhancement_multiplier(level);
+        assert!(
+            (actual - expected_mult).abs() < f64::EPSILON,
+            "Level {} should have multiplier {}, got {}",
+            level,
+            expected_mult,
+            actual
+        );
+    }
+}
+
+#[test]
+fn test_soulforge_ui_state_open_close() {
+    use quest::enhancement::SoulforgeUiState;
+
+    let mut ui = SoulforgeUiState::new();
+    assert!(!ui.open, "Should start closed");
+
+    // Set non-default state before opening to verify reset
+    ui.selected_slot = 3;
+    ui.animation_tick = 5;
+
+    ui.open();
+    assert!(ui.open, "Should be open after open()");
+    assert_eq!(ui.selected_slot, 0, "Should reset selected slot");
+    assert_eq!(
+        ui.phase,
+        quest::enhancement::SoulforgePhase::Menu,
+        "Should reset phase to Menu"
+    );
+    assert_eq!(ui.animation_tick, 0, "Should reset animation tick");
+    assert!(ui.last_result.is_none(), "Should clear last result");
+
+    // Set non-Menu phase before closing to verify reset
+    ui.phase = quest::enhancement::SoulforgePhase::Hammering;
+
+    ui.close();
+    assert!(!ui.open, "Should be closed after close()");
+    assert_eq!(
+        ui.phase,
+        quest::enhancement::SoulforgePhase::Menu,
+        "Should reset phase on close"
+    );
+    assert!(
+        ui.last_result.is_none(),
+        "Should clear last result on close"
+    );
+}
+
+#[test]
+fn test_soulforge_ui_state_default() {
+    use quest::enhancement::SoulforgeUiState;
+
+    let ui: SoulforgeUiState = Default::default();
+    assert!(!ui.open, "Default should be closed");
+    assert_eq!(ui.selected_slot, 0, "Default should have slot 0 selected");
+    assert!(
+        ui.last_result.is_none(),
+        "Default should have no last result"
+    );
+}
+
+#[test]
+fn test_soulforge_phase_equality() {
+    use quest::enhancement::SoulforgePhase;
+
+    // Test PartialEq for SoulforgePhase variants
+    assert_eq!(SoulforgePhase::Menu, SoulforgePhase::Menu);
+    assert_eq!(SoulforgePhase::Confirming, SoulforgePhase::Confirming);
+    assert_eq!(SoulforgePhase::Hammering, SoulforgePhase::Hammering);
+    assert_eq!(SoulforgePhase::ResultSuccess, SoulforgePhase::ResultSuccess);
+    assert_eq!(SoulforgePhase::ResultFailure, SoulforgePhase::ResultFailure);
+
+    assert_ne!(SoulforgePhase::Menu, SoulforgePhase::Confirming);
+    assert_ne!(SoulforgePhase::Hammering, SoulforgePhase::ResultSuccess);
+}
+
+#[test]
+fn test_enhancement_result_fields() {
+    use quest::enhancement::EnhancementResult;
+
+    let result = EnhancementResult {
+        slot_index: 0,
+        success: true,
+        old_level: 4,
+        new_level: 5,
+        cost: 3,
+    };
+
+    assert_eq!(result.slot_index, 0);
+    assert!(result.success);
+    assert_eq!(result.old_level, 4);
+    assert_eq!(result.new_level, 5);
+    assert_eq!(result.cost, 3);
 }
