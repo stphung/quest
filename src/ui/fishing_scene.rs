@@ -291,13 +291,7 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
             1 | 5 => Color::Rgb(188, 118, 70),
             _ => Color::Rgb(94, 58, 36),
         };
-        put_cell(
-            &mut buffer,
-            boat_row,
-            hull_start + idx as i32,
-            ch,
-            hull_fg,
-        );
+        put_cell(&mut buffer, boat_row, hull_start + idx as i32, ch, hull_fg);
     }
 
     let mast_x = boat_center;
@@ -319,7 +313,13 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
         '\\',
         Color::Rgb(255, 172, 96),
     );
-    put_cell(&mut buffer, mast_top, mast_x + 1, '>', Color::Rgb(255, 96, 72));
+    put_cell(
+        &mut buffer,
+        mast_top,
+        mast_x + 1,
+        '>',
+        Color::Rgb(255, 96, 72),
+    );
 
     // Bobber and interaction response by fishing phase.
     let (bobber_ratio, bobber_amp, bobber_sink, bobber_char, bobber_color, ripple_radius) =
