@@ -13,6 +13,130 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
     Frame,
 };
+use std::time::{SystemTime, UNIX_EPOCH};
+
+/// Per-cell render data for the fishing water scene.
+#[derive(Clone, Copy)]
+struct WaterCell {
+    ch: char,
+    fg: Color,
+    bg: Color,
+}
+
+impl Default for WaterCell {
+    fn default() -> Self {
+        Self {
+            ch: ' ',
+            fg: Color::Reset,
+            bg: Color::Reset,
+        }
+    }
+}
+
+fn lerp_channel(start: u8, end: u8, t: f64) -> u8 {
+    let t = t.clamp(0.0, 1.0);
+    (start as f64 + (end as f64 - start as f64) * t).round() as u8
+}
+
+fn lerp_rgb(start: (u8, u8, u8), end: (u8, u8, u8), t: f64) -> (u8, u8, u8) {
+    (
+        lerp_channel(start.0, end.0, t),
+        lerp_channel(start.1, end.1, t),
+        lerp_channel(start.2, end.2, t),
+    )
+}
+
+fn current_millis() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+}
+
+fn star_hash(row: usize, col: usize) -> u32 {
+    let seed = (row as u32)
+        .wrapping_mul(1664525)
+        .wrapping_add((col as u32).wrapping_mul(1013904223));
+    seed ^ (seed >> 13)
+}
+
+fn put_water_cell(buffer: &mut [Vec<WaterCell>], row: i32, col: i32, ch: char, fg: Color) {
+    if row < 0 || col < 0 {
+        return;
+    }
+    let row = row as usize;
+    let col = col as usize;
+    if row >= buffer.len() || col >= buffer[row].len() {
+        return;
+    }
+
+    let bg = buffer[row][col].bg;
+    buffer[row][col] = WaterCell { ch, fg, bg };
+}
+
+fn draw_line(buffer: &mut [Vec<WaterCell>], mut x0: i32, mut y0: i32, x1: i32, y1: i32, fg: Color) {
+    let dx = (x1 - x0).abs();
+    let sx = if x0 < x1 { 1 } else { -1 };
+    let dy = -(y1 - y0).abs();
+    let sy = if y0 < y1 { 1 } else { -1 };
+    let mut err = dx + dy;
+
+    let line_char = if (x1 - x0).abs() <= 1 {
+        '|'
+    } else if x1 > x0 {
+        '\\'
+    } else {
+        '/'
+    };
+
+    loop {
+        put_water_cell(buffer, y0, x0, line_char, fg);
+        if x0 == x1 && y0 == y1 {
+            break;
+        }
+        let e2 = 2 * err;
+        if e2 >= dy {
+            err += dy;
+            x0 += sx;
+        }
+        if e2 <= dx {
+            err += dx;
+            y0 += sy;
+        }
+    }
+}
+
+fn render_water_buffer(frame: &mut Frame, area: Rect, buffer: &[Vec<WaterCell>]) {
+    for (row, row_data) in buffer.iter().enumerate() {
+        let mut spans = Vec::new();
+        let mut current_fg = Color::Reset;
+        let mut current_bg = Color::Reset;
+        let mut current_text = String::new();
+
+        for cell in row_data {
+            if (cell.fg != current_fg || cell.bg != current_bg) && !current_text.is_empty() {
+                spans.push(Span::styled(
+                    std::mem::take(&mut current_text),
+                    Style::default().fg(current_fg).bg(current_bg),
+                ));
+            }
+
+            current_fg = cell.fg;
+            current_bg = cell.bg;
+            current_text.push(cell.ch);
+        }
+
+        if !current_text.is_empty() {
+            spans.push(Span::styled(
+                current_text,
+                Style::default().fg(current_fg).bg(current_bg),
+            ));
+        }
+
+        let row_area = Rect::new(area.x, area.y + row as u16, area.width, 1);
+        frame.render_widget(Paragraph::new(Line::from(spans)), row_area);
+    }
+}
 
 /// Renders the fishing scene UI.
 ///
@@ -85,80 +209,307 @@ fn draw_header(frame: &mut Frame, area: Rect, session: &FishingSession) {
 fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
     use crate::fishing::types::FishingPhase;
 
-    // Calculate bobber animation based on phase
-    let bobber_depth = if session.phase == FishingPhase::Reeling {
-        // Fish is biting - bobber dips
-        2
-    } else {
-        // Normal floating (Casting or Waiting)
-        1
-    };
-
-    let water_lines = if bobber_depth == 2 {
-        // Fish biting - more disturbance
-        vec![
-            Line::from(Span::styled(
-                "    ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~",
-                Style::default().fg(Color::Blue),
-            )),
-            Line::from(vec![
-                Span::styled("      ~~~", Style::default().fg(Color::Blue)),
-                Span::styled("~", Style::default().fg(Color::LightBlue)),
-                Span::styled("~", Style::default().fg(Color::Blue)),
-                Span::styled(
-                    " O ",
-                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-                ),
-                Span::styled("~", Style::default().fg(Color::Blue)),
-                Span::styled("~", Style::default().fg(Color::LightBlue)),
-                Span::styled("~~~", Style::default().fg(Color::Blue)),
-            ]),
-            Line::from(vec![
-                Span::styled("    ~ ~ ~ ~", Style::default().fg(Color::Blue)),
-                Span::styled(" |", Style::default().fg(Color::DarkGray)),
-                Span::styled(" ~ ~ ~ ~ ~ ~", Style::default().fg(Color::Blue)),
-            ]),
-            Line::from(Span::styled(
-                "             |",
-                Style::default().fg(Color::DarkGray),
-            )),
-        ]
-    } else {
-        // Normal floating
-        vec![
-            Line::from(Span::styled(
-                "    ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~",
-                Style::default().fg(Color::Blue),
-            )),
-            Line::from(vec![
-                Span::styled("      ~~~~~~", Style::default().fg(Color::Blue)),
-                Span::styled(
-                    " O ",
-                    Style::default()
-                        .fg(Color::White)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled("~~~~~~", Style::default().fg(Color::Blue)),
-            ]),
-            Line::from(vec![
-                Span::styled("    ~ ~ ~ ~ ~", Style::default().fg(Color::Blue)),
-                Span::styled("|", Style::default().fg(Color::DarkGray)),
-                Span::styled("~ ~ ~ ~ ~ ~ ~", Style::default().fg(Color::Blue)),
-            ]),
-            Line::from(Span::styled(
-                "             |",
-                Style::default().fg(Color::DarkGray),
-            )),
-        ]
-    };
-
     let water_block = Block::default().borders(Borders::LEFT | Borders::RIGHT);
+    let inner = water_block.inner(area);
+    frame.render_widget(water_block, area);
 
-    let water_paragraph = Paragraph::new(water_lines)
-        .block(water_block)
-        .alignment(Alignment::Center);
+    if inner.width < 12 || inner.height < 5 {
+        return;
+    }
 
-    frame.render_widget(water_paragraph, area);
+    let width = inner.width as usize;
+    let height = inner.height as usize;
+    let mut buffer = vec![vec![WaterCell::default(); width]; height];
+
+    let millis = current_millis() as f64;
+    let wave_tick = millis / 110.0;
+    let dusk = ((millis / 16_000.0).sin() * 0.5 + 0.5).powf(1.2);
+    let horizon = ((height as f64 * 0.34).round() as usize).clamp(1, height.saturating_sub(2));
+
+    // Sky and water gradients.
+    for (row, row_cells) in buffer.iter_mut().enumerate() {
+        let bg_rgb = if row < horizon {
+            let row_t = if horizon <= 1 {
+                0.0
+            } else {
+                row as f64 / (horizon - 1) as f64
+            };
+            let top = lerp_rgb((118, 196, 248), (20, 34, 66), dusk);
+            let low = lerp_rgb((210, 232, 252), (116, 96, 132), dusk);
+            lerp_rgb(top, low, row_t)
+        } else {
+            let row_t = if height - horizon <= 1 {
+                0.0
+            } else {
+                (row - horizon) as f64 / (height - horizon - 1) as f64
+            };
+            let near = lerp_rgb((48, 136, 192), (30, 70, 112), dusk);
+            let deep = lerp_rgb((10, 60, 112), (5, 22, 52), dusk);
+            lerp_rgb(near, deep, row_t.powf(0.85))
+        };
+
+        let bg = Color::Rgb(bg_rgb.0, bg_rgb.1, bg_rgb.2);
+        for cell in row_cells {
+            cell.bg = bg;
+        }
+    }
+
+    // Celestial body.
+    let orb_col = ((width as f64 * 0.78) + (wave_tick * 0.08).sin() * 3.0).round() as i32;
+    let orb_row = ((horizon as f64 * 0.32) + (wave_tick * 0.04).sin()).round() as i32;
+    let (orb_char, orb_color) = if dusk < 0.56 {
+        ('●', Color::Rgb(255, 228, 152))
+    } else {
+        ('◑', Color::Rgb(232, 238, 255))
+    };
+    for (dx, dy, ch, fg) in [
+        (0, 0, orb_char, orb_color),
+        (-1, 0, '·', Color::Rgb(240, 226, 176)),
+        (1, 0, '·', Color::Rgb(240, 226, 176)),
+        (0, -1, '·', Color::Rgb(236, 220, 170)),
+        (0, 1, '·', Color::Rgb(236, 220, 170)),
+    ] {
+        put_water_cell(&mut buffer, orb_row + dy, orb_col + dx, ch, fg);
+    }
+
+    // Stars appear as dusk settles.
+    if dusk > 0.25 {
+        let twinkle_tick = (wave_tick / 1.8) as usize;
+        for (row, row_cells) in buffer
+            .iter_mut()
+            .enumerate()
+            .take(horizon.saturating_sub(1))
+        {
+            for (col, cell) in row_cells.iter_mut().enumerate() {
+                if star_hash(row, col).is_multiple_of(97) && cell.ch == ' ' {
+                    let bright =
+                        star_hash(row + twinkle_tick, col + twinkle_tick).is_multiple_of(3);
+                    *cell = WaterCell {
+                        ch: if bright { '*' } else { '.' },
+                        fg: if bright {
+                            Color::Rgb(244, 246, 255)
+                        } else {
+                            Color::Rgb(184, 190, 232)
+                        },
+                        bg: cell.bg,
+                    };
+                }
+            }
+        }
+    }
+
+    // Sky clouds.
+    for &(base_x, y_ratio, speed, pattern, shade) in &[
+        (6.0, 0.18, 0.040, "~~", 148u8),
+        (18.0, 0.28, 0.032, "~~~", 140),
+        (34.0, 0.16, 0.052, "~~~~", 132),
+        (12.0, 0.44, 0.026, "~ ~", 126),
+        (44.0, 0.36, 0.036, "~~", 130),
+    ] {
+        let drift = (wave_tick * speed) % width as f64;
+        let cx = ((base_x - drift).rem_euclid(width as f64)) as usize;
+        let row = ((horizon as f64 * y_ratio).round() as usize).min(horizon.saturating_sub(1));
+        for (i, ch) in pattern.chars().enumerate() {
+            if ch == ' ' {
+                continue;
+            }
+            let col = (cx + i) % width;
+            if buffer[row][col].ch == ' ' {
+                let tint = lerp_channel(shade, 208, 1.0 - dusk);
+                buffer[row][col] = WaterCell {
+                    ch,
+                    fg: Color::Rgb(tint, tint, tint.saturating_add(8)),
+                    bg: buffer[row][col].bg,
+                };
+            }
+        }
+    }
+
+    // Distant shoreline silhouettes.
+    for col in 0..width {
+        let far_h =
+            (1.0 + ((col as f64 * 0.24 + wave_tick * 0.012).sin() + 1.0) * 1.1).round() as i32;
+        let near_h = (1.0 + ((col as f64 * 0.15 + wave_tick * 0.020 + 1.5).sin() + 1.0) * 1.5)
+            .round() as i32;
+
+        for (height_delta, ch, color) in [
+            (
+                far_h,
+                '░',
+                Color::Rgb(
+                    lerp_channel(84, 62, dusk),
+                    lerp_channel(110, 90, dusk),
+                    lerp_channel(126, 114, dusk),
+                ),
+            ),
+            (
+                near_h,
+                '▒',
+                Color::Rgb(
+                    lerp_channel(70, 52, dusk),
+                    lerp_channel(96, 74, dusk),
+                    lerp_channel(110, 98, dusk),
+                ),
+            ),
+        ] {
+            let top = horizon as i32 - height_delta;
+            for row in top.max(0)..=horizon as i32 {
+                put_water_cell(&mut buffer, row, col as i32, ch, color);
+            }
+        }
+    }
+
+    // Layered animated water surface.
+    for (row, row_cells) in buffer.iter_mut().enumerate().skip(horizon) {
+        let depth_t = if height - horizon <= 1 {
+            0.0
+        } else {
+            (row - horizon) as f64 / (height - horizon - 1) as f64
+        };
+        let crest = lerp_rgb((154, 226, 248), (98, 184, 226), depth_t);
+        for (col, cell) in row_cells.iter_mut().enumerate() {
+            let primary = (col as f64 * (0.24 + depth_t * 0.06)
+                + wave_tick * (0.055 + depth_t * 0.045))
+                .sin();
+            let secondary = (col as f64 * 0.11 - wave_tick * 0.043 + row as f64 * 0.92).cos();
+            let wave = primary * 0.72 + secondary * 0.28;
+
+            let ch = if wave > 0.74 {
+                '≈'
+            } else if wave > 0.38 {
+                '~'
+            } else if wave > 0.06 {
+                '-'
+            } else if wave > -0.34 {
+                '·'
+            } else {
+                ' '
+            };
+
+            if ch != ' ' {
+                let shimmer =
+                    (((col as f64 * 0.09 + wave_tick * 0.19).sin() + 1.0) * 0.5 * 18.0) as u8;
+                *cell = WaterCell {
+                    ch,
+                    fg: Color::Rgb(
+                        crest.0.saturating_add(shimmer),
+                        crest.1.saturating_add(shimmer / 2),
+                        crest.2.saturating_add(shimmer / 3),
+                    ),
+                    bg: cell.bg,
+                };
+            }
+        }
+    }
+
+    // Small fishing boat with gentle bob.
+    let boat_center = ((width as f64 * 0.35) + (wave_tick * 0.04).sin() * 2.0).round() as i32;
+    let boat_row = (horizon + 1).min(height.saturating_sub(2)) as i32;
+    let hull = "_/___\\_";
+    let hull_start = boat_center - (hull.len() as i32 / 2);
+    for (idx, ch) in hull.chars().enumerate() {
+        put_water_cell(
+            &mut buffer,
+            boat_row,
+            hull_start + idx as i32,
+            ch,
+            if idx == 0 || idx + 1 == hull.len() {
+                Color::Rgb(154, 118, 86)
+            } else {
+                Color::Rgb(126, 92, 66)
+            },
+        );
+    }
+
+    let mast_x = boat_center;
+    let mast_top = boat_row - 2;
+    for y in mast_top..=boat_row {
+        put_water_cell(&mut buffer, y, mast_x, '|', Color::Rgb(170, 132, 92));
+    }
+    put_water_cell(
+        &mut buffer,
+        mast_top + 1,
+        mast_x + 1,
+        '\\',
+        Color::Rgb(226, 236, 248),
+    );
+    put_water_cell(
+        &mut buffer,
+        mast_top,
+        mast_x + 2,
+        '\\',
+        Color::Rgb(226, 236, 248),
+    );
+
+    // Bobber and interaction response by fishing phase.
+    let (bobber_ratio, bobber_amp, bobber_sink, bobber_char, bobber_color, ripple_radius) =
+        match session.phase {
+            FishingPhase::Casting => (0.66, 0.45, 0.0, '○', Color::Rgb(240, 248, 255), 1),
+            FishingPhase::Waiting => (0.58, 0.60, 0.2, '◉', Color::Rgb(255, 236, 214), 1),
+            FishingPhase::Reeling => (0.50, 1.10, 0.9, '●', Color::Rgb(255, 96, 82), 2),
+        };
+
+    let bobber_x = ((width as f64 * bobber_ratio) + (wave_tick * 0.065).sin() * 2.5).round() as i32;
+    let bobber_base = horizon + ((height - horizon).max(2) / 5);
+    let bobber_y = (bobber_base as f64 + (wave_tick * 0.085).sin() * bobber_amp + bobber_sink)
+        .round()
+        .clamp((horizon + 1) as f64, (height.saturating_sub(2)) as f64) as i32;
+
+    draw_line(
+        &mut buffer,
+        mast_x,
+        mast_top.max(0),
+        bobber_x,
+        bobber_y,
+        Color::Rgb(208, 210, 220),
+    );
+    put_water_cell(&mut buffer, bobber_y, bobber_x, bobber_char, bobber_color);
+
+    for ring in 1..=ripple_radius {
+        let ch = if ring == 1 { 'o' } else { '.' };
+        let fg = if ring == 1 {
+            Color::Rgb(196, 236, 255)
+        } else {
+            Color::Rgb(146, 206, 238)
+        };
+        for &(dx, dy) in &[
+            (-ring, 0),
+            (ring, 0),
+            (0, -ring),
+            (0, ring),
+            (-ring, -ring),
+            (ring, -ring),
+            (-ring, ring),
+            (ring, ring),
+        ] {
+            put_water_cell(&mut buffer, bobber_y + dy, bobber_x + dx, ch, fg);
+        }
+    }
+
+    if session.phase == FishingPhase::Reeling {
+        let splash_row = bobber_y - 1;
+        let splash_x = bobber_x + if ((wave_tick as i32) & 1) == 0 { 4 } else { -4 };
+        for (i, ch) in "<><".chars().enumerate() {
+            put_water_cell(
+                &mut buffer,
+                splash_row,
+                splash_x + i as i32,
+                ch,
+                Color::Rgb(255, 224, 118),
+            );
+        }
+        for &(dx, dy, ch) in &[(-1, -1, '\''), (2, -1, '\''), (0, -2, '`')] {
+            put_water_cell(
+                &mut buffer,
+                splash_row + dy,
+                splash_x + dx,
+                ch,
+                Color::Rgb(216, 242, 255),
+            );
+        }
+    }
+
+    render_water_buffer(frame, inner, &buffer);
 }
 
 /// Draws the catch progress indicator with current phase.
