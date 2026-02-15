@@ -357,40 +357,40 @@ struct ChallengeWeight {
 /// Puzzles (Minesweeper, Rune) are more common; strategy games (Chess, Go) are rarer.
 const CHALLENGE_TABLE: &[ChallengeWeight] = &[
     ChallengeWeight {
-        challenge_type: ChallengeType::Minesweeper,
-        weight: 30, // ~27% - common quick puzzle
-    },
-    ChallengeWeight {
         challenge_type: ChallengeType::Rune,
-        weight: 25, // ~23% - common quick puzzle
+        weight: 30, // ~19% - fastest (~2 min)
     },
     ChallengeWeight {
-        challenge_type: ChallengeType::Gomoku,
-        weight: 20, // ~18% - moderate
-    },
-    ChallengeWeight {
-        challenge_type: ChallengeType::Morris,
-        weight: 15, // ~14% - less common
-    },
-    ChallengeWeight {
-        challenge_type: ChallengeType::FlappyBird,
-        weight: 20, // ~15% - moderate, action game novelty
-    },
-    ChallengeWeight {
-        challenge_type: ChallengeType::Jezzball,
-        weight: 18, // ~13% - moderate, precision action game
-    },
-    ChallengeWeight {
-        challenge_type: ChallengeType::Chess,
-        weight: 10, // ~8% - rare complex strategy
-    },
-    ChallengeWeight {
-        challenge_type: ChallengeType::Go,
-        weight: 10, // ~8% - rare complex strategy
+        challenge_type: ChallengeType::Minesweeper,
+        weight: 28, // ~18% - fast puzzle
     },
     ChallengeWeight {
         challenge_type: ChallengeType::Snake,
-        weight: 20, // ~13% - moderate, action game alongside Flappy Bird
+        weight: 22, // ~14% - quick action
+    },
+    ChallengeWeight {
+        challenge_type: ChallengeType::FlappyBird,
+        weight: 20, // ~13% - moderate action
+    },
+    ChallengeWeight {
+        challenge_type: ChallengeType::Jezzball,
+        weight: 18, // ~11% - moderate action
+    },
+    ChallengeWeight {
+        challenge_type: ChallengeType::Gomoku,
+        weight: 15, // ~9% - medium-length strategy
+    },
+    ChallengeWeight {
+        challenge_type: ChallengeType::Morris,
+        weight: 12, // ~8% - longer strategy
+    },
+    ChallengeWeight {
+        challenge_type: ChallengeType::Chess,
+        weight: 8, // ~5% - long commitment
+    },
+    ChallengeWeight {
+        challenge_type: ChallengeType::Go,
+        weight: 7, // ~4% - longest game
     },
 ];
 

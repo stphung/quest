@@ -132,6 +132,9 @@ pub struct ActiveWall {
     pub pos_done: bool,
 }
 
+/// Number of attempts the player gets per challenge.
+pub const MAX_LIVES: u32 = 3;
+
 /// Main JezzBall game state.
 #[derive(Debug, Clone)]
 pub struct JezzballGame {
@@ -158,6 +161,10 @@ pub struct JezzballGame {
     // Progress
     pub captured_percent: f64,
     pub target_percent: u32,
+
+    // Lives
+    /// Remaining lives (0 = game over on next wall hit).
+    pub lives: u32,
 
     // Timing
     pub wall_step_ms: u64,
@@ -194,6 +201,8 @@ impl JezzballGame {
             captured_percent: 0.0,
             target_percent: difficulty.target_percent(),
 
+            lives: MAX_LIVES,
+
             wall_step_ms: difficulty.wall_step_ms(),
             accumulated_time_ms: 0,
             wall_accumulated_ms: 0,
@@ -205,6 +214,20 @@ impl JezzballGame {
         }
 
         game
+    }
+
+    /// Reset game state for a retry after losing a life.
+    /// Preserves grid, balls, captured progress, and lives count.
+    pub fn reset_for_retry(&mut self) {
+        self.active_wall = None;
+        self.cursor = Position {
+            x: self.grid_width / 2,
+            y: self.grid_height / 2,
+        };
+        self.orientation = WallOrientation::Vertical;
+        self.forfeit_pending = false;
+        self.wall_accumulated_ms = 0;
+        self.waiting_to_start = true;
     }
 
     /// Total playable cells.
@@ -261,8 +284,36 @@ mod tests {
         assert_eq!(game.orientation, WallOrientation::Vertical);
         assert_eq!(game.balls.len(), 2);
         assert_eq!(game.target_percent, 60);
+        assert_eq!(game.lives, MAX_LIVES);
         assert_eq!(game.wall_step_ms, 70);
         assert_eq!(game.total_cells(), 748);
+    }
+
+    #[test]
+    fn test_reset_for_retry() {
+        let mut rng = rand::rng();
+        let mut game = JezzballGame::new(JezzballDifficulty::Novice, &mut rng);
+        game.waiting_to_start = false;
+        game.lives = 2;
+        game.captured_percent = 25.0;
+        game.blocked[5][5] = true;
+        game.active_wall = Some(ActiveWall {
+            orientation: WallOrientation::Horizontal,
+            pivot: Position { x: 10, y: 10 },
+            neg_extent: 3,
+            pos_extent: 5,
+            neg_done: false,
+            pos_done: false,
+        });
+
+        game.reset_for_retry();
+
+        assert!(game.active_wall.is_none());
+        assert!(game.waiting_to_start);
+        assert_eq!(game.lives, 2); // Lives preserved
+        assert!(game.blocked[5][5]); // Grid preserved
+        assert_eq!(game.captured_percent, 25.0); // Progress preserved
+        assert_eq!(game.cursor, Position { x: 17, y: 11 }); // Cursor reset to center
     }
 
     #[test]

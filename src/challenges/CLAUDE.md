@@ -247,14 +247,15 @@ Challenges are discovered randomly (~2hr average). The `CHALLENGE_TABLE` in `men
 
 | Challenge | Weight | ~Probability | Rationale |
 |-----------|--------|--------------|-----------|
-| Minesweeper | 30 | ~20% | Common - quick puzzle |
-| Rune | 25 | ~17% | Common - quick puzzle |
-| Gomoku | 20 | ~13% | Moderate |
-| Flappy Bird | 20 | ~13% | Moderate - action game |
-| Snake | 20 | ~13% | Moderate - action game |
-| Morris | 15 | ~10% | Less common |
-| Chess | 10 | ~7% | Rare - complex strategy |
-| Go | 10 | ~7% | Rare - complex strategy |
+| Rune | 30 | ~19% | Fastest (~2 min) |
+| Minesweeper | 28 | ~18% | Fast puzzle |
+| Snake | 22 | ~14% | Quick action |
+| Flappy Bird | 20 | ~13% | Moderate action |
+| JezzBall | 18 | ~11% | Moderate action |
+| Gomoku | 15 | ~9% | Medium-length strategy |
+| Morris | 12 | ~8% | Longer strategy |
+| Chess | 8 | ~5% | Long commitment |
+| Go | 7 | ~4% | Longest game |
 
 When adding a new challenge, add it to `CHALLENGE_TABLE` with an appropriate weight.
 

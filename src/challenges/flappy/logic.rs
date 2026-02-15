@@ -147,7 +147,7 @@ fn step_physics(game: &mut FlappyBirdGame) {
     // Row 0 = ceiling, Row 17 = ground
     let bird_row = game.bird_y.round() as i32;
     if bird_row <= 0 || bird_row >= GAME_HEIGHT as i32 - 1 {
-        game.game_result = Some(FlappyBirdResult::Loss);
+        handle_collision(game);
         return;
     }
 
@@ -169,7 +169,7 @@ fn step_physics(game: &mut FlappyBirdGame) {
 
             // Bird outside the gap?
             if bird_row_f < gap_top || bird_row_f > gap_bottom {
-                game.game_result = Some(FlappyBirdResult::Loss);
+                handle_collision(game);
                 return;
             }
         }
@@ -178,6 +178,16 @@ fn step_physics(game: &mut FlappyBirdGame) {
     // Win condition
     if game.score >= game.target_score {
         game.game_result = Some(FlappyBirdResult::Win);
+    }
+}
+
+/// Handle a collision: consume a life and reset, or end the game.
+fn handle_collision(game: &mut FlappyBirdGame) {
+    if game.lives > 0 {
+        game.lives -= 1;
+        game.reset_for_retry();
+    } else {
+        game.game_result = Some(FlappyBirdResult::Loss);
     }
 }
 
@@ -211,10 +221,10 @@ impl DifficultyInfo for FlappyBirdDifficulty {
 
     fn extra_info(&self) -> Option<String> {
         match self {
-            FlappyBirdDifficulty::Novice => Some("10 pipes, wide gaps".to_string()),
-            FlappyBirdDifficulty::Apprentice => Some("15 pipes, normal gaps".to_string()),
-            FlappyBirdDifficulty::Journeyman => Some("20 pipes, narrow gaps".to_string()),
-            FlappyBirdDifficulty::Master => Some("30 pipes, razor gaps".to_string()),
+            FlappyBirdDifficulty::Novice => Some("10 pipes, wide gaps, 3 lives".to_string()),
+            FlappyBirdDifficulty::Apprentice => Some("15 pipes, normal gaps, 3 lives".to_string()),
+            FlappyBirdDifficulty::Journeyman => Some("20 pipes, narrow gaps, 3 lives".to_string()),
+            FlappyBirdDifficulty::Master => Some("30 pipes, razor gaps, 3 lives".to_string()),
         }
     }
 }
@@ -250,9 +260,14 @@ pub fn apply_game_result(state: &mut GameState) -> Option<MinigameWinInfo> {
             true,
         );
     } else {
-        state
-            .combat_state
-            .add_log_entry(format!("> Crashed after {} pipes.", score), false, true);
+        state.combat_state.add_log_entry(
+            format!(
+                "> Crashed after {} pipes ({} lives used).",
+                score, MAX_LIVES
+            ),
+            false,
+            true,
+        );
     }
 
     crate::challenges::apply_challenge_rewards(
@@ -420,7 +435,7 @@ mod tests {
     }
 
     #[test]
-    fn test_collision_ground() {
+    fn test_collision_ground_consumes_life() {
         let mut game = started_game(FlappyBirdDifficulty::Novice);
         game.bird_y = 16.5;
         game.bird_velocity = 1.0;
@@ -428,17 +443,34 @@ mod tests {
         // Tick until bird hits ground
         for _ in 0..10 {
             tick_flappy_bird(&mut game, PHYSICS_TICK_MS);
-            if game.game_result.is_some() {
+            if game.waiting_to_start {
                 break;
             }
         }
 
-        assert_eq!(game.game_result, Some(FlappyBirdResult::Loss));
+        // Should have lost a life and reset, not ended the game
+        assert!(game.game_result.is_none());
+        assert_eq!(game.lives, MAX_LIVES - 1);
+        assert!(game.waiting_to_start);
     }
 
     #[test]
-    fn test_collision_ceiling() {
+    fn test_collision_ceiling_consumes_life() {
         let mut game = started_game(FlappyBirdDifficulty::Novice);
+        game.bird_y = 0.5;
+        game.bird_velocity = -2.0;
+
+        tick_flappy_bird(&mut game, PHYSICS_TICK_MS);
+
+        assert!(game.game_result.is_none());
+        assert_eq!(game.lives, MAX_LIVES - 1);
+        assert!(game.waiting_to_start);
+    }
+
+    #[test]
+    fn test_collision_on_last_life_ends_game() {
+        let mut game = started_game(FlappyBirdDifficulty::Novice);
+        game.lives = 0;
         game.bird_y = 0.5;
         game.bird_velocity = -2.0;
 
@@ -485,7 +517,7 @@ mod tests {
     }
 
     #[test]
-    fn test_pipe_collision() {
+    fn test_pipe_collision_consumes_life() {
         let mut game = started_game(FlappyBirdDifficulty::Novice);
         // Bird at row 3, pipe gap centered at row 12 (gap: rows 8..16 for Novice gap=7)
         // Bird is above the gap
@@ -501,11 +533,12 @@ mod tests {
 
         tick_flappy_bird(&mut game, PHYSICS_TICK_MS);
 
-        assert_eq!(
-            game.game_result,
-            Some(FlappyBirdResult::Loss),
-            "Bird should collide with pipe"
+        assert!(
+            game.game_result.is_none(),
+            "Should lose a life, not end game"
         );
+        assert_eq!(game.lives, MAX_LIVES - 1);
+        assert!(game.waiting_to_start);
     }
 
     #[test]
@@ -626,11 +659,11 @@ mod tests {
     fn test_extra_info() {
         assert_eq!(
             FlappyBirdDifficulty::Novice.extra_info().unwrap(),
-            "10 pipes, wide gaps"
+            "10 pipes, wide gaps, 3 lives"
         );
         assert_eq!(
             FlappyBirdDifficulty::Master.extra_info().unwrap(),
-            "30 pipes, razor gaps"
+            "30 pipes, razor gaps, 3 lives"
         );
     }
 
@@ -674,7 +707,7 @@ mod tests {
     }
 
     #[test]
-    fn test_collision_pipe_bottom() {
+    fn test_collision_pipe_bottom_consumes_life() {
         let mut game = started_game(FlappyBirdDifficulty::Novice);
         // Bird at row 15, pipe gap centered at row 5 (gap: rows 1..9 for Novice gap=7)
         // Bird is below the gap
@@ -689,11 +722,12 @@ mod tests {
 
         tick_flappy_bird(&mut game, PHYSICS_TICK_MS);
 
-        assert_eq!(
-            game.game_result,
-            Some(FlappyBirdResult::Loss),
-            "Bird should collide with bottom pipe section"
+        assert!(
+            game.game_result.is_none(),
+            "Should lose a life, not end game"
         );
+        assert_eq!(game.lives, MAX_LIVES - 1);
+        assert!(game.waiting_to_start);
     }
 
     #[test]

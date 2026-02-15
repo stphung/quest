@@ -5,7 +5,7 @@ use super::game_common::{
     render_info_panel_frame, render_minigame_too_small, render_status_bar, GameResultType,
 };
 use crate::challenges::jezzball::types::{
-    ActiveWall, JezzballGame, JezzballResult, Position, WallOrientation,
+    ActiveWall, JezzballGame, JezzballResult, Position, WallOrientation, MAX_LIVES,
 };
 use crate::challenges::menu::DifficultyInfo;
 use ratatui::{
@@ -355,6 +355,19 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &JezzballGame) {
             Span::styled(
                 game.balls.len().to_string(),
                 Style::default().fg(Color::LightRed),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("Lives: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{}/{}", game.lives, MAX_LIVES),
+                Style::default()
+                    .fg(if game.lives > 0 {
+                        Color::Rgb(255, 90, 90)
+                    } else {
+                        Color::Red
+                    })
+                    .add_modifier(Modifier::BOLD),
             ),
         ]),
         Line::from(""),

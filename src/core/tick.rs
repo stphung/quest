@@ -292,7 +292,9 @@ pub fn game_tick<R: Rng>(
         for event in dungeon_events {
             match event {
                 crate::dungeon::logic::DungeonEvent::EnteredRoom { room_type, .. } => {
-                    let message = format!("\u{1f6aa} Entered {:?} room", room_type);
+                    let narration = room_type.narration();
+                    let line = narration[rng.random_range(0..narration.len())];
+                    let message = format!("\u{1f6aa} {}", line);
                     result
                         .events
                         .push(TickEvent::DungeonRoomEntered { room_type, message });
@@ -317,12 +319,14 @@ pub fn game_tick<R: Rng>(
                 }
                 crate::dungeon::logic::DungeonEvent::FoundKey => {
                     result.events.push(TickEvent::DungeonKeyFound {
-                        message: "\u{1f5dd}\u{fe0f} Found the dungeon key!".to_string(),
+                        message: "\u{1f5dd}\u{fe0f} A heavy key clatters to the ground. The way forward is open.".to_string(),
                     });
                 }
                 crate::dungeon::logic::DungeonEvent::BossUnlocked => {
                     result.events.push(TickEvent::DungeonBossUnlocked {
-                        message: "\u{1f479} The boss room is now unlocked!".to_string(),
+                        message:
+                            "\u{1f479} Somewhere deep in the dungeon, a sealed door grinds open."
+                                .to_string(),
                     });
                 }
                 crate::dungeon::logic::DungeonEvent::DungeonComplete {
@@ -341,7 +345,7 @@ pub fn game_tick<R: Rng>(
                 }
                 crate::dungeon::logic::DungeonEvent::DungeonFailed => {
                     result.events.push(TickEvent::DungeonFailed {
-                        message: "\u{1f480} Escaped the dungeon... (no prestige lost)".to_string(),
+                        message: "\u{1f480} The dungeon spits you out, broken but alive. No prestige lost.".to_string(),
                     });
                 }
                 _ => {}
@@ -581,7 +585,7 @@ pub fn game_tick<R: Rng>(
                     for de in events {
                         if matches!(de, crate::dungeon::logic::DungeonEvent::FoundKey) {
                             result.events.push(TickEvent::DungeonKeyFound {
-                                message: "\u{1f5dd}\u{fe0f} Found the dungeon key!".to_string(),
+                                message: "\u{1f5dd}\u{fe0f} A heavy key clatters to the ground. The way forward is open.".to_string(),
                             });
                         }
                     }

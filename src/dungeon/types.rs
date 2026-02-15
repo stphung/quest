@@ -42,6 +42,48 @@ impl RoomType {
     pub fn cleared_icon(&self) -> char {
         '.'
     }
+
+    /// Returns a pool of narration lines for entering this room type.
+    pub fn narration(&self) -> &'static [&'static str] {
+        match self {
+            RoomType::Entrance => &[
+                "Stale air rushes out as the entrance groans open.",
+                "Torch sconces flicker to life along the walls. Something knows you're here.",
+                "The way in is narrow. The way out may be narrower.",
+                "Dust motes swirl in a draft that comes from deep below.",
+                "Old boot prints in the dust. Whoever made them didn't come back.",
+            ],
+            RoomType::Combat => &[
+                "Movement in the shadows. You're not alone.",
+                "A low growl echoes off the stone.",
+                "Something scrapes against the far wall.",
+                "The air turns sour. A creature blocks the path ahead.",
+                "Claws click on flagstone. Eyes catch the light.",
+                "A shape lunges from the dark.",
+                "Bones crunch underfoot. The room's last visitor didn't make it.",
+                "The ceiling drips. The floor is warm. Something breathes here.",
+            ],
+            RoomType::Treasure => &[
+                "A glint of metal catches your eye among the rubble.",
+                "An old chest sits untouched in the corner, its lock long rusted away.",
+                "Whoever cleared this room left their spoils behind.",
+                "Something valuable lies half-buried in the debris.",
+                "A hidden alcove holds gear that still shines.",
+            ],
+            RoomType::Elite => &[
+                "The guardian hasn't moved in a long time. It moves now.",
+                "Heavy chains rattle. Something ancient stands between you and the key.",
+                "A hulking shape blocks the only way forward. It carries a key at its belt.",
+                "The air hums with power. This room's guardian was placed here for a reason.",
+            ],
+            RoomType::Boss => &[
+                "The door seals behind you. Whatever waits ahead, there's no turning back.",
+                "A vast chamber opens before you. The darkness at its center is breathing.",
+                "The walls are scored with claw marks taller than you are.",
+                "The ground trembles. You've found what lives at the heart of this place.",
+            ],
+        }
+    }
 }
 
 /// State of a room in the dungeon
