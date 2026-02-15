@@ -1,4 +1,5 @@
 pub mod achievement_browser_scene;
+pub mod blacksmith_scene;
 pub mod challenge_menu_scene;
 pub mod character_creation;
 pub mod character_delete;

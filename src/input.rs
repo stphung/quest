@@ -2,6 +2,9 @@
 //!
 //! Extracts the input dispatch logic from main.rs into a clean priority chain.
 
+use crate::enhancement;
+use crate::items::EquipmentSlot;
+
 use crate::challenges::chess::logic::{
     apply_game_result as apply_chess_result, process_input as process_chess_input, ChessInput,
 };
@@ -77,6 +80,9 @@ impl HavenUiState {
     }
 }
 
+// Re-export blacksmith UI types from enhancement module
+pub use crate::enhancement::{BlacksmithPhase, BlacksmithUiState, EnhancementResult};
+
 /// Game-screen overlay state. At most one is active at a time.
 pub enum GameOverlay {
     None,
@@ -124,6 +130,8 @@ pub fn handle_game_input(
     state: &mut GameState,
     haven: &mut Haven,
     haven_ui: &mut HavenUiState,
+    blacksmith_ui: &mut BlacksmithUiState,
+    enhancement: &mut enhancement::EnhancementProgress,
     overlay: &mut GameOverlay,
     debug_menu: &mut DebugMenu,
     debug_mode: bool,
@@ -181,6 +189,17 @@ pub fn handle_game_input(
         return handle_haven(key, state, haven, haven_ui, achievements);
     }
 
+    // 2.5. Blacksmith overlay
+    if blacksmith_ui.open {
+        return handle_blacksmith(
+            key,
+            blacksmith_ui,
+            enhancement,
+            &mut state.prestige_rank,
+            &state.equipment,
+        );
+    }
+
     // 3. Vault item selection
     if matches!(overlay, GameOverlay::VaultSelection { .. }) {
         return handle_vault_selection(key, state, haven, overlay);
@@ -224,6 +243,8 @@ pub fn handle_game_input(
         state,
         haven,
         haven_ui,
+        blacksmith_ui,
+        enhancement,
         overlay,
         achievements,
         update_available,
@@ -243,6 +264,102 @@ fn handle_blacksmith_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> Inpu
         *overlay = GameOverlay::None;
     }
     InputResult::Continue
+}
+
+const SLOT_ORDER: [EquipmentSlot; 7] = [
+    EquipmentSlot::Weapon,
+    EquipmentSlot::Armor,
+    EquipmentSlot::Helmet,
+    EquipmentSlot::Gloves,
+    EquipmentSlot::Boots,
+    EquipmentSlot::Amulet,
+    EquipmentSlot::Ring,
+];
+
+fn handle_blacksmith(
+    key: KeyEvent,
+    blacksmith_ui: &mut BlacksmithUiState,
+    enhancement: &mut enhancement::EnhancementProgress,
+    prestige_rank: &mut u32,
+    equipment: &items::Equipment,
+) -> InputResult {
+    match blacksmith_ui.phase {
+        BlacksmithPhase::Menu => match key.code {
+            KeyCode::Up => {
+                blacksmith_ui.selected_slot = blacksmith_ui.selected_slot.saturating_sub(1);
+                InputResult::Continue
+            }
+            KeyCode::Down => {
+                if blacksmith_ui.selected_slot < 6 {
+                    blacksmith_ui.selected_slot += 1;
+                }
+                InputResult::Continue
+            }
+            KeyCode::Enter => {
+                let slot_index = blacksmith_ui.selected_slot;
+                let slot = SLOT_ORDER[slot_index];
+                let current_level = enhancement.level(slot_index);
+
+                // Check: item equipped, level < max, can afford
+                if equipment.get(slot).is_some()
+                    && current_level < enhancement::MAX_ENHANCEMENT_LEVEL
+                {
+                    let target_level = current_level + 1;
+                    let cost = enhancement::enhancement_cost(target_level);
+                    if *prestige_rank >= cost {
+                        blacksmith_ui.phase = BlacksmithPhase::Confirming;
+                    }
+                }
+                InputResult::Continue
+            }
+            KeyCode::Esc => {
+                blacksmith_ui.close();
+                InputResult::Continue
+            }
+            _ => InputResult::Continue,
+        },
+        BlacksmithPhase::Confirming => match key.code {
+            KeyCode::Enter => {
+                let slot_index = blacksmith_ui.selected_slot;
+                let current_level = enhancement.level(slot_index);
+                let target_level = current_level + 1;
+                let cost = enhancement::enhancement_cost(target_level);
+
+                // Deduct prestige cost
+                *prestige_rank -= cost;
+
+                // Attempt enhancement
+                let mut rng = rand::rng();
+                let success = enhancement::attempt_enhancement(enhancement, slot_index, &mut rng);
+                let new_level = enhancement.level(slot_index);
+
+                blacksmith_ui.last_result = Some(EnhancementResult {
+                    slot_index,
+                    success,
+                    old_level: current_level,
+                    new_level,
+                });
+                blacksmith_ui.phase = BlacksmithPhase::Hammering;
+                blacksmith_ui.animation_tick = 0;
+
+                InputResult::NeedsSaveAll
+            }
+            KeyCode::Esc => {
+                blacksmith_ui.phase = BlacksmithPhase::Menu;
+                InputResult::Continue
+            }
+            _ => InputResult::Continue,
+        },
+        BlacksmithPhase::Hammering => {
+            // No input accepted during hammering animation
+            InputResult::Continue
+        }
+        BlacksmithPhase::ResultSuccess | BlacksmithPhase::ResultFailure => {
+            // Any key returns to menu
+            blacksmith_ui.phase = BlacksmithPhase::Menu;
+            InputResult::Continue
+        }
+    }
 }
 
 fn handle_achievement_unlocked(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
@@ -658,6 +775,8 @@ fn handle_base_game(
     state: &mut GameState,
     haven: &Haven,
     haven_ui: &mut HavenUiState,
+    blacksmith_ui: &mut BlacksmithUiState,
+    enhancement: &enhancement::EnhancementProgress,
     overlay: &mut GameOverlay,
     achievements: &mut crate::achievements::Achievements,
     update_available: bool,
@@ -682,6 +801,12 @@ fn handle_base_game(
         KeyCode::Char('h') | KeyCode::Char('H') => {
             if haven.discovered {
                 haven_ui.open();
+            }
+            InputResult::Continue
+        }
+        KeyCode::Char('b') | KeyCode::Char('B') => {
+            if enhancement.discovered {
+                blacksmith_ui.open();
             }
             InputResult::Continue
         }

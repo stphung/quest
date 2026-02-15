@@ -117,3 +117,66 @@ pub fn enhancement_color_tier(level: u8) -> u8 {
         _ => 4,
     }
 }
+
+// --- Blacksmith UI state types ---
+// These live here (not in input.rs) so the UI module can access them from both
+// the binary and library crates.
+
+/// Blacksmith enhancement phase
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BlacksmithPhase {
+    Menu,
+    Confirming,
+    Hammering,
+    ResultSuccess,
+    ResultFailure,
+}
+
+/// Result of an enhancement attempt (for display)
+pub struct EnhancementResult {
+    pub slot_index: usize,
+    pub success: bool,
+    pub old_level: u8,
+    pub new_level: u8,
+}
+
+/// Blacksmith overlay state
+pub struct BlacksmithUiState {
+    pub open: bool,
+    pub selected_slot: usize,
+    pub phase: BlacksmithPhase,
+    pub animation_tick: u8,
+    pub last_result: Option<EnhancementResult>,
+}
+
+impl Default for BlacksmithUiState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BlacksmithUiState {
+    pub fn new() -> Self {
+        Self {
+            open: false,
+            selected_slot: 0,
+            phase: BlacksmithPhase::Menu,
+            animation_tick: 0,
+            last_result: None,
+        }
+    }
+
+    pub fn open(&mut self) {
+        self.open = true;
+        self.selected_slot = 0;
+        self.phase = BlacksmithPhase::Menu;
+        self.animation_tick = 0;
+        self.last_result = None;
+    }
+
+    pub fn close(&mut self) {
+        self.open = false;
+        self.phase = BlacksmithPhase::Menu;
+        self.last_result = None;
+    }
+}

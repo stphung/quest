@@ -24,7 +24,7 @@ use chrono::{Local, Utc};
 use core::constants::*;
 use core::game_logic::*;
 use core::game_state::*;
-use input::{GameOverlay, HavenUiState, InputResult};
+use input::{BlacksmithUiState, GameOverlay, HavenUiState, InputResult};
 use rand::RngExt;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::crossterm::terminal::{
@@ -169,6 +169,8 @@ fn draw_game_overlays(
     overlay: &GameOverlay,
     haven: &haven::Haven,
     haven_ui: &HavenUiState,
+    blacksmith_ui: &BlacksmithUiState,
+    enhancement: &enhancement::EnhancementProgress,
     global_achievements: &achievements::Achievements,
     debug_mode: bool,
     debug_menu: &utils::debug_menu::DebugMenu,
@@ -188,9 +190,7 @@ fn draw_game_overlays(
             ui::haven_scene::render_haven_discovery_modal(frame, area, ctx);
         }
         GameOverlay::BlacksmithDiscovery => {
-            // Placeholder: reuse Haven discovery modal layout for now.
-            // A dedicated blacksmith discovery modal will be added in a later task.
-            ui::haven_scene::render_haven_discovery_modal(frame, area, ctx);
+            ui::blacksmith_scene::render_blacksmith_discovery_modal(frame, area, ctx);
         }
         GameOverlay::AchievementUnlocked { ref achievements } => {
             ui::achievement_browser_scene::render_achievement_unlocked_modal(
@@ -268,6 +268,19 @@ fn draw_game_overlays(
             }
             input::HavenConfirmation::None => {}
         }
+    }
+
+    // Blacksmith overlay
+    if blacksmith_ui.open {
+        ui::blacksmith_scene::render_blacksmith(
+            frame,
+            area,
+            blacksmith_ui,
+            enhancement,
+            &state.equipment,
+            state.prestige_rank,
+            ctx,
+        );
     }
 
     // Debug indicator / save indicator
@@ -422,6 +435,7 @@ fn main() -> io::Result<()> {
     let mut pending_offline_report: Option<core::game_logic::OfflineReport> = None;
 
     let mut haven_ui = HavenUiState::new();
+    let mut blacksmith_ui = BlacksmithUiState::new();
     let mut achievement_browser = AchievementBrowserState::new();
 
     // Setup terminal
@@ -880,6 +894,8 @@ fn main() -> io::Result<()> {
                             &overlay,
                             &haven,
                             &haven_ui,
+                            &blacksmith_ui,
+                            &enhancement,
                             &global_achievements,
                             debug_mode,
                             &debug_menu,
@@ -921,6 +937,8 @@ fn main() -> io::Result<()> {
                                 &mut state,
                                 &mut haven,
                                 &mut haven_ui,
+                                &mut blacksmith_ui,
+                                &mut enhancement,
                                 &mut overlay,
                                 &mut debug_menu,
                                 debug_mode,
@@ -1104,6 +1122,36 @@ fn main() -> io::Result<()> {
                             }
                         }
                         last_tick = Instant::now();
+
+                        // Advance blacksmith animation
+                        if blacksmith_ui.open {
+                            match blacksmith_ui.phase {
+                                input::BlacksmithPhase::Hammering => {
+                                    blacksmith_ui.animation_tick += 1;
+                                    if blacksmith_ui.animation_tick >= 25 {
+                                        if let Some(ref result) = blacksmith_ui.last_result {
+                                            blacksmith_ui.phase = if result.success {
+                                                input::BlacksmithPhase::ResultSuccess
+                                            } else {
+                                                input::BlacksmithPhase::ResultFailure
+                                            };
+                                            blacksmith_ui.animation_tick = 0;
+                                        }
+                                    }
+                                }
+                                input::BlacksmithPhase::ResultSuccess => {
+                                    if blacksmith_ui.animation_tick < 20 {
+                                        blacksmith_ui.animation_tick += 1;
+                                    }
+                                }
+                                input::BlacksmithPhase::ResultFailure => {
+                                    if blacksmith_ui.animation_tick < 15 {
+                                        blacksmith_ui.animation_tick += 1;
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
                     }
 
                     // Auto-save every 30 seconds
