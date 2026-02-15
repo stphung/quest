@@ -122,12 +122,13 @@ fn render_menu(
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3), // Flavor text
+            Constraint::Length(1), // Spacer
+            Constraint::Length(1), // Column header
             Constraint::Length(7), // Slot list (7 slots)
             Constraint::Length(1), // Spacer
             Constraint::Length(3), // Detail panel for selected slot
             Constraint::Length(1), // Spacer
             Constraint::Length(1), // Stats
-            Constraint::Length(1), // Spacer
             Constraint::Length(1), // Help
             Constraint::Min(0),    // Padding
         ])
@@ -144,8 +145,16 @@ fn render_menu(
     .wrap(Wrap { trim: true });
     frame.render_widget(flavor, chunks[0]);
 
+    // Column header
+    //       "▶ " + icon + " " + name(20) + " " + level info
+    let header = Paragraph::new(Line::from(vec![Span::styled(
+        "     Equipment            Level      Rate",
+        Style::default().fg(Color::DarkGray),
+    )]));
+    frame.render_widget(header, chunks[2]);
+
     // Equipment slot rows
-    let slot_area = chunks[1];
+    let slot_area = chunks[3];
     for (i, (slot, icon)) in SLOT_ORDER.iter().zip(SLOT_ICONS.iter()).enumerate() {
         if i as u16 >= slot_area.height {
             break;
@@ -193,10 +202,10 @@ fn render_menu(
         spans.push(Span::styled(name, Style::default().fg(name_color)));
         spans.push(Span::raw(" "));
 
-        // Enhancement level and target
+        // Enhancement level and target (fixed-width for column alignment)
         if current_level >= MAX_ENHANCEMENT_LEVEL {
             spans.push(Span::styled(
-                "+10 MAX",
+                "+10 MAX    ",
                 Style::default()
                     .fg(Color::Rgb(255, 215, 0))
                     .add_modifier(Modifier::BOLD),
@@ -204,13 +213,13 @@ fn render_menu(
         } else {
             let lvl_color = level_color(current_level);
             spans.push(Span::styled(
-                format!("+{}", current_level),
+                format!("+{:<2}", current_level),
                 Style::default().fg(lvl_color),
             ));
 
             let target = current_level + 1;
             spans.push(Span::styled(
-                format!(" \u{2192} +{}", target),
+                format!(" \u{2192} +{:<2}", target),
                 Style::default().fg(level_color(target)),
             ));
 
@@ -240,7 +249,7 @@ fn render_menu(
 
     // Detail panel for selected slot
     let selected_level = enhancement.level(blacksmith_ui.selected_slot);
-    let detail_area = chunks[3];
+    let detail_area = chunks[5];
 
     if selected_level >= MAX_ENHANCEMENT_LEVEL {
         let detail = Paragraph::new(vec![
@@ -338,14 +347,14 @@ fn render_menu(
         ),
     ]);
     let stats = Paragraph::new(stats_line);
-    frame.render_widget(stats, chunks[5]);
+    frame.render_widget(stats, chunks[7]);
 
     // Help
     let help = Paragraph::new(Line::from(Span::styled(
         "\u{2191}\u{2193} Select  Enter Enhance  Esc Close",
         Style::default().fg(Color::DarkGray),
     )));
-    frame.render_widget(help, chunks[7]);
+    frame.render_widget(help, chunks[8]);
 }
 
 /// Render the confirmation phase
