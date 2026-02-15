@@ -674,3 +674,86 @@ fn test_enhancement_achievements() {
     achievements.on_enhancement_upgraded(1, &[10, 10, 10, 10, 10, 10, 10], 100, char_name);
     assert!(achievements.is_unlocked(quest::achievements::AchievementId::PersistentHammering));
 }
+
+// =========================================================================
+// Full enhancement flow (integration)
+// =========================================================================
+
+#[test]
+fn test_full_enhancement_flow() {
+    let mut enhancement = EnhancementProgress::new();
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+
+    // Not yet discovered
+    assert!(!enhancement.discovered);
+
+    // Discover
+    enhancement.discovered = true;
+    assert!(enhancement.discovered);
+
+    // Enhance weapon from +0 to +4 (100% success rate)
+    for target in 1..=4 {
+        let cost = enhancement_cost(target);
+        let rate = success_rate(target);
+        assert_eq!(rate, 1.0, "+{} should be 100% success", target);
+        assert_eq!(cost, 1, "+{} should cost 1 PR", target);
+
+        let success = attempt_enhancement(&mut enhancement, 0, &mut rng);
+        assert!(success, "+{} should always succeed", target);
+        assert_eq!(enhancement.level(0), target);
+    }
+
+    assert_eq!(enhancement.total_attempts, 4);
+    assert_eq!(enhancement.total_successes, 4);
+    assert_eq!(enhancement.total_failures, 0);
+    assert_eq!(enhancement.highest_level_reached, 4);
+}
+
+// =========================================================================
+// Persistence roundtrip (integration)
+// =========================================================================
+
+#[test]
+fn test_enhancement_persistence_roundtrip() {
+    let mut enhancement = EnhancementProgress::new();
+    enhancement.discovered = true;
+    enhancement.levels = [3, 5, 0, 0, 7, 0, 10];
+    enhancement.total_attempts = 50;
+    enhancement.total_successes = 30;
+    enhancement.total_failures = 20;
+    enhancement.highest_level_reached = 10;
+
+    // Serialize and deserialize
+    let json = serde_json::to_string(&enhancement).unwrap();
+    let loaded: EnhancementProgress = serde_json::from_str(&json).unwrap();
+
+    assert!(loaded.discovered);
+    assert_eq!(loaded.levels, [3, 5, 0, 0, 7, 0, 10]);
+    assert_eq!(loaded.total_attempts, 50);
+    assert_eq!(loaded.total_successes, 30);
+    assert_eq!(loaded.total_failures, 20);
+    assert_eq!(loaded.highest_level_reached, 10);
+}
+
+// =========================================================================
+// Display function tests (integration)
+// =========================================================================
+
+#[test]
+fn test_enhancement_display_functions() {
+    // enhancement_prefix
+    assert_eq!(enhancement_prefix(0), "");
+    assert_eq!(enhancement_prefix(1), "+1 ");
+    assert_eq!(enhancement_prefix(5), "+5 ");
+    assert_eq!(enhancement_prefix(10), "+10 ");
+
+    // enhancement_color_tier
+    assert_eq!(enhancement_color_tier(0), 0); // none
+    assert_eq!(enhancement_color_tier(1), 1); // white
+    assert_eq!(enhancement_color_tier(4), 1); // white
+    assert_eq!(enhancement_color_tier(5), 2); // yellow
+    assert_eq!(enhancement_color_tier(7), 2); // yellow
+    assert_eq!(enhancement_color_tier(8), 3); // magenta
+    assert_eq!(enhancement_color_tier(9), 3); // magenta
+    assert_eq!(enhancement_color_tier(10), 4); // gold
+}

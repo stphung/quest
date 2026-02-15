@@ -1,5 +1,6 @@
 use crate::character::manager::CharacterInfo;
 use crate::character::prestige::get_prestige_tier;
+use crate::enhancement::EnhancementProgress;
 use crate::haven::{Haven, HavenRoomId};
 use crate::items::types::EquipmentSlot;
 use crate::ui::responsive::SizeTier;
@@ -28,22 +29,30 @@ impl CharacterSelectScreen {
         area: Rect,
         characters: &[CharacterInfo],
         haven: &Haven,
+        enhancement: &EnhancementProgress,
         ctx: &super::responsive::LayoutContext,
     ) {
         match ctx.tier {
             SizeTier::S | SizeTier::TooSmall => {
-                self.draw_small(f, area, characters, haven);
+                self.draw_small(f, area, characters, haven, enhancement);
             }
             SizeTier::M => {
-                self.draw_medium(f, area, characters, haven);
+                self.draw_medium(f, area, characters, haven, enhancement);
             }
             _ => {
-                self.draw_large(f, area, characters, haven);
+                self.draw_large(f, area, characters, haven, enhancement);
             }
         }
     }
 
-    fn draw_large(&self, f: &mut Frame, area: Rect, characters: &[CharacterInfo], haven: &Haven) {
+    fn draw_large(
+        &self,
+        f: &mut Frame,
+        area: Rect,
+        characters: &[CharacterInfo],
+        haven: &Haven,
+        enhancement: &EnhancementProgress,
+    ) {
         // Only show Haven section if discovered (keep it secret otherwise!)
         let constraints = if haven.discovered {
             vec![
@@ -100,10 +109,24 @@ impl CharacterSelectScreen {
         };
 
         // Controls
-        self.draw_controls(f, chunks[controls_idx], characters, haven, false);
+        self.draw_controls(
+            f,
+            chunks[controls_idx],
+            characters,
+            haven,
+            enhancement,
+            false,
+        );
     }
 
-    fn draw_medium(&self, f: &mut Frame, area: Rect, characters: &[CharacterInfo], haven: &Haven) {
+    fn draw_medium(
+        &self,
+        f: &mut Frame,
+        area: Rect,
+        characters: &[CharacterInfo],
+        haven: &Haven,
+        enhancement: &EnhancementProgress,
+    ) {
         // M tier: reduced margins, no Haven tree, compact layout
         let constraints = vec![
             Constraint::Length(2), // Title
@@ -143,10 +166,17 @@ impl CharacterSelectScreen {
         self.draw_character_details(f, main_chunks[1], characters);
 
         // Controls (compact)
-        self.draw_controls(f, chunks[2], characters, haven, true);
+        self.draw_controls(f, chunks[2], characters, haven, enhancement, true);
     }
 
-    fn draw_small(&self, f: &mut Frame, area: Rect, characters: &[CharacterInfo], haven: &Haven) {
+    fn draw_small(
+        &self,
+        f: &mut Frame,
+        area: Rect,
+        characters: &[CharacterInfo],
+        haven: &Haven,
+        enhancement: &EnhancementProgress,
+    ) {
         // S tier: minimal list view, no details panel, no Haven tree
         let constraints = vec![
             Constraint::Length(1), // Title
@@ -175,7 +205,7 @@ impl CharacterSelectScreen {
         self.draw_character_list_compact(f, chunks[1], characters);
 
         // Compact controls
-        self.draw_controls(f, chunks[2], characters, haven, true);
+        self.draw_controls(f, chunks[2], characters, haven, enhancement, true);
     }
 
     fn draw_controls(
@@ -184,6 +214,7 @@ impl CharacterSelectScreen {
         area: Rect,
         characters: &[CharacterInfo],
         haven: &Haven,
+        enhancement: &EnhancementProgress,
         compact: bool,
     ) {
         let new_button = if characters.len() >= 3 {
@@ -213,6 +244,15 @@ impl CharacterSelectScreen {
                         .add_modifier(Modifier::BOLD),
                 ));
             }
+            if enhancement.discovered {
+                second_row_spans.push(Span::raw("  "));
+                second_row_spans.push(Span::styled(
+                    "[B] Smith",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ));
+            }
             control_lines.push(Line::from(second_row_spans));
             let controls = Paragraph::new(control_lines)
                 .alignment(Alignment::Center)
@@ -233,6 +273,15 @@ impl CharacterSelectScreen {
                 second_row_spans.push(Span::raw("    "));
                 second_row_spans.push(Span::styled(
                     "[H] Haven",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ));
+            }
+            if enhancement.discovered {
+                second_row_spans.push(Span::raw("    "));
+                second_row_spans.push(Span::styled(
+                    "[B] Blacksmith",
                     Style::default()
                         .fg(Color::Yellow)
                         .add_modifier(Modifier::BOLD),

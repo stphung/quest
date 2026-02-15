@@ -220,6 +220,7 @@ fn draw_game_overlays(
                 area,
                 global_achievements,
                 browser,
+                enhancement,
                 ctx,
             );
         }
@@ -509,7 +510,7 @@ fn main() -> io::Result<()> {
                 terminal.draw(|f| {
                     let area = f.area();
                     let ctx = ui::responsive::LayoutContext::from_frame(f);
-                    select_screen.draw(f, area, &characters, &haven, &ctx);
+                    select_screen.draw(f, area, &characters, &haven, &enhancement, &ctx);
                     // Draw Haven management overlay if open
                     if haven_ui.showing {
                         ui::haven_scene::render_haven_tree(
@@ -529,6 +530,19 @@ fn main() -> io::Result<()> {
                             area,
                             &global_achievements,
                             &achievement_browser,
+                            &enhancement,
+                            &ctx,
+                        );
+                    }
+                    // Draw Blacksmith overlay if open
+                    if blacksmith_ui.open {
+                        ui::blacksmith_scene::render_blacksmith(
+                            f,
+                            area,
+                            &blacksmith_ui,
+                            &enhancement,
+                            &crate::items::Equipment::new(),
+                            0,
                             &ctx,
                         );
                     }
@@ -540,6 +554,25 @@ fn main() -> io::Result<()> {
                         if key_event.kind != KeyEventKind::Press {
                             continue;
                         }
+                        // Handle Blacksmith overlay (blocks other input when open)
+                        if blacksmith_ui.open {
+                            match key_event.code {
+                                KeyCode::Up => {
+                                    if blacksmith_ui.selected_slot > 0 {
+                                        blacksmith_ui.selected_slot -= 1;
+                                    }
+                                }
+                                KeyCode::Down => {
+                                    if blacksmith_ui.selected_slot < 6 {
+                                        blacksmith_ui.selected_slot += 1;
+                                    }
+                                }
+                                KeyCode::Esc => blacksmith_ui.close(),
+                                _ => {}
+                            }
+                            continue;
+                        }
+
                         // Handle achievement browser (blocks other input when open)
                         if achievement_browser.showing {
                             let category_achievements = achievements::get_achievements_by_category(
@@ -613,6 +646,14 @@ fn main() -> io::Result<()> {
                             && haven.discovered
                         {
                             haven_ui.open();
+                            continue;
+                        }
+
+                        // Handle Blacksmith shortcut (if discovered)
+                        if matches!(key_event.code, KeyCode::Char('b') | KeyCode::Char('B'))
+                            && enhancement.discovered
+                        {
+                            blacksmith_ui.open();
                             continue;
                         }
 
