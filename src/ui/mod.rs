@@ -42,6 +42,7 @@ use ratatui::{
 use responsive::{render_too_small, LayoutContext, SizeTier};
 
 /// Main UI drawing function with optional update notification
+#[allow(clippy::too_many_arguments)]
 pub fn draw_ui_with_update(
     frame: &mut Frame,
     game_state: &GameState,
@@ -50,6 +51,7 @@ pub fn draw_ui_with_update(
     update_check_completed: bool,
     haven_discovered: bool,
     achievements: &crate::achievements::Achievements,
+    enhancement_levels: &[u8; 7],
 ) {
     let ctx = LayoutContext::from_frame(frame);
 
@@ -69,6 +71,7 @@ pub fn draw_ui_with_update(
                 update_check_completed,
                 haven_discovered,
                 achievements,
+                enhancement_levels,
             );
         }
         SizeTier::M => {
@@ -94,6 +97,7 @@ fn draw_xl_l_layout(
     update_check_completed: bool,
     haven_discovered: bool,
     achievements: &crate::achievements::Achievements,
+    enhancement_levels: &[u8; 7],
 ) {
     let size = frame.area();
 
@@ -169,7 +173,7 @@ fn draw_xl_l_layout(
         .split(content_area);
 
     // Draw stats panel on the left
-    stats_panel::draw_stats_panel(frame, chunks[0], game_state, ctx);
+    stats_panel::draw_stats_panel(frame, chunks[0], game_state, ctx, enhancement_levels);
 
     // Draw full-width Loot + Combat panels
     info_panel::draw_info_panel(frame, info_area, game_state, ctx);

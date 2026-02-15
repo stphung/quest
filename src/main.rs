@@ -872,6 +872,7 @@ fn main() -> io::Result<()> {
                             update_check_completed,
                             haven.discovered,
                             &global_achievements,
+                            &enhancement.levels,
                         );
                         draw_game_overlays(
                             frame,
