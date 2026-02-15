@@ -963,4 +963,38 @@ mod tests {
         state.close();
         assert!(!state.showing);
     }
+
+    #[test]
+    fn test_stats_tab_navigation() {
+        let mut state = AchievementBrowserState::new();
+
+        // Navigate to Stats tab
+        state.next_category(); // Level
+        state.next_category(); // Progression
+        state.next_category(); // Challenges
+        state.next_category(); // Exploration
+        state.next_category(); // Stats
+        assert_eq!(state.selected_category, AchievementCategory::Stats);
+
+        // Stats wraps to Combat
+        state.next_category();
+        assert_eq!(state.selected_category, AchievementCategory::Combat);
+
+        // Backward from Combat goes to Stats
+        state.prev_category();
+        assert_eq!(state.selected_category, AchievementCategory::Stats);
+
+        // Backward from Stats goes to Exploration
+        state.prev_category();
+        assert_eq!(state.selected_category, AchievementCategory::Exploration);
+    }
+
+    #[test]
+    fn test_format_number() {
+        assert_eq!(format_number(0), "0");
+        assert_eq!(format_number(999), "999");
+        assert_eq!(format_number(1000), "1,000");
+        assert_eq!(format_number(12847), "12,847");
+        assert_eq!(format_number(1000000), "1,000,000");
+    }
 }
