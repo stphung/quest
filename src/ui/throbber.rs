@@ -49,3 +49,32 @@ pub fn spinner_char() -> char {
 pub fn waiting_message(seed: u64) -> &'static str {
     WAITING_MESSAGES[(seed.wrapping_mul(7) as usize) % WAITING_MESSAGES.len()]
 }
+
+/// Atmospheric messages shown while regenerating HP after a kill.
+const REGEN_MESSAGES: [&str; 20] = [
+    "Catching your breath...",
+    "Wounds knitting shut...",
+    "Rest a moment...",
+    "Recovering strength...",
+    "Bandaging wounds...",
+    "Steadying your grip...",
+    "The pain subsides...",
+    "Vitality returns...",
+    "Second wind...",
+    "Steeling yourself...",
+    "Tending to injuries...",
+    "Gathering focus...",
+    "A brief respite...",
+    "Healing energies flow...",
+    "Shaking it off...",
+    "Ready soon...",
+    "Mending the damage...",
+    "Taking a breather...",
+    "Fortitude restored...",
+    "Regaining composure...",
+];
+
+/// Returns a regenerating message based on a seed value.
+pub fn regen_message(seed: u64) -> &'static str {
+    REGEN_MESSAGES[(seed.wrapping_mul(7) as usize) % REGEN_MESSAGES.len()]
+}

@@ -380,20 +380,6 @@ fn draw_s_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
             .ratio(hp_ratio);
 
         frame.render_widget(gauge, area);
-    } else {
-        let text = if game_state.combat_state.is_regenerating {
-            "Regenerating..."
-        } else {
-            "Spawning..."
-        };
-        let paragraph = Paragraph::new(Line::from(Span::styled(
-            text,
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::ITALIC),
-        )))
-        .alignment(Alignment::Center);
-        frame.render_widget(paragraph, area);
     }
 }
 
