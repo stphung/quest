@@ -171,8 +171,8 @@ fn test_fail_penalty_boundaries() {
 #[test]
 fn test_enhancement_multiplier_key_levels() {
     assert!((enhancement_multiplier(0) - 1.0).abs() < f64::EPSILON);
-    assert!((enhancement_multiplier(5) - 1.09).abs() < f64::EPSILON);
-    assert!((enhancement_multiplier(10) - 1.50).abs() < f64::EPSILON);
+    assert!((enhancement_multiplier(5) - 1.30).abs() < f64::EPSILON);
+    assert!((enhancement_multiplier(10) - 2.5).abs() < f64::EPSILON);
 }
 
 #[test]

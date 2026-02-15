@@ -69,8 +69,9 @@ pub const ENHANCEMENT_FAIL_PENALTY: [u8; 10] = [
     2, 2, 2, // +8-10: -2
 ];
 
-pub const ENHANCEMENT_CUMULATIVE_BONUS: [f64; 11] =
-    [0.0, 1.0, 2.0, 4.0, 6.0, 9.0, 13.0, 18.0, 25.0, 35.0, 50.0];
+pub const ENHANCEMENT_CUMULATIVE_BONUS: [f64; 11] = [
+    0.0, 5.0, 10.0, 15.0, 20.0, 30.0, 40.0, 55.0, 75.0, 100.0, 150.0,
+];
 
 pub fn success_rate(target_level: u8) -> f64 {
     if target_level == 0 || target_level > MAX_ENHANCEMENT_LEVEL {
