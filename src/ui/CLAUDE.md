@@ -33,6 +33,8 @@ src/ui/
 ├── rune_scene.rs             # Rune Deciphering with guess history
 ├── flappy_scene.rs           # Flappy Bird side-scroller (cyan border, pipe obstacles, bird)
 ├── snake_scene.rs            # Snake game (green border, 26×26 grid, body gradient, food)
+├── jezzball_scene.rs         # JezzBall game (containment breach, wall-building, ball physics)
+├── soulforge_scene.rs        # Soulforge enhancement overlay
 │
 ├── character_select.rs       # Character list with preview panel
 ├── character_creation.rs     # Name input with real-time validation

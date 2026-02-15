@@ -63,13 +63,14 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 - [`src/zones/CLAUDE.md`](src/zones/CLAUDE.md) — Zone tiers, progression, weapon gates
 - [`src/haven/CLAUDE.md`](src/haven/CLAUDE.md) — Account-level base building, bonus system
 - [`src/achievements/CLAUDE.md`](src/achievements/CLAUDE.md) — Achievement tracking, persistence
+- [`src/enhancement/CLAUDE.md`](src/enhancement/CLAUDE.md) — Soulforge enhancement system
 - [`src/ui/CLAUDE.md`](src/ui/CLAUDE.md) — Shared game layout components, color conventions
 
 ### Core Module (`src/core/`)
 
 - `game_state.rs` — Main character state struct (level, XP, prestige, combat state, equipment)
 - `game_logic.rs` — XP curve (`100 × level^1.5`), leveling (+3 random attribute points), enemy spawning, offline progression
-- `tick.rs` — Per-tick game engine: `game_tick<R: Rng>()` with 9 processing stages, returns `TickResult` with `Vec<TickEvent>` (25+ variants). Zero UI imports, zero file I/O — fully decoupled from rendering
+- `tick.rs` — Per-tick game engine: `game_tick<R: Rng>()` with 12 processing stages, returns `TickResult` with `Vec<TickEvent>` (25+ variants). Zero UI imports, zero file I/O — fully decoupled from rendering
 - `constants.rs` — Game balance constants (tick rate, attack intervals, XP rates, item drop rates, zone enemy stats, boss multipliers, prestige combat bonuses, update check jitter)
 
 ### Simulator (`src/bin/simulator.rs`)
@@ -87,7 +88,7 @@ CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FI
 ### Character Module (`src/character/`) — [detailed docs](src/character/CLAUDE.md)
 
 - `attributes.rs` — 6 RPG attributes (STR, DEX, CON, INT, WIS, CHA), modifier = `(value - 10) / 2`
-- `derived_stats.rs` — Combat stats calculated from attributes (HP, damage, defense, crit, XP mult)
+- `derived_stats.rs` — Combat stats calculated from attributes and enhancement levels (HP, damage, defense, crit, XP mult)
 - `prestige.rs` — Prestige tiers (Bronze→Eternal) with XP multipliers (`1+0.5×rank^0.7`, diminishing returns), attribute cap increases (`10+rank×5`), and `PrestigeCombatBonuses` (flat damage/defense/crit/HP from rank)
 - `manager.rs` — Character CRUD operations (create, delete, rename), JSON save/load in ~/.quest/, name validation
 - `input.rs` — Character selection, creation, deletion, renaming input handling and UI states
@@ -137,6 +138,14 @@ CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FI
 - `names.rs` — Procedural name generation with prefixes/suffixes
 - `scoring.rs` — Smart weighted auto-equip scoring (attribute specialization bonus, affix type weights)
 
+### Enhancement Module (`src/enhancement/`) — [detailed docs](src/enhancement/CLAUDE.md)
+
+- `types.rs` — EnhancementProgress (per-slot levels 0-10), SoulforgePhase, SoulforgeUiState, constants (success rates, costs, penalties, multiplier curve)
+- `logic.rs` — Enhancement rolling, result application, Soulforge discovery chance/roll
+- `persistence.rs` — Save/load from `~/.quest/enhancement.json`
+
+Account-level equipment enhancement system (Soulforge) that persists across characters. Each of 7 equipment slots can be enhanced from +0 to +10. Levels +1-4 are 100% success rate; +5-10 have decreasing success rates (60% down to 10%) and failure penalties (-1 or -2 levels). Costs prestige ranks. Discovered at P15+. Enhancement multipliers boost equipment stats in `derived_stats.rs`.
+
 ### Challenge Minigames (`src/challenges/`) — [detailed docs](src/challenges/CLAUDE.md)
 
 - `menu.rs` — Generic challenge menu system (pending challenges, extensible challenge types)
@@ -147,7 +156,8 @@ CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FI
 - `minesweeper/` — Trap Detection, 4 difficulties (9×9 to 20×16)
 - `rune/` — Rune Deciphering (Mastermind-style deduction), 4 difficulties
 - `snake/` — Serpent's Path (Snake) on 26×26 grid, 4 difficulties (Novice 10 food/200ms, Master 25 food/90ms), real-time ~60 FPS
-- `flappy/` — Skyward Gauntlet (Flappy Bird) on 50×18 area, 4 difficulties, gravity/flap physics, pipe obstacles with gap sizes (7→4 rows), real-time ~60 FPS
+- `flappy/` — Skyward Gauntlet (Flappy Bird) on 50×18 area, 4 difficulties, gravity/flap physics, pipe obstacles with gap sizes (7→4 rows), 3 lives, real-time ~60 FPS
+- `jezzball/` — Containment Breach (JezzBall) on 34×22 grid, 4 difficulties (2-5 balls), wall-building to capture area, 3 lives, real-time ~60 FPS
 
 ### Haven Module (`src/haven/`) — [detailed docs](src/haven/CLAUDE.md)
 
@@ -162,7 +172,7 @@ Account-level base building that persists across prestiges. 14 rooms in a two-br
 - `data.rs` — Achievement database with descriptions and unlock conditions
 - `persistence.rs` — Save/load from `~/.quest/achievements.json`
 
-Account-level achievement system that persists across characters. 5 categories (Combat, Level, Progression, Challenges, Exploration). Tracks kills, boss kills, levels, prestige, zone completion, challenge wins, fishing ranks/catches, dungeon completions, and Haven building. Includes modal notification system with 500ms accumulation window.
+Account-level achievement system that persists across characters. 5 categories (Combat, Level, Progression, Challenges, Exploration). Tracks kills, boss kills, levels, prestige, zone completion, challenge wins, fishing ranks/catches, dungeon completions, Haven building, and Soulforge enhancements. Includes modal notification system with 500ms accumulation window.
 
 ### Input Handling (`src/input.rs`)
 
@@ -172,7 +182,7 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 
 - `build_info.rs` — Build metadata (commit, date) embedded at compile time
 - `updater.rs` — Self-update from GitHub releases (30min check interval ±5min jitter)
-- `debug_menu.rs` — Debug menu for testing discoveries (activate with `--debug` flag, toggle with backtick). Options: trigger dungeons, fishing, all 8 challenge types, Haven discovery
+- `debug_menu.rs` — Debug menu for testing discoveries (activate with `--debug` flag, toggle with backtick). Options: trigger dungeons, fishing, all 9 challenge types, Haven discovery
 
 ### UI (`src/ui/`) — [detailed docs](src/ui/CLAUDE.md)
 
@@ -191,7 +201,8 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 - `achievement_browser_scene.rs` — Achievement browsing and tracking
 - `challenge_menu_scene.rs` — Challenge menu list/detail view
 - `responsive.rs` — Responsive layout with 5 size tiers (TooSmall/S/M/L/XL)
-- `chess_scene.rs`, `go_scene.rs`, `morris_scene.rs`, `gomoku_scene.rs`, `minesweeper_scene.rs`, `rune_scene.rs`, `snake_scene.rs`, `flappy_scene.rs` — Minigame UIs
+- `soulforge_scene.rs` — Soulforge enhancement overlay
+- `chess_scene.rs`, `go_scene.rs`, `morris_scene.rs`, `gomoku_scene.rs`, `minesweeper_scene.rs`, `rune_scene.rs`, `snake_scene.rs`, `flappy_scene.rs`, `jezzball_scene.rs` — Minigame UIs
 - `debug_menu_scene.rs` — Debug menu overlay
 - `throbber.rs` — Shared spinner animations and atmospheric messages
 - `character_select.rs`, `character_creation.rs`, `character_delete.rs`, `character_rename.rs` — Character management UI
@@ -237,6 +248,9 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 - Boss spawn: After 10 kills in subzone (5 kills to retry after boss death)
 - Haven discovery: requires P10+, base chance 0.000014/tick + 0.000007 per rank above 10
 - Challenge discovery: ~2hr avg per challenge (requires P1+)
+- Soulforge discovery: requires P15+, base chance 0.000014/tick + 0.000007 per rank above 15
+- Enhancement levels: 0-10, success rates 100% (+1-4), 60%/50%/40% (+5-7), 30%/20%/10% (+8-10)
+- Enhancement costs: 1 PR (+1-4), 3 PR (+5-7), 5 PR (+8-9), 10 PR (+10)
 
 ## Combat Mechanics
 
@@ -292,6 +306,10 @@ quest/
 │   │   ├── drops.rs         # Drop system
 │   │   ├── names.rs         # Name generation
 │   │   └── scoring.rs       # Auto-equip scoring
+│   ├── enhancement/         # Soulforge enhancement system [CLAUDE.md]
+│   │   ├── types.rs         # Enhancement progress, constants, UI state
+│   │   ├── logic.rs         # Enhancement rolling, discovery
+│   │   └── persistence.rs   # Save/load
 │   ├── challenges/          # Challenge minigames [CLAUDE.md]
 │   │   ├── menu.rs          # Challenge menu
 │   │   ├── chess/           # Chess minigame
@@ -301,7 +319,8 @@ quest/
 │   │   ├── minesweeper/     # Trap Detection
 │   │   ├── rune/            # Rune Deciphering
 │   │   ├── snake/           # Serpent's Path (Snake)
-│   │   └── flappy/          # Skyward Gauntlet (Flappy Bird)
+│   │   ├── flappy/          # Skyward Gauntlet (Flappy Bird)
+│   │   └── jezzball/        # Containment Breach (JezzBall)
 │   ├── haven/               # Haven base building [CLAUDE.md]
 │   │   ├── types.rs         # Room definitions, bonuses
 │   │   └── logic.rs         # Construction, upgrades
@@ -321,9 +340,11 @@ quest/
 │       ├── combat_3d.rs     # 3D dungeon renderer
 │       ├── snake_scene.rs   # Snake UI
 │       ├── flappy_scene.rs  # Flappy Bird UI
+│       ├── jezzball_scene.rs # JezzBall UI
+│       ├── soulforge_scene.rs # Soulforge enhancement UI
 │       ├── *_scene.rs       # Various game scenes
 │       └── character_*.rs   # Character management UI
-├── tests/                   # Integration tests (14 test files, 1,163+ tests)
+├── tests/                   # Integration tests (15 test files, 1,493+ tests)
 │   ├── game_loop_orchestration_test.rs  # 36 behavior-locking tests for game_tick
 │   ├── tick_integration_test.rs         # Tick module integration tests
 │   ├── zone_progression_test.rs         # Zone advancement tests
@@ -338,4 +359,4 @@ quest/
 
 ## Dependencies
 
-Ratatui 0.30, Serde (JSON), Rand 0.10, Rand_chacha 0.10 (seeded RNG for simulator), Chrono, Directories, Chess-engine 0.1, ureq 3.2, flate2 1.1, zip 7.4
+Ratatui 0.30, Serde (JSON), Rand 0.10, Rand_chacha 0.10 (seeded RNG for simulator), Chrono, Directories, Chess-engine 0.1, ureq 3.2, flate2 1.1, zip 8.0
