@@ -544,7 +544,7 @@ mod tests {
     #[test]
     fn test_bird_passes_through_gap() {
         let mut game = started_game(FlappyBirdDifficulty::Novice);
-        // Bird at row 8, pipe gap centered at row 8 (gap: rows 4.5..11.5 for Novice gap=7)
+        // Bird at row 8, pipe gap centered at row 8 (gap: rows 4..12 for Novice gap=7)
         game.bird_y = 8.0;
         game.bird_velocity = 0.0;
 
