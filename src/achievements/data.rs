@@ -1045,6 +1045,10 @@ mod tests {
     #[test]
     fn test_every_category_has_achievements() {
         for category in AchievementCategory::ALL {
+            // Stats is a special tab that shows game statistics, not achievements
+            if category == AchievementCategory::Stats {
+                continue;
+            }
             let achievements = get_achievements_by_category(category);
             assert!(
                 !achievements.is_empty(),

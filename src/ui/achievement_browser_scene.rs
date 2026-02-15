@@ -46,14 +46,16 @@ impl AchievementBrowserState {
             AchievementCategory::Level => AchievementCategory::Progression,
             AchievementCategory::Progression => AchievementCategory::Challenges,
             AchievementCategory::Challenges => AchievementCategory::Exploration,
-            AchievementCategory::Exploration => AchievementCategory::Combat,
+            AchievementCategory::Exploration => AchievementCategory::Stats,
+            AchievementCategory::Stats => AchievementCategory::Combat,
         };
         self.selected_index = 0;
     }
 
     pub fn prev_category(&mut self) {
         self.selected_category = match self.selected_category {
-            AchievementCategory::Combat => AchievementCategory::Exploration,
+            AchievementCategory::Combat => AchievementCategory::Stats,
+            AchievementCategory::Stats => AchievementCategory::Exploration,
             AchievementCategory::Level => AchievementCategory::Combat,
             AchievementCategory::Progression => AchievementCategory::Level,
             AchievementCategory::Challenges => AchievementCategory::Progression,
@@ -137,8 +139,6 @@ fn render_category_tabs(
     let mut spans = Vec::new();
 
     for cat in AchievementCategory::ALL {
-        let (unlocked, total) = achievements.count_by_category(cat);
-
         let style = if cat == ui_state.selected_category {
             Style::default()
                 .fg(Color::Yellow)
@@ -147,17 +147,22 @@ fn render_category_tabs(
             Style::default().fg(Color::DarkGray)
         };
 
-        let new_count = achievements.count_recently_unlocked_by_category(cat);
-        if new_count > 0 {
-            spans.push(Span::styled(
-                format!(" {} ({}/{}) +{} ", cat.name(), unlocked, total, new_count),
-                style,
-            ));
+        if cat == AchievementCategory::Stats {
+            spans.push(Span::styled(" Stats ", style));
         } else {
-            spans.push(Span::styled(
-                format!(" {} ({}/{}) ", cat.name(), unlocked, total),
-                style,
-            ));
+            let (unlocked, total) = achievements.count_by_category(cat);
+            let new_count = achievements.count_recently_unlocked_by_category(cat);
+            if new_count > 0 {
+                spans.push(Span::styled(
+                    format!(" {} ({}/{}) +{} ", cat.name(), unlocked, total, new_count),
+                    style,
+                ));
+            } else {
+                spans.push(Span::styled(
+                    format!(" {} ({}/{}) ", cat.name(), unlocked, total),
+                    style,
+                ));
+            }
         }
     }
 
@@ -484,8 +489,12 @@ mod tests {
         state.next_category();
         assert_eq!(state.selected_category, AchievementCategory::Exploration);
         state.next_category();
+        assert_eq!(state.selected_category, AchievementCategory::Stats);
+        state.next_category();
         assert_eq!(state.selected_category, AchievementCategory::Combat);
 
+        state.prev_category();
+        assert_eq!(state.selected_category, AchievementCategory::Stats);
         state.prev_category();
         assert_eq!(state.selected_category, AchievementCategory::Exploration);
 
