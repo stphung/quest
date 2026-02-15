@@ -1,15 +1,15 @@
 //! Blacksmith UI rendering: equipment enhancement overlay with animations.
 
 use crate::enhancement::{
-    enhancement_cost, enhancement_multiplier, success_rate, BlacksmithPhase, BlacksmithUiState,
-    EnhancementProgress, MAX_ENHANCEMENT_LEVEL,
+    enhancement_cost, enhancement_multiplier, fail_penalty, success_rate, BlacksmithPhase,
+    BlacksmithUiState, EnhancementProgress, MAX_ENHANCEMENT_LEVEL,
 };
 use crate::items::{Equipment, EquipmentSlot};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::{Block, Borders, Clear, Paragraph, Wrap},
     Frame,
 };
 
@@ -55,16 +55,19 @@ pub fn render_blacksmith(
     prestige_rank: u32,
     _ctx: &super::responsive::LayoutContext,
 ) {
-    // Center overlay: 62 wide, 22 tall (or fit to terminal)
+    // Center overlay: 62 wide, 24 tall (or fit to terminal)
     let overlay_width = 62u16.min(area.width.saturating_sub(4));
-    let overlay_height = 22u16.min(area.height.saturating_sub(2));
+    let overlay_height = 24u16.min(area.height.saturating_sub(2));
     let x = area.x + (area.width.saturating_sub(overlay_width)) / 2;
     let y = area.y + (area.height.saturating_sub(overlay_height)) / 2;
     let overlay_area = Rect::new(x, y, overlay_width, overlay_height);
 
     frame.render_widget(Clear, overlay_area);
 
-    let title = format!(" \u{2692} The Blacksmith  [PR: {}] ", prestige_rank);
+    let title = format!(
+        " \u{2692} The Blacksmith  [Prestige Ranks: {}] ",
+        prestige_rank
+    );
     let block = Block::default()
         .title(title)
         .borders(Borders::ALL)
@@ -118,9 +121,10 @@ fn render_menu(
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1), // Header
-            Constraint::Length(1), // Spacer
+            Constraint::Length(3), // Flavor text
             Constraint::Length(7), // Slot list (7 slots)
+            Constraint::Length(1), // Spacer
+            Constraint::Length(3), // Detail panel for selected slot
             Constraint::Length(1), // Spacer
             Constraint::Length(1), // Stats
             Constraint::Length(1), // Spacer
@@ -129,17 +133,19 @@ fn render_menu(
         ])
         .split(area);
 
-    // Header
-    let header = Paragraph::new(Line::from(Span::styled(
-        "Select equipment to enhance:",
-        Style::default()
-            .fg(Color::White)
-            .add_modifier(Modifier::BOLD),
-    )));
-    frame.render_widget(header, chunks[0]);
+    // Flavor text from the blacksmith
+    let flavor = Paragraph::new(
+        "\u{201c}What I do here is forge the bond between warrior and \
+         armament. The gear may change, but my work never fades. \
+         Push further and the craft grows perilous \u{2014} \
+         but the power grows faster.\u{201d}",
+    )
+    .style(Style::default().fg(Color::DarkGray))
+    .wrap(Wrap { trim: true });
+    frame.render_widget(flavor, chunks[0]);
 
     // Equipment slot rows
-    let slot_area = chunks[2];
+    let slot_area = chunks[1];
     for (i, (slot, icon)) in SLOT_ORDER.iter().zip(SLOT_ICONS.iter()).enumerate() {
         if i as u16 >= slot_area.height {
             break;
@@ -187,7 +193,7 @@ fn render_menu(
         spans.push(Span::styled(name, Style::default().fg(name_color)));
         spans.push(Span::raw(" "));
 
-        // Enhancement info (always shown regardless of equipped item)
+        // Enhancement level and target
         if current_level >= MAX_ENHANCEMENT_LEVEL {
             spans.push(Span::styled(
                 "+10 MAX",
@@ -220,14 +226,6 @@ fn render_menu(
                 format!(" {:>3.0}%", rate * 100.0),
                 Style::default().fg(rate_color),
             ));
-
-            let cost = enhancement_cost(target);
-            let can_afford = prestige_rank >= cost;
-            let cost_color = if can_afford { Color::Cyan } else { Color::Red };
-            spans.push(Span::styled(
-                format!(" {}PR", cost),
-                Style::default().fg(cost_color),
-            ));
         }
 
         let row_style = if is_selected {
@@ -238,6 +236,87 @@ fn render_menu(
 
         let row = Paragraph::new(Line::from(spans)).style(row_style);
         frame.render_widget(row, row_area);
+    }
+
+    // Detail panel for selected slot
+    let selected_level = enhancement.level(blacksmith_ui.selected_slot);
+    let detail_area = chunks[3];
+
+    if selected_level >= MAX_ENHANCEMENT_LEVEL {
+        let detail = Paragraph::new(vec![
+            Line::from(vec![
+                Span::styled("Bonus: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    "+50.0% stats",
+                    Style::default()
+                        .fg(Color::Rgb(255, 215, 0))
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ]),
+            Line::from(Span::styled(
+                "Maximum enhancement reached.",
+                Style::default().fg(Color::DarkGray),
+            )),
+        ]);
+        frame.render_widget(detail, detail_area);
+    } else {
+        let target = selected_level + 1;
+        let bonus = enhancement_multiplier(target);
+        let bonus_pct = (bonus - 1.0) * 100.0;
+        let rate = success_rate(target);
+        let cost = enhancement_cost(target);
+        let can_afford = prestige_rank >= cost;
+        let penalty = fail_penalty(target);
+
+        let rate_color = if rate >= 1.0 {
+            Color::Green
+        } else if rate >= 0.5 {
+            Color::Yellow
+        } else {
+            Color::Red
+        };
+        let cost_color = if can_afford { Color::Cyan } else { Color::Red };
+
+        let failure_text = if penalty == 0 {
+            Span::styled("safe (no level loss)", Style::default().fg(Color::Green))
+        } else {
+            let result_level = selected_level.saturating_sub(penalty);
+            Span::styled(
+                format!(
+                    "-{} level{} (+{} \u{2192} +{})",
+                    penalty,
+                    if penalty > 1 { "s" } else { "" },
+                    selected_level,
+                    result_level
+                ),
+                Style::default().fg(Color::Red),
+            )
+        };
+
+        let detail = Paragraph::new(vec![
+            Line::from(vec![
+                Span::styled("Bonus: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!("+{:.1}% stats", bonus_pct),
+                    Style::default().fg(Color::Green),
+                ),
+                Span::styled("  Rate: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!("{:.0}%", rate * 100.0),
+                    Style::default().fg(rate_color),
+                ),
+                Span::styled("  Cost: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!("{} Prestige Ranks", cost),
+                    Style::default().fg(cost_color),
+                ),
+            ]),
+            Line::from(vec![
+                Span::styled("On failure: ", Style::default().fg(Color::DarkGray)),
+                failure_text,
+            ]),
+        ]);
+        frame.render_widget(detail, detail_area);
     }
 
     // Lifetime stats
@@ -259,14 +338,14 @@ fn render_menu(
         ),
     ]);
     let stats = Paragraph::new(stats_line);
-    frame.render_widget(stats, chunks[4]);
+    frame.render_widget(stats, chunks[5]);
 
     // Help
     let help = Paragraph::new(Line::from(Span::styled(
         "\u{2191}\u{2193} Select  Enter Enhance  Esc Close",
         Style::default().fg(Color::DarkGray),
     )));
-    frame.render_widget(help, chunks[6]);
+    frame.render_widget(help, chunks[7]);
 }
 
 /// Render the confirmation phase
@@ -323,7 +402,10 @@ fn render_confirming(
                 }),
             ),
             Span::styled("  Cost: ", Style::default().fg(Color::White)),
-            Span::styled(format!("{} PR", cost), Style::default().fg(Color::Cyan)),
+            Span::styled(
+                format!("{} Prestige Ranks", cost),
+                Style::default().fg(Color::Cyan),
+            ),
             Span::styled(
                 format!(" ({} \u{2192} {})", prestige_rank, prestige_rank - cost),
                 Style::default().fg(Color::DarkGray),

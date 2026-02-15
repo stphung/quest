@@ -926,6 +926,7 @@ fn main() -> io::Result<()> {
                             update_expanded,
                             update_check_completed,
                             haven.discovered,
+                            enhancement.discovered,
                             &global_achievements,
                             &enhancement.levels,
                         );
