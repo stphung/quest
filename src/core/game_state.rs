@@ -14,6 +14,7 @@ use std::collections::VecDeque;
 
 /// A recently gained item or fish for display in the Loot panel
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct RecentDrop {
     pub name: String,
     pub rarity: Rarity,

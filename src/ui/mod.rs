@@ -141,13 +141,14 @@ fn draw_xl_l_layout(
     // Stats panel: header(4)+prestige(5)+fishing(4)+attrs(5) = 18 + equip ~9
     let stats_height: u16 = 27;
 
-    // Split vertically: fixed stats area, growing info panels, optional update drawer, footer
+    // Split vertically: fixed stats area, ticker, growing combat log, optional update drawer, footer
     let v_chunks = if show_update_drawer {
         Layout::default()
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(stats_height), // Main content (stats + right panel)
-                Constraint::Min(6),               // Full-width Loot + Combat (grows)
+                Constraint::Length(1),            // Loot ticker
+                Constraint::Min(6),               // Combat log (full width, grows)
                 Constraint::Length(12),           // Update drawer panel (taller for changelog)
                 Constraint::Length(4),            // Full-width footer (2 rows)
             ])
@@ -157,18 +158,20 @@ fn draw_xl_l_layout(
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(stats_height), // Main content (stats + right panel)
-                Constraint::Min(6),               // Full-width Loot + Combat (grows)
+                Constraint::Length(1),            // Loot ticker
+                Constraint::Min(6),               // Combat log (full width, grows)
                 Constraint::Length(4),            // Full-width footer (2 rows)
             ])
             .split(main_area)
     };
 
     let content_area = v_chunks[0];
-    let info_area = v_chunks[1];
+    let ticker_area = v_chunks[1];
+    let info_area = v_chunks[2];
     let (update_drawer_area, footer_area) = if show_update_drawer {
-        (Some(v_chunks[2]), v_chunks[3])
+        (Some(v_chunks[3]), v_chunks[4])
     } else {
-        (None, v_chunks[2])
+        (None, v_chunks[3])
     };
 
     // Split main content into two areas: stats panel (left) and combat/dungeon (right)
@@ -183,7 +186,10 @@ fn draw_xl_l_layout(
     // Draw stats panel on the left
     stats_panel::draw_stats_panel(frame, chunks[0], game_state, ctx, enhancement_levels);
 
-    // Draw full-width Loot + Combat panels
+    // Draw the scrolling loot ticker
+    ticker::draw_ticker(frame, ticker_area, &game_state.loot_ticker);
+
+    // Draw full-width combat log (no loot panel in XL/L — ticker handles loot display)
     info_panel::draw_info_panel(frame, info_area, game_state, ctx);
 
     // Draw update drawer if expanded

@@ -23,14 +23,8 @@ fn truncate_to_width(s: &str, max_width: usize) -> String {
 pub fn draw_info_panel(frame: &mut Frame, area: Rect, game_state: &GameState, ctx: &LayoutContext) {
     match ctx.tier {
         SizeTier::XL | SizeTier::L => {
-            // Full side-by-side with borders
-            let chunks = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-                .split(area);
-
-            draw_recent_gains(frame, chunks[0], game_state);
-            draw_combat_log(frame, chunks[1], game_state);
+            // Full-width combat log (ticker handles loot display)
+            draw_combat_log(frame, area, game_state);
         }
         SizeTier::M => {
             // Compact: side-by-side, no borders, less padding
@@ -102,6 +96,7 @@ fn draw_combat_log(frame: &mut Frame, area: Rect, game_state: &GameState) {
 }
 
 /// Draws the loot panel (items, fish, etc.) with two-line format for equipment.
+#[allow(dead_code)]
 fn draw_recent_gains(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let block = Block::default()
         .borders(Borders::ALL)
