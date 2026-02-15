@@ -425,15 +425,19 @@ fn render_stats_view(
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    // Split into two columns: 45% left (raw stats), 55% right (grids)
+    // Split into two columns with a gap: 44% left, 3-char gap, 56% right
     let columns = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(45), Constraint::Percentage(55)])
+        .constraints([
+            Constraint::Percentage(44),
+            Constraint::Length(3),
+            Constraint::Percentage(56),
+        ])
         .split(inner);
 
     // Build content for both columns
     let left_lines = build_stats_left_lines(achievements, columns[0].width);
-    let right_lines = build_stats_right_lines(achievements, columns[1].width);
+    let right_lines = build_stats_right_lines(achievements, columns[2].width);
 
     // Clamp scroll to the taller column's content minus visible area
     let max_content = left_lines.len().max(right_lines.len());
@@ -443,7 +447,7 @@ fn render_stats_view(
 
     // Render with clamped scroll
     render_lines(frame, columns[0], left_lines, scroll);
-    render_lines(frame, columns[1], right_lines, scroll);
+    render_lines(frame, columns[2], right_lines, scroll);
 }
 
 /// Render a list of lines into an area with a scroll offset.
