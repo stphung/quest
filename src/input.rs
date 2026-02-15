@@ -3,7 +3,6 @@
 //! Extracts the input dispatch logic from main.rs into a clean priority chain.
 
 use crate::enhancement;
-use crate::items::EquipmentSlot;
 
 use crate::challenges::chess::logic::{
     apply_game_result as apply_chess_result, process_input as process_chess_input, ChessInput,
@@ -196,7 +195,6 @@ pub fn handle_game_input(
             blacksmith_ui,
             enhancement,
             &mut state.prestige_rank,
-            &state.equipment,
             achievements,
             &state.character_name,
         );
@@ -268,22 +266,11 @@ fn handle_blacksmith_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> Inpu
     InputResult::Continue
 }
 
-const SLOT_ORDER: [EquipmentSlot; 7] = [
-    EquipmentSlot::Weapon,
-    EquipmentSlot::Armor,
-    EquipmentSlot::Helmet,
-    EquipmentSlot::Gloves,
-    EquipmentSlot::Boots,
-    EquipmentSlot::Amulet,
-    EquipmentSlot::Ring,
-];
-
 fn handle_blacksmith(
     key: KeyEvent,
     blacksmith_ui: &mut BlacksmithUiState,
     enhancement: &mut enhancement::EnhancementProgress,
     prestige_rank: &mut u32,
-    equipment: &items::Equipment,
     achievements: &mut crate::achievements::Achievements,
     character_name: &str,
 ) -> InputResult {
@@ -301,13 +288,10 @@ fn handle_blacksmith(
             }
             KeyCode::Enter => {
                 let slot_index = blacksmith_ui.selected_slot;
-                let slot = SLOT_ORDER[slot_index];
                 let current_level = enhancement.level(slot_index);
 
-                // Check: item equipped, level < max, can afford
-                if equipment.get(slot).is_some()
-                    && current_level < enhancement::MAX_ENHANCEMENT_LEVEL
-                {
+                // Check: level < max, can afford (slot enhancement is independent of equipped item)
+                if current_level < enhancement::MAX_ENHANCEMENT_LEVEL {
                     let target_level = current_level + 1;
                     let cost = enhancement::enhancement_cost(target_level);
                     if *prestige_rank >= cost {

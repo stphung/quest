@@ -164,10 +164,10 @@ fn render_menu(
         // Slot icon
         spans.push(Span::raw(format!("{} ", icon)));
 
-        if let Some(item_ref) = item.as_ref() {
-            // Item name (truncated to fit)
-            let max_name_len = 18;
-            let name = if item_ref.display_name.chars().count() > max_name_len {
+        // Display name: item name if equipped, slot name if empty
+        let max_name_len = 18;
+        let (name, name_color) = if let Some(item_ref) = item.as_ref() {
+            let n = if item_ref.display_name.chars().count() > max_name_len {
                 let truncated: String = item_ref
                     .display_name
                     .chars()
@@ -177,65 +177,56 @@ fn render_menu(
             } else {
                 format!("{:width$}", item_ref.display_name, width = max_name_len)
             };
-            spans.push(Span::styled(name, Style::default().fg(Color::White)));
-            spans.push(Span::raw(" "));
-
-            if current_level >= MAX_ENHANCEMENT_LEVEL {
-                // Max level
-                spans.push(Span::styled(
-                    "+10 MAX",
-                    Style::default()
-                        .fg(Color::Rgb(255, 215, 0))
-                        .add_modifier(Modifier::BOLD),
-                ));
-            } else {
-                // Current level
-                let lvl_color = level_color(current_level);
-                spans.push(Span::styled(
-                    format!("+{}", current_level),
-                    Style::default().fg(lvl_color),
-                ));
-
-                // Arrow to next
-                let target = current_level + 1;
-                spans.push(Span::styled(
-                    format!(" \u{2192} +{}", target),
-                    Style::default().fg(level_color(target)),
-                ));
-
-                // Success rate
-                let rate = success_rate(target);
-                let rate_color = if rate >= 1.0 {
-                    Color::Green
-                } else if rate >= 0.5 {
-                    Color::Yellow
-                } else {
-                    Color::Red
-                };
-                spans.push(Span::styled(
-                    format!(" {:>3.0}%", rate * 100.0),
-                    Style::default().fg(rate_color),
-                ));
-
-                // Cost
-                let cost = enhancement_cost(target);
-                let can_afford = prestige_rank >= cost;
-                let cost_color = if can_afford { Color::Cyan } else { Color::Red };
-                spans.push(Span::styled(
-                    format!(" {}PR", cost),
-                    Style::default().fg(cost_color),
-                ));
-            }
+            (n, Color::White)
         } else {
-            // Empty slot
-            let slot_name = format!("{:8}", slot.name());
+            (
+                format!("{:width$}", slot.name(), width = max_name_len),
+                Color::DarkGray,
+            )
+        };
+        spans.push(Span::styled(name, Style::default().fg(name_color)));
+        spans.push(Span::raw(" "));
+
+        // Enhancement info (always shown regardless of equipped item)
+        if current_level >= MAX_ENHANCEMENT_LEVEL {
             spans.push(Span::styled(
-                slot_name,
-                Style::default().fg(Color::DarkGray),
+                "+10 MAX",
+                Style::default()
+                    .fg(Color::Rgb(255, 215, 0))
+                    .add_modifier(Modifier::BOLD),
             ));
+        } else {
+            let lvl_color = level_color(current_level);
             spans.push(Span::styled(
-                " -- Empty --",
-                Style::default().fg(Color::DarkGray),
+                format!("+{}", current_level),
+                Style::default().fg(lvl_color),
+            ));
+
+            let target = current_level + 1;
+            spans.push(Span::styled(
+                format!(" \u{2192} +{}", target),
+                Style::default().fg(level_color(target)),
+            ));
+
+            let rate = success_rate(target);
+            let rate_color = if rate >= 1.0 {
+                Color::Green
+            } else if rate >= 0.5 {
+                Color::Yellow
+            } else {
+                Color::Red
+            };
+            spans.push(Span::styled(
+                format!(" {:>3.0}%", rate * 100.0),
+                Style::default().fg(rate_color),
+            ));
+
+            let cost = enhancement_cost(target);
+            let can_afford = prestige_rank >= cost;
+            let cost_color = if can_afford { Color::Cyan } else { Color::Red };
+            spans.push(Span::styled(
+                format!(" {}PR", cost),
+                Style::default().fg(cost_color),
             ));
         }
 
@@ -307,7 +298,7 @@ fn render_confirming(
         .get(slot)
         .as_ref()
         .map(|i| i.display_name.as_str())
-        .unwrap_or("Unknown");
+        .unwrap_or_else(|| slot.name());
 
     let bonus = enhancement_multiplier(target_level);
     let bonus_pct = (bonus - 1.0) * 100.0;
@@ -421,9 +412,10 @@ fn render_hammering(
         .get(slot)
         .as_ref()
         .map(|i| i.display_name.clone())
-        .unwrap_or_default();
-    let item_display = if item_name.len() > 15 {
-        format!("{}..+{}", &item_name[..12], current_level)
+        .unwrap_or_else(|| slot.name().to_string());
+    let item_display = if item_name.chars().count() > 15 {
+        let truncated: String = item_name.chars().take(12).collect();
+        format!("{}..+{}", truncated, current_level)
     } else {
         format!("{} +{}", item_name, current_level)
     };
@@ -515,7 +507,7 @@ fn render_success(
         .get(slot)
         .as_ref()
         .map(|i| i.display_name.as_str())
-        .unwrap_or("Unknown");
+        .unwrap_or_else(|| slot.name());
 
     let bonus = enhancement_multiplier(result.new_level);
     let bonus_pct = (bonus - 1.0) * 100.0;
