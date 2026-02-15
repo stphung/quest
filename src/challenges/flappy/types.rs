@@ -128,6 +128,9 @@ pub struct Pipe {
     pub passed: bool,
 }
 
+/// Number of attempts the player gets per challenge.
+pub const MAX_LIVES: u32 = 3;
+
 /// Main game state.
 #[derive(Debug, Clone)]
 pub struct FlappyBirdGame {
@@ -156,6 +159,10 @@ pub struct FlappyBirdGame {
     pub score: u32,
     /// Pipes needed to win.
     pub target_score: u32,
+
+    // Lives
+    /// Remaining lives (0 = game over on next crash).
+    pub lives: u32,
 
     // Timing
     /// Sub-tick time accumulator (milliseconds).
@@ -198,6 +205,8 @@ impl FlappyBirdGame {
             score: 0,
             target_score: difficulty.target_score(),
 
+            lives: MAX_LIVES,
+
             accumulated_time_ms: 0,
             tick_count: 0,
 
@@ -210,6 +219,21 @@ impl FlappyBirdGame {
             pipe_speed: difficulty.pipe_speed(),
             pipe_spacing,
         }
+    }
+
+    /// Reset game state for a retry after losing a life. Preserves lives and difficulty.
+    pub fn reset_for_retry(&mut self) {
+        self.bird_y = 8.0;
+        self.bird_velocity = 0.0;
+        self.flap_timer = 0;
+        self.pipes.clear();
+        self.next_pipe_x = GAME_WIDTH as f64 + 5.0;
+        self.score = 0;
+        self.accumulated_time_ms = 0;
+        self.tick_count = 0;
+        self.flap_queued = false;
+        self.forfeit_pending = false;
+        self.waiting_to_start = true;
     }
 
     /// Spawn a new pipe with a random gap position.
@@ -241,7 +265,33 @@ mod tests {
         assert!(!game.forfeit_pending);
         assert_eq!(game.score, 0);
         assert_eq!(game.target_score, 10);
+        assert_eq!(game.lives, MAX_LIVES);
         assert!(game.pipes.is_empty());
+        assert!(!game.flap_queued);
+    }
+
+    #[test]
+    fn test_reset_for_retry() {
+        let mut game = FlappyBirdGame::new(FlappyBirdDifficulty::Novice);
+        game.waiting_to_start = false;
+        game.bird_y = 15.0;
+        game.bird_velocity = 0.5;
+        game.score = 5;
+        game.lives = 2;
+        game.pipes.push(Pipe {
+            x: 10.0,
+            gap_center: 8,
+            passed: false,
+        });
+
+        game.reset_for_retry();
+
+        assert_eq!(game.bird_y, 8.0);
+        assert_eq!(game.bird_velocity, 0.0);
+        assert_eq!(game.score, 0);
+        assert_eq!(game.lives, 2); // Lives preserved
+        assert!(game.pipes.is_empty());
+        assert!(game.waiting_to_start);
         assert!(!game.flap_queued);
     }
 

@@ -8,7 +8,7 @@ use super::game_common::{
     render_info_panel_frame, render_minigame_too_small, render_status_bar, GameResultType,
 };
 use crate::challenges::flappy::types::{
-    FlappyBirdGame, FlappyBirdResult, BIRD_COL, GAME_HEIGHT, GAME_WIDTH, PIPE_WIDTH,
+    FlappyBirdGame, FlappyBirdResult, BIRD_COL, GAME_HEIGHT, GAME_WIDTH, MAX_LIVES, PIPE_WIDTH,
 };
 use crate::challenges::menu::DifficultyInfo;
 use ratatui::{
@@ -506,6 +506,49 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
         }
     }
 
+    // ── Lives display (top-left) ────────────────────────────────────
+    {
+        let lives_str: String = (0..MAX_LIVES)
+            .map(|i| {
+                if i < game.lives {
+                    '\u{2665}'
+                } else {
+                    '\u{2661}'
+                }
+            })
+            .collect();
+        for (i, ch) in lives_str.chars().enumerate() {
+            let col = 1 + i;
+            if col < render_width as usize {
+                buffer[0][col] = Cell {
+                    ch,
+                    fg: if ch == '\u{2665}' {
+                        Color::Rgb(255, 90, 90)
+                    } else {
+                        Color::Rgb(100, 60, 60)
+                    },
+                    bg: Color::Rgb(18, 26, 44),
+                };
+            }
+        }
+        // Background for lives plate
+        if render_width > 0 {
+            buffer[0][0] = Cell {
+                ch: ' ',
+                fg: Color::Reset,
+                bg: Color::Rgb(18, 26, 44),
+            };
+        }
+        let end = (1 + MAX_LIVES as usize + 1).min(render_width as usize);
+        if end < render_width as usize {
+            buffer[0][end - 1] = Cell {
+                ch: ' ',
+                fg: Color::Reset,
+                bg: Color::Rgb(18, 26, 44),
+            };
+        }
+    }
+
     // ── Score display (top-right) ───────────────────────────────────
     let score_text = format!("{}/{}", game.score, game.target_score);
     let label = "Score: ";
@@ -674,6 +717,19 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
             ),
         ]),
         Line::from(""),
+        Line::from(vec![
+            Span::styled("Lives: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{}/{}", game.lives, MAX_LIVES),
+                Style::default()
+                    .fg(if game.lives > 0 {
+                        Color::Rgb(255, 90, 90)
+                    } else {
+                        Color::Red
+                    })
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
         Line::from(vec![
             Span::styled("Gap: ", Style::default().fg(Color::DarkGray)),
             Span::styled(
