@@ -858,6 +858,51 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Exploration,
         icon: "🏛️",
     },
+    // ═══════════════════════════════════════════════════════════════
+    // ENHANCEMENT ACHIEVEMENTS
+    // ═══════════════════════════════════════════════════════════════
+    AchievementDef {
+        id: AchievementId::BlacksmithDiscovered,
+        name: "Blacksmith Found",
+        description: "Discover the wandering Blacksmith",
+        category: AchievementCategory::Progression,
+        icon: "\u{2692}",
+    },
+    AchievementDef {
+        id: AchievementId::ApprenticeSmith,
+        name: "Apprentice Smith",
+        description: "Enhance any equipment to +1",
+        category: AchievementCategory::Progression,
+        icon: "\u{2692}",
+    },
+    AchievementDef {
+        id: AchievementId::JourneymanSmith,
+        name: "Journeyman Smith",
+        description: "Enhance any equipment to +5",
+        category: AchievementCategory::Progression,
+        icon: "\u{2692}",
+    },
+    AchievementDef {
+        id: AchievementId::MasterSmith,
+        name: "Master Smith",
+        description: "Enhance any equipment to +10",
+        category: AchievementCategory::Progression,
+        icon: "\u{2692}",
+    },
+    AchievementDef {
+        id: AchievementId::FullyEnhanced,
+        name: "Fully Enhanced",
+        description: "Enhance all 7 equipment slots to +10",
+        category: AchievementCategory::Progression,
+        icon: "\u{2692}",
+    },
+    AchievementDef {
+        id: AchievementId::PersistentHammering,
+        name: "Persistent Hammering",
+        description: "Attempt 100 enhancements",
+        category: AchievementCategory::Progression,
+        icon: "\u{2692}",
+    },
 ];
 
 /// Get the definition for a specific achievement.
@@ -1023,6 +1068,12 @@ mod tests {
             AchievementId::HavenBuilderI,
             AchievementId::HavenBuilderII,
             AchievementId::HavenArchitect,
+            AchievementId::BlacksmithDiscovered,
+            AchievementId::ApprenticeSmith,
+            AchievementId::JourneymanSmith,
+            AchievementId::MasterSmith,
+            AchievementId::FullyEnhanced,
+            AchievementId::PersistentHammering,
         ];
 
         for id in &all_ids {

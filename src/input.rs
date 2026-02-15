@@ -197,6 +197,8 @@ pub fn handle_game_input(
             enhancement,
             &mut state.prestige_rank,
             &state.equipment,
+            achievements,
+            &state.character_name,
         );
     }
 
@@ -282,6 +284,8 @@ fn handle_blacksmith(
     enhancement: &mut enhancement::EnhancementProgress,
     prestige_rank: &mut u32,
     equipment: &items::Equipment,
+    achievements: &mut crate::achievements::Achievements,
+    character_name: &str,
 ) -> InputResult {
     match blacksmith_ui.phase {
         BlacksmithPhase::Menu => match key.code {
@@ -332,6 +336,14 @@ fn handle_blacksmith(
                 let mut rng = rand::rng();
                 let success = enhancement::attempt_enhancement(enhancement, slot_index, &mut rng);
                 let new_level = enhancement.level(slot_index);
+
+                // Track enhancement achievements
+                achievements.on_enhancement_upgraded(
+                    new_level,
+                    &enhancement.levels,
+                    enhancement.total_attempts,
+                    Some(character_name),
+                );
 
                 blacksmith_ui.last_result = Some(EnhancementResult {
                     slot_index,

@@ -774,6 +774,8 @@ pub fn game_tick<R: Rng>(
         && state.active_minigame.is_none()
         && crate::enhancement::try_discover_blacksmith(enhancement, state.prestige_rank, rng)
     {
+        // Track Blacksmith discovery achievement
+        achievements.on_blacksmith_discovered(Some(&state.character_name));
         result.events.push(TickEvent::BlacksmithDiscovered);
         result.enhancement_changed = true;
     }

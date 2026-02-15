@@ -634,3 +634,43 @@ fn test_enhancement_per_slot_independence() {
         "Armor enhancement should not affect phys damage"
     );
 }
+
+// =========================================================================
+// Enhancement Achievements
+// =========================================================================
+
+#[test]
+fn test_enhancement_achievements() {
+    use quest::achievements::Achievements;
+
+    let mut achievements = Achievements::default();
+    let char_name = Some("Test Hero");
+
+    // Blacksmith discovered
+    achievements.on_blacksmith_discovered(char_name);
+    assert!(achievements.is_unlocked(quest::achievements::AchievementId::BlacksmithDiscovered));
+
+    // +1 on any slot
+    achievements.on_enhancement_upgraded(1, &[1, 0, 0, 0, 0, 0, 0], 1, char_name);
+    assert!(achievements.is_unlocked(quest::achievements::AchievementId::ApprenticeSmith));
+    assert!(!achievements.is_unlocked(quest::achievements::AchievementId::JourneymanSmith));
+
+    // +5 on any slot
+    achievements.on_enhancement_upgraded(5, &[5, 0, 0, 0, 0, 0, 0], 10, char_name);
+    assert!(achievements.is_unlocked(quest::achievements::AchievementId::JourneymanSmith));
+    assert!(!achievements.is_unlocked(quest::achievements::AchievementId::MasterSmith));
+
+    // +10 on one slot
+    achievements.on_enhancement_upgraded(10, &[10, 0, 0, 0, 0, 0, 0], 50, char_name);
+    assert!(achievements.is_unlocked(quest::achievements::AchievementId::MasterSmith));
+    assert!(!achievements.is_unlocked(quest::achievements::AchievementId::FullyEnhanced));
+
+    // +10 on all slots
+    achievements.on_enhancement_upgraded(10, &[10, 10, 10, 10, 10, 10, 10], 99, char_name);
+    assert!(achievements.is_unlocked(quest::achievements::AchievementId::FullyEnhanced));
+    assert!(!achievements.is_unlocked(quest::achievements::AchievementId::PersistentHammering));
+
+    // 100 attempts
+    achievements.on_enhancement_upgraded(1, &[10, 10, 10, 10, 10, 10, 10], 100, char_name);
+    assert!(achievements.is_unlocked(quest::achievements::AchievementId::PersistentHammering));
+}
