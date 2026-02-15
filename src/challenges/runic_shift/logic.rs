@@ -68,6 +68,8 @@ pub fn process_input(game: &mut RunicShiftGame, input: RunicShiftInput) {
         RunicShiftInput::Swap => {
             if game.forfeit_pending {
                 game.forfeit_pending = false;
+            } else if game.has_active_animation() {
+                // Ignore swaps while animations are playing.
             } else {
                 attempt_swap(game);
             }
@@ -75,7 +77,7 @@ pub fn process_input(game: &mut RunicShiftGame, input: RunicShiftInput) {
         RunicShiftInput::ManualRise => {
             if game.forfeit_pending {
                 game.forfeit_pending = false;
-            } else if game.clear_timer_ms == 0 {
+            } else if game.clear_timer_ms == 0 && !game.has_active_animation() {
                 game.rise_accumulated_ms = 0;
                 trigger_rise(game);
             }
@@ -115,6 +117,15 @@ pub fn tick_runic_shift(game: &mut RunicShiftGame, dt_ms: u64) -> bool {
     let mut changed = false;
 
     while remaining > 0 && game.game_result.is_none() {
+        if game.has_active_animation() {
+            let step = remaining.min(animation_remaining_ms(game));
+            advance_animation(game, step);
+            game.accumulated_time_ms += step;
+            remaining -= step;
+            changed = true;
+            continue;
+        }
+
         if game.clear_timer_ms > 0 {
             let step = remaining.min(game.clear_timer_ms);
             game.clear_timer_ms -= step;
@@ -147,8 +158,61 @@ pub fn tick_runic_shift(game: &mut RunicShiftGame, dt_ms: u64) -> bool {
     changed
 }
 
+fn animation_remaining_ms(game: &RunicShiftGame) -> u64 {
+    match game.board_animation.as_ref() {
+        Some(BoardAnimation::Swap(anim)) => anim.remaining_ms,
+        Some(BoardAnimation::Fall(anim)) => anim.remaining_ms,
+        None => 0,
+    }
+}
+
+fn advance_animation(game: &mut RunicShiftGame, step_ms: u64) {
+    let mut completed = false;
+
+    if let Some(animation) = game.board_animation.as_mut() {
+        match animation {
+            BoardAnimation::Swap(anim) => {
+                anim.remaining_ms = anim.remaining_ms.saturating_sub(step_ms);
+                completed = anim.remaining_ms == 0;
+            }
+            BoardAnimation::Fall(anim) => {
+                anim.remaining_ms = anim.remaining_ms.saturating_sub(step_ms);
+                completed = anim.remaining_ms == 0;
+            }
+        }
+    }
+
+    if completed {
+        game.board_animation = None;
+        on_animation_complete(game);
+    }
+}
+
+fn on_animation_complete(game: &mut RunicShiftGame) {
+    let pending = game.pending_settle.take();
+    match pending {
+        Some(PendingSettle::AfterSwap) => {
+            let fall_moves = apply_gravity_collect(game);
+            if start_fall_animation(game, fall_moves, false) {
+                return;
+            }
+            start_clear_if_matches(game, false);
+        }
+        Some(PendingSettle::AfterFall { chain_continuation }) => {
+            if start_clear_if_matches(game, chain_continuation) {
+                return;
+            }
+            if chain_continuation {
+                game.current_chain = 0;
+                game.chain_depth = 0;
+            }
+        }
+        None => {}
+    }
+}
+
 fn attempt_swap(game: &mut RunicShiftGame) -> bool {
-    if game.clear_timer_ms > 0 {
+    if game.clear_timer_ms > 0 || game.has_active_animation() {
         return false;
     }
 
@@ -170,11 +234,17 @@ fn attempt_swap(game: &mut RunicShiftGame) -> bool {
     }
 
     game.grid[row].swap(left_col, right_col);
-    let mut changed = true;
-
-    changed |= apply_gravity(game);
-    changed |= start_clear_if_matches(game, false);
-    changed
+    game.board_animation = Some(BoardAnimation::Swap(SwapAnimation {
+        row,
+        left_col,
+        right_col,
+        left_block: left,
+        right_block: right,
+        duration_ms: SWAP_ANIM_MS,
+        remaining_ms: SWAP_ANIM_MS,
+    }));
+    game.pending_settle = Some(PendingSettle::AfterSwap);
+    true
 }
 
 fn trigger_rise(game: &mut RunicShiftGame) -> bool {
@@ -225,12 +295,14 @@ fn resolve_clearing(game: &mut RunicShiftGame) {
         }
     }
 
-    apply_gravity(game);
+    let fall_moves = apply_gravity_collect(game);
+    if start_fall_animation(game, fall_moves, true) {
+        return;
+    }
 
     if start_clear_if_matches(game, true) {
         return;
     }
-
     game.current_chain = 0;
     game.chain_depth = 0;
 }
@@ -285,8 +357,8 @@ fn remove_clearing_blocks(game: &mut RunicShiftGame) -> u32 {
     removed
 }
 
-fn apply_gravity(game: &mut RunicShiftGame) -> bool {
-    let mut moved = false;
+fn apply_gravity_collect(game: &mut RunicShiftGame) -> Vec<FallingBlockAnim> {
+    let mut motions = Vec::new();
 
     for col in 0..GRID_COLS {
         let mut write_row = GRID_ROWS;
@@ -297,21 +369,48 @@ fn apply_gravity(game: &mut RunicShiftGame) -> bool {
                 block.state = BlockState::Normal;
                 write_row -= 1;
                 if write_row != read_row {
-                    moved = true;
+                    motions.push(FallingBlockAnim {
+                        color: block.color,
+                        col,
+                        from_row: read_row,
+                        to_row: write_row,
+                    });
                 }
                 game.grid[write_row][col] = Some(block);
             }
         }
 
         for row in 0..write_row {
-            if game.grid[row][col].is_some() {
-                moved = true;
-            }
             game.grid[row][col] = None;
         }
     }
 
-    moved
+    motions
+}
+
+fn start_fall_animation(
+    game: &mut RunicShiftGame,
+    motions: Vec<FallingBlockAnim>,
+    chain_continuation: bool,
+) -> bool {
+    if motions.is_empty() {
+        return false;
+    }
+
+    let max_drop = motions
+        .iter()
+        .map(|m| m.to_row.abs_diff(m.from_row) as u64)
+        .max()
+        .unwrap_or(1);
+    let duration = (FALL_ANIM_MIN_MS + max_drop * FALL_ANIM_PER_ROW_MS).min(FALL_ANIM_MAX_MS);
+
+    game.board_animation = Some(BoardAnimation::Fall(FallAnimation {
+        blocks: motions,
+        duration_ms: duration,
+        remaining_ms: duration,
+    }));
+    game.pending_settle = Some(PendingSettle::AfterFall { chain_continuation });
+    true
 }
 
 fn find_matches(grid: &[[Option<Block>; GRID_COLS]; GRID_ROWS]) -> Vec<(usize, usize)> {
@@ -544,10 +643,35 @@ mod tests {
         game.grid[5][2] = Some(Block::normal(RuneColor::Fire));
 
         process_input(&mut game, RunicShiftInput::Swap);
+        assert!(matches!(
+            game.board_animation,
+            Some(BoardAnimation::Swap(_))
+        ));
+
+        // Let swap+fall animations resolve.
+        tick_runic_shift(&mut game, 1000);
 
         // After swap + gravity, block should settle at bottom of right column.
         assert!(game.grid[GRID_ROWS - 1][3].is_some());
         assert!(game.grid[5][2].is_none());
+    }
+
+    #[test]
+    fn test_swap_starts_animation_and_pending_settle() {
+        let mut game = started_game();
+        clear_grid(&mut game);
+        game.cursor_row = 6;
+        game.cursor_col = 2;
+        game.grid[6][2] = Some(Block::normal(RuneColor::Fire));
+        game.grid[6][3] = Some(Block::normal(RuneColor::Water));
+
+        process_input(&mut game, RunicShiftInput::Swap);
+
+        assert!(matches!(
+            game.board_animation,
+            Some(BoardAnimation::Swap(_))
+        ));
+        assert_eq!(game.pending_settle, Some(PendingSettle::AfterSwap));
     }
 
     #[test]

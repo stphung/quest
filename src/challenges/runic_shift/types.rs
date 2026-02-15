@@ -11,6 +11,14 @@ pub const GRID_COLS: usize = 6;
 pub const GRID_ROWS: usize = 12;
 /// Number of attempts per challenge.
 pub const MAX_LIVES: u32 = 3;
+/// Swap animation duration.
+pub const SWAP_ANIM_MS: u64 = 120;
+/// Minimum falling animation duration.
+pub const FALL_ANIM_MIN_MS: u64 = 80;
+/// Extra falling animation duration per dropped row.
+pub const FALL_ANIM_PER_ROW_MS: u64 = 40;
+/// Cap falling animation duration.
+pub const FALL_ANIM_MAX_MS: u64 = 260;
 
 /// Rune block colors.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -68,6 +76,49 @@ impl Block {
             state: BlockState::Normal,
         }
     }
+}
+
+/// A single block movement for falling animation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FallingBlockAnim {
+    pub color: RuneColor,
+    pub col: usize,
+    pub from_row: usize,
+    pub to_row: usize,
+}
+
+/// Swap animation state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SwapAnimation {
+    pub row: usize,
+    pub left_col: usize,
+    pub right_col: usize,
+    pub left_block: Option<Block>,
+    pub right_block: Option<Block>,
+    pub duration_ms: u64,
+    pub remaining_ms: u64,
+}
+
+/// Falling animation state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FallAnimation {
+    pub blocks: Vec<FallingBlockAnim>,
+    pub duration_ms: u64,
+    pub remaining_ms: u64,
+}
+
+/// Active animation for the board.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BoardAnimation {
+    Swap(SwapAnimation),
+    Fall(FallAnimation),
+}
+
+/// Post-animation action.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PendingSettle {
+    AfterSwap,
+    AfterFall { chain_continuation: bool },
 }
 
 /// Difficulty levels for Runic Shift.
@@ -186,6 +237,11 @@ pub struct RunicShiftGame {
 
     /// Internal chain depth tracker across a clear cascade.
     pub chain_depth: u32,
+
+    /// Active board animation.
+    pub board_animation: Option<BoardAnimation>,
+    /// Settle/match resolution to run when current animation completes.
+    pub pending_settle: Option<PendingSettle>,
 }
 
 impl RunicShiftGame {
@@ -221,6 +277,8 @@ impl RunicShiftGame {
 
             num_colors: difficulty.num_colors(),
             chain_depth: 0,
+            board_animation: None,
+            pending_settle: None,
         };
 
         let mut rng = rand::rng();
@@ -245,6 +303,8 @@ impl RunicShiftGame {
 
         self.accumulated_time_ms = 0;
         self.tick_count = 0;
+        self.board_animation = None;
+        self.pending_settle = None;
 
         let mut rng = rand::rng();
         self.fill_starting_rows(&mut rng);
@@ -315,6 +375,11 @@ impl RunicShiftGame {
     /// Pick a random color from the active palette.
     pub fn random_color<R: Rng>(&self, rng: &mut R) -> RuneColor {
         RuneColor::ALL[rng.random_range(0..self.num_colors)]
+    }
+
+    /// True when any board animation is in progress.
+    pub fn has_active_animation(&self) -> bool {
+        self.board_animation.is_some()
     }
 }
 

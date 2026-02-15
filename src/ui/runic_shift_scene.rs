@@ -6,7 +6,8 @@ use super::game_common::{
 };
 use crate::challenges::menu::DifficultyInfo;
 use crate::challenges::runic_shift::types::{
-    Block, BlockState, RuneColor, RunicShiftGame, RunicShiftResult, GRID_COLS, GRID_ROWS, MAX_LIVES,
+    Block, BlockState, BoardAnimation, RuneColor, RunicShiftGame, RunicShiftResult, SwapAnimation,
+    GRID_COLS, GRID_ROWS, MAX_LIVES,
 };
 use ratatui::{
     layout::Rect,
@@ -76,6 +77,11 @@ fn render_well(frame: &mut Frame, area: Rect, game: &RunicShiftGame) {
     let y_off = area.y + area.height.saturating_sub(render_height) / 2;
 
     let border_style = Style::default().fg(Color::DarkGray);
+    let swap_anim = match &game.board_animation {
+        Some(BoardAnimation::Swap(anim)) => Some(*anim),
+        _ => None,
+    };
+    let (hidden_cells, overlay_cells) = animation_layers(game);
 
     // Top border.
     let top = format!(
@@ -108,9 +114,31 @@ fn render_well(frame: &mut Frame, area: Rect, game: &RunicShiftGame) {
         spans.push(Span::styled("│", row_border_style));
 
         for col in 0..GRID_COLS {
-            let (glyph, style) = cell_visual(game.grid[row][col], clear_flash_on);
-            let highlighted =
-                row == game.cursor_row && (col == game.cursor_col || col == game.cursor_col + 1);
+            let is_swap_cell = swap_anim.is_some_and(|anim| {
+                row == anim.row && (col == anim.left_col || col == anim.right_col)
+            });
+            let (glyph, style) = if let Some(anim) = swap_anim {
+                if let Some((glyph, style)) = swap_cell_visual(anim, row, col, clear_flash_on) {
+                    (glyph, style)
+                } else {
+                    let base_block = if hidden_cells[row][col] {
+                        None
+                    } else {
+                        game.grid[row][col]
+                    };
+                    cell_visual_with_overlay(base_block, overlay_cells[row][col], clear_flash_on)
+                }
+            } else {
+                let base_block = if hidden_cells[row][col] {
+                    None
+                } else {
+                    game.grid[row][col]
+                };
+                cell_visual_with_overlay(base_block, overlay_cells[row][col], clear_flash_on)
+            };
+            let highlighted = !is_swap_cell
+                && row == game.cursor_row
+                && (col == game.cursor_col || col == game.cursor_col + 1);
             let style = if highlighted {
                 style
                     .fg(Color::Black)
@@ -122,7 +150,17 @@ fn render_well(frame: &mut Frame, area: Rect, game: &RunicShiftGame) {
             spans.push(Span::styled(glyph, style));
 
             if col + 1 < GRID_COLS {
-                if row_has_cursor && col == game.cursor_col {
+                let swap_gap_motion = swap_anim.is_some_and(|anim| {
+                    row == anim.row && col == anim.left_col && swap_phase(anim) == 1
+                });
+                if swap_gap_motion {
+                    spans.push(Span::styled(
+                        "↔",
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD),
+                    ));
+                } else if row_has_cursor && col == game.cursor_col {
                     spans.push(Span::styled(" ", Style::default().bg(CURSOR_BG)));
                 } else {
                     spans.push(Span::raw(" "));
@@ -164,6 +202,105 @@ fn render_well(frame: &mut Frame, area: Rect, game: &RunicShiftGame) {
         Paragraph::new(Line::from(preview_spans)),
         Rect::new(x_off, y_off + 2 + GRID_ROWS as u16, render_width, 1),
     );
+}
+
+fn cell_visual_with_overlay(
+    base_block: Option<Block>,
+    overlay_color: Option<RuneColor>,
+    clear_flash_on: bool,
+) -> (String, Style) {
+    if let Some(color) = overlay_color {
+        return (
+            color.glyph().to_string(),
+            rune_style(color).add_modifier(Modifier::BOLD),
+        );
+    }
+    cell_visual(base_block, clear_flash_on)
+}
+
+fn swap_phase(anim: SwapAnimation) -> u8 {
+    let duration = anim.duration_ms.max(1);
+    let progress = anim.duration_ms.saturating_sub(anim.remaining_ms);
+    let scaled = progress.saturating_mul(10) / duration;
+    if scaled < 3 {
+        0
+    } else if scaled < 7 {
+        1
+    } else {
+        2
+    }
+}
+
+fn swap_cell_visual(
+    anim: SwapAnimation,
+    row: usize,
+    col: usize,
+    clear_flash_on: bool,
+) -> Option<(String, Style)> {
+    if row != anim.row || (col != anim.left_col && col != anim.right_col) {
+        return None;
+    }
+
+    let phase = swap_phase(anim);
+    let (from, to, mid_glyph) = if col == anim.left_col {
+        (anim.left_block, anim.right_block, "▐ ")
+    } else {
+        (anim.right_block, anim.left_block, " ▌")
+    };
+
+    let visual = match phase {
+        0 => cell_visual(from, clear_flash_on),
+        1 => {
+            let Some(block) = from else {
+                return Some(("  ".to_string(), Style::default()));
+            };
+            (
+                mid_glyph.to_string(),
+                rune_style(block.color).add_modifier(Modifier::BOLD),
+            )
+        }
+        _ => cell_visual(to, clear_flash_on),
+    };
+
+    Some(visual)
+}
+
+fn animation_layers(
+    game: &RunicShiftGame,
+) -> (
+    [[bool; GRID_COLS]; GRID_ROWS],
+    [[Option<RuneColor>; GRID_COLS]; GRID_ROWS],
+) {
+    let mut hidden = [[false; GRID_COLS]; GRID_ROWS];
+    let mut overlay = [[None; GRID_COLS]; GRID_ROWS];
+
+    let Some(animation) = &game.board_animation else {
+        return (hidden, overlay);
+    };
+
+    match animation {
+        BoardAnimation::Fall(anim) => {
+            let duration = anim.duration_ms.max(1) as f32;
+            let elapsed = (anim.duration_ms.saturating_sub(anim.remaining_ms)) as f32;
+            let t = (elapsed / duration).clamp(0.0, 1.0);
+
+            for motion in &anim.blocks {
+                hidden[motion.to_row][motion.col] = true;
+                let row = lerp_index(motion.from_row, motion.to_row, t, GRID_ROWS - 1);
+                overlay[row][motion.col] = Some(motion.color);
+            }
+        }
+        BoardAnimation::Swap(_) => {}
+    }
+
+    (hidden, overlay)
+}
+
+fn lerp_index(from: usize, to: usize, t: f32, max: usize) -> usize {
+    let from = from as f32;
+    let to = to as f32;
+    let value = from + (to - from) * t;
+    value.round().clamp(0.0, max as f32) as usize
 }
 
 fn cell_visual(block: Option<Block>, clear_flash_on: bool) -> (String, Style) {
@@ -235,6 +372,19 @@ fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &RunicShiftGam
     }
 
     if render_forfeit_status_bar(frame, area, game.forfeit_pending) {
+        return;
+    }
+
+    if let Some(animation) = &game.board_animation {
+        let (text, color) = match animation {
+            crate::challenges::runic_shift::types::BoardAnimation::Swap(_) => {
+                ("Panels swapping...", Color::Yellow)
+            }
+            crate::challenges::runic_shift::types::BoardAnimation::Fall(_) => {
+                ("Panels falling...", Color::Yellow)
+            }
+        };
+        render_status_bar(frame, area, text, color, &[("[Esc]", "Forfeit")]);
         return;
     }
 
