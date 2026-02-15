@@ -155,7 +155,7 @@ fn step_physics(game: &mut FlappyBirdGame) {
     // Bird occupies columns BIRD_COL and BIRD_COL+1 (2 chars wide), row = bird_row
     let bird_left = BIRD_COL as f64;
     let bird_right = (BIRD_COL + 2) as f64;
-    let bird_row_f = game.bird_y;
+    let bird_row_f = game.bird_y.round();
 
     for pipe in &game.pipes {
         let pipe_left = pipe.x - (PIPE_WIDTH as f64) / 2.0;
@@ -164,8 +164,8 @@ fn step_physics(game: &mut FlappyBirdGame) {
         // Check horizontal overlap
         if bird_right > pipe_left && bird_left < pipe_right {
             let half_gap = game.pipe_gap as f64 / 2.0;
-            let gap_top = pipe.gap_center as f64 - half_gap;
-            let gap_bottom = pipe.gap_center as f64 + half_gap;
+            let gap_top = (pipe.gap_center as f64 - half_gap).floor();
+            let gap_bottom = (pipe.gap_center as f64 + half_gap).ceil();
 
             // Bird outside the gap?
             if bird_row_f < gap_top || bird_row_f > gap_bottom {
@@ -487,7 +487,7 @@ mod tests {
     #[test]
     fn test_pipe_collision() {
         let mut game = started_game(FlappyBirdDifficulty::Novice);
-        // Bird at row 3, pipe gap centered at row 12 (gap: rows 8.5..15.5 for Novice gap=7)
+        // Bird at row 3, pipe gap centered at row 12 (gap: rows 8..16 for Novice gap=7)
         // Bird is above the gap
         game.bird_y = 3.0;
         game.bird_velocity = 0.0;
@@ -511,7 +511,7 @@ mod tests {
     #[test]
     fn test_bird_passes_through_gap() {
         let mut game = started_game(FlappyBirdDifficulty::Novice);
-        // Bird at row 8, pipe gap centered at row 8 (gap: rows 4.5..11.5 for Novice gap=7)
+        // Bird at row 8, pipe gap centered at row 8 (gap: rows 4..12 for Novice gap=7)
         game.bird_y = 8.0;
         game.bird_velocity = 0.0;
 
@@ -676,7 +676,7 @@ mod tests {
     #[test]
     fn test_collision_pipe_bottom() {
         let mut game = started_game(FlappyBirdDifficulty::Novice);
-        // Bird at row 15, pipe gap centered at row 5 (gap: rows 1.5..8.5 for Novice gap=7)
+        // Bird at row 15, pipe gap centered at row 5 (gap: rows 1..9 for Novice gap=7)
         // Bird is below the gap
         game.bird_y = 15.0;
         game.bird_velocity = 0.0;
