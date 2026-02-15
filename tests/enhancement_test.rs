@@ -1,13 +1,24 @@
 //! Enhancement system tests: types, logic, persistence roundtrip.
 
 use quest::enhancement::{
-    attempt_enhancement, blacksmith_discovery_chance, enhancement_color_tier, enhancement_cost,
-    enhancement_multiplier, enhancement_prefix, fail_penalty, success_rate,
-    try_discover_blacksmith, EnhancementProgress, BLACKSMITH_MIN_PRESTIGE_RANK,
+    apply_enhancement_result, blacksmith_discovery_chance, enhancement_color_tier,
+    enhancement_cost, enhancement_multiplier, enhancement_prefix, fail_penalty, roll_enhancement,
+    success_rate, try_discover_blacksmith, EnhancementProgress, BLACKSMITH_MIN_PRESTIGE_RANK,
     MAX_ENHANCEMENT_LEVEL,
 };
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
+
+/// Test helper: roll + apply in one step (convenience wrapper).
+fn attempt_enhancement<R: Rng>(ep: &mut EnhancementProgress, slot: usize, rng: &mut R) -> bool {
+    let current_level = ep.level(slot);
+    if current_level >= MAX_ENHANCEMENT_LEVEL {
+        return false;
+    }
+    let (success, new_level) = roll_enhancement(current_level, rng);
+    apply_enhancement_result(ep, slot, new_level, success);
+    success
+}
 
 // =========================================================================
 // EnhancementProgress basics

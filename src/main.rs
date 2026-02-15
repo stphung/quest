@@ -1119,12 +1119,37 @@ fn main() -> io::Result<()> {
                                         blacksmith_ui.animation_tick.saturating_add(1);
                                     if blacksmith_ui.animation_tick >= 50 {
                                         if let Some(ref result) = blacksmith_ui.last_result {
+                                            // Apply cost and level change after animation
+                                            state.prestige_rank -= result.cost;
+                                            enhancement::apply_enhancement_result(
+                                                &mut enhancement,
+                                                result.slot_index,
+                                                result.new_level,
+                                                result.success,
+                                            );
+                                            global_achievements.on_enhancement_upgraded(
+                                                result.new_level,
+                                                &enhancement.levels,
+                                                enhancement.total_attempts,
+                                                Some(&state.character_name),
+                                            );
+
                                             blacksmith_ui.phase = if result.success {
                                                 input::BlacksmithPhase::ResultSuccess
                                             } else {
                                                 input::BlacksmithPhase::ResultFailure
                                             };
                                             blacksmith_ui.animation_tick = 0;
+
+                                            // Persist changes
+                                            if !debug_mode {
+                                                let _ = character_manager.save_character(&state);
+                                                enhancement::save_enhancement(&enhancement).ok();
+                                                achievements::save_achievements(
+                                                    &global_achievements,
+                                                )
+                                                .ok();
+                                            }
                                         }
                                     }
                                 }

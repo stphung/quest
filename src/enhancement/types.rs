@@ -152,6 +152,7 @@ pub struct EnhancementResult {
     pub success: bool,
     pub old_level: u8,
     pub new_level: u8,
+    pub cost: u32,
 }
 
 /// Blacksmith overlay state

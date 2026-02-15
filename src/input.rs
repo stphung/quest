@@ -190,14 +190,7 @@ pub fn handle_game_input(
 
     // 2.5. Blacksmith overlay
     if blacksmith_ui.open {
-        return handle_blacksmith(
-            key,
-            blacksmith_ui,
-            enhancement,
-            &mut state.prestige_rank,
-            achievements,
-            &state.character_name,
-        );
+        return handle_blacksmith(key, blacksmith_ui, enhancement, state.prestige_rank);
     }
 
     // 3. Vault item selection
@@ -269,10 +262,8 @@ fn handle_blacksmith_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> Inpu
 fn handle_blacksmith(
     key: KeyEvent,
     blacksmith_ui: &mut BlacksmithUiState,
-    enhancement: &mut enhancement::EnhancementProgress,
-    prestige_rank: &mut u32,
-    achievements: &mut crate::achievements::Achievements,
-    character_name: &str,
+    enhancement: &enhancement::EnhancementProgress,
+    prestige_rank: u32,
 ) -> InputResult {
     match blacksmith_ui.phase {
         BlacksmithPhase::Menu => match key.code {
@@ -294,7 +285,7 @@ fn handle_blacksmith(
                 if current_level < enhancement::MAX_ENHANCEMENT_LEVEL {
                     let target_level = current_level + 1;
                     let cost = enhancement::enhancement_cost(target_level);
-                    if *prestige_rank >= cost {
+                    if prestige_rank >= cost {
                         blacksmith_ui.phase = BlacksmithPhase::Confirming;
                     }
                 }
@@ -313,32 +304,21 @@ fn handle_blacksmith(
                 let target_level = current_level + 1;
                 let cost = enhancement::enhancement_cost(target_level);
 
-                // Deduct prestige cost
-                *prestige_rank -= cost;
-
-                // Attempt enhancement
+                // Roll the outcome (applied after animation completes in main loop)
                 let mut rng = rand::rng();
-                let success = enhancement::attempt_enhancement(enhancement, slot_index, &mut rng);
-                let new_level = enhancement.level(slot_index);
-
-                // Track enhancement achievements
-                achievements.on_enhancement_upgraded(
-                    new_level,
-                    &enhancement.levels,
-                    enhancement.total_attempts,
-                    Some(character_name),
-                );
+                let (success, new_level) = enhancement::roll_enhancement(current_level, &mut rng);
 
                 blacksmith_ui.last_result = Some(EnhancementResult {
                     slot_index,
                     success,
                     old_level: current_level,
                     new_level,
+                    cost,
                 });
                 blacksmith_ui.phase = BlacksmithPhase::Hammering;
                 blacksmith_ui.animation_tick = 0;
 
-                InputResult::NeedsSaveAll
+                InputResult::Continue
             }
             KeyCode::Esc => {
                 blacksmith_ui.phase = BlacksmithPhase::Menu;

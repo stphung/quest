@@ -1,32 +1,37 @@
 use super::types::*;
 use rand::{Rng, RngExt};
 
-/// Attempt to enhance a slot. Returns true on success, false on failure.
-/// Caller must verify prestige_rank >= cost and level < MAX before calling.
-pub fn attempt_enhancement<R: Rng>(
-    enhancement: &mut EnhancementProgress,
-    slot_index: usize,
-    rng: &mut R,
-) -> bool {
-    let current_level = enhancement.level(slot_index);
+/// Roll the enhancement outcome without modifying any state.
+/// Returns (success, new_level).
+pub fn roll_enhancement<R: Rng>(current_level: u8, rng: &mut R) -> (bool, u8) {
     if current_level >= MAX_ENHANCEMENT_LEVEL {
-        return false;
+        return (false, current_level);
     }
 
     let target_level = current_level + 1;
     let rate = success_rate(target_level);
-    enhancement.total_attempts += 1;
 
     if rng.random::<f64>() < rate {
-        enhancement.set_level(slot_index, target_level);
-        enhancement.total_successes += 1;
-        true
+        (true, target_level)
     } else {
         let penalty = fail_penalty(target_level);
-        let new_level = current_level.saturating_sub(penalty);
-        enhancement.set_level(slot_index, new_level);
+        (false, current_level.saturating_sub(penalty))
+    }
+}
+
+/// Apply a pre-rolled enhancement result to the state.
+pub fn apply_enhancement_result(
+    enhancement: &mut EnhancementProgress,
+    slot_index: usize,
+    new_level: u8,
+    success: bool,
+) {
+    enhancement.set_level(slot_index, new_level);
+    enhancement.total_attempts += 1;
+    if success {
+        enhancement.total_successes += 1;
+    } else {
         enhancement.total_failures += 1;
-        false
     }
 }
 
