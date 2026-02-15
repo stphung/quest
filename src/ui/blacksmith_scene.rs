@@ -137,13 +137,23 @@ fn render_menu(
         .split(area);
 
     // Flavor text from the blacksmith
-    let flavor = Paragraph::new(
-        "\u{201c}What I do here is forge the bond between warrior and \
-         armament. The gear may change, but my work never fades. \
-         Push further and the craft grows perilous \u{2014} \
-         but the power grows faster.\u{201d}",
-    )
-    .style(Style::default().fg(Color::DarkGray))
+    let flavor = Paragraph::new(vec![
+        Line::from(Span::styled(
+            "The Blacksmith:",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(Span::styled(
+            "\u{201c}What I do here is forge the bond between warrior and \
+             armament. The gear may change, but my work never fades. \
+             Push further and the craft grows perilous \u{2014} \
+             but the power grows faster.\u{201d}",
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::ITALIC),
+        )),
+    ])
     .wrap(Wrap { trim: true });
     frame.render_widget(flavor, chunks[0]);
 
