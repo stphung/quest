@@ -24,6 +24,7 @@ pub mod morris_scene;
 pub mod prestige_confirm;
 pub mod responsive;
 pub mod rune_scene;
+mod scene_fx;
 pub mod snake_scene;
 pub mod soulforge_scene;
 mod stats_panel;

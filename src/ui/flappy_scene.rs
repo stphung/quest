@@ -7,6 +7,7 @@ use super::game_common::{
     create_game_layout, render_forfeit_status_bar, render_game_over_overlay,
     render_info_panel_frame, render_minigame_too_small, render_status_bar, GameResultType,
 };
+use super::scene_fx::{hash2d, lerp_channel, lerp_rgb, render_buffer, SceneCell};
 use crate::challenges::flappy::types::{
     FlappyBirdGame, FlappyBirdResult, BIRD_COL, GAME_HEIGHT, GAME_WIDTH, MAX_LIVES, PIPE_WIDTH,
 };
@@ -29,19 +30,6 @@ const PIPE_EDGE_R: char = '▌';
 // ── Ground characters ───────────────────────────────────────────────
 const GROUND_CHAR: char = '▓';
 const GROUND_SUB: char = '░';
-
-fn lerp_channel(start: u8, end: u8, t: f64) -> u8 {
-    let t = t.clamp(0.0, 1.0);
-    (start as f64 + (end as f64 - start as f64) * t).round() as u8
-}
-
-fn lerp_rgb(start: (u8, u8, u8), end: (u8, u8, u8), t: f64) -> (u8, u8, u8) {
-    (
-        lerp_channel(start.0, end.0, t),
-        lerp_channel(start.1, end.1, t),
-        lerp_channel(start.2, end.2, t),
-    )
-}
 
 fn sky_color(row: usize, ground_row: usize, dusk: f64) -> Color {
     let height_t = if ground_row == 0 {
@@ -68,13 +56,6 @@ fn sky_color(row: usize, ground_row: usize, dusk: f64) -> Color {
         lerp_rgb(mid, low, (height_t - 0.45) / 0.55)
     };
     Color::Rgb(rgb.0, rgb.1, rgb.2)
-}
-
-fn star_hash(row: usize, col: usize) -> u32 {
-    let seed = (row as u32)
-        .wrapping_mul(1664525)
-        .wrapping_add((col as u32).wrapping_mul(1013904223));
-    seed ^ (seed >> 13)
 }
 
 /// Render the Flappy Bird game scene.
@@ -123,24 +104,6 @@ pub fn render_flappy_scene(
     render_info_panel(frame, layout.info_panel, game);
 }
 
-/// Cell in the render buffer with foreground and background colors.
-#[derive(Clone, Copy)]
-struct Cell {
-    ch: char,
-    fg: Color,
-    bg: Color,
-}
-
-impl Default for Cell {
-    fn default() -> Self {
-        Self {
-            ch: ' ',
-            fg: Color::Reset,
-            bg: Color::Reset,
-        }
-    }
-}
-
 /// Render the main play field: bird, pipes, ground, score, progress.
 fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
     if area.height < 2 || area.width < 10 {
@@ -151,8 +114,8 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
     let render_width = area.width.min(GAME_WIDTH);
 
     // Build cell buffer
-    let mut buffer: Vec<Vec<Cell>> =
-        vec![vec![Cell::default(); render_width as usize]; render_height as usize];
+    let mut buffer: Vec<Vec<SceneCell>> =
+        vec![vec![SceneCell::default(); render_width as usize]; render_height as usize];
 
     let y_scale = render_height as f64 / GAME_HEIGHT as f64;
     let x_scale = render_width as f64 / GAME_WIDTH as f64;
@@ -186,7 +149,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
         let col = orb_col + dx;
         let row = orb_row + dy;
         if row >= 0 && (row as usize) < ground_row && col >= 0 && col < render_width as i32 {
-            buffer[row as usize][col as usize] = Cell {
+            buffer[row as usize][col as usize] = SceneCell {
                 ch,
                 fg,
                 bg: buffer[row as usize][col as usize].bg,
@@ -203,10 +166,9 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
             .take(ground_row.saturating_sub(2))
         {
             for (col, cell) in row_cells.iter_mut().enumerate().take(render_width as usize) {
-                if star_hash(row, col).is_multiple_of(97) && cell.ch == ' ' {
-                    let bright =
-                        star_hash(row + twinkle_tick, col + twinkle_tick).is_multiple_of(3);
-                    *cell = Cell {
+                if hash2d(row, col).is_multiple_of(97) && cell.ch == ' ' {
+                    let bright = hash2d(row + twinkle_tick, col + twinkle_tick).is_multiple_of(3);
+                    *cell = SceneCell {
                         ch: if bright { '*' } else { '.' },
                         fg: if bright {
                             Color::Rgb(245, 245, 255)
@@ -238,7 +200,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
                 let col = (cx + i) % render_width as usize;
                 if buffer[ry][col].ch == ' ' {
                     let tint = lerp_channel(shade, 205, 1.0 - dusk);
-                    buffer[ry][col] = Cell {
+                    buffer[ry][col] = SceneCell {
                         ch,
                         fg: Color::Rgb(tint, tint, tint.saturating_add(6)),
                         bg: buffer[ry][col].bg,
@@ -282,7 +244,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
             for row in top.max(0)..=horizon as i32 {
                 let row = row as usize;
                 if row < ground_row && buffer[row][col].ch == ' ' {
-                    buffer[row][col] = Cell {
+                    buffer[row][col] = SceneCell {
                         ch,
                         fg: color,
                         bg: buffer[row][col].bg,
@@ -299,7 +261,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
         .enumerate()
         .take(render_width as usize)
     {
-        *cell = Cell {
+        *cell = SceneCell {
             ch: if (i + (game.tick_count as usize / 2)).is_multiple_of(4) {
                 GROUND_SUB
             } else {
@@ -316,7 +278,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
             .take(render_width as usize)
         {
             let bg = cell.bg;
-            *cell = Cell {
+            *cell = SceneCell {
                 ch: if (i + game.tick_count as usize).is_multiple_of(6) {
                     '┬'
                 } else {
@@ -409,7 +371,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
                     )
                 };
 
-                buffer_row[col] = Cell {
+                buffer_row[col] = SceneCell {
                     ch,
                     fg,
                     bg: if matches!(bg, Color::Reset) {
@@ -458,7 +420,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
             if *trail_col >= 0 && *trail_col < render_width as i32 {
                 let col = *trail_col as usize;
                 if buffer[row][col].ch == ' ' {
-                    buffer[row][col] = Cell {
+                    buffer[row][col] = SceneCell {
                         ch: if idx == 0 { '·' } else { '.' },
                         fg: Color::Rgb(220, 196, 98),
                         bg: buffer[row][col].bg,
@@ -470,7 +432,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
         if bird_col >= 0 && bird_col < render_width as i32 {
             let col = bird_col as usize;
             if buffer[shadow_row][col].ch == ' ' {
-                buffer[shadow_row][col] = Cell {
+                buffer[shadow_row][col] = SceneCell {
                     ch: '.',
                     fg: Color::Rgb(70, 74, 82),
                     bg: buffer[shadow_row][col].bg,
@@ -481,7 +443,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
         // Wing/tail
         if bird_col >= 1 && (bird_col - 1) < render_width as i32 {
             let col = (bird_col - 1) as usize;
-            buffer[row][col] = Cell {
+            buffer[row][col] = SceneCell {
                 ch: wing,
                 fg: bird_color,
                 bg: buffer[row][col].bg,
@@ -489,7 +451,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
         }
         // Body
         if bird_col >= 0 && bird_col < render_width as i32 {
-            buffer[row][bird_col as usize] = Cell {
+            buffer[row][bird_col as usize] = SceneCell {
                 ch: body,
                 fg: bird_color,
                 bg: buffer[row][bird_col as usize].bg,
@@ -498,7 +460,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
         // Beak
         let beak_col = bird_col + 1;
         if beak_col >= 0 && beak_col < render_width as i32 {
-            buffer[row][beak_col as usize] = Cell {
+            buffer[row][beak_col as usize] = SceneCell {
                 ch: beak,
                 fg: Color::Rgb(255, 170, 68),
                 bg: buffer[row][beak_col as usize].bg,
@@ -520,7 +482,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
         for (i, ch) in lives_str.chars().enumerate() {
             let col = 1 + i;
             if col < render_width as usize {
-                buffer[0][col] = Cell {
+                buffer[0][col] = SceneCell {
                     ch,
                     fg: if ch == '\u{2665}' {
                         Color::Rgb(255, 90, 90)
@@ -533,7 +495,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
         }
         // Background for lives plate
         if render_width > 0 {
-            buffer[0][0] = Cell {
+            buffer[0][0] = SceneCell {
                 ch: ' ',
                 fg: Color::Reset,
                 bg: Color::Rgb(18, 26, 44),
@@ -541,7 +503,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
         }
         let end = (1 + MAX_LIVES as usize + 1).min(render_width as usize);
         if end < render_width as usize {
-            buffer[0][end - 1] = Cell {
+            buffer[0][end - 1] = SceneCell {
                 ch: ' ',
                 fg: Color::Reset,
                 bg: Color::Rgb(18, 26, 44),
@@ -566,7 +528,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
     for (i, ch) in label.chars().enumerate() {
         let col = score_start + i;
         if col < render_width as usize {
-            buffer[0][col] = Cell {
+            buffer[0][col] = SceneCell {
                 ch,
                 fg: Color::Rgb(150, 170, 192),
                 bg: buffer[0][col].bg,
@@ -576,7 +538,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
     for (i, ch) in score_text.chars().enumerate() {
         let col = score_start + label.len() + i;
         if col < render_width as usize {
-            buffer[0][col] = Cell {
+            buffer[0][col] = SceneCell {
                 ch,
                 fg: Color::White,
                 bg: buffer[0][col].bg,
@@ -596,7 +558,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
     if render_height > 1 {
         // Opening bracket
         if bar_start > 0 {
-            buffer[1][bar_start - 1] = Cell {
+            buffer[1][bar_start - 1] = SceneCell {
                 ch: '[',
                 fg: Color::Rgb(150, 170, 192),
                 bg: buffer[1][bar_start - 1].bg,
@@ -612,13 +574,13 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
                         i as f64 / (bar_width - 1) as f64
                     };
                     let fill = lerp_rgb((90, 218, 255), (124, 255, 170), progress_t);
-                    buffer[1][col] = Cell {
+                    buffer[1][col] = SceneCell {
                         ch: '█',
                         fg: Color::Rgb(fill.0, fill.1, fill.2),
                         bg: buffer[1][col].bg,
                     };
                 } else {
-                    buffer[1][col] = Cell {
+                    buffer[1][col] = SceneCell {
                         ch: '░',
                         fg: Color::Rgb(82, 96, 116),
                         bg: buffer[1][col].bg,
@@ -628,7 +590,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
         }
         let bracket_col = bar_start + bar_width;
         if bracket_col < render_width as usize {
-            buffer[1][bracket_col] = Cell {
+            buffer[1][bracket_col] = SceneCell {
                 ch: ']',
                 fg: Color::Rgb(150, 170, 192),
                 bg: buffer[1][bracket_col].bg,
@@ -637,39 +599,11 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
     }
 
     // ── Render buffer to terminal ───────────────────────────────────
-    let x_offset = area.x;
-    let y_offset = area.y;
-
-    for (row_idx, row_data) in buffer.iter().enumerate().take(render_height as usize) {
-        let mut spans: Vec<Span> = Vec::new();
-        let mut current_fg = Color::Reset;
-        let mut current_bg = Color::Reset;
-        let mut current_text = String::new();
-
-        for &cell in row_data.iter() {
-            if (cell.fg != current_fg || cell.bg != current_bg) && !current_text.is_empty() {
-                spans.push(Span::styled(
-                    std::mem::take(&mut current_text),
-                    Style::default().fg(current_fg).bg(current_bg),
-                ));
-            }
-            current_fg = cell.fg;
-            current_bg = cell.bg;
-            current_text.push(cell.ch);
-        }
-        if !current_text.is_empty() {
-            spans.push(Span::styled(
-                current_text,
-                Style::default().fg(current_fg).bg(current_bg),
-            ));
-        }
-
-        let line = Paragraph::new(Line::from(spans));
-        let row_area = Rect::new(x_offset, y_offset + row_idx as u16, render_width, 1);
-        if row_area.y < area.y + area.height {
-            frame.render_widget(line, row_area);
-        }
-    }
+    render_buffer(
+        frame,
+        Rect::new(area.x, area.y, render_width, render_height),
+        &buffer,
+    );
 }
 
 /// Render the status bar below the play field.
