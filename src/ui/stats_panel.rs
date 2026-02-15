@@ -5,7 +5,7 @@ use crate::character::prestige::{get_adventurer_rank, get_prestige_tier};
 use crate::core::game_logic::xp_for_next_level;
 use crate::core::game_state::GameState;
 use crate::fishing::types::FishingState;
-use crate::items::types::{Affix, AffixType, Rarity};
+use crate::items::types::Rarity;
 use crate::utils::updater::UpdateInfo;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -15,50 +15,17 @@ use ratatui::{
     Frame,
 };
 
-/// Formats an affix for display in the equipment panel.
-fn format_affix(affix: &Affix) -> String {
-    match affix.affix_type {
-        AffixType::DamagePercent => format!("+{:.0}% DMG", affix.value),
-        AffixType::CritChance => format!("+{:.0}% CRIT", affix.value),
-        AffixType::CritMultiplier => format!("+{:.0}% CritMult", affix.value),
-        AffixType::AttackSpeed => format!("+{:.0}% Speed", affix.value),
-        AffixType::HPBonus => format!("+{:.0} HP", affix.value),
-        AffixType::DamageReduction => format!("+{:.0}% DR", affix.value),
-        AffixType::HPRegen => format!("+{:.0}% Regen", affix.value),
-        AffixType::DamageReflection => format!("+{:.0}% Reflect", affix.value),
-        AffixType::XPGain => format!("+{:.0}% XP", affix.value),
-    }
-}
-
 /// Draws the stats panel
 pub fn draw_stats_panel(
     frame: &mut Frame,
     area: Rect,
     game_state: &GameState,
     ctx: &LayoutContext,
+    enhancement_levels: &[u8; 7],
 ) {
     match ctx.height_tier {
-        SizeTier::XL => {
-            // Full layout: header(4) + prestige(5) + fishing(4) + attrs(8) + equip(rest)
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Length(4), // Header + XP bar
-                    Constraint::Length(5), // Prestige info (rank, multiplier, resets)
-                    Constraint::Length(4), // Fishing rank + progress bar
-                    Constraint::Length(8), // Attributes (6 attrs × 1 row + 2 borders)
-                    Constraint::Min(0),    // Equipment section (takes remaining space)
-                ])
-                .split(area);
-
-            draw_header(frame, chunks[0], game_state);
-            draw_prestige_info(frame, chunks[1], game_state);
-            draw_fishing_panel(frame, chunks[2], game_state);
-            draw_attributes(frame, chunks[3], game_state);
-            draw_equipment_section(frame, chunks[4], game_state);
-        }
-        SizeTier::L => {
-            // Condensed: header(4) + prestige(5) + fishing(4) + attrs_compact(5) + equip_names(rest)
+        SizeTier::XL | SizeTier::L => {
+            // header(4) + prestige(5) + fishing(4) + attrs_compact(5) + equip_names(rest)
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
@@ -74,7 +41,7 @@ pub fn draw_stats_panel(
             draw_prestige_info(frame, chunks[1], game_state);
             draw_fishing_panel(frame, chunks[2], game_state);
             draw_attributes_compact(frame, chunks[3], game_state);
-            draw_equipment_names_only(frame, chunks[4], game_state);
+            draw_equipment_names_only(frame, chunks[4], game_state, enhancement_levels);
         }
         _ => {
             // M and S don't use stats panel (handled by stacked layout in Phase 3)
@@ -355,50 +322,6 @@ pub(super) fn draw_zone_info(
     frame.render_widget(zone_widget, area);
 }
 
-/// Draws all 6 attributes with their values and caps
-fn draw_attributes(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    let attrs_block = Block::default().borders(Borders::ALL).title("Attributes");
-
-    let inner = attrs_block.inner(area);
-    frame.render_widget(attrs_block, area);
-
-    let cap = game_state.get_attribute_cap();
-
-    let mut lines = Vec::new();
-    for attr_type in AttributeType::all() {
-        let value = game_state.attributes.get(attr_type);
-        let modifier = game_state.attributes.modifier(attr_type);
-        let (color, emoji) = match attr_type {
-            AttributeType::Strength => (Color::Red, "💪"),
-            AttributeType::Dexterity => (Color::Green, "🏃"),
-            AttributeType::Constitution => (Color::Magenta, "❤️"),
-            AttributeType::Intelligence => (Color::Blue, "🧠"),
-            AttributeType::Wisdom => (Color::Cyan, "👁️"),
-            AttributeType::Charisma => (Color::Yellow, "✨"),
-        };
-        let mod_str = format_modifier(modifier);
-
-        lines.push(Line::from(vec![
-            Span::styled(
-                format!("{} {}: ", emoji, attr_type.abbrev()),
-                Style::default().add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                format!("{:2}", value),
-                Style::default().fg(color).add_modifier(Modifier::BOLD),
-            ),
-            Span::raw(format!(" ({:>3}) ", mod_str)),
-            Span::styled(
-                format!("[Cap: {}]", cap),
-                Style::default().fg(Color::DarkGray),
-            ),
-        ]));
-    }
-
-    let paragraph = Paragraph::new(lines);
-    frame.render_widget(paragraph, inner);
-}
-
 /// Draws prestige information with CHA bonus
 fn draw_prestige_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let prestige_block = Block::default().borders(Borders::ALL).title("Prestige");
@@ -507,114 +430,18 @@ fn draw_fishing_panel(frame: &mut Frame, area: Rect, game_state: &GameState) {
     }
 }
 
-/// Draws equipment section with all 7 equipment slots
-fn draw_equipment_section(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    let equipment_block = Block::default().borders(Borders::ALL).title("Equipment");
-
-    let inner = equipment_block.inner(area);
-    frame.render_widget(equipment_block, area);
-
-    let mut lines = Vec::new();
-
-    // Draw each equipment slot
-    let slots = vec![
-        (game_state.equipment.weapon.as_ref(), "⚔️ Weapon"),
-        (game_state.equipment.armor.as_ref(), "🛡 Armor"),
-        (game_state.equipment.helmet.as_ref(), "🪖 Helmet"),
-        (game_state.equipment.gloves.as_ref(), "🧤 Gloves"),
-        (game_state.equipment.boots.as_ref(), "👢 Boots"),
-        (game_state.equipment.amulet.as_ref(), "📿 Amulet"),
-        (game_state.equipment.ring.as_ref(), "💍 Ring"),
-    ];
-
-    for (item, slot_label) in slots {
-        if let Some(item) = item {
-            // Get rarity color
-            let rarity_color = match item.rarity {
-                Rarity::Common => Color::White,
-                Rarity::Magic => Color::Blue,
-                Rarity::Rare => Color::Yellow,
-                Rarity::Epic => Color::Magenta,
-                Rarity::Legendary => Color::LightRed,
-            };
-
-            // Line 1: icon, name, rarity, stars
-            let stars = "⭐".repeat(item.rarity as usize + 1);
-            let item_name = if item.display_name.len() > 28 {
-                format!("{}...", &item.display_name[..25])
-            } else {
-                item.display_name.clone()
-            };
-
-            lines.push(Line::from(vec![
-                Span::raw(format!("{} ", slot_label)),
-                Span::styled(item_name, Style::default().add_modifier(Modifier::BOLD)),
-                Span::raw(" "),
-                Span::styled(
-                    format!("[{}]", item.rarity.name()),
-                    Style::default().fg(rarity_color),
-                ),
-                Span::raw(format!(" {}", stars)),
-            ]));
-
-            // Line 2: attribute bonuses with colored emojis
-            let attr_bonuses = [
-                (item.attributes.str, "💪", Color::Red),
-                (item.attributes.dex, "🏃", Color::Green),
-                (item.attributes.con, "❤️", Color::Magenta),
-                (item.attributes.int, "🧠", Color::Blue),
-                (item.attributes.wis, "👁️", Color::Cyan),
-                (item.attributes.cha, "✨", Color::Yellow),
-            ];
-
-            let mut attr_spans: Vec<Span> = vec![Span::raw("   ")];
-            let mut has_attrs = false;
-            for (value, emoji, color) in attr_bonuses {
-                if value > 0 {
-                    if has_attrs {
-                        attr_spans.push(Span::raw(" "));
-                    }
-                    attr_spans.push(Span::styled(
-                        format!("{}+{}", emoji, value),
-                        Style::default().fg(color),
-                    ));
-                    has_attrs = true;
-                }
-            }
-
-            if has_attrs {
-                lines.push(Line::from(attr_spans));
-            }
-
-            // Line 3: affixes (if any)
-            if !item.affixes.is_empty() {
-                let mut affix_spans: Vec<Span> = vec![Span::raw("   ")];
-                for (i, affix) in item.affixes.iter().enumerate() {
-                    if i > 0 {
-                        affix_spans.push(Span::styled(" ", Style::default()));
-                    }
-                    affix_spans.push(Span::styled(
-                        format_affix(affix),
-                        Style::default().fg(Color::Gray),
-                    ));
-                }
-                lines.push(Line::from(affix_spans));
-            }
-        } else {
-            // Empty slot
-            lines.push(Line::from(vec![
-                Span::raw(slot_label),
-                Span::raw(" "),
-                Span::styled("[Empty]", Style::default().fg(Color::DarkGray)),
-            ]));
-        }
+/// Returns the style for an enhancement prefix based on its color tier.
+fn enhancement_style(level: u8) -> Style {
+    let (r, g, b) = crate::enhancement::enhancement_color_rgb(level);
+    let tier = crate::enhancement::enhancement_color_tier(level);
+    let style = Style::default().fg(Color::Rgb(r, g, b));
+    match tier {
+        2..=4 => style.add_modifier(Modifier::BOLD),
+        _ => style,
     }
-
-    let equipment_paragraph = Paragraph::new(lines);
-    frame.render_widget(equipment_paragraph, inner);
 }
 
-/// Draws attributes in a compact 2-column layout (L tier).
+/// Draws attributes in a compact 2-column layout.
 /// 3 rows: STR/INT, DEX/WIS, CON/CHA with modifiers.
 fn draw_attributes_compact(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let attrs_block = Block::default().borders(Borders::ALL).title("Attributes");
@@ -668,24 +495,32 @@ fn draw_attributes_compact(frame: &mut Frame, area: Rect, game_state: &GameState
 }
 
 /// Draws equipment with name + rarity color only, one line per slot (L tier).
-fn draw_equipment_names_only(frame: &mut Frame, area: Rect, game_state: &GameState) {
+fn draw_equipment_names_only(
+    frame: &mut Frame,
+    area: Rect,
+    game_state: &GameState,
+    enhancement_levels: &[u8; 7],
+) {
     let block = Block::default().borders(Borders::ALL).title("Equipment");
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
     let mut lines = Vec::new();
 
-    let slots = [
-        (game_state.equipment.weapon.as_ref(), "Weapon"),
-        (game_state.equipment.armor.as_ref(), "Armor"),
-        (game_state.equipment.helmet.as_ref(), "Helmet"),
-        (game_state.equipment.gloves.as_ref(), "Gloves"),
-        (game_state.equipment.boots.as_ref(), "Boots"),
-        (game_state.equipment.amulet.as_ref(), "Amulet"),
-        (game_state.equipment.ring.as_ref(), "Ring"),
+    use crate::items::EquipmentSlot;
+    let slot_order = [
+        EquipmentSlot::Weapon,
+        EquipmentSlot::Armor,
+        EquipmentSlot::Helmet,
+        EquipmentSlot::Gloves,
+        EquipmentSlot::Boots,
+        EquipmentSlot::Amulet,
+        EquipmentSlot::Ring,
     ];
 
-    for (item, slot_label) in &slots {
+    for (idx, slot_enum) in slot_order.iter().enumerate() {
+        let item = game_state.equipment.get(*slot_enum);
+        let slot_label = slot_enum.name();
         if let Some(item) = item {
             let rarity_color = match item.rarity {
                 Rarity::Common => Color::White,
@@ -695,24 +530,30 @@ fn draw_equipment_names_only(frame: &mut Frame, area: Rect, game_state: &GameSta
                 Rarity::Legendary => Color::LightRed,
             };
 
+            let enh_level = enhancement_levels[idx];
+            let prefix = crate::enhancement::enhancement_prefix(enh_level);
+
             let item_name = if item.display_name.len() > 20 {
                 format!("{}...", &item.display_name[..17])
             } else {
                 item.display_name.clone()
             };
 
-            lines.push(Line::from(vec![
-                Span::styled(
-                    format!("{:>6}: ", slot_label),
-                    Style::default().add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(item_name, Style::default().fg(rarity_color)),
-                Span::raw(" "),
-                Span::styled(
-                    format!("[{}]", item.rarity.name()),
-                    Style::default().fg(rarity_color),
-                ),
-            ]));
+            let mut name_spans = vec![Span::styled(
+                format!("{:>6}: ", slot_label),
+                Style::default().add_modifier(Modifier::BOLD),
+            )];
+            if !prefix.is_empty() {
+                name_spans.push(Span::styled(prefix, enhancement_style(enh_level)));
+            }
+            name_spans.push(Span::styled(item_name, Style::default().fg(rarity_color)));
+            name_spans.push(Span::raw(" "));
+            name_spans.push(Span::styled(
+                format!("[{}]", item.rarity.name()),
+                Style::default().fg(rarity_color),
+            ));
+
+            lines.push(Line::from(name_spans));
         } else {
             lines.push(Line::from(vec![
                 Span::styled(
@@ -848,6 +689,7 @@ pub(super) fn draw_footer_compact(
     area: Rect,
     game_state: &GameState,
     haven_discovered: bool,
+    soulforge_discovered: bool,
     pending_achievements: usize,
 ) {
     use crate::character::prestige::can_prestige;
@@ -866,6 +708,12 @@ pub(super) fn draw_footer_compact(
 
     let haven_span = if haven_discovered {
         Span::styled(" [H]Haven", Style::default().fg(Color::Cyan))
+    } else {
+        Span::raw("")
+    };
+
+    let soulforge_span = if soulforge_discovered {
+        Span::styled(" [S]oulforge", Style::default().fg(Color::Yellow))
     } else {
         Span::raw("")
     };
@@ -898,6 +746,7 @@ pub(super) fn draw_footer_compact(
         Span::raw(" "),
         prestige_span,
         haven_span,
+        soulforge_span,
         ach_span,
         challenge_span,
     ]);
@@ -1066,6 +915,7 @@ pub fn draw_footer(
     _update_expanded: bool,
     update_check_completed: bool,
     haven_discovered: bool,
+    soulforge_discovered: bool,
     pending_achievements: usize,
     _ctx: &LayoutContext,
 ) {
@@ -1130,27 +980,35 @@ pub fn draw_footer(
         Span::raw("")
     };
 
+    // Build Soulforge hint text
+    let soulforge_text = if soulforge_discovered {
+        Span::styled("    [S] Soulforge", Style::default().fg(Color::Yellow))
+    } else {
+        Span::raw("")
+    };
+
     // Achievements hint (with pending count if any)
     let achievements_text = if pending_achievements > 0 {
         Span::styled(
-            format!("    [A] Achievements (🏆 {} new!)", pending_achievements),
+            format!("[A] Achievements (\u{1f3c6} {} new!)", pending_achievements),
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         )
     } else {
-        Span::styled("    [A] Achievements", Style::default().fg(Color::Magenta))
+        Span::styled("[A] Achievements", Style::default().fg(Color::Magenta))
     };
 
-    let footer_text = vec![Line::from(vec![
-        Span::styled("[Esc] Quit", Style::default().fg(Color::Red)),
-        Span::raw("    "),
-        prestige_text,
-        haven_text,
-        achievements_text,
-        challenge_text,
-        update_status_text,
-    ])];
+    let footer_text = vec![
+        Line::from(vec![
+            Span::styled("[Esc] Quit", Style::default().fg(Color::Red)),
+            Span::raw("    "),
+            prestige_text,
+            haven_text,
+            soulforge_text,
+        ]),
+        Line::from(vec![achievements_text, challenge_text, update_status_text]),
+    ];
 
     let footer = Paragraph::new(footer_text)
         .block(Block::default().borders(Borders::ALL).title(version_title))

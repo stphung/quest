@@ -25,18 +25,37 @@ impl DerivedStats {
     /// `prestige_multiplier()` static method, not in this constructor.
     #[allow(dead_code)]
     pub fn from_attributes(attrs: &Attributes) -> Self {
-        Self::calculate_derived_stats(attrs, &Equipment::new())
+        Self::calculate_derived_stats(attrs, &Equipment::new(), &[0; 7])
     }
 
     /// Calculates derived stats from attributes and equipment bonuses.
     ///
     /// Equipment bonuses are added to base attributes before calculating modifiers.
     /// Affixes are then applied as multipliers/bonuses to the calculated stats.
-    pub fn calculate_derived_stats(attrs: &Attributes, equipment: &Equipment) -> Self {
-        // Sum equipment attribute bonuses
+    /// Enhancement levels scale item attribute and affix contributions per slot.
+    pub fn calculate_derived_stats(
+        attrs: &Attributes,
+        equipment: &Equipment,
+        enhancement_levels: &[u8; 7],
+    ) -> Self {
+        // Sum equipment attribute bonuses (scaled by enhancement)
+        let slots = [
+            &equipment.weapon,
+            &equipment.armor,
+            &equipment.helmet,
+            &equipment.gloves,
+            &equipment.boots,
+            &equipment.amulet,
+            &equipment.ring,
+        ];
+
         let mut total_attrs = *attrs;
-        for item in equipment.iter_equipped() {
-            total_attrs.add(&item.attributes.to_attributes());
+        for (idx, slot_item) in slots.iter().enumerate() {
+            if let Some(item) = slot_item {
+                let mult = crate::enhancement::enhancement_multiplier(enhancement_levels[idx]);
+                let attrs_bonus = item.attributes.to_attributes();
+                total_attrs.add_scaled(&attrs_bonus, mult);
+            }
         }
 
         let str_mod = total_attrs.modifier(AttributeType::Strength);
@@ -76,23 +95,29 @@ impl DerivedStats {
         let mut damage_reflection: f64 = 0.0;
         let mut xp_mult: f64 = 1.0;
 
-        for item in equipment.iter_equipped() {
-            for affix in &item.affixes {
-                use crate::items::types::AffixType;
-                match affix.affix_type {
-                    AffixType::DamagePercent => {
-                        damage_mult *= 1.0 + (affix.value / AFFIX_PERCENT_DIVISOR)
+        for (idx, slot_item) in slots.iter().enumerate() {
+            if let Some(item) = slot_item {
+                let mult = crate::enhancement::enhancement_multiplier(enhancement_levels[idx]);
+                for affix in &item.affixes {
+                    use crate::items::types::AffixType;
+                    let scaled_value = affix.value * mult;
+                    match affix.affix_type {
+                        AffixType::DamagePercent => {
+                            damage_mult *= 1.0 + (scaled_value / AFFIX_PERCENT_DIVISOR)
+                        }
+                        AffixType::CritChance => crit_bonus += scaled_value,
+                        AffixType::CritMultiplier => crit_mult_bonus += scaled_value,
+                        AffixType::AttackSpeed => attack_speed_bonus += scaled_value,
+                        AffixType::HPBonus => hp_bonus += scaled_value,
+                        AffixType::DamageReduction => {
+                            defense_mult *= 1.0 + (scaled_value / AFFIX_PERCENT_DIVISOR)
+                        }
+                        AffixType::HPRegen => hp_regen_bonus += scaled_value,
+                        AffixType::DamageReflection => damage_reflection += scaled_value,
+                        AffixType::XPGain => {
+                            xp_mult *= 1.0 + (scaled_value / AFFIX_PERCENT_DIVISOR)
+                        }
                     }
-                    AffixType::CritChance => crit_bonus += affix.value,
-                    AffixType::CritMultiplier => crit_mult_bonus += affix.value,
-                    AffixType::AttackSpeed => attack_speed_bonus += affix.value,
-                    AffixType::HPBonus => hp_bonus += affix.value,
-                    AffixType::DamageReduction => {
-                        defense_mult *= 1.0 + (affix.value / AFFIX_PERCENT_DIVISOR)
-                    }
-                    AffixType::HPRegen => hp_regen_bonus += affix.value,
-                    AffixType::DamageReflection => damage_reflection += affix.value,
-                    AffixType::XPGain => xp_mult *= 1.0 + (affix.value / AFFIX_PERCENT_DIVISOR),
                 }
             }
         }
@@ -249,7 +274,7 @@ mod tests {
 
         equipment.set(EquipmentSlot::Weapon, Some(weapon));
 
-        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment);
+        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment, &[0; 7]);
 
         // Base: STR 10 (+0 mod), DEX 10 (+0 mod)
         // With equipment: STR 12 (+1 mod), DEX 11 (+0 mod)
@@ -320,7 +345,7 @@ mod tests {
 
         equipment.set(EquipmentSlot::Weapon, Some(weapon));
 
-        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment);
+        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment, &[0; 7]);
 
         // Base damage: 5 + (0 * 2) = 5
         // With +20% multiplier: 5 * 1.2 = 6
@@ -366,7 +391,7 @@ mod tests {
 
         equipment.set(EquipmentSlot::Weapon, Some(weapon));
 
-        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment);
+        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment, &[0; 7]);
 
         // Base damage: 5 + (0 * 2) = 5
         // With +25% multiplier: 5 * 1.25 = 6.25 -> 6
@@ -410,7 +435,7 @@ mod tests {
 
         equipment.set(EquipmentSlot::Armor, Some(armor));
 
-        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment);
+        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment, &[0; 7]);
 
         // Base defense: 0 + 0 = 0
         // With +15% multiplier: 0 * 1.15 = 0
@@ -445,7 +470,7 @@ mod tests {
 
         equipment.set(EquipmentSlot::Amulet, Some(amulet));
 
-        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment);
+        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment, &[0; 7]);
 
         // Base XP multiplier: 1.0 + (0 * 0.05) = 1.0
         // With +50% multiplier: 1.0 * 1.5 = 1.5
@@ -473,7 +498,7 @@ mod tests {
 
         equipment.set(EquipmentSlot::Weapon, Some(weapon));
 
-        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment);
+        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment, &[0; 7]);
 
         // Base crit multiplier: 2.0
         // With +50%: 2.0 + 0.5 = 2.5
@@ -514,7 +539,7 @@ mod tests {
         equipment.set(EquipmentSlot::Weapon, Some(weapon));
         equipment.set(EquipmentSlot::Ring, Some(ring));
 
-        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment);
+        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment, &[0; 7]);
 
         // Base: 2.0, +25% + 25% = 2.5
         assert!((stats.crit_multiplier - 2.5).abs() < f64::EPSILON);
@@ -540,7 +565,7 @@ mod tests {
 
         equipment.set(EquipmentSlot::Gloves, Some(gloves));
 
-        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment);
+        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment, &[0; 7]);
 
         // Base: 1.0, +25% = 1.25
         assert!((stats.attack_speed_multiplier - 1.25).abs() < f64::EPSILON);
@@ -566,7 +591,7 @@ mod tests {
 
         equipment.set(EquipmentSlot::Armor, Some(armor));
 
-        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment);
+        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment, &[0; 7]);
 
         // Base: 1.0, +50% = 1.5
         assert!((stats.hp_regen_multiplier - 1.5).abs() < f64::EPSILON);
@@ -592,7 +617,7 @@ mod tests {
 
         equipment.set(EquipmentSlot::Armor, Some(armor));
 
-        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment);
+        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment, &[0; 7]);
 
         // Direct percentage: 30%
         assert!((stats.damage_reflection_percent - 30.0).abs() < f64::EPSILON);
@@ -632,7 +657,7 @@ mod tests {
         equipment.set(EquipmentSlot::Armor, Some(armor));
         equipment.set(EquipmentSlot::Helmet, Some(helmet));
 
-        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment);
+        let stats = DerivedStats::calculate_derived_stats(&attrs, &equipment, &[0; 7]);
 
         // 20% + 15% = 35%
         assert!((stats.damage_reflection_percent - 35.0).abs() < f64::EPSILON);

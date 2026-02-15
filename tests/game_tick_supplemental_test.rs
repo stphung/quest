@@ -9,6 +9,7 @@ use quest::character::attributes::AttributeType;
 use quest::character::derived_stats::DerivedStats;
 use quest::core::tick::game_tick;
 use quest::dungeon::generation::generate_dungeon;
+use quest::enhancement::EnhancementProgress;
 use quest::fishing::{FishingPhase, FishingSession};
 use quest::haven::Haven;
 use quest::{ActiveMinigame, ChessDifficulty, ChessGame};
@@ -32,7 +33,7 @@ fn strong() -> GameState {
     let mut s = fresh();
     s.attributes.set(AttributeType::Strength, 50);
     s.attributes.set(AttributeType::Intelligence, 50);
-    let d = DerivedStats::calculate_derived_stats(&s.attributes, &s.equipment);
+    let d = DerivedStats::calculate_derived_stats(&s.attributes, &s.equipment, &[0; 7]);
     s.combat_state.update_max_hp(d.max_hp);
     s.combat_state.player_current_hp = s.combat_state.player_max_hp;
     s
@@ -55,7 +56,16 @@ fn tick(
     ach: &mut Achievements,
     r: &mut ChaCha8Rng,
 ) -> Vec<TickEvent> {
-    game_tick(state, tc, &mut Haven::default(), ach, false, r).events
+    game_tick(
+        state,
+        tc,
+        &mut Haven::default(),
+        &mut EnhancementProgress::new(),
+        ach,
+        false,
+        r,
+    )
+    .events
 }
 
 fn has<F: Fn(&TickEvent) -> bool>(events: &[TickEvent], f: F) -> bool {
@@ -113,6 +123,7 @@ fn test_storm_leviathan_achievement_via_game_tick() {
             &mut state,
             &mut tc,
             &mut Haven::default(),
+            &mut EnhancementProgress::new(),
             &mut ach,
             false,
             &mut r,
@@ -232,6 +243,7 @@ fn test_dungeon_boss_completion_triggers_achievement() {
             &mut state,
             &mut tc,
             &mut Haven::default(),
+            &mut EnhancementProgress::new(),
             &mut ach,
             false,
             &mut r,

@@ -2,6 +2,8 @@
 //!
 //! Extracts the input dispatch logic from main.rs into a clean priority chain.
 
+use crate::enhancement;
+
 use crate::challenges::chess::logic::{
     apply_game_result as apply_chess_result, process_input as process_chess_input, ChessInput,
 };
@@ -77,10 +79,14 @@ impl HavenUiState {
     }
 }
 
+// Re-export soulforge UI types from enhancement module
+pub use crate::enhancement::{EnhancementResult, SoulforgePhase, SoulforgeUiState};
+
 /// Game-screen overlay state. At most one is active at a time.
 pub enum GameOverlay {
     None,
     HavenDiscovery,
+    SoulforgeDiscovery,
     PrestigeConfirm,
     VaultSelection {
         selected_index: usize,
@@ -123,6 +129,8 @@ pub fn handle_game_input(
     state: &mut GameState,
     haven: &mut Haven,
     haven_ui: &mut HavenUiState,
+    soulforge_ui: &mut SoulforgeUiState,
+    enhancement: &mut enhancement::EnhancementProgress,
     overlay: &mut GameOverlay,
     debug_menu: &mut DebugMenu,
     debug_mode: bool,
@@ -165,6 +173,11 @@ pub fn handle_game_input(
         return handle_haven_discovery(key, overlay);
     }
 
+    // 1a. Soulforge discovery modal (blocks all other input)
+    if matches!(overlay, GameOverlay::SoulforgeDiscovery) {
+        return handle_soulforge_discovery(key, overlay);
+    }
+
     // 1b. Achievement unlocked modal (blocks all other input)
     if matches!(overlay, GameOverlay::AchievementUnlocked { .. }) {
         return handle_achievement_unlocked(key, overlay);
@@ -173,6 +186,11 @@ pub fn handle_game_input(
     // 2. Haven screen (blocks other input when open)
     if haven_ui.showing {
         return handle_haven(key, state, haven, haven_ui, achievements);
+    }
+
+    // 2.5. Soulforge overlay
+    if soulforge_ui.open {
+        return handle_soulforge(key, soulforge_ui, enhancement, state.prestige_rank);
     }
 
     // 3. Vault item selection
@@ -192,7 +210,7 @@ pub fn handle_game_input(
             return InputResult::Continue;
         }
         if debug_menu.is_open {
-            return handle_debug_menu(key, state, haven, overlay, debug_menu);
+            return handle_debug_menu(key, state, haven, enhancement, overlay, debug_menu);
         }
     }
 
@@ -218,6 +236,8 @@ pub fn handle_game_input(
         state,
         haven,
         haven_ui,
+        soulforge_ui,
+        enhancement,
         overlay,
         achievements,
         update_available,
@@ -230,6 +250,92 @@ fn handle_haven_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> InputResu
         *overlay = GameOverlay::None;
     }
     InputResult::Continue
+}
+
+fn handle_soulforge_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
+    if matches!(key.code, KeyCode::Enter | KeyCode::Esc) {
+        *overlay = GameOverlay::None;
+    }
+    InputResult::Continue
+}
+
+fn handle_soulforge(
+    key: KeyEvent,
+    soulforge_ui: &mut SoulforgeUiState,
+    enhancement: &enhancement::EnhancementProgress,
+    prestige_rank: u32,
+) -> InputResult {
+    match soulforge_ui.phase {
+        SoulforgePhase::Menu => match key.code {
+            KeyCode::Up => {
+                soulforge_ui.selected_slot = soulforge_ui.selected_slot.saturating_sub(1);
+                InputResult::Continue
+            }
+            KeyCode::Down => {
+                if soulforge_ui.selected_slot < 6 {
+                    soulforge_ui.selected_slot += 1;
+                }
+                InputResult::Continue
+            }
+            KeyCode::Enter => {
+                let slot_index = soulforge_ui.selected_slot;
+                let current_level = enhancement.level(slot_index);
+
+                // Check: level < max, can afford (slot enhancement is independent of equipped item)
+                if current_level < enhancement::MAX_ENHANCEMENT_LEVEL {
+                    let target_level = current_level + 1;
+                    let cost = enhancement::enhancement_cost(target_level);
+                    if prestige_rank >= cost {
+                        soulforge_ui.phase = SoulforgePhase::Confirming;
+                    }
+                }
+                InputResult::Continue
+            }
+            KeyCode::Esc => {
+                soulforge_ui.close();
+                InputResult::Continue
+            }
+            _ => InputResult::Continue,
+        },
+        SoulforgePhase::Confirming => match key.code {
+            KeyCode::Enter => {
+                let slot_index = soulforge_ui.selected_slot;
+                let current_level = enhancement.level(slot_index);
+                let target_level = current_level + 1;
+                let cost = enhancement::enhancement_cost(target_level);
+
+                // Roll the outcome (applied after animation completes in main loop)
+                let mut rng = rand::rng();
+                let (success, new_level) = enhancement::roll_enhancement(current_level, &mut rng);
+
+                soulforge_ui.last_result = Some(EnhancementResult {
+                    slot_index,
+                    success,
+                    old_level: current_level,
+                    new_level,
+                    cost,
+                });
+                soulforge_ui.phase = SoulforgePhase::Hammering;
+                soulforge_ui.animation_tick = 0;
+
+                InputResult::Continue
+            }
+            KeyCode::Esc => {
+                soulforge_ui.phase = SoulforgePhase::Menu;
+                InputResult::Continue
+            }
+            _ => InputResult::Continue,
+        },
+        SoulforgePhase::Hammering => {
+            // No input accepted during hammering animation
+            InputResult::Continue
+        }
+        SoulforgePhase::ResultSuccess | SoulforgePhase::ResultFailure => {
+            // Any key returns to menu
+            soulforge_ui.phase = SoulforgePhase::Menu;
+            InputResult::Continue
+        }
+    }
 }
 
 fn handle_achievement_unlocked(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
@@ -450,6 +556,7 @@ fn handle_debug_menu(
     key: KeyEvent,
     state: &mut GameState,
     haven: &mut Haven,
+    enhancement: &mut enhancement::EnhancementProgress,
     overlay: &mut GameOverlay,
     debug_menu: &mut DebugMenu,
 ) -> InputResult {
@@ -457,13 +564,15 @@ fn handle_debug_menu(
         KeyCode::Up => debug_menu.navigate_up(),
         KeyCode::Down => debug_menu.navigate_down(),
         KeyCode::Enter => {
-            let msg = debug_menu.trigger_selected(state, haven);
+            let msg = debug_menu.trigger_selected(state, haven, enhancement);
             state
                 .combat_state
                 .add_log_entry(format!("[DEBUG] {}", msg), false, true);
-            // Show Haven discovery modal if just discovered (no save in debug mode)
+            // Show discovery modals (no save in debug mode)
             if msg == "Haven discovered!" {
                 *overlay = GameOverlay::HavenDiscovery;
+            } else if msg == "Soulforge discovered!" {
+                *overlay = GameOverlay::SoulforgeDiscovery;
             }
         }
         KeyCode::Esc => debug_menu.close(),
@@ -645,6 +754,8 @@ fn handle_base_game(
     state: &mut GameState,
     haven: &Haven,
     haven_ui: &mut HavenUiState,
+    soulforge_ui: &mut SoulforgeUiState,
+    enhancement: &enhancement::EnhancementProgress,
     overlay: &mut GameOverlay,
     achievements: &mut crate::achievements::Achievements,
     update_available: bool,
@@ -669,6 +780,12 @@ fn handle_base_game(
         KeyCode::Char('h') | KeyCode::Char('H') => {
             if haven.discovered {
                 haven_ui.open();
+            }
+            InputResult::Continue
+        }
+        KeyCode::Char('s') | KeyCode::Char('S') => {
+            if enhancement.discovered {
+                soulforge_ui.open();
             }
             InputResult::Continue
         }

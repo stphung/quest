@@ -4,6 +4,7 @@ mod character;
 mod combat;
 mod core;
 mod dungeon;
+mod enhancement;
 mod fishing;
 mod haven;
 mod input;
@@ -23,7 +24,7 @@ use chrono::{Local, Utc};
 use core::constants::*;
 use core::game_logic::*;
 use core::game_state::*;
-use input::{GameOverlay, HavenUiState, InputResult};
+use input::{GameOverlay, HavenUiState, InputResult, SoulforgeUiState};
 use rand::RngExt;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::crossterm::terminal::{
@@ -168,6 +169,8 @@ fn draw_game_overlays(
     overlay: &GameOverlay,
     haven: &haven::Haven,
     haven_ui: &HavenUiState,
+    soulforge_ui: &SoulforgeUiState,
+    enhancement: &enhancement::EnhancementProgress,
     global_achievements: &achievements::Achievements,
     debug_mode: bool,
     debug_menu: &utils::debug_menu::DebugMenu,
@@ -185,6 +188,9 @@ fn draw_game_overlays(
         }
         GameOverlay::HavenDiscovery => {
             ui::haven_scene::render_haven_discovery_modal(frame, area, ctx);
+        }
+        GameOverlay::SoulforgeDiscovery => {
+            ui::soulforge_scene::render_soulforge_discovery_modal(frame, area, ctx);
         }
         GameOverlay::AchievementUnlocked { ref achievements } => {
             ui::achievement_browser_scene::render_achievement_unlocked_modal(
@@ -214,6 +220,7 @@ fn draw_game_overlays(
                 area,
                 global_achievements,
                 browser,
+                enhancement,
                 ctx,
             );
         }
@@ -262,6 +269,18 @@ fn draw_game_overlays(
             }
             input::HavenConfirmation::None => {}
         }
+    }
+
+    // Soulforge overlay
+    if soulforge_ui.open {
+        ui::soulforge_scene::render_soulforge(
+            frame,
+            area,
+            soulforge_ui,
+            enhancement,
+            state.prestige_rank,
+            ctx,
+        );
     }
 
     // Debug indicator / save indicator
@@ -390,6 +409,9 @@ fn main() -> io::Result<()> {
     // Load account-level Haven state
     let mut haven = haven::load_haven();
 
+    // Load account-level Enhancement (soulforge) state
+    let mut enhancement = enhancement::load_enhancement();
+
     // Load global achievements (shared across all characters)
     let mut global_achievements = achievements::load_achievements();
     global_achievements.refresh_progress();
@@ -413,6 +435,7 @@ fn main() -> io::Result<()> {
     let mut pending_offline_report: Option<core::game_logic::OfflineReport> = None;
 
     let mut haven_ui = HavenUiState::new();
+    let mut soulforge_ui = SoulforgeUiState::new();
     let mut achievement_browser = AchievementBrowserState::new();
 
     // Setup terminal
@@ -486,7 +509,7 @@ fn main() -> io::Result<()> {
                 terminal.draw(|f| {
                     let area = f.area();
                     let ctx = ui::responsive::LayoutContext::from_frame(f);
-                    select_screen.draw(f, area, &characters, &haven, &ctx);
+                    select_screen.draw(f, area, &characters, &haven, &enhancement, &ctx);
                     // Draw Haven management overlay if open
                     if haven_ui.showing {
                         ui::haven_scene::render_haven_tree(
@@ -506,6 +529,18 @@ fn main() -> io::Result<()> {
                             area,
                             &global_achievements,
                             &achievement_browser,
+                            &enhancement,
+                            &ctx,
+                        );
+                    }
+                    // Draw Soulforge overlay if open
+                    if soulforge_ui.open {
+                        ui::soulforge_scene::render_soulforge(
+                            f,
+                            area,
+                            &soulforge_ui,
+                            &enhancement,
+                            0,
                             &ctx,
                         );
                     }
@@ -517,6 +552,25 @@ fn main() -> io::Result<()> {
                         if key_event.kind != KeyEventKind::Press {
                             continue;
                         }
+                        // Handle Soulforge overlay (blocks other input when open)
+                        if soulforge_ui.open {
+                            match key_event.code {
+                                KeyCode::Up => {
+                                    if soulforge_ui.selected_slot > 0 {
+                                        soulforge_ui.selected_slot -= 1;
+                                    }
+                                }
+                                KeyCode::Down => {
+                                    if soulforge_ui.selected_slot < 6 {
+                                        soulforge_ui.selected_slot += 1;
+                                    }
+                                }
+                                KeyCode::Esc => soulforge_ui.close(),
+                                _ => {}
+                            }
+                            continue;
+                        }
+
                         // Handle achievement browser (blocks other input when open)
                         if achievement_browser.showing {
                             let category_achievements = achievements::get_achievements_by_category(
@@ -542,54 +596,10 @@ fn main() -> io::Result<()> {
                             continue;
                         }
 
-                        // Handle Haven screen (blocks other input when open)
-                        if haven_ui.showing {
-                            if haven_ui.confirmation == input::HavenConfirmation::Build {
-                                match key_event.code {
-                                    KeyCode::Enter => {
-                                        // Note: Can't build from character select (no active character)
-                                        // Just close the confirmation
-                                        haven_ui.confirmation = input::HavenConfirmation::None;
-                                    }
-                                    KeyCode::Esc => {
-                                        haven_ui.confirmation = input::HavenConfirmation::None;
-                                    }
-                                    _ => {}
-                                }
-                            } else {
-                                match key_event.code {
-                                    KeyCode::Up => {
-                                        haven_ui.selected_room =
-                                            haven_ui.selected_room.saturating_sub(1);
-                                    }
-                                    KeyCode::Down => {
-                                        if haven_ui.selected_room + 1
-                                            < haven::HavenRoomId::ALL.len()
-                                        {
-                                            haven_ui.selected_room += 1;
-                                        }
-                                    }
-                                    KeyCode::Esc => {
-                                        haven_ui.close();
-                                    }
-                                    _ => {}
-                                }
-                            }
-                            continue;
-                        }
-
                         // Handle achievement browser shortcut
                         if matches!(key_event.code, KeyCode::Char('a') | KeyCode::Char('A')) {
                             global_achievements.clear_pending_notifications();
                             achievement_browser.open();
-                            continue;
-                        }
-
-                        // Handle Haven shortcut (if discovered)
-                        if matches!(key_event.code, KeyCode::Char('h') | KeyCode::Char('H'))
-                            && haven.discovered
-                        {
-                            haven_ui.open();
                             continue;
                         }
 
@@ -618,6 +628,7 @@ fn main() -> io::Result<()> {
                                         let derived = character::derived_stats::DerivedStats::calculate_derived_stats(
                                             &state.attributes,
                                             &state.equipment,
+                                            &enhancement.levels,
                                         );
                                         if let Some(enemy) = &state.combat_state.current_enemy {
                                             // Max possible enemy HP is 2.4x player HP (boss with max variance)
@@ -641,6 +652,19 @@ fn main() -> io::Result<()> {
                                         global_achievements.sync_from_haven(
                                             haven.discovered,
                                             &haven.rooms,
+                                            Some(&state.character_name),
+                                        );
+
+                                        // Retroactive enhancement/soulforge achievement sync
+                                        if enhancement.discovered {
+                                            global_achievements.on_soulforge_discovered(Some(
+                                                &state.character_name,
+                                            ));
+                                        }
+                                        global_achievements.on_enhancement_upgraded(
+                                            enhancement.highest_level_reached,
+                                            &enhancement.levels,
+                                            enhancement.total_attempts,
                                             Some(&state.character_name),
                                         );
 
@@ -861,7 +885,9 @@ fn main() -> io::Result<()> {
                             update_expanded,
                             update_check_completed,
                             haven.discovered,
+                            enhancement.discovered,
                             &global_achievements,
+                            &enhancement.levels,
                         );
                         draw_game_overlays(
                             frame,
@@ -869,6 +895,8 @@ fn main() -> io::Result<()> {
                             &overlay,
                             &haven,
                             &haven_ui,
+                            &soulforge_ui,
+                            &enhancement,
                             &global_achievements,
                             debug_mode,
                             &debug_menu,
@@ -910,6 +938,8 @@ fn main() -> io::Result<()> {
                                 &mut state,
                                 &mut haven,
                                 &mut haven_ui,
+                                &mut soulforge_ui,
+                                &mut enhancement,
                                 &mut overlay,
                                 &mut debug_menu,
                                 debug_mode,
@@ -932,6 +962,9 @@ fn main() -> io::Result<()> {
                                         character_manager.save_character(&state)?;
                                         // Save achievements when quitting to character select
                                         achievements::save_achievements(&global_achievements)?;
+                                        if enhancement.discovered {
+                                            enhancement::save_enhancement(&enhancement).ok();
+                                        }
                                     }
                                     game_state = None;
                                     current_screen = Screen::CharacterSelect;
@@ -950,6 +983,9 @@ fn main() -> io::Result<()> {
                                         // Only save Haven if it has been discovered
                                         if haven.discovered {
                                             haven::save_haven(&haven).ok();
+                                        }
+                                        if enhancement.discovered {
+                                            enhancement::save_enhancement(&enhancement).ok();
                                         }
                                         last_save_instant = Some(Instant::now());
                                         last_save_time = Some(Local::now());
@@ -1019,6 +1055,9 @@ fn main() -> io::Result<()> {
                                 if haven.discovered {
                                     haven::save_haven(&haven).ok();
                                 }
+                                if enhancement.discovered {
+                                    enhancement::save_enhancement(&enhancement).ok();
+                                }
                                 achievements::save_achievements(&global_achievements).ok();
                                 last_save_instant = Some(Instant::now());
                                 last_save_time = Some(Local::now());
@@ -1034,13 +1073,13 @@ fn main() -> io::Result<()> {
                                 &mut state,
                                 &mut tick_counter,
                                 &mut haven,
+                                &mut enhancement,
                                 &mut global_achievements,
                                 debug_mode,
                                 &mut rng,
                             );
 
-                            let haven_discovered =
-                                apply_tick_events(&mut state, &tick_result.events);
+                            let tick_flags = apply_tick_events(&mut state, &tick_result.events);
 
                             // Update visual effect lifetimes
                             let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
@@ -1065,8 +1104,14 @@ fn main() -> io::Result<()> {
                             if tick_result.haven_changed && !debug_mode {
                                 haven::save_haven(&haven).ok();
                             }
-                            if haven_discovered {
+                            if tick_result.enhancement_changed && !debug_mode {
+                                enhancement::save_enhancement(&enhancement).ok();
+                            }
+                            if tick_flags.haven_discovered {
                                 overlay = GameOverlay::HavenDiscovery;
+                            }
+                            if tick_flags.soulforge_discovered {
+                                overlay = GameOverlay::SoulforgeDiscovery;
                             }
 
                             if matches!(overlay, GameOverlay::None)
@@ -1078,6 +1123,92 @@ fn main() -> io::Result<()> {
                             }
                         }
                         last_tick = Instant::now();
+
+                        // Advance soulforge animation
+                        if soulforge_ui.open {
+                            match soulforge_ui.phase {
+                                input::SoulforgePhase::Hammering => {
+                                    soulforge_ui.animation_tick =
+                                        soulforge_ui.animation_tick.saturating_add(1);
+                                    if soulforge_ui.animation_tick >= 50 {
+                                        if let Some(ref result) = soulforge_ui.last_result {
+                                            // Apply cost and level change after animation
+                                            state.prestige_rank -= result.cost;
+                                            enhancement::apply_enhancement_result(
+                                                &mut enhancement,
+                                                result.slot_index,
+                                                result.new_level,
+                                                result.success,
+                                            );
+                                            global_achievements.on_enhancement_upgraded(
+                                                result.new_level,
+                                                &enhancement.levels,
+                                                enhancement.total_attempts,
+                                                Some(&state.character_name),
+                                            );
+
+                                            const SLOTS: [crate::items::types::EquipmentSlot; 7] = [
+                                                crate::items::types::EquipmentSlot::Weapon,
+                                                crate::items::types::EquipmentSlot::Armor,
+                                                crate::items::types::EquipmentSlot::Helmet,
+                                                crate::items::types::EquipmentSlot::Gloves,
+                                                crate::items::types::EquipmentSlot::Boots,
+                                                crate::items::types::EquipmentSlot::Amulet,
+                                                crate::items::types::EquipmentSlot::Ring,
+                                            ];
+                                            let slot_name = SLOTS
+                                                .get(result.slot_index)
+                                                .map(|s| s.name())
+                                                .unwrap_or("Unknown");
+                                            if result.success {
+                                                state.combat_state.add_log_entry(
+                                                    format!(
+                                                        "\u{2692} {} enhanced to +{}!",
+                                                        slot_name, result.new_level
+                                                    ),
+                                                    false,
+                                                    true,
+                                                );
+                                            } else {
+                                                state.combat_state.add_log_entry(
+                                                    format!("\u{2692} Enhancement failed! {} dropped to +{}.", slot_name, result.new_level),
+                                                    false,
+                                                    true,
+                                                );
+                                            }
+
+                                            soulforge_ui.phase = if result.success {
+                                                input::SoulforgePhase::ResultSuccess
+                                            } else {
+                                                input::SoulforgePhase::ResultFailure
+                                            };
+                                            soulforge_ui.animation_tick = 0;
+
+                                            // Persist changes
+                                            if !debug_mode {
+                                                let _ = character_manager.save_character(&state);
+                                                enhancement::save_enhancement(&enhancement).ok();
+                                                achievements::save_achievements(
+                                                    &global_achievements,
+                                                )
+                                                .ok();
+                                            }
+                                        }
+                                    }
+                                }
+                                input::SoulforgePhase::ResultSuccess => {
+                                    if soulforge_ui.animation_tick < 20 {
+                                        soulforge_ui.animation_tick += 1;
+                                    }
+                                }
+                                input::SoulforgePhase::ResultFailure => {
+                                    if soulforge_ui.animation_tick < 15 {
+                                        soulforge_ui.animation_tick += 1;
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
                     }
 
                     // Auto-save every 30 seconds
@@ -1093,6 +1224,9 @@ fn main() -> io::Result<()> {
                             character_manager.save_character(&state)?;
                             if haven.discovered {
                                 haven::save_haven(&haven)?;
+                            }
+                            if enhancement.discovered {
+                                enhancement::save_enhancement(&enhancement).ok();
                             }
                             achievements::save_achievements(&global_achievements)?;
                             last_save_instant = Some(Instant::now());

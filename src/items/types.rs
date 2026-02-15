@@ -23,6 +23,26 @@ impl EquipmentSlot {
             EquipmentSlot::Ring => "Ring",
         }
     }
+
+    pub fn icon(&self) -> &'static str {
+        match self {
+            EquipmentSlot::Weapon => "\u{2694}",
+            EquipmentSlot::Armor => "\u{1f6e1}",
+            EquipmentSlot::Helmet => "\u{1fa96}",
+            EquipmentSlot::Gloves => "\u{1f9e4}",
+            EquipmentSlot::Boots => "\u{1f462}",
+            EquipmentSlot::Amulet => "\u{1f4ff}",
+            EquipmentSlot::Ring => "\u{1f48d}",
+        }
+    }
+
+    /// Terminal cell width of the icon (text symbols = 1, emoji = 2).
+    pub fn icon_width(&self) -> u8 {
+        match self {
+            EquipmentSlot::Weapon | EquipmentSlot::Armor => 1,
+            _ => 2,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]

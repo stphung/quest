@@ -77,7 +77,7 @@ pub fn apply_tick_xp(state: &mut GameState, xp_gain: f64) -> (u32, Vec<Attribute
 
             // Update combat state max HP after level up
             let derived =
-                DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+                DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
             state.combat_state.update_max_hp(derived.max_hp);
         } else {
             break;

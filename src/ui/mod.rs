@@ -25,6 +25,7 @@ pub mod prestige_confirm;
 pub mod responsive;
 pub mod rune_scene;
 pub mod snake_scene;
+pub mod soulforge_scene;
 mod stats_panel;
 mod throbber;
 
@@ -42,6 +43,7 @@ use ratatui::{
 use responsive::{render_too_small, LayoutContext, SizeTier};
 
 /// Main UI drawing function with optional update notification
+#[allow(clippy::too_many_arguments)]
 pub fn draw_ui_with_update(
     frame: &mut Frame,
     game_state: &GameState,
@@ -49,7 +51,9 @@ pub fn draw_ui_with_update(
     update_expanded: bool,
     update_check_completed: bool,
     haven_discovered: bool,
+    soulforge_discovered: bool,
     achievements: &crate::achievements::Achievements,
+    enhancement_levels: &[u8; 7],
 ) {
     let ctx = LayoutContext::from_frame(frame);
 
@@ -68,11 +72,20 @@ pub fn draw_ui_with_update(
                 update_expanded,
                 update_check_completed,
                 haven_discovered,
+                soulforge_discovered,
                 achievements,
+                enhancement_levels,
             );
         }
         SizeTier::M => {
-            draw_m_layout(frame, &ctx, game_state, haven_discovered, achievements);
+            draw_m_layout(
+                frame,
+                &ctx,
+                game_state,
+                haven_discovered,
+                soulforge_discovered,
+                achievements,
+            );
         }
         SizeTier::S => {
             draw_s_layout(frame, &ctx, game_state, achievements);
@@ -93,7 +106,9 @@ fn draw_xl_l_layout(
     update_expanded: bool,
     update_check_completed: bool,
     haven_discovered: bool,
+    soulforge_discovered: bool,
     achievements: &crate::achievements::Achievements,
+    enhancement_levels: &[u8; 7],
 ) {
     let size = frame.area();
 
@@ -121,13 +136,8 @@ fn draw_xl_l_layout(
     // Determine if we need space for update drawer
     let show_update_drawer = update_expanded && update_info.is_some();
 
-    // Stats panel needs a fixed height: header(4)+prestige(5)+fishing(4)+attrs(8) = 21 + equip ~16
-    // At L tier: header(4)+prestige(5)+fishing(4)+attrs(5) = 18 + equip ~9
-    let stats_height: u16 = if ctx.height_tier >= SizeTier::XL {
-        37 // 21 fixed + 16 equipment
-    } else {
-        27 // 18 fixed + 9 equipment
-    };
+    // Stats panel: header(4)+prestige(5)+fishing(4)+attrs(5) = 18 + equip ~9
+    let stats_height: u16 = 27;
 
     // Split vertically: fixed stats area, growing info panels, optional update drawer, footer
     let v_chunks = if show_update_drawer {
@@ -137,7 +147,7 @@ fn draw_xl_l_layout(
                 Constraint::Length(stats_height), // Main content (stats + right panel)
                 Constraint::Min(6),               // Full-width Loot + Combat (grows)
                 Constraint::Length(12),           // Update drawer panel (taller for changelog)
-                Constraint::Length(3),            // Full-width footer
+                Constraint::Length(4),            // Full-width footer (2 rows)
             ])
             .split(main_area)
     } else {
@@ -146,7 +156,7 @@ fn draw_xl_l_layout(
             .constraints([
                 Constraint::Length(stats_height), // Main content (stats + right panel)
                 Constraint::Min(6),               // Full-width Loot + Combat (grows)
-                Constraint::Length(3),            // Full-width footer
+                Constraint::Length(4),            // Full-width footer (2 rows)
             ])
             .split(main_area)
     };
@@ -169,7 +179,7 @@ fn draw_xl_l_layout(
         .split(content_area);
 
     // Draw stats panel on the left
-    stats_panel::draw_stats_panel(frame, chunks[0], game_state, ctx);
+    stats_panel::draw_stats_panel(frame, chunks[0], game_state, ctx, enhancement_levels);
 
     // Draw full-width Loot + Combat panels
     info_panel::draw_info_panel(frame, info_area, game_state, ctx);
@@ -188,6 +198,7 @@ fn draw_xl_l_layout(
         update_expanded,
         update_check_completed,
         haven_discovered,
+        soulforge_discovered,
         achievements.pending_count(),
         ctx,
     );
@@ -203,6 +214,7 @@ fn draw_m_layout(
     ctx: &LayoutContext,
     game_state: &GameState,
     haven_discovered: bool,
+    soulforge_discovered: bool,
     achievements: &crate::achievements::Achievements,
 ) {
     let area = frame.area();
@@ -254,6 +266,7 @@ fn draw_m_layout(
         chunks[idx],
         game_state,
         haven_discovered,
+        soulforge_discovered,
         achievements.pending_count(),
     );
 }
@@ -362,20 +375,6 @@ fn draw_s_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
             .ratio(hp_ratio);
 
         frame.render_widget(gauge, area);
-    } else {
-        let text = if game_state.combat_state.is_regenerating {
-            "Regenerating..."
-        } else {
-            "Spawning..."
-        };
-        let paragraph = Paragraph::new(Line::from(Span::styled(
-            text,
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::ITALIC),
-        )))
-        .alignment(Alignment::Center);
-        frame.render_widget(paragraph, area);
     }
 }
 
@@ -432,11 +431,13 @@ fn draw_right_panel(
 ) {
     let zone_completion = stats_panel::compute_zone_completion(game_state);
 
+    // At L tier, the right panel is narrower so zone lines wrap — give more height
+    let zone_height = if ctx.tier >= SizeTier::XL { 7 } else { 8 };
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(7), // Zone info (always visible, includes flavor text + wrap)
-            Constraint::Min(10),   // Content (changes by activity)
+            Constraint::Length(zone_height), // Zone info (includes flavor text + wrap)
+            Constraint::Min(10),             // Content (changes by activity)
         ])
         .split(area);
 

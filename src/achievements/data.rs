@@ -858,6 +858,86 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Exploration,
         icon: "🏛️",
     },
+    // ═══════════════════════════════════════════════════════════════
+    // ENHANCEMENT ACHIEVEMENTS
+    // ═══════════════════════════════════════════════════════════════
+    AchievementDef {
+        id: AchievementId::SoulforgeDiscovered,
+        name: "Soulforge Found",
+        description: "Uncover an ancient Soulforge",
+        category: AchievementCategory::Progression,
+        icon: "\u{2692}",
+    },
+    AchievementDef {
+        id: AchievementId::ApprenticeSmith,
+        name: "Apprentice Smith",
+        description: "Enhance any equipment to +1",
+        category: AchievementCategory::Progression,
+        icon: "\u{2692}",
+    },
+    AchievementDef {
+        id: AchievementId::FullyTempered,
+        name: "Fully Tempered",
+        description: "Enhance all 7 equipment slots to +4",
+        category: AchievementCategory::Progression,
+        icon: "\u{2692}",
+    },
+    AchievementDef {
+        id: AchievementId::JourneymanSmith,
+        name: "Journeyman Smith",
+        description: "Enhance any equipment to +5",
+        category: AchievementCategory::Progression,
+        icon: "\u{2692}",
+    },
+    AchievementDef {
+        id: AchievementId::SoulforgeAdept,
+        name: "Soulforge Adept",
+        description: "Enhance any equipment to +6",
+        category: AchievementCategory::Progression,
+        icon: "\u{2692}",
+    },
+    AchievementDef {
+        id: AchievementId::SoulforgeSavant,
+        name: "Soulforge Savant",
+        description: "Enhance any equipment to +7",
+        category: AchievementCategory::Progression,
+        icon: "\u{2692}",
+    },
+    AchievementDef {
+        id: AchievementId::SoulforgeMaster,
+        name: "Soulforge Master",
+        description: "Enhance any equipment to +8",
+        category: AchievementCategory::Progression,
+        icon: "\u{2692}",
+    },
+    AchievementDef {
+        id: AchievementId::SoulforgeGrandmaster,
+        name: "Soulforge Grandmaster",
+        description: "Enhance any equipment to +9",
+        category: AchievementCategory::Progression,
+        icon: "\u{2692}",
+    },
+    AchievementDef {
+        id: AchievementId::MasterSmith,
+        name: "Master Smith",
+        description: "Enhance any equipment to +10",
+        category: AchievementCategory::Progression,
+        icon: "\u{2692}",
+    },
+    AchievementDef {
+        id: AchievementId::SoulConvergence,
+        name: "Soul Convergence",
+        description: "Enhance all 7 equipment slots to +7",
+        category: AchievementCategory::Progression,
+        icon: "\u{2692}",
+    },
+    AchievementDef {
+        id: AchievementId::PersistentHammering,
+        name: "Persistent Hammering",
+        description: "Attempt 100 enhancements",
+        category: AchievementCategory::Progression,
+        icon: "\u{2692}",
+    },
 ];
 
 /// Get the definition for a specific achievement.
@@ -1023,6 +1103,17 @@ mod tests {
             AchievementId::HavenBuilderI,
             AchievementId::HavenBuilderII,
             AchievementId::HavenArchitect,
+            AchievementId::SoulforgeDiscovered,
+            AchievementId::ApprenticeSmith,
+            AchievementId::FullyTempered,
+            AchievementId::JourneymanSmith,
+            AchievementId::SoulforgeAdept,
+            AchievementId::SoulforgeSavant,
+            AchievementId::SoulforgeMaster,
+            AchievementId::SoulforgeGrandmaster,
+            AchievementId::MasterSmith,
+            AchievementId::SoulConvergence,
+            AchievementId::PersistentHammering,
         ];
 
         for id in &all_ids {

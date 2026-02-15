@@ -49,28 +49,44 @@ fn draw_combat_full(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let inner = outer_block.inner(area);
     frame.render_widget(outer_block, area);
 
-    // Split inner area — no individual borders
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(1), // Player HP
-            Constraint::Min(5),    // Sprite + Combat log
-            Constraint::Length(1), // Enemy HP
-            Constraint::Length(1), // Status
-        ])
-        .split(inner);
+    let is_regen = game_state.combat_state.is_regenerating;
 
-    // Draw player HP bar (borderless)
+    // Add a regen throbber row below player HP when regenerating
+    let chunks = if is_regen {
+        Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1), // Player HP
+                Constraint::Length(1), // Regen throbber
+                Constraint::Min(5),    // Sprite
+                Constraint::Length(1), // Enemy HP
+                Constraint::Length(1), // Status
+            ])
+            .split(inner)
+    } else {
+        Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1), // Player HP
+                Constraint::Min(5),    // Sprite
+                Constraint::Length(1), // Enemy HP
+                Constraint::Length(1), // Status
+            ])
+            .split(inner)
+    };
+
     draw_player_hp(frame, chunks[0], game_state);
 
-    // Draw 3D combat scene (borderless)
-    render_combat_3d(frame, chunks[1], game_state);
-
-    // Draw enemy HP bar (borderless)
-    draw_enemy_hp(frame, chunks[2], game_state);
-
-    // Draw combat status
-    draw_combat_status(frame, chunks[3], game_state);
+    if is_regen {
+        draw_regen_throbber(frame, chunks[1], game_state);
+        render_combat_3d(frame, chunks[2], game_state);
+        draw_enemy_hp(frame, chunks[3], game_state);
+        draw_combat_status(frame, chunks[4], game_state);
+    } else {
+        render_combat_3d(frame, chunks[1], game_state);
+        draw_enemy_hp(frame, chunks[2], game_state);
+        draw_combat_status(frame, chunks[3], game_state);
+    }
 }
 
 /// Compact combat scene for M tier: HP bars + sprite + status.
@@ -83,20 +99,43 @@ fn draw_combat_compact(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let inner = outer_block.inner(area);
     frame.render_widget(outer_block, area);
 
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(1), // Player HP
-            Constraint::Min(3),    // Sprite (uses whatever space is available)
-            Constraint::Length(1), // Enemy HP
-            Constraint::Length(1), // Status
-        ])
-        .split(inner);
+    let is_regen = game_state.combat_state.is_regenerating;
+
+    let chunks = if is_regen {
+        Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1), // Player HP
+                Constraint::Length(1), // Regen throbber
+                Constraint::Min(3),    // Sprite
+                Constraint::Length(1), // Enemy HP
+                Constraint::Length(1), // Status
+            ])
+            .split(inner)
+    } else {
+        Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1), // Player HP
+                Constraint::Min(3),    // Sprite
+                Constraint::Length(1), // Enemy HP
+                Constraint::Length(1), // Status
+            ])
+            .split(inner)
+    };
 
     draw_player_hp(frame, chunks[0], game_state);
-    render_combat_3d(frame, chunks[1], game_state);
-    draw_enemy_hp(frame, chunks[2], game_state);
-    draw_combat_status(frame, chunks[3], game_state);
+
+    if is_regen {
+        draw_regen_throbber(frame, chunks[1], game_state);
+        render_combat_3d(frame, chunks[2], game_state);
+        draw_enemy_hp(frame, chunks[3], game_state);
+        draw_combat_status(frame, chunks[4], game_state);
+    } else {
+        render_combat_3d(frame, chunks[1], game_state);
+        draw_enemy_hp(frame, chunks[2], game_state);
+        draw_combat_status(frame, chunks[3], game_state);
+    }
 }
 
 /// Draws the player HP bar (borderless, single line)
@@ -115,6 +154,23 @@ pub(super) fn draw_player_hp(frame: &mut Frame, area: Rect, game_state: &GameSta
         .ratio(hp_ratio);
 
     frame.render_widget(gauge, area);
+}
+
+/// Draws a regen throbber line below the player HP bar (spinner + flavor text).
+fn draw_regen_throbber(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    use super::throbber::{regen_message, spinner_char};
+
+    let spinner = spinner_char();
+    let message = regen_message(game_state.character_xp);
+    let text = Line::from(Span::styled(
+        format!("{} {}", spinner, message),
+        Style::default()
+            .fg(Color::Green)
+            .add_modifier(Modifier::ITALIC),
+    ));
+
+    let paragraph = Paragraph::new(text).alignment(Alignment::Center);
+    frame.render_widget(paragraph, area);
 }
 
 /// Draws the enemy HP bar (borderless, single line) with zone-aware coloring
@@ -143,26 +199,6 @@ pub(super) fn draw_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameStat
             .ratio(hp_ratio);
 
         frame.render_widget(gauge, area);
-    } else {
-        let text = if game_state.combat_state.is_regenerating {
-            vec![Line::from(Span::styled(
-                "Regenerating...",
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::ITALIC),
-            ))]
-        } else {
-            vec![Line::from(Span::styled(
-                "Spawning enemy...",
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::ITALIC),
-            ))]
-        };
-
-        let paragraph = Paragraph::new(text).alignment(Alignment::Center);
-
-        frame.render_widget(paragraph, area);
     }
 }
 
@@ -174,8 +210,11 @@ pub(super) fn draw_combat_status(frame: &mut Frame, area: Rect, game_state: &Gam
     let spinner = spinner_char();
 
     // Calculate DPS for display
-    let derived =
-        DerivedStats::calculate_derived_stats(&game_state.attributes, &game_state.equipment);
+    let derived = DerivedStats::calculate_derived_stats(
+        &game_state.attributes,
+        &game_state.equipment,
+        &[0; 7],
+    );
     let base_dps = derived.total_damage() as f64 / ATTACK_INTERVAL_SECONDS;
     let effective_dps = base_dps
         * (1.0 + (derived.crit_chance_percent as f64 / 100.0) * (derived.crit_multiplier - 1.0));
@@ -184,16 +223,7 @@ pub(super) fn draw_combat_status(frame: &mut Frame, area: Rect, game_state: &Gam
         Style::default().fg(Color::DarkGray),
     );
 
-    let status_text = if game_state.combat_state.is_regenerating {
-        let message = waiting_message(game_state.character_xp);
-        vec![Line::from(vec![
-            Span::styled(
-                format!("{} {}", spinner, message),
-                Style::default().fg(Color::Yellow),
-            ),
-            dps_span,
-        ])]
-    } else if game_state.combat_state.current_enemy.is_some() {
+    let status_text = if game_state.combat_state.current_enemy.is_some() {
         let player_interval = ATTACK_INTERVAL_SECONDS / derived.attack_speed_multiplier;
         let player_next = (player_interval - game_state.combat_state.player_attack_timer).max(0.0);
         let enemy_interval = effective_enemy_attack_interval(game_state);

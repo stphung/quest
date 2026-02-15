@@ -18,6 +18,7 @@ use quest::achievements::{AchievementId, Achievements};
 use quest::character::attributes::AttributeType;
 use quest::character::derived_stats::DerivedStats;
 use quest::core::tick::{game_tick, TickEvent, TickResult};
+use quest::enhancement::EnhancementProgress;
 use quest::fishing::{FishingPhase, FishingSession};
 use quest::haven::{try_discover_haven, Haven};
 use quest::GameState;
@@ -40,7 +41,7 @@ fn strong_state() -> GameState {
     let mut s = fresh_state();
     s.attributes.set(AttributeType::Strength, 50);
     s.attributes.set(AttributeType::Intelligence, 50);
-    let d = DerivedStats::calculate_derived_stats(&s.attributes, &s.equipment);
+    let d = DerivedStats::calculate_derived_stats(&s.attributes, &s.equipment, &[0; 7]);
     s.combat_state.update_max_hp(d.max_hp);
     s.combat_state.player_current_hp = s.combat_state.player_max_hp;
     s
@@ -65,7 +66,15 @@ fn run_game_tick(
     debug_mode: bool,
     rng: &mut ChaCha8Rng,
 ) -> TickResult {
-    game_tick(state, tc, haven, ach, debug_mode, rng)
+    game_tick(
+        state,
+        tc,
+        haven,
+        &mut EnhancementProgress::new(),
+        ach,
+        debug_mode,
+        rng,
+    )
 }
 
 // =============================================================================

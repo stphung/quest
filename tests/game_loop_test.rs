@@ -24,7 +24,8 @@ fn simulate_tick(state: &mut GameState) -> Vec<CombatEvent> {
     let mut achievements = Achievements::default();
 
     // Sync max HP with derived stats
-    let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+    let derived =
+        DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
     state.combat_state.update_max_hp(derived.max_hp);
 
     // Spawn enemy if needed (this is called in the main game loop)
@@ -123,7 +124,8 @@ fn test_new_game_state_starts_in_zone_1() {
 fn test_derived_stats_calculated_from_base_attributes() {
     let state = GameState::new("Stats Test".to_string(), 0);
 
-    let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+    let derived =
+        DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
 
     // Base stats with all 10s
     assert!(derived.max_hp > 0, "Max HP should be positive");
@@ -462,7 +464,8 @@ fn test_zone_advancement_subzone_to_subzone() {
     // to minimize boss HP, and maximize STR/INT for damage output.
     state.attributes.set(AttributeType::Strength, 50);
     state.attributes.set(AttributeType::Intelligence, 50);
-    let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+    let derived =
+        DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
     state.combat_state.update_max_hp(derived.max_hp);
     state.combat_state.player_current_hp = state.combat_state.player_max_hp;
 
@@ -524,7 +527,8 @@ fn test_zone_advancement_full_zone_clear() {
     // to minimize boss HP, and maximize STR/INT for damage output.
     state.attributes.set(AttributeType::Strength, 50);
     state.attributes.set(AttributeType::Intelligence, 50);
-    let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+    let derived =
+        DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
     state.combat_state.update_max_hp(derived.max_hp);
     state.combat_state.player_current_hp = state.combat_state.player_max_hp;
 
@@ -640,7 +644,8 @@ fn test_max_hp_updates_with_derived_stats() {
     use quest::character::attributes::AttributeType;
     state.attributes.set(AttributeType::Constitution, 20);
 
-    let derived = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment);
+    let derived =
+        DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
     state.combat_state.update_max_hp(derived.max_hp);
 
     assert!(
