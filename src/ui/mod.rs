@@ -236,7 +236,8 @@ fn draw_m_layout(
     }
     constraints.push(Constraint::Length(1)); // XP bar
     constraints.push(Constraint::Min(5)); // Activity area (full width)
-    constraints.push(Constraint::Length(4)); // Info panel (compact)
+    constraints.push(Constraint::Length(1)); // Loot ticker
+    constraints.push(Constraint::Length(3)); // Combat log (compact)
     constraints.push(Constraint::Length(1)); // Footer
 
     let chunks = Layout::default()
@@ -264,7 +265,11 @@ fn draw_m_layout(
     draw_right_content(frame, chunks[idx], game_state, ctx);
     idx += 1;
 
-    // Compact info panel
+    // Loot ticker
+    ticker::draw_ticker(frame, chunks[idx], &game_state.loot_ticker);
+    idx += 1;
+
+    // Compact combat log (ticker handles loot display)
     info_panel::draw_info_panel(frame, chunks[idx], game_state, ctx);
     idx += 1;
 

@@ -27,8 +27,8 @@ pub fn draw_info_panel(frame: &mut Frame, area: Rect, game_state: &GameState, ct
             draw_combat_log(frame, area, game_state);
         }
         SizeTier::M => {
-            // Compact: side-by-side, no borders, less padding
-            draw_loot_combat_compact(frame, area, game_state);
+            // Compact combat log (ticker handles loot display)
+            draw_combat_log_compact(frame, area, game_state);
         }
         SizeTier::S => {
             // Merged chronological feed
@@ -163,7 +163,38 @@ fn draw_recent_gains(frame: &mut Frame, area: Rect, game_state: &GameState) {
     frame.render_widget(paragraph, inner);
 }
 
+/// Compact combat log for M tier (no borders, no loot side).
+fn draw_combat_log_compact(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    let mut lines: Vec<Line> = Vec::new();
+    let max_entries = area.height as usize;
+    let max_width = area.width as usize;
+
+    for entry in game_state
+        .combat_state
+        .combat_log
+        .iter()
+        .rev()
+        .take(max_entries)
+    {
+        let color = if entry.is_player_action {
+            if entry.is_crit {
+                Color::Yellow
+            } else {
+                Color::Green
+            }
+        } else {
+            Color::Red
+        };
+        let msg = truncate_to_width(&entry.message, max_width);
+        lines.push(Line::from(Span::styled(msg, Style::default().fg(color))));
+    }
+
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, area);
+}
+
 /// Compact side-by-side loot + combat log for M tier (no borders, minimal padding).
+#[allow(dead_code)]
 fn draw_loot_combat_compact(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
