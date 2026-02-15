@@ -115,7 +115,7 @@ fn render_menu(
     )
     .style(
         Style::default()
-            .fg(Color::DarkGray)
+            .fg(Color::White)
             .add_modifier(Modifier::ITALIC),
     )
     .wrap(Wrap { trim: true });
@@ -253,7 +253,7 @@ fn render_menu(
             Line::from(vec![
                 Span::styled("Bonus: ", Style::default().fg(Color::DarkGray)),
                 Span::styled(
-                    format!("+{:.1}% stats", bonus_pct),
+                    format!("+{:.1}% Power", bonus_pct),
                     Style::default().fg(Color::Green),
                 ),
                 Span::styled("  Rate: ", Style::default().fg(Color::DarkGray)),
@@ -592,7 +592,7 @@ fn render_success(frame: &mut Frame, area: Rect, soulforge_ui: &SoulforgeUiState
                 .add_modifier(Modifier::BOLD),
         )),
         Line::from(Span::styled(
-            format!("+{:.1}% stats", bonus_pct),
+            format!("+{:.1}% Power", bonus_pct),
             Style::default().fg(Color::Yellow),
         )),
         Line::from(""),
