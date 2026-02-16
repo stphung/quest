@@ -38,7 +38,6 @@ fn level_color(level: u8) -> Color {
 }
 
 /// Write a string into the scene buffer at (row, col). Each char occupies 1 cell.
-#[allow(dead_code)]
 fn put_text(buffer: &mut [Vec<SceneCell>], row: i32, col: i32, text: &str, fg: Color) {
     for (i, ch) in text.chars().enumerate() {
         put_cell(buffer, row, col + i as i32, ch, fg);
@@ -46,14 +45,12 @@ fn put_text(buffer: &mut [Vec<SceneCell>], row: i32, col: i32, text: &str, fg: C
 }
 
 /// Write a string centered horizontally in the buffer.
-#[allow(dead_code)]
 fn put_text_centered(buffer: &mut [Vec<SceneCell>], row: i32, width: usize, text: &str, fg: Color) {
     let col = (width as i32 - text.len() as i32) / 2;
     put_text(buffer, row, col, text, fg);
 }
 
 /// Parameters controlling the forge backdrop appearance.
-#[allow(dead_code)]
 struct ForgeBackdropParams {
     bottom_rgb: (u8, u8, u8),
     top_rgb: (u8, u8, u8),
@@ -65,7 +62,6 @@ struct ForgeBackdropParams {
     shimmer: bool,
 }
 
-#[allow(dead_code)]
 impl ForgeBackdropParams {
     /// Standard warm forge glow (Menu, Confirming phases).
     fn normal() -> Self {
@@ -94,38 +90,9 @@ impl ForgeBackdropParams {
             shimmer: true,
         }
     }
-
-    /// Golden glow for success result.
-    fn golden() -> Self {
-        Self {
-            bottom_rgb: (200, 170, 50),
-            top_rgb: (40, 30, 10),
-            ember_count: 20,
-            ember_speed: 8.0,
-            ember_upward: true,
-            ember_hot: (255, 230, 100),
-            ember_cool: (200, 150, 30),
-            shimmer: true,
-        }
-    }
-
-    /// Cold ash for failure result.
-    fn ash() -> Self {
-        Self {
-            bottom_rgb: (40, 40, 45),
-            top_rgb: (15, 15, 18),
-            ember_count: 4,
-            ember_speed: 2.0,
-            ember_upward: false,
-            ember_hot: (80, 30, 10),
-            ember_cool: (30, 15, 10),
-            shimmer: false,
-        }
-    }
 }
 
 /// Paint the forge backdrop into the buffer: gradient background, drifting embers, heat shimmer.
-#[allow(dead_code)]
 fn paint_forge_backdrop(buffer: &mut [Vec<SceneCell>], millis: u128, params: &ForgeBackdropParams) {
     let height = buffer.len();
     if height == 0 {
