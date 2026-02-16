@@ -73,6 +73,19 @@ impl LootTicker {
 
     /// Add a new entry to the ticker. Evicts oldest if at capacity.
     pub fn push(&mut self, entry: TickerEntry) {
+        // Compensate scroll offset for content prepended at the front.
+        // New entry chars: icon + space (if icon) + text + separator " ··· " (5 chars)
+        if !self.entries.is_empty() {
+            let icon_len = if entry.icon.is_empty() {
+                0
+            } else {
+                entry.icon.chars().count() + 1 // icon + space
+            };
+            let text_len = entry.text.chars().count();
+            let separator_len = 5; // " ··· "
+            self.scroll_offset += (icon_len + text_len + separator_len) as f64;
+        }
+
         if self.entries.len() >= TICKER_MAX_ENTRIES {
             self.entries.pop_back();
         }
@@ -628,6 +641,34 @@ mod tests {
         ticker.tick();
         assert_eq!(ticker.scroll_offset, offset_before);
         assert_eq!(ticker.pause_ticks, TICKER_PAUSE_TICKS - 1);
+    }
+
+    #[test]
+    fn test_loot_ticker_push_compensates_scroll_offset() {
+        let mut ticker = LootTicker::new();
+        // Add an initial entry and advance scroll
+        ticker.push(TickerEntry {
+            icon: "",
+            text: "First".to_string(),
+            color: ratatui::style::Color::White,
+            bold: false,
+        });
+        // Advance scroll past the pause
+        for _ in 0..10 {
+            ticker.tick();
+        }
+        let offset_before = ticker.scroll_offset;
+        assert!(offset_before > 0.0);
+
+        // Push a new entry — offset should increase to compensate
+        ticker.push(TickerEntry {
+            icon: "\u{2694}",
+            text: "Sword".to_string(),
+            color: ratatui::style::Color::Yellow,
+            bold: false,
+        });
+        // Offset should be greater than before (compensated for new content)
+        assert!(ticker.scroll_offset > offset_before);
     }
 
     #[test]
