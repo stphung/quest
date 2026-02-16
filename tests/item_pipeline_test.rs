@@ -989,9 +989,10 @@ fn test_pipeline_prestige_produces_better_average_scores() {
     let mut game_state_p10 = GameState::new("P10 Scorer".to_string(), 0);
     game_state_p10.prestige_rank = 10;
 
-    let avg_score = |gs: &GameState| -> f64 {
-        let mut rng = rand::rng();
-        let n = 200;
+    let avg_score = |gs: &GameState, seed: u64| -> f64 {
+        use rand::SeedableRng;
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+        let n = 1000;
         let sum: f64 = (0..n)
             .map(|_| {
                 let rarity = roll_rarity_for_mob(gs.prestige_rank, 0.0, &mut rng);
@@ -1002,8 +1003,8 @@ fn test_pipeline_prestige_produces_better_average_scores() {
         sum / n as f64
     };
 
-    let avg_p0 = avg_score(&game_state_p0);
-    let avg_p10 = avg_score(&game_state_p10);
+    let avg_p0 = avg_score(&game_state_p0, 42);
+    let avg_p10 = avg_score(&game_state_p10, 42);
 
     assert!(
         avg_p10 > avg_p0,

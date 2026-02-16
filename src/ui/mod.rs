@@ -182,7 +182,7 @@ fn draw_xl_l_layout(
     stats_panel::draw_stats_panel(frame, chunks[0], game_state, ctx, enhancement_levels);
 
     // Draw ticker
-    ticker::draw_ticker(frame, info_area, &game_state.loot_ticker);
+    ticker::draw_ticker(frame, info_area, &game_state.ticker);
 
     // Draw update drawer if expanded
     if let (Some(drawer_area), Some(info)) = (update_drawer_area, update_info) {
@@ -228,7 +228,7 @@ fn draw_m_layout(
     }
     constraints.push(Constraint::Length(1)); // XP bar
     constraints.push(Constraint::Min(5)); // Activity area (full width)
-    constraints.push(Constraint::Length(1)); // Loot ticker
+    constraints.push(Constraint::Length(1)); // Event ticker
     constraints.push(Constraint::Length(1)); // Footer
 
     let chunks = Layout::default()
@@ -256,8 +256,8 @@ fn draw_m_layout(
     draw_right_content(frame, chunks[idx], game_state, ctx);
     idx += 1;
 
-    // Loot ticker
-    ticker::draw_ticker(frame, chunks[idx], &game_state.loot_ticker);
+    // Event ticker
+    ticker::draw_ticker(frame, chunks[idx], &game_state.ticker);
     idx += 1;
 
     // Compact footer
@@ -314,7 +314,7 @@ fn draw_s_layout(
             Constraint::Length(1), // Player HP
             Constraint::Length(1), // Enemy HP + name
             Constraint::Min(1),    // Combat status (grows)
-            Constraint::Length(1), // Loot ticker
+            Constraint::Length(1), // Event ticker
             Constraint::Length(1), // Footer
         ])
         .split(area);
@@ -334,8 +334,8 @@ fn draw_s_layout(
     // Combat status
     combat_scene::draw_combat_scene(frame, chunks[4], game_state, ctx);
 
-    // Loot ticker
-    ticker::draw_ticker(frame, chunks[5], &game_state.loot_ticker);
+    // Event ticker
+    ticker::draw_ticker(frame, chunks[5], &game_state.ticker);
 
     // Minimal footer
     stats_panel::draw_footer_minimal(frame, chunks[6], game_state);
