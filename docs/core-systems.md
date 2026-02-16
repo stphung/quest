@@ -370,7 +370,7 @@ Generic `<R: Rng>` allows seeded RNG in tests (`ChaCha8Rng`) and `thread_rng()` 
 
 ### TickEvent and TickResult
 
-`TickEvent` is an enum with 25+ variants describing everything that can happen in a single tick. The presentation layer (`main.rs` via `tick_events.rs`) maps these to combat log entries and visual effects. Game logic never touches UI types.
+`TickEvent` is an enum with 28 variants describing everything that can happen in a single tick. The presentation layer (`main.rs` via `tick_events.rs`) maps these to combat log entries and visual effects. Game logic never touches UI types.
 
 ```rust
 pub struct TickResult {
@@ -513,7 +513,7 @@ Enhancement state (`EnhancementProgress`) is saved to `~/.quest/enhancement.json
 | Boss spawn threshold | 10 kills in subzone |
 | Base XP per tick | 1.0 |
 | Combat XP per kill | 200-400 ticks |
-| Dungeon discovery | 2% per kill |
+| Dungeon discovery | 1% per kill |
 | Fishing discovery | 5% per kill |
 | Challenge discovery | 0.000014/tick (~2hr avg) |
 | Haven discovery base | 0.000014/tick (P10+) |

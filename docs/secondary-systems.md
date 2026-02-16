@@ -101,7 +101,7 @@ Fishing state (rank, total fish caught, legendary catches) persists across prest
 
 ### Overview
 
-Procedurally generated dungeon exploration triggered randomly after kills (2% chance per kill). Dungeons feature connected rooms with various types, a key system for locked doors, and safe death (no prestige loss).
+Procedurally generated dungeon exploration triggered randomly after kills (1% chance per kill). Dungeons feature connected rooms with various types, a key system for locked doors, and safe death (no prestige loss).
 
 ### Dungeon Sizes
 
@@ -263,7 +263,7 @@ Account-level achievement system that persists across all characters. Stored in 
 - FirstPrestige, then P5, P10, P15, P20, P25, P30, P40, P50, P70, P90, Eternal (P100)
 
 **Challenges:**
-- Per-game per-difficulty wins: ChessNovice through ChessMaster, MorrisNovice through MorrisMaster, etc. for all 9 challenge types (chess, morris, gomoku, minesweeper, rune, go, flappy_bird, snake, jezzball)
+- Per-game per-difficulty wins: ChessNovice through ChessMaster, MorrisNovice through MorrisMaster, etc. for all 10 challenge types (chess, morris, gomoku, minesweeper, rune, go, flappy_bird, snake, jezzball, runic_shift)
 - GrandChampion: 100 total minigame wins
 
 **Exploration:**

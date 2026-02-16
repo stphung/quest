@@ -190,8 +190,9 @@ When active, a `[DEBUG]` indicator shows in the UI corner.
 9. **Trigger Flappy Bird Challenge** — Adds flappy bird to challenge menu
 10. **Trigger JezzBall Challenge** — Adds jezzball to challenge menu
 11. **Trigger Snake Challenge** — Adds snake to challenge menu
-12. **Trigger Haven Discovery** — Discovers Haven immediately
-13. **Trigger Soulforge Discovery** — Discovers Soulforge immediately
+12. **Trigger Sigil Surge Challenge** — Adds sigil surge to challenge menu
+13. **Trigger Haven Discovery** — Discovers Haven immediately
+14. **Trigger Soulforge Discovery** — Discovers Soulforge immediately
 
 Each option calls existing generation functions to bypass the normal RNG discovery system. Useful for testing features without waiting for random events.
 
@@ -230,7 +231,7 @@ The game detects OS-level process suspension (e.g., laptop lid close/open):
 
 | Crate | Version | Purpose |
 |-------|---------|---------|
-| ratatui | 0.26 | Terminal UI framework |
+| ratatui | 0.30 | Terminal UI framework |
 | crossterm | 0.27 | Terminal backend |
 | serde / serde_json | - | JSON serialization |
 | rand | - | RNG for all procedural systems |
