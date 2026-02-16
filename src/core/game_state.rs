@@ -44,77 +44,122 @@ pub struct TickerEntry {
     pub bold: bool,
 }
 
+/// Internal entry with its scroll birth time for independent positioning.
+#[derive(Debug, Clone)]
+struct TimedEntry {
+    entry: TickerEntry,
+    /// The scroll_offset value when this entry was pushed.
+    born_at: f64,
+}
+
 /// Scrolling loot ticker state. Transient (not serialized).
+///
+/// Each entry independently enters from the right edge of the viewport and
+/// scrolls left at a constant speed. Entries are spaced apart so they don't
+/// overlap, and are removed once they scroll off the left edge.
 #[derive(Debug, Clone)]
 pub struct LootTicker {
-    /// Recent events displayed in the ticker
-    pub entries: VecDeque<TickerEntry>,
+    entries: VecDeque<TimedEntry>,
     /// Fractional scroll offset (integer part = character position)
     pub scroll_offset: f64,
-    /// Remaining pause ticks when a new event arrives (0 = scrolling)
-    pub pause_ticks: u8,
-    /// Queued scroll debt from newly prepended entries (smoothed over time)
-    catchup_debt: f64,
+    /// Last known viewport width for cleanup calculations
+    pub viewport_width: usize,
 }
 
 /// Max entries in the ticker before oldest are evicted
 const TICKER_MAX_ENTRIES: usize = 30;
 
-/// Characters scrolled per tick (1.0 = 1 char per 100ms tick for smooth movement)
-pub const TICKER_SCROLL_SPEED: f64 = 1.0;
+/// Characters scrolled per tick (0.4 = ~4 chars/sec at 100ms ticks)
+pub const TICKER_SCROLL_SPEED: f64 = 0.4;
 
-/// Ticks to pause scrolling when a new event arrives (5 = 500ms)
-pub const TICKER_PAUSE_TICKS: u8 = 5;
-
-/// Catchup speed multiplier (how fast to absorb debt on top of normal scroll)
-const TICKER_CATCHUP_SPEED: f64 = 1.2;
+/// Gap (in chars) between consecutive entries on screen
+const ENTRY_GAP: usize = 3;
 
 impl LootTicker {
     pub fn new() -> Self {
         Self {
             entries: VecDeque::with_capacity(TICKER_MAX_ENTRIES),
             scroll_offset: 0.0,
-            pause_ticks: 0,
-            catchup_debt: 0.0,
+            viewport_width: 80,
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    #[cfg(test)]
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
     /// Add a new entry to the ticker. Evicts oldest if at capacity.
+    ///
+    /// Each entry gets a `born_at` timestamp so it independently enters from
+    /// the right edge. If entries arrive in rapid succession, they are spaced
+    /// apart so they don't overlap on screen.
     pub fn push(&mut self, entry: TickerEntry) {
-        // Queue scroll debt for content prepended at the front.
-        // The debt is smoothly absorbed over subsequent ticks instead of jumping.
-        if !self.entries.is_empty() {
-            let icon_len = if entry.icon.is_empty() {
-                0
-            } else {
-                entry.icon.chars().count() + 1 // icon + space
-            };
-            let text_len = entry.text.chars().count();
-            let separator_len = 5; // " ··· "
-            self.catchup_debt += (icon_len + text_len + separator_len) as f64;
-        }
+        // Space new entry after the previous one to avoid overlap
+        let born_at = if let Some(prev) = self.entries.front() {
+            let min_gap = Self::entry_char_len(&prev.entry) + ENTRY_GAP;
+            self.scroll_offset.max(prev.born_at + min_gap as f64)
+        } else {
+            self.scroll_offset
+        };
 
         if self.entries.len() >= TICKER_MAX_ENTRIES {
             self.entries.pop_back();
         }
-        self.entries.push_front(entry);
-        self.pause_ticks = TICKER_PAUSE_TICKS;
+        self.entries.push_front(TimedEntry { entry, born_at });
     }
 
     /// Advance the scroll offset by one tick. Call once per 100ms tick.
     pub fn tick(&mut self) {
-        if self.pause_ticks > 0 {
-            self.pause_ticks -= 1;
-        } else {
-            self.scroll_offset += TICKER_SCROLL_SPEED;
-        }
+        self.scroll_offset += TICKER_SCROLL_SPEED;
+        self.cleanup_scrolled_entries();
+    }
 
-        // Smoothly absorb catchup debt regardless of pause state
-        if self.catchup_debt > 0.0 {
-            let step = TICKER_CATCHUP_SPEED.min(self.catchup_debt);
-            self.scroll_offset += step;
-            self.catchup_debt -= step;
+    /// Returns entries with their viewport column position (oldest first).
+    /// Position is the left-edge column of the entry in the viewport.
+    pub fn visible_entries(&self, viewport_width: usize) -> Vec<(&TickerEntry, isize)> {
+        let vw = viewport_width as f64;
+        self.entries
+            .iter()
+            .rev()
+            .filter_map(|te| {
+                let pos = (vw - (self.scroll_offset - te.born_at)) as isize;
+                let entry_len = Self::entry_char_len(&te.entry) as isize;
+                // Visible if any part is on screen
+                if pos + entry_len > 0 && pos < viewport_width as isize {
+                    Some((&te.entry, pos))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// Remove entries that have fully scrolled off the left edge.
+    fn cleanup_scrolled_entries(&mut self) {
+        while let Some(oldest) = self.entries.back() {
+            let entry_chars = Self::entry_char_len(&oldest.entry);
+            let age = self.scroll_offset - oldest.born_at;
+            // Off-screen when it has scrolled past the viewport + its own width
+            if age > (self.viewport_width + entry_chars) as f64 {
+                self.entries.pop_back();
+            } else {
+                break;
+            }
         }
+    }
+
+    fn entry_char_len(entry: &TickerEntry) -> usize {
+        let icon_len = if entry.icon.is_empty() {
+            0
+        } else {
+            entry.icon.chars().count() + 1 // icon + space
+        };
+        icon_len + entry.text.chars().count()
     }
 }
 
@@ -629,9 +674,8 @@ mod tests {
     #[test]
     fn test_loot_ticker_new_is_empty() {
         let ticker = LootTicker::new();
-        assert!(ticker.entries.is_empty());
+        assert!(ticker.is_empty());
         assert_eq!(ticker.scroll_offset, 0.0);
-        assert_eq!(ticker.pause_ticks, 0);
     }
 
     #[test]
@@ -643,9 +687,7 @@ mod tests {
             color: ratatui::style::Color::Yellow,
             bold: false,
         });
-        assert_eq!(ticker.entries.len(), 1);
-        assert_eq!(ticker.entries[0].text, "[R] Flamebrand");
-        assert_eq!(ticker.pause_ticks, TICKER_PAUSE_TICKS);
+        assert_eq!(ticker.len(), 1);
     }
 
     #[test]
@@ -659,9 +701,7 @@ mod tests {
                 bold: false,
             });
         }
-        assert_eq!(ticker.entries.len(), TICKER_MAX_ENTRIES);
-        // Most recent should be at front
-        assert_eq!(ticker.entries[0].text, "Item 34");
+        assert_eq!(ticker.len(), TICKER_MAX_ENTRIES);
     }
 
     #[test]
@@ -675,23 +715,7 @@ mod tests {
     }
 
     #[test]
-    fn test_loot_ticker_pause_on_new_entry() {
-        let mut ticker = LootTicker::new();
-        ticker.push(TickerEntry {
-            icon: "",
-            text: "Test".to_string(),
-            color: ratatui::style::Color::White,
-            bold: false,
-        });
-        assert_eq!(ticker.pause_ticks, TICKER_PAUSE_TICKS);
-        let offset_before = ticker.scroll_offset;
-        ticker.tick();
-        assert_eq!(ticker.scroll_offset, offset_before);
-        assert_eq!(ticker.pause_ticks, TICKER_PAUSE_TICKS - 1);
-    }
-
-    #[test]
-    fn test_loot_ticker_push_queues_catchup_debt() {
+    fn test_loot_ticker_push_does_not_change_offset() {
         let mut ticker = LootTicker::new();
         // Add an initial entry and advance scroll
         ticker.push(TickerEntry {
@@ -700,32 +724,52 @@ mod tests {
             color: ratatui::style::Color::White,
             bold: false,
         });
-        // Advance scroll past the pause
         for _ in 0..10 {
             ticker.tick();
         }
         let offset_before = ticker.scroll_offset;
         assert!(offset_before > 0.0);
 
-        // Push a new entry — offset should NOT jump immediately
+        // Push a new entry — offset should NOT change at all
         ticker.push(TickerEntry {
             icon: "\u{2694}",
             text: "Sword".to_string(),
             color: ratatui::style::Color::Yellow,
             bold: false,
         });
-        // Offset unchanged immediately (debt queued instead)
         assert_eq!(ticker.scroll_offset, offset_before);
-
-        // But after ticking, offset should gradually increase to absorb debt
-        for _ in 0..50 {
-            ticker.tick();
-        }
-        assert!(ticker.scroll_offset > offset_before);
     }
 
     #[test]
-    fn test_loot_ticker_resumes_after_pause() {
+    fn test_loot_ticker_cleanup_removes_scrolled_entries() {
+        let mut ticker = LootTicker::new();
+        ticker.viewport_width = 10;
+        ticker.push(TickerEntry {
+            icon: "",
+            text: "Old".to_string(), // 3 chars, born_at=0
+            color: ratatui::style::Color::White,
+            bold: false,
+        });
+        ticker.push(TickerEntry {
+            icon: "",
+            text: "New".to_string(), // born_at spaced after "Old"
+            color: ratatui::style::Color::White,
+            bold: false,
+        });
+        assert_eq!(ticker.len(), 2);
+
+        // Old entry: born_at=0, off-screen when scroll > viewport(10) + len(3) = 13
+        // At 0.4/tick, need 32.5 ticks → ~35 ticks
+        for _ in 0..35 {
+            ticker.tick();
+        }
+
+        // Oldest entry should have been cleaned up
+        assert_eq!(ticker.len(), 1);
+    }
+
+    #[test]
+    fn test_loot_ticker_scrolls_continuously() {
         let mut ticker = LootTicker::new();
         ticker.push(TickerEntry {
             icon: "",
@@ -733,12 +777,12 @@ mod tests {
             color: ratatui::style::Color::White,
             bold: false,
         });
-        for _ in 0..TICKER_PAUSE_TICKS {
-            ticker.tick();
-        }
-        assert_eq!(ticker.pause_ticks, 0);
+        // Scrolling should advance every tick, no pauses
         let offset_before = ticker.scroll_offset;
         ticker.tick();
         assert!(ticker.scroll_offset > offset_before);
+        let offset_after_one = ticker.scroll_offset;
+        ticker.tick();
+        assert!(ticker.scroll_offset > offset_after_one);
     }
 }

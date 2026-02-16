@@ -225,11 +225,23 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 }
             }
             TickEvent::DungeonRoomEntered { message, .. }
-            | TickEvent::DungeonTreasureFound { message, .. }
             | TickEvent::DungeonBossUnlocked { message } => {
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
+            }
+            TickEvent::DungeonTreasureFound {
+                item_name, message, ..
+            } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, true);
+                game_state.loot_ticker.push(TickerEntry {
+                    icon: "\u{1F48E}",
+                    text: item_name.clone(),
+                    color: Color::Cyan,
+                    bold: false,
+                });
             }
             TickEvent::DungeonKeyFound { message } => {
                 game_state
@@ -286,10 +298,21 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     bold: false,
                 });
             }
-            TickEvent::FishingMessage { message } | TickEvent::FishingItemFound { message, .. } => {
+            TickEvent::FishingMessage { message } => {
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
+            }
+            TickEvent::FishingItemFound { item_name, message } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, true);
+                game_state.loot_ticker.push(TickerEntry {
+                    icon: "\u{1F41F}",
+                    text: item_name.clone(),
+                    color: Color::Cyan,
+                    bold: false,
+                });
             }
             TickEvent::FishingRankUp { message } => {
                 game_state
