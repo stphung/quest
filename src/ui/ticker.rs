@@ -1,10 +1,10 @@
 //! Scrolling loot ticker renderer.
 //!
-//! Renders a 1-row horizontal ticker by computing a visible window
-//! into a virtual character array built from concatenated TickerEntry spans.
+//! Each entry independently enters from the right edge and scrolls left.
+//! Entries are positioned based on their birth time, not concatenated.
 //! Uses char-based indexing to avoid multi-byte UTF-8 slicing panics.
 
-use crate::core::game_state::LootTicker;
+use crate::core::game_state::{LootTicker, TickerEntry};
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
@@ -13,22 +13,16 @@ use ratatui::{
     Frame,
 };
 
-/// Separator between ticker entries.
-const SEPARATOR: &str = " \u{00B7}\u{00B7}\u{00B7} ";
-
-/// A character with its associated style for the virtual ticker content.
-struct StyledChar {
-    ch: char,
-    style: Style,
-}
-
 /// Renders the scrolling loot ticker into a 1-row area.
+///
+/// Each entry is independently positioned based on when it was pushed.
+/// Entries enter from the right edge and scroll left across the viewport.
 pub fn draw_ticker(frame: &mut Frame, area: Rect, ticker: &LootTicker) {
     if area.height == 0 || area.width == 0 {
         return;
     }
 
-    if ticker.entries.is_empty() {
+    if ticker.is_empty() {
         let line = Line::from(Span::styled(
             "  Awaiting adventure...",
             Style::default().fg(Color::DarkGray),
@@ -37,107 +31,89 @@ pub fn draw_ticker(frame: &mut Frame, area: Rect, ticker: &LootTicker) {
         return;
     }
 
-    let chars = build_chars(ticker);
-    if chars.is_empty() {
+    let visible_width = area.width as usize;
+    let visible = ticker.visible_entries(visible_width);
+
+    if visible.is_empty() {
         return;
     }
 
-    let visible_width = area.width as usize;
-    let offset = (ticker.scroll_offset as usize) % chars.len();
+    // Build a viewport buffer — each cell is either a styled char or empty
+    let mut buffer: Vec<Option<(char, Style)>> = vec![None; visible_width];
 
-    let spans = extract_visible_spans(&chars, offset, visible_width);
+    for (entry, pos) in &visible {
+        let chars = entry_to_styled_chars(entry);
+        for (i, (ch, style)) in chars.into_iter().enumerate() {
+            let col = *pos + i as isize;
+            if col >= 0 && (col as usize) < visible_width {
+                buffer[col as usize] = Some((ch, style));
+            }
+        }
+    }
+
+    let spans = buffer_to_spans(&buffer);
     let line = Line::from(spans);
     frame.render_widget(Paragraph::new(line), area);
 }
 
-/// Builds a flat list of styled characters from ticker entries.
-/// Entries are iterated back-to-front (oldest first) for left-to-right chronology.
-fn build_chars(ticker: &LootTicker) -> Vec<StyledChar> {
+/// Convert a ticker entry into a sequence of (char, Style) pairs.
+fn entry_to_styled_chars(entry: &TickerEntry) -> Vec<(char, Style)> {
     let mut chars = Vec::new();
-    let sep_style = Style::default().fg(Color::DarkGray);
 
-    for (i, entry) in ticker.entries.iter().rev().enumerate() {
-        // Add separator between entries
-        if i > 0 {
-            for ch in SEPARATOR.chars() {
-                chars.push(StyledChar {
-                    ch,
-                    style: sep_style,
-                });
-            }
+    // Icon + space
+    if !entry.icon.is_empty() {
+        let icon_style = Style::default().fg(entry.color);
+        for ch in entry.icon.chars() {
+            chars.push((ch, icon_style));
         }
-
-        // Icon + space
-        if !entry.icon.is_empty() {
-            let icon_style = Style::default().fg(entry.color);
-            for ch in entry.icon.chars() {
-                chars.push(StyledChar {
-                    ch,
-                    style: icon_style,
-                });
-            }
-            chars.push(StyledChar {
-                ch: ' ',
-                style: icon_style,
-            });
-        }
-
-        // Main text
-        let mut style = Style::default().fg(entry.color);
-        if entry.bold {
-            style = style.add_modifier(Modifier::BOLD);
-        }
-        for ch in entry.text.chars() {
-            chars.push(StyledChar { ch, style });
-        }
+        chars.push((' ', icon_style));
     }
 
-    // Trailing separator for seamless loop
-    if !chars.is_empty() {
-        for ch in SEPARATOR.chars() {
-            chars.push(StyledChar {
-                ch,
-                style: sep_style,
-            });
-        }
+    // Main text
+    let mut style = Style::default().fg(entry.color);
+    if entry.bold {
+        style = style.add_modifier(Modifier::BOLD);
+    }
+    for ch in entry.text.chars() {
+        chars.push((ch, style));
     }
 
     chars
 }
 
-/// Extracts visible Spans from the char array at the given offset.
-/// Handles wrap-around by indexing modulo total_len.
-fn extract_visible_spans(
-    chars: &[StyledChar],
-    offset: usize,
-    visible_width: usize,
-) -> Vec<Span<'static>> {
-    if chars.is_empty() {
-        return Vec::new();
-    }
+/// Convert a viewport buffer into Ratatui Spans, grouping consecutive
+/// characters with the same style. Empty cells become spaces.
+fn buffer_to_spans(buffer: &[Option<(char, Style)>]) -> Vec<Span<'static>> {
+    // Find the last non-empty cell to avoid trailing spaces
+    let last_filled = buffer.iter().rposition(|cell| cell.is_some()).unwrap_or(0);
 
-    let total_len = chars.len();
     let mut spans: Vec<Span<'static>> = Vec::new();
     let mut current_text = String::new();
     let mut current_style: Option<Style> = None;
+    let space_style = Style::default();
 
-    for i in 0..visible_width {
-        let idx = (offset + i) % total_len;
-        let sc = &chars[idx];
+    for (i, slot) in buffer.iter().enumerate() {
+        if i > last_filled {
+            break;
+        }
+
+        let (ch, style) = match slot {
+            Some((ch, style)) => (*ch, *style),
+            None => (' ', space_style),
+        };
 
         match current_style {
-            Some(s) if s == sc.style => {
-                current_text.push(sc.ch);
+            Some(s) if s == style => {
+                current_text.push(ch);
             }
             _ => {
-                // Flush previous span
                 if let Some(s) = current_style {
                     if !current_text.is_empty() {
                         spans.push(Span::styled(std::mem::take(&mut current_text), s));
                     }
                 }
-                current_text.push(sc.ch);
-                current_style = Some(sc.style);
+                current_text.push(ch);
+                current_style = Some(style);
             }
         }
     }
@@ -155,141 +131,166 @@ fn extract_visible_spans(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::game_state::TickerEntry;
-
-    fn make_ticker(entries: Vec<(&'static str, &str, Color)>) -> LootTicker {
-        let mut ticker = LootTicker::new();
-        for (icon, text, color) in entries.into_iter().rev() {
-            ticker.push(TickerEntry {
-                icon,
-                text: text.to_string(),
-                color,
-                bold: false,
-            });
-        }
-        ticker
-    }
-
     #[test]
-    fn test_build_chars_empty() {
-        let ticker = LootTicker::new();
-        let chars = build_chars(&ticker);
-        assert!(chars.is_empty());
-    }
-
-    #[test]
-    fn test_build_chars_single_entry_no_icon() {
-        let mut ticker = LootTicker::new();
-        ticker.push(TickerEntry {
+    fn test_entry_to_styled_chars_no_icon() {
+        let entry = TickerEntry {
             icon: "",
             text: "Hello".to_string(),
             color: Color::White,
             bold: false,
-        });
-        let chars = build_chars(&ticker);
-        // "Hello" + trailing separator " ··· "
-        let text: String = chars.iter().map(|sc| sc.ch).collect();
-        assert!(text.starts_with("Hello"));
-        assert!(text.ends_with(' ')); // trailing separator ends with space
-    }
-
-    #[test]
-    fn test_build_chars_with_icon() {
-        let ticker = make_ticker(vec![("\u{2694}", "Sword", Color::Yellow)]);
-        let chars = build_chars(&ticker);
-        let text: String = chars.iter().map(|sc| sc.ch).collect();
-        // Should contain: icon + space + text + trailing separator
-        assert!(text.starts_with("\u{2694} Sword"));
-    }
-
-    #[test]
-    fn test_build_chars_multiple_entries_have_separators() {
-        let ticker = make_ticker(vec![
-            ("", "First", Color::White),
-            ("", "Second", Color::White),
-        ]);
-        let chars = build_chars(&ticker);
-        let text: String = chars.iter().map(|sc| sc.ch).collect();
-        // Should contain both entries with separator between them
-        assert!(text.contains("First"));
-        assert!(text.contains("Second"));
-        assert!(text.contains("\u{00B7}\u{00B7}\u{00B7}"));
-    }
-
-    #[test]
-    fn test_extract_visible_at_zero() {
-        let chars: Vec<StyledChar> = "Hello World"
-            .chars()
-            .map(|ch| StyledChar {
-                ch,
-                style: Style::default(),
-            })
-            .collect();
-        let spans = extract_visible_spans(&chars, 0, 5);
-        let text: String = spans.iter().map(|s| s.content.as_ref()).collect();
+        };
+        let chars = entry_to_styled_chars(&entry);
+        let text: String = chars.iter().map(|(ch, _)| ch).collect();
         assert_eq!(text, "Hello");
     }
 
     #[test]
-    fn test_extract_visible_with_offset() {
-        let chars: Vec<StyledChar> = "Hello World"
-            .chars()
-            .map(|ch| StyledChar {
-                ch,
-                style: Style::default(),
-            })
-            .collect();
-        let spans = extract_visible_spans(&chars, 6, 5);
-        let text: String = spans.iter().map(|s| s.content.as_ref()).collect();
-        assert_eq!(text, "World");
+    fn test_entry_to_styled_chars_with_icon() {
+        let entry = TickerEntry {
+            icon: "\u{2694}",
+            text: "Sword".to_string(),
+            color: Color::Yellow,
+            bold: false,
+        };
+        let chars = entry_to_styled_chars(&entry);
+        let text: String = chars.iter().map(|(ch, _)| ch).collect();
+        assert_eq!(text, "\u{2694} Sword");
     }
 
     #[test]
-    fn test_extract_visible_wraps_around() {
-        let chars: Vec<StyledChar> = "ABCDE"
-            .chars()
-            .map(|ch| StyledChar {
-                ch,
-                style: Style::default(),
-            })
-            .collect();
-        // Offset 3, width 4 -> "DE" + "AB"
-        let spans = extract_visible_spans(&chars, 3, 4);
-        let text: String = spans.iter().map(|s| s.content.as_ref()).collect();
-        assert_eq!(text, "DEAB");
+    fn test_visible_entries_starts_at_right_edge() {
+        let mut ticker = LootTicker::new();
+        ticker.push(TickerEntry {
+            icon: "",
+            text: "Test".to_string(),
+            color: Color::White,
+            bold: false,
+        });
+        // At scroll_offset=0, entry born_at=0, position = viewport_width - 0 = 80
+        // That's off-screen (>= viewport_width), so not visible
+        let visible = ticker.visible_entries(80);
+        assert!(visible.is_empty());
+
+        // After scrolling 1 char, position = 80 - 1 = 79 (on screen, rightmost area)
+        ticker.scroll_offset = 1.0;
+        let visible = ticker.visible_entries(80);
+        assert_eq!(visible.len(), 1);
+        assert_eq!(visible[0].1, 79); // at column 79
     }
 
     #[test]
-    fn test_extract_visible_with_multibyte_chars() {
-        // This is the critical test - verify no panic with multi-byte chars
-        let chars: Vec<StyledChar> = "\u{2694} Sword \u{00B7}\u{00B7}\u{00B7} \u{1F41F} Fish"
-            .chars()
-            .map(|ch| StyledChar {
-                ch,
-                style: Style::default(),
-            })
-            .collect();
-        // Try various offsets to ensure no panics
-        for offset in 0..chars.len() {
-            let _ = extract_visible_spans(&chars, offset, 10);
+    fn test_entries_dont_overlap() {
+        let mut ticker = LootTicker::new();
+        ticker.push(TickerEntry {
+            icon: "",
+            text: "First".to_string(), // 5 chars
+            color: Color::White,
+            bold: false,
+        });
+        ticker.push(TickerEntry {
+            icon: "",
+            text: "Second".to_string(),
+            color: Color::White,
+            bold: false,
+        });
+        // Second entry should be spaced after first (5 chars + 3 gap = 8)
+        ticker.scroll_offset = 100.0;
+        let visible = ticker.visible_entries(200);
+        if visible.len() == 2 {
+            let pos_first = visible[0].1;
+            let pos_second = visible[1].1;
+            // Second should be to the right of first
+            assert!(pos_second > pos_first);
         }
     }
 
     #[test]
-    fn test_extract_visible_groups_same_style() {
-        let mut chars = Vec::new();
+    fn test_buffer_to_spans_groups_styles() {
         let style_a = Style::default().fg(Color::Red);
         let style_b = Style::default().fg(Color::Blue);
-        for ch in "AAA".chars() {
-            chars.push(StyledChar { ch, style: style_a });
-        }
-        for ch in "BBB".chars() {
-            chars.push(StyledChar { ch, style: style_b });
-        }
-        let spans = extract_visible_spans(&chars, 0, 6);
-        // Should produce exactly 2 spans (one red, one blue), not 6
+        let buffer: Vec<Option<(char, Style)>> = vec![
+            Some(('A', style_a)),
+            Some(('A', style_a)),
+            Some(('B', style_b)),
+            Some(('B', style_b)),
+        ];
+        let spans = buffer_to_spans(&buffer);
         assert_eq!(spans.len(), 2);
-        assert_eq!(spans[0].content.as_ref(), "AAA");
-        assert_eq!(spans[1].content.as_ref(), "BBB");
+        assert_eq!(spans[0].content.as_ref(), "AA");
+        assert_eq!(spans[1].content.as_ref(), "BB");
+    }
+
+    #[test]
+    fn test_buffer_to_spans_handles_empty_cells() {
+        let style = Style::default().fg(Color::White);
+        let buffer: Vec<Option<(char, Style)>> =
+            vec![None, None, Some(('H', style)), Some(('i', style)), None];
+        let spans = buffer_to_spans(&buffer);
+        let text: String = spans.iter().map(|s| s.content.as_ref()).collect();
+        assert_eq!(text, "  Hi");
+    }
+
+    #[test]
+    fn test_multibyte_chars_no_panic() {
+        let mut ticker = LootTicker::new();
+        ticker.push(TickerEntry {
+            icon: "\u{2694}",
+            text: "Sword \u{00B7} Fish".to_string(),
+            color: Color::Yellow,
+            bold: false,
+        });
+        // Scroll various amounts — should never panic
+        for i in 0..100 {
+            ticker.scroll_offset = i as f64;
+            let _ = ticker.visible_entries(80);
+        }
+    }
+
+    #[test]
+    fn test_cleanup_removes_off_screen_entries() {
+        let mut ticker = LootTicker::new();
+        ticker.viewport_width = 20;
+        ticker.push(TickerEntry {
+            icon: "",
+            text: "Old".to_string(), // 3 chars
+            color: Color::White,
+            bold: false,
+        });
+        // born_at=0, off-screen when scroll > viewport(20) + len(3) = 23
+        // At 0.4/tick, need 57.5 ticks → ~60 ticks
+        for _ in 0..60 {
+            ticker.tick();
+        }
+        assert!(ticker.is_empty());
+    }
+
+    #[test]
+    fn test_entry_scrolls_across_full_viewport() {
+        let mut ticker = LootTicker::new();
+        ticker.viewport_width = 40;
+        ticker.push(TickerEntry {
+            icon: "",
+            text: "Test".to_string(), // 4 chars
+            color: Color::White,
+            bold: false,
+        });
+        // Entry should appear at right edge and scroll across the full 40-char
+        // viewport before being cleaned up.
+        let mut seen_at_right = false;
+        let mut seen_at_left = false;
+        for _ in 0..200 {
+            ticker.tick();
+            let visible = ticker.visible_entries(40);
+            for (_, pos) in &visible {
+                if *pos > 30 {
+                    seen_at_right = true;
+                }
+                if *pos < 5 {
+                    seen_at_left = true;
+                }
+            }
+        }
+        assert!(seen_at_right, "Entry should appear near right edge");
+        assert!(seen_at_left, "Entry should scroll to left side");
     }
 }

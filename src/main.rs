@@ -78,6 +78,15 @@ fn apply_offline_xp(state: &mut GameState, haven: &haven::Haven) -> Option<Offli
                 true,
             );
         }
+        state.loot_ticker.push(core::game_state::TickerEntry {
+            icon: "\u{2600}",
+            text: format!(
+                "+{} XP offline",
+                ui::game_common::format_number_short(report.xp_gained)
+            ),
+            color: ratatui::style::Color::Green,
+            bold: false,
+        });
         Some(report)
     } else {
         None
@@ -1141,7 +1150,10 @@ fn main() -> io::Result<()> {
 
                             let tick_flags = apply_tick_events(&mut state, &tick_result.events);
 
-                            // Advance loot ticker scroll
+                            // Advance loot ticker scroll (update viewport width for cleanup)
+                            if let Ok((cols, _)) = ratatui::crossterm::terminal::size() {
+                                state.loot_ticker.viewport_width = cols as usize;
+                            }
                             state.loot_ticker.tick();
 
                             // Update visual effect lifetimes
