@@ -50,7 +50,6 @@ fn draw_combat_full(frame: &mut Frame, area: Rect, game_state: &GameState) {
     frame.render_widget(outer_block, area);
 
     let is_regen = game_state.combat_state.is_regenerating;
-    let has_event = game_state.combat_state.event_line.is_some();
 
     let mut constraints = vec![Constraint::Length(1)]; // Player HP
     if is_regen {
@@ -58,9 +57,6 @@ fn draw_combat_full(frame: &mut Frame, area: Rect, game_state: &GameState) {
     }
     constraints.push(Constraint::Min(5)); // Sprite
     constraints.push(Constraint::Length(1)); // Enemy HP
-    if has_event {
-        constraints.push(Constraint::Length(1)); // Event line
-    }
     constraints.push(Constraint::Length(1)); // Status
 
     let chunks = Layout::default()
@@ -82,11 +78,6 @@ fn draw_combat_full(frame: &mut Frame, area: Rect, game_state: &GameState) {
 
     draw_enemy_hp(frame, chunks[idx], game_state);
     idx += 1;
-
-    if has_event {
-        draw_event_line(frame, chunks[idx], game_state);
-        idx += 1;
-    }
 
     draw_combat_status(frame, chunks[idx], game_state);
 }
@@ -102,7 +93,6 @@ fn draw_combat_compact(frame: &mut Frame, area: Rect, game_state: &GameState) {
     frame.render_widget(outer_block, area);
 
     let is_regen = game_state.combat_state.is_regenerating;
-    let has_event = game_state.combat_state.event_line.is_some();
 
     let mut constraints = vec![Constraint::Length(1)]; // Player HP
     if is_regen {
@@ -110,9 +100,6 @@ fn draw_combat_compact(frame: &mut Frame, area: Rect, game_state: &GameState) {
     }
     constraints.push(Constraint::Min(3)); // Sprite
     constraints.push(Constraint::Length(1)); // Enemy HP
-    if has_event {
-        constraints.push(Constraint::Length(1)); // Event line
-    }
     constraints.push(Constraint::Length(1)); // Status
 
     let chunks = Layout::default()
@@ -134,11 +121,6 @@ fn draw_combat_compact(frame: &mut Frame, area: Rect, game_state: &GameState) {
 
     draw_enemy_hp(frame, chunks[idx], game_state);
     idx += 1;
-
-    if has_event {
-        draw_event_line(frame, chunks[idx], game_state);
-        idx += 1;
-    }
 
     draw_combat_status(frame, chunks[idx], game_state);
 }
@@ -248,19 +230,6 @@ pub(super) fn draw_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameStat
         } else {
             frame.render_widget(gauge, area);
         }
-    }
-}
-
-/// Draws the single-line event notification (kill XP, level up, boss defeat, etc.)
-fn draw_event_line(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    if let Some(event) = &game_state.combat_state.event_line {
-        let mut style = Style::default().fg(event.color);
-        if event.bold {
-            style = style.add_modifier(Modifier::BOLD);
-        }
-        let text = Paragraph::new(Line::from(Span::styled(&event.text, style)))
-            .alignment(Alignment::Center);
-        frame.render_widget(text, area);
     }
 }
 

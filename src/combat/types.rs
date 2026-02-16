@@ -247,21 +247,8 @@ pub struct DamageFlash {
     pub remaining: f64,
 }
 
-/// A single event message shown below the enemy HP bar.
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub struct EventLine {
-    pub text: String,
-    pub color: ratatui::style::Color,
-    pub bold: bool,
-    /// Remaining display time in seconds (0.0 = permanent until replaced)
-    pub remaining: f64,
-}
-
 /// How long damage flashes display (seconds)
 pub const DAMAGE_FLASH_DURATION: f64 = 0.8;
-/// How long event lines display (seconds)
-pub const EVENT_LINE_DURATION: f64 = 2.5;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CombatLogEntry {
@@ -297,8 +284,6 @@ pub struct CombatState {
     pub player_damage_flash: Option<DamageFlash>,
     #[serde(skip)]
     pub enemy_damage_flash: Option<DamageFlash>,
-    #[serde(skip)]
-    pub event_line: Option<EventLine>,
 }
 
 impl Default for CombatState {
@@ -321,7 +306,6 @@ impl CombatState {
             combat_log: VecDeque::with_capacity(COMBAT_LOG_CAPACITY),
             player_damage_flash: None,
             enemy_damage_flash: None,
-            event_line: None,
         }
     }
 
@@ -362,15 +346,6 @@ impl CombatState {
             if flash.remaining <= 0.0 {
                 self.enemy_damage_flash = None;
             }
-        }
-        if let Some(line) = &mut self.event_line {
-            if line.remaining > 0.0 {
-                line.remaining -= delta_time;
-                if line.remaining <= 0.0 {
-                    self.event_line = None;
-                }
-            }
-            // remaining == 0.0 means permanent (death message)
         }
     }
 }
