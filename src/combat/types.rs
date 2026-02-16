@@ -350,7 +350,6 @@ impl CombatState {
     }
 
     /// Decay HUD flash timers by delta_time. Clears expired flashes.
-    #[allow(dead_code)]
     pub fn tick_hud(&mut self, delta_time: f64) {
         if let Some(flash) = &mut self.player_damage_flash {
             flash.remaining -= delta_time;

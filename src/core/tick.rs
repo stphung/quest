@@ -463,6 +463,9 @@ pub fn game_tick<R: Rng>(
             *tick_counter = 0;
         }
 
+        // Decay HUD flashes even while fishing
+        state.combat_state.tick_hud(delta_time);
+
         // Skip combat processing while fishing — collect achievements and return
         collect_achievement_events(achievements, &mut result);
         return result;
@@ -719,6 +722,9 @@ pub fn game_tick<R: Rng>(
             }
         }
     }
+
+    // ── 6b. Decay HUD flash timers ──────────────────────────────
+    state.combat_state.tick_hud(delta_time);
 
     // ── 7. Spawn enemy if needed ────────────────────────────────
     spawn_enemy_if_needed(state);
