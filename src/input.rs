@@ -30,6 +30,10 @@ use crate::challenges::morris::logic::{
 use crate::challenges::rune::logic::{
     apply_game_result as apply_rune_result, process_input as process_rune_input, RuneInput,
 };
+use crate::challenges::runic_shift::logic::{
+    apply_game_result as apply_runic_shift_result, process_input as process_runic_shift_input,
+    RunicShiftInput,
+};
 use crate::challenges::snake::logic::{
     apply_game_result as apply_snake_result, process_input as process_snake_input, SnakeInput,
 };
@@ -85,6 +89,7 @@ pub use crate::enhancement::{EnhancementResult, SoulforgePhase, SoulforgeUiState
 /// Game-screen overlay state. At most one is active at a time.
 pub enum GameOverlay {
     None,
+    Help,
     HavenDiscovery,
     SoulforgeDiscovery,
     PrestigeConfirm,
@@ -164,6 +169,14 @@ pub fn handle_game_input(
             KeyCode::Up => browser.move_up(),
             KeyCode::Down => browser.move_down(1000),
             _ => {}
+        }
+        return InputResult::Continue;
+    }
+
+    // 0.75. Help overlay
+    if matches!(overlay, GameOverlay::Help) {
+        if matches!(key.code, KeyCode::Esc | KeyCode::Char('?')) {
+            *overlay = GameOverlay::None;
         }
         return InputResult::Continue;
     }
@@ -730,6 +743,23 @@ fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
                 };
                 process_snake_input(snake_game, input);
             }
+            ActiveMinigame::RunicShift(runic_shift_game) => {
+                if runic_shift_game.game_result.is_some() {
+                    state.last_minigame_win = apply_runic_shift_result(state);
+                    return InputResult::Continue;
+                }
+                let input = match key.code {
+                    KeyCode::Up => RunicShiftInput::Up,
+                    KeyCode::Down => RunicShiftInput::Down,
+                    KeyCode::Left => RunicShiftInput::Left,
+                    KeyCode::Right => RunicShiftInput::Right,
+                    KeyCode::Char(' ') => RunicShiftInput::Swap,
+                    KeyCode::Char('r') | KeyCode::Char('R') => RunicShiftInput::ManualRise,
+                    KeyCode::Esc => RunicShiftInput::Forfeit,
+                    _ => RunicShiftInput::Other,
+                };
+                process_runic_shift_input(runic_shift_game, input);
+            }
         }
     }
     InputResult::Continue
@@ -795,6 +825,10 @@ fn handle_base_game(
             *overlay = GameOverlay::Achievements {
                 browser: crate::ui::achievement_browser_scene::AchievementBrowserState::new(),
             };
+            InputResult::Continue
+        }
+        KeyCode::Char('?') => {
+            *overlay = GameOverlay::Help;
             InputResult::Continue
         }
         _ => InputResult::Continue,

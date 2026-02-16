@@ -749,6 +749,7 @@ pub(super) fn draw_footer_compact(
         soulforge_span,
         ach_span,
         challenge_span,
+        Span::styled(" [?]Help", Style::default().fg(Color::DarkGray)),
     ]);
 
     let paragraph = Paragraph::new(line).alignment(Alignment::Center);
@@ -775,6 +776,7 @@ pub(super) fn draw_footer_minimal(frame: &mut Frame, area: Rect, game_state: &Ga
     let line = Line::from(vec![
         Span::styled("Esc:Quit", Style::default().fg(Color::Red)),
         prestige_span,
+        Span::styled(" ?:Help", Style::default().fg(Color::DarkGray)),
         Span::styled(" Tab:More", Style::default().fg(Color::DarkGray)),
     ]);
 
@@ -881,16 +883,20 @@ pub fn draw_update_drawer(frame: &mut Frame, area: Rect, info: &UpdateInfo) {
 
     // Add empty line and footer
     lines.push(Line::from(vec![]));
+    lines.push(Line::from(vec![Span::styled(
+        "  Run 'quest update' to install",
+        Style::default().fg(Color::DarkGray),
+    )]));
     lines.push(Line::from(vec![
         Span::styled(
-            "  Run 'quest update' to install",
+            format!("  Wiki: {}", crate::core::constants::WIKI_URL),
             Style::default().fg(Color::DarkGray),
         ),
         Span::raw("                              "),
         Span::styled("[U] Close", Style::default().fg(Color::Yellow)),
     ]));
 
-    let drawer = Paragraph::new(lines).block(
+    let drawer = Paragraph::new(lines).wrap(Wrap { trim: false }).block(
         Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::Yellow))
@@ -1007,7 +1013,12 @@ pub fn draw_footer(
             haven_text,
             soulforge_text,
         ]),
-        Line::from(vec![achievements_text, challenge_text, update_status_text]),
+        Line::from(vec![
+            achievements_text,
+            challenge_text,
+            update_status_text,
+            Span::styled("    [?] Help", Style::default().fg(Color::DarkGray)),
+        ]),
     ];
 
     let footer = Paragraph::new(footer_text)

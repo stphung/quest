@@ -14,6 +14,8 @@ make fmt               # Auto-fix formatting
 
 ## Development Workflow
 
+**Use git worktrees for feature work.** Create isolated worktrees for branches instead of switching branches in the main workspace.
+
 **Before pushing code, run:**
 ```bash
 make check             # Runs scripts/ci-checks.sh (same as CI)
@@ -45,6 +47,16 @@ make fmt               # Applies rustfmt to all code
 
 **Key insight:** Local `make check` runs the **exact same script** as CI, ensuring consistency.
 
+## Skills (`.claude/skills/`)
+
+Agent-invocable skills — ask in natural language to trigger them.
+
+| Skill | Trigger phrases | What it does |
+|-------|----------------|--------------|
+| `doc-health-audit` | "audit the docs", "update documentation" | Audits all docs/, CLAUDE.md files, and player-facing wiki (quest.wiki/) against the current codebase, fixes staleness |
+| `test-health-audit` | "audit the tests", "fix flaky tests" | Parallel flakiness + performance audit, fixes, 10x verification run |
+| `pr-validation` | "create a PR", "validate CI checks" | Creates PR, monitors CI, auto-fixes failures until green |
+
 ## Architecture
 
 Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui (with Crossterm backend).
@@ -70,7 +82,7 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 
 - `game_state.rs` — Main character state struct (level, XP, prestige, combat state, equipment)
 - `game_logic.rs` — XP curve (`100 × level^1.5`), leveling (+3 random attribute points), enemy spawning, offline progression
-- `tick.rs` — Per-tick game engine: `game_tick<R: Rng>()` with 12 processing stages, returns `TickResult` with `Vec<TickEvent>` (25+ variants). Zero UI imports, zero file I/O — fully decoupled from rendering
+- `tick.rs` — Per-tick game engine: `game_tick<R: Rng>()` with 12 processing stages, returns `TickResult` with `Vec<TickEvent>` (28 variants). Zero UI imports, zero file I/O — fully decoupled from rendering
 - `constants.rs` — Game balance constants (tick rate, attack intervals, XP rates, item drop rates, zone enemy stats, boss multipliers, prestige combat bonuses, update check jitter)
 
 ### Simulator (`src/bin/simulator.rs`)
@@ -79,11 +91,14 @@ Headless game balance simulator that calls the same `game_tick()` code with no U
 
 ```bash
 cargo run --release --bin simulator -- --ticks 36000 --seed 42 --prestige 10 --runs 3
+cargo run --release --bin simulator -- --ticks 36000 --seed 42 --prestige 15 --haven combat
 ```
 
-CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FILE`, `--quiet`, `--stormbreaker` (force-unlocks TheStormbreaker achievement for Zone 10+ testing)
+CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FILE`, `--quiet`, `--stormbreaker` (force-unlocks TheStormbreaker achievement for Zone 10+ testing), `--haven STR` (auto-build Haven rooms using a named strategy)
 
-**Limitation:** Only exercises the combat/zone progression loop. Interactive systems (dungeons, fishing, challenges, haven) are discovered but never activated (no player input). See issue #141 for auto-play policies.
+**Haven auto-building:** `--haven <strategy>` enables automatic Haven room construction during simulation. Four strategies: `combat` (Armory/damage path), `qol` (Bedroom/fishing path), `balanced` (both branches), `full` (everything + StormForge). When enabled, Haven is force-discovered at start and prestige ranks are spent on rooms each tick following the strategy's priority order. This models the real gameplay trade-off between investing prestige in Haven vs keeping it for combat bonuses.
+
+**Limitation:** Only exercises the combat/zone progression loop. Interactive systems (dungeons, fishing, challenges) are discovered but never activated (no player input). Haven bonuses are fully active when `--haven` is used. See issue #141 for auto-play policies.
 
 ### Character Module (`src/character/`) — [detailed docs](src/character/CLAUDE.md)
 
@@ -131,7 +146,7 @@ CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FI
 
 ### Item Module (`src/items/`) — [detailed docs](src/items/CLAUDE.md)
 
-- `types.rs` — Core item data structures (7 equipment slots, 5 rarity tiers, 9 affix types, ilvl scaling)
+- `types.rs` — Core item data structures (7 equipment slots, 5 rarity tiers, 9 affix types + Unknown fallback, ilvl scaling)
 - `equipment.rs` — Equipment container with slot management and iteration
 - `generation.rs` — Rarity-based attribute/affix generation with ilvl scaling (1.0x at ilvl 10 to 4.0x at ilvl 100)
 - `drops.rs` — Separate mob/boss drop systems: mobs have 15% base drop chance (capped at Epic), bosses always drop (can drop Legendary)
@@ -158,6 +173,7 @@ Account-level equipment enhancement system (Soulforge) that persists across char
 - `snake/` — Serpent's Path (Snake) on 26×26 grid, 4 difficulties (Novice 10 food/200ms, Master 25 food/90ms), real-time ~60 FPS
 - `flappy/` — Skyward Gauntlet (Flappy Bird) on 50×18 area, 4 difficulties, gravity/flap physics, pipe obstacles with gap sizes (7→4 rows), 3 lives, real-time ~60 FPS
 - `jezzball/` — Containment Breach (JezzBall) on 34×22 grid, 4 difficulties (2-5 balls), wall-building to capture area, 3 lives, real-time ~60 FPS
+- `runic_shift/` — Sigil Surge (panel-matching) on 6×12 grid, 5 rune colors, 3 lives, 4 difficulties (rise interval 7000-3000ms), real-time ~60 FPS
 
 ### Haven Module (`src/haven/`) — [detailed docs](src/haven/CLAUDE.md)
 
@@ -182,7 +198,7 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 
 - `build_info.rs` — Build metadata (commit, date) embedded at compile time
 - `updater.rs` — Self-update from GitHub releases (30min check interval ±5min jitter)
-- `debug_menu.rs` — Debug menu for testing discoveries (activate with `--debug` flag, toggle with backtick). Options: trigger dungeons, fishing, all 9 challenge types, Haven discovery
+- `debug_menu.rs` — Debug menu for testing discoveries (activate with `--debug` flag, toggle with backtick). Options: trigger dungeons, fishing, all 10 challenge types, Haven discovery, Soulforge discovery
 
 ### UI (`src/ui/`) — [detailed docs](src/ui/CLAUDE.md)
 
@@ -202,7 +218,8 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 - `challenge_menu_scene.rs` — Challenge menu list/detail view
 - `responsive.rs` — Responsive layout with 5 size tiers (TooSmall/S/M/L/XL)
 - `soulforge_scene.rs` — Soulforge enhancement overlay
-- `chess_scene.rs`, `go_scene.rs`, `morris_scene.rs`, `gomoku_scene.rs`, `minesweeper_scene.rs`, `rune_scene.rs`, `snake_scene.rs`, `flappy_scene.rs`, `jezzball_scene.rs` — Minigame UIs
+- `chess_scene.rs`, `go_scene.rs`, `morris_scene.rs`, `gomoku_scene.rs`, `minesweeper_scene.rs`, `rune_scene.rs`, `snake_scene.rs`, `flappy_scene.rs`, `jezzball_scene.rs`, `runic_shift_scene.rs` — Minigame UIs
+- `scene_fx.rs` — Shared utilities for layered ASCII scene rendering (scene buffer, backdrop effects)
 - `debug_menu_scene.rs` — Debug menu overlay
 - `throbber.rs` — Shared spinner animations and atmospheric messages
 - `character_select.rs`, `character_creation.rs`, `character_delete.rs`, `character_rename.rs` — Character management UI
@@ -320,7 +337,8 @@ quest/
 │   │   ├── rune/            # Rune Deciphering
 │   │   ├── snake/           # Serpent's Path (Snake)
 │   │   ├── flappy/          # Skyward Gauntlet (Flappy Bird)
-│   │   └── jezzball/        # Containment Breach (JezzBall)
+│   │   ├── jezzball/        # Containment Breach (JezzBall)
+│   │   └── runic_shift/     # Sigil Surge (panel-matching)
 │   ├── haven/               # Haven base building [CLAUDE.md]
 │   │   ├── types.rs         # Room definitions, bonuses
 │   │   └── logic.rs         # Construction, upgrades
@@ -344,7 +362,7 @@ quest/
 │       ├── soulforge_scene.rs # Soulforge enhancement UI
 │       ├── *_scene.rs       # Various game scenes
 │       └── character_*.rs   # Character management UI
-├── tests/                   # Integration tests (15 test files, 1,493+ tests)
+├── tests/                   # Integration tests (15 test files, 2,800+ tests)
 │   ├── game_loop_orchestration_test.rs  # 36 behavior-locking tests for game_tick
 │   ├── tick_integration_test.rs         # Tick module integration tests
 │   ├── zone_progression_test.rs         # Zone advancement tests

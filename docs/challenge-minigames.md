@@ -1,6 +1,6 @@
 # Challenge Minigames Design
 
-This document describes the 9 challenge minigames as implemented. All challenges share a common framework: discovery via RNG, difficulty selection, prestige/XP rewards, and a forfeit pattern (double-Esc to quit).
+This document describes the 10 challenge minigames as implemented. All challenges share a common framework: discovery via RNG, difficulty selection, prestige/XP rewards, and a forfeit pattern (double-Esc to quit).
 
 ## Common Framework
 
@@ -17,8 +17,9 @@ This document describes the 9 challenge minigames as implemented. All challenges
 | Minesweeper | 28 | ~18% |
 | Snake | 22 | ~14% |
 | Flappy Bird | 20 | ~13% |
-| JezzBall | 18 | ~11% |
-| Gomoku | 15 | ~9% |
+| Sigil Surge | 20 | ~10% |
+| JezzBall | 18 | ~9% |
+| Gomoku | 15 | ~8% |
 | Morris | 12 | ~8% |
 | Chess | 8 | ~5% |
 | Go | 7 | ~4% |
@@ -53,6 +54,7 @@ All games with AI opponents use `process_ai_thinking()` as the function name in 
 | Snake | +25% XP | +75% XP | +100% XP | +1 PR, +100% XP |
 | Flappy Bird | +50% XP | +100% XP | +1 PR, +75% XP | +2 PR, +150% XP, +1 FR |
 | JezzBall | +25% XP | +75% XP | +1 PR, +100% XP | +2 PR, +100% XP |
+| Sigil Surge | +50% XP | +100% XP | +1 PR, +75% XP | +2 PR, +150% XP, +1 FR |
 
 PR = Prestige Rank, FR = Fishing Rank, XP% = percentage of current level's XP requirement.
 
@@ -379,6 +381,37 @@ Split an arena by growing walls while avoiding bouncing hazard orbs. Capture eno
 ### Controls
 
 Arrow keys to move cursor, X to toggle wall orientation (horizontal/vertical), Space/Enter to start game or place wall, double-Esc to forfeit.
+
+---
+
+## Sigil Surge (Runic Shift)
+
+**Theme**: "Ancient sigils pulse with unstable energy, shifting and realigning across a crystalline grid..."
+
+### Rules
+
+Real-time action-puzzle inspired by panel-matching games. Rune blocks fill a 6×12 grid and periodically rise from the bottom. The player swaps adjacent blocks horizontally to form matches of 3+ same-colored runes. Matches clear blocks and award points. Chain reactions (cascading clears from falling blocks) earn bonus points.
+
+- 6×12 grid
+- Real-time ~60 FPS
+- 5 rune colors (Fire, Water, Earth, Light, Frost) with 6 glyphs
+- **3 lives** per attempt
+- A target line marks the danger zone — blocks above it count as danger
+- When blocks reach the top row, the player loses a life and the grid resets partially
+- Win by clearing all blocks at or above the target line
+
+### Difficulty
+
+| Difficulty | Rise Interval | Starting Rows | Clear Anim | Reward |
+|------------|--------------|---------------|------------|--------|
+| Novice | 7000ms | 7 | 800ms | +50% XP |
+| Apprentice | 6000ms | 8 | 800ms | +100% XP |
+| Journeyman | 5000ms | 8 | 800ms | +1 PR, +75% XP |
+| Master | 3000ms | 9 | 800ms | +2 PR, +150% XP, +1 FR |
+
+### Controls
+
+Arrow keys to move cursor, Space/Enter to swap (horizontal), Space to start game, double-Esc to forfeit.
 
 ---
 

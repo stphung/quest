@@ -227,12 +227,20 @@ impl CharacterSelectScreen {
                     "[Enter] Play  [R] Rename  [D] Del  {}  [Esc] Quit",
                     new_button
                 )),
-                Line::from(Span::styled(
-                    "[A] Achv",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                )),
+                Line::from(vec![
+                    Span::styled(
+                        "[A] Achv",
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(
+                        "  [?] Help",
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                ]),
             ];
             let controls = Paragraph::new(control_lines)
                 .alignment(Alignment::Center)
@@ -244,12 +252,20 @@ impl CharacterSelectScreen {
                     "[Enter] Play    [R] Rename    [D] Delete    {}    [Esc] Quit",
                     new_button
                 )),
-                Line::from(Span::styled(
-                    "[A] Achievements",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                )),
+                Line::from(vec![
+                    Span::styled(
+                        "[A] Achievements",
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(
+                        "    [?] Help",
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                ]),
             ];
             let controls = Paragraph::new(control_lines)
                 .alignment(Alignment::Center)

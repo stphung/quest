@@ -33,7 +33,7 @@ pub struct Item {
 ### Enums
 - **`EquipmentSlot`**: Weapon, Armor, Helmet, Gloves, Boots, Amulet, Ring
 - **`Rarity`**: Common(0), Magic(1), Rare(2), Epic(3), Legendary(4) — ordered for comparison
-- **`AffixType`**: DamagePercent, CritChance, CritMultiplier, AttackSpeed, HPBonus, DamageReduction, HPRegen, DamageReflection, XPGain
+- **`AffixType`**: DamagePercent, CritChance, CritMultiplier, AttackSpeed, HPBonus, DamageReduction, HPRegen, DamageReflection, XPGain, Unknown (`#[serde(other)]` fallback for removed variants like DropRate/PrestigeBonus/OfflineRate — ignored at runtime)
 
 ## Item Generation Pipeline
 

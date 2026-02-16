@@ -117,6 +117,7 @@ impl DerivedStats {
                         AffixType::XPGain => {
                             xp_mult *= 1.0 + (scaled_value / AFFIX_PERCENT_DIVISOR)
                         }
+                        AffixType::Unknown => {}
                     }
                 }
             }

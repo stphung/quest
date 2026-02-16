@@ -13,6 +13,8 @@ use super::jezzball::JezzballDifficulty;
 use super::minesweeper::{MinesweeperDifficulty, MinesweeperGame};
 use super::morris::{MorrisDifficulty, MorrisGame};
 use super::rune::{RuneDifficulty, RuneGame};
+use super::runic_shift::logic::start_runic_shift_game;
+use super::runic_shift::RunicShiftDifficulty;
 use super::snake::logic::start_snake_game;
 use super::snake::SnakeDifficulty;
 use super::ActiveMinigame;
@@ -108,6 +110,10 @@ fn accept_selected_challenge(state: &mut GameState) {
             ChallengeType::Snake => {
                 let d = SnakeDifficulty::from_index(difficulty_index);
                 start_snake_game(d)
+            }
+            ChallengeType::RunicShift => {
+                let d = RunicShiftDifficulty::from_index(difficulty_index);
+                start_runic_shift_game(d)
             }
         };
         state.active_minigame = Some(minigame);
@@ -373,6 +379,10 @@ const CHALLENGE_TABLE: &[ChallengeWeight] = &[
         weight: 20, // ~13% - moderate action
     },
     ChallengeWeight {
+        challenge_type: ChallengeType::RunicShift,
+        weight: 20, // ~13% - moderate action-puzzle
+    },
+    ChallengeWeight {
         challenge_type: ChallengeType::Jezzball,
         weight: 18, // ~11% - moderate action
     },
@@ -408,6 +418,7 @@ pub struct PendingChallenge {
 pub enum ChallengeType {
     Chess,
     FlappyBird,
+    RunicShift,
     Jezzball,
     Morris,
     Gomoku,
@@ -423,6 +434,7 @@ impl ChallengeType {
         match self {
             ChallengeType::Chess => "♟",
             ChallengeType::FlappyBird => ">",
+            ChallengeType::RunicShift => "⇄",
             ChallengeType::Jezzball => "▣",
             ChallengeType::Morris => "\u{25CB}", // ○
             ChallengeType::Gomoku => "◎",
@@ -438,6 +450,9 @@ impl ChallengeType {
         match self {
             ChallengeType::Chess => "A mysterious figure steps from the shadows...",
             ChallengeType::FlappyBird => "A tiny clockwork bird whirs to life on a nearby ledge...",
+            ChallengeType::RunicShift => {
+                "A lattice of runes rises from the earth, shifting in restless patterns..."
+            }
             ChallengeType::Jezzball => {
                 "A crackling containment grid erupts from the floor, humming with danger..."
             }
@@ -659,6 +674,15 @@ pub fn create_challenge(ct: &ChallengeType) -> PendingChallenge {
                 adventurer.\" The bird hovers expectantly, waiting for your command."
                 .to_string(),
         },
+        ChallengeType::RunicShift => PendingChallenge {
+            challenge_type: ChallengeType::RunicShift,
+            title: "Sigil Surge".to_string(),
+            icon: "⇄",
+            description: "A six-column rune well crackles to life before you. Colored sigils rise \
+                from below in relentless waves. Swap adjacent rune pairs to form matches, trigger \
+                cascading chains, and keep the top from overflowing."
+                .to_string(),
+        },
         ChallengeType::Jezzball => PendingChallenge {
             challenge_type: ChallengeType::Jezzball,
             title: "Containment Breach".to_string(),
@@ -713,6 +737,7 @@ mod tests {
     fn test_challenge_type_icon_returns_non_empty() {
         assert!(!ChallengeType::Chess.icon().is_empty());
         assert!(!ChallengeType::FlappyBird.icon().is_empty());
+        assert!(!ChallengeType::RunicShift.icon().is_empty());
         assert!(!ChallengeType::Jezzball.icon().is_empty());
         assert!(!ChallengeType::Morris.icon().is_empty());
         assert!(!ChallengeType::Gomoku.icon().is_empty());
@@ -726,6 +751,7 @@ mod tests {
     fn test_challenge_type_discovery_flavor_returns_non_empty() {
         assert!(!ChallengeType::Chess.discovery_flavor().is_empty());
         assert!(!ChallengeType::FlappyBird.discovery_flavor().is_empty());
+        assert!(!ChallengeType::RunicShift.discovery_flavor().is_empty());
         assert!(!ChallengeType::Jezzball.discovery_flavor().is_empty());
         assert!(!ChallengeType::Morris.discovery_flavor().is_empty());
         assert!(!ChallengeType::Gomoku.discovery_flavor().is_empty());
@@ -740,6 +766,7 @@ mod tests {
         let icons = [
             ChallengeType::Chess.icon(),
             ChallengeType::FlappyBird.icon(),
+            ChallengeType::RunicShift.icon(),
             ChallengeType::Jezzball.icon(),
             ChallengeType::Morris.icon(),
             ChallengeType::Gomoku.icon(),
@@ -1129,6 +1156,27 @@ mod tests {
         assert!(!state.challenge_menu.is_open);
     }
 
+    #[test]
+    fn test_process_input_select_starts_runic_shift_game() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.challenge_menu.add_challenge(PendingChallenge {
+            challenge_type: ChallengeType::RunicShift,
+            title: "Sigil Surge".to_string(),
+            icon: "⇄",
+            description: "Test".to_string(),
+        });
+        state.challenge_menu.open();
+        state.challenge_menu.open_detail();
+
+        process_input(&mut state, MenuInput::Select);
+
+        assert!(matches!(
+            state.active_minigame,
+            Some(ActiveMinigame::RunicShift(_))
+        ));
+        assert!(!state.challenge_menu.is_open);
+    }
+
     // =========================================================================
     // Haven Discovery Bonus Tests
     // =========================================================================
@@ -1190,6 +1238,7 @@ mod tests {
         use super::super::minesweeper::MinesweeperDifficulty;
         use super::super::morris::MorrisDifficulty;
         use super::super::rune::RuneDifficulty;
+        use super::super::runic_shift::RunicShiftDifficulty;
         use super::super::snake::SnakeDifficulty;
 
         // Verify all challenge difficulty types produce correct lowercase strings
@@ -1206,6 +1255,7 @@ mod tests {
             assert_eq!(FlappyBirdDifficulty::ALL[i].difficulty_str(), *expected);
             assert_eq!(JezzballDifficulty::ALL[i].difficulty_str(), *expected);
             assert_eq!(SnakeDifficulty::ALL[i].difficulty_str(), *expected);
+            assert_eq!(RunicShiftDifficulty::ALL[i].difficulty_str(), *expected);
         }
     }
 }

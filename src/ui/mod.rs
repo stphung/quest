@@ -17,6 +17,7 @@ pub mod game_common;
 pub mod go_scene;
 pub mod gomoku_scene;
 pub mod haven_scene;
+pub mod help_overlay;
 mod info_panel;
 pub mod jezzball_scene;
 pub mod minesweeper_scene;
@@ -24,6 +25,7 @@ pub mod morris_scene;
 pub mod prestige_confirm;
 pub mod responsive;
 pub mod rune_scene;
+pub mod runic_shift_scene;
 mod scene_fx;
 pub mod snake_scene;
 pub mod soulforge_scene;
@@ -148,8 +150,8 @@ fn draw_xl_l_layout(
             .constraints([
                 Constraint::Length(stats_height), // Main content (stats + right panel)
                 Constraint::Min(6),               // Full-width Loot + Combat (grows)
-                Constraint::Length(12),           // Update drawer panel (taller for changelog)
-                Constraint::Length(4),            // Full-width footer (2 rows)
+                Constraint::Length(20), // Update drawer panel (tall enough for wrapped changelog lines)
+                Constraint::Length(4),  // Full-width footer (2 rows)
             ])
             .split(main_area)
     } else {
@@ -497,6 +499,9 @@ fn draw_right_content(frame: &mut Frame, area: Rect, game_state: &GameState, ctx
         Some(ActiveMinigame::Snake(game)) => {
             snake_scene::render_snake_scene(frame, area, game, ctx);
         }
+        Some(ActiveMinigame::RunicShift(game)) => {
+            runic_shift_scene::render_runic_shift_scene(frame, area, game, ctx);
+        }
         None => {
             if game_state.challenge_menu.is_open {
                 challenge_menu_scene::render_challenge_menu(
@@ -563,7 +568,8 @@ fn draw_dungeon_view(
         .as_millis();
     let blink_phase = (millis % 500) as f64 / 500.0;
 
-    // Dungeon map
+    // Dungeon map backdrop + map overlay
+    draw_dungeon_backdrop(frame, inner_chunks[2], dungeon.zone_id);
     let map_widget = dungeon_map::DungeonMapWidget::new(dungeon, blink_phase);
     frame.render_widget(map_widget, inner_chunks[2]);
 
@@ -572,4 +578,145 @@ fn draw_dungeon_view(
 
     // Combat status (timers, DPS)
     combat_scene::draw_combat_status(frame, inner_chunks[4], game_state);
+}
+
+/// Draws a dark, mysterious animated backdrop for dungeon map areas.
+fn draw_dungeon_backdrop(frame: &mut Frame, area: Rect, zone_id: u32) {
+    use scene_fx::{current_millis, hash2d, lerp_rgb, put_cell, render_buffer, SceneCell};
+
+    if area.width < 8 || area.height < 4 {
+        return;
+    }
+
+    let width = area.width as usize;
+    let height = area.height as usize;
+    let mut buffer = vec![vec![SceneCell::default(); width]; height];
+
+    let millis = current_millis() as f64;
+    let phase = (millis / 620.0) as usize;
+
+    let tint = match zone_id {
+        1 | 2 => (8, 18, 8),
+        3 | 6 => (10, 14, 26),
+        4 | 7 => (20, 8, 28),
+        5 | 10 => (24, 12, 8),
+        8 | 9 => (6, 14, 30),
+        11 => (26, 8, 18),
+        _ => (12, 10, 14),
+    };
+
+    let top = (
+        (14 + tint.0 / 3) as u8,
+        (16 + tint.1 / 3) as u8,
+        (28 + tint.2 / 3) as u8,
+    );
+    let bottom = (
+        (7 + tint.0 / 5) as u8,
+        (8 + tint.1 / 5) as u8,
+        (14 + tint.2 / 5) as u8,
+    );
+    let mist_dim = (
+        (36 + tint.0 / 2) as u8,
+        (40 + tint.1 / 2) as u8,
+        (58 + tint.2 / 2) as u8,
+    );
+    let mist_bright = (
+        (54 + tint.0 / 2) as u8,
+        (60 + tint.1 / 2) as u8,
+        (84 + tint.2 / 2) as u8,
+    );
+
+    // Base gradient with very slow shimmer and a low "breathing" pulse.
+    let gloom = ((millis / 12_000.0).sin() * 0.5 + 0.5) * 0.16;
+    let pulse = (gloom * 12.0) as i16;
+    for (row, row_cells) in buffer.iter_mut().enumerate() {
+        let row_t = if height <= 1 {
+            0.0
+        } else {
+            row as f64 / (height - 1) as f64
+        };
+        let base_rgb = lerp_rgb(top, bottom, row_t.powf(0.84));
+
+        for (col, cell) in row_cells.iter_mut().enumerate() {
+            let wave = (col as f64 * 0.08 + millis * 0.00011 + zone_id as f64 * 0.7).sin()
+                + (row as f64 * 0.14 - millis * 0.00008 + zone_id as f64 * 0.41).cos();
+            let jitter = ((wave * 1.6).round() as i16).clamp(-3, 4);
+            let r = clamp_i16_to_u8(base_rgb.0 as i16 + jitter - pulse);
+            let g = clamp_i16_to_u8(base_rgb.1 as i16 + jitter - pulse);
+            let b = clamp_i16_to_u8(base_rgb.2 as i16 + jitter - pulse);
+            cell.bg = Color::Rgb(r, g, b);
+        }
+    }
+
+    // Faint, slow-moving shadow columns to make the scene feel deeper.
+    let drift = (millis * 0.00004) as usize;
+    for col in 0..width {
+        if hash2d(zone_id as usize * 41 + col, drift).is_multiple_of(9) {
+            for row_cells in buffer.iter_mut().take(height) {
+                if let Some(cell) = row_cells.get_mut(col) {
+                    if let Color::Rgb(r, g, b) = cell.bg {
+                        cell.bg = Color::Rgb(
+                            clamp_i16_to_u8(r as i16 - 6),
+                            clamp_i16_to_u8(g as i16 - 6),
+                            clamp_i16_to_u8(b as i16 - 6),
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    // Drifting mist ribbons.
+    let flow = millis * 0.00005;
+    for band in 0..3usize {
+        let anchor = (height as f64 * (0.24 + band as f64 * 0.27)).round();
+        for col in 0..width {
+            let wave =
+                (col as f64 * 0.08 + flow * (1.0 + band as f64 * 0.12) + band as f64 * 0.8).sin();
+            let row = (anchor + wave * (height as f64 * 0.03)) as i32;
+            if row < 0 || row >= height as i32 {
+                continue;
+            }
+
+            if hash2d(
+                row as usize + phase + band * 11,
+                col + zone_id as usize * 17,
+            )
+            .is_multiple_of(7)
+            {
+                let glyph = if band == 1 { '\'' } else { ':' };
+                put_cell(
+                    &mut buffer,
+                    row,
+                    col as i32,
+                    glyph,
+                    Color::Rgb(mist_dim.0, mist_dim.1, mist_dim.2),
+                );
+            }
+        }
+    }
+
+    // Sparse arcane specks (low flicker rate).
+    for row in 0..height {
+        for col in 0..width {
+            let seed = hash2d(row + zone_id as usize * 23, col + zone_id as usize * 37);
+            if !seed.is_multiple_of(257) {
+                continue;
+            }
+            let bright = hash2d(row + phase / 2, col + phase / 2).is_multiple_of(4);
+            let fg = if bright {
+                Color::Rgb(mist_bright.0, mist_bright.1, mist_bright.2)
+            } else {
+                Color::Rgb(mist_dim.0, mist_dim.1, mist_dim.2)
+            };
+            let ch = if bright { '*' } else { ':' };
+            put_cell(&mut buffer, row as i32, col as i32, ch, fg);
+        }
+    }
+
+    render_buffer(frame, area, &buffer);
+}
+
+fn clamp_i16_to_u8(value: i16) -> u8 {
+    value.clamp(0, 255) as u8
 }

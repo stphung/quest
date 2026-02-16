@@ -151,6 +151,11 @@ pub enum AchievementId {
     ContainmentBreachApprentice,
     ContainmentBreachJourneyman,
     ContainmentBreachMaster,
+    // Challenge achievements - Sigil Surge
+    SigilSurgeNovice,
+    SigilSurgeApprentice,
+    SigilSurgeJourneyman,
+    SigilSurgeMaster,
     // Challenge achievements - Meta
     GrandChampion,
 
@@ -685,6 +690,10 @@ impl Achievements {
             ("jezzball", "apprentice") => Some(AchievementId::ContainmentBreachApprentice),
             ("jezzball", "journeyman") => Some(AchievementId::ContainmentBreachJourneyman),
             ("jezzball", "master") => Some(AchievementId::ContainmentBreachMaster),
+            ("runic_shift", "novice") => Some(AchievementId::SigilSurgeNovice),
+            ("runic_shift", "apprentice") => Some(AchievementId::SigilSurgeApprentice),
+            ("runic_shift", "journeyman") => Some(AchievementId::SigilSurgeJourneyman),
+            ("runic_shift", "master") => Some(AchievementId::SigilSurgeMaster),
             _ => None,
         };
 

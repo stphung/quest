@@ -184,7 +184,7 @@ Offline XP formula: `(elapsed_seconds / 5.0) * 0.25 * xp_per_kill * (1 + haven_b
 |----------|-----------|---------|
 | `spawn_enemy_if_needed` | `(state)` | Spawns zone or dungeon enemy if no enemy and not regenerating. Uses zone-based generators (`generate_enemy_for_current_zone`, `generate_boss_for_current_zone`) |
 | `spawn_dungeon_enemy` | `(state)` (private) | Spawns Combat/Elite/Boss enemy via `generate_dungeon_enemy(zone_id)`, `generate_dungeon_elite(zone_id)`, `generate_dungeon_boss(zone_id)` |
-| `try_discover_dungeon` | `(state) -> bool` | 2% chance per call, generates dungeon via `generate_dungeon(level, prestige_rank, zone_id)` |
+| `try_discover_dungeon` | `(state) -> bool` | 1% chance per call, generates dungeon via `generate_dungeon(level, prestige_rank, zone_id)` |
 
 ## Constants (`constants.rs`)
 
@@ -227,7 +227,7 @@ Offline XP formula: `(elapsed_seconds / 5.0) * 0.25 * xp_per_kill * (1 + haven_b
 ### Discovery
 | Constant | Value | Notes |
 |----------|-------|-------|
-| `DUNGEON_DISCOVERY_CHANCE` | 0.02 | 2% per kill |
+| `DUNGEON_DISCOVERY_CHANCE` | 0.01 | 1% per kill |
 | `FISHING_DISCOVERY_CHANCE` | 0.05 | 5% per kill |
 | `CHALLENGE_DISCOVERY_CHANCE` | 0.000014 | ~2hr avg |
 | `HAVEN_DISCOVERY_BASE_CHANCE` | 0.000014 | Per tick |

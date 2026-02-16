@@ -65,6 +65,14 @@ impl CharacterManager {
         Ok(Self { quest_dir })
     }
 
+    /// Creates a CharacterManager with a custom directory path.
+    /// Useful for testing with isolated temp directories.
+    #[cfg(test)]
+    pub fn with_dir(quest_dir: PathBuf) -> io::Result<Self> {
+        fs::create_dir_all(&quest_dir)?;
+        Ok(Self { quest_dir })
+    }
+
     pub fn save_character(&self, state: &crate::core::game_state::GameState) -> io::Result<()> {
         // Use current time as last_save_time to prevent offline XP exploits.
         // Previously this used state.last_save_time which was only updated on load,
@@ -309,6 +317,14 @@ mod tests {
         }
     }
 
+    /// Creates a CharacterManager backed by an isolated temp directory.
+    fn temp_manager() -> (CharacterManager, tempfile::TempDir) {
+        let dir = tempfile::tempdir().expect("Failed to create temp dir");
+        let manager =
+            CharacterManager::with_dir(dir.path().to_path_buf()).expect("Failed to create manager");
+        (manager, dir)
+    }
+
     #[test]
     fn test_validate_name_valid() {
         assert!(validate_name("Hero").is_ok());
@@ -346,14 +362,13 @@ mod tests {
 
     #[test]
     fn test_character_manager_new() {
-        let manager = CharacterManager::new().expect("Failed to create CharacterManager");
-        assert!(manager.quest_dir.ends_with(".quest"));
+        let (manager, _dir) = temp_manager();
         assert!(manager.quest_dir.exists());
     }
 
     #[test]
     fn test_save_and_load_character() {
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
 
         let mut state = make_test_state("TestHero");
         state.character_level = 10;
@@ -373,20 +388,12 @@ mod tests {
         let loaded = manager.load_character(&filename).expect("Failed to load");
         assert_eq!(loaded.character_name, "TestHero");
         assert_eq!(loaded.character_level, 10);
-
-        // Cleanup
-        fs::remove_file(filepath).ok();
     }
 
     #[test]
     fn test_list_characters() {
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
 
-        // Clean up only our test files (isolation)
-        fs::remove_file(manager.quest_dir.join("listtest1.json")).ok();
-        fs::remove_file(manager.quest_dir.join("listtest2.json")).ok();
-
-        // Create test characters with unique names to avoid conflicts with other tests
         let mut char1 = make_test_state("ListTest1");
         char1.character_level = 10;
 
@@ -398,26 +405,18 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(1100));
         manager.save_character(&char2).unwrap();
 
-        // List characters and filter to only our test characters (for parallel test isolation)
+        // Isolated temp dir means only our test files are present
         let list = manager.list_characters().expect("Failed to list");
-        let test_chars: Vec<_> = list
-            .iter()
-            .filter(|c| c.character_name == "ListTest1" || c.character_name == "ListTest2")
-            .collect();
-        assert_eq!(test_chars.len(), 2);
+        assert_eq!(list.len(), 2);
 
         // Verify sorted by last_played (most recent first)
-        assert_eq!(test_chars[0].character_name, "ListTest2"); // last_save_time = 2000
-        assert_eq!(test_chars[1].character_name, "ListTest1"); // last_save_time = 1000
-
-        // Cleanup
-        fs::remove_file(manager.quest_dir.join("listtest1.json")).ok();
-        fs::remove_file(manager.quest_dir.join("listtest2.json")).ok();
+        assert_eq!(list[0].character_name, "ListTest2");
+        assert_eq!(list[1].character_name, "ListTest1");
     }
 
     #[test]
     fn test_delete_character() {
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
         let state = make_test_state("ToDelete");
 
         manager.save_character(&state).unwrap();
@@ -431,7 +430,7 @@ mod tests {
 
     #[test]
     fn test_rename_character() {
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
         let state = make_test_state("OldName");
 
         manager.save_character(&state).unwrap();
@@ -449,14 +448,11 @@ mod tests {
         // Load and verify name updated
         let loaded = manager.load_character("newname.json").unwrap();
         assert_eq!(loaded.character_name, "NewName");
-
-        // Cleanup
-        fs::remove_file(manager.quest_dir.join("newname.json")).ok();
     }
 
     #[test]
     fn test_load_nonexistent_character() {
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
 
         let result = manager.load_character("nonexistent_character_12345.json");
         assert!(result.is_err());
@@ -464,7 +460,7 @@ mod tests {
 
     #[test]
     fn test_delete_nonexistent_character() {
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
 
         let result = manager.delete_character("nonexistent_delete_test.json");
         assert!(result.is_err());
@@ -472,7 +468,7 @@ mod tests {
 
     #[test]
     fn test_rename_with_invalid_name() {
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
         let state = make_test_state("RenameTest");
 
         manager.save_character(&state).unwrap();
@@ -491,14 +487,11 @@ mod tests {
             "ThisNameIsWayTooLongForTheLimit".to_string(),
         );
         assert!(result.is_err());
-
-        // Cleanup
-        fs::remove_file(manager.quest_dir.join("renametest.json")).ok();
     }
 
     #[test]
     fn test_corrupted_file_handling() {
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
 
         // Write invalid JSON to a file
         let filepath = manager.quest_dir.join("corrupted_test.json");
@@ -513,9 +506,6 @@ mod tests {
         let corrupted = list.iter().find(|c| c.filename == "corrupted_test.json");
         assert!(corrupted.is_some());
         assert!(corrupted.unwrap().is_corrupted);
-
-        // Cleanup
-        fs::remove_file(filepath).ok();
     }
 
     #[test]
@@ -549,7 +539,7 @@ mod tests {
     fn test_character_data_integrity() {
         use crate::character::attributes::AttributeType;
 
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
 
         // Create a character with specific values
         let mut state = make_test_state("IntegrityTest");
@@ -576,14 +566,11 @@ mod tests {
         assert_eq!(loaded.play_time_seconds, 9999);
         assert_eq!(loaded.attributes.get(AttributeType::Strength), 15);
         assert_eq!(loaded.attributes.get(AttributeType::Dexterity), 18);
-
-        // Cleanup
-        fs::remove_file(manager.quest_dir.join("integritytest.json")).ok();
     }
 
     #[test]
     fn test_rename_nonexistent_character() {
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
 
         let result = manager.rename_character("does_not_exist.json", "NewName".to_string());
         assert!(result.is_err());
@@ -593,7 +580,7 @@ mod tests {
     fn test_load_json_with_extra_fields_backward_compat() {
         // Simulate loading a save from a NEWER version with extra fields
         // This should succeed - extra fields should be ignored
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
 
         let json_with_extra = r#"{
             "version": 2,
@@ -653,16 +640,13 @@ mod tests {
         let loaded = result.unwrap();
         assert_eq!(loaded.character_name, "BackwardCompat");
         assert_eq!(loaded.character_level, 10);
-
-        // Cleanup
-        fs::remove_file(filepath).ok();
     }
 
     #[test]
     fn test_load_json_missing_optional_fields_forward_compat() {
         // Simulate loading a save from an OLDER version missing newer optional fields
         // This tests forward compatibility - old saves should still load
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
 
         // Minimal save without fishing, zone_progression, active_dungeon
         let minimal_json = r#"{
@@ -712,15 +696,12 @@ mod tests {
         // Optional fields should have defaults
         assert_eq!(loaded.fishing.rank, 1); // Default
         assert_eq!(loaded.zone_progression.current_zone_id, 1); // Default
-
-        // Cleanup
-        fs::remove_file(filepath).ok();
     }
 
     #[test]
     fn test_load_json_missing_nested_optional_fields() {
         // Test that nested structs also handle missing fields gracefully
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
 
         // Save with zone_progression missing some fields that have #[serde(default)]
         let json = r#"{
@@ -775,9 +756,6 @@ mod tests {
         assert_eq!(loaded.zone_progression.kills_in_subzone, 0); // Default
         assert!(!loaded.zone_progression.fighting_boss); // Default
         assert!(!loaded.zone_progression.has_stormbreaker); // Default
-
-        // Cleanup
-        fs::remove_file(filepath).ok();
     }
 
     /// IMPORTANT: This test uses a "frozen" minimal JSON that represents the oldest
@@ -787,7 +765,7 @@ mod tests {
     /// DO NOT update this JSON to add new fields - that defeats the purpose!
     #[test]
     fn test_minimal_v2_save_still_loads() {
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
 
         // This is the MINIMAL valid v2 save - DO NOT ADD FIELDS HERE
         // If this fails, you broke backward compatibility!
@@ -831,9 +809,6 @@ mod tests {
              If you added a new field, add #[serde(default)] to it. Error: {:?}",
             result.err()
         );
-
-        // Cleanup
-        fs::remove_file(filepath).ok();
     }
 
     /// Test that Default impls exist and work for key structs.
