@@ -354,7 +354,11 @@ fn render_achievement_detail(
                     Span::styled("\u{2588}".repeat(20), Style::default().fg(Color::Green)),
                     Span::styled("] ", Style::default().fg(Color::DarkGray)),
                     Span::styled(
-                        format!("{}/{}", display_current, progress.target),
+                        format!(
+                            "{}/{}",
+                            format_number(display_current),
+                            format_number(progress.target)
+                        ),
                         Style::default().fg(Color::Green),
                     ),
                 ]));
@@ -383,7 +387,11 @@ fn render_achievement_detail(
                 0
             };
             lines.push(Line::from(Span::styled(
-                format!("    Progress: {}/{}", progress.current, progress.target),
+                format!(
+                    "    Progress: {}/{}",
+                    format_number(progress.current),
+                    format_number(progress.target)
+                ),
                 Style::default().fg(Color::Yellow),
             )));
 
