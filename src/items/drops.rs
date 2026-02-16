@@ -146,6 +146,8 @@ pub fn roll_random_slot(rng: &mut impl Rng) -> EquipmentSlot {
 mod tests {
     use super::*;
     use chrono::Utc;
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
 
     #[test]
     fn test_ilvl_for_zone() {
@@ -156,7 +158,7 @@ mod tests {
 
     #[test]
     fn test_mob_drops_never_legendary() {
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(100);
 
         // Legendary is structurally impossible for mobs (code never rolls it), 1000 suffices
         for _ in 0..1_000 {
@@ -171,7 +173,7 @@ mod tests {
 
     #[test]
     fn test_boss_can_drop_legendary() {
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(200);
         let mut found_legendary = false;
 
         // Normal boss has 5% legendary rate
@@ -186,7 +188,7 @@ mod tests {
 
     #[test]
     fn test_final_boss_higher_legendary_rate() {
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(300);
         let trials = 2_000;
 
         let mut normal_legendaries = 0;
@@ -212,7 +214,7 @@ mod tests {
 
     #[test]
     fn test_boss_never_drops_common() {
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(400);
 
         // Common is structurally impossible for bosses (code never rolls it), 200 suffices
         for _ in 0..200 {
@@ -230,7 +232,7 @@ mod tests {
 
     #[test]
     fn test_mob_distribution_base() {
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(500);
         let trials = 3_000;
 
         let mut common = 0;
@@ -293,7 +295,7 @@ mod tests {
 
     #[test]
     fn test_roll_random_slot_all_slots_reachable() {
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(600);
         let mut slots_seen = std::collections::HashSet::new();
 
         for _ in 0..500 {
@@ -320,7 +322,7 @@ mod tests {
 
     #[test]
     fn test_haven_bonuses_affect_mob_drops() {
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(700);
         let trials = 3_000;
 
         let mut common_no_bonus = 0;

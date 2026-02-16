@@ -58,7 +58,12 @@ impl MctsNode {
 
 /// Run MCTS and return the best move.
 pub fn mcts_best_move<R: Rng>(game: &GoGame, rng: &mut R) -> GoMove {
-    let simulations = game.difficulty.simulation_count();
+    mcts_best_move_with_limit(game, rng, game.difficulty.simulation_count())
+}
+
+/// Run MCTS with a custom simulation limit.
+/// Useful for tests that only need to verify move legality without full simulation count.
+pub fn mcts_best_move_with_limit<R: Rng>(game: &GoGame, rng: &mut R, simulations: u32) -> GoMove {
     let mut nodes: Vec<MctsNode> = Vec::with_capacity(simulations as usize);
 
     // Create root node
@@ -248,7 +253,7 @@ mod tests {
     fn test_mcts_returns_move() {
         let game = GoGame::new(GoDifficulty::Novice);
         let mut rng = rand::rng();
-        let mv = mcts_best_move(&game, &mut rng);
+        let mv = mcts_best_move_with_limit(&game, &mut rng, 50);
         // Should return some move (likely a placement, not pass on empty board)
         match mv {
             GoMove::Place(r, c) => {
@@ -270,7 +275,7 @@ mod tests {
         game.current_player = Stone::White;
 
         let mut rng = rand::rng();
-        let mv = mcts_best_move(&game, &mut rng);
+        let mv = mcts_best_move_with_limit(&game, &mut rng, 50);
 
         // Should not play at (4,4) - it's suicide
         assert_ne!(mv, GoMove::Place(4, 4));
