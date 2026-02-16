@@ -393,6 +393,8 @@ impl Achievements {
     }
 
     /// Helper to check and unlock milestones. Checks all milestones in order.
+    /// Short-circuits already-unlocked achievements to avoid String allocations
+    /// and HashMap updates on every call.
     fn check_milestones(
         &mut self,
         current: u64,
@@ -400,10 +402,14 @@ impl Achievements {
         character_name: Option<&str>,
     ) {
         for &(threshold, achievement_id) in milestones {
+            if self.is_unlocked(achievement_id) {
+                continue;
+            }
             if current >= threshold {
                 self.unlock_with_name(achievement_id, character_name);
+            } else {
+                self.update_progress(achievement_id, current, threshold);
             }
-            self.update_progress(achievement_id, current, threshold);
         }
     }
 

@@ -205,16 +205,10 @@ pub(super) fn draw_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameStat
 /// Draws the combat status information with DPS
 pub(super) fn draw_combat_status(frame: &mut Frame, area: Rect, game_state: &GameState) {
     use super::throbber::{spinner_char, waiting_message};
-    use crate::character::derived_stats::DerivedStats;
-
     let spinner = spinner_char();
 
-    // Calculate DPS for display
-    let derived = DerivedStats::calculate_derived_stats(
-        &game_state.attributes,
-        &game_state.equipment,
-        &[0; 7],
-    );
+    // Use cached derived stats (includes real enhancement levels)
+    let derived = game_state.cached_derived_stats;
     let base_dps = derived.total_damage() as f64 / ATTACK_INTERVAL_SECONDS;
     let effective_dps = base_dps
         * (1.0 + (derived.crit_chance_percent as f64 / 100.0) * (derived.crit_multiplier - 1.0));

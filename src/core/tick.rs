@@ -9,8 +9,6 @@
 use crate::achievements::Achievements;
 use crate::challenges::menu::ChallengeType;
 use crate::challenges::ActiveMinigame;
-use crate::character::derived_stats::DerivedStats;
-use crate::character::prestige::PrestigeCombatBonuses;
 use crate::combat::logic::{update_combat, CombatEvent, HavenCombatBonuses};
 use crate::core::constants::{
     FINAL_ZONE_ID, HAVEN_MIN_PRESTIGE_RANK, TICKS_PER_SECOND, TICK_INTERVAL_MS,
@@ -27,7 +25,7 @@ use crate::fishing::logic::{
     HavenFishingBonuses,
 };
 use crate::haven::Haven;
-use crate::haven::HavenBonusType;
+use crate::haven::HavenBonuses;
 use crate::items::drops::{try_drop_from_boss, try_drop_from_mob};
 use crate::items::scoring::auto_equip_if_better;
 use crate::items::types::Rarity;
@@ -257,6 +255,7 @@ pub fn game_tick<R: Rng>(
 ) -> TickResult {
     let mut result = TickResult::default();
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
+    let haven_bonuses = haven.compute_bonuses();
 
     // ── 1. Process challenge AI thinking ────────────────────────
     match &mut state.active_minigame {
@@ -277,7 +276,7 @@ pub fn game_tick<R: Rng>(
 
     // ── 2. Try challenge discovery ──────────────────────────────
     {
-        let haven_discovery = haven.get_bonus(HavenBonusType::ChallengeDiscoveryPercent);
+        let haven_discovery = haven_bonuses.challenge_discovery_percent;
         if let Some(challenge_type) =
             crate::challenges::menu::try_discover_challenge_with_haven(state, rng, haven_discovery)
         {
@@ -291,12 +290,12 @@ pub fn game_tick<R: Rng>(
         }
     }
 
-    // ── 3. Sync player max HP with derived stats ────────────────
-    let derived = DerivedStats::calculate_derived_stats(
-        &state.attributes,
-        &state.equipment,
-        &enhancement.levels,
-    );
+    // ── 3. Sync player max HP with cached derived stats ─────────
+    if state.derived_stats_dirty {
+        state.recalculate_derived_stats(&enhancement.levels);
+        state.recalculate_prestige_bonuses();
+    }
+    let derived = state.cached_derived_stats;
     state.combat_state.update_max_hp(derived.max_hp);
 
     // ── 4. Update dungeon exploration ───────────────────────────
@@ -369,9 +368,9 @@ pub fn game_tick<R: Rng>(
     // ── 5. Update fishing (mutually exclusive with combat) ──────
     if state.active_fishing.is_some() {
         let haven_fishing = HavenFishingBonuses {
-            timer_reduction_percent: haven.get_bonus(HavenBonusType::FishingTimerReduction),
-            double_fish_chance_percent: haven.get_bonus(HavenBonusType::DoubleFishChance),
-            max_fishing_rank_bonus: haven.fishing_rank_bonus(),
+            timer_reduction_percent: haven_bonuses.fishing_timer_reduction,
+            double_fish_chance_percent: haven_bonuses.double_fish_chance,
+            max_fishing_rank_bonus: haven_bonuses.max_fishing_rank_bonus,
         };
         let fishing_result = tick_fishing_with_haven_result(state, rng, &haven_fishing);
 
@@ -471,14 +470,14 @@ pub fn game_tick<R: Rng>(
 
     // ── 6. Combat ───────────────────────────────────────────────
     let haven_combat = HavenCombatBonuses {
-        hp_regen_percent: haven.get_bonus(HavenBonusType::HpRegenPercent),
-        hp_regen_delay_reduction: haven.get_bonus(HavenBonusType::HpRegenDelayReduction),
-        damage_percent: haven.get_bonus(HavenBonusType::DamagePercent),
-        crit_chance_percent: haven.get_bonus(HavenBonusType::CritChancePercent),
-        double_strike_chance: haven.get_bonus(HavenBonusType::DoubleStrikeChance),
-        xp_gain_percent: haven.get_bonus(HavenBonusType::XpGainPercent),
+        hp_regen_percent: haven_bonuses.hp_regen_percent,
+        hp_regen_delay_reduction: haven_bonuses.hp_regen_delay_reduction,
+        damage_percent: haven_bonuses.damage_percent,
+        crit_chance_percent: haven_bonuses.crit_chance_percent,
+        double_strike_chance: haven_bonuses.double_strike_chance,
+        xp_gain_percent: haven_bonuses.xp_gain_percent,
     };
-    let prestige_combat = PrestigeCombatBonuses::from_rank(state.prestige_rank);
+    let prestige_combat = state.cached_prestige_bonuses;
     // Apply prestige flat HP bonus to combat max HP (not in DerivedStats to avoid enemy scaling)
     if prestige_combat.flat_hp > 0 {
         let boosted_max = derived.max_hp + prestige_combat.flat_hp;
@@ -492,6 +491,13 @@ pub fn game_tick<R: Rng>(
         achievements,
         &derived,
     );
+
+    let current_enemy_name = state
+        .combat_state
+        .current_enemy
+        .as_ref()
+        .map(|e| e.name.clone())
+        .unwrap_or_default();
 
     for event in combat_events {
         match event {
@@ -515,12 +521,7 @@ pub fn game_tick<R: Rng>(
                 });
             }
             CombatEvent::EnemyAttack { damage } => {
-                let enemy_name = state
-                    .combat_state
-                    .current_enemy
-                    .as_ref()
-                    .map(|e| e.name.clone())
-                    .unwrap_or_default();
+                let enemy_name = current_enemy_name.clone();
                 let message = format!("\u{1f6e1} {} hits you for {} damage", enemy_name, damage);
                 result.events.push(TickEvent::EnemyAttack {
                     damage,
@@ -529,12 +530,7 @@ pub fn game_tick<R: Rng>(
                 });
             }
             CombatEvent::EnemyDied { xp_gained } => {
-                let enemy_name = state
-                    .combat_state
-                    .current_enemy
-                    .as_ref()
-                    .map(|e| e.name.clone())
-                    .unwrap_or_default();
+                let enemy_name = current_enemy_name.clone();
                 let message = format!("\u{2728} {} defeated! +{} XP", enemy_name, xp_gained);
                 result.events.push(TickEvent::EnemyDefeated {
                     xp_gained,
@@ -560,18 +556,13 @@ pub fn game_tick<R: Rng>(
                 }
 
                 // Item drops
-                process_item_drop(state, haven, &mut result);
+                process_item_drop(state, &haven_bonuses, &mut result);
 
                 // Discovery: dungeon, then fishing
                 process_discoveries(state, rng, &mut result);
             }
             CombatEvent::EliteDefeated { xp_gained } => {
-                let enemy_name = state
-                    .combat_state
-                    .current_enemy
-                    .as_ref()
-                    .map(|e| e.name.clone())
-                    .unwrap_or_default();
+                let enemy_name = current_enemy_name.clone();
                 let message = format!(
                     "\u{2694}\u{fe0f} {} defeated! +{} XP",
                     enemy_name, xp_gained
@@ -605,12 +596,7 @@ pub fn game_tick<R: Rng>(
                 }
             }
             CombatEvent::BossDefeated { xp_gained } => {
-                let enemy_name = state
-                    .combat_state
-                    .current_enemy
-                    .as_ref()
-                    .map(|e| e.name.clone())
-                    .unwrap_or_default();
+                let enemy_name = current_enemy_name.clone();
 
                 let level_before = state.character_level;
                 apply_tick_xp(state, xp_gained as f64);
@@ -806,7 +792,7 @@ fn collect_achievement_events(achievements: &mut Achievements, result: &mut Tick
 }
 
 /// Process item drops after killing a mob/boss in overworld combat.
-fn process_item_drop(state: &mut GameState, haven: &Haven, result: &mut TickResult) {
+fn process_item_drop(state: &mut GameState, haven_bonuses: &HavenBonuses, result: &mut TickResult) {
     let zone_id = state.zone_progression.current_zone_id as usize;
     let was_boss = state.zone_progression.fighting_boss;
     let is_final_zone = zone_id == FINAL_ZONE_ID as usize;
@@ -814,9 +800,12 @@ fn process_item_drop(state: &mut GameState, haven: &Haven, result: &mut TickResu
     let dropped_item = if was_boss {
         Some(try_drop_from_boss(zone_id, is_final_zone))
     } else {
-        let haven_drop_rate = haven.get_bonus(HavenBonusType::DropRatePercent);
-        let haven_rarity = haven.get_bonus(HavenBonusType::ItemRarityPercent);
-        try_drop_from_mob(state, zone_id, haven_drop_rate, haven_rarity)
+        try_drop_from_mob(
+            state,
+            zone_id,
+            haven_bonuses.drop_rate_percent,
+            haven_bonuses.item_rarity_percent,
+        )
     };
 
     if let Some(item) = dropped_item {
@@ -826,6 +815,9 @@ fn process_item_drop(state: &mut GameState, haven: &Haven, result: &mut TickResu
         let stats = item.stat_summary();
         let icon = if was_boss { "\u{1f451}" } else { "\u{1f381}" };
         let equipped = auto_equip_if_better(item, state);
+        if equipped {
+            state.invalidate_derived_stats();
+        }
         state.add_recent_drop(
             item_name.clone(),
             rarity,
@@ -988,6 +980,7 @@ mod tests {
     #[test]
     fn test_game_tick_combat_produces_events() {
         use crate::character::attributes::AttributeType;
+        use crate::character::derived_stats::DerivedStats;
 
         let mut state = GameState::new("Combat Test".to_string(), 0);
         state.attributes.set(AttributeType::Strength, 50);

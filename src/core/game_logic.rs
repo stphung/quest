@@ -1,7 +1,6 @@
 use super::constants::*;
 use super::game_state::GameState;
 use crate::character::attributes::AttributeType;
-use crate::character::derived_stats::DerivedStats;
 use crate::combat::types::{
     generate_boss_for_current_zone, generate_dungeon_boss, generate_dungeon_elite,
     generate_dungeon_enemy, generate_enemy_for_current_zone,
@@ -75,10 +74,8 @@ pub fn apply_tick_xp(state: &mut GameState, xp_gain: f64) -> (u32, Vec<Attribute
             let increased = distribute_level_up_points(state);
             all_increased.extend(increased);
 
-            // Update combat state max HP after level up
-            let derived =
-                DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
-            state.combat_state.update_max_hp(derived.max_hp);
+            // Mark derived stats as needing recalculation on next tick
+            state.invalidate_derived_stats();
         } else {
             break;
         }
