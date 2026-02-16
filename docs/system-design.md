@@ -71,7 +71,7 @@ Quest is a terminal-based idle RPG built in Rust using Ratatui for UI rendering 
 
 ### Key Architectural Patterns
 
-- **Event-driven tick processing**: `game_tick()` returns a `TickResult` containing `Vec<TickEvent>` (25+ event variants). The presentation layer maps events to combat log entries, visual effects, and overlays. Game logic has zero UI imports.
+- **Event-driven tick processing**: `game_tick()` returns a `TickResult` containing `Vec<TickEvent>` (28 event variants). The presentation layer maps events to combat log entries, visual effects, and overlays. Game logic has zero UI imports.
 - **Generic RNG**: `game_tick<R: Rng>()` uses a generic type parameter because `rand::Rng` is not dyn-compatible. Production uses `thread_rng()`, tests use seeded `ChaCha8Rng` for determinism.
 - **Haven bonus injection**: Haven bonuses are passed as explicit parameters to game systems rather than accessed globally, keeping modules decoupled.
 
@@ -79,7 +79,7 @@ Quest is a terminal-based idle RPG built in Rust using Ratatui for UI rendering 
 
 | Crate | Purpose |
 |-------|---------|
-| ratatui 0.26 | Terminal UI framework |
+| ratatui 0.30 | Terminal UI framework |
 | crossterm 0.27 | Terminal backend |
 | serde / serde_json | JSON serialization |
 | rand | RNG for procedural systems |
@@ -144,7 +144,7 @@ The game runs at **10 ticks per second** (100ms intervals). Each tick is process
 
 ### Key Types
 
-**`TickEvent`** (25+ variants):
+**`TickEvent`** (28 variants):
 - Combat: `PlayerAttack`, `PlayerAttackBlocked`, `EnemyAttack`, `EnemyDefeated`, `PlayerDied`, `PlayerDiedInDungeon`
 - Items: `ItemDropped`
 - Zones: `SubzoneBossDefeated`
@@ -522,7 +522,7 @@ Items are automatically equipped if they score higher than the current item usin
 
 ### Dungeons
 
-- 2% discovery chance per kill (overworld only)
+- 1% discovery chance per kill (overworld only)
 - Procedurally generated connected rooms on a grid
 - 5 sizes: Small 5x5, Medium 7x7, Large 9x9, Epic 11x11, Legendary 13x13
 - Size based on character level and prestige rank (with 20% random variation)
@@ -540,7 +540,7 @@ Items are automatically equipped if they score higher than the current item usin
 - 0.000014 per tick (~2 hour average)
 - Requires P1+ (not in dungeon, fishing, or another minigame)
 - Haven Library bonus: up to +50%
-- Weighted distribution: 9 challenge types with weights favoring quick games (Rune 30, Minesweeper 28, Snake 22, Flappy Bird 20, JezzBall 18, Gomoku 15, Morris 12, Chess 8, Go 7)
+- Weighted distribution: 10 challenge types with weights favoring quick games (Rune 30, Minesweeper 28, Snake 22, Flappy Bird 20, Sigil Surge 20, JezzBall 18, Gomoku 15, Morris 12, Chess 8, Go 7)
 
 ### Games & AI
 
@@ -555,6 +555,7 @@ Items are automatically equipped if they score higher than the current item usin
 | Snake | N/A (action) | 10-25 food, 200-90ms |
 | Flappy Bird | N/A (action) | Gap 7-4 rows, 3 lives |
 | JezzBall | N/A (action) | 2-5 balls, 3 lives |
+| Sigil Surge | N/A (action-puzzle) | 6×12 grid, 5 colors, 3 lives |
 
 All challenges use 4 difficulty levels: Novice, Apprentice, Journeyman, Master.
 
@@ -571,6 +572,7 @@ All challenges use 4 difficulty levels: Novice, Apprentice, Journeyman, Master.
 | Snake | +25% XP | +75% XP | +1 PR, +100% XP | +2 PR, +100% XP |
 | Flappy Bird | +25% XP | +75% XP | +1 PR, +100% XP | +2 PR, +100% XP |
 | JezzBall | +25% XP | +75% XP | +1 PR, +100% XP | +2 PR, +100% XP |
+| Sigil Surge | +50% XP | +100% XP | +1 PR, +75% XP | +2 PR, +150% XP, +1 FR |
 
 PR = Prestige Rank, FR = Fishing Rank, XP% = percentage of current level's XP requirement.
 
@@ -742,14 +744,15 @@ Headless game balance simulator that runs `game_tick()` without UI:
 
 Activated with `--debug` flag, toggle with backtick.
 
-Options: Trigger Dungeon, Fishing, all 6 Challenges, Haven Discovery.
+Options: Trigger Dungeon, Fishing, all 10 challenge types, Haven Discovery, Soulforge Discovery.
 
 ### Integration Tests
 
-13 integration test files in `tests/`:
+15 integration test files in `tests/`:
 - `game_loop_orchestration_test.rs` -- 36 behavior-locking tests for game tick pipeline
 - `game_tick_behavior_test.rs` / `game_tick_supplemental_test.rs` -- Tick processing behavior
 - `tick_integration_test.rs` -- Cross-system tick integration
+- `tick_stage_coverage_test.rs` -- Tick stage coverage tests
 - `behavior_lock_fishing_dungeon_test.rs` -- Fishing/dungeon mutual exclusion
 - `prestige_cycle_test.rs` -- Prestige reset and progression
 - `zone_progression_test.rs` -- Zone advancement and gating
@@ -758,6 +761,7 @@ Options: Trigger Dungeon, Fishing, all 6 Challenges, Haven Discovery.
 - `storm_forge_test.rs` -- Stormbreaker forging chain
 - `item_pipeline_test.rs` -- Item generation and equipping
 - `chess_integration_test.rs` -- Chess minigame
+- `enhancement_test.rs` -- Soulforge enhancement system
 - `game_loop_test.rs` -- Core game loop behavior
 
 ---
@@ -893,7 +897,8 @@ quest/
 │   │   ├── rune/            # Rune Deciphering
 │   │   ├── snake/           # Serpent's Path (Snake)
 │   │   ├── flappy/          # Skyward Gauntlet (Flappy Bird)
-│   │   └── jezzball/        # Containment Breach (JezzBall)
+│   │   ├── jezzball/        # Containment Breach (JezzBall)
+│   │   └── runic_shift/     # Sigil Surge (panel-matching)
 │   ├── haven/               # Haven base building
 │   │   ├── types.rs         # Room definitions, bonuses
 │   │   └── logic.rs         # Construction, upgrades
@@ -926,13 +931,15 @@ quest/
 │       ├── challenge_menu_scene.rs # Challenge menu
 │       ├── chess_scene.rs, go_scene.rs, morris_scene.rs,
 │       │   gomoku_scene.rs, minesweeper_scene.rs, rune_scene.rs,
-│       │   snake_scene.rs, flappy_scene.rs, jezzball_scene.rs
+│       │   snake_scene.rs, flappy_scene.rs, jezzball_scene.rs,
+│       │   runic_shift_scene.rs
 │       ├── soulforge_scene.rs # Soulforge enhancement overlay
+│       ├── scene_fx.rs       # Shared utilities for layered ASCII scene rendering
 │       ├── debug_menu_scene.rs # Debug overlay
 │       ├── throbber.rs      # Spinner animations
 │       └── character_select.rs, character_creation.rs,
 │           character_delete.rs, character_rename.rs
-├── tests/                   # 13 integration test files
+├── tests/                   # 15 integration test files
 ├── .github/workflows/       # CI/CD pipeline
 ├── scripts/                 # Quality checks (ci-checks.sh)
 ├── docs/                    # Design documents
