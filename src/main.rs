@@ -329,17 +329,14 @@ fn log_synced_achievements(
 }
 
 /// Track achievements that may have changed from input handling (prestige, minigame wins).
+/// Saving is handled by the caller via save_all().
 fn track_input_achievements(
     state: &mut GameState,
     global_achievements: &mut achievements::Achievements,
     prestige_before: u32,
-    debug_mode: bool,
 ) {
-    let mut achievements_changed = false;
-
     if state.prestige_rank > prestige_before {
         global_achievements.on_prestige(state.prestige_rank, Some(&state.character_name));
-        achievements_changed = true;
     }
 
     if let Some(ref win_info) = state.last_minigame_win {
@@ -348,14 +345,25 @@ fn track_input_achievements(
             win_info.difficulty,
             Some(&state.character_name),
         );
-        achievements_changed = true;
         state.last_minigame_win = None;
     }
+}
 
-    if achievements_changed && !debug_mode {
-        if let Err(e) = achievements::save_achievements(global_achievements) {
-            eprintln!("Failed to save achievements: {}", e);
-        }
+/// Save all game state files (character, achievements, haven, enhancement).
+fn save_all(
+    character_manager: &CharacterManager,
+    state: &GameState,
+    global_achievements: &achievements::Achievements,
+    haven: &haven::Haven,
+    enhancement: &enhancement::EnhancementProgress,
+) {
+    let _ = character_manager.save_character(state);
+    achievements::save_achievements(global_achievements).ok();
+    if haven.discovered {
+        haven::save_haven(haven).ok();
+    }
+    if enhancement.discovered {
+        enhancement::save_enhancement(enhancement).ok();
     }
 }
 
@@ -964,19 +972,19 @@ fn main() -> io::Result<()> {
                                 &mut state,
                                 &mut global_achievements,
                                 prestige_before,
-                                debug_mode,
                             );
 
                             match result {
                                 InputResult::Continue => {}
                                 InputResult::QuitToSelect => {
                                     if !debug_mode {
-                                        character_manager.save_character(&state)?;
-                                        // Save achievements when quitting to character select
-                                        achievements::save_achievements(&global_achievements)?;
-                                        if enhancement.discovered {
-                                            enhancement::save_enhancement(&enhancement).ok();
-                                        }
+                                        save_all(
+                                            &character_manager,
+                                            &state,
+                                            &global_achievements,
+                                            &haven,
+                                            &enhancement,
+                                        );
                                     }
                                     game_state = None;
                                     current_screen = Screen::CharacterSelect;
@@ -984,21 +992,26 @@ fn main() -> io::Result<()> {
                                 }
                                 InputResult::NeedsSave => {
                                     if !debug_mode {
-                                        let _ = character_manager.save_character(&state);
+                                        save_all(
+                                            &character_manager,
+                                            &state,
+                                            &global_achievements,
+                                            &haven,
+                                            &enhancement,
+                                        );
                                         last_save_instant = Some(Instant::now());
                                         last_save_time = Some(Local::now());
                                     }
                                 }
                                 InputResult::NeedsSaveAll => {
                                     if !debug_mode {
-                                        let _ = character_manager.save_character(&state);
-                                        // Only save Haven if it has been discovered
-                                        if haven.discovered {
-                                            haven::save_haven(&haven).ok();
-                                        }
-                                        if enhancement.discovered {
-                                            enhancement::save_enhancement(&enhancement).ok();
-                                        }
+                                        save_all(
+                                            &character_manager,
+                                            &state,
+                                            &global_achievements,
+                                            &haven,
+                                            &enhancement,
+                                        );
                                         last_save_instant = Some(Instant::now());
                                         last_save_time = Some(Local::now());
                                     }
@@ -1071,14 +1084,13 @@ fn main() -> io::Result<()> {
                             last_autosave = Instant::now();
                             // Immediate save with updated last_save_time
                             if !debug_mode {
-                                character_manager.save_character(&state)?;
-                                if haven.discovered {
-                                    haven::save_haven(&haven).ok();
-                                }
-                                if enhancement.discovered {
-                                    enhancement::save_enhancement(&enhancement).ok();
-                                }
-                                achievements::save_achievements(&global_achievements).ok();
+                                save_all(
+                                    &character_manager,
+                                    &state,
+                                    &global_achievements,
+                                    &haven,
+                                    &enhancement,
+                                );
                                 last_save_instant = Some(Instant::now());
                                 last_save_time = Some(Local::now());
                             }
@@ -1108,24 +1120,23 @@ fn main() -> io::Result<()> {
                                 .visual_effects
                                 .retain_mut(|effect| effect.update(delta_time));
 
-                            // Persist achievements if changed
-                            if tick_result.achievements_changed && !debug_mode {
-                                if let Err(e) =
-                                    achievements::save_achievements(&global_achievements)
-                                {
-                                    eprintln!("Failed to save achievements: {}", e);
-                                }
+                            // Persist all state if anything changed
+                            if (tick_result.achievements_changed
+                                || tick_result.haven_changed
+                                || tick_result.enhancement_changed)
+                                && !debug_mode
+                            {
+                                save_all(
+                                    &character_manager,
+                                    &state,
+                                    &global_achievements,
+                                    &haven,
+                                    &enhancement,
+                                );
                             }
 
                             if let Some(encounter_number) = tick_result.leviathan_encounter {
                                 overlay = GameOverlay::LeviathanEncounter { encounter_number };
-                            }
-
-                            if tick_result.haven_changed && !debug_mode {
-                                haven::save_haven(&haven).ok();
-                            }
-                            if tick_result.enhancement_changed && !debug_mode {
-                                enhancement::save_enhancement(&enhancement).ok();
                             }
                             if tick_flags.haven_discovered {
                                 overlay = GameOverlay::HavenDiscovery;
@@ -1206,12 +1217,13 @@ fn main() -> io::Result<()> {
 
                                             // Persist changes
                                             if !debug_mode {
-                                                let _ = character_manager.save_character(&state);
-                                                enhancement::save_enhancement(&enhancement).ok();
-                                                achievements::save_achievements(
+                                                save_all(
+                                                    &character_manager,
+                                                    &state,
                                                     &global_achievements,
-                                                )
-                                                .ok();
+                                                    &haven,
+                                                    &enhancement,
+                                                );
                                             }
                                         }
                                     }
@@ -1241,14 +1253,13 @@ fn main() -> io::Result<()> {
 
                         // Skip file I/O in debug mode
                         if !debug_mode {
-                            character_manager.save_character(&state)?;
-                            if haven.discovered {
-                                haven::save_haven(&haven)?;
-                            }
-                            if enhancement.discovered {
-                                enhancement::save_enhancement(&enhancement).ok();
-                            }
-                            achievements::save_achievements(&global_achievements)?;
+                            save_all(
+                                &character_manager,
+                                &state,
+                                &global_achievements,
+                                &haven,
+                                &enhancement,
+                            );
                             last_save_instant = Some(Instant::now());
                         }
                     }
