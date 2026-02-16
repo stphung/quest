@@ -232,6 +232,9 @@ fn draw_game_overlays(
                 ctx,
             );
         }
+        GameOverlay::Help => {
+            ui::help_overlay::draw_help_overlay(frame);
+        }
         GameOverlay::None => {}
     }
 
@@ -445,6 +448,7 @@ fn main() -> io::Result<()> {
     let mut haven_ui = HavenUiState::new();
     let mut soulforge_ui = SoulforgeUiState::new();
     let mut achievement_browser = AchievementBrowserState::new();
+    let mut help_overlay_showing = false;
 
     // Setup terminal
     enable_raw_mode()?;
@@ -552,6 +556,10 @@ fn main() -> io::Result<()> {
                             &ctx,
                         );
                     }
+                    // Draw Help overlay if open
+                    if help_overlay_showing {
+                        ui::help_overlay::draw_help_overlay(f);
+                    }
                 })?;
 
                 // Handle input
@@ -575,6 +583,14 @@ fn main() -> io::Result<()> {
                                 }
                                 KeyCode::Esc => soulforge_ui.close(),
                                 _ => {}
+                            }
+                            continue;
+                        }
+
+                        // Handle Help overlay (blocks other input when open)
+                        if help_overlay_showing {
+                            if matches!(key_event.code, KeyCode::Esc | KeyCode::Char('?')) {
+                                help_overlay_showing = false;
                             }
                             continue;
                         }
@@ -608,6 +624,12 @@ fn main() -> io::Result<()> {
                         if matches!(key_event.code, KeyCode::Char('a') | KeyCode::Char('A')) {
                             global_achievements.clear_pending_notifications();
                             achievement_browser.open();
+                            continue;
+                        }
+
+                        // Help overlay shortcut
+                        if key_event.code == KeyCode::Char('?') {
+                            help_overlay_showing = true;
                             continue;
                         }
 
