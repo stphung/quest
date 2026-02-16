@@ -184,5 +184,4 @@ pub const DUNGEON_MIN_ELITE_DISTANCE: usize = 1;
 pub const STORMBREAKER_PRESTIGE_REQUIREMENT: u32 = 25;
 
 // Wiki
-#[allow(dead_code)]
 pub const WIKI_URL: &str = "github.com/stphung/quest/wiki";

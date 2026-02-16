@@ -17,6 +17,7 @@ pub mod game_common;
 pub mod go_scene;
 pub mod gomoku_scene;
 pub mod haven_scene;
+pub mod help_overlay;
 mod info_panel;
 pub mod jezzball_scene;
 pub mod minesweeper_scene;

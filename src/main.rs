@@ -233,7 +233,7 @@ fn draw_game_overlays(
             );
         }
         GameOverlay::Help => {
-            // Will be replaced with actual rendering in next task
+            ui::help_overlay::draw_help_overlay(frame);
         }
         GameOverlay::None => {}
     }
