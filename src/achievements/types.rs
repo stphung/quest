@@ -51,6 +51,12 @@ pub enum AchievementId {
     SlayerVII,  // 100,000 kills
     SlayerVIII, // 500,000 kills
     SlayerIX,   // 1,000,000 kills
+    SlayerX,    // 2,500,000 kills
+    SlayerXI,   // 10,000,000 kills
+    SlayerXII,  // 50,000,000 kills
+    SlayerXIII, // 100,000,000 kills (Harbinger)
+    SlayerXIV,  // 500,000,000 kills (Reaper)
+    SlayerXV,   // 1,000,000,000 kills (Death Incarnate)
     // Combat achievements - boss kills
     BossHunterI,    // 1 boss
     BossHunterII,   // 10 bosses
@@ -60,6 +66,13 @@ pub enum AchievementId {
     BossHunterVI,   // 1,000 bosses
     BossHunterVII,  // 5,000 bosses
     BossHunterVIII, // 10,000 bosses
+    BossHunterIX,   // 25,000 bosses
+    BossHunterX,    // 75,000 bosses
+    BossHunterXI,   // 250,000 bosses
+    BossHunterXII,  // 750,000 bosses
+    BossHunterXIII, // 2,500,000 bosses (Titan Breaker)
+    BossHunterXIV,  // 5,000,000 bosses (Worldender)
+    BossHunterXV,   // 10,000,000 bosses (The Absolute)
 
     // Level achievements
     Level10,
@@ -493,6 +506,12 @@ impl Achievements {
                 (100000, AchievementId::SlayerVII),
                 (500000, AchievementId::SlayerVIII),
                 (1000000, AchievementId::SlayerIX),
+                (2500000, AchievementId::SlayerX),
+                (10000000, AchievementId::SlayerXI),
+                (50000000, AchievementId::SlayerXII),
+                (100000000, AchievementId::SlayerXIII),
+                (500000000, AchievementId::SlayerXIV),
+                (1000000000, AchievementId::SlayerXV),
             ],
             character_name,
         );
@@ -511,6 +530,13 @@ impl Achievements {
                     (1000, AchievementId::BossHunterVI),
                     (5000, AchievementId::BossHunterVII),
                     (10000, AchievementId::BossHunterVIII),
+                    (25000, AchievementId::BossHunterIX),
+                    (75000, AchievementId::BossHunterX),
+                    (250000, AchievementId::BossHunterXI),
+                    (750000, AchievementId::BossHunterXII),
+                    (2500000, AchievementId::BossHunterXIII),
+                    (5000000, AchievementId::BossHunterXIV),
+                    (10000000, AchievementId::BossHunterXV),
                 ],
                 character_name,
             );
@@ -888,6 +914,12 @@ impl Achievements {
                     (100000, AchievementId::SlayerVII),
                     (500000, AchievementId::SlayerVIII),
                     (1000000, AchievementId::SlayerIX),
+                    (2500000, AchievementId::SlayerX),
+                    (10000000, AchievementId::SlayerXI),
+                    (50000000, AchievementId::SlayerXII),
+                    (100000000, AchievementId::SlayerXIII),
+                    (500000000, AchievementId::SlayerXIV),
+                    (1000000000, AchievementId::SlayerXV),
                 ],
             ),
             (
@@ -901,6 +933,13 @@ impl Achievements {
                     (1000, AchievementId::BossHunterVI),
                     (5000, AchievementId::BossHunterVII),
                     (10000, AchievementId::BossHunterVIII),
+                    (25000, AchievementId::BossHunterIX),
+                    (75000, AchievementId::BossHunterX),
+                    (250000, AchievementId::BossHunterXI),
+                    (750000, AchievementId::BossHunterXII),
+                    (2500000, AchievementId::BossHunterXIII),
+                    (5000000, AchievementId::BossHunterXIV),
+                    (10000000, AchievementId::BossHunterXV),
                 ],
             ),
             (
@@ -918,10 +957,11 @@ impl Achievements {
             (
                 self.total_fish_caught,
                 &[
-                    (10, AchievementId::FishCatcherI),
-                    (100, AchievementId::FishCatcherII),
-                    (500, AchievementId::FishCatcherIII),
-                    (1000, AchievementId::FishCatcherIV),
+                    (1, AchievementId::GoneFishing),
+                    (100, AchievementId::FishCatcherI),
+                    (1000, AchievementId::FishCatcherII),
+                    (10000, AchievementId::FishCatcherIII),
+                    (100000, AchievementId::FishCatcherIV),
                 ],
             ),
             (
