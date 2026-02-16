@@ -792,6 +792,15 @@ fn build_stats_right_lines(
                 AchievementId::ContainmentBreachMaster,
             ],
         ),
+        (
+            "Sigil",
+            [
+                AchievementId::SigilSurgeNovice,
+                AchievementId::SigilSurgeApprentice,
+                AchievementId::SigilSurgeJourneyman,
+                AchievementId::SigilSurgeMaster,
+            ],
+        ),
     ];
 
     let diff_labels = ["Nov", "App", "Jou", "Mas"];
