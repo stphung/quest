@@ -657,13 +657,13 @@ total_xp = 180 * 1,316 * 2.0 = 473,760
 
 | Discovery | Chance | Condition | Notes |
 |-----------|--------|-----------|-------|
-| Dungeon | 2% per kill | Always | Blocked by active dungeon/fishing |
+| Dungeon | 1% per kill | Always | Blocked by active dungeon/fishing |
 | Fishing spot | 5% per kill | Always | Blocked by active fishing/dungeon |
 | Challenge | 0.0014% per tick | P1+ required | ~2hr average; Haven Library boosts |
 | Haven | 0.0014% per tick + 0.0007% per rank above 10 | P10+ required | Only when no active content |
 | Soulforge | 0.0014% per tick + 0.0007% per rank above 15 | P15+ required | Only when no active content |
 
-Constants: `DUNGEON_DISCOVERY_CHANCE = 0.02`, `FISHING_DISCOVERY_CHANCE = 0.05`, `CHALLENGE_DISCOVERY_CHANCE = 0.000014`, `HAVEN_DISCOVERY_BASE_CHANCE = 0.000014`, `HAVEN_DISCOVERY_RANK_BONUS = 0.000007`, `SOULFORGE_DISCOVERY_BASE_CHANCE = 0.000014`, `SOULFORGE_DISCOVERY_RANK_BONUS = 0.000007`, `SOULFORGE_MIN_PRESTIGE_RANK = 15`
+Constants: `DUNGEON_DISCOVERY_CHANCE = 0.01`, `FISHING_DISCOVERY_CHANCE = 0.05`, `CHALLENGE_DISCOVERY_CHANCE = 0.000014`, `HAVEN_DISCOVERY_BASE_CHANCE = 0.000014`, `HAVEN_DISCOVERY_RANK_BONUS = 0.000007`, `SOULFORGE_DISCOVERY_BASE_CHANCE = 0.000014`, `SOULFORGE_DISCOVERY_RANK_BONUS = 0.000007`, `SOULFORGE_MIN_PRESTIGE_RANK = 15`
 
 ---
 
@@ -694,7 +694,7 @@ Exactly one Elite and one Boss room per dungeon.
 
 ## Challenge Minigames
 
-All challenges require P1+ to discover. Discovery is random (~2hr average per challenge). 9 challenge types with 4 difficulty levels each.
+All challenges require P1+ to discover. Discovery is random (~2hr average per challenge). 10 challenge types with 4 difficulty levels each.
 
 ### Discovery Weights
 
@@ -708,6 +708,7 @@ All challenges require P1+ to discover. Discovery is random (~2hr average per ch
 | Gomoku (Five in a Row) | 15 | ~9% |
 | Morris (Nine Men's Morris) | 12 | ~8% |
 | Chess | 8 | ~5% |
+| Sigil Surge (Runic Shift) | 20 | ~10% |
 | Go (Territory Control) | 7 | ~4% |
 
 ### Challenge Rewards
@@ -792,6 +793,15 @@ All challenges require P1+ to discover. Discovery is random (~2hr average per ch
 | Apprentice | 3 | 70% | +75% level XP |
 | Journeyman | 4 | 78% | +1 Prestige Rank, +100% level XP |
 | Master | 5 | 84% | +2 Prestige Ranks, +100% level XP |
+
+**Sigil Surge** (Runic Shift, 6×12 grid, 5 rune colors, 3 lives):
+
+| Difficulty | Rise Interval | Reward |
+|------------|---------------|--------|
+| Novice | 7000ms | +50% level XP |
+| Apprentice | 6000ms | +100% level XP |
+| Journeyman | 5000ms | +1 Prestige Rank, +75% level XP |
+| Master | 3000ms | +2 Prestige Ranks, +150% level XP, +1 Fish Rank |
 
 ---
 
@@ -942,7 +952,7 @@ ILVL_SCALING_BASE: f64 = 10.0;
 ILVL_SCALING_DIVISOR: f64 = 30.0;
 
 // Discovery Chances
-DUNGEON_DISCOVERY_CHANCE: f64 = 0.02;
+DUNGEON_DISCOVERY_CHANCE: f64 = 0.01;
 FISHING_DISCOVERY_CHANCE: f64 = 0.05;
 CHALLENGE_DISCOVERY_CHANCE: f64 = 0.000014;
 HAVEN_DISCOVERY_BASE_CHANCE: f64 = 0.000014;

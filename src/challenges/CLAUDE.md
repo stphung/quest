@@ -255,6 +255,7 @@ Challenges are discovered randomly (~2hr average). The `CHALLENGE_TABLE` in `men
 | Gomoku | 15 | ~9% | Medium-length strategy |
 | Morris | 12 | ~8% | Longer strategy |
 | Chess | 8 | ~5% | Long commitment |
+| Sigil Surge | 20 | ~10% | Moderate action-puzzle |
 | Go | 7 | ~4% | Longest game |
 
 When adding a new challenge, add it to `CHALLENGE_TABLE` with an appropriate weight.
@@ -278,3 +279,4 @@ Winning a minigame emits a `MinigameWinInfo` (defined in `mod.rs`) with `game_ty
 | Snake (Serpent's Path) | 26×26 grid | N/A (action) | Real-time ~60 FPS, direction-based movement, 4 difficulties (Novice 10 food/200ms, Master 25 food/90ms), requires P1+ |
 | Flappy Bird (Skyward Gauntlet) | 50×18 area | N/A (action) | Real-time ~60 FPS, gravity/flap physics, pipe obstacles with gap sizes (7→4 rows), 3 lives, 4 difficulties, requires P1+ |
 | JezzBall (Containment Breach) | 34×22 grid | N/A (action) | Real-time ~60 FPS, ball physics, wall-building to capture area, 3 lives, 2-5 balls (Novice→Master), target 60-84%, 4 difficulties, requires P1+ |
+| Sigil Surge (Runic Shift) | 6×12 grid | N/A (action-puzzle) | Real-time ~60 FPS, panel-matching with 5 rune colors, 3 lives, rising blocks (7000-3000ms interval), chain combos, 4 difficulties, requires P1+ |

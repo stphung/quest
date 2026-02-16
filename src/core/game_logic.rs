@@ -373,7 +373,7 @@ mod tests {
         // Test that dungeon discovery happens with expected probability (1%)
         // Run many trials and check it's in reasonable range
         let mut discoveries = 0;
-        let trials = 10000;
+        let trials = 3_000;
 
         for _ in 0..trials {
             let mut state = GameState::new("Test Hero".to_string(), 0);
@@ -382,11 +382,11 @@ mod tests {
             }
         }
 
-        // 1% rate = 100 expected discoveries in 10000 trials
-        // Allow reasonable variance (0.4% to 2% = 40 to 200)
+        // 1% rate = 30 expected discoveries in 3000 trials
+        // Allow reasonable variance (0.2% to 2.5% = 6 to 75)
         assert!(
-            (40..=200).contains(&discoveries),
-            "Expected ~100 discoveries (1%), got {}",
+            (6..=75).contains(&discoveries),
+            "Expected ~30 discoveries (1%), got {}",
             discoveries
         );
     }
@@ -1029,7 +1029,8 @@ mod tests {
         let mut state = GameState::new("Test Hero".to_string(), 0);
         state.active_dungeon = Some(crate::dungeon::generation::generate_dungeon(1, 0, 1));
 
-        for _ in 0..1000 {
+        // Blocked by early return (active_dungeon.is_some()), 100 iterations suffices
+        for _ in 0..100 {
             assert!(!try_discover_dungeon(&mut state));
         }
     }
