@@ -690,6 +690,37 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         icon: "▣",
     },
     // ═══════════════════════════════════════════════════════════════
+    // CHALLENGE ACHIEVEMENTS - SIGIL SURGE
+    // ═══════════════════════════════════════════════════════════════
+    AchievementDef {
+        id: AchievementId::SigilSurgeNovice,
+        name: "Sigil Surge Novice",
+        description: "Win Sigil Surge on Novice difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "⚡",
+    },
+    AchievementDef {
+        id: AchievementId::SigilSurgeApprentice,
+        name: "Sigil Surge Apprentice",
+        description: "Win Sigil Surge on Apprentice difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "⚡",
+    },
+    AchievementDef {
+        id: AchievementId::SigilSurgeJourneyman,
+        name: "Sigil Surge Journeyman",
+        description: "Win Sigil Surge on Journeyman difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "⚡",
+    },
+    AchievementDef {
+        id: AchievementId::SigilSurgeMaster,
+        name: "Sigil Surge Master",
+        description: "Win Sigil Surge on Master difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "⚡",
+    },
+    // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - META
     // ═══════════════════════════════════════════════════════════════
     AchievementDef {
@@ -1081,6 +1112,10 @@ mod tests {
             AchievementId::ContainmentBreachApprentice,
             AchievementId::ContainmentBreachJourneyman,
             AchievementId::ContainmentBreachMaster,
+            AchievementId::SigilSurgeNovice,
+            AchievementId::SigilSurgeApprentice,
+            AchievementId::SigilSurgeJourneyman,
+            AchievementId::SigilSurgeMaster,
             AchievementId::GrandChampion,
             AchievementId::GoneFishing,
             AchievementId::FishermanI,
@@ -1285,6 +1320,15 @@ mod tests {
                     AchievementId::ContainmentBreachApprentice,
                     AchievementId::ContainmentBreachJourneyman,
                     AchievementId::ContainmentBreachMaster,
+                ],
+            ),
+            (
+                "Sigil Surge",
+                vec![
+                    AchievementId::SigilSurgeNovice,
+                    AchievementId::SigilSurgeApprentice,
+                    AchievementId::SigilSurgeJourneyman,
+                    AchievementId::SigilSurgeMaster,
                 ],
             ),
         ];
