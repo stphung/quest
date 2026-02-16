@@ -236,6 +236,35 @@ pub fn generate_boss_for_current_zone(zone_id: u32, subzone_id: u32) -> Enemy {
     )
 }
 
+/// A brief damage number shown next to an HP bar.
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct DamageFlash {
+    pub text: String,
+    pub color: ratatui::style::Color,
+    pub bold: bool,
+    /// Remaining display time in seconds
+    pub remaining: f64,
+}
+
+/// A single event message shown below the enemy HP bar.
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct EventLine {
+    pub text: String,
+    pub color: ratatui::style::Color,
+    pub bold: bool,
+    /// Remaining display time in seconds (0.0 = permanent until replaced)
+    pub remaining: f64,
+}
+
+/// How long damage flashes display (seconds)
+#[allow(dead_code)]
+pub const DAMAGE_FLASH_DURATION: f64 = 0.8;
+/// How long event lines display (seconds)
+#[allow(dead_code)]
+pub const EVENT_LINE_DURATION: f64 = 2.5;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CombatLogEntry {
     pub message: String,
@@ -266,6 +295,15 @@ pub struct CombatState {
     pub visual_effects: Vec<crate::ui::combat_effects::VisualEffect>,
     #[serde(skip)]
     pub combat_log: VecDeque<CombatLogEntry>,
+    #[serde(skip)]
+    #[allow(dead_code)]
+    pub player_damage_flash: Option<DamageFlash>,
+    #[serde(skip)]
+    #[allow(dead_code)]
+    pub enemy_damage_flash: Option<DamageFlash>,
+    #[serde(skip)]
+    #[allow(dead_code)]
+    pub event_line: Option<EventLine>,
 }
 
 impl Default for CombatState {
@@ -286,6 +324,9 @@ impl CombatState {
             is_regenerating: false,
             visual_effects: Vec::new(),
             combat_log: VecDeque::with_capacity(COMBAT_LOG_CAPACITY),
+            player_damage_flash: None,
+            enemy_damage_flash: None,
+            event_line: None,
         }
     }
 
@@ -311,6 +352,32 @@ impl CombatState {
 
     pub fn is_player_alive(&self) -> bool {
         self.player_current_hp > 0
+    }
+
+    /// Decay HUD flash timers by delta_time. Clears expired flashes.
+    #[allow(dead_code)]
+    pub fn tick_hud(&mut self, delta_time: f64) {
+        if let Some(flash) = &mut self.player_damage_flash {
+            flash.remaining -= delta_time;
+            if flash.remaining <= 0.0 {
+                self.player_damage_flash = None;
+            }
+        }
+        if let Some(flash) = &mut self.enemy_damage_flash {
+            flash.remaining -= delta_time;
+            if flash.remaining <= 0.0 {
+                self.enemy_damage_flash = None;
+            }
+        }
+        if let Some(line) = &mut self.event_line {
+            if line.remaining > 0.0 {
+                line.remaining -= delta_time;
+                if line.remaining <= 0.0 {
+                    self.event_line = None;
+                }
+            }
+            // remaining == 0.0 means permanent (death message)
+        }
     }
 }
 
