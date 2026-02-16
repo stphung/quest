@@ -25,7 +25,7 @@ use crate::fishing::logic::{
     HavenFishingBonuses,
 };
 use crate::haven::Haven;
-use crate::haven::HavenBonusType;
+use crate::haven::HavenBonuses;
 use crate::items::drops::{try_drop_from_boss, try_drop_from_mob};
 use crate::items::scoring::auto_equip_if_better;
 use crate::items::types::Rarity;
@@ -255,6 +255,7 @@ pub fn game_tick<R: Rng>(
 ) -> TickResult {
     let mut result = TickResult::default();
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
+    let haven_bonuses = haven.compute_bonuses();
 
     // ── 1. Process challenge AI thinking ────────────────────────
     match &mut state.active_minigame {
@@ -275,7 +276,7 @@ pub fn game_tick<R: Rng>(
 
     // ── 2. Try challenge discovery ──────────────────────────────
     {
-        let haven_discovery = haven.get_bonus(HavenBonusType::ChallengeDiscoveryPercent);
+        let haven_discovery = haven_bonuses.challenge_discovery_percent;
         if let Some(challenge_type) =
             crate::challenges::menu::try_discover_challenge_with_haven(state, rng, haven_discovery)
         {
@@ -367,9 +368,9 @@ pub fn game_tick<R: Rng>(
     // ── 5. Update fishing (mutually exclusive with combat) ──────
     if state.active_fishing.is_some() {
         let haven_fishing = HavenFishingBonuses {
-            timer_reduction_percent: haven.get_bonus(HavenBonusType::FishingTimerReduction),
-            double_fish_chance_percent: haven.get_bonus(HavenBonusType::DoubleFishChance),
-            max_fishing_rank_bonus: haven.fishing_rank_bonus(),
+            timer_reduction_percent: haven_bonuses.fishing_timer_reduction,
+            double_fish_chance_percent: haven_bonuses.double_fish_chance,
+            max_fishing_rank_bonus: haven_bonuses.max_fishing_rank_bonus,
         };
         let fishing_result = tick_fishing_with_haven_result(state, rng, &haven_fishing);
 
@@ -469,12 +470,12 @@ pub fn game_tick<R: Rng>(
 
     // ── 6. Combat ───────────────────────────────────────────────
     let haven_combat = HavenCombatBonuses {
-        hp_regen_percent: haven.get_bonus(HavenBonusType::HpRegenPercent),
-        hp_regen_delay_reduction: haven.get_bonus(HavenBonusType::HpRegenDelayReduction),
-        damage_percent: haven.get_bonus(HavenBonusType::DamagePercent),
-        crit_chance_percent: haven.get_bonus(HavenBonusType::CritChancePercent),
-        double_strike_chance: haven.get_bonus(HavenBonusType::DoubleStrikeChance),
-        xp_gain_percent: haven.get_bonus(HavenBonusType::XpGainPercent),
+        hp_regen_percent: haven_bonuses.hp_regen_percent,
+        hp_regen_delay_reduction: haven_bonuses.hp_regen_delay_reduction,
+        damage_percent: haven_bonuses.damage_percent,
+        crit_chance_percent: haven_bonuses.crit_chance_percent,
+        double_strike_chance: haven_bonuses.double_strike_chance,
+        xp_gain_percent: haven_bonuses.xp_gain_percent,
     };
     let prestige_combat = state.cached_prestige_bonuses;
     // Apply prestige flat HP bonus to combat max HP (not in DerivedStats to avoid enemy scaling)
@@ -558,7 +559,7 @@ pub fn game_tick<R: Rng>(
                 }
 
                 // Item drops
-                process_item_drop(state, haven, &mut result);
+                process_item_drop(state, &haven_bonuses, &mut result);
 
                 // Discovery: dungeon, then fishing
                 process_discoveries(state, rng, &mut result);
@@ -804,7 +805,7 @@ fn collect_achievement_events(achievements: &mut Achievements, result: &mut Tick
 }
 
 /// Process item drops after killing a mob/boss in overworld combat.
-fn process_item_drop(state: &mut GameState, haven: &Haven, result: &mut TickResult) {
+fn process_item_drop(state: &mut GameState, haven_bonuses: &HavenBonuses, result: &mut TickResult) {
     let zone_id = state.zone_progression.current_zone_id as usize;
     let was_boss = state.zone_progression.fighting_boss;
     let is_final_zone = zone_id == FINAL_ZONE_ID as usize;
@@ -812,9 +813,12 @@ fn process_item_drop(state: &mut GameState, haven: &Haven, result: &mut TickResu
     let dropped_item = if was_boss {
         Some(try_drop_from_boss(zone_id, is_final_zone))
     } else {
-        let haven_drop_rate = haven.get_bonus(HavenBonusType::DropRatePercent);
-        let haven_rarity = haven.get_bonus(HavenBonusType::ItemRarityPercent);
-        try_drop_from_mob(state, zone_id, haven_drop_rate, haven_rarity)
+        try_drop_from_mob(
+            state,
+            zone_id,
+            haven_bonuses.drop_rate_percent,
+            haven_bonuses.item_rarity_percent,
+        )
     };
 
     if let Some(item) = dropped_item {
