@@ -2,6 +2,7 @@
 //!
 //! Extracts the input dispatch logic from main.rs into a clean priority chain.
 
+use crate::achievements::get_achievements_by_category;
 use crate::enhancement;
 
 use crate::challenges::chess::logic::{
@@ -167,7 +168,10 @@ pub fn handle_game_input(
             KeyCode::Left => browser.prev_category(),
             KeyCode::Right => browser.next_category(),
             KeyCode::Up => browser.move_up(),
-            KeyCode::Down => browser.move_down(1000),
+            KeyCode::Down => {
+                let count = get_achievements_by_category(browser.selected_category).len();
+                browser.move_down(count);
+            }
             _ => {}
         }
         return InputResult::Continue;
