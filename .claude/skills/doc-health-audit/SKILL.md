@@ -1,11 +1,11 @@
 ---
 name: doc-health-audit
-description: Use when documentation is stale, after adding features or modules, before releases, or when docs/ and CLAUDE.md files need to match the current codebase. Use when asked to update docs or audit documentation accuracy.
+description: Use when documentation is stale, after adding features or modules, before releases, or when docs/, CLAUDE.md files, or the player-facing wiki (quest.wiki/) need to match the current codebase. Use when asked to update docs or audit documentation accuracy.
 ---
 
 # Update Documentation
 
-Audit and update all documentation (docs/ and CLAUDE.md files) to match the current codebase.
+Audit and update all documentation (docs/, CLAUDE.md files, and player-facing wiki) to match the current codebase.
 
 ## When to Use
 
@@ -13,6 +13,7 @@ Audit and update all documentation (docs/ and CLAUDE.md files) to match the curr
 - When constants, types, or signatures have changed
 - Before a release
 - When asked to update or audit docs
+- When player-facing wiki (`quest.wiki/`) needs updating after game changes
 
 ## Phase 1: Assess Scope
 
@@ -78,10 +79,66 @@ Audit and update all documentation (docs/ and CLAUDE.md files) to match the curr
 - Cross-reference source code for accurate values
 - Never modify .rs source files
 
-## Phase 3: Verify and Commit
+## Phase 3: Verify and Commit (Developer Docs)
 
 1. Run `cargo test` — confirm all tests pass (no source files accidentally changed)
 2. Run `cargo clippy --all-targets -- -D warnings` — confirm clean
 3. Create a branch `docs/update-<topic>` (since main is protected)
 4. Commit with message: `docs: update design docs and CLAUDE.md for <summary>`
 5. Push and create PR
+
+## Phase 4: Player-Facing Wiki (`quest.wiki/`)
+
+The GitHub wiki at `quest.wiki/` (git submodule) contains player-facing documentation. After updating developer docs, audit the wiki for staleness.
+
+### Wiki Pages (15):
+
+| Page | Content |
+|------|---------|
+| `Home.md` | Landing page, system overview table, quick links, installation |
+| `Getting-Started.md` | New player guide, character creation, gameplay loop, first prestige |
+| `Combat.md` | Damage pipeline, enemy scaling, boss multipliers, XP curve, death |
+| `Zones-and-Progression.md` | All 11 zones, subzones, bosses, prestige gates |
+| `Prestige.md` | Tier list (Bronze→Eternal), multipliers, combat bonuses, strategy |
+| `Equipment.md` | 7 slots, 5 rarities, affixes, drop rates, auto-equip |
+| `Dungeons.md` | Discovery, sizes, room types, keys, safe death |
+| `Fishing.md` | 40 ranks, 8 tiers, Storm Leviathan hunt |
+| `Haven.md` | 14-room skill tree, bonuses per tier, build order recommendations |
+| `Soulforge.md` | Enhancement +0 to +10, success rates, costs, strategy |
+| `Challenges.md` | All 10 minigames, controls, difficulties, rewards |
+| `Achievements.md` | 5 categories, 80+ achievements |
+| `Strategy-Guide.md` | 5-phase progression guide (early→endgame), pro tips |
+| `Stormbreaker-Path.md` | Step-by-step walkthrough, PR cost breakdown, checklist |
+| `Controls-and-UI.md` | Full keyboard reference for every screen and minigame |
+
+### What to check:
+- New game systems, challenges, or mechanics not yet documented in the wiki
+- Changed constants (discovery rates, rewards, costs, XP curves) that affect player-facing numbers
+- New zones, rooms, achievements, or equipment that need wiki coverage
+- Cross-links between pages (use `[[Page Name]]` format)
+
+### Wiki update workflow:
+
+**Small** (1-3 pages affected):
+- Edit the wiki pages directly, commit and push to `quest.wiki/`
+
+**Large** (new systems, many pages affected):
+- Create a team:
+  - **2 sys-architects**: Research the codebase, write findings to `_research_*.md` temp files
+  - **2 product managers**: Write/update wiki pages using research (split pages between them)
+  - **1 game designer**: Write/update strategy and gameplay guidance pages
+- Task dependencies:
+  1. Research tasks (parallel, sys-architects)
+  2. Writing tasks (parallel, blocked by research, PMs + game designer)
+  3. Final review (blocked by all writing): cross-link, clean up research files, verify Home.md TOC
+- Shut down agents as they complete their tasks
+
+### Wiki update rules:
+- Player-facing tone: friendly, engaging, practical tips alongside mechanics
+- Use `[[Page Name]]` for cross-references between wiki pages
+- Include data tables for numbers-heavy content (zone stats, reward tables, costs)
+- Translate code concepts into player language (e.g., "prestige" not "reset")
+- Every page should have a "See Also" or "Related Pages" section
+- Clean up any `_research_*.md` temp files before pushing
+- Commit directly to `quest.wiki/` (wiki repos have no branch protection)
+- Push to `origin master` (wiki repos use `master`, not `main`)

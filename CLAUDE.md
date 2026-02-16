@@ -53,7 +53,7 @@ Agent-invocable skills — ask in natural language to trigger them.
 
 | Skill | Trigger phrases | What it does |
 |-------|----------------|--------------|
-| `doc-health-audit` | "audit the docs", "update documentation" | Audits all docs/ and CLAUDE.md files against the current codebase, fixes staleness |
+| `doc-health-audit` | "audit the docs", "update documentation" | Audits all docs/, CLAUDE.md files, and player-facing wiki (quest.wiki/) against the current codebase, fixes staleness |
 | `test-health-audit` | "audit the tests", "fix flaky tests" | Parallel flakiness + performance audit, fixes, 10x verification run |
 | `pr-validation` | "create a PR", "validate CI checks" | Creates PR, monitors CI, auto-fixes failures until green |
 
