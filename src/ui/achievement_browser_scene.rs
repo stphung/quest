@@ -200,10 +200,25 @@ fn render_achievement_list(
     frame.render_widget(block, area);
 
     let category_achievements = get_achievements_by_category(ui_state.selected_category);
+    let total = category_achievements.len();
+    let visible_height = inner.height as usize;
+
+    // Calculate scroll offset to keep selected item visible (center-scroll)
+    let max_scroll = total.saturating_sub(visible_height);
+    let scroll_offset = if total <= visible_height {
+        0
+    } else {
+        ui_state
+            .selected_index
+            .saturating_sub(visible_height / 2)
+            .min(max_scroll)
+    };
 
     let items: Vec<ListItem> = category_achievements
         .iter()
         .enumerate()
+        .skip(scroll_offset)
+        .take(visible_height)
         .map(|(i, def)| {
             let is_unlocked = achievements.is_unlocked(def.id);
             let is_selected = i == ui_state.selected_index;
@@ -249,6 +264,24 @@ fn render_achievement_list(
 
     let list = List::new(items);
     frame.render_widget(list, inner);
+
+    // Scroll indicators when content overflows
+    if total > visible_height {
+        let indicator_style = Style::default().fg(Color::DarkGray);
+        if scroll_offset > 0 {
+            let up = Paragraph::new(Line::from(Span::styled(" \u{25b2}", indicator_style)))
+                .alignment(Alignment::Right);
+            frame.render_widget(up, Rect::new(inner.x, inner.y, inner.width, 1));
+        }
+        if scroll_offset < max_scroll {
+            let down = Paragraph::new(Line::from(Span::styled(" \u{25bc}", indicator_style)))
+                .alignment(Alignment::Right);
+            frame.render_widget(
+                down,
+                Rect::new(inner.x, inner.y + inner.height - 1, inner.width, 1),
+            );
+        }
+    }
 }
 
 fn render_achievement_detail(
