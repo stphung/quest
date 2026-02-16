@@ -10,6 +10,8 @@ use ratatui::{
     Frame,
 };
 
+use crate::combat::types::DAMAGE_FLASH_DURATION;
+
 use super::combat_3d::render_combat_3d;
 use super::enemy_sprites::zone_palette;
 
@@ -43,7 +45,7 @@ fn draw_combat_full(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let outer_block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Red))
-        .title(" ⚔ Combat ⚔ ")
+        .title(" \u{2694} Combat \u{2694} ")
         .title_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD));
 
     let inner = outer_block.inner(area);
@@ -51,42 +53,36 @@ fn draw_combat_full(frame: &mut Frame, area: Rect, game_state: &GameState) {
 
     let is_regen = game_state.combat_state.is_regenerating;
 
-    // Add a regen throbber row below player HP when regenerating
-    let chunks = if is_regen {
-        Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(1), // Player HP
-                Constraint::Length(1), // Regen throbber
-                Constraint::Min(5),    // Sprite
-                Constraint::Length(1), // Enemy HP
-                Constraint::Length(1), // Status
-            ])
-            .split(inner)
-    } else {
-        Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(1), // Player HP
-                Constraint::Min(5),    // Sprite
-                Constraint::Length(1), // Enemy HP
-                Constraint::Length(1), // Status
-            ])
-            .split(inner)
-    };
+    let mut constraints = vec![Constraint::Length(1)]; // Player HP
+    if is_regen {
+        constraints.push(Constraint::Length(1)); // Regen throbber
+    }
+    constraints.push(Constraint::Min(5)); // Sprite
+    constraints.push(Constraint::Length(1)); // Enemy HP
+    constraints.push(Constraint::Length(1)); // Status
 
-    draw_player_hp(frame, chunks[0], game_state);
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(constraints)
+        .split(inner);
+
+    let mut idx = 0;
+    draw_player_hp(frame, chunks[idx], game_state);
+    idx += 1;
 
     if is_regen {
-        draw_regen_throbber(frame, chunks[1], game_state);
-        render_combat_3d(frame, chunks[2], game_state);
-        draw_enemy_hp(frame, chunks[3], game_state);
-        draw_combat_status(frame, chunks[4], game_state);
-    } else {
-        render_combat_3d(frame, chunks[1], game_state);
-        draw_enemy_hp(frame, chunks[2], game_state);
-        draw_combat_status(frame, chunks[3], game_state);
+        draw_regen_throbber(frame, chunks[idx], game_state);
+        idx += 1;
     }
+
+    render_combat_3d(frame, chunks[idx], game_state);
+    draw_floating_damage(frame, chunks[idx], game_state);
+    idx += 1;
+
+    draw_enemy_hp(frame, chunks[idx], game_state);
+    idx += 1;
+
+    draw_combat_status(frame, chunks[idx], game_state);
 }
 
 /// Compact combat scene for M tier: HP bars + sprite + status.
@@ -101,41 +97,36 @@ fn draw_combat_compact(frame: &mut Frame, area: Rect, game_state: &GameState) {
 
     let is_regen = game_state.combat_state.is_regenerating;
 
-    let chunks = if is_regen {
-        Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(1), // Player HP
-                Constraint::Length(1), // Regen throbber
-                Constraint::Min(3),    // Sprite
-                Constraint::Length(1), // Enemy HP
-                Constraint::Length(1), // Status
-            ])
-            .split(inner)
-    } else {
-        Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(1), // Player HP
-                Constraint::Min(3),    // Sprite
-                Constraint::Length(1), // Enemy HP
-                Constraint::Length(1), // Status
-            ])
-            .split(inner)
-    };
+    let mut constraints = vec![Constraint::Length(1)]; // Player HP
+    if is_regen {
+        constraints.push(Constraint::Length(1)); // Regen throbber
+    }
+    constraints.push(Constraint::Min(3)); // Sprite
+    constraints.push(Constraint::Length(1)); // Enemy HP
+    constraints.push(Constraint::Length(1)); // Status
 
-    draw_player_hp(frame, chunks[0], game_state);
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(constraints)
+        .split(inner);
+
+    let mut idx = 0;
+    draw_player_hp(frame, chunks[idx], game_state);
+    idx += 1;
 
     if is_regen {
-        draw_regen_throbber(frame, chunks[1], game_state);
-        render_combat_3d(frame, chunks[2], game_state);
-        draw_enemy_hp(frame, chunks[3], game_state);
-        draw_combat_status(frame, chunks[4], game_state);
-    } else {
-        render_combat_3d(frame, chunks[1], game_state);
-        draw_enemy_hp(frame, chunks[2], game_state);
-        draw_combat_status(frame, chunks[3], game_state);
+        draw_regen_throbber(frame, chunks[idx], game_state);
+        idx += 1;
     }
+
+    render_combat_3d(frame, chunks[idx], game_state);
+    draw_floating_damage(frame, chunks[idx], game_state);
+    idx += 1;
+
+    draw_enemy_hp(frame, chunks[idx], game_state);
+    idx += 1;
+
+    draw_combat_status(frame, chunks[idx], game_state);
 }
 
 /// Draws the player HP bar (borderless, single line)
@@ -200,6 +191,74 @@ pub(super) fn draw_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameStat
 
         frame.render_widget(gauge, area);
     }
+}
+
+/// Renders floating damage numbers over the sprite area.
+/// Enemy damage floats UP from the bottom; player damage floats DOWN from the top.
+/// Numbers fade from their original color to DarkGray as they travel.
+fn draw_floating_damage(frame: &mut Frame, sprite_area: Rect, game_state: &GameState) {
+    if sprite_area.height == 0 || sprite_area.width == 0 {
+        return;
+    }
+
+    // Enemy damage floats UP from bottom of sprite area
+    for float in &game_state.combat_state.enemy_damage_floats {
+        let progress = 1.0 - (float.remaining / DAMAGE_FLASH_DURATION);
+        let max_rise = (sprite_area.height as f64 * 0.15).max(1.0);
+        let row_offset = (progress * max_rise) as u16;
+        let y = sprite_area.bottom().saturating_sub(1 + row_offset);
+        if y < sprite_area.y {
+            continue;
+        }
+        render_float_text(frame, sprite_area, y, float, progress);
+    }
+
+    // Player damage floats DOWN from top of sprite area
+    for float in &game_state.combat_state.player_damage_floats {
+        let progress = 1.0 - (float.remaining / DAMAGE_FLASH_DURATION);
+        let max_drop = (sprite_area.height as f64 * 0.15).max(1.0);
+        let row_offset = (progress * max_drop) as u16;
+        let y = sprite_area.y + row_offset;
+        if y >= sprite_area.bottom() {
+            continue;
+        }
+        render_float_text(frame, sprite_area, y, float, progress);
+    }
+}
+
+/// Renders a single floating damage text at the given y position, right-aligned.
+/// Fades the color based on progress (0.0 = fresh, 1.0 = expired).
+fn render_float_text(
+    frame: &mut Frame,
+    sprite_area: Rect,
+    y: u16,
+    float: &crate::combat::types::DamageFlash,
+    progress: f64,
+) {
+    let text_width = float.text.chars().count() as u16;
+    if text_width == 0 || text_width >= sprite_area.width {
+        return;
+    }
+
+    let style = if progress > 0.8 {
+        // Final fade: dim gray
+        Style::default().fg(Color::DarkGray)
+    } else if progress > 0.6 {
+        // Mid fade: original color, no bold
+        Style::default().fg(float.color)
+    } else {
+        // Full intensity: original color + bold if applicable
+        let mut s = Style::default().fg(float.color);
+        if float.bold {
+            s = s.add_modifier(Modifier::BOLD);
+        }
+        s
+    };
+
+    let x = sprite_area.right().saturating_sub(text_width + 1);
+    let rect = Rect::new(x, y, text_width, 1);
+    let para = Paragraph::new(Span::styled(&float.text, style)).alignment(Alignment::Right);
+    frame.render_widget(para, rect);
 }
 
 /// Draws the combat status information with DPS

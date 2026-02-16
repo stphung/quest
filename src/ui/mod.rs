@@ -18,7 +18,6 @@ pub mod go_scene;
 pub mod gomoku_scene;
 pub mod haven_scene;
 pub mod help_overlay;
-mod info_panel;
 pub mod jezzball_scene;
 pub mod minesweeper_scene;
 pub mod morris_scene;
@@ -140,16 +139,13 @@ fn draw_xl_l_layout(
     // Determine if we need space for update drawer
     let show_update_drawer = update_expanded && update_info.is_some();
 
-    // Stats panel: header(4)+prestige(5)+fishing(4)+attrs(5) = 18 + equip ~9
-    let stats_height: u16 = 27;
-
-    // Split vertically: fixed stats area, growing Loot + Combat panels, optional update drawer, footer
+    // Split vertically: growing content area, ticker, optional update drawer, footer
     let v_chunks = if show_update_drawer {
         Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(stats_height), // Main content (stats + right panel)
-                Constraint::Min(6),               // Full-width Loot + Combat (grows)
+                Constraint::Min(27),    // Main content (stats + right panel, grows)
+                Constraint::Length(1),  // Ticker
                 Constraint::Length(20), // Update drawer panel (tall enough for wrapped changelog lines)
                 Constraint::Length(4),  // Full-width footer (2 rows)
             ])
@@ -158,9 +154,9 @@ fn draw_xl_l_layout(
         Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(stats_height), // Main content (stats + right panel)
-                Constraint::Min(6),               // Full-width Loot + Combat (grows)
-                Constraint::Length(4),            // Full-width footer (2 rows)
+                Constraint::Min(27),   // Main content (stats + right panel, grows)
+                Constraint::Length(1), // Ticker
+                Constraint::Length(4), // Full-width footer (2 rows)
             ])
             .split(main_area)
     };
@@ -185,8 +181,8 @@ fn draw_xl_l_layout(
     // Draw stats panel on the left
     stats_panel::draw_stats_panel(frame, chunks[0], game_state, ctx, enhancement_levels);
 
-    // Draw full-width Loot + Combat panels
-    info_panel::draw_info_panel(frame, info_area, game_state, ctx);
+    // Draw ticker
+    ticker::draw_ticker(frame, info_area, &game_state.loot_ticker);
 
     // Draw update drawer if expanded
     if let (Some(drawer_area), Some(info)) = (update_drawer_area, update_info) {
@@ -233,7 +229,6 @@ fn draw_m_layout(
     constraints.push(Constraint::Length(1)); // XP bar
     constraints.push(Constraint::Min(5)); // Activity area (full width)
     constraints.push(Constraint::Length(1)); // Loot ticker
-    constraints.push(Constraint::Length(3)); // Combat log (compact)
     constraints.push(Constraint::Length(1)); // Footer
 
     let chunks = Layout::default()
@@ -263,10 +258,6 @@ fn draw_m_layout(
 
     // Loot ticker
     ticker::draw_ticker(frame, chunks[idx], &game_state.loot_ticker);
-    idx += 1;
-
-    // Compact combat log (ticker handles loot display)
-    info_panel::draw_info_panel(frame, chunks[idx], game_state, ctx);
     idx += 1;
 
     // Compact footer
@@ -322,9 +313,8 @@ fn draw_s_layout(
             Constraint::Length(1), // XP bar
             Constraint::Length(1), // Player HP
             Constraint::Length(1), // Enemy HP + name
-            Constraint::Length(1), // Combat status
+            Constraint::Min(1),    // Combat status (grows)
             Constraint::Length(1), // Loot ticker
-            Constraint::Min(3),    // Combat log
             Constraint::Length(1), // Footer
         ])
         .split(area);
@@ -347,14 +337,11 @@ fn draw_s_layout(
     // Loot ticker
     ticker::draw_ticker(frame, chunks[5], &game_state.loot_ticker);
 
-    // Compact combat log (ticker handles loot display)
-    info_panel::draw_info_panel(frame, chunks[6], game_state, ctx);
-
     // Minimal footer
-    stats_panel::draw_footer_minimal(frame, chunks[7], game_state);
+    stats_panel::draw_footer_minimal(frame, chunks[6], game_state);
 }
 
-/// Draws player HP bar for S tier (borderless, single line).
+/// Draws player HP bar for S tier (borderless, single line) with optional damage flash.
 fn draw_s_player_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let hp_ratio = game_state.combat_state.player_current_hp as f64
         / game_state.combat_state.player_max_hp as f64;
@@ -373,10 +360,32 @@ fn draw_s_player_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
         .label(label)
         .ratio(hp_ratio);
 
-    frame.render_widget(gauge, area);
+    if let Some(flash) = game_state.combat_state.player_damage_floats.last() {
+        let flash_width = (flash.text.chars().count() as u16) + 1;
+        if area.width > flash_width + 15 {
+            let chunks = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Min(15), Constraint::Length(flash_width)])
+                .split(area);
+
+            frame.render_widget(gauge, chunks[0]);
+
+            let mut style = Style::default().fg(flash.color);
+            if flash.bold {
+                style = style.add_modifier(Modifier::BOLD);
+            }
+            let flash_para =
+                Paragraph::new(Span::styled(&flash.text, style)).alignment(Alignment::Right);
+            frame.render_widget(flash_para, chunks[1]);
+        } else {
+            frame.render_widget(gauge, area);
+        }
+    } else {
+        frame.render_widget(gauge, area);
+    }
 }
 
-/// Draws enemy HP bar for S tier (borderless, single line).
+/// Draws enemy HP bar for S tier (borderless, single line) with optional damage flash.
 fn draw_s_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
     if let Some(enemy) = &game_state.combat_state.current_enemy {
         let hp_ratio = enemy.current_hp as f64 / enemy.max_hp as f64;
@@ -387,7 +396,29 @@ fn draw_s_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
             .label(label)
             .ratio(hp_ratio);
 
-        frame.render_widget(gauge, area);
+        if let Some(flash) = game_state.combat_state.enemy_damage_floats.last() {
+            let flash_width = (flash.text.chars().count() as u16) + 1;
+            if area.width > flash_width + 15 {
+                let chunks = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([Constraint::Min(15), Constraint::Length(flash_width)])
+                    .split(area);
+
+                frame.render_widget(gauge, chunks[0]);
+
+                let mut style = Style::default().fg(flash.color);
+                if flash.bold {
+                    style = style.add_modifier(Modifier::BOLD);
+                }
+                let flash_para =
+                    Paragraph::new(Span::styled(&flash.text, style)).alignment(Alignment::Right);
+                frame.render_widget(flash_para, chunks[1]);
+            } else {
+                frame.render_widget(gauge, area);
+            }
+        } else {
+            frame.render_widget(gauge, area);
+        }
     }
 }
 
