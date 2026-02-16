@@ -4,6 +4,7 @@
 //! pure game-logic events from [`core::tick`] to UI types like
 //! [`VisualEffect`] and [`EffectType`].
 
+use crate::combat::types::{DamageFlash, EventLine, DAMAGE_FLASH_DURATION, EVENT_LINE_DURATION};
 use crate::core::game_state::{GameState, TickerEntry};
 use crate::core::tick::TickEvent;
 use crate::items::types::Rarity;
@@ -33,21 +34,21 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     .combat_state
                     .add_log_entry(message.clone(), *was_crit, true);
 
-                // Spawn damage number effect
-                let damage_effect = VisualEffect::new(
-                    EffectType::DamageNumber {
-                        value: *damage,
-                        is_crit: *was_crit,
-                    },
-                    0.8,
-                );
-                game_state.combat_state.visual_effects.push(damage_effect);
+                let (text, color, bold) = if *was_crit {
+                    (format!("\u{2605}{}\u{2605}", damage), Color::Yellow, true)
+                } else {
+                    (format!("-{}", damage), Color::Green, false)
+                };
+                game_state.combat_state.enemy_damage_flash = Some(DamageFlash {
+                    text,
+                    color,
+                    bold,
+                    remaining: DAMAGE_FLASH_DURATION,
+                });
 
-                // Spawn attack flash
+                // Keep attack flash and hit impact effects
                 let flash_effect = VisualEffect::new(EffectType::AttackFlash, 0.2);
                 game_state.combat_state.visual_effects.push(flash_effect);
-
-                // Spawn impact effect
                 let impact_effect = VisualEffect::new(EffectType::HitImpact, 0.3);
                 game_state.combat_state.visual_effects.push(impact_effect);
             }
@@ -55,21 +56,50 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
+                game_state.combat_state.enemy_damage_flash = Some(DamageFlash {
+                    text: "BLOCK".to_string(),
+                    color: Color::DarkGray,
+                    bold: false,
+                    remaining: DAMAGE_FLASH_DURATION,
+                });
             }
-            TickEvent::EnemyAttack { message, .. } => {
+            TickEvent::EnemyAttack {
+                damage, message, ..
+            } => {
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, false);
+                game_state.combat_state.player_damage_flash = Some(DamageFlash {
+                    text: format!("-{}", damage),
+                    color: Color::Red,
+                    bold: false,
+                    remaining: DAMAGE_FLASH_DURATION,
+                });
             }
-            TickEvent::EnemyDefeated { message, .. } => {
+            TickEvent::EnemyDefeated {
+                xp_gained, message, ..
+            } => {
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
+                game_state.combat_state.event_line = Some(EventLine {
+                    text: format!("\u{2728} +{} XP", xp_gained),
+                    color: Color::Green,
+                    bold: false,
+                    remaining: EVENT_LINE_DURATION,
+                });
+                game_state.combat_state.enemy_damage_flash = None;
             }
             TickEvent::PlayerDied { message } | TickEvent::PlayerDiedInDungeon { message } => {
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, false);
+                game_state.combat_state.event_line = Some(EventLine {
+                    text: "\u{2620} Slain!".to_string(),
+                    color: Color::Red,
+                    bold: true,
+                    remaining: 0.0,
+                });
             }
             TickEvent::ItemDropped {
                 item_name,
@@ -97,11 +127,20 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 });
             }
             TickEvent::SubzoneBossDefeated {
-                message, result, ..
+                xp_gained,
+                message,
+                result,
             } => {
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
+                game_state.combat_state.event_line = Some(EventLine {
+                    text: format!("\u{1F451} Boss defeated! +{} XP", xp_gained),
+                    color: Color::Yellow,
+                    bold: true,
+                    remaining: EVENT_LINE_DURATION + 0.5,
+                });
+                game_state.combat_state.enemy_damage_flash = None;
                 // Push zone advancement to ticker
                 match result {
                     BossDefeatResult::SubzoneComplete { .. } => {
@@ -155,13 +194,45 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
             }
             TickEvent::DungeonRoomEntered { message, .. }
             | TickEvent::DungeonTreasureFound { message, .. }
-            | TickEvent::DungeonKeyFound { message }
-            | TickEvent::DungeonBossUnlocked { message }
-            | TickEvent::DungeonBossDefeated { message, .. }
-            | TickEvent::DungeonEliteDefeated { message, .. } => {
+            | TickEvent::DungeonBossUnlocked { message } => {
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
+            }
+            TickEvent::DungeonKeyFound { message } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, true);
+                game_state.combat_state.event_line = Some(EventLine {
+                    text: "\u{1F5DD} Key found!".to_string(),
+                    color: Color::Yellow,
+                    bold: false,
+                    remaining: EVENT_LINE_DURATION,
+                });
+            }
+            TickEvent::DungeonBossDefeated { message, .. } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, true);
+                game_state.combat_state.event_line = Some(EventLine {
+                    text: "\u{1F451} Dungeon Boss defeated!".to_string(),
+                    color: Color::Magenta,
+                    bold: true,
+                    remaining: EVENT_LINE_DURATION,
+                });
+                game_state.combat_state.enemy_damage_flash = None;
+            }
+            TickEvent::DungeonEliteDefeated { message, .. } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, true);
+                game_state.combat_state.event_line = Some(EventLine {
+                    text: "\u{2694} Elite defeated!".to_string(),
+                    color: Color::Magenta,
+                    bold: false,
+                    remaining: EVENT_LINE_DURATION,
+                });
+                game_state.combat_state.enemy_damage_flash = None;
             }
             TickEvent::DungeonCompleted { message, .. } => {
                 game_state
@@ -173,11 +244,23 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     color: Color::Magenta,
                     bold: true,
                 });
+                game_state.combat_state.event_line = Some(EventLine {
+                    text: "\u{1F3F0} Dungeon Complete!".to_string(),
+                    color: Color::Magenta,
+                    bold: true,
+                    remaining: EVENT_LINE_DURATION + 0.5,
+                });
             }
             TickEvent::DungeonFailed { message } => {
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, false);
+                game_state.combat_state.event_line = Some(EventLine {
+                    text: "\u{1F480} Dungeon failed...".to_string(),
+                    color: Color::Red,
+                    bold: false,
+                    remaining: 0.0,
+                });
             }
             TickEvent::FishingMessage { message }
             | TickEvent::FishingItemFound { message, .. }
@@ -274,6 +357,12 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     text: format!("Level {}!", new_level),
                     color: Color::Green,
                     bold: true,
+                });
+                game_state.combat_state.event_line = Some(EventLine {
+                    text: format!("\u{2B06} Level {}!", new_level),
+                    color: Color::Green,
+                    bold: true,
+                    remaining: EVENT_LINE_DURATION,
                 });
             }
         }

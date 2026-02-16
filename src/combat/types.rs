@@ -259,10 +259,8 @@ pub struct EventLine {
 }
 
 /// How long damage flashes display (seconds)
-#[allow(dead_code)]
 pub const DAMAGE_FLASH_DURATION: f64 = 0.8;
 /// How long event lines display (seconds)
-#[allow(dead_code)]
 pub const EVENT_LINE_DURATION: f64 = 2.5;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -296,13 +294,10 @@ pub struct CombatState {
     #[serde(skip)]
     pub combat_log: VecDeque<CombatLogEntry>,
     #[serde(skip)]
-    #[allow(dead_code)]
     pub player_damage_flash: Option<DamageFlash>,
     #[serde(skip)]
-    #[allow(dead_code)]
     pub enemy_damage_flash: Option<DamageFlash>,
     #[serde(skip)]
-    #[allow(dead_code)]
     pub event_line: Option<EventLine>,
 }
 

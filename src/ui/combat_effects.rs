@@ -12,6 +12,7 @@ pub struct VisualEffect {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum EffectType {
     DamageNumber {
         #[allow(dead_code)]
