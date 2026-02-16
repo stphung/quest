@@ -21,11 +21,98 @@ use quest::character::derived_stats::DerivedStats;
 use quest::core::game_state::GameState;
 use quest::core::tick::{game_tick, TickEvent, TickResult};
 use quest::enhancement::EnhancementProgress;
-use quest::haven::Haven;
+#[allow(unused_imports)]
+use quest::haven::{try_build_room, Haven, HavenRoomId};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use std::collections::HashMap;
 use std::io::Write;
+
+// ── Haven Strategy ──────────────────────────────────────────────────
+
+#[allow(dead_code)]
+enum HavenStrategy {
+    Combat,
+    Qol,
+    Balanced,
+    Full,
+}
+
+#[allow(dead_code)]
+impl HavenStrategy {
+    fn from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "combat" => Some(Self::Combat),
+            "qol" => Some(Self::Qol),
+            "balanced" => Some(Self::Balanced),
+            "full" => Some(Self::Full),
+            _ => None,
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        match self {
+            Self::Combat => "combat",
+            Self::Qol => "qol",
+            Self::Balanced => "balanced",
+            Self::Full => "full",
+        }
+    }
+
+    fn room_priority(&self) -> &'static [HavenRoomId] {
+        match self {
+            Self::Combat => &[
+                HavenRoomId::Hearthstone,
+                HavenRoomId::Armory,
+                HavenRoomId::TrainingYard,
+                HavenRoomId::TrophyHall,
+                HavenRoomId::Watchtower,
+                HavenRoomId::AlchemyLab,
+                HavenRoomId::WarRoom,
+            ],
+            Self::Qol => &[
+                HavenRoomId::Hearthstone,
+                HavenRoomId::Bedroom,
+                HavenRoomId::Garden,
+                HavenRoomId::Library,
+                HavenRoomId::FishingDock,
+                HavenRoomId::Workshop,
+                HavenRoomId::Vault,
+            ],
+            Self::Balanced => &[
+                HavenRoomId::Hearthstone,
+                HavenRoomId::Armory,
+                HavenRoomId::Bedroom,
+                HavenRoomId::TrainingYard,
+                HavenRoomId::Garden,
+                HavenRoomId::TrophyHall,
+                HavenRoomId::Library,
+                HavenRoomId::Watchtower,
+                HavenRoomId::FishingDock,
+                HavenRoomId::AlchemyLab,
+                HavenRoomId::Workshop,
+                HavenRoomId::WarRoom,
+                HavenRoomId::Vault,
+            ],
+            Self::Full => &[
+                HavenRoomId::Hearthstone,
+                HavenRoomId::Armory,
+                HavenRoomId::Bedroom,
+                HavenRoomId::TrainingYard,
+                HavenRoomId::Garden,
+                HavenRoomId::TrophyHall,
+                HavenRoomId::Library,
+                HavenRoomId::Watchtower,
+                HavenRoomId::FishingDock,
+                HavenRoomId::AlchemyLab,
+                HavenRoomId::Workshop,
+                HavenRoomId::WarRoom,
+                HavenRoomId::Vault,
+                HavenRoomId::StormForge,
+            ],
+        }
+    }
+}
 
 // ── CLI Configuration ────────────────────────────────────────────────
 
@@ -38,6 +125,7 @@ struct SimConfig {
     csv_path: Option<String>,
     quiet: bool,
     stormbreaker: bool,
+    haven_strategy: Option<HavenStrategy>,
 }
 
 impl Default for SimConfig {
@@ -51,6 +139,7 @@ impl Default for SimConfig {
             csv_path: None,
             quiet: false,
             stormbreaker: false,
+            haven_strategy: None,
         }
     }
 }
@@ -84,6 +173,17 @@ fn parse_args() -> SimConfig {
             }
             "--quiet" => config.quiet = true,
             "--stormbreaker" => config.stormbreaker = true,
+            "--haven" => {
+                i += 1;
+                config.haven_strategy =
+                    Some(HavenStrategy::from_str(&args[i]).unwrap_or_else(|| {
+                        eprintln!(
+                            "Unknown haven strategy: {}. Options: combat, qol, balanced, full",
+                            args[i]
+                        );
+                        std::process::exit(1);
+                    }));
+            }
             "--help" | "-h" => {
                 print_usage();
                 std::process::exit(0);
@@ -114,6 +214,7 @@ fn print_usage() {
          \x20 --csv FILE      Write time-series CSV\n\
          \x20 --quiet         Only final summary line\n\
          \x20 --stormbreaker  Unlock Stormbreaker achievement (access Zone 10 boss)\n\
+         \x20 --haven STR     Haven auto-build strategy (combat, qol, balanced, full)\n\
          \x20 --help, -h      Show this help"
     );
 }
