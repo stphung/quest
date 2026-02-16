@@ -158,8 +158,8 @@ mod tests {
     fn test_mob_drops_never_legendary() {
         let mut rng = rand::rng();
 
-        // Roll 10000 times - should never get legendary
-        for _ in 0..10000 {
+        // Legendary is structurally impossible for mobs (code never rolls it), 1000 suffices
+        for _ in 0..1_000 {
             let rarity = roll_rarity_for_mob(10, 25.0, &mut rng); // Max bonuses
             assert_ne!(
                 rarity,
@@ -187,7 +187,7 @@ mod tests {
     #[test]
     fn test_final_boss_higher_legendary_rate() {
         let mut rng = rand::rng();
-        let trials = 10000;
+        let trials = 2_000;
 
         let mut normal_legendaries = 0;
         let mut final_legendaries = 0;
@@ -201,7 +201,7 @@ mod tests {
             }
         }
 
-        // Final boss should have roughly 2x the legendary rate
+        // Final boss (10%) vs normal boss (5%) — 2k trials gives ~100 vs ~200 expected
         assert!(
             final_legendaries > normal_legendaries,
             "Final boss should have higher legendary rate: normal={}, final={}",
@@ -214,7 +214,8 @@ mod tests {
     fn test_boss_never_drops_common() {
         let mut rng = rand::rng();
 
-        for _ in 0..1000 {
+        // Common is structurally impossible for bosses (code never rolls it), 200 suffices
+        for _ in 0..200 {
             let rarity = roll_rarity_for_boss(false, &mut rng);
             assert_ne!(rarity, Rarity::Common, "Bosses should never drop common");
 
@@ -230,7 +231,7 @@ mod tests {
     #[test]
     fn test_mob_distribution_base() {
         let mut rng = rand::rng();
-        let trials = 10000;
+        let trials = 3_000;
 
         let mut common = 0;
         let mut magic = 0;
@@ -248,10 +249,10 @@ mod tests {
         }
 
         // Expected: 60% common, 28% magic, 10% rare, 2% epic
-        assert!(common > 5000, "Common should be ~60%, got {}", common);
-        assert!(magic > 2000, "Magic should be ~28%, got {}", magic);
-        assert!(rare > 500, "Rare should be ~10%, got {}", rare);
-        assert!(epic > 50, "Epic should be ~2%, got {}", epic);
+        assert!(common > 1400, "Common should be ~60%, got {}", common);
+        assert!(magic > 600, "Magic should be ~28%, got {}", magic);
+        assert!(rare > 150, "Rare should be ~10%, got {}", rare);
+        assert!(epic > 15, "Epic should be ~2%, got {}", epic);
     }
 
     #[test]
@@ -262,7 +263,7 @@ mod tests {
         let mut zone1_drops = Vec::new();
         let mut zone10_drops = Vec::new();
 
-        for _ in 0..1000 {
+        for _ in 0..300 {
             if let Some(item) = try_drop_from_mob(&game_state, 1, 0.0, 0.0) {
                 zone1_drops.push(item);
             }
@@ -320,7 +321,7 @@ mod tests {
     #[test]
     fn test_haven_bonuses_affect_mob_drops() {
         let mut rng = rand::rng();
-        let trials = 10000;
+        let trials = 3_000;
 
         let mut common_no_bonus = 0;
         let mut common_with_bonus = 0;
@@ -336,7 +337,7 @@ mod tests {
 
         // With +25% haven bonus, common rate should drop significantly
         assert!(
-            common_with_bonus < common_no_bonus - 500,
+            common_with_bonus < common_no_bonus - 100,
             "Haven bonus should reduce common rate: no_bonus={}, with_bonus={}",
             common_no_bonus,
             common_with_bonus

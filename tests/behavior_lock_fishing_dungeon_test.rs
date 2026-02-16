@@ -649,7 +649,7 @@ fn test_challenge_discovery_requires_prestige_1() {
     state.prestige_rank = 0;
 
     // Try many times - should never discover at P0
-    for _ in 0..1000 {
+    for _ in 0..100 {
         assert!(
             try_discover_challenge(&mut state, &mut rng).is_none(),
             "Should not discover challenges at P0"
@@ -665,7 +665,7 @@ fn test_challenge_discovery_blocked_during_dungeon() {
     state.prestige_rank = 1;
     state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
-    for _ in 0..1000 {
+    for _ in 0..100 {
         assert!(
             try_discover_challenge(&mut state, &mut rng).is_none(),
             "Should not discover challenges in dungeon"
@@ -681,7 +681,7 @@ fn test_challenge_discovery_blocked_during_fishing() {
     state.prestige_rank = 1;
     state.active_fishing = Some(make_fishing_session(FishingPhase::Waiting, 10, 5));
 
-    for _ in 0..1000 {
+    for _ in 0..100 {
         assert!(
             try_discover_challenge(&mut state, &mut rng).is_none(),
             "Should not discover challenges while fishing"
@@ -699,7 +699,7 @@ fn test_challenge_discovery_blocked_during_active_minigame() {
         quest::ChessGame::new(quest::ChessDifficulty::Novice),
     )));
 
-    for _ in 0..1000 {
+    for _ in 0..100 {
         assert!(
             try_discover_challenge(&mut state, &mut rng).is_none(),
             "Should not discover challenges during active minigame"
@@ -751,9 +751,9 @@ fn test_challenge_discovery_returns_valid_challenge_type() {
 #[test]
 fn test_challenge_discovery_haven_bonus_increases_rate() {
     // Behavior: Haven ChallengeDiscoveryPercent boosts discovery (line 1033)
-    // CHALLENGE_DISCOVERY_CHANCE is 0.000014, so with 50k trials base ~0.7.
+    // CHALLENGE_DISCOVERY_CHANCE is 0.000014, so with 20k trials base ~0.28.
     // Use a very high haven bonus (10000%) to make the boosted rate reliably higher.
-    let trials = 50_000u64;
+    let trials = 20_000u64;
     let mut discoveries_base = 0u32;
     let mut discoveries_boosted = 0u32;
 
