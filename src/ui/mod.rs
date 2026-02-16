@@ -147,8 +147,8 @@ fn draw_xl_l_layout(
             .constraints([
                 Constraint::Length(stats_height), // Main content (stats + right panel)
                 Constraint::Min(6),               // Full-width Loot + Combat (grows)
-                Constraint::Length(12),           // Update drawer panel (taller for changelog)
-                Constraint::Length(4),            // Full-width footer (2 rows)
+                Constraint::Length(16), // Update drawer panel (taller for wrapped changelog)
+                Constraint::Length(4),  // Full-width footer (2 rows)
             ])
             .split(main_area)
     } else {
