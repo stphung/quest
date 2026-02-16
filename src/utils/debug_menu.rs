@@ -22,6 +22,7 @@ pub const DEBUG_OPTIONS: &[&str] = &[
     "Trigger Flappy Bird Challenge",
     "Trigger JezzBall Challenge",
     "Trigger Snake Challenge",
+    "Trigger Sigil Surge Challenge",
     "Trigger Haven Discovery",
     "Trigger Soulforge Discovery",
 ];
@@ -86,8 +87,9 @@ impl DebugMenu {
             8 => trigger_flappy_challenge(state),
             9 => trigger_jezzball_challenge(state),
             10 => trigger_snake_challenge(state),
-            11 => trigger_haven_discovery(haven),
-            12 => trigger_soulforge_discovery(enhancement),
+            11 => trigger_runic_shift_challenge(state),
+            12 => trigger_haven_discovery(haven),
+            13 => trigger_soulforge_discovery(enhancement),
             _ => "Unknown option",
         };
         self.close();
@@ -216,6 +218,19 @@ fn trigger_jezzball_challenge(state: &mut GameState) -> &'static str {
     "JezzBall challenge added!"
 }
 
+fn trigger_runic_shift_challenge(state: &mut GameState) -> &'static str {
+    if state
+        .challenge_menu
+        .has_challenge(&ChallengeType::RunicShift)
+    {
+        return "Sigil Surge challenge already pending!";
+    }
+    state
+        .challenge_menu
+        .add_challenge(create_challenge(&ChallengeType::RunicShift));
+    "Sigil Surge challenge added!"
+}
+
 fn trigger_haven_discovery(haven: &mut Haven) -> &'static str {
     if haven.discovered {
         return "Haven already discovered!";
@@ -245,38 +260,22 @@ mod tests {
         menu.navigate_down();
         assert_eq!(menu.selected_index, 1);
 
-        menu.navigate_down();
-        menu.navigate_down();
-        menu.navigate_down();
-        menu.navigate_down();
-        menu.navigate_down();
-        menu.navigate_down();
-        menu.navigate_down();
-        menu.navigate_down();
-        menu.navigate_down();
-        menu.navigate_down();
-        menu.navigate_down();
-        assert_eq!(menu.selected_index, 12);
+        for _ in 0..32 {
+            menu.navigate_down();
+        }
+        assert_eq!(menu.selected_index, DEBUG_OPTIONS.len() - 1);
 
         // Can't go past end
         menu.navigate_down();
-        assert_eq!(menu.selected_index, 12);
+        assert_eq!(menu.selected_index, DEBUG_OPTIONS.len() - 1);
 
         menu.navigate_up();
-        assert_eq!(menu.selected_index, 11);
+        assert_eq!(menu.selected_index, DEBUG_OPTIONS.len() - 2);
 
         // Can't go before start
-        menu.navigate_up();
-        menu.navigate_up();
-        menu.navigate_up();
-        menu.navigate_up();
-        menu.navigate_up();
-        menu.navigate_up();
-        menu.navigate_up();
-        menu.navigate_up();
-        menu.navigate_up();
-        menu.navigate_up();
-        menu.navigate_up();
+        for _ in 0..32 {
+            menu.navigate_up();
+        }
         assert_eq!(menu.selected_index, 0);
     }
 
@@ -425,6 +424,20 @@ mod tests {
         // Can't add duplicate
         let msg = trigger_snake_challenge(&mut state);
         assert_eq!(msg, "Snake challenge already pending!");
+    }
+
+    #[test]
+    fn test_trigger_runic_shift_challenge() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let msg = trigger_runic_shift_challenge(&mut state);
+        assert_eq!(msg, "Sigil Surge challenge added!");
+        assert!(state
+            .challenge_menu
+            .has_challenge(&ChallengeType::RunicShift));
+
+        // Can't add duplicate
+        let msg = trigger_runic_shift_challenge(&mut state);
+        assert_eq!(msg, "Sigil Surge challenge already pending!");
     }
 
     #[test]

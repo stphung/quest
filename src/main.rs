@@ -839,6 +839,7 @@ fn main() -> io::Result<()> {
                 let mut last_flappy_frame = Instant::now();
                 let mut prev_overlay_was_fullscreen =
                     matches!(overlay, GameOverlay::Achievements { .. });
+                let mut prev_scene_kind = current_scene_kind(&state);
 
                 // Save indicator state (for non-debug mode)
                 let mut last_save_instant: Option<Instant> = None;
@@ -874,6 +875,17 @@ fn main() -> io::Result<()> {
                         terminal.clear()?;
                         prev_overlay_was_fullscreen = overlay_is_fullscreen;
                     }
+
+                    // Force a redraw sync when switching between challenge menu
+                    // and Sigil Surge scenes. Both use wide glyphs and can leave
+                    // stale cells during scene transitions.
+                    let scene_kind = current_scene_kind(&state);
+                    if scene_kind != prev_scene_kind
+                        && (is_wide_scene(scene_kind) || is_wide_scene(prev_scene_kind))
+                    {
+                        terminal.clear()?;
+                    }
+                    prev_scene_kind = scene_kind;
 
                     // Draw UI
                     terminal.draw(|frame| {
@@ -1019,6 +1031,14 @@ fn main() -> io::Result<()> {
                                 state.active_minigame
                             {
                                 challenges::snake::logic::tick_snake(game, dt.as_millis() as u64);
+                            }
+                            if let Some(challenges::ActiveMinigame::RunicShift(ref mut game)) =
+                                state.active_minigame
+                            {
+                                challenges::runic_shift::logic::tick_runic_shift(
+                                    game,
+                                    dt.as_millis() as u64,
+                                );
                             }
                             if let Some(challenges::ActiveMinigame::Jezzball(ref mut game)) =
                                 state.active_minigame
@@ -1266,5 +1286,30 @@ fn is_realtime_minigame(state: &GameState) -> bool {
         Some(challenges::ActiveMinigame::FlappyBird(_))
             | Some(challenges::ActiveMinigame::Jezzball(_))
             | Some(challenges::ActiveMinigame::Snake(_))
+            | Some(challenges::ActiveMinigame::RunicShift(_))
     )
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SceneKind {
+    RunicShift,
+    ChallengeMenu,
+    Other,
+}
+
+fn current_scene_kind(state: &GameState) -> SceneKind {
+    if matches!(
+        state.active_minigame,
+        Some(challenges::ActiveMinigame::RunicShift(_))
+    ) {
+        SceneKind::RunicShift
+    } else if state.challenge_menu.is_open {
+        SceneKind::ChallengeMenu
+    } else {
+        SceneKind::Other
+    }
+}
+
+fn is_wide_scene(scene: SceneKind) -> bool {
+    matches!(scene, SceneKind::RunicShift | SceneKind::ChallengeMenu)
 }
