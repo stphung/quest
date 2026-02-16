@@ -1,5 +1,7 @@
 //! Haven skill tree UI rendering.
 
+#[allow(unused_imports)]
+use super::scene_fx::{current_millis, hash2d, lerp_rgb, put_cell, render_buffer, SceneCell};
 use crate::core::game_state::GameState;
 use crate::haven::{can_afford, tier_cost, Haven, HavenBonusType, HavenRoomId};
 use crate::items::EquipmentSlot;
@@ -10,6 +12,447 @@ use ratatui::{
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap},
     Frame,
 };
+
+/// Write a string into the scene buffer at (row, col).
+#[allow(dead_code)]
+fn put_text(buffer: &mut [Vec<SceneCell>], row: i32, col: i32, text: &str, fg: Color) {
+    for (i, ch) in text.chars().enumerate() {
+        put_cell(buffer, row, col + i as i32, ch, fg);
+    }
+}
+
+/// Paint a warm hearth glow backdrop: gentle gradient + slow-drifting motes.
+#[allow(dead_code)]
+fn paint_hearth_backdrop(buffer: &mut [Vec<SceneCell>], millis: u128) {
+    let height = buffer.len();
+    if height == 0 {
+        return;
+    }
+    let width = buffer[0].len();
+
+    // 1. Background gradient: near-black at top, warm amber at bottom
+    let top_rgb = (10u8, 8u8, 6u8);
+    let bottom_rgb = (60u8, 35u8, 15u8);
+    for (row, row_cells) in buffer.iter_mut().enumerate() {
+        let t = if height <= 1 {
+            0.0
+        } else {
+            row as f64 / (height - 1) as f64
+        };
+        let rgb = lerp_rgb(top_rgb, bottom_rgb, t);
+        let bg = Color::Rgb(rgb.0, rgb.1, rgb.2);
+        for cell in row_cells.iter_mut() {
+            cell.bg = bg;
+        }
+    }
+
+    // 2. Slow-drifting motes (5 particles, ~0.3x Soulforge speed)
+    let mote_chars: &[char] = &['\u{00b7}', '\u{2022}']; // · •
+    let mote_count = 5;
+    let mote_speed = 1.5;
+    let mote_hot = (140u8, 90u8, 30u8);
+    let mote_cool = (60u8, 35u8, 15u8);
+
+    for i in 0..mote_count {
+        let seed = hash2d(i, 0);
+        let col = (seed as usize) % width;
+        let ch = mote_chars[(hash2d(i, 1) as usize) % mote_chars.len()];
+
+        let phase_offset = (seed as f64) * 0.73;
+        let pos = (phase_offset + millis as f64 * mote_speed / 1000.0) % height as f64;
+        let row = (height - 1) as f64 - pos;
+
+        let t = pos / height.max(1) as f64;
+        let rgb = lerp_rgb(mote_hot, mote_cool, t);
+        put_cell(
+            buffer,
+            row as i32,
+            col as i32,
+            ch,
+            Color::Rgb(rgb.0, rgb.1, rgb.2),
+        );
+    }
+}
+
+/// Render the summary bar into a scene buffer at the given row.
+#[allow(dead_code)]
+fn render_summary_bar_buf(buffer: &mut [Vec<SceneCell>], row: i32, haven: &Haven) {
+    let rooms_built = haven.rooms_built();
+    let total_rooms = haven.total_rooms();
+
+    let header = format!("Active bonuses ({}/{} rooms): ", rooms_built, total_rooms);
+    put_text(buffer, row, 0, &header, Color::White);
+    let mut col = header.chars().count() as i32;
+
+    let bonus_types = [
+        (HavenBonusType::DamagePercent, "+{}% DMG"),
+        (HavenBonusType::XpGainPercent, "+{}% XP"),
+        (HavenBonusType::DropRatePercent, "+{}% Drops"),
+        (HavenBonusType::CritChancePercent, "+{}% Crit"),
+        (HavenBonusType::HpRegenPercent, "+{}% HP Regen"),
+        (HavenBonusType::DoubleStrikeChance, "+{}% Double Strike"),
+        (HavenBonusType::OfflineXpPercent, "+{}% Offline XP"),
+        (HavenBonusType::ChallengeDiscoveryPercent, "+{}% Discovery"),
+    ];
+
+    let mut first = true;
+    for (bonus_type, fmt) in bonus_types {
+        let value = haven.get_bonus(bonus_type);
+        if value > 0.0 {
+            if !first {
+                put_text(buffer, row, col, "  ", Color::White);
+                col += 2;
+            }
+            let text = fmt.replace("{}", &format!("{:.0}", value));
+            put_text(buffer, row, col, &text, Color::Yellow);
+            col += text.chars().count() as i32;
+            first = false;
+        }
+    }
+
+    if first {
+        put_text(buffer, row, col, "None yet", Color::DarkGray);
+    }
+}
+
+/// Render the skill tree panel into a scene buffer.
+#[allow(dead_code)]
+fn render_skill_tree_buf(
+    buffer: &mut [Vec<SceneCell>],
+    left: i32,
+    top: i32,
+    panel_width: usize,
+    panel_height: usize,
+    haven: &Haven,
+    selected_room: usize,
+) {
+    let border_fg = Color::DarkGray;
+    let right = left + panel_width as i32 - 1;
+    let bottom = top + panel_height as i32 - 1;
+
+    // Draw border
+    put_cell(buffer, top, left, '\u{250c}', border_fg);
+    put_cell(buffer, top, right, '\u{2510}', border_fg);
+    put_cell(buffer, bottom, left, '\u{2514}', border_fg);
+    put_cell(buffer, bottom, right, '\u{2518}', border_fg);
+    for c in (left + 1)..right {
+        put_cell(buffer, top, c, '\u{2500}', border_fg);
+        put_cell(buffer, bottom, c, '\u{2500}', border_fg);
+    }
+    for r in (top + 1)..bottom {
+        put_cell(buffer, r, left, '\u{2502}', border_fg);
+        put_cell(buffer, r, right, '\u{2502}', border_fg);
+    }
+    put_text(buffer, top, left + 1, " Skill Tree ", border_fg);
+
+    let inner_left = left + 1;
+    let content_top = top + 1;
+
+    for (i, room) in HavenRoomId::ALL.iter().enumerate() {
+        let row = content_top + i as i32;
+        if row >= bottom {
+            break;
+        }
+
+        let tier = haven.room_tier(*room);
+        let unlocked = haven.is_room_unlocked(*room);
+        let is_selected = i == selected_room;
+
+        let max_t = room.max_tier();
+        let tier_str: String = (1..=max_t)
+            .map(|t| if tier >= t { "\u{2605}" } else { "\u{00b7}" })
+            .collect::<Vec<_>>()
+            .join("");
+
+        let prefix = if is_selected { "\u{25b6} " } else { "  " };
+
+        let indent = match room {
+            HavenRoomId::Hearthstone => "",
+            HavenRoomId::Armory | HavenRoomId::Bedroom => "  ",
+            HavenRoomId::TrainingYard
+            | HavenRoomId::TrophyHall
+            | HavenRoomId::Garden
+            | HavenRoomId::Library => "    ",
+            HavenRoomId::Watchtower
+            | HavenRoomId::AlchemyLab
+            | HavenRoomId::FishingDock
+            | HavenRoomId::Workshop => "      ",
+            HavenRoomId::WarRoom | HavenRoomId::Vault => "        ",
+            HavenRoomId::StormForge => "          ",
+        };
+
+        let style_fg = if !unlocked {
+            Color::DarkGray
+        } else if is_selected {
+            Color::Cyan
+        } else if tier > 0 {
+            Color::Green
+        } else {
+            Color::White
+        };
+
+        let tier_fg = if tier > 0 {
+            Color::Yellow
+        } else {
+            Color::DarkGray
+        };
+
+        let lock_indicator = if !unlocked { "\u{1f512} " } else { "" };
+
+        let mut col = inner_left;
+        put_text(buffer, row, col, prefix, style_fg);
+        col += prefix.chars().count() as i32;
+        put_text(buffer, row, col, &tier_str, tier_fg);
+        col += tier_str.chars().count() as i32;
+        put_text(buffer, row, col, " ", style_fg);
+        col += 1;
+        put_text(buffer, row, col, indent, style_fg);
+        col += indent.chars().count() as i32;
+        put_text(buffer, row, col, lock_indicator, Color::DarkGray);
+        col += lock_indicator.chars().count() as i32;
+        put_text(buffer, row, col, room.name(), style_fg);
+
+        // Highlight selected row background
+        if is_selected {
+            let highlight_bg = Color::Rgb(30, 22, 12);
+            let row_usize = row as usize;
+            if row_usize < buffer.len() {
+                for c in (inner_left as usize)..((right) as usize) {
+                    if c < buffer[row_usize].len() {
+                        buffer[row_usize][c].bg = highlight_bg;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Simple word-wrap: break text into lines that fit within `max_width` characters.
+#[allow(dead_code)]
+fn word_wrap(text: &str, max_width: usize) -> Vec<String> {
+    let mut lines = Vec::new();
+    let mut current_line = String::new();
+    for word in text.split_whitespace() {
+        if current_line.is_empty() {
+            current_line = word.to_string();
+        } else if current_line.chars().count() + 1 + word.chars().count() <= max_width {
+            current_line.push(' ');
+            current_line.push_str(word);
+        } else {
+            lines.push(current_line);
+            current_line = word.to_string();
+        }
+    }
+    if !current_line.is_empty() {
+        lines.push(current_line);
+    }
+    lines
+}
+
+/// Render the room detail panel into a scene buffer.
+#[allow(dead_code, clippy::too_many_arguments)]
+fn render_room_detail_buf(
+    buffer: &mut [Vec<SceneCell>],
+    left: i32,
+    top: i32,
+    panel_width: usize,
+    panel_height: usize,
+    haven: &Haven,
+    selected_room: usize,
+    prestige_rank: u32,
+    achievements: &crate::achievements::Achievements,
+) {
+    let room = HavenRoomId::ALL[selected_room];
+    let tier = haven.room_tier(room);
+    let unlocked = haven.is_room_unlocked(room);
+
+    let border_fg = if unlocked {
+        Color::Cyan
+    } else {
+        Color::DarkGray
+    };
+
+    let right = left + panel_width as i32 - 1;
+    let bottom = top + panel_height as i32 - 1;
+    put_cell(buffer, top, left, '\u{250c}', border_fg);
+    put_cell(buffer, top, right, '\u{2510}', border_fg);
+    put_cell(buffer, bottom, left, '\u{2514}', border_fg);
+    put_cell(buffer, bottom, right, '\u{2518}', border_fg);
+    for c in (left + 1)..right {
+        put_cell(buffer, top, c, '\u{2500}', border_fg);
+        put_cell(buffer, bottom, c, '\u{2500}', border_fg);
+    }
+    for r in (top + 1)..bottom {
+        put_cell(buffer, r, left, '\u{2502}', border_fg);
+        put_cell(buffer, r, right, '\u{2502}', border_fg);
+    }
+    let title = format!(" {} ", room.name());
+    put_text(buffer, top, left + 1, &title, border_fg);
+
+    let inner_left = left + 1;
+    let inner_width = (panel_width - 2).max(1);
+    let mut row = top + 1;
+
+    // Description (word-wrapped)
+    let desc = room.description();
+    let wrapped = word_wrap(desc, inner_width);
+    for line in &wrapped {
+        if row >= bottom {
+            break;
+        }
+        put_text(buffer, row, inner_left, line, Color::White);
+        row += 1;
+    }
+    row += 1;
+
+    // Bonuses
+    if row < bottom {
+        put_text(buffer, row, inner_left, "Bonuses:", Color::White);
+        row += 1;
+    }
+    let max_tier = room.max_tier();
+    for t in 1..=max_tier {
+        if row >= bottom {
+            break;
+        }
+        let is_built = t <= tier;
+        let is_next = t == tier + 1 && tier < max_tier;
+        let style_fg = if is_built {
+            Color::Green
+        } else if is_next {
+            Color::Yellow
+        } else {
+            Color::DarkGray
+        };
+        let marker = if is_next { "\u{25b6} " } else { "  " };
+        let tier_label = format!("T{}: ", t);
+        let bonus_text = room.format_bonus(t);
+        let mut col = inner_left;
+        put_text(buffer, row, col, marker, style_fg);
+        col += marker.chars().count() as i32;
+        put_text(buffer, row, col, &tier_label, Color::DarkGray);
+        col += tier_label.chars().count() as i32;
+        put_text(buffer, row, col, &bonus_text, style_fg);
+        row += 1;
+    }
+    row += 1;
+
+    // Requirements
+    let parents = room.parents();
+    if !parents.is_empty() && row < bottom {
+        put_text(buffer, row, inner_left, "Requires:", Color::White);
+        row += 1;
+        for parent in parents {
+            if row >= bottom {
+                break;
+            }
+            let parent_tier = haven.room_tier(*parent);
+            let is_built = parent_tier > 0;
+            let (marker, style_fg) = if is_built {
+                ("\u{2713}", Color::Green)
+            } else {
+                ("\u{2717}", Color::Red)
+            };
+            let tier_info = if parent_tier > 0 {
+                format!(" (T{})", parent_tier)
+            } else {
+                String::new()
+            };
+            let mut col = inner_left;
+            put_text(buffer, row, col, &format!("  {} ", marker), style_fg);
+            col += 4;
+            put_text(buffer, row, col, parent.name(), style_fg);
+            col += parent.name().chars().count() as i32;
+            put_text(buffer, row, col, &tier_info, Color::DarkGray);
+            row += 1;
+        }
+        row += 1;
+    }
+
+    // Cost info
+    if row >= bottom {
+        return;
+    }
+    if !unlocked {
+        put_text(buffer, row, inner_left, "\u{1f512} Locked", Color::Red);
+        row += 1;
+        if row < bottom {
+            put_text(
+                buffer,
+                row,
+                inner_left,
+                "Build all required rooms first",
+                Color::DarkGray,
+            );
+        }
+    } else if tier < room.max_tier() {
+        let next_tier = tier + 1;
+        let cost = tier_cost(room, next_tier);
+        let can_afford_it = can_afford(room, haven, prestige_rank);
+        let cost_fg = if can_afford_it {
+            Color::Green
+        } else {
+            Color::Red
+        };
+        let cost_text = format!("{} Prestige Ranks", cost);
+        put_text(buffer, row, inner_left, "Cost: ", Color::DarkGray);
+        put_text(buffer, row, inner_left + 6, &cost_text, cost_fg);
+        row += 1;
+        if row < bottom {
+            let have_text = format!("{} Prestige Ranks", prestige_rank);
+            put_text(buffer, row, inner_left, "You have: ", Color::DarkGray);
+            put_text(buffer, row, inner_left + 10, &have_text, Color::White);
+        }
+    } else if room == HavenRoomId::StormForge {
+        use crate::achievements::AchievementId;
+        let has_stormbreaker = achievements.is_unlocked(AchievementId::TheStormbreaker);
+        if has_stormbreaker {
+            put_text(
+                buffer,
+                row,
+                inner_left,
+                "\u{26a1} Stormbreaker forged!",
+                Color::Yellow,
+            );
+            row += 1;
+            if row < bottom {
+                put_text(
+                    buffer,
+                    row,
+                    inner_left,
+                    "Zone 10 boss accessible",
+                    Color::Green,
+                );
+            }
+        } else {
+            put_text(
+                buffer,
+                row,
+                inner_left,
+                "Press [Enter] to forge",
+                Color::Yellow,
+            );
+            row += 1;
+            if row < bottom {
+                put_text(
+                    buffer,
+                    row,
+                    inner_left,
+                    "Requires: Storm Leviathan + 25 PR",
+                    Color::DarkGray,
+                );
+            }
+        }
+    } else {
+        put_text(
+            buffer,
+            row,
+            inner_left,
+            "\u{2713} Max tier reached",
+            Color::Green,
+        );
+    }
+}
 
 /// Render a small Haven status indicator (for character select screen)
 #[allow(dead_code)] // May be used for compact display mode later
