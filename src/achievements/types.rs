@@ -180,19 +180,29 @@ pub enum AchievementId {
     FishermanIV,
     StormLeviathan,
     // Fishing achievements - catch counts
-    FishCatcherI,   // 100 fish
-    FishCatcherII,  // 1,000 fish
-    FishCatcherIII, // 10,000 fish
-    FishCatcherIV,  // 100,000 fish
+    FishCatcherI,    // 100 fish
+    FishCatcherII,   // 1,000 fish
+    FishCatcherIII,  // 10,000 fish
+    FishCatcherIV,   // 100,000 fish
+    FishCatcherV,    // 500,000 fish
+    FishCatcherVI,   // 1,000,000 fish
+    FishCatcherVII,  // 5,000,000 fish
+    FishCatcherVIII, // 10,000,000 fish (Leviathan's Rival)
+    FishCatcherIX,   // 50,000,000 fish (Poseidon's Hand)
+    FishCatcherX,    // 100,000,000 fish (Lord of the Deep)
 
     // Dungeon achievements
     DungeonDiver,
     DungeonMasterI,
     DungeonMasterII,
-    DungeonMasterIII, // 100 dungeons
-    DungeonMasterIV,  // 1,000 dungeons
-    DungeonMasterV,   // 5,000 dungeons
-    DungeonMasterVI,  // 10,000 dungeons
+    DungeonMasterIII,  // 100 dungeons
+    DungeonMasterIV,   // 1,000 dungeons
+    DungeonMasterV,    // 5,000 dungeons
+    DungeonMasterVI,   // 10,000 dungeons
+    DungeonMasterVII,  // 25,000 dungeons
+    DungeonMasterVIII, // 100,000 dungeons (Labyrinth Lord)
+    DungeonMasterIX,   // 500,000 dungeons (Abyss Walker)
+    DungeonMasterX,    // 1,000,000 dungeons (The Undying Delver)
 
     // Haven achievements
     HavenDiscovered,
@@ -480,6 +490,12 @@ impl Achievements {
                 (1000, AchievementId::FishCatcherII),
                 (10000, AchievementId::FishCatcherIII),
                 (100000, AchievementId::FishCatcherIV),
+                (500000, AchievementId::FishCatcherV),
+                (1000000, AchievementId::FishCatcherVI),
+                (5000000, AchievementId::FishCatcherVII),
+                (10000000, AchievementId::FishCatcherVIII),
+                (50000000, AchievementId::FishCatcherIX),
+                (100000000, AchievementId::FishCatcherX),
             ],
             character_name,
         );
@@ -664,6 +680,10 @@ impl Achievements {
                 (1000, AchievementId::DungeonMasterIV),
                 (5000, AchievementId::DungeonMasterV),
                 (10000, AchievementId::DungeonMasterVI),
+                (25000, AchievementId::DungeonMasterVII),
+                (100000, AchievementId::DungeonMasterVIII),
+                (500000, AchievementId::DungeonMasterIX),
+                (1000000, AchievementId::DungeonMasterX),
             ],
             character_name,
         );
@@ -952,6 +972,10 @@ impl Achievements {
                     (1000, AchievementId::DungeonMasterIV),
                     (5000, AchievementId::DungeonMasterV),
                     (10000, AchievementId::DungeonMasterVI),
+                    (25000, AchievementId::DungeonMasterVII),
+                    (100000, AchievementId::DungeonMasterVIII),
+                    (500000, AchievementId::DungeonMasterIX),
+                    (1000000, AchievementId::DungeonMasterX),
                 ],
             ),
             (
@@ -962,6 +986,12 @@ impl Achievements {
                     (1000, AchievementId::FishCatcherII),
                     (10000, AchievementId::FishCatcherIII),
                     (100000, AchievementId::FishCatcherIV),
+                    (500000, AchievementId::FishCatcherV),
+                    (1000000, AchievementId::FishCatcherVI),
+                    (5000000, AchievementId::FishCatcherVII),
+                    (10000000, AchievementId::FishCatcherVIII),
+                    (50000000, AchievementId::FishCatcherIX),
+                    (100000000, AchievementId::FishCatcherX),
                 ],
             ),
             (
@@ -1298,6 +1328,12 @@ mod tests {
             (1000, AchievementId::FishCatcherII),
             (10000, AchievementId::FishCatcherIII),
             (100000, AchievementId::FishCatcherIV),
+            (500000, AchievementId::FishCatcherV),
+            (1000000, AchievementId::FishCatcherVI),
+            (5000000, AchievementId::FishCatcherVII),
+            (10000000, AchievementId::FishCatcherVIII),
+            (50000000, AchievementId::FishCatcherIX),
+            (100000000, AchievementId::FishCatcherX),
         ];
 
         for (fish, achievement_id) in milestones {
@@ -1345,6 +1381,10 @@ mod tests {
             (1000, AchievementId::DungeonMasterIV),
             (5000, AchievementId::DungeonMasterV),
             (10000, AchievementId::DungeonMasterVI),
+            (25000, AchievementId::DungeonMasterVII),
+            (100000, AchievementId::DungeonMasterVIII),
+            (500000, AchievementId::DungeonMasterIX),
+            (1000000, AchievementId::DungeonMasterX),
         ];
 
         for (dungeons, achievement_id) in milestones {
