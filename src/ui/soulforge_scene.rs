@@ -6,7 +6,7 @@ use crate::enhancement::{
 };
 use crate::items::EquipmentSlot;
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph},
@@ -996,63 +996,107 @@ fn render_success(frame: &mut Frame, area: Rect, soulforge_ui: &SoulforgeUiState
     render_buffer(frame, area, &buffer);
 }
 
-/// Render the failure animation
+/// Render the failure animation with ash decay and crack effects.
 fn render_failure(frame: &mut Frame, area: Rect, soulforge_ui: &SoulforgeUiState) {
+    let w = area.width as usize;
+    let h = area.height as usize;
+    if w == 0 || h == 0 {
+        return;
+    }
+
     let tick = soulforge_ui.animation_tick;
+    let millis = current_millis();
 
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Min(0),    // Top padding
-            Constraint::Length(9), // Content
-            Constraint::Min(0),    // Bottom padding
-        ])
-        .split(area);
+    // 1. Create buffer and paint backdrop that rapidly cools over first 8 ticks
+    let mut buffer = vec![vec![SceneCell::default(); w]; h];
+    let cool_t = (tick as f64 / 8.0).min(1.0);
+    let params = ForgeBackdropParams {
+        bottom_rgb: lerp_rgb((120, 40, 15), (40, 40, 45), cool_t),
+        top_rgb: lerp_rgb((15, 8, 5), (15, 15, 18), cool_t),
+        ember_count: 10 - (6.0 * cool_t) as usize, // 10 -> 4
+        ember_speed: 5.0 - 3.0 * cool_t,           // 5.0 -> 2.0
+        ember_upward: cool_t < 1.0,                // embers fall after full cooling
+        ember_hot: lerp_rgb((255, 160, 40), (80, 30, 10), cool_t),
+        ember_cool: lerp_rgb((80, 20, 5), (30, 15, 10), cool_t),
+        shimmer: cool_t <= 0.5,
+    };
+    paint_forge_backdrop(&mut buffer, millis, &params);
 
+    // 2. Crack characters at deterministic positions, spreading with cool_t
+    let max_cracks = 8usize;
+    let active_cracks = ((cool_t * max_cracks as f64).ceil() as usize).min(max_cracks);
+    let crack_char = '\u{2573}'; // ╳
+    let crack_fg = Color::Rgb(
+        lerp_rgb((180, 60, 20), (80, 80, 90), cool_t).0,
+        lerp_rgb((180, 60, 20), (80, 80, 90), cool_t).1,
+        lerp_rgb((180, 60, 20), (80, 80, 90), cool_t).2,
+    );
+    for i in 0..active_cracks {
+        let seed = hash2d(i + 42, i * 7 + 13);
+        let row = (seed as usize) % h;
+        let col = (hash2d(i + 99, i * 3 + 5) as usize) % w;
+        put_cell(&mut buffer, row as i32, col as i32, crack_char, crack_fg);
+    }
+
+    // 3. Display centered content
     let result = soulforge_ui.last_result.as_ref().unwrap();
 
-    // Shake offset for first 5 ticks
-    let shake_offset = if tick < 5 {
-        if tick.is_multiple_of(2) {
-            " "
-        } else {
-            ""
-        }
-    } else {
-        ""
-    };
-
     let crack_line = " \u{2573}  \u{2573}  \u{2573}  \u{2573}  \u{2573} ";
-
     let level_drop = if result.old_level == result.new_level {
-        // No level change (stayed same)
         format!("+{} (no change)", result.old_level)
     } else {
         format!("+{} \u{2192} +{}", result.old_level, result.new_level)
     };
+    let result_line = format!("Enhancement failed! {}", level_drop);
 
-    let text = Paragraph::new(vec![
-        Line::from(Span::styled(crack_line, Style::default().fg(Color::Red))),
-        Line::from(""),
-        Line::from(Span::styled(
-            format!("{}FAILED!", shake_offset),
-            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-        )),
-        Line::from(""),
-        Line::from(Span::styled(
-            format!("Enhancement failed! {}", level_drop),
-            Style::default().fg(Color::Red),
-        )),
-        Line::from(""),
-        Line::from(Span::styled(crack_line, Style::default().fg(Color::Red))),
-        Line::from(""),
-        Line::from(Span::styled(
-            "Press any key to continue",
-            Style::default().fg(Color::DarkGray),
-        )),
-    ])
-    .alignment(Alignment::Center);
-    frame.render_widget(text, chunks[1]);
+    // Content block: crack border, blank, FAILED!, blank, result, blank, crack border, blank, help
+    let content_height = 9usize;
+    let top = if h > content_height {
+        (h - content_height) / 2
+    } else {
+        0
+    };
+
+    // Top crack border line
+    put_text_centered(&mut buffer, top as i32, w, crack_line, Color::Red);
+
+    // "FAILED!" with shake effect: +1/-1 col offset for first 5 ticks
+    let shake_offset: i32 = if tick < 5 {
+        if tick.is_multiple_of(2) {
+            1
+        } else {
+            -1
+        }
+    } else {
+        0
+    };
+    let failed_text = "FAILED!";
+    let failed_col = (w as i32 - failed_text.len() as i32) / 2 + shake_offset;
+    put_text(
+        &mut buffer,
+        (top + 2) as i32,
+        failed_col,
+        failed_text,
+        Color::Red,
+    );
+
+    // Enhancement result line
+    put_text_centered(&mut buffer, (top + 4) as i32, w, &result_line, Color::Red);
+
+    // Bottom crack border line
+    put_text_centered(&mut buffer, (top + 6) as i32, w, crack_line, Color::Red);
+
+    // "Press any key to continue" in dark gray
+    put_text_centered(
+        &mut buffer,
+        (top + 8) as i32,
+        w,
+        "Press any key to continue",
+        Color::DarkGray,
+    );
+
+    // 4. Flush buffer to frame
+    render_buffer(frame, area, &buffer);
 }
 
 /// Render the Soulforge discovery modal
