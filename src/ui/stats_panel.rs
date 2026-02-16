@@ -890,7 +890,7 @@ pub fn draw_update_drawer(frame: &mut Frame, area: Rect, info: &UpdateInfo) {
         Span::styled("[U] Close", Style::default().fg(Color::Yellow)),
     ]));
 
-    let drawer = Paragraph::new(lines).block(
+    let drawer = Paragraph::new(lines).wrap(Wrap { trim: false }).block(
         Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::Yellow))
