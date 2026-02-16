@@ -236,6 +236,20 @@ pub fn generate_boss_for_current_zone(zone_id: u32, subzone_id: u32) -> Enemy {
     )
 }
 
+/// A brief damage number shown next to an HP bar.
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct DamageFlash {
+    pub text: String,
+    pub color: ratatui::style::Color,
+    pub bold: bool,
+    /// Remaining display time in seconds
+    pub remaining: f64,
+}
+
+/// How long damage flashes display (seconds)
+pub const DAMAGE_FLASH_DURATION: f64 = 0.8;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CombatLogEntry {
     pub message: String,
@@ -266,6 +280,12 @@ pub struct CombatState {
     pub visual_effects: Vec<crate::ui::combat_effects::VisualEffect>,
     #[serde(skip)]
     pub combat_log: VecDeque<CombatLogEntry>,
+    #[serde(skip)]
+    pub regen_start_hp: u32,
+    #[serde(skip)]
+    pub player_damage_floats: Vec<DamageFlash>,
+    #[serde(skip)]
+    pub enemy_damage_floats: Vec<DamageFlash>,
 }
 
 impl Default for CombatState {
@@ -286,6 +306,9 @@ impl CombatState {
             is_regenerating: false,
             visual_effects: Vec::new(),
             combat_log: VecDeque::with_capacity(COMBAT_LOG_CAPACITY),
+            regen_start_hp: 0,
+            player_damage_floats: Vec::new(),
+            enemy_damage_floats: Vec::new(),
         }
     }
 
@@ -311,6 +334,18 @@ impl CombatState {
 
     pub fn is_player_alive(&self) -> bool {
         self.player_current_hp > 0
+    }
+
+    /// Decay HUD flash timers by delta_time. Removes expired floats.
+    pub fn tick_hud(&mut self, delta_time: f64) {
+        self.player_damage_floats.retain_mut(|f| {
+            f.remaining -= delta_time;
+            f.remaining > 0.0
+        });
+        self.enemy_damage_floats.retain_mut(|f| {
+            f.remaining -= delta_time;
+            f.remaining > 0.0
+        });
     }
 }
 

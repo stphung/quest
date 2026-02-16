@@ -37,6 +37,10 @@ pub enum CombatEvent {
     EnemyAttack {
         damage: u32,
     },
+    /// Damage reflected back to the enemy when they hit the player
+    DamageReflected {
+        damage: u32,
+    },
     PlayerDied,
     /// Player died while in a dungeon (no prestige loss)
     PlayerDiedInDungeon,
@@ -50,6 +54,10 @@ pub enum CombatEvent {
     /// Boss enemy defeated in dungeon (dungeon complete)
     BossDefeated {
         xp_gained: u64,
+    },
+    /// HP regen completed after a kill
+    RegenComplete {
+        healed: u32,
     },
     /// Subzone boss defeated (zone progression)
     SubzoneBossDefeated {
@@ -121,9 +129,16 @@ pub fn update_combat(
         state.combat_state.regen_timer += delta_time;
 
         if state.combat_state.regen_timer >= effective_regen_duration {
+            let healed = state
+                .combat_state
+                .player_max_hp
+                .saturating_sub(state.combat_state.regen_start_hp);
             state.combat_state.player_current_hp = state.combat_state.player_max_hp;
             state.combat_state.is_regenerating = false;
             state.combat_state.regen_timer = 0.0;
+            if healed > 0 {
+                events.push(CombatEvent::RegenComplete { healed });
+            }
         } else {
             // Gradual regen
             let regen_progress = state.combat_state.regen_timer / effective_regen_duration;
@@ -131,6 +146,22 @@ pub fn update_combat(
             let target_hp = state.combat_state.player_max_hp;
             state.combat_state.player_current_hp =
                 start_hp + ((target_hp - start_hp) as f64 * regen_progress) as u32;
+
+            // Emit periodic heal floats every 0.5s so they align with HP bar fill
+            const REGEN_FLOAT_INTERVAL: f64 = 0.5;
+            let prev_bucket =
+                ((state.combat_state.regen_timer - delta_time) / REGEN_FLOAT_INTERVAL) as u32;
+            let curr_bucket = (state.combat_state.regen_timer / REGEN_FLOAT_INTERVAL) as u32;
+            if curr_bucket > prev_bucket {
+                let healed = state
+                    .combat_state
+                    .player_current_hp
+                    .saturating_sub(state.combat_state.regen_start_hp);
+                if healed > 0 {
+                    events.push(CombatEvent::RegenComplete { healed });
+                    state.combat_state.regen_start_hp = state.combat_state.player_current_hp;
+                }
+            }
         }
         return events;
     }
@@ -276,6 +307,7 @@ pub fn update_combat(
                     state.combat_state.enemy_attack_timer = 0.0;
                     state.combat_state.is_regenerating = true;
                     state.combat_state.regen_timer = 0.0;
+                    state.combat_state.regen_start_hp = state.combat_state.player_current_hp;
 
                     return events;
                 }
@@ -305,6 +337,7 @@ pub fn update_combat(
                     (enemy_damage as f64 * derived.damage_reflection_percent / 100.0) as u32;
                 if reflected > 0 {
                     enemy.take_damage(reflected);
+                    events.push(CombatEvent::DamageReflected { damage: reflected });
                 }
             }
 
