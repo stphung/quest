@@ -492,6 +492,13 @@ pub fn game_tick<R: Rng>(
         &derived,
     );
 
+    let current_enemy_name = state
+        .combat_state
+        .current_enemy
+        .as_ref()
+        .map(|e| e.name.clone())
+        .unwrap_or_default();
+
     for event in combat_events {
         match event {
             CombatEvent::PlayerAttackBlocked { weapon_needed } => {
@@ -514,12 +521,7 @@ pub fn game_tick<R: Rng>(
                 });
             }
             CombatEvent::EnemyAttack { damage } => {
-                let enemy_name = state
-                    .combat_state
-                    .current_enemy
-                    .as_ref()
-                    .map(|e| e.name.clone())
-                    .unwrap_or_default();
+                let enemy_name = current_enemy_name.clone();
                 let message = format!("\u{1f6e1} {} hits you for {} damage", enemy_name, damage);
                 result.events.push(TickEvent::EnemyAttack {
                     damage,
@@ -528,12 +530,7 @@ pub fn game_tick<R: Rng>(
                 });
             }
             CombatEvent::EnemyDied { xp_gained } => {
-                let enemy_name = state
-                    .combat_state
-                    .current_enemy
-                    .as_ref()
-                    .map(|e| e.name.clone())
-                    .unwrap_or_default();
+                let enemy_name = current_enemy_name.clone();
                 let message = format!("\u{2728} {} defeated! +{} XP", enemy_name, xp_gained);
                 result.events.push(TickEvent::EnemyDefeated {
                     xp_gained,
@@ -565,12 +562,7 @@ pub fn game_tick<R: Rng>(
                 process_discoveries(state, rng, &mut result);
             }
             CombatEvent::EliteDefeated { xp_gained } => {
-                let enemy_name = state
-                    .combat_state
-                    .current_enemy
-                    .as_ref()
-                    .map(|e| e.name.clone())
-                    .unwrap_or_default();
+                let enemy_name = current_enemy_name.clone();
                 let message = format!(
                     "\u{2694}\u{fe0f} {} defeated! +{} XP",
                     enemy_name, xp_gained
@@ -604,12 +596,7 @@ pub fn game_tick<R: Rng>(
                 }
             }
             CombatEvent::BossDefeated { xp_gained } => {
-                let enemy_name = state
-                    .combat_state
-                    .current_enemy
-                    .as_ref()
-                    .map(|e| e.name.clone())
-                    .unwrap_or_default();
+                let enemy_name = current_enemy_name.clone();
 
                 let level_before = state.character_level;
                 apply_tick_xp(state, xp_gained as f64);
