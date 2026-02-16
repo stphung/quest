@@ -9,11 +9,10 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear, Paragraph},
     Frame,
 };
 
-#[allow(unused_imports)]
 use super::scene_fx::{current_millis, hash2d, lerp_rgb, put_cell, render_buffer, SceneCell};
 
 const SLOT_ORDER: [EquipmentSlot; 7] = [
@@ -236,7 +235,7 @@ pub fn render_soulforge(
     }
 }
 
-/// Render the equipment slot menu
+/// Render the equipment slot menu using scene buffer with forge backdrop.
 fn render_menu(
     frame: &mut Frame,
     area: Rect,
@@ -244,83 +243,85 @@ fn render_menu(
     enhancement: &EnhancementProgress,
     prestige_rank: u32,
 ) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(4), // Flavor text
-            Constraint::Length(1), // Spacer
-            Constraint::Length(7), // Slot list (7 slots)
-            Constraint::Length(1), // Spacer
-            Constraint::Length(3), // Detail panel for selected slot
-            Constraint::Length(1), // Spacer
-            Constraint::Length(1), // Stats
-            Constraint::Length(1), // Help
-            Constraint::Min(0),    // Padding
-        ])
-        .split(area);
+    let w = area.width as usize;
+    let h = area.height as usize;
+    if w == 0 || h == 0 {
+        return;
+    }
 
-    // Flavor text
-    let flavor = Paragraph::new(
-        "Ancient runes pulse with forgotten power. \
-         This forge tempers the soul, not the steel. \
-         All that you wield will strike truer.",
-    )
-    .style(
-        Style::default()
-            .fg(Color::White)
-            .add_modifier(Modifier::ITALIC),
-    )
-    .wrap(Wrap { trim: true });
-    frame.render_widget(flavor, chunks[0]);
+    // 1. Create buffer and paint forge backdrop
+    let mut buffer = vec![vec![SceneCell::default(); w]; h];
+    let millis = current_millis();
+    paint_forge_backdrop(&mut buffer, millis, &ForgeBackdropParams::normal());
 
-    // Equipment slot rows
-    let slot_area = chunks[2];
+    // 2. Flavor text (rows 0-2) with slow warm color pulse
+    let flavor_lines = [
+        "Ancient runes pulse with forgotten power.",
+        "This forge tempers the soul, not the steel.",
+        "All that you wield will strike truer.",
+    ];
+    // Slow warm pulse: oscillate between warm white and golden amber
+    let pulse_t = ((millis as f64 / 2000.0).sin() * 0.5 + 0.5).clamp(0.0, 1.0);
+    let pulse_rgb = lerp_rgb((220, 210, 190), (255, 180, 80), pulse_t);
+    let flavor_fg = Color::Rgb(pulse_rgb.0, pulse_rgb.1, pulse_rgb.2);
+    for (i, line) in flavor_lines.iter().enumerate() {
+        put_text(&mut buffer, i as i32, 0, line, flavor_fg);
+    }
+
+    // Row 3 is spacer
+
+    // 3. Equipment slot rows (row 4+, 7 rows)
+    let slot_start_row = 4i32;
     for (i, slot) in SLOT_ORDER.iter().enumerate() {
-        if i as u16 >= slot_area.height {
+        let row = slot_start_row + i as i32;
+        if row >= h as i32 {
             break;
         }
-        let row_area = Rect::new(slot_area.x, slot_area.y + i as u16, slot_area.width, 1);
         let is_selected = i == soulforge_ui.selected_slot;
         let current_level = enhancement.level(i);
 
-        let mut spans = Vec::new();
+        let mut col = 0i32;
 
         // Selection indicator
         if is_selected {
-            spans.push(Span::styled("> ", Style::default().fg(Color::Yellow)));
-        } else {
-            spans.push(Span::raw("  "));
+            put_text(&mut buffer, row, col, "> ", Color::Yellow);
         }
+        col += 2;
 
-        // Slot icon (pad narrow icons to align with wide emoji)
-        let icon_pad = if slot.icon_width() == 1 { "  " } else { " " };
-        spans.push(Span::raw(format!("{}{}", slot.icon(), icon_pad)));
-        spans.push(Span::styled(
-            format!("{:width$}", slot.name(), width = 8),
-            Style::default().fg(Color::White),
-        ));
-        spans.push(Span::raw(" "));
+        // Slot icon (put raw text; advance by icon_width then add padding)
+        let icon = slot.icon();
+        put_text(&mut buffer, row, col, icon, Color::Reset);
+        col += slot.icon_width() as i32;
+        // Pad narrow (width 1) icons with 2 spaces, wide (width 2) with 1, to align columns
+        let icon_pad = if slot.icon_width() == 1 { 2 } else { 1 };
+        col += icon_pad;
 
-        // Enhancement level and target (fixed-width for column alignment)
+        // Slot name padded to 8 chars
+        let name = format!("{:width$}", slot.name(), width = 8);
+        put_text(&mut buffer, row, col, &name, Color::White);
+        col += 8;
+        put_text(&mut buffer, row, col, " ", Color::Reset);
+        col += 1;
+
+        // Enhancement level and target
         if current_level >= MAX_ENHANCEMENT_LEVEL {
-            spans.push(Span::styled(
+            put_text(
+                &mut buffer,
+                row,
+                col,
                 "+10 MAX    ",
-                Style::default()
-                    .fg(Color::Rgb(255, 215, 0))
-                    .add_modifier(Modifier::BOLD),
-            ));
+                Color::Rgb(255, 215, 0),
+            );
         } else {
             let lvl_color = level_color(current_level);
-            spans.push(Span::styled(
-                format!("+{:<2}", current_level),
-                Style::default().fg(lvl_color),
-            ));
+            let lvl_str = format!("+{:<2}", current_level);
+            put_text(&mut buffer, row, col, &lvl_str, lvl_color);
+            col += lvl_str.len() as i32;
 
             let target = current_level + 1;
-            spans.push(Span::styled(
-                format!(" \u{2192} +{:<2}", target),
-                Style::default().fg(level_color(target)),
-            ));
+            let arrow_str = format!(" \u{2192} +{:<2}", target);
+            put_text(&mut buffer, row, col, &arrow_str, level_color(target));
+            col += arrow_str.len() as i32;
 
             let rate = success_rate(target);
             let rate_color = if rate >= 1.0 {
@@ -330,46 +331,55 @@ fn render_menu(
             } else {
                 Color::Red
             };
-            spans.push(Span::styled(
-                format!(" {:>3.0}% Success", rate * 100.0),
-                Style::default().fg(rate_color),
-            ));
+            let rate_str = format!(" {:>3.0}% Success", rate * 100.0);
+            put_text(&mut buffer, row, col, &rate_str, rate_color);
         }
 
-        let row_style = if is_selected {
-            Style::default().bg(Color::Rgb(40, 40, 20))
-        } else {
-            Style::default()
-        };
-
-        let row = Paragraph::new(Line::from(spans)).style(row_style);
-        frame.render_widget(row, row_area);
+        // Selected row gets highlighted background
+        if is_selected {
+            let highlight_bg = Color::Rgb(40, 40, 20);
+            if (row as usize) < h {
+                for cell in buffer[row as usize].iter_mut() {
+                    cell.bg = highlight_bg;
+                }
+            }
+        }
     }
 
-    // Detail panel for selected slot
+    // Row after slots: spacer (slot_start_row + 7 = row 11)
+    // Detail panel: 3 rows starting at row 12
+    let detail_start_row = slot_start_row + 7 + 1; // row 12
     let selected_level = enhancement.level(soulforge_ui.selected_slot);
-    let detail_area = chunks[4];
 
     if selected_level >= MAX_ENHANCEMENT_LEVEL {
-        let detail = Paragraph::new(vec![
-            Line::from(vec![
-                Span::styled("Bonus: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(
-                    format!(
-                        "+{:.1}% Power",
-                        (enhancement_multiplier(MAX_ENHANCEMENT_LEVEL) - 1.0) * 100.0
-                    ),
-                    Style::default()
-                        .fg(Color::Rgb(255, 215, 0))
-                        .add_modifier(Modifier::BOLD),
-                ),
-            ]),
-            Line::from(Span::styled(
-                "Maximum enhancement reached.",
-                Style::default().fg(Color::DarkGray),
-            )),
-        ]);
-        frame.render_widget(detail, detail_area);
+        // Line 1: Bonus
+        let bonus_label = "Bonus: ";
+        let bonus_value = format!(
+            "+{:.1}% Power",
+            (enhancement_multiplier(MAX_ENHANCEMENT_LEVEL) - 1.0) * 100.0
+        );
+        put_text(
+            &mut buffer,
+            detail_start_row,
+            0,
+            bonus_label,
+            Color::DarkGray,
+        );
+        put_text(
+            &mut buffer,
+            detail_start_row,
+            bonus_label.len() as i32,
+            &bonus_value,
+            Color::Rgb(255, 215, 0),
+        );
+        // Line 2: Max reached
+        put_text(
+            &mut buffer,
+            detail_start_row + 1,
+            0,
+            "Maximum enhancement reached.",
+            Color::DarkGray,
+        );
     } else {
         let target = selected_level + 1;
         let bonus = enhancement_multiplier(target);
@@ -388,75 +398,116 @@ fn render_menu(
         };
         let cost_color = if can_afford { Color::Cyan } else { Color::Red };
 
-        let failure_text = if penalty == 0 {
-            Span::styled("safe (no level loss)", Style::default().fg(Color::Green))
+        // Detail line 1: Bonus, Rate, Cost
+        let mut col = 0i32;
+        let bonus_label = "Bonus: ";
+        put_text(
+            &mut buffer,
+            detail_start_row,
+            col,
+            bonus_label,
+            Color::DarkGray,
+        );
+        col += bonus_label.len() as i32;
+        let bonus_val = format!("+{:.1}% Power", bonus_pct);
+        put_text(&mut buffer, detail_start_row, col, &bonus_val, Color::Green);
+        col += bonus_val.len() as i32;
+        let rate_label = "  Rate: ";
+        put_text(
+            &mut buffer,
+            detail_start_row,
+            col,
+            rate_label,
+            Color::DarkGray,
+        );
+        col += rate_label.len() as i32;
+        let rate_val = format!("{:.0}%", rate * 100.0);
+        put_text(&mut buffer, detail_start_row, col, &rate_val, rate_color);
+        col += rate_val.len() as i32;
+        let cost_label = "  Cost: ";
+        put_text(
+            &mut buffer,
+            detail_start_row,
+            col,
+            cost_label,
+            Color::DarkGray,
+        );
+        col += cost_label.len() as i32;
+        let cost_val = format!("{} Prestige Ranks", cost);
+        put_text(&mut buffer, detail_start_row, col, &cost_val, cost_color);
+
+        // Detail line 2: On failure
+        let fail_label = "On failure: ";
+        put_text(
+            &mut buffer,
+            detail_start_row + 1,
+            0,
+            fail_label,
+            Color::DarkGray,
+        );
+        let fail_col = fail_label.len() as i32;
+        if penalty == 0 {
+            put_text(
+                &mut buffer,
+                detail_start_row + 1,
+                fail_col,
+                "safe (no level loss)",
+                Color::Green,
+            );
         } else {
             let result_level = selected_level.saturating_sub(penalty);
-            Span::styled(
-                format!(
-                    "-{} level{} (+{} \u{2192} +{})",
-                    penalty,
-                    if penalty > 1 { "s" } else { "" },
-                    selected_level,
-                    result_level
-                ),
-                Style::default().fg(Color::Red),
-            )
-        };
-
-        let detail = Paragraph::new(vec![
-            Line::from(vec![
-                Span::styled("Bonus: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(
-                    format!("+{:.1}% Power", bonus_pct),
-                    Style::default().fg(Color::Green),
-                ),
-                Span::styled("  Rate: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(
-                    format!("{:.0}%", rate * 100.0),
-                    Style::default().fg(rate_color),
-                ),
-                Span::styled("  Cost: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(
-                    format!("{} Prestige Ranks", cost),
-                    Style::default().fg(cost_color),
-                ),
-            ]),
-            Line::from(vec![
-                Span::styled("On failure: ", Style::default().fg(Color::DarkGray)),
-                failure_text,
-            ]),
-        ]);
-        frame.render_widget(detail, detail_area);
+            let fail_text = format!(
+                "-{} level{} (+{} \u{2192} +{})",
+                penalty,
+                if penalty > 1 { "s" } else { "" },
+                selected_level,
+                result_level
+            );
+            put_text(
+                &mut buffer,
+                detail_start_row + 1,
+                fail_col,
+                &fail_text,
+                Color::Red,
+            );
+        }
     }
 
-    // Lifetime stats
-    let stats_line = Line::from(vec![
-        Span::styled("Attempts: ", Style::default().fg(Color::DarkGray)),
-        Span::styled(
-            format!("{}", enhancement.total_attempts),
-            Style::default().fg(Color::White),
-        ),
-        Span::styled(" | Successes: ", Style::default().fg(Color::DarkGray)),
-        Span::styled(
-            format!("{}", enhancement.total_successes),
-            Style::default().fg(Color::Green),
-        ),
-        Span::styled(" | Failures: ", Style::default().fg(Color::DarkGray)),
-        Span::styled(
-            format!("{}", enhancement.total_failures),
-            Style::default().fg(Color::Red),
-        ),
-    ]);
-    let stats = Paragraph::new(stats_line);
-    frame.render_widget(stats, chunks[6]);
+    // Stats row (detail_start_row + 3 = row 15, accounting for spacer)
+    let stats_row = detail_start_row + 3;
+    {
+        let mut col = 0i32;
+        let a_label = "Attempts: ";
+        put_text(&mut buffer, stats_row, col, a_label, Color::DarkGray);
+        col += a_label.len() as i32;
+        let a_val = format!("{}", enhancement.total_attempts);
+        put_text(&mut buffer, stats_row, col, &a_val, Color::White);
+        col += a_val.len() as i32;
+        let s_label = " | Successes: ";
+        put_text(&mut buffer, stats_row, col, s_label, Color::DarkGray);
+        col += s_label.len() as i32;
+        let s_val = format!("{}", enhancement.total_successes);
+        put_text(&mut buffer, stats_row, col, &s_val, Color::Green);
+        col += s_val.len() as i32;
+        let f_label = " | Failures: ";
+        put_text(&mut buffer, stats_row, col, f_label, Color::DarkGray);
+        col += f_label.len() as i32;
+        let f_val = format!("{}", enhancement.total_failures);
+        put_text(&mut buffer, stats_row, col, &f_val, Color::Red);
+    }
 
-    // Help
-    let help = Paragraph::new(Line::from(Span::styled(
+    // Help row (stats_row + 1 = row 16)
+    let help_row = stats_row + 1;
+    put_text(
+        &mut buffer,
+        help_row,
+        0,
         "[\u{2191}\u{2193}] Select  [Enter] Enhance  [Esc] Close",
-        Style::default().fg(Color::DarkGray),
-    )));
-    frame.render_widget(help, chunks[7]);
+        Color::DarkGray,
+    );
+
+    // 4. Flush buffer to frame
+    render_buffer(frame, area, &buffer);
 }
 
 /// Render the confirmation phase
