@@ -184,13 +184,13 @@ mod tests {
         // and seeded RNG for determinism
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
         let mut discovered = false;
-        for _ in 0..100_000 {
+        for _ in 0..20_000 {
             if try_discover_haven(&mut haven, 50, &mut rng) {
                 discovered = true;
                 break;
             }
         }
-        assert!(discovered, "Should discover haven within 100k ticks at P50");
+        assert!(discovered, "Should discover haven within 20k ticks at P50");
         assert!(haven.discovered);
     }
 

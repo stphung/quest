@@ -773,6 +773,7 @@ pub fn apply_game_result(state: &mut GameState) -> Option<crate::challenges::Min
 mod tests {
     use super::*;
     use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
 
     // ============ Placing Moves Tests ============
 
@@ -1019,7 +1020,11 @@ mod tests {
     fn test_ai_different_difficulties() {
         let mut rng = rand::rng();
 
-        for difficulty in MorrisDifficulty::ALL {
+        // Only test Novice and Apprentice (depth 2-3) on empty board.
+        // Master/Journeyman (depth 4-5) are very slow with 24 legal moves.
+        // Higher difficulties are covered by test_ai_blocks_obvious_mill
+        // and test_ai_completes_own_mill_over_blocking (constrained boards).
+        for difficulty in [MorrisDifficulty::Novice, MorrisDifficulty::Apprentice] {
             let mut game = MorrisGame::new(difficulty);
             game.current_player = Player::Ai;
 
@@ -1332,7 +1337,7 @@ mod tests {
 
     #[test]
     fn test_calculate_think_ticks_range() {
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(1000);
 
         for _ in 0..100 {
             let ticks = calculate_think_ticks(&mut rng);
