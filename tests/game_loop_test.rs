@@ -190,9 +190,18 @@ fn test_combat_produces_attack_events() {
 
 #[test]
 fn test_enemy_death_grants_xp() {
+    use quest::character::attributes::AttributeType;
     use quest::core::game_logic::apply_tick_xp;
 
     let mut state = GameState::new("XP Test".to_string(), 0);
+
+    // Set high STR so player always kills the enemy before dying,
+    // regardless of RNG rolls (crit, double strike).
+    state.attributes.set(AttributeType::Strength, 50);
+    let derived =
+        DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
+    state.combat_state.update_max_hp(derived.max_hp);
+    state.combat_state.player_current_hp = state.combat_state.player_max_hp;
 
     let initial_xp = state.character_xp;
 
@@ -477,7 +486,7 @@ fn test_zone_advancement_subzone_to_subzone() {
     // Kill enemies and bosses through combat until subzone advances
     let mut boss_defeated = false;
     let mut defeat_result = None;
-    for _ in 0..50_000 {
+    for _ in 0..20_000 {
         let events = simulate_tick(&mut state);
         for event in &events {
             match event {

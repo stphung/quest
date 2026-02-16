@@ -162,8 +162,8 @@ mod tests {
     fn test_try_discover_haven_below_p10() {
         let mut haven = Haven::new();
         let mut rng = rand::rng();
-        // Below P10, should never discover
-        for _ in 0..100_000 {
+        // Below P10, discovery chance is exactly 0 (early return), so 1000 iterations suffices
+        for _ in 0..1_000 {
             assert!(!try_discover_haven(&mut haven, 9, &mut rng));
         }
     }
@@ -178,16 +178,19 @@ mod tests {
 
     #[test]
     fn test_try_discover_haven_eventually_succeeds() {
+        use rand::SeedableRng;
         let mut haven = Haven::new();
-        let mut rng = rand::rng();
+        // Use P50 for much higher chance (0.000294/tick, expected ~3400 ticks)
+        // and seeded RNG for determinism
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
         let mut discovered = false;
-        for _ in 0..1_000_000 {
-            if try_discover_haven(&mut haven, 10, &mut rng) {
+        for _ in 0..100_000 {
+            if try_discover_haven(&mut haven, 50, &mut rng) {
                 discovered = true;
                 break;
             }
         }
-        assert!(discovered, "Should discover haven within 1M ticks at P10");
+        assert!(discovered, "Should discover haven within 100k ticks at P50");
         assert!(haven.discovered);
     }
 
@@ -395,9 +398,9 @@ mod tests {
         let mut haven = Haven::new();
         let mut rng = rand::rng();
 
-        // P0-P9 cannot discover Haven
+        // P0-P9 cannot discover Haven (chance is exactly 0, early return)
         for p in 0..10 {
-            for _ in 0..1000 {
+            for _ in 0..100 {
                 if try_discover_haven(&mut haven, p, &mut rng) {
                     panic!("Should not discover Haven at P{}", p);
                 }

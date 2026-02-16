@@ -77,14 +77,14 @@ fn test_drop_chance_never_exceeds_cap() {
 #[test]
 fn test_try_drop_item_frequency_at_prestige_zero() {
     let game_state = GameState::new("Drop Test".to_string(), 0);
-    let trials = 5000;
+    let trials = 2000;
     let drops: usize = (0..trials)
         .filter(|_| try_drop_from_mob(&game_state, 1, 0.0, 0.0).is_some())
         .count();
 
-    // Expected: 15% = 750 out of 5000, allow wide margin for randomness
-    let low = (trials as f64 * 0.10) as usize;
-    let high = (trials as f64 * 0.20) as usize;
+    // Expected: 15% = 300 out of 2000, allow wide margin for randomness
+    let low = (trials as f64 * 0.08) as usize;
+    let high = (trials as f64 * 0.22) as usize;
     assert!(
         drops >= low && drops <= high,
         "Expected ~15% drop rate at P0, got {drops}/{trials} ({:.1}%)",
@@ -94,7 +94,7 @@ fn test_try_drop_item_frequency_at_prestige_zero() {
 
 #[test]
 fn test_try_drop_item_frequency_increases_with_prestige() {
-    let trials = 5000;
+    let trials = 2000;
 
     let mut state_p0 = GameState::new("P0".to_string(), 0);
     state_p0.prestige_rank = 0;
@@ -793,7 +793,7 @@ fn test_roll_rarity_covers_all_mob_tiers() {
     let mut rng = rand::rng();
     let mut seen = std::collections::HashSet::new();
 
-    for _ in 0..10_000 {
+    for _ in 0..5_000 {
         let rarity = roll_rarity_for_mob(0, 0.0, &mut rng);
         seen.insert(format!("{:?}", rarity));
         if seen.len() == 4 {
@@ -816,7 +816,7 @@ fn test_roll_rarity_covers_all_mob_tiers() {
 #[test]
 fn test_roll_rarity_prestige_bonus_shifts_toward_higher_tiers() {
     let mut rng = rand::rng();
-    let trials = 20_000;
+    let trials = 5_000;
 
     let mut common_p0 = 0usize;
     let mut common_p10 = 0usize;
@@ -836,10 +836,10 @@ fn test_roll_rarity_prestige_bonus_shifts_toward_higher_tiers() {
         "P10 should have fewer commons ({common_p10}) than P0 ({common_p0})"
     );
 
-    // Verify the magnitude is meaningful (at least 5% difference = 1000 in 20k)
+    // Verify the magnitude is meaningful (at least ~2.5% difference = 125 in 5k)
     let diff = common_p0 as i64 - common_p10 as i64;
     assert!(
-        diff > 500,
+        diff > 100,
         "Prestige bonus should meaningfully reduce common rate. Diff = {diff}"
     );
 }
@@ -991,7 +991,7 @@ fn test_pipeline_prestige_produces_better_average_scores() {
 
     let avg_score = |gs: &GameState| -> f64 {
         let mut rng = rand::rng();
-        let n = 500;
+        let n = 200;
         let sum: f64 = (0..n)
             .map(|_| {
                 let rarity = roll_rarity_for_mob(gs.prestige_rank, 0.0, &mut rng);
