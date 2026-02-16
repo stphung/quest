@@ -1,12 +1,21 @@
+---
+name: doc-health-audit
+description: Use when documentation is stale, after adding features or modules, before releases, or when docs/ and CLAUDE.md files need to match the current codebase. Use when asked to update docs or audit documentation accuracy.
+---
+
 # Update Documentation
 
 Audit and update all documentation (docs/ and CLAUDE.md files) to match the current codebase.
 
+## When to Use
+
+- After landing new features, modules, or challenges
+- When constants, types, or signatures have changed
+- Before a release
+- When asked to update or audit docs
+
 ## Phase 1: Assess Scope
 
-Run a quick audit to determine how much has changed since docs were last updated.
-
-### Steps:
 1. Check when docs were last modified: `git log --format='%ai' -1 -- docs/ src/*/CLAUDE.md CLAUDE.md`
 2. List commits since that date: `git log --oneline --since="<date>" main`
 3. Categorize changes into:

@@ -14,6 +14,8 @@ make fmt               # Auto-fix formatting
 
 ## Development Workflow
 
+**Use git worktrees for feature work.** Create isolated worktrees for branches instead of switching branches in the main workspace.
+
 **Before pushing code, run:**
 ```bash
 make check             # Runs scripts/ci-checks.sh (same as CI)
