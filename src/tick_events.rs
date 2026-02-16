@@ -262,12 +262,21 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     remaining: 0.0,
                 });
             }
-            TickEvent::FishingMessage { message }
-            | TickEvent::FishingItemFound { message, .. }
-            | TickEvent::FishingRankUp { message } => {
+            TickEvent::FishingMessage { message } | TickEvent::FishingItemFound { message, .. } => {
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
+            }
+            TickEvent::FishingRankUp { message } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, true);
+                game_state.loot_ticker.push(TickerEntry {
+                    icon: "\u{1F3A3}",
+                    text: "Rank Up!".to_string(),
+                    color: Color::Cyan,
+                    bold: true,
+                });
             }
             TickEvent::FishCaught {
                 fish_name,

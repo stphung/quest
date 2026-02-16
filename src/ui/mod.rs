@@ -140,16 +140,13 @@ fn draw_xl_l_layout(
     // Determine if we need space for update drawer
     let show_update_drawer = update_expanded && update_info.is_some();
 
-    // Stats panel: header(4)+prestige(5)+fishing(4)+attrs(5) = 18 + equip ~9
-    let stats_height: u16 = 27;
-
-    // Split vertically: fixed stats area, growing Loot + Combat panels, optional update drawer, footer
+    // Split vertically: growing content area, ticker, optional update drawer, footer
     let v_chunks = if show_update_drawer {
         Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(stats_height), // Main content (stats + right panel)
-                Constraint::Min(6),               // Full-width Loot + Combat (grows)
+                Constraint::Min(27),    // Main content (stats + right panel, grows)
+                Constraint::Length(1),  // Ticker
                 Constraint::Length(20), // Update drawer panel (tall enough for wrapped changelog lines)
                 Constraint::Length(4),  // Full-width footer (2 rows)
             ])
@@ -158,9 +155,9 @@ fn draw_xl_l_layout(
         Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(stats_height), // Main content (stats + right panel)
-                Constraint::Min(6),               // Full-width Loot + Combat (grows)
-                Constraint::Length(4),            // Full-width footer (2 rows)
+                Constraint::Min(27),   // Main content (stats + right panel, grows)
+                Constraint::Length(1), // Ticker
+                Constraint::Length(4), // Full-width footer (2 rows)
             ])
             .split(main_area)
     };
@@ -185,8 +182,8 @@ fn draw_xl_l_layout(
     // Draw stats panel on the left
     stats_panel::draw_stats_panel(frame, chunks[0], game_state, ctx, enhancement_levels);
 
-    // Draw full-width Loot + Combat panels
-    info_panel::draw_info_panel(frame, info_area, game_state, ctx);
+    // Draw ticker
+    ticker::draw_ticker(frame, info_area, &game_state.loot_ticker);
 
     // Draw update drawer if expanded
     if let (Some(drawer_area), Some(info)) = (update_drawer_area, update_info) {
