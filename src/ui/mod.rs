@@ -18,7 +18,6 @@ pub mod go_scene;
 pub mod gomoku_scene;
 pub mod haven_scene;
 pub mod help_overlay;
-mod info_panel;
 pub mod jezzball_scene;
 pub mod minesweeper_scene;
 pub mod morris_scene;
@@ -230,7 +229,6 @@ fn draw_m_layout(
     constraints.push(Constraint::Length(1)); // XP bar
     constraints.push(Constraint::Min(5)); // Activity area (full width)
     constraints.push(Constraint::Length(1)); // Loot ticker
-    constraints.push(Constraint::Length(3)); // Combat log (compact)
     constraints.push(Constraint::Length(1)); // Footer
 
     let chunks = Layout::default()
@@ -260,10 +258,6 @@ fn draw_m_layout(
 
     // Loot ticker
     ticker::draw_ticker(frame, chunks[idx], &game_state.loot_ticker);
-    idx += 1;
-
-    // Compact combat log (ticker handles loot display)
-    info_panel::draw_info_panel(frame, chunks[idx], game_state, ctx);
     idx += 1;
 
     // Compact footer
@@ -319,9 +313,8 @@ fn draw_s_layout(
             Constraint::Length(1), // XP bar
             Constraint::Length(1), // Player HP
             Constraint::Length(1), // Enemy HP + name
-            Constraint::Length(1), // Combat status
+            Constraint::Min(1),    // Combat status (grows)
             Constraint::Length(1), // Loot ticker
-            Constraint::Min(3),    // Combat log
             Constraint::Length(1), // Footer
         ])
         .split(area);
@@ -344,11 +337,8 @@ fn draw_s_layout(
     // Loot ticker
     ticker::draw_ticker(frame, chunks[5], &game_state.loot_ticker);
 
-    // Compact combat log (ticker handles loot display)
-    info_panel::draw_info_panel(frame, chunks[6], game_state, ctx);
-
     // Minimal footer
-    stats_panel::draw_footer_minimal(frame, chunks[7], game_state);
+    stats_panel::draw_footer_minimal(frame, chunks[6], game_state);
 }
 
 /// Draws player HP bar for S tier (borderless, single line) with optional damage flash.
