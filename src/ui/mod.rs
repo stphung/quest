@@ -148,7 +148,7 @@ fn draw_xl_l_layout(
             .constraints([
                 Constraint::Length(stats_height), // Main content (stats + right panel)
                 Constraint::Min(6),               // Full-width Loot + Combat (grows)
-                Constraint::Length(16), // Update drawer panel (taller for wrapped changelog)
+                Constraint::Length(20), // Update drawer panel (tall enough for wrapped changelog lines)
                 Constraint::Length(4),  // Full-width footer (2 rows)
             ])
             .split(main_area)
