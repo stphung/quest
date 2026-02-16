@@ -192,7 +192,7 @@ fn render_skill_tree(
             Color::DarkGray
         };
 
-        let lock_indicator = if !unlocked { "\u{1f512} " } else { "" };
+        let lock_indicator = if !unlocked { "\u{2716} " } else { "" };
 
         let mut col = inner_left;
         put_text(buffer, row, col, prefix, style_fg);
@@ -368,7 +368,7 @@ fn render_room_detail(
         return;
     }
     if !unlocked {
-        put_text(buffer, row, inner_left, "\u{1f512} Locked", Color::Red);
+        put_text(buffer, row, inner_left, "\u{2716} Locked", Color::Red);
         row += 1;
         if row < bottom {
             put_text(
@@ -405,7 +405,7 @@ fn render_room_detail(
                 buffer,
                 row,
                 inner_left,
-                "\u{26a1} Stormbreaker forged!",
+                "\u{2726} Stormbreaker forged!",
                 Color::Yellow,
             );
             row += 1;
@@ -522,9 +522,9 @@ pub fn render_haven_tree(
     render_summary_bar(&mut buffer, 0, haven);
 
     // Main content: skill tree (40%) on left, room detail (60%) on right
-    let tree_width = (width * 40 / 100).max(10);
+    let tree_width = (width * 40 / 100).max(10).min(width);
     let detail_left = tree_width as i32;
-    let detail_width = width - tree_width;
+    let detail_width = width.saturating_sub(tree_width);
 
     render_skill_tree(
         &mut buffer,
