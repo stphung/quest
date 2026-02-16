@@ -21,11 +21,95 @@ use quest::character::derived_stats::DerivedStats;
 use quest::core::game_state::GameState;
 use quest::core::tick::{game_tick, TickEvent, TickResult};
 use quest::enhancement::EnhancementProgress;
-use quest::haven::Haven;
+use quest::haven::{try_build_room, Haven, HavenRoomId};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use std::collections::HashMap;
 use std::io::Write;
+
+// ── Haven Strategy ──────────────────────────────────────────────────
+
+enum HavenStrategy {
+    Combat,
+    Qol,
+    Balanced,
+    Full,
+}
+
+impl HavenStrategy {
+    fn from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "combat" => Some(Self::Combat),
+            "qol" => Some(Self::Qol),
+            "balanced" => Some(Self::Balanced),
+            "full" => Some(Self::Full),
+            _ => None,
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        match self {
+            Self::Combat => "combat",
+            Self::Qol => "qol",
+            Self::Balanced => "balanced",
+            Self::Full => "full",
+        }
+    }
+
+    fn room_priority(&self) -> &'static [HavenRoomId] {
+        match self {
+            Self::Combat => &[
+                HavenRoomId::Hearthstone,
+                HavenRoomId::Armory,
+                HavenRoomId::TrainingYard,
+                HavenRoomId::TrophyHall,
+                HavenRoomId::Watchtower,
+                HavenRoomId::AlchemyLab,
+                HavenRoomId::WarRoom,
+            ],
+            Self::Qol => &[
+                HavenRoomId::Hearthstone,
+                HavenRoomId::Bedroom,
+                HavenRoomId::Garden,
+                HavenRoomId::Library,
+                HavenRoomId::FishingDock,
+                HavenRoomId::Workshop,
+                HavenRoomId::Vault,
+            ],
+            Self::Balanced => &[
+                HavenRoomId::Hearthstone,
+                HavenRoomId::Armory,
+                HavenRoomId::Bedroom,
+                HavenRoomId::TrainingYard,
+                HavenRoomId::Garden,
+                HavenRoomId::TrophyHall,
+                HavenRoomId::Library,
+                HavenRoomId::Watchtower,
+                HavenRoomId::FishingDock,
+                HavenRoomId::AlchemyLab,
+                HavenRoomId::Workshop,
+                HavenRoomId::WarRoom,
+                HavenRoomId::Vault,
+            ],
+            Self::Full => &[
+                HavenRoomId::Hearthstone,
+                HavenRoomId::Armory,
+                HavenRoomId::Bedroom,
+                HavenRoomId::TrainingYard,
+                HavenRoomId::Garden,
+                HavenRoomId::TrophyHall,
+                HavenRoomId::Library,
+                HavenRoomId::Watchtower,
+                HavenRoomId::FishingDock,
+                HavenRoomId::AlchemyLab,
+                HavenRoomId::Workshop,
+                HavenRoomId::WarRoom,
+                HavenRoomId::Vault,
+                HavenRoomId::StormForge,
+            ],
+        }
+    }
+}
 
 // ── CLI Configuration ────────────────────────────────────────────────
 
@@ -38,6 +122,7 @@ struct SimConfig {
     csv_path: Option<String>,
     quiet: bool,
     stormbreaker: bool,
+    haven_strategy: Option<HavenStrategy>,
 }
 
 impl Default for SimConfig {
@@ -51,6 +136,7 @@ impl Default for SimConfig {
             csv_path: None,
             quiet: false,
             stormbreaker: false,
+            haven_strategy: None,
         }
     }
 }
@@ -84,6 +170,21 @@ fn parse_args() -> SimConfig {
             }
             "--quiet" => config.quiet = true,
             "--stormbreaker" => config.stormbreaker = true,
+            "--haven" => {
+                i += 1;
+                if i >= args.len() {
+                    eprintln!("--haven requires a strategy: combat, qol, balanced, full");
+                    std::process::exit(1);
+                }
+                config.haven_strategy =
+                    Some(HavenStrategy::from_str(&args[i]).unwrap_or_else(|| {
+                        eprintln!(
+                            "Unknown haven strategy: {}. Options: combat, qol, balanced, full",
+                            args[i]
+                        );
+                        std::process::exit(1);
+                    }));
+            }
             "--help" | "-h" => {
                 print_usage();
                 std::process::exit(0);
@@ -114,8 +215,27 @@ fn print_usage() {
          \x20 --csv FILE      Write time-series CSV\n\
          \x20 --quiet         Only final summary line\n\
          \x20 --stormbreaker  Unlock Stormbreaker achievement (access Zone 10 boss)\n\
+         \x20 --haven STR     Haven auto-build strategy (combat, qol, balanced, full)\n\
          \x20 --help, -h      Show this help"
     );
+}
+
+/// Auto-build one Haven room using the given strategy.
+/// Returns the (room, new_tier, cost) if a room was built this tick.
+fn auto_build_haven(
+    haven: &mut Haven,
+    prestige_rank: &mut u32,
+    priority: &[HavenRoomId],
+) -> Option<(HavenRoomId, u8, u32)> {
+    for &room in priority {
+        if haven.room_tier(room) >= room.max_tier() {
+            continue;
+        }
+        if let Some((new_tier, cost)) = try_build_room(room, haven, prestige_rank) {
+            return Some((room, new_tier, cost));
+        }
+    }
+    None
 }
 
 // ── Simulation Statistics ────────────────────────────────────────────
@@ -142,6 +262,9 @@ struct SimStats {
     dungeons_discovered: u64,
     achievements_unlocked: u64,
     haven_discovered: bool,
+    haven_rooms_built: u32,
+    haven_prestige_spent: u32,
+    haven_final_tiers: Vec<(String, u8)>,
     // Final state snapshot
     final_level: u32,
     final_xp: u64,
@@ -174,6 +297,9 @@ impl Default for SimStats {
             dungeons_discovered: 0,
             achievements_unlocked: 0,
             haven_discovered: false,
+            haven_rooms_built: 0,
+            haven_prestige_spent: 0,
+            haven_final_tiers: Vec::new(),
             final_level: 1,
             final_xp: 0,
             final_prestige: 0,
@@ -307,6 +433,10 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
     state.combat_state.player_current_hp = derived.max_hp;
 
     let mut haven = Haven::default();
+    let haven_priority = config.haven_strategy.as_ref().map(|s| s.room_priority());
+    if haven_priority.is_some() {
+        haven.discovered = true;
+    }
     let mut enhancement = EnhancementProgress::new();
     let mut achievements = Achievements::default();
 
@@ -336,7 +466,7 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
         let mut w = std::io::BufWriter::new(file);
         writeln!(
             w,
-            "tick,game_time_s,level,xp,zone_id,subzone_id,prestige_rank,total_kills,total_deaths,fishing_rank,items_found"
+            "tick,game_time_s,level,xp,zone_id,subzone_id,prestige_rank,total_kills,total_deaths,fishing_rank,items_found,haven_rooms_built,haven_prestige_spent"
         )
         .expect("Failed to write CSV header");
         w
@@ -363,6 +493,22 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
             prev_zone = curr_zone;
         }
 
+        // Auto-build Haven rooms if strategy is active
+        if let Some(priority) = haven_priority {
+            if let Some((room, new_tier, cost)) =
+                auto_build_haven(&mut haven, &mut state.prestige_rank, priority)
+            {
+                stats.haven_rooms_built += 1;
+                stats.haven_prestige_spent += cost;
+                if config.verbose {
+                    println!(
+                        "[t={tick:>6}] Haven: {} upgraded to T{new_tier} (cost {cost} PR)",
+                        room.name()
+                    );
+                }
+            }
+        }
+
         stats.process_tick(tick, &result, &state, curr_zone);
 
         if config.verbose {
@@ -375,7 +521,7 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
                 let total_items: u64 = stats.items_by_rarity.iter().sum();
                 writeln!(
                     w,
-                    "{},{:.1},{},{},{},{},{},{},{},{},{}",
+                    "{},{:.1},{},{},{},{},{},{},{},{},{},{},{}",
                     tick,
                     tick as f64 / 10.0,
                     state.character_level,
@@ -387,6 +533,8 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
                     stats.total_deaths,
                     state.fishing.rank,
                     total_items,
+                    stats.haven_rooms_built,
+                    stats.haven_prestige_spent,
                 )
                 .expect("Failed to write CSV row");
             }
@@ -396,6 +544,17 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
     // Flush CSV
     if let Some(ref mut w) = csv_writer {
         w.flush().expect("Failed to flush CSV");
+    }
+
+    if config.haven_strategy.is_some() {
+        for room in HavenRoomId::ALL {
+            let tier = haven.room_tier(room);
+            if tier > 0 {
+                stats
+                    .haven_final_tiers
+                    .push((room.name().to_string(), tier));
+            }
+        }
     }
 
     stats.finalize(&state);
@@ -482,7 +641,7 @@ fn print_summary(stats: &SimStats, seed: u64, config: &SimConfig) {
     if config.quiet {
         let total_items: u64 = stats.items_by_rarity.iter().sum();
         println!(
-            "seed={seed} ticks={} level={} zone={}-{} kills={} deaths={} items={} achievements={}",
+            "seed={seed} ticks={} level={} zone={}-{} kills={} deaths={} items={} achievements={} haven_built={} haven_spent={}",
             stats.total_ticks,
             stats.final_level,
             stats.final_zone.0,
@@ -491,6 +650,8 @@ fn print_summary(stats: &SimStats, seed: u64, config: &SimConfig) {
             stats.total_deaths,
             total_items,
             stats.achievements_unlocked,
+            stats.haven_rooms_built,
+            stats.haven_prestige_spent,
         );
         return;
     }
@@ -597,6 +758,25 @@ fn print_summary(stats: &SimStats, seed: u64, config: &SimConfig) {
         println!("Achievements: {}", stats.achievements_unlocked);
         if stats.haven_discovered {
             println!("Haven: discovered");
+        }
+        println!();
+    }
+
+    // Haven build progress
+    if let Some(ref strategy) = config.haven_strategy {
+        println!("--- Haven ---");
+        println!("Strategy: {}", strategy.name());
+        println!(
+            "Rooms built: {}  |  Prestige spent: {}",
+            stats.haven_rooms_built, stats.haven_prestige_spent
+        );
+        if !stats.haven_final_tiers.is_empty() {
+            let tier_strs: Vec<String> = stats
+                .haven_final_tiers
+                .iter()
+                .map(|(name, tier)| format!("{name} T{tier}"))
+                .collect();
+            println!("Final state: {}", tier_strs.join(", "));
         }
         println!();
     }
@@ -729,6 +909,33 @@ fn print_multi_run_summary(all_stats: &[SimStats]) {
         avg(&achievements),
         amax
     );
+
+    let haven_built: Vec<u64> = all_stats
+        .iter()
+        .map(|s| s.haven_rooms_built as u64)
+        .collect();
+    let haven_spent: Vec<u64> = all_stats
+        .iter()
+        .map(|s| s.haven_prestige_spent as u64)
+        .collect();
+    if haven_built.iter().any(|&v| v > 0) {
+        let (hbmin, hbmax) = min_max(&haven_built);
+        let (hsmin, hsmax) = min_max(&haven_spent);
+        println!(
+            "{:<20} {:>10} {:>10.1} {:>10}",
+            "Haven Builds",
+            hbmin,
+            avg(&haven_built),
+            hbmax
+        );
+        println!(
+            "{:<20} {:>10} {:>10.1} {:>10}",
+            "Haven PR Spent",
+            hsmin,
+            avg(&haven_spent),
+            hsmax
+        );
+    }
     println!();
 
     // Final zone distribution
@@ -751,14 +958,20 @@ fn main() {
     let config = parse_args();
 
     if !config.quiet {
+        let haven_str = config
+            .haven_strategy
+            .as_ref()
+            .map(|s| format!(", haven={}", s.name()))
+            .unwrap_or_default();
         eprintln!(
-            "Quest Simulator: {} ticks ({}) x {} run(s), seed={}, prestige=P{}, stormbreaker={}",
+            "Quest Simulator: {} ticks ({}) x {} run(s), seed={}, prestige=P{}, stormbreaker={}{}",
             config.ticks,
             ticks_to_time(config.ticks),
             config.runs,
             config.seed,
             config.prestige,
             config.stormbreaker,
+            haven_str,
         );
     }
 
