@@ -9,8 +9,6 @@
 use crate::achievements::Achievements;
 use crate::challenges::menu::ChallengeType;
 use crate::challenges::ActiveMinigame;
-use crate::character::derived_stats::DerivedStats;
-use crate::character::prestige::PrestigeCombatBonuses;
 use crate::combat::logic::{update_combat, CombatEvent, HavenCombatBonuses};
 use crate::core::constants::{
     FINAL_ZONE_ID, HAVEN_MIN_PRESTIGE_RANK, TICKS_PER_SECOND, TICK_INTERVAL_MS,
@@ -291,12 +289,12 @@ pub fn game_tick<R: Rng>(
         }
     }
 
-    // ── 3. Sync player max HP with derived stats ────────────────
-    let derived = DerivedStats::calculate_derived_stats(
-        &state.attributes,
-        &state.equipment,
-        &enhancement.levels,
-    );
+    // ── 3. Sync player max HP with cached derived stats ─────────
+    if state.derived_stats_dirty {
+        state.recalculate_derived_stats(&enhancement.levels);
+        state.recalculate_prestige_bonuses();
+    }
+    let derived = state.cached_derived_stats;
     state.combat_state.update_max_hp(derived.max_hp);
 
     // ── 4. Update dungeon exploration ───────────────────────────
@@ -478,7 +476,7 @@ pub fn game_tick<R: Rng>(
         double_strike_chance: haven.get_bonus(HavenBonusType::DoubleStrikeChance),
         xp_gain_percent: haven.get_bonus(HavenBonusType::XpGainPercent),
     };
-    let prestige_combat = PrestigeCombatBonuses::from_rank(state.prestige_rank);
+    let prestige_combat = state.cached_prestige_bonuses;
     // Apply prestige flat HP bonus to combat max HP (not in DerivedStats to avoid enemy scaling)
     if prestige_combat.flat_hp > 0 {
         let boosted_max = derived.max_hp + prestige_combat.flat_hp;
@@ -826,6 +824,9 @@ fn process_item_drop(state: &mut GameState, haven: &Haven, result: &mut TickResu
         let stats = item.stat_summary();
         let icon = if was_boss { "\u{1f451}" } else { "\u{1f381}" };
         let equipped = auto_equip_if_better(item, state);
+        if equipped {
+            state.invalidate_derived_stats();
+        }
         state.add_recent_drop(
             item_name.clone(),
             rarity,
@@ -988,6 +989,7 @@ mod tests {
     #[test]
     fn test_game_tick_combat_produces_events() {
         use crate::character::attributes::AttributeType;
+        use crate::character::derived_stats::DerivedStats;
 
         let mut state = GameState::new("Combat Test".to_string(), 0);
         state.attributes.set(AttributeType::Strength, 50);

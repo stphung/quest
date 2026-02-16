@@ -3,6 +3,8 @@ use crate::challenges::menu::ChallengeMenu;
 use crate::challenges::ActiveMinigame;
 use crate::challenges::MinigameWinInfo;
 use crate::character::attributes::Attributes;
+use crate::character::derived_stats::DerivedStats;
+use crate::character::prestige::PrestigeCombatBonuses;
 use crate::combat::types::CombatState;
 use crate::dungeon::types::Dungeon;
 use crate::fishing::types::{FishingSession, FishingState};
@@ -98,6 +100,15 @@ pub struct GameState {
     /// Last minigame win info for achievement tracking (transient, not saved)
     #[serde(skip)]
     pub last_minigame_win: Option<MinigameWinInfo>,
+    /// Cached derived stats — recalculated when attributes, equipment, or enhancement change
+    #[serde(skip)]
+    pub cached_derived_stats: DerivedStats,
+    /// Cached prestige combat bonuses — recalculated when prestige_rank changes
+    #[serde(skip)]
+    pub cached_prestige_bonuses: PrestigeCombatBonuses,
+    /// Dirty flag: set when attributes, equipment, or enhancement levels change
+    #[serde(skip)]
+    pub derived_stats_dirty: bool,
 }
 
 impl GameState {
@@ -131,6 +142,9 @@ impl GameState {
             session_kills: 0,
             recent_drops: VecDeque::with_capacity(5),
             last_minigame_win: None,
+            cached_derived_stats: DerivedStats::default(),
+            cached_prestige_bonuses: PrestigeCombatBonuses::default(),
+            derived_stats_dirty: true,
         }
     }
 
@@ -143,6 +157,26 @@ impl GameState {
     pub fn get_attribute_cap(&self) -> u32 {
         crate::core::constants::BASE_ATTRIBUTE_CAP
             + (self.prestige_rank * crate::core::constants::ATTRIBUTE_CAP_PER_PRESTIGE)
+    }
+
+    /// Recalculate and cache derived stats from current attributes, equipment, and enhancement levels.
+    pub fn recalculate_derived_stats(&mut self, enhancement_levels: &[u8; 7]) {
+        self.cached_derived_stats = DerivedStats::calculate_derived_stats(
+            &self.attributes,
+            &self.equipment,
+            enhancement_levels,
+        );
+        self.derived_stats_dirty = false;
+    }
+
+    /// Mark derived stats as needing recalculation (e.g., after equipment or attribute change).
+    pub fn invalidate_derived_stats(&mut self) {
+        self.derived_stats_dirty = true;
+    }
+
+    /// Recalculate and cache prestige combat bonuses from current prestige rank.
+    pub fn recalculate_prestige_bonuses(&mut self) {
+        self.cached_prestige_bonuses = PrestigeCombatBonuses::from_rank(self.prestige_rank);
     }
 }
 

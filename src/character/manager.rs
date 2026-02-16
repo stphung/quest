@@ -135,6 +135,9 @@ impl CharacterManager {
             session_kills: 0,
             recent_drops: std::collections::VecDeque::new(),
             last_minigame_win: None,
+            cached_derived_stats: Default::default(),
+            cached_prestige_bonuses: Default::default(),
+            derived_stats_dirty: true,
         })
     }
 
@@ -312,6 +315,9 @@ mod tests {
             session_kills: 0,
             recent_drops: std::collections::VecDeque::new(),
             last_minigame_win: None,
+            cached_derived_stats: Default::default(),
+            cached_prestige_bonuses: Default::default(),
+            derived_stats_dirty: true,
         }
     }
 

@@ -653,13 +653,13 @@ fn main() -> io::Result<()> {
                             SelectResult::LoadCharacter(filename) => {
                                 match character_manager.load_character(&filename) {
                                     Ok(mut state) => {
+                                        // Initialize cached derived stats and prestige bonuses
+                                        state.recalculate_derived_stats(&enhancement.levels);
+                                        state.recalculate_prestige_bonuses();
+
                                         // Sanity check: clear stale enemy if HP is impossibly high
                                         // (can happen if save was from before prestige reset)
-                                        let derived = character::derived_stats::DerivedStats::calculate_derived_stats(
-                                            &state.attributes,
-                                            &state.equipment,
-                                            &enhancement.levels,
-                                        );
+                                        let derived = state.cached_derived_stats;
                                         if let Some(enemy) = &state.combat_state.current_enemy {
                                             // Max possible enemy HP is 2.4x player HP (boss with max variance)
                                             // If enemy HP is > 2.5x, it's stale from before a stat reset
@@ -996,6 +996,12 @@ fn main() -> io::Result<()> {
                                 prestige_before,
                             );
 
+                            // Recalculate caches if prestige or enhancement changed
+                            if state.prestige_rank != prestige_before {
+                                state.recalculate_prestige_bonuses();
+                                state.recalculate_derived_stats(&enhancement.levels);
+                            }
+
                             match result {
                                 InputResult::Continue => {}
                                 InputResult::QuitToSelect => {
@@ -1199,6 +1205,10 @@ fn main() -> io::Result<()> {
                                                 enhancement.total_attempts,
                                                 Some(&state.character_name),
                                             );
+
+                                            // Recalculate cached derived stats after enhancement change
+                                            state.recalculate_derived_stats(&enhancement.levels);
+                                            state.recalculate_prestige_bonuses();
 
                                             const SLOTS: [crate::items::types::EquipmentSlot; 7] = [
                                                 crate::items::types::EquipmentSlot::Weapon,

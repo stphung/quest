@@ -17,6 +17,12 @@ pub struct DerivedStats {
     pub xp_multiplier: f64,
 }
 
+impl Default for DerivedStats {
+    fn default() -> Self {
+        Self::from_attributes(&Attributes::new())
+    }
+}
+
 impl DerivedStats {
     /// Creates derived stats from attributes with no equipment bonuses.
     /// Primarily used for backward compatibility and tests.
