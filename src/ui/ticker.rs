@@ -1,10 +1,10 @@
-//! Scrolling loot ticker renderer.
+//! Scrolling event ticker renderer.
 //!
 //! Each entry independently enters from the right edge and scrolls left.
 //! Entries are positioned based on their birth time, not concatenated.
 //! Uses char-based indexing to avoid multi-byte UTF-8 slicing panics.
 
-use crate::core::game_state::{LootTicker, TickerEntry};
+use crate::core::game_state::{Ticker, TickerEntry};
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
@@ -17,7 +17,7 @@ use ratatui::{
 ///
 /// Each entry is independently positioned based on when it was pushed.
 /// Entries enter from the right edge and scroll left across the viewport.
-pub fn draw_ticker(frame: &mut Frame, area: Rect, ticker: &LootTicker) {
+pub fn draw_ticker(frame: &mut Frame, area: Rect, ticker: &Ticker) {
     if area.height == 0 || area.width == 0 {
         return;
     }
@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn test_visible_entries_starts_at_right_edge() {
-        let mut ticker = LootTicker::new();
+        let mut ticker = Ticker::new();
         ticker.push(TickerEntry {
             icon: "",
             text: "Test".to_string(),
@@ -176,7 +176,7 @@ mod tests {
 
     #[test]
     fn test_entries_dont_overlap() {
-        let mut ticker = LootTicker::new();
+        let mut ticker = Ticker::new();
         ticker.push(TickerEntry {
             icon: "",
             text: "First".to_string(), // 5 chars
@@ -228,7 +228,7 @@ mod tests {
 
     #[test]
     fn test_multibyte_chars_no_panic() {
-        let mut ticker = LootTicker::new();
+        let mut ticker = Ticker::new();
         ticker.push(TickerEntry {
             icon: "\u{2694}",
             text: "Sword \u{00B7} Fish".to_string(),
@@ -244,7 +244,7 @@ mod tests {
 
     #[test]
     fn test_cleanup_removes_off_screen_entries() {
-        let mut ticker = LootTicker::new();
+        let mut ticker = Ticker::new();
         ticker.viewport_width = 20;
         ticker.push(TickerEntry {
             icon: "",
@@ -262,7 +262,7 @@ mod tests {
 
     #[test]
     fn test_entry_scrolls_across_full_viewport() {
-        let mut ticker = LootTicker::new();
+        let mut ticker = Ticker::new();
         ticker.viewport_width = 40;
         ticker.push(TickerEntry {
             icon: "",

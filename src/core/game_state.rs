@@ -59,7 +59,7 @@ struct TimedEntry {
 /// scroll accelerates to keep the ticker responsive; when the queue drains,
 /// it decelerates back to the base speed.
 #[derive(Debug, Clone)]
-pub struct LootTicker {
+pub struct Ticker {
     entries: VecDeque<TimedEntry>,
     /// Fractional scroll offset (integer part = character position)
     pub scroll_offset: f64,
@@ -85,7 +85,7 @@ const TICKER_SPEED_LERP: f64 = 0.08;
 /// Gap (in chars) between consecutive entries on screen
 const ENTRY_GAP: usize = 3;
 
-impl LootTicker {
+impl Ticker {
     pub fn new() -> Self {
         Self {
             entries: VecDeque::with_capacity(TICKER_MAX_ENTRIES),
@@ -191,7 +191,7 @@ impl LootTicker {
     }
 }
 
-impl Default for LootTicker {
+impl Default for Ticker {
     fn default() -> Self {
         Self::new()
     }
@@ -266,7 +266,7 @@ pub struct GameState {
     pub recent_drops: VecDeque<RecentDrop>,
     /// Scrolling loot ticker state (transient, not saved)
     #[serde(skip)]
-    pub loot_ticker: LootTicker,
+    pub ticker: Ticker,
     /// Last minigame win info for achievement tracking (transient, not saved)
     #[serde(skip)]
     pub last_minigame_win: Option<MinigameWinInfo>,
@@ -311,7 +311,7 @@ impl GameState {
             active_minigame: None,
             session_kills: 0,
             recent_drops: VecDeque::with_capacity(5),
-            loot_ticker: LootTicker::new(),
+            ticker: Ticker::new(),
             last_minigame_win: None,
             cached_derived_stats: DerivedStats::default(),
             cached_prestige_bonuses: PrestigeCombatBonuses::default(),
@@ -700,15 +700,15 @@ mod tests {
     }
 
     #[test]
-    fn test_loot_ticker_new_is_empty() {
-        let ticker = LootTicker::new();
+    fn test_ticker_new_is_empty() {
+        let ticker = Ticker::new();
         assert!(ticker.is_empty());
         assert_eq!(ticker.scroll_offset, 0.0);
     }
 
     #[test]
-    fn test_loot_ticker_push_adds_entry() {
-        let mut ticker = LootTicker::new();
+    fn test_ticker_push_adds_entry() {
+        let mut ticker = Ticker::new();
         ticker.push(TickerEntry {
             icon: "\u{2694}",
             text: "[R] Flamebrand".to_string(),
@@ -719,8 +719,8 @@ mod tests {
     }
 
     #[test]
-    fn test_loot_ticker_push_evicts_oldest() {
-        let mut ticker = LootTicker::new();
+    fn test_ticker_push_evicts_oldest() {
+        let mut ticker = Ticker::new();
         for i in 0..TICKER_MAX_ENTRIES + 5 {
             ticker.push(TickerEntry {
                 icon: "",
@@ -733,8 +733,8 @@ mod tests {
     }
 
     #[test]
-    fn test_loot_ticker_tick_advances_offset() {
-        let mut ticker = LootTicker::new();
+    fn test_ticker_tick_advances_offset() {
+        let mut ticker = Ticker::new();
         assert_eq!(ticker.scroll_offset, 0.0);
         ticker.tick();
         assert!((ticker.scroll_offset - TICKER_SCROLL_SPEED).abs() < f64::EPSILON);
@@ -743,8 +743,8 @@ mod tests {
     }
 
     #[test]
-    fn test_loot_ticker_push_does_not_change_offset() {
-        let mut ticker = LootTicker::new();
+    fn test_ticker_push_does_not_change_offset() {
+        let mut ticker = Ticker::new();
         // Add an initial entry and advance scroll
         ticker.push(TickerEntry {
             icon: "",
@@ -769,8 +769,8 @@ mod tests {
     }
 
     #[test]
-    fn test_loot_ticker_cleanup_removes_scrolled_entries() {
-        let mut ticker = LootTicker::new();
+    fn test_ticker_cleanup_removes_scrolled_entries() {
+        let mut ticker = Ticker::new();
         ticker.viewport_width = 10;
         ticker.push(TickerEntry {
             icon: "",
@@ -797,11 +797,11 @@ mod tests {
     }
 
     #[test]
-    fn test_loot_ticker_adaptive_speed_prevents_empty() {
+    fn test_ticker_adaptive_speed_prevents_empty() {
         // Simulate rapid entry arrivals (every 15 ticks, like combat kills).
         // Without adaptive scroll speed, born_at debt grows unboundedly
         // and entries become permanently invisible after ~1 minute.
-        let mut ticker = LootTicker::new();
+        let mut ticker = Ticker::new();
         ticker.viewport_width = 80;
 
         // Push 100 entries with 15 ticks between each (simulates ~2.5 min of play)
@@ -827,8 +827,8 @@ mod tests {
     }
 
     #[test]
-    fn test_loot_ticker_speed_ramps_up_with_debt() {
-        let mut ticker = LootTicker::new();
+    fn test_ticker_speed_ramps_up_with_debt() {
+        let mut ticker = Ticker::new();
         ticker.viewport_width = 80;
 
         // Push several entries rapidly to build up debt
@@ -853,8 +853,8 @@ mod tests {
     }
 
     #[test]
-    fn test_loot_ticker_speed_decelerates_when_caught_up() {
-        let mut ticker = LootTicker::new();
+    fn test_ticker_speed_decelerates_when_caught_up() {
+        let mut ticker = Ticker::new();
         ticker.viewport_width = 80;
 
         // Push entries to build debt
@@ -884,8 +884,8 @@ mod tests {
     }
 
     #[test]
-    fn test_loot_ticker_scrolls_continuously() {
-        let mut ticker = LootTicker::new();
+    fn test_ticker_scrolls_continuously() {
+        let mut ticker = Ticker::new();
         ticker.push(TickerEntry {
             icon: "",
             text: "Test".to_string(),

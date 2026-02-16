@@ -116,7 +116,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
-                game_state.loot_ticker.push(TickerEntry {
+                game_state.ticker.push(TickerEntry {
                     icon: "\u{2728}",
                     text: format!("+{} XP", xp_gained),
                     color: Color::Green,
@@ -127,7 +127,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, false);
-                game_state.loot_ticker.push(TickerEntry {
+                game_state.ticker.push(TickerEntry {
                     icon: "\u{2620}",
                     text: "Slain!".to_string(),
                     color: Color::Red,
@@ -152,7 +152,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 let equip_tag = if *equipped { " \u{1F528}" } else { "" };
                 let text = format!("[{}] {}{}", rarity_initial, item_name, equip_tag);
                 let color = rarity_color(*rarity);
-                game_state.loot_ticker.push(TickerEntry {
+                game_state.ticker.push(TickerEntry {
                     icon: "\u{2694}",
                     text,
                     color,
@@ -167,7 +167,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
-                game_state.loot_ticker.push(TickerEntry {
+                game_state.ticker.push(TickerEntry {
                     icon: "\u{1F451}",
                     text: format!("Boss +{} XP", xp_gained),
                     color: Color::Yellow,
@@ -176,7 +176,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 // Push zone advancement to ticker
                 match result {
                     BossDefeatResult::SubzoneComplete { .. } => {
-                        game_state.loot_ticker.push(TickerEntry {
+                        game_state.ticker.push(TickerEntry {
                             icon: "\u{1F5FA}",
                             text: "New Area!".to_string(),
                             color: Color::Cyan,
@@ -190,7 +190,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                         let zone_name = crate::zones::get_zone(*new_zone_id)
                             .map(|z| z.name)
                             .unwrap_or("???");
-                        game_state.loot_ticker.push(TickerEntry {
+                        game_state.ticker.push(TickerEntry {
                             icon: "\u{1F5FA}",
                             text: format!("Zone: {}!", zone_name),
                             color: Color::Cyan,
@@ -198,7 +198,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                         });
                     }
                     BossDefeatResult::ZoneCompleteButGated { zone_name, .. } => {
-                        game_state.loot_ticker.push(TickerEntry {
+                        game_state.ticker.push(TickerEntry {
                             icon: "\u{1F5FA}",
                             text: format!("{} Conquered!", zone_name),
                             color: Color::Cyan,
@@ -206,7 +206,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                         });
                     }
                     BossDefeatResult::StormsEnd => {
-                        game_state.loot_ticker.push(TickerEntry {
+                        game_state.ticker.push(TickerEntry {
                             icon: "\u{1F5FA}",
                             text: "All Zones Conquered!".to_string(),
                             color: Color::Yellow,
@@ -214,7 +214,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                         });
                     }
                     BossDefeatResult::ExpanseCycle => {
-                        game_state.loot_ticker.push(TickerEntry {
+                        game_state.ticker.push(TickerEntry {
                             icon: "\u{1F5FA}",
                             text: "Expanse Cycles!".to_string(),
                             color: Color::Cyan,
@@ -236,7 +236,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
-                game_state.loot_ticker.push(TickerEntry {
+                game_state.ticker.push(TickerEntry {
                     icon: "\u{1F48E}",
                     text: item_name.clone(),
                     color: Color::Cyan,
@@ -247,7 +247,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
-                game_state.loot_ticker.push(TickerEntry {
+                game_state.ticker.push(TickerEntry {
                     icon: "\u{1F5DD}",
                     text: "Key found!".to_string(),
                     color: Color::Yellow,
@@ -258,7 +258,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
-                game_state.loot_ticker.push(TickerEntry {
+                game_state.ticker.push(TickerEntry {
                     icon: "\u{1F451}",
                     text: "Dungeon Boss!".to_string(),
                     color: Color::Magenta,
@@ -269,7 +269,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
-                game_state.loot_ticker.push(TickerEntry {
+                game_state.ticker.push(TickerEntry {
                     icon: "\u{2694}",
                     text: "Elite!".to_string(),
                     color: Color::Magenta,
@@ -280,7 +280,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
-                game_state.loot_ticker.push(TickerEntry {
+                game_state.ticker.push(TickerEntry {
                     icon: "\u{1F3F0}",
                     text: "Dungeon Complete!".to_string(),
                     color: Color::Magenta,
@@ -291,7 +291,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, false);
-                game_state.loot_ticker.push(TickerEntry {
+                game_state.ticker.push(TickerEntry {
                     icon: "\u{1F480}",
                     text: "Dungeon failed".to_string(),
                     color: Color::Red,
@@ -307,7 +307,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
-                game_state.loot_ticker.push(TickerEntry {
+                game_state.ticker.push(TickerEntry {
                     icon: "\u{1F41F}",
                     text: item_name.clone(),
                     color: Color::Cyan,
@@ -318,7 +318,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
-                game_state.loot_ticker.push(TickerEntry {
+                game_state.ticker.push(TickerEntry {
                     icon: "\u{1F3A3}",
                     text: "Rank Up!".to_string(),
                     color: Color::Cyan,
@@ -342,7 +342,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 };
                 let text = format!("{} [{}]", fish_name, rarity_initial);
                 let color = rarity_color(*rarity);
-                game_state.loot_ticker.push(TickerEntry {
+                game_state.ticker.push(TickerEntry {
                     icon: "\u{1F41F}",
                     text,
                     color,
@@ -361,7 +361,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 game_state
                     .combat_state
                     .add_log_entry(follow_up.clone(), false, true);
-                game_state.loot_ticker.push(TickerEntry {
+                game_state.ticker.push(TickerEntry {
                     icon: "\u{1F3B2}",
                     text: "New Challenge!".to_string(),
                     color: Color::Yellow,
@@ -372,7 +372,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
-                game_state.loot_ticker.push(TickerEntry {
+                game_state.ticker.push(TickerEntry {
                     icon: "\u{1F3F0}",
                     text: "Dungeon Found!".to_string(),
                     color: Color::Magenta,
@@ -383,7 +383,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
-                game_state.loot_ticker.push(TickerEntry {
+                game_state.ticker.push(TickerEntry {
                     icon: "\u{1F41F}",
                     text: "Fishing Spot Found!".to_string(),
                     color: Color::Cyan,
@@ -394,7 +394,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
-                game_state.loot_ticker.push(TickerEntry {
+                game_state.ticker.push(TickerEntry {
                     icon: "\u{1F3C6}",
                     text: name.clone(),
                     color: Color::Yellow,
@@ -408,7 +408,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 soulforge_discovered = true;
             }
             TickEvent::LeveledUp { new_level } => {
-                game_state.loot_ticker.push(TickerEntry {
+                game_state.ticker.push(TickerEntry {
                     icon: "\u{2B06}",
                     text: format!("Level {}!", new_level),
                     color: Color::Green,
