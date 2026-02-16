@@ -47,7 +47,6 @@ impl HavenStrategy {
         }
     }
 
-    #[allow(dead_code)] // Used in Task 3 for reporting
     fn name(&self) -> &'static str {
         match self {
             Self::Combat => "combat",
@@ -261,6 +260,9 @@ struct SimStats {
     dungeons_discovered: u64,
     achievements_unlocked: u64,
     haven_discovered: bool,
+    haven_rooms_built: u32,
+    haven_prestige_spent: u32,
+    haven_final_tiers: Vec<(String, u8)>,
     // Final state snapshot
     final_level: u32,
     final_xp: u64,
@@ -293,6 +295,9 @@ impl Default for SimStats {
             dungeons_discovered: 0,
             achievements_unlocked: 0,
             haven_discovered: false,
+            haven_rooms_built: 0,
+            haven_prestige_spent: 0,
+            haven_final_tiers: Vec::new(),
             final_level: 1,
             final_xp: 0,
             final_prestige: 0,
@@ -490,6 +495,8 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
         if let Some(priority) = haven_priority {
             let built = auto_build_haven(&mut haven, &mut state.prestige_rank, priority);
             for (room, new_tier, cost) in &built {
+                stats.haven_rooms_built += 1;
+                stats.haven_prestige_spent += *cost;
                 if config.verbose {
                     println!(
                         "[t={tick:>6}] Haven: {} upgraded to T{new_tier} (cost {cost} PR)",
@@ -532,6 +539,17 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
     // Flush CSV
     if let Some(ref mut w) = csv_writer {
         w.flush().expect("Failed to flush CSV");
+    }
+
+    if config.haven_strategy.is_some() {
+        for room in HavenRoomId::ALL {
+            let tier = haven.room_tier(room);
+            if tier > 0 {
+                stats
+                    .haven_final_tiers
+                    .push((room.name().to_string(), tier));
+            }
+        }
     }
 
     stats.finalize(&state);
@@ -737,6 +755,27 @@ fn print_summary(stats: &SimStats, seed: u64, config: &SimConfig) {
         println!();
     }
 
+    // Haven build progress
+    if config.haven_strategy.is_some() {
+        println!("--- Haven ---");
+        if let Some(ref strategy) = config.haven_strategy {
+            println!("Strategy: {}", strategy.name());
+        }
+        println!(
+            "Rooms built: {}  |  Prestige spent: {}",
+            stats.haven_rooms_built, stats.haven_prestige_spent
+        );
+        if !stats.haven_final_tiers.is_empty() {
+            let tier_strs: Vec<String> = stats
+                .haven_final_tiers
+                .iter()
+                .map(|(name, tier)| format!("{name} T{tier}"))
+                .collect();
+            println!("Final state: {}", tier_strs.join(", "));
+        }
+        println!();
+    }
+
     // Level milestones
     let milestones = [5, 10, 15, 20, 25, 50, 75, 100];
     let reached: Vec<String> = milestones
@@ -865,6 +904,33 @@ fn print_multi_run_summary(all_stats: &[SimStats]) {
         avg(&achievements),
         amax
     );
+
+    let haven_built: Vec<u64> = all_stats
+        .iter()
+        .map(|s| s.haven_rooms_built as u64)
+        .collect();
+    let haven_spent: Vec<u64> = all_stats
+        .iter()
+        .map(|s| s.haven_prestige_spent as u64)
+        .collect();
+    if haven_built.iter().any(|&v| v > 0) {
+        let (hbmin, hbmax) = min_max(&haven_built);
+        let (hsmin, hsmax) = min_max(&haven_spent);
+        println!(
+            "{:<20} {:>10} {:>10.1} {:>10}",
+            "Haven Builds",
+            hbmin,
+            avg(&haven_built),
+            hbmax
+        );
+        println!(
+            "{:<20} {:>10} {:>10.1} {:>10}",
+            "Haven PR Spent",
+            hsmin,
+            avg(&haven_spent),
+            hsmax
+        );
+    }
     println!();
 
     // Final zone distribution
@@ -887,14 +953,20 @@ fn main() {
     let config = parse_args();
 
     if !config.quiet {
+        let haven_str = config
+            .haven_strategy
+            .as_ref()
+            .map(|s| format!(", haven={}", s.name()))
+            .unwrap_or_default();
         eprintln!(
-            "Quest Simulator: {} ticks ({}) x {} run(s), seed={}, prestige=P{}, stormbreaker={}",
+            "Quest Simulator: {} ticks ({}) x {} run(s), seed={}, prestige=P{}, stormbreaker={}{}",
             config.ticks,
             ticks_to_time(config.ticks),
             config.runs,
             config.seed,
             config.prestige,
             config.stormbreaker,
+            haven_str,
         );
     }
 
