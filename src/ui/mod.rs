@@ -354,7 +354,7 @@ fn draw_s_layout(
     stats_panel::draw_footer_minimal(frame, chunks[7], game_state);
 }
 
-/// Draws player HP bar for S tier (borderless, single line).
+/// Draws player HP bar for S tier (borderless, single line) with optional damage flash.
 fn draw_s_player_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let hp_ratio = game_state.combat_state.player_current_hp as f64
         / game_state.combat_state.player_max_hp as f64;
@@ -373,10 +373,32 @@ fn draw_s_player_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
         .label(label)
         .ratio(hp_ratio);
 
-    frame.render_widget(gauge, area);
+    if let Some(flash) = &game_state.combat_state.player_damage_flash {
+        let flash_width = (flash.text.chars().count() as u16) + 1;
+        if area.width > flash_width + 15 {
+            let chunks = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Min(15), Constraint::Length(flash_width)])
+                .split(area);
+
+            frame.render_widget(gauge, chunks[0]);
+
+            let mut style = Style::default().fg(flash.color);
+            if flash.bold {
+                style = style.add_modifier(Modifier::BOLD);
+            }
+            let flash_para =
+                Paragraph::new(Span::styled(&flash.text, style)).alignment(Alignment::Right);
+            frame.render_widget(flash_para, chunks[1]);
+        } else {
+            frame.render_widget(gauge, area);
+        }
+    } else {
+        frame.render_widget(gauge, area);
+    }
 }
 
-/// Draws enemy HP bar for S tier (borderless, single line).
+/// Draws enemy HP bar for S tier (borderless, single line) with optional damage flash.
 fn draw_s_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
     if let Some(enemy) = &game_state.combat_state.current_enemy {
         let hp_ratio = enemy.current_hp as f64 / enemy.max_hp as f64;
@@ -387,7 +409,29 @@ fn draw_s_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
             .label(label)
             .ratio(hp_ratio);
 
-        frame.render_widget(gauge, area);
+        if let Some(flash) = &game_state.combat_state.enemy_damage_flash {
+            let flash_width = (flash.text.chars().count() as u16) + 1;
+            if area.width > flash_width + 15 {
+                let chunks = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([Constraint::Min(15), Constraint::Length(flash_width)])
+                    .split(area);
+
+                frame.render_widget(gauge, chunks[0]);
+
+                let mut style = Style::default().fg(flash.color);
+                if flash.bold {
+                    style = style.add_modifier(Modifier::BOLD);
+                }
+                let flash_para =
+                    Paragraph::new(Span::styled(&flash.text, style)).alignment(Alignment::Right);
+                frame.render_widget(flash_para, chunks[1]);
+            } else {
+                frame.render_widget(gauge, area);
+            }
+        } else {
+            frame.render_widget(gauge, area);
+        }
     }
 }
 

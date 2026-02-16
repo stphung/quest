@@ -138,7 +138,7 @@ fn draw_combat_compact(frame: &mut Frame, area: Rect, game_state: &GameState) {
     }
 }
 
-/// Draws the player HP bar (borderless, single line)
+/// Draws the player HP bar (borderless, single line) with optional damage flash
 pub(super) fn draw_player_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let hp_ratio = game_state.combat_state.player_current_hp as f64
         / game_state.combat_state.player_max_hp as f64;
@@ -153,7 +153,29 @@ pub(super) fn draw_player_hp(frame: &mut Frame, area: Rect, game_state: &GameSta
         .label(label)
         .ratio(hp_ratio);
 
-    frame.render_widget(gauge, area);
+    if let Some(flash) = &game_state.combat_state.player_damage_flash {
+        let flash_width = (flash.text.chars().count() as u16) + 1;
+        if area.width > flash_width + 15 {
+            let chunks = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Min(15), Constraint::Length(flash_width)])
+                .split(area);
+
+            frame.render_widget(gauge, chunks[0]);
+
+            let mut style = Style::default().fg(flash.color);
+            if flash.bold {
+                style = style.add_modifier(Modifier::BOLD);
+            }
+            let flash_para =
+                Paragraph::new(Span::styled(&flash.text, style)).alignment(Alignment::Right);
+            frame.render_widget(flash_para, chunks[1]);
+        } else {
+            frame.render_widget(gauge, area);
+        }
+    } else {
+        frame.render_widget(gauge, area);
+    }
 }
 
 /// Draws a regen throbber line below the player HP bar (spinner + flavor text).
@@ -173,7 +195,7 @@ fn draw_regen_throbber(frame: &mut Frame, area: Rect, game_state: &GameState) {
     frame.render_widget(paragraph, area);
 }
 
-/// Draws the enemy HP bar (borderless, single line) with zone-aware coloring
+/// Draws the enemy HP bar (borderless, single line) with zone-aware coloring and optional damage flash
 pub(super) fn draw_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
     if let Some(enemy) = &game_state.combat_state.current_enemy {
         let hp_ratio = enemy.current_hp as f64 / enemy.max_hp as f64;
@@ -198,7 +220,29 @@ pub(super) fn draw_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameStat
             .label(label)
             .ratio(hp_ratio);
 
-        frame.render_widget(gauge, area);
+        if let Some(flash) = &game_state.combat_state.enemy_damage_flash {
+            let flash_width = (flash.text.chars().count() as u16) + 1;
+            if area.width > flash_width + 15 {
+                let chunks = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([Constraint::Min(15), Constraint::Length(flash_width)])
+                    .split(area);
+
+                frame.render_widget(gauge, chunks[0]);
+
+                let mut style = Style::default().fg(flash.color);
+                if flash.bold {
+                    style = style.add_modifier(Modifier::BOLD);
+                }
+                let flash_para =
+                    Paragraph::new(Span::styled(&flash.text, style)).alignment(Alignment::Right);
+                frame.render_widget(flash_para, chunks[1]);
+            } else {
+                frame.render_widget(gauge, area);
+            }
+        } else {
+            frame.render_widget(gauge, area);
+        }
     }
 }
 
