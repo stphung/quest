@@ -43,50 +43,52 @@ fn draw_combat_full(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let outer_block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Red))
-        .title(" ⚔ Combat ⚔ ")
+        .title(" \u{2694} Combat \u{2694} ")
         .title_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD));
 
     let inner = outer_block.inner(area);
     frame.render_widget(outer_block, area);
 
     let is_regen = game_state.combat_state.is_regenerating;
+    let has_event = game_state.combat_state.event_line.is_some();
 
-    // Add a regen throbber row below player HP when regenerating
-    let chunks = if is_regen {
-        Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(1), // Player HP
-                Constraint::Length(1), // Regen throbber
-                Constraint::Min(5),    // Sprite
-                Constraint::Length(1), // Enemy HP
-                Constraint::Length(1), // Status
-            ])
-            .split(inner)
-    } else {
-        Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(1), // Player HP
-                Constraint::Min(5),    // Sprite
-                Constraint::Length(1), // Enemy HP
-                Constraint::Length(1), // Status
-            ])
-            .split(inner)
-    };
+    let mut constraints = vec![Constraint::Length(1)]; // Player HP
+    if is_regen {
+        constraints.push(Constraint::Length(1)); // Regen throbber
+    }
+    constraints.push(Constraint::Min(5)); // Sprite
+    constraints.push(Constraint::Length(1)); // Enemy HP
+    if has_event {
+        constraints.push(Constraint::Length(1)); // Event line
+    }
+    constraints.push(Constraint::Length(1)); // Status
 
-    draw_player_hp(frame, chunks[0], game_state);
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(constraints)
+        .split(inner);
+
+    let mut idx = 0;
+    draw_player_hp(frame, chunks[idx], game_state);
+    idx += 1;
 
     if is_regen {
-        draw_regen_throbber(frame, chunks[1], game_state);
-        render_combat_3d(frame, chunks[2], game_state);
-        draw_enemy_hp(frame, chunks[3], game_state);
-        draw_combat_status(frame, chunks[4], game_state);
-    } else {
-        render_combat_3d(frame, chunks[1], game_state);
-        draw_enemy_hp(frame, chunks[2], game_state);
-        draw_combat_status(frame, chunks[3], game_state);
+        draw_regen_throbber(frame, chunks[idx], game_state);
+        idx += 1;
     }
+
+    render_combat_3d(frame, chunks[idx], game_state);
+    idx += 1;
+
+    draw_enemy_hp(frame, chunks[idx], game_state);
+    idx += 1;
+
+    if has_event {
+        draw_event_line(frame, chunks[idx], game_state);
+        idx += 1;
+    }
+
+    draw_combat_status(frame, chunks[idx], game_state);
 }
 
 /// Compact combat scene for M tier: HP bars + sprite + status.
@@ -100,42 +102,45 @@ fn draw_combat_compact(frame: &mut Frame, area: Rect, game_state: &GameState) {
     frame.render_widget(outer_block, area);
 
     let is_regen = game_state.combat_state.is_regenerating;
+    let has_event = game_state.combat_state.event_line.is_some();
 
-    let chunks = if is_regen {
-        Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(1), // Player HP
-                Constraint::Length(1), // Regen throbber
-                Constraint::Min(3),    // Sprite
-                Constraint::Length(1), // Enemy HP
-                Constraint::Length(1), // Status
-            ])
-            .split(inner)
-    } else {
-        Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(1), // Player HP
-                Constraint::Min(3),    // Sprite
-                Constraint::Length(1), // Enemy HP
-                Constraint::Length(1), // Status
-            ])
-            .split(inner)
-    };
+    let mut constraints = vec![Constraint::Length(1)]; // Player HP
+    if is_regen {
+        constraints.push(Constraint::Length(1)); // Regen throbber
+    }
+    constraints.push(Constraint::Min(3)); // Sprite
+    constraints.push(Constraint::Length(1)); // Enemy HP
+    if has_event {
+        constraints.push(Constraint::Length(1)); // Event line
+    }
+    constraints.push(Constraint::Length(1)); // Status
 
-    draw_player_hp(frame, chunks[0], game_state);
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(constraints)
+        .split(inner);
+
+    let mut idx = 0;
+    draw_player_hp(frame, chunks[idx], game_state);
+    idx += 1;
 
     if is_regen {
-        draw_regen_throbber(frame, chunks[1], game_state);
-        render_combat_3d(frame, chunks[2], game_state);
-        draw_enemy_hp(frame, chunks[3], game_state);
-        draw_combat_status(frame, chunks[4], game_state);
-    } else {
-        render_combat_3d(frame, chunks[1], game_state);
-        draw_enemy_hp(frame, chunks[2], game_state);
-        draw_combat_status(frame, chunks[3], game_state);
+        draw_regen_throbber(frame, chunks[idx], game_state);
+        idx += 1;
     }
+
+    render_combat_3d(frame, chunks[idx], game_state);
+    idx += 1;
+
+    draw_enemy_hp(frame, chunks[idx], game_state);
+    idx += 1;
+
+    if has_event {
+        draw_event_line(frame, chunks[idx], game_state);
+        idx += 1;
+    }
+
+    draw_combat_status(frame, chunks[idx], game_state);
 }
 
 /// Draws the player HP bar (borderless, single line) with optional damage flash
@@ -243,6 +248,19 @@ pub(super) fn draw_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameStat
         } else {
             frame.render_widget(gauge, area);
         }
+    }
+}
+
+/// Draws the single-line event notification (kill XP, level up, boss defeat, etc.)
+fn draw_event_line(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    if let Some(event) = &game_state.combat_state.event_line {
+        let mut style = Style::default().fg(event.color);
+        if event.bold {
+            style = style.add_modifier(Modifier::BOLD);
+        }
+        let text = Paragraph::new(Line::from(Span::styled(&event.text, style)))
+            .alignment(Alignment::Center);
+        frame.render_widget(text, area);
     }
 }
 
