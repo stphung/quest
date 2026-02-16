@@ -635,6 +635,56 @@ fn render_confirming(
     render_buffer(frame, area, &buffer);
 }
 
+/// Render spark particles that spray from a point. Fully derived from animation_tick -- no mutable state.
+fn render_sparks(
+    buffer: &mut [Vec<SceneCell>],
+    center_row: i32,
+    center_col: i32,
+    strike_tick: u8,
+    current_tick: u8,
+    spark_count: usize,
+) {
+    let age = current_tick.saturating_sub(strike_tick);
+    if age > 10 {
+        return;
+    }
+
+    let spark_chars: &[char] = &['\u{2726}', '\u{00b7}', '*', '\u{2727}'];
+    let t = age as f64;
+
+    for i in 0..spark_count {
+        let seed = hash2d(strike_tick as usize, i);
+        let ch = spark_chars[(seed as usize) % spark_chars.len()];
+
+        // Fan angle: 30-150 degrees (0.52 - 2.62 radians)
+        let angle = 0.52 + (seed % 1000) as f64 / 1000.0 * 2.1;
+        let speed = 1.5 + (hash2d(i, strike_tick as usize) % 100) as f64 / 100.0 * 2.0;
+
+        let vx = angle.cos() * speed;
+        let vy = angle.sin() * speed;
+        let gravity = 0.15;
+
+        let col = center_col as f64 + vx * t;
+        let row = center_row as f64 - vy * t + 0.5 * gravity * t * t;
+
+        // Color: bright white/yellow -> orange -> dark red
+        let color_t = age as f64 / 10.0;
+        let rgb = if color_t < 0.3 {
+            lerp_rgb((255, 255, 200), (255, 200, 60), color_t / 0.3)
+        } else {
+            lerp_rgb((255, 200, 60), (120, 30, 5), (color_t - 0.3) / 0.7)
+        };
+
+        put_cell(
+            buffer,
+            row.round() as i32,
+            col.round() as i32,
+            ch,
+            Color::Rgb(rgb.0, rgb.1, rgb.2),
+        );
+    }
+}
+
 /// Render the hammering animation
 fn render_hammering(
     frame: &mut Frame,
@@ -642,23 +692,24 @@ fn render_hammering(
     soulforge_ui: &SoulforgeUiState,
     enhancement: &EnhancementProgress,
 ) {
+    let w = area.width as usize;
+    let h = area.height as usize;
+    if w == 0 || h == 0 {
+        return;
+    }
+
     let tick = soulforge_ui.animation_tick;
+    let millis = current_millis();
 
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Min(0),     // Top padding
-            Constraint::Length(12), // Anvil area
-            Constraint::Length(1),  // Progress bar
-            Constraint::Length(1),  // Progress label
-            Constraint::Min(0),     // Bottom padding
-        ])
-        .split(area);
+    // 1. Create buffer and paint forge backdrop
+    let mut buffer = vec![vec![SceneCell::default(); w]; h];
+    paint_forge_backdrop(&mut buffer, millis, &ForgeBackdropParams::hot());
 
-    // Determine if this is a strike tick (3 strikes across 50 ticks)
+    // 2. Determine if current tick is a strike
     let is_strike = matches!(tick, 14..=16 | 30..=32 | 46..=48);
+    let is_strike_start = matches!(tick, 14 | 30 | 46);
 
-    // Hammer position: raised vs striking
+    // Hammer ASCII art
     let hammer_raised = [
         "       ___  ",
         "      |   | ",
@@ -683,106 +734,151 @@ fn render_hammering(
         "  |___________|  ",
     ];
 
+    // Center the art vertically (5 hammer + 1 gap + 6 anvil = 12 rows)
+    let total_art_height = 12;
+    let art_top = if h > total_art_height + 4 {
+        (h - total_art_height - 4) / 2
+    } else {
+        0
+    };
+
+    // Horizontal center for the widest piece (anvil at 17 chars)
+    let anvil_width = 17;
+    let hammer_width = 12;
+    let art_center_col = (w as i32) / 2;
+    let anvil_col = art_center_col - anvil_width / 2;
+    let hammer_col = art_center_col - hammer_width / 2;
+
+    // 3. Hammer afterimage: on first tick of each strike, render raised hammer dimly
+    if is_strike_start {
+        let dim_color = Color::Rgb(50, 40, 35);
+        for (i, line) in hammer_raised.iter().enumerate() {
+            let row = art_top as i32 + i as i32;
+            put_text(&mut buffer, row, hammer_col, line, dim_color);
+        }
+    }
+
+    // 4. Render hammer (raised or striking)
     let hammer = if is_strike {
         &hammer_strike
     } else {
         &hammer_raised
     };
 
-    let slot_index = soulforge_ui.selected_slot;
-    let slot = SLOT_ORDER[slot_index];
-    let current_level = enhancement.level(slot_index);
-    let item_display = format!("{} +{}", slot.name(), current_level);
-
-    // Build the visual
-    let mut lines = Vec::new();
-
-    // Hammer lines
-    for line in hammer {
-        let style = if is_strike {
-            Style::default()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(Color::DarkGray)
-        };
-        lines.push(Line::from(Span::styled(*line, style)));
-    }
-
-    // Spark line (only on strike)
-    if is_strike {
-        lines.push(Line::from(vec![
-            Span::styled("  \u{2726} ", Style::default().fg(Color::Yellow)),
-            Span::styled("\u{2727} ", Style::default().fg(Color::Rgb(255, 215, 0))),
-            Span::styled("* ", Style::default().fg(Color::Yellow)),
-            Span::styled("\u{00b7} ", Style::default().fg(Color::White)),
-            Span::styled("\u{2726}", Style::default().fg(Color::Rgb(255, 200, 0))),
-        ]));
+    let hammer_fg = if is_strike {
+        Color::White
     } else {
-        lines.push(Line::from(""));
+        Color::Rgb(160, 150, 140)
+    };
+
+    for (i, line) in hammer.iter().enumerate() {
+        let row = art_top as i32 + i as i32;
+        put_text(&mut buffer, row, hammer_col, line, hammer_fg);
     }
 
-    // Anvil lines
-    for line in &anvil {
-        lines.push(Line::from(Span::styled(
-            *line,
-            Style::default().fg(Color::DarkGray),
-        )));
+    // 5. Anvil glow: pulse from gray to warm orange on strikes
+    let anvil_top = art_top + hammer_raised.len() + 1; // 1 row gap between hammer and anvil
+    let anvil_base_rgb = (90, 80, 70);
+    let anvil_hot_rgb = (200, 140, 40);
+
+    // Compute anvil glow intensity based on proximity to last strike
+    let strike_ticks: [u8; 3] = [14, 30, 46];
+    let mut closest_strike_age: u8 = 255;
+    for &st in &strike_ticks {
+        if tick >= st {
+            let age = tick - st;
+            if age < closest_strike_age {
+                closest_strike_age = age;
+            }
+        }
+    }
+    // Glow fades over 8 ticks after a strike
+    let glow_t = if closest_strike_age <= 8 {
+        1.0 - closest_strike_age as f64 / 8.0
+    } else {
+        0.0
+    };
+    // Keep a subtle warm tint between strikes
+    let glow_t = glow_t.max(0.1);
+    let anvil_rgb = lerp_rgb(anvil_base_rgb, anvil_hot_rgb, glow_t);
+    let anvil_fg = Color::Rgb(anvil_rgb.0, anvil_rgb.1, anvil_rgb.2);
+
+    for (i, line) in anvil.iter().enumerate() {
+        let row = anvil_top as i32 + i as i32;
+        put_text(&mut buffer, row, anvil_col, line, anvil_fg);
     }
 
-    let visual = Paragraph::new(lines).alignment(Alignment::Center);
-    frame.render_widget(visual, chunks[1]);
+    // 6. Spark shower: for each strike start, render sparks if within 10 ticks
+    let spark_center_row = anvil_top as i32; // top of anvil
+    let spark_center_col = art_center_col;
+    for &st in &strike_ticks {
+        if tick >= st && tick.saturating_sub(st) <= 10 {
+            render_sparks(
+                &mut buffer,
+                spark_center_row,
+                spark_center_col,
+                st,
+                tick,
+                10,
+            );
+        }
+    }
 
-    // Progress bar with smooth fractional fill
+    // 7. Progress bar with pulsing fill color
+    let bar_row = (anvil_top + anvil.len() + 1) as i32;
+    let bar_width = w.saturating_sub(6);
     let progress = tick as f64 / 50.0;
-    let bar_width = area.width.saturating_sub(6) as usize;
     let fill_exact = progress * bar_width as f64;
     let full_cells = fill_exact as usize;
     let fraction = fill_exact - full_cells as f64;
 
     // Fractional block characters: ▏▎▍▌▋▊▉█ (1/8 to 8/8)
-    const BLOCKS: [&str; 8] = [
-        "\u{258f}", "\u{258e}", "\u{258d}", "\u{258c}", "\u{258b}", "\u{258a}", "\u{2589}",
-        "\u{2588}",
+    let blocks: &[char] = &[
+        '\u{258f}', '\u{258e}', '\u{258d}', '\u{258c}', '\u{258b}', '\u{258a}', '\u{2589}',
+        '\u{2588}',
     ];
 
-    let mut bar_spans = vec![
-        Span::styled("  [", Style::default().fg(Color::DarkGray)),
-        Span::styled(
-            "\u{2588}".repeat(full_cells),
-            Style::default().fg(Color::Yellow),
-        ),
-    ];
+    // Pulsing fill color: oscillate between dark orange and bright yellow
+    let pulse_t = ((millis as f64 / 200.0).sin() * 0.5 + 0.5).clamp(0.0, 1.0);
+    let fill_rgb = lerp_rgb((200, 120, 20), (255, 255, 80), pulse_t);
+    let fill_fg = Color::Rgb(fill_rgb.0, fill_rgb.1, fill_rgb.2);
+    let bracket_fg = Color::DarkGray;
+    let bar_start_col = 3i32; // "  [" offset
 
-    let partial_idx = (fraction * 8.0) as usize;
-    if partial_idx > 0 && full_cells < bar_width {
-        bar_spans.push(Span::styled(
-            BLOCKS[partial_idx - 1],
-            Style::default().fg(Color::Yellow),
-        ));
-        let empty = bar_width.saturating_sub(full_cells + 1);
-        bar_spans.push(Span::styled(
-            " ".repeat(empty),
-            Style::default().fg(Color::DarkGray),
-        ));
-    } else {
-        let empty = bar_width.saturating_sub(full_cells);
-        bar_spans.push(Span::styled(
-            " ".repeat(empty),
-            Style::default().fg(Color::DarkGray),
-        ));
+    put_text(&mut buffer, bar_row, bar_start_col - 1, "[", bracket_fg);
+    for i in 0..bar_width {
+        let col = bar_start_col + i as i32;
+        if i < full_cells {
+            put_cell(&mut buffer, bar_row, col, '\u{2588}', fill_fg);
+        } else if i == full_cells {
+            let partial_idx = (fraction * 8.0) as usize;
+            if partial_idx > 0 {
+                put_cell(&mut buffer, bar_row, col, blocks[partial_idx - 1], fill_fg);
+            } else {
+                put_cell(&mut buffer, bar_row, col, ' ', bracket_fg);
+            }
+        } else {
+            put_cell(&mut buffer, bar_row, col, ' ', bracket_fg);
+        }
     }
+    put_text(
+        &mut buffer,
+        bar_row,
+        bar_start_col + bar_width as i32,
+        "]",
+        bracket_fg,
+    );
 
-    bar_spans.push(Span::styled("]", Style::default().fg(Color::DarkGray)));
-    frame.render_widget(Paragraph::new(Line::from(bar_spans)), chunks[2]);
+    // 8. Item label centered below bar
+    let slot_index = soulforge_ui.selected_slot;
+    let slot = SLOT_ORDER[slot_index];
+    let current_level = enhancement.level(slot_index);
+    let item_display = format!("{} +{}", slot.name(), current_level);
+    let label_row = bar_row + 1;
+    put_text_centered(&mut buffer, label_row, w, &item_display, Color::White);
 
-    // Label below bar
-    let label = Paragraph::new(Span::styled(
-        item_display,
-        Style::default().fg(Color::White),
-    ))
-    .alignment(Alignment::Center);
-    frame.render_widget(label, chunks[3]);
+    // 9. Flush buffer to frame
+    render_buffer(frame, area, &buffer);
 }
 
 /// Render the success animation
