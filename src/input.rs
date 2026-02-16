@@ -89,7 +89,6 @@ pub use crate::enhancement::{EnhancementResult, SoulforgePhase, SoulforgeUiState
 /// Game-screen overlay state. At most one is active at a time.
 pub enum GameOverlay {
     None,
-    #[allow(dead_code)]
     Help,
     HavenDiscovery,
     SoulforgeDiscovery,
@@ -170,6 +169,14 @@ pub fn handle_game_input(
             KeyCode::Up => browser.move_up(),
             KeyCode::Down => browser.move_down(1000),
             _ => {}
+        }
+        return InputResult::Continue;
+    }
+
+    // 0.75. Help overlay
+    if matches!(overlay, GameOverlay::Help) {
+        if matches!(key.code, KeyCode::Esc | KeyCode::Char('?')) {
+            *overlay = GameOverlay::None;
         }
         return InputResult::Continue;
     }
@@ -818,6 +825,10 @@ fn handle_base_game(
             *overlay = GameOverlay::Achievements {
                 browser: crate::ui::achievement_browser_scene::AchievementBrowserState::new(),
             };
+            InputResult::Continue
+        }
+        KeyCode::Char('?') => {
+            *overlay = GameOverlay::Help;
             InputResult::Continue
         }
         _ => InputResult::Continue,
