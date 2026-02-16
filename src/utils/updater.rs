@@ -391,13 +391,8 @@ pub fn check_update_info() -> Option<UpdateInfo> {
                     .into_iter()
                     .take(5) // Limit to 5 entries for in-game display
                     .map(|e| {
-                        // Truncate long messages and take first line only
-                        let msg = e.message.lines().next().unwrap_or(&e.message);
-                        if msg.len() > 45 {
-                            format!("{}...", &msg[..42])
-                        } else {
-                            msg.to_string()
-                        }
+                        // Take first line only (multi-line commit messages)
+                        e.message.lines().next().unwrap_or(&e.message).to_string()
                     })
                     .collect(),
                 changelog_total: total,
