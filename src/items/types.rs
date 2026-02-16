@@ -127,6 +127,10 @@ pub enum AffixType {
     DamageReflection,
     // Progression
     XPGain,
+    /// Catch-all for removed variants (DropRate, PrestigeBonus, OfflineRate).
+    /// Stripped on load — never appears at runtime.
+    #[serde(other)]
+    Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -174,6 +178,7 @@ impl Item {
                 AffixType::HPRegen => format!("+{:.0} Regen", affix.value),
                 AffixType::DamageReflection => format!("+{:.0}% Reflect", affix.value),
                 AffixType::XPGain => format!("+{:.0}% XP", affix.value),
+                AffixType::Unknown => continue,
             };
             parts.push(label);
         }
@@ -310,5 +315,22 @@ mod tests {
         assert_eq!(item.affixes.len(), 3);
         assert_eq!(item.affixes[0].affix_type, AffixType::DamagePercent);
         assert!((item.affixes[0].value - 15.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_deserialize_removed_affix_types() {
+        // Old saves may contain DropRate, PrestigeBonus, or OfflineRate affixes.
+        // These should deserialize as Unknown instead of failing.
+        let json = r#"{"affix_type":"DropRate","value":5.0}"#;
+        let affix: Affix = serde_json::from_str(json).unwrap();
+        assert_eq!(affix.affix_type, AffixType::Unknown);
+
+        let json = r#"{"affix_type":"PrestigeBonus","value":10.0}"#;
+        let affix: Affix = serde_json::from_str(json).unwrap();
+        assert_eq!(affix.affix_type, AffixType::Unknown);
+
+        let json = r#"{"affix_type":"OfflineRate","value":3.0}"#;
+        let affix: Affix = serde_json::from_str(json).unwrap();
+        assert_eq!(affix.affix_type, AffixType::Unknown);
     }
 }

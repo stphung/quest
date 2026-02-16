@@ -184,12 +184,7 @@ impl RunicShiftDifficulty {
 
     /// Clearing animation duration.
     pub fn clear_duration_ms(&self) -> u64 {
-        match self {
-            Self::Novice => 800,
-            Self::Apprentice => 700,
-            Self::Journeyman => 600,
-            Self::Master => 500,
-        }
+        800
     }
 }
 
@@ -430,7 +425,7 @@ mod tests {
         assert_eq!(RunicShiftDifficulty::Master.rise_interval_ms(), 3000);
         assert_eq!(RunicShiftDifficulty::Master.target_line_row(), 8);
         assert_eq!(RunicShiftDifficulty::Master.starting_rows(), 9);
-        assert_eq!(RunicShiftDifficulty::Master.clear_duration_ms(), 500);
+        assert_eq!(RunicShiftDifficulty::Master.clear_duration_ms(), 800);
     }
 
     #[test]
