@@ -141,14 +141,13 @@ fn draw_xl_l_layout(
     // Stats panel: header(4)+prestige(5)+fishing(4)+attrs(5) = 18 + equip ~9
     let stats_height: u16 = 27;
 
-    // Split vertically: fixed stats area, ticker, growing combat log, optional update drawer, footer
+    // Split vertically: fixed stats area, growing Loot + Combat panels, optional update drawer, footer
     let v_chunks = if show_update_drawer {
         Layout::default()
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(stats_height), // Main content (stats + right panel)
-                Constraint::Length(1),            // Loot ticker
-                Constraint::Min(6),               // Combat log (full width, grows)
+                Constraint::Min(6),               // Full-width Loot + Combat (grows)
                 Constraint::Length(12),           // Update drawer panel (taller for changelog)
                 Constraint::Length(4),            // Full-width footer (2 rows)
             ])
@@ -158,20 +157,18 @@ fn draw_xl_l_layout(
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(stats_height), // Main content (stats + right panel)
-                Constraint::Length(1),            // Loot ticker
-                Constraint::Min(6),               // Combat log (full width, grows)
+                Constraint::Min(6),               // Full-width Loot + Combat (grows)
                 Constraint::Length(4),            // Full-width footer (2 rows)
             ])
             .split(main_area)
     };
 
     let content_area = v_chunks[0];
-    let ticker_area = v_chunks[1];
-    let info_area = v_chunks[2];
+    let info_area = v_chunks[1];
     let (update_drawer_area, footer_area) = if show_update_drawer {
-        (Some(v_chunks[3]), v_chunks[4])
+        (Some(v_chunks[2]), v_chunks[3])
     } else {
-        (None, v_chunks[3])
+        (None, v_chunks[2])
     };
 
     // Split main content into two areas: stats panel (left) and combat/dungeon (right)
@@ -186,10 +183,7 @@ fn draw_xl_l_layout(
     // Draw stats panel on the left
     stats_panel::draw_stats_panel(frame, chunks[0], game_state, ctx, enhancement_levels);
 
-    // Draw the scrolling loot ticker
-    ticker::draw_ticker(frame, ticker_area, &game_state.loot_ticker);
-
-    // Draw full-width combat log (no loot panel in XL/L — ticker handles loot display)
+    // Draw full-width Loot + Combat panels
     info_panel::draw_info_panel(frame, info_area, game_state, ctx);
 
     // Draw update drawer if expanded
@@ -327,7 +321,8 @@ fn draw_s_layout(
             Constraint::Length(1), // Player HP
             Constraint::Length(1), // Enemy HP + name
             Constraint::Length(1), // Combat status
-            Constraint::Min(4),    // Merged activity feed
+            Constraint::Length(1), // Loot ticker
+            Constraint::Min(3),    // Combat log
             Constraint::Length(1), // Footer
         ])
         .split(area);
@@ -347,11 +342,14 @@ fn draw_s_layout(
     // Combat status
     combat_scene::draw_combat_scene(frame, chunks[4], game_state, ctx);
 
-    // Merged feed
-    info_panel::draw_info_panel(frame, chunks[5], game_state, ctx);
+    // Loot ticker
+    ticker::draw_ticker(frame, chunks[5], &game_state.loot_ticker);
+
+    // Compact combat log (ticker handles loot display)
+    info_panel::draw_info_panel(frame, chunks[6], game_state, ctx);
 
     // Minimal footer
-    stats_panel::draw_footer_minimal(frame, chunks[6], game_state);
+    stats_panel::draw_footer_minimal(frame, chunks[7], game_state);
 }
 
 /// Draws player HP bar for S tier (borderless, single line).
