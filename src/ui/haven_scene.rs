@@ -27,9 +27,9 @@ fn paint_hearth_backdrop(buffer: &mut [Vec<SceneCell>], millis: u128) {
     }
     let width = buffer[0].len();
 
-    // 1. Background gradient: near-black at top, warm amber at bottom
-    let top_rgb = (10u8, 8u8, 6u8);
-    let bottom_rgb = (60u8, 35u8, 15u8);
+    // 1. Background gradient: near-black at top, warm grey-sage at bottom
+    let top_rgb = (8u8, 8u8, 8u8);
+    let bottom_rgb = (30u8, 35u8, 28u8);
     for (row, row_cells) in buffer.iter_mut().enumerate() {
         let t = if height <= 1 {
             0.0
@@ -43,12 +43,12 @@ fn paint_hearth_backdrop(buffer: &mut [Vec<SceneCell>], millis: u128) {
         }
     }
 
-    // 2. Slow-drifting motes (5 particles, ~0.3x Soulforge speed)
+    // 2. Slow-drifting motes (8 particles, ~0.5x Soulforge speed)
     let mote_chars: &[char] = &['\u{00b7}', '\u{2022}']; // · •
-    let mote_count = 5;
-    let mote_speed = 1.5;
-    let mote_hot = (140u8, 90u8, 30u8);
-    let mote_cool = (60u8, 35u8, 15u8);
+    let mote_count = 8;
+    let mote_speed = 2.5;
+    let mote_hot = (70u8, 85u8, 60u8);
+    let mote_cool = (30u8, 35u8, 28u8);
 
     for i in 0..mote_count {
         let seed = hash2d(i, 0);
