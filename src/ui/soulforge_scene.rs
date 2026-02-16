@@ -881,82 +881,119 @@ fn render_hammering(
     render_buffer(frame, area, &buffer);
 }
 
-/// Render the success animation
+/// Render the success animation with golden burst and sparkle effects.
 fn render_success(frame: &mut Frame, area: Rect, soulforge_ui: &SoulforgeUiState) {
+    let w = area.width as usize;
+    let h = area.height as usize;
+    if w == 0 || h == 0 {
+        return;
+    }
+
     let tick = soulforge_ui.animation_tick;
+    let millis = current_millis();
 
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Min(0),    // Top padding
-            Constraint::Length(9), // Content
-            Constraint::Min(0),    // Bottom padding
-        ])
-        .split(area);
+    // 1. Create buffer and paint backdrop that transitions from normal forge to golden
+    let mut buffer = vec![vec![SceneCell::default(); w]; h];
+    let intensity = (tick as f64 / 30.0).min(1.0);
+    let params = ForgeBackdropParams {
+        bottom_rgb: lerp_rgb((120, 40, 15), (200, 170, 50), intensity),
+        top_rgb: lerp_rgb((15, 8, 5), (40, 30, 10), intensity),
+        ember_count: 10 + (10.0 * intensity) as usize,
+        ember_speed: 5.0 + 3.0 * intensity,
+        ember_upward: true,
+        ember_hot: lerp_rgb((255, 160, 40), (255, 230, 100), intensity),
+        ember_cool: lerp_rgb((80, 20, 5), (200, 150, 30), intensity),
+        shimmer: true,
+    };
+    paint_forge_backdrop(&mut buffer, millis, &params);
 
+    // 2. Sparkle twinkle: ~15 sparkle characters at random positions
+    let sparkle_chars: &[char] = &['\u{2726}', '\u{2727}', '*'];
+    for i in 0..15 {
+        let phase_seed = hash2d(i, tick as usize / 3);
+        let row = (phase_seed as usize) % h;
+        let col = (hash2d(i + 100, tick as usize / 3) as usize) % w;
+        let ch = sparkle_chars[(hash2d(i, 0) as usize) % sparkle_chars.len()];
+
+        // Sine-based brightness oscillation
+        let brightness =
+            ((millis as f64 / 300.0 + i as f64 * 1.7).sin() * 0.5 + 0.5).clamp(0.0, 1.0);
+        let rgb = lerp_rgb((80, 60, 20), (255, 230, 100), brightness);
+        put_cell(
+            &mut buffer,
+            row as i32,
+            col as i32,
+            ch,
+            Color::Rgb(rgb.0, rgb.1, rgb.2),
+        );
+    }
+
+    // 3. Display centered content
     let result = soulforge_ui.last_result.as_ref().unwrap();
     let slot = SLOT_ORDER[result.slot_index];
     let item_name = slot.name();
-
     let bonus = enhancement_multiplier(result.new_level);
     let bonus_pct = (bonus - 1.0) * 100.0;
 
-    // Pulse between yellow and gold
+    // Build sparkle border line (width of buffer)
+    let sparkle_border: String = (0..w)
+        .map(|i| {
+            if i % 2 == 0 {
+                let idx = (i / 2 + tick as usize) % sparkle_chars.len();
+                sparkle_chars[idx]
+            } else {
+                ' '
+            }
+        })
+        .collect();
+
+    // Content block: sparkle, blank, SUCCESS!, blank, item line, power line, blank, sparkle, help
+    let content_height = 9usize;
+    let top = if h > content_height {
+        (h - content_height) / 2
+    } else {
+        0
+    };
+
+    // Top sparkle border
+    put_text_centered(&mut buffer, top as i32, w, &sparkle_border, Color::Yellow);
+
+    // "SUCCESS!" pulsing between yellow and gold
     let title_color = if tick % 4 < 2 {
         Color::Yellow
     } else {
         Color::Rgb(255, 215, 0)
     };
+    put_text_centered(&mut buffer, (top + 2) as i32, w, "SUCCESS!", title_color);
 
-    // Sparkle border characters
-    let sparkle = if tick.is_multiple_of(3) {
-        "\u{2726}"
-    } else if tick % 3 == 1 {
-        "\u{2727}"
-    } else {
-        "*"
-    };
+    // "[SlotName] is now +[new_level]!" in green
+    let item_line = format!("{} is now +{}!", item_name, result.new_level);
+    put_text_centered(&mut buffer, (top + 4) as i32, w, &item_line, Color::Green);
 
-    let sparkle_line = format!(
-        " {} {} {} {} {} {} {} ",
-        sparkle, sparkle, sparkle, sparkle, sparkle, sparkle, sparkle
+    // "+[bonus]% Power" in yellow
+    let power_line = format!("+{:.1}% Power", bonus_pct);
+    put_text_centered(&mut buffer, (top + 5) as i32, w, &power_line, Color::Yellow);
+
+    // Bottom sparkle border
+    put_text_centered(
+        &mut buffer,
+        (top + 7) as i32,
+        w,
+        &sparkle_border,
+        Color::Yellow,
     );
 
-    let text = Paragraph::new(vec![
-        Line::from(Span::styled(
-            &sparkle_line,
-            Style::default().fg(Color::Yellow),
-        )),
-        Line::from(""),
-        Line::from(Span::styled(
-            "SUCCESS!",
-            Style::default()
-                .fg(title_color)
-                .add_modifier(Modifier::BOLD),
-        )),
-        Line::from(""),
-        Line::from(Span::styled(
-            format!("{} is now +{}!", item_name, result.new_level),
-            Style::default()
-                .fg(Color::Green)
-                .add_modifier(Modifier::BOLD),
-        )),
-        Line::from(Span::styled(
-            format!("+{:.1}% Power", bonus_pct),
-            Style::default().fg(Color::Yellow),
-        )),
-        Line::from(""),
-        Line::from(Span::styled(
-            &sparkle_line,
-            Style::default().fg(Color::Yellow),
-        )),
-        Line::from(Span::styled(
-            "Press any key to continue",
-            Style::default().fg(Color::DarkGray),
-        )),
-    ])
-    .alignment(Alignment::Center);
-    frame.render_widget(text, chunks[1]);
+    // "Press any key to continue" in dark gray
+    put_text_centered(
+        &mut buffer,
+        (top + 8) as i32,
+        w,
+        "Press any key to continue",
+        Color::DarkGray,
+    );
+
+    // 4. Flush buffer to frame
+    render_buffer(frame, area, &buffer);
 }
 
 /// Render the failure animation
