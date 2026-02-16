@@ -1,6 +1,5 @@
 //! Haven skill tree UI rendering.
 
-#[allow(unused_imports)]
 use super::scene_fx::{current_millis, hash2d, lerp_rgb, put_cell, render_buffer, SceneCell};
 use crate::core::game_state::GameState;
 use crate::haven::{can_afford, tier_cost, Haven, HavenBonusType, HavenRoomId};
@@ -9,12 +8,11 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
     Frame,
 };
 
 /// Write a string into the scene buffer at (row, col).
-#[allow(dead_code)]
 fn put_text(buffer: &mut [Vec<SceneCell>], row: i32, col: i32, text: &str, fg: Color) {
     for (i, ch) in text.chars().enumerate() {
         put_cell(buffer, row, col + i as i32, ch, fg);
@@ -22,7 +20,6 @@ fn put_text(buffer: &mut [Vec<SceneCell>], row: i32, col: i32, text: &str, fg: C
 }
 
 /// Paint a warm hearth glow backdrop: gentle gradient + slow-drifting motes.
-#[allow(dead_code)]
 fn paint_hearth_backdrop(buffer: &mut [Vec<SceneCell>], millis: u128) {
     let height = buffer.len();
     if height == 0 {
@@ -75,8 +72,7 @@ fn paint_hearth_backdrop(buffer: &mut [Vec<SceneCell>], millis: u128) {
 }
 
 /// Render the summary bar into a scene buffer at the given row.
-#[allow(dead_code)]
-fn render_summary_bar_buf(buffer: &mut [Vec<SceneCell>], row: i32, haven: &Haven) {
+fn render_summary_bar(buffer: &mut [Vec<SceneCell>], row: i32, haven: &Haven) {
     let rooms_built = haven.rooms_built();
     let total_rooms = haven.total_rooms();
 
@@ -116,8 +112,7 @@ fn render_summary_bar_buf(buffer: &mut [Vec<SceneCell>], row: i32, haven: &Haven
 }
 
 /// Render the skill tree panel into a scene buffer.
-#[allow(dead_code)]
-fn render_skill_tree_buf(
+fn render_skill_tree(
     buffer: &mut [Vec<SceneCell>],
     left: i32,
     top: i32,
@@ -228,7 +223,6 @@ fn render_skill_tree_buf(
 }
 
 /// Simple word-wrap: break text into lines that fit within `max_width` characters.
-#[allow(dead_code)]
 fn word_wrap(text: &str, max_width: usize) -> Vec<String> {
     let mut lines = Vec::new();
     let mut current_line = String::new();
@@ -250,8 +244,8 @@ fn word_wrap(text: &str, max_width: usize) -> Vec<String> {
 }
 
 /// Render the room detail panel into a scene buffer.
-#[allow(dead_code, clippy::too_many_arguments)]
-fn render_room_detail_buf(
+#[allow(clippy::too_many_arguments)]
+fn render_room_detail(
     buffer: &mut [Vec<SceneCell>],
     left: i32,
     top: i32,
@@ -455,7 +449,7 @@ fn render_room_detail_buf(
 }
 
 /// Render a small Haven status indicator (for character select screen)
-#[allow(dead_code)] // May be used for compact display mode later
+#[allow(dead_code)] // Planned for compact display mode
 pub fn render_haven_indicator(
     frame: &mut Frame,
     area: Rect,
@@ -507,29 +501,46 @@ pub fn render_haven_tree(
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    // Split into summary bar, main content, and help
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(2), // Summary bar
-            Constraint::Min(0),    // Main content (tree + detail)
-            Constraint::Length(1), // Help
-        ])
-        .split(inner);
+    let height = inner.height as usize;
+    let width = inner.width as usize;
+    if height == 0 || width == 0 {
+        return;
+    }
 
-    // Summary bar - active bonuses
-    render_summary_bar(frame, chunks[0], haven);
+    // Create scene buffer and paint hearth backdrop
+    let mut buffer = vec![vec![SceneCell::default(); width]; height];
+    let millis = current_millis();
+    paint_hearth_backdrop(&mut buffer, millis);
 
-    // Main content - tree on left, detail on right
-    let main_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
-        .split(chunks[1]);
+    // Layout: summary (row 0-1), main content, help (last row)
+    let summary_rows = 2usize;
+    let help_row = (height - 1) as i32;
+    let content_top = summary_rows as i32;
+    let content_height = height.saturating_sub(summary_rows + 1);
 
-    render_skill_tree(frame, main_chunks[0], haven, selected_room);
+    // Summary bar
+    render_summary_bar(&mut buffer, 0, haven);
+
+    // Main content: skill tree (40%) on left, room detail (60%) on right
+    let tree_width = (width * 40 / 100).max(10);
+    let detail_left = tree_width as i32;
+    let detail_width = width - tree_width;
+
+    render_skill_tree(
+        &mut buffer,
+        0,
+        content_top,
+        tree_width,
+        content_height,
+        haven,
+        selected_room,
+    );
     render_room_detail(
-        frame,
-        main_chunks[1],
+        &mut buffer,
+        detail_left,
+        content_top,
+        detail_width,
+        content_height,
         haven,
         selected_room,
         prestige_rank,
@@ -537,339 +548,16 @@ pub fn render_haven_tree(
     );
 
     // Help bar
-    let help = Paragraph::new("[↑/↓] Navigate  [Enter] Build/Forge  [Esc] Close")
-        .style(Style::default().fg(Color::DarkGray));
-    frame.render_widget(help, chunks[2]);
-}
+    put_text(
+        &mut buffer,
+        help_row,
+        0,
+        "[\u{2191}/\u{2193}] Navigate  [Enter] Build/Forge  [Esc] Close",
+        Color::DarkGray,
+    );
 
-/// Render the summary bar showing active bonuses
-fn render_summary_bar(frame: &mut Frame, area: Rect, haven: &Haven) {
-    let rooms_built = haven.rooms_built();
-    let total_rooms = haven.total_rooms();
-
-    let mut spans = vec![Span::styled(
-        format!("Active bonuses ({}/{} rooms): ", rooms_built, total_rooms),
-        Style::default().fg(Color::White),
-    )];
-
-    // Add each active bonus
-    let bonus_types = [
-        (HavenBonusType::DamagePercent, "+{}% DMG"),
-        (HavenBonusType::XpGainPercent, "+{}% XP"),
-        (HavenBonusType::DropRatePercent, "+{}% Drops"),
-        (HavenBonusType::CritChancePercent, "+{}% Crit"),
-        (HavenBonusType::HpRegenPercent, "+{}% HP Regen"),
-        (HavenBonusType::DoubleStrikeChance, "+{}% Double Strike"),
-        (HavenBonusType::OfflineXpPercent, "+{}% Offline XP"),
-        (HavenBonusType::ChallengeDiscoveryPercent, "+{}% Discovery"),
-    ];
-
-    let mut first = true;
-    for (bonus_type, fmt) in bonus_types {
-        let value = haven.get_bonus(bonus_type);
-        if value > 0.0 {
-            if !first {
-                spans.push(Span::raw("  "));
-            }
-            spans.push(Span::styled(
-                fmt.replace("{}", &format!("{:.0}", value)),
-                Style::default().fg(Color::Yellow),
-            ));
-            first = false;
-        }
-    }
-
-    if first {
-        spans.push(Span::styled(
-            "None yet",
-            Style::default().fg(Color::DarkGray),
-        ));
-    }
-
-    let summary = Paragraph::new(Line::from(spans));
-    frame.render_widget(summary, area);
-}
-
-/// Render the skill tree list
-fn render_skill_tree(frame: &mut Frame, area: Rect, haven: &Haven, selected_room: usize) {
-    let block = Block::default()
-        .title(" Skill Tree ")
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray));
-
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-
-    let items: Vec<ListItem> = HavenRoomId::ALL
-        .iter()
-        .enumerate()
-        .map(|(i, room)| {
-            let tier = haven.room_tier(*room);
-            let unlocked = haven.is_room_unlocked(*room);
-            let is_selected = i == selected_room;
-
-            // Tier indicator: ★ for built tiers, · for unbuilt (respects max_tier)
-            let max_t = room.max_tier();
-            let tier_str: String = (1..=max_t)
-                .map(|t| if tier >= t { "★" } else { "·" })
-                .collect::<Vec<_>>()
-                .join("");
-
-            // Room prefix based on state
-            let prefix = if is_selected { "▶ " } else { "  " };
-
-            // Indent based on tree depth
-            let indent = match room {
-                HavenRoomId::Hearthstone => "",
-                HavenRoomId::Armory | HavenRoomId::Bedroom => "  ",
-                HavenRoomId::TrainingYard
-                | HavenRoomId::TrophyHall
-                | HavenRoomId::Garden
-                | HavenRoomId::Library => "    ",
-                HavenRoomId::Watchtower
-                | HavenRoomId::AlchemyLab
-                | HavenRoomId::FishingDock
-                | HavenRoomId::Workshop => "      ",
-                HavenRoomId::WarRoom | HavenRoomId::Vault => "        ",
-                HavenRoomId::StormForge => "          ",
-            };
-
-            let style = if !unlocked {
-                Style::default().fg(Color::DarkGray)
-            } else if is_selected {
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD)
-            } else if tier > 0 {
-                Style::default().fg(Color::Green)
-            } else {
-                Style::default().fg(Color::White)
-            };
-
-            let lock_indicator = if !unlocked { "🔒 " } else { "" };
-
-            ListItem::new(Line::from(vec![
-                Span::styled(prefix, style),
-                Span::styled(
-                    tier_str,
-                    if tier > 0 {
-                        Style::default().fg(Color::Yellow)
-                    } else {
-                        Style::default().fg(Color::DarkGray)
-                    },
-                ),
-                Span::raw(" "),
-                Span::styled(indent, style),
-                Span::styled(lock_indicator, Style::default().fg(Color::DarkGray)),
-                Span::styled(room.name(), style),
-            ]))
-        })
-        .collect();
-
-    let list = List::new(items);
-    frame.render_widget(list, inner);
-}
-
-/// Render the room detail panel
-fn render_room_detail(
-    frame: &mut Frame,
-    area: Rect,
-    haven: &Haven,
-    selected_room: usize,
-    prestige_rank: u32,
-    achievements: &crate::achievements::Achievements,
-) {
-    let room = HavenRoomId::ALL[selected_room];
-    let tier = haven.room_tier(room);
-    let unlocked = haven.is_room_unlocked(room);
-
-    let title = format!(" {} ", room.name());
-    let block = Block::default()
-        .title(title)
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(if unlocked {
-            Color::Cyan
-        } else {
-            Color::DarkGray
-        }));
-
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-
-    // Calculate requirements section height (header + one line per parent)
-    let parents = room.parents();
-    let has_requirements = !parents.is_empty();
-    let req_height = if has_requirements {
-        1 + parents.len() as u16 // "Requires:" + one line per parent
-    } else {
-        0
-    };
-
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(3),                                    // Description
-            Constraint::Length(1),                                    // Spacer
-            Constraint::Length(1 + room.max_tier() as u16),           // Bonus info (header + tiers)
-            Constraint::Length(1),                                    // Spacer
-            Constraint::Length(req_height),                           // Requirements (if any)
-            Constraint::Length(if has_requirements { 1 } else { 0 }), // Spacer after requirements
-            Constraint::Length(3),                                    // Cost info
-            Constraint::Min(0),                                       // Padding
-        ])
-        .split(inner);
-
-    // Description
-    let desc = Paragraph::new(room.description())
-        .style(Style::default().fg(Color::White))
-        .wrap(Wrap { trim: true });
-    frame.render_widget(desc, chunks[0]);
-
-    // Bonus info - show tiers up to room's max
-    let max_tier = room.max_tier();
-    let mut bonus_lines = vec![Line::from(Span::styled(
-        "Bonuses:",
-        Style::default()
-            .fg(Color::White)
-            .add_modifier(Modifier::BOLD),
-    ))];
-
-    for t in 1..=max_tier {
-        let is_built = t <= tier;
-        let is_next = t == tier + 1 && tier < max_tier;
-        let style = if is_built {
-            Style::default().fg(Color::Green)
-        } else if is_next {
-            Style::default().fg(Color::Yellow)
-        } else {
-            Style::default().fg(Color::DarkGray)
-        };
-
-        // Arrow points at the tier being built (the next tier)
-        let marker = if is_next { "▶ " } else { "  " };
-
-        bonus_lines.push(Line::from(vec![
-            Span::styled(marker, style),
-            Span::styled(format!("T{}: ", t), Style::default().fg(Color::DarkGray)),
-            Span::styled(room.format_bonus(t), style),
-        ]));
-    }
-
-    let bonus_para = Paragraph::new(bonus_lines);
-    frame.render_widget(bonus_para, chunks[2]);
-
-    // Requirements section (if room has parents)
-    if has_requirements {
-        let mut req_lines = vec![Line::from(Span::styled(
-            "Requires:",
-            Style::default()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
-        ))];
-
-        for parent in parents {
-            let parent_tier = haven.room_tier(*parent);
-            let is_built = parent_tier > 0;
-            let (marker, style) = if is_built {
-                ("✓", Style::default().fg(Color::Green))
-            } else {
-                ("✗", Style::default().fg(Color::Red))
-            };
-
-            let tier_info = if parent_tier > 0 {
-                format!(" (T{})", parent_tier)
-            } else {
-                String::new()
-            };
-
-            req_lines.push(Line::from(vec![
-                Span::styled(format!("  {} ", marker), style),
-                Span::styled(parent.name(), style),
-                Span::styled(tier_info, Style::default().fg(Color::DarkGray)),
-            ]));
-        }
-
-        let req_para = Paragraph::new(req_lines);
-        frame.render_widget(req_para, chunks[4]);
-    }
-
-    // Cost info (now at chunks[6] due to new layout)
-    let cost_chunk = chunks[6];
-    if !unlocked {
-        // Show locked status
-        let cost_text = Paragraph::new(vec![
-            Line::from(Span::styled("🔒 Locked", Style::default().fg(Color::Red))),
-            Line::from(Span::styled(
-                "Build all required rooms first",
-                Style::default().fg(Color::DarkGray),
-            )),
-        ]);
-        frame.render_widget(cost_text, cost_chunk);
-    } else if tier < room.max_tier() {
-        let next_tier = tier + 1;
-        let cost = tier_cost(room, next_tier);
-        let can_afford_it = can_afford(room, haven, prestige_rank);
-
-        let cost_style = if can_afford_it {
-            Style::default().fg(Color::Green)
-        } else {
-            Style::default().fg(Color::Red)
-        };
-
-        let cost_text = Paragraph::new(vec![
-            Line::from(vec![
-                Span::styled("Cost: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(format!("{} Prestige Ranks", cost), cost_style),
-            ]),
-            Line::from(vec![
-                Span::styled("You have: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(
-                    format!("{} Prestige Ranks", prestige_rank),
-                    Style::default().fg(Color::White),
-                ),
-            ]),
-        ]);
-        frame.render_widget(cost_text, cost_chunk);
-    } else {
-        // Max tier reached - special handling for Storm Forge
-        if room == HavenRoomId::StormForge {
-            use crate::achievements::AchievementId;
-            let has_stormbreaker = achievements.is_unlocked(AchievementId::TheStormbreaker);
-
-            let cost_text = if has_stormbreaker {
-                Paragraph::new(vec![
-                    Line::from(Span::styled(
-                        "⚡ Stormbreaker forged!",
-                        Style::default()
-                            .fg(Color::Yellow)
-                            .add_modifier(Modifier::BOLD),
-                    )),
-                    Line::from(Span::styled(
-                        "Zone 10 boss accessible",
-                        Style::default().fg(Color::Green),
-                    )),
-                ])
-            } else {
-                Paragraph::new(vec![
-                    Line::from(Span::styled(
-                        "Press [Enter] to forge",
-                        Style::default().fg(Color::Yellow),
-                    )),
-                    Line::from(Span::styled(
-                        "Requires: Storm Leviathan + 25 PR",
-                        Style::default().fg(Color::DarkGray),
-                    )),
-                ])
-            };
-            frame.render_widget(cost_text, cost_chunk);
-        } else {
-            let cost_text = Paragraph::new(Line::from(Span::styled(
-                "✓ Max tier reached",
-                Style::default().fg(Color::Green),
-            )));
-            frame.render_widget(cost_text, cost_chunk);
-        }
-    }
+    // Flush buffer to frame
+    render_buffer(frame, inner, &buffer);
 }
 
 /// Render the Haven discovery modal
