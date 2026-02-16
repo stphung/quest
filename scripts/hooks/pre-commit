@@ -1,8 +1,16 @@
 #!/bin/bash
-# Pre-commit hook - runs full CI checks before commit
-# This ensures commits always pass CI
+# Pre-commit hook - auto-formats code and runs CI checks before commit
+# cargo fmt is applied automatically so commits always have correct formatting
 
 # Get the repo root (where ci-checks.sh lives)
 REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+# Auto-format staged Rust files
+cargo fmt --manifest-path "$REPO_ROOT/Cargo.toml"
+
+# Re-stage any files that were reformatted
+git diff --name-only -- '*.rs' | while read -r file; do
+    git add "$file"
+done
 
 exec "$REPO_ROOT/scripts/ci-checks.sh"
