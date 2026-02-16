@@ -510,7 +510,7 @@ fn render_menu(
     render_buffer(frame, area, &buffer);
 }
 
-/// Render the confirmation phase
+/// Render the confirmation phase using scene buffer with intensified forge backdrop.
 fn render_confirming(
     frame: &mut Frame,
     area: Rect,
@@ -518,77 +518,121 @@ fn render_confirming(
     enhancement: &EnhancementProgress,
     prestige_rank: u32,
 ) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Min(0),    // Top padding
-            Constraint::Length(8), // Confirmation content
-            Constraint::Min(0),    // Bottom padding
-        ])
-        .split(area);
+    let w = area.width as usize;
+    let h = area.height as usize;
+    if w == 0 || h == 0 {
+        return;
+    }
 
+    // 1. Create buffer and paint slightly intensified forge backdrop
+    let mut buffer = vec![vec![SceneCell::default(); w]; h];
+    let millis = current_millis();
+    let mut params = ForgeBackdropParams::normal();
+    params.bottom_rgb = (150, 50, 18);
+    params.ember_count = 12;
+    paint_forge_backdrop(&mut buffer, millis, &params);
+
+    // 2. Compute enhancement data
     let slot_index = soulforge_ui.selected_slot;
     let slot = SLOT_ORDER[slot_index];
     let current_level = enhancement.level(slot_index);
     let target_level = current_level + 1;
     let cost = enhancement_cost(target_level);
     let rate = success_rate(target_level);
-
     let bonus = enhancement_multiplier(target_level);
     let bonus_pct = (bonus - 1.0) * 100.0;
 
-    let text = Paragraph::new(vec![
-        Line::from(""),
-        Line::from(Span::styled(
-            format!("Enhance {} to +{}?", slot.name(), target_level),
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        )),
-        Line::from(""),
-        Line::from(vec![
-            Span::styled("Success rate: ", Style::default().fg(Color::White)),
-            Span::styled(
-                format!("{:.0}%", rate * 100.0),
-                Style::default().fg(if rate >= 0.5 {
-                    Color::Green
-                } else {
-                    Color::Red
-                }),
-            ),
-            Span::styled("  Cost: ", Style::default().fg(Color::White)),
-            Span::styled(
-                format!("{} Prestige Ranks", cost),
-                Style::default().fg(Color::Cyan),
-            ),
-            Span::styled(
-                format!(
-                    " ({} \u{2192} {})",
-                    prestige_rank,
-                    prestige_rank.saturating_sub(cost)
-                ),
-                Style::default().fg(Color::DarkGray),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled("Bonus at +", Style::default().fg(Color::White)),
-            Span::styled(
-                format!("{}", target_level),
-                Style::default().fg(level_color(target_level)),
-            ),
-            Span::styled(
-                format!(": +{:.1}% Power", bonus_pct),
-                Style::default().fg(Color::Green),
-            ),
-        ]),
-        Line::from(""),
-        Line::from(Span::styled(
-            "[Enter] Confirm  [Esc] Cancel",
-            Style::default().fg(Color::DarkGray),
-        )),
-    ])
-    .alignment(Alignment::Center);
-    frame.render_widget(text, chunks[1]);
+    // 3. Center 7 content lines vertically (title, blank, rate/cost, bonus, blank, help)
+    //    Layout: blank, title, blank, rate+cost, bonus, blank, help = 7 lines
+    let content_height = 7usize;
+    let top = if h > content_height {
+        (h - content_height) / 2
+    } else {
+        0
+    };
+
+    // Row 0 (top+0): blank (part of vertical centering)
+    // Row 1 (top+1): "Enhance [SlotName] to +[target]?" with pulsing yellow glow
+    let title = format!("Enhance {} to +{}?", slot.name(), target_level);
+    let pulse_t = ((millis as f64 / 600.0).sin() * 0.5 + 0.5).clamp(0.0, 1.0);
+    let title_rgb = lerp_rgb((200, 180, 50), (255, 255, 100), pulse_t);
+    put_text_centered(
+        &mut buffer,
+        (top + 1) as i32,
+        w,
+        &title,
+        Color::Rgb(title_rgb.0, title_rgb.1, title_rgb.2),
+    );
+
+    // Row 2 (top+2): blank
+
+    // Row 3 (top+3): Success rate + Cost + Remaining ranks
+    let rate_color = if rate >= 0.5 {
+        Color::Green
+    } else {
+        Color::Red
+    };
+    let remaining = prestige_rank.saturating_sub(cost);
+    let detail_line = format!(
+        "Success rate: {:.0}%  Cost: {} Prestige Ranks ({} \u{2192} {})",
+        rate * 100.0,
+        cost,
+        prestige_rank,
+        remaining
+    );
+    // Render piece by piece for per-segment coloring
+    {
+        let rate_str = format!("{:.0}%", rate * 100.0);
+        let cost_str = format!("{} Prestige Ranks", cost);
+        let remaining_str = format!("({} \u{2192} {})", prestige_rank, remaining);
+        let full_len = detail_line.len();
+        let start_col = (w as i32 - full_len as i32) / 2;
+        let mut col = start_col;
+
+        let label1 = "Success rate: ";
+        put_text(&mut buffer, (top + 3) as i32, col, label1, Color::White);
+        col += label1.len() as i32;
+
+        put_text(&mut buffer, (top + 3) as i32, col, &rate_str, rate_color);
+        col += rate_str.len() as i32;
+
+        let label2 = "  Cost: ";
+        put_text(&mut buffer, (top + 3) as i32, col, label2, Color::White);
+        col += label2.len() as i32;
+
+        put_text(&mut buffer, (top + 3) as i32, col, &cost_str, Color::Cyan);
+        col += cost_str.len() as i32;
+
+        let label3 = " ";
+        put_text(&mut buffer, (top + 3) as i32, col, label3, Color::Reset);
+        col += label3.len() as i32;
+
+        put_text(
+            &mut buffer,
+            (top + 3) as i32,
+            col,
+            &remaining_str,
+            Color::DarkGray,
+        );
+    }
+
+    // Row 4 (top+4): Bonus at target level
+    let bonus_line = format!("Bonus at +{}: +{:.1}% Power", target_level, bonus_pct);
+    put_text_centered(&mut buffer, (top + 4) as i32, w, &bonus_line, Color::Green);
+
+    // Row 5 (top+5): blank
+
+    // Row 6 (top+6): Help text
+    put_text_centered(
+        &mut buffer,
+        (top + 6) as i32,
+        w,
+        "[Enter] Confirm  [Esc] Cancel",
+        Color::DarkGray,
+    );
+
+    // 4. Flush buffer to frame
+    render_buffer(frame, area, &buffer);
 }
 
 /// Render the hammering animation
