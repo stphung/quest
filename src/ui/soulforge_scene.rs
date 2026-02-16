@@ -46,7 +46,7 @@ fn put_text(buffer: &mut [Vec<SceneCell>], row: i32, col: i32, text: &str, fg: C
 
 /// Write a string centered horizontally in the buffer.
 fn put_text_centered(buffer: &mut [Vec<SceneCell>], row: i32, width: usize, text: &str, fg: Color) {
-    let col = (width as i32 - text.len() as i32) / 2;
+    let col = (width as i32 - text.chars().count() as i32) / 2;
     put_text(buffer, row, col, text, fg);
 }
 
@@ -993,11 +993,8 @@ fn render_failure(frame: &mut Frame, area: Rect, soulforge_ui: &SoulforgeUiState
     let max_cracks = 8usize;
     let active_cracks = ((cool_t * max_cracks as f64).ceil() as usize).min(max_cracks);
     let crack_char = '\u{2573}'; // ╳
-    let crack_fg = Color::Rgb(
-        lerp_rgb((180, 60, 20), (80, 80, 90), cool_t).0,
-        lerp_rgb((180, 60, 20), (80, 80, 90), cool_t).1,
-        lerp_rgb((180, 60, 20), (80, 80, 90), cool_t).2,
-    );
+    let crack_rgb = lerp_rgb((180, 60, 20), (80, 80, 90), cool_t);
+    let crack_fg = Color::Rgb(crack_rgb.0, crack_rgb.1, crack_rgb.2);
     for i in 0..active_cracks {
         let seed = hash2d(i + 42, i * 7 + 13);
         let row = (seed as usize) % h;
