@@ -53,16 +53,21 @@ pub struct LootTicker {
     pub scroll_offset: f64,
     /// Remaining pause ticks when a new event arrives (0 = scrolling)
     pub pause_ticks: u8,
+    /// Queued scroll debt from newly prepended entries (smoothed over time)
+    catchup_debt: f64,
 }
 
 /// Max entries in the ticker before oldest are evicted
 const TICKER_MAX_ENTRIES: usize = 30;
 
-/// Characters scrolled per tick (0.4 = ~4 chars/sec at 100ms ticks)
-pub const TICKER_SCROLL_SPEED: f64 = 0.4;
+/// Characters scrolled per tick (1.0 = 1 char per 100ms tick for smooth movement)
+pub const TICKER_SCROLL_SPEED: f64 = 1.0;
 
 /// Ticks to pause scrolling when a new event arrives (5 = 500ms)
 pub const TICKER_PAUSE_TICKS: u8 = 5;
+
+/// Catchup speed multiplier (how fast to absorb debt on top of normal scroll)
+const TICKER_CATCHUP_SPEED: f64 = 1.2;
 
 impl LootTicker {
     pub fn new() -> Self {
@@ -70,13 +75,14 @@ impl LootTicker {
             entries: VecDeque::with_capacity(TICKER_MAX_ENTRIES),
             scroll_offset: 0.0,
             pause_ticks: 0,
+            catchup_debt: 0.0,
         }
     }
 
     /// Add a new entry to the ticker. Evicts oldest if at capacity.
     pub fn push(&mut self, entry: TickerEntry) {
-        // Compensate scroll offset for content prepended at the front.
-        // New entry chars: icon + space (if icon) + text + separator " ··· " (5 chars)
+        // Queue scroll debt for content prepended at the front.
+        // The debt is smoothly absorbed over subsequent ticks instead of jumping.
         if !self.entries.is_empty() {
             let icon_len = if entry.icon.is_empty() {
                 0
@@ -85,7 +91,7 @@ impl LootTicker {
             };
             let text_len = entry.text.chars().count();
             let separator_len = 5; // " ··· "
-            self.scroll_offset += (icon_len + text_len + separator_len) as f64;
+            self.catchup_debt += (icon_len + text_len + separator_len) as f64;
         }
 
         if self.entries.len() >= TICKER_MAX_ENTRIES {
@@ -101,6 +107,13 @@ impl LootTicker {
             self.pause_ticks -= 1;
         } else {
             self.scroll_offset += TICKER_SCROLL_SPEED;
+        }
+
+        // Smoothly absorb catchup debt regardless of pause state
+        if self.catchup_debt > 0.0 {
+            let step = TICKER_CATCHUP_SPEED.min(self.catchup_debt);
+            self.scroll_offset += step;
+            self.catchup_debt -= step;
         }
     }
 }
@@ -678,7 +691,7 @@ mod tests {
     }
 
     #[test]
-    fn test_loot_ticker_push_compensates_scroll_offset() {
+    fn test_loot_ticker_push_queues_catchup_debt() {
         let mut ticker = LootTicker::new();
         // Add an initial entry and advance scroll
         ticker.push(TickerEntry {
@@ -694,14 +707,20 @@ mod tests {
         let offset_before = ticker.scroll_offset;
         assert!(offset_before > 0.0);
 
-        // Push a new entry — offset should increase to compensate
+        // Push a new entry — offset should NOT jump immediately
         ticker.push(TickerEntry {
             icon: "\u{2694}",
             text: "Sword".to_string(),
             color: ratatui::style::Color::Yellow,
             bold: false,
         });
-        // Offset should be greater than before (compensated for new content)
+        // Offset unchanged immediately (debt queued instead)
+        assert_eq!(ticker.scroll_offset, offset_before);
+
+        // But after ticking, offset should gradually increase to absorb debt
+        for _ in 0..50 {
+            ticker.tick();
+        }
         assert!(ticker.scroll_offset > offset_before);
     }
 
