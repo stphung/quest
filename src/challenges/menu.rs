@@ -680,8 +680,7 @@ pub fn create_challenge(ct: &ChallengeType) -> PendingChallenge {
             icon: "⇄",
             description: "A six-column rune well crackles to life before you. Colored sigils rise \
                 from below in relentless waves. Swap adjacent rune pairs to form matches, trigger \
-                cascading chains, and keep the top from overflowing. The longer you survive, the \
-                faster the rise."
+                cascading chains, and keep the top from overflowing."
                 .to_string(),
         },
         ChallengeType::Jezzball => PendingChallenge {

@@ -226,8 +226,6 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
     let outcomes = Paragraph::new(vec![Line::from(vec![
         Span::styled("✓ ", Style::default().fg(Color::Green)),
         Span::styled("No penalty for losing", Style::default().fg(Color::Gray)),
-        Span::styled("    ✓ ", Style::default().fg(Color::Green)),
-        Span::styled("Draw grants bonus XP", Style::default().fg(Color::Gray)),
     ])]);
     frame.render_widget(outcomes, chunks[4]);
 
