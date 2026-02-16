@@ -749,6 +749,7 @@ pub(super) fn draw_footer_compact(
         soulforge_span,
         ach_span,
         challenge_span,
+        Span::styled(" [?]Help", Style::default().fg(Color::DarkGray)),
     ]);
 
     let paragraph = Paragraph::new(line).alignment(Alignment::Center);
@@ -775,6 +776,7 @@ pub(super) fn draw_footer_minimal(frame: &mut Frame, area: Rect, game_state: &Ga
     let line = Line::from(vec![
         Span::styled("Esc:Quit", Style::default().fg(Color::Red)),
         prestige_span,
+        Span::styled(" ?:Help", Style::default().fg(Color::DarkGray)),
         Span::styled(" Tab:More", Style::default().fg(Color::DarkGray)),
     ]);
 
@@ -1011,7 +1013,12 @@ pub fn draw_footer(
             haven_text,
             soulforge_text,
         ]),
-        Line::from(vec![achievements_text, challenge_text, update_status_text]),
+        Line::from(vec![
+            achievements_text,
+            challenge_text,
+            update_status_text,
+            Span::styled("    [?] Help", Style::default().fg(Color::DarkGray)),
+        ]),
     ];
 
     let footer = Paragraph::new(footer_text)
