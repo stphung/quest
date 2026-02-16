@@ -232,6 +232,9 @@ fn draw_game_overlays(
                 ctx,
             );
         }
+        GameOverlay::Help => {
+            // Will be replaced with actual rendering in next task
+        }
         GameOverlay::None => {}
     }
 

@@ -89,6 +89,8 @@ pub use crate::enhancement::{EnhancementResult, SoulforgePhase, SoulforgeUiState
 /// Game-screen overlay state. At most one is active at a time.
 pub enum GameOverlay {
     None,
+    #[allow(dead_code)]
+    Help,
     HavenDiscovery,
     SoulforgeDiscovery,
     PrestigeConfirm,
