@@ -360,7 +360,7 @@ fn draw_s_player_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
         .label(label)
         .ratio(hp_ratio);
 
-    if let Some(flash) = &game_state.combat_state.player_damage_flash {
+    if let Some(flash) = game_state.combat_state.player_damage_floats.last() {
         let flash_width = (flash.text.chars().count() as u16) + 1;
         if area.width > flash_width + 15 {
             let chunks = Layout::default()
@@ -396,7 +396,7 @@ fn draw_s_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
             .label(label)
             .ratio(hp_ratio);
 
-        if let Some(flash) = &game_state.combat_state.enemy_damage_flash {
+        if let Some(flash) = game_state.combat_state.enemy_damage_floats.last() {
             let flash_width = (flash.text.chars().count() as u16) + 1;
             if area.width > flash_width + 15 {
                 let chunks = Layout::default()

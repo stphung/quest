@@ -61,6 +61,12 @@ pub enum TickEvent {
         message: String,
     },
 
+    /// Damage reflected back to the enemy.
+    DamageReflected { damage: u32, message: String },
+
+    /// HP regen completed after a kill.
+    RegenComplete { healed: u32 },
+
     /// Normal enemy or dungeon combat-room enemy was defeated.
     EnemyDefeated {
         xp_gained: u64,
@@ -531,6 +537,15 @@ pub fn game_tick<R: Rng>(
                     enemy_name,
                     message,
                 });
+            }
+            CombatEvent::DamageReflected { damage } => {
+                let message = format!("\u{1f4a5} {} reflected!", damage);
+                result
+                    .events
+                    .push(TickEvent::DamageReflected { damage, message });
+            }
+            CombatEvent::RegenComplete { healed } => {
+                result.events.push(TickEvent::RegenComplete { healed });
             }
             CombatEvent::EnemyDied { xp_gained } => {
                 let enemy_name = current_enemy_name.clone();

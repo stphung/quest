@@ -281,9 +281,11 @@ pub struct CombatState {
     #[serde(skip)]
     pub combat_log: VecDeque<CombatLogEntry>,
     #[serde(skip)]
-    pub player_damage_flash: Option<DamageFlash>,
+    pub regen_start_hp: u32,
     #[serde(skip)]
-    pub enemy_damage_flash: Option<DamageFlash>,
+    pub player_damage_floats: Vec<DamageFlash>,
+    #[serde(skip)]
+    pub enemy_damage_floats: Vec<DamageFlash>,
 }
 
 impl Default for CombatState {
@@ -304,8 +306,9 @@ impl CombatState {
             is_regenerating: false,
             visual_effects: Vec::new(),
             combat_log: VecDeque::with_capacity(COMBAT_LOG_CAPACITY),
-            player_damage_flash: None,
-            enemy_damage_flash: None,
+            regen_start_hp: 0,
+            player_damage_floats: Vec::new(),
+            enemy_damage_floats: Vec::new(),
         }
     }
 
@@ -333,20 +336,16 @@ impl CombatState {
         self.player_current_hp > 0
     }
 
-    /// Decay HUD flash timers by delta_time. Clears expired flashes.
+    /// Decay HUD flash timers by delta_time. Removes expired floats.
     pub fn tick_hud(&mut self, delta_time: f64) {
-        if let Some(flash) = &mut self.player_damage_flash {
-            flash.remaining -= delta_time;
-            if flash.remaining <= 0.0 {
-                self.player_damage_flash = None;
-            }
-        }
-        if let Some(flash) = &mut self.enemy_damage_flash {
-            flash.remaining -= delta_time;
-            if flash.remaining <= 0.0 {
-                self.enemy_damage_flash = None;
-            }
-        }
+        self.player_damage_floats.retain_mut(|f| {
+            f.remaining -= delta_time;
+            f.remaining > 0.0
+        });
+        self.enemy_damage_floats.retain_mut(|f| {
+            f.remaining -= delta_time;
+            f.remaining > 0.0
+        });
     }
 }
 

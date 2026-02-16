@@ -39,12 +39,15 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 } else {
                     (format!("-{}", damage), Color::Green, false)
                 };
-                game_state.combat_state.enemy_damage_flash = Some(DamageFlash {
-                    text,
-                    color,
-                    bold,
-                    remaining: DAMAGE_FLASH_DURATION,
-                });
+                game_state
+                    .combat_state
+                    .enemy_damage_floats
+                    .push(DamageFlash {
+                        text,
+                        color,
+                        bold,
+                        remaining: DAMAGE_FLASH_DURATION,
+                    });
 
                 // Keep attack flash and hit impact effects
                 let flash_effect = VisualEffect::new(EffectType::AttackFlash, 0.2);
@@ -56,12 +59,15 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
-                game_state.combat_state.enemy_damage_flash = Some(DamageFlash {
-                    text: "BLOCK".to_string(),
-                    color: Color::DarkGray,
-                    bold: false,
-                    remaining: DAMAGE_FLASH_DURATION,
-                });
+                game_state
+                    .combat_state
+                    .enemy_damage_floats
+                    .push(DamageFlash {
+                        text: "BLOCK".to_string(),
+                        color: Color::DarkGray,
+                        bold: false,
+                        remaining: DAMAGE_FLASH_DURATION,
+                    });
             }
             TickEvent::EnemyAttack {
                 damage, message, ..
@@ -69,12 +75,40 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, false);
-                game_state.combat_state.player_damage_flash = Some(DamageFlash {
-                    text: format!("-{}", damage),
-                    color: Color::Red,
-                    bold: false,
-                    remaining: DAMAGE_FLASH_DURATION,
-                });
+                game_state
+                    .combat_state
+                    .player_damage_floats
+                    .push(DamageFlash {
+                        text: format!("-{}", damage),
+                        color: Color::Red,
+                        bold: false,
+                        remaining: DAMAGE_FLASH_DURATION,
+                    });
+            }
+            TickEvent::DamageReflected { damage, message } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, true);
+                game_state
+                    .combat_state
+                    .enemy_damage_floats
+                    .push(DamageFlash {
+                        text: format!("\u{1f4a5}{}", damage),
+                        color: Color::Magenta,
+                        bold: false,
+                        remaining: DAMAGE_FLASH_DURATION,
+                    });
+            }
+            TickEvent::RegenComplete { healed } => {
+                game_state
+                    .combat_state
+                    .player_damage_floats
+                    .push(DamageFlash {
+                        text: format!("+{}", healed),
+                        color: Color::Green,
+                        bold: false,
+                        remaining: DAMAGE_FLASH_DURATION,
+                    });
             }
             TickEvent::EnemyDefeated {
                 xp_gained, message, ..
@@ -88,7 +122,6 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     color: Color::Green,
                     bold: false,
                 });
-                game_state.combat_state.enemy_damage_flash = None;
             }
             TickEvent::PlayerDied { message } | TickEvent::PlayerDiedInDungeon { message } => {
                 game_state
@@ -140,7 +173,6 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     color: Color::Yellow,
                     bold: true,
                 });
-                game_state.combat_state.enemy_damage_flash = None;
                 // Push zone advancement to ticker
                 match result {
                     BossDefeatResult::SubzoneComplete { .. } => {
@@ -220,7 +252,6 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     color: Color::Magenta,
                     bold: true,
                 });
-                game_state.combat_state.enemy_damage_flash = None;
             }
             TickEvent::DungeonEliteDefeated { message, .. } => {
                 game_state
@@ -232,7 +263,6 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     color: Color::Magenta,
                     bold: false,
                 });
-                game_state.combat_state.enemy_damage_flash = None;
             }
             TickEvent::DungeonCompleted { message, .. } => {
                 game_state
