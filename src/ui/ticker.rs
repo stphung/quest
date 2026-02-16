@@ -22,19 +22,15 @@ pub fn draw_ticker(frame: &mut Frame, area: Rect, ticker: &LootTicker) {
         return;
     }
 
-    if ticker.is_empty() {
+    let visible_width = area.width as usize;
+    let visible = ticker.visible_entries(visible_width);
+
+    if visible.is_empty() {
         let line = Line::from(Span::styled(
             "  Awaiting adventure...",
             Style::default().fg(Color::DarkGray),
         ));
         frame.render_widget(Paragraph::new(line), area);
-        return;
-    }
-
-    let visible_width = area.width as usize;
-    let visible = ticker.visible_entries(visible_width);
-
-    if visible.is_empty() {
         return;
     }
 
