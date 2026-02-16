@@ -465,7 +465,7 @@ item_level = zone_id x 10
 ```
 Zone 1 = ilvl 10, Zone 10 = ilvl 100. Higher ilvl items have proportionally stronger attribute bonuses and affix values (1.0x at ilvl 10 to 4.0x at ilvl 100).
 
-### Affix Types (9)
+### Affix Types (9 + Unknown)
 
 | Category | Affixes |
 |----------|---------|
@@ -907,7 +907,7 @@ quest/
 │   │   ├── logic.rs         # Enhancement rolls, discovery
 │   │   └── persistence.rs   # Save/load from ~/.quest/enhancement.json
 │   ├── achievements/        # Achievement system
-│   │   ├── types.rs         # AchievementId (80+ variants), Achievements state
+│   │   ├── types.rs         # AchievementId (130+ variants), Achievements state
 │   │   ├── data.rs          # Achievement database
 │   │   └── persistence.rs   # Save/load
 │   ├── utils/               # Utilities

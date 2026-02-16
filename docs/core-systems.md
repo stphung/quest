@@ -304,7 +304,7 @@ Weapon, Armor, Helmet, Gloves, Boots, Amulet, Ring.
 - Prestige bonus for rarity: +1%/rank, capped at 10%. Haven Workshop bonus: up to 25%. Both shift weight away from Common toward higher rarities
 - Common floor: never drops below 20%
 
-### Affix Types (9)
+### Affix Types (9 + Unknown)
 
 | Category | Affixes |
 |----------|---------|

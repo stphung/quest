@@ -91,11 +91,14 @@ Headless game balance simulator that calls the same `game_tick()` code with no U
 
 ```bash
 cargo run --release --bin simulator -- --ticks 36000 --seed 42 --prestige 10 --runs 3
+cargo run --release --bin simulator -- --ticks 36000 --seed 42 --prestige 15 --haven combat
 ```
 
-CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FILE`, `--quiet`, `--stormbreaker` (force-unlocks TheStormbreaker achievement for Zone 10+ testing)
+CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FILE`, `--quiet`, `--stormbreaker` (force-unlocks TheStormbreaker achievement for Zone 10+ testing), `--haven STR` (auto-build Haven rooms using a named strategy)
 
-**Limitation:** Only exercises the combat/zone progression loop. Interactive systems (dungeons, fishing, challenges, haven) are discovered but never activated (no player input). See issue #141 for auto-play policies.
+**Haven auto-building:** `--haven <strategy>` enables automatic Haven room construction during simulation. Four strategies: `combat` (Armory/damage path), `qol` (Bedroom/fishing path), `balanced` (both branches), `full` (everything + StormForge). When enabled, Haven is force-discovered at start and prestige ranks are spent on rooms each tick following the strategy's priority order. This models the real gameplay trade-off between investing prestige in Haven vs keeping it for combat bonuses.
+
+**Limitation:** Only exercises the combat/zone progression loop. Interactive systems (dungeons, fishing, challenges) are discovered but never activated (no player input). Haven bonuses are fully active when `--haven` is used. See issue #141 for auto-play policies.
 
 ### Character Module (`src/character/`) — [detailed docs](src/character/CLAUDE.md)
 
@@ -143,7 +146,7 @@ CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FI
 
 ### Item Module (`src/items/`) — [detailed docs](src/items/CLAUDE.md)
 
-- `types.rs` — Core item data structures (7 equipment slots, 5 rarity tiers, 9 affix types, ilvl scaling)
+- `types.rs` — Core item data structures (7 equipment slots, 5 rarity tiers, 9 affix types + Unknown fallback, ilvl scaling)
 - `equipment.rs` — Equipment container with slot management and iteration
 - `generation.rs` — Rarity-based attribute/affix generation with ilvl scaling (1.0x at ilvl 10 to 4.0x at ilvl 100)
 - `drops.rs` — Separate mob/boss drop systems: mobs have 15% base drop chance (capped at Epic), bosses always drop (can drop Legendary)
@@ -359,7 +362,7 @@ quest/
 │       ├── soulforge_scene.rs # Soulforge enhancement UI
 │       ├── *_scene.rs       # Various game scenes
 │       └── character_*.rs   # Character management UI
-├── tests/                   # Integration tests (15 test files, 1,600+ tests)
+├── tests/                   # Integration tests (15 test files, 2,800+ tests)
 │   ├── game_loop_orchestration_test.rs  # 36 behavior-locking tests for game_tick
 │   ├── tick_integration_test.rs         # Tick module integration tests
 │   ├── zone_progression_test.rs         # Zone advancement tests
