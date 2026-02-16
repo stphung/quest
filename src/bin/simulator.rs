@@ -464,7 +464,7 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
         let mut w = std::io::BufWriter::new(file);
         writeln!(
             w,
-            "tick,game_time_s,level,xp,zone_id,subzone_id,prestige_rank,total_kills,total_deaths,fishing_rank,items_found"
+            "tick,game_time_s,level,xp,zone_id,subzone_id,prestige_rank,total_kills,total_deaths,fishing_rank,items_found,haven_rooms_built,haven_prestige_spent"
         )
         .expect("Failed to write CSV header");
         w
@@ -518,7 +518,7 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
                 let total_items: u64 = stats.items_by_rarity.iter().sum();
                 writeln!(
                     w,
-                    "{},{:.1},{},{},{},{},{},{},{},{},{}",
+                    "{},{:.1},{},{},{},{},{},{},{},{},{},{},{}",
                     tick,
                     tick as f64 / 10.0,
                     state.character_level,
@@ -530,6 +530,8 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
                     stats.total_deaths,
                     state.fishing.rank,
                     total_items,
+                    stats.haven_rooms_built,
+                    stats.haven_prestige_spent,
                 )
                 .expect("Failed to write CSV row");
             }
@@ -636,7 +638,7 @@ fn print_summary(stats: &SimStats, seed: u64, config: &SimConfig) {
     if config.quiet {
         let total_items: u64 = stats.items_by_rarity.iter().sum();
         println!(
-            "seed={seed} ticks={} level={} zone={}-{} kills={} deaths={} items={} achievements={}",
+            "seed={seed} ticks={} level={} zone={}-{} kills={} deaths={} items={} achievements={} haven_built={} haven_spent={}",
             stats.total_ticks,
             stats.final_level,
             stats.final_zone.0,
@@ -645,6 +647,8 @@ fn print_summary(stats: &SimStats, seed: u64, config: &SimConfig) {
             stats.total_deaths,
             total_items,
             stats.achievements_unlocked,
+            stats.haven_rooms_built,
+            stats.haven_prestige_spent,
         );
         return;
     }
