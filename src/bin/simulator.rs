@@ -21,7 +21,6 @@ use quest::character::derived_stats::DerivedStats;
 use quest::core::game_state::GameState;
 use quest::core::tick::{game_tick, TickEvent, TickResult};
 use quest::enhancement::EnhancementProgress;
-#[allow(unused_imports)]
 use quest::haven::{try_build_room, Haven, HavenRoomId};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -30,7 +29,6 @@ use std::io::Write;
 
 // ── Haven Strategy ──────────────────────────────────────────────────
 
-#[allow(dead_code)]
 enum HavenStrategy {
     Combat,
     Qol,
@@ -38,7 +36,6 @@ enum HavenStrategy {
     Full,
 }
 
-#[allow(dead_code)]
 impl HavenStrategy {
     fn from_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
@@ -50,6 +47,7 @@ impl HavenStrategy {
         }
     }
 
+    #[allow(dead_code)] // Used in Task 3 for reporting
     fn name(&self) -> &'static str {
         match self {
             Self::Combat => "combat",
@@ -217,6 +215,26 @@ fn print_usage() {
          \x20 --haven STR     Haven auto-build strategy (combat, qol, balanced, full)\n\
          \x20 --help, -h      Show this help"
     );
+}
+
+/// Auto-build Haven rooms using the given strategy.
+/// Returns a list of (room, new_tier, cost) for rooms built this tick.
+fn auto_build_haven(
+    haven: &mut Haven,
+    prestige_rank: &mut u32,
+    priority: &[HavenRoomId],
+) -> Vec<(HavenRoomId, u8, u32)> {
+    let mut built = Vec::new();
+    for &room in priority {
+        if haven.room_tier(room) >= room.max_tier() {
+            continue;
+        }
+        if let Some((new_tier, cost)) = try_build_room(room, haven, prestige_rank) {
+            built.push((room, new_tier, cost));
+            break; // One room per tick
+        }
+    }
+    built
 }
 
 // ── Simulation Statistics ────────────────────────────────────────────
@@ -408,6 +426,10 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
     state.combat_state.player_current_hp = derived.max_hp;
 
     let mut haven = Haven::default();
+    let haven_priority = config.haven_strategy.as_ref().map(|s| s.room_priority());
+    if haven_priority.is_some() {
+        haven.discovered = true;
+    }
     let mut enhancement = EnhancementProgress::new();
     let mut achievements = Achievements::default();
 
@@ -462,6 +484,19 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
         if curr_zone != prev_zone {
             stats.record_zone_entry(tick, curr_zone.0, curr_zone.1);
             prev_zone = curr_zone;
+        }
+
+        // Auto-build Haven rooms if strategy is active
+        if let Some(priority) = haven_priority {
+            let built = auto_build_haven(&mut haven, &mut state.prestige_rank, priority);
+            for (room, new_tier, cost) in &built {
+                if config.verbose {
+                    println!(
+                        "[t={tick:>6}] Haven: {} upgraded to T{new_tier} (cost {cost} PR)",
+                        room.name()
+                    );
+                }
+            }
         }
 
         stats.process_tick(tick, &result, &state, curr_zone);
