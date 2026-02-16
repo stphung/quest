@@ -1,4 +1,4 @@
-//! Challenge minigames: Chess, Gomoku, Minesweeper, Morris, Rune, Runic Shift, Go, JezzBall.
+//! Challenge minigames: Chess, Gomoku, Minesweeper, Morris, Rune, Sigil Surge, Go, JezzBall.
 
 #![allow(unused_imports)]
 

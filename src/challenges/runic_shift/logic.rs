@@ -1,11 +1,11 @@
-//! Runic Shift game logic.
+//! Sigil Surge game logic.
 
 use super::types::*;
 use crate::challenges::menu::{ChallengeReward, DifficultyInfo};
 use crate::challenges::{ActiveMinigame, GameResultInfo, MinigameWinInfo};
 use crate::core::game_state::GameState;
 
-/// UI-agnostic input actions for Runic Shift.
+/// UI-agnostic input actions for Sigil Surge.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RunicShiftInput {
     Up,
@@ -18,7 +18,7 @@ pub enum RunicShiftInput {
     Other,
 }
 
-/// Start a new Runic Shift game at the given difficulty.
+/// Start a new Sigil Surge game at the given difficulty.
 pub fn start_runic_shift_game(difficulty: RunicShiftDifficulty) -> ActiveMinigame {
     ActiveMinigame::RunicShift(RunicShiftGame::new(difficulty))
 }
@@ -97,7 +97,7 @@ pub fn process_input(game: &mut RunicShiftGame, input: RunicShiftInput) {
     }
 }
 
-/// Advance Runic Shift simulation.
+/// Advance Sigil Surge simulation.
 ///
 /// `dt_ms` is elapsed time in milliseconds since the previous call.
 pub fn tick_runic_shift(game: &mut RunicShiftGame, dt_ms: u64) -> bool {
@@ -162,6 +162,7 @@ fn animation_remaining_ms(game: &RunicShiftGame) -> u64 {
     match game.board_animation.as_ref() {
         Some(BoardAnimation::Swap(anim)) => anim.remaining_ms,
         Some(BoardAnimation::Fall(anim)) => anim.remaining_ms,
+        Some(BoardAnimation::Rise(anim)) => anim.remaining_ms,
         None => 0,
     }
 }
@@ -179,6 +180,10 @@ fn advance_animation(game: &mut RunicShiftGame, step_ms: u64) {
                 anim.remaining_ms = anim.remaining_ms.saturating_sub(step_ms);
                 completed = anim.remaining_ms == 0;
             }
+            BoardAnimation::Rise(anim) => {
+                anim.remaining_ms = anim.remaining_ms.saturating_sub(step_ms);
+                completed = anim.remaining_ms == 0;
+            }
         }
     }
 
@@ -191,7 +196,7 @@ fn advance_animation(game: &mut RunicShiftGame, step_ms: u64) {
 fn on_animation_complete(game: &mut RunicShiftGame) {
     let pending = game.pending_settle.take();
     match pending {
-        Some(PendingSettle::AfterSwap) => {
+        Some(PendingSettle::Swap) => {
             let fall_moves = apply_gravity_collect(game);
             if start_fall_animation(game, fall_moves, false) {
                 return;
@@ -201,13 +206,19 @@ fn on_animation_complete(game: &mut RunicShiftGame) {
             }
             check_line_goal_win(game);
         }
-        Some(PendingSettle::AfterFall { chain_continuation }) => {
+        Some(PendingSettle::Fall { chain_continuation }) => {
             if start_clear_if_matches(game, chain_continuation) {
                 return;
             }
             if chain_continuation {
                 game.current_chain = 0;
                 game.chain_depth = 0;
+            }
+            check_line_goal_win(game);
+        }
+        Some(PendingSettle::Rise) => {
+            if start_clear_if_matches(game, false) {
+                return;
             }
             check_line_goal_win(game);
         }
@@ -247,7 +258,7 @@ fn attempt_swap(game: &mut RunicShiftGame) -> bool {
         duration_ms: SWAP_ANIM_MS,
         remaining_ms: SWAP_ANIM_MS,
     }));
-    game.pending_settle = Some(PendingSettle::AfterSwap);
+    game.pending_settle = Some(PendingSettle::Swap);
     true
 }
 
@@ -255,6 +266,8 @@ fn trigger_rise(game: &mut RunicShiftGame) -> bool {
     if game.clear_timer_ms > 0 {
         return false;
     }
+
+    let rise_motions = collect_rise_motions(&game.grid);
 
     // Overflow happens when a filled top-row block is pushed beyond the visible well.
     let overflowed = game.has_top_occupancy();
@@ -282,7 +295,15 @@ fn trigger_rise(game: &mut RunicShiftGame) -> bool {
         return true;
     }
 
-    start_clear_if_matches(game, false)
+    if start_rise_animation(game, rise_motions) {
+        return true;
+    }
+
+    if start_clear_if_matches(game, false) {
+        return true;
+    }
+    check_line_goal_win(game);
+    true
 }
 
 fn lose_life(game: &mut RunicShiftGame) {
@@ -319,13 +340,11 @@ fn start_clear_if_matches(game: &mut RunicShiftGame, chain_continuation: bool) -
     if matches.is_empty() {
         return false;
     }
+    game.matches = game.matches.saturating_add(1);
 
     if chain_continuation {
         game.chain_depth = game.chain_depth.saturating_add(1).max(2);
         game.current_chain = game.chain_depth;
-
-        let bonus = game.chain_depth.saturating_sub(1);
-        game.clears = game.clears.saturating_add(bonus);
     } else {
         game.chain_depth = 1;
         game.current_chain = 1;
@@ -397,6 +416,23 @@ fn apply_gravity_collect(game: &mut RunicShiftGame) -> Vec<FallingBlockAnim> {
     motions
 }
 
+fn collect_rise_motions(grid: &[[Option<Block>; GRID_COLS]; GRID_ROWS]) -> Vec<FallingBlockAnim> {
+    let mut motions = Vec::new();
+    for (row, row_cells) in grid.iter().enumerate().skip(1) {
+        for (col, cell) in row_cells.iter().enumerate() {
+            if let Some(block) = *cell {
+                motions.push(FallingBlockAnim {
+                    color: block.color,
+                    col,
+                    from_row: row,
+                    to_row: row - 1,
+                });
+            }
+        }
+    }
+    motions
+}
+
 fn start_fall_animation(
     game: &mut RunicShiftGame,
     motions: Vec<FallingBlockAnim>,
@@ -418,7 +454,21 @@ fn start_fall_animation(
         duration_ms: duration,
         remaining_ms: duration,
     }));
-    game.pending_settle = Some(PendingSettle::AfterFall { chain_continuation });
+    game.pending_settle = Some(PendingSettle::Fall { chain_continuation });
+    true
+}
+
+fn start_rise_animation(game: &mut RunicShiftGame, motions: Vec<FallingBlockAnim>) -> bool {
+    if motions.is_empty() {
+        return false;
+    }
+
+    game.board_animation = Some(BoardAnimation::Rise(RiseAnimation {
+        blocks: motions,
+        duration_ms: RISE_ANIM_MS,
+        remaining_ms: RISE_ANIM_MS,
+    }));
+    game.pending_settle = Some(PendingSettle::Rise);
     true
 }
 
@@ -535,11 +585,8 @@ impl DifficultyInfo for RunicShiftDifficulty {
     }
 
     fn extra_info(&self) -> Option<String> {
-        let rows_to_clear = GRID_ROWS.saturating_sub(self.target_line_row());
         Some(format!(
-            "clear {} rows, {} colors, {}ms rise",
-            rows_to_clear,
-            self.num_colors(),
+            "Clear all sigils above the line, {}ms rise",
             self.rise_interval_ms()
         ))
     }
@@ -548,15 +595,24 @@ impl DifficultyInfo for RunicShiftDifficulty {
 /// Apply game result using the shared challenge reward system.
 /// Returns `Some(MinigameWinInfo)` if the player won, `None` otherwise.
 pub fn apply_game_result(state: &mut GameState) -> Option<MinigameWinInfo> {
-    let (result, difficulty, clears, best_chain, forfeit_pending, remaining_below_line) = {
+    let (
+        result,
+        difficulty,
+        clears,
+        matches,
+        best_chain,
+        forfeit_pending,
+        remaining_at_or_above_line,
+    ) = {
         if let Some(ActiveMinigame::RunicShift(ref game)) = state.active_minigame {
             (
                 game.game_result,
                 game.difficulty,
                 game.clears,
+                game.matches,
                 game.best_chain,
                 game.forfeit_pending,
-                game.runes_below_target_line(),
+                game.runes_at_or_above_target_line(),
             )
         } else {
             return None;
@@ -570,23 +626,23 @@ pub fn apply_game_result(state: &mut GameState) -> Option<MinigameWinInfo> {
     if won {
         state.combat_state.add_log_entry(
             format!(
-                "⇄ Runic Shift mastered! Target line cleared (best chain x{}, {} clears).",
-                best_chain, clears
+                "⇄ Sigil Surge mastered! All sigils are below the line (best chain x{}, {} blocks, {} matches).",
+                best_chain, clears, matches
             ),
             false,
             true,
         );
     } else if forfeit_pending {
         state.combat_state.add_log_entry(
-            "⇄ You abandon the shifting runes.".to_string(),
+            "⇄ You abandon the shifting sigils.".to_string(),
             false,
             true,
         );
     } else {
         state.combat_state.add_log_entry(
             format!(
-                "⇄ The runes overwhelm you with {} runes still below the line.",
-                remaining_below_line
+                "⇄ The sigils overwhelm you with {} sigils still at/above the line.",
+                remaining_at_or_above_line
             ),
             false,
             true,
@@ -601,8 +657,8 @@ pub fn apply_game_result(state: &mut GameState) -> Option<MinigameWinInfo> {
             difficulty_str: difficulty.difficulty_str(),
             reward,
             icon: "⇄",
-            win_message: "Runic Shift conquered!",
-            loss_message: "The runes rise beyond control.",
+            win_message: "Sigil Surge conquered!",
+            loss_message: "The sigils rise beyond control.",
         },
     )
 }
@@ -684,7 +740,7 @@ mod tests {
             game.board_animation,
             Some(BoardAnimation::Swap(_))
         ));
-        assert_eq!(game.pending_settle, Some(PendingSettle::AfterSwap));
+        assert_eq!(game.pending_settle, Some(PendingSettle::Swap));
     }
 
     #[test]
@@ -718,10 +774,13 @@ mod tests {
         start_clear_if_matches(&mut game, false);
         assert_eq!(game.current_chain, 1);
 
-        // Advance until clear resolves.
-        tick_runic_shift(&mut game, 1000);
+        // Advance until clear resolves (tick caps at 500ms per call).
+        for _ in 0..4 {
+            tick_runic_shift(&mut game, 500);
+        }
 
         assert_eq!(game.clears, 3);
+        assert_eq!(game.matches, 1);
         assert_eq!(game.current_chain, 0);
         assert_eq!(game.chain_depth, 0);
     }
@@ -731,17 +790,19 @@ mod tests {
         let mut game = started_game();
         clear_grid(&mut game);
 
-        // Novice target zone starts at row 10 (bottom 2 rows).
-        game.grid[10][0] = Some(Block::normal(RuneColor::Fire));
-        game.grid[10][1] = Some(Block::normal(RuneColor::Fire));
-        game.grid[10][2] = Some(Block::normal(RuneColor::Fire));
+        // The target line is fixed across difficulties, and row 8 must be cleared too.
+        game.grid[8][0] = Some(Block::normal(RuneColor::Fire));
+        game.grid[8][1] = Some(Block::normal(RuneColor::Fire));
+        game.grid[8][2] = Some(Block::normal(RuneColor::Fire));
         assert!(!game.target_zone_cleared());
 
         start_clear_if_matches(&mut game, false);
-        tick_runic_shift(&mut game, 1000);
+        for _ in 0..4 {
+            tick_runic_shift(&mut game, 500);
+        }
 
         assert_eq!(game.game_result, Some(RunicShiftResult::Win));
-        assert_eq!(game.runes_below_target_line(), 0);
+        assert_eq!(game.runes_at_or_above_target_line(), 0);
     }
 
     #[test]
@@ -792,6 +853,43 @@ mod tests {
     }
 
     #[test]
+    fn test_rise_starts_animation_and_pending_settle() {
+        let mut game = started_game();
+        clear_grid(&mut game);
+        game.grid[6][2] = Some(Block::normal(RuneColor::Fire));
+        game.grid[7][2] = Some(Block::normal(RuneColor::Water));
+
+        trigger_rise(&mut game);
+
+        assert!(matches!(
+            game.board_animation,
+            Some(BoardAnimation::Rise(_))
+        ));
+        assert_eq!(game.pending_settle, Some(PendingSettle::Rise));
+    }
+
+    #[test]
+    fn test_rise_waits_for_animation_before_clearing() {
+        let mut game = started_game();
+        clear_grid(&mut game);
+
+        // After a rise, these runes move into row 8 and should clear.
+        game.grid[9][0] = Some(Block::normal(RuneColor::Fire));
+        game.grid[9][1] = Some(Block::normal(RuneColor::Fire));
+        game.grid[9][2] = Some(Block::normal(RuneColor::Fire));
+
+        trigger_rise(&mut game);
+        assert_eq!(game.clear_timer_ms, 0);
+        assert!(matches!(
+            game.board_animation,
+            Some(BoardAnimation::Rise(_))
+        ));
+
+        tick_runic_shift(&mut game, RISE_ANIM_MS);
+        assert!(game.clear_timer_ms > 0);
+    }
+
+    #[test]
     fn test_final_life_loss_ends_game() {
         let mut game = started_game();
         clear_grid(&mut game);
@@ -810,6 +908,7 @@ mod tests {
         let mut game = RunicShiftGame::new(RunicShiftDifficulty::Novice);
         game.game_result = Some(RunicShiftResult::Win);
         game.clears = 12;
+        game.matches = 4;
         state.active_minigame = Some(ActiveMinigame::RunicShift(game));
 
         let result = apply_game_result(&mut state);

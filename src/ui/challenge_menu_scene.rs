@@ -102,8 +102,8 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
         .constraints([Constraint::Min(0), Constraint::Length(1)])
         .split(inner);
 
-    const DIFFICULTY_HEIGHT: u16 = 12;
     const TAIL_HEIGHT_WITHOUT_DIFFICULTY: u16 = 3; // spacer + spacer + outcomes
+    let preferred_difficulty_height = preferred_difficulty_height(&challenge.challenge_type);
 
     // Size description to actual wrapped text height so difficulty options sit
     // directly below it, instead of being visually pinned near the bottom.
@@ -111,11 +111,11 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
         estimate_wrapped_line_count(&challenge.description, outer_chunks[0].width.max(1));
     let max_desc_for_full_difficulty = outer_chunks[0]
         .height
-        .saturating_sub(DIFFICULTY_HEIGHT + TAIL_HEIGHT_WITHOUT_DIFFICULTY)
+        .saturating_sub(preferred_difficulty_height + TAIL_HEIGHT_WITHOUT_DIFFICULTY)
         .max(1);
     let description_height = wrapped_lines.clamp(1, max_desc_for_full_difficulty);
 
-    let difficulty_height = DIFFICULTY_HEIGHT.min(
+    let difficulty_height = preferred_difficulty_height.min(
         outer_chunks[0]
             .height
             .saturating_sub(description_height + TAIL_HEIGHT_WITHOUT_DIFFICULTY),
@@ -237,6 +237,24 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
     frame.render_widget(help, outer_chunks[1]);
 }
 
+fn preferred_difficulty_height(challenge_type: &ChallengeType) -> u16 {
+    let count = match challenge_type {
+        ChallengeType::Chess => ChessDifficulty::ALL.len(),
+        ChallengeType::Morris => MorrisDifficulty::ALL.len(),
+        ChallengeType::Gomoku => GomokuDifficulty::ALL.len(),
+        ChallengeType::Minesweeper => MinesweeperDifficulty::ALL.len(),
+        ChallengeType::Rune => RuneDifficulty::ALL.len(),
+        ChallengeType::Go => GoDifficulty::ALL.len(),
+        ChallengeType::FlappyBird => FlappyBirdDifficulty::ALL.len(),
+        ChallengeType::RunicShift => RunicShiftDifficulty::ALL.len(),
+        ChallengeType::Jezzball => JezzballDifficulty::ALL.len(),
+        ChallengeType::Snake => SnakeDifficulty::ALL.len(),
+    };
+
+    // 1 title line + 2 lines per option (name + reward), no blank spacer rows.
+    1 + (count as u16) * 2
+}
+
 /// Estimate wrapped line count for word-wrapped text in a fixed-width area.
 fn estimate_wrapped_line_count(text: &str, width: u16) -> u16 {
     let width = usize::from(width.max(1));
@@ -298,9 +316,9 @@ fn render_difficulty_selector<D: DifficultyInfo>(
     );
     frame.render_widget(title, Rect { height: 1, ..area });
 
-    // Each option uses 3 lines: name + reward + blank (last has no trailing blank)
+    // Each option uses 2 lines: name + reward.
     for (i, diff) in options.iter().enumerate() {
-        let row_y = area.y + 1 + (i as u16) * 3;
+        let row_y = area.y + 1 + (i as u16) * 2;
         if row_y + 1 >= area.y + area.height {
             break;
         }

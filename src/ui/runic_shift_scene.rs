@@ -1,4 +1,4 @@
-//! Runic Shift scene rendering.
+//! Sigil Surge scene rendering.
 
 use super::game_common::{
     create_game_layout, render_forfeit_status_bar, render_game_over_overlay,
@@ -13,15 +13,39 @@ use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::Paragraph,
+    widgets::{Paragraph, Wrap},
     Frame,
 };
 
 const WELL_INNER_WIDTH: u16 = 17;
 const ROW_PREFIX_WIDTH: u16 = 3;
 const CURSOR_BG: Color = Color::Rgb(255, 196, 64);
+const START_CONTROLS_FULL: [(&str, &str); 4] = [
+    ("[Arrows]", "Move"),
+    ("[Space]", "Start"),
+    ("[R]", "Rise"),
+    ("[Esc]", "Forfeit"),
+];
+const START_CONTROLS_MEDIUM: [(&str, &str); 3] = [
+    ("[Arrows]", "Move"),
+    ("[Space]", "Start"),
+    ("[Esc]", "Forfeit"),
+];
+const START_CONTROLS_COMPACT: [(&str, &str); 2] = [("[Space]", "Start"), ("[Esc]", "Forfeit")];
+const PLAY_CONTROLS_FULL: [(&str, &str); 4] = [
+    ("[Arrows]", "Move"),
+    ("[Space]", "Swap"),
+    ("[R]", "Rise"),
+    ("[Esc]", "Forfeit"),
+];
+const PLAY_CONTROLS_MEDIUM: [(&str, &str); 3] = [
+    ("[Arrows]", "Move"),
+    ("[Space]", "Swap"),
+    ("[Esc]", "Forfeit"),
+];
+const PLAY_CONTROLS_COMPACT: [(&str, &str); 2] = [("[Space]", "Swap"), ("[Esc]", "Forfeit")];
 
-/// Render the Runic Shift scene.
+/// Render the Sigil Surge scene.
 pub fn render_runic_shift_scene(
     frame: &mut Frame,
     area: Rect,
@@ -36,42 +60,40 @@ pub fn render_runic_shift_scene(
     const MIN_WIDTH: u16 = 36;
     const MIN_HEIGHT: u16 = 18;
     if area.width < MIN_WIDTH || area.height < MIN_HEIGHT {
-        render_minigame_too_small(frame, area, "Runic Shift", MIN_WIDTH, MIN_HEIGHT);
+        render_minigame_too_small(frame, area, "Sigil Surge", MIN_WIDTH, MIN_HEIGHT);
         return;
     }
 
     let layout = create_game_layout(
         frame,
         area,
-        " Runic Shift ",
+        " Sigil Surge ",
         Color::LightMagenta,
         16,
-        18,
+        24,
         ctx,
     );
 
     render_well(frame, layout.content, game);
-
-    if game.waiting_to_start {
-        render_start_prompt(frame, layout.content);
-    }
 
     render_status_bar_content(frame, layout.status_bar, game);
     render_info_panel(frame, layout.info_panel, game);
 }
 
 fn render_well(frame: &mut Frame, area: Rect, game: &RunicShiftGame) {
-    if area.height < GRID_ROWS as u16 + 3 || area.width < 24 {
+    let separator_after_row = game.target_line_row;
+    if area.height < GRID_ROWS as u16 + 2 || area.width < 24 {
         return;
     }
 
     let danger_flash_on = (game.accumulated_time_ms / 250).is_multiple_of(2);
+    let line_blink_on = (game.accumulated_time_ms / 350).is_multiple_of(2);
     let flash_div = game.clear_flash_ms.max(1);
     let clear_flash_on =
         game.clear_timer_ms > 0 && (game.clear_timer_ms / flash_div).is_multiple_of(2);
 
     let render_width = ROW_PREFIX_WIDTH + WELL_INNER_WIDTH + 4;
-    let render_height = GRID_ROWS as u16 + 3;
+    let render_height = GRID_ROWS as u16 + 2;
 
     let x_off = area.x + area.width.saturating_sub(render_width) / 2;
     let y_off = area.y + area.height.saturating_sub(render_height) / 2;
@@ -97,17 +119,15 @@ fn render_well(frame: &mut Frame, area: Rect, game: &RunicShiftGame) {
     for row in 0..GRID_ROWS {
         let mut spans = Vec::new();
         let row_has_cursor = row == game.cursor_row;
-        let row_is_target_line = row == game.target_line_row;
+        let row_is_separator = row == separator_after_row;
+        let separator_style = Style::default()
+            .fg(Color::LightMagenta)
+            .add_modifier(Modifier::UNDERLINED | Modifier::DIM);
 
         let danger_prefix = if row == 1 && game.has_danger() && danger_flash_on {
             Span::styled("!! ", Style::default().fg(Color::LightRed))
-        } else if row_is_target_line {
-            Span::styled(
-                "▼  ",
-                Style::default()
-                    .fg(Color::LightMagenta)
-                    .add_modifier(Modifier::BOLD),
-            )
+        } else if row_is_separator && line_blink_on {
+            Span::styled("   ", separator_style)
         } else {
             Span::styled("   ", Style::default().fg(Color::DarkGray))
         };
@@ -116,8 +136,8 @@ fn render_well(frame: &mut Frame, area: Rect, game: &RunicShiftGame) {
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD)
-        } else if row_is_target_line {
-            Style::default().fg(Color::LightMagenta)
+        } else if row_is_separator && line_blink_on {
+            separator_style
         } else {
             border_style
         };
@@ -172,6 +192,8 @@ fn render_well(frame: &mut Frame, area: Rect, game: &RunicShiftGame) {
                     ));
                 } else if row_has_cursor && col == game.cursor_col {
                     spans.push(Span::styled(" ", Style::default().bg(CURSOR_BG)));
+                } else if row_is_separator && line_blink_on {
+                    spans.push(Span::styled(" ", separator_style));
                 } else {
                     spans.push(Span::raw(" "));
                 }
@@ -179,10 +201,17 @@ fn render_well(frame: &mut Frame, area: Rect, game: &RunicShiftGame) {
         }
 
         spans.push(Span::styled("│", row_border_style));
+        if row_is_separator && line_blink_on {
+            spans.push(Span::styled("  ", separator_style));
+        } else {
+            spans.push(Span::raw("  "));
+        }
+
+        let row_y = y_off + 1 + row as u16;
 
         frame.render_widget(
             Paragraph::new(Line::from(spans)),
-            Rect::new(x_off, y_off + 1 + row as u16, render_width, 1),
+            Rect::new(x_off, row_y, render_width, 1),
         );
     }
 
@@ -194,23 +223,6 @@ fn render_well(frame: &mut Frame, area: Rect, game: &RunicShiftGame) {
     frame.render_widget(
         Paragraph::new(Line::from(Span::styled(bottom, border_style))),
         Rect::new(x_off, y_off + 1 + GRID_ROWS as u16, render_width, 1),
-    );
-
-    // Next row preview.
-    let mut preview_spans = vec![Span::styled(
-        "   next: ",
-        Style::default().fg(Color::DarkGray),
-    )];
-    for (i, color) in game.next_row.iter().enumerate() {
-        preview_spans.push(Span::styled(color.glyph(), preview_style(*color)));
-        if i + 1 < GRID_COLS {
-            preview_spans.push(Span::styled(" ", Style::default().fg(Color::DarkGray)));
-        }
-    }
-
-    frame.render_widget(
-        Paragraph::new(Line::from(preview_spans)),
-        Rect::new(x_off, y_off + 2 + GRID_ROWS as u16, render_width, 1),
     );
 }
 
@@ -300,6 +312,22 @@ fn animation_layers(
                 overlay[row][motion.col] = Some(motion.color);
             }
         }
+        BoardAnimation::Rise(anim) => {
+            let duration = anim.duration_ms.max(1) as f32;
+            let elapsed = (anim.duration_ms.saturating_sub(anim.remaining_ms)) as f32;
+            let t = (elapsed / duration).clamp(0.0, 1.0);
+
+            for motion in &anim.blocks {
+                hidden[motion.to_row][motion.col] = true;
+                let row = lerp_index(motion.from_row, motion.to_row, t, GRID_ROWS - 1);
+                overlay[row][motion.col] = Some(motion.color);
+            }
+
+            // Incoming bottom row appears once the rise settle completes.
+            for cell in hidden[GRID_ROWS - 1].iter_mut() {
+                *cell = true;
+            }
+        }
         BoardAnimation::Swap(_) => {}
     }
 
@@ -340,43 +368,19 @@ fn rune_style(color: RuneColor) -> Style {
     })
 }
 
-fn preview_style(color: RuneColor) -> Style {
-    rune_style(color).add_modifier(Modifier::DIM)
-}
-
-fn render_start_prompt(frame: &mut Frame, area: Rect) {
-    if area.height < 5 || area.width < 24 {
-        return;
-    }
-
-    let prompt = "[ Press Space to Start ]";
-    let x = area.x + area.width.saturating_sub(prompt.len() as u16) / 2;
-    let y = area.y + area.height / 2;
-
-    frame.render_widget(
-        Paragraph::new(Line::from(Span::styled(
-            prompt,
-            Style::default()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
-        ))),
-        Rect::new(x, y, prompt.len() as u16, 1),
-    );
-}
-
 fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &RunicShiftGame) {
     if game.waiting_to_start {
+        let controls = controls_for_width(area.width, true);
         render_status_bar(
             frame,
             area,
-            "Rune well primed",
+            if area.width >= 36 {
+                "Press Space to start"
+            } else {
+                "Press Space"
+            },
             Color::LightMagenta,
-            &[
-                ("[Arrows]", "Move"),
-                ("[Space]", "Start"),
-                ("[R]", "Rise"),
-                ("[Esc]", "Forfeit"),
-            ],
+            controls,
         );
         return;
     }
@@ -393,6 +397,9 @@ fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &RunicShiftGam
             crate::challenges::runic_shift::types::BoardAnimation::Fall(_) => {
                 ("Panels falling...", Color::Yellow)
             }
+            crate::challenges::runic_shift::types::BoardAnimation::Rise(_) => {
+                ("Panels rising...", Color::Yellow)
+            }
         };
         render_status_bar(frame, area, text, color, &[("[Esc]", "Forfeit")]);
         return;
@@ -402,7 +409,7 @@ fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &RunicShiftGam
         render_status_bar(
             frame,
             area,
-            "Runes clearing...",
+            "Sigils clearing...",
             Color::Yellow,
             &[("[Esc]", "Forfeit")],
         );
@@ -411,39 +418,60 @@ fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &RunicShiftGam
 
     let danger_flash_on = (game.accumulated_time_ms / 250).is_multiple_of(2);
     if game.has_danger() && danger_flash_on {
+        let controls = controls_for_width(area.width, false);
         render_status_bar(
             frame,
             area,
-            "DANGER: Top rows are filling",
+            if area.width >= 36 {
+                "DANGER: Top rows are filling"
+            } else {
+                "DANGER"
+            },
             Color::LightRed,
-            &[
-                ("[Arrows]", "Move"),
-                ("[Space]", "Swap"),
-                ("[R]", "Rise"),
-                ("[Esc]", "Forfeit"),
-            ],
+            controls,
         );
         return;
     }
 
+    let controls = controls_for_width(area.width, false);
     render_status_bar(
         frame,
         area,
-        "Match runes and build chains",
+        if area.width >= 36 {
+            "Match sigils and build chains"
+        } else {
+            "Match sigils"
+        },
         Color::LightCyan,
-        &[
-            ("[Arrows]", "Move"),
-            ("[Space]", "Swap"),
-            ("[R]", "Rise"),
-            ("[Esc]", "Forfeit"),
-        ],
+        controls,
     );
+}
+
+fn controls_for_width(
+    area_width: u16,
+    waiting_to_start: bool,
+) -> &'static [(&'static str, &'static str)] {
+    if waiting_to_start {
+        if area_width >= 56 {
+            &START_CONTROLS_FULL
+        } else if area_width >= 40 {
+            &START_CONTROLS_MEDIUM
+        } else {
+            &START_CONTROLS_COMPACT
+        }
+    } else if area_width >= 56 {
+        &PLAY_CONTROLS_FULL
+    } else if area_width >= 40 {
+        &PLAY_CONTROLS_MEDIUM
+    } else {
+        &PLAY_CONTROLS_COMPACT
+    }
 }
 
 fn render_info_panel(frame: &mut Frame, area: Rect, game: &RunicShiftGame) {
     let inner = render_info_panel_frame(frame, area);
-    let below_count = game.runes_below_target_line();
-    let rows_to_clear = GRID_ROWS.saturating_sub(game.target_line_row);
+    let compact = inner.width < 20;
+    let at_or_above_count = game.runes_at_or_above_target_line();
 
     let rise_text = if game.clear_timer_ms > 0 {
         "Paused".to_string()
@@ -470,26 +498,32 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &RunicShiftGame) {
     } else {
         "-".to_string()
     };
+    let difficulty_label = if compact { "Diff: " } else { "Difficulty: " };
+    let goal_text = "Clear all sigils above the line".to_string();
+    let above_label = if compact {
+        "At/abv: "
+    } else {
+        "At/above line: "
+    };
+    let blocks_label = if compact { "Blks: " } else { "Blocks: " };
+    let matches_label = if compact { "Mtch: " } else { "Matches: " };
 
     let lines = vec![
         Line::from(vec![
-            Span::styled("Difficulty: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(difficulty_label, Style::default().fg(Color::DarkGray)),
             Span::styled(game.difficulty.name(), Style::default().fg(Color::Cyan)),
         ]),
         Line::from(""),
         Line::from(vec![
             Span::styled("Goal: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                format!("Clear {} bottom rows", rows_to_clear),
-                Style::default().fg(Color::White),
-            ),
+            Span::styled(goal_text, Style::default().fg(Color::White)),
         ]),
         Line::from(vec![
-            Span::styled("Below line: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(above_label, Style::default().fg(Color::DarkGray)),
             Span::styled(
-                below_count.to_string(),
+                at_or_above_count.to_string(),
                 Style::default()
-                    .fg(if below_count == 0 {
+                    .fg(if at_or_above_count == 0 {
                         Color::Green
                     } else {
                         Color::White
@@ -498,8 +532,12 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &RunicShiftGame) {
             ),
         ]),
         Line::from(vec![
-            Span::styled("Clears: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(blocks_label, Style::default().fg(Color::DarkGray)),
             Span::styled(game.clears.to_string(), Style::default().fg(Color::White)),
+        ]),
+        Line::from(vec![
+            Span::styled(matches_label, Style::default().fg(Color::DarkGray)),
+            Span::styled(game.matches.to_string(), Style::default().fg(Color::White)),
         ]),
         Line::from(""),
         Line::from(vec![
@@ -519,17 +557,9 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &RunicShiftGame) {
             Span::styled("Rise:  ", Style::default().fg(Color::DarkGray)),
             Span::styled(rise_text, Style::default().fg(Color::White)),
         ]),
-        Line::from(""),
-        Line::from(vec![
-            Span::styled("Colors: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                game.num_colors.to_string(),
-                Style::default().fg(Color::White),
-            ),
-        ]),
     ];
 
-    frame.render_widget(Paragraph::new(lines), inner);
+    frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: true }), inner);
 }
 
 fn render_runic_shift_game_over(frame: &mut Frame, area: Rect, game: &RunicShiftGame) {
@@ -542,25 +572,26 @@ fn render_runic_shift_game_over(frame: &mut Frame, area: Rect, game: &RunicShift
             GameResultType::Win,
             "RUNE MASTERED!",
             format!(
-                "Target line cleared - best chain x{} ({} clears)",
+                "All sigils below the line - best chain x{} ({} blocks, {} matches)",
                 game.best_chain.max(1),
-                game.clears
+                game.clears,
+                game.matches
             ),
         ),
         RunicShiftResult::Loss if game.forfeit_pending => (
             GameResultType::Forfeit,
             "CHALLENGE ABANDONED",
             format!(
-                "You stepped away with {} runes below the line.",
-                game.runes_below_target_line()
+                "You stepped away with {} sigils at/above the line.",
+                game.runes_at_or_above_target_line()
             ),
         ),
         RunicShiftResult::Loss => (
             GameResultType::Loss,
-            "RUNES OVERFLOW",
+            "SIGILS OVERFLOW",
             format!(
-                "{} runes remained below the line.",
-                game.runes_below_target_line()
+                "{} sigils remained at/above the line.",
+                game.runes_at_or_above_target_line()
             ),
         ),
     };

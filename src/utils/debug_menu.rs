@@ -22,7 +22,7 @@ pub const DEBUG_OPTIONS: &[&str] = &[
     "Trigger Flappy Bird Challenge",
     "Trigger JezzBall Challenge",
     "Trigger Snake Challenge",
-    "Trigger Runic Shift Challenge",
+    "Trigger Sigil Surge Challenge",
     "Trigger Haven Discovery",
     "Trigger Soulforge Discovery",
 ];
@@ -223,12 +223,12 @@ fn trigger_runic_shift_challenge(state: &mut GameState) -> &'static str {
         .challenge_menu
         .has_challenge(&ChallengeType::RunicShift)
     {
-        return "Runic Shift challenge already pending!";
+        return "Sigil Surge challenge already pending!";
     }
     state
         .challenge_menu
         .add_challenge(create_challenge(&ChallengeType::RunicShift));
-    "Runic Shift challenge added!"
+    "Sigil Surge challenge added!"
 }
 
 fn trigger_haven_discovery(haven: &mut Haven) -> &'static str {
@@ -430,14 +430,14 @@ mod tests {
     fn test_trigger_runic_shift_challenge() {
         let mut state = GameState::new("Test".to_string(), 0);
         let msg = trigger_runic_shift_challenge(&mut state);
-        assert_eq!(msg, "Runic Shift challenge added!");
+        assert_eq!(msg, "Sigil Surge challenge added!");
         assert!(state
             .challenge_menu
             .has_challenge(&ChallengeType::RunicShift));
 
         // Can't add duplicate
         let msg = trigger_runic_shift_challenge(&mut state);
-        assert_eq!(msg, "Runic Shift challenge already pending!");
+        assert_eq!(msg, "Sigil Surge challenge already pending!");
     }
 
     #[test]

@@ -676,7 +676,7 @@ pub fn create_challenge(ct: &ChallengeType) -> PendingChallenge {
         },
         ChallengeType::RunicShift => PendingChallenge {
             challenge_type: ChallengeType::RunicShift,
-            title: "Runic Shift".to_string(),
+            title: "Sigil Surge".to_string(),
             icon: "⇄",
             description: "A six-column rune well crackles to life before you. Colored sigils rise \
                 from below in relentless waves. Swap adjacent rune pairs to form matches, trigger \
@@ -1162,7 +1162,7 @@ mod tests {
         let mut state = GameState::new("Test".to_string(), 0);
         state.challenge_menu.add_challenge(PendingChallenge {
             challenge_type: ChallengeType::RunicShift,
-            title: "Runic Shift".to_string(),
+            title: "Sigil Surge".to_string(),
             icon: "⇄",
             description: "Test".to_string(),
         });
