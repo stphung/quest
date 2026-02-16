@@ -1,0 +1,3 @@
+[submodule "quest.wiki"]
+	path = quest.wiki
+	url = git@github.com:stphung/quest.wiki.git
