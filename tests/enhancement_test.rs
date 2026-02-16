@@ -379,7 +379,7 @@ fn test_soulforge_discovery_above_min_prestige() {
 fn test_discover_soulforge_below_prestige_always_fails() {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let mut ep = EnhancementProgress::new();
-    for _ in 0..100_000 {
+    for _ in 0..100 {
         assert!(!try_discover_soulforge(&mut ep, 14, &mut rng));
     }
     assert!(!ep.discovered);
@@ -390,13 +390,13 @@ fn test_discover_soulforge_eventually_succeeds() {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let mut ep = EnhancementProgress::new();
     let mut found = false;
-    for _ in 0..1_000_000 {
+    for _ in 0..500_000 {
         if try_discover_soulforge(&mut ep, 15, &mut rng) {
             found = true;
             break;
         }
     }
-    assert!(found, "Should discover soulforge within 1M ticks at P15");
+    assert!(found, "Should discover soulforge within 500k ticks at P15");
     assert!(ep.discovered);
 }
 

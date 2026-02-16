@@ -407,9 +407,22 @@ mod tests {
         char2.character_level = 15;
 
         manager.save_character(&char1).unwrap();
-        // Small delay to ensure different timestamps (save uses current time)
-        std::thread::sleep(std::time::Duration::from_millis(1100));
         manager.save_character(&char2).unwrap();
+
+        // Manually backdate char1's save file to guarantee sort order
+        // (save_character uses Utc::now() so both saves may get the same timestamp)
+        let char1_path = manager
+            .quest_dir
+            .join(format!("{}.json", sanitize_name(&char1.character_name)));
+        let json_str = fs::read_to_string(&char1_path).unwrap();
+        let mut save_data: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+        save_data["last_save_time"] =
+            serde_json::Value::Number(serde_json::Number::from(1_000_000i64));
+        fs::write(
+            &char1_path,
+            serde_json::to_string_pretty(&save_data).unwrap(),
+        )
+        .unwrap();
 
         // Isolated temp dir means only our test files are present
         let list = manager.list_characters().expect("Failed to list");

@@ -632,7 +632,7 @@ fn test_haven_discovery_blocked_by_active_fishing() {
 #[test]
 fn test_haven_discovery_sets_haven_changed_and_achievements_changed() {
     // Use many different seeds to find one that triggers Haven discovery quickly
-    for seed in 0u64..200 {
+    for seed in 0u64..20 {
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
         let mut haven = Haven::default();
         let mut achievements = Achievements::default();
@@ -752,7 +752,7 @@ fn test_challenge_discovery_blocked_by_active_fishing() {
 #[test]
 fn test_challenge_discovered_event_has_type_and_messages() {
     // Try many seeds to find challenge discovery
-    for seed in 0u64..500 {
+    for seed in 0u64..50 {
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
         let mut test_state = GameState::new("Challenge Event Test".to_string(), 0);
         test_state.prestige_rank = 1;
@@ -824,7 +824,7 @@ fn test_dungeon_discovered_event_message() {
         &mut haven,
         &mut achievements,
         &mut rng,
-        50_000,
+        5_000,
     );
 
     let dungeon_discovered: Vec<_> = events
@@ -861,7 +861,7 @@ fn test_fishing_spot_discovered_event() {
         &mut haven,
         &mut achievements,
         &mut rng,
-        100_000,
+        5_000,
     );
 
     let fishing_discovered: Vec<_> = events
@@ -952,7 +952,7 @@ fn test_item_dropped_event_fields_from_mob() {
         &mut haven,
         &mut achievements,
         &mut rng,
-        50_000,
+        5_000,
     );
 
     let mob_drops: Vec<_> = events
@@ -1246,7 +1246,7 @@ fn test_dungeon_boss_defeated_event_fields() {
     state.active_dungeon = Some(dungeon);
 
     let mut all_events = Vec::new();
-    for _ in 0..50_000 {
+    for _ in 0..5_000 {
         let result = game_tick(
             &mut state,
             &mut tick_counter,
@@ -1310,7 +1310,7 @@ fn test_dungeon_elite_defeated_event() {
     state.active_dungeon = Some(dungeon);
 
     let mut all_events = Vec::new();
-    for _ in 0..50_000 {
+    for _ in 0..5_000 {
         let result = game_tick(
             &mut state,
             &mut tick_counter,

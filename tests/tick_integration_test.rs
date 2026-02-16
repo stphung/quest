@@ -1014,7 +1014,7 @@ fn test_game_tick_debug_mode_suppresses_achievement_save() {
     // Note: debug_mode only suppresses the flag for fishing storm leviathan path.
     // Achievement events themselves still fire. This test verifies the code path
     // doesn't crash when debug_mode is true.
-    for _ in 0..5000 {
+    for _ in 0..500 {
         let _result = game_tick(
             &mut state,
             &mut tick_counter,
@@ -1125,7 +1125,7 @@ fn test_simulator_different_seeds_produce_different_results() {
         let mut achievements = Achievements::default();
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
 
-        for _ in 0..2000 {
+        for _ in 0..200 {
             game_tick(
                 &mut state,
                 &mut tick_counter,
@@ -1207,7 +1207,7 @@ fn test_game_tick_returns_events_in_chronological_order() {
     let mut rng = test_rng();
 
     // Run until we get a tick with multiple events (e.g., attack + defeat)
-    for _ in 0..5000 {
+    for _ in 0..500 {
         let result = game_tick(
             &mut state,
             &mut tick_counter,

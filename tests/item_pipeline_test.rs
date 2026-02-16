@@ -3,6 +3,9 @@
 //! Tests the full end-to-end flow: drop chance → item generation → scoring → equip decision.
 //! Covers the complete lifecycle from enemy kill drop roll through to equipment slot management.
 
+use rand::SeedableRng;
+use rand_chacha::ChaCha8Rng;
+
 use quest::character::attributes::AttributeType;
 use quest::core::constants::{ITEM_DROP_BASE_CHANCE, ITEM_DROP_MAX_CHANCE};
 use quest::items::drops::{drop_chance_for_prestige, roll_rarity_for_mob, try_drop_from_mob};
@@ -790,7 +793,7 @@ fn test_full_pipeline_equip_all_seven_slots_from_drops() {
 fn test_roll_rarity_covers_all_mob_tiers() {
     // Over enough rolls, all 4 mob rarity tiers should appear (no Legendary from mobs)
     // Legendary only drops from bosses now
-    let mut rng = rand::rng();
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
     let mut seen = std::collections::HashSet::new();
 
     for _ in 0..5_000 {
@@ -815,7 +818,7 @@ fn test_roll_rarity_covers_all_mob_tiers() {
 
 #[test]
 fn test_roll_rarity_prestige_bonus_shifts_toward_higher_tiers() {
-    let mut rng = rand::rng();
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
     let trials = 5_000;
 
     let mut common_p0 = 0usize;
@@ -990,7 +993,7 @@ fn test_pipeline_prestige_produces_better_average_scores() {
     game_state_p10.prestige_rank = 10;
 
     let avg_score = |gs: &GameState| -> f64 {
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
         let n = 200;
         let sum: f64 = (0..n)
             .map(|_| {

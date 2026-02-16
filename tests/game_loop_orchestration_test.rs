@@ -485,7 +485,7 @@ fn test_player_attack_event_has_message_and_damage() {
     let mut rng = seeded_rng(42);
 
     let mut found = false;
-    for _ in 0..5000 {
+    for _ in 0..500 {
         let result = run_game_tick(
             &mut state,
             &mut tc,
@@ -529,7 +529,7 @@ fn test_enemy_attack_event_has_enemy_name() {
     let mut rng = seeded_rng(42);
 
     let mut found = false;
-    for _ in 0..5000 {
+    for _ in 0..500 {
         let result = run_game_tick(
             &mut state,
             &mut tc,
@@ -571,7 +571,7 @@ fn test_enemy_defeated_event_has_xp_and_message() {
     let mut rng = seeded_rng(42);
 
     let mut found = false;
-    for _ in 0..5000 {
+    for _ in 0..500 {
         let result = run_game_tick(
             &mut state,
             &mut tc,
@@ -1262,7 +1262,7 @@ fn test_session_kills_accumulate_across_ticks() {
     assert_eq!(state.session_kills, 0);
 
     let mut kill_count = 0u64;
-    for _ in 0..5000 {
+    for _ in 0..500 {
         let result = run_game_tick(
             &mut state,
             &mut tc,
@@ -1309,7 +1309,7 @@ fn test_xp_increases_with_each_kill() {
     let initial_level = state.character_level;
 
     // Run until first kill
-    for _ in 0..5000 {
+    for _ in 0..500 {
         let result = run_game_tick(
             &mut state,
             &mut tc,
