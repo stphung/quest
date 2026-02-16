@@ -405,9 +405,9 @@ Real-time action-puzzle inspired by panel-matching games. Rune blocks fill a 6×
 | Difficulty | Rise Interval | Starting Rows | Clear Anim | Reward |
 |------------|--------------|---------------|------------|--------|
 | Novice | 7000ms | 7 | 800ms | +50% XP |
-| Apprentice | 6000ms | 8 | 700ms | +100% XP |
-| Journeyman | 5000ms | 8 | 600ms | +1 PR, +75% XP |
-| Master | 3000ms | 9 | 500ms | +2 PR, +150% XP, +1 FR |
+| Apprentice | 6000ms | 8 | 800ms | +100% XP |
+| Journeyman | 5000ms | 8 | 800ms | +1 PR, +75% XP |
+| Master | 3000ms | 9 | 800ms | +2 PR, +150% XP, +1 FR |
 
 ### Controls
 
