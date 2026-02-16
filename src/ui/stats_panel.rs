@@ -881,9 +881,13 @@ pub fn draw_update_drawer(frame: &mut Frame, area: Rect, info: &UpdateInfo) {
 
     // Add empty line and footer
     lines.push(Line::from(vec![]));
+    lines.push(Line::from(vec![Span::styled(
+        "  Run 'quest update' to install",
+        Style::default().fg(Color::DarkGray),
+    )]));
     lines.push(Line::from(vec![
         Span::styled(
-            "  Run 'quest update' to install",
+            format!("  Wiki: {}", crate::core::constants::WIKI_URL),
             Style::default().fg(Color::DarkGray),
         ),
         Span::raw("                              "),
