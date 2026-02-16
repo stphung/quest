@@ -97,7 +97,7 @@ fn draw_combat_log(frame: &mut Frame, area: Rect, game_state: &GameState) {
     frame.render_widget(paragraph, inner);
 }
 
-/// Draws the loot panel (items, fish, etc.) with two-line format for equipment.
+/// Draws the loot panel (items, fish, etc.) — one line per drop.
 fn draw_recent_gains(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let block = Block::default()
         .borders(Borders::ALL)
@@ -143,13 +143,6 @@ fn draw_recent_gains(frame: &mut Frame, area: Rect, game_state: &GameState) {
             }
 
             lines.push(Line::from(spans));
-
-            if !drop.stats.is_empty() && lines.len() < max_lines {
-                lines.push(Line::from(Span::styled(
-                    format!("  {}", drop.stats),
-                    Style::default().fg(Color::DarkGray),
-                )));
-            }
         }
     }
 

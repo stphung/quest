@@ -76,7 +76,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 rarity,
                 equipped,
                 slot: _,
-                stats,
+                stats: _,
                 from_boss: _,
             } => {
                 let rarity_initial = match rarity {
@@ -87,15 +87,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     Rarity::Legendary => "L",
                 };
                 let equip_tag = if *equipped { " \u{1F528}" } else { "" };
-                let stat_suffix = if stats.is_empty() {
-                    String::new()
-                } else {
-                    format!(" {}", stats)
-                };
-                let text = format!(
-                    "[{}] {}{}{}",
-                    rarity_initial, item_name, stat_suffix, equip_tag
-                );
+                let text = format!("[{}] {}{}", rarity_initial, item_name, equip_tag);
                 let color = rarity_color(*rarity);
                 game_state.loot_ticker.push(TickerEntry {
                     icon: "\u{2694}",
