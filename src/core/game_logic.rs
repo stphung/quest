@@ -370,7 +370,7 @@ mod tests {
 
     #[test]
     fn test_try_discover_dungeon_probability() {
-        // Test that dungeon discovery happens with expected probability (2%)
+        // Test that dungeon discovery happens with expected probability (1%)
         // Run many trials and check it's in reasonable range
         let mut discoveries = 0;
         let trials = 10000;
@@ -382,11 +382,11 @@ mod tests {
             }
         }
 
-        // 2% rate = 200 expected discoveries in 10000 trials
-        // Allow reasonable variance (1% to 4% = 100 to 400)
+        // 1% rate = 100 expected discoveries in 10000 trials
+        // Allow reasonable variance (0.4% to 2% = 40 to 200)
         assert!(
-            (100..=400).contains(&discoveries),
-            "Expected ~200 discoveries (2%), got {}",
+            (40..=200).contains(&discoveries),
+            "Expected ~100 discoveries (1%), got {}",
             discoveries
         );
     }
