@@ -412,6 +412,12 @@ fn handle_haven(
                     if let Some((_tier, p_spent)) =
                         haven::try_build_room(room, haven, &mut state.prestige_rank)
                     {
+                        // Check Haven tier achievements after upgrade
+                        achievements.sync_from_haven(
+                            haven.discovered,
+                            &haven.rooms,
+                            Some(&state.character_name),
+                        );
                         // Haven saved via NeedsSaveAll (skipped in debug mode)
                         state.combat_state.add_log_entry(
                             format!(

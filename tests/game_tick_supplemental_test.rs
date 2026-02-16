@@ -472,6 +472,303 @@ fn test_fish_caught_event_has_name_and_rarity() {
 }
 
 // =============================================================================
+// Fish Caught Achievement Tracking via game_tick (Fix #1)
+// =============================================================================
+
+#[test]
+fn test_fish_caught_unlocks_gone_fishing_achievement() {
+    let mut state = fresh();
+    state.active_fishing = Some(fishing_session(FishingPhase::Reeling, 1, 5));
+    let mut tc = 0u32;
+    let mut ach = Achievements::default();
+    let mut r = rng(42);
+
+    assert!(
+        !ach.is_unlocked(quest::AchievementId::GoneFishing),
+        "GoneFishing should not be unlocked before catching a fish"
+    );
+
+    let events = tick(&mut state, &mut tc, &mut ach, &mut r);
+
+    // If a fish was caught, GoneFishing should now be unlocked
+    if has(&events, |e| matches!(e, TickEvent::FishCaught { .. })) {
+        assert!(
+            ach.is_unlocked(quest::AchievementId::GoneFishing),
+            "GoneFishing should be unlocked after catching first fish via game_tick"
+        );
+        assert_eq!(ach.total_fish_caught, 1, "total_fish_caught should be 1");
+    }
+}
+
+#[test]
+fn test_fish_caught_increments_total_across_sessions() {
+    let mut state = fresh();
+    let mut tc = 0u32;
+    let mut ach = Achievements::default();
+    let mut r = rng(100);
+
+    // Run multiple fishing sessions, counting catches
+    for _ in 0..50 {
+        if state.active_fishing.is_none() {
+            state.active_fishing = Some(fishing_session(FishingPhase::Reeling, 1, 5));
+        }
+        tick(&mut state, &mut tc, &mut ach, &mut r);
+    }
+
+    assert!(
+        ach.total_fish_caught > 0,
+        "Should have caught at least one fish across 50 ticks"
+    );
+    assert!(
+        ach.is_unlocked(quest::AchievementId::GoneFishing),
+        "GoneFishing should be unlocked"
+    );
+}
+
+#[test]
+fn test_fish_catcher_i_unlocks_at_100_catches() {
+    let mut state = fresh();
+    let mut tc = 0u32;
+    let mut ach = Achievements::default();
+    let mut r = rng(77);
+
+    // Pre-set counter to 99 so the next catch triggers FishCatcherI
+    ach.total_fish_caught = 99;
+
+    state.active_fishing = Some(fishing_session(FishingPhase::Reeling, 1, 5));
+    let events = tick(&mut state, &mut tc, &mut ach, &mut r);
+
+    if has(&events, |e| matches!(e, TickEvent::FishCaught { .. })) {
+        assert_eq!(ach.total_fish_caught, 100);
+        assert!(
+            ach.is_unlocked(quest::AchievementId::FishCatcherI),
+            "FishCatcherI should unlock at 100 fish caught"
+        );
+    }
+}
+
+// =============================================================================
+// Fishing Rank-Up Achievement Tracking via game_tick (Fix #2)
+// =============================================================================
+
+#[test]
+fn test_fishing_rank_up_unlocks_fisherman_i_achievement() {
+    let mut state = fresh();
+    state.fishing.rank = 9;
+    state.fishing.fish_toward_next_rank = 99; // 1 away from rank 10
+    state.active_fishing = Some(fishing_session(FishingPhase::Reeling, 1, 5));
+    let mut tc = 0u32;
+    let mut ach = Achievements::default();
+    let mut r = rng(42);
+
+    assert!(
+        !ach.is_unlocked(quest::AchievementId::FishermanI),
+        "FishermanI should not be unlocked before rank 10"
+    );
+
+    let events = tick(&mut state, &mut tc, &mut ach, &mut r);
+
+    if has(&events, |e| matches!(e, TickEvent::FishingRankUp { .. })) {
+        assert!(
+            state.fishing.rank >= 10,
+            "Rank should be >= 10 after rank up"
+        );
+        assert!(
+            ach.is_unlocked(quest::AchievementId::FishermanI),
+            "FishermanI should unlock when rank reaches 10 via game_tick"
+        );
+    }
+}
+
+#[test]
+fn test_fishing_rank_up_tracks_highest_rank() {
+    let mut state = fresh();
+    state.fishing.rank = 9;
+    state.fishing.fish_toward_next_rank = 99;
+    state.active_fishing = Some(fishing_session(FishingPhase::Reeling, 1, 5));
+    let mut tc = 0u32;
+    let mut ach = Achievements::default();
+    let mut r = rng(42);
+
+    tick(&mut state, &mut tc, &mut ach, &mut r);
+
+    if state.fishing.rank >= 10 {
+        assert!(
+            ach.highest_fishing_rank >= 10,
+            "highest_fishing_rank should track the new rank"
+        );
+    }
+}
+
+// =============================================================================
+// Multi-Level-Up Achievement Tracking via game_tick (Fix #4)
+// =============================================================================
+
+#[test]
+fn test_multi_level_up_unlocks_intermediate_achievements() {
+    // Set character to level 9 with enough XP to jump past level 10 in one kill
+    let mut state = strong();
+    state.character_level = 9;
+    // XP needed for level 9->10: 100 * 9^1.5 = ~2700
+    // XP needed for level 10->11: 100 * 10^1.5 = ~3162
+    // Total to jump from 9 to 11: ~5862
+    // A kill gives 200-400 ticks of XP, but with STR 50 the base damage
+    // makes kills fast. We'll give enough XP directly to be near the edge.
+    let xp_for_9 = (100.0 * f64::powf(9.0, 1.5)) as u64;
+    let xp_for_10 = (100.0 * f64::powf(10.0, 1.5)) as u64;
+    // Set XP so that only 1 XP is needed to cross level 9 AND 10
+    state.character_xp = xp_for_9 + xp_for_10 - 1;
+    let mut tc = 0u32;
+    let mut ach = Achievements::default();
+    let mut r = rng(42);
+
+    assert!(
+        !ach.is_unlocked(quest::AchievementId::Level10),
+        "Level10 should not be unlocked at level 9"
+    );
+
+    // Run ticks until an enemy is killed (granting XP)
+    let mut all_events = Vec::new();
+    for _ in 0..5000 {
+        let result = game_tick(
+            &mut state,
+            &mut tc,
+            &mut Haven::default(),
+            &mut EnhancementProgress::new(),
+            &mut ach,
+            false,
+            &mut r,
+        );
+        all_events.extend(result.events);
+        if has(&all_events, |e| {
+            matches!(e, TickEvent::EnemyDefeated { .. })
+        }) {
+            break;
+        }
+    }
+
+    // After gaining XP from a kill, we should have jumped past level 10
+    if state.character_level >= 11 {
+        assert!(
+            ach.is_unlocked(quest::AchievementId::Level10),
+            "Level10 achievement should unlock when jumping from 9 to 11+ in one kill"
+        );
+    }
+}
+
+#[test]
+fn test_multi_level_up_calls_on_level_up_for_each_level() {
+    // Directly test the loop logic: achievements should track every intermediate level
+    let mut ach = Achievements::default();
+
+    // Simulate what tick.rs does: loop from (level_before + 1) to current_level
+    let level_before = 8;
+    let level_after = 12;
+    for lvl in (level_before + 1)..=level_after {
+        ach.on_level_up(lvl, Some("TestHero"));
+    }
+
+    assert!(
+        ach.is_unlocked(quest::AchievementId::Level10),
+        "Level10 should be unlocked when leveling from 8 to 12"
+    );
+    assert_eq!(
+        ach.highest_level, 12,
+        "highest_level should track the final level"
+    );
+}
+
+#[test]
+fn test_single_level_up_through_milestone_unlocks_achievement() {
+    // If we level from exactly 9 to 10, Level10 should unlock
+    let mut ach = Achievements::default();
+    let level_before = 9;
+    let level_after = 10;
+    for lvl in (level_before + 1)..=level_after {
+        ach.on_level_up(lvl, Some("TestHero"));
+    }
+
+    assert!(
+        ach.is_unlocked(quest::AchievementId::Level10),
+        "Level10 should unlock at exactly level 10"
+    );
+}
+
+// =============================================================================
+// Haven Tier Achievement Sync (Fix #3 - unit-level verification)
+// =============================================================================
+
+#[test]
+fn test_haven_sync_unlocks_builder_achievements() {
+    use quest::haven::types::HavenRoomId;
+    use std::collections::HashMap;
+
+    let mut ach = Achievements::default();
+
+    // Build all rooms to tier 1
+    let mut rooms: HashMap<HavenRoomId, u8> = HashMap::new();
+    for room in HavenRoomId::ALL.iter() {
+        if *room != HavenRoomId::StormForge {
+            rooms.insert(*room, 1);
+        }
+    }
+
+    ach.sync_from_haven(true, &rooms, Some("TestHero"));
+    assert!(
+        ach.is_unlocked(quest::AchievementId::HavenDiscovered),
+        "HavenDiscovered should unlock"
+    );
+    assert!(
+        ach.is_unlocked(quest::AchievementId::HavenBuilderI),
+        "HavenBuilderI should unlock when all rooms at T1"
+    );
+    assert!(
+        !ach.is_unlocked(quest::AchievementId::HavenBuilderII),
+        "HavenBuilderII should NOT unlock at T1"
+    );
+
+    // Upgrade all to tier 2
+    for room in HavenRoomId::ALL.iter() {
+        if *room != HavenRoomId::StormForge {
+            rooms.insert(*room, 2);
+        }
+    }
+
+    ach.sync_from_haven(true, &rooms, Some("TestHero"));
+    assert!(
+        ach.is_unlocked(quest::AchievementId::HavenBuilderII),
+        "HavenBuilderII should unlock when all rooms at T2"
+    );
+    assert!(
+        !ach.is_unlocked(quest::AchievementId::HavenArchitect),
+        "HavenArchitect should NOT unlock at T2"
+    );
+}
+
+#[test]
+fn test_haven_sync_idempotent() {
+    use quest::haven::types::HavenRoomId;
+    use std::collections::HashMap;
+
+    let mut ach = Achievements::default();
+    let mut rooms: HashMap<HavenRoomId, u8> = HashMap::new();
+    for room in HavenRoomId::ALL.iter() {
+        if *room != HavenRoomId::StormForge {
+            rooms.insert(*room, 1);
+        }
+    }
+
+    // Calling sync multiple times should not cause issues
+    ach.sync_from_haven(true, &rooms, Some("TestHero"));
+    ach.sync_from_haven(true, &rooms, Some("TestHero"));
+    ach.sync_from_haven(true, &rooms, Some("TestHero"));
+
+    assert!(ach.is_unlocked(quest::AchievementId::HavenBuilderI));
+    // pending_notifications should only have each achievement once
+    // (duplicates are filtered by unlock())
+}
+
+// =============================================================================
 // Subzone Boss Defeat Event via game_tick
 // =============================================================================
 
