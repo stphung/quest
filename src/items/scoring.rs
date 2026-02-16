@@ -29,6 +29,7 @@ pub fn score_item(item: &Item, game_state: &GameState) -> f64 {
             AffixType::HPRegen => affix.value * 1.0,
             AffixType::DamageReflection => affix.value * 0.8,
             AffixType::XPGain => affix.value * 1.0,
+            AffixType::Unknown => 0.0,
         };
         score += affix_score;
     }

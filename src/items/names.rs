@@ -32,6 +32,7 @@ pub fn get_affix_prefix(affix_type: AffixType) -> &'static str {
         AffixType::HPRegen => "Regenerating",
         AffixType::DamageReflection => "Thorned",
         AffixType::XPGain => "Wise",
+        AffixType::Unknown => "",
     }
 }
 
@@ -46,6 +47,7 @@ pub fn get_affix_suffix(affix_type: AffixType) -> &'static str {
         AffixType::HPRegen => "of Renewal",
         AffixType::DamageReflection => "of Thorns",
         AffixType::XPGain => "of Learning",
+        AffixType::Unknown => "",
     }
 }
 
