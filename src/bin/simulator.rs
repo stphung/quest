@@ -172,6 +172,10 @@ fn parse_args() -> SimConfig {
             "--stormbreaker" => config.stormbreaker = true,
             "--haven" => {
                 i += 1;
+                if i >= args.len() {
+                    eprintln!("--haven requires a strategy: combat, qol, balanced, full");
+                    std::process::exit(1);
+                }
                 config.haven_strategy =
                     Some(HavenStrategy::from_str(&args[i]).unwrap_or_else(|| {
                         eprintln!(
@@ -216,24 +220,22 @@ fn print_usage() {
     );
 }
 
-/// Auto-build Haven rooms using the given strategy.
-/// Returns a list of (room, new_tier, cost) for rooms built this tick.
+/// Auto-build one Haven room using the given strategy.
+/// Returns the (room, new_tier, cost) if a room was built this tick.
 fn auto_build_haven(
     haven: &mut Haven,
     prestige_rank: &mut u32,
     priority: &[HavenRoomId],
-) -> Vec<(HavenRoomId, u8, u32)> {
-    let mut built = Vec::new();
+) -> Option<(HavenRoomId, u8, u32)> {
     for &room in priority {
         if haven.room_tier(room) >= room.max_tier() {
             continue;
         }
         if let Some((new_tier, cost)) = try_build_room(room, haven, prestige_rank) {
-            built.push((room, new_tier, cost));
-            break; // One room per tick
+            return Some((room, new_tier, cost));
         }
     }
-    built
+    None
 }
 
 // ── Simulation Statistics ────────────────────────────────────────────
@@ -493,10 +495,11 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
 
         // Auto-build Haven rooms if strategy is active
         if let Some(priority) = haven_priority {
-            let built = auto_build_haven(&mut haven, &mut state.prestige_rank, priority);
-            for (room, new_tier, cost) in &built {
+            if let Some((room, new_tier, cost)) =
+                auto_build_haven(&mut haven, &mut state.prestige_rank, priority)
+            {
                 stats.haven_rooms_built += 1;
-                stats.haven_prestige_spent += *cost;
+                stats.haven_prestige_spent += cost;
                 if config.verbose {
                     println!(
                         "[t={tick:>6}] Haven: {} upgraded to T{new_tier} (cost {cost} PR)",
@@ -760,11 +763,9 @@ fn print_summary(stats: &SimStats, seed: u64, config: &SimConfig) {
     }
 
     // Haven build progress
-    if config.haven_strategy.is_some() {
+    if let Some(ref strategy) = config.haven_strategy {
         println!("--- Haven ---");
-        if let Some(ref strategy) = config.haven_strategy {
-            println!("Strategy: {}", strategy.name());
-        }
+        println!("Strategy: {}", strategy.name());
         println!(
             "Rooms built: {}  |  Prestige spent: {}",
             stats.haven_rooms_built, stats.haven_prestige_spent
