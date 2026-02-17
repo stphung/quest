@@ -64,7 +64,7 @@ impl Rarity {
             Rarity::Rare => "Rare",
             Rarity::Epic => "Epic",
             Rarity::Legendary => "Legendary",
-            Rarity::Mythic => "Mythic",
+            Rarity::Mythic => "God",
         }
     }
 }
@@ -229,7 +229,7 @@ mod tests {
 
     #[test]
     fn test_mythic_rarity_name() {
-        assert_eq!(Rarity::Mythic.name(), "Mythic");
+        assert_eq!(Rarity::Mythic.name(), "God");
     }
 
     #[test]
