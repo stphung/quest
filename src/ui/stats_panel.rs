@@ -5,7 +5,6 @@ use crate::character::prestige::{get_adventurer_rank, get_prestige_tier};
 use crate::core::game_logic::xp_for_next_level;
 use crate::core::game_state::GameState;
 use crate::fishing::types::FishingState;
-use crate::items::types::Rarity;
 use crate::utils::updater::UpdateInfo;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -524,14 +523,7 @@ fn draw_equipment_names_only(
         let item = game_state.equipment.get(*slot_enum);
         let slot_label = slot_enum.name();
         if let Some(item) = item {
-            let rarity_color = match item.rarity {
-                Rarity::Common => Color::White,
-                Rarity::Magic => Color::Blue,
-                Rarity::Rare => Color::Yellow,
-                Rarity::Epic => Color::Magenta,
-                Rarity::Legendary => Color::LightRed,
-                Rarity::Mythic => Color::Rgb(255, 215, 0),
-            };
+            let rarity_color = super::rarity_color(item.rarity);
 
             let enh_level = enhancement_levels[idx];
             let prefix = crate::enhancement::enhancement_prefix(enh_level);

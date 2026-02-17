@@ -43,7 +43,20 @@ use ratatui::{
     Frame,
 };
 
+use crate::items::types::Rarity;
 use responsive::{render_too_small, LayoutContext, SizeTier};
+
+/// Maps item rarity to its display color. Single source of truth for all UI.
+pub fn rarity_color(rarity: Rarity) -> Color {
+    match rarity {
+        Rarity::Common => Color::White,
+        Rarity::Magic => Color::Blue,
+        Rarity::Rare => Color::Yellow,
+        Rarity::Epic => Color::Magenta,
+        Rarity::Legendary => Color::LightRed,
+        Rarity::Mythic => Color::Rgb(255, 215, 0),
+    }
+}
 
 /// Main UI drawing function with optional update notification
 #[allow(clippy::too_many_arguments)]
