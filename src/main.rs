@@ -172,6 +172,72 @@ fn show_startup_update_notification(
     Ok(())
 }
 
+/// Draws the quit confirmation dialog when pending challenges exist.
+fn draw_quit_confirm(frame: &mut ratatui::Frame, pending_count: usize) {
+    use ratatui::{
+        layout::{Alignment, Rect},
+        style::{Color, Modifier, Style},
+        text::{Line, Span},
+        widgets::{Block, Borders, Clear, Paragraph},
+    };
+
+    let size = frame.area();
+    let w = 42.min(size.width.saturating_sub(4));
+    let h = 8.min(size.height.saturating_sub(4));
+    let x = (size.width.saturating_sub(w)) / 2;
+    let y = (size.height.saturating_sub(h)) / 2;
+    let area = Rect::new(x, y, w, h);
+
+    frame.render_widget(Clear, area);
+
+    let challenge_word = if pending_count == 1 {
+        "challenge"
+    } else {
+        "challenges"
+    };
+
+    let lines = vec![
+        Line::from(""),
+        Line::from(format!(
+            "  {} pending {} will be lost.",
+            pending_count, challenge_word
+        )),
+        Line::from(""),
+        Line::from(""),
+        Line::from(vec![
+            Span::raw("  "),
+            Span::styled(
+                "[Enter] Leave",
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ),
+            Span::raw("    "),
+            Span::styled(
+                "[Esc] Stay",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+    ];
+
+    let paragraph = Paragraph::new(lines).block(
+        Block::default()
+            .title(
+                Line::from(Span::styled(
+                    " Unsaved Challenges ",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ))
+                .alignment(Alignment::Center),
+            )
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Yellow)),
+    );
+
+    frame.render_widget(paragraph, area);
+}
+
 /// Draw all game overlays on top of the main game UI.
 #[allow(clippy::too_many_arguments)]
 fn draw_game_overlays(
@@ -242,6 +308,9 @@ fn draw_game_overlays(
                 *encounter_number,
                 ctx,
             );
+        }
+        GameOverlay::QuitConfirm => {
+            draw_quit_confirm(frame, state.challenge_menu.challenges.len());
         }
         GameOverlay::Help => {
             ui::help_overlay::draw_help_overlay(frame);
