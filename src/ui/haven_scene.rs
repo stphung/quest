@@ -850,10 +850,10 @@ pub fn render_vault_selection(
             let (slot_name, item_text, style) = if let Some(item) = item.as_ref() {
                 let rarity_color = match item.rarity {
                     crate::items::Rarity::Common => Color::White,
-                    crate::items::Rarity::Magic => Color::Green,
-                    crate::items::Rarity::Rare => Color::Blue,
+                    crate::items::Rarity::Magic => Color::Blue,
+                    crate::items::Rarity::Rare => Color::Yellow,
                     crate::items::Rarity::Epic => Color::Magenta,
-                    crate::items::Rarity::Legendary => Color::Yellow,
+                    crate::items::Rarity::Legendary => Color::LightRed,
                     crate::items::Rarity::Mythic => Color::Rgb(255, 215, 0),
                 };
                 (

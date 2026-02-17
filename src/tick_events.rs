@@ -428,11 +428,11 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
 /// Maps item rarity to a display color for the loot ticker.
 fn rarity_color(rarity: Rarity) -> Color {
     match rarity {
-        Rarity::Common => Color::Gray,
+        Rarity::Common => Color::White,
         Rarity::Magic => Color::Blue,
         Rarity::Rare => Color::Yellow,
         Rarity::Epic => Color::Magenta,
-        Rarity::Legendary => Color::Rgb(255, 165, 0),
+        Rarity::Legendary => Color::LightRed,
         Rarity::Mythic => Color::Rgb(255, 215, 0),
     }
 }
