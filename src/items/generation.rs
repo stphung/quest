@@ -22,6 +22,7 @@ pub fn generate_item(slot: EquipmentSlot, rarity: Rarity, ilvl: u32) -> Item {
         display_name: String::new(),
         attributes,
         affixes,
+        god_item_id: None,
     };
 
     item.display_name = generate_display_name(&item);
@@ -43,7 +44,7 @@ fn generate_attributes(rarity: Rarity, ilvl: u32, rng: &mut impl Rng) -> Attribu
         Rarity::Magic => (1, 2),
         Rarity::Rare => (2, 3),
         Rarity::Epic => (3, 4),
-        Rarity::Legendary => (4, 6),
+        Rarity::Legendary | Rarity::Mythic => (4, 6),
     };
 
     let multiplier = ilvl_multiplier(ilvl);
@@ -77,7 +78,7 @@ fn generate_affixes(rarity: Rarity, ilvl: u32, rng: &mut impl Rng) -> Vec<Affix>
         Rarity::Magic => 1,
         Rarity::Rare => rng.random_range(2..=3),
         Rarity::Epic => rng.random_range(3..=4),
-        Rarity::Legendary => rng.random_range(4..=5),
+        Rarity::Legendary | Rarity::Mythic => rng.random_range(4..=5),
     };
 
     let mut affixes = Vec::new();
@@ -116,7 +117,7 @@ fn generate_affix_value(
         Rarity::Magic => (1.0, 3.0),
         Rarity::Rare => (2.0, 4.0),
         Rarity::Epic => (4.0, 6.0),
-        Rarity::Legendary => (6.0, 10.0),
+        Rarity::Legendary | Rarity::Mythic => (6.0, 10.0),
     };
 
     match affix_type {
@@ -127,7 +128,7 @@ fn generate_affix_value(
                 Rarity::Magic => (10.0, 20.0),
                 Rarity::Rare => (20.0, 35.0),
                 Rarity::Epic => (30.0, 50.0),
-                Rarity::Legendary => (50.0, 80.0),
+                Rarity::Legendary | Rarity::Mythic => (50.0, 80.0),
             };
             let base = rng.random_range(hp_min..=hp_max);
             (base * multiplier).round()
@@ -139,10 +140,22 @@ fn generate_affix_value(
                 Rarity::Magic => (0.05, 0.1),
                 Rarity::Rare => (0.1, 0.15),
                 Rarity::Epic => (0.15, 0.25),
-                Rarity::Legendary => (0.2, 0.35),
+                Rarity::Legendary | Rarity::Mythic => (0.2, 0.35),
             };
             let base = rng.random_range(cm_min..=cm_max);
             ((base * multiplier) * 100.0).round() / 100.0 // Round to 2 decimals
+        }
+        AffixType::AttackSpeed => {
+            // Attack speed uses 1/3 base ranges so god item Windborne (100%) stands out
+            let (as_min, as_max) = match rarity {
+                Rarity::Common => (0.0, 0.0),
+                Rarity::Magic => (0.3, 1.0),
+                Rarity::Rare => (0.7, 1.3),
+                Rarity::Epic => (1.3, 2.0),
+                Rarity::Legendary | Rarity::Mythic => (2.0, 3.3),
+            };
+            let base = rng.random_range(as_min..=as_max);
+            (base * multiplier).round()
         }
         _ => {
             // Percentage affixes
@@ -265,6 +278,14 @@ mod tests {
                         assert!(
                             affix.value >= 0.5 && affix.value <= 1.5,
                             "Crit mult out of range: {}",
+                            affix.value
+                        );
+                    }
+                    AffixType::AttackSpeed => {
+                        // 2.0-3.3 base * 4.0 = 8-13% (nerfed to 1/3)
+                        assert!(
+                            affix.value >= 7.0 && affix.value <= 14.0,
+                            "AttackSpeed out of range: {}",
                             affix.value
                         );
                     }

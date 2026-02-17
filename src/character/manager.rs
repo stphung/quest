@@ -1128,6 +1128,7 @@ mod tests {
                 affix_type: AffixType::DamagePercent,
                 value: 5.0,
             }],
+            god_item_id: None,
         };
         let json = serde_json::to_string(&item).expect("Item should serialize");
         let _: Item = serde_json::from_str(&json).expect("Item should roundtrip");

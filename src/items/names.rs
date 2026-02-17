@@ -62,7 +62,7 @@ pub fn generate_display_name(item: &Item) -> String {
             let prefix = get_quality_prefix(item.rarity);
             format!("{} {}", prefix, base)
         }
-        Rarity::Rare | Rarity::Epic | Rarity::Legendary => {
+        Rarity::Rare | Rarity::Epic | Rarity::Legendary | Rarity::Mythic => {
             // Use first affix for naming (if any)
             if let Some(first_affix) = item.affixes.first() {
                 let use_prefix = rng.random_bool(0.5);
@@ -95,6 +95,7 @@ mod tests {
             display_name: String::new(),
             attributes: AttributeBonuses::new(),
             affixes: vec![],
+            god_item_id: None,
         };
         let name = generate_display_name(&item);
         // Should be just base name
@@ -112,6 +113,7 @@ mod tests {
             display_name: String::new(),
             attributes: AttributeBonuses::new(),
             affixes: vec![],
+            god_item_id: None,
         };
         let name = generate_display_name(&item);
         assert!(name.starts_with("Fine"));
@@ -130,6 +132,7 @@ mod tests {
                 affix_type: AffixType::DamagePercent,
                 value: 15.0,
             }],
+            god_item_id: None,
         };
         let name = generate_display_name(&item);
         // Should contain either "Cruel" or "of Power"
@@ -217,6 +220,7 @@ mod tests {
                 affix_type: AffixType::HPBonus,
                 value: 50.0,
             }],
+            god_item_id: None,
         };
         let name = generate_display_name(&item);
         // Should use affix prefix "Sturdy" or suffix "of Vitality"
@@ -240,6 +244,7 @@ mod tests {
                 affix_type: AffixType::CritChance,
                 value: 30.0,
             }],
+            god_item_id: None,
         };
         let name = generate_display_name(&item);
         assert!(
@@ -259,6 +264,7 @@ mod tests {
             display_name: String::new(),
             attributes: AttributeBonuses::new(),
             affixes: vec![],
+            god_item_id: None,
         };
         let name = generate_display_name(&item);
         // Should be a plain base name since there are no affixes
@@ -282,6 +288,7 @@ mod tests {
                 display_name: String::new(),
                 attributes: AttributeBonuses::new(),
                 affixes: vec![],
+                god_item_id: None,
             };
             let name = generate_display_name(&item);
             let base_names = get_base_name(EquipmentSlot::Boots);
@@ -344,6 +351,7 @@ mod tests {
                         } else {
                             vec![]
                         },
+                        god_item_id: None,
                     };
 
                     let name = generate_display_name(&item);
@@ -383,6 +391,7 @@ mod tests {
                     display_name: String::new(),
                     attributes: AttributeBonuses::new(),
                     affixes: vec![],
+                    god_item_id: None,
                 };
 
                 let name = generate_display_name(&item);

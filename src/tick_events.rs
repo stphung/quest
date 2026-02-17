@@ -148,6 +148,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     Rarity::Rare => "R",
                     Rarity::Epic => "E",
                     Rarity::Legendary => "L",
+                    Rarity::Mythic => "G",
                 };
                 let equip_tag = if *equipped { " \u{1F528}" } else { "" };
                 let text = format!("[{}] {}{}", rarity_initial, item_name, equip_tag);
@@ -156,7 +157,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     icon: "\u{2694}",
                     text,
                     color,
-                    bold: matches!(rarity, Rarity::Epic | Rarity::Legendary),
+                    bold: matches!(rarity, Rarity::Epic | Rarity::Legendary | Rarity::Mythic),
                 });
             }
             TickEvent::SubzoneBossDefeated {
@@ -339,6 +340,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     Rarity::Rare => "R",
                     Rarity::Epic => "E",
                     Rarity::Legendary => "L",
+                    Rarity::Mythic => "G",
                 };
                 let text = format!("{} [{}]", fish_name, rarity_initial);
                 let color = rarity_color(*rarity);
@@ -431,5 +433,6 @@ fn rarity_color(rarity: Rarity) -> Color {
         Rarity::Rare => Color::Yellow,
         Rarity::Epic => Color::Magenta,
         Rarity::Legendary => Color::Rgb(255, 165, 0),
+        Rarity::Mythic => Color::Rgb(255, 215, 0),
     }
 }

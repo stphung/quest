@@ -62,6 +62,7 @@ pub fn tick_fishing_with_haven_result(
     state: &mut GameState,
     rng: &mut impl Rng,
     haven: &HavenFishingBonuses,
+    god_item_fishing_reduction_percent: f64,
 ) -> FishingTickResult {
     let mut result = FishingTickResult::default();
 
@@ -85,9 +86,10 @@ pub fn tick_fishing_with_haven_result(
                 // Casting complete, start waiting for bite
                 session.phase = FishingPhase::Waiting;
                 let base_ticks = fishing_generation::roll_waiting_ticks(rng);
-                // Apply Garden bonus: reduce timers
+                // Apply Garden bonus then god item bonus (multiplicative)
+                let after_haven = apply_timer_reduction(base_ticks, haven.timer_reduction_percent);
                 session.ticks_remaining =
-                    apply_timer_reduction(base_ticks, haven.timer_reduction_percent);
+                    apply_timer_reduction(after_haven, god_item_fishing_reduction_percent);
                 result
                     .messages
                     .push("Line cast... waiting for a bite...".to_string());
@@ -96,9 +98,10 @@ pub fn tick_fishing_with_haven_result(
                 // Got a bite! Start reeling
                 session.phase = FishingPhase::Reeling;
                 let base_ticks = fishing_generation::roll_reeling_ticks(rng);
-                // Apply Garden bonus: reduce timers
+                // Apply Garden bonus then god item bonus (multiplicative)
+                let after_haven = apply_timer_reduction(base_ticks, haven.timer_reduction_percent);
                 session.ticks_remaining =
-                    apply_timer_reduction(base_ticks, haven.timer_reduction_percent);
+                    apply_timer_reduction(after_haven, god_item_fishing_reduction_percent);
                 result
                     .messages
                     .push("🐟 Got a bite! Reeling in...".to_string());
@@ -208,8 +211,10 @@ pub fn tick_fishing_with_haven_result(
                 // Start casting again for next fish
                 session.phase = FishingPhase::Casting;
                 let base_ticks = fishing_generation::roll_casting_ticks(rng);
+                // Apply Garden bonus then god item bonus (multiplicative)
+                let after_haven = apply_timer_reduction(base_ticks, haven.timer_reduction_percent);
                 session.ticks_remaining =
-                    apply_timer_reduction(base_ticks, haven.timer_reduction_percent);
+                    apply_timer_reduction(after_haven, god_item_fishing_reduction_percent);
             }
         }
     }
@@ -234,7 +239,7 @@ pub fn tick_fishing_with_haven(
     rng: &mut impl Rng,
     haven: &HavenFishingBonuses,
 ) -> Vec<String> {
-    tick_fishing_with_haven_result(state, rng, haven).messages
+    tick_fishing_with_haven_result(state, rng, haven, 0.0).messages
 }
 
 /// Legacy function without Haven bonuses (for backwards compatibility)
@@ -1072,7 +1077,7 @@ mod tests {
             };
             state.active_fishing = Some(session);
 
-            let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven);
+            let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven, 0.0);
 
             if let Some(enc) = result.leviathan_encounter {
                 assert_eq!(enc, 1, "First encounter should be number 1");
@@ -1111,7 +1116,7 @@ mod tests {
             };
             state.active_fishing = Some(session);
 
-            let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven);
+            let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven, 0.0);
 
             assert!(
                 result.leviathan_encounter.is_none(),
@@ -1146,7 +1151,7 @@ mod tests {
             };
             state.active_fishing = Some(session);
 
-            let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven);
+            let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven, 0.0);
 
             if result.caught_storm_leviathan {
                 assert!(
@@ -1369,7 +1374,7 @@ mod tests {
                 max_fishing_rank_bonus: 0,
             };
 
-            let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven);
+            let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven, 0.0);
 
             // With 100% double fish and 2 total needed, should complete in one catch
             if state.active_fishing.is_none() {
@@ -1408,7 +1413,7 @@ mod tests {
         };
         state.active_fishing = Some(session);
 
-        let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven);
+        let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven, 0.0);
 
         // Catch message should contain one of the rarity names
         let catch_msg = result
@@ -1426,5 +1431,15 @@ mod tests {
             "Catch message should contain rarity: {}",
             catch_msg
         );
+    }
+
+    #[test]
+    fn test_god_item_fishing_reduction_stacks_with_haven() {
+        let base_ticks = 100;
+        let after_haven = apply_timer_reduction(base_ticks, 40.0); // 60 ticks
+        assert_eq!(after_haven, 60);
+        let after_god_item = apply_timer_reduction(after_haven, 50.0); // 30 ticks
+        assert_eq!(after_god_item, 30);
+        // Total reduction: 70% (multiplicative, not additive)
     }
 }

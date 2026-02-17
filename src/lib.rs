@@ -13,6 +13,7 @@ pub mod core;
 pub mod dungeon;
 pub mod enhancement;
 pub mod fishing;
+pub mod god_items;
 pub mod haven;
 pub mod items;
 pub mod utils;

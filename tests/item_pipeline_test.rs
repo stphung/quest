@@ -339,6 +339,7 @@ fn test_score_reflects_attribute_specialization() {
             ..AttributeBonuses::new()
         },
         affixes: vec![],
+        god_item_id: None,
     };
 
     let dex_item = Item {
@@ -352,6 +353,7 @@ fn test_score_reflects_attribute_specialization() {
             ..AttributeBonuses::new()
         },
         affixes: vec![],
+        god_item_id: None,
     };
 
     let str_score = score_item(&str_item, &game_state);
@@ -418,6 +420,7 @@ fn test_auto_equip_higher_scored_item_replaces_lower() {
             ..AttributeBonuses::new()
         },
         affixes: vec![],
+        god_item_id: None,
     };
     auto_equip_if_better(weak, &mut game_state);
 
@@ -452,6 +455,7 @@ fn test_auto_equip_higher_scored_item_replaces_lower() {
                 value: 30.0,
             },
         ],
+        god_item_id: None,
     };
     let strong_score = score_item(&strong, &game_state);
     let replaced = auto_equip_if_better(strong, &mut game_state);
@@ -491,6 +495,7 @@ fn test_auto_equip_lower_scored_item_does_not_replace() {
             affix_type: AffixType::DamageReduction,
             value: 40.0,
         }],
+        god_item_id: None,
     };
     auto_equip_if_better(strong, &mut game_state);
 
@@ -506,6 +511,7 @@ fn test_auto_equip_lower_scored_item_does_not_replace() {
             ..AttributeBonuses::new()
         },
         affixes: vec![],
+        god_item_id: None,
     };
     let replaced = auto_equip_if_better(weak, &mut game_state);
 
@@ -540,6 +546,7 @@ fn test_auto_equip_across_different_slots_is_independent() {
             ..AttributeBonuses::new()
         },
         affixes: vec![],
+        god_item_id: None,
     };
     let helmet = Item {
         slot: EquipmentSlot::Helmet,
@@ -552,6 +559,7 @@ fn test_auto_equip_across_different_slots_is_independent() {
             ..AttributeBonuses::new()
         },
         affixes: vec![],
+        god_item_id: None,
     };
     let boots = Item {
         slot: EquipmentSlot::Boots,
@@ -564,6 +572,7 @@ fn test_auto_equip_across_different_slots_is_independent() {
             ..AttributeBonuses::new()
         },
         affixes: vec![],
+        god_item_id: None,
     };
 
     assert!(auto_equip_if_better(weapon, &mut game_state));
@@ -644,6 +653,7 @@ fn test_full_pipeline_progressive_upgrade_chain() {
                 ..AttributeBonuses::new()
             },
             affixes: vec![],
+            god_item_id: None,
         },
         Item {
             slot: EquipmentSlot::Weapon,
@@ -659,6 +669,7 @@ fn test_full_pipeline_progressive_upgrade_chain() {
                 affix_type: AffixType::DamagePercent,
                 value: 8.0,
             }],
+            god_item_id: None,
         },
         Item {
             slot: EquipmentSlot::Weapon,
@@ -681,6 +692,7 @@ fn test_full_pipeline_progressive_upgrade_chain() {
                     value: 12.0,
                 },
             ],
+            god_item_id: None,
         },
         Item {
             slot: EquipmentSlot::Weapon,
@@ -712,6 +724,7 @@ fn test_full_pipeline_progressive_upgrade_chain() {
                     value: 30.0,
                 },
             ],
+            god_item_id: None,
         },
     ];
 
@@ -908,6 +921,7 @@ fn test_damage_percent_affix_outscores_hp_bonus_affix_at_same_value() {
             affix_type: AffixType::DamagePercent,
             value: 10.0,
         }],
+        god_item_id: None,
     };
 
     let hp_item = Item {
@@ -921,6 +935,7 @@ fn test_damage_percent_affix_outscores_hp_bonus_affix_at_same_value() {
             affix_type: AffixType::HPBonus,
             value: 10.0,
         }],
+        god_item_id: None,
     };
 
     let dmg_score = score_item(&dmg_item, &game_state);
@@ -967,6 +982,7 @@ fn test_score_affix_only_item_is_positive() {
                 value: 20.0,
             },
         ],
+        god_item_id: None,
     };
 
     let score = score_item(&item, &game_state);
@@ -1073,6 +1089,7 @@ fn test_auto_equip_equal_score_does_not_replace() {
             ..AttributeBonuses::new()
         },
         affixes: vec![],
+        god_item_id: None,
     };
 
     // Create an identical item (same stats, different name)
@@ -1087,6 +1104,7 @@ fn test_auto_equip_equal_score_does_not_replace() {
             ..AttributeBonuses::new()
         },
         affixes: vec![],
+        god_item_id: None,
     };
 
     // Verify both items have the same score

@@ -20,7 +20,7 @@ use quest::achievements::Achievements;
 use quest::character::attributes::AttributeType;
 use quest::character::derived_stats::DerivedStats;
 use quest::character::prestige::PrestigeCombatBonuses;
-use quest::combat::logic::{update_combat, CombatEvent, HavenCombatBonuses};
+use quest::combat::logic::{update_combat, CombatEvent, GodItemCombatBonuses, HavenCombatBonuses};
 use quest::core::game_logic::{
     apply_tick_xp, spawn_enemy_if_needed, try_discover_dungeon, xp_for_next_level,
 };
@@ -73,6 +73,7 @@ fn simulate_combat_tick(
         &PrestigeCombatBonuses::default(),
         achievements,
         &derived,
+        &GodItemCombatBonuses::default(),
     )
 }
 
@@ -426,7 +427,8 @@ fn test_fishing_tick_produces_messages() {
     state.active_fishing = Some(session);
 
     // Tick the fishing
-    let result = tick_fishing_with_haven_result(&mut state, &mut rng, &default_fishing_bonuses());
+    let result =
+        tick_fishing_with_haven_result(&mut state, &mut rng, &default_fishing_bonuses(), 0.0);
 
     // game_tick processes these messages (lines 1137-1188)
     // Messages get added to combat_log with 🎣 prefix
@@ -458,7 +460,8 @@ fn test_fishing_tick_skips_combat() {
 
     // When fishing is active, game_tick returns early at line 1207
     // Combat should NOT be processed
-    let result = tick_fishing_with_haven_result(&mut state, &mut rng, &default_fishing_bonuses());
+    let result =
+        tick_fishing_with_haven_result(&mut state, &mut rng, &default_fishing_bonuses(), 0.0);
 
     // After fishing tick returns, game_tick skips combat (line 1207: return)
     // Verify that combat would not have run
@@ -492,7 +495,7 @@ fn test_fishing_complete_session_updates_state() {
     // Tick until session completes
     let mut ticks = 0;
     while state.active_fishing.is_some() && ticks < 500 {
-        tick_fishing_with_haven_result(&mut state, &mut rng, &default_fishing_bonuses());
+        tick_fishing_with_haven_result(&mut state, &mut rng, &default_fishing_bonuses(), 0.0);
         ticks += 1;
     }
 
@@ -524,7 +527,7 @@ fn test_dungeon_tick_produces_events() {
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
 
     // Tick the dungeon — should produce room entry events
-    let events = update_dungeon(&mut state, delta_time);
+    let events = update_dungeon(&mut state, delta_time, 0.0);
 
     // game_tick processes these events (lines 1060-1113)
     for event in &events {
@@ -890,6 +893,7 @@ fn test_haven_combat_bonuses_passed_to_update_combat() {
         &PrestigeCombatBonuses::default(),
         &mut achievements,
         &derived,
+        &GodItemCombatBonuses::default(),
     );
 
     // Verify combat ran (may or may not produce events depending on timer)
@@ -1040,7 +1044,7 @@ fn test_fishing_with_haven_bonuses() {
         max_fishing_rank_bonus: 0,
     };
 
-    let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven_fishing);
+    let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven_fishing, 0.0);
 
     // Verify the tick processed (no panic, correct return type)
     let _ = result.messages;

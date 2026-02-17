@@ -97,7 +97,8 @@ fn test_fishing_tick_catches_fish_awards_xp_and_tracks_count() {
     let initial_xp = state.character_xp;
 
     let mut rng = create_seeded_rng(42);
-    let result = tick_fishing_with_haven_result(&mut state, &mut rng, &default_haven_fishing());
+    let result =
+        tick_fishing_with_haven_result(&mut state, &mut rng, &default_haven_fishing(), 0.0);
 
     // Fish should be caught
     assert!(!result.messages.is_empty(), "Should produce catch messages");
@@ -130,7 +131,8 @@ fn test_fishing_tick_session_ends_when_all_fish_caught() {
     state.active_fishing = Some(make_fishing_session(FishingPhase::Reeling, 1, 1)); // 1 total fish
 
     let mut rng = create_seeded_rng(42);
-    let result = tick_fishing_with_haven_result(&mut state, &mut rng, &default_haven_fishing());
+    let result =
+        tick_fishing_with_haven_result(&mut state, &mut rng, &default_haven_fishing(), 0.0);
 
     assert!(
         result.messages.iter().any(|m| m.contains("depleted")),
@@ -150,7 +152,7 @@ fn test_fishing_prestige_multiplier_increases_xp() {
     state1.prestige_rank = 0;
     state1.active_fishing = Some(make_fishing_session(FishingPhase::Reeling, 1, 5));
     let xp_before_1 = state1.character_xp;
-    tick_fishing_with_haven_result(&mut state1, &mut rng1, &default_haven_fishing());
+    tick_fishing_with_haven_result(&mut state1, &mut rng1, &default_haven_fishing(), 0.0);
     let xp_gain_no_prestige = state1.character_xp - xp_before_1;
 
     let mut rng2 = create_seeded_rng(99999); // Same seed = same fish
@@ -158,7 +160,7 @@ fn test_fishing_prestige_multiplier_increases_xp() {
     state2.prestige_rank = 5;
     state2.active_fishing = Some(make_fishing_session(FishingPhase::Reeling, 1, 5));
     let xp_before_2 = state2.character_xp;
-    tick_fishing_with_haven_result(&mut state2, &mut rng2, &default_haven_fishing());
+    tick_fishing_with_haven_result(&mut state2, &mut rng2, &default_haven_fishing(), 0.0);
     let xp_gain_with_prestige = state2.character_xp - xp_before_2;
 
     assert!(
@@ -179,7 +181,7 @@ fn test_fishing_rank_up_check_triggers_at_threshold() {
     // Catch a fish to push over the threshold
     state.active_fishing = Some(make_fishing_session(FishingPhase::Reeling, 1, 5));
     let mut rng = create_seeded_rng(42);
-    tick_fishing_with_haven_result(&mut state, &mut rng, &default_haven_fishing());
+    tick_fishing_with_haven_result(&mut state, &mut rng, &default_haven_fishing(), 0.0);
 
     // fish_toward_next_rank should now be 100
     // check_rank_up should trigger
@@ -260,7 +262,7 @@ fn test_fishing_haven_double_fish_chance() {
             double_fish_chance_percent: 50.0, // 50% double chance
             max_fishing_rank_bonus: 0,
         };
-        tick_fishing_with_haven_result(&mut state, &mut rng, &haven);
+        tick_fishing_with_haven_result(&mut state, &mut rng, &haven, 0.0);
 
         let caught = state.fishing.total_fish_caught - initial_fish;
         if caught == 2 {
@@ -294,7 +296,8 @@ fn test_fishing_storm_leviathan_flag_set_on_catch() {
             state.active_fishing = Some(make_fishing_session(FishingPhase::Reeling, 1, 100));
         }
 
-        let result = tick_fishing_with_haven_result(&mut state, &mut rng, &default_haven_fishing());
+        let result =
+            tick_fishing_with_haven_result(&mut state, &mut rng, &default_haven_fishing(), 0.0);
         if result.caught_storm_leviathan {
             caught = true;
 
@@ -333,7 +336,8 @@ fn test_fishing_leviathan_encounter_tracking() {
             state.active_fishing = Some(make_fishing_session(FishingPhase::Reeling, 1, 100));
         }
 
-        let result = tick_fishing_with_haven_result(&mut state, &mut rng, &default_haven_fishing());
+        let result =
+            tick_fishing_with_haven_result(&mut state, &mut rng, &default_haven_fishing(), 0.0);
         if let Some(encounter_num) = result.leviathan_encounter {
             assert!(
                 (1..=10).contains(&encounter_num),
@@ -366,7 +370,7 @@ fn test_fishing_legendary_catch_tracking() {
     let mut found_legendary = false;
     for _ in 0..2000 {
         state.active_fishing = Some(make_fishing_session(FishingPhase::Reeling, 1, 100));
-        tick_fishing_with_haven_result(&mut state, &mut rng, &default_haven_fishing());
+        tick_fishing_with_haven_result(&mut state, &mut rng, &default_haven_fishing(), 0.0);
 
         if state.fishing.legendary_catches > 0 {
             found_legendary = true;
@@ -447,7 +451,7 @@ fn test_dungeon_update_produces_entered_room_events() {
         dungeon.move_timer = ROOM_MOVE_INTERVAL; // Ready to move
     }
 
-    let events = update_dungeon(&mut state, delta_time());
+    let events = update_dungeon(&mut state, delta_time(), 0.0);
 
     // Should produce an EnteredRoom event (or nothing if no next room)
     if !events.is_empty() {
@@ -471,7 +475,7 @@ fn test_dungeon_blocks_movement_during_combat() {
         dungeon.move_timer = 100.0; // Way past interval
     }
 
-    let events = update_dungeon(&mut state, delta_time());
+    let events = update_dungeon(&mut state, delta_time(), 0.0);
     assert!(events.is_empty(), "Should not move when room not cleared");
 }
 
@@ -481,7 +485,7 @@ fn test_dungeon_no_events_when_no_active_dungeon() {
     let mut state = create_test_state();
     state.active_dungeon = None;
 
-    let events = update_dungeon(&mut state, delta_time());
+    let events = update_dungeon(&mut state, delta_time(), 0.0);
     assert!(events.is_empty());
 }
 
@@ -625,7 +629,7 @@ fn test_dungeon_timer_accumulates_before_move() {
     }
 
     // Small tick - not enough to move
-    let events = update_dungeon(&mut state, 0.5);
+    let events = update_dungeon(&mut state, 0.5, 0.0);
     assert!(events.is_empty(), "Should not move yet");
 
     let timer = state.active_dungeon.as_ref().unwrap().move_timer;
@@ -990,12 +994,12 @@ fn test_deterministic_fishing_same_seed_same_result() {
     let mut state1 = create_test_state();
     state1.active_fishing = Some(make_fishing_session(FishingPhase::Reeling, 1, 5));
     let mut rng1 = create_seeded_rng(12345);
-    let result1 = tick_fishing_with_haven_result(&mut state1, &mut rng1, &haven);
+    let result1 = tick_fishing_with_haven_result(&mut state1, &mut rng1, &haven, 0.0);
 
     let mut state2 = create_test_state();
     state2.active_fishing = Some(make_fishing_session(FishingPhase::Reeling, 1, 5));
     let mut rng2 = create_seeded_rng(12345);
-    let result2 = tick_fishing_with_haven_result(&mut state2, &mut rng2, &haven);
+    let result2 = tick_fishing_with_haven_result(&mut state2, &mut rng2, &haven, 0.0);
 
     assert_eq!(result1.messages.len(), result2.messages.len());
     assert_eq!(result1.messages, result2.messages);
@@ -1016,12 +1020,12 @@ fn test_deterministic_fishing_different_seed_different_result() {
         let mut state1 = create_test_state();
         state1.active_fishing = Some(make_fishing_session(FishingPhase::Reeling, 1, 5));
         let mut rng1 = create_seeded_rng(12345);
-        tick_fishing_with_haven_result(&mut state1, &mut rng1, &haven);
+        tick_fishing_with_haven_result(&mut state1, &mut rng1, &haven, 0.0);
 
         let mut state2 = create_test_state();
         state2.active_fishing = Some(make_fishing_session(FishingPhase::Reeling, 1, 5));
         let mut rng2 = create_seeded_rng(12345 + seed_offset);
-        tick_fishing_with_haven_result(&mut state2, &mut rng2, &haven);
+        tick_fishing_with_haven_result(&mut state2, &mut rng2, &haven, 0.0);
 
         if state1.character_xp != state2.character_xp {
             different = true;

@@ -88,6 +88,7 @@ mod tests {
             display_name: "Test Item".to_string(),
             attributes: AttributeBonuses::new(),
             affixes: vec![],
+            god_item_id: None,
         }
     }
 
@@ -161,6 +162,7 @@ mod tests {
                 ..AttributeBonuses::new()
             },
             affixes: vec![],
+            god_item_id: None,
         };
         let item2 = Item {
             slot: EquipmentSlot::Weapon,
@@ -173,6 +175,7 @@ mod tests {
                 ..AttributeBonuses::new()
             },
             affixes: vec![],
+            god_item_id: None,
         };
 
         eq.set(EquipmentSlot::Weapon, Some(item1));
@@ -226,6 +229,7 @@ mod tests {
                 ..AttributeBonuses::new()
             },
             affixes: vec![],
+            god_item_id: None,
         };
         let armor = Item {
             slot: EquipmentSlot::Armor,
@@ -238,6 +242,7 @@ mod tests {
                 ..AttributeBonuses::new()
             },
             affixes: vec![],
+            god_item_id: None,
         };
 
         eq.set(EquipmentSlot::Weapon, Some(weapon));

@@ -473,6 +473,7 @@ fn test_enhancement_multiplier_affects_derived_stats() {
             cha: 0,
         },
         affixes: vec![],
+        god_item_id: None,
     };
     equipment.set(EquipmentSlot::Weapon, Some(weapon));
 
@@ -516,6 +517,7 @@ fn test_enhancement_multiplier_affects_affixes() {
             affix_type: AffixType::CritChance,
             value: 10.0,
         }],
+        god_item_id: None,
     };
     equipment.set(EquipmentSlot::Weapon, Some(weapon));
 
@@ -559,6 +561,7 @@ fn test_enhancement_zero_levels_no_change() {
             cha: 0,
         },
         affixes: vec![],
+        god_item_id: None,
     };
     equipment.set(EquipmentSlot::Weapon, Some(weapon));
 
@@ -594,6 +597,7 @@ fn test_enhancement_per_slot_independence() {
             cha: 0,
         },
         affixes: vec![],
+        god_item_id: None,
     };
     // Armor with +4 CON
     let armor = Item {
@@ -611,6 +615,7 @@ fn test_enhancement_per_slot_independence() {
             cha: 0,
         },
         affixes: vec![],
+        god_item_id: None,
     };
     equipment.set(EquipmentSlot::Weapon, Some(weapon));
     equipment.set(EquipmentSlot::Armor, Some(armor));
