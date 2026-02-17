@@ -444,11 +444,12 @@ fn enhancement_style(level: u8) -> Style {
 /// Draws attributes in a compact 2-column layout.
 /// 3 rows: STR/INT, DEX/WIS, CON/CHA with modifiers.
 fn draw_attributes_compact(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    let attrs_block = Block::default().borders(Borders::ALL).title("Attributes");
+    let cap = game_state.get_attribute_cap();
+    let attrs_block = Block::default()
+        .borders(Borders::ALL)
+        .title(format!("Attributes ({})", cap));
     let inner = attrs_block.inner(area);
     frame.render_widget(attrs_block, area);
-
-    let cap = game_state.get_attribute_cap();
 
     // Pair attributes: STR/INT, DEX/WIS, CON/CHA
     let pairs = [
@@ -482,11 +483,7 @@ fn draw_attributes_compact(frame: &mut Frame, area: Rect, game_state: &GameState
                 Style::default().add_modifier(Modifier::BOLD),
             ),
             Span::styled(format!("{:2}", r_val), Style::default().fg(r_color)),
-            Span::raw(format!(" ({:>3})  ", r_mod_str)),
-            Span::styled(
-                format!("[Cap:{}]", cap),
-                Style::default().fg(Color::DarkGray),
-            ),
+            Span::raw(format!(" ({:>3})", r_mod_str)),
         ]));
     }
 
