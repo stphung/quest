@@ -105,7 +105,7 @@ pub fn roll_rarity_for_boss(is_final_zone: bool, rng: &mut impl Rng) -> Rarity {
     let roll = rng.random::<f64>();
 
     if is_final_zone {
-        // Zone 10 final boss: 20% Magic, 40% Rare, 30% Epic, 10% Legendary
+        // Zone 10 final boss: 20% Magic, 40% Rare, 35% Epic, 5% Legendary
         if roll < BOSS_FINAL_MAGIC_THRESHOLD {
             Rarity::Magic
         } else if roll < BOSS_FINAL_RARE_THRESHOLD {
@@ -116,7 +116,7 @@ pub fn roll_rarity_for_boss(is_final_zone: bool, rng: &mut impl Rng) -> Rarity {
             Rarity::Legendary
         }
     } else {
-        // Normal zone boss: 40% Magic, 35% Rare, 20% Epic, 5% Legendary
+        // Normal zone boss: 40% Magic, 35% Rare, 23% Epic, 2% Legendary
         if roll < BOSS_NORMAL_MAGIC_THRESHOLD {
             Rarity::Magic
         } else if roll < BOSS_NORMAL_RARE_THRESHOLD {
@@ -176,7 +176,7 @@ mod tests {
         let mut rng = ChaCha8Rng::seed_from_u64(200);
         let mut found_legendary = false;
 
-        // Normal boss has 5% legendary rate
+        // Normal boss has 2% legendary rate
         for _ in 0..500 {
             if roll_rarity_for_boss(false, &mut rng) == Rarity::Legendary {
                 found_legendary = true;
@@ -203,7 +203,7 @@ mod tests {
             }
         }
 
-        // Final boss (10%) vs normal boss (5%) — 2k trials gives ~100 vs ~200 expected
+        // Final boss (5%) vs normal boss (2%) — 2k trials gives ~40 vs ~100 expected
         assert!(
             final_legendaries > normal_legendaries,
             "Final boss should have higher legendary rate: normal={}, final={}",
