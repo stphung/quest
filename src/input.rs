@@ -112,6 +112,8 @@ pub enum GameOverlay {
     LeviathanEncounter {
         encounter_number: u8,
     },
+    /// Quit confirmation when pending challenges exist
+    QuitConfirm,
 }
 
 /// Result of handling a game input event.
@@ -218,6 +220,17 @@ pub fn handle_game_input(
     // 4. Prestige confirmation
     if matches!(overlay, GameOverlay::PrestigeConfirm) {
         return handle_prestige_confirm(key, state, haven, overlay);
+    }
+
+    // 4.5. Quit confirmation (pending challenges warning)
+    if matches!(overlay, GameOverlay::QuitConfirm) {
+        match key.code {
+            KeyCode::Enter => return InputResult::QuitToSelect,
+            _ => {
+                *overlay = GameOverlay::None;
+                return InputResult::Continue;
+            }
+        }
     }
 
     // 5. Debug menu
@@ -802,7 +815,14 @@ fn handle_base_game(
     update_expanded: bool,
 ) -> InputResult {
     match key.code {
-        KeyCode::Esc => InputResult::QuitToSelect,
+        KeyCode::Esc => {
+            if state.challenge_menu.challenges.is_empty() {
+                InputResult::QuitToSelect
+            } else {
+                *overlay = GameOverlay::QuitConfirm;
+                InputResult::Continue
+            }
+        }
         KeyCode::Char('u') | KeyCode::Char('U') => {
             // Toggle update details if update available OR already expanded
             if update_available || update_expanded {
