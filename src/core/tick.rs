@@ -419,6 +419,7 @@ pub fn game_tick<R: Rng>(
                     String::new(),
                     String::new(),
                 );
+                achievements.on_fish_caught(Some(&state.character_name));
                 result.events.push(TickEvent::FishCaught {
                     fish_name,
                     rarity,
@@ -452,7 +453,11 @@ pub fn game_tick<R: Rng>(
 
         // Check fishing rank up
         let max_rank = get_max_fishing_rank(haven_fishing.max_fishing_rank_bonus);
+        let rank_before = state.fishing.rank;
         if let Some(rank_msg) = check_rank_up_with_max(&mut state.fishing, max_rank) {
+            if state.fishing.rank > rank_before {
+                achievements.on_fishing_rank_up(state.fishing.rank, Some(&state.character_name));
+            }
             let prefixed = format!("\u{1f3a3} {}", rank_msg);
             result
                 .events
@@ -560,7 +565,9 @@ pub fn game_tick<R: Rng>(
                 let level_before = state.character_level;
                 apply_tick_xp(state, xp_gained as f64);
                 if state.character_level > level_before {
-                    achievements.on_level_up(state.character_level, Some(&state.character_name));
+                    for lvl in (level_before + 1)..=state.character_level {
+                        achievements.on_level_up(lvl, Some(&state.character_name));
+                    }
                     result.events.push(TickEvent::LeveledUp {
                         new_level: state.character_level,
                     });
@@ -594,7 +601,9 @@ pub fn game_tick<R: Rng>(
                 let level_before = state.character_level;
                 apply_tick_xp(state, xp_gained as f64);
                 if state.character_level > level_before {
-                    achievements.on_level_up(state.character_level, Some(&state.character_name));
+                    for lvl in (level_before + 1)..=state.character_level {
+                        achievements.on_level_up(lvl, Some(&state.character_name));
+                    }
                     result.events.push(TickEvent::LeveledUp {
                         new_level: state.character_level,
                     });
@@ -631,7 +640,9 @@ pub fn game_tick<R: Rng>(
 
                 apply_tick_xp(state, bonus_xp as f64);
                 if state.character_level > level_before {
-                    achievements.on_level_up(state.character_level, Some(&state.character_name));
+                    for lvl in (level_before + 1)..=state.character_level {
+                        achievements.on_level_up(lvl, Some(&state.character_name));
+                    }
                     result.events.push(TickEvent::LeveledUp {
                         new_level: state.character_level,
                     });
@@ -673,7 +684,9 @@ pub fn game_tick<R: Rng>(
                 let level_before = state.character_level;
                 apply_tick_xp(state, xp_gained as f64);
                 if state.character_level > level_before {
-                    achievements.on_level_up(state.character_level, Some(&state.character_name));
+                    for lvl in (level_before + 1)..=state.character_level {
+                        achievements.on_level_up(lvl, Some(&state.character_name));
+                    }
                     result.events.push(TickEvent::LeveledUp {
                         new_level: state.character_level,
                     });
