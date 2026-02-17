@@ -25,6 +25,29 @@ pub struct HavenCombatBonuses {
     pub xp_gain_percent: f64,
 }
 
+/// God item bonuses that affect combat
+pub struct GodItemCombatBonuses {
+    /// Asprika: Divine Bulwark damage reduction percent
+    pub damage_reduction_percent: f64,
+    /// Sleipnir: Windborne attack speed percent bonus
+    pub attack_speed_percent: f64,
+    /// Sleipnir: Swiftstrider regen duration reduction percent
+    pub regen_reduction_percent: f64,
+    /// Megingjord: Giant's Might damage percent bonus
+    pub damage_percent: f64,
+}
+
+impl Default for GodItemCombatBonuses {
+    fn default() -> Self {
+        Self {
+            damage_reduction_percent: 0.0,
+            attack_speed_percent: 0.0,
+            regen_reduction_percent: 0.0,
+            damage_percent: 0.0,
+        }
+    }
+}
+
 pub enum CombatEvent {
     PlayerAttack {
         damage: u32,
@@ -112,6 +135,7 @@ pub fn update_combat(
     prestige_bonuses: &PrestigeCombatBonuses,
     achievements: &mut crate::achievements::Achievements,
     derived: &DerivedStats,
+    god_items: &GodItemCombatBonuses,
 ) -> Vec<CombatEvent> {
     let mut events = Vec::new();
 
@@ -122,8 +146,9 @@ pub fn update_combat(
             derived.hp_regen_multiplier * (1.0 + haven.hp_regen_percent / 100.0);
 
         // Apply Bedroom bonus: reduce base regen duration
-        let base_regen_duration =
-            HP_REGEN_DURATION_SECONDS * (1.0 - haven.hp_regen_delay_reduction / 100.0);
+        let base_regen_duration = HP_REGEN_DURATION_SECONDS
+            * (1.0 - haven.hp_regen_delay_reduction / 100.0)
+            * (1.0 - god_items.regen_reduction_percent / 100.0);
         let effective_regen_duration = base_regen_duration / total_regen_multiplier;
 
         state.combat_state.regen_timer += delta_time;
@@ -176,7 +201,8 @@ pub fn update_combat(
     state.combat_state.enemy_attack_timer += delta_time;
 
     // Attack speed multiplier: higher = faster attacks
-    let player_interval = ATTACK_INTERVAL_SECONDS / derived.attack_speed_multiplier;
+    let player_interval = ATTACK_INTERVAL_SECONDS
+        / (derived.attack_speed_multiplier + god_items.attack_speed_percent / 100.0);
     let enemy_interval = effective_enemy_attack_interval(state);
 
     // --- Phase 2: Determine who attacks this tick ---
@@ -197,8 +223,12 @@ pub fn update_combat(
             // Player attacks normally
             // 1. Base damage from DerivedStats (STR/INT + equipment)
             let base_damage = derived.total_damage();
+            // 1b. Apply Giant's Might: +% base damage
+            let god_boosted_damage =
+                (base_damage as f64 * (1.0 + god_items.damage_percent / 100.0)) as u32;
             // 2. Apply Haven Armory multiplier: +% damage
-            let haven_damage = (base_damage as f64 * (1.0 + haven.damage_percent / 100.0)) as u32;
+            let haven_damage =
+                (god_boosted_damage as f64 * (1.0 + haven.damage_percent / 100.0)) as u32;
             // 3. Apply prestige flat damage (added after Haven %, before crit)
             let pre_crit_damage = haven_damage + prestige_bonuses.flat_damage;
             // 4. Apply enemy defense: min damage floor of 1
@@ -321,7 +351,14 @@ pub fn update_combat(
 
         if let Some(enemy) = state.combat_state.current_enemy.as_mut() {
             let total_defense = derived.defense + prestige_bonuses.flat_defense;
-            let enemy_damage = enemy.damage.saturating_sub(total_defense).max(1);
+            let base_damage = enemy.damage.saturating_sub(total_defense).max(1);
+            // Apply Divine Bulwark (god item damage reduction)
+            let enemy_damage = if god_items.damage_reduction_percent > 0.0 {
+                (((base_damage as f64) * (1.0 - god_items.damage_reduction_percent / 100.0)) as u32)
+                    .max(1)
+            } else {
+                base_damage
+            };
             state.combat_state.player_current_hp = state
                 .combat_state
                 .player_current_hp
@@ -483,6 +520,7 @@ mod tests {
             &default_prestige(),
             achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         )
     }
 
@@ -502,6 +540,7 @@ mod tests {
             &default_prestige(),
             achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         )
     }
 
@@ -521,6 +560,7 @@ mod tests {
             &default_prestige(),
             achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         )
     }
 
@@ -565,6 +605,7 @@ mod tests {
             &default_prestige(),
             &mut achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         );
         assert_eq!(events.len(), 0);
     }
@@ -584,6 +625,7 @@ mod tests {
             &default_prestige(),
             &mut achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         );
         assert_eq!(events.len(), 0);
 
@@ -595,6 +637,7 @@ mod tests {
             &default_prestige(),
             &mut achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         );
         assert!(!events.is_empty()); // Player attack (enemy not yet at 2.0s)
     }
@@ -661,6 +704,7 @@ mod tests {
             &default_prestige(),
             &mut achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         );
         assert_eq!(
             state.combat_state.player_current_hp,
@@ -940,6 +984,7 @@ mod tests {
             &default_prestige(),
             &mut achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         );
 
         // No combat events during regen
@@ -968,6 +1013,7 @@ mod tests {
             &default_prestige(),
             &mut achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         );
 
         // HP should be partially restored (roughly halfway)
@@ -1040,6 +1086,7 @@ mod tests {
             &default_prestige(),
             &mut achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         );
 
         // Find the PlayerAttack event
@@ -1085,6 +1132,7 @@ mod tests {
                 &default_prestige(),
                 &mut achievements,
                 &d,
+                &GodItemCombatBonuses::default(),
             );
 
             for e in &events {
@@ -1127,6 +1175,7 @@ mod tests {
             &default_prestige(),
             &mut achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         );
 
         let attack_event = events
@@ -1233,6 +1282,7 @@ mod tests {
                     &default_prestige(),
                     &mut achievements,
                     &d,
+                    &GodItemCombatBonuses::default(),
                 );
             }
         }
@@ -1364,6 +1414,7 @@ mod tests {
             &default_prestige(),
             &mut achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         );
 
         let xp_event = events.iter().find_map(|e| match e {
@@ -1534,6 +1585,7 @@ mod tests {
                 affix_type: AffixType::CritMultiplier,
                 value: 100.0,
             }],
+            god_item_id: None,
         };
         state.equipment.set(EquipmentSlot::Weapon, Some(weapon));
 
@@ -1552,6 +1604,7 @@ mod tests {
             &default_prestige(),
             &mut achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         );
 
         let attack = events
@@ -1587,6 +1640,7 @@ mod tests {
                 affix_type: AffixType::AttackSpeed,
                 value: 50.0,
             }],
+            god_item_id: None,
         };
         state.equipment.set(EquipmentSlot::Gloves, Some(gloves));
 
@@ -1603,6 +1657,7 @@ mod tests {
             &default_prestige(),
             &mut achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         );
 
         let attacked = events
@@ -1627,6 +1682,7 @@ mod tests {
             &default_prestige(),
             &mut achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         );
 
         let attacked = events
@@ -1656,6 +1712,7 @@ mod tests {
                 affix_type: AffixType::HPRegen,
                 value: 100.0,
             }],
+            god_item_id: None,
         };
         state.equipment.set(EquipmentSlot::Armor, Some(armor));
 
@@ -1674,6 +1731,7 @@ mod tests {
             &default_prestige(),
             &mut achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         );
 
         assert_eq!(state.combat_state.player_current_hp, 100);
@@ -1699,6 +1757,7 @@ mod tests {
             &default_prestige(),
             &mut achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         );
 
         // Should still be regenerating, not fully healed
@@ -1730,6 +1789,7 @@ mod tests {
             &default_prestige(),
             &mut achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         );
 
         assert_eq!(state.combat_state.player_current_hp, 100);
@@ -1756,6 +1816,7 @@ mod tests {
                 affix_type: AffixType::HPRegen,
                 value: 100.0,
             }],
+            god_item_id: None,
         };
         state.equipment.set(EquipmentSlot::Armor, Some(armor));
 
@@ -1780,6 +1841,7 @@ mod tests {
             &default_prestige(),
             &mut achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         );
 
         assert_eq!(state.combat_state.player_current_hp, 100);
@@ -1811,6 +1873,7 @@ mod tests {
                 affix_type: AffixType::DamageReflection,
                 value: 50.0,
             }],
+            god_item_id: None,
         };
         state.equipment.set(EquipmentSlot::Armor, Some(armor));
 
@@ -1864,6 +1927,7 @@ mod tests {
                 affix_type: AffixType::DamageReflection,
                 value: 1000.0, // 1000% reflection
             }],
+            god_item_id: None,
         };
         state.equipment.set(EquipmentSlot::Armor, Some(armor));
 
@@ -1913,6 +1977,7 @@ mod tests {
                 affix_type: AffixType::DamageReflection,
                 value: 100.0,
             }],
+            god_item_id: None,
         };
         state.equipment.set(EquipmentSlot::Armor, Some(armor));
 
@@ -1968,6 +2033,7 @@ mod tests {
             &default_prestige(),
             &mut achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         );
         let damage_no_bonus = events_no_bonus
             .iter()
@@ -1996,6 +2062,7 @@ mod tests {
             &default_prestige(),
             &mut achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         );
         let damage_with_bonus = events_with_bonus
             .iter()
@@ -2041,6 +2108,7 @@ mod tests {
                 &default_prestige(),
                 &mut achievements,
                 &d,
+                &GodItemCombatBonuses::default(),
             );
             if events
                 .iter()
@@ -2069,6 +2137,7 @@ mod tests {
                 &default_prestige(),
                 &mut achievements,
                 &d,
+                &GodItemCombatBonuses::default(),
             );
             if events
                 .iter()
@@ -2115,6 +2184,7 @@ mod tests {
                 &default_prestige(),
                 &mut achievements,
                 &d,
+                &GodItemCombatBonuses::default(),
             );
 
             // Count PlayerAttack events (should be 2 if double strike procs)
@@ -2159,6 +2229,7 @@ mod tests {
             &default_prestige(),
             &mut achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         );
 
         assert_eq!(state.combat_state.player_current_hp, 100);
@@ -2193,6 +2264,7 @@ mod tests {
             &default_prestige(),
             &mut achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         );
 
         // Should have at least one attack
@@ -2790,6 +2862,7 @@ mod tests {
             &default_prestige(),
             &mut achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         );
         assert!(!state.combat_state.is_regenerating);
 
@@ -2850,6 +2923,7 @@ mod tests {
             &default_prestige(),
             &mut achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         );
 
         // Timers should NOT have advanced (regen blocks combat)
@@ -2889,5 +2963,158 @@ mod tests {
             "Missing enemy_attack_timer should default to 0.0, got {}",
             loaded.enemy_attack_timer
         );
+    }
+
+    #[test]
+    fn test_divine_bulwark_reduces_enemy_damage() {
+        // Set up a scenario where the enemy attacks the player.
+        // Without DR (0.0): damage = enemy.damage - defense, min 1
+        // With 30% DR: damage = 70% of post-defense damage, min 1
+        let mut state = GameState::new("DR Test".to_string(), 0);
+        let mut achievements = Achievements::default();
+
+        let enemy_base_damage = 20;
+        state.combat_state.current_enemy =
+            Some(Enemy::new("Attacker".to_string(), 10000, enemy_base_damage));
+
+        let derived = default_derived(&state);
+        let total_defense = derived.defense + default_prestige().flat_defense;
+        let post_defense_damage = enemy_base_damage.saturating_sub(total_defense).max(1);
+
+        // -- Test WITHOUT DR --
+        let initial_hp = state.combat_state.player_current_hp;
+        state.combat_state.player_attack_timer = 0.0;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &default_prestige(),
+            &mut achievements,
+            &derived,
+            &GodItemCombatBonuses::default(), // no DR
+        );
+        let hp_lost_no_dr = initial_hp - state.combat_state.player_current_hp;
+        assert_eq!(
+            hp_lost_no_dr, post_defense_damage,
+            "Without DR, damage should be post-defense"
+        );
+        assert_has_event(
+            &events,
+            "EnemyAttack",
+            |e| matches!(e, CombatEvent::EnemyAttack { damage } if *damage == post_defense_damage),
+        );
+
+        // -- Test WITH 30% DR --
+        // Reset HP and enemy for second test
+        state.combat_state.player_current_hp = initial_hp;
+        state.combat_state.current_enemy =
+            Some(Enemy::new("Attacker".to_string(), 10000, enemy_base_damage));
+        state.combat_state.player_attack_timer = 0.0;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
+        let events_dr = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &default_prestige(),
+            &mut achievements,
+            &derived,
+            &GodItemCombatBonuses {
+                damage_reduction_percent: 30.0,
+                ..GodItemCombatBonuses::default()
+            }, // 30% DR from Divine Bulwark
+        );
+        let hp_lost_with_dr = initial_hp - state.combat_state.player_current_hp;
+        let expected_dr_damage = ((post_defense_damage as f64) * 0.70) as u32;
+        let expected_dr_damage = expected_dr_damage.max(1);
+        assert_eq!(
+            hp_lost_with_dr, expected_dr_damage,
+            "With 30% DR, damage should be 70% of post-defense (expected {expected_dr_damage}, got {hp_lost_with_dr})"
+        );
+        assert_has_event(
+            &events_dr,
+            "EnemyAttack with DR",
+            |e| matches!(e, CombatEvent::EnemyAttack { damage } if *damage == expected_dr_damage),
+        );
+
+        // Verify DR actually reduced damage
+        assert!(
+            hp_lost_with_dr < hp_lost_no_dr,
+            "DR should reduce damage: {hp_lost_with_dr} < {hp_lost_no_dr}"
+        );
+    }
+
+    #[test]
+    fn test_divine_bulwark_minimum_damage_is_one() {
+        // Even with very high DR, enemy should still deal at least 1 damage
+        let mut state = GameState::new("DR Min Test".to_string(), 0);
+        let mut achievements = Achievements::default();
+
+        // Give player high defense so post-defense damage is 1
+        state
+            .attributes
+            .set(crate::character::attributes::AttributeType::Dexterity, 30);
+        let derived = default_derived(&state);
+
+        // Enemy with very low damage (just above defense)
+        let enemy_damage = derived.defense + 1;
+        state.combat_state.current_enemy =
+            Some(Enemy::new("Weak Attacker".to_string(), 10000, enemy_damage));
+
+        let initial_hp = state.combat_state.player_current_hp;
+        state.combat_state.player_attack_timer = 0.0;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &default_prestige(),
+            &mut achievements,
+            &derived,
+            &GodItemCombatBonuses {
+                damage_reduction_percent: 99.0,
+                ..GodItemCombatBonuses::default()
+            }, // 99% DR — should still deal 1 damage
+        );
+        let hp_lost = initial_hp - state.combat_state.player_current_hp;
+        assert_eq!(
+            hp_lost, 1,
+            "Minimum damage should be 1 even with extreme DR"
+        );
+        assert_has_event(
+            &events,
+            "EnemyAttack min 1",
+            |e| matches!(e, CombatEvent::EnemyAttack { damage } if *damage == 1),
+        );
+    }
+
+    #[test]
+    fn test_divine_bulwark_zero_dr_unchanged() {
+        // With 0.0 DR, damage should be identical to the normal path
+        let mut state = GameState::new("Zero DR Test".to_string(), 0);
+        let mut achievements = Achievements::default();
+
+        let enemy_base_damage = 15;
+        state.combat_state.current_enemy =
+            Some(Enemy::new("Normal".to_string(), 10000, enemy_base_damage));
+
+        let derived = default_derived(&state);
+        let total_defense = derived.defense + default_prestige().flat_defense;
+        let expected_damage = enemy_base_damage.saturating_sub(total_defense).max(1);
+
+        let initial_hp = state.combat_state.player_current_hp;
+        state.combat_state.player_attack_timer = 0.0;
+        state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
+        update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &default_prestige(),
+            &mut achievements,
+            &derived,
+            &GodItemCombatBonuses::default(),
+        );
+        let hp_lost = initial_hp - state.combat_state.player_current_hp;
+        assert_eq!(hp_lost, expected_damage, "Zero DR should not change damage");
     }
 }

@@ -1,4 +1,4 @@
-use super::types::{AffixType, AttributeBonuses, Item};
+use super::types::{AffixType, AttributeBonuses, Item, Rarity};
 use crate::core::game_state::GameState;
 
 pub fn score_item(item: &Item, game_state: &GameState) -> f64 {
@@ -60,6 +60,13 @@ fn calculate_attribute_weights(game_state: &GameState) -> AttributeBonuses {
 }
 
 pub fn auto_equip_if_better(item: Item, game_state: &mut GameState) -> bool {
+    // Never auto-replace a Mythic (god) item
+    if let Some(current) = game_state.equipment.get(item.slot).as_ref() {
+        if current.rarity == Rarity::Mythic && item.rarity != Rarity::Mythic {
+            return false;
+        }
+    }
+
     let new_score = score_item(&item, game_state);
     let current_score = game_state
         .equipment
@@ -94,6 +101,7 @@ mod tests {
                 ..AttributeBonuses::new()
             },
             affixes: vec![],
+            god_item_id: None,
         }
     }
 
@@ -120,6 +128,7 @@ mod tests {
                 affix_type: AffixType::DamagePercent,
                 value: 15.0,
             }],
+            god_item_id: None,
         };
 
         let score = score_item(&item, &game_state);
@@ -210,6 +219,7 @@ mod tests {
                 ..AttributeBonuses::new()
             },
             affixes: vec![],
+            god_item_id: None,
         };
         let dex_item = Item {
             slot: EquipmentSlot::Weapon,
@@ -222,6 +232,7 @@ mod tests {
                 ..AttributeBonuses::new()
             },
             affixes: vec![],
+            god_item_id: None,
         };
 
         let str_score = score_item(&str_item, &game_state);
@@ -242,6 +253,7 @@ mod tests {
             display_name: "Test".to_string(),
             attributes: AttributeBonuses::new(),
             affixes: vec![],
+            god_item_id: None,
         };
 
         let score = score_item(&item, &game_state);
@@ -267,6 +279,7 @@ mod tests {
                     affix_type,
                     value: 10.0,
                 }],
+                god_item_id: None,
             }
         };
 
@@ -299,6 +312,7 @@ mod tests {
                 ..AttributeBonuses::new()
             },
             affixes: vec![],
+            god_item_id: None,
         };
         let combined = Item {
             slot: EquipmentSlot::Weapon,
@@ -314,6 +328,7 @@ mod tests {
                 affix_type: AffixType::DamagePercent,
                 value: 10.0,
             }],
+            god_item_id: None,
         };
 
         let attr_score = score_item(&attr_only, &game_state);
@@ -339,6 +354,7 @@ mod tests {
                 ..AttributeBonuses::new()
             },
             affixes: vec![],
+            god_item_id: None,
         };
 
         assert!(auto_equip_if_better(weapon, &mut game_state));
@@ -346,6 +362,60 @@ mod tests {
 
         assert!(game_state.equipment.get(EquipmentSlot::Weapon).is_some());
         assert!(game_state.equipment.get(EquipmentSlot::Armor).is_some());
+    }
+
+    #[test]
+    fn test_mythic_item_never_auto_replaced() {
+        let mut game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
+
+        // Equip a Mythic item (weak stats)
+        let mythic = Item {
+            slot: EquipmentSlot::Armor,
+            rarity: Rarity::Mythic,
+            ilvl: 100,
+            base_name: "Asprika".to_string(),
+            display_name: "Asprika".to_string(),
+            attributes: AttributeBonuses {
+                con: 1,
+                ..AttributeBonuses::new()
+            },
+            affixes: vec![],
+            god_item_id: None,
+        };
+        game_state.equipment.set(EquipmentSlot::Armor, Some(mythic));
+
+        // Try to equip a Legendary with higher raw score
+        let legendary = Item {
+            slot: EquipmentSlot::Armor,
+            rarity: Rarity::Legendary,
+            ilvl: 100,
+            base_name: "Test".to_string(),
+            display_name: "Test".to_string(),
+            attributes: AttributeBonuses {
+                con: 50,
+                str: 50,
+                ..AttributeBonuses::new()
+            },
+            affixes: vec![Affix {
+                affix_type: AffixType::DamagePercent,
+                value: 100.0,
+            }],
+            god_item_id: None,
+        };
+        let equipped = auto_equip_if_better(legendary, &mut game_state);
+        assert!(
+            !equipped,
+            "Mythic item should never be auto-replaced by a Legendary"
+        );
+        assert_eq!(
+            game_state
+                .equipment
+                .get(EquipmentSlot::Armor)
+                .as_ref()
+                .unwrap()
+                .rarity,
+            Rarity::Mythic,
+        );
     }
 
     #[test]
@@ -371,6 +441,7 @@ mod tests {
                 affix_type: AffixType::DamagePercent,
                 value: 20.0,
             }],
+            god_item_id: None,
         };
 
         let equipped = auto_equip_if_better(affix_item, &mut game_state);

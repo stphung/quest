@@ -716,7 +716,7 @@ fn test_leviathan_tick_result_returns_encounter() {
         };
         state.active_fishing = Some(session);
 
-        let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven_bonuses);
+        let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven_bonuses, 0.0);
 
         if result.leviathan_encounter.is_some() {
             assert_eq!(

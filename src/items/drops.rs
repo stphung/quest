@@ -246,7 +246,7 @@ mod tests {
                 Rarity::Magic => magic += 1,
                 Rarity::Rare => rare += 1,
                 Rarity::Epic => epic += 1,
-                Rarity::Legendary => panic!("Should never happen"),
+                Rarity::Legendary | Rarity::Mythic => panic!("Should never happen"),
             }
         }
 

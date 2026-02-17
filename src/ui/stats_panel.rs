@@ -528,6 +528,7 @@ fn draw_equipment_names_only(
                 Rarity::Rare => Color::Yellow,
                 Rarity::Epic => Color::Magenta,
                 Rarity::Legendary => Color::LightRed,
+                Rarity::Mythic => Color::Rgb(255, 215, 0),
             };
 
             let enh_level = enhancement_levels[idx];

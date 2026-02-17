@@ -52,6 +52,7 @@ pub enum Rarity {
     Rare = 2,
     Epic = 3,
     Legendary = 4,
+    Mythic = 5,
 }
 
 impl Rarity {
@@ -63,6 +64,7 @@ impl Rarity {
             Rarity::Rare => "Rare",
             Rarity::Epic => "Epic",
             Rarity::Legendary => "Legendary",
+            Rarity::Mythic => "Mythic",
         }
     }
 }
@@ -149,6 +151,8 @@ pub struct Item {
     pub display_name: String,
     pub attributes: AttributeBonuses,
     pub affixes: Vec<Affix>,
+    #[serde(default)]
+    pub god_item_id: Option<crate::god_items::GodItemId>,
 }
 
 fn default_ilvl() -> u32 {
@@ -218,6 +222,17 @@ mod tests {
     }
 
     #[test]
+    fn test_mythic_rarity_above_legendary() {
+        assert!(Rarity::Legendary < Rarity::Mythic);
+        assert!(Rarity::Mythic > Rarity::Epic);
+    }
+
+    #[test]
+    fn test_mythic_rarity_name() {
+        assert_eq!(Rarity::Mythic.name(), "Mythic");
+    }
+
+    #[test]
     fn test_item_creation() {
         let item = Item {
             slot: EquipmentSlot::Weapon,
@@ -230,6 +245,7 @@ mod tests {
                 ..AttributeBonuses::new()
             },
             affixes: vec![],
+            god_item_id: None,
         };
         assert_eq!(item.slot, EquipmentSlot::Weapon);
         assert_eq!(item.rarity, Rarity::Common);
@@ -311,6 +327,7 @@ mod tests {
                     value: 50.0,
                 },
             ],
+            god_item_id: None,
         };
         assert_eq!(item.affixes.len(), 3);
         assert_eq!(item.affixes[0].affix_type, AffixType::DamagePercent);

@@ -131,7 +131,7 @@ fn test_complete_dungeon_run() {
         }
 
         // Try to move to next room
-        let events = update_dungeon(&mut state, ROOM_MOVE_INTERVAL + 0.1);
+        let events = update_dungeon(&mut state, ROOM_MOVE_INTERVAL + 0.1, 0.0);
 
         for event in &events {
             if matches!(event, DungeonEvent::EnteredRoom { .. }) {

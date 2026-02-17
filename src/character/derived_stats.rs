@@ -277,6 +277,7 @@ mod tests {
                 cha: 0,
             },
             affixes: vec![],
+            god_item_id: None,
         };
 
         equipment.set(EquipmentSlot::Weapon, Some(weapon));
@@ -314,6 +315,7 @@ mod tests {
                 cha: 3,
             },
             affixes: vec![],
+            god_item_id: None,
         };
 
         equipment.set(EquipmentSlot::Amulet, Some(amulet));
@@ -348,6 +350,7 @@ mod tests {
                 affix_type: AffixType::DamagePercent,
                 value: 20.0,
             }],
+            god_item_id: None,
         };
 
         equipment.set(EquipmentSlot::Weapon, Some(weapon));
@@ -394,6 +397,7 @@ mod tests {
                     value: 20.0,
                 },
             ],
+            god_item_id: None,
         };
 
         equipment.set(EquipmentSlot::Weapon, Some(weapon));
@@ -438,6 +442,7 @@ mod tests {
                 affix_type: AffixType::DamageReduction,
                 value: 15.0,
             }],
+            god_item_id: None,
         };
 
         equipment.set(EquipmentSlot::Armor, Some(armor));
@@ -473,6 +478,7 @@ mod tests {
                 affix_type: AffixType::XPGain,
                 value: 50.0,
             }],
+            god_item_id: None,
         };
 
         equipment.set(EquipmentSlot::Amulet, Some(amulet));
@@ -501,6 +507,7 @@ mod tests {
                 affix_type: AffixType::CritMultiplier,
                 value: 50.0,
             }],
+            god_item_id: None,
         };
 
         equipment.set(EquipmentSlot::Weapon, Some(weapon));
@@ -528,6 +535,7 @@ mod tests {
                 affix_type: AffixType::CritMultiplier,
                 value: 25.0,
             }],
+            god_item_id: None,
         };
 
         let ring = Item {
@@ -541,6 +549,7 @@ mod tests {
                 affix_type: AffixType::CritMultiplier,
                 value: 25.0,
             }],
+            god_item_id: None,
         };
 
         equipment.set(EquipmentSlot::Weapon, Some(weapon));
@@ -568,6 +577,7 @@ mod tests {
                 affix_type: AffixType::AttackSpeed,
                 value: 25.0,
             }],
+            god_item_id: None,
         };
 
         equipment.set(EquipmentSlot::Gloves, Some(gloves));
@@ -594,6 +604,7 @@ mod tests {
                 affix_type: AffixType::HPRegen,
                 value: 50.0,
             }],
+            god_item_id: None,
         };
 
         equipment.set(EquipmentSlot::Armor, Some(armor));
@@ -620,6 +631,7 @@ mod tests {
                 affix_type: AffixType::DamageReflection,
                 value: 30.0,
             }],
+            god_item_id: None,
         };
 
         equipment.set(EquipmentSlot::Armor, Some(armor));
@@ -646,6 +658,7 @@ mod tests {
                 affix_type: AffixType::DamageReflection,
                 value: 20.0,
             }],
+            god_item_id: None,
         };
 
         let helmet = Item {
@@ -659,6 +672,7 @@ mod tests {
                 affix_type: AffixType::DamageReflection,
                 value: 15.0,
             }],
+            god_item_id: None,
         };
 
         equipment.set(EquipmentSlot::Armor, Some(armor));

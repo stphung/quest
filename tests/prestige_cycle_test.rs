@@ -230,7 +230,9 @@ fn test_cannot_prestige_when_ineligible() {
 fn test_combat_to_prestige_full_loop() {
     use quest::character::derived_stats::DerivedStats;
     use quest::character::prestige::{can_prestige, perform_prestige};
-    use quest::combat::logic::{update_combat, CombatEvent, HavenCombatBonuses};
+    use quest::combat::logic::{
+        update_combat, CombatEvent, GodItemCombatBonuses, HavenCombatBonuses,
+    };
     use quest::core::game_logic::spawn_enemy_if_needed;
     use quest::TICK_INTERVAL_MS;
 
@@ -263,6 +265,7 @@ fn test_combat_to_prestige_full_loop() {
             &PrestigeCombatBonuses::default(),
             &mut achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         );
 
         // Apply XP from kills (mimics main.rs game loop)
@@ -345,6 +348,7 @@ fn test_combat_to_prestige_full_loop() {
             &PrestigeCombatBonuses::default(),
             &mut achievements,
             &derived,
+            &GodItemCombatBonuses::default(),
         );
         for event in &events {
             if matches!(event, CombatEvent::EnemyDied { .. }) {

@@ -43,7 +43,11 @@ pub enum DungeonEvent {
 
 /// Updates dungeon exploration state
 /// Returns events that occurred during this tick
-pub fn update_dungeon(state: &mut GameState, delta_time: f64) -> Vec<DungeonEvent> {
+pub fn update_dungeon(
+    state: &mut GameState,
+    delta_time: f64,
+    god_item_dungeon_speed_percent: f64,
+) -> Vec<DungeonEvent> {
     let mut events = Vec::new();
 
     let dungeon = match &mut state.active_dungeon {
@@ -68,11 +72,12 @@ pub fn update_dungeon(state: &mut GameState, delta_time: f64) -> Vec<DungeonEven
             .unwrap_or(false);
 
         // Use faster interval when traveling through cleared rooms
-        let move_interval = if is_traveling {
+        let base_interval = if is_traveling {
             ROOM_TRAVEL_INTERVAL
         } else {
             ROOM_MOVE_INTERVAL
         };
+        let move_interval = base_interval * (1.0 - god_item_dungeon_speed_percent / 100.0);
 
         // Update traveling state for UI
         dungeon.is_traveling = is_traveling;
@@ -347,12 +352,17 @@ pub fn generate_treasure_item(prestige_rank: u32, zone_id: usize, rarity_boost: 
 
 /// Boosts a rarity by N tiers (capped at Legendary)
 fn boost_rarity(rarity: Rarity, boost: u32) -> Rarity {
+    if rarity == Rarity::Mythic {
+        return Rarity::Mythic; // God items are never rarity-shifted
+    }
+
     let rarity_level = match rarity {
         Rarity::Common => 0,
         Rarity::Magic => 1,
         Rarity::Rare => 2,
         Rarity::Epic => 3,
         Rarity::Legendary => 4,
+        Rarity::Mythic => unreachable!(),
     };
 
     match (rarity_level + boost).min(4) {
@@ -624,7 +634,7 @@ mod tests {
         let mut state = GameState::new("Test".to_string(), 0);
         state.active_dungeon = None;
 
-        let events = update_dungeon(&mut state, 0.1);
+        let events = update_dungeon(&mut state, 0.1, 0.0);
 
         assert!(events.is_empty());
     }
@@ -640,7 +650,7 @@ mod tests {
             dungeon.move_timer = 10.0; // Way past move interval
         }
 
-        let events = update_dungeon(&mut state, 0.1);
+        let events = update_dungeon(&mut state, 0.1, 0.0);
 
         // Should not move - blocked by combat
         assert!(events.is_empty());
@@ -658,7 +668,7 @@ mod tests {
         }
 
         // Not enough time to move
-        let events = update_dungeon(&mut state, 0.5);
+        let events = update_dungeon(&mut state, 0.5, 0.0);
         assert!(events.is_empty());
 
         // Check timer accumulated
@@ -679,7 +689,7 @@ mod tests {
         let start_pos = state.active_dungeon.as_ref().unwrap().player_position;
 
         // This tick should trigger movement
-        let events = update_dungeon(&mut state, 0.2);
+        let events = update_dungeon(&mut state, 0.2, 0.0);
 
         // Should have moved
         let new_pos = state.active_dungeon.as_ref().unwrap().player_position;
@@ -712,7 +722,7 @@ mod tests {
         }
 
         // Small delta that would pass travel interval but not explore interval
-        let events = update_dungeon(&mut state, 0.1);
+        let events = update_dungeon(&mut state, 0.1, 0.0);
 
         // Check is_traveling flag was set
         if let Some(dungeon) = &state.active_dungeon {
@@ -1460,7 +1470,7 @@ mod tests {
         let start_pos = state.active_dungeon.as_ref().unwrap().player_position;
 
         // Tick with less than ROOM_MOVE_INTERVAL (2.5s) - should NOT move
-        let events = update_dungeon(&mut state, 1.0);
+        let events = update_dungeon(&mut state, 1.0, 0.0);
         assert!(events.is_empty());
         assert_eq!(
             state.active_dungeon.as_ref().unwrap().player_position,
@@ -1501,6 +1511,54 @@ mod tests {
                 .get_room(first_neighbor.0, first_neighbor.1)
                 .unwrap();
             assert_eq!(new.state, RoomState::Current);
+        }
+    }
+
+    // =========================================================================
+    // GOD ITEM DUNGEON SPEED BONUS
+    // =========================================================================
+
+    #[test]
+    fn test_god_item_dungeon_speed_halves_move_interval() {
+        // With 50% speed bonus, the effective interval should be halved.
+        // At 50% speed: move_interval = base * (1.0 - 50.0/100.0) = base * 0.5
+        // So ROOM_MOVE_INTERVAL (2.5s) becomes 1.25s, ROOM_TRAVEL_INTERVAL (0.8s) becomes 0.4s.
+
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.active_dungeon = Some(generate_dungeon(10, 0, 1));
+
+        if let Some(dungeon) = &mut state.active_dungeon {
+            dungeon.current_room_cleared = true;
+            dungeon.move_timer = 0.0;
+        }
+
+        let start_pos = state.active_dungeon.as_ref().unwrap().player_position;
+
+        // With 0% bonus, 1.3s is not enough to move (need 2.5s)
+        let events = update_dungeon(&mut state, 1.3, 0.0);
+        assert!(
+            events.is_empty(),
+            "Should not move at 1.3s with 0% speed bonus"
+        );
+        assert_eq!(
+            state.active_dungeon.as_ref().unwrap().player_position,
+            start_pos
+        );
+
+        // Reset timer
+        if let Some(dungeon) = &mut state.active_dungeon {
+            dungeon.move_timer = 0.0;
+        }
+
+        // With 50% bonus, 1.3s IS enough to move (need only 1.25s)
+        let events = update_dungeon(&mut state, 1.3, 50.0);
+        if !events.is_empty() {
+            // Should have moved
+            assert_ne!(
+                state.active_dungeon.as_ref().unwrap().player_position,
+                start_pos,
+                "Should move at 1.3s with 50% speed bonus (effective interval = 1.25s)"
+            );
         }
     }
 }

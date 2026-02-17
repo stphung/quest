@@ -44,9 +44,9 @@ pub fn calculate_offline_xp(
     let avg_xp_per_kill = (COMBAT_XP_MIN_TICKS + COMBAT_XP_MAX_TICKS) as f64 / 2.0;
     let xp_per_kill = xp_per_tick_rate * avg_xp_per_kill;
 
-    // Apply Haven Hearthstone bonus
     let base_xp = estimated_kills * xp_per_kill;
-    base_xp * (1.0 + haven_offline_xp_percent / 100.0)
+    let haven_mult = 1.0 + haven_offline_xp_percent / 100.0;
+    base_xp * haven_mult
 }
 
 /// Processes offline progression and updates game state.

@@ -854,6 +854,7 @@ pub fn render_vault_selection(
                     crate::items::Rarity::Rare => Color::Blue,
                     crate::items::Rarity::Epic => Color::Magenta,
                     crate::items::Rarity::Legendary => Color::Yellow,
+                    crate::items::Rarity::Mythic => Color::Rgb(255, 215, 0),
                 };
                 (
                     format!("{:8}", format!("{:?}", slot)),

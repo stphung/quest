@@ -216,6 +216,9 @@ pub struct TickResult {
     /// True if Enhancement state was modified (discovery) and should be persisted.
     pub enhancement_changed: bool,
 
+    /// True if God Item progress was modified and should be persisted.
+    pub god_items_changed: bool,
+
     /// Achievement IDs ready to be shown in a modal overlay.
     /// Populated when the 500ms accumulation window has elapsed.
     /// Empty if no modal is ready or another overlay is already active.
@@ -306,7 +309,9 @@ pub fn game_tick<R: Rng>(
 
     // ── 4. Update dungeon exploration ───────────────────────────
     if state.active_dungeon.is_some() {
-        let dungeon_events = update_dungeon(state, delta_time);
+        let god_item_dungeon_speed =
+            crate::god_items::equipped_god_item_dungeon_speed_percent(&state.equipment);
+        let dungeon_events = update_dungeon(state, delta_time, god_item_dungeon_speed);
         for event in dungeon_events {
             match event {
                 crate::dungeon::logic::DungeonEvent::EnteredRoom { room_type, .. } => {
@@ -378,7 +383,10 @@ pub fn game_tick<R: Rng>(
             double_fish_chance_percent: haven_bonuses.double_fish_chance,
             max_fishing_rank_bonus: haven_bonuses.max_fishing_rank_bonus,
         };
-        let fishing_result = tick_fishing_with_haven_result(state, rng, &haven_fishing);
+        let god_item_fishing_reduction =
+            crate::god_items::equipped_god_item_fishing_reduction_percent(&state.equipment);
+        let fishing_result =
+            tick_fishing_with_haven_result(state, rng, &haven_fishing, god_item_fishing_reduction);
 
         // Storm Leviathan caught → achievement
         if fishing_result.caught_storm_leviathan {
@@ -497,6 +505,16 @@ pub fn game_tick<R: Rng>(
         let boosted_max = derived.max_hp + prestige_combat.flat_hp;
         state.combat_state.update_max_hp(boosted_max);
     }
+    let god_items_combat = crate::combat::logic::GodItemCombatBonuses {
+        damage_reduction_percent: crate::god_items::equipped_god_item_dr(&state.equipment),
+        attack_speed_percent: crate::god_items::equipped_god_item_attack_speed_percent(
+            &state.equipment,
+        ),
+        regen_reduction_percent: crate::god_items::equipped_god_item_regen_reduction_percent(
+            &state.equipment,
+        ),
+        damage_percent: crate::god_items::equipped_god_item_damage_percent(&state.equipment),
+    };
     let combat_events = update_combat(
         state,
         delta_time,
@@ -504,6 +522,7 @@ pub fn game_tick<R: Rng>(
         &prestige_combat,
         achievements,
         &derived,
+        &god_items_combat,
     );
 
     let current_enemy_name = state

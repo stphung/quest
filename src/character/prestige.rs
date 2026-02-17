@@ -488,6 +488,7 @@ mod tests {
                 ..AttributeBonuses::new()
             },
             affixes: vec![],
+            god_item_id: None,
         };
         game_state
             .equipment
@@ -531,6 +532,7 @@ mod tests {
                 ..AttributeBonuses::new()
             },
             affixes: vec![],
+            god_item_id: None,
         };
         let armor = Item {
             slot: EquipmentSlot::Armor,
@@ -543,6 +545,7 @@ mod tests {
                 ..AttributeBonuses::new()
             },
             affixes: vec![],
+            god_item_id: None,
         };
         game_state
             .equipment
