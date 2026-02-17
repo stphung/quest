@@ -111,7 +111,7 @@ CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FI
 ### Combat Module (`src/combat/`) — [detailed docs](src/combat/CLAUDE.md)
 
 - `types.rs` — Enemy struct (with defense field), zone-based enemy generators, combat state machine
-- `logic.rs` — Turn-based combat mechanics with prestige bonuses, damage pipeline (Haven % -> prestige flat -> enemy defense -> crit), event emission
+- `logic.rs` — Turn-based combat mechanics with prestige bonuses and god item passives, damage pipeline (Giant's Might % -> Haven % -> prestige flat -> enemy defense -> Divine Bulwark DR -> crit), `GodItemCombatBonuses` struct, event emission
 
 ### Zone System (`src/zones/`)
 
@@ -146,12 +146,12 @@ CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FI
 
 ### Item Module (`src/items/`) — [detailed docs](src/items/CLAUDE.md)
 
-- `types.rs` — Core item data structures (7 equipment slots, 5 rarity tiers, 9 affix types + Unknown fallback, ilvl scaling)
+- `types.rs` — Core item data structures (7 equipment slots, 6 rarity tiers including God/Mythic, 9 affix types + Unknown fallback, ilvl scaling, `god_item_id` field)
 - `equipment.rs` — Equipment container with slot management and iteration
 - `generation.rs` — Rarity-based attribute/affix generation with ilvl scaling (1.0x at ilvl 10 to 4.0x at ilvl 100)
 - `drops.rs` — Separate mob/boss drop systems: mobs have 15% base drop chance (capped at Epic), bosses always drop (can drop Legendary)
 - `names.rs` — Procedural name generation with prefixes/suffixes
-- `scoring.rs` — Smart weighted auto-equip scoring (attribute specialization bonus, affix type weights)
+- `scoring.rs` — Smart weighted auto-equip scoring (attribute specialization bonus, affix type weights). God (Mythic) items are never auto-replaced by lower rarity
 
 ### Enhancement Module (`src/enhancement/`) — [detailed docs](src/enhancement/CLAUDE.md)
 
@@ -160,6 +160,20 @@ CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FI
 - `persistence.rs` — Save/load from `~/.quest/enhancement.json`
 
 Account-level equipment enhancement system (Soulforge) that persists across characters. Each of 7 equipment slots can be enhanced from +0 to +10. Levels +1-4 are 100% success rate; +5-10 have decreasing success rates (60% down to 10%) and failure penalties (-1 or -2 levels). Costs prestige ranks. Discovered at P15+. Enhancement multipliers boost equipment stats in `derived_stats.rs`.
+
+### God Items Module (`src/god_items/`)
+
+- `types.rs` — 3 god items (Asprika, Sleipnir, Megingjord) with unique passives and bonuses, `GodItemId` enum, `GodItemDefinition` struct, helper functions for querying equipped god item effects
+
+Three Norse mythology-themed endgame items with `Rarity::Mythic` (displayed as "God"). Each has unique combat passives and non-combat bonuses:
+
+| God Item | Slot | Attributes | Passive | Bonuses |
+|----------|------|-----------|---------|---------|
+| Asprika | Armor | +40 CON, +20 WIS | Divine Bulwark: 30% damage reduction | +40% XP |
+| Sleipnir | Boots | +40 DEX, +20 WIS | Windborne: 100% attack speed | Swiftstrider (50% regen reduction), Swiftfoot (50% dungeon speed), NimbleHands (50% fishing speed) |
+| Megingjord | Ring | +40 STR, +20 CON | Giant's Might: 150% damage | +40% XP |
+
+God items are created via debug menu (discovery/forging system not yet designed, see issue #235). Items have `god_item_id: Option<GodItemId>` field; auto-equip never replaces a god item with a lower rarity.
 
 ### Challenge Minigames (`src/challenges/`) — [detailed docs](src/challenges/CLAUDE.md)
 
@@ -198,7 +212,7 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 
 - `build_info.rs` — Build metadata (commit, date) embedded at compile time
 - `updater.rs` — Self-update from GitHub releases (30min check interval ±5min jitter)
-- `debug_menu.rs` — Debug menu for testing discoveries (activate with `--debug` flag, toggle with backtick). Options: trigger dungeons, fishing, all 10 challenge types, Haven discovery, Soulforge discovery
+- `debug_menu.rs` — Debug menu for testing discoveries (activate with `--debug` flag, toggle with backtick). Options: trigger dungeons, fishing, all 10 challenge types, Haven discovery, Soulforge discovery, forge god items (Asprika, Sleipnir, Megingjord)
 
 ### UI (`src/ui/`) — [detailed docs](src/ui/CLAUDE.md)
 
@@ -274,7 +288,8 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 
 - **Enemy scaling**: Static zone-based stats from `ZONE_ENEMY_STATS` table (not player-HP-based). Each zone has `(base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)` tuples; subzone depth adds incremental stats
 - **Prestige combat bonuses**: `PrestigeCombatBonuses::from_rank()` provides flat damage, flat defense, crit chance, and flat HP that scale with prestige rank via power-law formulas
-- **Damage pipeline**: base damage → Haven Armory % → prestige flat damage → enemy defense → min 1 → crit (2x)
+- **God item combat bonuses**: `GodItemCombatBonuses` struct injected into `update_combat()` — carries damage %, attack speed %, damage reduction %, and regen reduction % from equipped god items
+- **Damage pipeline**: base damage → Giant's Might % → Haven Armory % → prestige flat damage → enemy defense → min 1 → Divine Bulwark DR → crit (2x)
 - **Enemy attack intervals**: Vary by tier (2.0s normal, 1.8s boss, 1.5s zone boss, 1.6s dungeon elite, 1.4s dungeon boss)
 - **Death to Boss**: Sets `kills_in_subzone = KILLS_FOR_BOSS - KILLS_FOR_BOSS_RETRY` (only 5 more kills to retry), preserves prestige
 - **Death in Dungeon**: Exits dungeon, no prestige loss
@@ -329,6 +344,8 @@ quest/
 │   │   ├── types.rs         # Enhancement progress, constants, UI state
 │   │   ├── logic.rs         # Enhancement rolling, discovery
 │   │   └── persistence.rs   # Save/load
+│   ├── god_items/           # God Items system
+│   │   └── types.rs         # 3 god items, passives, bonuses, helper queries
 │   ├── challenges/          # Challenge minigames [CLAUDE.md]
 │   │   ├── menu.rs          # Challenge menu
 │   │   ├── chess/           # Chess minigame
@@ -365,7 +382,7 @@ quest/
 │       ├── soulforge_scene.rs # Soulforge enhancement UI
 │       ├── *_scene.rs       # Various game scenes
 │       └── character_*.rs   # Character management UI
-├── tests/                   # Integration tests (15 test files, 1,600+ tests)
+├── tests/                   # Integration tests (16 test files, 1,600+ tests)
 │   ├── game_loop_orchestration_test.rs  # 36 behavior-locking tests for game_tick
 │   ├── tick_integration_test.rs         # Tick module integration tests
 │   ├── zone_progression_test.rs         # Zone advancement tests

@@ -27,7 +27,7 @@ Then run `quest` to start your adventure!
 - **Prestige System** - Reset for permanent XP multipliers (1.5× per rank) and unlock higher zones
 - **Procedural Dungeons** - Explore grid-based dungeons with fog of war, treasure rooms, elite guardians, and bosses
 - **Fishing** - Separate progression track with 30 ranks and 5 fish rarities
-- **Diablo-style Items** - 7 equipment slots, 5 rarity tiers, procedural names, and smart auto-equip
+- **Diablo-style Items** - 7 equipment slots, 6 rarity tiers (including God items with unique passives), procedural names, and smart auto-equip
 - **Multi-Character** - Create and manage multiple characters with JSON saves
 - **Offline Progress** - Continue gaining XP even when closed (50% rate, max 7 days)
 - **Challenge Minigames** - Discover and play Chess, Go, Nine Men's Morris, Gomoku, Minesweeper, and Rune Deciphering (requires P1+)

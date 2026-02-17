@@ -1,6 +1,6 @@
 # Item System
 
-Diablo-style procedural item system with 7 equipment slots, 5 rarity tiers, attribute bonuses, affixes, and smart auto-equip.
+Diablo-style procedural item system with 7 equipment slots, 6 rarity tiers (including God/Mythic for god items), attribute bonuses, affixes, and smart auto-equip.
 
 ## Module Structure
 
@@ -27,12 +27,13 @@ pub struct Item {
     pub display_name: String,
     pub attributes: AttributeBonuses,  // STR, DEX, CON, INT, WIS, CHA
     pub affixes: Vec<Affix>,
+    pub god_item_id: Option<GodItemId>, // Set for god items (Asprika, Sleipnir, Megingjord)
 }
 ```
 
 ### Enums
 - **`EquipmentSlot`**: Weapon, Armor, Helmet, Gloves, Boots, Amulet, Ring
-- **`Rarity`**: Common(0), Magic(1), Rare(2), Epic(3), Legendary(4) — ordered for comparison
+- **`Rarity`**: Common(0), Magic(1), Rare(2), Epic(3), Legendary(4), Mythic(5) — ordered for comparison. Mythic displays as "God" and is used exclusively for god items
 - **`AffixType`**: DamagePercent, CritChance, CritMultiplier, AttackSpeed, HPBonus, DamageReduction, HPRegen, DamageReflection, XPGain, Unknown (`#[serde(other)]` fallback for removed variants like DropRate/PrestigeBonus/OfflineRate — ignored at runtime)
 
 ## Item Generation Pipeline
@@ -96,6 +97,8 @@ Affix weights (from `score_item`):
 - HPRegen, XPGain: 1.0x
 - DamageReflection: 0.8x
 - HPBonus: 0.5x (lowest — flat HP less valuable at scale)
+
+**God item protection**: God (Mythic) items are never auto-replaced by lower rarity items.
 
 ## Mob Drop Rate Formula
 
