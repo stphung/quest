@@ -139,6 +139,8 @@ impl CharacterManager {
             cached_derived_stats: Default::default(),
             cached_prestige_bonuses: Default::default(),
             derived_stats_dirty: true,
+            xp_rate_samples: std::collections::VecDeque::new(),
+            xp_this_second: 0,
         })
     }
 
@@ -320,6 +322,8 @@ mod tests {
             cached_derived_stats: Default::default(),
             cached_prestige_bonuses: Default::default(),
             derived_stats_dirty: true,
+            xp_rate_samples: std::collections::VecDeque::new(),
+            xp_this_second: 0,
         }
     }
 

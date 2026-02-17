@@ -58,6 +58,7 @@ pub fn distribute_level_up_points(state: &mut GameState) -> Vec<AttributeType> {
 /// Applies XP to the character and processes any level-ups
 /// Returns (number of level-ups, attributes increased)
 pub fn apply_tick_xp(state: &mut GameState, xp_gain: f64) -> (u32, Vec<AttributeType>) {
+    state.xp_this_second += xp_gain as u64;
     state.character_xp += xp_gain as u64;
 
     let mut levelups = 0;

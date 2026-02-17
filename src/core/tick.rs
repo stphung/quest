@@ -479,6 +479,11 @@ pub fn game_tick<R: Rng>(
         *tick_counter += 1;
         if *tick_counter >= TICKS_PER_SECOND {
             state.play_time_seconds += 1;
+            state.xp_rate_samples.push_back(state.xp_this_second);
+            state.xp_this_second = 0;
+            if state.xp_rate_samples.len() > 300 {
+                state.xp_rate_samples.pop_front();
+            }
             *tick_counter = 0;
         }
 
@@ -780,6 +785,11 @@ pub fn game_tick<R: Rng>(
     *tick_counter += 1;
     if *tick_counter >= TICKS_PER_SECOND {
         state.play_time_seconds += 1;
+        state.xp_rate_samples.push_back(state.xp_this_second);
+        state.xp_this_second = 0;
+        if state.xp_rate_samples.len() > 300 {
+            state.xp_rate_samples.pop_front();
+        }
         *tick_counter = 0;
     }
 

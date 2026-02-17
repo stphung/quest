@@ -82,11 +82,16 @@ fn draw_header(frame: &mut Frame, area: Rect, game_state: &GameState) {
     ])];
 
     // XP progress bar
+    let rate_suffix = match game_state.xp_per_hour() {
+        Some(rate) => format!(" | {}/hr", format_number(rate)),
+        None => String::new(),
+    };
     let xp_label = format!(
-        "XP: {}/{} ({:.1}%)",
+        "XP: {}/{} ({:.1}%){}",
         game_state.character_xp,
         xp_needed,
-        xp_ratio * 100.0
+        xp_ratio * 100.0,
+        rate_suffix
     );
 
     let xp_gauge = Gauge::default()
@@ -664,11 +669,16 @@ pub(super) fn draw_xp_bar_compact(frame: &mut Frame, area: Rect, game_state: &Ga
         0.0
     };
 
+    let rate_suffix = match game_state.xp_per_hour() {
+        Some(rate) => format!(" | {}/hr", format_number(rate)),
+        None => String::new(),
+    };
     let xp_label = format!(
-        "XP: {}/{} ({:.1}%)",
+        "XP: {}/{} ({:.1}%){}",
         game_state.character_xp,
         xp_needed,
-        xp_ratio * 100.0
+        xp_ratio * 100.0,
+        rate_suffix
     );
 
     let xp_gauge = Gauge::default()
@@ -795,6 +805,19 @@ fn attr_color(attr_type: AttributeType) -> Color {
         AttributeType::Wisdom => Color::Cyan,
         AttributeType::Charisma => Color::Yellow,
     }
+}
+
+/// Formats a number with comma separators (e.g., 1234567 -> "1,234,567").
+fn format_number(n: u64) -> String {
+    let s = n.to_string();
+    let mut result = String::with_capacity(s.len() + s.len() / 3);
+    for (i, c) in s.chars().enumerate() {
+        if i > 0 && (s.len() - i).is_multiple_of(3) {
+            result.push(',');
+        }
+        result.push(c);
+    }
+    result
 }
 
 /// Formats a modifier value with a sign prefix.

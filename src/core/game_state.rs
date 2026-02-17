@@ -279,6 +279,12 @@ pub struct GameState {
     /// Dirty flag: set when attributes, equipment, or enhancement levels change
     #[serde(skip)]
     pub derived_stats_dirty: bool,
+    /// Rolling XP rate: XP gained per second over the last 5 minutes
+    #[serde(skip)]
+    pub xp_rate_samples: VecDeque<u64>,
+    /// XP accumulated during the current second (rotated into xp_rate_samples each second)
+    #[serde(skip)]
+    pub xp_this_second: u64,
 }
 
 impl GameState {
@@ -316,6 +322,8 @@ impl GameState {
             cached_derived_stats: DerivedStats::default(),
             cached_prestige_bonuses: PrestigeCombatBonuses::default(),
             derived_stats_dirty: true,
+            xp_rate_samples: VecDeque::new(),
+            xp_this_second: 0,
         }
     }
 
@@ -323,6 +331,15 @@ impl GameState {
     #[allow(dead_code)]
     pub fn is_in_dungeon(&self) -> bool {
         self.active_dungeon.is_some()
+    }
+
+    /// Returns XP per hour based on rolling 5-minute window, or None if < 10s of data.
+    pub fn xp_per_hour(&self) -> Option<u64> {
+        if self.xp_rate_samples.len() < 10 {
+            return None;
+        }
+        let sum: u64 = self.xp_rate_samples.iter().sum();
+        Some((sum as f64 / self.xp_rate_samples.len() as f64 * 3600.0) as u64)
     }
 
     pub fn get_attribute_cap(&self) -> u32 {
