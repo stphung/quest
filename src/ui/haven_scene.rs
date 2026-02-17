@@ -848,14 +848,7 @@ pub fn render_vault_selection(
             let checkbox = if is_preserved { "[✓] " } else { "[ ] " };
 
             let (slot_name, item_text, style) = if let Some(item) = item.as_ref() {
-                let rarity_color = match item.rarity {
-                    crate::items::Rarity::Common => Color::White,
-                    crate::items::Rarity::Magic => Color::Green,
-                    crate::items::Rarity::Rare => Color::Blue,
-                    crate::items::Rarity::Epic => Color::Magenta,
-                    crate::items::Rarity::Legendary => Color::Yellow,
-                    crate::items::Rarity::Mythic => Color::Rgb(255, 215, 0),
-                };
+                let rarity_color = super::rarity_color(item.rarity);
                 (
                     format!("{:8}", format!("{:?}", slot)),
                     item.display_name.clone(),

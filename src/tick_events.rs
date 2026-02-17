@@ -9,6 +9,7 @@ use crate::core::game_state::{GameState, TickerEntry};
 use crate::core::tick::TickEvent;
 use crate::items::types::Rarity;
 use crate::ui::combat_effects::{EffectType, VisualEffect};
+use crate::ui::rarity_color;
 use crate::zones::BossDefeatResult;
 use ratatui::style::Color;
 
@@ -422,17 +423,5 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
     TickEventFlags {
         haven_discovered,
         soulforge_discovered,
-    }
-}
-
-/// Maps item rarity to a display color for the loot ticker.
-fn rarity_color(rarity: Rarity) -> Color {
-    match rarity {
-        Rarity::Common => Color::Gray,
-        Rarity::Magic => Color::Blue,
-        Rarity::Rare => Color::Yellow,
-        Rarity::Epic => Color::Magenta,
-        Rarity::Legendary => Color::Rgb(255, 165, 0),
-        Rarity::Mythic => Color::Rgb(255, 215, 0),
     }
 }

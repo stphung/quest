@@ -161,6 +161,7 @@ Then register in `mod.rs` and dispatch from `draw_ui_with_update()`.
 | Rarity: Rare | `Color::Yellow` |
 | Rarity: Epic | `Color::Magenta` |
 | Rarity: Legendary | `Color::LightRed` |
+| Rarity: Mythic | `Color::Rgb(255, 215, 0)` (Gold) |
 
 Each minigame scene uses a unique border color (Cyan, Green, Yellow, Magenta, etc.).
 
