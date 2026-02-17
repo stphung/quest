@@ -117,14 +117,14 @@ pub const MOB_RARITY_COMMON_FLOOR: f64 = 0.20;
 pub const MOB_RARITY_HAVEN_BONUS_CAP: f64 = 0.25;
 pub const MOB_RARITY_RARE_BONUS_SHARE: f64 = 0.6;
 
-// Boss rarity distribution (normal boss)
+// Boss rarity distribution (normal boss): 40% Magic, 35% Rare, 23% Epic, 2% Legendary
 pub const BOSS_NORMAL_MAGIC_THRESHOLD: f64 = 0.40;
 pub const BOSS_NORMAL_RARE_THRESHOLD: f64 = 0.75;
-pub const BOSS_NORMAL_EPIC_THRESHOLD: f64 = 0.95;
-// Boss rarity distribution (final zone boss)
+pub const BOSS_NORMAL_EPIC_THRESHOLD: f64 = 0.98;
+// Boss rarity distribution (final zone boss): 20% Magic, 40% Rare, 35% Epic, 5% Legendary
 pub const BOSS_FINAL_MAGIC_THRESHOLD: f64 = 0.20;
 pub const BOSS_FINAL_RARE_THRESHOLD: f64 = 0.60;
-pub const BOSS_FINAL_EPIC_THRESHOLD: f64 = 0.90;
+pub const BOSS_FINAL_EPIC_THRESHOLD: f64 = 0.95;
 
 // Fishing session
 pub const FISHING_SESSION_MIN_FISH: u32 = 3;
