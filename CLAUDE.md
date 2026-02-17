@@ -82,7 +82,7 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 
 - `game_state.rs` — Main character state struct (level, XP, prestige, combat state, equipment)
 - `game_logic.rs` — XP curve (`100 × level^1.5`), leveling (+3 random attribute points), enemy spawning, offline progression
-- `tick.rs` — Per-tick game engine: `game_tick<R: Rng>()` with 12 processing stages, returns `TickResult` with `Vec<TickEvent>` (28 variants). Zero UI imports, zero file I/O — fully decoupled from rendering
+- `tick.rs` — Per-tick game engine: `game_tick<R: Rng>()` with 12 processing stages, returns `TickResult` with `Vec<TickEvent>` (30 variants). Zero UI imports, zero file I/O — fully decoupled from rendering
 - `constants.rs` — Game balance constants (tick rate, attack intervals, XP rates, item drop rates, zone enemy stats, boss multipliers, prestige combat bonuses, update check jitter)
 
 ### Simulator (`src/bin/simulator.rs`)
@@ -188,7 +188,7 @@ Account-level base building that persists across prestiges. 14 rooms in a two-br
 - `data.rs` — Achievement database with descriptions and unlock conditions
 - `persistence.rs` — Save/load from `~/.quest/achievements.json`
 
-Account-level achievement system that persists across characters. 5 categories (Combat, Level, Progression, Challenges, Exploration). Tracks kills, boss kills, levels, prestige, zone completion, challenge wins, fishing ranks/catches, dungeon completions, Haven building, and Soulforge enhancements. Includes modal notification system with 500ms accumulation window.
+Account-level achievement system that persists across characters. 6 categories (Combat, Level, Progression, Challenges, Exploration, Stats). Tracks kills, boss kills, levels, prestige, zone completion, challenge wins, fishing ranks/catches, dungeon completions, Haven building, and Soulforge enhancements. Includes modal notification system with 500ms accumulation window.
 
 ### Input Handling (`src/input.rs`)
 
@@ -205,7 +205,7 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 - `mod.rs` — Layout coordinator (stats panel left 50%, combat scene right 50%)
 - `game_common.rs` — Shared minigame layout, status bars, game-over overlays
 - `stats_panel.rs` — Character stats, attributes, equipment display, prestige info
-- `info_panel.rs` — Full-width Loot + Combat log panels
+- `ticker.rs` — Scrolling loot ticker with independent per-entry scrolling
 - `combat_scene.rs` — Combat view with HP bars and enemy sprites
 - `combat_3d.rs` — 3D ASCII first-person dungeon renderer
 - `combat_effects.rs` — Visual effects (damage numbers, attack flashes)
@@ -221,6 +221,7 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 - `chess_scene.rs`, `go_scene.rs`, `morris_scene.rs`, `gomoku_scene.rs`, `minesweeper_scene.rs`, `rune_scene.rs`, `snake_scene.rs`, `flappy_scene.rs`, `jezzball_scene.rs`, `runic_shift_scene.rs` — Minigame UIs
 - `scene_fx.rs` — Shared utilities for layered ASCII scene rendering (scene buffer, backdrop effects)
 - `debug_menu_scene.rs` — Debug menu overlay
+- `help_overlay.rs` — Help/controls overlay
 - `throbber.rs` — Shared spinner animations and atmospheric messages
 - `character_select.rs`, `character_creation.rs`, `character_delete.rs`, `character_rename.rs` — Character management UI
 
@@ -289,6 +290,7 @@ quest/
 │   ├── main.rs              # Entry point, game loop, input handling
 │   ├── lib.rs               # Library crate for testing
 │   ├── input.rs             # Keyboard input routing
+│   ├── tick_events.rs         # TickEvent → combat log mapping
 │   ├── bin/
 │   │   └── simulator.rs     # Headless game balance simulator
 │   ├── core/                # Core game systems
@@ -354,6 +356,7 @@ quest/
 │       ├── game_common.rs   # Shared minigame layout
 │       ├── responsive.rs    # Responsive layout tiers
 │       ├── stats_panel.rs   # Character stats
+│       ├── ticker.rs        # Scrolling loot ticker
 │       ├── combat_scene.rs  # Combat view
 │       ├── combat_3d.rs     # 3D dungeon renderer
 │       ├── snake_scene.rs   # Snake UI
@@ -362,7 +365,7 @@ quest/
 │       ├── soulforge_scene.rs # Soulforge enhancement UI
 │       ├── *_scene.rs       # Various game scenes
 │       └── character_*.rs   # Character management UI
-├── tests/                   # Integration tests (15 test files, 2,800+ tests)
+├── tests/                   # Integration tests (15 test files, 1,600+ tests)
 │   ├── game_loop_orchestration_test.rs  # 36 behavior-locking tests for game_tick
 │   ├── tick_integration_test.rs         # Tick module integration tests
 │   ├── zone_progression_test.rs         # Zone advancement tests

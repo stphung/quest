@@ -250,11 +250,11 @@ Haven bonuses are passed as explicit parameters to game systems rather than acce
 
 Account-level achievement system that persists across all characters. Stored in `~/.quest/achievements.json`. Achievement tracking is driven by `on_*` event handlers called from `tick.rs` during game processing. Newly unlocked achievements are emitted as `TickEvent::AchievementUnlocked` events and collected by `collect_achievement_events()`. The `achievements_changed` flag in `TickResult` signals when the file needs to be saved.
 
-### Categories (5)
+### Categories (6)
 
 **Combat:**
-- Slayer I-IX: 100, 500, 1K, 5K, 10K, 50K, 100K, 500K, 1M kills
-- Boss Hunter I-VIII: 1, 10, 50, 100, 500, 1K, 5K, 10K boss kills
+- Slayer I-XV: 100, 500, 1K, 5K, 10K, 50K, 100K, 500K, 1M, 5M, 10M, 50M, 100M, 500M, 1B kills
+- Boss Hunter I-XV: 1, 10, 50, 100, 500, 1K, 5K, 10K, 50K, 100K, 500K, 1M, 2M, 5M, 10M boss kills
 
 **Level:**
 - Milestones: L10, L25, L50, L100, L150, L200, L250, L500, L750, L1000, L1500
@@ -291,7 +291,10 @@ Account-level achievement system that persists across all characters. Stored in 
 
 **Fishing:**
 - FishermanI-IV: Ranks 10, 20, 30, 40
-- FishCatcherI-IV: 100, 1K, 10K, 100K fish caught
+- FishCatcherI-X: 100, 1K, 10K, 100K, 500K, 1M, 5M, 10M, 50M, 100M fish caught
 
 **Dungeons:**
-- DungeonDiver through DungeonMasterVI: 1, 10, 50, 100, 1K, 5K, 10K dungeons cleared
+- DungeonDiver, DungeonMasterI-X: 1, 10, 50, 100, 1K, 5K, 10K, 50K, 100K, 500K, 1M dungeons cleared
+
+**Stats:**
+- Tracks cumulative gameplay statistics (kills, deaths, fish caught, dungeons cleared, etc.)

@@ -16,21 +16,21 @@ src/achievements/
 
 ### `AchievementId` (`types.rs`)
 
-Enum with 130+ variants covering all trackable milestones. Organized by domain:
+Enum with 158 variants covering all trackable milestones. Organized by domain:
 
-- **Combat**: `SlayerI`..`SlayerIX` (100 to 1M kills), `BossHunterI`..`BossHunterVIII` (1 to 10K bosses)
+- **Combat**: `SlayerI`..`SlayerXV` (100 to 1B kills), `BossHunterI`..`BossHunterXV` (1 to 10M bosses)
 - **Level**: `Level10`..`Level1500` (11 milestones)
 - **Prestige**: `FirstPrestige`..`Eternal` (P1 to P100, 12 milestones)
 - **Zones**: `Zone1Complete`..`Zone10Complete`, `TheStormbreaker`, `StormsEnd`, `ExpanseCycleI`..`ExpanseCycleIV`
 - **Challenges**: 4 difficulties per game type (chess, morris, gomoku, minesweeper, rune, go, flappy_bird, snake, jezzball, runic_shift) + `GrandChampion` (100 wins)
 - **Enhancement**: `SoulforgeDiscovered`, `ApprenticeSmith` (+1), `FullyTempered` (+4 all), `JourneymanSmith` (+5), `SoulforgeAdept` (+6), `SoulforgeSavant` (+7), `SoulforgeMaster` (+8), `SoulforgeGrandmaster` (+9), `MasterSmith` (+10), `SoulConvergence` (+7 all)
-- **Fishing**: `GoneFishing`, `FishermanI`..`FishermanIV` (rank milestones), `FishCatcherI`..`FishCatcherIV` (catch counts), `StormLeviathan`
-- **Dungeons**: `DungeonDiver`, `DungeonMasterI`..`DungeonMasterVI`
+- **Fishing**: `GoneFishing`, `FishermanI`..`FishermanIV` (rank milestones), `FishCatcherI`..`FishCatcherX` (100 to 100M fish catches), `StormLeviathan`
+- **Dungeons**: `DungeonDiver`, `DungeonMasterI`..`DungeonMasterX` (10 to 1M dungeons)
 - **Haven**: `HavenDiscovered`, `HavenBuilderI`..`HavenBuilderII`, `HavenArchitect`
 
 ### `AchievementCategory` (`types.rs`)
 
-Five categories for browsing: `Combat`, `Level`, `Progression`, `Challenges`, `Exploration`.
+Six categories for browsing: `Combat`, `Level`, `Progression`, `Challenges`, `Exploration`, `Stats`.
 
 ### `AchievementDef` (`data.rs`)
 

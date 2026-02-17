@@ -87,10 +87,10 @@ pub struct OfflineReport {
 
 ### `TickEvent` (`tick.rs`)
 
-Enum with 25+ variants describing everything that can happen in a single tick. The presentation layer (main.rs) maps these to combat log entries and visual effects. Game logic never touches UI types.
+Enum with 30 variants describing everything that can happen in a single tick. The presentation layer (main.rs) maps these to combat log entries and visual effects. Game logic never touches UI types.
 
 **Categories:**
-- **Combat**: `PlayerAttack`, `PlayerAttackBlocked`, `EnemyAttack`, `EnemyDefeated`, `PlayerDied`, `PlayerDiedInDungeon`
+- **Combat**: `PlayerAttack`, `PlayerAttackBlocked`, `EnemyAttack`, `EnemyDefeated`, `PlayerDied`, `PlayerDiedInDungeon`, `DamageReflected`, `RegenComplete`
 - **Item Drops**: `ItemDropped` (with rarity, slot, stats, equipped flag)
 - **Zone Progression**: `SubzoneBossDefeated` (with `BossDefeatResult`)
 - **Dungeon**: `DungeonRoomEntered`, `DungeonTreasureFound`, `DungeonKeyFound`, `DungeonBossUnlocked`, `DungeonBossDefeated`, `DungeonEliteDefeated`, `DungeonFailed`, `DungeonCompleted`
