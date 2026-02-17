@@ -7,7 +7,7 @@ use crate::core::game_state::GameState;
 use crate::dungeon::generation::generate_dungeon;
 use crate::enhancement::EnhancementProgress;
 use crate::fishing::generation::generate_fishing_session;
-use crate::god_items::{self, GodItemProgress, GodItemState};
+use crate::god_items;
 use crate::haven::Haven;
 use crate::items;
 
@@ -27,15 +27,9 @@ pub const DEBUG_OPTIONS: &[&str] = &[
     "Trigger Sigil Surge Challenge",
     "Trigger Haven Discovery",
     "Trigger Soulforge Discovery",
-    "Discover Asprika (God Item quest)",
-    "Complete Asprika Milestones",
-    "Forge Asprika",
-    "Discover Sleipnir (God Item quest)",
-    "Complete Sleipnir Milestones",
-    "Forge Sleipnir",
-    "Discover Megingjord (God Item quest)",
-    "Complete Megingjord Milestones",
-    "Forge Megingjord",
+    "Forge Asprika (God Item)",
+    "Forge Sleipnir (God Item)",
+    "Forge Megingjord (God Item)",
 ];
 
 /// Debug menu state
@@ -85,7 +79,6 @@ impl DebugMenu {
         state: &mut GameState,
         haven: &mut Haven,
         enhancement: &mut EnhancementProgress,
-        god_item_progress: &mut GodItemProgress,
     ) -> &'static str {
         let msg = match self.selected_index {
             0 => trigger_dungeon(state),
@@ -102,15 +95,9 @@ impl DebugMenu {
             11 => trigger_runic_shift_challenge(state),
             12 => trigger_haven_discovery(haven),
             13 => trigger_soulforge_discovery(enhancement),
-            14 => trigger_discover_asprika(god_item_progress),
-            15 => trigger_complete_asprika_milestones(god_item_progress),
-            16 => trigger_forge_asprika(state, god_item_progress, enhancement),
-            17 => trigger_discover_sleipnir(god_item_progress),
-            18 => trigger_complete_sleipnir_milestones(god_item_progress),
-            19 => trigger_forge_sleipnir(state, god_item_progress, enhancement),
-            20 => trigger_discover_megingjord(god_item_progress),
-            21 => trigger_complete_megingjord_milestones(god_item_progress),
-            22 => trigger_forge_megingjord(state, god_item_progress, enhancement),
+            14 => trigger_forge_asprika(state, enhancement),
+            15 => trigger_forge_sleipnir(state, enhancement),
+            16 => trigger_forge_megingjord(state, enhancement),
             _ => "Unknown option",
         };
         self.close();
@@ -268,124 +255,61 @@ fn trigger_soulforge_discovery(enhancement: &mut EnhancementProgress) -> &'stati
     "Soulforge discovered!"
 }
 
-fn trigger_discover_asprika(god_item_progress: &mut GodItemProgress) -> &'static str {
-    if god_item_progress.asprika_state != GodItemState::Undiscovered {
-        return "Asprika already discovered!";
-    }
-    god_item_progress.asprika_state = GodItemState::Discovered;
-    "Asprika quest discovered!"
-}
-
-fn trigger_complete_asprika_milestones(god_item_progress: &mut GodItemProgress) -> &'static str {
-    if god_item_progress.asprika_state == GodItemState::Forged {
-        return "Asprika already forged!";
-    }
-    if god_item_progress.asprika_state == GodItemState::Undiscovered {
-        god_item_progress.asprika_state = GodItemState::Discovered;
-    }
-    god_item_progress.asprika_milestones.expanse_cycle_complete = true;
-    god_item_progress.asprika_state = GodItemState::ReadyToForge;
-    "Asprika milestones completed!"
-}
-
-fn trigger_forge_asprika(
-    state: &mut GameState,
-    god_item_progress: &mut GodItemProgress,
-    enhancement: &EnhancementProgress,
-) -> &'static str {
-    if god_item_progress.asprika_state == GodItemState::Forged {
-        return "Asprika already forged!";
+fn trigger_forge_asprika(state: &mut GameState, enhancement: &EnhancementProgress) -> &'static str {
+    if state
+        .equipment
+        .get(items::EquipmentSlot::Armor)
+        .as_ref()
+        .is_some_and(|i| i.god_item_id == Some(god_items::GodItemId::Asprika))
+    {
+        return "Asprika already equipped!";
     }
     let asprika = god_items::asprika_definition().to_item();
     state
         .equipment
         .set(items::EquipmentSlot::Armor, Some(asprika));
-    god_item_progress.asprika_state = GodItemState::Forged;
-    // Recalculate derived stats with new equipment
     state.recalculate_prestige_bonuses();
     state.recalculate_derived_stats(&enhancement.levels);
     "Asprika forged and equipped!"
 }
 
-fn trigger_discover_sleipnir(god_item_progress: &mut GodItemProgress) -> &'static str {
-    if god_item_progress.sleipnir_state != GodItemState::Undiscovered {
-        return "Sleipnir already discovered!";
-    }
-    god_item_progress.sleipnir_state = GodItemState::Discovered;
-    "Sleipnir quest discovered!"
-}
-
-fn trigger_complete_sleipnir_milestones(god_item_progress: &mut GodItemProgress) -> &'static str {
-    if god_item_progress.sleipnir_state == GodItemState::Forged {
-        return "Sleipnir already forged!";
-    }
-    if god_item_progress.sleipnir_state == GodItemState::Undiscovered {
-        god_item_progress.sleipnir_state = GodItemState::Discovered;
-    }
-    god_item_progress
-        .sleipnir_milestones
-        .master_challenge_types_won =
-        vec!["chess".to_string(), "go".to_string(), "snake".to_string()];
-    god_item_progress
-        .sleipnir_milestones
-        .highest_enhancement_level = 7;
-    god_item_progress.sleipnir_state = GodItemState::ReadyToForge;
-    "Sleipnir milestones completed!"
-}
-
 fn trigger_forge_sleipnir(
     state: &mut GameState,
-    god_item_progress: &mut GodItemProgress,
     enhancement: &EnhancementProgress,
 ) -> &'static str {
-    if god_item_progress.sleipnir_state == GodItemState::Forged {
-        return "Sleipnir already forged!";
+    if state
+        .equipment
+        .get(items::EquipmentSlot::Boots)
+        .as_ref()
+        .is_some_and(|i| i.god_item_id == Some(god_items::GodItemId::Sleipnir))
+    {
+        return "Sleipnir already equipped!";
     }
     let sleipnir = god_items::sleipnir_definition().to_item();
     state
         .equipment
         .set(items::EquipmentSlot::Boots, Some(sleipnir));
-    god_item_progress.sleipnir_state = GodItemState::Forged;
     state.recalculate_prestige_bonuses();
     state.recalculate_derived_stats(&enhancement.levels);
     "Sleipnir forged and equipped!"
 }
 
-fn trigger_discover_megingjord(god_item_progress: &mut GodItemProgress) -> &'static str {
-    if god_item_progress.megingjord_state != GodItemState::Undiscovered {
-        return "Megingjord already discovered!";
-    }
-    god_item_progress.megingjord_state = GodItemState::Discovered;
-    "Megingjord quest discovered!"
-}
-
-fn trigger_complete_megingjord_milestones(god_item_progress: &mut GodItemProgress) -> &'static str {
-    if god_item_progress.megingjord_state == GodItemState::Forged {
-        return "Megingjord already forged!";
-    }
-    if god_item_progress.megingjord_state == GodItemState::Undiscovered {
-        god_item_progress.megingjord_state = GodItemState::Discovered;
-    }
-    god_item_progress
-        .megingjord_milestones
-        .highest_enhancement_level = 9;
-    god_item_progress.megingjord_state = GodItemState::ReadyToForge;
-    "Megingjord milestones completed!"
-}
-
 fn trigger_forge_megingjord(
     state: &mut GameState,
-    god_item_progress: &mut GodItemProgress,
     enhancement: &EnhancementProgress,
 ) -> &'static str {
-    if god_item_progress.megingjord_state == GodItemState::Forged {
-        return "Megingjord already forged!";
+    if state
+        .equipment
+        .get(items::EquipmentSlot::Ring)
+        .as_ref()
+        .is_some_and(|i| i.god_item_id == Some(god_items::GodItemId::Megingjord))
+    {
+        return "Megingjord already equipped!";
     }
     let megingjord = god_items::megingjord_definition().to_item();
     state
         .equipment
         .set(items::EquipmentSlot::Ring, Some(megingjord));
-    god_item_progress.megingjord_state = GodItemState::Forged;
     state.recalculate_prestige_bonuses();
     state.recalculate_derived_stats(&enhancement.levels);
     "Megingjord forged and equipped!"
@@ -613,126 +537,44 @@ mod tests {
     }
 
     #[test]
-    fn test_trigger_discover_asprika() {
-        let mut progress = GodItemProgress::default();
-        assert_eq!(progress.asprika_state, GodItemState::Undiscovered);
-
-        let msg = trigger_discover_asprika(&mut progress);
-        assert_eq!(msg, "Asprika quest discovered!");
-        assert_eq!(progress.asprika_state, GodItemState::Discovered);
-
-        // Can't discover again
-        let msg = trigger_discover_asprika(&mut progress);
-        assert_eq!(msg, "Asprika already discovered!");
-    }
-
-    #[test]
-    fn test_trigger_complete_asprika_milestones() {
-        let mut progress = GodItemProgress::default();
-
-        // Auto-discovers if undiscovered
-        let msg = trigger_complete_asprika_milestones(&mut progress);
-        assert_eq!(msg, "Asprika milestones completed!");
-        assert_eq!(progress.asprika_state, GodItemState::ReadyToForge);
-        assert!(progress.asprika_milestones.all_met());
-
-        // Can't complete if already forged
-        progress.asprika_state = GodItemState::Forged;
-        let msg = trigger_complete_asprika_milestones(&mut progress);
-        assert_eq!(msg, "Asprika already forged!");
-    }
-
-    #[test]
     fn test_trigger_forge_asprika() {
         let mut state = GameState::new("Test".to_string(), 0);
-        let mut progress = GodItemProgress::default();
         let enhancement = EnhancementProgress::new();
 
-        let msg = trigger_forge_asprika(&mut state, &mut progress, &enhancement);
+        let msg = trigger_forge_asprika(&mut state, &enhancement);
         assert_eq!(msg, "Asprika forged and equipped!");
-        assert_eq!(progress.asprika_state, GodItemState::Forged);
         assert!(state.equipment.get(items::EquipmentSlot::Armor).is_some());
 
         // Can't forge again
-        let msg = trigger_forge_asprika(&mut state, &mut progress, &enhancement);
-        assert_eq!(msg, "Asprika already forged!");
-    }
-
-    #[test]
-    fn test_trigger_discover_sleipnir() {
-        let mut progress = GodItemProgress::default();
-        let msg = trigger_discover_sleipnir(&mut progress);
-        assert_eq!(msg, "Sleipnir quest discovered!");
-        assert_eq!(progress.sleipnir_state, GodItemState::Discovered);
-
-        let msg = trigger_discover_sleipnir(&mut progress);
-        assert_eq!(msg, "Sleipnir already discovered!");
-    }
-
-    #[test]
-    fn test_trigger_complete_sleipnir_milestones() {
-        let mut progress = GodItemProgress::default();
-        let msg = trigger_complete_sleipnir_milestones(&mut progress);
-        assert_eq!(msg, "Sleipnir milestones completed!");
-        assert_eq!(progress.sleipnir_state, GodItemState::ReadyToForge);
-        assert!(progress.sleipnir_milestones.all_met());
-
-        progress.sleipnir_state = GodItemState::Forged;
-        let msg = trigger_complete_sleipnir_milestones(&mut progress);
-        assert_eq!(msg, "Sleipnir already forged!");
+        let msg = trigger_forge_asprika(&mut state, &enhancement);
+        assert_eq!(msg, "Asprika already equipped!");
     }
 
     #[test]
     fn test_trigger_forge_sleipnir() {
         let mut state = GameState::new("Test".to_string(), 0);
-        let mut progress = GodItemProgress::default();
         let enhancement = EnhancementProgress::new();
 
-        let msg = trigger_forge_sleipnir(&mut state, &mut progress, &enhancement);
+        let msg = trigger_forge_sleipnir(&mut state, &enhancement);
         assert_eq!(msg, "Sleipnir forged and equipped!");
-        assert_eq!(progress.sleipnir_state, GodItemState::Forged);
         assert!(state.equipment.get(items::EquipmentSlot::Boots).is_some());
 
-        let msg = trigger_forge_sleipnir(&mut state, &mut progress, &enhancement);
-        assert_eq!(msg, "Sleipnir already forged!");
-    }
-
-    #[test]
-    fn test_trigger_discover_megingjord() {
-        let mut progress = GodItemProgress::default();
-        let msg = trigger_discover_megingjord(&mut progress);
-        assert_eq!(msg, "Megingjord quest discovered!");
-        assert_eq!(progress.megingjord_state, GodItemState::Discovered);
-
-        let msg = trigger_discover_megingjord(&mut progress);
-        assert_eq!(msg, "Megingjord already discovered!");
-    }
-
-    #[test]
-    fn test_trigger_complete_megingjord_milestones() {
-        let mut progress = GodItemProgress::default();
-        let msg = trigger_complete_megingjord_milestones(&mut progress);
-        assert_eq!(msg, "Megingjord milestones completed!");
-        assert_eq!(progress.megingjord_state, GodItemState::ReadyToForge);
-        assert!(progress.megingjord_milestones.all_met());
-
-        progress.megingjord_state = GodItemState::Forged;
-        let msg = trigger_complete_megingjord_milestones(&mut progress);
-        assert_eq!(msg, "Megingjord already forged!");
+        // Can't forge again
+        let msg = trigger_forge_sleipnir(&mut state, &enhancement);
+        assert_eq!(msg, "Sleipnir already equipped!");
     }
 
     #[test]
     fn test_trigger_forge_megingjord() {
         let mut state = GameState::new("Test".to_string(), 0);
-        let mut progress = GodItemProgress::default();
         let enhancement = EnhancementProgress::new();
 
-        let msg = trigger_forge_megingjord(&mut state, &mut progress, &enhancement);
+        let msg = trigger_forge_megingjord(&mut state, &enhancement);
         assert_eq!(msg, "Megingjord forged and equipped!");
-        assert_eq!(progress.megingjord_state, GodItemState::Forged);
         assert!(state.equipment.get(items::EquipmentSlot::Ring).is_some());
 
-        let msg = trigger_forge_megingjord(&mut state, &mut progress, &enhancement);
-        assert_eq!(msg, "Megingjord already forged!");
+        // Can't forge again
+        let msg = trigger_forge_megingjord(&mut state, &enhancement);
+        assert_eq!(msg, "Megingjord already equipped!");
     }
 }

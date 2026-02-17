@@ -347,7 +347,6 @@ fn log_synced_achievements(
 fn track_input_achievements(
     state: &mut GameState,
     global_achievements: &mut achievements::Achievements,
-    god_item_progress: &mut god_items::GodItemProgress,
     prestige_before: u32,
 ) {
     if state.prestige_rank > prestige_before {
@@ -360,22 +359,17 @@ fn track_input_achievements(
             win_info.difficulty,
             Some(&state.character_name),
         );
-        // Track Master difficulty wins for god item milestones
-        if win_info.difficulty == "master" {
-            god_item_progress.record_master_challenge_win(win_info.game_type);
-        }
         state.last_minigame_win = None;
     }
 }
 
-/// Save all game state files (character, achievements, haven, enhancement, god items).
+/// Save all game state files (character, achievements, haven, enhancement).
 fn save_all(
     character_manager: &CharacterManager,
     state: &GameState,
     global_achievements: &achievements::Achievements,
     haven: &haven::Haven,
     enhancement: &enhancement::EnhancementProgress,
-    god_item_progress: &god_items::GodItemProgress,
 ) {
     let _ = character_manager.save_character(state);
     achievements::save_achievements(global_achievements).ok();
@@ -385,7 +379,6 @@ fn save_all(
     if enhancement.discovered {
         enhancement::save_enhancement(enhancement).ok();
     }
-    let _ = god_items::save_god_item_progress(god_item_progress);
 }
 
 fn main() -> io::Result<()> {
@@ -442,7 +435,6 @@ fn main() -> io::Result<()> {
     let mut enhancement = enhancement::load_enhancement();
 
     // Load account-level God Item progress
-    let mut god_item_progress = god_items::load_god_item_progress();
 
     // Load global achievements (shared across all characters)
     let mut global_achievements = achievements::load_achievements();
@@ -1009,13 +1001,11 @@ fn main() -> io::Result<()> {
                                 &mut global_achievements,
                                 update_info.is_some(),
                                 update_expanded,
-                                &mut god_item_progress,
                             );
 
                             track_input_achievements(
                                 &mut state,
                                 &mut global_achievements,
-                                &mut god_item_progress,
                                 prestige_before,
                             );
 
@@ -1035,12 +1025,7 @@ fn main() -> io::Result<()> {
                                             &global_achievements,
                                             &haven,
                                             &enhancement,
-                                            &god_item_progress,
                                         );
-                                    } else {
-                                        // Reload account-level state from disk so debug
-                                        // changes don't persist across character reloads
-                                        god_item_progress = god_items::load_god_item_progress();
                                     }
                                     game_state = None;
                                     current_screen = Screen::CharacterSelect;
@@ -1054,7 +1039,6 @@ fn main() -> io::Result<()> {
                                             &global_achievements,
                                             &haven,
                                             &enhancement,
-                                            &god_item_progress,
                                         );
                                         last_save_instant = Some(Instant::now());
                                         last_save_time = Some(Local::now());
@@ -1068,7 +1052,6 @@ fn main() -> io::Result<()> {
                                             &global_achievements,
                                             &haven,
                                             &enhancement,
-                                            &god_item_progress,
                                         );
                                         last_save_instant = Some(Instant::now());
                                         last_save_time = Some(Local::now());
@@ -1148,7 +1131,6 @@ fn main() -> io::Result<()> {
                                     &global_achievements,
                                     &haven,
                                     &enhancement,
-                                    &god_item_progress,
                                 );
                                 last_save_instant = Some(Instant::now());
                                 last_save_time = Some(Local::now());
@@ -1185,14 +1167,6 @@ fn main() -> io::Result<()> {
                                 .visual_effects
                                 .retain_mut(|effect| effect.update(delta_time));
 
-                            // Sync Asprika milestone with achievement state
-                            if tick_result.achievements_changed {
-                                god_item_progress.sync_asprika_milestone(
-                                    global_achievements
-                                        .is_unlocked(achievements::AchievementId::ExpanseCycleI),
-                                );
-                            }
-
                             // Persist all state if anything changed
                             if (tick_result.achievements_changed
                                 || tick_result.haven_changed
@@ -1206,7 +1180,6 @@ fn main() -> io::Result<()> {
                                     &global_achievements,
                                     &haven,
                                     &enhancement,
-                                    &god_item_progress,
                                 );
                             }
 
@@ -1252,10 +1225,6 @@ fn main() -> io::Result<()> {
                                                 enhancement.total_attempts,
                                                 Some(&state.character_name),
                                             );
-
-                                            // Sync god item enhancement milestones
-                                            god_item_progress
-                                                .sync_enhancement_milestones(&enhancement.levels);
 
                                             // Recalculate cached derived stats after enhancement change
                                             state.recalculate_derived_stats(&enhancement.levels);
@@ -1306,7 +1275,6 @@ fn main() -> io::Result<()> {
                                                     &global_achievements,
                                                     &haven,
                                                     &enhancement,
-                                                    &god_item_progress,
                                                 );
                                             }
                                         }
@@ -1343,7 +1311,6 @@ fn main() -> io::Result<()> {
                                 &global_achievements,
                                 &haven,
                                 &enhancement,
-                                &god_item_progress,
                             );
                             last_save_instant = Some(Instant::now());
                         }
