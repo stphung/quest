@@ -94,6 +94,7 @@ mod tests {
             slot,
             rarity,
             ilvl: 10,
+            tier: 5,
             base_name: "Test".to_string(),
             display_name: "Test Item".to_string(),
             attributes: AttributeBonuses {
@@ -121,6 +122,7 @@ mod tests {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Magic,
             ilvl: 10,
+            tier: 5,
             base_name: "Test".to_string(),
             display_name: "Test Item".to_string(),
             attributes: AttributeBonuses::new(),
@@ -212,6 +214,7 @@ mod tests {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Common,
             ilvl: 10,
+            tier: 5,
             base_name: "Test".to_string(),
             display_name: "Test".to_string(),
             attributes: AttributeBonuses {
@@ -225,6 +228,7 @@ mod tests {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Common,
             ilvl: 10,
+            tier: 5,
             base_name: "Test".to_string(),
             display_name: "Test".to_string(),
             attributes: AttributeBonuses {
@@ -249,6 +253,7 @@ mod tests {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Common,
             ilvl: 10,
+            tier: 5,
             base_name: "Test".to_string(),
             display_name: "Test".to_string(),
             attributes: AttributeBonuses::new(),
@@ -272,6 +277,7 @@ mod tests {
                 slot: EquipmentSlot::Weapon,
                 rarity: Rarity::Magic,
                 ilvl: 10,
+                tier: 5,
                 base_name: "Test".to_string(),
                 display_name: "Test".to_string(),
                 attributes: AttributeBonuses::new(),
@@ -305,6 +311,7 @@ mod tests {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Common,
             ilvl: 10,
+            tier: 5,
             base_name: "Test".to_string(),
             display_name: "Test".to_string(),
             attributes: AttributeBonuses {
@@ -318,6 +325,7 @@ mod tests {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Magic,
             ilvl: 10,
+            tier: 5,
             base_name: "Test".to_string(),
             display_name: "Test".to_string(),
             attributes: AttributeBonuses {
@@ -347,6 +355,7 @@ mod tests {
             slot: EquipmentSlot::Armor,
             rarity: Rarity::Common,
             ilvl: 10,
+            tier: 5,
             base_name: "Test".to_string(),
             display_name: "Test".to_string(),
             attributes: AttributeBonuses {
@@ -373,6 +382,7 @@ mod tests {
             slot: EquipmentSlot::Armor,
             rarity: Rarity::Mythic,
             ilvl: 100,
+            tier: 5,
             base_name: "Asprika".to_string(),
             display_name: "Asprika".to_string(),
             attributes: AttributeBonuses {
@@ -389,6 +399,7 @@ mod tests {
             slot: EquipmentSlot::Armor,
             rarity: Rarity::Legendary,
             ilvl: 100,
+            tier: 5,
             base_name: "Test".to_string(),
             display_name: "Test".to_string(),
             attributes: AttributeBonuses {
@@ -431,6 +442,7 @@ mod tests {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Magic,
             ilvl: 10,
+            tier: 5,
             base_name: "Test".to_string(),
             display_name: "Test".to_string(),
             attributes: AttributeBonuses {

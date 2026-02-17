@@ -44,6 +44,33 @@ pub const ZONE_ILVL_MULTIPLIER: u32 = 10;
 pub const ILVL_SCALING_BASE: f64 = 10.0;
 pub const ILVL_SCALING_DIVISOR: f64 = 30.0;
 
+// Item tier (quality) system — T0 (worst) to T9 (best)
+// Cumulative drop rate thresholds for exponential curve
+pub const TIER_THRESHOLDS: [f64; 9] = [
+    0.380, // T0: 38.0%
+    0.620, // T1: 24.0%
+    0.770, // T2: 15.0%
+    0.870, // T3: 10.0%
+    0.930, // T4:  6.0%
+    0.965, // T5:  3.5%
+    0.985, // T6:  2.0%
+    0.995, // T7:  1.0%
+    0.999, // T8:  0.4%
+           // T9:  0.1% (remainder)
+];
+pub const TIER_MULTIPLIERS: [f64; 10] = [
+    0.40, // T0
+    0.47, // T1
+    0.54, // T2
+    0.61, // T3
+    0.68, // T4
+    0.74, // T5
+    0.80, // T6
+    0.86, // T7
+    0.93, // T8
+    1.00, // T9
+];
+
 // Discovery chances
 pub const DUNGEON_DISCOVERY_CHANCE: f64 = 0.01;
 pub const FISHING_DISCOVERY_CHANCE: f64 = 0.05;

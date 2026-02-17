@@ -1,23 +1,27 @@
 use super::names::generate_display_name;
 use super::types::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
-use crate::core::constants::{ILVL_SCALING_BASE, ILVL_SCALING_DIVISOR};
+use crate::core::constants::{
+    ILVL_SCALING_BASE, ILVL_SCALING_DIVISOR, TIER_MULTIPLIERS, TIER_THRESHOLDS,
+};
 use rand::{Rng, RngExt};
 
 /// Generate an item with the given slot, rarity, and item level.
 /// ilvl determines stat scaling: ilvl 10 (zone 1) to ilvl 100 (zone 10).
 pub fn generate_item(slot: EquipmentSlot, rarity: Rarity, ilvl: u32) -> Item {
     let mut rng = rand::rng();
+    let tier = roll_tier(&mut rng);
 
-    // Generate attribute bonuses based on rarity and ilvl
-    let attributes = generate_attributes(rarity, ilvl, &mut rng);
+    // Generate attribute bonuses based on rarity, ilvl, and tier
+    let attributes = generate_attributes(rarity, ilvl, tier, &mut rng);
 
-    // Generate affixes based on rarity and ilvl
-    let affixes = generate_affixes(rarity, ilvl, &mut rng);
+    // Generate affixes based on rarity, ilvl, and tier
+    let affixes = generate_affixes(rarity, ilvl, tier, &mut rng);
 
     let mut item = Item {
         slot,
         rarity,
         ilvl,
+        tier,
         base_name: String::new(),
         display_name: String::new(),
         attributes,
@@ -31,13 +35,38 @@ pub fn generate_item(slot: EquipmentSlot, rarity: Rarity, ilvl: u32) -> Item {
     item
 }
 
+/// Roll a tier (T0-T9) using an exponential drop curve.
+/// T0 (38%) through T9 (0.1%).
+pub fn roll_tier(rng: &mut impl Rng) -> u8 {
+    let roll: f64 = rng.random();
+    for (i, &threshold) in TIER_THRESHOLDS.iter().enumerate() {
+        if roll < threshold {
+            return i as u8;
+        }
+    }
+    9
+}
+
+/// Returns the stat multiplier for a given tier (0.40x for T0, 1.00x for T9).
+pub fn tier_multiplier(tier: u8) -> f64 {
+    TIER_MULTIPLIERS
+        .get(tier as usize)
+        .copied()
+        .unwrap_or(TIER_MULTIPLIERS[5])
+}
+
 /// Calculate the ilvl multiplier for scaling stats.
 /// ilvl 10: 1.0x, ilvl 50: 2.33x, ilvl 100: 4.0x
 fn ilvl_multiplier(ilvl: u32) -> f64 {
     1.0 + (ilvl.max(ILVL_SCALING_BASE as u32) as f64 - ILVL_SCALING_BASE) / ILVL_SCALING_DIVISOR
 }
 
-fn generate_attributes(rarity: Rarity, ilvl: u32, rng: &mut impl Rng) -> AttributeBonuses {
+fn generate_attributes(
+    rarity: Rarity,
+    ilvl: u32,
+    tier: u8,
+    rng: &mut impl Rng,
+) -> AttributeBonuses {
     // Base ranges at ilvl 10 (reduced from original)
     let (base_min, base_max) = match rarity {
         Rarity::Common => (1, 1),
@@ -47,7 +76,7 @@ fn generate_attributes(rarity: Rarity, ilvl: u32, rng: &mut impl Rng) -> Attribu
         Rarity::Legendary | Rarity::Mythic => (4, 6),
     };
 
-    let multiplier = ilvl_multiplier(ilvl);
+    let multiplier = ilvl_multiplier(ilvl) * tier_multiplier(tier);
 
     // Pick a random number of attributes to boost (1-3)
     let num_attrs = rng.random_range(1..=3);
@@ -72,7 +101,7 @@ fn generate_attributes(rarity: Rarity, ilvl: u32, rng: &mut impl Rng) -> Attribu
     attrs
 }
 
-fn generate_affixes(rarity: Rarity, ilvl: u32, rng: &mut impl Rng) -> Vec<Affix> {
+fn generate_affixes(rarity: Rarity, ilvl: u32, tier: u8, rng: &mut impl Rng) -> Vec<Affix> {
     let count = match rarity {
         Rarity::Common => 0,
         Rarity::Magic => 1,
@@ -96,7 +125,7 @@ fn generate_affixes(rarity: Rarity, ilvl: u32, rng: &mut impl Rng) -> Vec<Affix>
 
     for _ in 0..count {
         let affix_type = all_affix_types[rng.random_range(0..all_affix_types.len())];
-        let value = generate_affix_value(affix_type, rarity, ilvl, rng);
+        let value = generate_affix_value(affix_type, rarity, ilvl, tier, rng);
         affixes.push(Affix { affix_type, value });
     }
 
@@ -107,9 +136,10 @@ fn generate_affix_value(
     affix_type: AffixType,
     rarity: Rarity,
     ilvl: u32,
+    tier: u8,
     rng: &mut impl Rng,
 ) -> f64 {
-    let multiplier = ilvl_multiplier(ilvl);
+    let multiplier = ilvl_multiplier(ilvl) * tier_multiplier(tier);
 
     // Base ranges at ilvl 10 (significantly reduced from original)
     let (base_min, base_max) = match rarity {
@@ -247,12 +277,13 @@ mod tests {
     #[test]
     fn test_ilvl_100_legendary_reasonable_values() {
         // Verify ilvl 100 legendaries are in expected range
+        // Tier ranges from T0 (0.40x) to T9 (1.00x), so multiply old bounds by 0.40 on low end
         for _ in 0..20 {
             let item = generate_item(EquipmentSlot::Weapon, Rarity::Legendary, 100);
 
-            // Attributes: 4-6 base * 4.0 multiplier * 1-3 stats = 16-72 total
+            // Attributes: 4-6 base * (4.0 * 0.40..1.00) * 1-3 stats = 6-72 total
             assert!(
-                item.attributes.total() >= 16,
+                item.attributes.total() >= 6,
                 "Legendary attrs too low: {}",
                 item.attributes.total()
             );
@@ -266,33 +297,33 @@ mod tests {
             for affix in &item.affixes {
                 match affix.affix_type {
                     AffixType::HPBonus => {
-                        // 50-80 base * 4.0 = 200-320
+                        // 50-80 base * (4.0 * 0.40..1.00) = 80-320
                         assert!(
-                            affix.value >= 150.0 && affix.value <= 350.0,
+                            affix.value >= 60.0 && affix.value <= 350.0,
                             "HP bonus out of range: {}",
                             affix.value
                         );
                     }
                     AffixType::CritMultiplier => {
-                        // 0.2-0.35 base * 4.0 = 0.8-1.4
+                        // 0.2-0.35 base * (4.0 * 0.40..1.00) = 0.32-1.4
                         assert!(
-                            affix.value >= 0.5 && affix.value <= 1.5,
+                            affix.value >= 0.2 && affix.value <= 1.5,
                             "Crit mult out of range: {}",
                             affix.value
                         );
                     }
                     AffixType::AttackSpeed => {
-                        // 2.0-3.3 base * 4.0 = 8-13% (nerfed to 1/3)
+                        // 2.0-3.3 base * (4.0 * 0.40..1.00) = 3-13%
                         assert!(
-                            affix.value >= 7.0 && affix.value <= 14.0,
+                            affix.value >= 2.0 && affix.value <= 14.0,
                             "AttackSpeed out of range: {}",
                             affix.value
                         );
                     }
                     _ => {
-                        // 6-10 base * 4.0 = 24-40%
+                        // 6-10 base * (4.0 * 0.40..1.00) = 10-40%
                         assert!(
-                            affix.value >= 20.0 && affix.value <= 45.0,
+                            affix.value >= 8.0 && affix.value <= 45.0,
                             "Affix {:?} out of range: {}",
                             affix.affix_type,
                             affix.value
@@ -306,12 +337,13 @@ mod tests {
     #[test]
     fn test_ilvl_10_items_weak() {
         // Verify ilvl 10 items are appropriately weak
+        // With tier T0 (0.40x), minimum is even lower: 4 * 0.40 = 1.6 → rounds to 2
         for _ in 0..20 {
             let item = generate_item(EquipmentSlot::Weapon, Rarity::Legendary, 10);
 
-            // Attributes: 4-6 base * 1.0 multiplier * 1-3 stats = 4-18 total
+            // Attributes: 4-6 base * (1.0 * 0.40..1.00) * 1-3 stats = 1-18 total
             assert!(
-                item.attributes.total() >= 4,
+                item.attributes.total() >= 1,
                 "Legendary attrs too low: {}",
                 item.attributes.total()
             );
@@ -333,5 +365,87 @@ mod tests {
                 "Common items should never have affixes"
             );
         }
+    }
+
+    #[test]
+    fn test_roll_tier_distribution() {
+        use rand::SeedableRng;
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
+        let mut counts = [0u32; 10];
+        let n = 100_000;
+        for _ in 0..n {
+            let tier = roll_tier(&mut rng);
+            counts[tier as usize] += 1;
+        }
+        // Expected percentages: T0=38%, T1=24%, T2=15%, T3=10%, T4=6%, T5=3.5%, T6=2%, T7=1%, T8=0.4%, T9=0.1%
+        let expected = [
+            0.380, 0.240, 0.150, 0.100, 0.060, 0.035, 0.020, 0.010, 0.004, 0.001,
+        ];
+        for (i, &exp) in expected.iter().enumerate() {
+            let actual = counts[i] as f64 / n as f64;
+            let tolerance = if exp < 0.01 { 0.005 } else { 0.02 };
+            assert!(
+                (actual - exp).abs() < tolerance,
+                "T{} distribution off: expected {:.1}%, got {:.1}%",
+                i,
+                exp * 100.0,
+                actual * 100.0
+            );
+        }
+    }
+
+    #[test]
+    fn test_tier_multiplier_values() {
+        let expected = [0.40, 0.47, 0.54, 0.61, 0.68, 0.74, 0.80, 0.86, 0.93, 1.00];
+        for (i, &exp) in expected.iter().enumerate() {
+            assert!(
+                (tier_multiplier(i as u8) - exp).abs() < f64::EPSILON,
+                "T{} multiplier wrong: expected {}, got {}",
+                i,
+                exp,
+                tier_multiplier(i as u8)
+            );
+        }
+        // Out-of-range falls back to T5
+        assert!((tier_multiplier(10) - 0.74).abs() < f64::EPSILON);
+        assert!((tier_multiplier(255) - 0.74).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_generated_items_have_valid_tier() {
+        for _ in 0..100 {
+            let item = generate_item(EquipmentSlot::Weapon, Rarity::Rare, 50);
+            assert!(item.tier <= 9, "Tier should be 0-9, got {}", item.tier);
+        }
+    }
+
+    #[test]
+    fn test_tier_affects_item_power() {
+        // T9 items at ilvl 50 should be stronger than T0 items on average
+        use rand::SeedableRng;
+        let mut t0_total = 0u64;
+        let mut t9_total = 0u64;
+        let samples = 200;
+        for seed in 0..samples {
+            let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+            let t0_attrs = generate_attributes(Rarity::Rare, 50, 0, &mut rng);
+            let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+            let t9_attrs = generate_attributes(Rarity::Rare, 50, 9, &mut rng);
+            t0_total += t0_attrs.total() as u64;
+            t9_total += t9_attrs.total() as u64;
+        }
+        assert!(
+            t9_total > t0_total,
+            "T9 total ({}) should exceed T0 total ({})",
+            t9_total,
+            t0_total
+        );
+        // T9 should be ~2.5x T0 (1.00/0.40)
+        let ratio = t9_total as f64 / t0_total as f64;
+        assert!(
+            ratio > 2.0 && ratio < 3.0,
+            "T9/T0 ratio should be ~2.5, got {:.2}",
+            ratio
+        );
     }
 }

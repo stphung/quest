@@ -147,6 +147,8 @@ pub struct Item {
     pub rarity: Rarity,
     #[serde(default = "default_ilvl")]
     pub ilvl: u32,
+    #[serde(default = "default_tier")]
+    pub tier: u8,
     pub base_name: String,
     pub display_name: String,
     pub attributes: AttributeBonuses,
@@ -157,6 +159,10 @@ pub struct Item {
 
 fn default_ilvl() -> u32 {
     10
+}
+
+fn default_tier() -> u8 {
+    1
 }
 
 impl Item {
@@ -238,6 +244,7 @@ mod tests {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Common,
             ilvl: 10,
+            tier: 5,
             base_name: "Sword".to_string(),
             display_name: "Fine Sword".to_string(),
             attributes: AttributeBonuses {
@@ -310,6 +317,7 @@ mod tests {
             slot: EquipmentSlot::Ring,
             rarity: Rarity::Epic,
             ilvl: 10,
+            tier: 5,
             base_name: "Ring".to_string(),
             display_name: "Ring of Power".to_string(),
             attributes: AttributeBonuses::new(),

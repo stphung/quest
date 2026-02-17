@@ -481,6 +481,7 @@ mod tests {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Rare,
             ilvl: 10,
+            tier: 5,
             base_name: "Sword".to_string(),
             display_name: "Test Sword".to_string(),
             attributes: AttributeBonuses {
@@ -525,6 +526,7 @@ mod tests {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Legendary,
             ilvl: 10,
+            tier: 5,
             base_name: "Sword".to_string(),
             display_name: "Stormbreaker".to_string(),
             attributes: AttributeBonuses {
@@ -538,6 +540,7 @@ mod tests {
             slot: EquipmentSlot::Armor,
             rarity: Rarity::Rare,
             ilvl: 10,
+            tier: 5,
             base_name: "Plate".to_string(),
             display_name: "Dragon Plate".to_string(),
             attributes: AttributeBonuses {

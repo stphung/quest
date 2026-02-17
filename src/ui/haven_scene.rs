@@ -851,7 +851,12 @@ pub fn render_vault_selection(
                 let rarity_color = super::rarity_color(item.rarity);
                 (
                     format!("{:8}", format!("{:?}", slot)),
-                    item.display_name.clone(),
+                    format!(
+                        "{} {} T{}",
+                        item.display_name,
+                        item.rarity.name(),
+                        item.tier
+                    ),
                     Style::default().fg(rarity_color),
                 )
             } else {

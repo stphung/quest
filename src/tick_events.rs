@@ -138,27 +138,21 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
             TickEvent::ItemDropped {
                 item_name,
                 rarity,
+                tier,
                 equipped,
                 slot: _,
                 stats: _,
                 from_boss: _,
             } => {
-                let rarity_initial = match rarity {
-                    Rarity::Common => "C",
-                    Rarity::Magic => "M",
-                    Rarity::Rare => "R",
-                    Rarity::Epic => "E",
-                    Rarity::Legendary => "L",
-                    Rarity::Mythic => "G",
-                };
                 let equip_tag = if *equipped { " \u{1F528}" } else { "" };
-                let text = format!("[{}] {}{}", rarity_initial, item_name, equip_tag);
+                let text = format!("{} T{} {}{}", rarity.name(), tier, item_name, equip_tag);
                 let color = rarity_color(*rarity);
                 game_state.ticker.push(TickerEntry {
                     icon: "\u{2694}",
                     text,
                     color,
-                    bold: matches!(rarity, Rarity::Epic | Rarity::Legendary | Rarity::Mythic),
+                    bold: *tier >= 7
+                        || matches!(rarity, Rarity::Epic | Rarity::Legendary | Rarity::Mythic),
                 });
             }
             TickEvent::SubzoneBossDefeated {
@@ -335,15 +329,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
-                let rarity_initial = match rarity {
-                    Rarity::Common => "C",
-                    Rarity::Magic => "M",
-                    Rarity::Rare => "R",
-                    Rarity::Epic => "E",
-                    Rarity::Legendary => "L",
-                    Rarity::Mythic => "G",
-                };
-                let text = format!("{} [{}]", fish_name, rarity_initial);
+                let text = format!("{} {}", fish_name, rarity.name());
                 let color = rarity_color(*rarity);
                 game_state.ticker.push(TickerEntry {
                     icon: "\u{1F41F}",

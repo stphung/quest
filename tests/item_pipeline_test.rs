@@ -225,7 +225,7 @@ fn test_affix_count_contract_across_all_rarities() {
 #[test]
 fn test_higher_rarity_produces_higher_average_attribute_total() {
     let sample_avg = |rarity: Rarity| -> f64 {
-        let n = 200;
+        let n = 2000;
         let sum: u32 = (0..n)
             .map(|_| {
                 generate_item(EquipmentSlot::Weapon, rarity, 10)
@@ -269,7 +269,7 @@ fn test_score_increases_with_rarity_on_average() {
     let game_state = GameState::new("Score Test".to_string(), 0);
 
     let sample_avg_score = |rarity: Rarity| -> f64 {
-        let n = 200;
+        let n = 2000;
         let sum: f64 = (0..n)
             .map(|_| {
                 let item = generate_item(EquipmentSlot::Weapon, rarity, 10);
@@ -332,6 +332,7 @@ fn test_score_reflects_attribute_specialization() {
         slot: EquipmentSlot::Weapon,
         rarity: Rarity::Common,
         ilvl: 10,
+        tier: 5,
         base_name: "STR Sword".to_string(),
         display_name: "STR Sword".to_string(),
         attributes: AttributeBonuses {
@@ -346,6 +347,7 @@ fn test_score_reflects_attribute_specialization() {
         slot: EquipmentSlot::Weapon,
         rarity: Rarity::Common,
         ilvl: 10,
+        tier: 5,
         base_name: "DEX Dagger".to_string(),
         display_name: "DEX Dagger".to_string(),
         attributes: AttributeBonuses {
@@ -413,6 +415,7 @@ fn test_auto_equip_higher_scored_item_replaces_lower() {
         slot: EquipmentSlot::Weapon,
         rarity: Rarity::Common,
         ilvl: 10,
+        tier: 5,
         base_name: "Rusty Sword".to_string(),
         display_name: "Rusty Sword".to_string(),
         attributes: AttributeBonuses {
@@ -438,6 +441,7 @@ fn test_auto_equip_higher_scored_item_replaces_lower() {
         slot: EquipmentSlot::Weapon,
         rarity: Rarity::Legendary,
         ilvl: 10,
+        tier: 5,
         base_name: "Legendary Blade".to_string(),
         display_name: "Legendary Blade".to_string(),
         attributes: AttributeBonuses {
@@ -484,6 +488,7 @@ fn test_auto_equip_lower_scored_item_does_not_replace() {
         slot: EquipmentSlot::Armor,
         rarity: Rarity::Legendary,
         ilvl: 10,
+        tier: 5,
         base_name: "Dragon Plate".to_string(),
         display_name: "Dragon Plate".to_string(),
         attributes: AttributeBonuses {
@@ -504,6 +509,7 @@ fn test_auto_equip_lower_scored_item_does_not_replace() {
         slot: EquipmentSlot::Armor,
         rarity: Rarity::Common,
         ilvl: 10,
+        tier: 5,
         base_name: "Cloth Shirt".to_string(),
         display_name: "Cloth Shirt".to_string(),
         attributes: AttributeBonuses {
@@ -539,6 +545,7 @@ fn test_auto_equip_across_different_slots_is_independent() {
         slot: EquipmentSlot::Weapon,
         rarity: Rarity::Rare,
         ilvl: 10,
+        tier: 5,
         base_name: "Sword".to_string(),
         display_name: "Fine Sword".to_string(),
         attributes: AttributeBonuses {
@@ -552,6 +559,7 @@ fn test_auto_equip_across_different_slots_is_independent() {
         slot: EquipmentSlot::Helmet,
         rarity: Rarity::Magic,
         ilvl: 10,
+        tier: 5,
         base_name: "Helm".to_string(),
         display_name: "Iron Helm".to_string(),
         attributes: AttributeBonuses {
@@ -565,6 +573,7 @@ fn test_auto_equip_across_different_slots_is_independent() {
         slot: EquipmentSlot::Boots,
         rarity: Rarity::Epic,
         ilvl: 10,
+        tier: 5,
         base_name: "Boots".to_string(),
         display_name: "Swift Boots".to_string(),
         attributes: AttributeBonuses {
@@ -646,6 +655,7 @@ fn test_full_pipeline_progressive_upgrade_chain() {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Common,
             ilvl: 10,
+            tier: 5,
             base_name: "Tier1".to_string(),
             display_name: "Wooden Sword".to_string(),
             attributes: AttributeBonuses {
@@ -659,6 +669,7 @@ fn test_full_pipeline_progressive_upgrade_chain() {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Magic,
             ilvl: 10,
+            tier: 5,
             base_name: "Tier2".to_string(),
             display_name: "Iron Sword".to_string(),
             attributes: AttributeBonuses {
@@ -675,6 +686,7 @@ fn test_full_pipeline_progressive_upgrade_chain() {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Rare,
             ilvl: 10,
+            tier: 5,
             base_name: "Tier3".to_string(),
             display_name: "Steel Longsword".to_string(),
             attributes: AttributeBonuses {
@@ -698,6 +710,7 @@ fn test_full_pipeline_progressive_upgrade_chain() {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Legendary,
             ilvl: 10,
+            tier: 5,
             base_name: "Tier4".to_string(),
             display_name: "Excalibur".to_string(),
             attributes: AttributeBonuses {
@@ -914,6 +927,7 @@ fn test_damage_percent_affix_outscores_hp_bonus_affix_at_same_value() {
         slot: EquipmentSlot::Ring,
         rarity: Rarity::Magic,
         ilvl: 10,
+        tier: 5,
         base_name: "DmgRing".to_string(),
         display_name: "Ring of Damage".to_string(),
         attributes: AttributeBonuses::new(),
@@ -928,6 +942,7 @@ fn test_damage_percent_affix_outscores_hp_bonus_affix_at_same_value() {
         slot: EquipmentSlot::Ring,
         rarity: Rarity::Magic,
         ilvl: 10,
+        tier: 5,
         base_name: "HPRing".to_string(),
         display_name: "Ring of Health".to_string(),
         attributes: AttributeBonuses::new(),
@@ -969,6 +984,7 @@ fn test_score_affix_only_item_is_positive() {
         slot: EquipmentSlot::Amulet,
         rarity: Rarity::Rare,
         ilvl: 10,
+        tier: 5,
         base_name: "Pure Affix".to_string(),
         display_name: "Amulet of Power".to_string(),
         attributes: AttributeBonuses::new(), // zero attributes
@@ -1082,6 +1098,7 @@ fn test_auto_equip_equal_score_does_not_replace() {
         slot: EquipmentSlot::Ring,
         rarity: Rarity::Common,
         ilvl: 10,
+        tier: 5,
         base_name: "Ring1".to_string(),
         display_name: "Ring Alpha".to_string(),
         attributes: AttributeBonuses {
@@ -1097,6 +1114,7 @@ fn test_auto_equip_equal_score_does_not_replace() {
         slot: EquipmentSlot::Ring,
         rarity: Rarity::Common,
         ilvl: 10,
+        tier: 5,
         base_name: "Ring2".to_string(),
         display_name: "Ring Beta".to_string(),
         attributes: AttributeBonuses {
@@ -1132,5 +1150,88 @@ fn test_auto_equip_equal_score_does_not_replace() {
             .unwrap()
             .display_name,
         "Ring Alpha"
+    );
+}
+
+// =========================================================================
+// Tier system integration tests
+// =========================================================================
+
+#[test]
+fn test_tier_stored_on_generated_items() {
+    // Items from generate_item() should have a tier in the 0-9 range
+    for _ in 0..50 {
+        let item = generate_item(EquipmentSlot::Weapon, Rarity::Rare, 50);
+        assert!(item.tier <= 9, "Tier should be 0-9, got {}", item.tier);
+    }
+}
+
+#[test]
+fn test_tier_serialization_roundtrip() {
+    // Tier persists through JSON save/load
+    let item = Item {
+        slot: EquipmentSlot::Weapon,
+        rarity: Rarity::Epic,
+        ilvl: 70,
+        tier: 7,
+        base_name: "Sword".to_string(),
+        display_name: "Crystal Blade".to_string(),
+        attributes: AttributeBonuses {
+            str: 10,
+            ..AttributeBonuses::new()
+        },
+        affixes: vec![],
+        god_item_id: None,
+    };
+
+    let json = serde_json::to_string(&item).unwrap();
+    let loaded: Item = serde_json::from_str(&json).unwrap();
+    assert_eq!(
+        loaded.tier, 7,
+        "Tier should survive serialization roundtrip"
+    );
+}
+
+#[test]
+fn test_tier_default_for_legacy_items() {
+    // Items without a tier field in JSON should deserialize as T1
+    let json = r#"{
+        "slot": "Weapon",
+        "rarity": "Legendary",
+        "ilvl": 100,
+        "base_name": "Old Sword",
+        "display_name": "Old Sword",
+        "attributes": {"str": 5, "dex": 0, "con": 0, "int": 0, "wis": 0, "cha": 0},
+        "affixes": [],
+        "god_item_id": null
+    }"#;
+    let item: Item = serde_json::from_str(json).unwrap();
+    assert_eq!(
+        item.tier, 1,
+        "Legacy items without tier should default to T1"
+    );
+}
+
+#[test]
+fn test_tier_distribution_across_many_items() {
+    // Over many generated items, T0 should be most common and T9 very rare
+    let mut counts = [0u32; 10];
+    for _ in 0..1000 {
+        let item = generate_item(EquipmentSlot::Armor, Rarity::Common, 10);
+        counts[item.tier as usize] += 1;
+    }
+    // T0 should be most frequent
+    assert!(
+        counts[0] > counts[9],
+        "T0 ({}) should be more common than T9 ({})",
+        counts[0],
+        counts[9]
+    );
+    // T0-T3 should be the vast majority (87% expected)
+    let low_tiers: u32 = counts[0..=3].iter().sum();
+    assert!(
+        low_tiers > 750,
+        "T0-T3 should be >75% of drops, got {}/1000",
+        low_tiers
     );
 }

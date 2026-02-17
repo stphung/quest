@@ -1125,6 +1125,7 @@ mod tests {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Common,
             ilvl: 10,
+            tier: 5,
             base_name: "Sword".to_string(),
             display_name: "Test Sword".to_string(),
             attributes: AttributeBonuses::new(),

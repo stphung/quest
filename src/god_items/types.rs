@@ -51,6 +51,7 @@ impl GodItemDefinition {
             slot: self.slot,
             rarity: Rarity::Mythic,
             ilvl: 100,
+            tier: 9,
             base_name: self.name.to_string(),
             display_name: self.name.to_string(),
             attributes: self.attributes.clone(),
