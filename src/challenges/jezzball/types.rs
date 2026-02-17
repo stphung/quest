@@ -58,14 +58,10 @@ impl JezzballDifficulty {
         }
     }
 
-    /// Wall growth interval in milliseconds.
+    /// Wall growth interval in milliseconds (uniform across difficulties).
     pub fn wall_step_ms(&self) -> u64 {
-        match self {
-            Self::Novice => 70,
-            Self::Apprentice => 60,
-            Self::Journeyman => 50,
-            Self::Master => 40,
-        }
+        let _ = self;
+        70
     }
 }
 
@@ -327,7 +323,7 @@ mod tests {
         assert_eq!(JezzballDifficulty::Master.target_percent(), 84);
 
         assert_eq!(JezzballDifficulty::Novice.wall_step_ms(), 70);
-        assert_eq!(JezzballDifficulty::Master.wall_step_ms(), 40);
+        assert_eq!(JezzballDifficulty::Master.wall_step_ms(), 70);
 
         assert!(JezzballDifficulty::Master.ball_speed() > JezzballDifficulty::Novice.ball_speed());
     }
