@@ -10,7 +10,7 @@ src/ui/
 ├── responsive.rs             # Responsive layout: SizeTier enum, LayoutContext, size thresholds
 ├── game_common.rs            # Shared minigame layout components (IMPORTANT)
 ├── stats_panel.rs            # Left panel: character stats, attributes, equipment
-├── info_panel.rs             # Full-width Loot + Combat log panels
+├── ticker.rs                 # Scrolling loot ticker with independent per-entry scrolling
 ├── throbber.rs               # Spinner animations and atmospheric messages
 │
 ├── combat_scene.rs           # Combat view orchestration
@@ -23,6 +23,7 @@ src/ui/
 ├── haven_scene.rs            # Haven base building overlay
 ├── achievement_browser_scene.rs # Achievement browsing
 ├── debug_menu_scene.rs       # Debug menu overlay
+├── help_overlay.rs           # Help/controls overlay
 │
 ├── challenge_menu_scene.rs   # Challenge menu list/detail view
 ├── chess_scene.rs            # Chess board with letter notation (K/Q/R/B/N/P)
@@ -73,7 +74,7 @@ Layout dispatch in `draw_ui_with_update()`:
 │   Stats Panel (50%)   │  Combat Scene (50%)  │
 │                       │                      │
 ├───────────────────────┴──────────────────────┤
-│  Loot Panel + Combat Log (full-width, 8h)    │
+│  Inline Combat HUD + Scrolling Ticker (8h)   │
 ├──────────────────────────────────────────────┤
 │  Footer (1 line)                             │
 └──────────────────────────────────────────────┘

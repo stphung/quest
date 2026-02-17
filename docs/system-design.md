@@ -918,7 +918,7 @@ quest/
 │       ├── mod.rs           # Layout coordinator
 │       ├── game_common.rs   # Shared minigame layout
 │       ├── stats_panel.rs   # Character stats
-│       ├── info_panel.rs    # Loot + Combat log
+│       ├── ticker.rs        # Scrolling loot ticker with independent per-entry scrolling
 │       ├── combat_scene.rs  # Combat view
 │       ├── combat_3d.rs     # 3D dungeon renderer
 │       ├── combat_effects.rs # Visual effects
@@ -934,6 +934,7 @@ quest/
 │       │   snake_scene.rs, flappy_scene.rs, jezzball_scene.rs,
 │       │   runic_shift_scene.rs
 │       ├── soulforge_scene.rs # Soulforge enhancement overlay
+│       ├── help_overlay.rs   # Help overlay with keybindings
 │       ├── scene_fx.rs       # Shared utilities for layered ASCII scene rendering
 │       ├── debug_menu_scene.rs # Debug overlay
 │       ├── throbber.rs      # Spinner animations
