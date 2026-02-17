@@ -145,8 +145,11 @@ pub fn tick_fishing_with_haven_result(
                     // Award character XP
                     state.character_xp += xp_gained;
 
-                    // Award fishing rank progress
-                    state.fishing.fish_toward_next_rank += 1;
+                    // Award fishing rank progress (only if below current cap)
+                    let max_rank = get_max_fishing_rank(haven.max_fishing_rank_bonus);
+                    if state.fishing.rank < max_rank {
+                        state.fishing.fish_toward_next_rank += 1;
+                    }
                     state.fishing.total_fish_caught += 1;
 
                     // Track legendary catches
@@ -1342,6 +1345,79 @@ mod tests {
                 "Progress should reset exactly at threshold"
             );
         }
+    }
+
+    #[test]
+    fn test_fish_progress_does_not_accumulate_at_cap() {
+        // When at rank 30 without T4, fish_toward_next_rank should NOT increase
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
+        let mut state = create_test_game_state();
+        state.fishing.rank = 30;
+        state.fishing.fish_toward_next_rank = 0;
+        state.fishing.total_fish_caught = 25000;
+
+        // Set up a session about to complete a catch
+        let session = FishingSession {
+            spot_name: "Small Pond".to_string(),
+            total_fish: 5,
+            fish_caught: Vec::new(),
+            items_found: Vec::new(),
+            ticks_remaining: 1,
+            phase: FishingPhase::Reeling,
+        };
+        state.active_fishing = Some(session);
+
+        let haven = HavenFishingBonuses {
+            timer_reduction_percent: 0.0,
+            double_fish_chance_percent: 0.0,
+            max_fishing_rank_bonus: 0, // No T4 — cap is 30
+        };
+
+        let _result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven, 0.0);
+
+        // total_fish_caught should increase (it always counts)
+        assert!(
+            state.fishing.total_fish_caught > 25000,
+            "total_fish_caught should still increase"
+        );
+        // But fish_toward_next_rank should NOT increase at cap
+        assert_eq!(
+            state.fishing.fish_toward_next_rank, 0,
+            "fish_toward_next_rank should not accumulate when at rank cap"
+        );
+    }
+
+    #[test]
+    fn test_fish_progress_accumulates_with_t4() {
+        // When at rank 30 WITH T4, fish_toward_next_rank SHOULD increase
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
+        let mut state = create_test_game_state();
+        state.fishing.rank = 30;
+        state.fishing.fish_toward_next_rank = 0;
+        state.fishing.total_fish_caught = 25000;
+
+        let session = FishingSession {
+            spot_name: "Small Pond".to_string(),
+            total_fish: 5,
+            fish_caught: Vec::new(),
+            items_found: Vec::new(),
+            ticks_remaining: 1,
+            phase: FishingPhase::Reeling,
+        };
+        state.active_fishing = Some(session);
+
+        let haven = HavenFishingBonuses {
+            timer_reduction_percent: 0.0,
+            double_fish_chance_percent: 0.0,
+            max_fishing_rank_bonus: 10, // T4 unlocked — cap is 40
+        };
+
+        let _result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven, 0.0);
+
+        assert!(
+            state.fishing.fish_toward_next_rank > 0,
+            "fish_toward_next_rank should accumulate when below rank cap with T4"
+        );
     }
 
     // =========================================================================
