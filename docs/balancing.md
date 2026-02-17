@@ -448,6 +448,8 @@ Base attribute ranges at ilvl 10 (scaled by ilvl multiplier), 1-3 random attribu
 | Epic | 3-4 | 3-4 | 3-12 total | 12-48 total |
 | Legendary | 4-6 | 4-5 | 4-18 total | 16-72 total |
 
+**God (Mythic) items** have fixed stats and are not procedurally generated. See god_items module for Asprika (+40 CON/+20 WIS, 30% DR), Sleipnir (+40 DEX/+20 WIS, 100% attack speed, speed bonuses), Megingjord (+40 STR/+20 CON, 150% damage). All have ilvl 100 and +40% XP affix.
+
 ### 9 Affix Types
 
 DamagePercent, CritChance, CritMultiplier, AttackSpeed, HPBonus, DamageReduction, HPRegen, DamageReflection, XPGain

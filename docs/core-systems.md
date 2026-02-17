@@ -282,7 +282,7 @@ Post-game:                     The Expanse (infinite cycling)
 
 Weapon, Armor, Helmet, Gloves, Boots, Amulet, Ring.
 
-### Rarity Tiers (5)
+### Rarity Tiers (6)
 
 | Rarity | Color | Attribute Range | Affix Count |
 |--------|-------|-----------------|-------------|
@@ -291,6 +291,9 @@ Weapon, Armor, Helmet, Gloves, Boots, Amulet, Ring.
 | Rare | Yellow | +3-6 | 2-3 |
 | Epic | Purple | +5-10 | 3-4 |
 | Legendary | Orange | +8-15 | 4-5 |
+| God (Mythic) | — | Fixed per item | Fixed per item |
+
+God (Mythic) rarity is exclusive to the three god items (Asprika, Sleipnir, Megingjord). These have fixed stats and unique passives, not procedurally generated.
 
 ### Drop System
 
@@ -370,7 +373,7 @@ Generic `<R: Rng>` allows seeded RNG in tests (`ChaCha8Rng`) and `thread_rng()` 
 
 ### TickEvent and TickResult
 
-`TickEvent` is an enum with 28 variants describing everything that can happen in a single tick. The presentation layer (`main.rs` via `tick_events.rs`) maps these to combat log entries and visual effects. Game logic never touches UI types.
+`TickEvent` is an enum with 30 variants describing everything that can happen in a single tick. The presentation layer (`main.rs` via `tick_events.rs`) maps these to combat log entries and visual effects. Game logic never touches UI types.
 
 ```rust
 pub struct TickResult {
@@ -384,7 +387,7 @@ pub struct TickResult {
 ```
 
 **TickEvent categories**:
-- Combat: `PlayerAttack`, `EnemyAttack`, `EnemyDefeated`, `PlayerDied`, `PlayerDiedInDungeon`
+- Combat: `PlayerAttack`, `PlayerAttackBlocked`, `EnemyAttack`, `DamageReflected`, `RegenComplete`, `EnemyDefeated`, `PlayerDied`, `PlayerDiedInDungeon`
 - Items: `ItemDropped` (rarity, slot, stats, equipped flag, from_boss flag)
 - Zones: `SubzoneBossDefeated` (with `BossDefeatResult`)
 - Dungeon: room entry, treasure, keys, boss unlock, completion, failure

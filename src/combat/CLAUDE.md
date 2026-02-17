@@ -40,8 +40,8 @@ State machine for combat flow:
 
 1. **Enemy spawn**: Triggered by zone progression or dungeon room entry
 2. **Turn loop**: Player attacks every 1.5s (15 ticks); enemy attack intervals vary by tier (2.0s normal, 1.8s boss, 1.5s zone boss, 1.6s dungeon elite, 1.4s dungeon boss)
-3. **Player damage pipeline**: base damage (from DerivedStats) -> Haven % bonus (Armory) -> prestige flat damage -> subtract enemy defense -> min 1 -> crit roll (2x)
-4. **Enemy damage pipeline**: enemy.damage -> subtract (derived.defense + prestige flat_defense) -> min 1
+3. **Player damage pipeline**: base damage (from DerivedStats) -> Giant's Might % (god item) -> Haven % bonus (Armory) -> prestige flat damage -> subtract enemy defense -> min 1 -> crit roll (2x)
+4. **Enemy damage pipeline**: enemy.damage -> subtract (derived.defense + prestige flat_defense) -> min 1 -> Divine Bulwark DR % (god item) -> min 1
 5. **Critical hits**: Chance from DEX modifier + prestige crit bonus (capped at 15%), deals 2x damage
 6. **Enemy death**: Awards XP, triggers item drop roll, enters Regen state
 7. **Player death**:
@@ -98,10 +98,20 @@ pub fn update_combat(
     haven: &HavenCombatBonuses,
     prestige_bonuses: &PrestigeCombatBonuses,
     achievements: &mut Achievements,
+    derived: &DerivedStats,
+    god_items: &GodItemCombatBonuses,
 ) -> Vec<CombatEvent>
 ```
 
 Called from `core/tick.rs` each tick. Returns `Vec<CombatEvent>` that tick.rs maps to `TickEvent` variants.
+
+### `GodItemCombatBonuses` (`logic.rs`)
+
+Struct carrying god item passive effects into the combat loop:
+- `damage_reduction_percent` — Asprika's Divine Bulwark (applied after defense subtraction)
+- `attack_speed_percent` — Sleipnir's Windborne (added to attack speed multiplier)
+- `damage_percent` — Megingjord's Giant's Might (applied to base damage before Haven)
+- `regen_reduction_percent` — Sleipnir's Swiftstrider (reduces HP regen delay)
 
 ## Integration Points
 
@@ -112,6 +122,7 @@ Called from `core/tick.rs` each tick. Returns `Vec<CombatEvent>` that tick.rs ma
 - **Items** (`items/drops.rs`): Mob drops via `try_drop_from_mob()`, boss drops via `try_drop_from_boss()`
 - **Zones** (`zones/progression.rs`): Zone-based stat lookup, boss definitions
 - **Dungeon** (`dungeon/logic.rs`): Dungeon room combat with zone-scaled enemies
+- **God Items** (`god_items/types.rs`): `equipped_god_item_*()` helper functions supply `GodItemCombatBonuses` values
 - **UI** (`ui/combat_scene.rs`): HP bars, enemy sprites, visual effects
 
 ## Constants (from `core/constants.rs`)

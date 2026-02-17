@@ -55,10 +55,10 @@ Quest is a terminal-based idle RPG built in Rust using Ratatui for UI rendering 
     ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
     │   Zones  │ │  Items   │ │  Haven   │ │Achievemts│
     └──────────┘ └──────────┘ └──────────┘ └──────────┘
-    ┌──────────┐
-    │Soulforge │
-    │(Enhance) │
-    └──────────┘
+    ┌──────────┐ ┌──────────┐
+    │Soulforge │ │God Items │
+    │(Enhance) │ │          │
+    └──────────┘ └──────────┘
          │              │            │             │
          └──────────────┴────────────┴─────────────┘
                               │
@@ -71,7 +71,7 @@ Quest is a terminal-based idle RPG built in Rust using Ratatui for UI rendering 
 
 ### Key Architectural Patterns
 
-- **Event-driven tick processing**: `game_tick()` returns a `TickResult` containing `Vec<TickEvent>` (28 event variants). The presentation layer maps events to combat log entries, visual effects, and overlays. Game logic has zero UI imports.
+- **Event-driven tick processing**: `game_tick()` returns a `TickResult` containing `Vec<TickEvent>` (30 event variants). The presentation layer maps events to combat log entries, visual effects, and overlays. Game logic has zero UI imports.
 - **Generic RNG**: `game_tick<R: Rng>()` uses a generic type parameter because `rand::Rng` is not dyn-compatible. Production uses `thread_rng()`, tests use seeded `ChaCha8Rng` for determinism.
 - **Haven bonus injection**: Haven bonuses are passed as explicit parameters to game systems rather than accessed globally, keeping modules decoupled.
 
@@ -144,8 +144,8 @@ The game runs at **10 ticks per second** (100ms intervals). Each tick is process
 
 ### Key Types
 
-**`TickEvent`** (28 variants):
-- Combat: `PlayerAttack`, `PlayerAttackBlocked`, `EnemyAttack`, `EnemyDefeated`, `PlayerDied`, `PlayerDiedInDungeon`
+**`TickEvent`** (30 variants):
+- Combat: `PlayerAttack`, `PlayerAttackBlocked`, `EnemyAttack`, `DamageReflected`, `RegenComplete`, `EnemyDefeated`, `PlayerDied`, `PlayerDiedInDungeon`
 - Items: `ItemDropped`
 - Zones: `SubzoneBossDefeated`
 - Dungeon: `DungeonRoomEntered`, `DungeonTreasureFound`, `DungeonKeyFound`, `DungeonBossUnlocked`, `DungeonBossDefeated`, `DungeonEliteDefeated`, `DungeonFailed`, `DungeonCompleted`
@@ -440,6 +440,9 @@ Weapon, Armor, Helmet, Gloves, Boots, Amulet, Ring
 | Rare | Yellow | +3-6 | 2-3 |
 | Epic | Purple | +5-10 | 3-4 |
 | Legendary | Orange | +8-15 | 4-5 |
+| God (Mythic) | — | Fixed per item | Fixed per item |
+
+God (Mythic) rarity is reserved for the three god items (Asprika, Sleipnir, Megingjord). These are not generated procedurally — they have fixed stats and unique passives. See [God Items](#god-items) below.
 
 ### Drop Rates
 
@@ -530,6 +533,20 @@ Items are automatically equipped if they score higher than the current item usin
 - Key system: Elite guardian drops the key to unlock Boss room
 - Safe death (no prestige loss, exits dungeon)
 - Fog of war: rooms start Hidden, become Revealed when adjacent to visited rooms
+
+### God Items
+
+Three Norse mythology-themed endgame items with unique combat passives and non-combat bonuses. Rarity: Mythic (displayed as "God"), above Legendary.
+
+| Item | Slot | Passive | Combat Effect |
+|------|------|---------|--------------|
+| Asprika | Armor | Divine Bulwark | 30% damage reduction (after defense) |
+| Sleipnir | Boots | Windborne | 100% attack speed bonus |
+| Megingjord | Ring | Giant's Might | 150% damage bonus |
+
+Sleipnir also provides non-combat bonuses: 50% regen delay reduction, 50% dungeon movement speed, 50% fishing timer reduction.
+
+All god items have ilvl 100, +40% XP affix, and high fixed attribute bonuses (+40 primary, +20 secondary). Discovery/forging system not yet implemented (tracked in issue #235); currently available via debug menu.
 
 ---
 
@@ -906,6 +923,8 @@ quest/
 │   │   ├── types.rs         # Enhancement progress, constants, success rates
 │   │   ├── logic.rs         # Enhancement rolls, discovery
 │   │   └── persistence.rs   # Save/load from ~/.quest/enhancement.json
+│   ├── god_items/           # God Items system (Asprika, Sleipnir, Megingjord)
+│   │   └── types.rs         # God item definitions, passives, bonuses, query helpers
 │   ├── achievements/        # Achievement system
 │   │   ├── types.rs         # AchievementId (130+ variants), Achievements state
 │   │   ├── data.rs          # Achievement database
@@ -940,7 +959,7 @@ quest/
 │       ├── throbber.rs      # Spinner animations
 │       └── character_select.rs, character_creation.rs,
 │           character_delete.rs, character_rename.rs
-├── tests/                   # 15 integration test files
+├── tests/                   # 16 integration test files
 ├── .github/workflows/       # CI/CD pipeline
 ├── scripts/                 # Quality checks (ci-checks.sh)
 ├── docs/                    # Design documents
