@@ -426,25 +426,23 @@ fn test_game_tick_can_produce_item_dropped_event() {
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
-    // Run many ticks — mob drop rate is 15%, so need multiple kills
-    let events = run_ticks(
+    // Run ticks with early break — mob drop rate is 15%, so expect a drop within a few kills
+    let (events, found) = run_until(
         &mut state,
         &mut tick_counter,
         &mut haven,
         &mut achievements,
         &mut rng,
-        50_000,
+        10_000,
+        |e| matches!(e, TickEvent::ItemDropped { .. }),
     );
+
+    assert!(found, "Should get at least one item drop in 10k ticks");
 
     let item_drops: Vec<_> = events
         .iter()
         .filter(|e| matches!(e, TickEvent::ItemDropped { .. }))
         .collect();
-
-    assert!(
-        !item_drops.is_empty(),
-        "Should get at least one item drop in 50k ticks"
-    );
 
     if let TickEvent::ItemDropped {
         item_name,
@@ -467,19 +465,21 @@ fn test_game_tick_item_drop_updates_recent_drops() {
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
-    let events = run_ticks(
+    let (events, found) = run_until(
         &mut state,
         &mut tick_counter,
         &mut haven,
         &mut achievements,
         &mut rng,
-        50_000,
+        10_000,
+        |e| matches!(e, TickEvent::ItemDropped { .. }),
     );
 
     let has_drops = events
         .iter()
         .any(|e| matches!(e, TickEvent::ItemDropped { .. }));
 
+    assert!(found, "Should get an item drop in 10k ticks");
     if has_drops {
         assert!(
             !state.recent_drops.is_empty(),
@@ -862,17 +862,30 @@ fn test_game_tick_can_discover_dungeon() {
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
-    // Run many ticks to allow dungeon discovery after kills
-    let events = run_ticks(
-        &mut state,
-        &mut tick_counter,
-        &mut haven,
-        &mut achievements,
-        &mut rng,
-        50_000,
-    );
+    // Run ticks with early break to allow dungeon discovery after kills
+    let mut all_events = Vec::new();
+    let mut enhancement = EnhancementProgress::new();
+    for _ in 0..10_000 {
+        let result = game_tick(
+            &mut state,
+            &mut tick_counter,
+            &mut haven,
+            &mut enhancement,
+            &mut achievements,
+            false,
+            &mut rng,
+        );
+        let found = result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::DungeonDiscovered { .. }));
+        all_events.extend(result.events);
+        if found {
+            break;
+        }
+    }
 
-    let discovery_events: Vec<_> = events
+    let discovery_events: Vec<_> = all_events
         .iter()
         .filter(|e| matches!(e, TickEvent::DungeonDiscovered { .. }))
         .collect();

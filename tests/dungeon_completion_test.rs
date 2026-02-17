@@ -12,6 +12,8 @@ use quest::dungeon::{Dungeon, DungeonSize, RoomState, RoomType};
 use quest::items::generation::generate_item;
 use quest::GameState;
 use quest::{EquipmentSlot, Rarity};
+use rand::SeedableRng;
+use rand_chacha::ChaCha8Rng;
 
 /// Helper to find a room of a specific type in the dungeon
 fn find_room_of_type(dungeon: &Dungeon, room_type: RoomType) -> Option<(usize, usize)> {
@@ -422,12 +424,13 @@ fn test_dungeon_xp_tracking() {
 /// Test dungeon item collection tracking
 #[test]
 fn test_dungeon_item_collection() {
+    let mut rng = ChaCha8Rng::seed_from_u64(300);
     let mut state = GameState::new("Collector".to_string(), 0);
     state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
     // Collect some items
-    let item1 = generate_item(EquipmentSlot::Weapon, Rarity::Rare, 10);
-    let item2 = generate_item(EquipmentSlot::Armor, Rarity::Magic, 10);
+    let item1 = generate_item(EquipmentSlot::Weapon, Rarity::Rare, 10, &mut rng);
+    let item2 = generate_item(EquipmentSlot::Armor, Rarity::Magic, 10, &mut rng);
 
     collect_dungeon_item(&mut state, item1);
     collect_dungeon_item(&mut state, item2);
@@ -439,13 +442,14 @@ fn test_dungeon_item_collection() {
 /// Test boss defeat reports correct stats
 #[test]
 fn test_boss_defeat_completion_report() {
+    let mut rng = ChaCha8Rng::seed_from_u64(301);
     let mut state = GameState::new("Boss Slayer".to_string(), 0);
     state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
     // Simulate dungeon progress
     add_dungeon_xp(&mut state, 1500);
 
-    let item = generate_item(EquipmentSlot::Weapon, Rarity::Epic, 10);
+    let item = generate_item(EquipmentSlot::Weapon, Rarity::Epic, 10, &mut rng);
     collect_dungeon_item(&mut state, item);
 
     // Defeat boss

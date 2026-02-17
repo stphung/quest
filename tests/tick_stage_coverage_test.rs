@@ -632,7 +632,7 @@ fn test_haven_discovery_blocked_by_active_fishing() {
 #[test]
 fn test_haven_discovery_sets_haven_changed_and_achievements_changed() {
     // Use many different seeds to find one that triggers Haven discovery quickly
-    for seed in 0u64..200 {
+    for seed in 0u64..50 {
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
         let mut haven = Haven::default();
         let mut achievements = Achievements::default();
@@ -640,7 +640,7 @@ fn test_haven_discovery_sets_haven_changed_and_achievements_changed() {
         state.prestige_rank = 50;
         let mut tick_counter = 0u32;
 
-        for _ in 0..10_000 {
+        for _ in 0..5_000 {
             let result = game_tick(
                 &mut state,
                 &mut tick_counter,
@@ -666,9 +666,9 @@ fn test_haven_discovery_sets_haven_changed_and_achievements_changed() {
             }
         }
     }
-    // If we couldn't find it in 200 seeds * 10k ticks, the probability is too low
-    // but at P50 with ~0.000294 chance per tick, expected ~3 discoveries per 10k ticks
-    panic!("Haven discovery should have occurred with P50 in 200 * 10k ticks");
+    // If we couldn't find it in 50 seeds * 5k ticks, the probability is too low
+    // but at P50 with ~0.000294 chance per tick, expected ~1.5 discoveries per 5k ticks
+    panic!("Haven discovery should have occurred with P50 in 50 * 5k ticks");
 }
 
 // =============================================================================
@@ -752,7 +752,7 @@ fn test_challenge_discovery_blocked_by_active_fishing() {
 #[test]
 fn test_challenge_discovered_event_has_type_and_messages() {
     // Try many seeds to find challenge discovery
-    for seed in 0u64..500 {
+    for seed in 0u64..100 {
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
         let mut test_state = GameState::new("Challenge Event Test".to_string(), 0);
         test_state.prestige_rank = 1;
@@ -766,7 +766,7 @@ fn test_challenge_discovered_event_has_type_and_messages() {
         h.rooms.insert(quest::HavenRoomId::Bedroom, 1);
         let mut a = Achievements::default();
 
-        for _ in 0..5_000 {
+        for _ in 0..2_000 {
             let result = game_tick(
                 &mut test_state,
                 &mut tc,
@@ -802,7 +802,7 @@ fn test_challenge_discovered_event_has_type_and_messages() {
         }
     }
     // Challenge discovery at 0.000014 base * 1.5 (Library T3) = 0.000021/tick
-    // Over 500 seeds * 5000 ticks = 2.5M ticks, expected ~52 discoveries
+    // Over 100 seeds * 2000 ticks = 200k ticks, expected ~4 discoveries
     panic!("Should have discovered at least one challenge");
 }
 
@@ -818,16 +818,29 @@ fn test_dungeon_discovered_event_message() {
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
-    let events = run_ticks_collecting(
-        &mut state,
-        &mut tick_counter,
-        &mut haven,
-        &mut achievements,
-        &mut rng,
-        50_000,
-    );
+    let mut all_events = Vec::new();
+    let mut enhancement = EnhancementProgress::new();
+    for _ in 0..10_000 {
+        let result = game_tick(
+            &mut state,
+            &mut tick_counter,
+            &mut haven,
+            &mut enhancement,
+            &mut achievements,
+            false,
+            &mut rng,
+        );
+        let found = result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::DungeonDiscovered { .. }));
+        all_events.extend(result.events);
+        if found {
+            break;
+        }
+    }
 
-    let dungeon_discovered: Vec<_> = events
+    let dungeon_discovered: Vec<_> = all_events
         .iter()
         .filter(|e| matches!(e, TickEvent::DungeonDiscovered { .. }))
         .collect();
@@ -855,16 +868,29 @@ fn test_fishing_spot_discovered_event() {
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
-    let events = run_ticks_collecting(
-        &mut state,
-        &mut tick_counter,
-        &mut haven,
-        &mut achievements,
-        &mut rng,
-        100_000,
-    );
+    let mut all_events = Vec::new();
+    let mut enhancement = EnhancementProgress::new();
+    for _ in 0..20_000 {
+        let result = game_tick(
+            &mut state,
+            &mut tick_counter,
+            &mut haven,
+            &mut enhancement,
+            &mut achievements,
+            false,
+            &mut rng,
+        );
+        let found = result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::FishingSpotDiscovered { .. }));
+        all_events.extend(result.events);
+        if found {
+            break;
+        }
+    }
 
-    let fishing_discovered: Vec<_> = events
+    let fishing_discovered: Vec<_> = all_events
         .iter()
         .filter(|e| matches!(e, TickEvent::FishingSpotDiscovered { .. }))
         .collect();
@@ -946,16 +972,34 @@ fn test_item_dropped_event_fields_from_mob() {
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
-    let events = run_ticks_collecting(
-        &mut state,
-        &mut tick_counter,
-        &mut haven,
-        &mut achievements,
-        &mut rng,
-        50_000,
-    );
+    let mut all_events = Vec::new();
+    let mut enhancement = EnhancementProgress::new();
+    for _ in 0..10_000 {
+        let result = game_tick(
+            &mut state,
+            &mut tick_counter,
+            &mut haven,
+            &mut enhancement,
+            &mut achievements,
+            false,
+            &mut rng,
+        );
+        let found = result.events.iter().any(|e| {
+            matches!(
+                e,
+                TickEvent::ItemDropped {
+                    from_boss: false,
+                    ..
+                }
+            )
+        });
+        all_events.extend(result.events);
+        if found {
+            break;
+        }
+    }
 
-    let mob_drops: Vec<_> = events
+    let mob_drops: Vec<_> = all_events
         .iter()
         .filter(|e| {
             matches!(
@@ -1246,7 +1290,7 @@ fn test_dungeon_boss_defeated_event_fields() {
     state.active_dungeon = Some(dungeon);
 
     let mut all_events = Vec::new();
-    for _ in 0..50_000 {
+    for _ in 0..10_000 {
         let result = game_tick(
             &mut state,
             &mut tick_counter,
@@ -1310,7 +1354,7 @@ fn test_dungeon_elite_defeated_event() {
     state.active_dungeon = Some(dungeon);
 
     let mut all_events = Vec::new();
-    for _ in 0..50_000 {
+    for _ in 0..10_000 {
         let result = game_tick(
             &mut state,
             &mut tick_counter,

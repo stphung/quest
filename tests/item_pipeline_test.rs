@@ -78,10 +78,11 @@ fn test_drop_chance_never_exceeds_cap() {
 
 #[test]
 fn test_try_drop_item_frequency_at_prestige_zero() {
+    let mut rng = ChaCha8Rng::seed_from_u64(100);
     let game_state = GameState::new("Drop Test".to_string(), 0);
     let trials = 2000;
     let drops: usize = (0..trials)
-        .filter(|_| try_drop_from_mob(&game_state, 1, 0.0, 0.0).is_some())
+        .filter(|_| try_drop_from_mob(&game_state, 1, 0.0, 0.0, &mut rng).is_some())
         .count();
 
     // Expected: 15% = 300 out of 2000, allow wide margin for randomness
@@ -100,14 +101,16 @@ fn test_try_drop_item_frequency_increases_with_prestige() {
 
     let mut state_p0 = GameState::new("P0".to_string(), 0);
     state_p0.prestige_rank = 0;
+    let mut rng_p0 = ChaCha8Rng::seed_from_u64(101);
     let drops_p0: usize = (0..trials)
-        .filter(|_| try_drop_from_mob(&state_p0, 1, 0.0, 0.0).is_some())
+        .filter(|_| try_drop_from_mob(&state_p0, 1, 0.0, 0.0, &mut rng_p0).is_some())
         .count();
 
     let mut state_p5 = GameState::new("P5".to_string(), 0);
     state_p5.prestige_rank = 5;
+    let mut rng_p5 = ChaCha8Rng::seed_from_u64(101);
     let drops_p5: usize = (0..trials)
-        .filter(|_| try_drop_from_mob(&state_p5, 1, 0.0, 0.0).is_some())
+        .filter(|_| try_drop_from_mob(&state_p5, 1, 0.0, 0.0, &mut rng_p5).is_some())
         .count();
 
     assert!(
@@ -122,6 +125,7 @@ fn test_try_drop_item_frequency_increases_with_prestige() {
 
 #[test]
 fn test_generated_items_have_correct_slot() {
+    let mut rng = ChaCha8Rng::seed_from_u64(102);
     let slots = [
         EquipmentSlot::Weapon,
         EquipmentSlot::Armor,
@@ -133,7 +137,7 @@ fn test_generated_items_have_correct_slot() {
     ];
 
     for slot in slots {
-        let item = generate_item(slot, Rarity::Rare, 10);
+        let item = generate_item(slot, Rarity::Rare, 10, &mut rng);
         assert_eq!(
             item.slot, slot,
             "Generated item should have the requested slot"
@@ -143,6 +147,7 @@ fn test_generated_items_have_correct_slot() {
 
 #[test]
 fn test_generated_items_have_correct_rarity() {
+    let mut rng = ChaCha8Rng::seed_from_u64(103);
     let rarities = [
         Rarity::Common,
         Rarity::Magic,
@@ -152,7 +157,7 @@ fn test_generated_items_have_correct_rarity() {
     ];
 
     for rarity in rarities {
-        let item = generate_item(EquipmentSlot::Weapon, rarity, 10);
+        let item = generate_item(EquipmentSlot::Weapon, rarity, 10, &mut rng);
         assert_eq!(
             item.rarity, rarity,
             "Generated item should have the requested rarity"
@@ -162,9 +167,10 @@ fn test_generated_items_have_correct_rarity() {
 
 #[test]
 fn test_generated_items_always_have_positive_attributes() {
+    let mut rng = ChaCha8Rng::seed_from_u64(104);
     // Every generated item must contribute some attribute bonuses
     for _ in 0..100 {
-        let item = generate_item(EquipmentSlot::Weapon, Rarity::Common, 1);
+        let item = generate_item(EquipmentSlot::Weapon, Rarity::Common, 1, &mut rng);
         assert!(
             item.attributes.total() > 0,
             "Every generated item should have at least some attributes"
@@ -174,7 +180,8 @@ fn test_generated_items_always_have_positive_attributes() {
 
 #[test]
 fn test_generated_items_have_nonempty_display_name() {
-    let item = generate_item(EquipmentSlot::Boots, Rarity::Epic, 15);
+    let mut rng = ChaCha8Rng::seed_from_u64(105);
+    let item = generate_item(EquipmentSlot::Boots, Rarity::Epic, 15, &mut rng);
     assert!(
         !item.display_name.is_empty(),
         "Generated items must have a display name"
@@ -187,29 +194,30 @@ fn test_generated_items_have_nonempty_display_name() {
 
 #[test]
 fn test_affix_count_contract_across_all_rarities() {
+    let mut rng = ChaCha8Rng::seed_from_u64(106);
     // Run multiple times to cover the random ranges
     for _ in 0..50 {
-        let common = generate_item(EquipmentSlot::Weapon, Rarity::Common, 1);
+        let common = generate_item(EquipmentSlot::Weapon, Rarity::Common, 1, &mut rng);
         assert_eq!(common.affixes.len(), 0, "Common items: 0 affixes");
 
-        let magic = generate_item(EquipmentSlot::Weapon, Rarity::Magic, 5);
+        let magic = generate_item(EquipmentSlot::Weapon, Rarity::Magic, 5, &mut rng);
         assert_eq!(magic.affixes.len(), 1, "Magic items: exactly 1 affix");
 
-        let rare = generate_item(EquipmentSlot::Weapon, Rarity::Rare, 10);
+        let rare = generate_item(EquipmentSlot::Weapon, Rarity::Rare, 10, &mut rng);
         assert!(
             (2..=3).contains(&rare.affixes.len()),
             "Rare items: 2-3 affixes, got {}",
             rare.affixes.len()
         );
 
-        let epic = generate_item(EquipmentSlot::Weapon, Rarity::Epic, 15);
+        let epic = generate_item(EquipmentSlot::Weapon, Rarity::Epic, 15, &mut rng);
         assert!(
             (3..=4).contains(&epic.affixes.len()),
             "Epic items: 3-4 affixes, got {}",
             epic.affixes.len()
         );
 
-        let legendary = generate_item(EquipmentSlot::Weapon, Rarity::Legendary, 20);
+        let legendary = generate_item(EquipmentSlot::Weapon, Rarity::Legendary, 20, &mut rng);
         assert!(
             (4..=5).contains(&legendary.affixes.len()),
             "Legendary items: 4-5 affixes, got {}",
@@ -224,11 +232,12 @@ fn test_affix_count_contract_across_all_rarities() {
 
 #[test]
 fn test_higher_rarity_produces_higher_average_attribute_total() {
-    let sample_avg = |rarity: Rarity| -> f64 {
+    let sample_avg = |rarity: Rarity, seed: u64| -> f64 {
+        let mut rng = ChaCha8Rng::seed_from_u64(seed);
         let n = 200;
         let sum: u32 = (0..n)
             .map(|_| {
-                generate_item(EquipmentSlot::Weapon, rarity, 10)
+                generate_item(EquipmentSlot::Weapon, rarity, 10, &mut rng)
                     .attributes
                     .total()
             })
@@ -236,11 +245,11 @@ fn test_higher_rarity_produces_higher_average_attribute_total() {
         sum as f64 / n as f64
     };
 
-    let common_avg = sample_avg(Rarity::Common);
-    let magic_avg = sample_avg(Rarity::Magic);
-    let rare_avg = sample_avg(Rarity::Rare);
-    let epic_avg = sample_avg(Rarity::Epic);
-    let legendary_avg = sample_avg(Rarity::Legendary);
+    let common_avg = sample_avg(Rarity::Common, 107);
+    let magic_avg = sample_avg(Rarity::Magic, 108);
+    let rare_avg = sample_avg(Rarity::Rare, 109);
+    let epic_avg = sample_avg(Rarity::Epic, 110);
+    let legendary_avg = sample_avg(Rarity::Legendary, 111);
 
     assert!(
         common_avg < magic_avg,
@@ -268,22 +277,23 @@ fn test_higher_rarity_produces_higher_average_attribute_total() {
 fn test_score_increases_with_rarity_on_average() {
     let game_state = GameState::new("Score Test".to_string(), 0);
 
-    let sample_avg_score = |rarity: Rarity| -> f64 {
+    let sample_avg_score = |rarity: Rarity, seed: u64| -> f64 {
+        let mut rng = ChaCha8Rng::seed_from_u64(seed);
         let n = 200;
         let sum: f64 = (0..n)
             .map(|_| {
-                let item = generate_item(EquipmentSlot::Weapon, rarity, 10);
+                let item = generate_item(EquipmentSlot::Weapon, rarity, 10, &mut rng);
                 score_item(&item, &game_state)
             })
             .sum();
         sum / n as f64
     };
 
-    let common_avg = sample_avg_score(Rarity::Common);
-    let magic_avg = sample_avg_score(Rarity::Magic);
-    let rare_avg = sample_avg_score(Rarity::Rare);
-    let epic_avg = sample_avg_score(Rarity::Epic);
-    let legendary_avg = sample_avg_score(Rarity::Legendary);
+    let common_avg = sample_avg_score(Rarity::Common, 112);
+    let magic_avg = sample_avg_score(Rarity::Magic, 113);
+    let rare_avg = sample_avg_score(Rarity::Rare, 114);
+    let epic_avg = sample_avg_score(Rarity::Epic, 115);
+    let legendary_avg = sample_avg_score(Rarity::Legendary, 116);
 
     assert!(
         common_avg < magic_avg,
@@ -305,8 +315,9 @@ fn test_score_increases_with_rarity_on_average() {
 
 #[test]
 fn test_score_is_deterministic_for_same_item_and_state() {
+    let mut rng = ChaCha8Rng::seed_from_u64(117);
     let game_state = GameState::new("Deterministic".to_string(), 0);
-    let item = generate_item(EquipmentSlot::Weapon, Rarity::Rare, 10);
+    let item = generate_item(EquipmentSlot::Weapon, Rarity::Rare, 10, &mut rng);
 
     let score1 = score_item(&item, &game_state);
     let score2 = score_item(&item, &game_state);
@@ -371,6 +382,7 @@ fn test_score_reflects_attribute_specialization() {
 
 #[test]
 fn test_auto_equip_into_empty_slot_always_succeeds() {
+    let mut rng = ChaCha8Rng::seed_from_u64(118);
     let slots = [
         EquipmentSlot::Weapon,
         EquipmentSlot::Armor,
@@ -388,7 +400,7 @@ fn test_auto_equip_into_empty_slot_always_succeeds() {
         assert!(game_state.equipment.get(slot).is_none());
 
         // Any item with positive attributes should equip into an empty slot
-        let item = generate_item(slot, Rarity::Common, 1);
+        let item = generate_item(slot, Rarity::Common, 1, &mut rng);
         let equipped = auto_equip_if_better(item, &mut game_state);
 
         assert!(
@@ -597,10 +609,11 @@ fn test_auto_equip_across_different_slots_is_independent() {
 
 #[test]
 fn test_full_pipeline_generate_score_equip() {
+    let mut rng = ChaCha8Rng::seed_from_u64(119);
     let mut game_state = GameState::new("Pipeline Hero".to_string(), 0);
 
     // Generate a common item and equip it
-    let common_item = generate_item(EquipmentSlot::Weapon, Rarity::Common, 5);
+    let common_item = generate_item(EquipmentSlot::Weapon, Rarity::Common, 5, &mut rng);
     assert!(common_item.attributes.total() > 0);
     let common_score = score_item(&common_item, &game_state);
     assert!(common_score > 0.0);
@@ -609,7 +622,7 @@ fn test_full_pipeline_generate_score_equip() {
     assert!(equipped, "Common item should equip into empty weapon slot");
 
     // Generate a legendary item and verify it replaces the common
-    let legendary_item = generate_item(EquipmentSlot::Weapon, Rarity::Legendary, 20);
+    let legendary_item = generate_item(EquipmentSlot::Weapon, Rarity::Legendary, 20, &mut rng);
     let legendary_score = score_item(&legendary_item, &game_state);
 
     // Legendary should outscore common (on average, overwhelmingly so)
@@ -777,9 +790,10 @@ fn test_full_pipeline_equip_all_seven_slots_from_drops() {
         EquipmentSlot::Ring,
     ];
 
+    let mut rng = ChaCha8Rng::seed_from_u64(120);
     // Generate and equip one item per slot
     for slot in slots {
-        let item = generate_item(slot, Rarity::Rare, 10);
+        let item = generate_item(slot, Rarity::Rare, 10, &mut rng);
         let equipped = auto_equip_if_better(item, &mut game_state);
         assert!(equipped, "Should equip into empty slot {:?}", slot);
     }
@@ -866,11 +880,12 @@ fn test_roll_rarity_prestige_bonus_shifts_toward_higher_tiers() {
 #[test]
 fn test_affix_values_scale_with_rarity() {
     // Higher rarity items should have higher affix values on average
-    let avg_affix_value = |rarity: Rarity| -> f64 {
+    let avg_affix_value = |rarity: Rarity, seed: u64| -> f64 {
+        let mut rng = ChaCha8Rng::seed_from_u64(seed);
         let mut total_value = 0.0;
         let mut total_affixes = 0;
         for _ in 0..200 {
-            let item = generate_item(EquipmentSlot::Weapon, rarity, 10);
+            let item = generate_item(EquipmentSlot::Weapon, rarity, 10, &mut rng);
             for affix in &item.affixes {
                 total_value += affix.value;
                 total_affixes += 1;
@@ -883,10 +898,10 @@ fn test_affix_values_scale_with_rarity() {
     };
 
     // Common has no affixes, so skip it
-    let magic_avg = avg_affix_value(Rarity::Magic);
-    let rare_avg = avg_affix_value(Rarity::Rare);
-    let epic_avg = avg_affix_value(Rarity::Epic);
-    let legendary_avg = avg_affix_value(Rarity::Legendary);
+    let magic_avg = avg_affix_value(Rarity::Magic, 121);
+    let rare_avg = avg_affix_value(Rarity::Rare, 122);
+    let epic_avg = avg_affix_value(Rarity::Epic, 123);
+    let legendary_avg = avg_affix_value(Rarity::Legendary, 124);
 
     assert!(
         magic_avg < rare_avg,
@@ -1008,13 +1023,12 @@ fn test_pipeline_prestige_produces_better_average_scores() {
     game_state_p10.prestige_rank = 10;
 
     let avg_score = |gs: &GameState, seed: u64| -> f64 {
-        use rand::SeedableRng;
-        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+        let mut rng = ChaCha8Rng::seed_from_u64(seed);
         let n = 1000;
         let sum: f64 = (0..n)
             .map(|_| {
                 let rarity = roll_rarity_for_mob(gs.prestige_rank, 0.0, &mut rng);
-                let item = generate_item(EquipmentSlot::Weapon, rarity, 10);
+                let item = generate_item(EquipmentSlot::Weapon, rarity, 10, &mut rng);
                 score_item(&item, gs)
             })
             .sum();
@@ -1036,13 +1050,14 @@ fn test_pipeline_prestige_produces_better_average_scores() {
 
 #[test]
 fn test_try_drop_item_produces_valid_equippable_items() {
+    let mut rng = ChaCha8Rng::seed_from_u64(125);
     let mut game_state = GameState::new("Drop Equip".to_string(), 0);
     game_state.prestige_rank = 5;
 
     let mut items_equipped = 0;
     // Run many trials to collect some actual drops
     for _ in 0..1000 {
-        if let Some(item) = try_drop_from_mob(&game_state, 1, 0.0, 0.0) {
+        if let Some(item) = try_drop_from_mob(&game_state, 1, 0.0, 0.0, &mut rng) {
             // Verify basic item validity
             assert!(!item.display_name.is_empty());
             assert!(item.attributes.total() > 0);

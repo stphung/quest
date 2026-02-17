@@ -600,7 +600,7 @@ pub fn game_tick<R: Rng>(
                 }
 
                 // Item drops
-                process_item_drop(state, &haven_bonuses, &mut result);
+                process_item_drop(state, &haven_bonuses, rng, &mut result);
 
                 // Discovery: dungeon, then fishing
                 process_discoveries(state, rng, &mut result);
@@ -845,19 +845,25 @@ fn collect_achievement_events(achievements: &mut Achievements, result: &mut Tick
 }
 
 /// Process item drops after killing a mob/boss in overworld combat.
-fn process_item_drop(state: &mut GameState, haven_bonuses: &HavenBonuses, result: &mut TickResult) {
+fn process_item_drop<R: Rng>(
+    state: &mut GameState,
+    haven_bonuses: &HavenBonuses,
+    rng: &mut R,
+    result: &mut TickResult,
+) {
     let zone_id = state.zone_progression.current_zone_id as usize;
     let was_boss = state.zone_progression.fighting_boss;
     let is_final_zone = zone_id == FINAL_ZONE_ID as usize;
 
     let dropped_item = if was_boss {
-        Some(try_drop_from_boss(zone_id, is_final_zone))
+        Some(try_drop_from_boss(zone_id, is_final_zone, rng))
     } else {
         try_drop_from_mob(
             state,
             zone_id,
             haven_bonuses.drop_rate_percent,
             haven_bonuses.item_rarity_percent,
+            rng,
         )
     };
 

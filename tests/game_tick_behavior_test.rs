@@ -207,6 +207,7 @@ fn test_level_up_triggers_achievement_sync() {
 
 #[test]
 fn test_mob_kill_can_drop_item() {
+    let mut rng = ChaCha8Rng::seed_from_u64(200);
     let mut state = create_strong_character("Drop Test");
 
     let zone_id = state.zone_progression.current_zone_id as usize;
@@ -214,7 +215,7 @@ fn test_mob_kill_can_drop_item() {
     // Try many times since drop rate is 15%
     let mut got_drop = false;
     for _ in 0..100 {
-        if let Some(item) = try_drop_from_mob(&state, zone_id, 0.0, 0.0) {
+        if let Some(item) = try_drop_from_mob(&state, zone_id, 0.0, 0.0, &mut rng) {
             // game_tick calls auto_equip_if_better (line 1316)
             let _equipped = auto_equip_if_better(item, &mut state);
             got_drop = true;
@@ -230,11 +231,12 @@ fn test_mob_kill_can_drop_item() {
 
 #[test]
 fn test_boss_kill_always_drops_item() {
+    let mut rng = ChaCha8Rng::seed_from_u64(201);
     let zone_id = 1;
     let is_final_zone = false;
 
     // Boss drops are guaranteed (game_tick line 1301-1302)
-    let item = try_drop_from_boss(zone_id, is_final_zone);
+    let item = try_drop_from_boss(zone_id, is_final_zone, &mut rng);
 
     assert!(
         !item.display_name.is_empty(),
@@ -244,11 +246,12 @@ fn test_boss_kill_always_drops_item() {
 
 #[test]
 fn test_item_drop_auto_equips_if_better() {
+    let mut rng = ChaCha8Rng::seed_from_u64(202);
     let mut state = GameState::new("Auto Equip Test".to_string(), 0);
 
     // First equip should always succeed (empty slot)
     let zone_id = 1;
-    let item = try_drop_from_boss(zone_id, false);
+    let item = try_drop_from_boss(zone_id, false, &mut rng);
     let slot = item.slot;
     let equipped = auto_equip_if_better(item, &mut state);
 
@@ -261,13 +264,14 @@ fn test_item_drop_auto_equips_if_better() {
 
 #[test]
 fn test_mob_drop_adds_to_recent_drops() {
+    let mut rng = ChaCha8Rng::seed_from_u64(203);
     let mut state = create_strong_character("Recent Drop Test");
 
     let zone_id = state.zone_progression.current_zone_id as usize;
 
     // Try to get a drop
     for _ in 0..200 {
-        if let Some(item) = try_drop_from_mob(&state, zone_id, 0.0, 0.0) {
+        if let Some(item) = try_drop_from_mob(&state, zone_id, 0.0, 0.0, &mut rng) {
             let item_name = item.display_name.clone();
             let rarity = item.rarity;
             let slot = item.slot_name().to_string();
@@ -954,6 +958,7 @@ fn test_dungeon_combat_room_cleared_after_kill() {
 
 #[test]
 fn test_full_combat_kill_orchestration() {
+    let mut rng = ChaCha8Rng::seed_from_u64(204);
     let mut state = create_strong_character("Full Orchestration Test");
     let mut achievements = Achievements::default();
 
@@ -977,7 +982,7 @@ fn test_full_combat_kill_orchestration() {
 
     // Try item drop (game_tick lines 1296-1308)
     let zone_id = state.zone_progression.current_zone_id as usize;
-    if let Some(item) = try_drop_from_mob(&state, zone_id, 0.0, 0.0) {
+    if let Some(item) = try_drop_from_mob(&state, zone_id, 0.0, 0.0, &mut rng) {
         let item_name = item.display_name.clone();
         let rarity = item.rarity;
         let slot = item.slot_name().to_string();

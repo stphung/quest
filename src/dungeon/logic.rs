@@ -6,7 +6,7 @@ use crate::core::game_state::GameState;
 use crate::items::{
     generate_item, ilvl_for_zone, roll_random_slot, roll_rarity_for_mob, Item, Rarity,
 };
-use rand::RngExt;
+use rand::{Rng, RngExt};
 use std::collections::{HashSet, VecDeque};
 
 /// Time between room movements during auto-exploration (seconds)
@@ -334,20 +334,23 @@ pub fn calculate_boss_xp_reward(size: DungeonSize) -> u64 {
 
 /// Generates a treasure room item with rarity boost based on dungeon size.
 /// `zone_id` determines item level (ilvl = zone_id * 10).
-pub fn generate_treasure_item(prestige_rank: u32, zone_id: usize, rarity_boost: u32) -> Item {
-    let mut rng = rand::rng();
-
+pub fn generate_treasure_item(
+    prestige_rank: u32,
+    zone_id: usize,
+    rarity_boost: u32,
+    rng: &mut impl Rng,
+) -> Item {
     // Roll a random slot
-    let slot = roll_random_slot(&mut rng);
+    let slot = roll_random_slot(rng);
 
     // Roll rarity with boost based on dungeon tier
-    let base_rarity = roll_rarity_for_mob(prestige_rank, 0.0, &mut rng);
+    let base_rarity = roll_rarity_for_mob(prestige_rank, 0.0, rng);
     let boosted_rarity = boost_rarity(base_rarity, rarity_boost);
 
     // Item level based on zone
     let ilvl = ilvl_for_zone(zone_id);
 
-    generate_item(slot, boosted_rarity, ilvl)
+    generate_item(slot, boosted_rarity, ilvl, rng)
 }
 
 /// Boosts a rarity by N tiers (capped at Legendary)
@@ -392,6 +395,7 @@ pub fn collect_dungeon_item(state: &mut GameState, item: Item) {
 /// Called when player enters a treasure room - generates and collects an item
 /// Returns (item, was_equipped)
 pub fn on_treasure_room_entered(state: &mut GameState) -> Option<(Item, bool)> {
+    let mut rng = rand::rng();
     // Get rarity boost from dungeon size (defaults to 1 if no dungeon somehow)
     let rarity_boost = state
         .active_dungeon
@@ -402,7 +406,7 @@ pub fn on_treasure_room_entered(state: &mut GameState) -> Option<(Item, bool)> {
     // Use current zone for item level
     let zone_id = state.zone_progression.current_zone_id as usize;
 
-    let item = generate_treasure_item(state.prestige_rank, zone_id, rarity_boost);
+    let item = generate_treasure_item(state.prestige_rank, zone_id, rarity_boost, &mut rng);
 
     // Auto-equip if better
     let item_clone = item.clone();
@@ -447,6 +451,8 @@ pub fn get_enemy_stat_multiplier(dungeon: &Dungeon) -> f64 {
 mod tests {
     use super::super::generation::generate_dungeon;
     use super::*;
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
 
     /// Finds the first room of the given type in the dungeon.
     fn find_room_of_type(dungeon: &Dungeon, room_type: RoomType) -> Option<(usize, usize)> {
@@ -555,8 +561,9 @@ mod tests {
 
     #[test]
     fn test_generate_treasure_item() {
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
         // prestige_rank=0, zone_id=5 (ilvl 50), rarity_boost=1
-        let item = generate_treasure_item(0, 5, 1);
+        let item = generate_treasure_item(0, 5, 1, &mut rng);
         assert!(!item.display_name.is_empty());
         assert_eq!(item.ilvl, 50);
     }
@@ -1021,6 +1028,7 @@ mod tests {
 
     #[test]
     fn test_on_boss_defeated_reports_xp_and_items() {
+        let mut rng = ChaCha8Rng::seed_from_u64(43);
         let mut state = GameState::new("Test".to_string(), 0);
         state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
@@ -1031,6 +1039,7 @@ mod tests {
                 crate::items::EquipmentSlot::Weapon,
                 Rarity::Rare,
                 10,
+                &mut rng,
             ));
         }
 
@@ -1118,11 +1127,16 @@ mod tests {
 
     #[test]
     fn test_collect_dungeon_item_adds_to_list() {
+        let mut rng = ChaCha8Rng::seed_from_u64(44);
         let mut state = GameState::new("Test".to_string(), 0);
         state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
-        let item =
-            crate::items::generate_item(crate::items::EquipmentSlot::Weapon, Rarity::Magic, 10);
+        let item = crate::items::generate_item(
+            crate::items::EquipmentSlot::Weapon,
+            Rarity::Magic,
+            10,
+            &mut rng,
+        );
 
         collect_dungeon_item(&mut state, item);
 

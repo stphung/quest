@@ -5,14 +5,12 @@ use rand::{Rng, RngExt};
 
 /// Generate an item with the given slot, rarity, and item level.
 /// ilvl determines stat scaling: ilvl 10 (zone 1) to ilvl 100 (zone 10).
-pub fn generate_item(slot: EquipmentSlot, rarity: Rarity, ilvl: u32) -> Item {
-    let mut rng = rand::rng();
-
+pub fn generate_item(slot: EquipmentSlot, rarity: Rarity, ilvl: u32, rng: &mut impl Rng) -> Item {
     // Generate attribute bonuses based on rarity and ilvl
-    let attributes = generate_attributes(rarity, ilvl, &mut rng);
+    let attributes = generate_attributes(rarity, ilvl, rng);
 
     // Generate affixes based on rarity and ilvl
-    let affixes = generate_affixes(rarity, ilvl, &mut rng);
+    let affixes = generate_affixes(rarity, ilvl, rng);
 
     let mut item = Item {
         slot,
@@ -25,7 +23,7 @@ pub fn generate_item(slot: EquipmentSlot, rarity: Rarity, ilvl: u32) -> Item {
         god_item_id: None,
     };
 
-    item.display_name = generate_display_name(&item);
+    item.display_name = generate_display_name(&item, rng);
     item.base_name = item.display_name.clone();
 
     item
@@ -168,6 +166,8 @@ fn generate_affix_value(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
 
     #[test]
     fn test_ilvl_multiplier() {
@@ -179,7 +179,8 @@ mod tests {
 
     #[test]
     fn test_generate_common_item() {
-        let item = generate_item(EquipmentSlot::Weapon, Rarity::Common, 10);
+        let mut rng = ChaCha8Rng::seed_from_u64(1);
+        let item = generate_item(EquipmentSlot::Weapon, Rarity::Common, 10, &mut rng);
         assert_eq!(item.rarity, Rarity::Common);
         assert_eq!(item.slot, EquipmentSlot::Weapon);
         assert_eq!(item.ilvl, 10);
@@ -189,7 +190,8 @@ mod tests {
 
     #[test]
     fn test_generate_magic_item_has_affix() {
-        let item = generate_item(EquipmentSlot::Armor, Rarity::Magic, 50);
+        let mut rng = ChaCha8Rng::seed_from_u64(2);
+        let item = generate_item(EquipmentSlot::Armor, Rarity::Magic, 50, &mut rng);
         assert_eq!(item.rarity, Rarity::Magic);
         assert_eq!(item.ilvl, 50);
         assert_eq!(item.affixes.len(), 1);
@@ -197,14 +199,16 @@ mod tests {
 
     #[test]
     fn test_generate_rare_item_has_multiple_affixes() {
-        let item = generate_item(EquipmentSlot::Helmet, Rarity::Rare, 100);
+        let mut rng = ChaCha8Rng::seed_from_u64(3);
+        let item = generate_item(EquipmentSlot::Helmet, Rarity::Rare, 100, &mut rng);
         assert_eq!(item.rarity, Rarity::Rare);
         assert!(item.affixes.len() >= 2 && item.affixes.len() <= 3);
     }
 
     #[test]
     fn test_generate_legendary_item() {
-        let item = generate_item(EquipmentSlot::Weapon, Rarity::Legendary, 100);
+        let mut rng = ChaCha8Rng::seed_from_u64(4);
+        let item = generate_item(EquipmentSlot::Weapon, Rarity::Legendary, 100, &mut rng);
         assert_eq!(item.rarity, Rarity::Legendary);
         assert_eq!(item.ilvl, 100);
         assert!(item.affixes.len() >= 4 && item.affixes.len() <= 5);
@@ -212,17 +216,19 @@ mod tests {
 
     #[test]
     fn test_item_has_display_name() {
-        let item = generate_item(EquipmentSlot::Weapon, Rarity::Magic, 50);
+        let mut rng = ChaCha8Rng::seed_from_u64(5);
+        let item = generate_item(EquipmentSlot::Weapon, Rarity::Magic, 50, &mut rng);
         assert!(!item.display_name.is_empty());
     }
 
     #[test]
     fn test_higher_ilvl_stronger_items() {
         // Over many samples, ilvl 100 should produce higher average totals than ilvl 10
-        let sample = |ilvl: u32| -> f64 {
+        let sample = |ilvl: u32, seed: u64| -> f64 {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
             let sum: u32 = (0..100)
                 .map(|_| {
-                    generate_item(EquipmentSlot::Weapon, Rarity::Rare, ilvl)
+                    generate_item(EquipmentSlot::Weapon, Rarity::Rare, ilvl, &mut rng)
                         .attributes
                         .total()
                 })
@@ -230,9 +236,9 @@ mod tests {
             sum as f64 / 100.0
         };
 
-        let ilvl_10_avg = sample(10);
-        let ilvl_50_avg = sample(50);
-        let ilvl_100_avg = sample(100);
+        let ilvl_10_avg = sample(10, 42);
+        let ilvl_50_avg = sample(50, 43);
+        let ilvl_100_avg = sample(100, 44);
 
         assert!(
             ilvl_10_avg < ilvl_50_avg,
@@ -246,9 +252,10 @@ mod tests {
 
     #[test]
     fn test_ilvl_100_legendary_reasonable_values() {
+        let mut rng = ChaCha8Rng::seed_from_u64(6);
         // Verify ilvl 100 legendaries are in expected range
         for _ in 0..20 {
-            let item = generate_item(EquipmentSlot::Weapon, Rarity::Legendary, 100);
+            let item = generate_item(EquipmentSlot::Weapon, Rarity::Legendary, 100, &mut rng);
 
             // Attributes: 4-6 base * 4.0 multiplier * 1-3 stats = 16-72 total
             assert!(
@@ -305,9 +312,10 @@ mod tests {
 
     #[test]
     fn test_ilvl_10_items_weak() {
+        let mut rng = ChaCha8Rng::seed_from_u64(7);
         // Verify ilvl 10 items are appropriately weak
         for _ in 0..20 {
-            let item = generate_item(EquipmentSlot::Weapon, Rarity::Legendary, 10);
+            let item = generate_item(EquipmentSlot::Weapon, Rarity::Legendary, 10, &mut rng);
 
             // Attributes: 4-6 base * 1.0 multiplier * 1-3 stats = 4-18 total
             assert!(
@@ -325,8 +333,9 @@ mod tests {
 
     #[test]
     fn test_common_items_never_have_affixes() {
+        let mut rng = ChaCha8Rng::seed_from_u64(8);
         for _ in 0..50 {
-            let item = generate_item(EquipmentSlot::Gloves, Rarity::Common, 100);
+            let item = generate_item(EquipmentSlot::Gloves, Rarity::Common, 100, &mut rng);
             assert_eq!(
                 item.affixes.len(),
                 0,

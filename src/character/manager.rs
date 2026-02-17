@@ -407,15 +407,27 @@ mod tests {
         char2.character_level = 15;
 
         manager.save_character(&char1).unwrap();
-        // Small delay to ensure different timestamps (save uses current time)
-        std::thread::sleep(std::time::Duration::from_millis(1100));
         manager.save_character(&char2).unwrap();
+
+        // Set deterministic timestamps by rewriting the save files directly
+        // (save_character always uses Utc::now(), so we override after the fact)
+        let path1 = manager.quest_dir.join("listtest1.json");
+        let mut data1: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path1).unwrap()).unwrap();
+        data1["last_save_time"] = serde_json::json!(1000);
+        std::fs::write(&path1, serde_json::to_string_pretty(&data1).unwrap()).unwrap();
+
+        let path2 = manager.quest_dir.join("listtest2.json");
+        let mut data2: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path2).unwrap()).unwrap();
+        data2["last_save_time"] = serde_json::json!(2000);
+        std::fs::write(&path2, serde_json::to_string_pretty(&data2).unwrap()).unwrap();
 
         // Isolated temp dir means only our test files are present
         let list = manager.list_characters().expect("Failed to list");
         assert_eq!(list.len(), 2);
 
-        // Verify sorted by last_played (most recent first)
+        // Verify sorted by last_save_time (most recent first)
         assert_eq!(list[0].character_name, "ListTest2");
         assert_eq!(list[1].character_name, "ListTest1");
     }

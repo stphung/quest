@@ -664,11 +664,13 @@ fn test_leviathan_encounter_progresses_through_stages() {
     let mut rng = ChaCha8Rng::seed_from_u64(77777);
 
     // Test that encounter numbers increment correctly
+    // At 8% encounter rate with Legendary fish, expected hit in ~12 attempts.
+    // 500 gives 99.999%+ confidence.
     for expected_encounter in 1..=10 {
         let encounters_so_far = expected_encounter - 1;
         let mut found = false;
 
-        for _ in 0..10000 {
+        for _ in 0..500 {
             let (_, result) =
                 generate_fish_with_rank(FishRarity::Legendary, 40, encounters_so_far, &mut rng);
             if let LeviathanResult::Escaped { encounter_number } = result {
@@ -683,7 +685,7 @@ fn test_leviathan_encounter_progresses_through_stages() {
         }
         assert!(
             found,
-            "Should find encounter {} within 10000 tries",
+            "Should find encounter {} within 500 tries",
             expected_encounter
         );
     }

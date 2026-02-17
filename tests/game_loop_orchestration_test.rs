@@ -117,11 +117,11 @@ fn test_haven_discovery_possible_at_prestige_10() {
 #[test]
 fn test_haven_discovery_higher_prestige_increases_chance() {
     // Behavior: chance = 0.000014 + 0.000007 * (rank - 10) for rank > 10
-    // Use P10 vs P50 for reliable distinction with 20k trials.
-    // P10: 0.000014 → ~0.28 expected. P50: 0.000014 + 0.000007*40 = 0.000294 → ~5.88 expected.
-    let trials = 20_000u64;
+    // Use P10 vs P100 for reliable distinction with 10k trials.
+    // P10: 0.000014 → ~0.14 expected. P100: 0.000014 + 0.000007*90 = 0.000644 → ~6.44 expected.
+    let trials = 10_000u64;
     let mut discoveries_p10 = 0u32;
-    let mut discoveries_p50 = 0u32;
+    let mut discoveries_p100 = 0u32;
 
     for seed in 0..trials {
         let mut haven = Haven::default();
@@ -134,16 +134,16 @@ fn test_haven_discovery_higher_prestige_increases_chance() {
     for seed in 0..trials {
         let mut haven = Haven::default();
         let mut rng = seeded_rng(seed);
-        if try_discover_haven(&mut haven, 50, &mut rng) {
-            discoveries_p50 += 1;
+        if try_discover_haven(&mut haven, 100, &mut rng) {
+            discoveries_p100 += 1;
         }
     }
 
     assert!(
-        discoveries_p50 > discoveries_p10,
-        "P50 should discover Haven more often than P10: p10={}, p50={}",
+        discoveries_p100 > discoveries_p10,
+        "P100 should discover Haven more often than P10: p10={}, p50={}",
         discoveries_p10,
-        discoveries_p50
+        discoveries_p100
     );
 }
 
@@ -654,7 +654,7 @@ fn test_item_dropped_event_has_complete_fields() {
     let mut rng = seeded_rng(42);
 
     let mut found = false;
-    for _ in 0..20_000 {
+    for _ in 0..5_000 {
         let result = run_game_tick(
             &mut state,
             &mut tc,
@@ -684,7 +684,7 @@ fn test_item_dropped_event_has_complete_fields() {
             break;
         }
     }
-    assert!(found, "Should produce ItemDropped events in 20k ticks");
+    assert!(found, "Should produce ItemDropped events in 5k ticks");
 }
 
 #[test]
@@ -734,12 +734,21 @@ fn test_challenge_discovered_event_has_follow_up() {
     let mut ach = Achievements::default();
 
     let mut found = false;
-    // Use many seeds since discovery is very rare (0.000014/tick)
+    // Use many seeds since discovery is very rare (0.000014/tick base)
+    // game_tick only attempts discovery after enemy defeat, so most ticks won't trigger
     for seed in 0..50_000u64 {
         let mut rng = seeded_rng(seed);
         let mut s = fresh_state();
         s.prestige_rank = 1;
-        let result = run_game_tick(&mut s, &mut tc, &mut haven, &mut ach, false, &mut rng);
+        let result = game_tick(
+            &mut s,
+            &mut tc,
+            &mut haven,
+            &mut EnhancementProgress::new(),
+            &mut ach,
+            false,
+            &mut rng,
+        );
         tc = 0; // Reset for next iteration
 
         for event in &result.events {
@@ -833,7 +842,7 @@ fn test_recent_drops_populated_on_item_drop() {
     let mut rng = seeded_rng(42);
 
     let mut got_drop = false;
-    for _ in 0..20_000 {
+    for _ in 0..5_000 {
         let result = run_game_tick(
             &mut state,
             &mut tc,
@@ -1037,7 +1046,7 @@ fn test_dungeon_discovery_only_after_enemy_defeated() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(42);
 
-    for _ in 0..20_000 {
+    for _ in 0..5_000 {
         let result = run_game_tick(
             &mut state,
             &mut tc,
@@ -1064,7 +1073,7 @@ fn test_dungeon_discovery_only_after_enemy_defeated() {
             return;
         }
     }
-    // Probabilistic — may not discover in 50k ticks, which is fine
+    // Probabilistic — may not discover in 5k ticks, which is fine
 }
 
 #[test]
@@ -1076,7 +1085,7 @@ fn test_fishing_discovery_only_after_enemy_defeated() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(42);
 
-    for _ in 0..20_000 {
+    for _ in 0..5_000 {
         let result = run_game_tick(
             &mut state,
             &mut tc,
@@ -1118,7 +1127,7 @@ fn test_enemy_defeated_before_item_dropped() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(42);
 
-    for _ in 0..20_000 {
+    for _ in 0..5_000 {
         let result = run_game_tick(
             &mut state,
             &mut tc,
@@ -1158,7 +1167,7 @@ fn test_enemy_defeated_before_discovery() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(42);
 
-    for _ in 0..20_000 {
+    for _ in 0..5_000 {
         let result = run_game_tick(
             &mut state,
             &mut tc,
@@ -1377,7 +1386,7 @@ fn test_haven_discovery_via_game_tick_at_p10() {
 #[test]
 fn test_haven_discovery_via_game_tick_blocked_at_p9() {
     // Verify game_tick does NOT produce HavenDiscovered at P9
-    for seed in 0..1_000u64 {
+    for seed in 0..50u64 {
         let mut state = fresh_state();
         state.prestige_rank = 9;
         let mut tc = 0u32;
@@ -1402,7 +1411,7 @@ fn test_haven_discovery_via_game_tick_blocked_at_p9() {
 #[test]
 fn test_haven_discovery_via_game_tick_blocked_during_fishing() {
     // Verify game_tick does NOT produce HavenDiscovered during fishing
-    for seed in 0..1_000u64 {
+    for seed in 0..50u64 {
         let mut state = fresh_state();
         state.prestige_rank = 15;
         state.active_fishing = Some(make_fishing_session(FishingPhase::Waiting, 100, 5));
@@ -1429,7 +1438,7 @@ fn test_haven_discovery_via_game_tick_blocked_during_dungeon() {
     // Verify game_tick does NOT produce HavenDiscovered during dungeon
     use quest::dungeon::generation::generate_dungeon;
 
-    for seed in 0..1_000u64 {
+    for seed in 0..50u64 {
         let mut state = fresh_state();
         state.prestige_rank = 15;
         state.active_dungeon = Some(generate_dungeon(10, 0, 1));

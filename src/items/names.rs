@@ -1,5 +1,5 @@
 use super::types::{AffixType, EquipmentSlot, Item, Rarity};
-use rand::RngExt;
+use rand::{Rng, RngExt};
 
 pub fn get_base_name(slot: EquipmentSlot) -> &'static [&'static str] {
     match slot {
@@ -51,8 +51,7 @@ pub fn get_affix_suffix(affix_type: AffixType) -> &'static str {
     }
 }
 
-pub fn generate_display_name(item: &Item) -> String {
-    let mut rng = rand::rng();
+pub fn generate_display_name(item: &Item, rng: &mut impl Rng) -> String {
     let base_names = get_base_name(item.slot);
     let base = base_names[rng.random_range(0..base_names.len())];
 
@@ -84,9 +83,12 @@ pub fn generate_display_name(item: &Item) -> String {
 mod tests {
     use super::super::types::{Affix, AttributeBonuses};
     use super::*;
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
 
     #[test]
     fn test_common_item_name() {
+        let mut rng = ChaCha8Rng::seed_from_u64(1);
         let item = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Common,
@@ -97,7 +99,7 @@ mod tests {
             affixes: vec![],
             god_item_id: None,
         };
-        let name = generate_display_name(&item);
+        let name = generate_display_name(&item, &mut rng);
         // Should be just base name
         assert!(!name.is_empty());
         assert!(!name.contains("Fine"));
@@ -105,6 +107,7 @@ mod tests {
 
     #[test]
     fn test_magic_item_name() {
+        let mut rng = ChaCha8Rng::seed_from_u64(2);
         let item = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Magic,
@@ -115,12 +118,13 @@ mod tests {
             affixes: vec![],
             god_item_id: None,
         };
-        let name = generate_display_name(&item);
+        let name = generate_display_name(&item, &mut rng);
         assert!(name.starts_with("Fine"));
     }
 
     #[test]
     fn test_rare_item_name_with_affix() {
+        let mut rng = ChaCha8Rng::seed_from_u64(3);
         let item = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Rare,
@@ -134,7 +138,7 @@ mod tests {
             }],
             god_item_id: None,
         };
-        let name = generate_display_name(&item);
+        let name = generate_display_name(&item, &mut rng);
         // Should contain either "Cruel" or "of Power"
         assert!(name.contains("Cruel") || name.contains("of Power"));
     }
@@ -209,6 +213,7 @@ mod tests {
 
     #[test]
     fn test_epic_item_name_with_affix() {
+        let mut rng = ChaCha8Rng::seed_from_u64(4);
         let item = Item {
             slot: EquipmentSlot::Armor,
             rarity: Rarity::Epic,
@@ -222,7 +227,7 @@ mod tests {
             }],
             god_item_id: None,
         };
-        let name = generate_display_name(&item);
+        let name = generate_display_name(&item, &mut rng);
         // Should use affix prefix "Sturdy" or suffix "of Vitality"
         assert!(
             name.contains("Sturdy") || name.contains("of Vitality"),
@@ -233,6 +238,7 @@ mod tests {
 
     #[test]
     fn test_legendary_item_name_with_affix() {
+        let mut rng = ChaCha8Rng::seed_from_u64(5);
         let item = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Legendary,
@@ -246,7 +252,7 @@ mod tests {
             }],
             god_item_id: None,
         };
-        let name = generate_display_name(&item);
+        let name = generate_display_name(&item, &mut rng);
         assert!(
             name.contains("Deadly") || name.contains("of Precision"),
             "Legendary item name '{}' should reference CritChance affix",
@@ -256,6 +262,7 @@ mod tests {
 
     #[test]
     fn test_rare_item_without_affixes_uses_base_name() {
+        let mut rng = ChaCha8Rng::seed_from_u64(6);
         let item = Item {
             slot: EquipmentSlot::Ring,
             rarity: Rarity::Rare,
@@ -266,7 +273,7 @@ mod tests {
             affixes: vec![],
             god_item_id: None,
         };
-        let name = generate_display_name(&item);
+        let name = generate_display_name(&item, &mut rng);
         // Should be a plain base name since there are no affixes
         let ring_names = get_base_name(EquipmentSlot::Ring);
         assert!(
@@ -278,6 +285,7 @@ mod tests {
 
     #[test]
     fn test_common_name_is_base_name_only() {
+        let mut rng = ChaCha8Rng::seed_from_u64(7);
         // Run multiple times since base name is randomly chosen
         for _ in 0..20 {
             let item = Item {
@@ -290,7 +298,7 @@ mod tests {
                 affixes: vec![],
                 god_item_id: None,
             };
-            let name = generate_display_name(&item);
+            let name = generate_display_name(&item, &mut rng);
             let base_names = get_base_name(EquipmentSlot::Boots);
             assert!(
                 base_names.iter().any(|&n| name == n),
@@ -315,6 +323,7 @@ mod tests {
 
     #[test]
     fn test_generate_display_name_never_empty() {
+        let mut rng = ChaCha8Rng::seed_from_u64(8);
         // Generate 100 items of each rarity and slot, verify names are never empty
         let slots = [
             EquipmentSlot::Weapon,
@@ -354,7 +363,7 @@ mod tests {
                         god_item_id: None,
                     };
 
-                    let name = generate_display_name(&item);
+                    let name = generate_display_name(&item, &mut rng);
                     assert!(
                         !name.is_empty(),
                         "Generated name should never be empty for {:?} {:?}",
@@ -374,6 +383,7 @@ mod tests {
 
     #[test]
     fn test_generate_display_name_no_double_spaces() {
+        let mut rng = ChaCha8Rng::seed_from_u64(9);
         // Verify names don't have double spaces or leading/trailing spaces
         let slots = [
             EquipmentSlot::Weapon,
@@ -394,7 +404,7 @@ mod tests {
                     god_item_id: None,
                 };
 
-                let name = generate_display_name(&item);
+                let name = generate_display_name(&item, &mut rng);
                 assert!(
                     !name.contains("  "),
                     "Name '{}' should not have double spaces",
