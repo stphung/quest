@@ -454,7 +454,7 @@ God (Mythic) rarity is reserved for the three god items (Asprika, Sleipnir, Megi
 
 **Boss drops:**
 - Guaranteed drop on every boss kill
-- Can include Legendary rarity (5% normal boss, 10% Zone 10 final boss)
+- Can include Legendary rarity (2% normal boss, 5% Zone 10 final boss)
 
 **Rarity bonuses:**
 - Prestige: +1% per rank toward higher rarities (capped at +10%)

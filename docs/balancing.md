@@ -252,8 +252,8 @@ drop_chance = min(base_chance * (1.0 + haven_drop_bonus/100), 0.25)
 
 | Boss Type | Magic | Rare | Epic | Legendary |
 |-----------|-------|------|------|-----------|
-| Normal boss | 40% | 35% | 20% | 5% |
-| Zone 10 final boss | 20% | 40% | 30% | 10% |
+| Normal boss | 40% | 35% | 23% | 2% |
+| Zone 10 final boss | 20% | 40% | 35% | 5% |
 
 Bosses always drop an item. Bosses never drop Common.
 
