@@ -82,7 +82,20 @@ fn draw_header(frame: &mut Frame, area: Rect, game_state: &GameState) {
 
     // XP progress bar
     let rate_suffix = match game_state.xp_per_hour() {
-        Some(rate) => format!(" | {}/hr", format_number(rate)),
+        Some(rate) => {
+            let xp_remaining = xp_needed.saturating_sub(game_state.character_xp);
+            let eta = if rate > 0 {
+                let seconds = (xp_remaining as f64 / rate as f64 * 3600.0) as u64;
+                format!(" ({})", format_eta(seconds))
+            } else {
+                String::new()
+            };
+            format!(
+                " | {}/hr{}",
+                super::game_common::format_number_short(rate),
+                eta
+            )
+        }
         None => String::new(),
     };
     let xp_label = format!(
@@ -659,7 +672,20 @@ pub(super) fn draw_xp_bar_compact(frame: &mut Frame, area: Rect, game_state: &Ga
     };
 
     let rate_suffix = match game_state.xp_per_hour() {
-        Some(rate) => format!(" | {}/hr", format_number(rate)),
+        Some(rate) => {
+            let xp_remaining = xp_needed.saturating_sub(game_state.character_xp);
+            let eta = if rate > 0 {
+                let seconds = (xp_remaining as f64 / rate as f64 * 3600.0) as u64;
+                format!(" ({})", format_eta(seconds))
+            } else {
+                String::new()
+            };
+            format!(
+                " | {}/hr{}",
+                super::game_common::format_number_short(rate),
+                eta
+            )
+        }
         None => String::new(),
     };
     let xp_label = format!(
@@ -796,17 +822,30 @@ fn attr_color(attr_type: AttributeType) -> Color {
     }
 }
 
-/// Formats a number with comma separators (e.g., 1234567 -> "1,234,567").
-fn format_number(n: u64) -> String {
-    let s = n.to_string();
-    let mut result = String::with_capacity(s.len() + s.len() / 3);
-    for (i, c) in s.chars().enumerate() {
-        if i > 0 && (s.len() - i).is_multiple_of(3) {
-            result.push(',');
-        }
-        result.push(c);
+/// Formats seconds into a human-readable ETA (e.g., "~3m", "~1h 20m", "~2d 5h").
+fn format_eta(seconds: u64) -> String {
+    if seconds < 60 {
+        return "~<1m".to_string();
     }
-    result
+    let minutes = seconds / 60;
+    if minutes < 60 {
+        return format!("~{}m", minutes);
+    }
+    let hours = minutes / 60;
+    let remaining_mins = minutes % 60;
+    if hours < 24 {
+        if remaining_mins > 0 {
+            return format!("~{}h {}m", hours, remaining_mins);
+        }
+        return format!("~{}h", hours);
+    }
+    let days = hours / 24;
+    let remaining_hours = hours % 24;
+    if remaining_hours > 0 {
+        format!("~{}d {}h", days, remaining_hours)
+    } else {
+        format!("~{}d", days)
+    }
 }
 
 /// Formats a modifier value with a sign prefix.
