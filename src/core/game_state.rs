@@ -85,11 +85,11 @@ const TICKER_MAX_ENTRIES: usize = 30;
 pub const TICKER_SCROLL_SPEED: f64 = 0.4;
 
 /// Maximum scroll speed multiplier when catching up to queued entries
-const TICKER_MAX_SPEED_MULT: f64 = 4.0;
+const TICKER_MAX_SPEED_MULT: f64 = 20.0;
 
-/// How quickly the scroll speed adjusts toward the target (0.0–1.0).
-/// Lower = smoother but slower to react. 0.08 gives ~1s ramp time.
-const TICKER_SPEED_LERP: f64 = 0.08;
+/// SLO target: newest entry should appear on screen within this many ticks.
+/// 30 ticks = 3 seconds at 100ms tick interval.
+const TICKER_SLO_TICKS: f64 = 30.0;
 
 /// Gap (in chars) between consecutive entries on screen
 const ENTRY_GAP: usize = 3;
@@ -143,15 +143,16 @@ impl Ticker {
     pub fn tick(&mut self) {
         let target_speed = if let Some(newest) = self.entries.front() {
             let debt = (newest.born_at - self.scroll_offset).max(0.0);
-            let half_vw = (self.viewport_width as f64 / 2.0).max(1.0);
-            let multiplier = (1.0 + debt / half_vw).min(TICKER_MAX_SPEED_MULT);
-            TICKER_SCROLL_SPEED * multiplier
+            // SLO-aware: speed needed to display newest entry within SLO window
+            let slo_speed = debt / TICKER_SLO_TICKS;
+            let max_speed = TICKER_SCROLL_SPEED * TICKER_MAX_SPEED_MULT;
+            slo_speed.max(TICKER_SCROLL_SPEED).min(max_speed)
         } else {
             TICKER_SCROLL_SPEED
         };
 
-        // Smooth interpolation toward target speed
-        self.current_speed += (target_speed - self.current_speed) * TICKER_SPEED_LERP;
+        // Instant speed adjustment — no lerp, meets SLO precisely
+        self.current_speed = target_speed;
         self.scroll_offset += self.current_speed;
         self.cleanup_scrolled_entries();
     }
