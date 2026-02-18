@@ -1,10 +1,10 @@
 use super::responsive::{LayoutContext, SizeTier};
 use crate::character::attributes::AttributeType;
 use crate::character::derived_stats::DerivedStats;
-use crate::character::prestige::{get_adventurer_rank, get_prestige_tier};
+use crate::character::prestige::{get_adventurer_rank, get_next_prestige_tier, get_prestige_tier};
 use crate::core::game_logic::xp_for_next_level;
 use crate::core::game_state::GameState;
-use crate::fishing::types::FishingState;
+use crate::fishing::types::{FishingState, RANK_NAMES};
 use crate::utils::updater::UpdateInfo;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -21,6 +21,7 @@ pub fn draw_stats_panel(
     game_state: &GameState,
     ctx: &LayoutContext,
     enhancement_levels: &[u8; 7],
+    achievements: &crate::achievements::Achievements,
 ) {
     match ctx.height_tier {
         SizeTier::XL | SizeTier::L => {
@@ -36,9 +37,9 @@ pub fn draw_stats_panel(
                 ])
                 .split(area);
 
-            draw_header(frame, chunks[0], game_state);
-            draw_prestige_info(frame, chunks[1], game_state);
-            draw_fishing_panel(frame, chunks[2], game_state);
+            draw_header(frame, chunks[0], game_state, achievements);
+            draw_prestige_info(frame, chunks[1], game_state, achievements);
+            draw_fishing_panel(frame, chunks[2], game_state, achievements);
             draw_attributes_compact(frame, chunks[3], game_state);
             draw_equipment_names_only(frame, chunks[4], game_state, enhancement_levels);
         }
@@ -49,7 +50,12 @@ pub fn draw_stats_panel(
 }
 
 /// Draws the header with character level, XP bar, and play time
-fn draw_header(frame: &mut Frame, area: Rect, game_state: &GameState) {
+fn draw_header(
+    frame: &mut Frame,
+    area: Rect,
+    game_state: &GameState,
+    achievements: &crate::achievements::Achievements,
+) {
     let xp_needed = xp_for_next_level(game_state.character_level);
     let xp_ratio = if xp_needed > 0 {
         (game_state.character_xp as f64 / xp_needed as f64).min(1.0)
@@ -61,9 +67,11 @@ fn draw_header(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let play_time = format_play_time(game_state.play_time_seconds);
 
     // Create block and get inner area
-    let header_block = Block::default()
-        .borders(Borders::ALL)
-        .title(game_state.character_name.as_str());
+    let header_title = match highest_level_badge(achievements) {
+        Some(icon) => format!(" {} {} ", game_state.character_name, icon),
+        None => format!(" {} ", game_state.character_name),
+    };
+    let header_block = Block::default().borders(Borders::ALL).title(header_title);
     let inner = header_block.inner(area);
     frame.render_widget(header_block, area);
 
@@ -326,12 +334,16 @@ pub(super) fn draw_zone_info(
         }
     }
 
+    let location_title = match highest_zone_badge(achievements) {
+        Some(icon) => format!(" Location {} ", icon),
+        None => " Location ".to_string(),
+    };
     let zone_widget = Paragraph::new(zone_lines)
         .block(
             Block::default()
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(zone_color))
-                .title("Location"),
+                .title(location_title),
         )
         .wrap(Wrap { trim: true })
         .alignment(Alignment::Center);
@@ -339,9 +351,119 @@ pub(super) fn draw_zone_info(
     frame.render_widget(zone_widget, area);
 }
 
+/// Returns the icon of the highest unlocked zone completion achievement, if any.
+fn highest_zone_badge(achievements: &crate::achievements::Achievements) -> Option<&'static str> {
+    use crate::achievements::AchievementId;
+
+    let zone_achievements = [
+        AchievementId::BeyondInfinity,
+        AchievementId::Zone10Complete,
+        AchievementId::Zone9Complete,
+        AchievementId::Zone8Complete,
+        AchievementId::Zone7Complete,
+        AchievementId::Zone6Complete,
+        AchievementId::Zone5Complete,
+        AchievementId::Zone4Complete,
+        AchievementId::Zone3Complete,
+        AchievementId::Zone2Complete,
+        AchievementId::Zone1Complete,
+    ];
+
+    for id in zone_achievements {
+        if achievements.is_unlocked(id) {
+            return crate::achievements::data::get_achievement_def(id).map(|def| def.icon);
+        }
+    }
+    None
+}
+
+/// Returns the icon of the highest unlocked prestige achievement, if any.
+fn highest_prestige_badge(
+    achievements: &crate::achievements::Achievements,
+) -> Option<&'static str> {
+    use crate::achievements::AchievementId;
+
+    // Ordered from highest to lowest so we return the first match
+    let prestige_achievements = [
+        AchievementId::Eternal,
+        AchievementId::PrestigeXC,
+        AchievementId::PrestigeLXX,
+        AchievementId::PrestigeL,
+        AchievementId::PrestigeXL,
+        AchievementId::PrestigeXXX,
+        AchievementId::PrestigeXXV,
+        AchievementId::PrestigeXX,
+        AchievementId::PrestigeXV,
+        AchievementId::PrestigeX,
+        AchievementId::PrestigeV,
+        AchievementId::FirstPrestige,
+    ];
+
+    for id in prestige_achievements {
+        if achievements.is_unlocked(id) {
+            return crate::achievements::data::get_achievement_def(id).map(|def| def.icon);
+        }
+    }
+    None
+}
+
+/// Returns the icon of the highest unlocked level achievement, if any.
+fn highest_level_badge(achievements: &crate::achievements::Achievements) -> Option<&'static str> {
+    use crate::achievements::AchievementId;
+
+    let level_achievements = [
+        AchievementId::Level1500,
+        AchievementId::Level1000,
+        AchievementId::Level750,
+        AchievementId::Level500,
+        AchievementId::Level250,
+        AchievementId::Level200,
+        AchievementId::Level150,
+        AchievementId::Level100,
+        AchievementId::Level50,
+        AchievementId::Level25,
+        AchievementId::Level10,
+    ];
+
+    for id in level_achievements {
+        if achievements.is_unlocked(id) {
+            return crate::achievements::data::get_achievement_def(id).map(|def| def.icon);
+        }
+    }
+    None
+}
+
+/// Returns the icon of the highest unlocked fishing rank achievement, if any.
+fn highest_fishing_badge(achievements: &crate::achievements::Achievements) -> Option<&'static str> {
+    use crate::achievements::AchievementId;
+
+    let fishing_achievements = [
+        AchievementId::FishermanIV,
+        AchievementId::FishermanIII,
+        AchievementId::FishermanII,
+        AchievementId::FishermanI,
+    ];
+
+    for id in fishing_achievements {
+        if achievements.is_unlocked(id) {
+            return crate::achievements::data::get_achievement_def(id).map(|def| def.icon);
+        }
+    }
+    None
+}
+
 /// Draws prestige information with CHA bonus
-fn draw_prestige_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    let prestige_block = Block::default().borders(Borders::ALL).title("Prestige");
+fn draw_prestige_info(
+    frame: &mut Frame,
+    area: Rect,
+    game_state: &GameState,
+    achievements: &crate::achievements::Achievements,
+) {
+    let title = match highest_prestige_badge(achievements) {
+        Some(icon) => format!(" Prestige {} ", icon),
+        None => " Prestige ".to_string(),
+    };
+    let prestige_block = Block::default().borders(Borders::ALL).title(title);
 
     let inner = prestige_block.inner(area);
     frame.render_widget(prestige_block, area);
@@ -358,45 +480,111 @@ fn draw_prestige_info(frame: &mut Frame, area: Rect, game_state: &GameState) {
                 format!("{} ({})", game_state.prestige_rank, tier.name),
                 Style::default().fg(Color::Yellow),
             ),
-        ]),
-        Line::from(vec![
-            Span::styled("⚡ Mult: ", Style::default().add_modifier(Modifier::BOLD)),
-            Span::styled(
-                format!("{:.2}x", tier.multiplier),
-                Style::default().fg(Color::Cyan),
-            ),
-            Span::raw(" + "),
-            Span::styled(
-                format!("{:.2}x (CHA)", cha_mod as f64 * 0.1),
-                Style::default().fg(Color::Yellow),
-            ),
-            Span::raw(" = "),
-            Span::styled(
-                format!("{:.2}x", effective_multiplier),
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::BOLD),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled("🔄 Resets: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::styled(" | ", Style::default().fg(Color::DarkGray)),
+            Span::styled("🔄 ", Style::default()),
             Span::styled(
                 format!("{}", game_state.total_prestige_count),
                 Style::default().fg(Color::Magenta),
             ),
         ]),
+        Line::from({
+            let mut spans = vec![
+                Span::styled("⚡ XP: ", Style::default().add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    format!("{:.2}x", tier.multiplier),
+                    Style::default().fg(Color::Cyan),
+                ),
+            ];
+            if cha_mod != 0 {
+                spans.push(Span::styled(
+                    format!(" +{:.1} CHA", cha_mod as f64 * 0.1),
+                    Style::default().fg(Color::Yellow),
+                ));
+            }
+            spans.push(Span::styled(
+                " \u{2192} ",
+                Style::default().fg(Color::DarkGray),
+            ));
+            spans.push(Span::styled(
+                format!("{:.2}x", effective_multiplier),
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ));
+            spans
+        }),
     ];
 
-    // Show as many lines as fit, rank first
-    let lines_to_show = inner.height as usize;
-    let truncated: Vec<Line> = prestige_text.into_iter().take(lines_to_show).collect();
-    let prestige_paragraph = Paragraph::new(truncated);
-    frame.render_widget(prestige_paragraph, inner);
+    // Prestige level progress bar
+    let next_prestige = get_next_prestige_tier(game_state.prestige_rank);
+    let prestige_ratio =
+        (game_state.character_level as f64 / next_prestige.required_level as f64).min(1.0);
+    let prestige_eta = match game_state.xp_per_hour() {
+        Some(rate) if rate > 0 && game_state.character_level < next_prestige.required_level => {
+            // Sum XP needed from current level to prestige required level
+            let xp_remaining_current = xp_for_next_level(game_state.character_level)
+                .saturating_sub(game_state.character_xp);
+            let xp_future_levels: u64 = (game_state.character_level + 1
+                ..next_prestige.required_level)
+                .map(xp_for_next_level)
+                .sum();
+            let total_xp = xp_remaining_current + xp_future_levels;
+            let seconds = (total_xp as f64 / rate as f64 * 3600.0) as u64;
+            format!(" ({})", format_eta(seconds))
+        }
+        _ => String::new(),
+    };
+    let prestige_label = format!(
+        "Lv {}/{} to {} (P{}){}",
+        game_state.character_level,
+        next_prestige.required_level,
+        next_prestige.name,
+        next_prestige.rank,
+        prestige_eta
+    );
+    let prestige_gauge = Gauge::default()
+        .gauge_style(
+            Style::default()
+                .fg(Color::Rgb(180, 100, 255))
+                .add_modifier(Modifier::BOLD),
+        )
+        .label(prestige_label)
+        .ratio(prestige_ratio);
+
+    if inner.height >= 3 {
+        let inner_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(1),
+            ])
+            .split(inner);
+
+        frame.render_widget(Paragraph::new(prestige_text[0].clone()), inner_chunks[0]);
+        frame.render_widget(Paragraph::new(prestige_text[1].clone()), inner_chunks[1]);
+        frame.render_widget(prestige_gauge, inner_chunks[2]);
+    } else {
+        // Show as many text lines as fit, rank first
+        let lines_to_show = inner.height as usize;
+        let truncated: Vec<Line> = prestige_text.into_iter().take(lines_to_show).collect();
+        let prestige_paragraph = Paragraph::new(truncated);
+        frame.render_widget(prestige_paragraph, inner);
+    }
 }
 
 /// Draws the fishing panel with rank and progress bar.
-fn draw_fishing_panel(frame: &mut Frame, area: Rect, game_state: &GameState) {
-    let block = Block::default().borders(Borders::ALL).title("Fishing");
+fn draw_fishing_panel(
+    frame: &mut Frame,
+    area: Rect,
+    game_state: &GameState,
+    achievements: &crate::achievements::Achievements,
+) {
+    let title = match highest_fishing_badge(achievements) {
+        Some(icon) => format!(" Fishing {} ", icon),
+        None => " Fishing ".to_string(),
+    };
+    let block = Block::default().borders(Borders::ALL).title(title);
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -421,7 +609,18 @@ fn draw_fishing_panel(frame: &mut Frame, area: Rect, game_state: &GameState) {
         ),
     ]);
 
-    let fish_label = format!("{}/{}", fish_progress, fish_required);
+    let is_max_rank = game_state.fishing.rank as usize >= RANK_NAMES.len();
+    let fish_label = if is_max_rank {
+        "Max Rank".to_string()
+    } else {
+        let next_rank = game_state.fishing.rank + 1;
+        let next_rank_name = RANK_NAMES[next_rank as usize - 1];
+        format!(
+            "{}/{} to {} ({})",
+            fish_progress, fish_required, next_rank_name, next_rank
+        )
+    };
+    let fish_ratio = if is_max_rank { 1.0 } else { fish_ratio };
     let fish_gauge = Gauge::default()
         .gauge_style(
             Style::default()
@@ -464,7 +663,7 @@ fn draw_attributes_compact(frame: &mut Frame, area: Rect, game_state: &GameState
     let cap = game_state.get_attribute_cap();
     let attrs_block = Block::default()
         .borders(Borders::ALL)
-        .title(format!("Attributes ({})", cap));
+        .title(format!(" Attributes ({}) ", cap));
     let inner = attrs_block.inner(area);
     frame.render_widget(attrs_block, area);
 
@@ -516,7 +715,7 @@ fn draw_equipment_names_only(
     game_state: &GameState,
     enhancement_levels: &[u8; 7],
 ) {
-    let block = Block::default().borders(Borders::ALL).title("Equipment");
+    let block = Block::default().borders(Borders::ALL).title(" Equipment ");
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -1003,7 +1202,7 @@ pub fn draw_footer(
     use crate::utils::build_info::{BUILD_COMMIT, BUILD_DATE};
 
     // Build version string for the title
-    let version_title = format!("v{} ({}) ", BUILD_DATE, BUILD_COMMIT);
+    let version_title = format!(" v{} ({}) ", BUILD_DATE, BUILD_COMMIT);
 
     // Normal footer (update drawer is drawn separately when expanded)
     let can_prestige_now = can_prestige(game_state);

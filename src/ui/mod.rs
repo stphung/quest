@@ -208,7 +208,14 @@ fn draw_xl_l_layout(
         .split(content_area);
 
     // Draw stats panel on the left
-    stats_panel::draw_stats_panel(frame, chunks[0], game_state, ctx, enhancement_levels);
+    stats_panel::draw_stats_panel(
+        frame,
+        chunks[0],
+        game_state,
+        ctx,
+        enhancement_levels,
+        achievements,
+    );
 
     // Draw ticker
     ticker::draw_ticker(frame, info_area, &game_state.ticker);

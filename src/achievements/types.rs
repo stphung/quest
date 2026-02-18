@@ -113,11 +113,8 @@ pub enum AchievementId {
     Zone10Complete, // Storm Citadel
     TheStormbreaker,
     StormsEnd,
-    // The Expanse cycle achievements
-    ExpanseCycleI,   // 1 cycle
-    ExpanseCycleII,  // 100 cycles
-    ExpanseCycleIII, // 1,000 cycles
-    ExpanseCycleIV,  // 10,000 cycles
+    // The Expanse achievement
+    BeyondInfinity, // Complete a cycle of The Expanse
 
     // Challenge achievements - Chess
     ChessNovice,
@@ -620,19 +617,10 @@ impl Achievements {
     pub fn on_zone_fully_cleared(&mut self, zone_id: u32, character_name: Option<&str>) {
         self.zones_fully_cleared += 1;
 
-        // Zone 11 (The Expanse) has cycle-based achievements
+        // Zone 11 (The Expanse) — single achievement for entering
         if zone_id == 11 {
             self.expanse_cycles_completed += 1;
-            self.check_milestones(
-                self.expanse_cycles_completed,
-                &[
-                    (1, AchievementId::ExpanseCycleI),
-                    (100, AchievementId::ExpanseCycleII),
-                    (1000, AchievementId::ExpanseCycleIII),
-                    (10000, AchievementId::ExpanseCycleIV),
-                ],
-                character_name,
-            );
+            self.unlock_with_name(AchievementId::BeyondInfinity, character_name);
             return;
         }
 
@@ -1212,41 +1200,17 @@ mod tests {
     // =========================================================================
 
     #[test]
-    fn test_expanse_cycle_first_completion() {
+    fn test_expanse_achievement_on_first_completion() {
         let mut achievements = Achievements::default();
 
-        assert!(!achievements.is_unlocked(AchievementId::ExpanseCycleI));
+        assert!(!achievements.is_unlocked(AchievementId::BeyondInfinity));
         assert_eq!(achievements.expanse_cycles_completed, 0);
 
         // Complete first cycle of The Expanse (zone 11)
         achievements.on_zone_fully_cleared(11, Some("Hero"));
 
-        assert!(achievements.is_unlocked(AchievementId::ExpanseCycleI));
+        assert!(achievements.is_unlocked(AchievementId::BeyondInfinity));
         assert_eq!(achievements.expanse_cycles_completed, 1);
-        assert!(!achievements.is_unlocked(AchievementId::ExpanseCycleII));
-    }
-
-    #[test]
-    fn test_expanse_cycle_all_milestones() {
-        let mut achievements = Achievements::default();
-
-        let milestones = [
-            (1, AchievementId::ExpanseCycleI),
-            (100, AchievementId::ExpanseCycleII),
-            (1000, AchievementId::ExpanseCycleIII),
-            (10000, AchievementId::ExpanseCycleIV),
-        ];
-
-        for (cycles, achievement_id) in milestones {
-            achievements.expanse_cycles_completed = cycles - 1;
-            achievements.on_zone_fully_cleared(11, Some("Hero"));
-            assert!(
-                achievements.is_unlocked(achievement_id),
-                "Expected {:?} to be unlocked at {} cycles",
-                achievement_id,
-                cycles
-            );
-        }
     }
 
     #[test]
@@ -1258,7 +1222,7 @@ mod tests {
 
         assert!(!achievements.is_unlocked(AchievementId::Zone1Complete));
         assert!(!achievements.is_unlocked(AchievementId::Zone10Complete));
-        assert!(achievements.is_unlocked(AchievementId::ExpanseCycleI));
+        assert!(achievements.is_unlocked(AchievementId::BeyondInfinity));
     }
 
     // =========================================================================
