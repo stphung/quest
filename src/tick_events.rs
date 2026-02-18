@@ -137,6 +137,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 rarity,
                 tier,
                 ilvl,
+                power,
                 equipped,
                 slot: _,
                 stats: _,
@@ -158,8 +159,12 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                         color: rc,
                     },
                     TickerSegment {
-                        text: format!(" i{}", ilvl),
+                        text: format!(" Z{}", ilvl / 10),
                         color: Color::DarkGray,
+                    },
+                    TickerSegment {
+                        text: format!(" \u{26A1}{}", power),
+                        color: Color::Cyan,
                     },
                 ];
                 if *equipped {
@@ -255,6 +260,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 rarity,
                 tier,
                 ilvl,
+                power,
                 equipped,
                 message,
             } => {
@@ -277,8 +283,12 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                         color: rc,
                     },
                     TickerSegment {
-                        text: format!(" i{}", ilvl),
+                        text: format!(" Z{}", ilvl / 10),
                         color: Color::DarkGray,
+                    },
+                    TickerSegment {
+                        text: format!(" \u{26A1}{}", power),
+                        color: Color::Cyan,
                     },
                 ];
                 if *equipped {

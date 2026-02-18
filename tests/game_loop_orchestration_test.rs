@@ -666,13 +666,9 @@ fn test_item_dropped_event_has_complete_fields() {
         for event in &result.events {
             if let TickEvent::ItemDropped {
                 item_name,
-                rarity: _,
-                tier: _,
-                ilvl: _,
-                equipped: _,
                 slot,
                 stats,
-                from_boss: _,
+                ..
             } = event
             {
                 assert!(!item_name.is_empty(), "Item name must be non-empty");

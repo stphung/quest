@@ -692,9 +692,9 @@ fn draw_equipment_names_only(
     frame.render_widget(block, area);
 
     let width = inner.width as usize;
-    // Right-side columns: " Legendary  T9  100" = 20 chars fixed
-    //   rarity(9) + gap(2) + tier(2) + gap(2) + ilvl(3) + trailing(2) = 20
-    let right_cols = 20;
+    // Right-side columns: " Legendary  T9  100  ⚡999" = 27 chars fixed
+    //   rarity(9) + gap(2) + tier(2) + gap(2) + ilvl(3) + gap(1) + power(~6) + trailing(2) = 27
+    let right_cols = 27;
     // Left side: "Weapon  " = 8 chars
     let slot_col = 8;
     // Name gets whatever remains
@@ -750,8 +750,12 @@ fn draw_equipment_names_only(
                 Style::default().fg(super::tier_color(item.tier)),
             ));
             spans.push(Span::styled(
-                format!("  {:>3}", item.ilvl),
+                format!("  Z{}", item.ilvl / 10),
                 Style::default().fg(Color::DarkGray),
+            ));
+            spans.push(Span::styled(
+                format!(" \u{26A1}{}", item.power()),
+                Style::default().fg(Color::Cyan),
             ));
 
             lines.push(Line::from(spans));

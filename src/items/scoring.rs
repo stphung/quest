@@ -1,6 +1,23 @@
 use super::types::{AffixType, AttributeBonuses, Item, Rarity};
 use crate::core::game_state::GameState;
 
+/// Returns the power weight for a given affix type.
+/// Used by both auto-equip scoring and intrinsic item power calculation.
+pub fn affix_power_weight(affix_type: AffixType) -> f64 {
+    match affix_type {
+        AffixType::DamagePercent => 2.0,
+        AffixType::CritChance => 1.5,
+        AffixType::CritMultiplier => 1.5,
+        AffixType::AttackSpeed => 1.2,
+        AffixType::HPBonus => 0.5, // Flat HP less valuable
+        AffixType::DamageReduction => 1.3,
+        AffixType::HPRegen => 1.0,
+        AffixType::DamageReflection => 0.8,
+        AffixType::XPGain => 1.0,
+        AffixType::Unknown => 0.0,
+    }
+}
+
 pub fn score_item(item: &Item, game_state: &GameState) -> f64 {
     let mut score = 0.0;
 
@@ -19,19 +36,7 @@ pub fn score_item(item: &Item, game_state: &GameState) -> f64 {
 
     // Score affixes with different weights
     for affix in &item.affixes {
-        let affix_score = match affix.affix_type {
-            AffixType::DamagePercent => affix.value * 2.0,
-            AffixType::CritChance => affix.value * 1.5,
-            AffixType::CritMultiplier => affix.value * 1.5,
-            AffixType::AttackSpeed => affix.value * 1.2,
-            AffixType::HPBonus => affix.value * 0.5, // Flat HP less valuable
-            AffixType::DamageReduction => affix.value * 1.3,
-            AffixType::HPRegen => affix.value * 1.0,
-            AffixType::DamageReflection => affix.value * 0.8,
-            AffixType::XPGain => affix.value * 1.0,
-            AffixType::Unknown => 0.0,
-        };
-        score += affix_score;
+        score += affix.value * affix_power_weight(affix.affix_type);
     }
 
     score

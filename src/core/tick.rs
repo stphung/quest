@@ -87,6 +87,7 @@ pub enum TickEvent {
         rarity: Rarity,
         tier: u8,
         ilvl: u32,
+        power: u32,
         equipped: bool,
         slot: String,
         stats: String,
@@ -114,6 +115,7 @@ pub enum TickEvent {
         rarity: Rarity,
         tier: u8,
         ilvl: u32,
+        power: u32,
         equipped: bool,
         message: String,
     },
@@ -337,6 +339,7 @@ pub fn game_tick<R: Rng>(
                             } else {
                                 "Kept current gear"
                             };
+                            let power = item.power();
                             let msg =
                                 format!("\u{1f48e} Found: {} [{}]", item.display_name, status);
                             result.events.push(TickEvent::DungeonTreasureFound {
@@ -344,6 +347,7 @@ pub fn game_tick<R: Rng>(
                                 rarity: item.rarity,
                                 tier: item.tier,
                                 ilvl: item.ilvl,
+                                power,
                                 equipped,
                                 message: msg,
                             });
@@ -886,6 +890,7 @@ fn process_item_drop(state: &mut GameState, haven_bonuses: &HavenBonuses, result
         let rarity = item.rarity;
         let tier = item.tier;
         let ilvl = item.ilvl;
+        let power = item.power();
         let slot = item.slot_name().to_string();
         let stats = item.stat_summary();
         let icon = if was_boss { "\u{1f451}" } else { "\u{1f381}" };
@@ -906,6 +911,7 @@ fn process_item_drop(state: &mut GameState, haven_bonuses: &HavenBonuses, result
             rarity,
             tier,
             ilvl,
+            power,
             equipped,
             slot,
             stats,
