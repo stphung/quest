@@ -265,9 +265,13 @@ fn spawn_ball<R: Rng>(game: &JezzballGame, rng: &mut R) -> Ball {
 mod tests {
     use super::*;
 
+    fn seeded_rng(seed: u64) -> rand_chacha::ChaCha8Rng {
+        rand::SeedableRng::seed_from_u64(seed)
+    }
+
     #[test]
     fn test_new_game_defaults() {
-        let mut rng = rand::rng();
+        let mut rng = seeded_rng(42);
         let game = JezzballGame::new(JezzballDifficulty::Novice, &mut rng);
 
         assert_eq!(game.difficulty, JezzballDifficulty::Novice);
@@ -287,7 +291,7 @@ mod tests {
 
     #[test]
     fn test_reset_for_retry() {
-        let mut rng = rand::rng();
+        let mut rng = seeded_rng(42);
         let mut game = JezzballGame::new(JezzballDifficulty::Novice, &mut rng);
         game.waiting_to_start = false;
         game.lives = 2;
@@ -374,7 +378,7 @@ mod tests {
 
     #[test]
     fn test_spawned_balls_within_bounds() {
-        let mut rng = rand::rng();
+        let mut rng = seeded_rng(42);
         let game = JezzballGame::new(JezzballDifficulty::Master, &mut rng);
 
         for ball in &game.balls {

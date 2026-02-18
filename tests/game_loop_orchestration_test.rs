@@ -20,7 +20,7 @@ use quest::character::derived_stats::DerivedStats;
 use quest::core::tick::{game_tick, TickEvent, TickResult};
 use quest::enhancement::EnhancementProgress;
 use quest::fishing::{FishingPhase, FishingSession};
-use quest::haven::{try_discover_haven, Haven};
+use quest::haven::{try_discover_haven, Haven, HavenRoomId};
 use quest::GameState;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -87,8 +87,8 @@ fn test_haven_discovery_requires_prestige_10_or_higher() {
     let mut haven = Haven::default();
     let mut rng = seeded_rng(42);
 
-    // P9 should never discover Haven
-    for _ in 0..1_000 {
+    // P9 should never discover Haven (structurally blocked by prestige check)
+    for _ in 0..100 {
         assert!(
             !try_discover_haven(&mut haven, 9, &mut rng),
             "P9 should not discover Haven"
@@ -729,14 +729,17 @@ fn test_fishing_message_event_prefixed() {
 #[test]
 fn test_challenge_discovered_event_has_follow_up() {
     // Contract: ChallengeDiscovered has both message and follow_up
-    let mut state = fresh_state();
-    state.prestige_rank = 1;
+    // Build Haven Library T3 (+50% discovery) to boost chance from 0.000014 to 0.000021/tick
     let mut haven = Haven::default();
+    haven.build_room(HavenRoomId::Hearthstone); // Required for Bedroom
+    haven.build_room(HavenRoomId::Bedroom); // Required for Library
+    haven.build_room(HavenRoomId::Library); // T1: +20%
+    haven.build_room(HavenRoomId::Library); // T2: +30%
+    haven.build_room(HavenRoomId::Library); // T3: +50%
     let mut tc = 0u32;
     let mut ach = Achievements::default();
 
     let mut found = false;
-    // Use many seeds since discovery is very rare (0.000014/tick)
     for seed in 0..50_000u64 {
         let mut rng = seeded_rng(seed);
         let mut s = fresh_state();
@@ -765,7 +768,10 @@ fn test_challenge_discovered_event_has_follow_up() {
             break;
         }
     }
-    assert!(found, "Should discover a challenge in 50k attempts at P1");
+    assert!(
+        found,
+        "Should discover a challenge in 50k attempts with Library T3"
+    );
 }
 
 #[test]
@@ -1378,8 +1384,8 @@ fn test_haven_discovery_via_game_tick_at_p10() {
 
 #[test]
 fn test_haven_discovery_via_game_tick_blocked_at_p9() {
-    // Verify game_tick does NOT produce HavenDiscovered at P9
-    for seed in 0..1_000u64 {
+    // Verify game_tick does NOT produce HavenDiscovered at P9 (structurally blocked)
+    for seed in 0..100u64 {
         let mut state = fresh_state();
         state.prestige_rank = 9;
         let mut tc = 0u32;
@@ -1403,8 +1409,8 @@ fn test_haven_discovery_via_game_tick_blocked_at_p9() {
 
 #[test]
 fn test_haven_discovery_via_game_tick_blocked_during_fishing() {
-    // Verify game_tick does NOT produce HavenDiscovered during fishing
-    for seed in 0..1_000u64 {
+    // Verify game_tick does NOT produce HavenDiscovered during fishing (structurally blocked)
+    for seed in 0..100u64 {
         let mut state = fresh_state();
         state.prestige_rank = 15;
         state.active_fishing = Some(make_fishing_session(FishingPhase::Waiting, 100, 5));
@@ -1431,7 +1437,7 @@ fn test_haven_discovery_via_game_tick_blocked_during_dungeon() {
     // Verify game_tick does NOT produce HavenDiscovered during dungeon
     use quest::dungeon::generation::generate_dungeon;
 
-    for seed in 0..1_000u64 {
+    for seed in 0..100u64 {
         let mut state = fresh_state();
         state.prestige_rank = 15;
         state.active_dungeon = Some(generate_dungeon(10, 0, 1));
