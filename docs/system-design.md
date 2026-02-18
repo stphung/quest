@@ -501,6 +501,10 @@ God items always receive T9. Legacy saves default to T1 for backward compatibili
 | Survival | HPBonus, DamageReduction, HPRegen, DamageReflection |
 | Utility | XPGain |
 
+### Intrinsic Power Score
+
+Every item exposes a character-independent power score (⚡) via `Item::power()`: `sum(attributes) + sum(affix_value × affix_weight)`. Displayed in cyan in the equipment panel and loot ticker. Shared affix weights with auto-equip (DmgPct 2.0, Crit 1.5, DR 1.3, AtkSpd 1.2, Regen/XP 1.0, Reflect 0.8, HP 0.5).
+
 ### Auto-Equip
 
 Items are automatically equipped if they score higher than the current item using a weighted scoring system. Attributes are weighted by the character's current build (specialization bonus), affix types by category (damage > survivability > progression). Empty slots always equip the first item found.
@@ -928,7 +932,7 @@ quest/
 │   │   ├── generation.rs    # Item generation
 │   │   ├── drops.rs         # Drop system
 │   │   ├── names.rs         # Name generation
-│   │   └── scoring.rs       # Auto-equip scoring
+│   │   └── scoring.rs       # Power scoring and auto-equip scoring
 │   ├── challenges/          # Challenge minigames
 │   │   ├── menu.rs          # Challenge menu
 │   │   ├── chess/           # Chess minigame

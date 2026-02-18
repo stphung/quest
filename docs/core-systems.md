@@ -321,6 +321,10 @@ Every item is independently assigned a quality tier (T0-T9) on an exponential dr
 | Survivability | HPBonus, DamageReduction, HPRegen, DamageReflection |
 | Progression | XPGain |
 
+### Intrinsic Power Score
+
+Every item has a character-independent power score (⚡) computed from raw attribute totals plus weighted affix values. Formula: `sum(attributes) + sum(affix_value × affix_weight)`. Displayed in cyan in the equipment panel and loot ticker. Uses the same affix weights as auto-equip (DmgPct 2.0, Crit 1.5, etc.).
+
 ### Auto-Equip
 
 Items are automatically equipped if they score higher than the current item using a weighted scoring system:
@@ -394,7 +398,7 @@ pub struct TickResult {
 
 **TickEvent categories**:
 - Combat: `PlayerAttack`, `PlayerAttackBlocked`, `EnemyAttack`, `DamageReflected`, `RegenComplete`, `EnemyDefeated`, `PlayerDied`, `PlayerDiedInDungeon`
-- Items: `ItemDropped` (rarity, slot, stats, equipped flag, from_boss flag)
+- Items: `ItemDropped` (rarity, tier, ilvl, power, slot, stats, equipped flag, from_boss flag)
 - Zones: `SubzoneBossDefeated` (with `BossDefeatResult`)
 - Dungeon: room entry, treasure, keys, boss unlock, completion, failure
 - Fishing: messages, catches, item drops, rank-ups, Storm Leviathan
