@@ -111,6 +111,9 @@ pub enum TickEvent {
     /// Treasure found in a dungeon treasure room.
     DungeonTreasureFound {
         item_name: String,
+        rarity: Rarity,
+        tier: u8,
+        ilvl: u32,
         equipped: bool,
         message: String,
     },
@@ -326,7 +329,9 @@ pub fn game_tick<R: Rng>(
 
                     // Handle treasure room
                     if room_type == RoomType::Treasure {
-                        if let Some((item, equipped)) = on_treasure_room_entered(state) {
+                        if let Some((item, equipped)) =
+                            on_treasure_room_entered(state, haven_bonuses.item_rarity_percent)
+                        {
                             let status = if equipped {
                                 "Equipped!"
                             } else {
@@ -336,6 +341,9 @@ pub fn game_tick<R: Rng>(
                                 format!("\u{1f48e} Found: {} [{}]", item.display_name, status);
                             result.events.push(TickEvent::DungeonTreasureFound {
                                 item_name: item.display_name,
+                                rarity: item.rarity,
+                                tier: item.tier,
+                                ilvl: item.ilvl,
                                 equipped,
                                 message: msg,
                             });

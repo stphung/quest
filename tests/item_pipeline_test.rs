@@ -226,9 +226,10 @@ fn test_affix_count_contract_across_all_rarities() {
 fn test_higher_rarity_produces_higher_average_attribute_total() {
     let sample_avg = |rarity: Rarity| -> f64 {
         let n = 2000;
+        // Use ilvl 50 so tier multiplier differences are meaningful
         let sum: u32 = (0..n)
             .map(|_| {
-                generate_item(EquipmentSlot::Weapon, rarity, 10)
+                generate_item(EquipmentSlot::Weapon, rarity, 50)
                     .attributes
                     .total()
             })

@@ -581,7 +581,7 @@ fn test_dungeon_treasure_room_gives_item() {
         dungeon.current_room_cleared = false;
 
         // on_treasure_room_entered generates an item and auto-equips (game_tick line 1069)
-        if let Some((item, equipped)) = on_treasure_room_entered(&mut state) {
+        if let Some((item, equipped)) = on_treasure_room_entered(&mut state, 0.0) {
             assert!(
                 !item.display_name.is_empty(),
                 "Treasure item should have a name"

@@ -583,7 +583,7 @@ fn test_dungeon_treasure_room_gives_item() {
     state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
     // on_treasure_room_entered generates an item and auto-equips if better
-    let result = on_treasure_room_entered(&mut state);
+    let result = on_treasure_room_entered(&mut state, 0.0);
     assert!(result.is_some(), "Treasure room should produce an item");
 
     let (item, _equipped) = result.unwrap();

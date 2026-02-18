@@ -260,17 +260,49 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     .add_log_entry(message.clone(), false, true);
             }
             TickEvent::DungeonTreasureFound {
-                item_name, message, ..
+                item_name,
+                rarity,
+                tier,
+                ilvl,
+                equipped,
+                message,
             } => {
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
+                let rc = rarity_color(*rarity);
+                let tc = crate::ui::tier_color(*tier);
+                let mut segs = vec![
+                    TickerSegment {
+                        text: format!("{} ", rarity.name()),
+                        color: rc,
+                    },
+                    TickerSegment {
+                        text: format!("T{}", tier),
+                        color: tc,
+                    },
+                    TickerSegment {
+                        text: format!(" {}", item_name),
+                        color: rc,
+                    },
+                    TickerSegment {
+                        text: format!(" i{}", ilvl),
+                        color: Color::DarkGray,
+                    },
+                ];
+                if *equipped {
+                    segs.push(TickerSegment {
+                        text: " \u{1F528}".to_string(),
+                        color: rc,
+                    });
+                }
                 game_state.ticker.push(TickerEntry {
                     icon: "\u{1F48E}",
-                    text: item_name.clone(),
-                    color: Color::Cyan,
-                    bold: false,
-                    segments: None,
+                    text: String::new(),
+                    color: rc,
+                    bold: *tier >= 7
+                        || matches!(rarity, Rarity::Epic | Rarity::Legendary | Rarity::Mythic),
+                    segments: Some(segs),
                 });
             }
             TickEvent::DungeonKeyFound { message } => {

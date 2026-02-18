@@ -64,7 +64,8 @@ pub fn try_drop_from_boss(zone_id: usize, is_final_zone: bool) -> Item {
 }
 
 /// Roll rarity for mob drops - caps at Epic (no legendaries).
-/// Haven Workshop bonus shifts distribution toward higher rarities.
+/// Prestige gives a flat bonus (shifts Common → Rare/Epic).
+/// Haven Workshop bonus is multiplicative on non-Common rates.
 pub fn roll_rarity_for_mob(
     prestige_rank: u32,
     haven_rarity_percent: f64,
@@ -72,27 +73,29 @@ pub fn roll_rarity_for_mob(
 ) -> Rarity {
     let roll = rng.random::<f64>();
 
-    // Prestige gives a small bonus per rank, capped
+    // Step 1: Prestige flat bonus — shifts from Common to Rare (60%) and Epic (remainder)
     let prestige_bonus = (prestige_rank as f64 * MOB_RARITY_PRESTIGE_BONUS_PER_RANK)
         .min(MOB_RARITY_PRESTIGE_BONUS_CAP);
 
-    // Workshop bonus: shifts distribution toward higher rarities
-    let haven_bonus = (haven_rarity_percent / 100.0).min(MOB_RARITY_HAVEN_BONUS_CAP);
-    let total_bonus = prestige_bonus + haven_bonus;
+    let common_base = (MOB_RARITY_COMMON_BASE - prestige_bonus).max(MOB_RARITY_COMMON_FLOOR);
+    let magic_base = MOB_RARITY_MAGIC_BASE;
+    let rare_base = MOB_RARITY_RARE_BASE + prestige_bonus * MOB_RARITY_RARE_BONUS_SHARE;
+    let epic_base = 1.0 - common_base - magic_base - rare_base;
 
-    // Mob distribution: 60% Common, 28% Magic, 10% Rare, 2% Epic, 0% Legendary
-    // Bonuses shift Common down and spread across higher tiers.
-    let common_threshold = (MOB_RARITY_COMMON_BASE - total_bonus).max(MOB_RARITY_COMMON_FLOOR);
-    let magic_threshold = common_threshold + MOB_RARITY_MAGIC_BASE;
-    let rare_threshold =
-        magic_threshold + MOB_RARITY_RARE_BASE + total_bonus * MOB_RARITY_RARE_BONUS_SHARE;
-    // Epic is the remainder (capped, no legendary)
+    // Step 2: Haven Workshop — multiplicative on non-Common rates
+    let haven_mult = 1.0 + (haven_rarity_percent / 100.0).min(MOB_RARITY_HAVEN_BONUS_CAP);
+    let magic = magic_base * haven_mult;
+    let rare = rare_base * haven_mult;
+    let epic = epic_base * haven_mult;
 
-    if roll < common_threshold {
+    // Common absorbs the remainder (floored at 20%)
+    let common = (1.0 - magic - rare - epic).max(MOB_RARITY_COMMON_FLOOR);
+
+    if roll < common {
         Rarity::Common
-    } else if roll < magic_threshold {
+    } else if roll < common + magic {
         Rarity::Magic
-    } else if roll < rare_threshold {
+    } else if roll < common + magic + rare {
         Rarity::Rare
     } else {
         Rarity::Epic
