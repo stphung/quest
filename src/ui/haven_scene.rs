@@ -12,6 +12,25 @@ use ratatui::{
     Frame,
 };
 
+/// Returns the icon of the highest unlocked Haven achievement, if any.
+fn highest_haven_badge(achievements: &crate::achievements::Achievements) -> Option<&'static str> {
+    use crate::achievements::AchievementId;
+
+    let haven_achievements = [
+        AchievementId::HavenArchitect,
+        AchievementId::HavenBuilderII,
+        AchievementId::HavenBuilderI,
+        AchievementId::HavenDiscovered,
+    ];
+
+    for id in haven_achievements {
+        if achievements.is_unlocked(id) {
+            return crate::achievements::data::get_achievement_def(id).map(|def| def.icon);
+        }
+    }
+    None
+}
+
 /// Write a string into the scene buffer at (row, col).
 fn put_text(buffer: &mut [Vec<SceneCell>], row: i32, col: i32, text: &str, fg: Color) {
     for (i, ch) in text.chars().enumerate() {
@@ -76,7 +95,7 @@ fn render_summary_bar(buffer: &mut [Vec<SceneCell>], row: i32, haven: &Haven) {
     let rooms_built = haven.rooms_built();
     let total_rooms = haven.total_rooms();
 
-    let header = format!("Active bonuses ({}/{} rooms): ", rooms_built, total_rooms);
+    let header = format!("Active bonuses ({}/{}): ", rooms_built, total_rooms);
     put_text(buffer, row, 0, &header, Color::White);
     let mut col = header.chars().count() as i32;
 
@@ -138,7 +157,7 @@ fn render_skill_tree(
         put_cell(buffer, r, left, '\u{2502}', border_fg);
         put_cell(buffer, r, right, '\u{2502}', border_fg);
     }
-    put_text(buffer, top, left + 1, " Skill Tree ", border_fg);
+    put_text(buffer, top, left + 1, " Buildings ", border_fg);
 
     let inner_left = left + 1;
     let content_top = top + 1;
@@ -493,8 +512,12 @@ pub fn render_haven_tree(
 ) {
     frame.render_widget(Clear, area);
 
+    let haven_title = match highest_haven_badge(achievements) {
+        Some(icon) => format!(" Haven {} ", icon),
+        None => " Haven ".to_string(),
+    };
     let block = Block::default()
-        .title(" Haven ")
+        .title(haven_title)
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Cyan));
 

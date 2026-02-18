@@ -11,7 +11,7 @@ Issue: #123 — Prestige provides no direct combat benefit; 65% of P0 players st
 | XP multiplier | `1.0 + 0.5 * rank^0.7` | Indirect — faster leveling, not combat power |
 | Attribute cap | `20 + 5 * rank` | **Negated** — enemies scale with `player_max_hp` |
 | Item drop rate | `+1% per rank (cap 25%)` | Indirect — more gear, not combat power |
-| Mob rarity bonus | `+1% per rank (cap 10%)` | Indirect — better gear quality |
+| Mob rarity bonus | `+0.5% per rank (cap 10%)` | Indirect — better gear quality |
 
 ### The Core Problem: Enemy HP Scaling Cancels Attribute Caps
 

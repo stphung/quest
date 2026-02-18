@@ -146,9 +146,9 @@ CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FI
 
 ### Item Module (`src/items/`) — [detailed docs](src/items/CLAUDE.md)
 
-- `types.rs` — Core item data structures (7 equipment slots, 6 rarity tiers including God/Mythic, 9 affix types + Unknown fallback, ilvl scaling, `god_item_id` field)
+- `types.rs` — Core item data structures (7 equipment slots, 6 rarity tiers including God/Mythic, 9 affix types + Unknown fallback, ilvl scaling, tier (T0-T9), `god_item_id` field)
 - `equipment.rs` — Equipment container with slot management and iteration
-- `generation.rs` — Rarity-based attribute/affix generation with ilvl scaling (1.0x at ilvl 10 to 4.0x at ilvl 100)
+- `generation.rs` — Rarity-based attribute/affix generation with ilvl scaling (1.0x at ilvl 10 to 4.0x at ilvl 100) and tier quality multiplier (T0 0.40x to T9 1.00x)
 - `drops.rs` — Separate mob/boss drop systems: mobs have 15% base drop chance (capped at Epic), bosses always drop (can drop Legendary)
 - `names.rs` — Procedural name generation with prefixes/suffixes
 - `scoring.rs` — Smart weighted auto-equip scoring (attribute specialization bonus, affix type weights). God (Mythic) items are never auto-replaced by lower rarity
@@ -277,6 +277,7 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 - Mob item drop rate: 15% base + 1% per prestige rank (capped at 25%), max rarity Epic
 - Boss item drops: Guaranteed, can include Legendary (2% normal boss, 5% Zone 10 final boss)
 - Item level: ilvl = zone_id × 10 (Zone 1 = ilvl 10, Zone 10 = ilvl 100)
+- Item tier: T0-T9 quality roll (exponential curve: T0 38%, T9 0.1%). Stat multiplier: T0 0.40x to T9 1.00x. God items always T9
 - Boss spawn: After 10 kills in subzone (5 kills to retry after boss death)
 - Haven discovery: requires P10+, base chance 0.000014/tick + 0.000007 per rank above 10
 - Challenge discovery: ~2hr avg per challenge (requires P1+)

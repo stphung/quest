@@ -293,7 +293,13 @@ Weapon, Armor, Helmet, Gloves, Boots, Amulet, Ring.
 | Legendary | Orange | +8-15 | 4-5 |
 | God (Mythic) | — | Fixed per item | Fixed per item |
 
-God (Mythic) rarity is exclusive to the three god items (Asprika, Sleipnir, Megingjord). These have fixed stats and unique passives, not procedurally generated.
+God (Mythic) rarity is exclusive to the three god items (Asprika, Sleipnir, Megingjord). These have fixed stats and unique passives, not procedurally generated. God items always receive tier T9.
+
+Attribute values scale with both ilvl (zone-based) and tier (T0-T9 quality roll). See Item Tier section below.
+
+### Item Tier (Quality) System
+
+Every item is independently assigned a quality tier (T0-T9) on an exponential drop curve. Tier multiplies stat values alongside ilvl: `effective_multiplier = ilvl_multiplier × tier_multiplier`. T9 (0.1% drop rate, 1.00x multiplier) equals the pre-tier power ceiling. T0 (38.0% drop rate, 0.40x multiplier) is the most common. God items always T9. Legacy saves default to T1.
 
 ### Drop System
 
@@ -304,7 +310,7 @@ God (Mythic) rarity is exclusive to the three god items (Asprika, Sleipnir, Megi
 
 **Mob rarity distribution** (base at P0):
 - Common: 60%, Magic: 28%, Rare: 10%, Epic: 2%, Legendary: never (mob drops cannot be Legendary)
-- Prestige bonus for rarity: +1%/rank, capped at 10%. Haven Workshop bonus: up to 25%. Both shift weight away from Common toward higher rarities
+- Prestige bonus for rarity: +0.5%/rank, capped at 10% (cap reached at P20). Haven Workshop bonus: multiplicative on non-Common rates (up to +25%)
 - Common floor: never drops below 20%
 
 ### Affix Types (9 + Unknown)

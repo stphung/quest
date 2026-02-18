@@ -64,10 +64,11 @@ pub fn render_flappy_scene(
     area: Rect,
     game: &FlappyBirdGame,
     ctx: &super::responsive::LayoutContext,
+    show_dismiss_hint: bool,
 ) {
     // Game over overlay takes priority
     if game.game_result.is_some() {
-        render_flappy_game_over(frame, area, game);
+        render_flappy_game_over(frame, area, game, show_dismiss_hint);
         return;
     }
 
@@ -726,7 +727,12 @@ fn render_start_prompt(frame: &mut Frame, area: Rect) {
 }
 
 /// Render the game over overlay.
-fn render_flappy_game_over(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
+fn render_flappy_game_over(
+    frame: &mut Frame,
+    area: Rect,
+    game: &FlappyBirdGame,
+    show_dismiss_hint: bool,
+) {
     let result = game.game_result.as_ref().unwrap();
 
     let (result_type, title, message, reward) = match result {
@@ -760,5 +766,13 @@ fn render_flappy_game_over(frame: &mut Frame, area: Rect, game: &FlappyBirdGame)
         }
     };
 
-    render_game_over_overlay(frame, area, result_type, title, &message, &reward);
+    render_game_over_overlay(
+        frame,
+        area,
+        result_type,
+        title,
+        &message,
+        &reward,
+        show_dismiss_hint,
+    );
 }
