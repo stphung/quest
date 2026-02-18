@@ -618,7 +618,7 @@ fn handle_debug_menu(
 }
 
 /// Duration to ignore input after game-over screen appears.
-const GAME_OVER_COOLDOWN: std::time::Duration = std::time::Duration::from_secs(1);
+const GAME_OVER_COOLDOWN: std::time::Duration = std::time::Duration::from_secs(2);
 
 fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
     if let Some(ref minigame) = state.active_minigame {

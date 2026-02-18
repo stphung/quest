@@ -534,7 +534,7 @@ fn draw_right_content(frame: &mut Frame, area: Rect, game_state: &GameState, ctx
     // Show "[Press any key]" only after the game-over dismiss cooldown expires
     let show_dismiss_hint = game_state
         .game_over_shown_at
-        .is_some_and(|t| t.elapsed() >= std::time::Duration::from_secs(1));
+        .is_some_and(|t| t.elapsed() >= std::time::Duration::from_secs(2));
 
     match &game_state.active_minigame {
         Some(ActiveMinigame::Rune(game)) => {
