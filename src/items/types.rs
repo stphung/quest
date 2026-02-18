@@ -200,6 +200,22 @@ impl Item {
     pub fn slot_name(&self) -> &'static str {
         self.slot.name()
     }
+
+    /// Returns the intrinsic power score for this item.
+    ///
+    /// Computed from raw attribute totals (equal weight) plus weighted affix values.
+    /// Independent of character build — the same item always returns the same power.
+    pub fn power(&self) -> u32 {
+        use crate::items::scoring::affix_power_weight;
+
+        let attr_total: f64 = self.attributes.as_array().iter().map(|&v| v as f64).sum();
+        let affix_total: f64 = self
+            .affixes
+            .iter()
+            .map(|a| a.value * affix_power_weight(a.affix_type))
+            .sum();
+        (attr_total + affix_total).round() as u32
+    }
 }
 
 #[cfg(test)]
