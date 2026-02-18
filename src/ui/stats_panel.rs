@@ -133,54 +133,10 @@ fn draw_header(frame: &mut Frame, area: Rect, game_state: &GameState) {
     }
 }
 
-/// Draws the current zone and subzone info
-/// Zone completion status for the second line of the zone info panel.
-pub(super) enum ZoneCompletionStatus {
-    /// Zone complete but next zone requires higher prestige
-    Gated {
-        next_zone_id: u32,
-        next_zone_name: &'static str,
-        required_prestige: u32,
-    },
-    /// Zone complete and player meets the requirement
-    Unlocked {
-        next_zone_id: u32,
-        next_zone_name: &'static str,
-        required_prestige: u32,
-    },
-    /// No next zone — unknown territory
-    Mystery,
-}
-
-pub(super) fn compute_zone_completion(game_state: &GameState) -> ZoneCompletionStatus {
-    use crate::zones::get_all_zones;
-
-    let zones = get_all_zones();
-    let prog = &game_state.zone_progression;
-
-    // Always show next zone status when a next zone exists
-    match zones.iter().find(|z| z.id == prog.current_zone_id + 1) {
-        Some(next) if next.prestige_requirement > game_state.prestige_rank => {
-            ZoneCompletionStatus::Gated {
-                next_zone_id: next.id,
-                next_zone_name: next.name,
-                required_prestige: next.prestige_requirement,
-            }
-        }
-        Some(next) => ZoneCompletionStatus::Unlocked {
-            next_zone_id: next.id,
-            next_zone_name: next.name,
-            required_prestige: next.prestige_requirement,
-        },
-        None => ZoneCompletionStatus::Mystery,
-    }
-}
-
 pub(super) fn draw_zone_info(
     frame: &mut Frame,
     area: Rect,
     game_state: &GameState,
-    zone_completion: &ZoneCompletionStatus,
     achievements: &crate::achievements::Achievements,
     _ctx: &LayoutContext,
 ) {
@@ -259,72 +215,88 @@ pub(super) fn draw_zone_info(
         )]));
     }
 
-    // Blank line separator between flavor text and next-zone status
-    zone_lines.push(Line::from(""));
+    // Segmented zone progress bar
+    // Each zone gets a 3-char segment showing subzone completion
+    let mut bar_spans: Vec<Span> = Vec::new();
+    let mut label_spans: Vec<Span> = Vec::new();
 
-    // Add second line based on completion status
-    match zone_completion {
-        ZoneCompletionStatus::Gated {
-            next_zone_id,
-            next_zone_name,
-            required_prestige,
-        } => {
-            zone_lines.push(Line::from(vec![
-                Span::styled("🔒 Next: ", Style::default().fg(Color::Yellow)),
-                Span::styled(
-                    format!("Zone {}: {}", next_zone_id, next_zone_name),
-                    Style::default()
-                        .fg(Color::White)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(
-                    format!(" — requires Prestige {}", required_prestige),
-                    Style::default().fg(Color::Yellow),
-                ),
-            ]));
+    for zid in 1..=11u32 {
+        if zid > 1 {
+            bar_spans.push(Span::raw(" "));
         }
-        ZoneCompletionStatus::Unlocked {
-            next_zone_id,
-            next_zone_name,
-            required_prestige,
-        } => {
-            let line = if *required_prestige == 0 {
-                // No prestige needed — just show the arrow
-                Line::from(vec![
-                    Span::styled("➡ Next: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(
-                        format!("Zone {}: {}", next_zone_id, next_zone_name),
-                        Style::default()
-                            .fg(Color::White)
-                            .add_modifier(Modifier::BOLD),
-                    ),
-                ])
-            } else {
-                Line::from(vec![
-                    Span::styled("✅ Next: ", Style::default().fg(Color::Green)),
-                    Span::styled(
-                        format!("Zone {}: {}", next_zone_id, next_zone_name),
-                        Style::default()
-                            .fg(Color::White)
-                            .add_modifier(Modifier::BOLD),
-                    ),
-                    Span::styled(
-                        format!(" — Prestige {} requirement met!", required_prestige),
-                        Style::default().fg(Color::Green),
-                    ),
-                ])
-            };
-            zone_lines.push(line);
+
+        let zone_data = zones.iter().find(|z| z.id == zid);
+        let num_subzones = zone_data.map(|z| z.subzones.len()).unwrap_or(3);
+
+        // Count defeated bosses in this zone
+        let defeated_count = zone_data
+            .map(|z| {
+                z.subzones
+                    .iter()
+                    .filter(|s| prog.is_boss_defeated(zid, s.id))
+                    .count()
+            })
+            .unwrap_or(0);
+
+        // Determine zone state
+        let is_current = zid == prog.current_zone_id;
+        let is_completed = defeated_count == num_subzones;
+        // Zone 11 is achievement-gated (StormsEnd), not prestige-gated
+        let is_unlocked = if zid == 11 {
+            achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd)
+        } else {
+            prog.is_zone_unlocked(zid)
+        };
+
+        // Build 3-char segment based on fill level
+        let filled = if is_completed {
+            3
+        } else if defeated_count == 0 {
+            0
+        } else {
+            ((defeated_count as f64 / num_subzones as f64) * 3.0).ceil() as usize
         }
-        ZoneCompletionStatus::Mystery => {
-            zone_lines.push(Line::from(vec![Span::styled(
-                "❓ Next: Zone ???: ????????",
-                Style::default()
-                    .fg(Color::DarkGray)
-                    .add_modifier(Modifier::DIM),
-            )]));
+        .min(3);
+
+        let (fill_char, empty_char, fg) = if is_completed {
+            ("█", "█", Color::Green)
+        } else if is_current {
+            ("█", "░", Color::Yellow)
+        } else if is_unlocked {
+            ("░", "░", Color::White)
+        } else {
+            ("░", "░", Color::DarkGray)
+        };
+
+        let segment: String = fill_char.repeat(filled) + &empty_char.repeat(3 - filled);
+        let segment_style = if is_current {
+            Style::default().fg(fg).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(fg)
+        };
+        bar_spans.push(Span::styled(segment, segment_style));
+
+        // Zone number label — 3 chars wide to match segment, plus separator
+        let label_fg = if is_current {
+            Color::Yellow
+        } else if is_completed {
+            Color::Green
+        } else if is_unlocked {
+            Color::White
+        } else {
+            Color::DarkGray
+        };
+        // Add separator space before label (matching bar separator), except first
+        if zid > 1 {
+            let sep = if zid == 10 { "  " } else { " " };
+            label_spans.push(Span::raw(sep));
         }
+        let label = format!("{:^3}", zid);
+        label_spans.push(Span::styled(label, Style::default().fg(label_fg)));
     }
+
+    zone_lines.push(Line::from(bar_spans));
+    zone_lines.push(Line::from(label_spans));
 
     let zone_widget = Paragraph::new(zone_lines)
         .block(
