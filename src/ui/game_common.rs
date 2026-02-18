@@ -196,6 +196,7 @@ pub fn render_game_over_overlay(
     title: &str,
     message: &str,
     reward: &str,
+    show_dismiss_hint: bool,
 ) {
     frame.render_widget(Clear, area);
 
@@ -211,7 +212,7 @@ pub fn render_game_over_overlay(
     let content_height: u16 = 7;
     let y_offset = inner.y + (inner.height.saturating_sub(content_height)) / 2;
 
-    let lines = vec![
+    let mut lines = vec![
         Line::from(Span::styled(
             title,
             Style::default()
@@ -223,11 +224,16 @@ pub fn render_game_over_overlay(
         Line::from(""),
         Line::from(Span::styled(reward, Style::default().fg(Color::Cyan))),
         Line::from(""),
-        Line::from(Span::styled(
+    ];
+
+    if show_dismiss_hint {
+        lines.push(Line::from(Span::styled(
             "[Press any key]",
             Style::default().fg(Color::DarkGray),
-        )),
-    ];
+        )));
+    } else {
+        lines.push(Line::from(""));
+    }
 
     let text = Paragraph::new(lines).alignment(Alignment::Center);
     frame.render_widget(
@@ -256,6 +262,7 @@ pub fn render_game_over_banner(
     title: &str,
     message: &str,
     reward: &str,
+    show_dismiss_hint: bool,
 ) {
     let banner_height: u16 = if reward.is_empty() { 4 } else { 5 };
     let banner_y = area.y + area.height.saturating_sub(banner_height);
@@ -297,10 +304,14 @@ pub fn render_game_over_banner(
         )));
     }
 
-    lines.push(Line::from(Span::styled(
-        "[Press any key]",
-        Style::default().fg(Color::DarkGray),
-    )));
+    if show_dismiss_hint {
+        lines.push(Line::from(Span::styled(
+            "[Press any key]",
+            Style::default().fg(Color::DarkGray),
+        )));
+    } else {
+        lines.push(Line::from(""));
+    }
 
     let text = Paragraph::new(lines).alignment(Alignment::Center);
     frame.render_widget(text, inner);

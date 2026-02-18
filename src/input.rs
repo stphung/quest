@@ -617,7 +617,31 @@ fn handle_debug_menu(
     InputResult::Continue
 }
 
+/// Duration to ignore input after game-over screen appears.
+const GAME_OVER_COOLDOWN: std::time::Duration = std::time::Duration::from_secs(2);
+
 fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
+    if let Some(ref minigame) = state.active_minigame {
+        if minigame.has_game_result() {
+            let now = std::time::Instant::now();
+            match state.game_over_shown_at {
+                None => {
+                    // First keypress after game-over: start cooldown, swallow input
+                    state.game_over_shown_at = Some(now);
+                    return InputResult::Continue;
+                }
+                Some(shown_at) if now.duration_since(shown_at) < GAME_OVER_COOLDOWN => {
+                    // Still in cooldown: swallow input
+                    return InputResult::Continue;
+                }
+                _ => {
+                    // Cooldown expired: dismiss game-over
+                    state.game_over_shown_at = None;
+                }
+            }
+        }
+    }
+
     if let Some(ref mut minigame) = state.active_minigame {
         match minigame {
             ActiveMinigame::Rune(rune_game) => {

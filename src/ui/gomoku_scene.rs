@@ -20,10 +20,11 @@ pub fn render_gomoku_scene(
     area: Rect,
     game: &GomokuGame,
     ctx: &super::responsive::LayoutContext,
+    show_dismiss_hint: bool,
 ) {
     // Game over overlay
     if game.game_result.is_some() {
-        render_gomoku_game_over(frame, area, game, ctx);
+        render_gomoku_game_over(frame, area, game, ctx, show_dismiss_hint);
         return;
     }
 
@@ -219,6 +220,7 @@ fn render_gomoku_game_over(
     area: Rect,
     game: &GomokuGame,
     ctx: &super::responsive::LayoutContext,
+    show_dismiss_hint: bool,
 ) {
     use crate::challenges::menu::DifficultyInfo;
     use ratatui::widgets::Clear;
@@ -254,5 +256,13 @@ fn render_gomoku_game_over(
     };
 
     // Render banner at bottom of content area (not status bar, which is too small)
-    render_game_over_banner(frame, layout.content, result_type, title, message, &reward);
+    render_game_over_banner(
+        frame,
+        layout.content,
+        result_type,
+        title,
+        message,
+        &reward,
+        show_dismiss_hint,
+    );
 }

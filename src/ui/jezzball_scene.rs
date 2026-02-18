@@ -50,9 +50,10 @@ pub fn render_jezzball_scene(
     area: Rect,
     game: &JezzballGame,
     ctx: &super::responsive::LayoutContext,
+    show_dismiss_hint: bool,
 ) {
     if game.game_result.is_some() {
-        render_jezzball_game_over(frame, area, game);
+        render_jezzball_game_over(frame, area, game, show_dismiss_hint);
         return;
     }
 
@@ -425,7 +426,12 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &JezzballGame) {
     frame.render_widget(Paragraph::new(lines), inner);
 }
 
-fn render_jezzball_game_over(frame: &mut Frame, area: Rect, game: &JezzballGame) {
+fn render_jezzball_game_over(
+    frame: &mut Frame,
+    area: Rect,
+    game: &JezzballGame,
+    show_dismiss_hint: bool,
+) {
     let result = game.game_result.expect("game_result checked before call");
 
     let (result_type, title, message, reward) = match result {
@@ -459,5 +465,13 @@ fn render_jezzball_game_over(frame: &mut Frame, area: Rect, game: &JezzballGame)
         }
     };
 
-    render_game_over_overlay(frame, area, result_type, title, &message, &reward);
+    render_game_over_overlay(
+        frame,
+        area,
+        result_type,
+        title,
+        &message,
+        &reward,
+        show_dismiss_hint,
+    );
 }

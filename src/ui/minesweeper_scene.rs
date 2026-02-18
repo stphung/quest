@@ -19,10 +19,11 @@ pub fn render_minesweeper(
     area: Rect,
     game: &MinesweeperGame,
     ctx: &super::responsive::LayoutContext,
+    show_dismiss_hint: bool,
 ) {
     // Game over overlay
     if game.game_result.is_some() {
-        render_minesweeper_game_over(frame, area, game);
+        render_minesweeper_game_over(frame, area, game, show_dismiss_hint);
         return;
     }
 
@@ -207,7 +208,12 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &MinesweeperGame) {
     frame.render_widget(text, inner);
 }
 
-fn render_minesweeper_game_over(frame: &mut Frame, area: Rect, game: &MinesweeperGame) {
+fn render_minesweeper_game_over(
+    frame: &mut Frame,
+    area: Rect,
+    game: &MinesweeperGame,
+    show_dismiss_hint: bool,
+) {
     let result = game.game_result.as_ref().unwrap();
 
     let (result_type, title, message, reward) = match result {
@@ -233,5 +239,13 @@ fn render_minesweeper_game_over(frame: &mut Frame, area: Rect, game: &Minesweepe
         ),
     };
 
-    render_game_over_overlay(frame, area, result_type, title, message, &reward);
+    render_game_over_overlay(
+        frame,
+        area,
+        result_type,
+        title,
+        message,
+        &reward,
+        show_dismiss_hint,
+    );
 }

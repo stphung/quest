@@ -78,6 +78,24 @@ pub enum ActiveMinigame {
     Snake(SnakeGame),
 }
 
+impl ActiveMinigame {
+    /// Returns true if this minigame has a final result (win/loss/draw).
+    pub fn has_game_result(&self) -> bool {
+        match self {
+            ActiveMinigame::Chess(g) => g.game_result.is_some(),
+            ActiveMinigame::FlappyBird(g) => g.game_result.is_some(),
+            ActiveMinigame::Morris(g) => g.game_result.is_some(),
+            ActiveMinigame::Gomoku(g) => g.game_result.is_some(),
+            ActiveMinigame::Minesweeper(g) => g.game_result.is_some(),
+            ActiveMinigame::Rune(g) => g.game_result.is_some(),
+            ActiveMinigame::RunicShift(g) => g.game_result.is_some(),
+            ActiveMinigame::Go(g) => g.game_result.is_some(),
+            ActiveMinigame::Jezzball(g) => g.game_result.is_some(),
+            ActiveMinigame::Snake(g) => g.game_result.is_some(),
+        }
+    }
+}
+
 /// Information about a minigame win for achievement tracking.
 #[derive(Debug, Clone)]
 pub struct MinigameWinInfo {
