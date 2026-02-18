@@ -442,7 +442,9 @@ Weapon, Armor, Helmet, Gloves, Boots, Amulet, Ring
 | Legendary | Orange | +8-15 | 4-5 |
 | God (Mythic) | — | Fixed per item | Fixed per item |
 
-God (Mythic) rarity is reserved for the three god items (Asprika, Sleipnir, Megingjord). These are not generated procedurally — they have fixed stats and unique passives. See [God Items](#god-items) below.
+God (Mythic) rarity is reserved for the three god items (Asprika, Sleipnir, Megingjord). These are not generated procedurally — they have fixed stats and unique passives. God items always receive tier T9. See [God Items](#god-items) below.
+
+Attribute bonuses scale with both ilvl (zone-based) and tier (T0-T9 quality roll). The values above are approximate base ranges at ilvl 10. See [Item Tier System](#item-tier-quality-system) below for tier details.
 
 ### Drop Rates
 
@@ -457,8 +459,8 @@ God (Mythic) rarity is reserved for the three god items (Asprika, Sleipnir, Megi
 - Can include Legendary rarity (2% normal boss, 5% Zone 10 final boss)
 
 **Rarity bonuses:**
-- Prestige: +1% per rank toward higher rarities (capped at +10%)
-- Haven Workshop: up to +25% rarity shift
+- Prestige: +0.5% per rank toward higher rarities (capped at +10%, reaches cap at P20)
+- Haven Workshop: multiplicative on non-Common rates (up to +25%)
 - Common floor: never drops below 20%
 
 ### Item Level Scaling
@@ -467,6 +469,29 @@ God (Mythic) rarity is reserved for the three god items (Asprika, Sleipnir, Megi
 item_level = zone_id x 10
 ```
 Zone 1 = ilvl 10, Zone 10 = ilvl 100. Higher ilvl items have proportionally stronger attribute bonuses and affix values (1.0x at ilvl 10 to 4.0x at ilvl 100).
+
+### Item Tier (Quality) System
+
+Every item is independently assigned a quality tier from T0 (worst) to T9 (best). Tier is rolled on an exponential drop curve and multiplies stat values alongside the ilvl multiplier. T9 equals the pre-tier power ceiling, so most drops are weaker than before, making high-tier finds exciting.
+
+**Tier Distribution:**
+
+| Tier | Drop Rate | Stat Multiplier |
+|------|-----------|----------------|
+| T0 | 38.0% | 0.40x |
+| T1 | 24.0% | 0.47x |
+| T2 | 15.0% | 0.54x |
+| T3 | 10.0% | 0.61x |
+| T4 | 6.0% | 0.68x |
+| T5 | 3.5% | 0.74x |
+| T6 | 2.0% | 0.80x |
+| T7 | 1.0% | 0.86x |
+| T8 | 0.4% | 0.93x |
+| T9 | 0.1% | 1.00x |
+
+**Effective stat multiplier**: `ilvl_multiplier × tier_multiplier`. For example, an ilvl 100 T9 item has 4.0x stats (same as pre-tier ceiling), while an ilvl 100 T0 item has only 1.6x stats.
+
+God items always receive T9. Legacy saves default to T1 for backward compatibility.
 
 ### Affix Types (9 + Unknown)
 
