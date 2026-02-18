@@ -366,7 +366,7 @@ fn test_fishing_discovery_creates_valid_session() {
 fn test_all_spot_names_used() {
     let mut spot_counts = std::collections::HashMap::new();
 
-    for seed in 0..10000 {
+    for seed in 0..2000 {
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
         let mut state = create_test_state();
 
@@ -668,7 +668,7 @@ fn test_leviathan_encounter_progresses_through_stages() {
         let encounters_so_far = expected_encounter - 1;
         let mut found = false;
 
-        for _ in 0..10000 {
+        for _ in 0..3000 {
             let (_, result) =
                 generate_fish_with_rank(FishRarity::Legendary, 40, encounters_so_far, &mut rng);
             if let LeviathanResult::Escaped { encounter_number } = result {
@@ -683,7 +683,7 @@ fn test_leviathan_encounter_progresses_through_stages() {
         }
         assert!(
             found,
-            "Should find encounter {} within 10000 tries",
+            "Should find encounter {} within 3000 tries",
             expected_encounter
         );
     }

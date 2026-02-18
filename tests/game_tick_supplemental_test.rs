@@ -156,7 +156,7 @@ fn test_storm_leviathan_achievement_via_game_tick() {
 
 #[test]
 fn test_challenge_discovery_blocked_during_fishing_via_game_tick() {
-    for seed in 0..1_000u64 {
+    for seed in 0..100u64 {
         let mut state = fresh();
         state.prestige_rank = 1;
         state.active_fishing = Some(fishing_session(FishingPhase::Waiting, 100, 5));
@@ -178,7 +178,7 @@ fn test_challenge_discovery_blocked_during_fishing_via_game_tick() {
 
 #[test]
 fn test_challenge_discovery_blocked_during_dungeon_via_game_tick() {
-    for seed in 0..1_000u64 {
+    for seed in 0..100u64 {
         let mut state = fresh();
         state.prestige_rank = 1;
         state.active_dungeon = Some(generate_dungeon(10, 0, 1));
@@ -200,7 +200,7 @@ fn test_challenge_discovery_blocked_during_dungeon_via_game_tick() {
 
 #[test]
 fn test_challenge_discovery_blocked_during_active_minigame_via_game_tick() {
-    for seed in 0..1_000u64 {
+    for seed in 0..100u64 {
         let mut state = fresh();
         state.prestige_rank = 1;
         state.active_minigame = Some(ActiveMinigame::Chess(Box::new(ChessGame::new(

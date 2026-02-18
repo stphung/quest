@@ -402,7 +402,7 @@ mod tests {
 
     #[test]
     fn test_list_characters() {
-        let (manager, _dir) = temp_manager();
+        let (manager, dir) = temp_manager();
 
         let mut char1 = make_test_state("ListTest1");
         char1.character_level = 10;
@@ -411,9 +411,22 @@ mod tests {
         char2.character_level = 15;
 
         manager.save_character(&char1).unwrap();
-        // Small delay to ensure different timestamps (save uses current time)
-        std::thread::sleep(std::time::Duration::from_millis(1100));
         manager.save_character(&char2).unwrap();
+
+        // Set deterministic timestamps to avoid timing-dependent ordering.
+        // save_character() uses Utc::now() which can produce equal timestamps
+        // when both saves happen within the same second.
+        let path1 = dir.path().join("listtest1.json");
+        let mut json1: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path1).unwrap()).unwrap();
+        json1["last_save_time"] = serde_json::json!(1000);
+        std::fs::write(&path1, serde_json::to_string_pretty(&json1).unwrap()).unwrap();
+
+        let path2 = dir.path().join("listtest2.json");
+        let mut json2: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path2).unwrap()).unwrap();
+        json2["last_save_time"] = serde_json::json!(2000);
+        std::fs::write(&path2, serde_json::to_string_pretty(&json2).unwrap()).unwrap();
 
         // Isolated temp dir means only our test files are present
         let list = manager.list_characters().expect("Failed to list");

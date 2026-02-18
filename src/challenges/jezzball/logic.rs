@@ -567,8 +567,12 @@ pub fn apply_game_result(state: &mut GameState) -> Option<MinigameWinInfo> {
 mod tests {
     use super::*;
 
+    fn seeded_rng(seed: u64) -> rand_chacha::ChaCha8Rng {
+        rand::SeedableRng::seed_from_u64(seed)
+    }
+
     fn started_game(difficulty: JezzballDifficulty) -> JezzballGame {
-        let mut rng = rand::rng();
+        let mut rng = seeded_rng(42);
         let mut game = JezzballGame::new(difficulty, &mut rng);
         game.waiting_to_start = false;
         game
@@ -576,7 +580,7 @@ mod tests {
 
     #[test]
     fn test_waiting_to_start_blocks_input_and_ticks() {
-        let mut rng = rand::rng();
+        let mut rng = seeded_rng(42);
         let mut game = JezzballGame::new(JezzballDifficulty::Novice, &mut rng);
         let cursor_before = game.cursor;
         let ball_before = game.balls[0];
@@ -591,7 +595,7 @@ mod tests {
 
     #[test]
     fn test_select_starts_game() {
-        let mut rng = rand::rng();
+        let mut rng = seeded_rng(42);
         let mut game = JezzballGame::new(JezzballDifficulty::Novice, &mut rng);
         assert!(game.waiting_to_start);
 

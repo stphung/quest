@@ -1027,7 +1027,9 @@ fn test_pipeline_prestige_produces_better_average_scores() {
     let avg_score = |gs: &GameState, seed: u64| -> f64 {
         use rand::SeedableRng;
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
-        let n = 1000;
+        // generate_item() uses internal rand::rng(), making scores non-deterministic.
+        // Use 3000 samples to reduce variance and avoid flaky comparisons.
+        let n = 3000;
         let sum: f64 = (0..n)
             .map(|_| {
                 let rarity = roll_rarity_for_mob(gs.prestige_rank, 0.0, &mut rng);
