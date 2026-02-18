@@ -23,6 +23,7 @@ pub struct Item {
     pub slot: EquipmentSlot,
     pub rarity: Rarity,
     pub ilvl: u32,                     // Item level (zone_id × 10)
+    pub tier: u8,                      // Quality tier (T0-T9), rolled on exponential curve
     pub base_name: String,
     pub display_name: String,
     pub attributes: AttributeBonuses,  // STR, DEX, CON, INT, WIS, CHA
@@ -42,7 +43,7 @@ Items flow through two separate drop paths:
 
 ### Mob Drops (`try_drop_from_mob`)
 1. **Drop roll**: 15% base + 1% per prestige rank (capped at 25%), Trophy Hall bonus applied multiplicatively
-2. **Rarity roll** (`roll_rarity_for_mob`): 60% Common, 28% Magic, 10% Rare, 2% Epic. **No Legendaries from mobs.** Prestige (+1%/rank, max 10%) and Workshop bonus (max 25%) shift Common downward.
+2. **Rarity roll** (`roll_rarity_for_mob`): 60% Common, 28% Magic, 10% Rare, 2% Epic. **No Legendaries from mobs.** Prestige (+0.5%/rank, max 10%, cap at P20) shifts Common downward. Workshop bonus is multiplicative on non-Common rates (max +25%).
 3. **Item generation**: `generate_item(slot, rarity, ilvl)` with ilvl = zone_id × 10
 4. **Name generation** and **auto-equip** as below
 
@@ -54,31 +55,47 @@ Items flow through two separate drop paths:
 5. **No Common drops** from bosses
 
 ### Shared Steps
-- **Item generation** (`generation.rs`): `generate_item(slot, rarity, ilvl)` creates Item with ilvl-scaled attributes and affixes
+- **Item generation** (`generation.rs`): `generate_item(slot, rarity, ilvl)` creates Item with ilvl-scaled and tier-scaled attributes and affixes. Tier is rolled via `roll_tier()` on an exponential drop curve (T0 38% to T9 0.1%)
 - **Name generation** (`names.rs`): Procedural name from prefix/suffix tables based on rarity and slot
 - **Auto-equip** (`scoring.rs`): `auto_equip_if_better()` compares weighted score against current equipment
 
-## Item Level (ilvl) Scaling
+## Item Level (ilvl) and Tier Scaling
 
-Items scale with zone progression via `ilvl = zone_id × 10`:
-- **ilvl multiplier**: `1.0 + (ilvl - 10) / 30.0`
-- ilvl 10 (Zone 1): 1.0x stats
-- ilvl 50 (Zone 5): 2.33x stats
-- ilvl 100 (Zone 10): 4.0x stats
+Items scale with two independent multipliers:
 
-Both attribute values and affix values are multiplied by the ilvl multiplier.
+**ilvl multiplier** (zone-based): `1.0 + (ilvl - 10) / 30.0`
+- ilvl 10 (Zone 1): 1.0x, ilvl 50 (Zone 5): 2.33x, ilvl 100 (Zone 10): 4.0x
+
+**Tier multiplier** (quality roll): T0 = 0.40x through T9 = 1.00x
+
+**Effective multiplier**: `ilvl_multiplier × tier_multiplier`
+
+| Tier | Drop Rate | Multiplier |
+|------|-----------|-----------|
+| T0 | 38.0% | 0.40x |
+| T1 | 24.0% | 0.47x |
+| T2 | 15.0% | 0.54x |
+| T3 | 10.0% | 0.61x |
+| T4 | 6.0% | 0.68x |
+| T5 | 3.5% | 0.74x |
+| T6 | 2.0% | 0.80x |
+| T7 | 1.0% | 0.86x |
+| T8 | 0.4% | 0.93x |
+| T9 | 0.1% | 1.00x |
+
+Both attribute values and affix values are multiplied by the combined multiplier. God items always receive T9. Legacy saves default to T1.
 
 ## Generation Rules by Rarity
 
-Base attribute ranges at ilvl 10 (scaled by ilvl multiplier), 1-3 random attributes:
+Base attribute ranges at ilvl 10 (scaled by `ilvl_multiplier × tier_multiplier`), 1-3 random attributes:
 
-| Rarity    | Base Attr Range | Affixes | At ilvl 10 | At ilvl 100 (4.0x) |
-|-----------|----------------|---------|------------|---------------------|
-| Common    | 1              | 0       | 1-3 total  | 4-12 total          |
-| Magic     | 1-2            | 1       | 1-6 total  | 4-24 total          |
-| Rare      | 2-3            | 2-3     | 2-9 total  | 8-36 total          |
-| Epic      | 3-4            | 3-4     | 3-12 total | 12-48 total         |
-| Legendary | 4-6            | 4-5     | 4-18 total | 16-72 total         |
+| Rarity    | Base Attr Range | Affixes | At ilvl 10 T9 | At ilvl 100 T9 (4.0x) | At ilvl 100 T0 (1.6x) |
+|-----------|----------------|---------|--------------|----------------------|----------------------|
+| Common    | 1              | 0       | 1-3 total    | 4-12 total           | 1-5 total            |
+| Magic     | 1-2            | 1       | 1-6 total    | 4-24 total           | 1-10 total           |
+| Rare      | 2-3            | 2-3     | 2-9 total    | 8-36 total           | 3-14 total           |
+| Epic      | 3-4            | 3-4     | 3-12 total   | 12-48 total          | 5-19 total           |
+| Legendary | 4-6            | 4-5     | 4-18 total   | 16-72 total          | 6-29 total           |
 
 ## Auto-Equip Scoring (`scoring.rs`)
 
@@ -113,7 +130,7 @@ Constants from `core/constants.rs`: 15% base, +1% per prestige rank, capped at 2
 
 Two Haven rooms affect mob drops (boss drops are not affected):
 - **Trophy Hall**: Increases drop rate percentage (applied multiplicatively to base chance)
-- **Workshop**: Shifts rarity distribution toward higher tiers (max 25% bonus)
+- **Workshop**: Multiplicative bonus on non-Common rarity rates (e.g. T3 = ×1.25 on Magic/Rare/Epic). Max 25% bonus
 
 Both bonuses are passed as parameters to `try_drop_from_mob()`.
 

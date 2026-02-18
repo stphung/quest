@@ -244,8 +244,8 @@ drop_chance = min(base_chance * (1.0 + haven_drop_bonus/100), 0.25)
 
 **Mob rarity distribution** (base at P0, no Haven):
 - Common: 60%, Magic: 28%, Rare: 10%, Epic: 2%, Legendary: **never**
-- Prestige bonus: +1% per rank (capped at 10%) shifts Common downward
-- Workshop bonus: shifts distribution toward higher rarities (max 25%)
+- Prestige bonus: +0.5% per rank (capped at 10%, reaches cap at P20) shifts Common downward
+- Workshop bonus: multiplicative on non-Common rates (max +25%)
 - Common floor: 20% minimum
 
 **Boss rarity distribution** (fixed, no Haven/prestige bonuses):
@@ -428,27 +428,50 @@ Items scale with zone progression: `ilvl = zone_id * 10`
 
 ilvl multiplier formula: `1.0 + (ilvl - 10) / 30`
 
-| Zone | ilvl | Multiplier | Effect |
-|------|------|------------|--------|
-| 1 | 10 | 1.0x | Baseline |
-| 3 | 30 | 1.67x | Early prestige |
-| 5 | 50 | 2.33x | Mid-game |
-| 7 | 70 | 3.0x | Late-game |
-| 10 | 100 | 4.0x | Endgame |
+| Zone | ilvl | ilvl Multiplier | With T9 (1.00x) | With T0 (0.40x) |
+|------|------|-----------------|------------------|------------------|
+| 1 | 10 | 1.0x | 1.00x | 0.40x |
+| 3 | 30 | 1.67x | 1.67x | 0.67x |
+| 5 | 50 | 2.33x | 2.33x | 0.93x |
+| 7 | 70 | 3.0x | 3.00x | 1.20x |
+| 10 | 100 | 4.0x | 4.00x | 1.60x |
+
+Effective stat multiplier = `ilvl_multiplier × tier_multiplier`. The tier system adds variance within each zone.
 
 ### Generation Rules by Rarity
 
-Base attribute ranges at ilvl 10 (scaled by ilvl multiplier), 1-3 random attributes:
+Base attribute ranges at ilvl 10 (scaled by `ilvl_multiplier × tier_multiplier`), 1-3 random attributes:
 
-| Rarity | Base Attr Range | Affixes | At ilvl 10 | At ilvl 100 (4.0x) |
-|--------|----------------|---------|------------|---------------------|
-| Common | 1 | 0 | 1-3 total | 4-12 total |
-| Magic | 1-2 | 1 | 1-6 total | 4-24 total |
-| Rare | 2-3 | 2-3 | 2-9 total | 8-36 total |
-| Epic | 3-4 | 3-4 | 3-12 total | 12-48 total |
-| Legendary | 4-6 | 4-5 | 4-18 total | 16-72 total |
+| Rarity | Base Attr Range | Affixes | At ilvl 10 T9 | At ilvl 100 T9 (4.0x) | At ilvl 100 T0 (1.6x) |
+|--------|----------------|---------|--------------|----------------------|----------------------|
+| Common | 1 | 0 | 1-3 total | 4-12 total | 1-5 total |
+| Magic | 1-2 | 1 | 1-6 total | 4-24 total | 1-10 total |
+| Rare | 2-3 | 2-3 | 2-9 total | 8-36 total | 3-14 total |
+| Epic | 3-4 | 3-4 | 3-12 total | 12-48 total | 5-19 total |
+| Legendary | 4-6 | 4-5 | 4-18 total | 16-72 total | 6-29 total |
 
-**God (Mythic) items** have fixed stats and are not procedurally generated. See god_items module for Asprika (+40 CON/+20 WIS, 30% DR), Sleipnir (+40 DEX/+20 WIS, 100% attack speed, speed bonuses), Megingjord (+40 STR/+20 CON, 150% damage). All have ilvl 100 and +40% XP affix.
+### Item Tier (Quality) System
+
+Every item rolls an independent quality tier (T0-T9) on an exponential drop curve. The tier multiplier scales stats alongside ilvl.
+
+| Tier | Drop Rate | Stat Multiplier |
+|------|-----------|----------------|
+| T0 | 38.0% | 0.40x |
+| T1 | 24.0% | 0.47x |
+| T2 | 15.0% | 0.54x |
+| T3 | 10.0% | 0.61x |
+| T4 | 6.0% | 0.68x |
+| T5 | 3.5% | 0.74x |
+| T6 | 2.0% | 0.80x |
+| T7 | 1.0% | 0.86x |
+| T8 | 0.4% | 0.93x |
+| T9 | 0.1% | 1.00x |
+
+**Design intent**: T9 equals the pre-tier power ceiling, so there is no power creep. Most drops (62%) are T0-T1 with 0.40-0.47x stats, making high-tier finds feel rewarding. God items always receive T9.
+
+Constants: `TIER_THRESHOLDS` (cumulative drop curve), `TIER_MULTIPLIERS` (stat scaling per tier).
+
+**God (Mythic) items** have fixed stats and are not procedurally generated. Always T9. See god_items module for Asprika (+40 CON/+20 WIS, 30% DR), Sleipnir (+40 DEX/+20 WIS, 100% attack speed, speed bonuses), Megingjord (+40 STR/+20 CON, 150% damage). All have ilvl 100 and +40% XP affix.
 
 ### 9 Affix Types
 
@@ -947,11 +970,15 @@ PRESTIGE_MULT_EXPONENT: f64 = 0.7;
 ITEM_DROP_BASE_CHANCE: f64 = 0.15;
 ITEM_DROP_PRESTIGE_BONUS: f64 = 0.01;
 ITEM_DROP_MAX_CHANCE: f64 = 0.25;
-MOB_RARITY_PRESTIGE_BONUS_PER_RANK: f64 = 0.01;
+MOB_RARITY_PRESTIGE_BONUS_PER_RANK: f64 = 0.005;
 MOB_RARITY_PRESTIGE_BONUS_CAP: f64 = 0.10;
 ZONE_ILVL_MULTIPLIER: u32 = 10;
 ILVL_SCALING_BASE: f64 = 10.0;
 ILVL_SCALING_DIVISOR: f64 = 30.0;
+
+// Item Tier (Quality) System
+TIER_THRESHOLDS: [f64; 9] = [0.380, 0.620, 0.770, 0.870, 0.930, 0.965, 0.985, 0.995, 0.999];
+TIER_MULTIPLIERS: [f64; 10] = [0.40, 0.47, 0.54, 0.61, 0.68, 0.74, 0.80, 0.86, 0.93, 1.00];
 
 // Discovery Chances
 DUNGEON_DISCOVERY_CHANCE: f64 = 0.01;
