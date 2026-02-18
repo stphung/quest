@@ -210,8 +210,8 @@ pub(super) fn draw_zone_info(
             format!(" ({}/{})", prog.current_subzone_id, total_subzones),
             Style::default().fg(Color::DarkGray),
         ),
-        boss_progress,
     ])];
+    zone_lines.push(Line::from(boss_progress));
 
     // Add subzone flavor text
     if let Some(sz) = subzone {
@@ -303,6 +303,7 @@ pub(super) fn draw_zone_info(
         label_spans.push(Span::styled(label, Style::default().fg(label_fg)));
     }
 
+    zone_lines.push(Line::from(""));
     zone_lines.push(Line::from(bar_spans));
     zone_lines.push(Line::from(label_spans));
 

@@ -510,7 +510,7 @@ fn draw_right_panel(
     ctx: &LayoutContext,
 ) {
     // Zone info + progress bar at top
-    let zone_height = if ctx.tier >= SizeTier::XL { 7 } else { 8 };
+    let zone_height = if ctx.tier >= SizeTier::XL { 9 } else { 10 };
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
