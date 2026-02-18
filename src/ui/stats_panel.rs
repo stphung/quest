@@ -563,7 +563,7 @@ fn draw_equipment_names_only(
             ));
             spans.push(Span::styled(
                 format!("  T{}", item.tier),
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(super::tier_color(item.tier)),
             ));
             spans.push(Span::styled(
                 format!("  {:>3}", item.ilvl),

@@ -58,6 +58,22 @@ pub fn rarity_color(rarity: Rarity) -> Color {
     }
 }
 
+/// Maps item tier (T0–T9) to a cool-to-hot color gradient.
+pub fn tier_color(tier: u8) -> Color {
+    match tier {
+        0 => Color::Gray,
+        1 => Color::Rgb(60, 80, 180),   // dark blue
+        2 => Color::Rgb(0, 180, 170),   // teal
+        3 => Color::Rgb(80, 200, 80),   // green
+        4 => Color::Rgb(220, 220, 50),  // yellow
+        5 => Color::Rgb(255, 165, 0),   // orange
+        6 => Color::Rgb(220, 50, 50),   // red
+        7 => Color::Magenta,            // magenta
+        8 => Color::Rgb(255, 150, 255), // light magenta
+        _ => Color::Rgb(255, 215, 0),   // gold (T9+)
+    }
+}
+
 /// Main UI drawing function with optional update notification
 #[allow(clippy::too_many_arguments)]
 pub fn draw_ui_with_update(

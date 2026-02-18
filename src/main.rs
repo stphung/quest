@@ -88,6 +88,7 @@ fn apply_offline_xp(state: &mut GameState, haven: &haven::Haven) -> Option<Offli
             ),
             color: ratatui::style::Color::Green,
             bold: false,
+            segments: None,
         });
         Some(report)
     } else {

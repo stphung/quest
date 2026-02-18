@@ -86,6 +86,7 @@ pub enum TickEvent {
         item_name: String,
         rarity: Rarity,
         tier: u8,
+        ilvl: u32,
         equipped: bool,
         slot: String,
         stats: String,
@@ -876,6 +877,7 @@ fn process_item_drop(state: &mut GameState, haven_bonuses: &HavenBonuses, result
         let item_name = item.display_name.clone();
         let rarity = item.rarity;
         let tier = item.tier;
+        let ilvl = item.ilvl;
         let slot = item.slot_name().to_string();
         let stats = item.stat_summary();
         let icon = if was_boss { "\u{1f451}" } else { "\u{1f381}" };
@@ -895,6 +897,7 @@ fn process_item_drop(state: &mut GameState, haven_bonuses: &HavenBonuses, result
             item_name,
             rarity,
             tier,
+            ilvl,
             equipped,
             slot,
             stats,

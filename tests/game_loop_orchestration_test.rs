@@ -668,6 +668,7 @@ fn test_item_dropped_event_has_complete_fields() {
                 item_name,
                 rarity: _,
                 tier: _,
+                ilvl: _,
                 equipped: _,
                 slot,
                 stats,

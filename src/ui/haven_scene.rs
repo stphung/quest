@@ -847,25 +847,25 @@ pub fn render_vault_selection(
             let prefix = if is_selected { "▶ " } else { "  " };
             let checkbox = if is_preserved { "[✓] " } else { "[ ] " };
 
-            let (slot_name, item_text, style) = if let Some(item) = item.as_ref() {
-                let rarity_color = super::rarity_color(item.rarity);
-                (
-                    format!("{:8}", format!("{:?}", slot)),
-                    format!(
-                        "{} {} T{}",
-                        item.display_name,
-                        item.rarity.name(),
-                        item.tier
-                    ),
-                    Style::default().fg(rarity_color),
-                )
-            } else {
-                (
-                    format!("{:8}", format!("{:?}", slot)),
-                    "(empty)".to_string(),
-                    Style::default().fg(Color::DarkGray),
-                )
-            };
+            let (slot_name, item_text, tier_text, style, tier_style) =
+                if let Some(item) = item.as_ref() {
+                    let rc = super::rarity_color(item.rarity);
+                    (
+                        format!("{:8}", format!("{:?}", slot)),
+                        format!("{} {}", item.display_name, item.rarity.name()),
+                        format!(" T{}", item.tier),
+                        Style::default().fg(rc),
+                        Style::default().fg(super::tier_color(item.tier)),
+                    )
+                } else {
+                    (
+                        format!("{:8}", format!("{:?}", slot)),
+                        "(empty)".to_string(),
+                        String::new(),
+                        Style::default().fg(Color::DarkGray),
+                        Style::default(),
+                    )
+                };
 
             let prefix_style = if is_selected {
                 Style::default().fg(Color::Cyan)
@@ -883,6 +883,7 @@ pub fn render_vault_selection(
                 Span::styled(checkbox, checkbox_style),
                 Span::styled(slot_name, Style::default().fg(Color::DarkGray)),
                 Span::styled(item_text, style),
+                Span::styled(tier_text, tier_style),
             ]))
         })
         .collect();

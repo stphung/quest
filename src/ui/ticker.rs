@@ -65,13 +65,25 @@ fn entry_to_styled_chars(entry: &TickerEntry) -> Vec<(char, Style)> {
         chars.push((' ', icon_style));
     }
 
-    // Main text
-    let mut style = Style::default().fg(entry.color);
-    if entry.bold {
-        style = style.add_modifier(Modifier::BOLD);
-    }
-    for ch in entry.text.chars() {
-        chars.push((ch, style));
+    // Use segments if present, otherwise fall back to single text/color
+    if let Some(segments) = &entry.segments {
+        for seg in segments {
+            let mut style = Style::default().fg(seg.color);
+            if entry.bold {
+                style = style.add_modifier(Modifier::BOLD);
+            }
+            for ch in seg.text.chars() {
+                chars.push((ch, style));
+            }
+        }
+    } else {
+        let mut style = Style::default().fg(entry.color);
+        if entry.bold {
+            style = style.add_modifier(Modifier::BOLD);
+        }
+        for ch in entry.text.chars() {
+            chars.push((ch, style));
+        }
     }
 
     chars
@@ -134,6 +146,7 @@ mod tests {
             text: "Hello".to_string(),
             color: Color::White,
             bold: false,
+            segments: None,
         };
         let chars = entry_to_styled_chars(&entry);
         let text: String = chars.iter().map(|(ch, _)| ch).collect();
@@ -147,6 +160,7 @@ mod tests {
             text: "Sword".to_string(),
             color: Color::Yellow,
             bold: false,
+            segments: None,
         };
         let chars = entry_to_styled_chars(&entry);
         let text: String = chars.iter().map(|(ch, _)| ch).collect();
@@ -161,6 +175,7 @@ mod tests {
             text: "Test".to_string(),
             color: Color::White,
             bold: false,
+            segments: None,
         });
         // At scroll_offset=0, entry born_at=0, position = viewport_width - 0 = 80
         // That's off-screen (>= viewport_width), so not visible
@@ -182,12 +197,14 @@ mod tests {
             text: "First".to_string(), // 5 chars
             color: Color::White,
             bold: false,
+            segments: None,
         });
         ticker.push(TickerEntry {
             icon: "",
             text: "Second".to_string(),
             color: Color::White,
             bold: false,
+            segments: None,
         });
         // Second entry should be spaced after first (5 chars + 3 gap = 8)
         ticker.scroll_offset = 100.0;
@@ -234,6 +251,7 @@ mod tests {
             text: "Sword \u{00B7} Fish".to_string(),
             color: Color::Yellow,
             bold: false,
+            segments: None,
         });
         // Scroll various amounts — should never panic
         for i in 0..100 {
@@ -251,6 +269,7 @@ mod tests {
             text: "Old".to_string(), // 3 chars
             color: Color::White,
             bold: false,
+            segments: None,
         });
         // born_at=0, off-screen when scroll > viewport(20) + len(3) = 23
         // At 0.4/tick, need 57.5 ticks → ~60 ticks
@@ -269,6 +288,7 @@ mod tests {
             text: "Test".to_string(), // 4 chars
             color: Color::White,
             bold: false,
+            segments: None,
         });
         // Entry should appear at right edge and scroll across the full 40-char
         // viewport before being cleaned up.
