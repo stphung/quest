@@ -146,12 +146,12 @@ CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FI
 
 ### Item Module (`src/items/`) — [detailed docs](src/items/CLAUDE.md)
 
-- `types.rs` — Core item data structures (7 equipment slots, 6 rarity tiers including God/Mythic, 9 affix types + Unknown fallback, ilvl scaling, tier (T0-T9), `god_item_id` field)
+- `types.rs` — Core item data structures (7 equipment slots, 6 rarity tiers including God/Mythic, 9 affix types + Unknown fallback, ilvl scaling, tier (T0-T9), `god_item_id` field, `power()` intrinsic score)
 - `equipment.rs` — Equipment container with slot management and iteration
 - `generation.rs` — Rarity-based attribute/affix generation with ilvl scaling (1.0x at ilvl 10 to 4.0x at ilvl 100) and tier quality multiplier (T0 0.40x to T9 1.00x)
 - `drops.rs` — Separate mob/boss drop systems: mobs have 15% base drop chance (capped at Epic), bosses always drop (can drop Legendary)
 - `names.rs` — Procedural name generation with prefixes/suffixes
-- `scoring.rs` — Smart weighted auto-equip scoring (attribute specialization bonus, affix type weights). God (Mythic) items are never auto-replaced by lower rarity
+- `scoring.rs` — Intrinsic power scoring (`power()`) and smart weighted auto-equip scoring (attribute specialization bonus, affix type weights). God (Mythic) items are never auto-replaced by lower rarity
 
 ### Enhancement Module (`src/enhancement/`) — [detailed docs](src/enhancement/CLAUDE.md)
 
@@ -340,7 +340,7 @@ quest/
 │   │   ├── generation.rs    # Item generation
 │   │   ├── drops.rs         # Drop system
 │   │   ├── names.rs         # Name generation
-│   │   └── scoring.rs       # Auto-equip scoring
+│   │   └── scoring.rs       # Power scoring and auto-equip scoring
 │   ├── enhancement/         # Soulforge enhancement system [CLAUDE.md]
 │   │   ├── types.rs         # Enhancement progress, constants, UI state
 │   │   ├── logic.rs         # Enhancement rolling, discovery

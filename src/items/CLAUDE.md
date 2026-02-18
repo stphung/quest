@@ -12,7 +12,7 @@ src/items/
 ├── generation.rs  # Rarity-based item generation (attributes + affixes)
 ├── drops.rs       # Drop rate calculation and item rolling
 ├── names.rs       # Procedural name generation with prefixes/suffixes
-└── scoring.rs     # Weighted auto-equip scoring with attribute specialization
+└── scoring.rs     # Intrinsic power scoring and weighted auto-equip scoring
 ```
 
 ## Key Types
@@ -97,23 +97,35 @@ Base attribute ranges at ilvl 10 (scaled by `ilvl_multiplier × tier_multiplier`
 | Epic      | 3-4            | 3-4     | 3-12 total   | 12-48 total          | 5-19 total           |
 | Legendary | 4-6            | 4-5     | 4-18 total   | 16-72 total          | 6-29 total           |
 
-## Auto-Equip Scoring (`scoring.rs`)
+## Intrinsic Power Score (`types.rs` + `scoring.rs`)
 
-The scoring system uses **attribute specialization**: attributes that the character already has high values in get weighted more heavily. This reinforces the character's natural build.
+Every item has a `power()` method that returns an intrinsic power score (displayed as ⚡ in cyan). This score is **character-independent** — the same item always produces the same power number regardless of who equips it.
 
 ```
-score = sum(item_attr * weight) + sum(affix_value * affix_weight)
-weight = 1 + (current_attr_value * 100 / total_attr_points)
+power = sum(all_attribute_values) + sum(affix_value × affix_power_weight)
 ```
 
-Affix weights (from `score_item`):
+Affix power weights (from `affix_power_weight()`):
 - DamagePercent: 2.0x (highest)
 - CritChance, CritMultiplier: 1.5x
 - DamageReduction: 1.3x
 - AttackSpeed: 1.2x
 - HPRegen, XPGain: 1.0x
 - DamageReflection: 0.8x
-- HPBonus: 0.5x (lowest — flat HP less valuable at scale)
+- HPBonus: 0.5x (lowest)
+
+Power score is shown in the equipment panel and scrolling loot ticker. God item power scoring is deferred (#272).
+
+## Auto-Equip Scoring (`scoring.rs`)
+
+The auto-equip scoring system uses **attribute specialization**: attributes that the character already has high values in get weighted more heavily. This reinforces the character's natural build. Unlike intrinsic power, auto-equip scores are character-dependent.
+
+```
+score = sum(item_attr * weight) + sum(affix_value * affix_power_weight)
+weight = 1 + (current_attr_value * 100 / total_attr_points)
+```
+
+The same `affix_power_weight()` function is shared between power scoring and auto-equip scoring.
 
 **God item protection**: God (Mythic) items are never auto-replaced by lower rarity items.
 
