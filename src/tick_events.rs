@@ -159,7 +159,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                         color: rc,
                     },
                     TickerSegment {
-                        text: format!(" i{}", ilvl),
+                        text: format!(" Z{}", ilvl / 10),
                         color: Color::DarkGray,
                     },
                     TickerSegment {
@@ -283,7 +283,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                         color: rc,
                     },
                     TickerSegment {
-                        text: format!(" i{}", ilvl),
+                        text: format!(" Z{}", ilvl / 10),
                         color: Color::DarkGray,
                     },
                     TickerSegment {

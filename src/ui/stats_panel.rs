@@ -750,7 +750,7 @@ fn draw_equipment_names_only(
                 Style::default().fg(super::tier_color(item.tier)),
             ));
             spans.push(Span::styled(
-                format!("  {:>3}", item.ilvl),
+                format!("  Z{}", item.ilvl / 10),
                 Style::default().fg(Color::DarkGray),
             ));
             spans.push(Span::styled(
