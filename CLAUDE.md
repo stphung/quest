@@ -206,7 +206,7 @@ Account-level achievement system that persists across characters. 6 categories (
 
 ### Input Handling (`src/input.rs`)
 
-Routes keyboard input to the appropriate handler based on current game state. Dispatches to minigame input handlers, character management flows, haven overlay, and debug menu.
+Routes keyboard input to the appropriate handler based on current game state. Dispatches to minigame input handlers, character management flows, haven overlay, and debug menu. When quitting with pending challenges, shows a confirmation dialog ([Enter] Leave / [Esc] Stay).
 
 ### Utilities (`src/utils/`)
 
@@ -216,9 +216,9 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 
 ### UI (`src/ui/`) — [detailed docs](src/ui/CLAUDE.md)
 
-- `mod.rs` — Layout coordinator (stats panel left 50%, combat scene right 50%)
+- `mod.rs` — Layout coordinator (stats panel left 50%, combat scene right 50%), centralized `rarity_color()` function
 - `game_common.rs` — Shared minigame layout, status bars, game-over overlays
-- `stats_panel.rs` — Character stats, attributes, equipment display, prestige info
+- `stats_panel.rs` — Character stats, attributes, equipment display, prestige info, XP rate + ETA
 - `ticker.rs` — Scrolling loot ticker with independent per-entry scrolling
 - `combat_scene.rs` — Combat view with HP bars and enemy sprites
 - `combat_3d.rs` — 3D ASCII first-person dungeon renderer

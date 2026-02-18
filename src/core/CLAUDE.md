@@ -45,6 +45,8 @@ pub struct GameState {
     pub session_kills: u64,
     pub recent_drops: VecDeque<RecentDrop>,  // Capped at 10
     pub last_minigame_win: Option<MinigameWinInfo>,
+    pub xp_rate_samples: VecDeque<u64>,    // Rolling 5-min XP/sec window
+    pub xp_this_second: u64,               // Accumulator for current second
 }
 ```
 
@@ -53,6 +55,7 @@ Key methods:
 - `get_attribute_cap()` -- Returns `20 + prestige_rank * 5`
 - `add_recent_drop(...)` -- Push to front of bounded deque (max 10, evicts oldest)
 - `is_in_dungeon()` -- Checks `active_dungeon.is_some()`
+- `xp_per_hour()` -- Returns XP/hr from rolling 5-minute sample window (None if <10s data)
 
 ### `RecentDrop` (`game_state.rs`)
 

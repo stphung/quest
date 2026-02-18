@@ -229,6 +229,9 @@ fn trigger_newgame_challenge(state: &mut GameState) -> &'static str {
 4. Use `render_forfeit_status_bar` for consistent UI
 5. UI checks `forfeit_pending` flag on Loss result to display "Forfeit" vs "Defeat"
 
+### Quit Confirmation
+When the player quits the game while challenges are pending, a confirmation dialog appears warning that pending challenges will be lost. [Enter] leaves, [Esc] stays.
+
 ### AI Thinking
 All games with AI use a standardized `process_ai_thinking()` function name (not game-specific names like `process_go_ai`).
 
