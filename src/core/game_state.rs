@@ -300,6 +300,9 @@ pub struct GameState {
     /// XP accumulated during the current second (rotated into xp_rate_samples each second)
     #[serde(skip)]
     pub xp_this_second: u64,
+    /// When the game-over screen was first shown (for dismiss cooldown)
+    #[serde(skip)]
+    pub game_over_shown_at: Option<std::time::Instant>,
 }
 
 impl GameState {
@@ -339,6 +342,7 @@ impl GameState {
             derived_stats_dirty: true,
             xp_rate_samples: VecDeque::new(),
             xp_this_second: 0,
+            game_over_shown_at: None,
         }
     }
 

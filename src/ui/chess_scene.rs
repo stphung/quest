@@ -20,10 +20,11 @@ pub fn render_chess_scene(
     area: Rect,
     game: &ChessGame,
     ctx: &super::responsive::LayoutContext,
+    show_dismiss_hint: bool,
 ) {
     // Check for game over - show board with banner
     if game.game_result.is_some() {
-        render_chess_game_over(frame, area, game, ctx);
+        render_chess_game_over(frame, area, game, ctx, show_dismiss_hint);
         return;
     }
 
@@ -362,6 +363,7 @@ fn render_chess_game_over(
     area: Rect,
     game: &ChessGame,
     ctx: &super::responsive::LayoutContext,
+    show_dismiss_hint: bool,
 ) {
     use ratatui::widgets::Clear;
 
@@ -421,6 +423,7 @@ fn render_chess_game_over(
         title,
         message,
         &reward,
+        show_dismiss_hint,
     );
 }
 

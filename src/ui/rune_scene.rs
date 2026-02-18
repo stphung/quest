@@ -19,10 +19,11 @@ pub fn render_rune(
     area: Rect,
     game: &RuneGame,
     ctx: &super::responsive::LayoutContext,
+    show_dismiss_hint: bool,
 ) {
     // Game over overlay
     if game.game_result.is_some() {
-        render_rune_game_over(frame, area, game);
+        render_rune_game_over(frame, area, game, show_dismiss_hint);
         return;
     }
 
@@ -248,7 +249,7 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &RuneGame) {
     frame.render_widget(text, inner);
 }
 
-fn render_rune_game_over(frame: &mut Frame, area: Rect, game: &RuneGame) {
+fn render_rune_game_over(frame: &mut Frame, area: Rect, game: &RuneGame, show_dismiss_hint: bool) {
     use crate::challenges::menu::DifficultyInfo;
 
     let result = game.game_result.as_ref().unwrap();
@@ -277,5 +278,13 @@ fn render_rune_game_over(frame: &mut Frame, area: Rect, game: &RuneGame) {
         }
     };
 
-    render_game_over_overlay(frame, area, result_type, title, &message, &reward);
+    render_game_over_overlay(
+        frame,
+        area,
+        result_type,
+        title,
+        &message,
+        &reward,
+        show_dismiss_hint,
+    );
 }

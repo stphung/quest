@@ -531,36 +531,48 @@ fn draw_right_panel(
 /// Draws the main content area of the right panel based on current activity.
 /// Priority: minigame > challenge menu > fishing > dungeon > combat
 fn draw_right_content(frame: &mut Frame, area: Rect, game_state: &GameState, ctx: &LayoutContext) {
+    // Show "[Press any key]" only after the game-over dismiss cooldown expires
+    let show_dismiss_hint = game_state
+        .game_over_shown_at
+        .is_some_and(|t| t.elapsed() >= std::time::Duration::from_secs(1));
+
     match &game_state.active_minigame {
         Some(ActiveMinigame::Rune(game)) => {
-            rune_scene::render_rune(frame, area, game, ctx);
+            rune_scene::render_rune(frame, area, game, ctx, show_dismiss_hint);
         }
         Some(ActiveMinigame::Minesweeper(game)) => {
-            minesweeper_scene::render_minesweeper(frame, area, game, ctx);
+            minesweeper_scene::render_minesweeper(frame, area, game, ctx, show_dismiss_hint);
         }
         Some(ActiveMinigame::Gomoku(game)) => {
-            gomoku_scene::render_gomoku_scene(frame, area, game, ctx);
+            gomoku_scene::render_gomoku_scene(frame, area, game, ctx, show_dismiss_hint);
         }
         Some(ActiveMinigame::Morris(game)) => {
-            morris_scene::render_morris_scene(frame, area, game, game_state.character_level, ctx);
+            morris_scene::render_morris_scene(
+                frame,
+                area,
+                game,
+                game_state.character_level,
+                ctx,
+                show_dismiss_hint,
+            );
         }
         Some(ActiveMinigame::Chess(game)) => {
-            chess_scene::render_chess_scene(frame, area, game, ctx);
+            chess_scene::render_chess_scene(frame, area, game, ctx, show_dismiss_hint);
         }
         Some(ActiveMinigame::Go(game)) => {
-            go_scene::render_go_scene(frame, area, game, ctx);
+            go_scene::render_go_scene(frame, area, game, ctx, show_dismiss_hint);
         }
         Some(ActiveMinigame::FlappyBird(game)) => {
-            flappy_scene::render_flappy_scene(frame, area, game, ctx);
+            flappy_scene::render_flappy_scene(frame, area, game, ctx, show_dismiss_hint);
         }
         Some(ActiveMinigame::Jezzball(game)) => {
-            jezzball_scene::render_jezzball_scene(frame, area, game, ctx);
+            jezzball_scene::render_jezzball_scene(frame, area, game, ctx, show_dismiss_hint);
         }
         Some(ActiveMinigame::Snake(game)) => {
-            snake_scene::render_snake_scene(frame, area, game, ctx);
+            snake_scene::render_snake_scene(frame, area, game, ctx, show_dismiss_hint);
         }
         Some(ActiveMinigame::RunicShift(game)) => {
-            runic_shift_scene::render_runic_shift_scene(frame, area, game, ctx);
+            runic_shift_scene::render_runic_shift_scene(frame, area, game, ctx, show_dismiss_hint);
         }
         None => {
             if game_state.challenge_menu.is_open {

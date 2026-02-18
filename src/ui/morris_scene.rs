@@ -23,6 +23,7 @@ pub fn render_morris_scene(
     game: &MorrisGame,
     character_level: u32,
     ctx: &super::responsive::LayoutContext,
+    show_dismiss_hint: bool,
 ) {
     // Check for game over - show board with banner
     if game.game_result.is_some() {
@@ -31,7 +32,15 @@ pub fn render_morris_scene(
             (xp_for_level as f64 * game.difficulty.reward_xp_percent() as f64 / 100.0) as u64;
         let xp_reward = xp_reward.max(100);
         let is_master = game.difficulty == crate::challenges::morris::MorrisDifficulty::Master;
-        render_morris_game_over(frame, area, game, xp_reward, is_master, ctx);
+        render_morris_game_over(
+            frame,
+            area,
+            game,
+            xp_reward,
+            is_master,
+            ctx,
+            show_dismiss_hint,
+        );
         return;
     }
 
@@ -543,6 +552,7 @@ fn render_morris_game_over(
     xp_reward: u64,
     is_master: bool,
     ctx: &super::responsive::LayoutContext,
+    show_dismiss_hint: bool,
 ) {
     use ratatui::widgets::Clear;
 
@@ -592,5 +602,13 @@ fn render_morris_game_over(
     };
 
     // Render banner at bottom of content area
-    render_game_over_banner(frame, layout.content, result_type, title, message, &reward);
+    render_game_over_banner(
+        frame,
+        layout.content,
+        result_type,
+        title,
+        message,
+        &reward,
+        show_dismiss_hint,
+    );
 }

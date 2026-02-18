@@ -141,6 +141,7 @@ impl CharacterManager {
             derived_stats_dirty: true,
             xp_rate_samples: std::collections::VecDeque::new(),
             xp_this_second: 0,
+            game_over_shown_at: None,
         })
     }
 
@@ -324,6 +325,7 @@ mod tests {
             derived_stats_dirty: true,
             xp_rate_samples: std::collections::VecDeque::new(),
             xp_this_second: 0,
+            game_over_shown_at: None,
         }
     }
 

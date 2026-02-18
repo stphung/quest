@@ -51,9 +51,10 @@ pub fn render_runic_shift_scene(
     area: Rect,
     game: &RunicShiftGame,
     ctx: &super::responsive::LayoutContext,
+    show_dismiss_hint: bool,
 ) {
     if game.game_result.is_some() {
-        render_runic_shift_game_over(frame, area, game);
+        render_runic_shift_game_over(frame, area, game, show_dismiss_hint);
         return;
     }
 
@@ -562,7 +563,12 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &RunicShiftGame) {
     frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: true }), inner);
 }
 
-fn render_runic_shift_game_over(frame: &mut Frame, area: Rect, game: &RunicShiftGame) {
+fn render_runic_shift_game_over(
+    frame: &mut Frame,
+    area: Rect,
+    game: &RunicShiftGame,
+    show_dismiss_hint: bool,
+) {
     let Some(result) = game.game_result else {
         return;
     };
@@ -602,5 +608,13 @@ fn render_runic_shift_game_over(frame: &mut Frame, area: Rect, game: &RunicShift
         "No reward".to_string()
     };
 
-    render_game_over_overlay(frame, area, result_type, title, &message, &reward_text);
+    render_game_over_overlay(
+        frame,
+        area,
+        result_type,
+        title,
+        &message,
+        &reward_text,
+        show_dismiss_hint,
+    );
 }

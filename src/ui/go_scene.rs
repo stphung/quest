@@ -21,10 +21,11 @@ pub fn render_go_scene(
     area: Rect,
     game: &GoGame,
     ctx: &super::responsive::LayoutContext,
+    show_dismiss_hint: bool,
 ) {
     // Game over overlay
     if game.game_result.is_some() {
-        render_go_game_over(frame, area, game, ctx);
+        render_go_game_over(frame, area, game, ctx, show_dismiss_hint);
         return;
     }
 
@@ -252,6 +253,7 @@ fn render_go_game_over(
     area: Rect,
     game: &GoGame,
     ctx: &super::responsive::LayoutContext,
+    show_dismiss_hint: bool,
 ) {
     use crate::challenges::go::logic::calculate_score;
     use ratatui::widgets::Clear;
@@ -284,5 +286,13 @@ fn render_go_game_over(
     };
 
     // Render banner at bottom of content area
-    render_game_over_banner(frame, layout.content, result_type, title, &message, &reward);
+    render_game_over_banner(
+        frame,
+        layout.content,
+        result_type,
+        title,
+        &message,
+        &reward,
+        show_dismiss_hint,
+    );
 }
