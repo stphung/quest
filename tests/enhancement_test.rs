@@ -462,6 +462,7 @@ fn test_enhancement_multiplier_affects_derived_stats() {
         slot: EquipmentSlot::Weapon,
         rarity: Rarity::Common,
         ilvl: 10,
+        tier: 5,
         base_name: "Sword".to_string(),
         display_name: "Iron Sword".to_string(),
         attributes: AttributeBonuses {
@@ -510,6 +511,7 @@ fn test_enhancement_multiplier_affects_affixes() {
         slot: EquipmentSlot::Weapon,
         rarity: Rarity::Rare,
         ilvl: 10,
+        tier: 5,
         base_name: "Sword".to_string(),
         display_name: "Epic Sword".to_string(),
         attributes: AttributeBonuses::new(),
@@ -550,6 +552,7 @@ fn test_enhancement_zero_levels_no_change() {
         slot: EquipmentSlot::Weapon,
         rarity: Rarity::Common,
         ilvl: 10,
+        tier: 5,
         base_name: "Sword".to_string(),
         display_name: "Iron Sword".to_string(),
         attributes: AttributeBonuses {
@@ -586,6 +589,7 @@ fn test_enhancement_per_slot_independence() {
         slot: EquipmentSlot::Weapon,
         rarity: Rarity::Common,
         ilvl: 10,
+        tier: 5,
         base_name: "Sword".to_string(),
         display_name: "Sword".to_string(),
         attributes: AttributeBonuses {
@@ -604,6 +608,7 @@ fn test_enhancement_per_slot_independence() {
         slot: EquipmentSlot::Armor,
         rarity: Rarity::Common,
         ilvl: 10,
+        tier: 5,
         base_name: "Armor".to_string(),
         display_name: "Armor".to_string(),
         attributes: AttributeBonuses {

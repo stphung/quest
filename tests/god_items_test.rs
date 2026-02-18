@@ -40,6 +40,7 @@ fn test_asprika_item_is_always_best_in_slot() {
         slot: EquipmentSlot::Armor,
         rarity: Rarity::Legendary,
         ilvl: 100,
+        tier: 5,
         base_name: "Test".to_string(),
         display_name: "Test".to_string(),
         attributes: AttributeBonuses {
@@ -118,6 +119,7 @@ fn test_equipped_god_item_dr_zero_with_non_god_items() {
         slot: EquipmentSlot::Armor,
         rarity: Rarity::Legendary,
         ilvl: 100,
+        tier: 5,
         base_name: "Plate".to_string(),
         display_name: "Plate".to_string(),
         attributes: AttributeBonuses {

@@ -334,14 +334,20 @@ pub fn calculate_boss_xp_reward(size: DungeonSize) -> u64 {
 
 /// Generates a treasure room item with rarity boost based on dungeon size.
 /// `zone_id` determines item level (ilvl = zone_id * 10).
-pub fn generate_treasure_item(prestige_rank: u32, zone_id: usize, rarity_boost: u32) -> Item {
+/// Haven Workshop bonus applies to base rarity before dungeon size boost.
+pub fn generate_treasure_item(
+    prestige_rank: u32,
+    zone_id: usize,
+    rarity_boost: u32,
+    haven_rarity_percent: f64,
+) -> Item {
     let mut rng = rand::rng();
 
     // Roll a random slot
     let slot = roll_random_slot(&mut rng);
 
-    // Roll rarity with boost based on dungeon tier
-    let base_rarity = roll_rarity_for_mob(prestige_rank, 0.0, &mut rng);
+    // Roll rarity with Haven bonus, then boost based on dungeon tier
+    let base_rarity = roll_rarity_for_mob(prestige_rank, haven_rarity_percent, &mut rng);
     let boosted_rarity = boost_rarity(base_rarity, rarity_boost);
 
     // Item level based on zone
@@ -391,7 +397,10 @@ pub fn collect_dungeon_item(state: &mut GameState, item: Item) {
 
 /// Called when player enters a treasure room - generates and collects an item
 /// Returns (item, was_equipped)
-pub fn on_treasure_room_entered(state: &mut GameState) -> Option<(Item, bool)> {
+pub fn on_treasure_room_entered(
+    state: &mut GameState,
+    haven_rarity_percent: f64,
+) -> Option<(Item, bool)> {
     // Get rarity boost from dungeon size (defaults to 1 if no dungeon somehow)
     let rarity_boost = state
         .active_dungeon
@@ -402,7 +411,12 @@ pub fn on_treasure_room_entered(state: &mut GameState) -> Option<(Item, bool)> {
     // Use current zone for item level
     let zone_id = state.zone_progression.current_zone_id as usize;
 
-    let item = generate_treasure_item(state.prestige_rank, zone_id, rarity_boost);
+    let item = generate_treasure_item(
+        state.prestige_rank,
+        zone_id,
+        rarity_boost,
+        haven_rarity_percent,
+    );
 
     // Auto-equip if better
     let item_clone = item.clone();
@@ -556,7 +570,7 @@ mod tests {
     #[test]
     fn test_generate_treasure_item() {
         // prestige_rank=0, zone_id=5 (ilvl 50), rarity_boost=1
-        let item = generate_treasure_item(0, 5, 1);
+        let item = generate_treasure_item(0, 5, 1, 0.0);
         assert!(!item.display_name.is_empty());
         assert_eq!(item.ilvl, 50);
     }

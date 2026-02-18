@@ -84,6 +84,7 @@ mod tests {
             slot,
             rarity: Rarity::Common,
             ilvl: 10,
+            tier: 5,
             base_name: "Test".to_string(),
             display_name: "Test Item".to_string(),
             attributes: AttributeBonuses::new(),
@@ -155,6 +156,7 @@ mod tests {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Common,
             ilvl: 10,
+            tier: 5,
             base_name: "Old Sword".to_string(),
             display_name: "Old Sword".to_string(),
             attributes: AttributeBonuses {
@@ -168,6 +170,7 @@ mod tests {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Rare,
             ilvl: 10,
+            tier: 5,
             base_name: "New Sword".to_string(),
             display_name: "New Sword".to_string(),
             attributes: AttributeBonuses {
@@ -222,6 +225,7 @@ mod tests {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Common,
             ilvl: 10,
+            tier: 5,
             base_name: "Sword".to_string(),
             display_name: "Sword".to_string(),
             attributes: AttributeBonuses {
@@ -235,6 +239,7 @@ mod tests {
             slot: EquipmentSlot::Armor,
             rarity: Rarity::Rare,
             ilvl: 10,
+            tier: 5,
             base_name: "Plate".to_string(),
             display_name: "Plate".to_string(),
             attributes: AttributeBonuses {

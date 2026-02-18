@@ -119,7 +119,7 @@ fn test_complete_dungeon_run() {
                     }
                     RoomType::Treasure => {
                         // Auto-cleared, collect item
-                        let result = on_treasure_room_entered(&mut state);
+                        let result = on_treasure_room_entered(&mut state, 0.0);
                         assert!(result.is_some());
                     }
                     RoomType::Entrance => {
@@ -314,7 +314,7 @@ fn test_treasure_room_rewards() {
     state.active_dungeon = Some(generate_dungeon(20, 3, 1));
 
     // Simulate entering treasure room
-    let result = on_treasure_room_entered(&mut state);
+    let result = on_treasure_room_entered(&mut state, 0.0);
 
     assert!(result.is_some());
     let (item, was_equipped) = result.unwrap();

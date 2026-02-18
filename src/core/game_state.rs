@@ -31,6 +31,13 @@ pub struct RecentDrop {
 /// Max number of recent drops to track
 const MAX_RECENT_DROPS: usize = 10;
 
+/// A colored text segment for multi-color ticker entries.
+#[derive(Debug, Clone)]
+pub struct TickerSegment {
+    pub text: String,
+    pub color: ratatui::style::Color,
+}
+
 /// A single entry in the scrolling loot ticker.
 #[derive(Debug, Clone)]
 pub struct TickerEntry {
@@ -42,6 +49,8 @@ pub struct TickerEntry {
     pub color: ratatui::style::Color,
     /// Whether to render bold
     pub bold: bool,
+    /// Optional multi-color segments (overrides `text`/`color` when present)
+    pub segments: Option<Vec<TickerSegment>>,
 }
 
 /// Internal entry with its scroll birth time for independent positioning.
@@ -187,7 +196,12 @@ impl Ticker {
         } else {
             entry.icon.chars().count() + 1 // icon + space
         };
-        icon_len + entry.text.chars().count()
+        let text_len = if let Some(segments) = &entry.segments {
+            segments.iter().map(|s| s.text.chars().count()).sum()
+        } else {
+            entry.text.chars().count()
+        };
+        icon_len + text_len
     }
 }
 
@@ -731,6 +745,7 @@ mod tests {
             text: "[R] Flamebrand".to_string(),
             color: ratatui::style::Color::Yellow,
             bold: false,
+            segments: None,
         });
         assert_eq!(ticker.len(), 1);
     }
@@ -744,6 +759,7 @@ mod tests {
                 text: format!("Item {i}"),
                 color: ratatui::style::Color::White,
                 bold: false,
+                segments: None,
             });
         }
         assert_eq!(ticker.len(), TICKER_MAX_ENTRIES);
@@ -768,6 +784,7 @@ mod tests {
             text: "First".to_string(),
             color: ratatui::style::Color::White,
             bold: false,
+            segments: None,
         });
         for _ in 0..10 {
             ticker.tick();
@@ -781,6 +798,7 @@ mod tests {
             text: "Sword".to_string(),
             color: ratatui::style::Color::Yellow,
             bold: false,
+            segments: None,
         });
         assert_eq!(ticker.scroll_offset, offset_before);
     }
@@ -794,12 +812,14 @@ mod tests {
             text: "Old".to_string(), // 3 chars, born_at=0
             color: ratatui::style::Color::White,
             bold: false,
+            segments: None,
         });
         ticker.push(TickerEntry {
             icon: "",
             text: "New".to_string(), // born_at spaced after "Old"
             color: ratatui::style::Color::White,
             bold: false,
+            segments: None,
         });
         assert_eq!(ticker.len(), 2);
 
@@ -828,6 +848,7 @@ mod tests {
                 text: format!("+{} XP", 200 + i),
                 color: ratatui::style::Color::Green,
                 bold: false,
+                segments: None,
             });
             for _ in 0..15 {
                 ticker.tick();
@@ -855,6 +876,7 @@ mod tests {
                 text: format!("Entry {i}"),
                 color: ratatui::style::Color::White,
                 bold: false,
+                segments: None,
             });
         }
 
@@ -881,6 +903,7 @@ mod tests {
                 text: format!("Entry {i}"),
                 color: ratatui::style::Color::White,
                 bold: false,
+                segments: None,
             });
         }
 
@@ -908,6 +931,7 @@ mod tests {
             text: "Test".to_string(),
             color: ratatui::style::Color::White,
             bold: false,
+            segments: None,
         });
         // Scrolling should advance every tick, no pauses
         let offset_before = ticker.scroll_offset;

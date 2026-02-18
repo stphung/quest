@@ -5,7 +5,7 @@
 //! [`VisualEffect`] and [`EffectType`].
 
 use crate::combat::types::{DamageFlash, DAMAGE_FLASH_DURATION};
-use crate::core::game_state::{GameState, TickerEntry};
+use crate::core::game_state::{GameState, TickerEntry, TickerSegment};
 use crate::core::tick::TickEvent;
 use crate::items::types::Rarity;
 use crate::ui::combat_effects::{EffectType, VisualEffect};
@@ -122,6 +122,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     text: format!("+{} XP", xp_gained),
                     color: Color::Green,
                     bold: false,
+                    segments: None,
                 });
             }
             TickEvent::PlayerDied { message } | TickEvent::PlayerDiedInDungeon { message } => {
@@ -133,32 +134,52 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     text: "Slain!".to_string(),
                     color: Color::Red,
                     bold: true,
+                    segments: None,
                 });
             }
             TickEvent::ItemDropped {
                 item_name,
                 rarity,
+                tier,
+                ilvl,
                 equipped,
                 slot: _,
                 stats: _,
                 from_boss: _,
             } => {
-                let rarity_initial = match rarity {
-                    Rarity::Common => "C",
-                    Rarity::Magic => "M",
-                    Rarity::Rare => "R",
-                    Rarity::Epic => "E",
-                    Rarity::Legendary => "L",
-                    Rarity::Mythic => "G",
-                };
-                let equip_tag = if *equipped { " \u{1F528}" } else { "" };
-                let text = format!("[{}] {}{}", rarity_initial, item_name, equip_tag);
-                let color = rarity_color(*rarity);
+                let rc = rarity_color(*rarity);
+                let tc = crate::ui::tier_color(*tier);
+                let mut segs = vec![
+                    TickerSegment {
+                        text: format!("{} ", rarity.name()),
+                        color: rc,
+                    },
+                    TickerSegment {
+                        text: format!("T{}", tier),
+                        color: tc,
+                    },
+                    TickerSegment {
+                        text: format!(" {}", item_name),
+                        color: rc,
+                    },
+                    TickerSegment {
+                        text: format!(" i{}", ilvl),
+                        color: Color::DarkGray,
+                    },
+                ];
+                if *equipped {
+                    segs.push(TickerSegment {
+                        text: " \u{1F528}".to_string(),
+                        color: rc,
+                    });
+                }
                 game_state.ticker.push(TickerEntry {
                     icon: "\u{2694}",
-                    text,
-                    color,
-                    bold: matches!(rarity, Rarity::Epic | Rarity::Legendary | Rarity::Mythic),
+                    text: String::new(),
+                    color: rc,
+                    bold: *tier >= 7
+                        || matches!(rarity, Rarity::Epic | Rarity::Legendary | Rarity::Mythic),
+                    segments: Some(segs),
                 });
             }
             TickEvent::SubzoneBossDefeated {
@@ -174,6 +195,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     text: format!("Boss +{} XP", xp_gained),
                     color: Color::Yellow,
                     bold: true,
+                    segments: None,
                 });
                 // Push zone advancement to ticker
                 match result {
@@ -183,6 +205,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                             text: "New Area!".to_string(),
                             color: Color::Cyan,
                             bold: false,
+                            segments: None,
                         });
                     }
                     BossDefeatResult::ZoneComplete {
@@ -197,6 +220,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                             text: format!("Zone: {}!", zone_name),
                             color: Color::Cyan,
                             bold: true,
+                            segments: None,
                         });
                     }
                     BossDefeatResult::ZoneCompleteButGated { zone_name, .. } => {
@@ -205,6 +229,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                             text: format!("{} Conquered!", zone_name),
                             color: Color::Cyan,
                             bold: true,
+                            segments: None,
                         });
                     }
                     BossDefeatResult::StormsEnd => {
@@ -213,6 +238,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                             text: "All Zones Conquered!".to_string(),
                             color: Color::Yellow,
                             bold: true,
+                            segments: None,
                         });
                     }
                     BossDefeatResult::ExpanseCycle => {
@@ -221,6 +247,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                             text: "Expanse Cycles!".to_string(),
                             color: Color::Cyan,
                             bold: false,
+                            segments: None,
                         });
                     }
                     _ => {} // WeaponRequired doesn't go to ticker
@@ -233,16 +260,49 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     .add_log_entry(message.clone(), false, true);
             }
             TickEvent::DungeonTreasureFound {
-                item_name, message, ..
+                item_name,
+                rarity,
+                tier,
+                ilvl,
+                equipped,
+                message,
             } => {
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
+                let rc = rarity_color(*rarity);
+                let tc = crate::ui::tier_color(*tier);
+                let mut segs = vec![
+                    TickerSegment {
+                        text: format!("{} ", rarity.name()),
+                        color: rc,
+                    },
+                    TickerSegment {
+                        text: format!("T{}", tier),
+                        color: tc,
+                    },
+                    TickerSegment {
+                        text: format!(" {}", item_name),
+                        color: rc,
+                    },
+                    TickerSegment {
+                        text: format!(" i{}", ilvl),
+                        color: Color::DarkGray,
+                    },
+                ];
+                if *equipped {
+                    segs.push(TickerSegment {
+                        text: " \u{1F528}".to_string(),
+                        color: rc,
+                    });
+                }
                 game_state.ticker.push(TickerEntry {
                     icon: "\u{1F48E}",
-                    text: item_name.clone(),
-                    color: Color::Cyan,
-                    bold: false,
+                    text: String::new(),
+                    color: rc,
+                    bold: *tier >= 7
+                        || matches!(rarity, Rarity::Epic | Rarity::Legendary | Rarity::Mythic),
+                    segments: Some(segs),
                 });
             }
             TickEvent::DungeonKeyFound { message } => {
@@ -254,6 +314,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     text: "Key found!".to_string(),
                     color: Color::Yellow,
                     bold: false,
+                    segments: None,
                 });
             }
             TickEvent::DungeonBossDefeated { message, .. } => {
@@ -265,6 +326,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     text: "Dungeon Boss!".to_string(),
                     color: Color::Magenta,
                     bold: true,
+                    segments: None,
                 });
             }
             TickEvent::DungeonEliteDefeated { message, .. } => {
@@ -276,6 +338,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     text: "Elite!".to_string(),
                     color: Color::Magenta,
                     bold: false,
+                    segments: None,
                 });
             }
             TickEvent::DungeonCompleted { message, .. } => {
@@ -287,6 +350,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     text: "Dungeon Complete!".to_string(),
                     color: Color::Magenta,
                     bold: true,
+                    segments: None,
                 });
             }
             TickEvent::DungeonFailed { message } => {
@@ -298,6 +362,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     text: "Dungeon failed".to_string(),
                     color: Color::Red,
                     bold: false,
+                    segments: None,
                 });
             }
             TickEvent::FishingMessage { message } => {
@@ -314,6 +379,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     text: item_name.clone(),
                     color: Color::Cyan,
                     bold: false,
+                    segments: None,
                 });
             }
             TickEvent::FishingRankUp { message } => {
@@ -325,6 +391,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     text: "Rank Up!".to_string(),
                     color: Color::Cyan,
                     bold: true,
+                    segments: None,
                 });
             }
             TickEvent::FishCaught {
@@ -335,21 +402,14 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
-                let rarity_initial = match rarity {
-                    Rarity::Common => "C",
-                    Rarity::Magic => "M",
-                    Rarity::Rare => "R",
-                    Rarity::Epic => "E",
-                    Rarity::Legendary => "L",
-                    Rarity::Mythic => "G",
-                };
-                let text = format!("{} [{}]", fish_name, rarity_initial);
+                let text = format!("{} {}", fish_name, rarity.name());
                 let color = rarity_color(*rarity);
                 game_state.ticker.push(TickerEntry {
                     icon: "\u{1F41F}",
                     text,
                     color,
                     bold: false,
+                    segments: None,
                 });
             }
             TickEvent::StormLeviathanCaught => {
@@ -369,6 +429,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     text: "New Challenge!".to_string(),
                     color: Color::Yellow,
                     bold: true,
+                    segments: None,
                 });
             }
             TickEvent::DungeonDiscovered { message } => {
@@ -380,6 +441,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     text: "Dungeon Found!".to_string(),
                     color: Color::Magenta,
                     bold: false,
+                    segments: None,
                 });
             }
             TickEvent::FishingSpotDiscovered { message } => {
@@ -391,6 +453,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     text: "Fishing Spot Found!".to_string(),
                     color: Color::Cyan,
                     bold: false,
+                    segments: None,
                 });
             }
             TickEvent::AchievementUnlocked { name, message } => {
@@ -402,6 +465,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     text: name.clone(),
                     color: Color::Yellow,
                     bold: true,
+                    segments: None,
                 });
             }
             TickEvent::HavenDiscovered => {
@@ -416,6 +480,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     text: format!("Level {}!", new_level),
                     color: Color::Green,
                     bold: true,
+                    segments: None,
                 });
             }
         }
