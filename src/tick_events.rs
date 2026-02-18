@@ -112,18 +112,13 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     });
             }
             TickEvent::EnemyDefeated {
-                xp_gained, message, ..
+                xp_gained: _,
+                message,
+                ..
             } => {
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
-                game_state.ticker.push(TickerEntry {
-                    icon: "\u{2728}",
-                    text: format!("+{} XP", xp_gained),
-                    color: Color::Green,
-                    bold: false,
-                    segments: None,
-                });
             }
             TickEvent::PlayerDied { message } | TickEvent::PlayerDiedInDungeon { message } => {
                 game_state
@@ -183,20 +178,13 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 });
             }
             TickEvent::SubzoneBossDefeated {
-                xp_gained,
+                xp_gained: _,
                 message,
                 result,
             } => {
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
-                game_state.ticker.push(TickerEntry {
-                    icon: "\u{1F451}",
-                    text: format!("Boss +{} XP", xp_gained),
-                    color: Color::Yellow,
-                    bold: true,
-                    segments: None,
-                });
                 // Push zone advancement to ticker
                 match result {
                     BossDefeatResult::SubzoneComplete { .. } => {
@@ -223,12 +211,15 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                             segments: None,
                         });
                     }
-                    BossDefeatResult::ZoneCompleteButGated { zone_name, .. } => {
+                    BossDefeatResult::ZoneCompleteButGated {
+                        zone_name,
+                        required_prestige,
+                    } => {
                         game_state.ticker.push(TickerEntry {
-                            icon: "\u{1F5FA}",
-                            text: format!("{} Conquered!", zone_name),
-                            color: Color::Cyan,
-                            bold: true,
+                            icon: "\u{1F512}",
+                            text: format!("{} cleared! P{} needed", zone_name, required_prestige),
+                            color: Color::DarkGray,
+                            bold: false,
                             segments: None,
                         });
                     }
