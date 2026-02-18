@@ -509,27 +509,17 @@ fn draw_right_panel(
     achievements: &crate::achievements::Achievements,
     ctx: &LayoutContext,
 ) {
-    let zone_completion = stats_panel::compute_zone_completion(game_state);
-
-    // At L tier, the right panel is narrower so zone lines wrap — give more height
+    // Zone info + progress bar at top
     let zone_height = if ctx.tier >= SizeTier::XL { 7 } else { 8 };
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(zone_height), // Zone info (includes flavor text + wrap)
+            Constraint::Length(zone_height), // Zone info + segmented progress bar
             Constraint::Min(10),             // Content (changes by activity)
         ])
         .split(area);
 
-    // Zone info at top (always)
-    stats_panel::draw_zone_info(
-        frame,
-        chunks[0],
-        game_state,
-        &zone_completion,
-        achievements,
-        ctx,
-    );
+    stats_panel::draw_zone_info(frame, chunks[0], game_state, achievements, ctx);
 
     // Content area — dispatched by current activity
     draw_right_content(frame, chunks[1], game_state, ctx);
