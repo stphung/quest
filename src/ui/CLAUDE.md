@@ -84,7 +84,7 @@ When a minigame is active, the right panel is replaced by the minigame scene.
 
 ## Combat HUD in Dungeons
 
-When a dungeon is active, the right panel renders a single "Dungeon" panel with player/enemy HP bars, dungeon status, the map, and combat status all integrated inside one bordered block (no separate combat panel split).
+When a dungeon is active, the right panel renders a single "Dungeon" panel with player/enemy HP bars, dungeon status, the map, and combat status all integrated inside one bordered block (no separate combat panel split). The dungeon uses a plain black background for clarity.
 
 ## Shared Game Components (`game_common.rs`)
 
@@ -145,6 +145,8 @@ pub fn render_newgame_scene(frame: &mut Frame, area: Rect, game: &NewGameGame) {
 Then register in `mod.rs` and dispatch from `draw_ui_with_update()`.
 
 ## Color Conventions
+
+Rarity colors are centralized in `mod.rs` via `pub fn rarity_color(rarity: Rarity) -> Color`. All UI code should use this function instead of inline matches.
 
 | Element | Color |
 |---------|-------|
