@@ -275,7 +275,7 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 - XP gain: Only from defeating enemies (200-400 XP per kill)
 - Offline XP: 25% rate, max 7 days (simulates kills)
 - Mob item drop rate: 15% base + 1% per prestige rank (capped at 25%), max rarity Epic
-- Boss item drops: Guaranteed, can include Legendary (5% normal boss, 10% Zone 10 final boss)
+- Boss item drops: Guaranteed, can include Legendary (2% normal boss, 5% Zone 10 final boss)
 - Item level: ilvl = zone_id × 10 (Zone 1 = ilvl 10, Zone 10 = ilvl 100)
 - Boss spawn: After 10 kills in subzone (5 kills to retry after boss death)
 - Haven discovery: requires P10+, base chance 0.000014/tick + 0.000007 per rank above 10
@@ -382,7 +382,7 @@ quest/
 │       ├── soulforge_scene.rs # Soulforge enhancement UI
 │       ├── *_scene.rs       # Various game scenes
 │       └── character_*.rs   # Character management UI
-├── tests/                   # Integration tests (16 test files, 1,600+ tests)
+├── tests/                   # Integration tests (16 test files, 2,900+ tests)
 │   ├── game_loop_orchestration_test.rs  # 36 behavior-locking tests for game_tick
 │   ├── tick_integration_test.rs         # Tick module integration tests
 │   ├── zone_progression_test.rs         # Zone advancement tests

@@ -49,8 +49,8 @@ Items flow through two separate drop paths:
 ### Boss Drops (`try_drop_from_boss`)
 1. **Always drops** — guaranteed item on boss kill
 2. **No Haven/prestige bonuses** — fixed rarity tables
-3. **Normal boss**: 40% Magic, 35% Rare, 20% Epic, 5% Legendary
-4. **Zone 10 final boss**: 20% Magic, 40% Rare, 30% Epic, 10% Legendary
+3. **Normal boss**: 40% Magic, 35% Rare, 23% Epic, 2% Legendary
+4. **Zone 10 final boss**: 20% Magic, 40% Rare, 35% Epic, 5% Legendary
 5. **No Common drops** from bosses
 
 ### Shared Steps
