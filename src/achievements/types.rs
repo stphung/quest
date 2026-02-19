@@ -370,6 +370,21 @@ pub enum AchievementId {
     PersistentHammering,  // 100 total enhancement attempts
 }
 
+impl AchievementId {
+    /// Total number of `AchievementId` variants.
+    ///
+    /// **Must be kept in sync with the enum.**  Update this whenever you add or
+    /// remove a variant so that `test_every_achievement_id_variant_has_definition`
+    /// in `data.rs` catches mismatches between the enum and `ALL_ACHIEVEMENTS`.
+    ///
+    /// Once `std::mem::variant_count` stabilises (tracking issue #73662) this
+    /// constant can be replaced with a `const_assert!` that computes the count
+    /// automatically.
+    // Used by `achievements::data` tests to verify ALL_ACHIEVEMENTS coverage.
+    #[allow(dead_code)]
+    pub const VARIANT_COUNT: usize = 149;
+}
+
 /// Static definition of an achievement.
 #[derive(Debug, Clone)]
 pub struct AchievementDef {
