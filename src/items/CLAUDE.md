@@ -12,7 +12,7 @@ src/items/
 ├── generation.rs  # Rarity-based item generation (attributes + affixes)
 ├── drops.rs       # Drop rate calculation and item rolling
 ├── names.rs       # Procedural name generation with prefixes/suffixes
-└── scoring.rs     # Intrinsic power scoring and weighted auto-equip scoring
+└── scoring.rs     # Affix power weights and power-based auto-equip
 ```
 
 ## Key Types
@@ -57,7 +57,7 @@ Items flow through two separate drop paths:
 ### Shared Steps
 - **Item generation** (`generation.rs`): `generate_item(slot, rarity, ilvl)` creates Item with ilvl-scaled and tier-scaled attributes and affixes. Tier is rolled via `roll_tier()` on an exponential drop curve (T0 38% to T9 0.1%)
 - **Name generation** (`names.rs`): Procedural name from prefix/suffix tables based on rarity and slot
-- **Auto-equip** (`scoring.rs`): `auto_equip_if_better()` compares weighted score against current equipment
+- **Auto-equip** (`scoring.rs`): `auto_equip_if_better()` compares intrinsic `power()` against current equipment
 
 ## Item Level (ilvl) and Tier Scaling
 
@@ -116,16 +116,9 @@ Affix power weights (from `affix_power_weight()`):
 
 Power score is shown in the equipment panel and scrolling loot ticker. God item power scoring is deferred (#272).
 
-## Auto-Equip Scoring (`scoring.rs`)
+## Auto-Equip (`scoring.rs`)
 
-The auto-equip scoring system uses **attribute specialization**: attributes that the character already has high values in get weighted more heavily. This reinforces the character's natural build. Unlike intrinsic power, auto-equip scores are character-dependent.
-
-```
-score = sum(item_attr * weight) + sum(affix_value * affix_power_weight)
-weight = 1 + (current_attr_value * 100 / total_attr_points)
-```
-
-The same `affix_power_weight()` function is shared between power scoring and auto-equip scoring.
+Auto-equip uses the intrinsic `power()` score to decide whether a new item replaces the current one. If the new item has strictly higher power, it replaces the equipped item. Equal power keeps the incumbent.
 
 **God item protection**: God (Mythic) items are never auto-replaced by lower rarity items.
 
@@ -160,7 +153,7 @@ Item rarity matches the fish rarity. Item ilvl is based on the current zone.
 
 1. Add variant to `AffixType` enum in `types.rs`
 2. Add generation rules in `generation.rs` (value ranges per rarity)
-3. Add scoring weight in `scoring.rs` `score_item()` match
+3. Add weight in `scoring.rs` `affix_power_weight()` match
 4. Add display name/formatting in `names.rs` if it affects item names
 5. Apply the affix effect in `combat/logic.rs` or `character/derived_stats.rs`
 
