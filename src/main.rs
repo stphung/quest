@@ -26,7 +26,7 @@ use chrono::{Local, Utc};
 use core::constants::*;
 use core::game_logic::*;
 use core::game_state::*;
-use input::{GameOverlay, HavenUiState, InputResult, SoulforgeUiState};
+use input::{EquipmentViewState, GameOverlay, HavenUiState, InputResult, SoulforgeUiState};
 use rand::RngExt;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::crossterm::terminal::{
@@ -952,6 +952,7 @@ fn main() -> io::Result<()> {
                     GameOverlay::None
                 };
                 let mut debug_menu = utils::debug_menu::DebugMenu::new();
+                let mut equipment_view = EquipmentViewState::new();
                 let mut last_flappy_frame = Instant::now();
                 let mut prev_overlay_was_fullscreen =
                     matches!(overlay, GameOverlay::Achievements { .. });
@@ -1016,6 +1017,8 @@ fn main() -> io::Result<()> {
                             enhancement.discovered,
                             &global_achievements,
                             &enhancement.levels,
+                            equipment_view.showing,
+                            equipment_view.selected_slot,
                         );
                         draw_game_overlays(
                             frame,
@@ -1067,6 +1070,7 @@ fn main() -> io::Result<()> {
                                 &mut haven,
                                 &mut haven_ui,
                                 &mut soulforge_ui,
+                                &mut equipment_view,
                                 &mut enhancement,
                                 &mut overlay,
                                 &mut debug_menu,
