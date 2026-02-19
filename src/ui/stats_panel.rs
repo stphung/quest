@@ -620,7 +620,7 @@ fn draw_fishing_panel(
 }
 
 /// Returns the style for an enhancement prefix based on its color tier.
-fn enhancement_style(level: u8) -> Style {
+pub(super) fn enhancement_style(level: u8) -> Style {
     let (r, g, b) = crate::enhancement::enhancement_color_rgb(level);
     let tier = crate::enhancement::enhancement_color_tier(level);
     let style = Style::default().fg(Color::Rgb(r, g, b));

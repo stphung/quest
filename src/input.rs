@@ -97,6 +97,7 @@ pub enum GameOverlay {
     VaultSelection {
         selected_index: usize,
         selected_slots: Vec<items::EquipmentSlot>,
+        confirm_pending: bool,
     },
     OfflineWelcome {
         report: OfflineReport,
@@ -499,18 +500,23 @@ fn handle_vault_selection(
     if let GameOverlay::VaultSelection {
         ref mut selected_index,
         ref mut selected_slots,
+        ref mut confirm_pending,
     } = overlay
     {
+        let vault_slots = haven.get_bonus(crate::haven::HavenBonusType::VaultSlots) as usize;
+
         match key.code {
             KeyCode::Up => {
                 *selected_index = selected_index.saturating_sub(1);
+                *confirm_pending = false;
             }
             KeyCode::Down => {
                 if *selected_index < 6 {
                     *selected_index += 1;
                 }
+                *confirm_pending = false;
             }
-            KeyCode::Enter => {
+            KeyCode::Char(' ') => {
                 let slots = [
                     items::EquipmentSlot::Weapon,
                     items::EquipmentSlot::Armor,
@@ -524,30 +530,41 @@ fn handle_vault_selection(
                 if state.equipment.get(slot).is_some() {
                     if let Some(pos) = selected_slots.iter().position(|s| *s == slot) {
                         selected_slots.remove(pos);
-                    } else if selected_slots.len()
-                        < haven.get_bonus(crate::haven::HavenBonusType::VaultSlots) as usize
-                    {
+                    } else if selected_slots.len() < vault_slots {
                         selected_slots.push(slot);
                     }
                 }
+                *confirm_pending = false;
             }
-            KeyCode::Char(' ') => {
-                crate::character::prestige::perform_prestige_with_vault(state, selected_slots);
-                *overlay = GameOverlay::None;
-                state.combat_state.add_log_entry(
-                    format!(
-                        "Prestiged to {}! (Vault preserved items)",
-                        get_prestige_tier(state.prestige_rank).name
-                    ),
-                    false,
-                    true,
-                );
-                return InputResult::NeedsSave;
+            KeyCode::Enter => {
+                // At max selections: prestige immediately.
+                // Under max: require a second Enter to confirm.
+                if selected_slots.len() >= vault_slots || *confirm_pending {
+                    crate::character::prestige::perform_prestige_with_vault(state, selected_slots);
+                    *overlay = GameOverlay::None;
+                    state.combat_state.add_log_entry(
+                        format!(
+                            "Prestiged to {}! (Vault preserved items)",
+                            get_prestige_tier(state.prestige_rank).name
+                        ),
+                        false,
+                        true,
+                    );
+                    return InputResult::NeedsSave;
+                } else {
+                    *confirm_pending = true;
+                }
             }
             KeyCode::Esc => {
-                *overlay = GameOverlay::None;
+                if *confirm_pending {
+                    *confirm_pending = false;
+                } else {
+                    *overlay = GameOverlay::None;
+                }
             }
-            _ => {}
+            _ => {
+                *confirm_pending = false;
+            }
         }
     }
     InputResult::Continue
@@ -565,6 +582,7 @@ fn handle_prestige_confirm(
                 *overlay = GameOverlay::VaultSelection {
                     selected_index: 0,
                     selected_slots: Vec::new(),
+                    confirm_pending: false,
                 };
             } else {
                 perform_prestige(state);

@@ -281,6 +281,7 @@ fn draw_game_overlays(
         GameOverlay::VaultSelection {
             selected_index,
             ref selected_slots,
+            confirm_pending,
         } => {
             ui::haven_scene::render_vault_selection(
                 frame,
@@ -289,6 +290,8 @@ fn draw_game_overlays(
                 haven.get_bonus(haven::HavenBonusType::VaultSlots) as u8,
                 *selected_index,
                 selected_slots,
+                &enhancement.levels,
+                *confirm_pending,
                 ctx,
             );
         }
