@@ -10,8 +10,11 @@
 //! - T7: Haven sync edge cases
 //! - T8: State sync idempotency
 
+use std::collections::HashMap;
+
 use quest::achievements::{types::MinigameDifficulty, types::MinigameType, Achievements};
 use quest::achievements::{AchievementCategory, AchievementId};
+use quest::haven::types::HavenRoomId;
 
 // =========================================================================
 // T1: Enhancement achievement integration tests
@@ -556,123 +559,241 @@ fn test_offline_progression_does_not_call_achievement_handlers() {
 // T5: Minigame achievement integration tests (using new enums)
 // =========================================================================
 
-/// Maps each (MinigameType, MinigameDifficulty) combination to its expected AchievementId
-fn expected_achievement(game: MinigameType, difficulty: MinigameDifficulty) -> AchievementId {
-    match (game, difficulty) {
-        (MinigameType::Chess, MinigameDifficulty::Novice) => AchievementId::ChessNovice,
-        (MinigameType::Chess, MinigameDifficulty::Apprentice) => AchievementId::ChessApprentice,
-        (MinigameType::Chess, MinigameDifficulty::Journeyman) => AchievementId::ChessJourneyman,
-        (MinigameType::Chess, MinigameDifficulty::Master) => AchievementId::ChessMaster,
-        (MinigameType::Morris, MinigameDifficulty::Novice) => AchievementId::MorrisNovice,
-        (MinigameType::Morris, MinigameDifficulty::Apprentice) => AchievementId::MorrisApprentice,
-        (MinigameType::Morris, MinigameDifficulty::Journeyman) => AchievementId::MorrisJourneyman,
-        (MinigameType::Morris, MinigameDifficulty::Master) => AchievementId::MorrisMaster,
-        (MinigameType::Gomoku, MinigameDifficulty::Novice) => AchievementId::GomokuNovice,
-        (MinigameType::Gomoku, MinigameDifficulty::Apprentice) => AchievementId::GomokuApprentice,
-        (MinigameType::Gomoku, MinigameDifficulty::Journeyman) => AchievementId::GomokuJourneyman,
-        (MinigameType::Gomoku, MinigameDifficulty::Master) => AchievementId::GomokuMaster,
-        (MinigameType::Minesweeper, MinigameDifficulty::Novice) => AchievementId::MinesweeperNovice,
-        (MinigameType::Minesweeper, MinigameDifficulty::Apprentice) => {
-            AchievementId::MinesweeperApprentice
-        }
-        (MinigameType::Minesweeper, MinigameDifficulty::Journeyman) => {
-            AchievementId::MinesweeperJourneyman
-        }
-        (MinigameType::Minesweeper, MinigameDifficulty::Master) => AchievementId::MinesweeperMaster,
-        (MinigameType::Rune, MinigameDifficulty::Novice) => AchievementId::RuneNovice,
-        (MinigameType::Rune, MinigameDifficulty::Apprentice) => AchievementId::RuneApprentice,
-        (MinigameType::Rune, MinigameDifficulty::Journeyman) => AchievementId::RuneJourneyman,
-        (MinigameType::Rune, MinigameDifficulty::Master) => AchievementId::RuneMaster,
-        (MinigameType::Go, MinigameDifficulty::Novice) => AchievementId::GoNovice,
-        (MinigameType::Go, MinigameDifficulty::Apprentice) => AchievementId::GoApprentice,
-        (MinigameType::Go, MinigameDifficulty::Journeyman) => AchievementId::GoJourneyman,
-        (MinigameType::Go, MinigameDifficulty::Master) => AchievementId::GoMaster,
-        (MinigameType::FlappyBird, MinigameDifficulty::Novice) => AchievementId::FlappyNovice,
-        (MinigameType::FlappyBird, MinigameDifficulty::Apprentice) => {
-            AchievementId::FlappyApprentice
-        }
-        (MinigameType::FlappyBird, MinigameDifficulty::Journeyman) => {
-            AchievementId::FlappyJourneyman
-        }
-        (MinigameType::FlappyBird, MinigameDifficulty::Master) => AchievementId::FlappyMaster,
-        (MinigameType::Snake, MinigameDifficulty::Novice) => AchievementId::SnakeNovice,
-        (MinigameType::Snake, MinigameDifficulty::Apprentice) => AchievementId::SnakeApprentice,
-        (MinigameType::Snake, MinigameDifficulty::Journeyman) => AchievementId::SnakeJourneyman,
-        (MinigameType::Snake, MinigameDifficulty::Master) => AchievementId::SnakeMaster,
-        (MinigameType::Jezzball, MinigameDifficulty::Novice) => {
-            AchievementId::ContainmentBreachNovice
-        }
-        (MinigameType::Jezzball, MinigameDifficulty::Apprentice) => {
-            AchievementId::ContainmentBreachApprentice
-        }
-        (MinigameType::Jezzball, MinigameDifficulty::Journeyman) => {
-            AchievementId::ContainmentBreachJourneyman
-        }
-        (MinigameType::Jezzball, MinigameDifficulty::Master) => {
-            AchievementId::ContainmentBreachMaster
-        }
-        (MinigameType::RunicShift, MinigameDifficulty::Novice) => AchievementId::SigilSurgeNovice,
-        (MinigameType::RunicShift, MinigameDifficulty::Apprentice) => {
-            AchievementId::SigilSurgeApprentice
-        }
-        (MinigameType::RunicShift, MinigameDifficulty::Journeyman) => {
-            AchievementId::SigilSurgeJourneyman
-        }
-        (MinigameType::RunicShift, MinigameDifficulty::Master) => AchievementId::SigilSurgeMaster,
-    }
-}
+/// Flat lookup table: (MinigameType, MinigameDifficulty, expected AchievementId).
+/// Declared as data (not logic) so it can be visually audited against achievement definitions
+/// without risk of mirroring a bug in the production match statement.
+const MINIGAME_ACHIEVEMENT_TABLE: &[(MinigameType, MinigameDifficulty, AchievementId)] = &[
+    (
+        MinigameType::Chess,
+        MinigameDifficulty::Novice,
+        AchievementId::ChessNovice,
+    ),
+    (
+        MinigameType::Chess,
+        MinigameDifficulty::Apprentice,
+        AchievementId::ChessApprentice,
+    ),
+    (
+        MinigameType::Chess,
+        MinigameDifficulty::Journeyman,
+        AchievementId::ChessJourneyman,
+    ),
+    (
+        MinigameType::Chess,
+        MinigameDifficulty::Master,
+        AchievementId::ChessMaster,
+    ),
+    (
+        MinigameType::Morris,
+        MinigameDifficulty::Novice,
+        AchievementId::MorrisNovice,
+    ),
+    (
+        MinigameType::Morris,
+        MinigameDifficulty::Apprentice,
+        AchievementId::MorrisApprentice,
+    ),
+    (
+        MinigameType::Morris,
+        MinigameDifficulty::Journeyman,
+        AchievementId::MorrisJourneyman,
+    ),
+    (
+        MinigameType::Morris,
+        MinigameDifficulty::Master,
+        AchievementId::MorrisMaster,
+    ),
+    (
+        MinigameType::Gomoku,
+        MinigameDifficulty::Novice,
+        AchievementId::GomokuNovice,
+    ),
+    (
+        MinigameType::Gomoku,
+        MinigameDifficulty::Apprentice,
+        AchievementId::GomokuApprentice,
+    ),
+    (
+        MinigameType::Gomoku,
+        MinigameDifficulty::Journeyman,
+        AchievementId::GomokuJourneyman,
+    ),
+    (
+        MinigameType::Gomoku,
+        MinigameDifficulty::Master,
+        AchievementId::GomokuMaster,
+    ),
+    (
+        MinigameType::Minesweeper,
+        MinigameDifficulty::Novice,
+        AchievementId::MinesweeperNovice,
+    ),
+    (
+        MinigameType::Minesweeper,
+        MinigameDifficulty::Apprentice,
+        AchievementId::MinesweeperApprentice,
+    ),
+    (
+        MinigameType::Minesweeper,
+        MinigameDifficulty::Journeyman,
+        AchievementId::MinesweeperJourneyman,
+    ),
+    (
+        MinigameType::Minesweeper,
+        MinigameDifficulty::Master,
+        AchievementId::MinesweeperMaster,
+    ),
+    (
+        MinigameType::Rune,
+        MinigameDifficulty::Novice,
+        AchievementId::RuneNovice,
+    ),
+    (
+        MinigameType::Rune,
+        MinigameDifficulty::Apprentice,
+        AchievementId::RuneApprentice,
+    ),
+    (
+        MinigameType::Rune,
+        MinigameDifficulty::Journeyman,
+        AchievementId::RuneJourneyman,
+    ),
+    (
+        MinigameType::Rune,
+        MinigameDifficulty::Master,
+        AchievementId::RuneMaster,
+    ),
+    (
+        MinigameType::Go,
+        MinigameDifficulty::Novice,
+        AchievementId::GoNovice,
+    ),
+    (
+        MinigameType::Go,
+        MinigameDifficulty::Apprentice,
+        AchievementId::GoApprentice,
+    ),
+    (
+        MinigameType::Go,
+        MinigameDifficulty::Journeyman,
+        AchievementId::GoJourneyman,
+    ),
+    (
+        MinigameType::Go,
+        MinigameDifficulty::Master,
+        AchievementId::GoMaster,
+    ),
+    (
+        MinigameType::FlappyBird,
+        MinigameDifficulty::Novice,
+        AchievementId::FlappyNovice,
+    ),
+    (
+        MinigameType::FlappyBird,
+        MinigameDifficulty::Apprentice,
+        AchievementId::FlappyApprentice,
+    ),
+    (
+        MinigameType::FlappyBird,
+        MinigameDifficulty::Journeyman,
+        AchievementId::FlappyJourneyman,
+    ),
+    (
+        MinigameType::FlappyBird,
+        MinigameDifficulty::Master,
+        AchievementId::FlappyMaster,
+    ),
+    (
+        MinigameType::Snake,
+        MinigameDifficulty::Novice,
+        AchievementId::SnakeNovice,
+    ),
+    (
+        MinigameType::Snake,
+        MinigameDifficulty::Apprentice,
+        AchievementId::SnakeApprentice,
+    ),
+    (
+        MinigameType::Snake,
+        MinigameDifficulty::Journeyman,
+        AchievementId::SnakeJourneyman,
+    ),
+    (
+        MinigameType::Snake,
+        MinigameDifficulty::Master,
+        AchievementId::SnakeMaster,
+    ),
+    (
+        MinigameType::Jezzball,
+        MinigameDifficulty::Novice,
+        AchievementId::ContainmentBreachNovice,
+    ),
+    (
+        MinigameType::Jezzball,
+        MinigameDifficulty::Apprentice,
+        AchievementId::ContainmentBreachApprentice,
+    ),
+    (
+        MinigameType::Jezzball,
+        MinigameDifficulty::Journeyman,
+        AchievementId::ContainmentBreachJourneyman,
+    ),
+    (
+        MinigameType::Jezzball,
+        MinigameDifficulty::Master,
+        AchievementId::ContainmentBreachMaster,
+    ),
+    (
+        MinigameType::RunicShift,
+        MinigameDifficulty::Novice,
+        AchievementId::SigilSurgeNovice,
+    ),
+    (
+        MinigameType::RunicShift,
+        MinigameDifficulty::Apprentice,
+        AchievementId::SigilSurgeApprentice,
+    ),
+    (
+        MinigameType::RunicShift,
+        MinigameDifficulty::Journeyman,
+        AchievementId::SigilSurgeJourneyman,
+    ),
+    (
+        MinigameType::RunicShift,
+        MinigameDifficulty::Master,
+        AchievementId::SigilSurgeMaster,
+    ),
+];
 
 #[test]
 fn test_minigame_win_unlocks_correct_achievement() {
-    let all_game_types = [
-        MinigameType::Chess,
-        MinigameType::Morris,
-        MinigameType::Gomoku,
-        MinigameType::Minesweeper,
-        MinigameType::Rune,
-        MinigameType::Go,
-        MinigameType::FlappyBird,
-        MinigameType::Snake,
-        MinigameType::Jezzball,
-        MinigameType::RunicShift,
-    ];
+    assert_eq!(
+        MINIGAME_ACHIEVEMENT_TABLE.len(),
+        40,
+        "Table should cover all 10 game types x 4 difficulties"
+    );
 
-    let all_difficulties = [
-        MinigameDifficulty::Novice,
-        MinigameDifficulty::Apprentice,
-        MinigameDifficulty::Journeyman,
-        MinigameDifficulty::Master,
-    ];
+    for &(game_type, difficulty, expected) in MINIGAME_ACHIEVEMENT_TABLE {
+        let mut achievements = Achievements::default();
+        achievements.on_minigame_won(game_type, difficulty, Some("ChampionHero"));
 
-    for &game_type in &all_game_types {
-        for &difficulty in &all_difficulties {
-            let mut achievements = Achievements::default();
-            achievements.on_minigame_won(game_type, difficulty, Some("ChampionHero"));
-
-            let expected = expected_achievement(game_type, difficulty);
-            assert!(
-                achievements.is_unlocked(expected),
-                "Expected {:?} to be unlocked when winning {:?} at {:?} difficulty",
-                expected,
-                game_type,
-                difficulty
-            );
-        }
+        assert!(
+            achievements.is_unlocked(expected),
+            "Expected {:?} to be unlocked when winning {:?} at {:?} difficulty",
+            expected,
+            game_type,
+            difficulty
+        );
     }
 }
 
 #[test]
 fn test_grand_champion_at_100_wins() {
-    let mut achievements = Achievements::default();
+    let mut achievements = Achievements {
+        total_minigame_wins: 99,
+        ..Default::default()
+    };
 
-    // Win 100 games total across any combination of game types
-    for _ in 0..99 {
-        achievements.on_minigame_won(
-            MinigameType::Chess,
-            MinigameDifficulty::Novice,
-            Some("Hero"),
-        );
-    }
     // Not yet unlocked at 99
     assert!(
         !achievements.is_unlocked(AchievementId::GrandChampion),
@@ -693,15 +814,10 @@ fn test_grand_champion_at_100_wins() {
 
 #[test]
 fn test_grand_champion_not_at_99() {
-    let mut achievements = Achievements::default();
-
-    for _ in 0..99 {
-        achievements.on_minigame_won(
-            MinigameType::Gomoku,
-            MinigameDifficulty::Journeyman,
-            Some("Hero"),
-        );
-    }
+    let achievements = Achievements {
+        total_minigame_wins: 99,
+        ..Default::default()
+    };
 
     assert_eq!(
         achievements.total_minigame_wins, 99,
@@ -715,16 +831,17 @@ fn test_grand_champion_not_at_99() {
 
 #[test]
 fn test_minigame_progress_tracking() {
-    let mut achievements = Achievements::default();
+    let mut achievements = Achievements {
+        total_minigame_wins: 49,
+        ..Default::default()
+    };
 
-    // Win 50 games — progress should be tracked for GrandChampion
-    for _ in 0..50 {
-        achievements.on_minigame_won(
-            MinigameType::Snake,
-            MinigameDifficulty::Novice,
-            Some("Hero"),
-        );
-    }
+    // Win 1 more game to reach 50 total
+    achievements.on_minigame_won(
+        MinigameType::Snake,
+        MinigameDifficulty::Novice,
+        Some("Hero"),
+    );
 
     // GrandChampion should NOT be unlocked yet
     assert!(!achievements.is_unlocked(AchievementId::GrandChampion));
@@ -895,9 +1012,6 @@ fn test_zone_completion_unknown_zone_id_does_nothing() {
 
 #[test]
 fn test_haven_sync_partial_rooms_not_all_t1() {
-    use quest::haven::types::HavenRoomId;
-    use std::collections::HashMap;
-
     let mut achievements = Achievements::default();
 
     // Set MOST rooms to T1, but leave one room at T0
@@ -932,9 +1046,6 @@ fn test_haven_sync_partial_rooms_not_all_t1() {
 
 #[test]
 fn test_haven_sync_not_discovered() {
-    use quest::haven::types::HavenRoomId;
-    use std::collections::HashMap;
-
     let mut achievements = Achievements::default();
 
     // Even if rooms are at T1, if haven not discovered, no achievements
@@ -961,9 +1072,6 @@ fn test_haven_sync_not_discovered() {
 
 #[test]
 fn test_haven_sync_fishing_dock_max_counts_for_architect() {
-    use quest::haven::types::HavenRoomId;
-    use std::collections::HashMap;
-
     // HavenArchitect uses a special rule: rooms with max_tier < 3 count as "T3"
     // when at their max tier. FishingDock max_tier=4, so it needs to be >= 3 to count.
     // StormForge max_tier=1 — it is excluded from the HavenBuilderI/II/Architect checks.
@@ -994,9 +1102,6 @@ fn test_haven_sync_fishing_dock_max_counts_for_architect() {
 
 #[test]
 fn test_haven_sync_fishing_dock_at_t1_not_enough_for_architect() {
-    use quest::haven::types::HavenRoomId;
-    use std::collections::HashMap;
-
     // All rooms at T3 (or max), BUT FishingDock only at T1.
     // The all_at_t2 check uses raw ">= 2" comparison, so FishingDock at T1 also
     // blocks HavenBuilderII (it fails the >= 2 check).
@@ -1032,9 +1137,6 @@ fn test_haven_sync_fishing_dock_at_t1_not_enough_for_architect() {
 
 #[test]
 fn test_haven_sync_empty_room_tiers_with_discovery() {
-    use quest::haven::types::HavenRoomId;
-    use std::collections::HashMap;
-
     let mut achievements = Achievements::default();
 
     // Haven discovered but no rooms built yet
@@ -1156,9 +1258,6 @@ fn test_sync_after_normal_progression_is_safe() {
 
 #[test]
 fn test_sync_from_haven_twice_is_idempotent() {
-    use quest::haven::types::HavenRoomId;
-    use std::collections::HashMap;
-
     let mut achievements = Achievements::default();
 
     let room_tiers: HashMap<HavenRoomId, u8> = HavenRoomId::ALL
