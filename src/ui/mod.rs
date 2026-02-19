@@ -31,6 +31,7 @@ pub mod soulforge_scene;
 mod stats_panel;
 mod throbber;
 pub mod ticker;
+mod zone_bg;
 
 use crate::challenges::ActiveMinigame;
 use crate::core::game_state::GameState;
