@@ -123,10 +123,21 @@ pub fn draw_ui_with_update(
                 haven_discovered,
                 soulforge_discovered,
                 achievements,
+                enhancement_levels,
+                equipment_showing,
+                equipment_selected_slot,
             );
         }
         SizeTier::S => {
-            draw_s_layout(frame, &ctx, game_state, achievements);
+            draw_s_layout(
+                frame,
+                &ctx,
+                game_state,
+                achievements,
+                enhancement_levels,
+                equipment_showing,
+                equipment_selected_slot,
+            );
         }
         SizeTier::TooSmall => {
             // Already handled above
@@ -262,6 +273,7 @@ fn draw_xl_l_layout(
 
 /// M tier stacked single-column layout.
 /// Compact stats bar + optional attrs + XP bar + full-width activity + compact info + footer
+#[allow(clippy::too_many_arguments)]
 fn draw_m_layout(
     frame: &mut Frame,
     ctx: &LayoutContext,
@@ -269,6 +281,9 @@ fn draw_m_layout(
     haven_discovered: bool,
     soulforge_discovered: bool,
     achievements: &crate::achievements::Achievements,
+    enhancement_levels: &[u8; 7],
+    equipment_showing: bool,
+    equipment_selected_slot: usize,
 ) {
     let area = frame.area();
     let show_attrs = ctx.rows >= 26;
@@ -305,8 +320,19 @@ fn draw_m_layout(
     stats_panel::draw_xp_bar_compact(frame, chunks[idx], game_state);
     idx += 1;
 
-    // Activity area - dispatched by current activity
-    draw_right_content(frame, chunks[idx], game_state, achievements, ctx);
+    // Activity area - equipment detail or dispatched by current activity
+    if equipment_showing {
+        equipment_detail_scene::render_equipment_detail(
+            frame,
+            chunks[idx],
+            game_state,
+            equipment_selected_slot,
+            enhancement_levels,
+            ctx,
+        );
+    } else {
+        draw_right_content(frame, chunks[idx], game_state, achievements, ctx);
+    }
     idx += 1;
 
     // Event ticker
@@ -326,11 +352,15 @@ fn draw_m_layout(
 
 /// S tier minimal text-only layout.
 /// Status line + XP bar + player HP + enemy HP + combat status + merged feed + footer
+#[allow(clippy::too_many_arguments)]
 fn draw_s_layout(
     frame: &mut Frame,
     ctx: &LayoutContext,
     game_state: &GameState,
     achievements: &crate::achievements::Achievements,
+    enhancement_levels: &[u8; 7],
+    equipment_showing: bool,
+    equipment_selected_slot: usize,
 ) {
     let area = frame.area();
 
@@ -338,7 +368,8 @@ fn draw_s_layout(
     let has_special_activity = game_state.active_minigame.is_some()
         || game_state.challenge_menu.is_open
         || game_state.active_fishing.is_some()
-        || game_state.active_dungeon.is_some();
+        || game_state.active_dungeon.is_some()
+        || equipment_showing;
 
     if has_special_activity {
         // Minimal: status line + activity area + footer
@@ -352,7 +383,18 @@ fn draw_s_layout(
             .split(area);
 
         stats_panel::draw_compact_stats_bar(frame, chunks[0], game_state, ctx);
-        draw_right_content(frame, chunks[1], game_state, achievements, ctx);
+        if equipment_showing {
+            equipment_detail_scene::render_equipment_detail(
+                frame,
+                chunks[1],
+                game_state,
+                equipment_selected_slot,
+                enhancement_levels,
+                ctx,
+            );
+        } else {
+            draw_right_content(frame, chunks[1], game_state, achievements, ctx);
+        }
         stats_panel::draw_footer_minimal(frame, chunks[2], game_state);
         return;
     }
