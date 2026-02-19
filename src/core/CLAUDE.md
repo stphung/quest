@@ -6,11 +6,19 @@ Central game state, game logic, balance constants, and the per-tick orchestratio
 
 ```
 src/core/
-├── mod.rs         # Public re-exports (GameState, constants, TickEvent, TickResult)
-├── constants.rs   # All game balance constants (timing, XP, drops, discovery, zones)
-├── game_state.rs  # GameState struct and RecentDrop display type
-├── game_logic.rs  # XP curves, leveling, offline progression, enemy spawning
-└── tick.rs        # game_tick() orchestration — the central per-tick function
+├── mod.rs           # Public re-exports (GameState, constants, TickEvent, TickResult)
+├── constants.rs     # All game balance constants (timing, XP, drops, discovery, zones)
+├── discoveries.rs   # Discovery rolls (dungeons, fishing spots, Haven, Soulforge)
+├── enemy_spawning.rs # Enemy generation and spawning logic
+├── game_logic.rs    # Thin re-export wrapper (most logic extracted to submodules)
+├── game_state.rs    # GameState struct
+├── offline.rs       # Offline XP progression (calculate_offline_xp, process_offline_progression)
+├── recent_drops.rs  # RecentDrop struct, recent drops deque management
+├── tick.rs          # game_tick() orchestration — coordinates all stages
+├── tick_stages.rs   # Tick processing stages 4-6 and helper functions
+├── tick_types.rs    # TickEvent enum (30 variants) and TickResult struct
+├── ticker.rs        # Scrolling loot ticker (TickerEntry, Ticker, adaptive scroll speed)
+└── xp.rs            # XP curves, leveling, combat kill XP, distribute_level_up_points
 ```
 
 ## Key Types
@@ -57,7 +65,7 @@ Key methods:
 - `is_in_dungeon()` -- Checks `active_dungeon.is_some()`
 - `xp_per_hour()` -- Returns XP/hr from rolling 5-minute sample window (None if <10s data)
 
-### `RecentDrop` (`game_state.rs`)
+### `RecentDrop` (`recent_drops.rs`)
 
 Display-only struct for the Loot panel. Not serialized.
 
@@ -72,7 +80,7 @@ pub struct RecentDrop {
 }
 ```
 
-### `OfflineReport` (`game_logic.rs`)
+### `OfflineReport` (`offline.rs`)
 
 Returned by `process_offline_progression()` to summarize what happened while the player was away.
 
@@ -88,7 +96,7 @@ pub struct OfflineReport {
 }
 ```
 
-### `TickEvent` (`tick.rs`)
+### `TickEvent` (`tick_types.rs`)
 
 Enum with 30 variants describing everything that can happen in a single tick. The presentation layer (main.rs) maps these to combat log entries and visual effects. Game logic never touches UI types.
 
@@ -104,7 +112,7 @@ Enum with 30 variants describing everything that can happen in a single tick. Th
 
 Each variant carries pre-formatted message strings with unicode escapes (e.g., `\u{2694}` for crossed swords). The presentation layer uses these directly for log entries.
 
-### `TickResult` (`tick.rs`)
+### `TickResult` (`tick_types.rs`)
 
 ```rust
 pub struct TickResult {
@@ -152,16 +160,19 @@ pub fn game_tick<R: Rng>(
 
 **Important**: Stage 5 (fishing) returns early, skipping stages 6-7. Fishing and combat are mutually exclusive.
 
-### Helper Functions (private)
+### Stage Functions (`tick_stages.rs`)
 
+- `process_dungeon_events(state, dt, haven, result, rng)` -- Stage 4: dungeon exploration events
+- `process_fishing_tick(state, tick_counter, dt, haven, achievements, debug, result, rng)` -- Stage 5: fishing tick processing
+- `process_combat_events(state, events, haven, achievements, result, rng)` -- Stage 6: combat event mapping
 - `process_item_drop(state, haven, result)` -- Rolls mob/boss drops, auto-equips, adds to recent drops
 - `process_discoveries(state, rng, result)` -- Rolls dungeon and fishing spot discovery after kills
 - `process_zone_achievements(defeat_result, achievements, name)` -- Tracks zone completion achievements
 - `collect_achievement_events(achievements, result)` -- Drains unlock queue into TickResult events
 
-## Key Functions (`game_logic.rs`)
+## Key Functions
 
-### XP and Leveling
+### XP and Leveling (`xp.rs`)
 
 | Function | Signature | Purpose |
 |----------|-----------|---------|
@@ -172,7 +183,7 @@ pub fn game_tick<R: Rng>(
 | `distribute_level_up_points` | `(state) -> Vec<AttributeType>` | Randomly distributes 3 points among non-capped attributes |
 | `combat_kill_xp` | `(passive_rate, haven_bonus) -> u64` | Random 200-400 ticks of XP per kill, with Haven Training Yard bonus |
 
-### Offline Progression
+### Offline Progression (`offline.rs`)
 
 | Function | Signature | Purpose |
 |----------|-----------|---------|
@@ -181,13 +192,22 @@ pub fn game_tick<R: Rng>(
 
 Offline XP formula: `(elapsed_seconds / 5.0) * 0.25 * xp_per_kill * (1 + haven_bonus/100)`
 
-### Enemy Spawning
+### Enemy Spawning (`enemy_spawning.rs`)
 
 | Function | Signature | Purpose |
 |----------|-----------|---------|
 | `spawn_enemy_if_needed` | `(state)` | Spawns zone or dungeon enemy if no enemy and not regenerating. Uses zone-based generators (`generate_enemy_for_current_zone`, `generate_boss_for_current_zone`) |
 | `spawn_dungeon_enemy` | `(state)` (private) | Spawns Combat/Elite/Boss enemy via `generate_dungeon_enemy(zone_id)`, `generate_dungeon_elite(zone_id)`, `generate_dungeon_boss(zone_id)` |
+
+### Discovery (`discoveries.rs`)
+
+| Function | Signature | Purpose |
+|----------|-----------|---------|
 | `try_discover_dungeon` | `(state) -> bool` | 1% chance per call, generates dungeon via `generate_dungeon(level, prestige_rank, zone_id)` |
+
+### Re-export Wrapper (`game_logic.rs`)
+
+All functions above are re-exported through `game_logic.rs` for backward compatibility. New code should import from the submodules directly.
 
 ## Constants (`constants.rs`)
 
@@ -321,5 +341,5 @@ Zone 11 (The Expanse) is an endgame wall: `(5000, 400, 500, 80, 250, 30)` — ro
 
 ## Known Issues
 
-- `combat_kill_xp()` and `distribute_level_up_points()` use internal `thread_rng()` (not yet parameterized with generic `R: Rng`)
-- `try_discover_dungeon()` also uses internal `thread_rng()`
+- `combat_kill_xp()` (`xp.rs`) and `distribute_level_up_points()` (`xp.rs`) use internal `thread_rng()` (not yet parameterized with generic `R: Rng`)
+- `try_discover_dungeon()` (`discoveries.rs`) also uses internal `thread_rng()`

@@ -11,6 +11,7 @@ A random fishing minigame with persistent ranking that survives prestige. Provid
 ### Discovery and Sessions
 
 - **Discovery chance**: 5% per kill during overworld combat (not in dungeon/minigame)
+- **Discovery logic**: Implemented in `fishing/discovery.rs` (extracted from logic.rs)
 - **Mutual exclusivity**: Dungeon checked first, then fishing (both rolled inside `process_discoveries()` after each kill)
 - **Session length**: 3-8 fish (random)
 - **Automation**: Fully automatic, no player input required
@@ -140,7 +141,7 @@ Death in a dungeon exits the dungeon with no prestige loss — a safe environmen
 
 ### Overview
 
-Account-level base building presented as a skill tree. Players spend prestige ranks to construct and upgrade rooms that provide permanent passive bonuses. The Haven persists across all prestige resets and benefits every character on the account. Stored in `~/.quest/haven.json`.
+Account-level base building presented as a skill tree. Players spend prestige ranks to construct and upgrade rooms that provide permanent passive bonuses. The Haven persists across all prestige resets and benefits every character on the account. Stored in `~/.quest/haven.json`. Room definitions are in `haven/room_defs.rs` and bonus calculation logic is in `haven/bonus.rs`.
 
 ### Unlock Conditions
 
@@ -248,7 +249,7 @@ Haven bonuses are passed as explicit parameters to game systems rather than acce
 
 ### Overview
 
-Account-level achievement system that persists across all characters. Stored in `~/.quest/achievements.json`. Achievement tracking is driven by `on_*` event handlers called from `tick.rs` during game processing. Newly unlocked achievements are emitted as `TickEvent::AchievementUnlocked` events and collected by `collect_achievement_events()`. The `achievements_changed` flag in `TickResult` signals when the file needs to be saved.
+Account-level achievement system that persists across all characters. Stored in `~/.quest/achievements.json`. Achievement tracking is driven by `on_*` event handlers (in `achievements/handlers.rs`) called from `tick.rs` during game processing. Milestone definitions and thresholds are in `achievements/milestones.rs`. Newly unlocked achievements are emitted as `TickEvent::AchievementUnlocked` events and collected by `collect_achievement_events()`. The `achievements_changed` flag in `TickResult` signals when the file needs to be saved.
 
 ### Categories (6)
 

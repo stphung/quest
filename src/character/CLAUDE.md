@@ -6,12 +6,14 @@ Character attributes, derived stats, prestige progression, and multi-character p
 
 ```
 src/character/
-├── mod.rs          # Public re-exports
-├── attributes.rs   # 6 RPG attributes, modifiers, cap enforcement
-├── derived_stats.rs # Combat stats calculated from attributes
-├── prestige.rs     # Prestige tiers, multipliers, tier progression
-├── manager.rs      # Character CRUD, JSON persistence in ~/.quest/
-└── input.rs        # Character select/create/delete/rename input handling
+├── mod.rs             # Public re-exports
+├── attributes.rs      # 6 RPG attributes, modifiers, cap enforcement
+├── derived_stats.rs   # Combat stats calculated from attributes
+├── prestige.rs        # Prestige tiers, multipliers, tier progression
+├── manager.rs         # Character CRUD orchestration (create/delete/rename), struct definitions
+├── persistence.rs     # JSON save/load file I/O operations (extracted from manager.rs)
+├── name_validation.rs # Character name validation rules and sanitization
+└── input.rs           # Character select/create/delete/rename input handling
 ```
 
 ## Key Types
@@ -42,20 +44,22 @@ Named tiers from Bronze through Eternal with diminishing-returns XP multipliers.
 **Formula**: `multiplier = 1.0 + 0.5 × rank^0.7`
 - P0: 1.0x, P1 (Bronze): 1.5x, P5: ~2.7x, P10: ~3.5x, P20: ~5.1x, P100: ~13.3x
 
-## Character Persistence (`manager.rs`)
+## Character Persistence (`manager.rs` + `persistence.rs`)
 
 Characters are saved as individual JSON files in `~/.quest/`:
 - File pattern: `~/.quest/{character_name}.json`
 - Auto-save every 30 seconds (driven by `main.rs` timer)
-- Name validation: 1-20 chars, alphanumeric + spaces, no leading/trailing spaces
+- Name validation (`name_validation.rs`): 1-20 chars, alphanumeric + spaces/hyphens/underscores, no leading/trailing spaces, reserved names blocked
+
+`manager.rs` defines the `CharacterManager` struct, `CharacterSaveData`, and `CharacterInfo` types. `persistence.rs` implements the file I/O methods on `CharacterManager`.
 
 ### Character CRUD Operations
 - `create_character(name)` — Creates new character with base attributes, validates name uniqueness
-- `load_character(name)` — Loads from JSON file
-- `save_character(state)` — Serializes GameState to JSON
-- `delete_character(name)` — Removes JSON file
-- `rename_character(old, new)` — Renames file, updates internal state
-- `list_characters()` — Lists all `.json` files in `~/.quest/`
+- `load_character(name)` — Loads from JSON file (`persistence.rs`)
+- `save_character(state)` — Serializes GameState to JSON (`persistence.rs`)
+- `delete_character(name)` — Removes JSON file (`persistence.rs`)
+- `rename_character(old, new)` — Renames file, updates internal state (`persistence.rs`)
+- `list_characters()` — Lists all `.json` files in `~/.quest/` (`persistence.rs`)
 
 ## Leveling System
 

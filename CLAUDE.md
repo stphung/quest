@@ -81,8 +81,16 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 ### Core Module (`src/core/`)
 
 - `game_state.rs` — Main character state struct (level, XP, prestige, combat state, equipment)
-- `game_logic.rs` — XP curve (`100 × level^1.5`), leveling (+3 random attribute points), enemy spawning, offline progression
-- `tick.rs` — Per-tick game engine: `game_tick<R: Rng>()` with 12 processing stages, returns `TickResult` with `Vec<TickEvent>` (30 variants). Zero UI imports, zero file I/O — fully decoupled from rendering
+- `game_logic.rs` — Thin re-export wrapper (XP curve, leveling, spawning, offline logic extracted to submodules)
+- `tick.rs` — Per-tick game engine: `game_tick<R: Rng>()` with 12 processing stages. Zero UI imports, zero file I/O — fully decoupled from rendering
+- `tick_types.rs` — TickEvent enum (30 variants) and TickResult struct
+- `tick_stages.rs` — Tick processing stages 4-6 and helper functions (process_item_drop, process_discoveries, etc.)
+- `xp.rs` — XP calculation, leveling logic, combat kill XP
+- `discoveries.rs` — Discovery rolls for dungeons, fishing spots, Haven, Soulforge
+- `enemy_spawning.rs` — Enemy generation and spawning (spawn_enemy_if_needed, try_discover_dungeon)
+- `offline.rs` — Offline XP progression (calculate_offline_xp, process_offline_progression)
+- `recent_drops.rs` — RecentDrop struct and deque management
+- `ticker.rs` — XP rate sampling and rolling window
 - `constants.rs` — Game balance constants (tick rate, attack intervals, XP rates, item drop rates, zone enemy stats, boss multipliers, prestige combat bonuses, update check jitter)
 
 ### Simulator (`src/bin/simulator.rs`)
@@ -105,13 +113,20 @@ CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FI
 - `attributes.rs` — 6 RPG attributes (STR, DEX, CON, INT, WIS, CHA), modifier = `(value - 10) / 2`
 - `derived_stats.rs` — Combat stats calculated from attributes and enhancement levels (HP, damage, defense, crit, XP mult)
 - `prestige.rs` — Prestige tiers (Bronze→Eternal) with XP multipliers (`1+0.5×rank^0.7`, diminishing returns), attribute cap increases (`10+rank×5`), and `PrestigeCombatBonuses` (flat damage/defense/crit/HP from rank)
-- `manager.rs` — Character CRUD operations (create, delete, rename), JSON save/load in ~/.quest/, name validation
+- `manager.rs` — Character CRUD operations (create, delete, rename)
+- `persistence.rs` — JSON save/load operations (extracted from manager.rs)
+- `name_validation.rs` — Character name validation rules
 - `input.rs` — Character selection, creation, deletion, renaming input handling and UI states
 
 ### Combat Module (`src/combat/`) — [detailed docs](src/combat/CLAUDE.md)
 
 - `types.rs` — Enemy struct (with defense field), zone-based enemy generators, combat state machine
-- `logic.rs` — Turn-based combat mechanics with prestige bonuses and god item passives, damage pipeline (Giant's Might % -> Haven % -> prestige flat -> enemy defense -> Divine Bulwark DR -> crit), `GodItemCombatBonuses` struct, event emission
+- `logic.rs` — Turn-based combat orchestration with prestige bonuses and god item passives
+- `player_attack.rs` — Player damage pipeline (weapon gate, Giant's Might, Haven, prestige, defense, crit, double strike)
+- `enemy_attack.rs` — Enemy attack resolution (defense, Divine Bulwark DR, reflection, death handling)
+- `damage.rs` — Shared damage calculation and enemy death handling
+- `events.rs` — CombatEvent enum, HavenCombatBonuses, GodItemCombatBonuses structs
+- `regen.rs` — HP regeneration after combat
 
 ### Zone System (`src/zones/`)
 
@@ -138,7 +153,10 @@ CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FI
 
 - `types.rs` — Fish rarities (Common→Legendary), fishing phases (Casting, Waiting, Reeling), 40 ranks across 8 tiers, Storm Leviathan encounter tracking
 - `generation.rs` — Fish name generation, rarity rolling, Storm Leviathan progressive hunt
-- `logic.rs` — Fishing session tick processing, Haven bonus integration, item drops from fishing
+- `logic.rs` — Fishing session tick processing, Haven bonus integration
+- `discovery.rs` — Fishing spot discovery logic (try_discover_fishing)
+- `drops.rs` — Item drop chance and generation from fish catches
+- `rank.rs` — Rank-up checking and max rank calculation
 
 **Fishing Ranks:** 40 ranks across 8 tiers (Novice 1-5, Apprentice 6-10, Journeyman 11-15, Expert 16-20, Master 21-25, Grandmaster 26-30 base max, Mythic 31-35, Transcendent 36-40 with Fishing Dock T4). Storm Leviathan encounter at rank 40.
 
@@ -191,8 +209,10 @@ God items are created via debug menu (discovery/forging system not yet designed,
 
 ### Haven Module (`src/haven/`) — [detailed docs](src/haven/CLAUDE.md)
 
-- `types.rs` — Haven struct, 14 room definitions in a skill tree, upgrade tiers, 15 bonus types, Storm Forge
-- `logic.rs` — Room construction, upgrade logic, bonus calculation, prestige rank cost system
+- `types.rs` — Haven struct, upgrade tiers, Storm Forge
+- `room_defs.rs` — HavenRoomId enum, room metadata (name, description, parents, children, depth, tier costs)
+- `bonus.rs` — HavenBonusType, HavenBonus, HavenBonuses, bonus calculation, haven_discovery_chance
+- `logic.rs` — Room construction, upgrade logic, prestige rank cost system
 
 Account-level base building that persists across prestiges. 14 rooms in a two-branch skill tree (combat + QoL) with 3 capstones (War Room, Vault, Storm Forge). Rooms provide bonuses (damage, XP, drop rate, rarity, crit, HP regen, double strike, offline XP, fishing, discovery). Costs prestige ranks. Discovered at P10+.
 
@@ -200,11 +220,20 @@ Account-level base building that persists across prestiges. 14 rooms in a two-br
 
 - `types.rs` — AchievementId enum, categories, unlock tracking
 - `data.rs` — Achievement database with descriptions and unlock conditions
+- `handlers.rs` — Event handlers (on_enemy_killed, on_boss_killed, on_level_up, etc.) and check_milestones
+- `milestones.rs` — MinigameType, MinigameDifficulty enums, milestone threshold arrays
 - `persistence.rs` — Save/load from `~/.quest/achievements.json`
 
 Account-level achievement system that persists across characters. 6 categories (Combat, Level, Progression, Challenges, Exploration, Stats). Tracks kills, boss kills, levels, prestige, zone completion, challenge wins, fishing ranks/catches, dungeon completions, Haven building, and Soulforge enhancements. Includes modal notification system with 500ms accumulation window.
 
-### Input Handling (`src/input.rs`)
+### Input Handling (`src/input/`)
+
+- `mod.rs` — Top-level input routing based on current game state
+- `types.rs` — Input-related type definitions
+- `minigame_input.rs` — Dispatches to individual minigame input handlers
+- `haven_input.rs` — Haven overlay input handling
+- `prestige_input.rs` — Prestige confirmation input handling
+- `soulforge_input.rs` — Soulforge overlay input handling
 
 Routes keyboard input to the appropriate handler based on current game state. Dispatches to minigame input handlers, character management flows, haven overlay, and debug menu. When quitting with pending challenges, shows a confirmation dialog ([Enter] Leave / [Esc] Stay).
 
@@ -304,26 +333,56 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 ```
 quest/
 ├── src/
-│   ├── main.rs              # Entry point, game loop, input handling
+│   ├── main.rs              # Entry point, game loop
 │   ├── lib.rs               # Library crate for testing
-│   ├── input.rs             # Keyboard input routing
 │   ├── tick_events.rs         # TickEvent → combat log mapping
+│   ├── input/               # Keyboard input routing
+│   │   ├── mod.rs           # Top-level input dispatch
+│   │   ├── types.rs         # Input type definitions
+│   │   ├── minigame_input.rs # Minigame input dispatch
+│   │   ├── haven_input.rs   # Haven overlay input
+│   │   ├── prestige_input.rs # Prestige confirmation input
+│   │   └── soulforge_input.rs # Soulforge overlay input
+│   ├── main_helpers/        # Extracted main.rs helpers
+│   │   ├── character_screens.rs  # Character screen handlers
+│   │   ├── input_routing.rs      # Game input routing
+│   │   ├── achievements.rs       # Achievement processing
+│   │   ├── offline.rs            # Offline progression handling
+│   │   ├── overlay.rs            # Overlay management
+│   │   ├── persistence.rs        # Save/load orchestration
+│   │   ├── scene.rs              # Scene rendering dispatch
+│   │   └── update.rs             # Update checking
 │   ├── bin/
 │   │   └── simulator.rs     # Headless game balance simulator
 │   ├── core/                # Core game systems
 │   │   ├── constants.rs     # Game balance constants
-│   │   ├── game_logic.rs    # XP, leveling, spawning
+│   │   ├── game_logic.rs    # Re-export wrapper
 │   │   ├── game_state.rs    # Main game state
-│   │   └── tick.rs          # Per-tick game engine (game_tick)
+│   │   ├── tick.rs          # Per-tick game engine (game_tick)
+│   │   ├── tick_types.rs    # TickEvent enum, TickResult struct
+│   │   ├── tick_stages.rs   # Tick processing stages 4-6
+│   │   ├── xp.rs            # XP calculation, leveling
+│   │   ├── discoveries.rs   # Discovery rolls
+│   │   ├── enemy_spawning.rs # Enemy generation
+│   │   ├── offline.rs       # Offline XP progression
+│   │   ├── recent_drops.rs  # RecentDrop deque management
+│   │   └── ticker.rs        # XP rate sampling
 │   ├── character/           # Character system [CLAUDE.md]
 │   │   ├── attributes.rs    # 6 RPG attributes
 │   │   ├── derived_stats.rs # Stats from attributes
 │   │   ├── prestige.rs      # Prestige system
-│   │   ├── manager.rs       # JSON saves
+│   │   ├── manager.rs       # Character CRUD operations
+│   │   ├── persistence.rs   # JSON save/load
+│   │   ├── name_validation.rs # Name validation rules
 │   │   └── input.rs         # Character management input
 │   ├── combat/              # Combat system [CLAUDE.md]
 │   │   ├── types.rs         # Enemy, combat state
-│   │   └── logic.rs         # Combat resolution
+│   │   ├── logic.rs         # Combat orchestration
+│   │   ├── player_attack.rs # Player damage pipeline
+│   │   ├── enemy_attack.rs  # Enemy attack resolution
+│   │   ├── damage.rs        # Shared damage calculations
+│   │   ├── events.rs        # CombatEvent, bonus structs
+│   │   └── regen.rs         # HP regeneration
 │   ├── zones/               # Zone system
 │   │   ├── data.rs          # Zone definitions
 │   │   └── progression.rs   # Zone progression
@@ -334,7 +393,10 @@ quest/
 │   ├── fishing/             # Fishing system
 │   │   ├── types.rs         # Fish, phases, ranks
 │   │   ├── generation.rs    # Fish generation
-│   │   └── logic.rs         # Session processing
+│   │   ├── logic.rs         # Session processing
+│   │   ├── discovery.rs     # Fishing spot discovery
+│   │   ├── drops.rs         # Item drops from catches
+│   │   └── rank.rs          # Rank-up logic
 │   ├── items/               # Item system [CLAUDE.md]
 │   │   ├── types.rs         # Items, slots, affixes
 │   │   ├── equipment.rs     # Equipment container
@@ -361,11 +423,15 @@ quest/
 │   │   ├── jezzball/        # Containment Breach (JezzBall)
 │   │   └── runic_shift/     # Sigil Surge (panel-matching)
 │   ├── haven/               # Haven base building [CLAUDE.md]
-│   │   ├── types.rs         # Room definitions, bonuses
+│   │   ├── types.rs         # Haven struct, upgrade tiers
+│   │   ├── room_defs.rs     # Room ID, metadata, costs
+│   │   ├── bonus.rs         # Bonus types and calculation
 │   │   └── logic.rs         # Construction, upgrades
 │   ├── achievements/        # Achievement system
 │   │   ├── types.rs         # Achievement definitions
 │   │   ├── data.rs          # Achievement database
+│   │   ├── handlers.rs      # Event handlers, check_milestones
+│   │   ├── milestones.rs    # Minigame types, threshold arrays
 │   │   └── persistence.rs   # Save/load
 │   ├── utils/               # Utilities
 │   │   ├── build_info.rs    # Build metadata

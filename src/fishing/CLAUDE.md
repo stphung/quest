@@ -9,7 +9,10 @@ src/fishing/
 ├── mod.rs         # Public re-exports
 ├── types.rs       # FishRarity, FishingPhase, FishingSession, FishingState, rank names/thresholds
 ├── generation.rs  # Rarity rolling, fish/session generation, Storm Leviathan encounter logic
-└── logic.rs       # Tick processing, discovery, rank-ups, item drops, Haven bonus integration
+├── logic.rs       # Tick processing, Haven bonus integration (discovery/drops/rank extracted)
+├── discovery.rs   # Fishing spot discovery (try_discover_fishing)
+├── drops.rs       # Item drop chance and generation from fish catches
+└── rank.rs        # Rank-up checking, max rank calculation
 ```
 
 ## Key Types
@@ -136,10 +139,17 @@ Progressive 10-encounter hunt, only available at rank 40 on legendary fish catch
 - `tick_fishing_with_haven_result(state, rng, haven) -> FishingTickResult` -- Main tick processor (preferred)
 - `tick_fishing_with_haven(state, rng, haven) -> Vec<String>` -- Returns messages only
 - `tick_fishing(state, rng) -> Vec<String>` -- Legacy wrapper (no Haven bonuses)
+
+### discovery.rs
 - `try_discover_fishing(state, rng) -> Option<String>` -- 5% chance to discover a spot (blocked by active fishing/dungeon)
+
+### rank.rs
 - `get_max_fishing_rank(fishing_rank_bonus) -> u32` -- Base 30 + bonus, capped at 40
 - `check_rank_up_with_max(fishing_state, max_rank) -> Option<String>` -- Rank-up check with configurable cap
 - `check_rank_up(fishing_state) -> Option<String>` -- Legacy rank-up (cap 30)
+
+### drops.rs
+- `try_fishing_item_drop(rarity, zone_id, rng) -> Option<Item>` -- Item drop roll based on fish rarity
 
 ## Integration Points
 

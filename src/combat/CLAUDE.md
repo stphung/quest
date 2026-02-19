@@ -6,9 +6,14 @@ Turn-based auto-combat with zone-based enemy generation, prestige combat bonuses
 
 ```
 src/combat/
-├── mod.rs      # Public re-exports
-├── types.rs    # Enemy struct, CombatState enum, zone-based enemy generators
-└── logic.rs    # Turn processing, damage calculation, HP regen, boss encounters
+├── mod.rs           # Public re-exports
+├── types.rs         # Enemy struct, CombatState, zone-based enemy generators
+├── logic.rs         # update_combat() orchestrator — coordinates attack phases
+├── player_attack.rs # Player damage pipeline (weapon gate → damage → crit → double strike)
+├── enemy_attack.rs  # Enemy attack resolution (defense, Bulwark DR, reflection, death)
+├── damage.rs        # Shared damage helpers, handle_enemy_death()
+├── events.rs        # CombatEvent enum, HavenCombatBonuses, GodItemCombatBonuses
+└── regen.rs         # HP regeneration after combat
 ```
 
 ## Key Types
@@ -105,7 +110,7 @@ pub fn update_combat(
 
 Called from `core/tick.rs` each tick. Returns `Vec<CombatEvent>` that tick.rs maps to `TickEvent` variants.
 
-### `GodItemCombatBonuses` (`logic.rs`)
+### `GodItemCombatBonuses` (`events.rs`)
 
 Struct carrying god item passive effects into the combat loop:
 - `damage_reduction_percent` — Asprika's Divine Bulwark (applied after defense subtraction)
