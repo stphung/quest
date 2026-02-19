@@ -17,22 +17,8 @@ use std::collections::VecDeque;
 // Re-export ticker types for backward compatibility
 pub use super::ticker::{Ticker, TickerEntry, TickerSegment, TICKER_SCROLL_SPEED};
 
-/// A recently gained item or fish for display in the Loot panel
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub struct RecentDrop {
-    pub name: String,
-    pub rarity: Rarity,
-    pub equipped: bool,
-    pub icon: &'static str,
-    /// Equipment slot name (e.g. "Weapon", "Armor"), empty for non-equipment
-    pub slot: String,
-    /// Stat summary (e.g. "+8 STR +3 DEX +Crit"), empty for non-equipment
-    pub stats: String,
-}
-
-/// Max number of recent drops to track
-const MAX_RECENT_DROPS: usize = 10;
+// Re-export RecentDrop types for backward compatibility
+pub use super::recent_drops::{RecentDrop, MAX_RECENT_DROPS};
 
 impl GameState {
     /// Record a recent gain (item drop, fish catch, etc.)
@@ -45,17 +31,15 @@ impl GameState {
         slot: String,
         stats: String,
     ) {
-        if self.recent_drops.len() >= MAX_RECENT_DROPS {
-            self.recent_drops.pop_back();
-        }
-        self.recent_drops.push_front(RecentDrop {
+        super::recent_drops::add_recent_drop(
+            &mut self.recent_drops,
             name,
             rarity,
             equipped,
             icon,
             slot,
             stats,
-        });
+        );
     }
 }
 

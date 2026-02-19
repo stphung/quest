@@ -3,6 +3,7 @@
 //! The zone system provides a sense of traveling through themed areas,
 //! with boss gates between subzones and prestige gates between zone tiers.
 
+pub mod advancement;
 pub mod boss_defeat;
 mod data;
 mod progression;
