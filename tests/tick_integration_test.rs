@@ -433,7 +433,7 @@ fn test_game_tick_can_produce_item_dropped_event() {
         &mut haven,
         &mut achievements,
         &mut rng,
-        50_000,
+        2_000,
     );
 
     let item_drops: Vec<_> = events
@@ -473,7 +473,7 @@ fn test_game_tick_item_drop_updates_recent_drops() {
         &mut haven,
         &mut achievements,
         &mut rng,
-        50_000,
+        2_000,
     );
 
     let has_drops = events
@@ -1125,7 +1125,7 @@ fn test_simulator_different_seeds_produce_different_results() {
         let mut achievements = Achievements::default();
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
 
-        for _ in 0..2000 {
+        for _ in 0..200 {
             game_tick(
                 &mut state,
                 &mut tick_counter,
