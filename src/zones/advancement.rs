@@ -312,4 +312,43 @@ mod tests {
         let result = prog.travel_to(5, 1);
         assert!(!result);
     }
+
+    #[test]
+    fn test_advance_to_next_zone_beyond_last_zone() {
+        let mut prog = ZoneProgression::new();
+
+        // Set to zone 11 (The Expanse), which is the last zone
+        prog.current_zone_id = crate::core::constants::EXPANSE_ZONE_ID;
+        prog.unlock_zone(crate::core::constants::EXPANSE_ZONE_ID);
+
+        // There is no zone 12, so advance should fail
+        assert!(!prog.advance_to_next_zone(50));
+        assert_eq!(
+            prog.current_zone_id,
+            crate::core::constants::EXPANSE_ZONE_ID
+        );
+    }
+
+    #[test]
+    fn test_advance_subzone_at_max_subzone() {
+        let mut prog = ZoneProgression::new();
+
+        // Zone 1 has 3 subzones; set to the last one
+        prog.current_subzone_id = 3;
+        prog.defeat_boss(1, 3);
+
+        // Can't advance past the last subzone
+        assert!(!prog.advance_to_next_subzone());
+        assert_eq!(prog.current_subzone_id, 3);
+    }
+
+    #[test]
+    fn test_travel_to_current_location() {
+        let mut prog = ZoneProgression::new();
+
+        // Can travel to where we already are
+        assert!(prog.travel_to(1, 1));
+        assert_eq!(prog.current_zone_id, 1);
+        assert_eq!(prog.current_subzone_id, 1);
+    }
 }

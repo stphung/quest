@@ -388,4 +388,47 @@ mod tests {
         assert_eq!(zone10.weapon_name, Some("Stormbreaker"));
         assert_eq!(zone10.prestige_requirement, 20);
     }
+
+    #[test]
+    fn test_zone_10_non_final_subzone_boss_no_stormbreaker() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        // Zone 10, subzone 2 boss (not the final subzone) - no Stormbreaker needed
+        prog.current_zone_id = 10;
+        prog.current_subzone_id = 2;
+        prog.unlock_zone(10);
+        prog.defeat_boss(10, 1);
+        for _ in 0..KILLS_FOR_BOSS {
+            prog.record_kill();
+        }
+
+        let result = prog.on_boss_defeated(20, &mut achievements);
+        assert!(
+            matches!(
+                result,
+                BossDefeatResult::SubzoneComplete { new_subzone_id: 3 }
+            ),
+            "Non-final subzone boss in Zone 10 should not require Stormbreaker, got {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_boss_defeat_resets_kill_state() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        for _ in 0..KILLS_FOR_BOSS {
+            prog.record_kill();
+        }
+        assert!(prog.fighting_boss);
+        assert_eq!(prog.kills_in_subzone, KILLS_FOR_BOSS);
+
+        prog.on_boss_defeated(0, &mut achievements);
+
+        // After boss defeat, kills and boss flag should be reset
+        assert_eq!(prog.kills_in_subzone, 0);
+        assert!(!prog.fighting_boss);
+    }
 }

@@ -194,4 +194,51 @@ mod tests {
         let blocked = prog.boss_weapon_blocked(&achievements);
         assert!(blocked.is_none());
     }
+
+    #[test]
+    fn test_weapon_gate_returns_none_when_not_fighting_boss() {
+        let mut prog = ZoneProgression::new();
+        let achievements = Achievements::default();
+
+        // At zone 10 final subzone but not fighting boss
+        prog.current_zone_id = 10;
+        prog.current_subzone_id = 4;
+        prog.unlock_zone(10);
+        prog.fighting_boss = false;
+
+        assert!(prog.boss_weapon_blocked(&achievements).is_none());
+    }
+
+    #[test]
+    fn test_can_enter_subzone_locked_zone() {
+        let prog = ZoneProgression::new();
+
+        // Zone 5 is not unlocked at P0
+        assert!(!prog.can_enter_subzone(5, 1));
+    }
+
+    #[test]
+    fn test_can_unlock_zone_1_always_true() {
+        let prog = ZoneProgression::new();
+        let zones = get_all_zones();
+
+        // Zone 1 has no previous zone requirement and P0 prestige
+        assert!(prog.can_unlock_zone(&zones[0], 0));
+    }
+
+    #[test]
+    fn test_can_unlock_zone_exact_prestige_boundary() {
+        let mut prog = ZoneProgression::new();
+        let zones = get_all_zones();
+
+        // Defeat zone 2's bosses to satisfy boss gate
+        prog.defeat_boss(2, 1);
+        prog.defeat_boss(2, 2);
+        prog.defeat_boss(2, 3);
+
+        // Zone 3 requires exactly P5
+        assert!(!prog.can_unlock_zone(&zones[2], 4));
+        assert!(prog.can_unlock_zone(&zones[2], 5));
+        assert!(prog.can_unlock_zone(&zones[2], 6));
+    }
 }
