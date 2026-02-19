@@ -87,6 +87,30 @@ impl HavenUiState {
 // Re-export soulforge UI types from enhancement module
 pub use crate::enhancement::{EnhancementResult, SoulforgePhase, SoulforgeUiState};
 
+/// Equipment detail view state.
+pub struct EquipmentViewState {
+    pub showing: bool,
+    pub selected_slot: usize, // 0-6 indexes into slot order (Weapon, Armor, Helmet, Gloves, Boots, Amulet, Ring)
+}
+
+impl EquipmentViewState {
+    pub fn new() -> Self {
+        Self {
+            showing: false,
+            selected_slot: 0,
+        }
+    }
+
+    pub fn open(&mut self) {
+        self.showing = true;
+        self.selected_slot = 0;
+    }
+
+    pub fn close(&mut self) {
+        self.showing = false;
+    }
+}
+
 /// Game-screen overlay state. At most one is active at a time.
 pub enum GameOverlay {
     None,
@@ -139,6 +163,7 @@ pub fn handle_game_input(
     haven: &mut Haven,
     haven_ui: &mut HavenUiState,
     soulforge_ui: &mut SoulforgeUiState,
+    equipment_view: &mut EquipmentViewState,
     enhancement: &mut enhancement::EnhancementProgress,
     overlay: &mut GameOverlay,
     debug_menu: &mut DebugMenu,
@@ -213,6 +238,11 @@ pub fn handle_game_input(
         return handle_soulforge(key, soulforge_ui, enhancement, state.prestige_rank);
     }
 
+    // 2.7. Equipment detail view
+    if equipment_view.showing {
+        return handle_equipment_view(key, equipment_view);
+    }
+
     // 3. Vault item selection
     if matches!(overlay, GameOverlay::VaultSelection { .. }) {
         return handle_vault_selection(key, state, haven, overlay);
@@ -268,6 +298,7 @@ pub fn handle_game_input(
         haven,
         haven_ui,
         soulforge_ui,
+        equipment_view,
         enhancement,
         overlay,
         achievements,
@@ -367,6 +398,24 @@ fn handle_soulforge(
             InputResult::Continue
         }
     }
+}
+
+fn handle_equipment_view(key: KeyEvent, equipment_view: &mut EquipmentViewState) -> InputResult {
+    match key.code {
+        KeyCode::Up => {
+            equipment_view.selected_slot = equipment_view.selected_slot.saturating_sub(1);
+        }
+        KeyCode::Down => {
+            if equipment_view.selected_slot < 6 {
+                equipment_view.selected_slot += 1;
+            }
+        }
+        KeyCode::Esc | KeyCode::Char('e') | KeyCode::Char('E') => {
+            equipment_view.close();
+        }
+        _ => {}
+    }
+    InputResult::Continue
 }
 
 fn handle_achievement_unlocked(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
@@ -850,6 +899,7 @@ fn handle_base_game(
     haven: &Haven,
     haven_ui: &mut HavenUiState,
     soulforge_ui: &mut SoulforgeUiState,
+    equipment_view: &mut EquipmentViewState,
     enhancement: &enhancement::EnhancementProgress,
     overlay: &mut GameOverlay,
     achievements: &mut crate::achievements::Achievements,
@@ -889,6 +939,10 @@ fn handle_base_game(
             if enhancement.discovered {
                 soulforge_ui.open();
             }
+            InputResult::Continue
+        }
+        KeyCode::Char('e') | KeyCode::Char('E') => {
+            equipment_view.open();
             InputResult::Continue
         }
         KeyCode::Char('a') | KeyCode::Char('A') => {
