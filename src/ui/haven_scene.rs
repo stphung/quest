@@ -817,18 +817,27 @@ pub fn render_vault_selection(
     confirm_pending: bool,
     _ctx: &super::responsive::LayoutContext,
 ) {
-    frame.render_widget(Clear, area);
+    // Center the vault as a modal: 7 item rows + 2 instruction + 1 help + 2 border + 1 gap = 13
+    let modal_height = 13_u16;
+    // Enough width for full item detail columns
+    let modal_width = area.width.min(78);
+    let modal_x = area.x + (area.width.saturating_sub(modal_width)) / 2;
+    let modal_y = area.y + (area.height.saturating_sub(modal_height)) / 2;
+    let modal_area = Rect::new(modal_x, modal_y, modal_width, modal_height);
+
+    frame.render_widget(Clear, modal_area);
 
     let block = Block::default()
         .title(format!(
-            " Vault - Choose {} Item(s) to Preserve ",
-            vault_slots
+            " Vault \u{2014} Preserve {} Item{} ",
+            vault_slots,
+            if vault_slots == 1 { "" } else { "s" }
         ))
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Yellow));
 
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
+    let inner = block.inner(modal_area);
+    frame.render_widget(block, modal_area);
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -842,8 +851,7 @@ pub fn render_vault_selection(
     // Instructions
     let instructions = Paragraph::new(vec![Line::from(Span::styled(
         format!(
-            "Select up to {} item(s) to keep through prestige. ({}/{} selected)",
-            vault_slots,
+            " Select items to keep through prestige. ({}/{} selected)",
             selected_items.len(),
             vault_slots
         ),
@@ -851,7 +859,18 @@ pub fn render_vault_selection(
     ))]);
     frame.render_widget(instructions, chunks[0]);
 
-    // Get all equipped items
+    // Column layout matching equipment panel:
+    // "▶ [✓] Weapon  +5 Name...       Legendary  T9  Z10  ⚡999"
+    //  ^cursor(2) ^check(4) ^slot(8)  ^name(flex)  ^right_cols(27)
+    let width = inner.width as usize;
+    let cursor_col = 2; // "▶ " or "  "
+    let check_col = 4; // "[✓] " or "[ ] "
+    let slot_col = 8; // "Weapon  "
+                      // Right-side: " Legendary  T9  Z10 ⚡999" = 27 chars
+    let right_cols = 27;
+    let left_fixed = cursor_col + check_col + slot_col;
+    let name_max = width.saturating_sub(left_fixed + right_cols);
+
     let slots = [
         EquipmentSlot::Weapon,
         EquipmentSlot::Armor,
@@ -888,13 +907,26 @@ pub fn render_vault_selection(
                 let rc = super::rarity_color(item.rarity);
                 let enh_level = enhancement_levels[i];
                 let enh_prefix = crate::enhancement::enhancement_prefix(enh_level);
+                let prefix_len = enh_prefix.len();
+
+                // Truncate name if needed (matching equipment panel pattern)
+                let max_name_len = name_max.saturating_sub(prefix_len);
+                let item_name = if item.display_name.len() > max_name_len && max_name_len > 3 {
+                    format!("{}...", &item.display_name[..max_name_len - 3])
+                } else {
+                    item.display_name.clone()
+                };
+                let name_len = prefix_len + item_name.len();
+                let pad = name_max.saturating_sub(name_len);
 
                 let mut spans = vec![
                     Span::styled(prefix, prefix_style),
                     Span::styled(checkbox, checkbox_style),
                     Span::styled(
-                        format!("{:<8}", slot.name()),
-                        Style::default().fg(Color::DarkGray),
+                        format!("{:>6}  ", slot.name()),
+                        Style::default()
+                            .fg(Color::DarkGray)
+                            .add_modifier(Modifier::BOLD),
                     ),
                 ];
                 if !enh_prefix.is_empty() {
@@ -903,10 +935,8 @@ pub fn render_vault_selection(
                         super::stats_panel::enhancement_style(enh_level),
                     ));
                 }
-                spans.push(Span::styled(
-                    format!("{} ", item.display_name),
-                    Style::default().fg(rc),
-                ));
+                spans.push(Span::styled(item_name, Style::default().fg(rc)));
+                spans.push(Span::raw(" ".repeat(pad)));
                 spans.push(Span::styled(
                     format!("{:>9}", item.rarity.name()),
                     Style::default().fg(rc),
@@ -930,10 +960,12 @@ pub fn render_vault_selection(
                     Span::styled(prefix, prefix_style),
                     Span::styled(checkbox, checkbox_style),
                     Span::styled(
-                        format!("{:<8}", slot.name()),
-                        Style::default().fg(Color::DarkGray),
+                        format!("{:>6}  ", slot.name()),
+                        Style::default()
+                            .fg(Color::DarkGray)
+                            .add_modifier(Modifier::BOLD),
                     ),
-                    Span::styled("(empty)", Style::default().fg(Color::DarkGray)),
+                    Span::styled("[Empty]", Style::default().fg(Color::DarkGray)),
                 ]))
             }
         })
@@ -948,23 +980,23 @@ pub fn render_vault_selection(
             .style(Style::default().fg(Color::DarkGray));
     frame.render_widget(help, chunks[2]);
 
-    // Under-selection confirmation modal
+    // Under-selection confirmation modal (layered on top)
     if confirm_pending {
         let selected = selected_items.len();
 
-        let modal_width = 42_u16;
-        let modal_height = 7_u16;
-        let modal_x = inner.x + (inner.width.saturating_sub(modal_width)) / 2;
-        let modal_y = inner.y + (inner.height.saturating_sub(modal_height)) / 2;
-        let modal_area = Rect::new(modal_x, modal_y, modal_width, modal_height);
+        let confirm_width = 42_u16;
+        let confirm_height = 7_u16;
+        let confirm_x = modal_area.x + (modal_area.width.saturating_sub(confirm_width)) / 2;
+        let confirm_y = modal_area.y + (modal_area.height.saturating_sub(confirm_height)) / 2;
+        let confirm_area = Rect::new(confirm_x, confirm_y, confirm_width, confirm_height);
 
-        frame.render_widget(Clear, modal_area);
+        frame.render_widget(Clear, confirm_area);
 
-        let modal_block = Block::default()
+        let confirm_block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::Yellow));
-        let modal_inner = modal_block.inner(modal_area);
-        frame.render_widget(modal_block, modal_area);
+        let confirm_inner = confirm_block.inner(confirm_area);
+        frame.render_widget(confirm_block, confirm_area);
 
         let lines = vec![
             Line::from(""),
@@ -988,7 +1020,7 @@ pub fn render_vault_selection(
             ]),
         ];
 
-        let modal_text = Paragraph::new(lines);
-        frame.render_widget(modal_text, modal_inner);
+        let confirm_text = Paragraph::new(lines);
+        frame.render_widget(confirm_text, confirm_inner);
     }
 }
