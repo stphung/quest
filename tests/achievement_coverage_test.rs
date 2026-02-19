@@ -12,8 +12,9 @@
 
 use std::collections::HashMap;
 
-use quest::achievements::{types::MinigameDifficulty, types::MinigameType, Achievements};
-use quest::achievements::{AchievementCategory, AchievementId};
+use quest::achievements::{
+    AchievementCategory, AchievementId, Achievements, MinigameDifficulty, MinigameType,
+};
 use quest::haven::types::HavenRoomId;
 
 // =========================================================================

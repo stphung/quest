@@ -581,7 +581,7 @@ pub(super) fn process_discoveries<R: Rng>(
 
     // Try fishing spot discovery (only if no dungeon or fishing active)
     if !discovered_dungeon && state.active_dungeon.is_none() && state.active_fishing.is_none() {
-        if let Some(message) = crate::fishing::logic::try_discover_fishing(state, rng) {
+        if let Some(message) = crate::fishing::discovery::try_discover_fishing(state, rng) {
             result.events.push(TickEvent::FishingSpotDiscovered {
                 message: format!("\u{1f3a3} {}", message),
             });

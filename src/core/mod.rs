@@ -10,6 +10,7 @@ pub mod game_state;
 pub mod offline;
 pub mod recent_drops;
 pub mod tick;
+pub mod tick_stages;
 pub mod tick_types;
 pub mod ticker;
 pub mod xp;

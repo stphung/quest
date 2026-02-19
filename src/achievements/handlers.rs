@@ -12,12 +12,12 @@
 //! - `sync_*` — called once on character load to retroactively unlock achievements
 //!   for milestones already passed in a pre-existing save.
 
-use super::types::{
-    AchievementId, Achievements, BOSS_HUNTER_MILESTONES, DUNGEON_MILESTONES, FISHERMAN_MILESTONES,
-    FISH_CATCHER_MILESTONES, GRAND_CHAMPION_MILESTONES, LEVEL_MILESTONES, PRESTIGE_MILESTONES,
-    SLAYER_MILESTONES,
+use super::milestones::{
+    MinigameDifficulty, MinigameType, BOSS_HUNTER_MILESTONES, DUNGEON_MILESTONES,
+    FISHERMAN_MILESTONES, FISH_CATCHER_MILESTONES, GRAND_CHAMPION_MILESTONES, LEVEL_MILESTONES,
+    PRESTIGE_MILESTONES, SLAYER_MILESTONES,
 };
-use super::types::{MinigameDifficulty, MinigameType};
+use super::types::{AchievementId, Achievements};
 
 impl Achievements {
     // =========================================================================
