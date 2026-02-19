@@ -4,6 +4,7 @@
 //! across all characters. Achievements are stored in `~/.quest/achievements.json`.
 
 pub mod data;
+pub mod handlers;
 pub mod persistence;
 pub mod types;
 
