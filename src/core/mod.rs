@@ -3,6 +3,8 @@
 #![allow(unused_imports)]
 
 pub mod constants;
+pub mod discoveries;
+pub mod enemy_spawning;
 pub mod game_logic;
 pub mod game_state;
 pub mod offline;

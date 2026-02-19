@@ -5,7 +5,9 @@ use std::path::PathBuf;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
-use crate::core::constants::{CHARACTER_NAME_MAX_LENGTH, SAVE_FILE_VERSION};
+// Re-export for backward API compatibility
+pub use super::name_validation::{sanitize_name, validate_name};
+use crate::core::constants::SAVE_FILE_VERSION;
 
 #[derive(Clone, Serialize, Deserialize)]
 struct CharacterSaveData {
@@ -241,54 +243,10 @@ impl CharacterManager {
 /// Account-level JSON files that are not character saves
 const ACCOUNT_FILES: &[&str] = &["haven.json", "achievements.json"];
 
-/// Reserved names that cannot be used for characters (would conflict with system files)
-const RESERVED_NAMES: &[&str] = &["haven", "achievements"];
-
-pub fn validate_name(name: &str) -> Result<(), String> {
-    let trimmed = name.trim();
-
-    if trimmed.is_empty() {
-        return Err("Name cannot be empty".to_string());
-    }
-
-    if trimmed.len() > CHARACTER_NAME_MAX_LENGTH {
-        return Err(format!(
-            "Name must be {} characters or less",
-            CHARACTER_NAME_MAX_LENGTH
-        ));
-    }
-
-    let valid_chars = trimmed
-        .chars()
-        .all(|c| c.is_alphanumeric() || c == ' ' || c == '-' || c == '_');
-
-    if !valid_chars {
-        return Err(
-            "Name can only contain letters, numbers, spaces, hyphens, and underscores".to_string(),
-        );
-    }
-
-    // Check for reserved names (case-insensitive, matches sanitized filename)
-    let sanitized = sanitize_name(trimmed);
-    if RESERVED_NAMES.contains(&sanitized.as_str()) {
-        return Err(format!("Name '{}' is reserved", trimmed));
-    }
-
-    Ok(())
-}
-
-pub fn sanitize_name(name: &str) -> String {
-    name.trim()
-        .to_lowercase()
-        .replace(' ', "_")
-        .chars()
-        .filter(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     /// Creates a test GameState with the given name for persistence tests.
     fn make_test_state(name: &str) -> crate::core::game_state::GameState {
@@ -335,41 +293,6 @@ mod tests {
         let manager =
             CharacterManager::with_dir(dir.path().to_path_buf()).expect("Failed to create manager");
         (manager, dir)
-    }
-
-    #[test]
-    fn test_validate_name_valid() {
-        assert!(validate_name("Hero").is_ok());
-        assert!(validate_name("Test 123").is_ok());
-        assert!(validate_name("Warrior-2").is_ok());
-        assert!(validate_name("under_score").is_ok());
-    }
-
-    #[test]
-    fn test_validate_name_too_short() {
-        assert!(validate_name("").is_err());
-        assert!(validate_name("   ").is_err());
-    }
-
-    #[test]
-    fn test_validate_name_too_long() {
-        assert!(validate_name("12345678901234567").is_err()); // 17 chars
-    }
-
-    #[test]
-    fn test_validate_name_invalid_chars() {
-        assert!(validate_name("test@123").is_err());
-        assert!(validate_name("hello!world").is_err());
-    }
-
-    #[test]
-    fn test_sanitize_name() {
-        assert_eq!(sanitize_name("Hero"), "hero");
-        assert_eq!(sanitize_name("Mage the Great"), "mage_the_great");
-        assert_eq!(sanitize_name("Warrior-2"), "warrior-2");
-        assert_eq!(sanitize_name("Test!!!"), "test");
-        assert_eq!(sanitize_name("   Spaces   "), "spaces");
-        assert_eq!(sanitize_name("MixedCase"), "mixedcase");
     }
 
     #[test]
@@ -534,33 +457,6 @@ mod tests {
     }
 
     #[test]
-    fn test_sanitize_name_special_cases() {
-        // Unicode alphanumeric characters are preserved
-        assert_eq!(sanitize_name("Hérö"), "hérö");
-
-        // Multiple spaces become underscores
-        assert_eq!(sanitize_name("My   Hero"), "my___hero");
-
-        // Empty after sanitization (only special chars)
-        assert_eq!(sanitize_name("!!!"), "");
-
-        // Numbers preserved
-        assert_eq!(sanitize_name("Hero123"), "hero123");
-    }
-
-    #[test]
-    fn test_validate_name_boundary_lengths() {
-        // Exactly 16 characters should be valid
-        assert!(validate_name("1234567890123456").is_ok());
-
-        // 17 characters should fail
-        assert!(validate_name("12345678901234567").is_err());
-
-        // 1 character should be valid
-        assert!(validate_name("A").is_ok());
-    }
-
-    #[test]
     fn test_character_data_integrity() {
         use crate::character::attributes::AttributeType;
 
@@ -603,8 +499,6 @@ mod tests {
 
     #[test]
     fn test_load_json_with_extra_fields_backward_compat() {
-        // Simulate loading a save from a NEWER version with extra fields
-        // This should succeed - extra fields should be ignored
         let (manager, _dir) = temp_manager();
 
         let json_with_extra = r#"{
@@ -654,7 +548,6 @@ mod tests {
         let filepath = manager.quest_dir.join("backward_compat_test.json");
         fs::write(&filepath, json_with_extra).unwrap();
 
-        // Should load successfully, ignoring extra fields
         let result = manager.load_character("backward_compat_test.json");
         assert!(
             result.is_ok(),
@@ -669,11 +562,8 @@ mod tests {
 
     #[test]
     fn test_load_json_missing_optional_fields_forward_compat() {
-        // Simulate loading a save from an OLDER version missing newer optional fields
-        // This tests forward compatibility - old saves should still load
         let (manager, _dir) = temp_manager();
 
-        // Minimal save without fishing, zone_progression, active_dungeon
         let minimal_json = r#"{
             "version": 2,
             "character_id": "old-save-id",
@@ -707,7 +597,6 @@ mod tests {
         let filepath = manager.quest_dir.join("forward_compat_test.json");
         fs::write(&filepath, minimal_json).unwrap();
 
-        // Should load with defaults for missing fields
         let result = manager.load_character("forward_compat_test.json");
         assert!(
             result.is_ok(),
@@ -718,17 +607,14 @@ mod tests {
         let loaded = result.unwrap();
         assert_eq!(loaded.character_name, "OldSave");
         assert_eq!(loaded.character_level, 5);
-        // Optional fields should have defaults
-        assert_eq!(loaded.fishing.rank, 1); // Default
-        assert_eq!(loaded.zone_progression.current_zone_id, 1); // Default
+        assert_eq!(loaded.fishing.rank, 1);
+        assert_eq!(loaded.zone_progression.current_zone_id, 1);
     }
 
     #[test]
     fn test_load_json_missing_nested_optional_fields() {
-        // Test that nested structs also handle missing fields gracefully
         let (manager, _dir) = temp_manager();
 
-        // Save with zone_progression missing some fields that have #[serde(default)]
         let json = r#"{
             "version": 2,
             "character_id": "nested-test",
@@ -776,24 +662,16 @@ mod tests {
         );
 
         let loaded = result.unwrap();
-        // Zone progression fields that have defaults should be set
         assert_eq!(loaded.zone_progression.current_zone_id, 3);
-        assert_eq!(loaded.zone_progression.kills_in_subzone, 0); // Default
-        assert!(!loaded.zone_progression.fighting_boss); // Default
-        assert!(!loaded.zone_progression.has_stormbreaker); // Default
+        assert_eq!(loaded.zone_progression.kills_in_subzone, 0);
+        assert!(!loaded.zone_progression.fighting_boss);
+        assert!(!loaded.zone_progression.has_stormbreaker);
     }
 
-    /// IMPORTANT: This test uses a "frozen" minimal JSON that represents the oldest
-    /// supported save format. If this test fails after adding a new field, you MUST
-    /// add #[serde(default)] to that field to maintain backward compatibility.
-    ///
-    /// DO NOT update this JSON to add new fields - that defeats the purpose!
     #[test]
     fn test_minimal_v2_save_still_loads() {
         let (manager, _dir) = temp_manager();
 
-        // This is the MINIMAL valid v2 save - DO NOT ADD FIELDS HERE
-        // If this fails, you broke backward compatibility!
         let minimal_v2_json = r#"{
             "version": 2,
             "character_id": "minimal-v2",
@@ -836,8 +714,6 @@ mod tests {
         );
     }
 
-    /// Test that Default impls exist and work for key structs.
-    /// This ensures we can use #[serde(default)] on these types.
     #[test]
     fn test_default_impls_exist_for_save_structs() {
         use crate::combat::CombatState;
@@ -845,7 +721,6 @@ mod tests {
         use crate::items::Equipment;
         use crate::zones::ZoneProgression;
 
-        // These should all compile and produce valid defaults
         let combat = CombatState::default();
         assert_eq!(combat.player_max_hp, 50);
         assert!(combat.current_enemy.is_none());
@@ -863,20 +738,7 @@ mod tests {
     // =========================================================================
     // SAVE STRUCT COMPATIBILITY REGISTRY
     // =========================================================================
-    //
-    // This section contains exhaustive tests for ALL structs that are serialized
-    // to save files. Each struct has:
-    //   1. A minimal JSON test (frozen format - DO NOT ADD FIELDS)
-    //   2. A roundtrip test (serialize -> deserialize)
-    //
-    // When adding a new serializable struct:
-    //   1. Add it to the registry below
-    //   2. Add a minimal JSON test
-    //   3. Add it to test_save_struct_registry
-    // =========================================================================
 
-    /// Minimal JSON for CombatState - DO NOT ADD FIELDS
-    /// Tests that old saves without newer fields still load
     #[test]
     fn test_combat_state_minimal_json() {
         use crate::combat::CombatState;
@@ -899,7 +761,6 @@ mod tests {
         );
     }
 
-    /// Minimal JSON for Equipment - DO NOT ADD FIELDS
     #[test]
     fn test_equipment_minimal_json() {
         use crate::items::Equipment;
@@ -923,7 +784,6 @@ mod tests {
         );
     }
 
-    /// Minimal JSON for Attributes - DO NOT ADD FIELDS
     #[test]
     fn test_attributes_minimal_json() {
         use crate::character::attributes::Attributes;
@@ -938,7 +798,6 @@ mod tests {
         );
     }
 
-    /// Minimal JSON for FishingState - DO NOT ADD FIELDS
     #[test]
     fn test_fishing_state_minimal_json() {
         use crate::fishing::FishingState;
@@ -959,14 +818,10 @@ mod tests {
         );
     }
 
-    /// Minimal JSON for ZoneProgression - DO NOT ADD FIELDS
-    /// Note: kills_in_subzone, fighting_boss, has_stormbreaker were added later
-    /// and have #[serde(default)]
     #[test]
     fn test_zone_progression_minimal_json() {
         use crate::zones::ZoneProgression;
 
-        // This is the ORIGINAL format before newer fields were added
         let minimal_json = r#"{
             "current_zone_id": 1,
             "current_subzone_id": 1,
@@ -982,23 +837,12 @@ mod tests {
             result.err()
         );
 
-        // Verify defaults are applied for missing fields
         let zones = result.unwrap();
-        assert_eq!(
-            zones.kills_in_subzone, 0,
-            "kills_in_subzone should default to 0"
-        );
-        assert!(
-            !zones.fighting_boss,
-            "fighting_boss should default to false"
-        );
-        assert!(
-            !zones.has_stormbreaker,
-            "has_stormbreaker should default to false"
-        );
+        assert_eq!(zones.kills_in_subzone, 0);
+        assert!(!zones.fighting_boss);
+        assert!(!zones.has_stormbreaker);
     }
 
-    /// Minimal JSON for Enemy - DO NOT ADD FIELDS
     #[test]
     fn test_enemy_minimal_json() {
         use crate::combat::Enemy;
@@ -1019,7 +863,6 @@ mod tests {
         );
     }
 
-    /// Minimal JSON for Item - DO NOT ADD FIELDS
     #[test]
     fn test_item_minimal_json() {
         use crate::items::Item;
@@ -1042,14 +885,10 @@ mod tests {
         );
     }
 
-    /// Minimal JSON for Dungeon - DO NOT ADD FIELDS
-    /// Note: current_room_cleared was added later and has #[serde(default)]
     #[test]
     fn test_dungeon_minimal_json() {
         use crate::dungeon::Dungeon;
 
-        // Minimal dungeon with a simple 1x1 grid
-        // connections is [bool; 4] for [up, right, down, left]
         let minimal_json = r#"{
             "size": "Small",
             "grid": [[{
@@ -1076,21 +915,10 @@ mod tests {
             result.err()
         );
 
-        // Verify defaults are applied
         let dungeon = result.unwrap();
-        assert!(
-            !dungeon.current_room_cleared,
-            "current_room_cleared should default to false"
-        );
+        assert!(!dungeon.current_room_cleared);
     }
 
-    /// EXHAUSTIVE REGISTRY TEST
-    ///
-    /// This test verifies ALL save structs can:
-    /// 1. Be created with Default (where applicable)
-    /// 2. Roundtrip through JSON serialization
-    ///
-    /// If you add a new serializable struct, ADD IT HERE.
     #[test]
     fn test_save_struct_registry_roundtrip() {
         use crate::character::attributes::Attributes;
@@ -1100,42 +928,31 @@ mod tests {
         use crate::items::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
         use crate::zones::ZoneProgression;
 
-        // === Structs with Default impls ===
-
-        // Attributes
         let attrs = Attributes::default();
         let json = serde_json::to_string(&attrs).expect("Attributes should serialize");
         let _: Attributes = serde_json::from_str(&json).expect("Attributes should roundtrip");
 
-        // CombatState
         let combat = CombatState::default();
         let json = serde_json::to_string(&combat).expect("CombatState should serialize");
         let _: CombatState = serde_json::from_str(&json).expect("CombatState should roundtrip");
 
-        // Equipment
         let equipment = Equipment::default();
         let json = serde_json::to_string(&equipment).expect("Equipment should serialize");
         let _: Equipment = serde_json::from_str(&json).expect("Equipment should roundtrip");
 
-        // FishingState
         let fishing = FishingState::default();
         let json = serde_json::to_string(&fishing).expect("FishingState should serialize");
         let _: FishingState = serde_json::from_str(&json).expect("FishingState should roundtrip");
 
-        // ZoneProgression
         let zones = ZoneProgression::default();
         let json = serde_json::to_string(&zones).expect("ZoneProgression should serialize");
         let _: ZoneProgression =
             serde_json::from_str(&json).expect("ZoneProgression should roundtrip");
 
-        // === Structs without Default (created manually) ===
-
-        // Enemy
         let enemy = Enemy::new("Test".to_string(), 100, 10);
         let json = serde_json::to_string(&enemy).expect("Enemy should serialize");
         let _: Enemy = serde_json::from_str(&json).expect("Enemy should roundtrip");
 
-        // Item
         let item = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Common,
@@ -1153,7 +970,6 @@ mod tests {
         let json = serde_json::to_string(&item).expect("Item should serialize");
         let _: Item = serde_json::from_str(&json).expect("Item should roundtrip");
 
-        // AttributeBonuses
         let bonuses = AttributeBonuses {
             str: 5,
             dex: 3,
@@ -1166,72 +982,11 @@ mod tests {
         let _: AttributeBonuses =
             serde_json::from_str(&json).expect("AttributeBonuses should roundtrip");
 
-        // Affix
         let affix = Affix {
             affix_type: AffixType::CritChance,
             value: 10.0,
         };
         let json = serde_json::to_string(&affix).expect("Affix should serialize");
         let _: Affix = serde_json::from_str(&json).expect("Affix should roundtrip");
-
-        // Note: Dungeon is tested separately due to complexity (test_dungeon_minimal_json)
-    }
-
-    // =========================================================================
-    // CHARACTER NAME VALIDATION - EXTENDED EDGE CASES
-    // =========================================================================
-
-    #[test]
-    fn test_validate_name_extended_invalid_chars() {
-        // Various special characters that should be rejected
-        assert!(validate_name("Name#1").is_err());
-        assert!(validate_name("Hero$").is_err());
-        assert!(validate_name("Test%").is_err());
-        assert!(validate_name("Name&Name").is_err());
-        assert!(validate_name("Hero*").is_err());
-        assert!(validate_name("<script>").is_err());
-        assert!(validate_name("Name\nNewline").is_err());
-        assert!(validate_name("Name\tTab").is_err());
-        assert!(validate_name("test;drop").is_err());
-        assert!(validate_name("name'quote").is_err());
-        assert!(validate_name("name\"quote").is_err());
-    }
-
-    #[test]
-    fn test_validate_name_trims_whitespace() {
-        // Leading/trailing whitespace should be trimmed, then validated
-        assert!(validate_name("  Hero  ").is_ok());
-        assert!(validate_name("\tHero\t").is_ok());
-    }
-
-    #[test]
-    fn test_validate_name_unicode_letters() {
-        // Unicode letters should work (alphanumeric includes unicode)
-        assert!(validate_name("Héro").is_ok());
-        assert!(validate_name("日本語").is_ok()); // Japanese
-        assert!(validate_name("Müller").is_ok()); // German umlaut
-        assert!(validate_name("Ωmega").is_ok()); // Greek
-    }
-
-    #[test]
-    fn test_validate_name_reserved_names() {
-        // "haven" is reserved (conflicts with haven.json)
-        assert!(validate_name("haven").is_err());
-        assert!(validate_name("Haven").is_err()); // Case-insensitive
-        assert!(validate_name("HAVEN").is_err());
-        assert!(validate_name("  haven  ").is_err()); // With whitespace
-
-        // "achievements" is reserved (conflicts with achievements.json)
-        assert!(validate_name("achievements").is_err());
-        assert!(validate_name("Achievements").is_err()); // Case-insensitive
-        assert!(validate_name("ACHIEVEMENTS").is_err());
-        assert!(validate_name("  achievements  ").is_err()); // With whitespace
-
-        // Similar names that don't conflict should be fine
-        assert!(validate_name("haven2").is_ok());
-        assert!(validate_name("myhaven").is_ok());
-        assert!(validate_name("the-haven").is_ok());
-        assert!(validate_name("achievements2").is_ok());
-        assert!(validate_name("myachievements").is_ok());
     }
 }
