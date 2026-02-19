@@ -290,7 +290,7 @@ fn draw_m_layout(
     idx += 1;
 
     // Activity area - dispatched by current activity
-    draw_right_content(frame, chunks[idx], game_state, ctx);
+    draw_right_content(frame, chunks[idx], game_state, achievements, ctx);
     idx += 1;
 
     // Event ticker
@@ -336,13 +336,12 @@ fn draw_s_layout(
             .split(area);
 
         stats_panel::draw_compact_stats_bar(frame, chunks[0], game_state, ctx);
-        draw_right_content(frame, chunks[1], game_state, ctx);
+        draw_right_content(frame, chunks[1], game_state, achievements, ctx);
         stats_panel::draw_footer_minimal(frame, chunks[2], game_state);
         return;
     }
 
     // Standard S layout: combat-focused
-    let _ = achievements; // Not used in S layout currently
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -369,7 +368,7 @@ fn draw_s_layout(
     draw_s_enemy_hp(frame, chunks[3], game_state);
 
     // Combat status
-    combat_scene::draw_combat_scene(frame, chunks[4], game_state, ctx);
+    combat_scene::draw_combat_scene(frame, chunks[4], game_state, achievements, ctx);
 
     // Event ticker
     ticker::draw_ticker(frame, chunks[5], &game_state.ticker);
@@ -523,12 +522,18 @@ fn draw_right_panel(
     stats_panel::draw_zone_info(frame, chunks[0], game_state, achievements, ctx);
 
     // Content area — dispatched by current activity
-    draw_right_content(frame, chunks[1], game_state, ctx);
+    draw_right_content(frame, chunks[1], game_state, achievements, ctx);
 }
 
 /// Draws the main content area of the right panel based on current activity.
 /// Priority: minigame > challenge menu > fishing > dungeon > combat
-fn draw_right_content(frame: &mut Frame, area: Rect, game_state: &GameState, ctx: &LayoutContext) {
+fn draw_right_content(
+    frame: &mut Frame,
+    area: Rect,
+    game_state: &GameState,
+    achievements: &crate::achievements::Achievements,
+    ctx: &LayoutContext,
+) {
     // Show "[Press any key]" only after the game-over dismiss cooldown expires
     let show_dismiss_hint = game_state
         .game_over_shown_at
@@ -585,7 +590,7 @@ fn draw_right_content(frame: &mut Frame, area: Rect, game_state: &GameState, ctx
             } else if let Some(dungeon) = &game_state.active_dungeon {
                 draw_dungeon_view(frame, area, game_state, dungeon, ctx);
             } else {
-                combat_scene::draw_combat_scene(frame, area, game_state, ctx);
+                combat_scene::draw_combat_scene(frame, area, game_state, achievements, ctx);
             }
         }
     }
