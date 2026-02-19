@@ -965,12 +965,15 @@ pub(super) fn draw_footer_compact(
         Span::raw("")
     };
 
+    let equipment_span = Span::styled(" [E]Equip", Style::default().fg(Color::White));
+
     let line = Line::from(vec![
         Span::styled("[Esc]Quit", Style::default().fg(Color::Red)),
         Span::raw(" "),
         prestige_span,
         haven_span,
         soulforge_span,
+        equipment_span,
         ach_span,
         challenge_span,
         Span::styled(" [?]Help", Style::default().fg(Color::DarkGray)),
@@ -1255,6 +1258,8 @@ pub fn draw_footer(
         Span::styled("[A] Achievements", Style::default().fg(Color::Magenta))
     };
 
+    let equipment_text = Span::styled("    [E] Equipment", Style::default().fg(Color::White));
+
     let footer_text = vec![
         Line::from(vec![
             Span::styled("[Esc] Quit", Style::default().fg(Color::Red)),
@@ -1262,6 +1267,7 @@ pub fn draw_footer(
             prestige_text,
             haven_text,
             soulforge_text,
+            equipment_text,
         ]),
         Line::from(vec![
             achievements_text,

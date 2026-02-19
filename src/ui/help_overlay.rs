@@ -34,7 +34,7 @@ pub fn draw_help_overlay(frame: &mut Frame) {
             "  Controls",
             Style::default().add_modifier(Modifier::BOLD),
         )),
-        Line::from("  [P] Prestige    [H] Haven    [S] Soulforge"),
+        Line::from("  [P] Prestige  [H] Haven  [S] Soulforge  [E] Equipment"),
         Line::from("  [A] Achievements    [Tab] Challenges"),
         Line::from("  [U] Toggle Updates    [Esc] Quit"),
         Line::from(""),
