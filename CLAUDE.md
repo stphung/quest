@@ -151,7 +151,7 @@ CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FI
 - `generation.rs` — Rarity-based attribute/affix generation with ilvl scaling (1.0x at ilvl 10 to 4.0x at ilvl 100) and tier quality multiplier (T0 0.40x to T9 1.00x)
 - `drops.rs` — Separate mob/boss drop systems: mobs have 15% base drop chance (capped at Epic), bosses always drop (can drop Legendary)
 - `names.rs` — Procedural name generation with prefixes/suffixes
-- `scoring.rs` — Intrinsic power scoring (`power()`) and smart weighted auto-equip scoring (attribute specialization bonus, affix type weights). God (Mythic) items are never auto-replaced by lower rarity
+- `scoring.rs` — Affix power weights (`affix_power_weight()`) and power-based auto-equip (`auto_equip_if_better()` uses intrinsic `power()` score). God (Mythic) items are never auto-replaced by lower rarity
 
 ### Enhancement Module (`src/enhancement/`) — [detailed docs](src/enhancement/CLAUDE.md)
 

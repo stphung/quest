@@ -1,13 +1,12 @@
 //! Integration test: Item Drop -> Auto-Equip Pipeline
 //!
-//! Tests the full end-to-end flow: drop chance → item generation → scoring → equip decision.
+//! Tests the full end-to-end flow: drop chance → item generation → power scoring → equip decision.
 //! Covers the complete lifecycle from enemy kill drop roll through to equipment slot management.
 
-use quest::character::attributes::AttributeType;
 use quest::core::constants::{ITEM_DROP_BASE_CHANCE, ITEM_DROP_MAX_CHANCE};
 use quest::items::drops::{drop_chance_for_prestige, roll_rarity_for_mob, try_drop_from_mob};
 use quest::items::generation::generate_item;
-use quest::items::scoring::{auto_equip_if_better, score_item};
+use quest::items::scoring::auto_equip_if_better;
 use quest::items::types::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
 use quest::GameState;
 use rand::SeedableRng;
@@ -262,109 +261,53 @@ fn test_higher_rarity_produces_higher_average_attribute_total() {
 }
 
 // =========================================================================
-// score_item: higher rarity items score higher on average
+// power(): higher rarity items have higher power on average
 // =========================================================================
 
 #[test]
-fn test_score_increases_with_rarity_on_average() {
-    let game_state = GameState::new("Score Test".to_string(), 0);
-
-    let sample_avg_score = |rarity: Rarity| -> f64 {
+fn test_power_increases_with_rarity_on_average() {
+    let sample_avg_power = |rarity: Rarity| -> f64 {
         let n = 2000;
-        let sum: f64 = (0..n)
-            .map(|_| {
-                let item = generate_item(EquipmentSlot::Weapon, rarity, 10);
-                score_item(&item, &game_state)
-            })
+        let sum: u32 = (0..n)
+            .map(|_| generate_item(EquipmentSlot::Weapon, rarity, 10).power())
             .sum();
-        sum / n as f64
+        sum as f64 / n as f64
     };
 
-    let common_avg = sample_avg_score(Rarity::Common);
-    let magic_avg = sample_avg_score(Rarity::Magic);
-    let rare_avg = sample_avg_score(Rarity::Rare);
-    let epic_avg = sample_avg_score(Rarity::Epic);
-    let legendary_avg = sample_avg_score(Rarity::Legendary);
+    let common_avg = sample_avg_power(Rarity::Common);
+    let magic_avg = sample_avg_power(Rarity::Magic);
+    let rare_avg = sample_avg_power(Rarity::Rare);
+    let epic_avg = sample_avg_power(Rarity::Epic);
+    let legendary_avg = sample_avg_power(Rarity::Legendary);
 
     assert!(
         common_avg < magic_avg,
-        "Common score ({common_avg:.1}) < Magic ({magic_avg:.1})"
+        "Common power ({common_avg:.1}) < Magic ({magic_avg:.1})"
     );
     assert!(
         magic_avg < rare_avg,
-        "Magic score ({magic_avg:.1}) < Rare ({rare_avg:.1})"
+        "Magic power ({magic_avg:.1}) < Rare ({rare_avg:.1})"
     );
     assert!(
         rare_avg < epic_avg,
-        "Rare score ({rare_avg:.1}) < Epic ({epic_avg:.1})"
+        "Rare power ({rare_avg:.1}) < Epic ({epic_avg:.1})"
     );
     assert!(
         epic_avg < legendary_avg,
-        "Epic score ({epic_avg:.1}) < Legendary ({legendary_avg:.1})"
+        "Epic power ({epic_avg:.1}) < Legendary ({legendary_avg:.1})"
     );
 }
 
 #[test]
-fn test_score_is_deterministic_for_same_item_and_state() {
-    let game_state = GameState::new("Deterministic".to_string(), 0);
+fn test_power_is_deterministic_for_same_item() {
     let item = generate_item(EquipmentSlot::Weapon, Rarity::Rare, 10);
 
-    let score1 = score_item(&item, &game_state);
-    let score2 = score_item(&item, &game_state);
+    let power1 = item.power();
+    let power2 = item.power();
 
-    assert!(
-        (score1 - score2).abs() < f64::EPSILON,
-        "Scoring the same item twice should produce identical results: {score1} vs {score2}"
-    );
-}
-
-#[test]
-fn test_score_reflects_attribute_specialization() {
-    // A STR-focused character should score STR items higher than DEX items
-    let mut game_state = GameState::new("STR Build".to_string(), 0);
-    game_state.attributes.set(AttributeType::Strength, 30);
-    game_state.attributes.set(AttributeType::Dexterity, 10);
-    game_state.attributes.set(AttributeType::Constitution, 10);
-    game_state.attributes.set(AttributeType::Intelligence, 10);
-    game_state.attributes.set(AttributeType::Wisdom, 10);
-    game_state.attributes.set(AttributeType::Charisma, 10);
-
-    let str_item = Item {
-        slot: EquipmentSlot::Weapon,
-        rarity: Rarity::Common,
-        ilvl: 10,
-        tier: 5,
-        base_name: "STR Sword".to_string(),
-        display_name: "STR Sword".to_string(),
-        attributes: AttributeBonuses {
-            str: 5,
-            ..AttributeBonuses::new()
-        },
-        affixes: vec![],
-        god_item_id: None,
-    };
-
-    let dex_item = Item {
-        slot: EquipmentSlot::Weapon,
-        rarity: Rarity::Common,
-        ilvl: 10,
-        tier: 5,
-        base_name: "DEX Dagger".to_string(),
-        display_name: "DEX Dagger".to_string(),
-        attributes: AttributeBonuses {
-            dex: 5,
-            ..AttributeBonuses::new()
-        },
-        affixes: vec![],
-        god_item_id: None,
-    };
-
-    let str_score = score_item(&str_item, &game_state);
-    let dex_score = score_item(&dex_item, &game_state);
-
-    assert!(
-        str_score > dex_score,
-        "STR item ({str_score}) should score higher than DEX item ({dex_score}) for STR-focused build"
+    assert_eq!(
+        power1, power2,
+        "Scoring the same item twice should produce identical results: {power1} vs {power2}"
     );
 }
 
@@ -408,7 +351,7 @@ fn test_auto_equip_into_empty_slot_always_succeeds() {
 }
 
 #[test]
-fn test_auto_equip_higher_scored_item_replaces_lower() {
+fn test_auto_equip_higher_power_item_replaces_lower() {
     let mut game_state = GameState::new("Replace Test".to_string(), 0);
 
     // Equip a weak common item
@@ -426,16 +369,8 @@ fn test_auto_equip_higher_scored_item_replaces_lower() {
         affixes: vec![],
         god_item_id: None,
     };
+    let weak_power = weak.power();
     auto_equip_if_better(weak, &mut game_state);
-
-    let weak_score = score_item(
-        game_state
-            .equipment
-            .get(EquipmentSlot::Weapon)
-            .as_ref()
-            .unwrap(),
-        &game_state,
-    );
 
     // Try a much stronger legendary item
     let strong = Item {
@@ -462,12 +397,12 @@ fn test_auto_equip_higher_scored_item_replaces_lower() {
         ],
         god_item_id: None,
     };
-    let strong_score = score_item(&strong, &game_state);
+    let strong_power = strong.power();
     let replaced = auto_equip_if_better(strong, &mut game_state);
 
     assert!(
         replaced,
-        "Stronger item (score {strong_score}) should replace weaker (score {weak_score})"
+        "Stronger item (power {strong_power}) should replace weaker (power {weak_power})"
     );
     assert_eq!(
         game_state
@@ -481,7 +416,7 @@ fn test_auto_equip_higher_scored_item_replaces_lower() {
 }
 
 #[test]
-fn test_auto_equip_lower_scored_item_does_not_replace() {
+fn test_auto_equip_lower_power_item_does_not_replace() {
     let mut game_state = GameState::new("No Replace Test".to_string(), 0);
 
     // Equip a strong legendary item first
@@ -602,32 +537,30 @@ fn test_auto_equip_across_different_slots_is_independent() {
 }
 
 // =========================================================================
-// Full pipeline: generate → score → equip → upgrade chain
+// Full pipeline: generate → power → equip → upgrade chain
 // =========================================================================
 
 #[test]
-fn test_full_pipeline_generate_score_equip() {
+fn test_full_pipeline_generate_power_equip() {
     let mut game_state = GameState::new("Pipeline Hero".to_string(), 0);
 
     // Generate a common item and equip it
     let common_item = generate_item(EquipmentSlot::Weapon, Rarity::Common, 5);
     assert!(common_item.attributes.total() > 0);
-    let common_score = score_item(&common_item, &game_state);
-    assert!(common_score > 0.0);
+    let common_power = common_item.power();
+    assert!(common_power > 0);
 
     let equipped = auto_equip_if_better(common_item, &mut game_state);
     assert!(equipped, "Common item should equip into empty weapon slot");
 
     // Generate a legendary item and verify it replaces the common
     let legendary_item = generate_item(EquipmentSlot::Weapon, Rarity::Legendary, 20);
-    let legendary_score = score_item(&legendary_item, &game_state);
+    let legendary_power = legendary_item.power();
 
-    // Legendary should outscore common (on average, overwhelmingly so)
-    // This could theoretically fail with astronomically bad RNG, but the ranges
-    // make it impossible: legendary min attrs = 8, common max = 6
+    // Legendary should outpower common (on average, overwhelmingly so)
     assert!(
-        legendary_score > common_score,
-        "Legendary ({legendary_score:.1}) should outscore Common ({common_score:.1})"
+        legendary_power > common_power,
+        "Legendary (power {legendary_power}) should outpower Common (power {common_power})"
     );
 
     let replaced = auto_equip_if_better(legendary_item, &mut game_state);
@@ -742,14 +675,14 @@ fn test_full_pipeline_progressive_upgrade_chain() {
         },
     ];
 
-    let mut prev_score = 0.0_f64;
+    let mut prev_power = 0u32;
     for (i, item) in items.into_iter().enumerate() {
         let item_name = item.display_name.clone();
-        let item_score = score_item(&item, &game_state);
+        let item_power = item.power();
 
         assert!(
-            item_score > prev_score,
-            "Tier {} ({item_name}, score {item_score:.1}) should outscore previous ({prev_score:.1})",
+            item_power > prev_power,
+            "Tier {} ({item_name}, power {item_power}) should outpower previous ({prev_power})",
             i + 1
         );
 
@@ -760,7 +693,7 @@ fn test_full_pipeline_progressive_upgrade_chain() {
             i + 1
         );
 
-        prev_score = item_score;
+        prev_power = item_power;
     }
 
     // Final state: Excalibur should be equipped
@@ -917,13 +850,11 @@ fn test_affix_values_scale_with_rarity() {
 }
 
 // =========================================================================
-// Score item with affix type weight ordering
+// Power with affix type weight ordering
 // =========================================================================
 
 #[test]
-fn test_damage_percent_affix_outscores_hp_bonus_affix_at_same_value() {
-    let game_state = GameState::new("Affix Weight Test".to_string(), 0);
-
+fn test_damage_percent_affix_outpowers_hp_bonus_affix_at_same_value() {
     let dmg_item = Item {
         slot: EquipmentSlot::Ring,
         rarity: Rarity::Magic,
@@ -954,23 +885,20 @@ fn test_damage_percent_affix_outscores_hp_bonus_affix_at_same_value() {
         god_item_id: None,
     };
 
-    let dmg_score = score_item(&dmg_item, &game_state);
-    let hp_score = score_item(&hp_item, &game_state);
+    let dmg_power = dmg_item.power();
+    let hp_power = hp_item.power();
 
     // DamagePercent weight = 2.0, HPBonus weight = 0.5
-    // So 10*2.0 = 20.0 vs 10*0.5 = 5.0
+    // So 10*2.0 = 20 vs 10*0.5 = 5
     assert!(
-        dmg_score > hp_score,
-        "DamagePercent ({dmg_score}) should outscore HPBonus ({hp_score}) at same value"
+        dmg_power > hp_power,
+        "DamagePercent ({dmg_power}) should outpower HPBonus ({hp_power}) at same value"
     );
-    assert!(
-        (dmg_score - 20.0).abs() < f64::EPSILON,
-        "DamagePercent score should be exactly 20.0, got {dmg_score}"
+    assert_eq!(
+        dmg_power, 20,
+        "DamagePercent power should be 20, got {dmg_power}"
     );
-    assert!(
-        (hp_score - 5.0).abs() < f64::EPSILON,
-        "HPBonus score should be exactly 5.0, got {hp_score}"
-    );
+    assert_eq!(hp_power, 5, "HPBonus power should be 5, got {hp_power}");
 }
 
 // =========================================================================
@@ -978,9 +906,7 @@ fn test_damage_percent_affix_outscores_hp_bonus_affix_at_same_value() {
 // =========================================================================
 
 #[test]
-fn test_score_affix_only_item_is_positive() {
-    let game_state = GameState::new("Affix Only".to_string(), 0);
-
+fn test_power_affix_only_item_is_positive() {
     let item = Item {
         slot: EquipmentSlot::Amulet,
         rarity: Rarity::Rare,
@@ -1002,14 +928,11 @@ fn test_score_affix_only_item_is_positive() {
         god_item_id: None,
     };
 
-    let score = score_item(&item, &game_state);
-    // CritChance: 15 * 1.5 = 22.5, CritMultiplier: 20 * 1.5 = 30.0
-    let expected = 15.0 * 1.5 + 20.0 * 1.5;
-    assert!(
-        (score - expected).abs() < f64::EPSILON,
-        "Score should be {expected}, got {score}"
-    );
-    assert!(score > 0.0);
+    let power = item.power();
+    // CritChance: 15 * 1.5 = 22.5, CritMultiplier: 20 * 1.5 = 30.0, total = 52.5 → rounds to 53
+    let expected = 53u32;
+    assert_eq!(power, expected, "Power should be {expected}, got {power}");
+    assert!(power > 0);
 }
 
 // =========================================================================
@@ -1017,35 +940,27 @@ fn test_score_affix_only_item_is_positive() {
 // =========================================================================
 
 #[test]
-fn test_pipeline_prestige_produces_better_average_scores() {
-    // Higher prestige shifts rarity distribution, so average scored items should be better
-    let game_state_p0 = GameState::new("P0 Scorer".to_string(), 0);
-
-    let mut game_state_p10 = GameState::new("P10 Scorer".to_string(), 0);
-    game_state_p10.prestige_rank = 10;
-
-    let avg_score = |gs: &GameState, seed: u64| -> f64 {
+fn test_pipeline_prestige_produces_better_average_power() {
+    // Higher prestige shifts rarity distribution, so average item power should be better
+    let avg_power = |prestige_rank: u32, seed: u64| -> f64 {
         use rand::SeedableRng;
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
-        // generate_item() uses internal rand::rng(), making scores non-deterministic.
-        // Use 3000 samples to reduce variance and avoid flaky comparisons.
         let n = 3000;
-        let sum: f64 = (0..n)
+        let sum: u32 = (0..n)
             .map(|_| {
-                let rarity = roll_rarity_for_mob(gs.prestige_rank, 0.0, &mut rng);
-                let item = generate_item(EquipmentSlot::Weapon, rarity, 10);
-                score_item(&item, gs)
+                let rarity = roll_rarity_for_mob(prestige_rank, 0.0, &mut rng);
+                generate_item(EquipmentSlot::Weapon, rarity, 10).power()
             })
             .sum();
-        sum / n as f64
+        sum as f64 / n as f64
     };
 
-    let avg_p0 = avg_score(&game_state_p0, 42);
-    let avg_p10 = avg_score(&game_state_p10, 42);
+    let avg_p0 = avg_power(0, 42);
+    let avg_p10 = avg_power(10, 42);
 
     assert!(
         avg_p10 > avg_p0,
-        "P10 average score ({avg_p10:.1}) should exceed P0 average ({avg_p0:.1})"
+        "P10 average power ({avg_p10:.1}) should exceed P0 average ({avg_p0:.1})"
     );
 }
 
@@ -1066,11 +981,11 @@ fn test_try_drop_item_produces_valid_equippable_items() {
             assert!(!item.display_name.is_empty());
             assert!(item.attributes.total() > 0);
 
-            // Score should be positive for any valid item
-            let score = score_item(&item, &game_state);
+            // Power should be positive for any valid item
+            let power = item.power();
             assert!(
-                score > 0.0,
-                "Dropped item should have positive score, got {score}"
+                power > 0,
+                "Dropped item should have positive power, got {power}"
             );
 
             // Try to equip it
@@ -1090,11 +1005,11 @@ fn test_try_drop_item_produces_valid_equippable_items() {
 }
 
 // =========================================================================
-// Auto-equip with equal-score items: tie goes to existing (no replacement)
+// Auto-equip with equal-power items: tie goes to existing (no replacement)
 // =========================================================================
 
 #[test]
-fn test_auto_equip_equal_score_does_not_replace() {
+fn test_auto_equip_equal_power_does_not_replace() {
     let mut game_state = GameState::new("Tie Test".to_string(), 0);
 
     let item1 = Item {
@@ -1128,22 +1043,22 @@ fn test_auto_equip_equal_score_does_not_replace() {
         god_item_id: None,
     };
 
-    // Verify both items have the same score
-    let score1 = score_item(&item1, &game_state);
-    let score2 = score_item(&item2, &game_state);
-    assert!(
-        (score1 - score2).abs() < f64::EPSILON,
-        "Items should have equal scores: {score1} vs {score2}"
+    // Verify both items have the same power
+    let power1 = item1.power();
+    let power2 = item2.power();
+    assert_eq!(
+        power1, power2,
+        "Items should have equal power: {power1} vs {power2}"
     );
 
     // Equip first
     assert!(auto_equip_if_better(item1, &mut game_state));
 
-    // Second item with equal score should NOT replace (strictly greater required)
+    // Second item with equal power should NOT replace (strictly greater required)
     let replaced = auto_equip_if_better(item2, &mut game_state);
     assert!(
         !replaced,
-        "Equal-score item should NOT replace existing (tie goes to incumbent)"
+        "Equal-power item should NOT replace existing (tie goes to incumbent)"
     );
     assert_eq!(
         game_state

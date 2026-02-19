@@ -1,8 +1,8 @@
-use super::types::{AffixType, AttributeBonuses, Item, Rarity};
+use super::types::{AffixType, Item, Rarity};
 use crate::core::game_state::GameState;
 
 /// Returns the power weight for a given affix type.
-/// Used by both auto-equip scoring and intrinsic item power calculation.
+/// Used by intrinsic item power calculation (`Item::power()`).
 pub fn affix_power_weight(affix_type: AffixType) -> f64 {
     match affix_type {
         AffixType::DamagePercent => 2.0,
@@ -18,52 +18,6 @@ pub fn affix_power_weight(affix_type: AffixType) -> f64 {
     }
 }
 
-pub fn score_item(item: &Item, game_state: &GameState) -> f64 {
-    let mut score = 0.0;
-
-    // Calculate attribute weights based on current character build
-    let weights = calculate_attribute_weights(game_state);
-
-    // Score attributes
-    for (item_val, weight) in item
-        .attributes
-        .as_array()
-        .iter()
-        .zip(weights.as_array().iter())
-    {
-        score += *item_val as f64 * *weight as f64;
-    }
-
-    // Score affixes with different weights
-    for affix in &item.affixes {
-        score += affix.value * affix_power_weight(affix.affix_type);
-    }
-
-    score
-}
-
-fn calculate_attribute_weights(game_state: &GameState) -> AttributeBonuses {
-    // Weight attributes based on current values (specialization bonus)
-    // Higher existing attributes get higher weights
-    use crate::character::attributes::AttributeType;
-
-    let attrs = &game_state.attributes;
-    let attr_values: Vec<u32> = AttributeType::all()
-        .iter()
-        .map(|&attr| attrs.get(attr))
-        .collect();
-    let total = attr_values.iter().sum::<u32>().max(1);
-
-    AttributeBonuses {
-        str: 1 + (attr_values[0] * 100 / total),
-        dex: 1 + (attr_values[1] * 100 / total),
-        con: 1 + (attr_values[2] * 100 / total),
-        int: 1 + (attr_values[3] * 100 / total),
-        wis: 1 + (attr_values[4] * 100 / total),
-        cha: 1 + (attr_values[5] * 100 / total),
-    }
-}
-
 pub fn auto_equip_if_better(item: Item, game_state: &mut GameState) -> bool {
     // Never auto-replace a Mythic (god) item
     if let Some(current) = game_state.equipment.get(item.slot).as_ref() {
@@ -72,15 +26,15 @@ pub fn auto_equip_if_better(item: Item, game_state: &mut GameState) -> bool {
         }
     }
 
-    let new_score = score_item(&item, game_state);
-    let current_score = game_state
+    let new_power = item.power();
+    let current_power = game_state
         .equipment
         .get(item.slot)
         .as_ref()
-        .map(|current| score_item(current, game_state))
-        .unwrap_or(0.0);
+        .map(|current| current.power())
+        .unwrap_or(0);
 
-    if new_score > current_score {
+    if new_power > current_power {
         game_state.equipment.set(item.slot, Some(item));
         true
     } else {
@@ -90,7 +44,7 @@ pub fn auto_equip_if_better(item: Item, game_state: &mut GameState) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::super::types::{Affix, EquipmentSlot, Rarity};
+    use super::super::types::{Affix, AttributeBonuses, EquipmentSlot, Rarity};
     use super::*;
     use chrono::Utc;
 
@@ -112,38 +66,6 @@ mod tests {
     }
 
     #[test]
-    fn test_score_item_with_attributes() {
-        let game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
-        let item = create_test_item(EquipmentSlot::Weapon, Rarity::Common, 5);
-
-        let score = score_item(&item, &game_state);
-        assert!(score > 0.0);
-    }
-
-    #[test]
-    fn test_score_item_with_affixes() {
-        let game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
-        let item = Item {
-            slot: EquipmentSlot::Weapon,
-            rarity: Rarity::Magic,
-            ilvl: 10,
-            tier: 5,
-            base_name: "Test".to_string(),
-            display_name: "Test Item".to_string(),
-            attributes: AttributeBonuses::new(),
-            affixes: vec![Affix {
-                affix_type: AffixType::DamagePercent,
-                value: 15.0,
-            }],
-            god_item_id: None,
-        };
-
-        let score = score_item(&item, &game_state);
-        // DamagePercent has 2.0 weight, so 15 * 2 = 30
-        assert!(score >= 30.0);
-    }
-
-    #[test]
     fn test_auto_equip_empty_slot() {
         let mut game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
         let item = create_test_item(EquipmentSlot::Weapon, Rarity::Common, 2);
@@ -154,16 +76,16 @@ mod tests {
     }
 
     #[test]
-    fn test_auto_equip_better_item() {
+    fn test_auto_equip_higher_power_replaces() {
         let mut game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
 
-        // Equip weak item
+        // Equip weak item (power = 1)
         let weak = create_test_item(EquipmentSlot::Weapon, Rarity::Common, 1);
         auto_equip_if_better(weak, &mut game_state);
 
-        // Try stronger item
+        // Try stronger item (power = 10)
         let strong = create_test_item(EquipmentSlot::Weapon, Rarity::Rare, 10);
-        let equipped = auto_equip_if_better(strong.clone(), &mut game_state);
+        let equipped = auto_equip_if_better(strong, &mut game_state);
 
         assert!(equipped);
         assert_eq!(
@@ -179,14 +101,14 @@ mod tests {
     }
 
     #[test]
-    fn test_auto_equip_rejects_worse_item() {
+    fn test_auto_equip_rejects_lower_power() {
         let mut game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
 
-        // Equip strong item
+        // Equip strong item (power = 10)
         let strong = create_test_item(EquipmentSlot::Weapon, Rarity::Rare, 10);
         auto_equip_if_better(strong, &mut game_state);
 
-        // Try weaker item
+        // Try weaker item (power = 1)
         let weak = create_test_item(EquipmentSlot::Weapon, Rarity::Common, 1);
         let equipped = auto_equip_if_better(weak, &mut game_state);
 
@@ -204,17 +126,14 @@ mod tests {
     }
 
     #[test]
-    fn test_attribute_weights_favor_specialization() {
-        // A character with high STR should weight STR items higher
+    fn test_auto_equip_uses_power_not_build() {
+        // A high-STR character should still equip a higher-power DEX item
         let mut game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
         use crate::character::attributes::AttributeType;
         game_state.attributes.set(AttributeType::Strength, 30);
         game_state.attributes.set(AttributeType::Dexterity, 10);
-        game_state.attributes.set(AttributeType::Constitution, 10);
-        game_state.attributes.set(AttributeType::Intelligence, 10);
-        game_state.attributes.set(AttributeType::Wisdom, 10);
-        game_state.attributes.set(AttributeType::Charisma, 10);
 
+        // Equip a STR item (power = 5)
         let str_item = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Common,
@@ -229,126 +148,28 @@ mod tests {
             affixes: vec![],
             god_item_id: None,
         };
+        auto_equip_if_better(str_item, &mut game_state);
+
+        // DEX item with higher power (power = 8) should replace it
         let dex_item = Item {
             slot: EquipmentSlot::Weapon,
-            rarity: Rarity::Common,
+            rarity: Rarity::Rare,
             ilvl: 10,
             tier: 5,
             base_name: "Test".to_string(),
             display_name: "Test".to_string(),
             attributes: AttributeBonuses {
-                dex: 5,
+                dex: 8,
                 ..AttributeBonuses::new()
             },
             affixes: vec![],
             god_item_id: None,
         };
-
-        let str_score = score_item(&str_item, &game_state);
-        let dex_score = score_item(&dex_item, &game_state);
-
-        assert!(str_score > dex_score,
-            "STR item ({str_score}) should score higher than DEX item ({dex_score}) for STR-focused character");
-    }
-
-    #[test]
-    fn test_score_item_zero_attributes() {
-        let game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
-        let item = Item {
-            slot: EquipmentSlot::Weapon,
-            rarity: Rarity::Common,
-            ilvl: 10,
-            tier: 5,
-            base_name: "Test".to_string(),
-            display_name: "Test".to_string(),
-            attributes: AttributeBonuses::new(),
-            affixes: vec![],
-            god_item_id: None,
-        };
-
-        let score = score_item(&item, &game_state);
-        assert_eq!(
-            score, 0.0,
-            "Item with no attributes or affixes should score 0"
-        );
-    }
-
-    #[test]
-    fn test_affix_type_weights() {
-        let game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
-
-        let make_affix_item = |affix_type: AffixType| -> Item {
-            Item {
-                slot: EquipmentSlot::Weapon,
-                rarity: Rarity::Magic,
-                ilvl: 10,
-                tier: 5,
-                base_name: "Test".to_string(),
-                display_name: "Test".to_string(),
-                attributes: AttributeBonuses::new(),
-                affixes: vec![Affix {
-                    affix_type,
-                    value: 10.0,
-                }],
-                god_item_id: None,
-            }
-        };
-
-        // DamagePercent (2.0) should outscore XPGain (1.0)
-        let dmg_score = score_item(&make_affix_item(AffixType::DamagePercent), &game_state);
-        let xp_score = score_item(&make_affix_item(AffixType::XPGain), &game_state);
+        let equipped = auto_equip_if_better(dex_item, &mut game_state);
         assert!(
-            dmg_score > xp_score,
-            "DamagePercent ({dmg_score}) should outscore XPGain ({xp_score})"
+            equipped,
+            "Higher-power DEX item should replace lower-power STR item regardless of character build"
         );
-
-        // Verify specific multipliers: DamagePercent = 10 * 2.0 = 20
-        assert!((dmg_score - 20.0).abs() < f64::EPSILON);
-        // XPGain = 10 * 1.0 = 10
-        assert!((xp_score - 10.0).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn test_score_combines_attributes_and_affixes() {
-        let game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
-
-        let attr_only = Item {
-            slot: EquipmentSlot::Weapon,
-            rarity: Rarity::Common,
-            ilvl: 10,
-            tier: 5,
-            base_name: "Test".to_string(),
-            display_name: "Test".to_string(),
-            attributes: AttributeBonuses {
-                str: 5,
-                ..AttributeBonuses::new()
-            },
-            affixes: vec![],
-            god_item_id: None,
-        };
-        let combined = Item {
-            slot: EquipmentSlot::Weapon,
-            rarity: Rarity::Magic,
-            ilvl: 10,
-            tier: 5,
-            base_name: "Test".to_string(),
-            display_name: "Test".to_string(),
-            attributes: AttributeBonuses {
-                str: 5,
-                ..AttributeBonuses::new()
-            },
-            affixes: vec![Affix {
-                affix_type: AffixType::DamagePercent,
-                value: 10.0,
-            }],
-            god_item_id: None,
-        };
-
-        let attr_score = score_item(&attr_only, &game_state);
-        let combined_score = score_item(&combined, &game_state);
-
-        assert!(combined_score > attr_score,
-            "Item with attributes + affixes ({combined_score}) should outscore attributes alone ({attr_score})");
     }
 
     #[test]
@@ -399,7 +220,7 @@ mod tests {
         };
         game_state.equipment.set(EquipmentSlot::Armor, Some(mythic));
 
-        // Try to equip a Legendary with higher raw score
+        // Try to equip a Legendary with higher power
         let legendary = Item {
             slot: EquipmentSlot::Armor,
             rarity: Rarity::Legendary,
@@ -438,11 +259,11 @@ mod tests {
     fn test_auto_equip_affix_item_beats_attribute_item() {
         let mut game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
 
-        // Equip a small attribute-only item
+        // Equip a small attribute-only item (power = 1)
         let weak = create_test_item(EquipmentSlot::Weapon, Rarity::Common, 1);
         auto_equip_if_better(weak, &mut game_state);
 
-        // An item with good affixes should replace it even with same attributes
+        // An item with good affixes should replace it (power = 1 + 20*2.0 = 41)
         let affix_item = Item {
             slot: EquipmentSlot::Weapon,
             rarity: Rarity::Magic,
