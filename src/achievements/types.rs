@@ -3,6 +3,121 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+// =========================================================================
+// Milestone threshold constants
+// =========================================================================
+
+/// Kill count milestones for the Slayer achievement series.
+pub const SLAYER_MILESTONES: &[(u64, AchievementId)] = &[
+    (100, AchievementId::SlayerI),
+    (500, AchievementId::SlayerII),
+    (1000, AchievementId::SlayerIII),
+    (5000, AchievementId::SlayerIV),
+    (10000, AchievementId::SlayerV),
+    (50000, AchievementId::SlayerVI),
+    (100000, AchievementId::SlayerVII),
+    (500000, AchievementId::SlayerVIII),
+    (1000000, AchievementId::SlayerIX),
+    (2500000, AchievementId::SlayerX),
+    (10000000, AchievementId::SlayerXI),
+    (50000000, AchievementId::SlayerXII),
+    (100000000, AchievementId::SlayerXIII),
+    (500000000, AchievementId::SlayerXIV),
+    (1000000000, AchievementId::SlayerXV),
+];
+
+/// Boss kill milestones for the Boss Hunter achievement series.
+pub const BOSS_HUNTER_MILESTONES: &[(u64, AchievementId)] = &[
+    (1, AchievementId::BossHunterI),
+    (10, AchievementId::BossHunterII),
+    (50, AchievementId::BossHunterIII),
+    (100, AchievementId::BossHunterIV),
+    (500, AchievementId::BossHunterV),
+    (1000, AchievementId::BossHunterVI),
+    (5000, AchievementId::BossHunterVII),
+    (10000, AchievementId::BossHunterVIII),
+    (25000, AchievementId::BossHunterIX),
+    (75000, AchievementId::BossHunterX),
+    (250000, AchievementId::BossHunterXI),
+    (750000, AchievementId::BossHunterXII),
+    (2500000, AchievementId::BossHunterXIII),
+    (5000000, AchievementId::BossHunterXIV),
+    (10000000, AchievementId::BossHunterXV),
+];
+
+/// Level milestones for level-up achievements.
+pub const LEVEL_MILESTONES: &[(u64, AchievementId)] = &[
+    (10, AchievementId::Level10),
+    (25, AchievementId::Level25),
+    (50, AchievementId::Level50),
+    (100, AchievementId::Level100),
+    (150, AchievementId::Level150),
+    (200, AchievementId::Level200),
+    (250, AchievementId::Level250),
+    (500, AchievementId::Level500),
+    (750, AchievementId::Level750),
+    (1000, AchievementId::Level1000),
+    (1500, AchievementId::Level1500),
+];
+
+/// Prestige rank milestones for prestige achievements.
+pub const PRESTIGE_MILESTONES: &[(u64, AchievementId)] = &[
+    (1, AchievementId::FirstPrestige),
+    (5, AchievementId::PrestigeV),
+    (10, AchievementId::PrestigeX),
+    (15, AchievementId::PrestigeXV),
+    (20, AchievementId::PrestigeXX),
+    (25, AchievementId::PrestigeXXV),
+    (30, AchievementId::PrestigeXXX),
+    (40, AchievementId::PrestigeXL),
+    (50, AchievementId::PrestigeL),
+    (70, AchievementId::PrestigeLXX),
+    (90, AchievementId::PrestigeXC),
+    (100, AchievementId::Eternal),
+];
+
+/// Fish catch count milestones for fish catcher achievements.
+pub const FISH_CATCHER_MILESTONES: &[(u64, AchievementId)] = &[
+    (1, AchievementId::GoneFishing),
+    (100, AchievementId::FishCatcherI),
+    (1000, AchievementId::FishCatcherII),
+    (10000, AchievementId::FishCatcherIII),
+    (100000, AchievementId::FishCatcherIV),
+    (500000, AchievementId::FishCatcherV),
+    (1000000, AchievementId::FishCatcherVI),
+    (5000000, AchievementId::FishCatcherVII),
+    (10000000, AchievementId::FishCatcherVIII),
+    (50000000, AchievementId::FishCatcherIX),
+    (100000000, AchievementId::FishCatcherX),
+];
+
+/// Fishing rank milestones for fisherman achievements.
+pub const FISHERMAN_MILESTONES: &[(u64, AchievementId)] = &[
+    (10, AchievementId::FishermanI),
+    (20, AchievementId::FishermanII),
+    (30, AchievementId::FishermanIII),
+    (40, AchievementId::FishermanIV),
+];
+
+/// Dungeon completion milestones for dungeon master achievements.
+pub const DUNGEON_MILESTONES: &[(u64, AchievementId)] = &[
+    (1, AchievementId::DungeonDiver),
+    (10, AchievementId::DungeonMasterI),
+    (50, AchievementId::DungeonMasterII),
+    (100, AchievementId::DungeonMasterIII),
+    (1000, AchievementId::DungeonMasterIV),
+    (5000, AchievementId::DungeonMasterV),
+    (10000, AchievementId::DungeonMasterVI),
+    (25000, AchievementId::DungeonMasterVII),
+    (100000, AchievementId::DungeonMasterVIII),
+    (500000, AchievementId::DungeonMasterIX),
+    (1000000, AchievementId::DungeonMasterX),
+];
+
+/// Minigame win count milestone for the Grand Champion achievement.
+pub const GRAND_CHAMPION_MILESTONES: &[(u64, AchievementId)] =
+    &[(100, AchievementId::GrandChampion)];
+
 /// Achievement categories for organization in the browser.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AchievementCategory {
@@ -462,16 +577,7 @@ impl Achievements {
             self.highest_fishing_rank = new_rank;
         }
 
-        self.check_milestones(
-            new_rank as u64,
-            &[
-                (10, AchievementId::FishermanI),
-                (20, AchievementId::FishermanII),
-                (30, AchievementId::FishermanIII),
-                (40, AchievementId::FishermanIV),
-            ],
-            character_name,
-        );
+        self.check_milestones(new_rank as u64, FISHERMAN_MILESTONES, character_name);
     }
 
     /// Called when a fish is caught.
@@ -481,19 +587,7 @@ impl Achievements {
 
         self.check_milestones(
             self.total_fish_caught,
-            &[
-                (1, AchievementId::GoneFishing),
-                (100, AchievementId::FishCatcherI),
-                (1000, AchievementId::FishCatcherII),
-                (10000, AchievementId::FishCatcherIII),
-                (100000, AchievementId::FishCatcherIV),
-                (500000, AchievementId::FishCatcherV),
-                (1000000, AchievementId::FishCatcherVI),
-                (5000000, AchievementId::FishCatcherVII),
-                (10000000, AchievementId::FishCatcherVIII),
-                (50000000, AchievementId::FishCatcherIX),
-                (100000000, AchievementId::FishCatcherX),
-            ],
+            FISH_CATCHER_MILESTONES,
             character_name,
         );
     }
@@ -507,50 +601,14 @@ impl Achievements {
     pub fn on_enemy_killed(&mut self, is_boss: bool, character_name: Option<&str>) {
         self.total_kills += 1;
 
-        self.check_milestones(
-            self.total_kills,
-            &[
-                (100, AchievementId::SlayerI),
-                (500, AchievementId::SlayerII),
-                (1000, AchievementId::SlayerIII),
-                (5000, AchievementId::SlayerIV),
-                (10000, AchievementId::SlayerV),
-                (50000, AchievementId::SlayerVI),
-                (100000, AchievementId::SlayerVII),
-                (500000, AchievementId::SlayerVIII),
-                (1000000, AchievementId::SlayerIX),
-                (2500000, AchievementId::SlayerX),
-                (10000000, AchievementId::SlayerXI),
-                (50000000, AchievementId::SlayerXII),
-                (100000000, AchievementId::SlayerXIII),
-                (500000000, AchievementId::SlayerXIV),
-                (1000000000, AchievementId::SlayerXV),
-            ],
-            character_name,
-        );
+        self.check_milestones(self.total_kills, SLAYER_MILESTONES, character_name);
 
         if is_boss {
             self.total_bosses_defeated += 1;
 
             self.check_milestones(
                 self.total_bosses_defeated,
-                &[
-                    (1, AchievementId::BossHunterI),
-                    (10, AchievementId::BossHunterII),
-                    (50, AchievementId::BossHunterIII),
-                    (100, AchievementId::BossHunterIV),
-                    (500, AchievementId::BossHunterV),
-                    (1000, AchievementId::BossHunterVI),
-                    (5000, AchievementId::BossHunterVII),
-                    (10000, AchievementId::BossHunterVIII),
-                    (25000, AchievementId::BossHunterIX),
-                    (75000, AchievementId::BossHunterX),
-                    (250000, AchievementId::BossHunterXI),
-                    (750000, AchievementId::BossHunterXII),
-                    (2500000, AchievementId::BossHunterXIII),
-                    (5000000, AchievementId::BossHunterXIV),
-                    (10000000, AchievementId::BossHunterXV),
-                ],
+                BOSS_HUNTER_MILESTONES,
                 character_name,
             );
         }
@@ -567,23 +625,7 @@ impl Achievements {
             self.highest_level = new_level;
         }
 
-        self.check_milestones(
-            new_level as u64,
-            &[
-                (10, AchievementId::Level10),
-                (25, AchievementId::Level25),
-                (50, AchievementId::Level50),
-                (100, AchievementId::Level100),
-                (150, AchievementId::Level150),
-                (200, AchievementId::Level200),
-                (250, AchievementId::Level250),
-                (500, AchievementId::Level500),
-                (750, AchievementId::Level750),
-                (1000, AchievementId::Level1000),
-                (1500, AchievementId::Level1500),
-            ],
-            character_name,
-        );
+        self.check_milestones(new_level as u64, LEVEL_MILESTONES, character_name);
     }
 
     /// Called when the character prestiges.
@@ -593,24 +635,7 @@ impl Achievements {
             self.highest_prestige_rank = new_rank;
         }
 
-        self.check_milestones(
-            new_rank as u64,
-            &[
-                (1, AchievementId::FirstPrestige),
-                (5, AchievementId::PrestigeV),
-                (10, AchievementId::PrestigeX),
-                (15, AchievementId::PrestigeXV),
-                (20, AchievementId::PrestigeXX),
-                (25, AchievementId::PrestigeXXV),
-                (30, AchievementId::PrestigeXXX),
-                (40, AchievementId::PrestigeXL),
-                (50, AchievementId::PrestigeL),
-                (70, AchievementId::PrestigeLXX),
-                (90, AchievementId::PrestigeXC),
-                (100, AchievementId::Eternal),
-            ],
-            character_name,
-        );
+        self.check_milestones(new_rank as u64, PRESTIGE_MILESTONES, character_name);
     }
 
     /// Called when a zone is fully cleared (all subzones completed).
@@ -660,19 +685,7 @@ impl Achievements {
 
         self.check_milestones(
             self.total_dungeons_completed,
-            &[
-                (1, AchievementId::DungeonDiver),
-                (10, AchievementId::DungeonMasterI),
-                (50, AchievementId::DungeonMasterII),
-                (100, AchievementId::DungeonMasterIII),
-                (1000, AchievementId::DungeonMasterIV),
-                (5000, AchievementId::DungeonMasterV),
-                (10000, AchievementId::DungeonMasterVI),
-                (25000, AchievementId::DungeonMasterVII),
-                (100000, AchievementId::DungeonMasterVIII),
-                (500000, AchievementId::DungeonMasterIX),
-                (1000000, AchievementId::DungeonMasterX),
-            ],
+            DUNGEON_MILESTONES,
             character_name,
         );
     }
@@ -742,15 +755,10 @@ impl Achievements {
         }
 
         // Grand Champion - 100 total wins
-        if self.total_minigame_wins >= 100 {
-            self.unlock_with_name(AchievementId::GrandChampion, character_name);
-        }
-
-        // Update progress tracking
-        self.update_progress(
-            AchievementId::GrandChampion,
-            self.total_minigame_wins.min(100),
-            100,
+        self.check_milestones(
+            self.total_minigame_wins,
+            GRAND_CHAMPION_MILESTONES,
+            character_name,
         );
     }
 
@@ -908,84 +916,12 @@ impl Achievements {
     /// Refresh progress entries from existing aggregate counters.
     /// Called on load so progress bars display even for counters accumulated before this feature.
     pub fn refresh_progress(&mut self) {
-        // Helper: update progress for all unachieved milestones in a series
         let series: &[(u64, &[(u64, AchievementId)])] = &[
-            (
-                self.total_kills,
-                &[
-                    (100, AchievementId::SlayerI),
-                    (500, AchievementId::SlayerII),
-                    (1000, AchievementId::SlayerIII),
-                    (5000, AchievementId::SlayerIV),
-                    (10000, AchievementId::SlayerV),
-                    (50000, AchievementId::SlayerVI),
-                    (100000, AchievementId::SlayerVII),
-                    (500000, AchievementId::SlayerVIII),
-                    (1000000, AchievementId::SlayerIX),
-                    (2500000, AchievementId::SlayerX),
-                    (10000000, AchievementId::SlayerXI),
-                    (50000000, AchievementId::SlayerXII),
-                    (100000000, AchievementId::SlayerXIII),
-                    (500000000, AchievementId::SlayerXIV),
-                    (1000000000, AchievementId::SlayerXV),
-                ],
-            ),
-            (
-                self.total_bosses_defeated,
-                &[
-                    (1, AchievementId::BossHunterI),
-                    (10, AchievementId::BossHunterII),
-                    (50, AchievementId::BossHunterIII),
-                    (100, AchievementId::BossHunterIV),
-                    (500, AchievementId::BossHunterV),
-                    (1000, AchievementId::BossHunterVI),
-                    (5000, AchievementId::BossHunterVII),
-                    (10000, AchievementId::BossHunterVIII),
-                    (25000, AchievementId::BossHunterIX),
-                    (75000, AchievementId::BossHunterX),
-                    (250000, AchievementId::BossHunterXI),
-                    (750000, AchievementId::BossHunterXII),
-                    (2500000, AchievementId::BossHunterXIII),
-                    (5000000, AchievementId::BossHunterXIV),
-                    (10000000, AchievementId::BossHunterXV),
-                ],
-            ),
-            (
-                self.total_dungeons_completed,
-                &[
-                    (1, AchievementId::DungeonDiver),
-                    (10, AchievementId::DungeonMasterI),
-                    (50, AchievementId::DungeonMasterII),
-                    (100, AchievementId::DungeonMasterIII),
-                    (1000, AchievementId::DungeonMasterIV),
-                    (5000, AchievementId::DungeonMasterV),
-                    (10000, AchievementId::DungeonMasterVI),
-                    (25000, AchievementId::DungeonMasterVII),
-                    (100000, AchievementId::DungeonMasterVIII),
-                    (500000, AchievementId::DungeonMasterIX),
-                    (1000000, AchievementId::DungeonMasterX),
-                ],
-            ),
-            (
-                self.total_fish_caught,
-                &[
-                    (1, AchievementId::GoneFishing),
-                    (100, AchievementId::FishCatcherI),
-                    (1000, AchievementId::FishCatcherII),
-                    (10000, AchievementId::FishCatcherIII),
-                    (100000, AchievementId::FishCatcherIV),
-                    (500000, AchievementId::FishCatcherV),
-                    (1000000, AchievementId::FishCatcherVI),
-                    (5000000, AchievementId::FishCatcherVII),
-                    (10000000, AchievementId::FishCatcherVIII),
-                    (50000000, AchievementId::FishCatcherIX),
-                    (100000000, AchievementId::FishCatcherX),
-                ],
-            ),
-            (
-                self.total_minigame_wins,
-                &[(100, AchievementId::GrandChampion)],
-            ),
+            (self.total_kills, SLAYER_MILESTONES),
+            (self.total_bosses_defeated, BOSS_HUNTER_MILESTONES),
+            (self.total_dungeons_completed, DUNGEON_MILESTONES),
+            (self.total_fish_caught, FISH_CATCHER_MILESTONES),
+            (self.total_minigame_wins, GRAND_CHAMPION_MILESTONES),
         ];
 
         for (current, milestones) in series {
