@@ -794,7 +794,7 @@ Options: Trigger Dungeon, Fishing, all 10 challenge types, Haven Discovery, Soul
 
 ### Integration Tests
 
-15 integration test files in `tests/`:
+16 integration test files in `tests/`:
 - `game_loop_orchestration_test.rs` -- 36 behavior-locking tests for game tick pipeline
 - `game_tick_behavior_test.rs` / `game_tick_supplemental_test.rs` -- Tick processing behavior
 - `tick_integration_test.rs` -- Cross-system tick integration
@@ -808,6 +808,7 @@ Options: Trigger Dungeon, Fishing, all 10 challenge types, Haven Discovery, Soul
 - `item_pipeline_test.rs` -- Item generation and equipping
 - `chess_integration_test.rs` -- Chess minigame
 - `enhancement_test.rs` -- Soulforge enhancement system
+- `god_items_test.rs` -- God items system
 - `game_loop_test.rs` -- Core game loop behavior
 
 ---
@@ -984,6 +985,7 @@ quest/
 │       ├── soulforge_scene.rs # Soulforge enhancement overlay
 │       ├── help_overlay.rs   # Help overlay with keybindings
 │       ├── scene_fx.rs       # Shared utilities for layered ASCII scene rendering
+│       ├── zone_bg.rs        # Stylized zone background scenes (6-layer compositing)
 │       ├── debug_menu_scene.rs # Debug overlay
 │       ├── throbber.rs      # Spinner animations
 │       └── character_select.rs, character_creation.rs,
