@@ -6,7 +6,8 @@
 use quest::achievements::Achievements;
 use quest::character::derived_stats::DerivedStats;
 use quest::character::prestige::PrestigeCombatBonuses;
-use quest::combat::logic::{update_combat, CombatEvent, GodItemCombatBonuses, HavenCombatBonuses};
+use quest::combat::logic::update_combat;
+use quest::combat::{CombatEvent, GodItemCombatBonuses, HavenCombatBonuses};
 use quest::core::game_logic::{
     process_offline_progression, spawn_enemy_if_needed, xp_for_next_level,
 };

@@ -5,17 +5,13 @@
 
 #![allow(dead_code)]
 
+use super::drops::try_fishing_item_drop;
 use super::generation::{self as fishing_generation, is_storm_leviathan, LeviathanResult};
-use super::types::{FishRarity, FishingPhase, FishingState};
+use super::rank::get_max_fishing_rank;
+use super::types::{FishRarity, FishingPhase};
 use crate::character::prestige::get_prestige_tier;
-use crate::core::constants::{
-    BASE_MAX_FISHING_RANK, FISHING_DISCOVERY_CHANCE, FISHING_DROP_CHANCE_COMMON,
-    FISHING_DROP_CHANCE_EPIC, FISHING_DROP_CHANCE_LEGENDARY, FISHING_DROP_CHANCE_RARE,
-    FISHING_DROP_CHANCE_UNCOMMON, MAX_FISHING_RANK,
-};
+use crate::core::constants::FISHING_DISCOVERY_CHANCE;
 use crate::core::game_state::GameState;
-use crate::items::generation as item_generation;
-use crate::items::{ilvl_for_zone, roll_random_slot, Rarity};
 use rand::{Rng, RngExt};
 
 /// Apply timer reduction from Garden bonus
@@ -250,51 +246,6 @@ pub fn tick_fishing(state: &mut GameState, rng: &mut impl Rng) -> Vec<String> {
     tick_fishing_with_haven(state, rng, &HavenFishingBonuses::default())
 }
 
-/// Attempts to drop an item based on fish rarity.
-///
-/// Drop chances:
-/// - Common: 5%
-/// - Uncommon: 5%
-/// - Rare: 15%
-/// - Epic: 35%
-/// - Legendary: 75%
-///
-/// Item level is based on zone_id (ilvl = zone_id * 10).
-fn try_fishing_item_drop(
-    rarity: FishRarity,
-    zone_id: usize,
-    rng: &mut impl Rng,
-) -> Option<crate::items::Item> {
-    let drop_chance = match rarity {
-        FishRarity::Common => FISHING_DROP_CHANCE_COMMON,
-        FishRarity::Uncommon => FISHING_DROP_CHANCE_UNCOMMON,
-        FishRarity::Rare => FISHING_DROP_CHANCE_RARE,
-        FishRarity::Epic => FISHING_DROP_CHANCE_EPIC,
-        FishRarity::Legendary => FISHING_DROP_CHANCE_LEGENDARY,
-    };
-
-    if rng.random::<f64>() < drop_chance {
-        // Generate item with rarity matching fish rarity
-        let item_rarity = match rarity {
-            FishRarity::Common => Rarity::Common,
-            FishRarity::Uncommon => Rarity::Magic,
-            FishRarity::Rare => Rarity::Rare,
-            FishRarity::Epic => Rarity::Epic,
-            FishRarity::Legendary => Rarity::Legendary,
-        };
-
-        // Random equipment slot
-        let slot = roll_random_slot(rng);
-
-        // Item level based on zone
-        let ilvl = ilvl_for_zone(zone_id);
-
-        Some(item_generation::generate_item(slot, item_rarity, ilvl))
-    } else {
-        None
-    }
-}
-
 /// Attempts to discover a fishing spot.
 ///
 /// Returns a discovery message if a spot is found.
@@ -326,68 +277,15 @@ pub fn try_discover_fishing(state: &mut GameState, rng: &mut impl Rng) -> Option
     Some(format!("Discovered fishing spot: {}!", spot_name))
 }
 
-// BASE_MAX_FISHING_RANK and MAX_FISHING_RANK are imported from core::constants
-
-/// Returns the effective maximum fishing rank based on Haven bonus.
-///
-/// Base max is 30, but FishingDock T4 adds +10 for a total of 40.
-pub fn get_max_fishing_rank(fishing_rank_bonus: u32) -> u32 {
-    (BASE_MAX_FISHING_RANK + fishing_rank_bonus).min(MAX_FISHING_RANK)
-}
-
-/// Checks if the player should rank up in fishing.
-///
-/// Returns a rank up message if the threshold is reached.
-///
-/// # Arguments
-/// - `fishing_state`: The player's fishing state
-/// - `max_rank`: The effective maximum rank (base 30 + Haven bonus)
-///
-/// # Rank Up Mechanics
-/// - Each rank requires a certain number of fish to catch
-/// - Fish requirement increases with rank tier
-/// - Excess fish count carries over to next rank
-/// - Rank is capped at the effective max rank
-pub fn check_rank_up_with_max(fishing_state: &mut FishingState, max_rank: u32) -> Option<String> {
-    // Already at max rank - no further progression
-    if fishing_state.rank >= max_rank {
-        return None;
-    }
-
-    let required = FishingState::fish_required_for_rank(fishing_state.rank);
-
-    if fishing_state.fish_toward_next_rank >= required {
-        // Rank up
-        fishing_state.fish_toward_next_rank -= required;
-        fishing_state.rank += 1;
-
-        let new_rank_name = fishing_state.rank_name();
-        Some(format!(
-            "Fishing rank up! Now rank {}: {}",
-            fishing_state.rank, new_rank_name
-        ))
-    } else {
-        None
-    }
-}
-
-/// Checks if the player should rank up in fishing (legacy, uses absolute max).
-///
-/// Returns a rank up message if the threshold is reached.
-///
-/// # Rank Up Mechanics
-/// - Each rank requires a certain number of fish to catch
-/// - Fish requirement increases with rank tier
-/// - Excess fish count carries over to next rank
-/// - Rank is capped at MAX_FISHING_RANK (30)
-pub fn check_rank_up(fishing_state: &mut FishingState) -> Option<String> {
-    check_rank_up_with_max(fishing_state, MAX_FISHING_RANK)
-}
-
 #[cfg(test)]
 mod tests {
-    use super::super::types::FishingSession;
+    use super::super::drops::try_fishing_item_drop;
+    use super::super::rank::{check_rank_up, check_rank_up_with_max, get_max_fishing_rank};
+    use super::super::types::{FishingSession, FishingState};
     use super::*;
+    use crate::core::constants::{BASE_MAX_FISHING_RANK, MAX_FISHING_RANK};
+    use crate::fishing::types::FishRarity;
+    use crate::items::Rarity;
     use rand::SeedableRng;
     use rand_chacha::ChaCha8Rng;
 
