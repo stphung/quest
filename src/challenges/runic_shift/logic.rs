@@ -653,8 +653,8 @@ pub fn apply_game_result(state: &mut GameState) -> Option<MinigameWinInfo> {
         state,
         GameResultInfo {
             won,
-            game_type: "runic_shift",
-            difficulty_str: difficulty.difficulty_str(),
+            game_type: crate::achievements::MinigameType::RunicShift,
+            difficulty: difficulty.difficulty_enum(),
             reward,
             icon: "⇄",
             win_message: "Sigil Surge conquered!",
@@ -914,8 +914,14 @@ mod tests {
         let result = apply_game_result(&mut state);
         assert!(result.is_some());
         let win_info = result.unwrap();
-        assert_eq!(win_info.game_type, "runic_shift");
-        assert_eq!(win_info.difficulty, "novice");
+        assert_eq!(
+            win_info.game_type,
+            crate::achievements::MinigameType::RunicShift
+        );
+        assert_eq!(
+            win_info.difficulty,
+            crate::achievements::MinigameDifficulty::Novice
+        );
     }
 
     #[test]

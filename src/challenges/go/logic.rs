@@ -441,8 +441,8 @@ pub fn apply_go_result(
         state,
         GameResultInfo {
             won,
-            game_type: "go",
-            difficulty_str: difficulty.difficulty_str(),
+            game_type: crate::achievements::MinigameType::Go,
+            difficulty: difficulty.difficulty_enum(),
             reward,
             icon: "◉",
             win_message: "Victory! The master bows in respect.",

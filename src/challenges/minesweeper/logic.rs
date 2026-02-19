@@ -303,8 +303,8 @@ pub fn apply_game_result(
         state,
         GameResultInfo {
             won,
-            game_type: "minesweeper",
-            difficulty_str: difficulty.difficulty_str(),
+            game_type: crate::achievements::MinigameType::Minesweeper,
+            difficulty: difficulty.difficulty_enum(),
             reward,
             icon: "\u{26A0}",
             win_message: "All traps identified! The scout salutes you.",

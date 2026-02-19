@@ -274,8 +274,8 @@ pub fn apply_game_result(state: &mut GameState) -> Option<MinigameWinInfo> {
         state,
         GameResultInfo {
             won,
-            game_type: "flappy_bird",
-            difficulty_str: difficulty.difficulty_str(),
+            game_type: crate::achievements::MinigameType::FlappyBird,
+            difficulty: difficulty.difficulty_enum(),
             reward,
             icon: ">",
             win_message: "Skyward Gauntlet conquered!",
@@ -625,8 +625,14 @@ mod tests {
         let result = apply_game_result(&mut state);
         assert!(result.is_some());
         let info = result.unwrap();
-        assert_eq!(info.game_type, "flappy_bird");
-        assert_eq!(info.difficulty, "apprentice");
+        assert_eq!(
+            info.game_type,
+            crate::achievements::MinigameType::FlappyBird
+        );
+        assert_eq!(
+            info.difficulty,
+            crate::achievements::MinigameDifficulty::Apprentice
+        );
         assert!(state.character_xp > initial_xp);
         assert!(state.active_minigame.is_none());
     }
@@ -731,17 +737,24 @@ mod tests {
     }
 
     #[test]
-    fn test_difficulty_str_values() {
-        assert_eq!(FlappyBirdDifficulty::Novice.difficulty_str(), "novice");
+    fn test_difficulty_enum_values() {
+        use crate::achievements::MinigameDifficulty;
         assert_eq!(
-            FlappyBirdDifficulty::Apprentice.difficulty_str(),
-            "apprentice"
+            FlappyBirdDifficulty::Novice.difficulty_enum(),
+            MinigameDifficulty::Novice
         );
         assert_eq!(
-            FlappyBirdDifficulty::Journeyman.difficulty_str(),
-            "journeyman"
+            FlappyBirdDifficulty::Apprentice.difficulty_enum(),
+            MinigameDifficulty::Apprentice
         );
-        assert_eq!(FlappyBirdDifficulty::Master.difficulty_str(), "master");
+        assert_eq!(
+            FlappyBirdDifficulty::Journeyman.difficulty_enum(),
+            MinigameDifficulty::Journeyman
+        );
+        assert_eq!(
+            FlappyBirdDifficulty::Master.difficulty_enum(),
+            MinigameDifficulty::Master
+        );
     }
 
     #[test]

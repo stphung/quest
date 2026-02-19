@@ -1158,9 +1158,39 @@ mod tests {
         }
     }
 
+    /// Verify every `AchievementId` variant has exactly one entry in
+    /// `ALL_ACHIEVEMENTS`, and that `ALL_ACHIEVEMENTS` has no extras.
+    ///
+    /// ## How this test enforces coverage
+    ///
+    /// We compare `ALL_ACHIEVEMENTS.len()` against the manually maintained
+    /// `AchievementId::VARIANT_COUNT` constant.  When a new variant is added,
+    /// updating `VARIANT_COUNT` in `types.rs` will fail this test unless a
+    /// matching definition is also added to `ALL_ACHIEVEMENTS`.
+    ///
+    /// Note: `std::mem::variant_count` (issue #73662) would replace the manual
+    /// constant but is not yet stable on the Rust toolchain used by this project.
+    /// Switch to it once it stabilises.
+    ///
+    /// The per-ID loop below catches the complementary error: a definition whose
+    /// `id` field doesn't correspond to the expected variant (e.g. a copy-paste
+    /// typo).  Together the two checks give complete bidirectional coverage.
     #[test]
     fn test_every_achievement_id_variant_has_definition() {
-        let all_ids: Vec<AchievementId> = vec![
+        // ── 1. Count check ────────────────────────────────────────────────────
+        assert_eq!(
+            AchievementId::VARIANT_COUNT,
+            ALL_ACHIEVEMENTS.len(),
+            "AchievementId::VARIANT_COUNT ({}) does not match ALL_ACHIEVEMENTS.len() ({}). \
+             Add a definition for every new variant and update VARIANT_COUNT.",
+            AchievementId::VARIANT_COUNT,
+            ALL_ACHIEVEMENTS.len(),
+        );
+
+        // ── 2. Per-entry check ────────────────────────────────────────────────
+        // Ensures no definition uses the wrong AchievementId (copy-paste typos).
+        // `test_all_achievements_have_unique_ids` guarantees there are no duplicates.
+        let all_ids: &[AchievementId] = &[
             AchievementId::SlayerI,
             AchievementId::SlayerII,
             AchievementId::SlayerIII,
@@ -1312,21 +1342,23 @@ mod tests {
             AchievementId::PersistentHammering,
         ];
 
-        for id in &all_ids {
+        // Sanity-check: the slice above must itself be up-to-date.
+        assert_eq!(
+            all_ids.len(),
+            AchievementId::VARIANT_COUNT,
+            "The all_ids slice in this test has {} entries but AchievementId::VARIANT_COUNT is \
+             {} — update the slice when adding/removing variants.",
+            all_ids.len(),
+            AchievementId::VARIANT_COUNT,
+        );
+
+        for id in all_ids {
             assert!(
                 get_achievement_def(*id).is_some(),
                 "AchievementId::{:?} has no definition in ALL_ACHIEVEMENTS",
                 id
             );
         }
-
-        assert_eq!(
-            all_ids.len(),
-            ALL_ACHIEVEMENTS.len(),
-            "Mismatch between AchievementId variants ({}) and ALL_ACHIEVEMENTS entries ({})",
-            all_ids.len(),
-            ALL_ACHIEVEMENTS.len()
-        );
     }
 
     #[test]

@@ -759,8 +759,8 @@ pub fn apply_game_result(state: &mut GameState) -> Option<crate::challenges::Min
         state,
         GameResultInfo {
             won,
-            game_type: "morris",
-            difficulty_str: difficulty.difficulty_str(),
+            game_type: crate::achievements::MinigameType::Morris,
+            difficulty: difficulty.difficulty_enum(),
             reward,
             icon: "\u{25CB}",
             win_message: "Victory! The sage bows with respect.",

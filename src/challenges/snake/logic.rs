@@ -266,8 +266,8 @@ pub fn apply_game_result(state: &mut GameState) -> Option<MinigameWinInfo> {
         state,
         GameResultInfo {
             won,
-            game_type: "snake",
-            difficulty_str: difficulty.difficulty_str(),
+            game_type: crate::achievements::MinigameType::Snake,
+            difficulty: difficulty.difficulty_enum(),
             reward,
             icon: "~",
             win_message: "Serpent's Path conquered!",
@@ -615,11 +615,24 @@ mod tests {
     }
 
     #[test]
-    fn test_difficulty_str_values() {
-        assert_eq!(SnakeDifficulty::Novice.difficulty_str(), "novice");
-        assert_eq!(SnakeDifficulty::Apprentice.difficulty_str(), "apprentice");
-        assert_eq!(SnakeDifficulty::Journeyman.difficulty_str(), "journeyman");
-        assert_eq!(SnakeDifficulty::Master.difficulty_str(), "master");
+    fn test_difficulty_enum_values() {
+        use crate::achievements::MinigameDifficulty;
+        assert_eq!(
+            SnakeDifficulty::Novice.difficulty_enum(),
+            MinigameDifficulty::Novice
+        );
+        assert_eq!(
+            SnakeDifficulty::Apprentice.difficulty_enum(),
+            MinigameDifficulty::Apprentice
+        );
+        assert_eq!(
+            SnakeDifficulty::Journeyman.difficulty_enum(),
+            MinigameDifficulty::Journeyman
+        );
+        assert_eq!(
+            SnakeDifficulty::Master.difficulty_enum(),
+            MinigameDifficulty::Master
+        );
     }
 
     #[test]
@@ -637,8 +650,11 @@ mod tests {
         let result = apply_game_result(&mut state);
         assert!(result.is_some());
         let info = result.unwrap();
-        assert_eq!(info.game_type, "snake");
-        assert_eq!(info.difficulty, "apprentice");
+        assert_eq!(info.game_type, crate::achievements::MinigameType::Snake);
+        assert_eq!(
+            info.difficulty,
+            crate::achievements::MinigameDifficulty::Apprentice
+        );
         assert!(state.character_xp > initial_xp);
         assert!(state.active_minigame.is_none());
     }

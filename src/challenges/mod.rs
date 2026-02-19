@@ -99,20 +99,20 @@ impl ActiveMinigame {
 /// Information about a minigame win for achievement tracking.
 #[derive(Debug, Clone)]
 pub struct MinigameWinInfo {
-    /// The type of game: "chess", "morris", "gomoku", "minesweeper", "rune", "go", etc.
-    pub game_type: &'static str,
-    /// The difficulty level: "novice", "apprentice", "journeyman", "master"
-    pub difficulty: &'static str,
+    /// The type of game.
+    pub game_type: crate::achievements::MinigameType,
+    /// The difficulty level.
+    pub difficulty: crate::achievements::MinigameDifficulty,
 }
 
 /// Describes a completed challenge for the shared reward-application helper.
 pub struct GameResultInfo {
     /// Whether the player won
     pub won: bool,
-    /// Game type string for achievements (e.g., "chess", "go")
-    pub game_type: &'static str,
-    /// Lowercase difficulty string for achievements (e.g., "novice")
-    pub difficulty_str: &'static str,
+    /// Game type enum for achievements.
+    pub game_type: crate::achievements::MinigameType,
+    /// Difficulty enum for achievements.
+    pub difficulty: crate::achievements::MinigameDifficulty,
     /// The reward to apply (only used if won)
     pub reward: menu::ChallengeReward,
     /// Icon prefix for combat log entries (e.g., "♟", "◎")
@@ -203,7 +203,7 @@ pub fn apply_challenge_rewards(
     if info.won {
         Some(MinigameWinInfo {
             game_type: info.game_type,
-            difficulty: info.difficulty_str,
+            difficulty: info.difficulty,
         })
     } else {
         None
@@ -218,8 +218,8 @@ mod tests {
     fn make_info(won: bool, reward: menu::ChallengeReward) -> GameResultInfo {
         GameResultInfo {
             won,
-            game_type: "test",
-            difficulty_str: "novice",
+            game_type: crate::achievements::MinigameType::Chess,
+            difficulty: crate::achievements::MinigameDifficulty::Novice,
             reward,
             icon: "T",
             win_message: "You won!",
@@ -239,8 +239,11 @@ mod tests {
 
         assert!(result.is_some());
         let info = result.unwrap();
-        assert_eq!(info.game_type, "test");
-        assert_eq!(info.difficulty, "novice");
+        assert_eq!(info.game_type, crate::achievements::MinigameType::Chess);
+        assert_eq!(
+            info.difficulty,
+            crate::achievements::MinigameDifficulty::Novice
+        );
     }
 
     #[test]
