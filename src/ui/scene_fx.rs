@@ -147,3 +147,8 @@ pub fn render_buffer(frame: &mut Frame, area: Rect, buffer: &[Vec<SceneCell>]) {
         frame.render_widget(Paragraph::new(Line::from(spans)), row_area);
     }
 }
+
+/// Clamps an i16 to the u8 range [0, 255].
+pub fn clamp_u8(value: i16) -> u8 {
+    value.clamp(0, 255) as u8
+}
