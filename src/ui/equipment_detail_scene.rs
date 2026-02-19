@@ -245,24 +245,23 @@ fn render_detail_pane(
             // Blank line
             lines.push(Line::from(""));
 
-            // Attributes: Show non-zero attribute bonuses
+            // Attributes: one per line with derived effect
             let attrs = item.attributes.as_array();
-            let mut attr_spans: Vec<Span> = vec![Span::styled(" ", Style::default())];
-            let mut has_attrs = false;
             for (value, label) in attrs.iter().zip(ATTR_LABELS.iter()) {
                 if *value > 0 {
-                    if has_attrs {
-                        attr_spans.push(Span::styled("  ", Style::default()));
-                    }
-                    attr_spans.push(Span::styled(
-                        format!("+{} {}", value, label),
-                        Style::default().fg(Color::Green),
-                    ));
-                    has_attrs = true;
+                    let modifier = *value as i32 / 2;
+                    let effect = attr_effect_text(label, modifier);
+                    lines.push(Line::from(vec![
+                        Span::styled(
+                            format!(" +{:<3} {:<3}", value, label),
+                            Style::default().fg(Color::Green),
+                        ),
+                        Span::styled(
+                            format!(" \u{2192} {}", effect),
+                            Style::default().fg(Color::DarkGray),
+                        ),
+                    ]));
                 }
-            }
-            if has_attrs {
-                lines.push(Line::from(attr_spans));
             }
 
             // Blank line before affixes
@@ -409,5 +408,22 @@ fn render_detail_pane(
             let paragraph = Paragraph::new(lines).alignment(Alignment::Center);
             frame.render_widget(paragraph, area);
         }
+    }
+}
+
+/// Returns a human-readable effect description for an attribute modifier contribution.
+fn attr_effect_text(label: &str, modifier: i32) -> String {
+    use crate::core::constants::*;
+    match label {
+        "STR" => format!("+{} Physical Damage", modifier * DAMAGE_PER_STR_MODIFIER),
+        "DEX" => format!("+{} Defense, +{}% Crit", modifier, modifier),
+        "CON" => format!("+{} Max HP", modifier * HP_PER_CON_MODIFIER),
+        "INT" => format!("+{} Magic Damage", modifier * DAMAGE_PER_INT_MODIFIER),
+        "WIS" => format!(
+            "+{:.0}% XP Gain",
+            modifier as f64 * XP_MULT_PER_WIS_MODIFIER * 100.0
+        ),
+        "CHA" => format!("+{}% Prestige Bonus", modifier * 10),
+        _ => String::new(),
     }
 }
