@@ -5,13 +5,14 @@
 mod haven_input;
 mod minigame_input;
 mod prestige_input;
+mod soulforge_input;
 pub mod types;
 
 // Re-export all types for backward compatibility
 pub use types::*;
 
 // Re-export soulforge UI types from enhancement module
-pub use crate::enhancement::{EnhancementResult, SoulforgePhase, SoulforgeUiState};
+pub use crate::enhancement::{SoulforgePhase, SoulforgeUiState};
 
 use crate::achievements::get_achievements_by_category;
 use crate::challenges::menu::{process_input as process_menu_input, MenuInput};
@@ -24,6 +25,7 @@ use haven_input::handle_haven;
 use minigame_input::handle_minigame;
 use prestige_input::{handle_prestige_confirm, handle_vault_selection};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
+use soulforge_input::handle_soulforge;
 
 /// Main dispatcher for Game screen input. Handles the priority chain.
 #[allow(clippy::too_many_arguments)]
@@ -182,85 +184,6 @@ fn handle_soulforge_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> Input
         *overlay = GameOverlay::None;
     }
     InputResult::Continue
-}
-
-fn handle_soulforge(
-    key: KeyEvent,
-    soulforge_ui: &mut SoulforgeUiState,
-    enhancement: &enhancement::EnhancementProgress,
-    prestige_rank: u32,
-) -> InputResult {
-    match soulforge_ui.phase {
-        SoulforgePhase::Menu => match key.code {
-            KeyCode::Up => {
-                soulforge_ui.selected_slot = soulforge_ui.selected_slot.saturating_sub(1);
-                InputResult::Continue
-            }
-            KeyCode::Down => {
-                if soulforge_ui.selected_slot < 6 {
-                    soulforge_ui.selected_slot += 1;
-                }
-                InputResult::Continue
-            }
-            KeyCode::Enter => {
-                let slot_index = soulforge_ui.selected_slot;
-                let current_level = enhancement.level(slot_index);
-
-                // Check: level < max, can afford (slot enhancement is independent of equipped item)
-                if current_level < enhancement::MAX_ENHANCEMENT_LEVEL {
-                    let target_level = current_level + 1;
-                    let cost = enhancement::enhancement_cost(target_level);
-                    if prestige_rank >= cost {
-                        soulforge_ui.phase = SoulforgePhase::Confirming;
-                    }
-                }
-                InputResult::Continue
-            }
-            KeyCode::Esc => {
-                soulforge_ui.close();
-                InputResult::Continue
-            }
-            _ => InputResult::Continue,
-        },
-        SoulforgePhase::Confirming => match key.code {
-            KeyCode::Enter => {
-                let slot_index = soulforge_ui.selected_slot;
-                let current_level = enhancement.level(slot_index);
-                let target_level = current_level + 1;
-                let cost = enhancement::enhancement_cost(target_level);
-
-                // Roll the outcome (applied after animation completes in main loop)
-                let mut rng = rand::rng();
-                let (success, new_level) = enhancement::roll_enhancement(current_level, &mut rng);
-
-                soulforge_ui.last_result = Some(EnhancementResult {
-                    slot_index,
-                    success,
-                    old_level: current_level,
-                    new_level,
-                    cost,
-                });
-                soulforge_ui.phase = SoulforgePhase::Hammering;
-                soulforge_ui.animation_tick = 0;
-
-                InputResult::Continue
-            }
-            KeyCode::Esc => {
-                soulforge_ui.phase = SoulforgePhase::Menu;
-                InputResult::Continue
-            }
-            _ => InputResult::Continue,
-        },
-        SoulforgePhase::Hammering => {
-            // No input accepted during hammering animation
-            InputResult::Continue
-        }
-        SoulforgePhase::ResultSuccess | SoulforgePhase::ResultFailure => {
-            // Any key returns to menu
-            soulforge_ui.phase = SoulforgePhase::Menu;
-            InputResult::Continue
-        }
-    }
 }
 
 fn handle_achievement_unlocked(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
