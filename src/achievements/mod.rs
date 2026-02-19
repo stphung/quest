@@ -6,8 +6,12 @@
 pub mod data;
 pub mod handlers;
 pub mod milestones;
+pub mod modal;
+pub mod notifications;
 pub mod persistence;
+pub mod stats;
 pub mod types;
+pub mod unlock;
 
 pub use data::{get_achievement_def, get_achievements_by_category};
 pub use milestones::{MinigameDifficulty, MinigameType};
