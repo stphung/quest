@@ -4,6 +4,40 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // =========================================================================
+// Minigame type and difficulty enums (R2)
+// =========================================================================
+
+/// Type-safe identifier for each minigame variant.
+///
+/// Used by [`Achievements::on_minigame_won`] to replace the previous
+/// `&'static str` game-type parameter and eliminate the 40-arm string match.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MinigameType {
+    Chess,
+    Morris,
+    Gomoku,
+    Minesweeper,
+    Rune,
+    Go,
+    FlappyBird,
+    Snake,
+    Jezzball,
+    RunicShift,
+}
+
+/// Type-safe difficulty level shared by all minigames.
+///
+/// Mirrors the per-game `*Difficulty` enums but is game-agnostic,
+/// allowing a single enum to describe difficulty across all games.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MinigameDifficulty {
+    Novice,
+    Apprentice,
+    Journeyman,
+    Master,
+}
+
+// =========================================================================
 // Milestone threshold constants
 // =========================================================================
 
@@ -695,59 +729,111 @@ impl Achievements {
     // =========================================================================
 
     /// Called when a minigame is won.
-    /// game_type: "chess", "morris", "gomoku", "minesweeper", "rune", "go", "flappy_bird", "snake", "jezzball"
-    /// difficulty: "novice", "apprentice", "journeyman", "master"
+    ///
+    /// Uses type-safe [`MinigameType`] and [`MinigameDifficulty`] enums
+    /// instead of raw strings, providing exhaustive compile-time coverage.
     pub fn on_minigame_won(
         &mut self,
-        game_type: &str,
-        difficulty: &str,
+        game_type: MinigameType,
+        difficulty: MinigameDifficulty,
         character_name: Option<&str>,
     ) {
         self.total_minigame_wins += 1;
 
         // Game-specific achievements based on difficulty
         let achievement = match (game_type, difficulty) {
-            ("chess", "novice") => Some(AchievementId::ChessNovice),
-            ("chess", "apprentice") => Some(AchievementId::ChessApprentice),
-            ("chess", "journeyman") => Some(AchievementId::ChessJourneyman),
-            ("chess", "master") => Some(AchievementId::ChessMaster),
-            ("morris", "novice") => Some(AchievementId::MorrisNovice),
-            ("morris", "apprentice") => Some(AchievementId::MorrisApprentice),
-            ("morris", "journeyman") => Some(AchievementId::MorrisJourneyman),
-            ("morris", "master") => Some(AchievementId::MorrisMaster),
-            ("gomoku", "novice") => Some(AchievementId::GomokuNovice),
-            ("gomoku", "apprentice") => Some(AchievementId::GomokuApprentice),
-            ("gomoku", "journeyman") => Some(AchievementId::GomokuJourneyman),
-            ("gomoku", "master") => Some(AchievementId::GomokuMaster),
-            ("minesweeper", "novice") => Some(AchievementId::MinesweeperNovice),
-            ("minesweeper", "apprentice") => Some(AchievementId::MinesweeperApprentice),
-            ("minesweeper", "journeyman") => Some(AchievementId::MinesweeperJourneyman),
-            ("minesweeper", "master") => Some(AchievementId::MinesweeperMaster),
-            ("rune", "novice") => Some(AchievementId::RuneNovice),
-            ("rune", "apprentice") => Some(AchievementId::RuneApprentice),
-            ("rune", "journeyman") => Some(AchievementId::RuneJourneyman),
-            ("rune", "master") => Some(AchievementId::RuneMaster),
-            ("go", "novice") => Some(AchievementId::GoNovice),
-            ("go", "apprentice") => Some(AchievementId::GoApprentice),
-            ("go", "journeyman") => Some(AchievementId::GoJourneyman),
-            ("go", "master") => Some(AchievementId::GoMaster),
-            ("flappy_bird", "novice") => Some(AchievementId::FlappyNovice),
-            ("flappy_bird", "apprentice") => Some(AchievementId::FlappyApprentice),
-            ("flappy_bird", "journeyman") => Some(AchievementId::FlappyJourneyman),
-            ("flappy_bird", "master") => Some(AchievementId::FlappyMaster),
-            ("snake", "novice") => Some(AchievementId::SnakeNovice),
-            ("snake", "apprentice") => Some(AchievementId::SnakeApprentice),
-            ("snake", "journeyman") => Some(AchievementId::SnakeJourneyman),
-            ("snake", "master") => Some(AchievementId::SnakeMaster),
-            ("jezzball", "novice") => Some(AchievementId::ContainmentBreachNovice),
-            ("jezzball", "apprentice") => Some(AchievementId::ContainmentBreachApprentice),
-            ("jezzball", "journeyman") => Some(AchievementId::ContainmentBreachJourneyman),
-            ("jezzball", "master") => Some(AchievementId::ContainmentBreachMaster),
-            ("runic_shift", "novice") => Some(AchievementId::SigilSurgeNovice),
-            ("runic_shift", "apprentice") => Some(AchievementId::SigilSurgeApprentice),
-            ("runic_shift", "journeyman") => Some(AchievementId::SigilSurgeJourneyman),
-            ("runic_shift", "master") => Some(AchievementId::SigilSurgeMaster),
-            _ => None,
+            (MinigameType::Chess, MinigameDifficulty::Novice) => Some(AchievementId::ChessNovice),
+            (MinigameType::Chess, MinigameDifficulty::Apprentice) => {
+                Some(AchievementId::ChessApprentice)
+            }
+            (MinigameType::Chess, MinigameDifficulty::Journeyman) => {
+                Some(AchievementId::ChessJourneyman)
+            }
+            (MinigameType::Chess, MinigameDifficulty::Master) => Some(AchievementId::ChessMaster),
+            (MinigameType::Morris, MinigameDifficulty::Novice) => Some(AchievementId::MorrisNovice),
+            (MinigameType::Morris, MinigameDifficulty::Apprentice) => {
+                Some(AchievementId::MorrisApprentice)
+            }
+            (MinigameType::Morris, MinigameDifficulty::Journeyman) => {
+                Some(AchievementId::MorrisJourneyman)
+            }
+            (MinigameType::Morris, MinigameDifficulty::Master) => Some(AchievementId::MorrisMaster),
+            (MinigameType::Gomoku, MinigameDifficulty::Novice) => Some(AchievementId::GomokuNovice),
+            (MinigameType::Gomoku, MinigameDifficulty::Apprentice) => {
+                Some(AchievementId::GomokuApprentice)
+            }
+            (MinigameType::Gomoku, MinigameDifficulty::Journeyman) => {
+                Some(AchievementId::GomokuJourneyman)
+            }
+            (MinigameType::Gomoku, MinigameDifficulty::Master) => Some(AchievementId::GomokuMaster),
+            (MinigameType::Minesweeper, MinigameDifficulty::Novice) => {
+                Some(AchievementId::MinesweeperNovice)
+            }
+            (MinigameType::Minesweeper, MinigameDifficulty::Apprentice) => {
+                Some(AchievementId::MinesweeperApprentice)
+            }
+            (MinigameType::Minesweeper, MinigameDifficulty::Journeyman) => {
+                Some(AchievementId::MinesweeperJourneyman)
+            }
+            (MinigameType::Minesweeper, MinigameDifficulty::Master) => {
+                Some(AchievementId::MinesweeperMaster)
+            }
+            (MinigameType::Rune, MinigameDifficulty::Novice) => Some(AchievementId::RuneNovice),
+            (MinigameType::Rune, MinigameDifficulty::Apprentice) => {
+                Some(AchievementId::RuneApprentice)
+            }
+            (MinigameType::Rune, MinigameDifficulty::Journeyman) => {
+                Some(AchievementId::RuneJourneyman)
+            }
+            (MinigameType::Rune, MinigameDifficulty::Master) => Some(AchievementId::RuneMaster),
+            (MinigameType::Go, MinigameDifficulty::Novice) => Some(AchievementId::GoNovice),
+            (MinigameType::Go, MinigameDifficulty::Apprentice) => Some(AchievementId::GoApprentice),
+            (MinigameType::Go, MinigameDifficulty::Journeyman) => Some(AchievementId::GoJourneyman),
+            (MinigameType::Go, MinigameDifficulty::Master) => Some(AchievementId::GoMaster),
+            (MinigameType::FlappyBird, MinigameDifficulty::Novice) => {
+                Some(AchievementId::FlappyNovice)
+            }
+            (MinigameType::FlappyBird, MinigameDifficulty::Apprentice) => {
+                Some(AchievementId::FlappyApprentice)
+            }
+            (MinigameType::FlappyBird, MinigameDifficulty::Journeyman) => {
+                Some(AchievementId::FlappyJourneyman)
+            }
+            (MinigameType::FlappyBird, MinigameDifficulty::Master) => {
+                Some(AchievementId::FlappyMaster)
+            }
+            (MinigameType::Snake, MinigameDifficulty::Novice) => Some(AchievementId::SnakeNovice),
+            (MinigameType::Snake, MinigameDifficulty::Apprentice) => {
+                Some(AchievementId::SnakeApprentice)
+            }
+            (MinigameType::Snake, MinigameDifficulty::Journeyman) => {
+                Some(AchievementId::SnakeJourneyman)
+            }
+            (MinigameType::Snake, MinigameDifficulty::Master) => Some(AchievementId::SnakeMaster),
+            (MinigameType::Jezzball, MinigameDifficulty::Novice) => {
+                Some(AchievementId::ContainmentBreachNovice)
+            }
+            (MinigameType::Jezzball, MinigameDifficulty::Apprentice) => {
+                Some(AchievementId::ContainmentBreachApprentice)
+            }
+            (MinigameType::Jezzball, MinigameDifficulty::Journeyman) => {
+                Some(AchievementId::ContainmentBreachJourneyman)
+            }
+            (MinigameType::Jezzball, MinigameDifficulty::Master) => {
+                Some(AchievementId::ContainmentBreachMaster)
+            }
+            (MinigameType::RunicShift, MinigameDifficulty::Novice) => {
+                Some(AchievementId::SigilSurgeNovice)
+            }
+            (MinigameType::RunicShift, MinigameDifficulty::Apprentice) => {
+                Some(AchievementId::SigilSurgeApprentice)
+            }
+            (MinigameType::RunicShift, MinigameDifficulty::Journeyman) => {
+                Some(AchievementId::SigilSurgeJourneyman)
+            }
+            (MinigameType::RunicShift, MinigameDifficulty::Master) => {
+                Some(AchievementId::SigilSurgeMaster)
+            }
         };
 
         if let Some(id) = achievement {

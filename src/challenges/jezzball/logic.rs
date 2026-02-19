@@ -553,8 +553,8 @@ pub fn apply_game_result(state: &mut GameState) -> Option<MinigameWinInfo> {
         state,
         GameResultInfo {
             won,
-            game_type: "jezzball",
-            difficulty_str: difficulty.difficulty_str(),
+            game_type: crate::achievements::MinigameType::Jezzball,
+            difficulty: difficulty.difficulty_enum(),
             reward,
             icon: "▣",
             win_message: "Containment Breach conquered!",
@@ -761,8 +761,11 @@ mod tests {
 
         assert!(info.is_some());
         let info = info.unwrap();
-        assert_eq!(info.game_type, "jezzball");
-        assert_eq!(info.difficulty, "novice");
+        assert_eq!(info.game_type, crate::achievements::MinigameType::Jezzball);
+        assert_eq!(
+            info.difficulty,
+            crate::achievements::MinigameDifficulty::Novice
+        );
         assert!(state.active_minigame.is_none());
     }
 

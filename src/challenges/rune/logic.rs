@@ -187,8 +187,8 @@ pub fn apply_game_result(
         state,
         GameResultInfo {
             won,
-            game_type: "rune",
-            difficulty_str: difficulty.difficulty_str(),
+            game_type: crate::achievements::MinigameType::Rune,
+            difficulty: difficulty.difficulty_enum(),
             reward,
             icon: "\u{16B1}",
             win_message: "The runes glow with approval! Code deciphered.",

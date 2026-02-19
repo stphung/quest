@@ -181,14 +181,14 @@ pub trait DifficultyInfo {
         None
     }
 
-    /// Lowercase difficulty name for achievement tracking (e.g., "novice", "master")
-    fn difficulty_str(&self) -> &'static str {
+    /// Type-safe difficulty enum for achievement tracking.
+    fn difficulty_enum(&self) -> crate::achievements::MinigameDifficulty {
         match self.name() {
-            "Novice" => "novice",
-            "Apprentice" => "apprentice",
-            "Journeyman" => "journeyman",
-            "Master" => "master",
-            _ => "novice",
+            "Novice" => crate::achievements::MinigameDifficulty::Novice,
+            "Apprentice" => crate::achievements::MinigameDifficulty::Apprentice,
+            "Journeyman" => crate::achievements::MinigameDifficulty::Journeyman,
+            "Master" => crate::achievements::MinigameDifficulty::Master,
+            _ => crate::achievements::MinigameDifficulty::Novice,
         }
     }
 }
@@ -1225,11 +1225,11 @@ mod tests {
     }
 
     // =========================================================================
-    // DifficultyInfo::difficulty_str() Tests
+    // DifficultyInfo::difficulty_enum() Tests
     // =========================================================================
 
     #[test]
-    fn test_difficulty_str_all_types() {
+    fn test_difficulty_enum_all_types() {
         use super::super::chess::ChessDifficulty;
         use super::super::flappy::FlappyBirdDifficulty;
         use super::super::go::GoDifficulty;
@@ -1240,22 +1240,26 @@ mod tests {
         use super::super::rune::RuneDifficulty;
         use super::super::runic_shift::RunicShiftDifficulty;
         use super::super::snake::SnakeDifficulty;
+        use crate::achievements::MinigameDifficulty;
 
-        // Verify all challenge difficulty types produce correct lowercase strings
-        for (i, expected) in ["novice", "apprentice", "journeyman", "master"]
-            .iter()
-            .enumerate()
-        {
-            assert_eq!(ChessDifficulty::ALL[i].difficulty_str(), *expected);
-            assert_eq!(GomokuDifficulty::ALL[i].difficulty_str(), *expected);
-            assert_eq!(MorrisDifficulty::ALL[i].difficulty_str(), *expected);
-            assert_eq!(MinesweeperDifficulty::ALL[i].difficulty_str(), *expected);
-            assert_eq!(RuneDifficulty::ALL[i].difficulty_str(), *expected);
-            assert_eq!(GoDifficulty::ALL[i].difficulty_str(), *expected);
-            assert_eq!(FlappyBirdDifficulty::ALL[i].difficulty_str(), *expected);
-            assert_eq!(JezzballDifficulty::ALL[i].difficulty_str(), *expected);
-            assert_eq!(SnakeDifficulty::ALL[i].difficulty_str(), *expected);
-            assert_eq!(RunicShiftDifficulty::ALL[i].difficulty_str(), *expected);
+        // Verify all challenge difficulty types produce the correct enum variant
+        let expected = [
+            MinigameDifficulty::Novice,
+            MinigameDifficulty::Apprentice,
+            MinigameDifficulty::Journeyman,
+            MinigameDifficulty::Master,
+        ];
+        for (i, exp) in expected.iter().enumerate() {
+            assert_eq!(ChessDifficulty::ALL[i].difficulty_enum(), *exp);
+            assert_eq!(GomokuDifficulty::ALL[i].difficulty_enum(), *exp);
+            assert_eq!(MorrisDifficulty::ALL[i].difficulty_enum(), *exp);
+            assert_eq!(MinesweeperDifficulty::ALL[i].difficulty_enum(), *exp);
+            assert_eq!(RuneDifficulty::ALL[i].difficulty_enum(), *exp);
+            assert_eq!(GoDifficulty::ALL[i].difficulty_enum(), *exp);
+            assert_eq!(FlappyBirdDifficulty::ALL[i].difficulty_enum(), *exp);
+            assert_eq!(JezzballDifficulty::ALL[i].difficulty_enum(), *exp);
+            assert_eq!(SnakeDifficulty::ALL[i].difficulty_enum(), *exp);
+            assert_eq!(RunicShiftDifficulty::ALL[i].difficulty_enum(), *exp);
         }
     }
 }

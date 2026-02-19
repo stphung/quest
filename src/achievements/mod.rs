@@ -9,4 +9,6 @@ pub mod types;
 
 pub use data::{get_achievement_def, get_achievements_by_category};
 pub use persistence::{load_achievements, save_achievements};
-pub use types::{AchievementCategory, AchievementId, Achievements};
+pub use types::{
+    AchievementCategory, AchievementId, Achievements, MinigameDifficulty, MinigameType,
+};

@@ -256,8 +256,8 @@ pub fn apply_game_result(state: &mut GameState) -> Option<crate::challenges::Min
         state,
         GameResultInfo {
             won,
-            game_type: "chess",
-            difficulty_str: difficulty.difficulty_str(),
+            game_type: crate::achievements::MinigameType::Chess,
+            difficulty: difficulty.difficulty_enum(),
             reward,
             icon: "♟",
             win_message: "Checkmate! You defeated the mysterious figure.",
