@@ -814,6 +814,7 @@ pub fn render_vault_selection(
     selected_index: usize,
     selected_items: &[EquipmentSlot],
     enhancement_levels: &[u8; 7],
+    confirm_pending: bool,
     _ctx: &super::responsive::LayoutContext,
 ) {
     frame.render_widget(Clear, area);
@@ -943,7 +944,51 @@ pub fn render_vault_selection(
 
     // Help bar
     let help =
-        Paragraph::new("[↑/↓] Navigate  [Enter] Toggle  [Space] Confirm Prestige  [Esc] Cancel")
+        Paragraph::new("[↑/↓] Navigate  [Space] Toggle  [Enter] Confirm Prestige  [Esc] Cancel")
             .style(Style::default().fg(Color::DarkGray));
     frame.render_widget(help, chunks[2]);
+
+    // Under-selection confirmation modal
+    if confirm_pending {
+        let selected = selected_items.len();
+
+        let modal_width = 42_u16;
+        let modal_height = 7_u16;
+        let modal_x = inner.x + (inner.width.saturating_sub(modal_width)) / 2;
+        let modal_y = inner.y + (inner.height.saturating_sub(modal_height)) / 2;
+        let modal_area = Rect::new(modal_x, modal_y, modal_width, modal_height);
+
+        frame.render_widget(Clear, modal_area);
+
+        let modal_block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Yellow));
+        let modal_inner = modal_block.inner(modal_area);
+        frame.render_widget(modal_block, modal_area);
+
+        let lines = vec![
+            Line::from(""),
+            Line::from(Span::styled(
+                format!(
+                    "  Only {} of {} vault slot{} used.",
+                    selected,
+                    vault_slots,
+                    if vault_slots == 1 { "" } else { "s" }
+                ),
+                Style::default().fg(Color::Yellow),
+            )),
+            Line::from(Span::styled(
+                "  Remaining equipment will be lost.",
+                Style::default().fg(Color::DarkGray),
+            )),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("  [Enter] Prestige   ", Style::default().fg(Color::Yellow)),
+                Span::styled("[Esc] Go Back", Style::default().fg(Color::DarkGray)),
+            ]),
+        ];
+
+        let modal_text = Paragraph::new(lines);
+        frame.render_widget(modal_text, modal_inner);
+    }
 }
