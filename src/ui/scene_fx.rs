@@ -152,12 +152,3 @@ pub fn render_buffer(frame: &mut Frame, area: Rect, buffer: &[Vec<SceneCell>]) {
 pub fn clamp_u8(value: i16) -> u8 {
     value.clamp(0, 255) as u8
 }
-
-/// Uniformly lifts an RGB tuple by `amount`, clamping to [0, 255].
-pub fn lift_rgb(rgb: (u8, u8, u8), amount: i16) -> (u8, u8, u8) {
-    (
-        clamp_u8(rgb.0 as i16 + amount),
-        clamp_u8(rgb.1 as i16 + amount),
-        clamp_u8(rgb.2 as i16 + amount),
-    )
-}

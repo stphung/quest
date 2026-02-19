@@ -14,9 +14,6 @@
 //! An optional per-zone overlay function runs last to add effects like
 //! lightning flashes or pulsing void colours.
 
-// Module is created ahead of integration (Task 3 wires it into combat_3d).
-#![allow(dead_code)]
-
 use ratatui::style::Color;
 
 use super::scene_fx::{clamp_u8, current_millis, hash2d, lerp_rgb, put_cell, SceneCell};
