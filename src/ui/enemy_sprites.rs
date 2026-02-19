@@ -372,6 +372,79 @@ pub const PIXEL_HORROR: PixelSprite = PixelSprite {
     ],
 };
 
+// UNDEAD: Skeletal warrior. Hollow eyes, exposed ribs, bony arms, leg bones.
+// 16 pixels wide, 18 pixels tall → 9 cell rows
+pub const PIXEL_UNDEAD: PixelSprite = PixelSprite {
+    rows: &[
+        "....HDDDDH......",
+        "...DBBEBBD......",
+        "...DBEEBBD......",
+        "....DDDDD.......",
+        "...DBSBSBD......",
+        "..HDBBBBBBDH....",
+        "..DSBSDBSBD.....",
+        "..DBBBBBBBD.....",
+        "...DDDDDDD......",
+        "..DBBBD.DBD.....",
+        "..DBBD..DBD.....",
+        "..DBBD..DBD.....",
+        "...DDD..DDD.....",
+        "..DBD....DBD....",
+        ".DBBD....DBBD...",
+        ".DBSD....DSBD...",
+        "..DDD....DDD....",
+        "................",
+    ],
+};
+
+// PLANT: Aggressive flora. Leafy canopy, thorned vines, root legs.
+// 16 pixels wide, 18 pixels tall → 9 cell rows
+pub const PIXEL_PLANT: PixelSprite = PixelSprite {
+    rows: &[
+        "...HBHBHBHB.....",
+        "..HBBBBBBBBD....",
+        "..DBEBEBBBD.....",
+        "..DBBBBBBBD.....",
+        ".DBHBBBBBBBD....",
+        "DBBBBBBBBBBBD...",
+        "DBSBBBHBBSBBBD..",
+        "DBBBBBBBBBBBD...",
+        ".DBBHBBHBBBD....",
+        "..DBBBBBBBD.....",
+        "DBBBBBBBBBBBBBD.",
+        "DBBSBBBBSBBBBBD.",
+        ".DSBBBBBBBSBD...",
+        "..DDBBBBBBDD....",
+        "...DBBBBBBD.....",
+        "..DBSD.DBSD.....",
+        ".DBBBD.DBBBD....",
+        "DDSSD...DSSDD...",
+    ],
+};
+
+// AQUATIC: Sea creature. Streamlined torpedo body, fin ridges, deep-water coloring.
+// 18 pixels wide, 16 pixels tall → 8 cell rows
+pub const PIXEL_AQUATIC: PixelSprite = PixelSprite {
+    rows: &[
+        "..DBBBBBBBBBBBBBD.",
+        ".DEBBBBBBBBBBBBBED",
+        "DBSBBBBBBBBBBBBSBD",
+        "DEBBBBBBBBBBBBBBBD",
+        "DBSSBBBBBBBBBBBSBD",
+        ".DBBBBBBBBBBBBBBD.",
+        "DBBSBBBBBBBBSBBD..",
+        ".DBBBBBBBBBBBBD...",
+        "DBBSSBBBBBBSSBD...",
+        ".DBBBBBBBBBBBBD...",
+        "..DBBBBBBBBBBD....",
+        "DBBBBBBBBBBBBBBBD.",
+        ".DSBBBBBBBBBSBBD..",
+        "..DBBBBBBBBBBD....",
+        "...DBBBBBBBBBD....",
+        "....DHBBBBBHD.....",
+    ],
+};
+
 // ── Sprite Archetype Enum ───────────────────────────────────────────
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -384,6 +457,9 @@ pub enum SpriteArchetype {
     Elemental,
     Titan,
     Horror,
+    Undead,
+    Aquatic,
+    Plant,
 }
 
 impl SpriteArchetype {
@@ -398,6 +474,9 @@ impl SpriteArchetype {
             SpriteArchetype::Elemental => &SPRITE_ELEMENTAL,
             SpriteArchetype::Titan => &SPRITE_TITAN,
             SpriteArchetype::Horror => &SPRITE_HORROR,
+            SpriteArchetype::Undead => &SPRITE_HUMANOID,
+            SpriteArchetype::Aquatic => &SPRITE_SERPENT,
+            SpriteArchetype::Plant => &SPRITE_TITAN,
         }
     }
 
@@ -411,6 +490,9 @@ impl SpriteArchetype {
             SpriteArchetype::Elemental => &PIXEL_ELEMENTAL,
             SpriteArchetype::Titan => &PIXEL_TITAN,
             SpriteArchetype::Horror => &PIXEL_HORROR,
+            SpriteArchetype::Undead => &PIXEL_UNDEAD,
+            SpriteArchetype::Aquatic => &PIXEL_AQUATIC,
+            SpriteArchetype::Plant => &PIXEL_PLANT,
         }
     }
 }
@@ -660,77 +742,102 @@ pub fn archetype_for_suffix(zone_id: u32, suffix: &str) -> SpriteArchetype {
     let s = suffix.to_lowercase();
     let matched = match zone_id {
         1 => match s.as_str() {
-            "beetle" | "wasp" => Some(SpriteArchetype::Insect),
-            "rabbit" | "boar" => Some(SpriteArchetype::Quadruped),
+            "beetle" | "wasp" | "mantis" => Some(SpriteArchetype::Insect),
+            "rabbit" | "boar" | "hare" | "toad" => Some(SpriteArchetype::Quadruped),
             "serpent" => Some(SpriteArchetype::Serpent),
+            "grub" => Some(SpriteArchetype::Insect),
+            "sprout" => Some(SpriteArchetype::Plant),
             _ => None,
         },
         2 => match s.as_str() {
-            "wolf" => Some(SpriteArchetype::Quadruped),
-            "spider" => Some(SpriteArchetype::Insect),
+            "wolf" | "lynx" => Some(SpriteArchetype::Quadruped),
+            "spider" | "moth" => Some(SpriteArchetype::Insect),
             "bat" => Some(SpriteArchetype::Avian),
             "treant" => Some(SpriteArchetype::Titan),
             "wisp" => Some(SpriteArchetype::Elemental),
+            "hollow" => Some(SpriteArchetype::Horror),
+            "shambler" => Some(SpriteArchetype::Plant),
+            "wretch" => Some(SpriteArchetype::Humanoid),
             _ => None,
         },
         3 => match s.as_str() {
-            "goat" => Some(SpriteArchetype::Quadruped),
-            "eagle" => Some(SpriteArchetype::Avian),
-            "golem" | "yeti" => Some(SpriteArchetype::Titan),
-            "harpy" => Some(SpriteArchetype::Humanoid),
+            "goat" | "ram" => Some(SpriteArchetype::Quadruped),
+            "eagle" | "condor" => Some(SpriteArchetype::Avian),
+            "golem" | "yeti" | "troll" | "gargoyle" => Some(SpriteArchetype::Titan),
+            "harpy" | "bandit" => Some(SpriteArchetype::Humanoid),
             _ => None,
         },
         4 => match s.as_str() {
-            "skeleton" | "mummy" => Some(SpriteArchetype::Humanoid),
+            "skeleton" | "mummy" | "revenant" | "lich" => Some(SpriteArchetype::Undead),
             "spirit" => Some(SpriteArchetype::Elemental),
             "gargoyle" => Some(SpriteArchetype::Titan),
             "specter" => Some(SpriteArchetype::Horror),
+            "shade" => Some(SpriteArchetype::Horror),
+            "cultist" => Some(SpriteArchetype::Humanoid),
+            "apparition" => Some(SpriteArchetype::Elemental),
             _ => None,
         },
         5 => match s.as_str() {
-            "salamander" => Some(SpriteArchetype::Serpent),
+            "salamander" | "cinderwyrm" => Some(SpriteArchetype::Serpent),
             "phoenix" | "drake" => Some(SpriteArchetype::Avian),
-            "imp" => Some(SpriteArchetype::Humanoid),
-            "elemental" => Some(SpriteArchetype::Elemental),
+            "imp" | "ashborn" => Some(SpriteArchetype::Humanoid),
+            "elemental" | "magmite" => Some(SpriteArchetype::Elemental),
+            "hellhound" => Some(SpriteArchetype::Quadruped),
+            "infernal" => Some(SpriteArchetype::Horror),
             _ => None,
         },
         6 => match s.as_str() {
-            "mammoth" => Some(SpriteArchetype::Titan),
+            "mammoth" | "glacial" => Some(SpriteArchetype::Titan),
             "wendigo" | "wraith" => Some(SpriteArchetype::Horror),
-            "bear" => Some(SpriteArchetype::Quadruped),
+            "bear" | "moose" => Some(SpriteArchetype::Quadruped),
             "wyrm" => Some(SpriteArchetype::Serpent),
+            "banshee" => Some(SpriteArchetype::Elemental),
+            "imp" => Some(SpriteArchetype::Humanoid),
+            "revenant" => Some(SpriteArchetype::Undead),
             _ => None,
         },
         7 => match s.as_str() {
-            "construct" | "golem" => Some(SpriteArchetype::Titan),
+            "construct" | "golem" | "sentinel" => Some(SpriteArchetype::Titan),
             "guardian" => Some(SpriteArchetype::Humanoid),
-            "sprite" => Some(SpriteArchetype::Elemental),
-            "watcher" => Some(SpriteArchetype::Horror),
+            "sprite" | "shard" | "prism" => Some(SpriteArchetype::Elemental),
+            "watcher" | "echo" => Some(SpriteArchetype::Horror),
+            "crawler" => Some(SpriteArchetype::Insect),
             _ => None,
         },
         8 => match s.as_str() {
             "kraken" => Some(SpriteArchetype::Horror),
-            "shark" => Some(SpriteArchetype::Quadruped),
+            "shark" | "ray" | "lurker" => Some(SpriteArchetype::Aquatic),
             "naga" => Some(SpriteArchetype::Serpent),
             "leviathan" => Some(SpriteArchetype::Titan),
             "siren" => Some(SpriteArchetype::Humanoid),
+            "eel" | "hydra" => Some(SpriteArchetype::Serpent),
+            "drowned" => Some(SpriteArchetype::Undead),
             _ => None,
         },
         9 => match s.as_str() {
-            "griffin" | "roc" | "wyvern" => Some(SpriteArchetype::Avian),
-            "djinn" | "sylph" => Some(SpriteArchetype::Elemental),
+            "griffin" | "roc" | "wyvern" | "pegasus" | "stormhawk" => Some(SpriteArchetype::Avian),
+            "djinn" | "sylph" | "zephyr" => Some(SpriteArchetype::Elemental),
+            "manticore" => Some(SpriteArchetype::Quadruped),
+            "cloudwalker" => Some(SpriteArchetype::Humanoid),
             _ => None,
         },
         10 => match s.as_str() {
-            "titan" | "colossus" => Some(SpriteArchetype::Titan),
-            "lord" | "king" | "champion" => Some(SpriteArchetype::Humanoid),
+            "titan" | "colossus" | "juggernaut" | "breaker" => Some(SpriteArchetype::Titan),
+            "lord" | "king" | "champion" | "warlord" | "stormknight" => {
+                Some(SpriteArchetype::Humanoid)
+            }
+            "thunderborn" => Some(SpriteArchetype::Elemental),
             _ => None,
         },
         11 => match s.as_str() {
             "beast" => Some(SpriteArchetype::Quadruped),
-            "horror" | "terror" => Some(SpriteArchetype::Horror),
+            "horror" | "terror" | "abomination" | "rift" | "amalgam" => {
+                Some(SpriteArchetype::Horror)
+            }
             "fiend" => Some(SpriteArchetype::Humanoid),
             "monster" => Some(SpriteArchetype::Titan),
+            "void" => Some(SpriteArchetype::Elemental),
+            "remnant" => Some(SpriteArchetype::Undead),
             _ => None,
         },
         _ => None,
@@ -791,6 +898,12 @@ fn boss_name_archetype(boss_name: &str) -> Option<SpriteArchetype> {
         || name.contains("salamander")
     {
         Some(SpriteArchetype::Serpent)
+    } else if name.contains("revenant") || name.contains("lich") || name.contains("mummy") {
+        Some(SpriteArchetype::Undead)
+    } else if name.contains("shark") || name.contains("lurker") || name.contains("ray") {
+        Some(SpriteArchetype::Aquatic)
+    } else if name.contains("shambler") || name.contains("sprout") {
+        Some(SpriteArchetype::Plant)
     } else if name.contains("horror")
         || name.contains("wraith")
         || name.contains("specter")
@@ -884,38 +997,146 @@ fn suffix_is_known_for_zone(zone_id: u32, suffix: &str) -> bool {
     match zone_id {
         1 => matches!(
             s.as_str(),
-            "beetle" | "rabbit" | "wasp" | "boar" | "serpent"
+            "beetle"
+                | "rabbit"
+                | "wasp"
+                | "boar"
+                | "serpent"
+                | "grub"
+                | "hare"
+                | "toad"
+                | "mantis"
+                | "sprout"
         ),
-        2 => matches!(s.as_str(), "wolf" | "spider" | "bat" | "treant" | "wisp"),
-        3 => matches!(s.as_str(), "goat" | "eagle" | "golem" | "yeti" | "harpy"),
+        2 => matches!(
+            s.as_str(),
+            "wolf"
+                | "spider"
+                | "bat"
+                | "treant"
+                | "wisp"
+                | "lynx"
+                | "moth"
+                | "hollow"
+                | "shambler"
+                | "wretch"
+        ),
+        3 => matches!(
+            s.as_str(),
+            "goat"
+                | "eagle"
+                | "golem"
+                | "yeti"
+                | "harpy"
+                | "ram"
+                | "condor"
+                | "troll"
+                | "bandit"
+                | "gargoyle"
+        ),
         4 => matches!(
             s.as_str(),
-            "skeleton" | "mummy" | "spirit" | "gargoyle" | "specter"
+            "skeleton"
+                | "mummy"
+                | "spirit"
+                | "gargoyle"
+                | "specter"
+                | "revenant"
+                | "shade"
+                | "lich"
+                | "cultist"
+                | "apparition"
         ),
         5 => matches!(
             s.as_str(),
-            "salamander" | "phoenix" | "imp" | "drake" | "elemental"
+            "salamander"
+                | "phoenix"
+                | "imp"
+                | "drake"
+                | "elemental"
+                | "cinderwyrm"
+                | "ashborn"
+                | "magmite"
+                | "hellhound"
+                | "infernal"
         ),
         6 => matches!(
             s.as_str(),
-            "mammoth" | "wendigo" | "wraith" | "bear" | "wyrm"
+            "mammoth"
+                | "wendigo"
+                | "wraith"
+                | "bear"
+                | "wyrm"
+                | "moose"
+                | "banshee"
+                | "imp"
+                | "glacial"
+                | "revenant"
         ),
         7 => matches!(
             s.as_str(),
-            "construct" | "guardian" | "sprite" | "watcher" | "golem"
+            "construct"
+                | "guardian"
+                | "sprite"
+                | "watcher"
+                | "golem"
+                | "shard"
+                | "crawler"
+                | "prism"
+                | "sentinel"
+                | "echo"
         ),
         8 => matches!(
             s.as_str(),
-            "kraken" | "shark" | "naga" | "leviathan" | "siren"
+            "kraken"
+                | "shark"
+                | "naga"
+                | "leviathan"
+                | "siren"
+                | "eel"
+                | "ray"
+                | "lurker"
+                | "drowned"
+                | "hydra"
         ),
-        9 => matches!(s.as_str(), "griffin" | "djinn" | "sylph" | "roc" | "wyvern"),
+        9 => matches!(
+            s.as_str(),
+            "griffin"
+                | "djinn"
+                | "sylph"
+                | "roc"
+                | "wyvern"
+                | "zephyr"
+                | "pegasus"
+                | "manticore"
+                | "cloudwalker"
+                | "stormhawk"
+        ),
         10 => matches!(
             s.as_str(),
-            "titan" | "colossus" | "lord" | "king" | "champion"
+            "titan"
+                | "colossus"
+                | "lord"
+                | "king"
+                | "champion"
+                | "warlord"
+                | "juggernaut"
+                | "thunderborn"
+                | "stormknight"
+                | "breaker"
         ),
         11 => matches!(
             s.as_str(),
-            "beast" | "horror" | "fiend" | "terror" | "monster"
+            "beast"
+                | "horror"
+                | "fiend"
+                | "terror"
+                | "monster"
+                | "abomination"
+                | "void"
+                | "rift"
+                | "amalgam"
+                | "remnant"
         ),
         _ => false,
     }
@@ -1012,6 +1233,9 @@ mod tests {
             SpriteArchetype::Elemental,
             SpriteArchetype::Titan,
             SpriteArchetype::Horror,
+            SpriteArchetype::Undead,
+            SpriteArchetype::Aquatic,
+            SpriteArchetype::Plant,
         ];
 
         for archetype in &archetypes {
@@ -1057,17 +1281,21 @@ mod tests {
         assert_eq!(archetype_for_suffix(1, "Beetle"), SpriteArchetype::Insect);
         assert_eq!(archetype_for_suffix(1, "Boar"), SpriteArchetype::Quadruped);
         assert_eq!(archetype_for_suffix(1, "Serpent"), SpriteArchetype::Serpent);
+        assert_eq!(archetype_for_suffix(1, "Sprout"), SpriteArchetype::Plant);
 
-        // Zone 4
-        assert_eq!(
-            archetype_for_suffix(4, "Skeleton"),
-            SpriteArchetype::Humanoid
-        );
+        // Zone 4 — Skeleton and Mummy are now Undead
+        assert_eq!(archetype_for_suffix(4, "Skeleton"), SpriteArchetype::Undead);
+        assert_eq!(archetype_for_suffix(4, "Mummy"), SpriteArchetype::Undead);
         assert_eq!(
             archetype_for_suffix(4, "Spirit"),
             SpriteArchetype::Elemental
         );
         assert_eq!(archetype_for_suffix(4, "Specter"), SpriteArchetype::Horror);
+
+        // Zone 8 — Shark is now Aquatic
+        assert_eq!(archetype_for_suffix(8, "Shark"), SpriteArchetype::Aquatic);
+        assert_eq!(archetype_for_suffix(8, "Ray"), SpriteArchetype::Aquatic);
+        assert_eq!(archetype_for_suffix(8, "Drowned"), SpriteArchetype::Undead);
 
         // Zone 9
         assert_eq!(archetype_for_suffix(9, "Griffin"), SpriteArchetype::Avian);
@@ -1127,6 +1355,9 @@ mod tests {
             SpriteArchetype::Elemental,
             SpriteArchetype::Titan,
             SpriteArchetype::Horror,
+            SpriteArchetype::Undead,
+            SpriteArchetype::Aquatic,
+            SpriteArchetype::Plant,
         ];
 
         for archetype in &archetypes {
