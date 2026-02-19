@@ -11,6 +11,7 @@ mod god_items;
 mod haven;
 mod input;
 mod items;
+mod main_helpers;
 mod tick_events;
 mod ui;
 mod utils;
@@ -24,10 +25,13 @@ use character::input::{
 use character::manager::CharacterManager;
 use chrono::{Local, Utc};
 use core::constants::*;
-use core::game_logic::*;
 use core::game_state::*;
 use input::{GameOverlay, HavenUiState, InputResult, SoulforgeUiState};
-use rand::RngExt;
+use main_helpers::achievements::{log_synced_achievements, track_input_achievements};
+use main_helpers::offline::apply_offline_xp;
+use main_helpers::persistence::save_all;
+use main_helpers::scene::{current_scene_kind, is_realtime_minigame, is_wide_scene};
+use main_helpers::update::{jittered_update_interval, show_startup_update_notification};
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
@@ -45,57 +49,6 @@ use ui::character_select::CharacterSelectScreen;
 use ui::draw_ui_with_update;
 use utils::updater::UpdateInfo;
 
-/// Process offline XP and add combat log entries. Returns the report if XP was gained.
-fn apply_offline_xp(state: &mut GameState, haven: &haven::Haven) -> Option<OfflineReport> {
-    let haven_offline_bonus = haven.get_bonus(haven::HavenBonusType::OfflineXpPercent);
-    let report = process_offline_progression(state, haven_offline_bonus);
-    if report.xp_gained > 0 {
-        let hours = report.elapsed_seconds / 3600;
-        let minutes = (report.elapsed_seconds % 3600) / 60;
-        let away_str = if hours > 0 {
-            format!("{}h {}m", hours, minutes)
-        } else {
-            format!("{}m", minutes)
-        };
-        state.combat_state.add_log_entry(
-            format!("☀️ Welcome back! ({} away)", away_str),
-            false,
-            true,
-        );
-        state.combat_state.add_log_entry(
-            format!(
-                "⚔️ +{} XP gained offline",
-                ui::game_common::format_number_short(report.xp_gained)
-            ),
-            false,
-            true,
-        );
-        if report.total_level_ups > 0 {
-            state.combat_state.add_log_entry(
-                format!(
-                    "📈 Leveled up {} times! ({} → {})",
-                    report.total_level_ups, report.level_before, report.level_after,
-                ),
-                false,
-                true,
-            );
-        }
-        state.ticker.push(core::game_state::TickerEntry {
-            icon: "\u{2600}",
-            text: format!(
-                "+{} XP offline",
-                ui::game_common::format_number_short(report.xp_gained)
-            ),
-            color: ratatui::style::Color::Green,
-            bold: false,
-            segments: None,
-        });
-        Some(report)
-    } else {
-        None
-    }
-}
-
 #[derive(Clone, Copy, PartialEq)]
 enum Screen {
     CharacterSelect,
@@ -103,74 +56,6 @@ enum Screen {
     CharacterDelete,
     CharacterRename,
     Game,
-}
-
-/// Returns the update check interval with random jitter applied.
-/// Jitter spreads checks across [base - jitter, base + jitter] to avoid
-/// simultaneous API requests from many clients.
-fn jittered_update_interval() -> Duration {
-    let mut rng = rand::rng();
-    let jitter = rng.random_range(0..=2 * UPDATE_CHECK_JITTER_SECONDS);
-    let interval = UPDATE_CHECK_INTERVAL_SECONDS - UPDATE_CHECK_JITTER_SECONDS + jitter;
-    Duration::from_secs(interval)
-}
-
-/// Show update notification with changelog at startup, then wait for keypress.
-fn show_startup_update_notification(
-    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-    update_info: &UpdateInfo,
-) -> io::Result<()> {
-    terminal.draw(|frame| {
-        let area = frame.area();
-        let block = ratatui::widgets::Block::default()
-            .borders(ratatui::widgets::Borders::ALL)
-            .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Yellow))
-            .title(" Update Available ");
-
-        let inner = block.inner(area);
-        frame.render_widget(block, area);
-
-        let mut text = vec![
-            ratatui::text::Line::from(""),
-            ratatui::text::Line::from(format!(
-                "  New version: {} ({})",
-                update_info.new_version, update_info.new_commit
-            )),
-            ratatui::text::Line::from(""),
-        ];
-
-        if !update_info.changelog.is_empty() {
-            text.push(ratatui::text::Line::from("  What's new:"));
-            for entry in update_info.changelog.iter().take(15) {
-                text.push(ratatui::text::Line::from(format!("    • {}", entry)));
-            }
-            if update_info.changelog.len() > 15 {
-                text.push(ratatui::text::Line::from(format!(
-                    "    ...and {} more",
-                    update_info.changelog.len() - 15
-                )));
-            }
-            text.push(ratatui::text::Line::from(""));
-        }
-
-        text.push(ratatui::text::Line::from(
-            "  Run 'quest update' to install.",
-        ));
-        text.push(ratatui::text::Line::from(""));
-        text.push(ratatui::text::Line::from("  Press any key to continue..."));
-
-        let paragraph =
-            ratatui::widgets::Paragraph::new(text).alignment(ratatui::layout::Alignment::Left);
-
-        frame.render_widget(paragraph, inner);
-    })?;
-
-    // Wait for keypress (max 5 seconds)
-    let _ = event::poll(Duration::from_secs(5));
-    if event::poll(Duration::from_millis(0))? {
-        let _ = event::read()?;
-    }
-    Ok(())
 }
 
 /// Draws the quit confirmation dialog when pending challenges exist.
@@ -381,98 +266,6 @@ fn draw_game_overlays(
             .map(|t| t.elapsed() < Duration::from_secs(1))
             .unwrap_or(false);
         ui::debug_menu_scene::render_save_indicator(frame, area, is_saving, last_save_time, ctx);
-    }
-}
-
-/// Log synced achievements to the combat log after loading a character.
-fn log_synced_achievements(
-    state: &mut GameState,
-    global_achievements: &mut achievements::Achievements,
-) {
-    let synced_count = global_achievements.pending_count();
-    if synced_count > 0 {
-        if synced_count == 1 {
-            if let Some(id) = global_achievements.pending_notifications.first() {
-                if let Some(def) = achievements::get_achievement_def(*id) {
-                    state.combat_state.add_log_entry(
-                        format!("\u{1f3c6} Achievement Unlocked: {}", def.name),
-                        false,
-                        true,
-                    );
-                }
-            }
-        } else {
-            state.combat_state.add_log_entry(
-                format!(
-                    "\u{1f3c6} {} achievements synced from progress!",
-                    synced_count
-                ),
-                false,
-                true,
-            );
-        }
-        global_achievements.newly_unlocked.clear();
-    }
-}
-
-/// Track achievements that may have changed from input handling (prestige, minigame wins).
-/// Saving is handled by the caller via save_all().
-///
-/// # Why this lives in main.rs (R4 skip rationale)
-///
-/// A previous refactoring pass (R4) considered moving these two triggers into
-/// `tick.rs` or the relevant domain modules so that all achievement tracking is
-/// co-located with game logic.  That was deferred for the following reasons:
-///
-/// **Prestige**: Prestige fires from user input (Enter on the prestige dialog),
-/// not from `game_tick()`.  Moving it to `tick.rs` would require either:
-/// (a) adding a `prestige_changed` flag to `TickResult`, or
-/// (b) having `tick.rs` compare the current and previous prestige rank each
-///     tick — introducing a data-dependency the tick engine doesn't currently
-///     carry.  Both options expand `TickResult`'s interface for minimal gain.
-///
-/// **Minigame wins**: `state.last_minigame_win` is set inside input handlers.
-/// `tick.rs` *could* drain it, but that would delay the achievement by one tick
-/// (100 ms) and place input-state management inside a pure-logic function.
-///
-/// The current design is a clean two-phase split: `game_tick()` handles all
-/// autonomous game events; `track_input_achievements()` handles the two cases
-/// where achievement progress is driven directly by player input.  Revisit if
-/// the number of input-driven achievements grows significantly.
-fn track_input_achievements(
-    state: &mut GameState,
-    global_achievements: &mut achievements::Achievements,
-    prestige_before: u32,
-) {
-    if state.prestige_rank > prestige_before {
-        global_achievements.on_prestige(state.prestige_rank, Some(&state.character_name));
-    }
-
-    if let Some(ref win_info) = state.last_minigame_win {
-        global_achievements.on_minigame_won(
-            win_info.game_type,
-            win_info.difficulty,
-            Some(&state.character_name),
-        );
-        state.last_minigame_win = None;
-    }
-}
-
-/// Save all game state files (character, achievements, haven, enhancement).
-fn save_all(
-    character_manager: &CharacterManager,
-    state: &GameState,
-    global_achievements: &achievements::Achievements,
-    haven: &haven::Haven,
-    enhancement: &enhancement::EnhancementProgress,
-) {
-    let _ = character_manager.save_character(state);
-    achievements::save_achievements(global_achievements).ok();
-    if haven.discovered {
-        haven::save_haven(haven).ok();
-    }
-    if enhancement.discovered {
-        enhancement::save_enhancement(enhancement).ok();
     }
 }
 
@@ -1437,37 +1230,3 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-/// Returns true if the active minigame requires real-time (high FPS) updates.
-fn is_realtime_minigame(state: &GameState) -> bool {
-    matches!(
-        state.active_minigame,
-        Some(challenges::ActiveMinigame::FlappyBird(_))
-            | Some(challenges::ActiveMinigame::Jezzball(_))
-            | Some(challenges::ActiveMinigame::Snake(_))
-            | Some(challenges::ActiveMinigame::RunicShift(_))
-    )
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum SceneKind {
-    RunicShift,
-    ChallengeMenu,
-    Other,
-}
-
-fn current_scene_kind(state: &GameState) -> SceneKind {
-    if matches!(
-        state.active_minigame,
-        Some(challenges::ActiveMinigame::RunicShift(_))
-    ) {
-        SceneKind::RunicShift
-    } else if state.challenge_menu.is_open {
-        SceneKind::ChallengeMenu
-    } else {
-        SceneKind::Other
-    }
-}
-
-fn is_wide_scene(scene: SceneKind) -> bool {
-    matches!(scene, SceneKind::RunicShift | SceneKind::ChallengeMenu)
-}
