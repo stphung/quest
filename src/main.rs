@@ -289,6 +289,7 @@ fn draw_game_overlays(
                 haven.get_bonus(haven::HavenBonusType::VaultSlots) as u8,
                 *selected_index,
                 selected_slots,
+                &enhancement.levels,
                 ctx,
             );
         }
