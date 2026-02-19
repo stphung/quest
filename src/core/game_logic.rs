@@ -1,6 +1,5 @@
 use super::constants::*;
 use super::game_state::GameState;
-use crate::character::attributes::AttributeType;
 use crate::combat::types::{
     generate_boss_for_current_zone, generate_dungeon_boss, generate_dungeon_elite,
     generate_dungeon_enemy, generate_enemy_for_current_zone,
@@ -11,88 +10,11 @@ use rand::RngExt;
 // Re-export offline progression types for backwards compatibility
 pub use super::offline::{calculate_offline_xp, process_offline_progression, OfflineReport};
 
-/// Calculates the XP required to reach the next level
-pub fn xp_for_next_level(level: u32) -> u64 {
-    (XP_CURVE_BASE * f64::powf(level as f64, XP_CURVE_EXPONENT)) as u64
-}
-
-/// Calculates the prestige multiplier for XP gains including CHA bonus
-pub fn prestige_multiplier(rank: u32, cha_modifier: i32) -> f64 {
-    let base = crate::character::prestige::get_prestige_tier(rank).multiplier;
-    base + (cha_modifier as f64 * PRESTIGE_MULT_PER_CHA_MODIFIER)
-}
-
-/// Calculates the XP gained per tick based on prestige rank and WIS
-pub fn xp_gain_per_tick(prestige_rank: u32, wis_modifier: i32, cha_modifier: i32) -> f64 {
-    let prestige_mult = prestige_multiplier(prestige_rank, cha_modifier);
-    let wis_mult = 1.0 + (wis_modifier as f64 * XP_MULT_PER_WIS_MODIFIER);
-    BASE_XP_PER_TICK * prestige_mult * wis_mult
-}
-
-/// Distributes 3 attribute points randomly among non-capped attributes
-pub fn distribute_level_up_points(state: &mut GameState) -> Vec<AttributeType> {
-    let mut rng = rand::rng();
-    let cap = state.get_attribute_cap();
-    let mut increased = Vec::new();
-
-    let mut points = LEVEL_UP_ATTRIBUTE_POINTS;
-    let mut attempts = 0;
-    let max_attempts = LEVEL_UP_MAX_DISTRIBUTION_ATTEMPTS;
-
-    while points > 0 && attempts < max_attempts {
-        let attr_index = rng.random_range(0..NUM_ATTRIBUTES);
-        let attr = AttributeType::all()[attr_index];
-
-        if state.attributes.get(attr) < cap {
-            state.attributes.increment(attr);
-            increased.push(attr);
-            points -= 1;
-        }
-
-        attempts += 1;
-    }
-
-    increased
-}
-
-/// Applies XP to the character and processes any level-ups
-/// Returns (number of level-ups, attributes increased)
-pub fn apply_tick_xp(state: &mut GameState, xp_gain: f64) -> (u32, Vec<AttributeType>) {
-    state.xp_this_second += xp_gain as u64;
-    state.character_xp += xp_gain as u64;
-
-    let mut levelups = 0;
-    let mut all_increased = Vec::new();
-
-    loop {
-        let xp_needed = xp_for_next_level(state.character_level);
-
-        if state.character_xp >= xp_needed {
-            state.character_xp -= xp_needed;
-            state.character_level += 1;
-            levelups += 1;
-
-            let increased = distribute_level_up_points(state);
-            all_increased.extend(increased);
-
-            // Mark derived stats as needing recalculation on next tick
-            state.invalidate_derived_stats();
-        } else {
-            break;
-        }
-    }
-
-    (levelups, all_increased)
-}
-
-/// Calculates XP bonus from killing an enemy
-/// `haven_xp_gain_percent` is the Training Yard bonus (0.0 if not built)
-pub fn combat_kill_xp(passive_xp_rate: f64, haven_xp_gain_percent: f64) -> u64 {
-    let ticks = rand::rng().random_range(COMBAT_XP_MIN_TICKS..=COMBAT_XP_MAX_TICKS);
-    let base_xp = passive_xp_rate * ticks as f64;
-    // Apply Haven Training Yard bonus
-    (base_xp * (1.0 + haven_xp_gain_percent / 100.0)) as u64
-}
+// Re-export XP system types for backward compatibility
+pub use super::xp::{
+    apply_tick_xp, combat_kill_xp, distribute_level_up_points, prestige_multiplier,
+    xp_for_next_level, xp_gain_per_tick,
+};
 
 /// Spawns a new enemy if none exists
 pub fn spawn_enemy_if_needed(state: &mut GameState) {
@@ -184,122 +106,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_xp_for_next_level() {
-        assert_eq!(xp_for_next_level(1), 100);
-        assert_eq!(xp_for_next_level(2), 282);
-        assert_eq!(xp_for_next_level(10), 3162);
-    }
-
-    #[test]
-    fn test_prestige_multiplier() {
-        // New formula: base = 1 + 0.5 * rank^0.7, then add CHA bonus
-
-        // Rank 0, CHA 10 (+0): 1.0 + 0 = 1.0
-        assert_eq!(prestige_multiplier(0, 0), 1.0);
-
-        // Rank 1, CHA 10 (+0): 1.5 + 0 = 1.5 (using 1 + 0.5*rank^0.7 formula)
-        assert_eq!(prestige_multiplier(1, 0), 1.5);
-
-        // Rank 1, CHA 16 (+3): 1.5 + 0.3 = 1.8
-        assert_eq!(prestige_multiplier(1, 3), 1.8);
-    }
-
-    #[test]
-    fn test_xp_gain_per_tick() {
-        // Rank 0, WIS 10 (+0), CHA 10 (+0): 1.0 * 1.0 * 1.0 = 1.0
-        assert_eq!(xp_gain_per_tick(0, 0, 0), 1.0);
-
-        // Rank 1, WIS 20 (+5), CHA 16 (+3): 1.8 * 1.25 = 2.25
-        assert_eq!(xp_gain_per_tick(1, 5, 3), 2.25);
-    }
-
-    #[test]
-    fn test_distribute_level_up_points() {
-        let mut state = GameState::new("Test Hero".to_string(), 0);
-        let increased = distribute_level_up_points(&mut state);
-
-        // Should distribute 3 points
-        assert_eq!(increased.len(), 3);
-
-        // Total attribute sum should be 60 + 3 = 63
-        let mut sum = 0;
-        for attr in AttributeType::all() {
-            sum += state.attributes.get(attr);
-        }
-        assert_eq!(sum, 63);
-    }
-
-    #[test]
-    fn test_distribute_respects_caps() {
-        let mut state = GameState::new("Test Hero".to_string(), 0);
-
-        // Set all attributes to cap - 1 (prestige 0 = cap 20)
-        for attr in AttributeType::all() {
-            state.attributes.set(attr, 19);
-        }
-
-        let increased = distribute_level_up_points(&mut state);
-        assert_eq!(increased.len(), 3);
-
-        // All should be at cap now (20)
-        for attr in increased {
-            assert!(state.attributes.get(attr) <= 20);
-        }
-    }
-
-    #[test]
-    fn test_apply_tick_xp_no_levelup() {
-        let mut state = GameState::new("Test Hero".to_string(), 0);
-        let (levelups, increased) = apply_tick_xp(&mut state, 50.0);
-
-        assert_eq!(levelups, 0);
-        assert_eq!(increased.len(), 0);
-        assert_eq!(state.character_level, 1);
-        assert_eq!(state.character_xp, 50);
-    }
-
-    #[test]
-    fn test_apply_tick_xp_single_levelup() {
-        let mut state = GameState::new("Test Hero".to_string(), 0);
-        let (levelups, increased) = apply_tick_xp(&mut state, 100.0);
-
-        assert_eq!(levelups, 1);
-        assert_eq!(increased.len(), 3);
-        assert_eq!(state.character_level, 2);
-        assert_eq!(state.character_xp, 0);
-    }
-
-    #[test]
-    fn test_combat_kill_xp() {
-        let xp = combat_kill_xp(1.0, 0.0);
-        assert!((200..=400).contains(&xp));
-    }
-
-    #[test]
-    fn test_combat_kill_xp_with_haven_bonus() {
-        // Run many trials to verify average XP is higher with bonus
-        let mut total_no_bonus = 0u64;
-        let mut total_with_bonus = 0u64;
-        let trials = 1000;
-
-        for _ in 0..trials {
-            total_no_bonus += combat_kill_xp(1.0, 0.0);
-            total_with_bonus += combat_kill_xp(1.0, 30.0); // +30% XP from Training Yard
-        }
-
-        let avg_no_bonus = total_no_bonus as f64 / trials as f64;
-        let avg_with_bonus = total_with_bonus as f64 / trials as f64;
-        let ratio = avg_with_bonus / avg_no_bonus;
-
-        // Should be approximately 30% higher
-        assert!(
-            (1.25..=1.35).contains(&ratio),
-            "Haven +30% XP should increase average XP by ~30%, got {:.2}x",
-            ratio
-        );
-    }
-
-    #[test]
     fn test_spawn_enemy_if_needed() {
         let mut state = GameState::new("Test Hero".to_string(), 0);
         assert!(state.combat_state.current_enemy.is_none());
@@ -349,7 +155,6 @@ mod tests {
         // Should have spawned a boss enemy
         assert!(state.combat_state.current_enemy.is_some());
         let enemy = state.combat_state.current_enemy.as_ref().unwrap();
-        // Boss enemies have higher stats - just verify it exists
         assert!(enemy.max_hp > 0);
     }
 
@@ -368,8 +173,6 @@ mod tests {
 
     #[test]
     fn test_try_discover_dungeon_probability() {
-        // Test that dungeon discovery happens with expected probability (1%)
-        // Run many trials and check it's in reasonable range
         let mut discoveries = 0;
         let trials = 3_000;
 
@@ -381,7 +184,6 @@ mod tests {
         }
 
         // 1% rate = 30 expected discoveries in 3000 trials
-        // Allow reasonable variance (0.2% to 2.5% = 6 to 75)
         assert!(
             (6..=75).contains(&discoveries),
             "Expected ~30 discoveries (1%), got {}",
@@ -391,93 +193,36 @@ mod tests {
 
     #[test]
     fn test_try_discover_dungeon_creates_valid_dungeon() {
-        // Keep trying until we discover a dungeon
         let mut state = GameState::new("Test Hero".to_string(), 0);
         state.character_level = 10;
         state.prestige_rank = 1;
 
-        // Force a discovery by trying many times
         let mut discovered = false;
         for _ in 0..1000 {
             if try_discover_dungeon(&mut state) {
                 discovered = true;
                 break;
             }
-            state.active_dungeon = None; // Reset for next try
+            state.active_dungeon = None;
         }
 
         if discovered {
             let dungeon = state.active_dungeon.as_ref().unwrap();
-            // Verify dungeon has a valid grid
             assert!(!dungeon.grid.is_empty());
-            // Player position should be at entrance
             assert_eq!(dungeon.player_position, dungeon.entrance_position);
         }
-    }
-
-    #[test]
-    fn test_apply_tick_xp_multiple_levelups() {
-        let mut state = GameState::new("Test Hero".to_string(), 0);
-
-        // Give enough XP for multiple level ups
-        // Level 1->2: 100, Level 2->3: 282, Total: 382
-        let (levelups, increased) = apply_tick_xp(&mut state, 400.0);
-
-        assert_eq!(levelups, 2);
-        assert_eq!(increased.len(), 6); // 3 points per level * 2 levels
-        assert_eq!(state.character_level, 3);
-    }
-
-    #[test]
-    fn test_xp_for_next_level_scaling() {
-        // Verify XP curve increases with level
-        let xp_1 = xp_for_next_level(1);
-        let xp_5 = xp_for_next_level(5);
-        let xp_10 = xp_for_next_level(10);
-        let xp_50 = xp_for_next_level(50);
-
-        assert!(xp_1 < xp_5);
-        assert!(xp_5 < xp_10);
-        assert!(xp_10 < xp_50);
-    }
-
-    #[test]
-    fn test_prestige_multiplier_negative_charisma() {
-        // CHA below 10 gives negative modifier
-        let mult = prestige_multiplier(1, -2); // CHA 6 = -2 modifier
-                                               // 1.5 + (-0.2) = 1.3
-        assert_eq!(mult, 1.3);
-    }
-
-    #[test]
-    fn test_distribute_when_all_at_cap() {
-        let mut state = GameState::new("Test Hero".to_string(), 0);
-
-        // Set all attributes to cap
-        for attr in AttributeType::all() {
-            state.attributes.set(attr, 20);
-        }
-
-        let increased = distribute_level_up_points(&mut state);
-
-        // Should return empty since no points could be distributed
-        assert!(increased.len() < 3); // May distribute some if loop hasn't hit max attempts
     }
 
     // =========================================================================
     // DUNGEON ROOM TYPE SPAWNING TESTS
     // =========================================================================
 
-    /// Helper: create a minimal dungeon with the player in a room of the given type.
-    /// Returns a GameState with an active dungeon where current_room_cleared = false
-    /// so spawn_enemy_if_needed will attempt to spawn.
     fn setup_dungeon_with_room_type(room_type: RoomType) -> GameState {
         use crate::dungeon::types::{Dungeon, DungeonSize, Room, RoomState};
 
         let mut state = GameState::new("Dungeon Tester".to_string(), 0);
         state.character_level = 10;
 
-        // Build a minimal 5x5 dungeon with one room at center
         let mut dungeon = Dungeon::new(DungeonSize::Small);
         let pos = (2, 2);
 
@@ -505,7 +250,6 @@ mod tests {
             .as_ref()
             .expect("Combat room should spawn an enemy");
 
-        // Regular dungeon enemies do NOT have "Elite" or "Boss" prefix
         assert!(
             !enemy.name.starts_with("Elite "),
             "Combat room should spawn regular enemy, got: {}",
@@ -588,11 +332,7 @@ mod tests {
 
     #[test]
     fn test_spawn_enemy_if_needed_respects_current_room_cleared() {
-        // When current_room_cleared is true, no enemy should be spawned
-        // even for combat room types
         let mut state = setup_dungeon_with_room_type(RoomType::Combat);
-
-        // Mark room as already cleared
         state.active_dungeon.as_mut().unwrap().current_room_cleared = true;
 
         spawn_enemy_if_needed(&mut state);
@@ -606,7 +346,6 @@ mod tests {
     #[test]
     fn test_spawn_enemy_if_needed_cleared_elite_no_spawn() {
         let mut state = setup_dungeon_with_room_type(RoomType::Elite);
-
         state.active_dungeon.as_mut().unwrap().current_room_cleared = true;
 
         spawn_enemy_if_needed(&mut state);
@@ -620,7 +359,6 @@ mod tests {
     #[test]
     fn test_spawn_enemy_if_needed_cleared_boss_no_spawn() {
         let mut state = setup_dungeon_with_room_type(RoomType::Boss);
-
         state.active_dungeon.as_mut().unwrap().current_room_cleared = true;
 
         spawn_enemy_if_needed(&mut state);
@@ -633,7 +371,6 @@ mod tests {
 
     #[test]
     fn test_dungeon_elite_stats_higher_than_regular() {
-        // Use sampling to handle random variance in stat generation
         let zone_id = 5;
         let samples = 50;
         let mut elite_hp = 0u64;
@@ -654,7 +391,6 @@ mod tests {
 
     #[test]
     fn test_dungeon_boss_stats_higher_than_elite() {
-        // Use sampling to handle random variance in stat generation
         let zone_id = 5;
         let samples = 50;
         let mut boss_hp = 0u64;
@@ -675,7 +411,6 @@ mod tests {
 
     #[test]
     fn test_dungeon_enemy_stats_scale_with_zone() {
-        // Enemies in higher zones should have more HP
         let low_zone = generate_dungeon_enemy(1);
         let high_zone = generate_dungeon_enemy(10);
 
@@ -689,7 +424,6 @@ mod tests {
 
     #[test]
     fn test_dungeon_enemy_damage_scales_with_zone() {
-        // Enemy damage in higher zones should be higher
         let low_zone = generate_dungeon_enemy(1);
         let high_zone = generate_dungeon_enemy(10);
 
@@ -703,10 +437,7 @@ mod tests {
 
     #[test]
     fn test_spawn_dungeon_enemy_uses_zone_scaling() {
-        // Verify that dungeon enemy spawning uses zone-based scaling
         let mut state = setup_dungeon_with_room_type(RoomType::Combat);
-
-        // Set dungeon zone_id to a known value
         state.active_dungeon.as_mut().unwrap().zone_id = 5;
 
         spawn_enemy_if_needed(&mut state);
@@ -717,8 +448,6 @@ mod tests {
             .as_ref()
             .expect("Should have spawned enemy");
 
-        // Enemy stats should be near zone 5 base stats (with ±10% random variance)
-        // zone_base_stats uses zone_id - 1 as index
         let (base_hp, _, base_dmg, _, _, _) = ZONE_ENEMY_STATS[4];
         let hp_lo = (base_hp as f64 * 0.85) as u32;
         let hp_hi = (base_hp as f64 * 1.15) as u32;
@@ -744,10 +473,8 @@ mod tests {
 
     #[test]
     fn test_spawn_dungeon_enemy_does_not_overwrite_existing() {
-        // If an enemy already exists, spawn_enemy_if_needed should not replace it
         let mut state = setup_dungeon_with_room_type(RoomType::Combat);
 
-        // Manually place an enemy
         let sentinel = crate::combat::types::Enemy::new("Sentinel".to_string(), 9999, 1);
         state.combat_state.current_enemy = Some(sentinel);
 
@@ -763,7 +490,6 @@ mod tests {
 
     #[test]
     fn test_spawn_dungeon_enemy_skips_when_regenerating() {
-        // During HP regen phase, no enemy should be spawned
         let mut state = setup_dungeon_with_room_type(RoomType::Combat);
         state.combat_state.is_regenerating = true;
 
@@ -777,10 +503,9 @@ mod tests {
 
     #[test]
     fn test_spawn_dungeon_enemy_resets_attack_timers() {
-        // When a new dungeon enemy is spawned, both attack timers should be reset to 0
         let mut state = setup_dungeon_with_room_type(RoomType::Combat);
-        state.combat_state.player_attack_timer = 5.0; // Non-zero
-        state.combat_state.enemy_attack_timer = 3.0; // Non-zero
+        state.combat_state.player_attack_timer = 5.0;
+        state.combat_state.enemy_attack_timer = 3.0;
 
         spawn_enemy_if_needed(&mut state);
 
@@ -799,182 +524,6 @@ mod tests {
     }
 
     // =========================================================================
-    // XP CURVE AT EXTREME LEVELS
-    // =========================================================================
-
-    #[test]
-    fn test_xp_for_next_level_at_level_100() {
-        let xp = xp_for_next_level(100);
-        // 100 * 100^1.5 = 100 * 1000 = 100000
-        assert_eq!(xp, 100_000);
-    }
-
-    #[test]
-    fn test_xp_for_next_level_at_level_500() {
-        let xp = xp_for_next_level(500);
-        // 100 * 500^1.5 = 100 * 11180.34 ~ 1118034
-        let expected = (100.0 * 500.0_f64.powf(1.5)) as u64;
-        assert_eq!(xp, expected);
-        assert!(xp > 1_000_000);
-    }
-
-    #[test]
-    fn test_xp_for_next_level_at_level_1000() {
-        let xp = xp_for_next_level(1000);
-        // 100 * 1000^1.5 = 100 * 31622.77 ~ 3162277
-        let expected = (100.0 * 1000.0_f64.powf(1.5)) as u64;
-        assert_eq!(xp, expected);
-        assert!(xp > 3_000_000);
-    }
-
-    #[test]
-    fn test_xp_curve_monotonically_increasing() {
-        let mut prev_xp = 0u64;
-        for level in 1..=500 {
-            let xp = xp_for_next_level(level);
-            assert!(
-                xp > prev_xp,
-                "XP at level {level} ({xp}) must exceed level {} ({prev_xp})",
-                level - 1
-            );
-            prev_xp = xp;
-        }
-    }
-
-    #[test]
-    fn test_xp_at_level_1_is_base_value() {
-        assert_eq!(xp_for_next_level(1), XP_CURVE_BASE as u64);
-    }
-
-    // =========================================================================
-    // PRESTIGE MULTIPLIER AT EXTREME RANKS
-    // =========================================================================
-
-    #[test]
-    fn test_prestige_multiplier_at_p50() {
-        let mult = prestige_multiplier(50, 0);
-        // 1 + 0.5 * 50^0.7 = 1 + 0.5 * ~17.68 = ~9.84
-        let expected = 1.0 + 0.5 * 50.0_f64.powf(0.7);
-        assert!((mult - expected).abs() < 0.01);
-    }
-
-    #[test]
-    fn test_prestige_multiplier_at_p100() {
-        let mult = prestige_multiplier(100, 0);
-        let expected = 1.0 + 0.5 * 100.0_f64.powf(0.7);
-        assert!((mult - expected).abs() < 0.01);
-        assert!(mult > 10.0);
-    }
-
-    #[test]
-    fn test_prestige_multiplier_with_very_low_cha() {
-        // CHA 1 => modifier = (1 - 10) / 2 = -4 (integer division)
-        let mult = prestige_multiplier(1, -4);
-        // 1.5 + (-4 * 0.1) = 1.5 - 0.4 = 1.1
-        assert!((mult - 1.1).abs() < 0.01);
-    }
-
-    #[test]
-    fn test_prestige_multiplier_with_very_high_cha() {
-        // CHA 30 => modifier = (30 - 10) / 2 = +10
-        let mult = prestige_multiplier(1, 10);
-        // 1.5 + (10 * 0.1) = 1.5 + 1.0 = 2.5
-        assert!((mult - 2.5).abs() < 0.01);
-    }
-
-    #[test]
-    fn test_prestige_multiplier_always_at_least_1() {
-        // Even with extreme negative CHA, multiplier should stay >= 1.0 at reasonable ranks
-        // P0 with CHA modifier -4: 1.0 + (-0.4) = 0.6 (can go below 1.0!)
-        // This documents existing behavior - negative CHA can reduce multiplier below 1.0
-        let mult_p0 = prestige_multiplier(0, -4);
-        // At P0 base is 1.0, CHA -4 gives 0.6
-        assert!((mult_p0 - 0.6).abs() < 0.01);
-
-        // At higher prestige ranks, the base dominates
-        let mult_p10 = prestige_multiplier(10, -4);
-        assert!(mult_p10 > 1.0);
-    }
-
-    // =========================================================================
-    // ATTRIBUTE DISTRIBUTION EDGE CASES
-    // =========================================================================
-
-    #[test]
-    fn test_distribute_when_all_at_cap_returns_empty() {
-        let mut state = GameState::new("Test Hero".to_string(), 0);
-        let cap = state.get_attribute_cap();
-
-        for attr in AttributeType::all() {
-            state.attributes.set(attr, cap);
-        }
-
-        let increased = distribute_level_up_points(&mut state);
-        assert!(
-            increased.is_empty(),
-            "Should distribute zero points when all attributes at cap"
-        );
-
-        // All attributes should remain at cap
-        for attr in AttributeType::all() {
-            assert_eq!(state.attributes.get(attr), cap);
-        }
-    }
-
-    #[test]
-    fn test_distribute_when_only_one_below_cap() {
-        let mut state = GameState::new("Test Hero".to_string(), 0);
-        let cap = state.get_attribute_cap(); // 20
-
-        // Set all to cap except Strength
-        for attr in AttributeType::all() {
-            state.attributes.set(attr, cap);
-        }
-        state.attributes.set(AttributeType::Strength, cap - 3);
-
-        let increased = distribute_level_up_points(&mut state);
-        assert_eq!(increased.len(), 3);
-
-        // All 3 points should go to Strength
-        for attr in &increased {
-            assert_eq!(*attr, AttributeType::Strength);
-        }
-        assert_eq!(state.attributes.get(AttributeType::Strength), cap);
-    }
-
-    #[test]
-    fn test_distribute_with_high_prestige_cap() {
-        let mut state = GameState::new("Test Hero".to_string(), 0);
-        state.prestige_rank = 10; // cap = 20 + 50 = 70
-        let cap = state.get_attribute_cap();
-        assert_eq!(cap, 70);
-
-        // Set all to 69 (one below cap)
-        for attr in AttributeType::all() {
-            state.attributes.set(attr, 69);
-        }
-
-        let increased = distribute_level_up_points(&mut state);
-        assert_eq!(increased.len(), 3);
-
-        // Each increased attribute should now be at 70
-        for attr in &increased {
-            assert_eq!(state.attributes.get(*attr), 70);
-        }
-    }
-
-    #[test]
-    fn test_distribute_with_p20_cap() {
-        let mut state = GameState::new("Test Hero".to_string(), 0);
-        state.prestige_rank = 20; // cap = 20 + 100 = 120
-        assert_eq!(state.get_attribute_cap(), 120);
-
-        // Points should be distributable well above the base cap
-        let increased = distribute_level_up_points(&mut state);
-        assert_eq!(increased.len(), 3);
-    }
-
-    // =========================================================================
     // ENEMY SPAWNING WITH ZONE/PRESTIGE SCALING
     // =========================================================================
 
@@ -988,7 +537,6 @@ mod tests {
         spawn_enemy_if_needed(&mut state);
 
         let enemy = state.combat_state.current_enemy.as_ref().unwrap();
-        // Zone 10 base HP is 810 (with ±10% variance)
         let (base_hp, _, _, _, _, _) = ZONE_ENEMY_STATS[9];
         assert!(
             enemy.max_hp >= (base_hp as f64 * 0.85) as u32,
@@ -1008,7 +556,6 @@ mod tests {
         spawn_enemy_if_needed(&mut state);
 
         let enemy = state.combat_state.current_enemy.as_ref().unwrap();
-        // Zone 11 base HP is 5000 (endgame wall)
         let (base_hp, _, _, _, _, _) = ZONE_ENEMY_STATS[10];
         assert!(
             enemy.max_hp >= (base_hp as f64 * 0.85) as u32,
@@ -1027,7 +574,6 @@ mod tests {
         let mut state = GameState::new("Test Hero".to_string(), 0);
         state.active_dungeon = Some(crate::dungeon::generation::generate_dungeon(1, 0, 1));
 
-        // Blocked by early return (active_dungeon.is_some()), 100 iterations suffices
         for _ in 0..100 {
             assert!(!try_discover_dungeon(&mut state));
         }

@@ -9,6 +9,7 @@ pub mod offline;
 pub mod recent_drops;
 pub mod tick;
 pub mod ticker;
+pub mod xp;
 
 pub use constants::*;
 pub use game_logic::*;
