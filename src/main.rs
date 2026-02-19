@@ -21,12 +21,13 @@ use character::manager::CharacterManager;
 use chrono::{Local, Utc};
 use core::constants::*;
 use core::game_state::*;
-use input::{GameOverlay, HavenUiState, InputResult, SoulforgeUiState};
+use input::{GameOverlay, HavenUiState, SoulforgeUiState};
 use main_helpers::achievements::track_input_achievements;
 use main_helpers::character_screens::{
     handle_creation_frame, handle_delete_frame, handle_rename_frame, handle_select_frame,
     ScreenTransition,
 };
+use main_helpers::input_routing::{route_game_input, InputAction};
 use main_helpers::offline::apply_offline_xp;
 use main_helpers::overlay::draw_game_overlays;
 use main_helpers::persistence::save_all;
@@ -393,51 +394,24 @@ fn main() -> io::Result<()> {
                                 state.recalculate_derived_stats(&enhancement.levels);
                             }
 
-                            match result {
-                                InputResult::Continue => {}
-                                InputResult::QuitToSelect => {
-                                    if !debug_mode {
-                                        save_all(
-                                            &character_manager,
-                                            &state,
-                                            &global_achievements,
-                                            &haven,
-                                            &enhancement,
-                                        );
-                                    }
+                            match route_game_input(
+                                result,
+                                &state,
+                                &character_manager,
+                                &global_achievements,
+                                &haven,
+                                &enhancement,
+                                debug_mode,
+                                &mut update_expanded,
+                                &mut last_save_instant,
+                                &mut last_save_time,
+                            ) {
+                                InputAction::QuitToSelect => {
                                     game_state = None;
                                     current_screen = Screen::CharacterSelect;
                                     break 'game_loop;
                                 }
-                                InputResult::NeedsSave => {
-                                    if !debug_mode {
-                                        save_all(
-                                            &character_manager,
-                                            &state,
-                                            &global_achievements,
-                                            &haven,
-                                            &enhancement,
-                                        );
-                                        last_save_instant = Some(Instant::now());
-                                        last_save_time = Some(Local::now());
-                                    }
-                                }
-                                InputResult::NeedsSaveAll => {
-                                    if !debug_mode {
-                                        save_all(
-                                            &character_manager,
-                                            &state,
-                                            &global_achievements,
-                                            &haven,
-                                            &enhancement,
-                                        );
-                                        last_save_instant = Some(Instant::now());
-                                        last_save_time = Some(Local::now());
-                                    }
-                                }
-                                InputResult::ToggleUpdateDetails => {
-                                    update_expanded = !update_expanded;
-                                }
+                                InputAction::Continue => {}
                             }
                         }
                         // Normal mode: process one event per frame. Realtime: drain all.
