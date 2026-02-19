@@ -72,6 +72,7 @@ pub fn render_equipment_detail(
 }
 
 /// Render the 7-slot equipment list with cursor highlight.
+/// Uses the same column alignment as `draw_equipment_names_only` in stats_panel.
 fn render_slot_list(
     frame: &mut Frame,
     area: Rect,
@@ -85,54 +86,60 @@ fn render_slot_list(
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
+    let width = inner.width as usize;
+    // Match draw_equipment_names_only column layout:
+    // cursor(2) + slot(8) + name(variable) + right_cols(27)
+    let cursor_col = 2; // "▸ " or "  "
+    let slot_col = 8; // "{:>6}  "
+    let right_cols = 27; // rarity(9) + tier(4) + zone(4) + power(~6) + gaps
+    let name_max = width.saturating_sub(cursor_col + slot_col + right_cols);
+
     let mut lines: Vec<Line> = Vec::with_capacity(7);
 
     for (i, slot) in SLOT_ORDER.iter().enumerate() {
         let item = game_state.equipment.get(*slot);
         let is_selected = i == selected_slot;
-
-        let prefix = if is_selected { "\u{25b8} " } else { "  " };
+        let cursor = if is_selected { "\u{25b8} " } else { "  " };
 
         if let Some(item) = item.as_ref() {
             let rc = super::rarity_color(item.rarity);
             let tc = super::tier_color(item.tier);
             let enh_level = enhancement_levels[i];
             let enh_prefix = crate::enhancement::enhancement_prefix(enh_level);
+            let prefix_len = enh_prefix.len();
+
+            // Truncate name to fit column layout
+            let max_name_len = name_max.saturating_sub(prefix_len);
+            let item_name = if item.display_name.len() > max_name_len && max_name_len > 3 {
+                format!("{}...", &item.display_name[..max_name_len - 3])
+            } else {
+                item.display_name.clone()
+            };
+            let name_len = prefix_len + item_name.len();
+            let pad = name_max.saturating_sub(name_len);
 
             if is_selected {
-                // All in Yellow when selected
+                let yellow = Style::default().fg(Color::Yellow);
                 let mut spans = vec![
-                    Span::styled(prefix, Style::default().fg(Color::Yellow)),
-                    Span::styled(
-                        format!("{:<8}", slot.name()),
-                        Style::default().fg(Color::Yellow),
-                    ),
+                    Span::styled(cursor, yellow),
+                    Span::styled(format!("{:>6}  ", slot.name()), yellow),
                 ];
                 if !enh_prefix.is_empty() {
-                    spans.push(Span::styled(enh_prefix, Style::default().fg(Color::Yellow)));
+                    spans.push(Span::styled(enh_prefix, yellow));
                 }
-                spans.push(Span::styled(
-                    &item.display_name,
-                    Style::default().fg(Color::Yellow),
-                ));
-                spans.push(Span::styled("  ", Style::default()));
-                spans.push(Span::styled(
-                    item.rarity.name(),
-                    Style::default().fg(Color::Yellow),
-                ));
-                spans.push(Span::styled(
-                    format!(" T{}", item.tier),
-                    Style::default().fg(Color::Yellow),
-                ));
+                spans.push(Span::styled(item_name, yellow));
+                spans.push(Span::raw(" ".repeat(pad)));
+                spans.push(Span::styled(format!("{:>9}", item.rarity.name()), yellow));
+                spans.push(Span::styled(format!("  T{}", item.tier), yellow));
+                spans.push(Span::styled(format!("  Z{}", item.ilvl / 10), yellow));
+                spans.push(Span::styled(format!(" \u{26A1}{}", item.power()), yellow));
                 lines.push(Line::from(spans));
             } else {
                 let mut spans = vec![
-                    Span::styled(prefix, Style::default().fg(Color::DarkGray)),
+                    Span::styled(cursor, Style::default().fg(Color::DarkGray)),
                     Span::styled(
-                        format!("{:<8}", slot.name()),
-                        Style::default()
-                            .fg(Color::DarkGray)
-                            .add_modifier(Modifier::BOLD),
+                        format!("{:>6}  ", slot.name()),
+                        Style::default().add_modifier(Modifier::BOLD),
                     ),
                 ];
                 if !enh_prefix.is_empty() {
@@ -141,25 +148,42 @@ fn render_slot_list(
                         super::stats_panel::enhancement_style(enh_level),
                     ));
                 }
-                spans.push(Span::styled(&item.display_name, Style::default().fg(rc)));
-                spans.push(Span::styled("  ", Style::default()));
-                spans.push(Span::styled(item.rarity.name(), Style::default().fg(rc)));
+                spans.push(Span::styled(item_name, Style::default().fg(rc)));
+                spans.push(Span::raw(" ".repeat(pad)));
                 spans.push(Span::styled(
-                    format!(" T{}", item.tier),
+                    format!("{:>9}", item.rarity.name()),
+                    Style::default().fg(rc),
+                ));
+                spans.push(Span::styled(
+                    format!("  T{}", item.tier),
                     Style::default().fg(tc),
+                ));
+                spans.push(Span::styled(
+                    format!("  Z{}", item.ilvl / 10),
+                    Style::default().fg(Color::DarkGray),
+                ));
+                spans.push(Span::styled(
+                    format!(" \u{26A1}{}", item.power()),
+                    Style::default().fg(Color::Cyan),
                 ));
                 lines.push(Line::from(spans));
             }
         } else {
-            // Empty slot
             let style = if is_selected {
                 Style::default().fg(Color::Yellow)
             } else {
                 Style::default().fg(Color::DarkGray)
             };
             lines.push(Line::from(vec![
-                Span::styled(prefix, style),
-                Span::styled(format!("{:<8}", slot.name()), style),
+                Span::styled(cursor, style),
+                Span::styled(
+                    format!("{:>6}  ", slot.name()),
+                    if is_selected {
+                        style
+                    } else {
+                        Style::default().add_modifier(Modifier::BOLD)
+                    },
+                ),
                 Span::styled("[Empty]", Style::default().fg(Color::DarkGray)),
             ]));
         }
