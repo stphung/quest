@@ -14,7 +14,7 @@ use quest::dungeon::logic::{
     on_boss_defeated, on_elite_defeated, on_room_enemy_defeated, on_treasure_room_entered,
     update_dungeon, DungeonEvent, ROOM_MOVE_INTERVAL,
 };
-use quest::fishing::logic::{
+use quest::fishing::{
     check_rank_up, check_rank_up_with_max, get_max_fishing_rank, tick_fishing_with_haven,
     tick_fishing_with_haven_result, HavenFishingBonuses,
 };

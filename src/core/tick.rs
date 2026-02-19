@@ -9,18 +9,19 @@
 use crate::achievements::Achievements;
 use crate::challenges::menu::ChallengeType;
 use crate::challenges::ActiveMinigame;
-use crate::combat::logic::{update_combat, CombatEvent, HavenCombatBonuses};
+use crate::combat::logic::update_combat;
+use crate::combat::{CombatEvent, HavenCombatBonuses};
 use crate::core::constants::{
     FINAL_ZONE_ID, HAVEN_MIN_PRESTIGE_RANK, TICKS_PER_SECOND, TICK_INTERVAL_MS,
 };
 use crate::core::game_logic::{apply_tick_xp, spawn_enemy_if_needed, try_discover_dungeon};
 use crate::core::game_state::GameState;
 use crate::dungeon::logic::{
-    add_dungeon_xp, calculate_boss_xp_reward, on_boss_defeated, on_elite_defeated,
-    on_room_enemy_defeated, on_treasure_room_entered, update_dungeon,
+    on_boss_defeated, on_elite_defeated, on_room_enemy_defeated, update_dungeon,
 };
+use crate::dungeon::rewards::{add_dungeon_xp, calculate_boss_xp_reward, on_treasure_room_entered};
 use crate::dungeon::types::RoomType;
-use crate::fishing::logic::{
+use crate::fishing::{
     check_rank_up_with_max, get_max_fishing_rank, tick_fishing_with_haven_result,
     HavenFishingBonuses,
 };
@@ -524,7 +525,7 @@ pub fn game_tick<R: Rng>(
         let boosted_max = derived.max_hp + prestige_combat.flat_hp;
         state.combat_state.update_max_hp(boosted_max);
     }
-    let god_items_combat = crate::combat::logic::GodItemCombatBonuses {
+    let god_items_combat = crate::combat::GodItemCombatBonuses {
         damage_reduction_percent: crate::god_items::equipped_god_item_dr(&state.equipment),
         attack_speed_percent: crate::god_items::equipped_god_item_attack_speed_percent(
             &state.equipment,
