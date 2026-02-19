@@ -10,10 +10,11 @@ pub mod game_state;
 pub mod offline;
 pub mod recent_drops;
 pub mod tick;
+pub mod tick_types;
 pub mod ticker;
 pub mod xp;
 
 pub use constants::*;
 pub use game_logic::*;
 pub use game_state::*;
-pub use tick::{TickEvent, TickResult};
+pub use tick_types::{TickEvent, TickResult};
