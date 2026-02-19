@@ -5,11 +5,11 @@
 
 pub mod data;
 pub mod handlers;
+pub mod milestones;
 pub mod persistence;
 pub mod types;
 
 pub use data::{get_achievement_def, get_achievements_by_category};
+pub use milestones::{MinigameDifficulty, MinigameType};
 pub use persistence::{load_achievements, save_achievements};
-pub use types::{
-    AchievementCategory, AchievementId, Achievements, MinigameDifficulty, MinigameType,
-};
+pub use types::{AchievementCategory, AchievementId, Achievements};

@@ -206,6 +206,7 @@ fn test_enemy_death_grants_xp() {
     state.combat_state.player_current_hp = state.combat_state.player_max_hp;
 
     let initial_xp = state.character_xp;
+    let initial_level = state.character_level;
 
     // Run combat until enemy dies
     let mut enemy_killed = false;
@@ -228,9 +229,10 @@ fn test_enemy_death_grants_xp() {
 
     assert!(enemy_killed, "Enemy should be defeated eventually");
     assert!(xp_from_kill > 0, "Kill should grant XP");
+    // XP was applied: either character_xp increased, or it was consumed by level-ups
     assert!(
-        state.character_xp > initial_xp,
-        "XP should increase after killing enemy"
+        state.character_xp > initial_xp || state.character_level > initial_level,
+        "XP should increase or cause level-up after killing enemy"
     );
 }
 

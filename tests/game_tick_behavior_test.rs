@@ -30,9 +30,7 @@ use quest::dungeon::logic::{
     on_boss_defeated, on_elite_defeated, on_room_enemy_defeated, on_treasure_room_entered,
     update_dungeon, DungeonEvent,
 };
-use quest::fishing::logic::{
-    tick_fishing_with_haven_result, try_discover_fishing, HavenFishingBonuses,
-};
+use quest::fishing::{tick_fishing_with_haven_result, try_discover_fishing, HavenFishingBonuses};
 use quest::items::drops::{try_drop_from_boss, try_drop_from_mob};
 use quest::items::scoring::auto_equip_if_better;
 use quest::zones::BossDefeatResult;

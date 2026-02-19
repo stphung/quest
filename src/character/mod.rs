@@ -7,6 +7,7 @@ pub mod derived_stats;
 pub mod input;
 pub mod manager;
 pub mod name_validation;
+pub mod persistence;
 pub mod prestige;
 
 pub use attributes::*;
