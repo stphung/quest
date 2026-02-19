@@ -805,6 +805,7 @@ pub fn render_forge_confirmation(
 }
 
 /// Render the Vault item selection screen (shown during prestige when Vault is built)
+#[allow(clippy::too_many_arguments)]
 pub fn render_vault_selection(
     frame: &mut Frame,
     area: Rect,
@@ -812,6 +813,7 @@ pub fn render_vault_selection(
     vault_slots: u8,
     selected_index: usize,
     selected_items: &[EquipmentSlot],
+    enhancement_levels: &[u8; 7],
     _ctx: &super::responsive::LayoutContext,
 ) {
     frame.render_widget(Clear, area);
@@ -867,28 +869,8 @@ pub fn render_vault_selection(
             let is_selected = i == selected_index;
             let is_preserved = selected_items.contains(slot);
 
-            let prefix = if is_selected { "▶ " } else { "  " };
-            let checkbox = if is_preserved { "[✓] " } else { "[ ] " };
-
-            let (slot_name, item_text, tier_text, style, tier_style) =
-                if let Some(item) = item.as_ref() {
-                    let rc = super::rarity_color(item.rarity);
-                    (
-                        format!("{:8}", format!("{:?}", slot)),
-                        format!("{} {}", item.display_name, item.rarity.name()),
-                        format!(" T{}", item.tier),
-                        Style::default().fg(rc),
-                        Style::default().fg(super::tier_color(item.tier)),
-                    )
-                } else {
-                    (
-                        format!("{:8}", format!("{:?}", slot)),
-                        "(empty)".to_string(),
-                        String::new(),
-                        Style::default().fg(Color::DarkGray),
-                        Style::default(),
-                    )
-                };
+            let prefix = if is_selected { "\u{25b6} " } else { "  " };
+            let checkbox = if is_preserved { "[\u{2713}] " } else { "[ ] " };
 
             let prefix_style = if is_selected {
                 Style::default().fg(Color::Cyan)
@@ -901,13 +883,58 @@ pub fn render_vault_selection(
                 Style::default().fg(Color::DarkGray)
             };
 
-            ListItem::new(Line::from(vec![
-                Span::styled(prefix, prefix_style),
-                Span::styled(checkbox, checkbox_style),
-                Span::styled(slot_name, Style::default().fg(Color::DarkGray)),
-                Span::styled(item_text, style),
-                Span::styled(tier_text, tier_style),
-            ]))
+            if let Some(item) = item.as_ref() {
+                let rc = super::rarity_color(item.rarity);
+                let enh_level = enhancement_levels[i];
+                let enh_prefix = crate::enhancement::enhancement_prefix(enh_level);
+
+                let mut spans = vec![
+                    Span::styled(prefix, prefix_style),
+                    Span::styled(checkbox, checkbox_style),
+                    Span::styled(
+                        format!("{:8}", format!("{:?}", slot)),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                ];
+                if !enh_prefix.is_empty() {
+                    spans.push(Span::styled(
+                        enh_prefix,
+                        super::stats_panel::enhancement_style(enh_level),
+                    ));
+                }
+                spans.push(Span::styled(
+                    format!("{} ", item.display_name),
+                    Style::default().fg(rc),
+                ));
+                spans.push(Span::styled(
+                    format!("{:>9}", item.rarity.name()),
+                    Style::default().fg(rc),
+                ));
+                spans.push(Span::styled(
+                    format!("  T{}", item.tier),
+                    Style::default().fg(super::tier_color(item.tier)),
+                ));
+                spans.push(Span::styled(
+                    format!("  Z{}", item.ilvl / 10),
+                    Style::default().fg(Color::DarkGray),
+                ));
+                spans.push(Span::styled(
+                    format!(" \u{26a1}{}", item.power()),
+                    Style::default().fg(Color::Cyan),
+                ));
+
+                ListItem::new(Line::from(spans))
+            } else {
+                ListItem::new(Line::from(vec![
+                    Span::styled(prefix, prefix_style),
+                    Span::styled(checkbox, checkbox_style),
+                    Span::styled(
+                        format!("{:8}", format!("{:?}", slot)),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                    Span::styled("(empty)", Style::default().fg(Color::DarkGray)),
+                ]))
+            }
         })
         .collect();
 
