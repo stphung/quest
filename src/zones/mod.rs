@@ -6,6 +6,7 @@
 pub mod advancement;
 pub mod boss_defeat;
 mod data;
+pub mod gates;
 mod progression;
 
 pub use boss_defeat::BossDefeatResult;
