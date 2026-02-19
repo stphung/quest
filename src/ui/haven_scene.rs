@@ -892,7 +892,7 @@ pub fn render_vault_selection(
                     Span::styled(prefix, prefix_style),
                     Span::styled(checkbox, checkbox_style),
                     Span::styled(
-                        format!("{:8}", format!("{:?}", slot)),
+                        format!("{:<8}", slot.name()),
                         Style::default().fg(Color::DarkGray),
                     ),
                 ];
@@ -929,7 +929,7 @@ pub fn render_vault_selection(
                     Span::styled(prefix, prefix_style),
                     Span::styled(checkbox, checkbox_style),
                     Span::styled(
-                        format!("{:8}", format!("{:?}", slot)),
+                        format!("{:<8}", slot.name()),
                         Style::default().fg(Color::DarkGray),
                     ),
                     Span::styled("(empty)", Style::default().fg(Color::DarkGray)),
