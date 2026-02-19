@@ -197,3 +197,24 @@ This enables systematic balance validation: "does a P0 character reach Zone 2 in
 - Rune: 30, Minesweeper: 28, Snake: 22, Flappy Bird: 20, JezzBall: 18, Gomoku: 15, Morris: 12, Chess: 8, Go: 7
 
 **Rationale**: The rebalance follows the principle that quick, accessible games should appear more frequently. Action games (Snake, Flappy Bird, JezzBall) are placed in the middle tier since they offer moderate play sessions. Strategy games (Chess, Go) were reduced slightly to make room for the new entries while maintaining their "rare discovery" feel. Rune was promoted to the top weight as the fastest challenge (~2 minutes).
+
+## Phase 2 Large Module Refactoring (PRs #288, #291, #292)
+
+**Decision**: Extract ~33 submodules from 7 large logic files across core, combat, character, fishing, haven, achievements, main.rs, and input.rs.
+
+**What changed**:
+- `core/tick.rs` split into `tick.rs` (orchestrator), `tick_types.rs` (TickEvent/TickResult), `tick_stages.rs` (stages 4-6 + helpers), `xp.rs` (XP calculation), `discoveries.rs` (discovery rolls)
+- `core/game_logic.rs` thinned to a re-export wrapper; logic moved to `enemy_spawning.rs`, `xp.rs`, `recent_drops.rs`, `ticker.rs`
+- `combat/logic.rs` split into `logic.rs` (orchestrator), `player_attack.rs`, `enemy_attack.rs`, `damage.rs`, `events.rs`, `regen.rs`
+- `character/manager.rs` split into `manager.rs`, `persistence.rs`, `name_validation.rs`
+- `fishing/logic.rs` split into `logic.rs`, `discovery.rs`, `drops.rs`, `rank.rs`
+- `haven/types.rs` split into `types.rs`, `room_defs.rs`, `bonus.rs`
+- `achievements/data.rs` split into `data.rs`, `handlers.rs`, `milestones.rs`
+- `main.rs` helpers extracted into `main_helpers/` directory (achievements, character_screens, input_routing, offline, overlay, persistence, scene, update)
+- `input.rs` promoted to `input/` directory with submodules (haven_input, minigame_input, prestige_input, soulforge_input, types)
+
+**Why**: The largest files exceeded 1000 LOC (main.rs 1548, character/manager.rs 1396, dungeon/logic.rs 1217, fishing/logic.rs 1047, core/game_logic.rs 1012), making navigation and maintenance difficult. The docs/plans/2026-02-18-large-module-refactoring-design.md design document identified the candidates.
+
+**Pattern**: Move focused logic into sibling files within the same module, keep the original file as a thin orchestrator, and re-export all public symbols from `mod.rs` for backward compatibility. No public API changes.
+
+**Result**: All 1302 tests pass. No changes to module public APIs. Callers unaffected.

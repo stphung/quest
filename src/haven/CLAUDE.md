@@ -6,9 +6,11 @@ Account-level base building that persists across all prestige resets and benefit
 
 ```
 src/haven/
-├── mod.rs      # Public re-exports
-├── types.rs    # Haven struct, 14 room definitions, skill tree, upgrade tiers, 15 bonus types
-└── logic.rs    # Room construction, upgrades, bonus calculation, prestige rank cost system
+├── mod.rs       # Public re-exports
+├── types.rs     # Haven struct, upgrade tiers (room defs and bonuses extracted)
+├── room_defs.rs # HavenRoomId enum (14 variants), room metadata, skill tree, tier costs
+├── bonus.rs     # HavenBonusType, HavenBonus, HavenBonuses, compute_bonuses(), haven_discovery_chance()
+└── logic.rs     # Room construction, upgrades, prestige rank cost system
 ```
 
 ## Key Concepts
@@ -101,13 +103,13 @@ Haven is displayed as an overlay (not a separate screen):
 
 ## Adding a New Haven Room
 
-1. Add `HavenRoomId` variant in `types.rs`
-2. Add to `HavenRoomId::ALL` array
-3. Implement `name()`, `description()`, `parents()`, `children()`, `depth()`, `max_tier()` matches
-4. Add tier costs in `tier_cost()` function
-5. Add bonus definition in `bonus()` match
-6. Add `HavenBonusType` variant if new bonus type
-7. Add bonus display formatting in `format_bonus()`
+1. Add `HavenRoomId` variant in `room_defs.rs`
+2. Add to `HavenRoomId::ALL` array in `room_defs.rs`
+3. Implement `name()`, `description()`, `parents()`, `children()`, `depth()`, `max_tier()` matches in `room_defs.rs`
+4. Add tier costs in `tier_cost()` function in `room_defs.rs`
+5. Add bonus definition in `bonus()` match in `bonus.rs`
+6. Add `HavenBonusType` variant if new bonus type in `bonus.rs`
+7. Add bonus display formatting in `format_bonus()` in `bonus.rs`
 8. Add bonus application logic in the consuming module
 9. Pass the bonus value through the appropriate function parameters
 10. Update `ui/haven_scene.rs` to display the new room

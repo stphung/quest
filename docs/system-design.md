@@ -897,25 +897,55 @@ quest/
 ├── src/
 │   ├── main.rs              # Entry point, game loop, input routing, UI rendering
 │   ├── lib.rs               # Library crate for testing (exposes all game logic)
-│   ├── input.rs             # Keyboard input routing by game state
+│   ├── input/               # Keyboard input routing (split into submodules)
+│   │   ├── mod.rs           # Top-level input dispatcher
+│   │   ├── types.rs         # Input-related types
+│   │   ├── haven_input.rs   # Haven overlay input
+│   │   ├── minigame_input.rs # Minigame input dispatch
+│   │   ├── prestige_input.rs # Prestige confirmation input
+│   │   └── soulforge_input.rs # Soulforge overlay input
+│   ├── main_helpers/        # Extracted helpers from main.rs
+│   │   ├── mod.rs           # Re-exports
+│   │   ├── achievements.rs  # Achievement modal/save handling
+│   │   ├── character_screens.rs # Character management screen logic
+│   │   ├── input_routing.rs # Input dispatch from main loop
+│   │   ├── offline.rs       # Offline progression handling
+│   │   ├── overlay.rs       # Overlay state management
+│   │   ├── persistence.rs   # Save/load orchestration
+│   │   ├── scene.rs         # Scene rendering dispatch
+│   │   └── update.rs        # Auto-update check handling
 │   ├── tick_events.rs       # TickEvent → combat log + visual effects bridge
 │   ├── bin/
 │   │   └── simulator.rs     # Headless balance simulator binary
 │   ├── core/                # Core game systems
 │   │   ├── constants.rs     # All game balance constants
-│   │   ├── game_logic.rs    # XP curves, leveling, enemy spawning
+│   │   ├── game_logic.rs    # Thin re-export wrapper for submodules
 │   │   ├── game_state.rs    # Main GameState struct
+│   │   ├── tick.rs          # game_tick() orchestrator
+│   │   ├── tick_types.rs    # TickEvent enum (30 variants), TickResult struct
+│   │   ├── tick_stages.rs   # Tick processing stages 4-6 + helpers
+│   │   ├── xp.rs            # XP calculation, leveling, combat kill XP
+│   │   ├── discoveries.rs   # Discovery rolls (dungeon, fishing, Haven, Soulforge)
+│   │   ├── enemy_spawning.rs # Enemy generation and spawning
 │   │   ├── offline.rs       # Offline XP progression
-│   │   └── tick.rs          # game_tick() orchestrator, TickEvent, TickResult
+│   │   ├── recent_drops.rs  # RecentDrop struct and deque management
+│   │   └── ticker.rs        # XP rate sampling and rolling window
 │   ├── character/           # Character system
 │   │   ├── attributes.rs    # 6 RPG attributes
 │   │   ├── derived_stats.rs # Stats from attributes
 │   │   ├── prestige.rs      # Prestige system
-│   │   ├── manager.rs       # JSON saves in ~/.quest/
+│   │   ├── manager.rs       # Character CRUD operations
+│   │   ├── persistence.rs   # JSON save/load (extracted from manager.rs)
+│   │   ├── name_validation.rs # Character name validation rules
 │   │   └── input.rs         # Character management input
 │   ├── combat/              # Combat system
 │   │   ├── types.rs         # Enemy, combat state
-│   │   └── logic.rs         # Combat resolution
+│   │   ├── logic.rs         # Combat orchestration
+│   │   ├── player_attack.rs # Player damage pipeline
+│   │   ├── enemy_attack.rs  # Enemy attack resolution
+│   │   ├── damage.rs        # Shared damage calculation, enemy death handling
+│   │   ├── events.rs        # CombatEvent, HavenCombatBonuses, GodItemCombatBonuses
+│   │   └── regen.rs         # HP regeneration after combat
 │   ├── zones/               # Zone system
 │   │   ├── data.rs          # Zone definitions
 │   │   └── progression.rs   # Zone progression
@@ -926,7 +956,10 @@ quest/
 │   ├── fishing/             # Fishing system
 │   │   ├── types.rs         # Fish, phases, ranks
 │   │   ├── generation.rs    # Fish generation, Leviathan
-│   │   └── logic.rs         # Session processing
+│   │   ├── logic.rs         # Session tick processing
+│   │   ├── discovery.rs     # Fishing spot discovery logic
+│   │   ├── drops.rs         # Item drops from fishing
+│   │   └── rank.rs          # Rank progression and tier definitions
 │   ├── items/               # Item system
 │   │   ├── types.rs         # Items, slots, affixes
 │   │   ├── equipment.rs     # Equipment container
@@ -947,8 +980,10 @@ quest/
 │   │   ├── jezzball/        # Containment Breach (JezzBall)
 │   │   └── runic_shift/     # Sigil Surge (panel-matching)
 │   ├── haven/               # Haven base building
-│   │   ├── types.rs         # Room definitions, bonuses
-│   │   └── logic.rs         # Construction, upgrades
+│   │   ├── types.rs         # Haven struct, upgrade tiers, bonus types
+│   │   ├── logic.rs         # Construction, upgrade orchestration
+│   │   ├── room_defs.rs     # 14 room definitions and skill tree
+│   │   └── bonus.rs         # Bonus calculation from room tiers
 │   ├── enhancement/         # Soulforge enhancement system
 │   │   ├── types.rs         # Enhancement progress, constants, success rates
 │   │   ├── logic.rs         # Enhancement rolls, discovery
@@ -958,6 +993,8 @@ quest/
 │   ├── achievements/        # Achievement system
 │   │   ├── types.rs         # AchievementId (130+ variants), Achievements state
 │   │   ├── data.rs          # Achievement database
+│   │   ├── handlers.rs      # Event handlers (on_kill, on_boss_kill, etc.)
+│   │   ├── milestones.rs    # Milestone definitions and thresholds
 │   │   └── persistence.rs   # Save/load
 │   ├── utils/               # Utilities
 │   │   ├── build_info.rs    # Build metadata

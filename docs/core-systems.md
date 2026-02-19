@@ -366,6 +366,13 @@ Individual JSON files per character stored in `~/.quest/`. Maximum 3 characters.
 
 The game runs a 100ms tick loop. Each tick calls `game_tick()` in `src/core/tick.rs`, which orchestrates all game systems and returns a `TickResult`.
 
+The tick implementation is split across several files:
+- `tick.rs` -- Orchestrator: calls each stage in order, returns `TickResult`
+- `tick_types.rs` -- `TickEvent` enum (30 variants) and `TickResult` struct
+- `tick_stages.rs` -- Processing stages 4-6 and helper functions (`process_item_drop`, `process_discoveries`, etc.)
+- `xp.rs` -- XP calculation, leveling logic, combat kill XP
+- `discoveries.rs` -- Discovery rolls for dungeons, fishing spots, Haven, Soulforge
+
 ### game_tick() Signature
 
 ```rust
@@ -383,7 +390,7 @@ Generic `<R: Rng>` allows seeded RNG in tests (`ChaCha8Rng`) and `thread_rng()` 
 
 ### TickEvent and TickResult
 
-`TickEvent` is an enum with 30 variants describing everything that can happen in a single tick. The presentation layer (`main.rs` via `tick_events.rs`) maps these to combat log entries and visual effects. Game logic never touches UI types.
+`TickEvent` is an enum with 30 variants describing everything that can happen in a single tick. The presentation layer (`main.rs` via `tick_events.rs`) maps these to combat log entries and visual effects. Game logic never touches UI types. Defined in `tick_types.rs`.
 
 ```rust
 pub struct TickResult {
@@ -407,20 +414,20 @@ pub struct TickResult {
 
 ### Processing Stages
 
-| Stage | What it does |
-|-------|-------------|
-| 1. Challenge AI | Ticks AI thinking for active Chess, Morris, Gomoku, or Go games |
-| 2. Challenge discovery | Rolls for new challenge discovery (P1+ required, Haven bonus applied) |
-| 3. Sync player HP | Recalculates DerivedStats and updates player_max_hp |
-| 4. Dungeon exploration | Processes room entry, treasure, keys, boss unlock, completion/failure |
-| 5. Fishing | If fishing active: ticks session, handles catches/items/rank-ups/Leviathan, **returns early** (skips combat) |
-| 6. Combat | Maps CombatEvent to TickEvent, applies XP, handles kills/deaths, processes item drops and discoveries |
-| 7. Enemy spawn | Spawns enemy if no enemy and not regenerating |
-| 8. Play time | Increments tick counter; at 10 ticks, increments play_time_seconds |
-| 9. Achievement collection | Drains newly unlocked achievements into TickResult.events |
-| 10. Haven discovery | Rolls for Haven discovery (P10+, no active content) |
-| 11. Soulforge discovery | Rolls for Soulforge discovery (P15+, no active content) |
-| 12. Achievement modal | Checks if 500ms accumulation window has elapsed for modal display |
+| Stage | What it does | File |
+|-------|-------------|------|
+| 1. Challenge AI | Ticks AI thinking for active Chess, Morris, Gomoku, or Go games | tick.rs |
+| 2. Challenge discovery | Rolls for new challenge discovery (P1+ required, Haven bonus applied) | tick.rs |
+| 3. Sync player HP | Recalculates DerivedStats and updates player_max_hp | tick.rs |
+| 4. Dungeon exploration | Processes room entry, treasure, keys, boss unlock, completion/failure | tick_stages.rs |
+| 5. Fishing | If fishing active: ticks session, handles catches/items/rank-ups/Leviathan, **returns early** (skips combat) | tick_stages.rs |
+| 6. Combat | Maps CombatEvent to TickEvent, applies XP, handles kills/deaths, processes item drops and discoveries | tick_stages.rs |
+| 7. Enemy spawn | Spawns enemy if no enemy and not regenerating | tick.rs |
+| 8. Play time | Increments tick counter; at 10 ticks, increments play_time_seconds | tick.rs |
+| 9. Achievement collection | Drains newly unlocked achievements into TickResult.events | tick.rs |
+| 10. Haven discovery | Rolls for Haven discovery (P10+, no active content) | tick.rs |
+| 11. Soulforge discovery | Rolls for Soulforge discovery (P15+, no active content) | tick.rs |
+| 12. Achievement modal | Checks if 500ms accumulation window has elapsed for modal display | tick.rs |
 
 **Important**: Stage 5 (fishing) returns early, skipping stages 6-7. Fishing and combat are mutually exclusive.
 

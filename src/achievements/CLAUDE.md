@@ -7,8 +7,10 @@ Account-level achievement tracking that persists across all characters. Tracks m
 ```
 src/achievements/
 ├── mod.rs          # Public re-exports
-├── types.rs        # Data structures, AchievementId enum, Achievements state, event handlers
+├── types.rs        # Data structures, AchievementId enum, Achievements state, core unlock machinery
 ├── data.rs         # Static achievement definitions (ALL_ACHIEVEMENTS constant)
+├── handlers.rs     # Event handlers (on_enemy_killed, on_boss_killed, on_level_up, etc.), sync_* methods
+├── milestones.rs   # MinigameType, MinigameDifficulty enums, milestone threshold arrays (SLAYER, BOSS_HUNTER, etc.)
 └── persistence.rs  # Save/load from ~/.quest/achievements.json
 ```
 
@@ -47,9 +49,9 @@ Main state struct (serialized to disk). Contains:
 
 ## How Achievements Are Unlocked
 
-### Event Handler Pattern
+### Event Handler Pattern (`handlers.rs`)
 
-`Achievements` exposes `on_*` methods that game systems call to report events. Each handler increments counters and checks milestone thresholds using a shared `check_milestones()` helper:
+`Achievements` exposes `on_*` methods (implemented in `handlers.rs`) that game systems call to report events. Each handler increments counters and checks milestone thresholds against arrays defined in `milestones.rs`:
 
 ```rust
 // Called from tick.rs when an enemy dies
@@ -108,6 +110,6 @@ Additionally, `newly_unlocked` is drained each tick by `collect_achievement_even
 
 1. Add variant to `AchievementId` enum in `types.rs`
 2. Add `AchievementDef` entry to `ALL_ACHIEVEMENTS` in `data.rs` (with name, description, category, icon)
-3. Add unlock logic: either add a threshold to an existing `check_milestones()` call, or create a new `on_*` handler
+3. Add unlock logic: either add a threshold to a milestone array in `milestones.rs`, or create a new `on_*` handler in `handlers.rs`
 4. Call the handler from `tick.rs` or `main.rs` at the appropriate point
-5. Tests: add milestone test in `types.rs` following the existing pattern
+5. Tests: add milestone test following the existing pattern
