@@ -15,6 +15,7 @@ use ratatui::{
 };
 
 /// Draws the stats panel
+#[allow(clippy::too_many_arguments)]
 pub fn draw_stats_panel(
     frame: &mut Frame,
     area: Rect,
@@ -22,6 +23,8 @@ pub fn draw_stats_panel(
     ctx: &LayoutContext,
     enhancement_levels: &[u8; 7],
     achievements: &crate::achievements::Achievements,
+    equipment_showing: bool,
+    equipment_selected_slot: usize,
 ) {
     match ctx.height_tier {
         SizeTier::XL | SizeTier::L => {
@@ -41,7 +44,19 @@ pub fn draw_stats_panel(
             draw_prestige_info(frame, chunks[1], game_state, achievements);
             draw_fishing_panel(frame, chunks[2], game_state, achievements);
             draw_attributes_compact(frame, chunks[3], game_state);
-            draw_equipment_names_only(frame, chunks[4], game_state, enhancement_levels);
+
+            if equipment_showing {
+                super::equipment_detail_scene::render_equipment_detail(
+                    frame,
+                    chunks[4],
+                    game_state,
+                    equipment_selected_slot,
+                    enhancement_levels,
+                    ctx,
+                );
+            } else {
+                draw_equipment_names_only(frame, chunks[4], game_state, enhancement_levels);
+            }
         }
         _ => {
             // M and S don't use stats panel (handled by stacked layout in Phase 3)

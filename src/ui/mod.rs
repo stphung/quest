@@ -234,6 +234,8 @@ fn draw_xl_l_layout(
         ctx,
         enhancement_levels,
         achievements,
+        equipment_showing,
+        equipment_selected_slot,
     );
 
     // Draw ticker
@@ -259,16 +261,7 @@ fn draw_xl_l_layout(
     );
 
     // Draw right panel with stable layout: zone info + content + info panel
-    draw_right_panel(
-        frame,
-        chunks[1],
-        game_state,
-        achievements,
-        ctx,
-        equipment_showing,
-        equipment_selected_slot,
-        enhancement_levels,
-    );
+    draw_right_panel(frame, chunks[1], game_state, achievements, ctx);
 }
 
 /// M tier stacked single-column layout.
@@ -560,29 +553,13 @@ fn draw_challenge_banner(
 
 /// Draws the right panel with a stable 2-part layout: zone info and content.
 /// The content area changes based on activity but zone info stays fixed.
-#[allow(clippy::too_many_arguments)]
 fn draw_right_panel(
     frame: &mut Frame,
     area: Rect,
     game_state: &GameState,
     achievements: &crate::achievements::Achievements,
     ctx: &LayoutContext,
-    equipment_showing: bool,
-    equipment_selected_slot: usize,
-    enhancement_levels: &[u8; 7],
 ) {
-    if equipment_showing {
-        equipment_detail_scene::render_equipment_detail(
-            frame,
-            area,
-            game_state,
-            equipment_selected_slot,
-            enhancement_levels,
-            ctx,
-        );
-        return;
-    }
-
     // Zone info + progress bar at top
     let zone_height = if ctx.tier >= SizeTier::XL { 9 } else { 10 };
     let chunks = Layout::default()
