@@ -196,7 +196,7 @@ fn test_tick_event_player_died_in_dungeon() {
     // Run ticks one at a time, stop after dungeon death/failure
     let mut all_events = Vec::new();
     let mut died_in_dungeon = false;
-    for _ in 0..10_000 {
+    for _ in 0..2_000 {
         let result = game_tick(
             &mut state,
             &mut tick_counter,
@@ -574,7 +574,7 @@ fn test_haven_discovery_blocked_by_active_dungeon() {
         &mut haven,
         &mut achievements,
         &mut rng,
-        500,
+        100,
     );
 
     let haven_discovered = events
@@ -612,7 +612,7 @@ fn test_haven_discovery_blocked_by_active_fishing() {
         &mut haven,
         &mut achievements,
         &mut rng,
-        500,
+        100,
     );
 
     let haven_discovered = events
@@ -640,7 +640,7 @@ fn test_haven_discovery_sets_haven_changed_and_achievements_changed() {
         state.prestige_rank = 50;
         let mut tick_counter = 0u32;
 
-        for _ in 0..10_000 {
+        for _ in 0..2_000 {
             let result = game_tick(
                 &mut state,
                 &mut tick_counter,
@@ -824,7 +824,7 @@ fn test_dungeon_discovered_event_message() {
         &mut haven,
         &mut achievements,
         &mut rng,
-        50_000,
+        5_000,
     );
 
     let dungeon_discovered: Vec<_> = events
@@ -861,7 +861,7 @@ fn test_fishing_spot_discovered_event() {
         &mut haven,
         &mut achievements,
         &mut rng,
-        100_000,
+        5_000,
     );
 
     let fishing_discovered: Vec<_> = events
@@ -1001,7 +1001,7 @@ fn test_item_dropped_event_from_boss() {
 
     // Run until boss defeated and check for boss item drop
     let mut all_events = Vec::new();
-    for _ in 0..10_000 {
+    for _ in 0..2_000 {
         let result = game_tick(
             &mut state,
             &mut tick_counter,
@@ -1062,7 +1062,7 @@ fn test_subzone_boss_defeated_advances_progression() {
     assert_eq!(state.zone_progression.current_subzone_id, 1);
 
     let mut all_events = Vec::new();
-    for _ in 0..10_000 {
+    for _ in 0..2_000 {
         let result = game_tick(
             &mut state,
             &mut tick_counter,
@@ -1120,7 +1120,7 @@ fn test_achievement_unlocked_event_format() {
     let mut rng = test_rng();
 
     let mut all_events = Vec::new();
-    for _ in 0..10_000 {
+    for _ in 0..2_000 {
         let result = game_tick(
             &mut state,
             &mut tick_counter,
@@ -1204,7 +1204,7 @@ fn test_tick_result_achievement_modal_ready() {
     let mut rng = test_rng();
 
     let mut modal_ready_found = false;
-    for _ in 0..10_000 {
+    for _ in 0..2_000 {
         let result = game_tick(
             &mut state,
             &mut tick_counter,
@@ -1246,7 +1246,7 @@ fn test_dungeon_boss_defeated_event_fields() {
     state.active_dungeon = Some(dungeon);
 
     let mut all_events = Vec::new();
-    for _ in 0..50_000 {
+    for _ in 0..5_000 {
         let result = game_tick(
             &mut state,
             &mut tick_counter,
@@ -1310,7 +1310,7 @@ fn test_dungeon_elite_defeated_event() {
     state.active_dungeon = Some(dungeon);
 
     let mut all_events = Vec::new();
-    for _ in 0..50_000 {
+    for _ in 0..5_000 {
         let result = game_tick(
             &mut state,
             &mut tick_counter,

@@ -6,88 +6,7 @@ use crate::dungeon::types::RoomType;
 use crate::zones::get_all_zones;
 use rand::RngExt;
 
-use crate::zones::BossDefeatResult;
-
-/// Haven bonuses that affect combat
-#[derive(Debug, Clone, Default)]
-pub struct HavenCombatBonuses {
-    /// Alchemy Lab: +% HP regen speed
-    pub hp_regen_percent: f64,
-    /// Bedroom: -% HP regen delay (reduces wait time before regen starts)
-    pub hp_regen_delay_reduction: f64,
-    /// Armory: +% damage
-    pub damage_percent: f64,
-    /// Watchtower: +% crit chance
-    pub crit_chance_percent: f64,
-    /// War Room: +% chance to strike twice
-    pub double_strike_chance: f64,
-    /// Training Yard: +% XP from kills
-    pub xp_gain_percent: f64,
-}
-
-/// God item bonuses that affect combat
-pub struct GodItemCombatBonuses {
-    /// Asprika: Divine Bulwark damage reduction percent
-    pub damage_reduction_percent: f64,
-    /// Sleipnir: Windborne attack speed percent bonus
-    pub attack_speed_percent: f64,
-    /// Sleipnir: Swiftstrider regen duration reduction percent
-    pub regen_reduction_percent: f64,
-    /// Megingjord: Giant's Might damage percent bonus
-    pub damage_percent: f64,
-}
-
-impl Default for GodItemCombatBonuses {
-    fn default() -> Self {
-        Self {
-            damage_reduction_percent: 0.0,
-            attack_speed_percent: 0.0,
-            regen_reduction_percent: 0.0,
-            damage_percent: 0.0,
-        }
-    }
-}
-
-pub enum CombatEvent {
-    PlayerAttack {
-        damage: u32,
-        was_crit: bool,
-    },
-    /// Player's attack was blocked because boss requires a weapon
-    PlayerAttackBlocked {
-        weapon_needed: String,
-    },
-    EnemyAttack {
-        damage: u32,
-    },
-    /// Damage reflected back to the enemy when they hit the player
-    DamageReflected {
-        damage: u32,
-    },
-    PlayerDied,
-    /// Player died while in a dungeon (no prestige loss)
-    PlayerDiedInDungeon,
-    EnemyDied {
-        xp_gained: u64,
-    },
-    /// Elite enemy defeated in dungeon (player gets key)
-    EliteDefeated {
-        xp_gained: u64,
-    },
-    /// Boss enemy defeated in dungeon (dungeon complete)
-    BossDefeated {
-        xp_gained: u64,
-    },
-    /// HP regen completed after a kill
-    RegenComplete {
-        healed: u32,
-    },
-    /// Subzone boss defeated (zone progression)
-    SubzoneBossDefeated {
-        xp_gained: u64,
-        result: BossDefeatResult,
-    },
-}
+use super::events::{CombatEvent, GodItemCombatBonuses, HavenCombatBonuses};
 
 /// Calculates the effective enemy attack interval for the current encounter.
 /// Uses fixed constants per enemy tier (game design doc values).
@@ -141,54 +60,7 @@ pub fn update_combat(
 
     // Handle regeneration after enemy death
     if state.combat_state.is_regenerating {
-        // HP regen multiplier: higher = faster regen (equipment + haven bonus)
-        let total_regen_multiplier =
-            derived.hp_regen_multiplier * (1.0 + haven.hp_regen_percent / 100.0);
-
-        // Apply Bedroom bonus: reduce base regen duration
-        let base_regen_duration = HP_REGEN_DURATION_SECONDS
-            * (1.0 - haven.hp_regen_delay_reduction / 100.0)
-            * (1.0 - god_items.regen_reduction_percent / 100.0);
-        let effective_regen_duration = base_regen_duration / total_regen_multiplier;
-
-        state.combat_state.regen_timer += delta_time;
-
-        if state.combat_state.regen_timer >= effective_regen_duration {
-            let healed = state
-                .combat_state
-                .player_max_hp
-                .saturating_sub(state.combat_state.regen_start_hp);
-            state.combat_state.player_current_hp = state.combat_state.player_max_hp;
-            state.combat_state.is_regenerating = false;
-            state.combat_state.regen_timer = 0.0;
-            if healed > 0 {
-                events.push(CombatEvent::RegenComplete { healed });
-            }
-        } else {
-            // Gradual regen
-            let regen_progress = state.combat_state.regen_timer / effective_regen_duration;
-            let start_hp = state.combat_state.player_current_hp;
-            let target_hp = state.combat_state.player_max_hp;
-            state.combat_state.player_current_hp =
-                start_hp + ((target_hp - start_hp) as f64 * regen_progress) as u32;
-
-            // Emit periodic heal floats every 0.5s so they align with HP bar fill
-            const REGEN_FLOAT_INTERVAL: f64 = 0.5;
-            let prev_bucket =
-                ((state.combat_state.regen_timer - delta_time) / REGEN_FLOAT_INTERVAL) as u32;
-            let curr_bucket = (state.combat_state.regen_timer / REGEN_FLOAT_INTERVAL) as u32;
-            if curr_bucket > prev_bucket {
-                let healed = state
-                    .combat_state
-                    .player_current_hp
-                    .saturating_sub(state.combat_state.regen_start_hp);
-                if healed > 0 {
-                    events.push(CombatEvent::RegenComplete { healed });
-                    state.combat_state.regen_start_hp = state.combat_state.player_current_hp;
-                }
-            }
-        }
-        return events;
+        return super::regen::process_regen(state, delta_time, haven, god_items, derived);
     }
 
     // No combat if no enemy
@@ -275,70 +147,12 @@ pub fn update_combat(
 
                 // Check if enemy died
                 if !enemy.is_alive() {
-                    let wis_mod = state
-                        .attributes
-                        .modifier(crate::character::attributes::AttributeType::Wisdom);
-                    let cha_mod = state
-                        .attributes
-                        .modifier(crate::character::attributes::AttributeType::Charisma);
-                    let xp_gained = crate::core::game_logic::combat_kill_xp(
-                        crate::core::game_logic::xp_gain_per_tick(
-                            state.prestige_rank,
-                            wis_mod,
-                            cha_mod,
-                        ),
+                    let (death_events, _) = super::damage::handle_enemy_death(
+                        state,
+                        achievements,
                         haven.xp_gain_percent,
                     );
-
-                    // Check if we're in a dungeon and what type of room
-                    let dungeon_room_type = state
-                        .active_dungeon
-                        .as_ref()
-                        .and_then(|d| d.current_room())
-                        .map(|r| r.room_type);
-
-                    // Track if this was a boss-level kill for achievements
-                    let is_boss_kill = matches!(
-                        dungeon_room_type,
-                        Some(RoomType::Elite) | Some(RoomType::Boss)
-                    ) || (state.active_dungeon.is_none()
-                        && state.zone_progression.fighting_boss);
-
-                    match dungeon_room_type {
-                        Some(RoomType::Elite) => {
-                            events.push(CombatEvent::EliteDefeated { xp_gained });
-                        }
-                        Some(RoomType::Boss) => {
-                            events.push(CombatEvent::BossDefeated { xp_gained });
-                        }
-                        _ => {
-                            if state.active_dungeon.is_some() {
-                                // Dungeon Combat room kill — don't affect zone progression
-                                events.push(CombatEvent::EnemyDied { xp_gained });
-                            } else if state.zone_progression.fighting_boss {
-                                // Overworld boss defeated
-                                let result = state
-                                    .zone_progression
-                                    .on_boss_defeated(state.prestige_rank, achievements);
-                                events.push(CombatEvent::SubzoneBossDefeated { xp_gained, result });
-                            } else {
-                                // Record the kill for boss spawn tracking (boss flag set if threshold reached)
-                                state.zone_progression.record_kill();
-                                events.push(CombatEvent::EnemyDied { xp_gained });
-                            }
-                        }
-                    }
-
-                    // Track kill for achievements
-                    achievements.on_enemy_killed(is_boss_kill, Some(&state.character_name));
-
-                    // Remove enemy and start regeneration
-                    state.combat_state.current_enemy = None;
-                    state.combat_state.enemy_attack_timer = 0.0;
-                    state.combat_state.is_regenerating = true;
-                    state.combat_state.regen_timer = 0.0;
-                    state.combat_state.regen_start_hp = state.combat_state.player_current_hp;
-
+                    events.extend(death_events);
                     return events;
                 }
             }
@@ -380,61 +194,9 @@ pub fn update_combat(
 
             // Check if reflection killed the enemy
             if !enemy.is_alive() {
-                let wis_mod = state
-                    .attributes
-                    .modifier(crate::character::attributes::AttributeType::Wisdom);
-                let cha_mod = state
-                    .attributes
-                    .modifier(crate::character::attributes::AttributeType::Charisma);
-                let xp_gained = crate::core::game_logic::combat_kill_xp(
-                    crate::core::game_logic::xp_gain_per_tick(
-                        state.prestige_rank,
-                        wis_mod,
-                        cha_mod,
-                    ),
-                    haven.xp_gain_percent,
-                );
-
-                let dungeon_room_type = state
-                    .active_dungeon
-                    .as_ref()
-                    .and_then(|d| d.current_room())
-                    .map(|r| r.room_type);
-
-                let is_boss_kill = matches!(
-                    dungeon_room_type,
-                    Some(RoomType::Elite) | Some(RoomType::Boss)
-                ) || (state.active_dungeon.is_none()
-                    && state.zone_progression.fighting_boss);
-
-                match dungeon_room_type {
-                    Some(RoomType::Elite) => {
-                        events.push(CombatEvent::EliteDefeated { xp_gained });
-                    }
-                    Some(RoomType::Boss) => {
-                        events.push(CombatEvent::BossDefeated { xp_gained });
-                    }
-                    _ => {
-                        if state.active_dungeon.is_some() {
-                            events.push(CombatEvent::EnemyDied { xp_gained });
-                        } else if state.zone_progression.fighting_boss {
-                            let result = state
-                                .zone_progression
-                                .on_boss_defeated(state.prestige_rank, achievements);
-                            events.push(CombatEvent::SubzoneBossDefeated { xp_gained, result });
-                        } else {
-                            state.zone_progression.record_kill();
-                            events.push(CombatEvent::EnemyDied { xp_gained });
-                        }
-                    }
-                }
-
-                achievements.on_enemy_killed(is_boss_kill, Some(&state.character_name));
-
-                state.combat_state.current_enemy = None;
-                state.combat_state.is_regenerating = true;
-                state.combat_state.regen_timer = 0.0;
-
+                let (death_events, _) =
+                    super::damage::handle_enemy_death(state, achievements, haven.xp_gain_percent);
+                events.extend(death_events);
                 return events;
             }
 

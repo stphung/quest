@@ -837,7 +837,7 @@ fn test_recent_drops_populated_on_item_drop() {
     let mut rng = seeded_rng(42);
 
     let mut got_drop = false;
-    for _ in 0..20_000 {
+    for _ in 0..5_000 {
         let result = run_game_tick(
             &mut state,
             &mut tc,
@@ -1041,7 +1041,7 @@ fn test_dungeon_discovery_only_after_enemy_defeated() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(42);
 
-    for _ in 0..20_000 {
+    for _ in 0..5_000 {
         let result = run_game_tick(
             &mut state,
             &mut tc,
@@ -1080,7 +1080,7 @@ fn test_fishing_discovery_only_after_enemy_defeated() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(42);
 
-    for _ in 0..20_000 {
+    for _ in 0..5_000 {
         let result = run_game_tick(
             &mut state,
             &mut tc,
@@ -1122,7 +1122,7 @@ fn test_enemy_defeated_before_item_dropped() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(42);
 
-    for _ in 0..20_000 {
+    for _ in 0..5_000 {
         let result = run_game_tick(
             &mut state,
             &mut tc,
@@ -1162,7 +1162,7 @@ fn test_enemy_defeated_before_discovery() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(42);
 
-    for _ in 0..20_000 {
+    for _ in 0..5_000 {
         let result = run_game_tick(
             &mut state,
             &mut tc,

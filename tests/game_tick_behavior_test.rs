@@ -20,7 +20,8 @@ use quest::achievements::Achievements;
 use quest::character::attributes::AttributeType;
 use quest::character::derived_stats::DerivedStats;
 use quest::character::prestige::PrestigeCombatBonuses;
-use quest::combat::logic::{update_combat, CombatEvent, GodItemCombatBonuses, HavenCombatBonuses};
+use quest::combat::logic::update_combat;
+use quest::combat::{CombatEvent, GodItemCombatBonuses, HavenCombatBonuses};
 use quest::core::game_logic::{
     apply_tick_xp, spawn_enemy_if_needed, try_discover_dungeon, xp_for_next_level,
 };

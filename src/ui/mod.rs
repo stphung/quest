@@ -342,7 +342,6 @@ fn draw_s_layout(
     }
 
     // Standard S layout: combat-focused
-    let _ = achievements; // Not used in S layout currently
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -369,7 +368,7 @@ fn draw_s_layout(
     draw_s_enemy_hp(frame, chunks[3], game_state);
 
     // Combat status
-    combat_scene::draw_combat_scene(frame, chunks[4], game_state, ctx);
+    combat_scene::draw_combat_scene(frame, chunks[4], game_state, achievements, ctx);
 
     // Event ticker
     ticker::draw_ticker(frame, chunks[5], &game_state.ticker);
@@ -591,7 +590,7 @@ fn draw_right_content(
             } else if let Some(dungeon) = &game_state.active_dungeon {
                 draw_dungeon_view(frame, area, game_state, dungeon, achievements, ctx);
             } else {
-                combat_scene::draw_combat_scene(frame, area, game_state, ctx);
+                combat_scene::draw_combat_scene(frame, area, game_state, achievements, ctx);
             }
         }
     }

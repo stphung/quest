@@ -280,46 +280,137 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
         }
     }
 
-    // Small fishing boat with gentle bob.
+    // Halfblock sailboat with gentle bob.
+    //
+    // Layout (~13 wide, 5 tall):
+    //   row 0:          ▸         pennant
+    //   row 1:         ╱│         sail top + mast
+    //   row 2:        ╱ │         sail body + mast
+    //   row 3:    ▄▄▟█▀▀█▀█▙▄▄   deck (halfblock taper)
+    //   row 4:     ▀▀▄████▄▀▀    hull bottom
+    //   row 5:        ▀▀▀▀       keel/waterline
     let boat_center = ((width as f64 * 0.35) + (wave_tick * 0.04).sin() * 2.0).round() as i32;
-    let boat_row = (horizon + 1).min(height.saturating_sub(2)) as i32;
-    let hull = "_/___\\_";
-    let hull_start = boat_center - (hull.len() as i32 / 2);
-    for (idx, ch) in hull.chars().enumerate() {
-        let hull_fg = match idx {
-            0 | 6 => Color::Rgb(242, 176, 96),
-            1 | 5 => Color::Rgb(188, 118, 70),
-            _ => Color::Rgb(94, 58, 36),
+    let deck_row = (horizon + 1).min(height.saturating_sub(4)) as i32;
+    let mast_x = boat_center;
+    let mast_top = deck_row - 3;
+
+    // Colour palette.
+    let hull_dark = (94, 58, 36);
+    let hull_mid = (140, 90, 52);
+    let hull_light = (188, 140, 86);
+    let deck_color = (188, 148, 96);
+    let mast_color = Color::Rgb(210, 168, 104);
+    let sail_color = Color::Rgb(245, 235, 215);
+    let pennant_color = Color::Rgb(255, 96, 72);
+
+    // Helper: set a cell with explicit fg, bg, and char.
+    let set = |buf: &mut Vec<Vec<SceneCell>>,
+               r: i32,
+               c: i32,
+               ch: char,
+               fg: (u8, u8, u8),
+               bg: (u8, u8, u8)| {
+        if r < 0 || c < 0 {
+            return;
+        }
+        let (ru, cu) = (r as usize, c as usize);
+        if ru < buf.len() && cu < buf[ru].len() {
+            buf[ru][cu] = SceneCell {
+                ch,
+                fg: Color::Rgb(fg.0, fg.1, fg.2),
+                bg: Color::Rgb(bg.0, bg.1, bg.2),
+            };
+        }
+    };
+
+    // Helper: get bg color tuple at a buffer position.
+    let bg_at = |buf: &[Vec<SceneCell>], r: i32, c: i32| -> (u8, u8, u8) {
+        if r < 0 || c < 0 {
+            return (0, 0, 0);
+        }
+        let (ru, cu) = (r as usize, c as usize);
+        if ru < buf.len() && cu < buf[ru].len() {
+            match buf[ru][cu].bg {
+                Color::Rgb(r, g, b) => (r, g, b),
+                _ => (0, 0, 0),
+            }
+        } else {
+            (0, 0, 0)
+        }
+    };
+
+    // Row 0: pennant at mast top.
+    put_cell(&mut buffer, mast_top, mast_x + 1, '▸', pennant_color);
+
+    // Rows 1-2: sail (triangular) + mast.
+    // Sail uses ╱ for the leading edge; mast is │.
+    put_cell(&mut buffer, mast_top + 1, mast_x - 1, '╱', sail_color);
+    put_cell(&mut buffer, mast_top + 1, mast_x, '│', mast_color);
+
+    put_cell(&mut buffer, mast_top + 2, mast_x - 2, '╱', sail_color);
+    // Fill sail interior.
+    let sail_fill = Color::Rgb(238, 228, 208);
+    put_cell(&mut buffer, mast_top + 2, mast_x - 1, '░', sail_fill);
+    put_cell(&mut buffer, mast_top + 2, mast_x, '│', mast_color);
+
+    // Row 3: deck — halfblock tapered edges blending into surrounding bg.
+    // Pattern: ▄▄▟█▀▀█▀▀█▙▄▄  (13 chars, centered on mast_x)
+    // Offsets from mast_x: -6 to +6
+    let dr = deck_row;
+    // Far-left taper: ▄ with fg=deck, bg=existing
+    let bg0 = bg_at(&buffer, dr, mast_x - 6);
+    set(&mut buffer, dr, mast_x - 6, '▄', deck_color, bg0);
+    let bg1 = bg_at(&buffer, dr, mast_x - 5);
+    set(&mut buffer, dr, mast_x - 5, '▄', hull_mid, bg1);
+    // ▟ quarter block (lower-right filled): fg=hull, bg=existing
+    let bg2 = bg_at(&buffer, dr, mast_x - 4);
+    set(&mut buffer, dr, mast_x - 4, '▟', hull_mid, bg2);
+    // Solid deck section.
+    for dx in -3..=3 {
+        let c = if dx == 0 { '│' } else { '█' };
+        let fg = if dx == 0 {
+            match mast_color {
+                Color::Rgb(r, g, b) => (r, g, b),
+                _ => deck_color,
+            }
+        } else {
+            deck_color
         };
-        put_cell(&mut buffer, boat_row, hull_start + idx as i32, ch, hull_fg);
+        set(&mut buffer, dr, mast_x + dx, c, fg, hull_dark);
+    }
+    // Right taper: ▙ then ▄▄
+    let bg3 = bg_at(&buffer, dr, mast_x + 4);
+    set(&mut buffer, dr, mast_x + 4, '▙', hull_mid, bg3);
+    let bg4 = bg_at(&buffer, dr, mast_x + 5);
+    set(&mut buffer, dr, mast_x + 5, '▄', hull_mid, bg4);
+    let bg5 = bg_at(&buffer, dr, mast_x + 6);
+    set(&mut buffer, dr, mast_x + 6, '▄', deck_color, bg5);
+
+    // Row 4: hull bottom — ▀ chars blending hull top into water bg below.
+    // Pattern:  ▀▄████▄▀  (offset -4..+4, narrower than deck)
+    let hr = deck_row + 1;
+    let bg_l3 = bg_at(&buffer, hr, mast_x - 4);
+    set(&mut buffer, hr, mast_x - 4, '▀', hull_mid, bg_l3);
+    let bg_l2 = bg_at(&buffer, hr, mast_x - 3);
+    set(&mut buffer, hr, mast_x - 3, '▄', hull_dark, bg_l2);
+    for dx in -2..=2 {
+        set(&mut buffer, hr, mast_x + dx, '█', hull_dark, hull_dark);
+    }
+    let bg_r2 = bg_at(&buffer, hr, mast_x + 3);
+    set(&mut buffer, hr, mast_x + 3, '▄', hull_dark, bg_r2);
+    let bg_r3 = bg_at(&buffer, hr, mast_x + 4);
+    set(&mut buffer, hr, mast_x + 4, '▀', hull_mid, bg_r3);
+
+    // Row 5: keel/waterline — ▀ blending hull color as fg into water bg.
+    let kr = deck_row + 2;
+    for dx in -1..=1 {
+        let bg_k = bg_at(&buffer, kr, mast_x + dx);
+        set(&mut buffer, kr, mast_x + dx, '▀', hull_dark, bg_k);
     }
 
-    let mast_x = boat_center;
-    let mast_top = boat_row - 2;
-    for y in mast_top..=boat_row {
-        put_cell(&mut buffer, y, mast_x, '|', Color::Rgb(236, 180, 108));
-    }
-    put_cell(
-        &mut buffer,
-        mast_top + 1,
-        mast_x + 1,
-        '\\',
-        Color::Rgb(255, 172, 96),
-    );
-    put_cell(
-        &mut buffer,
-        mast_top,
-        mast_x + 2,
-        '\\',
-        Color::Rgb(255, 172, 96),
-    );
-    put_cell(
-        &mut buffer,
-        mast_top,
-        mast_x + 1,
-        '>',
-        Color::Rgb(255, 96, 72),
-    );
+    // Small highlight stripe on upper hull for depth.
+    let bg_hl = bg_at(&buffer, dr, mast_x - 3);
+    set(&mut buffer, dr, mast_x - 3, '▓', hull_light, bg_hl);
 
     // Bobber and interaction response by fishing phase.
     let (bobber_ratio, bobber_amp, bobber_sink, bobber_char, bobber_color, ripple_radius) =
