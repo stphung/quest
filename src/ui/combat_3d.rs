@@ -9,7 +9,9 @@ use ratatui::{
 use super::enemy_sprites::{
     detect_enemy_tier, get_sprite_for_enemy, zone_palette, EnemyTier, BOSS_CROWN, ZONE_BOSS_CROWN,
 };
-use super::scene_fx::{current_millis, hash2d, lerp_rgb, put_cell, render_buffer, SceneCell};
+use super::scene_fx::{
+    clamp_u8, current_millis, hash2d, lerp_rgb, lift_rgb, put_cell, render_buffer, SceneCell,
+};
 
 /// Returns the effective zone_id for the current combat context.
 fn effective_zone_id(game_state: &GameState) -> u32 {
@@ -495,16 +497,4 @@ fn zone_backdrop_theme(zone_id: u32) -> ZoneBackdropTheme {
             particle_mod: 151,
         },
     }
-}
-
-fn clamp_u8(value: i16) -> u8 {
-    value.clamp(0, 255) as u8
-}
-
-fn lift_rgb(rgb: (u8, u8, u8), amount: i16) -> (u8, u8, u8) {
-    (
-        clamp_u8(rgb.0 as i16 + amount),
-        clamp_u8(rgb.1 as i16 + amount),
-        clamp_u8(rgb.2 as i16 + amount),
-    )
 }
