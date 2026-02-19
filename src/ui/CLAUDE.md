@@ -38,6 +38,7 @@ src/ui/
 ├── runic_shift_scene.rs     # Sigil Surge game (panel-matching, rune grid)
 ├── soulforge_scene.rs        # Soulforge enhancement overlay
 ├── scene_fx.rs               # Shared utilities for layered ASCII scene rendering
+├── zone_bg.rs                # Stylized zone background scenes (6-layer compositing, all 11 zones)
 │
 ├── character_select.rs       # Character list with preview panel
 ├── character_creation.rs     # Name input with real-time validation

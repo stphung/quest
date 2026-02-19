@@ -234,6 +234,7 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 - `soulforge_scene.rs` — Soulforge enhancement overlay
 - `chess_scene.rs`, `go_scene.rs`, `morris_scene.rs`, `gomoku_scene.rs`, `minesweeper_scene.rs`, `rune_scene.rs`, `snake_scene.rs`, `flappy_scene.rs`, `jezzball_scene.rs`, `runic_shift_scene.rs` — Minigame UIs
 - `scene_fx.rs` — Shared utilities for layered ASCII scene rendering (scene buffer, backdrop effects)
+- `zone_bg.rs` — Stylized zone background scenes with 6-layer compositing pipeline for all 11 zones
 - `debug_menu_scene.rs` — Debug menu overlay
 - `help_overlay.rs` — Help/controls overlay
 - `throbber.rs` — Shared spinner animations and atmospheric messages
@@ -381,6 +382,8 @@ quest/
 │       ├── flappy_scene.rs  # Flappy Bird UI
 │       ├── jezzball_scene.rs # JezzBall UI
 │       ├── soulforge_scene.rs # Soulforge enhancement UI
+│       ├── scene_fx.rs       # Shared utilities for layered ASCII scene rendering
+│       ├── zone_bg.rs        # Stylized zone background scenes (6-layer compositing)
 │       ├── *_scene.rs       # Various game scenes
 │       └── character_*.rs   # Character management UI
 ├── tests/                   # Integration tests (16 test files, 2,900+ tests)
