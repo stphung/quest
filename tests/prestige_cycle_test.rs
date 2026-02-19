@@ -363,6 +363,34 @@ fn test_combat_to_prestige_full_loop() {
     assert!(post_prestige_kill, "Combat should work after prestige");
 }
 
+/// Test prestige clears XP rate samples so ETA recalculates from fresh data
+#[test]
+fn test_prestige_clears_xp_rate_tracking() {
+    let mut state = GameState::new("ETA Reset Hero".to_string(), 0);
+
+    // Simulate XP rate tracking with stale high-level data
+    for _ in 0..50 {
+        state.xp_rate_samples.push_back(5000);
+    }
+    state.xp_this_second = 1234;
+
+    // Verify we have rate data before prestige
+    assert!(state.xp_per_hour().is_some());
+
+    // Level up and prestige
+    while state.character_level < 10 {
+        apply_tick_xp(&mut state, 10000.0);
+    }
+    perform_prestige(&mut state);
+
+    // XP rate samples should be cleared
+    assert!(state.xp_rate_samples.is_empty());
+    assert_eq!(state.xp_this_second, 0);
+
+    // xp_per_hour should return None (not enough samples yet)
+    assert!(state.xp_per_hour().is_none());
+}
+
 /// Test prestige XP multiplier affects future gains
 #[test]
 fn test_prestige_xp_multiplier() {
