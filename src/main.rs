@@ -417,6 +417,28 @@ fn log_synced_achievements(
 
 /// Track achievements that may have changed from input handling (prestige, minigame wins).
 /// Saving is handled by the caller via save_all().
+///
+/// # Why this lives in main.rs (R4 skip rationale)
+///
+/// A previous refactoring pass (R4) considered moving these two triggers into
+/// `tick.rs` or the relevant domain modules so that all achievement tracking is
+/// co-located with game logic.  That was deferred for the following reasons:
+///
+/// **Prestige**: Prestige fires from user input (Enter on the prestige dialog),
+/// not from `game_tick()`.  Moving it to `tick.rs` would require either:
+/// (a) adding a `prestige_changed` flag to `TickResult`, or
+/// (b) having `tick.rs` compare the current and previous prestige rank each
+///     tick — introducing a data-dependency the tick engine doesn't currently
+///     carry.  Both options expand `TickResult`'s interface for minimal gain.
+///
+/// **Minigame wins**: `state.last_minigame_win` is set inside input handlers.
+/// `tick.rs` *could* drain it, but that would delay the achievement by one tick
+/// (100 ms) and place input-state management inside a pure-logic function.
+///
+/// The current design is a clean two-phase split: `game_tick()` handles all
+/// autonomous game events; `track_input_achievements()` handles the two cases
+/// where achievement progress is driven directly by player input.  Revisit if
+/// the number of input-driven achievements grows significantly.
 fn track_input_achievements(
     state: &mut GameState,
     global_achievements: &mut achievements::Achievements,
