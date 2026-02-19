@@ -2,9 +2,15 @@
 //!
 //! Extracts the input dispatch logic from main.rs into a clean priority chain.
 
-use crate::achievements::get_achievements_by_category;
-use crate::enhancement;
+pub mod types;
 
+// Re-export all types for backward compatibility
+pub use types::*;
+
+// Re-export soulforge UI types from enhancement module
+pub use crate::enhancement::{EnhancementResult, SoulforgePhase, SoulforgeUiState};
+
+use crate::achievements::get_achievements_by_category;
 use crate::challenges::chess::logic::{
     apply_game_result as apply_chess_result, process_input as process_chess_input, ChessInput,
 };
@@ -40,96 +46,13 @@ use crate::challenges::snake::logic::{
 };
 use crate::challenges::ActiveMinigame;
 use crate::character::prestige::{can_prestige, get_prestige_tier, perform_prestige};
-use crate::core::game_logic::OfflineReport;
 use crate::core::game_state::GameState;
+use crate::enhancement;
 use crate::haven;
 use crate::haven::Haven;
 use crate::items;
 use crate::utils::debug_menu::DebugMenu;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
-
-/// Haven confirmation dialog state
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HavenConfirmation {
-    None,
-    Build,
-    Forge,
-}
-
-/// Haven overlay state, shared between CharacterSelect and Game screens.
-pub struct HavenUiState {
-    pub showing: bool,
-    pub selected_room: usize,
-    pub confirmation: HavenConfirmation,
-}
-
-impl HavenUiState {
-    pub fn new() -> Self {
-        Self {
-            showing: false,
-            selected_room: 0,
-            confirmation: HavenConfirmation::None,
-        }
-    }
-
-    pub fn open(&mut self) {
-        self.showing = true;
-        self.selected_room = 0;
-        self.confirmation = HavenConfirmation::None;
-    }
-
-    pub fn close(&mut self) {
-        self.showing = false;
-        self.confirmation = HavenConfirmation::None;
-    }
-}
-
-// Re-export soulforge UI types from enhancement module
-pub use crate::enhancement::{EnhancementResult, SoulforgePhase, SoulforgeUiState};
-
-/// Game-screen overlay state. At most one is active at a time.
-pub enum GameOverlay {
-    None,
-    Help,
-    HavenDiscovery,
-    SoulforgeDiscovery,
-    PrestigeConfirm,
-    VaultSelection {
-        selected_index: usize,
-        selected_slots: Vec<items::EquipmentSlot>,
-        confirm_pending: bool,
-    },
-    OfflineWelcome {
-        report: OfflineReport,
-    },
-    Achievements {
-        browser: crate::ui::achievement_browser_scene::AchievementBrowserState,
-    },
-    /// Achievement unlock celebration modal
-    AchievementUnlocked {
-        achievements: Vec<crate::achievements::AchievementId>,
-    },
-    /// Storm Leviathan encounter modal (fishing)
-    LeviathanEncounter {
-        encounter_number: u8,
-    },
-    /// Quit confirmation when pending challenges exist
-    QuitConfirm,
-}
-
-/// Result of handling a game input event.
-pub enum InputResult {
-    /// Continue the game loop normally.
-    Continue,
-    /// Player quit to character select. State should be saved first.
-    QuitToSelect,
-    /// State was modified (prestige, haven build) and should be saved.
-    NeedsSave,
-    /// Haven was modified along with state — save both.
-    NeedsSaveAll,
-    /// Toggle the update details expanded state.
-    ToggleUpdateDetails,
-}
 
 /// Main dispatcher for Game screen input. Handles the priority chain.
 #[allow(clippy::too_many_arguments)]
