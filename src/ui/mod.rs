@@ -290,7 +290,7 @@ fn draw_m_layout(
     idx += 1;
 
     // Activity area - dispatched by current activity
-    draw_right_content(frame, chunks[idx], game_state, ctx);
+    draw_right_content(frame, chunks[idx], game_state, achievements, ctx);
     idx += 1;
 
     // Event ticker
@@ -336,7 +336,7 @@ fn draw_s_layout(
             .split(area);
 
         stats_panel::draw_compact_stats_bar(frame, chunks[0], game_state, ctx);
-        draw_right_content(frame, chunks[1], game_state, ctx);
+        draw_right_content(frame, chunks[1], game_state, achievements, ctx);
         stats_panel::draw_footer_minimal(frame, chunks[2], game_state);
         return;
     }
@@ -523,12 +523,18 @@ fn draw_right_panel(
     stats_panel::draw_zone_info(frame, chunks[0], game_state, achievements, ctx);
 
     // Content area — dispatched by current activity
-    draw_right_content(frame, chunks[1], game_state, ctx);
+    draw_right_content(frame, chunks[1], game_state, achievements, ctx);
 }
 
 /// Draws the main content area of the right panel based on current activity.
 /// Priority: minigame > challenge menu > fishing > dungeon > combat
-fn draw_right_content(frame: &mut Frame, area: Rect, game_state: &GameState, ctx: &LayoutContext) {
+fn draw_right_content(
+    frame: &mut Frame,
+    area: Rect,
+    game_state: &GameState,
+    achievements: &crate::achievements::Achievements,
+    ctx: &LayoutContext,
+) {
     // Show "[Press any key]" only after the game-over dismiss cooldown expires
     let show_dismiss_hint = game_state
         .game_over_shown_at
@@ -583,12 +589,38 @@ fn draw_right_content(frame: &mut Frame, area: Rect, game_state: &GameState, ctx
             } else if let Some(ref session) = game_state.active_fishing {
                 fishing_scene::render_fishing_scene(frame, area, session, &game_state.fishing, ctx);
             } else if let Some(dungeon) = &game_state.active_dungeon {
-                draw_dungeon_view(frame, area, game_state, dungeon, ctx);
+                draw_dungeon_view(frame, area, game_state, dungeon, achievements, ctx);
             } else {
                 combat_scene::draw_combat_scene(frame, area, game_state, ctx);
             }
         }
     }
+}
+
+/// Returns the icon of the highest unlocked dungeon achievement, if any.
+fn highest_dungeon_badge(achievements: &crate::achievements::Achievements) -> Option<&'static str> {
+    use crate::achievements::AchievementId;
+
+    let dungeon_achievements = [
+        AchievementId::DungeonMasterX,
+        AchievementId::DungeonMasterIX,
+        AchievementId::DungeonMasterVIII,
+        AchievementId::DungeonMasterVII,
+        AchievementId::DungeonMasterVI,
+        AchievementId::DungeonMasterV,
+        AchievementId::DungeonMasterIV,
+        AchievementId::DungeonMasterIII,
+        AchievementId::DungeonMasterII,
+        AchievementId::DungeonMasterI,
+        AchievementId::DungeonDiver,
+    ];
+
+    for id in dungeon_achievements {
+        if achievements.is_unlocked(id) {
+            return crate::achievements::data::get_achievement_def(id).map(|def| def.icon);
+        }
+    }
+    None
 }
 
 /// Draws the dungeon view with combat HUD overlay on the map.
@@ -599,13 +631,18 @@ fn draw_dungeon_view(
     area: Rect,
     game_state: &GameState,
     dungeon: &crate::dungeon::types::Dungeon,
+    achievements: &crate::achievements::Achievements,
     _ctx: &LayoutContext,
 ) {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     // Single border wrapping everything
+    let dungeon_title = match highest_dungeon_badge(achievements) {
+        Some(icon) => format!(" Dungeon {} ", icon),
+        None => " Dungeon ".to_string(),
+    };
     let block = Block::default()
-        .title(" Dungeon ")
+        .title(dungeon_title)
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Magenta));
 
