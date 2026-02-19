@@ -1,6 +1,7 @@
 //! Helper functions extracted from main.rs for maintainability.
 
 pub mod achievements;
+pub mod character_screens;
 pub mod offline;
 pub mod overlay;
 pub mod persistence;

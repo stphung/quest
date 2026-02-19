@@ -17,23 +17,22 @@ mod ui;
 mod utils;
 mod zones;
 
-use character::input::{
-    process_creation_input, process_delete_input, process_rename_input, process_select_input,
-    CreationInput, CreationResult, DeleteInput, DeleteResult, RenameInput, RenameResult,
-    SelectInput, SelectResult,
-};
 use character::manager::CharacterManager;
 use chrono::{Local, Utc};
 use core::constants::*;
 use core::game_state::*;
 use input::{GameOverlay, HavenUiState, InputResult, SoulforgeUiState};
-use main_helpers::achievements::{log_synced_achievements, track_input_achievements};
+use main_helpers::achievements::track_input_achievements;
+use main_helpers::character_screens::{
+    handle_creation_frame, handle_delete_frame, handle_rename_frame, handle_select_frame,
+    ScreenTransition,
+};
 use main_helpers::offline::apply_offline_xp;
 use main_helpers::overlay::draw_game_overlays;
 use main_helpers::persistence::save_all;
 use main_helpers::scene::{current_scene_kind, is_realtime_minigame, is_wide_scene};
 use main_helpers::update::{jittered_update_interval, show_startup_update_notification};
-use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use ratatui::crossterm::event::{self, Event, KeyEventKind};
 use ratatui::crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
@@ -163,379 +162,80 @@ fn main() -> io::Result<()> {
         }
         match current_screen {
             Screen::CharacterCreation => {
-                // Draw character creation screen
-                terminal.draw(|f| {
-                    let area = f.area();
-                    let ctx = ui::responsive::LayoutContext::from_frame(f);
-                    creation_screen.draw(f, area, &ctx);
-                })?;
-
-                // Handle input
-                if event::poll(Duration::from_millis(50))? {
-                    if let Event::Key(key_event) = event::read()? {
-                        if key_event.kind != KeyEventKind::Press {
-                            continue;
-                        }
-                        let input = match key_event.code {
-                            KeyCode::Char(c) => CreationInput::Char(c),
-                            KeyCode::Backspace => CreationInput::Backspace,
-                            KeyCode::Enter => CreationInput::Submit,
-                            KeyCode::Esc => CreationInput::Cancel,
-                            _ => CreationInput::Other,
-                        };
-
-                        let has_existing = !character_manager.list_characters()?.is_empty();
-                        let result = process_creation_input(
-                            &mut creation_screen,
-                            input,
-                            &character_manager,
-                            has_existing,
-                        );
-
-                        match result {
-                            CreationResult::Created | CreationResult::Cancelled => {
-                                creation_screen = CharacterCreationScreen::new();
-                                select_screen = CharacterSelectScreen::new();
-                                current_screen = Screen::CharacterSelect;
-                            }
-                            CreationResult::Continue | CreationResult::SaveFailed(_) => {}
-                        }
-                    }
+                let transition =
+                    handle_creation_frame(&mut terminal, &mut creation_screen, &character_manager)?;
+                if let ScreenTransition::GoToSelect = transition {
+                    creation_screen = CharacterCreationScreen::new();
+                    select_screen = CharacterSelectScreen::new();
+                    current_screen = Screen::CharacterSelect;
                 }
             }
 
             Screen::CharacterSelect => {
-                // Refresh character list
-                let characters = character_manager.list_characters()?;
-
-                // Draw character select screen (includes Haven tree visualization)
-                terminal.draw(|f| {
-                    let area = f.area();
-                    let ctx = ui::responsive::LayoutContext::from_frame(f);
-                    select_screen.draw(f, area, &characters, &haven, &enhancement, &ctx);
-                    // Draw Haven management overlay if open
-                    if haven_ui.showing {
-                        ui::haven_scene::render_haven_tree(
-                            f,
-                            area,
-                            &haven,
-                            haven_ui.selected_room,
-                            0, // No character selected, so prestige rank = 0
-                            &global_achievements,
-                            &ctx,
-                        );
+                let transition = handle_select_frame(
+                    &mut terminal,
+                    &mut select_screen,
+                    &character_manager,
+                    &mut haven,
+                    &mut haven_ui,
+                    &mut soulforge_ui,
+                    &mut enhancement,
+                    &mut global_achievements,
+                    &mut achievement_browser,
+                    &mut help_overlay_showing,
+                )?;
+                match transition {
+                    ScreenTransition::GoToCreation => {
+                        creation_screen = CharacterCreationScreen::new();
+                        current_screen = Screen::CharacterCreation;
                     }
-                    // Draw achievement browser overlay if open
-                    if achievement_browser.showing {
-                        ui::achievement_browser_scene::render_achievement_browser(
-                            f,
-                            area,
-                            &global_achievements,
-                            &achievement_browser,
-                            &enhancement,
-                            &ctx,
-                        );
+                    ScreenTransition::GoToDelete => {
+                        delete_screen = CharacterDeleteScreen::new();
+                        current_screen = Screen::CharacterDelete;
                     }
-                    // Draw Soulforge overlay if open
-                    if soulforge_ui.open {
-                        ui::soulforge_scene::render_soulforge(
-                            f,
-                            area,
-                            &soulforge_ui,
-                            &enhancement,
-                            0,
-                            &ctx,
-                        );
+                    ScreenTransition::GoToRename => {
+                        rename_screen = CharacterRenameScreen::new();
+                        current_screen = Screen::CharacterRename;
                     }
-                    // Draw Help overlay if open
-                    if help_overlay_showing {
-                        ui::help_overlay::draw_help_overlay(f);
+                    ScreenTransition::LoadCharacter {
+                        state,
+                        offline_report,
+                    } => {
+                        pending_offline_report = offline_report;
+                        game_state = Some(*state);
+                        current_screen = Screen::Game;
                     }
-                })?;
-
-                // Handle input
-                if event::poll(Duration::from_millis(50))? {
-                    if let Event::Key(key_event) = event::read()? {
-                        if key_event.kind != KeyEventKind::Press {
-                            continue;
-                        }
-                        // Handle Soulforge overlay (blocks other input when open)
-                        if soulforge_ui.open {
-                            match key_event.code {
-                                KeyCode::Up => {
-                                    if soulforge_ui.selected_slot > 0 {
-                                        soulforge_ui.selected_slot -= 1;
-                                    }
-                                }
-                                KeyCode::Down => {
-                                    if soulforge_ui.selected_slot < 6 {
-                                        soulforge_ui.selected_slot += 1;
-                                    }
-                                }
-                                KeyCode::Esc => soulforge_ui.close(),
-                                _ => {}
-                            }
-                            continue;
-                        }
-
-                        // Handle Help overlay (blocks other input when open)
-                        if help_overlay_showing {
-                            if matches!(key_event.code, KeyCode::Esc | KeyCode::Char('?')) {
-                                help_overlay_showing = false;
-                            }
-                            continue;
-                        }
-
-                        // Handle achievement browser (blocks other input when open)
-                        if achievement_browser.showing {
-                            let category_achievements = achievements::get_achievements_by_category(
-                                achievement_browser.selected_category,
-                            );
-                            match key_event.code {
-                                KeyCode::Up => achievement_browser.move_up(),
-                                KeyCode::Down => {
-                                    achievement_browser.move_down(category_achievements.len())
-                                }
-                                KeyCode::Left | KeyCode::Char(',') | KeyCode::Char('<') => {
-                                    achievement_browser.prev_category()
-                                }
-                                KeyCode::Right | KeyCode::Char('.') | KeyCode::Char('>') => {
-                                    achievement_browser.next_category()
-                                }
-                                KeyCode::Esc => {
-                                    global_achievements.clear_recently_unlocked();
-                                    achievement_browser.close();
-                                }
-                                _ => {}
-                            }
-                            continue;
-                        }
-
-                        // Handle achievement browser shortcut
-                        if matches!(key_event.code, KeyCode::Char('a') | KeyCode::Char('A')) {
-                            global_achievements.clear_pending_notifications();
-                            achievement_browser.open();
-                            continue;
-                        }
-
-                        // Help overlay shortcut
-                        if key_event.code == KeyCode::Char('?') {
-                            help_overlay_showing = true;
-                            continue;
-                        }
-
-                        let input = match key_event.code {
-                            KeyCode::Up => SelectInput::Up,
-                            KeyCode::Down => SelectInput::Down,
-                            KeyCode::Enter => SelectInput::Select,
-                            KeyCode::Char('n') | KeyCode::Char('N') => SelectInput::New,
-                            KeyCode::Char('d') | KeyCode::Char('D') => SelectInput::Delete,
-                            KeyCode::Char('r') | KeyCode::Char('R') => SelectInput::Rename,
-                            KeyCode::Esc => SelectInput::Quit,
-                            _ => SelectInput::Other,
-                        };
-
-                        let result = process_select_input(&mut select_screen, input, &characters);
-
-                        match result {
-                            SelectResult::NoCharacters => {
-                                current_screen = Screen::CharacterCreation;
-                            }
-                            SelectResult::LoadCharacter(filename) => {
-                                match character_manager.load_character(&filename) {
-                                    Ok(mut state) => {
-                                        // Initialize cached derived stats and prestige bonuses
-                                        state.recalculate_derived_stats(&enhancement.levels);
-                                        state.recalculate_prestige_bonuses();
-
-                                        // Sanity check: clear stale enemy if HP is impossibly high
-                                        // (can happen if save was from before prestige reset)
-                                        let derived = state.cached_derived_stats;
-                                        if let Some(enemy) = &state.combat_state.current_enemy {
-                                            // Max possible enemy HP is 2.4x player HP (boss with max variance)
-                                            // If enemy HP is > 2.5x, it's stale from before a stat reset
-                                            if enemy.max_hp > (derived.max_hp as f64 * 2.5) as u32 {
-                                                state.combat_state.current_enemy = None;
-                                            }
-                                        }
-
-                                        // Sync achievements from character state (retroactive unlocks)
-                                        let defeated_bosses =
-                                            state.zone_progression.defeated_bosses.to_vec();
-                                        global_achievements.sync_from_game_state(
-                                            state.character_level,
-                                            state.prestige_rank,
-                                            state.fishing.rank,
-                                            state.fishing.total_fish_caught,
-                                            &defeated_bosses,
-                                            Some(&state.character_name),
-                                        );
-                                        global_achievements.sync_from_haven(
-                                            haven.discovered,
-                                            &haven.rooms,
-                                            Some(&state.character_name),
-                                        );
-
-                                        // Retroactive enhancement/soulforge achievement sync
-                                        if enhancement.discovered {
-                                            global_achievements.on_soulforge_discovered(Some(
-                                                &state.character_name,
-                                            ));
-                                        }
-                                        global_achievements.on_enhancement_upgraded(
-                                            enhancement.highest_level_reached,
-                                            &enhancement.levels,
-                                            enhancement.total_attempts,
-                                            Some(&state.character_name),
-                                        );
-
-                                        log_synced_achievements(
-                                            &mut state,
-                                            &mut global_achievements,
-                                        );
-
-                                        // Process offline progression
-                                        let current_time = Utc::now().timestamp();
-                                        let elapsed_seconds = current_time - state.last_save_time;
-
-                                        if elapsed_seconds > 60 {
-                                            if let Some(report) =
-                                                apply_offline_xp(&mut state, &haven)
-                                            {
-                                                pending_offline_report = Some(report);
-                                            }
-                                        }
-                                        // Always sync last_save_time on load so suspension
-                                        // detection doesn't false-trigger from a stale value
-                                        state.last_save_time = Utc::now().timestamp();
-
-                                        game_state = Some(state);
-                                        current_screen = Screen::Game;
-                                    }
-                                    Err(e) => {
-                                        // Could show error message, for now just stay on select
-                                        eprintln!("Failed to load character: {}", e);
-                                    }
-                                }
-                            }
-                            SelectResult::GoToCreation => {
-                                creation_screen = CharacterCreationScreen::new();
-                                current_screen = Screen::CharacterCreation;
-                            }
-                            SelectResult::GoToDelete => {
-                                delete_screen = CharacterDeleteScreen::new();
-                                current_screen = Screen::CharacterDelete;
-                            }
-                            SelectResult::GoToRename => {
-                                rename_screen = CharacterRenameScreen::new();
-                                current_screen = Screen::CharacterRename;
-                            }
-                            SelectResult::Quit => {
-                                break;
-                            }
-                            SelectResult::Continue | SelectResult::LoadFailed(_) => {}
-                        }
+                    ScreenTransition::Quit => {
+                        break;
                     }
+                    _ => {}
                 }
             }
 
             Screen::CharacterDelete => {
-                // Get current character list and selected character
-                let characters = character_manager.list_characters()?;
-                if characters.is_empty() || select_screen.selected_index >= characters.len() {
+                let transition = handle_delete_frame(
+                    &mut terminal,
+                    &mut delete_screen,
+                    &select_screen,
+                    &character_manager,
+                )?;
+                if let ScreenTransition::GoToSelect = transition {
+                    delete_screen = CharacterDeleteScreen::new();
+                    select_screen.selected_index = 0;
                     current_screen = Screen::CharacterSelect;
-                    continue;
-                }
-                let selected_character = &characters[select_screen.selected_index];
-
-                // Draw delete confirmation screen
-                terminal.draw(|f| {
-                    let area = f.area();
-                    let ctx = ui::responsive::LayoutContext::from_frame(f);
-                    delete_screen.draw(f, area, selected_character, &ctx);
-                })?;
-
-                // Handle input
-                if event::poll(Duration::from_millis(50))? {
-                    if let Event::Key(key_event) = event::read()? {
-                        if key_event.kind != KeyEventKind::Press {
-                            continue;
-                        }
-                        let input = match key_event.code {
-                            KeyCode::Char(c) => DeleteInput::Char(c),
-                            KeyCode::Backspace => DeleteInput::Backspace,
-                            KeyCode::Enter => DeleteInput::Submit,
-                            KeyCode::Esc => DeleteInput::Cancel,
-                            _ => DeleteInput::Other,
-                        };
-
-                        let result = process_delete_input(
-                            &mut delete_screen,
-                            input,
-                            &character_manager,
-                            selected_character,
-                        );
-
-                        match result {
-                            DeleteResult::Deleted | DeleteResult::Cancelled => {
-                                delete_screen = CharacterDeleteScreen::new();
-                                select_screen.selected_index = 0;
-                                current_screen = Screen::CharacterSelect;
-                            }
-                            DeleteResult::DeleteFailed(e) => {
-                                eprintln!("Failed to delete character: {}", e);
-                            }
-                            DeleteResult::Continue => {}
-                        }
-                    }
                 }
             }
 
             Screen::CharacterRename => {
-                // Get current character list and selected character
-                let characters = character_manager.list_characters()?;
-                if characters.is_empty() || select_screen.selected_index >= characters.len() {
+                let transition = handle_rename_frame(
+                    &mut terminal,
+                    &mut rename_screen,
+                    &select_screen,
+                    &character_manager,
+                )?;
+                if let ScreenTransition::GoToSelect = transition {
+                    rename_screen = CharacterRenameScreen::new();
                     current_screen = Screen::CharacterSelect;
-                    continue;
-                }
-                let selected_character = &characters[select_screen.selected_index];
-
-                // Draw rename screen
-                terminal.draw(|f| {
-                    let area = f.area();
-                    let ctx = ui::responsive::LayoutContext::from_frame(f);
-                    rename_screen.draw(f, area, selected_character, &ctx);
-                })?;
-
-                // Handle input
-                if event::poll(Duration::from_millis(50))? {
-                    if let Event::Key(key_event) = event::read()? {
-                        if key_event.kind != KeyEventKind::Press {
-                            continue;
-                        }
-                        let input = match key_event.code {
-                            KeyCode::Char(c) => RenameInput::Char(c),
-                            KeyCode::Backspace => RenameInput::Backspace,
-                            KeyCode::Enter => RenameInput::Submit,
-                            KeyCode::Esc => RenameInput::Cancel,
-                            _ => RenameInput::Other,
-                        };
-
-                        let result = process_rename_input(
-                            &mut rename_screen,
-                            input,
-                            &character_manager,
-                            selected_character,
-                        );
-
-                        match result {
-                            RenameResult::Renamed | RenameResult::Cancelled => {
-                                rename_screen = CharacterRenameScreen::new();
-                                current_screen = Screen::CharacterSelect;
-                            }
-                            RenameResult::RenameFailed(_) | RenameResult::Continue => {}
-                        }
-                    }
                 }
             }
 
