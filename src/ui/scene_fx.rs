@@ -71,6 +71,13 @@ pub fn put_cell(buffer: &mut [Vec<SceneCell>], row: i32, col: i32, ch: char, fg:
     buffer[row][col] = SceneCell { ch, fg, bg };
 }
 
+/// Write a string into the scene buffer at (row, col). Each char occupies 1 cell.
+pub fn put_text(buffer: &mut [Vec<SceneCell>], row: i32, col: i32, text: &str, fg: Color) {
+    for (i, ch) in text.chars().enumerate() {
+        put_cell(buffer, row, col + i as i32, ch, fg);
+    }
+}
+
 /// Draws a simple line with `/`, `\` or `|` glyphs based on slope.
 pub fn draw_line(
     buffer: &mut [Vec<SceneCell>],
