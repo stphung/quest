@@ -188,7 +188,7 @@ pub trait DifficultyInfo {
             "Apprentice" => crate::achievements::MinigameDifficulty::Apprentice,
             "Journeyman" => crate::achievements::MinigameDifficulty::Journeyman,
             "Master" => crate::achievements::MinigameDifficulty::Master,
-            _ => crate::achievements::MinigameDifficulty::Novice,
+            other => unreachable!("unknown difficulty name: {}", other),
         }
     }
 }

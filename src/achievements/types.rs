@@ -11,7 +11,7 @@ use std::collections::HashMap;
 ///
 /// Used by [`Achievements::on_minigame_won`] to replace the previous
 /// `&'static str` game-type parameter and eliminate the 40-arm string match.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MinigameType {
     Chess,
     Morris,
@@ -29,7 +29,7 @@ pub enum MinigameType {
 ///
 /// Mirrors the per-game `*Difficulty` enums but is game-agnostic,
 /// allowing a single enum to describe difficulty across all games.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MinigameDifficulty {
     Novice,
     Apprentice,
