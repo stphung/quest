@@ -12,3 +12,26 @@ pub use super::enemy_spawning::spawn_enemy_if_needed;
 
 // Re-export dungeon discovery for backward compatibility
 pub use super::discoveries::try_discover_dungeon;
+
+#[cfg(test)]
+mod tests {
+    /// Verify that all re-exports from game_logic.rs resolve correctly.
+    /// This test ensures backward compatibility after extraction.
+    #[test]
+    fn test_reexports_resolve() {
+        // XP system
+        let _xp = super::xp_for_next_level(1);
+        let _mult = super::prestige_multiplier(0, 0);
+        let _rate = super::xp_gain_per_tick(0, 0, 0);
+
+        // Enemy spawning - just verify the function exists (needs GameState to call)
+        let _fn_ptr: fn(&mut crate::core::game_state::GameState) = super::spawn_enemy_if_needed;
+
+        // Dungeon discovery - verify the function exists
+        let _fn_ptr: fn(&mut crate::core::game_state::GameState) -> bool =
+            super::try_discover_dungeon;
+
+        // Offline progression - verify the type exists
+        fn _accepts_report(_r: super::OfflineReport) {}
+    }
+}

@@ -184,4 +184,39 @@ mod tests {
         assert_eq!(drops[0].name, "Extra2");
         assert_eq!(drops[1].name, "Extra1");
     }
+
+    #[test]
+    fn test_add_recent_drop_preserves_all_fields() {
+        let mut drops = VecDeque::new();
+
+        add_recent_drop(
+            &mut drops,
+            "Legendary Blade".to_string(),
+            Rarity::Legendary,
+            true,
+            "\u{2694}",
+            "Weapon".to_string(),
+            "+20 STR +10 DEX +Crit".to_string(),
+        );
+
+        let drop = &drops[0];
+        assert_eq!(drop.name, "Legendary Blade");
+        assert_eq!(drop.rarity, Rarity::Legendary);
+        assert!(drop.equipped);
+        assert_eq!(drop.icon, "\u{2694}");
+        assert_eq!(drop.slot, "Weapon");
+        assert_eq!(drop.stats, "+20 STR +10 DEX +Crit");
+    }
+
+    #[test]
+    fn test_empty_deque_has_zero_length() {
+        let drops: VecDeque<RecentDrop> = VecDeque::new();
+        assert_eq!(drops.len(), 0);
+        assert!(drops.is_empty());
+    }
+
+    #[test]
+    fn test_max_recent_drops_constant() {
+        assert_eq!(MAX_RECENT_DROPS, 10);
+    }
 }

@@ -398,4 +398,68 @@ mod tests {
         ticker.tick();
         assert!(ticker.scroll_offset > offset_after_one);
     }
+
+    #[test]
+    fn test_ticker_visible_entries_empty_when_no_entries() {
+        let ticker = Ticker::new();
+        let visible = ticker.visible_entries(80);
+        assert!(visible.is_empty());
+    }
+
+    #[test]
+    fn test_ticker_visible_entries_returns_on_screen_entry() {
+        let mut ticker = Ticker::new();
+        ticker.viewport_width = 80;
+        ticker.push(TickerEntry {
+            icon: "\u{2694}",
+            text: "Flamebrand".to_string(),
+            color: Color::Yellow,
+            bold: true,
+            segments: None,
+        });
+        // Entry born at scroll_offset=0, so pos = 80 - 0 = 80.
+        // It enters screen only after scrolling at least 1 unit.
+        ticker.tick();
+        let visible = ticker.visible_entries(80);
+        assert_eq!(visible.len(), 1);
+        assert_eq!(visible[0].0.text, "Flamebrand");
+        assert!(visible[0].0.bold);
+    }
+
+    #[test]
+    fn test_ticker_segmented_entry_length() {
+        let mut ticker = Ticker::new();
+        ticker.viewport_width = 80;
+        ticker.push(TickerEntry {
+            icon: "",
+            text: String::new(),
+            color: Color::White,
+            bold: false,
+            segments: Some(vec![
+                TickerSegment {
+                    text: "Hello".to_string(),
+                    color: Color::Red,
+                },
+                TickerSegment {
+                    text: " World".to_string(),
+                    color: Color::Blue,
+                },
+            ]),
+        });
+        assert_eq!(ticker.len(), 1);
+        // Scroll one tick so entry enters the viewport
+        ticker.tick();
+        let visible = ticker.visible_entries(80);
+        assert_eq!(visible.len(), 1);
+    }
+
+    #[test]
+    fn test_ticker_default_matches_new() {
+        let ticker_new = Ticker::new();
+        let ticker_default = Ticker::default();
+        assert_eq!(ticker_new.scroll_offset, ticker_default.scroll_offset);
+        assert_eq!(ticker_new.viewport_width, ticker_default.viewport_width);
+        assert!(ticker_new.is_empty());
+        assert!(ticker_default.is_empty());
+    }
 }
