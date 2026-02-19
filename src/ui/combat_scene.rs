@@ -15,17 +15,85 @@ use crate::combat::types::DAMAGE_FLASH_DURATION;
 use super::combat_3d::render_combat_3d;
 use super::enemy_sprites::zone_palette;
 
+fn highest_slayer_badge(achievements: &crate::achievements::Achievements) -> Option<&'static str> {
+    use crate::achievements::AchievementId;
+    let ids = [
+        AchievementId::SlayerXV,
+        AchievementId::SlayerXIV,
+        AchievementId::SlayerXIII,
+        AchievementId::SlayerXII,
+        AchievementId::SlayerXI,
+        AchievementId::SlayerX,
+        AchievementId::SlayerIX,
+        AchievementId::SlayerVIII,
+        AchievementId::SlayerVII,
+        AchievementId::SlayerVI,
+        AchievementId::SlayerV,
+        AchievementId::SlayerIV,
+        AchievementId::SlayerIII,
+        AchievementId::SlayerII,
+        AchievementId::SlayerI,
+    ];
+    for id in ids {
+        if achievements.is_unlocked(id) {
+            return crate::achievements::data::get_achievement_def(id).map(|def| def.icon);
+        }
+    }
+    None
+}
+
+fn highest_boss_hunter_badge(
+    achievements: &crate::achievements::Achievements,
+) -> Option<&'static str> {
+    use crate::achievements::AchievementId;
+    let ids = [
+        AchievementId::BossHunterXV,
+        AchievementId::BossHunterXIV,
+        AchievementId::BossHunterXIII,
+        AchievementId::BossHunterXII,
+        AchievementId::BossHunterXI,
+        AchievementId::BossHunterX,
+        AchievementId::BossHunterIX,
+        AchievementId::BossHunterVIII,
+        AchievementId::BossHunterVII,
+        AchievementId::BossHunterVI,
+        AchievementId::BossHunterV,
+        AchievementId::BossHunterIV,
+        AchievementId::BossHunterIII,
+        AchievementId::BossHunterII,
+        AchievementId::BossHunterI,
+    ];
+    for id in ids {
+        if achievements.is_unlocked(id) {
+            return crate::achievements::data::get_achievement_def(id).map(|def| def.icon);
+        }
+    }
+    None
+}
+
+fn combat_title(achievements: &crate::achievements::Achievements) -> String {
+    let slayer = highest_slayer_badge(achievements).unwrap_or("");
+    let boss = highest_boss_hunter_badge(achievements).unwrap_or("");
+    match (slayer.is_empty(), boss.is_empty()) {
+        (true, true) => " \u{2694} Combat \u{2694} ".to_string(),
+        (false, true) => format!(" \u{2694} Combat {} ", slayer),
+        (true, false) => format!(" \u{2694} Combat {} ", boss),
+        (false, false) => format!(" \u{2694} Combat {}{} ", slayer, boss),
+    }
+}
+
 /// Draws the combat scene with 3D first-person view
 pub fn draw_combat_scene(
     frame: &mut Frame,
     area: Rect,
     game_state: &GameState,
+    achievements: &crate::achievements::Achievements,
     ctx: &LayoutContext,
 ) {
     match ctx.tier {
         SizeTier::M => {
             // Compact: no 3D sprite, just HP bars + status, with border
-            draw_combat_compact(frame, area, game_state);
+            draw_combat_compact(frame, area, game_state, achievements);
         }
         SizeTier::S => {
             // Minimal: no border, no sprite — HP bars handled by S layout directly
@@ -34,18 +102,24 @@ pub fn draw_combat_scene(
         }
         _ => {
             // Full layout with 3D sprite (XL/L)
-            draw_combat_full(frame, area, game_state);
+            draw_combat_full(frame, area, game_state, achievements);
         }
     }
 }
 
 /// Full combat scene with 3D sprite (XL/L tier).
-fn draw_combat_full(frame: &mut Frame, area: Rect, game_state: &GameState) {
+fn draw_combat_full(
+    frame: &mut Frame,
+    area: Rect,
+    game_state: &GameState,
+    achievements: &crate::achievements::Achievements,
+) {
     // Single outer border wrapping everything
+    let title = combat_title(achievements);
     let outer_block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Red))
-        .title(" \u{2694} Combat \u{2694} ")
+        .title(title)
         .title_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD));
 
     let inner = outer_block.inner(area);
@@ -86,11 +160,17 @@ fn draw_combat_full(frame: &mut Frame, area: Rect, game_state: &GameState) {
 }
 
 /// Compact combat scene for M tier: HP bars + sprite + status.
-fn draw_combat_compact(frame: &mut Frame, area: Rect, game_state: &GameState) {
+fn draw_combat_compact(
+    frame: &mut Frame,
+    area: Rect,
+    game_state: &GameState,
+    achievements: &crate::achievements::Achievements,
+) {
+    let title = combat_title(achievements);
     let outer_block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Red))
-        .title(" Combat ");
+        .title(title);
 
     let inner = outer_block.inner(area);
     frame.render_widget(outer_block, area);
