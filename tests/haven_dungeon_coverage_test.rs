@@ -1,7 +1,10 @@
-//! Coverage tests for haven/room_defs, dungeon/rewards, achievements/modal, achievements/persistence.
+//! Coverage tests for haven/room_defs, dungeon/rewards, achievements/modal, achievements/persistence,
+//! haven/bonus.rs discovery chance and maxed compute_bonuses.
 
 use quest::achievements::Achievements;
 use quest::dungeon::{Dungeon, DungeonSize};
+use quest::haven::bonus::haven_discovery_chance;
+use quest::haven::types::{Haven, HavenBonuses};
 use quest::haven::{tier_cost, HavenRoomId};
 use quest::items::Rarity;
 use quest::AchievementId;
@@ -814,5 +817,218 @@ fn test_dungeon_size_boss_xp_ranges_are_ordered() {
             prev_max
         );
         prev_max = max;
+    }
+}
+
+// =========================================================================
+// Haven Bonus Tests — compute_bonuses with maxed Haven
+// =========================================================================
+
+/// Build a fully maxed Haven (all 14 rooms at their maximum tier).
+fn maxed_haven() -> Haven {
+    let mut haven = Haven::new();
+    for _ in 0..3 {
+        haven.build_room(HavenRoomId::Hearthstone);
+    }
+    for _ in 0..3 {
+        haven.build_room(HavenRoomId::Armory);
+        haven.build_room(HavenRoomId::Bedroom);
+    }
+    for _ in 0..3 {
+        haven.build_room(HavenRoomId::TrainingYard);
+        haven.build_room(HavenRoomId::Garden);
+    }
+    for _ in 0..3 {
+        haven.build_room(HavenRoomId::TrophyHall);
+        haven.build_room(HavenRoomId::Library);
+        haven.build_room(HavenRoomId::Watchtower);
+        haven.build_room(HavenRoomId::AlchemyLab);
+        haven.build_room(HavenRoomId::Workshop);
+    }
+    for _ in 0..4 {
+        haven.build_room(HavenRoomId::FishingDock);
+    }
+    for _ in 0..3 {
+        haven.build_room(HavenRoomId::WarRoom);
+        haven.build_room(HavenRoomId::Vault);
+    }
+    haven.build_room(HavenRoomId::StormForge);
+    haven
+}
+
+#[test]
+fn haven_compute_bonuses_maxed_has_storm_forge() {
+    let haven = maxed_haven();
+    let bonuses: HavenBonuses = haven.compute_bonuses();
+    assert!(bonuses.has_storm_forge);
+}
+
+#[test]
+fn haven_compute_bonuses_maxed_fishing_rank_bonus_is_ten() {
+    let haven = maxed_haven();
+    let bonuses = haven.compute_bonuses();
+    assert_eq!(bonuses.max_fishing_rank_bonus, 10);
+}
+
+#[test]
+fn haven_compute_bonuses_maxed_damage_percent() {
+    // Armory T3 = +25%
+    let haven = maxed_haven();
+    let bonuses = haven.compute_bonuses();
+    assert!(
+        (bonuses.damage_percent - 25.0).abs() < f64::EPSILON,
+        "Expected 25.0, got {}",
+        bonuses.damage_percent
+    );
+}
+
+#[test]
+fn haven_compute_bonuses_maxed_xp_gain_percent() {
+    // TrainingYard T3 = +30%
+    let haven = maxed_haven();
+    let bonuses = haven.compute_bonuses();
+    assert!(
+        (bonuses.xp_gain_percent - 30.0).abs() < f64::EPSILON,
+        "Expected 30.0, got {}",
+        bonuses.xp_gain_percent
+    );
+}
+
+#[test]
+fn haven_compute_bonuses_maxed_drop_rate_percent() {
+    // TrophyHall T3 = +15%
+    let haven = maxed_haven();
+    let bonuses = haven.compute_bonuses();
+    assert!(
+        (bonuses.drop_rate_percent - 15.0).abs() < f64::EPSILON,
+        "Expected 15.0, got {}",
+        bonuses.drop_rate_percent
+    );
+}
+
+#[test]
+fn haven_compute_bonuses_maxed_crit_chance_percent() {
+    // Watchtower T3 = +20%
+    let haven = maxed_haven();
+    let bonuses = haven.compute_bonuses();
+    assert!(
+        (bonuses.crit_chance_percent - 20.0).abs() < f64::EPSILON,
+        "Expected 20.0, got {}",
+        bonuses.crit_chance_percent
+    );
+}
+
+#[test]
+fn haven_compute_bonuses_maxed_double_strike_chance() {
+    // WarRoom T3 = +35%
+    let haven = maxed_haven();
+    let bonuses = haven.compute_bonuses();
+    assert!(
+        (bonuses.double_strike_chance - 35.0).abs() < f64::EPSILON,
+        "Expected 35.0, got {}",
+        bonuses.double_strike_chance
+    );
+}
+
+#[test]
+fn haven_compute_bonuses_maxed_offline_xp_percent() {
+    // Hearthstone T3 = +100%
+    let haven = maxed_haven();
+    let bonuses = haven.compute_bonuses();
+    assert!(
+        (bonuses.offline_xp_percent - 100.0).abs() < f64::EPSILON,
+        "Expected 100.0, got {}",
+        bonuses.offline_xp_percent
+    );
+}
+
+#[test]
+fn haven_compute_bonuses_maxed_hp_regen_percent() {
+    // AlchemyLab T3 = +100%
+    let haven = maxed_haven();
+    let bonuses = haven.compute_bonuses();
+    assert!(
+        (bonuses.hp_regen_percent - 100.0).abs() < f64::EPSILON,
+        "Expected 100.0, got {}",
+        bonuses.hp_regen_percent
+    );
+}
+
+#[test]
+fn haven_compute_bonuses_maxed_vault_slots() {
+    // Vault T3 = 5 slots
+    let haven = maxed_haven();
+    let bonuses = haven.compute_bonuses();
+    assert_eq!(bonuses.vault_slots, 5);
+}
+
+// =========================================================================
+// Haven Discovery Chance Tests — haven/bonus.rs
+// =========================================================================
+
+#[test]
+fn haven_discovery_chance_zero_below_prestige_10() {
+    assert_eq!(haven_discovery_chance(0), 0.0);
+    assert_eq!(haven_discovery_chance(5), 0.0);
+    assert_eq!(haven_discovery_chance(9), 0.0);
+}
+
+#[test]
+fn haven_discovery_chance_nonzero_at_prestige_10() {
+    let chance = haven_discovery_chance(10);
+    assert!(
+        chance > 0.0,
+        "Expected positive chance at P10, got {}",
+        chance
+    );
+}
+
+#[test]
+fn haven_discovery_chance_equals_base_at_prestige_10() {
+    // Base constant is 0.000014
+    let chance = haven_discovery_chance(10);
+    assert!(
+        (chance - 0.000014).abs() < 1e-10,
+        "Expected 0.000014 at P10, got {}",
+        chance
+    );
+}
+
+#[test]
+fn haven_discovery_chance_increases_linearly_above_prestige_10() {
+    let p10 = haven_discovery_chance(10);
+    let p11 = haven_discovery_chance(11);
+    let p20 = haven_discovery_chance(20);
+
+    // Each rank above 10 adds 0.000007
+    let step = 0.000007_f64;
+    assert!(
+        (p11 - p10 - step).abs() < 1e-10,
+        "Step from P10->P11 should be {}, got {}",
+        step,
+        p11 - p10
+    );
+    assert!(
+        (p20 - p10 - 10.0 * step).abs() < 1e-10,
+        "Step from P10->P20 should be 10 steps of {}, got {}",
+        step,
+        p20 - p10
+    );
+}
+
+#[test]
+fn haven_discovery_chance_strictly_monotonic_above_prestige_10() {
+    let mut prev = haven_discovery_chance(10);
+    for rank in 11..=30 {
+        let cur = haven_discovery_chance(rank);
+        assert!(
+            cur > prev,
+            "Expected monotonic increase: P{} ({}) > P{} ({})",
+            rank,
+            cur,
+            rank - 1,
+            prev
+        );
+        prev = cur;
     }
 }

@@ -4,7 +4,10 @@
 //! serialization, and equipped bonus queries.
 
 use quest::god_items::{
-    asprika_definition, equipped_god_item_dr, megingjord_definition, sleipnir_definition, GodItemId,
+    asprika_definition, equipped_god_item_attack_speed_percent, equipped_god_item_damage_percent,
+    equipped_god_item_dr, equipped_god_item_dungeon_speed_percent,
+    equipped_god_item_fishing_reduction_percent, equipped_god_item_regen_reduction_percent,
+    megingjord_definition, sleipnir_definition, GodItemId,
 };
 use quest::items::{
     auto_equip_if_better, Affix, AffixType, AttributeBonuses, Equipment, EquipmentSlot, Item,
@@ -165,4 +168,217 @@ fn test_megingjord_item_is_mythic_with_correct_fields() {
     assert_eq!(megingjord.god_item_id, Some(GodItemId::Megingjord));
     assert_eq!(megingjord.ilvl, 100);
     assert!(megingjord.attributes.str > 0, "Megingjord should have STR");
+}
+
+// =========================================================================
+// Cross-god-item passive queries (wrong item equipped returns 0.0)
+// =========================================================================
+
+/// Equip a god item defined by the given slot, returning the populated Equipment.
+fn equipment_with_god_item(slot: EquipmentSlot, item: Item) -> Equipment {
+    let mut eq = Equipment::new();
+    eq.set(slot, Some(item));
+    eq
+}
+
+// --- equipped_god_item_dr: wrong items return 0.0 ---
+
+#[test]
+fn god_item_dr_with_megingjord_equipped_is_zero() {
+    let item = megingjord_definition().to_item();
+    let eq = equipment_with_god_item(EquipmentSlot::Ring, item);
+    assert!(
+        equipped_god_item_dr(&eq).abs() < f64::EPSILON,
+        "Megingjord should not provide DR"
+    );
+}
+
+#[test]
+fn god_item_dr_with_sleipnir_equipped_is_zero() {
+    let item = sleipnir_definition().to_item();
+    let eq = equipment_with_god_item(EquipmentSlot::Boots, item);
+    assert!(
+        equipped_god_item_dr(&eq).abs() < f64::EPSILON,
+        "Sleipnir should not provide DR"
+    );
+}
+
+// --- equipped_god_item_damage_percent: only Megingjord provides this ---
+
+#[test]
+fn god_item_damage_percent_with_asprika_equipped_is_zero() {
+    let item = asprika_definition().to_item();
+    let eq = equipment_with_god_item(EquipmentSlot::Armor, item);
+    assert!(
+        equipped_god_item_damage_percent(&eq).abs() < f64::EPSILON,
+        "Asprika should not provide damage %"
+    );
+}
+
+#[test]
+fn god_item_damage_percent_with_sleipnir_equipped_is_zero() {
+    let item = sleipnir_definition().to_item();
+    let eq = equipment_with_god_item(EquipmentSlot::Boots, item);
+    assert!(
+        equipped_god_item_damage_percent(&eq).abs() < f64::EPSILON,
+        "Sleipnir should not provide damage %"
+    );
+}
+
+// --- equipped_god_item_attack_speed_percent: only Sleipnir provides this ---
+
+#[test]
+fn god_item_attack_speed_with_asprika_equipped_is_zero() {
+    let item = asprika_definition().to_item();
+    let eq = equipment_with_god_item(EquipmentSlot::Armor, item);
+    assert!(
+        equipped_god_item_attack_speed_percent(&eq).abs() < f64::EPSILON,
+        "Asprika should not provide attack speed"
+    );
+}
+
+#[test]
+fn god_item_attack_speed_with_megingjord_equipped_is_zero() {
+    let item = megingjord_definition().to_item();
+    let eq = equipment_with_god_item(EquipmentSlot::Ring, item);
+    assert!(
+        equipped_god_item_attack_speed_percent(&eq).abs() < f64::EPSILON,
+        "Megingjord should not provide attack speed"
+    );
+}
+
+// --- equipped_god_item_regen_reduction_percent: only Sleipnir (Swiftstrider) ---
+
+#[test]
+fn god_item_regen_reduction_with_asprika_equipped_is_zero() {
+    let item = asprika_definition().to_item();
+    let eq = equipment_with_god_item(EquipmentSlot::Armor, item);
+    assert!(
+        equipped_god_item_regen_reduction_percent(&eq).abs() < f64::EPSILON,
+        "Asprika has no bonuses, regen reduction must be 0"
+    );
+}
+
+#[test]
+fn god_item_regen_reduction_with_megingjord_equipped_is_zero() {
+    let item = megingjord_definition().to_item();
+    let eq = equipment_with_god_item(EquipmentSlot::Ring, item);
+    assert!(
+        equipped_god_item_regen_reduction_percent(&eq).abs() < f64::EPSILON,
+        "Megingjord has no bonuses, regen reduction must be 0"
+    );
+}
+
+// --- equipped_god_item_dungeon_speed_percent: only Sleipnir (Swiftfoot) ---
+
+#[test]
+fn god_item_dungeon_speed_with_asprika_equipped_is_zero() {
+    let item = asprika_definition().to_item();
+    let eq = equipment_with_god_item(EquipmentSlot::Armor, item);
+    assert!(
+        equipped_god_item_dungeon_speed_percent(&eq).abs() < f64::EPSILON,
+        "Asprika should not provide dungeon speed"
+    );
+}
+
+#[test]
+fn god_item_dungeon_speed_with_megingjord_equipped_is_zero() {
+    let item = megingjord_definition().to_item();
+    let eq = equipment_with_god_item(EquipmentSlot::Ring, item);
+    assert!(
+        equipped_god_item_dungeon_speed_percent(&eq).abs() < f64::EPSILON,
+        "Megingjord should not provide dungeon speed"
+    );
+}
+
+// --- equipped_god_item_fishing_reduction_percent: only Sleipnir (NimbleHands) ---
+
+#[test]
+fn god_item_fishing_reduction_with_asprika_equipped_is_zero() {
+    let item = asprika_definition().to_item();
+    let eq = equipment_with_god_item(EquipmentSlot::Armor, item);
+    assert!(
+        equipped_god_item_fishing_reduction_percent(&eq).abs() < f64::EPSILON,
+        "Asprika should not provide fishing reduction"
+    );
+}
+
+#[test]
+fn god_item_fishing_reduction_with_megingjord_equipped_is_zero() {
+    let item = megingjord_definition().to_item();
+    let eq = equipment_with_god_item(EquipmentSlot::Ring, item);
+    assert!(
+        equipped_god_item_fishing_reduction_percent(&eq).abs() < f64::EPSILON,
+        "Megingjord should not provide fishing reduction"
+    );
+}
+
+// --- Multiple god items equipped simultaneously: each query resolves to its owner ---
+
+#[test]
+fn god_item_multiple_equipped_each_query_resolves_correctly() {
+    // Equip Asprika (Armor) and Sleipnir (Boots) and Megingjord (Ring)
+    let mut eq = Equipment::new();
+    eq.set(EquipmentSlot::Armor, Some(asprika_definition().to_item()));
+    eq.set(EquipmentSlot::Boots, Some(sleipnir_definition().to_item()));
+    eq.set(EquipmentSlot::Ring, Some(megingjord_definition().to_item()));
+
+    // DR comes from Asprika
+    assert!(
+        (equipped_god_item_dr(&eq) - 30.0).abs() < f64::EPSILON,
+        "DR should be 30 from Asprika"
+    );
+
+    // Attack speed comes from Sleipnir
+    assert!(
+        (equipped_god_item_attack_speed_percent(&eq) - 100.0).abs() < f64::EPSILON,
+        "Attack speed should be 100 from Sleipnir"
+    );
+
+    // Damage % comes from Megingjord
+    assert!(
+        (equipped_god_item_damage_percent(&eq) - 150.0).abs() < f64::EPSILON,
+        "Damage % should be 150 from Megingjord"
+    );
+
+    // Regen reduction, dungeon speed, fishing reduction all come from Sleipnir
+    assert!(
+        (equipped_god_item_regen_reduction_percent(&eq) - 50.0).abs() < f64::EPSILON,
+        "Regen reduction should be 50 from Sleipnir"
+    );
+    assert!(
+        (equipped_god_item_dungeon_speed_percent(&eq) - 50.0).abs() < f64::EPSILON,
+        "Dungeon speed should be 50 from Sleipnir"
+    );
+    assert!(
+        (equipped_god_item_fishing_reduction_percent(&eq) - 50.0).abs() < f64::EPSILON,
+        "Fishing reduction should be 50 from Sleipnir"
+    );
+}
+
+#[test]
+fn god_item_asprika_only_does_not_provide_any_speed_or_fishing_bonus() {
+    let eq = equipment_with_god_item(EquipmentSlot::Armor, asprika_definition().to_item());
+
+    assert!(equipped_god_item_attack_speed_percent(&eq).abs() < f64::EPSILON);
+    assert!(equipped_god_item_damage_percent(&eq).abs() < f64::EPSILON);
+    assert!(equipped_god_item_regen_reduction_percent(&eq).abs() < f64::EPSILON);
+    assert!(equipped_god_item_dungeon_speed_percent(&eq).abs() < f64::EPSILON);
+    assert!(equipped_god_item_fishing_reduction_percent(&eq).abs() < f64::EPSILON);
+}
+
+#[test]
+fn god_item_megingjord_only_does_not_provide_any_passive_except_damage() {
+    let eq = equipment_with_god_item(EquipmentSlot::Ring, megingjord_definition().to_item());
+
+    assert!(equipped_god_item_dr(&eq).abs() < f64::EPSILON);
+    assert!(equipped_god_item_attack_speed_percent(&eq).abs() < f64::EPSILON);
+    assert!(equipped_god_item_regen_reduction_percent(&eq).abs() < f64::EPSILON);
+    assert!(equipped_god_item_dungeon_speed_percent(&eq).abs() < f64::EPSILON);
+    assert!(equipped_god_item_fishing_reduction_percent(&eq).abs() < f64::EPSILON);
+    // Damage % should be 150
+    assert!(
+        (equipped_god_item_damage_percent(&eq) - 150.0).abs() < f64::EPSILON,
+        "Megingjord damage % should be 150"
+    );
 }

@@ -1411,3 +1411,168 @@ fn test_achievement_count_by_category_after_multiple_unlocks() {
         "Level10 achievement should be unlocked"
     );
 }
+
+// =========================================================================
+// Achievement notification tests (achievements/notifications.rs)
+// =========================================================================
+
+#[test]
+fn achievements_pending_count_fresh_is_zero() {
+    let ach = Achievements::default();
+    assert_eq!(ach.pending_count(), 0);
+}
+
+#[test]
+fn achievements_pending_count_increments_after_unlock() {
+    let mut ach = Achievements::default();
+    ach.unlock(AchievementId::SlayerI, None);
+    assert_eq!(ach.pending_count(), 1);
+    ach.unlock(AchievementId::Level10, None);
+    assert_eq!(ach.pending_count(), 2);
+}
+
+#[test]
+fn achievements_unlock_same_id_twice_does_not_double_count() {
+    let mut ach = Achievements::default();
+    ach.unlock(AchievementId::SlayerI, None);
+    ach.unlock(AchievementId::SlayerI, None); // duplicate — ignored
+    assert_eq!(ach.pending_count(), 1);
+}
+
+#[test]
+fn achievements_clear_pending_notifications_moves_to_recently_unlocked() {
+    let mut ach = Achievements::default();
+    ach.unlock(AchievementId::SlayerI, None);
+    ach.unlock(AchievementId::Level10, None);
+
+    ach.clear_pending_notifications();
+
+    // recently_unlocked now holds both IDs
+    assert!(ach.is_recently_unlocked(AchievementId::SlayerI));
+    assert!(ach.is_recently_unlocked(AchievementId::Level10));
+}
+
+#[test]
+fn achievements_clear_pending_notifications_empties_pending() {
+    let mut ach = Achievements::default();
+    ach.unlock(AchievementId::SlayerI, None);
+    ach.clear_pending_notifications();
+
+    assert_eq!(ach.pending_count(), 0);
+}
+
+#[test]
+fn achievements_is_recently_unlocked_false_before_clear_pending() {
+    let mut ach = Achievements::default();
+    ach.unlock(AchievementId::FirstPrestige, None);
+
+    // Unlocked but notifications not yet cleared — recently_unlocked is still empty
+    assert!(!ach.is_recently_unlocked(AchievementId::FirstPrestige));
+}
+
+#[test]
+fn achievements_is_recently_unlocked_true_after_clear_pending() {
+    let mut ach = Achievements::default();
+    ach.unlock(AchievementId::FirstPrestige, None);
+    ach.clear_pending_notifications();
+
+    assert!(ach.is_recently_unlocked(AchievementId::FirstPrestige));
+}
+
+#[test]
+fn achievements_is_recently_unlocked_false_for_never_unlocked_id() {
+    let mut ach = Achievements::default();
+    ach.unlock(AchievementId::SlayerI, None);
+    ach.clear_pending_notifications();
+
+    // Level10 was never unlocked, so should not be recently unlocked
+    assert!(!ach.is_recently_unlocked(AchievementId::Level10));
+}
+
+#[test]
+fn achievements_clear_recently_unlocked_empties_the_list() {
+    let mut ach = Achievements::default();
+    ach.unlock(AchievementId::SlayerI, None);
+    ach.clear_pending_notifications();
+    assert!(ach.is_recently_unlocked(AchievementId::SlayerI));
+
+    ach.clear_recently_unlocked();
+
+    assert!(!ach.is_recently_unlocked(AchievementId::SlayerI));
+}
+
+#[test]
+fn achievements_clear_recently_unlocked_on_empty_is_idempotent() {
+    let mut ach = Achievements::default();
+    // No unlocks at all — calling clear should not panic
+    ach.clear_recently_unlocked();
+    assert_eq!(ach.pending_count(), 0);
+}
+
+#[test]
+fn achievements_count_recently_unlocked_by_category_zero_for_empty() {
+    let ach = Achievements::default();
+    assert_eq!(
+        ach.count_recently_unlocked_by_category(AchievementCategory::Combat),
+        0
+    );
+    assert_eq!(
+        ach.count_recently_unlocked_by_category(AchievementCategory::Level),
+        0
+    );
+}
+
+#[test]
+fn achievements_count_recently_unlocked_by_category_counts_correctly() {
+    let mut ach = Achievements::default();
+    // SlayerI is Combat, Level10 is Level, Zone1Complete is Progression
+    ach.unlock(AchievementId::SlayerI, None);
+    ach.unlock(AchievementId::Level10, None);
+    ach.unlock(AchievementId::Zone1Complete, None);
+    ach.clear_pending_notifications();
+
+    assert_eq!(
+        ach.count_recently_unlocked_by_category(AchievementCategory::Combat),
+        1
+    );
+    assert_eq!(
+        ach.count_recently_unlocked_by_category(AchievementCategory::Level),
+        1
+    );
+    assert_eq!(
+        ach.count_recently_unlocked_by_category(AchievementCategory::Progression),
+        1
+    );
+    // Unrelated categories should be 0
+    assert_eq!(
+        ach.count_recently_unlocked_by_category(AchievementCategory::Challenges),
+        0
+    );
+}
+
+#[test]
+fn achievements_count_recently_unlocked_reflects_multiple_in_same_category() {
+    let mut ach = Achievements::default();
+    // Both SlayerI and BossHunterI are Combat category
+    ach.unlock(AchievementId::SlayerI, None);
+    ach.unlock(AchievementId::BossHunterI, None);
+    ach.clear_pending_notifications();
+
+    assert_eq!(
+        ach.count_recently_unlocked_by_category(AchievementCategory::Combat),
+        2
+    );
+}
+
+#[test]
+fn achievements_count_recently_unlocked_zero_after_clear_recently_unlocked() {
+    let mut ach = Achievements::default();
+    ach.unlock(AchievementId::SlayerI, None);
+    ach.clear_pending_notifications();
+    ach.clear_recently_unlocked();
+
+    assert_eq!(
+        ach.count_recently_unlocked_by_category(AchievementCategory::Combat),
+        0
+    );
+}
