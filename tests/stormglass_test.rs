@@ -14,29 +14,29 @@ fn test_salvage_value_common() {
 
 #[test]
 fn test_salvage_value_magic() {
-    assert_eq!(earning::salvage_value(Rarity::Magic), 2);
+    assert_eq!(earning::salvage_value(Rarity::Magic), 1);
 }
 
 #[test]
 fn test_salvage_value_rare() {
-    assert_eq!(earning::salvage_value(Rarity::Rare), 5);
+    assert_eq!(earning::salvage_value(Rarity::Rare), 3);
 }
 
 #[test]
 fn test_salvage_value_epic() {
-    assert_eq!(earning::salvage_value(Rarity::Epic), 15);
+    assert_eq!(earning::salvage_value(Rarity::Epic), 8);
 }
 
 #[test]
 fn test_salvage_value_legendary() {
-    assert_eq!(earning::salvage_value(Rarity::Legendary), 50);
+    assert_eq!(earning::salvage_value(Rarity::Legendary), 25);
 }
 
 #[test]
 fn test_salvage_value_mythic_fallback() {
     // God/Mythic items should never be salvaged (auto-equip preserves them),
     // but if they were, they'd return the same as Legendary
-    assert_eq!(earning::salvage_value(Rarity::Mythic), 50);
+    assert_eq!(earning::salvage_value(Rarity::Mythic), 25);
 }
 
 // ── Earning: challenge rewards by difficulty ────────────────────────────
@@ -399,21 +399,20 @@ fn test_chrono_surge_costs_monotonically_increase() {
 
 #[test]
 fn test_chrono_surge_state_new() {
-    let surge = types::ChronoSurgeState::new(9_000, 500);
+    let surge = types::ChronoSurgeState::new(9_000);
     assert_eq!(surge.ticks_remaining, 9_000);
     assert_eq!(surge.ticks_total, 9_000);
     assert_eq!(surge.kills, 0);
     assert_eq!(surge.levels_gained, 0);
     assert_eq!(surge.items_equipped, 0);
-    assert_eq!(surge.start_sg, 500);
     assert!(surge.batch_size > 0);
 }
 
 #[test]
 fn test_chrono_surge_batch_size_scales_with_ticks() {
     // Longer surges should have larger batch sizes to maintain same animation duration
-    let small = types::ChronoSurgeState::new(9_000, 0);
-    let large = types::ChronoSurgeState::new(288_000, 0);
+    let small = types::ChronoSurgeState::new(9_000);
+    let large = types::ChronoSurgeState::new(288_000);
     assert!(
         large.batch_size > small.batch_size,
         "8hr batch ({}) should be larger than 15min batch ({})",
@@ -424,7 +423,7 @@ fn test_chrono_surge_batch_size_scales_with_ticks() {
 
 #[test]
 fn test_chrono_surge_progress() {
-    let mut surge = types::ChronoSurgeState::new(100, 0);
+    let mut surge = types::ChronoSurgeState::new(100);
     assert!((surge.progress() - 0.0).abs() < 0.01);
 
     surge.ticks_remaining = 50;
@@ -464,7 +463,7 @@ fn test_chrono_surge_batch_accumulates_stats() {
     let mut achievements = Achievements::default();
     let mut rng = ChaCha8Rng::seed_from_u64(42);
 
-    let mut surge = types::ChronoSurgeState::new(9_000, state.stormglass);
+    let mut surge = types::ChronoSurgeState::new(9_000);
 
     // Run all ticks (simulating what main.rs does during surge across multiple frames)
     let total_ticks = surge.ticks_total;
@@ -533,16 +532,6 @@ fn test_chrono_surge_cannot_afford() {
 
     let (_, cost, _) = spending::chrono_surge_cost(0).unwrap(); // 25 SG
     assert!(state.stormglass < cost, "Should not be able to afford");
-}
-
-// ── Chrono Surge: summary ────────────────────────────────────────────
-
-#[test]
-fn test_chrono_surge_summary_sg_earned() {
-    let start_sg = 200u64;
-    let end_sg = 326u64;
-    let earned = end_sg.saturating_sub(start_sg);
-    assert_eq!(earned, 126);
 }
 
 // ── ExchangeUiState: surge_selected field ────────────────────────────

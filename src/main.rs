@@ -389,6 +389,7 @@ fn main() -> io::Result<()> {
                                 if key_event.code == ratatui::crossterm::event::KeyCode::Esc {
                                     // Run all remaining ticks headlessly
                                     let mut rng = rand::rng();
+                                    let sg_before_skip = state.stormglass;
                                     while chrono_surge.as_ref().unwrap().ticks_remaining > 0 {
                                         let tick_result = core::tick::game_tick(
                                             &mut state,
@@ -435,11 +436,12 @@ fn main() -> io::Result<()> {
                                         }
                                         chrono_surge.as_mut().unwrap().ticks_remaining -= 1;
                                     }
+                                    // No SG during surge — restore to pre-skip value
+                                    state.stormglass = sg_before_skip;
                                     let surge = chrono_surge.take().unwrap();
                                     chrono_summary = Some(ChronoSurgeSummary {
                                         kills: surge.kills,
                                         levels_gained: surge.levels_gained,
-                                        sg_earned: state.stormglass.saturating_sub(surge.start_sg),
                                         items_equipped: surge.items_equipped,
                                         ticks_completed: surge.ticks_total,
                                         ticks_total: surge.ticks_total,
@@ -492,7 +494,7 @@ fn main() -> io::Result<()> {
 
                             // Handle StartChronoSurge before routing
                             if let InputResult::StartChronoSurge { ticks } = result {
-                                chrono_surge = Some(ChronoSurgeState::new(ticks, state.stormglass));
+                                chrono_surge = Some(ChronoSurgeState::new(ticks));
                                 continue;
                             }
 
@@ -603,6 +605,7 @@ fn main() -> io::Result<()> {
 
                         let mut rng = rand::rng();
                         let mut needs_save = false;
+                        let sg_before_batch = state.stormglass;
 
                         for _ in 0..batch {
                             let tick_result = core::tick::game_tick(
@@ -655,6 +658,10 @@ fn main() -> io::Result<()> {
                             chrono_surge.as_mut().unwrap().ticks_remaining -= 1;
                         }
 
+                        // No SG earned during Chrono Surge — temporal displacement
+                        // prevents salvage from materializing
+                        state.stormglass = sg_before_batch;
+
                         // Advance loot ticker (once per frame, not per tick)
                         if let Ok((cols, _)) = ratatui::crossterm::terminal::size() {
                             state.ticker.viewport_width = cols as usize;
@@ -685,7 +692,6 @@ fn main() -> io::Result<()> {
                             chrono_summary = Some(ChronoSurgeSummary {
                                 kills: surge.kills,
                                 levels_gained: surge.levels_gained,
-                                sg_earned: state.stormglass.saturating_sub(surge.start_sg),
                                 items_equipped: surge.items_equipped,
                                 ticks_completed: surge.ticks_total,
                                 ticks_total: surge.ticks_total,

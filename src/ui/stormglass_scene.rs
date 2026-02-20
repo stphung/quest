@@ -285,7 +285,7 @@ fn render_exchange_menu(
         let desc = match exchange_ui.selected_item {
             0 => "Spend Stormglass to unlock a choice of three challenges.",
             1 => "Spend Stormglass to advance your prestige rank, keeping all progress.",
-            _ => "Choose a duration to fast-forward combat, earning XP and loot.",
+            _ => "Bend time itself. Earn XP and loot, but no Stormglass.",
         };
         let desc_area = Rect::new(inner.x, inner.y + 8, inner.width, 2);
         let desc_widget = Paragraph::new(Span::styled(
@@ -509,7 +509,7 @@ fn render_chrono_surge_select(
     if h > 2 {
         let flavor_area = Rect::new(inner.x, inner.y + 1, inner.width, 2);
         let flavor = Paragraph::new(Span::styled(
-            "Stormglass consumes the hourglass. What was slow becomes swift.",
+            "Bend time itself. Earn XP and loot, but no Stormglass.",
             Style::default()
                 .fg(flavor_fg)
                 .add_modifier(Modifier::ITALIC),
@@ -555,11 +555,8 @@ pub fn render_chrono_surge_banner(
     );
 
     let stats_line = format!(
-        "\u{2694}{} kills  \u{2B06}+{} levels  \u{26A1}+{} SG  \u{1F528}{} equipped",
-        surge.kills,
-        surge.levels_gained,
-        0, // SG earned isn't tracked in state directly during surge
-        surge.items_equipped,
+        "\u{2694}{} kills  \u{2B06}+{} levels  \u{1F528}{} equipped",
+        surge.kills, surge.levels_gained, surge.items_equipped,
     );
 
     let lines = vec![
@@ -635,7 +632,6 @@ pub fn render_chrono_surge_summary(
     let stats = [
         format!("\u{2694}  Kills: {}", summary.kills),
         format!("\u{2B06}  Levels gained: +{}", summary.levels_gained),
-        format!("\u{26A1}  Stormglass earned: +{}", summary.sg_earned),
         format!("\u{1F528}  Items equipped: {}", summary.items_equipped),
     ];
 

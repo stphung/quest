@@ -4,10 +4,10 @@ use crate::challenges::menu::ChallengeType;
 
 // ── Earning rates by rarity ────────────────────────────────────────────
 pub const SALVAGE_COMMON: u64 = 1;
-pub const SALVAGE_MAGIC: u64 = 2;
-pub const SALVAGE_RARE: u64 = 5;
-pub const SALVAGE_EPIC: u64 = 15;
-pub const SALVAGE_LEGENDARY: u64 = 50;
+pub const SALVAGE_MAGIC: u64 = 1;
+pub const SALVAGE_RARE: u64 = 3;
+pub const SALVAGE_EPIC: u64 = 8;
+pub const SALVAGE_LEGENDARY: u64 = 25;
 
 // ── Challenge win rewards by difficulty ────────────────────────────────
 pub const CHALLENGE_NOVICE: u64 = 5;
@@ -27,7 +27,7 @@ pub const DUNGEON_CACHE_LEGENDARY: u64 = 75;
 pub const SOULFORGE_CONSOLATION: [u64; 10] = [0, 0, 0, 0, 5, 10, 15, 25, 40, 75];
 
 // ── Spending ───────────────────────────────────────────────────────────
-pub const INVOKE_TRIAL_COST: u64 = 50;
+pub const INVOKE_TRIAL_COST: u64 = 250;
 pub const PRESTIGE_RANK_BASE_COST: f64 = 500.0;
 
 // ── Chrono Surge ─────────────────────────────────────────────────────
@@ -119,11 +119,10 @@ pub struct ChronoSurgeState {
     pub kills: u64,
     pub levels_gained: u32,
     pub items_equipped: u32,
-    pub start_sg: u64,
 }
 
 impl ChronoSurgeState {
-    pub fn new(ticks: u64, start_sg: u64) -> Self {
+    pub fn new(ticks: u64) -> Self {
         // 10 frames per second * animation seconds = total animation frames
         let animation_frames = CHRONO_SURGE_ANIMATION_SECONDS * 10;
         let batch_size = (ticks / animation_frames).max(1);
@@ -134,7 +133,6 @@ impl ChronoSurgeState {
             kills: 0,
             levels_gained: 0,
             items_equipped: 0,
-            start_sg,
         }
     }
 
@@ -152,7 +150,6 @@ impl ChronoSurgeState {
 pub struct ChronoSurgeSummary {
     pub kills: u64,
     pub levels_gained: u32,
-    pub sg_earned: u64,
     pub items_equipped: u32,
     pub ticks_completed: u64,
     pub ticks_total: u64,
