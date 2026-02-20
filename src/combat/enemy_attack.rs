@@ -94,13 +94,30 @@ pub(crate) fn resolve_enemy_attack(
             if !in_dungeon {
                 // Check if we died to a boss
                 if state.zone_progression.fighting_boss {
-                    // Reset boss encounter but preserve kill counter
-                    // Boss respawns after KILLS_FOR_BOSS_RETRY kills (reduced penalty)
                     state.zone_progression.fighting_boss = false;
-                    state.zone_progression.kills_in_subzone =
-                        KILLS_FOR_BOSS.saturating_sub(KILLS_FOR_BOSS_RETRY);
                     state.combat_state.current_enemy = None;
                     state.combat_state.boss_fight_timer = 0.0;
+
+                    // Zone boss death: reset to subzone 1 as if just arriving
+                    // Subzone boss death: 5 kills to retry in same subzone
+                    let is_zone_boss = crate::zones::get_zone(
+                        state.zone_progression.current_zone_id,
+                    )
+                    .and_then(|zone| {
+                        zone.subzones
+                            .iter()
+                            .find(|s| s.id == state.zone_progression.current_subzone_id)
+                    })
+                    .map(|sub| sub.boss.is_zone_boss)
+                    .unwrap_or(false);
+
+                    if is_zone_boss {
+                        state.zone_progression.current_subzone_id = 1;
+                        state.zone_progression.kills_in_subzone = 0;
+                    } else {
+                        state.zone_progression.kills_in_subzone =
+                            KILLS_FOR_BOSS.saturating_sub(KILLS_FOR_BOSS_RETRY);
+                    }
                 } else if let Some(enemy) = state.combat_state.current_enemy.as_mut() {
                     enemy.reset_hp();
                 }

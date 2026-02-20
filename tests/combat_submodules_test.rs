@@ -1129,8 +1129,11 @@ fn player_death_in_dungeon_exits_dungeon() {
 }
 
 #[test]
-fn player_death_to_boss_sets_retry_kills() {
+fn player_death_to_subzone_boss_sets_retry_kills() {
     let mut state = state_player_about_to_die();
+    // Zone 1, subzone 1 — NOT a zone boss (zone boss is subzone 3)
+    state.zone_progression.current_zone_id = 1;
+    state.zone_progression.current_subzone_id = 1;
     state.zone_progression.fighting_boss = true;
     state.zone_progression.kills_in_subzone = KILLS_FOR_BOSS;
 
@@ -1145,12 +1148,168 @@ fn player_death_to_boss_sets_retry_kills() {
         !state.zone_progression.fighting_boss,
         "Boss flag should be cleared on death"
     );
+    // Stays in same subzone
+    assert_eq!(state.zone_progression.current_subzone_id, 1);
     // Kills should be set so only KILLS_FOR_BOSS_RETRY more kills needed
     assert_eq!(
         state.zone_progression.kills_in_subzone,
         KILLS_FOR_BOSS.saturating_sub(KILLS_FOR_BOSS_RETRY),
         "Kills should be set for retry (need {} more kills)",
         KILLS_FOR_BOSS_RETRY
+    );
+}
+
+#[test]
+fn player_death_to_zone_boss_resets_to_subzone_1() {
+    let mut state = state_player_about_to_die();
+    // Zone 1, subzone 3 — the zone boss (Sporeling Queen)
+    state.zone_progression.current_zone_id = 1;
+    state.zone_progression.current_subzone_id = 3;
+    state.zone_progression.fighting_boss = true;
+    state.zone_progression.kills_in_subzone = KILLS_FOR_BOSS;
+
+    let haven = default_haven();
+    let prestige = default_prestige();
+    let god_items = default_god_items();
+
+    force_enemy_attack(&mut state, &haven, &prestige, &god_items);
+
+    assert!(!state.zone_progression.fighting_boss);
+    // Sent back to subzone 1
+    assert_eq!(
+        state.zone_progression.current_subzone_id, 1,
+        "Death to zone boss should reset to subzone 1"
+    );
+    // Kills reset to 0 (fresh start)
+    assert_eq!(
+        state.zone_progression.kills_in_subzone, 0,
+        "Kills should be fully reset after zone boss death"
+    );
+}
+
+#[test]
+fn player_death_to_undying_storm_resets_to_lightning_fields() {
+    let mut state = state_player_about_to_die();
+    // Zone 10 (Storm Citadel), subzone 4 (Apex Spire) — The Undying Storm
+    state.zone_progression.current_zone_id = 10;
+    state.zone_progression.current_subzone_id = 4;
+    state.zone_progression.fighting_boss = true;
+    state.zone_progression.kills_in_subzone = KILLS_FOR_BOSS;
+
+    let haven = default_haven();
+    let prestige = default_prestige();
+    let god_items = default_god_items();
+
+    force_enemy_attack(&mut state, &haven, &prestige, &god_items);
+
+    assert!(!state.zone_progression.fighting_boss);
+    // Sent back to subzone 1 (Lightning Fields)
+    assert_eq!(
+        state.zone_progression.current_subzone_id, 1,
+        "Death to The Undying Storm should reset to Lightning Fields (subzone 1)"
+    );
+    assert_eq!(state.zone_progression.kills_in_subzone, 0);
+}
+
+#[test]
+fn player_death_to_zone_boss_preserves_zone_id() {
+    let mut state = state_player_about_to_die();
+    // Zone 5 (Volcanic Wastes), subzone 4 (Magma Core) — Infernal Titan (zone boss)
+    state.zone_progression.current_zone_id = 5;
+    state.zone_progression.current_subzone_id = 4;
+    state.zone_progression.fighting_boss = true;
+    state.zone_progression.kills_in_subzone = KILLS_FOR_BOSS;
+
+    let haven = default_haven();
+    let prestige = default_prestige();
+    let god_items = default_god_items();
+
+    force_enemy_attack(&mut state, &haven, &prestige, &god_items);
+
+    // Stays in same zone, just reset to subzone 1
+    assert_eq!(
+        state.zone_progression.current_zone_id, 5,
+        "Zone should not change on zone boss death"
+    );
+    assert_eq!(
+        state.zone_progression.current_subzone_id, 1,
+        "Should reset to subzone 1 of same zone"
+    );
+    assert_eq!(state.zone_progression.kills_in_subzone, 0);
+}
+
+#[test]
+fn player_death_to_expanse_zone_boss_resets_to_subzone_1() {
+    let mut state = state_player_about_to_die();
+    // Zone 11 (The Expanse), subzone 4 (The Endless) — Avatar of Infinity (zone boss)
+    state.zone_progression.current_zone_id = 11;
+    state.zone_progression.current_subzone_id = 4;
+    state.zone_progression.fighting_boss = true;
+    state.zone_progression.kills_in_subzone = KILLS_FOR_BOSS;
+
+    let haven = default_haven();
+    let prestige = default_prestige();
+    let god_items = default_god_items();
+
+    force_enemy_attack(&mut state, &haven, &prestige, &god_items);
+
+    assert_eq!(
+        state.zone_progression.current_zone_id, 11,
+        "Should stay in The Expanse"
+    );
+    assert_eq!(
+        state.zone_progression.current_subzone_id, 1,
+        "Death to Avatar of Infinity should reset to Void's Edge (subzone 1)"
+    );
+    assert_eq!(state.zone_progression.kills_in_subzone, 0);
+}
+
+#[test]
+fn player_death_to_mid_subzone_boss_in_4_subzone_zone_uses_retry() {
+    let mut state = state_player_about_to_die();
+    // Zone 5 (Volcanic Wastes), subzone 2 (Lava Rivers) — Magma Serpent (NOT zone boss)
+    state.zone_progression.current_zone_id = 5;
+    state.zone_progression.current_subzone_id = 2;
+    state.zone_progression.fighting_boss = true;
+    state.zone_progression.kills_in_subzone = KILLS_FOR_BOSS;
+
+    let haven = default_haven();
+    let prestige = default_prestige();
+    let god_items = default_god_items();
+
+    force_enemy_attack(&mut state, &haven, &prestige, &god_items);
+
+    // Stays in same subzone with retry mechanic
+    assert_eq!(state.zone_progression.current_zone_id, 5);
+    assert_eq!(
+        state.zone_progression.current_subzone_id, 2,
+        "Should stay in same subzone for non-zone boss"
+    );
+    assert_eq!(
+        state.zone_progression.kills_in_subzone,
+        KILLS_FOR_BOSS.saturating_sub(KILLS_FOR_BOSS_RETRY),
+        "Should use 5-kill retry for subzone boss"
+    );
+}
+
+#[test]
+fn player_death_to_zone_boss_emits_player_died_event() {
+    let mut state = state_player_about_to_die();
+    // Zone 1, subzone 3 — Sporeling Queen (zone boss)
+    state.zone_progression.current_zone_id = 1;
+    state.zone_progression.current_subzone_id = 3;
+    state.zone_progression.fighting_boss = true;
+    state.zone_progression.kills_in_subzone = KILLS_FOR_BOSS;
+
+    let haven = default_haven();
+    let prestige = default_prestige();
+    let god_items = default_god_items();
+
+    let events = force_enemy_attack(&mut state, &haven, &prestige, &god_items);
+
+    assert!(
+        events.iter().any(|e| matches!(e, CombatEvent::PlayerDied)),
+        "Should emit PlayerDied event on zone boss death"
     );
 }
 
