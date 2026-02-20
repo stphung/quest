@@ -485,7 +485,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
             } => {
                 let sg_color = Color::Rgb(100, 180, 255);
                 game_state.ticker.push(TickerEntry {
-                    icon: "\u{26A1}",
+                    icon: "\u{1F48E}",
                     text: format!("Salvaged {} \u{2192} +{} SG", item_name, amount),
                     color: sg_color,
                     bold: false,
@@ -495,7 +495,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
             TickEvent::StormglassDungeonCache { amount } => {
                 let sg_color = Color::Rgb(100, 180, 255);
                 game_state.ticker.push(TickerEntry {
-                    icon: "\u{26A1}",
+                    icon: "\u{1F48E}",
                     text: format!("Found {} Stormglass!", amount),
                     color: sg_color,
                     bold: true,

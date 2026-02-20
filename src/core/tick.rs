@@ -76,8 +76,8 @@ pub fn game_tick<R: Rng>(
         _ => {}
     }
 
-    // ── 2. Try challenge discovery ──────────────────────────────
-    {
+    // ── 2. Try challenge discovery (skipped during Chrono Surge) ─
+    if !state.chrono_surge_active {
         let haven_discovery = haven_bonuses.challenge_discovery_percent;
         if let Some(challenge_type) =
             crate::challenges::menu::try_discover_challenge_with_haven(state, rng, haven_discovery)

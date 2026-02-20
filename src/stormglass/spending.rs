@@ -36,8 +36,13 @@ const TRIAL_CHALLENGE_TYPES: [ChallengeType; 10] = [
 const TRIAL_OPTION_COUNT: usize = 3;
 
 /// Generate 3 unique trial options with different challenge types.
-pub fn generate_trial_options<R: Rng>(rng: &mut R) -> Vec<TrialOption> {
-    let mut types = TRIAL_CHALLENGE_TYPES.to_vec();
+/// Excludes any challenge types already pending in the player's challenge menu.
+pub fn generate_trial_options<R: Rng>(rng: &mut R, exclude: &[ChallengeType]) -> Vec<TrialOption> {
+    let mut types: Vec<ChallengeType> = TRIAL_CHALLENGE_TYPES
+        .iter()
+        .filter(|ct| !exclude.contains(ct))
+        .cloned()
+        .collect();
     types.shuffle(rng);
 
     types

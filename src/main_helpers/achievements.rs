@@ -79,7 +79,7 @@ pub fn track_input_achievements(
             let sg_reward = crate::stormglass::earning::challenge_reward(win_info.difficulty);
             state.stormglass += sg_reward;
             state.combat_state.add_log_entry(
-                format!("\u{26A1} Challenge won! +{} Stormglass", sg_reward),
+                format!("\u{1F48E} Challenge won! +{} Stormglass", sg_reward),
                 false,
                 true,
             );

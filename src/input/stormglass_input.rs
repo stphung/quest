@@ -48,7 +48,13 @@ fn handle_menu(
                     if state.stormglass >= INVOKE_TRIAL_COST {
                         state.stormglass -= INVOKE_TRIAL_COST;
                         let mut rng = rand::rng();
-                        exchange_ui.trial_options = generate_trial_options(&mut rng);
+                        let pending: Vec<_> = state
+                            .challenge_menu
+                            .challenges
+                            .iter()
+                            .map(|c| c.challenge_type.clone())
+                            .collect();
+                        exchange_ui.trial_options = generate_trial_options(&mut rng, &pending);
                         exchange_ui.trial_selected = 0;
                         exchange_ui.phase = ExchangePhase::InvokeTrial;
                     }
@@ -61,7 +67,7 @@ fn handle_menu(
                         grant_prestige_rank_no_reset(state);
                         state.combat_state.add_log_entry(
                             format!(
-                                "\u{26A1} Stormglass Exchange: Prestige rank increased to P{}!",
+                                "\u{1F48E} Stormglass Exchange: Prestige rank increased to P{}!",
                                 state.prestige_rank
                             ),
                             false,

@@ -86,6 +86,7 @@ impl CharacterManager {
             game_over_shown_at: None,
             stormglass: save_data.stormglass,
             stormglass_discovered: save_data.stormglass_discovered,
+            chrono_surge_active: false,
         })
     }
 

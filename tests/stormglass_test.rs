@@ -209,14 +209,14 @@ fn test_prestige_rank_cost_monotonically_increases() {
 #[test]
 fn test_generate_trial_options_returns_3() {
     let mut rng = rand::rng();
-    let options = spending::generate_trial_options(&mut rng);
+    let options = spending::generate_trial_options(&mut rng, &[]);
     assert_eq!(options.len(), 3);
 }
 
 #[test]
 fn test_generate_trial_options_unique_types() {
     let mut rng = rand::rng();
-    let options = spending::generate_trial_options(&mut rng);
+    let options = spending::generate_trial_options(&mut rng, &[]);
     let types: Vec<_> = options.iter().map(|o| &o.challenge_type).collect();
     for i in 0..types.len() {
         for j in (i + 1)..types.len() {
@@ -231,9 +231,27 @@ fn test_generate_trial_options_unique_types() {
 #[test]
 fn test_generate_trial_options_has_display_names() {
     let mut rng = rand::rng();
-    let options = spending::generate_trial_options(&mut rng);
+    let options = spending::generate_trial_options(&mut rng, &[]);
     for option in &options {
         assert!(!option.display_name.is_empty());
+    }
+}
+
+#[test]
+fn test_generate_trial_options_excludes_pending() {
+    use quest::challenges::menu::ChallengeType;
+    let mut rng = rand::rng();
+    let exclude = vec![
+        ChallengeType::Chess,
+        ChallengeType::Morris,
+        ChallengeType::Gomoku,
+    ];
+    let options = spending::generate_trial_options(&mut rng, &exclude);
+    for option in &options {
+        assert!(
+            !exclude.contains(&option.challenge_type),
+            "Trial options should not include pending challenge types"
+        );
     }
 }
 

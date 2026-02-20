@@ -124,6 +124,7 @@ mod tests {
             game_over_shown_at: None,
             stormglass: 0,
             stormglass_discovered: false,
+            chrono_surge_active: false,
         }
     }
 

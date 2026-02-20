@@ -148,7 +148,7 @@ fn render_exchange_menu(
     frame.render_widget(Clear, overlay_area);
 
     let title = format!(
-        " \u{26A1} Stormglass Exchange  [\u{26A1}{} SG] ",
+        " \u{1F48E} Stormglass Exchange  [\u{1F48E}{} SG] ",
         state.stormglass
     );
     let block = Block::default()
@@ -312,7 +312,7 @@ fn render_invoke_trial(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiSt
 
     let block = Block::default()
         .title(Line::from(Span::styled(
-            " \u{26A1} Invoke Trial \u{26A1} ",
+            " \u{1F48E} Invoke Trial \u{1F48E} ",
             Style::default()
                 .fg(ELECTRIC_BLUE)
                 .add_modifier(Modifier::BOLD),
@@ -415,7 +415,10 @@ fn render_chrono_surge_select(
 
     frame.render_widget(Clear, overlay_area);
 
-    let title = format!(" \u{26A1} Chrono Surge  [\u{26A1}{} SG] ", state.stormglass);
+    let title = format!(
+        " \u{1F48E} Chrono Surge  [\u{1F48E}{} SG] ",
+        state.stormglass
+    );
     let block = Block::default()
         .title(Line::from(Span::styled(
             title,
@@ -562,7 +565,7 @@ pub fn render_chrono_surge_banner(
     let lines = vec![
         Line::from(vec![
             Span::styled(
-                "\u{26A1} Chrono Surge ",
+                "\u{1F48E} Chrono Surge ",
                 Style::default()
                     .fg(ELECTRIC_BLUE)
                     .add_modifier(Modifier::BOLD),
@@ -601,7 +604,7 @@ pub fn render_chrono_surge_summary(
 
     let block = Block::default()
         .title(Line::from(Span::styled(
-            " \u{26A1} Chrono Surge Complete \u{26A1} ",
+            " \u{1F48E} Chrono Surge Complete \u{1F48E} ",
             Style::default()
                 .fg(ELECTRIC_BLUE)
                 .add_modifier(Modifier::BOLD),
@@ -694,7 +697,7 @@ pub fn render_stormglass_discovery_modal(
     let text = Paragraph::new(vec![
         Line::from(""),
         Line::from(Span::styled(
-            "\u{26A1} Your unwanted gear crystallized into Stormglass!",
+            "\u{1F48E} Your unwanted gear crystallized into Stormglass!",
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),

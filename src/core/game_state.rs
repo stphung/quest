@@ -88,6 +88,9 @@ pub struct GameState {
     /// Session kill count (transient, not saved)
     #[serde(skip)]
     pub session_kills: u64,
+    /// When true, suppresses challenge discovery during Chrono Surge
+    #[serde(skip)]
+    pub chrono_surge_active: bool,
     /// Recent item drops for display (transient, not saved)
     #[serde(skip)]
     pub recent_drops: VecDeque<RecentDrop>,
@@ -157,6 +160,7 @@ impl GameState {
             xp_rate_samples: VecDeque::new(),
             xp_this_second: 0,
             game_over_shown_at: None,
+            chrono_surge_active: false,
         }
     }
 

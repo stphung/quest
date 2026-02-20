@@ -438,6 +438,7 @@ fn main() -> io::Result<()> {
                                     }
                                     // No SG during surge — restore to pre-skip value
                                     state.stormglass = sg_before_skip;
+                                    state.chrono_surge_active = false;
                                     let surge = chrono_surge.take().unwrap();
                                     chrono_summary = Some(ChronoSurgeSummary {
                                         kills: surge.kills,
@@ -495,6 +496,7 @@ fn main() -> io::Result<()> {
                             // Handle StartChronoSurge before routing
                             if let InputResult::StartChronoSurge { ticks } = result {
                                 chrono_surge = Some(ChronoSurgeState::new(ticks));
+                                state.chrono_surge_active = true;
                                 continue;
                             }
 
@@ -688,6 +690,7 @@ fn main() -> io::Result<()> {
                         // Check if surge is complete
                         let done = chrono_surge.as_ref().unwrap().ticks_remaining == 0;
                         if done {
+                            state.chrono_surge_active = false;
                             let surge = chrono_surge.take().unwrap();
                             chrono_summary = Some(ChronoSurgeSummary {
                                 kills: surge.kills,
@@ -848,7 +851,7 @@ fn main() -> io::Result<()> {
                                                     if consolation > 0 {
                                                         state.stormglass += consolation;
                                                         state.combat_state.add_log_entry(
-                                                            format!("\u{26A1} +{} Stormglass recovered from failed enhancement", consolation),
+                                                            format!("\u{1F48E} +{} Stormglass recovered from failed enhancement", consolation),
                                                             false,
                                                             true,
                                                         );
