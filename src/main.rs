@@ -439,8 +439,6 @@ fn main() -> io::Result<()> {
                                     // No SG during surge — restore to pre-skip value
                                     state.stormglass = sg_before_skip;
                                     state.chrono_surge_active = false;
-                                    // Reset ticker so it starts fresh after the surge
-                                    state.ticker.clear();
                                     let surge = chrono_surge.take().unwrap();
                                     chrono_summary = Some(ChronoSurgeSummary {
                                         kills: surge.kills,
@@ -647,9 +645,9 @@ fn main() -> io::Result<()> {
                                 }
                             }
 
-                            // Skip apply_tick_events during surge — the surge overlay
-                            // shows its own stats, and flooding the ticker with thousands
-                            // of entries breaks scroll positioning after the surge ends.
+                            // Apply events to UI state — ticker zooms at surge speed
+                            apply_tick_events(&mut state, &tick_result.events);
+                            state.ticker.tick();
 
                             if tick_result.achievements_changed
                                 || tick_result.haven_changed
@@ -680,8 +678,6 @@ fn main() -> io::Result<()> {
                         let done = chrono_surge.as_ref().unwrap().ticks_remaining == 0;
                         if done {
                             state.chrono_surge_active = false;
-                            // Reset ticker so it starts fresh after the surge
-                            state.ticker.clear();
                             let surge = chrono_surge.take().unwrap();
                             chrono_summary = Some(ChronoSurgeSummary {
                                 kills: surge.kills,
