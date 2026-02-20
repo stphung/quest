@@ -16,6 +16,7 @@ pub mod fishing;
 pub mod god_items;
 pub mod haven;
 pub mod items;
+pub mod stormglass;
 pub mod utils;
 pub mod zones;
 

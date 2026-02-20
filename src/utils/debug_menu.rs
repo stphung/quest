@@ -30,6 +30,8 @@ pub const DEBUG_OPTIONS: &[&str] = &[
     "Forge Asprika (God Item)",
     "Forge Sleipnir (God Item)",
     "Forge Megingjord (God Item)",
+    "Grant 1000 Stormglass",
+    "Discover Stormglass",
 ];
 
 /// Debug menu state
@@ -98,6 +100,8 @@ impl DebugMenu {
             14 => trigger_forge_asprika(state, enhancement),
             15 => trigger_forge_sleipnir(state, enhancement),
             16 => trigger_forge_megingjord(state, enhancement),
+            17 => trigger_grant_stormglass(state),
+            18 => trigger_discover_stormglass(state),
             _ => "Unknown option",
         };
         self.close();
@@ -313,6 +317,20 @@ fn trigger_forge_megingjord(
     state.recalculate_prestige_bonuses();
     state.recalculate_derived_stats(&enhancement.levels);
     "Megingjord forged and equipped!"
+}
+
+fn trigger_grant_stormglass(state: &mut GameState) -> &'static str {
+    state.stormglass += 1000;
+    state.stormglass_discovered = true;
+    "Granted 1000 Stormglass!"
+}
+
+fn trigger_discover_stormglass(state: &mut GameState) -> &'static str {
+    if state.stormglass_discovered {
+        return "Stormglass already discovered!";
+    }
+    state.stormglass_discovered = true;
+    "Stormglass discovered!"
 }
 
 #[cfg(test)]

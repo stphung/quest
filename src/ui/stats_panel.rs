@@ -478,6 +478,7 @@ pub(super) fn draw_footer_compact(
     game_state: &GameState,
     haven_discovered: bool,
     soulforge_discovered: bool,
+    stormglass_discovered: bool,
     pending_achievements: usize,
 ) {
     use crate::character::prestige::can_prestige;
@@ -502,6 +503,12 @@ pub(super) fn draw_footer_compact(
 
     let soulforge_span = if soulforge_discovered {
         Span::styled(" [S]oulforge", Style::default().fg(Color::Yellow))
+    } else {
+        Span::raw("")
+    };
+
+    let stormglass_span = if stormglass_discovered {
+        Span::styled(" [G]lass", Style::default().fg(Color::Rgb(100, 180, 255)))
     } else {
         Span::raw("")
     };
@@ -535,6 +542,7 @@ pub(super) fn draw_footer_compact(
         prestige_span,
         haven_span,
         soulforge_span,
+        stormglass_span,
         ach_span,
         challenge_span,
         Span::styled(" [?]Help", Style::default().fg(Color::DarkGray)),
@@ -685,6 +693,7 @@ pub fn draw_footer(
     update_check_completed: bool,
     haven_discovered: bool,
     soulforge_discovered: bool,
+    stormglass_discovered: bool,
     pending_achievements: usize,
     _ctx: &LayoutContext,
 ) {
@@ -750,6 +759,15 @@ pub fn draw_footer(
         Span::raw("")
     };
 
+    let stormglass_text = if stormglass_discovered {
+        Span::styled(
+            "    [G] Stormglass",
+            Style::default().fg(Color::Rgb(100, 180, 255)),
+        )
+    } else {
+        Span::raw("")
+    };
+
     let achievements_text = if pending_achievements > 0 {
         Span::styled(
             format!("[A] Achievements (\u{1f3c6} {} new!)", pending_achievements),
@@ -768,6 +786,7 @@ pub fn draw_footer(
             prestige_text,
             haven_text,
             soulforge_text,
+            stormglass_text,
         ]),
         Line::from(vec![
             achievements_text,

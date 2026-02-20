@@ -29,6 +29,10 @@ pub(super) struct CharacterSaveData {
     pub(super) zone_progression: crate::zones::ZoneProgression,
     #[serde(default)]
     pub(super) chess_stats: crate::challenges::chess::ChessStats,
+    #[serde(default)]
+    pub(super) stormglass: u64,
+    #[serde(default)]
+    pub(super) stormglass_discovered: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -118,6 +122,8 @@ mod tests {
             xp_rate_samples: std::collections::VecDeque::new(),
             xp_this_second: 0,
             game_over_shown_at: None,
+            stormglass: 0,
+            stormglass_discovered: false,
         }
     }
 

@@ -352,19 +352,13 @@ pub fn render_soulforge_discovery_modal(
         )),
         Line::from(""),
         Line::from(Span::styled(
-            "Ancient runes pulse with forgotten power.",
+            "Ancient power courses through the forge,",
             Style::default()
                 .fg(Color::White)
                 .add_modifier(Modifier::ITALIC),
         )),
         Line::from(Span::styled(
-            "This forge tempers the soul, not the steel.",
-            Style::default()
-                .fg(Color::White)
-                .add_modifier(Modifier::ITALIC),
-        )),
-        Line::from(Span::styled(
-            "All that you wield will strike truer.",
+            "ready to enhance all that you wield.",
             Style::default()
                 .fg(Color::White)
                 .add_modifier(Modifier::ITALIC),

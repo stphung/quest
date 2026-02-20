@@ -67,5 +67,8 @@ pub fn route_game_input(
             *update_expanded = !*update_expanded;
             InputAction::Continue
         }
+        // StartChronoSurge is handled directly in main.rs before reaching
+        // route_game_input, but must be matched for exhaustiveness.
+        InputResult::StartChronoSurge { .. } => InputAction::Continue,
     }
 }

@@ -34,6 +34,8 @@ impl CharacterManager {
             fishing: state.fishing.clone(),
             zone_progression: state.zone_progression.clone(),
             chess_stats: state.chess_stats.clone(),
+            stormglass: state.stormglass,
+            stormglass_discovered: state.stormglass_discovered,
         };
 
         let json = serde_json::to_string_pretty(&save_data)
@@ -82,6 +84,8 @@ impl CharacterManager {
             xp_rate_samples: std::collections::VecDeque::new(),
             xp_this_second: 0,
             game_over_shown_at: None,
+            stormglass: save_data.stormglass,
+            stormglass_discovered: save_data.stormglass_discovered,
         })
     }
 

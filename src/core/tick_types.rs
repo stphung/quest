@@ -171,6 +171,19 @@ pub enum TickEvent {
     /// The Soulforge was discovered (P15+ idle roll).
     SoulforgeDiscovered,
 
+    /// Stormglass was discovered for the first time (first gear salvage).
+    StormglassDiscovered,
+
+    /// An item was salvaged into Stormglass.
+    StormglassSalvaged {
+        item_name: String,
+        rarity: Rarity,
+        amount: u64,
+    },
+
+    /// Stormglass cache found in a dungeon treasure room.
+    StormglassDungeonCache { amount: u64 },
+
     // ── Achievements ────────────────────────────────────────────
     /// An achievement was unlocked during this tick.
     AchievementUnlocked { name: String, message: String },
