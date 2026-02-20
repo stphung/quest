@@ -194,7 +194,7 @@ CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FI
 - `logic.rs` — Enhancement rolling, result application, Soulforge discovery chance/roll
 - `persistence.rs` — Save/load from `~/.quest/enhancement.json`
 
-Account-level equipment enhancement system (Soulforge) that persists across characters. Each of 7 equipment slots can be enhanced from +0 to +10. Levels +1-4 are 100% success rate; +5-10 have decreasing success rates (60% down to 10%) and failure penalties (-1 or -2 levels). Costs prestige ranks. Discovered at P15+. Enhancement multipliers boost equipment stats in `derived_stats.rs`.
+Account-level equipment enhancement system (Soulforge) that persists across characters. Each of 7 equipment slots can be enhanced from +0 to +10. Levels +1-4 are 100% success rate; +5-10 have decreasing success rates (70% down to 10%) and failure penalties (-1 or -2 levels). Levels +5-7 offer a "Soul Tithe" option for guaranteed success at higher PR cost. Costs prestige ranks. Discovered at P15+. Enhancement multipliers boost equipment stats in `derived_stats.rs`.
 
 ### God Items Module (`src/god_items/`)
 
@@ -345,8 +345,9 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 - Haven discovery: requires P10+, base chance 0.000014/tick + 0.000007 per rank above 10
 - Challenge discovery: ~2hr avg per challenge (requires P1+)
 - Soulforge discovery: requires P15+, base chance 0.000014/tick + 0.000007 per rank above 15
-- Enhancement levels: 0-10, success rates 100% (+1-4), 60%/50%/40% (+5-7), 30%/20%/10% (+8-10)
-- Enhancement costs: 1 PR (+1-4), 3 PR (+5-7), 5 PR (+8-9), 10 PR (+10)
+- Enhancement levels: 0-10, success rates 100% (+1-4), 70%/55%/40% (+5-7), 30%/20%/10% (+8-10)
+- Enhancement costs: 1 PR (+1-4), 2/3/3 PR (+5-7), 4 PR (+8-9), 5 PR (+10)
+- Enhancement Soul Tithe: +5/+6/+7 can pay 4/6/8 PR for guaranteed 100% success
 
 ## Combat Mechanics
 
