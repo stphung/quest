@@ -13,6 +13,7 @@ pub mod combat_effects;
 mod combat_scene;
 pub mod debug_menu_scene;
 pub mod dungeon_map;
+mod enemy_sprite_data;
 mod enemy_sprites;
 pub mod fishing_scene;
 pub mod flappy_scene;

@@ -86,8 +86,6 @@ fn draw_header(frame: &mut Frame, area: Rect, session: &FishingSession) {
 
 /// Draws the ASCII water scene with bobber.
 fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
-    use crate::fishing::types::FishingPhase;
-
     let water_block = Block::default().borders(Borders::LEFT | Borders::RIGHT);
     let inner = water_block.inner(area);
     frame.render_widget(water_block, area);
@@ -105,7 +103,24 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
     let dusk = ((millis / 16_000.0).sin() * 0.5 + 0.5).powf(1.2);
     let horizon = ((height as f64 * 0.34).round() as usize).clamp(1, height.saturating_sub(2));
 
-    // Sky and water gradients.
+    render_sky_and_shoreline(&mut buffer, width, height, horizon, wave_tick, dusk);
+    render_water_surface(&mut buffer, height, horizon, wave_tick);
+    render_sailboat(&mut buffer, width, horizon, height, wave_tick);
+    render_bobber_and_line(&mut buffer, session, width, height, horizon, wave_tick);
+
+    render_buffer(frame, inner, &buffer);
+}
+
+/// Sky gradient, celestial body, stars, clouds, and distant shoreline silhouettes.
+fn render_sky_and_shoreline(
+    buffer: &mut [Vec<SceneCell>],
+    width: usize,
+    height: usize,
+    horizon: usize,
+    wave_tick: f64,
+    dusk: f64,
+) {
+    // Sky and water background gradients
     for (row, row_cells) in buffer.iter_mut().enumerate() {
         let bg_rgb = if row < horizon {
             let row_t = if horizon <= 1 {
@@ -133,7 +148,7 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
         }
     }
 
-    // Celestial body.
+    // Celestial body
     let orb_col = ((width as f64 * 0.78) + (wave_tick * 0.08).sin() * 3.0).round() as i32;
     let orb_row = ((horizon as f64 * 0.32) + (wave_tick * 0.04).sin()).round() as i32;
     let (orb_char, orb_color) = if dusk < 0.56 {
@@ -148,10 +163,10 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
         (0, -1, '·', Color::Rgb(236, 220, 170)),
         (0, 1, '·', Color::Rgb(236, 220, 170)),
     ] {
-        put_cell(&mut buffer, orb_row + dy, orb_col + dx, ch, fg);
+        put_cell(&mut buffer[..], orb_row + dy, orb_col + dx, ch, fg);
     }
 
-    // Stars appear as dusk settles.
+    // Stars appear as dusk settles
     if dusk > 0.25 {
         let twinkle_tick = (wave_tick / 1.8) as usize;
         for (row, row_cells) in buffer
@@ -176,7 +191,7 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
         }
     }
 
-    // Sky clouds.
+    // Sky clouds
     for &(base_x, y_ratio, speed, pattern, shade) in &[
         (6.0, 0.18, 0.040, "~~", 148u8),
         (18.0, 0.28, 0.032, "~~~", 140),
@@ -203,7 +218,7 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
         }
     }
 
-    // Distant shoreline silhouettes.
+    // Distant shoreline silhouettes
     for col in 0..width {
         let far_h =
             (1.0 + ((col as f64 * 0.24 + wave_tick * 0.012).sin() + 1.0) * 1.1).round() as i32;
@@ -232,12 +247,19 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
         ] {
             let top = horizon as i32 - height_delta;
             for row in top.max(0)..=horizon as i32 {
-                put_cell(&mut buffer, row, col as i32, ch, color);
+                put_cell(&mut buffer[..], row, col as i32, ch, color);
             }
         }
     }
+}
 
-    // Layered animated water surface.
+/// Layered animated water surface with wave patterns and shimmer.
+fn render_water_surface(
+    buffer: &mut [Vec<SceneCell>],
+    height: usize,
+    horizon: usize,
+    wave_tick: f64,
+) {
     for (row, row_cells) in buffer.iter_mut().enumerate().skip(horizon) {
         let depth_t = if height - horizon <= 1 {
             0.0
@@ -279,22 +301,22 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
             }
         }
     }
+}
 
-    // Halfblock sailboat with gentle bob.
-    //
-    // Layout (~13 wide, 5 tall):
-    //   row 0:          ▸         pennant
-    //   row 1:         ╱│         sail top + mast
-    //   row 2:        ╱ │         sail body + mast
-    //   row 3:    ▄▄▟█▀▀█▀█▙▄▄   deck (halfblock taper)
-    //   row 4:     ▀▀▄████▄▀▀    hull bottom
-    //   row 5:        ▀▀▀▀       keel/waterline
+/// Halfblock sailboat with gentle bob near the horizon.
+fn render_sailboat(
+    buffer: &mut [Vec<SceneCell>],
+    width: usize,
+    horizon: usize,
+    height: usize,
+    wave_tick: f64,
+) {
     let boat_center = ((width as f64 * 0.35) + (wave_tick * 0.04).sin() * 2.0).round() as i32;
     let deck_row = (horizon + 1).min(height.saturating_sub(4)) as i32;
     let mast_x = boat_center;
     let mast_top = deck_row - 3;
 
-    // Colour palette.
+    // Colour palette
     let hull_dark = (94, 58, 36);
     let hull_mid = (140, 90, 52);
     let hull_light = (188, 140, 86);
@@ -303,8 +325,8 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
     let sail_color = Color::Rgb(245, 235, 215);
     let pennant_color = Color::Rgb(255, 96, 72);
 
-    // Helper: set a cell with explicit fg, bg, and char.
-    let set = |buf: &mut Vec<Vec<SceneCell>>,
+    // Helper: set a cell with explicit fg, bg, and char
+    let set = |buf: &mut [Vec<SceneCell>],
                r: i32,
                c: i32,
                ch: char,
@@ -323,7 +345,7 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
         }
     };
 
-    // Helper: get bg color tuple at a buffer position.
+    // Helper: get bg color tuple at a buffer position
     let bg_at = |buf: &[Vec<SceneCell>], r: i32, c: i32| -> (u8, u8, u8) {
         if r < 0 || c < 0 {
             return (0, 0, 0);
@@ -339,33 +361,27 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
         }
     };
 
-    // Row 0: pennant at mast top.
-    put_cell(&mut buffer, mast_top, mast_x + 1, '▸', pennant_color);
+    // Row 0: pennant at mast top
+    put_cell(buffer, mast_top, mast_x + 1, '▸', pennant_color);
 
-    // Rows 1-2: sail (triangular) + mast.
-    // Sail uses ╱ for the leading edge; mast is │.
-    put_cell(&mut buffer, mast_top + 1, mast_x - 1, '╱', sail_color);
-    put_cell(&mut buffer, mast_top + 1, mast_x, '│', mast_color);
+    // Rows 1-2: sail (triangular) + mast
+    put_cell(buffer, mast_top + 1, mast_x - 1, '╱', sail_color);
+    put_cell(buffer, mast_top + 1, mast_x, '│', mast_color);
 
-    put_cell(&mut buffer, mast_top + 2, mast_x - 2, '╱', sail_color);
-    // Fill sail interior.
+    put_cell(buffer, mast_top + 2, mast_x - 2, '╱', sail_color);
     let sail_fill = Color::Rgb(238, 228, 208);
-    put_cell(&mut buffer, mast_top + 2, mast_x - 1, '░', sail_fill);
-    put_cell(&mut buffer, mast_top + 2, mast_x, '│', mast_color);
+    put_cell(buffer, mast_top + 2, mast_x - 1, '░', sail_fill);
+    put_cell(buffer, mast_top + 2, mast_x, '│', mast_color);
 
-    // Row 3: deck — halfblock tapered edges blending into surrounding bg.
-    // Pattern: ▄▄▟█▀▀█▀▀█▙▄▄  (13 chars, centered on mast_x)
-    // Offsets from mast_x: -6 to +6
+    // Row 3: deck -- halfblock tapered edges blending into surrounding bg
     let dr = deck_row;
-    // Far-left taper: ▄ with fg=deck, bg=existing
-    let bg0 = bg_at(&buffer, dr, mast_x - 6);
-    set(&mut buffer, dr, mast_x - 6, '▄', deck_color, bg0);
-    let bg1 = bg_at(&buffer, dr, mast_x - 5);
-    set(&mut buffer, dr, mast_x - 5, '▄', hull_mid, bg1);
-    // ▟ quarter block (lower-right filled): fg=hull, bg=existing
-    let bg2 = bg_at(&buffer, dr, mast_x - 4);
-    set(&mut buffer, dr, mast_x - 4, '▟', hull_mid, bg2);
-    // Solid deck section.
+    let bg0 = bg_at(buffer, dr, mast_x - 6);
+    set(buffer, dr, mast_x - 6, '▄', deck_color, bg0);
+    let bg1 = bg_at(buffer, dr, mast_x - 5);
+    set(buffer, dr, mast_x - 5, '▄', hull_mid, bg1);
+    let bg2 = bg_at(buffer, dr, mast_x - 4);
+    set(buffer, dr, mast_x - 4, '▟', hull_mid, bg2);
+    // Solid deck section
     for dx in -3..=3 {
         let c = if dx == 0 { '│' } else { '█' };
         let fg = if dx == 0 {
@@ -376,43 +392,59 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
         } else {
             deck_color
         };
-        set(&mut buffer, dr, mast_x + dx, c, fg, hull_dark);
+        set(buffer, dr, mast_x + dx, c, fg, hull_dark);
     }
-    // Right taper: ▙ then ▄▄
-    let bg3 = bg_at(&buffer, dr, mast_x + 4);
-    set(&mut buffer, dr, mast_x + 4, '▙', hull_mid, bg3);
-    let bg4 = bg_at(&buffer, dr, mast_x + 5);
-    set(&mut buffer, dr, mast_x + 5, '▄', hull_mid, bg4);
-    let bg5 = bg_at(&buffer, dr, mast_x + 6);
-    set(&mut buffer, dr, mast_x + 6, '▄', deck_color, bg5);
+    // Right taper
+    let bg3 = bg_at(buffer, dr, mast_x + 4);
+    set(buffer, dr, mast_x + 4, '▙', hull_mid, bg3);
+    let bg4 = bg_at(buffer, dr, mast_x + 5);
+    set(buffer, dr, mast_x + 5, '▄', hull_mid, bg4);
+    let bg5 = bg_at(buffer, dr, mast_x + 6);
+    set(buffer, dr, mast_x + 6, '▄', deck_color, bg5);
 
-    // Row 4: hull bottom — ▀ chars blending hull top into water bg below.
-    // Pattern:  ▀▄████▄▀  (offset -4..+4, narrower than deck)
+    // Row 4: hull bottom
     let hr = deck_row + 1;
-    let bg_l3 = bg_at(&buffer, hr, mast_x - 4);
-    set(&mut buffer, hr, mast_x - 4, '▀', hull_mid, bg_l3);
-    let bg_l2 = bg_at(&buffer, hr, mast_x - 3);
-    set(&mut buffer, hr, mast_x - 3, '▄', hull_dark, bg_l2);
+    let bg_l3 = bg_at(buffer, hr, mast_x - 4);
+    set(buffer, hr, mast_x - 4, '▀', hull_mid, bg_l3);
+    let bg_l2 = bg_at(buffer, hr, mast_x - 3);
+    set(buffer, hr, mast_x - 3, '▄', hull_dark, bg_l2);
     for dx in -2..=2 {
-        set(&mut buffer, hr, mast_x + dx, '█', hull_dark, hull_dark);
+        set(buffer, hr, mast_x + dx, '█', hull_dark, hull_dark);
     }
-    let bg_r2 = bg_at(&buffer, hr, mast_x + 3);
-    set(&mut buffer, hr, mast_x + 3, '▄', hull_dark, bg_r2);
-    let bg_r3 = bg_at(&buffer, hr, mast_x + 4);
-    set(&mut buffer, hr, mast_x + 4, '▀', hull_mid, bg_r3);
+    let bg_r2 = bg_at(buffer, hr, mast_x + 3);
+    set(buffer, hr, mast_x + 3, '▄', hull_dark, bg_r2);
+    let bg_r3 = bg_at(buffer, hr, mast_x + 4);
+    set(buffer, hr, mast_x + 4, '▀', hull_mid, bg_r3);
 
-    // Row 5: keel/waterline — ▀ blending hull color as fg into water bg.
+    // Row 5: keel/waterline
     let kr = deck_row + 2;
     for dx in -1..=1 {
-        let bg_k = bg_at(&buffer, kr, mast_x + dx);
-        set(&mut buffer, kr, mast_x + dx, '▀', hull_dark, bg_k);
+        let bg_k = bg_at(buffer, kr, mast_x + dx);
+        set(buffer, kr, mast_x + dx, '▀', hull_dark, bg_k);
     }
 
-    // Small highlight stripe on upper hull for depth.
-    let bg_hl = bg_at(&buffer, dr, mast_x - 3);
-    set(&mut buffer, dr, mast_x - 3, '▓', hull_light, bg_hl);
+    // Small highlight stripe on upper hull for depth
+    let bg_hl = bg_at(buffer, dr, mast_x - 3);
+    set(buffer, dr, mast_x - 3, '▓', hull_light, bg_hl);
+}
 
-    // Bobber and interaction response by fishing phase.
+/// Bobber, fishing line, ripples, and splash effects.
+fn render_bobber_and_line(
+    buffer: &mut [Vec<SceneCell>],
+    session: &FishingSession,
+    width: usize,
+    height: usize,
+    horizon: usize,
+    wave_tick: f64,
+) {
+    use crate::fishing::types::FishingPhase;
+
+    // Sailboat mast position (must match render_sailboat for line origin)
+    let boat_center = ((width as f64 * 0.35) + (wave_tick * 0.04).sin() * 2.0).round() as i32;
+    let deck_row = (horizon + 1).min(height.saturating_sub(4)) as i32;
+    let mast_x = boat_center;
+    let mast_top = deck_row - 3;
+
     let (bobber_ratio, bobber_amp, bobber_sink, bobber_char, bobber_color, ripple_radius) =
         match session.phase {
             FishingPhase::Casting => (0.66, 0.45, 0.0, '○', Color::Rgb(240, 248, 255), 1),
@@ -426,9 +458,9 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
         .round()
         .clamp((horizon + 1) as f64, (height.saturating_sub(2)) as f64) as i32;
 
-    // Draw a darker shadow first, then a bright main line for contrast on both sky and water.
+    // Fishing line: shadow then bright
     draw_line(
-        &mut buffer,
+        buffer,
         mast_x + 1,
         mast_top.max(0),
         bobber_x + 1,
@@ -436,15 +468,18 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
         Color::Rgb(38, 52, 78),
     );
     draw_line(
-        &mut buffer,
+        buffer,
         mast_x,
         mast_top.max(0),
         bobber_x,
         bobber_y,
         Color::Rgb(255, 208, 122),
     );
-    put_cell(&mut buffer, bobber_y, bobber_x, bobber_char, bobber_color);
 
+    // Bobber
+    put_cell(buffer, bobber_y, bobber_x, bobber_char, bobber_color);
+
+    // Ripples around bobber
     for ring in 1..=ripple_radius {
         let ch = if ring == 1 { 'o' } else { '.' };
         let fg = if ring == 1 {
@@ -462,16 +497,17 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
             (-ring, ring),
             (ring, ring),
         ] {
-            put_cell(&mut buffer, bobber_y + dy, bobber_x + dx, ch, fg);
+            put_cell(buffer, bobber_y + dy, bobber_x + dx, ch, fg);
         }
     }
 
+    // Splash effect during reeling
     if session.phase == FishingPhase::Reeling {
         let splash_row = bobber_y - 1;
         let splash_x = bobber_x + if ((wave_tick as i32) & 1) == 0 { 4 } else { -4 };
         for (i, ch) in "<><".chars().enumerate() {
             put_cell(
-                &mut buffer,
+                buffer,
                 splash_row,
                 splash_x + i as i32,
                 ch,
@@ -480,7 +516,7 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
         }
         for &(dx, dy, ch) in &[(-1, -1, '\''), (2, -1, '\''), (0, -2, '`')] {
             put_cell(
-                &mut buffer,
+                buffer,
                 splash_row + dy,
                 splash_x + dx,
                 ch,
@@ -488,8 +524,6 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
             );
         }
     }
-
-    render_buffer(frame, inner, &buffer);
 }
 
 /// Draws the catch progress indicator with current phase.

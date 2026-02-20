@@ -229,59 +229,32 @@ impl DifficultyInfo for FlappyBirdDifficulty {
     }
 }
 
-/// Apply game result using the shared challenge reward system.
-/// Returns `Some(MinigameWinInfo)` if the player won, `None` otherwise.
-pub fn apply_game_result(state: &mut GameState) -> Option<MinigameWinInfo> {
-    let (result, difficulty, score, target) = {
-        if let Some(ActiveMinigame::FlappyBird(ref game)) = state.active_minigame {
-            (
-                game.game_result,
-                game.difficulty,
-                game.score,
-                game.target_score,
-            )
+impl_apply_game_result! {
+    variant: FlappyBird;
+    result_body: |result, state, reward| {
+        let won = matches!(result, FlappyBirdResult::Win);
+        let (score, target) = match state.active_minigame.as_ref() {
+            Some(crate::challenges::ActiveMinigame::FlappyBird(g)) => (g.score, g.target_score),
+            _ => (0, 0),
+        };
+        if won {
+            state.combat_state.add_log_entry(
+                format!("> You conquered the Skyward Gauntlet! ({}/{} pipes)", score, target),
+                false,
+                true,
+            );
         } else {
-            return None;
+            state.combat_state.add_log_entry(
+                format!("> Crashed after {} pipes ({} lives used).", score, MAX_LIVES),
+                false,
+                true,
+            );
         }
-    };
-
-    let result = result?;
-    let won = matches!(result, FlappyBirdResult::Win);
-    let reward = difficulty.reward();
-
-    // Log score-specific message before the shared reward system logs its messages
-    if won {
-        state.combat_state.add_log_entry(
-            format!(
-                "> You conquered the Skyward Gauntlet! ({}/{} pipes)",
-                score, target
-            ),
-            false,
-            true,
-        );
-    } else {
-        state.combat_state.add_log_entry(
-            format!(
-                "> Crashed after {} pipes ({} lives used).",
-                score, MAX_LIVES
-            ),
-            false,
-            true,
-        );
+        (won, "The gauntlet claims another.")
     }
-
-    crate::challenges::apply_challenge_rewards(
-        state,
-        GameResultInfo {
-            won,
-            game_type: crate::achievements::MinigameType::FlappyBird,
-            difficulty: difficulty.difficulty_enum(),
-            reward,
-            icon: ">",
-            win_message: "Skyward Gauntlet conquered!",
-            loss_message: "The gauntlet claims another.",
-        },
-    )
+    game_type: crate::achievements::MinigameType::FlappyBird;
+    icon: ">";
+    win_message: "Skyward Gauntlet conquered!";
 }
 
 #[cfg(test)]

@@ -162,39 +162,17 @@ pub fn submit_guess<R: Rng>(game: &mut RuneGame, rng: &mut R) -> bool {
     true
 }
 
-/// Apply game result: update stats, grant rewards, and add combat log entries.
-/// Returns Some(MinigameWinInfo) if the player won, None otherwise.
-pub fn apply_game_result(
-    state: &mut crate::core::game_state::GameState,
-) -> Option<crate::challenges::MinigameWinInfo> {
-    use crate::challenges::menu::DifficultyInfo;
-    use crate::challenges::{apply_challenge_rewards, GameResultInfo};
-
-    let game = match state.active_minigame.as_ref() {
-        Some(ActiveMinigame::Rune(g)) => g,
-        _ => return None,
-    };
-    let result = game.game_result?;
-    let difficulty = game.difficulty;
-    let reward = difficulty.reward();
-
-    let (won, loss_message) = match result {
-        RuneResult::Win => (true, ""),
-        RuneResult::Loss => (false, "The tablet fades. The code remains a mystery."),
-    };
-
-    apply_challenge_rewards(
-        state,
-        GameResultInfo {
-            won,
-            game_type: crate::achievements::MinigameType::Rune,
-            difficulty: difficulty.difficulty_enum(),
-            reward,
-            icon: "\u{16B1}",
-            win_message: "The runes glow with approval! Code deciphered.",
-            loss_message,
-        },
-    )
+impl_apply_game_result! {
+    variant: Rune;
+    result_body: |result, state, reward| {
+        match result {
+            RuneResult::Win => (true, ""),
+            RuneResult::Loss => (false, "The tablet fades. The code remains a mystery."),
+        }
+    }
+    game_type: crate::achievements::MinigameType::Rune;
+    icon: "\u{16B1}";
+    win_message: "The runes glow with approval! Code deciphered.";
 }
 
 #[cfg(test)]

@@ -2,6 +2,7 @@
 
 #![allow(unused_imports)]
 
+pub mod ai;
 pub mod logic;
 pub mod types;
 

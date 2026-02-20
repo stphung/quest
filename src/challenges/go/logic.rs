@@ -415,40 +415,19 @@ pub fn process_input(game: &mut GoGame, input: GoInput) -> bool {
     }
 }
 
-/// Apply Go game result to state (rewards for win, clear game).
-/// Returns Some(MinigameWinInfo) if the player won, None otherwise.
-pub fn apply_go_result(
-    state: &mut crate::core::game_state::GameState,
-) -> Option<crate::challenges::MinigameWinInfo> {
-    use crate::challenges::menu::DifficultyInfo;
-    use crate::challenges::{apply_challenge_rewards, GameResultInfo};
-
-    let game = match state.active_minigame.as_ref() {
-        Some(ActiveMinigame::Go(g)) => g,
-        _ => return None,
-    };
-    let result = game.game_result?;
-    let difficulty = game.difficulty;
-    let reward = difficulty.reward();
-
-    let (won, loss_message) = match result {
-        GoResult::Win => (true, ""),
-        GoResult::Loss => (false, "The master nods thoughtfully and departs."),
-        GoResult::Draw => (false, "A rare tie. The master seems impressed."),
-    };
-
-    apply_challenge_rewards(
-        state,
-        GameResultInfo {
-            won,
-            game_type: crate::achievements::MinigameType::Go,
-            difficulty: difficulty.difficulty_enum(),
-            reward,
-            icon: "◉",
-            win_message: "Victory! The master bows in respect.",
-            loss_message,
-        },
-    )
+impl_apply_game_result! {
+    fn apply_go_result;
+    variant: Go;
+    result_body: |result, state, reward| {
+        match result {
+            GoResult::Win => (true, ""),
+            GoResult::Loss => (false, "The master nods thoughtfully and departs."),
+            GoResult::Draw => (false, "A rare tie. The master seems impressed."),
+        }
+    }
+    game_type: crate::achievements::MinigameType::Go;
+    icon: "◉";
+    win_message: "Victory! The master bows in respect.";
 }
 
 /// Process human move at cursor position.

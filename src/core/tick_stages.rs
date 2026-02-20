@@ -25,6 +25,26 @@ use crate::items::types::Rarity;
 use crate::zones::BossDefeatResult;
 use rand::{Rng, RngExt};
 
+/// Apply XP to the player and emit a LeveledUp event if the character leveled up.
+/// Also notifies the achievement system about any new levels reached.
+fn apply_xp_and_check_levelup(
+    state: &mut GameState,
+    xp: f64,
+    achievements: &mut Achievements,
+    result: &mut TickResult,
+) {
+    let level_before = state.character_level;
+    apply_tick_xp(state, xp);
+    if state.character_level > level_before {
+        for lvl in (level_before + 1)..=state.character_level {
+            achievements.on_level_up(lvl, Some(&state.character_name));
+        }
+        result.events.push(TickEvent::LeveledUp {
+            new_level: state.character_level,
+        });
+    }
+}
+
 /// Stage 4: Process dungeon exploration events.
 ///
 /// Calls `update_dungeon()` and maps `DungeonEvent` variants to `TickEvent`s.
@@ -319,16 +339,7 @@ pub fn process_combat_events<R: Rng>(
                 });
 
                 // Apply XP and check level up
-                let level_before = state.character_level;
-                apply_tick_xp(state, xp_gained as f64);
-                if state.character_level > level_before {
-                    for lvl in (level_before + 1)..=state.character_level {
-                        achievements.on_level_up(lvl, Some(&state.character_name));
-                    }
-                    result.events.push(TickEvent::LeveledUp {
-                        new_level: state.character_level,
-                    });
-                }
+                apply_xp_and_check_levelup(state, xp_gained as f64, achievements, result);
                 state.session_kills += 1;
 
                 // Track XP in dungeon and mark room cleared
@@ -355,16 +366,7 @@ pub fn process_combat_events<R: Rng>(
                     message,
                 });
 
-                let level_before = state.character_level;
-                apply_tick_xp(state, xp_gained as f64);
-                if state.character_level > level_before {
-                    for lvl in (level_before + 1)..=state.character_level {
-                        achievements.on_level_up(lvl, Some(&state.character_name));
-                    }
-                    result.events.push(TickEvent::LeveledUp {
-                        new_level: state.character_level,
-                    });
-                }
+                apply_xp_and_check_levelup(state, xp_gained as f64, achievements, result);
                 add_dungeon_xp(state, xp_gained);
 
                 // Give key
@@ -382,9 +384,6 @@ pub fn process_combat_events<R: Rng>(
             CombatEvent::BossDefeated { xp_gained } => {
                 let enemy_name = current_enemy_name.clone();
 
-                let level_before = state.character_level;
-                apply_tick_xp(state, xp_gained as f64);
-
                 // Calculate boss bonus XP
                 let (bonus_xp, total_xp, items) = if let Some(dungeon) = &state.active_dungeon {
                     let bonus = calculate_boss_xp_reward(dungeon.size);
@@ -395,15 +394,12 @@ pub fn process_combat_events<R: Rng>(
                     (0, xp_gained, 0)
                 };
 
-                apply_tick_xp(state, bonus_xp as f64);
-                if state.character_level > level_before {
-                    for lvl in (level_before + 1)..=state.character_level {
-                        achievements.on_level_up(lvl, Some(&state.character_name));
-                    }
-                    result.events.push(TickEvent::LeveledUp {
-                        new_level: state.character_level,
-                    });
-                }
+                apply_xp_and_check_levelup(
+                    state,
+                    (xp_gained + bonus_xp) as f64,
+                    achievements,
+                    result,
+                );
 
                 achievements.on_dungeon_completed(Some(&state.character_name));
 
@@ -438,16 +434,7 @@ pub fn process_combat_events<R: Rng>(
                 xp_gained,
                 result: defeat_result,
             } => {
-                let level_before = state.character_level;
-                apply_tick_xp(state, xp_gained as f64);
-                if state.character_level > level_before {
-                    for lvl in (level_before + 1)..=state.character_level {
-                        achievements.on_level_up(lvl, Some(&state.character_name));
-                    }
-                    result.events.push(TickEvent::LeveledUp {
-                        new_level: state.character_level,
-                    });
-                }
+                apply_xp_and_check_levelup(state, xp_gained as f64, achievements, result);
                 state.session_kills += 1;
 
                 // Track zone achievements
