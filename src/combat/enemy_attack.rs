@@ -100,6 +100,7 @@ pub(crate) fn resolve_enemy_attack(
                     state.zone_progression.kills_in_subzone =
                         KILLS_FOR_BOSS.saturating_sub(KILLS_FOR_BOSS_RETRY);
                     state.combat_state.current_enemy = None;
+                    state.combat_state.boss_fight_timer = 0.0;
                 } else if let Some(enemy) = state.combat_state.current_enemy.as_mut() {
                     enemy.reset_hp();
                 }

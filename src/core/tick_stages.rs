@@ -448,6 +448,23 @@ pub fn process_combat_events<R: Rng>(
                 // Clear dungeon
                 let _events = on_boss_defeated(state);
             }
+            CombatEvent::BossEnrage {
+                weapon_blocked,
+                enemy_name,
+            } => {
+                let message = if weapon_blocked {
+                    format!(
+                        "\u{1f525} {} enrages! You lack the weapon to challenge this foe. Retreating to safety...",
+                        enemy_name
+                    )
+                } else {
+                    format!(
+                        "\u{1f525} {} enrages, striking you down! Boss encounter reset.",
+                        enemy_name
+                    )
+                };
+                result.events.push(TickEvent::BossEnrage { message });
+            }
             CombatEvent::PlayerDiedInDungeon => {
                 result.events.push(TickEvent::PlayerDiedInDungeon {
                     message: "\u{1f480} You fell in the dungeon... (escaped without prestige loss)"
