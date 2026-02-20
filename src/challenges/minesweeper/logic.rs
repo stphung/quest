@@ -276,41 +276,19 @@ pub fn handle_first_click<R: Rng>(game: &mut MinesweeperGame, row: usize, col: u
     reveal_cell(game, row, col);
 }
 
-/// Apply game result: update stats, grant rewards, and add combat log entries.
-/// Returns Some(MinigameWinInfo) if the player won, None otherwise.
-pub fn apply_game_result(
-    state: &mut crate::core::game_state::GameState,
-) -> Option<crate::challenges::MinigameWinInfo> {
-    use crate::challenges::menu::DifficultyInfo;
-    use crate::challenges::{apply_challenge_rewards, GameResultInfo};
-
-    let game = match state.active_minigame.as_ref() {
-        Some(ActiveMinigame::Minesweeper(g)) => g,
-        _ => return None,
-    };
-    let result = game.game_result?;
-    let difficulty = game.difficulty;
-    let reward = difficulty.reward();
-
-    let (won, loss_message) = match result {
-        super::super::MinesweeperResult::Win => (true, ""),
-        super::super::MinesweeperResult::Loss => {
-            (false, "A trap detonates! The scout pulls you to safety.")
+impl_apply_game_result! {
+    variant: Minesweeper;
+    result_body: |result, state, reward| {
+        match result {
+            super::super::MinesweeperResult::Win => (true, ""),
+            super::super::MinesweeperResult::Loss => {
+                (false, "A trap detonates! The scout pulls you to safety.")
+            }
         }
-    };
-
-    apply_challenge_rewards(
-        state,
-        GameResultInfo {
-            won,
-            game_type: crate::achievements::MinigameType::Minesweeper,
-            difficulty: difficulty.difficulty_enum(),
-            reward,
-            icon: "\u{26A0}",
-            win_message: "All traps identified! The scout salutes you.",
-            loss_message,
-        },
-    )
+    }
+    game_type: crate::achievements::MinigameType::Minesweeper;
+    icon: "\u{26A0}";
+    win_message: "All traps identified! The scout salutes you.";
 }
 
 #[cfg(test)]

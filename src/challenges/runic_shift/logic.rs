@@ -592,75 +592,51 @@ impl DifficultyInfo for RunicShiftDifficulty {
     }
 }
 
-/// Apply game result using the shared challenge reward system.
-/// Returns `Some(MinigameWinInfo)` if the player won, `None` otherwise.
-pub fn apply_game_result(state: &mut GameState) -> Option<MinigameWinInfo> {
-    let (
-        result,
-        difficulty,
-        clears,
-        matches,
-        best_chain,
-        forfeit_pending,
-        remaining_at_or_above_line,
-    ) = {
-        if let Some(ActiveMinigame::RunicShift(ref game)) = state.active_minigame {
-            (
-                game.game_result,
-                game.difficulty,
-                game.clears,
-                game.matches,
-                game.best_chain,
-                game.forfeit_pending,
-                game.runes_at_or_above_target_line(),
-            )
+impl_apply_game_result! {
+    variant: RunicShift;
+    result_body: |result, state, reward| {
+        let won = matches!(result, RunicShiftResult::Win);
+        let (clears, matches_count, best_chain, forfeit_pending, remaining) =
+            match state.active_minigame.as_ref() {
+                Some(crate::challenges::ActiveMinigame::RunicShift(g)) => (
+                    g.clears,
+                    g.matches,
+                    g.best_chain,
+                    g.forfeit_pending,
+                    g.runes_at_or_above_target_line(),
+                ),
+                _ => (0, 0, 0, false, 0),
+            };
+        if won {
+            state.combat_state.add_log_entry(
+                format!(
+                    "\u{21C4} Sigil Surge mastered! All sigils are below the line (best chain x{}, {} blocks, {} matches).",
+                    best_chain, clears, matches_count
+                ),
+                false,
+                true,
+            );
+        } else if forfeit_pending {
+            state.combat_state.add_log_entry(
+                "\u{21C4} You abandon the shifting sigils.".to_string(),
+                false,
+                true,
+            );
         } else {
-            return None;
+            state.combat_state.add_log_entry(
+                format!(
+                    "\u{21C4} The sigils overwhelm you with {} sigils still at/above the line.",
+                    remaining
+                ),
+                false,
+                true,
+            );
         }
-    };
-
-    let result = result?;
-    let won = matches!(result, RunicShiftResult::Win);
-    let reward = difficulty.reward();
-
-    if won {
-        state.combat_state.add_log_entry(
-            format!(
-                "⇄ Sigil Surge mastered! All sigils are below the line (best chain x{}, {} blocks, {} matches).",
-                best_chain, clears, matches
-            ),
-            false,
-            true,
-        );
-    } else if forfeit_pending {
-        state.combat_state.add_log_entry(
-            "⇄ You abandon the shifting sigils.".to_string(),
-            false,
-            true,
-        );
-    } else {
-        state.combat_state.add_log_entry(
-            format!(
-                "⇄ The sigils overwhelm you with {} sigils still at/above the line.",
-                remaining_at_or_above_line
-            ),
-            false,
-            true,
-        );
+        (won, "The sigils rise beyond control.")
     }
-
-    crate::challenges::apply_challenge_rewards(
-        state,
-        GameResultInfo {
-            won,
-            game_type: crate::achievements::MinigameType::RunicShift,
-            difficulty: difficulty.difficulty_enum(),
-            reward,
-            icon: "⇄",
-            win_message: "Sigil Surge conquered!",
-            loss_message: "The sigils rise beyond control.",
-        },
-    )
+    game_type: crate::achievements::MinigameType::RunicShift;
+    icon: "\u{21C4}";
+    win_message: "Sigil Surge conquered!";
 }
 
 #[cfg(test)]

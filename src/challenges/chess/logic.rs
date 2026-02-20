@@ -216,54 +216,32 @@ pub fn check_game_over(game: &mut ChessGame) {
     }
 }
 
-/// Apply game result: update stats, grant rewards, and add combat log entries.
-/// Returns Some(MinigameWinInfo) if the player won, None otherwise.
-pub fn apply_game_result(state: &mut GameState) -> Option<crate::challenges::MinigameWinInfo> {
-    use crate::challenges::menu::DifficultyInfo;
-    use crate::challenges::{apply_challenge_rewards, GameResultInfo};
-
-    let game = match state.active_minigame.as_ref() {
-        Some(ActiveMinigame::Chess(g)) => g,
-        _ => return None,
-    };
-    let result = game.game_result?;
-    let difficulty = game.difficulty;
-    let reward = difficulty.reward();
-
-    // Chess-specific stats tracking
-    state.chess_stats.games_played += 1;
-
-    let (won, loss_message) = match result {
-        ChessResult::Win => {
-            state.chess_stats.games_won += 1;
-            state.chess_stats.prestige_earned += reward.prestige_ranks;
-            (true, "")
+impl_apply_game_result! {
+    variant: Chess;
+    result_body: |result, state, reward| {
+        state.chess_stats.games_played += 1;
+        match result {
+            ChessResult::Win => {
+                state.chess_stats.games_won += 1;
+                state.chess_stats.prestige_earned += reward.prestige_ranks;
+                (true, "")
+            }
+            ChessResult::Loss => {
+                state.chess_stats.games_lost += 1;
+                (
+                    false,
+                    "The mysterious figure nods respectfully and vanishes.",
+                )
+            }
+            ChessResult::Draw => {
+                state.chess_stats.games_drawn += 1;
+                (false, "The figure smiles knowingly and fades away.")
+            }
         }
-        ChessResult::Loss => {
-            state.chess_stats.games_lost += 1;
-            (
-                false,
-                "The mysterious figure nods respectfully and vanishes.",
-            )
-        }
-        ChessResult::Draw => {
-            state.chess_stats.games_drawn += 1;
-            (false, "The figure smiles knowingly and fades away.")
-        }
-    };
-
-    apply_challenge_rewards(
-        state,
-        GameResultInfo {
-            won,
-            game_type: crate::achievements::MinigameType::Chess,
-            difficulty: difficulty.difficulty_enum(),
-            reward,
-            icon: "♟",
-            win_message: "Checkmate! You defeated the mysterious figure.",
-            loss_message,
-        },
-    )
+    }
+    game_type: crate::achievements::MinigameType::Chess;
+    icon: "♟";
+    win_message: "Checkmate! You defeated the mysterious figure.";
 }
 
 #[cfg(test)]

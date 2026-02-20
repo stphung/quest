@@ -7,12 +7,12 @@ mod tests {
     use crate::character::derived_stats::DerivedStats;
     use crate::character::prestige::PrestigeCombatBonuses;
     use crate::combat::attacks::effective_enemy_attack_interval;
+    use crate::combat::enemy_generation::{
+        generate_dungeon_boss, generate_dungeon_elite, generate_dungeon_enemy, generate_zone_enemy,
+    };
     use crate::combat::events::{CombatEvent, GodItemCombatBonuses, HavenCombatBonuses};
     use crate::combat::orchestration::update_combat;
-    use crate::combat::types::{
-        generate_dungeon_boss, generate_dungeon_elite, generate_dungeon_enemy, generate_zone_enemy,
-        CombatState, Enemy,
-    };
+    use crate::combat::types::{CombatState, Enemy};
     use crate::core::constants::*;
     use crate::core::game_state::GameState;
     use crate::dungeon::types::RoomType;

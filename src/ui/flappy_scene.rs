@@ -123,7 +123,43 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
     let ground_row = (render_height - 1) as usize;
     let dusk = ((game.tick_count as f64 * 0.004).sin() * 0.5 + 0.5).powf(1.15);
 
-    // ── Sky gradient + celestial body ───────────────────────────────
+    render_sky_and_background(&mut buffer, game, render_width, ground_row, y_scale, dusk);
+    render_ground(&mut buffer, game, render_width as usize, ground_row);
+    render_pipes(
+        &mut buffer,
+        game,
+        render_width,
+        ground_row,
+        x_scale,
+        y_scale,
+    );
+    render_bird(
+        &mut buffer,
+        game,
+        render_width,
+        render_height,
+        y_scale,
+        x_scale,
+    );
+    render_hud(&mut buffer, game, render_width, render_height);
+
+    render_buffer(
+        frame,
+        Rect::new(area.x, area.y, render_width, render_height),
+        &buffer,
+    );
+}
+
+/// Sky gradient, celestial body, stars, clouds, and distant cliffs.
+fn render_sky_and_background(
+    buffer: &mut [Vec<SceneCell>],
+    game: &FlappyBirdGame,
+    render_width: u16,
+    ground_row: usize,
+    y_scale: f64,
+    dusk: f64,
+) {
+    // Sky gradient
     for (row, row_cells) in buffer.iter_mut().enumerate().take(ground_row) {
         let bg = sky_color(row, ground_row, dusk);
         for cell in row_cells.iter_mut().take(render_width as usize) {
@@ -131,6 +167,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
         }
     }
 
+    // Celestial body (sun/moon)
     let orb_col = ((render_width as f64 * 0.74) + (game.tick_count as f64 * 0.025).sin() * 4.0)
         .round() as i32;
     let orb_row =
@@ -158,7 +195,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
         }
     }
 
-    // ── Stars + layered clouds ──────────────────────────────────────
+    // Stars (visible at dusk)
     if dusk > 0.25 {
         let twinkle_tick = (game.tick_count / 6) as usize;
         for (row, row_cells) in buffer
@@ -183,6 +220,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
         }
     }
 
+    // Layered clouds
     for &(base_x, y, speed, pattern, shade) in &[
         (4.0_f64, 2.0_f64, 0.018_f64, "~~", 140u8),
         (20.0, 3.0, 0.022, "~~~", 135),
@@ -211,7 +249,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
         }
     }
 
-    // ── Distant cliffs for depth ────────────────────────────────────
+    // Distant cliffs for depth
     let horizon = ground_row.saturating_sub(1);
     let mut col = 0usize;
     while col < render_width as usize {
@@ -255,13 +293,16 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
         }
         col += 1;
     }
+}
 
-    // ── Ground layers ───────────────────────────────────────────────
-    for (i, cell) in buffer[ground_row]
-        .iter_mut()
-        .enumerate()
-        .take(render_width as usize)
-    {
+/// Ground dirt and grass layers at the bottom of the play field.
+fn render_ground(
+    buffer: &mut [Vec<SceneCell>],
+    game: &FlappyBirdGame,
+    render_width: usize,
+    ground_row: usize,
+) {
+    for (i, cell) in buffer[ground_row].iter_mut().enumerate().take(render_width) {
         *cell = SceneCell {
             ch: if (i + (game.tick_count as usize / 2)).is_multiple_of(4) {
                 GROUND_SUB
@@ -276,7 +317,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
         for (i, cell) in buffer[ground_row - 1]
             .iter_mut()
             .enumerate()
-            .take(render_width as usize)
+            .take(render_width)
         {
             let bg = cell.bg;
             *cell = SceneCell {
@@ -290,8 +331,17 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
             };
         }
     }
+}
 
-    // ── Pipes ───────────────────────────────────────────────────────
+/// Green pipe obstacles with caps, edges, and body texturing.
+fn render_pipes(
+    buffer: &mut [Vec<SceneCell>],
+    game: &FlappyBirdGame,
+    render_width: u16,
+    ground_row: usize,
+    x_scale: f64,
+    y_scale: f64,
+) {
     for pipe in &game.pipes {
         let pipe_center_x = (pipe.x * x_scale).round() as i32;
         let pipe_half_w = ((PIPE_WIDTH as f64 * x_scale) / 2.0).round().max(1.0) as i32;
@@ -384,8 +434,17 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
             }
         }
     }
+}
 
-    // ── Bird ───────────────────────────────────────────────────────
+/// Bird sprite with wing animation, trail particles, and shadow.
+fn render_bird(
+    buffer: &mut [Vec<SceneCell>],
+    game: &FlappyBirdGame,
+    render_width: u16,
+    render_height: u16,
+    y_scale: f64,
+    x_scale: f64,
+) {
     let bird_y_scaled = game.bird_y * y_scale;
     let bird_row = bird_y_scaled.round() as i32;
     let bird_col = (BIRD_COL as f64 * x_scale).round() as i32;
@@ -417,6 +476,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
         let row = bird_row as usize;
         let shadow_row = (bird_row + 1).min(render_height as i32 - 1) as usize;
 
+        // Trail particles
         for (idx, trail_col) in [bird_col - 2, bird_col - 3].iter().enumerate() {
             if *trail_col >= 0 && *trail_col < render_width as i32 {
                 let col = *trail_col as usize;
@@ -430,6 +490,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
             }
         }
 
+        // Shadow
         if bird_col >= 0 && bird_col < render_width as i32 {
             let col = bird_col as usize;
             if buffer[shadow_row][col].ch == ' ' {
@@ -468,8 +529,16 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
             };
         }
     }
+}
 
-    // ── Lives display (top-left) ────────────────────────────────────
+/// Lives display (top-left), score display (top-right), and progress bar.
+fn render_hud(
+    buffer: &mut [Vec<SceneCell>],
+    game: &FlappyBirdGame,
+    render_width: u16,
+    render_height: u16,
+) {
+    // Lives display (top-left)
     {
         let lives_str: String = (0..MAX_LIVES)
             .map(|i| {
@@ -512,7 +581,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
         }
     }
 
-    // ── Score display (top-right) ───────────────────────────────────
+    // Score display (top-right)
     let score_text = format!("{}/{}", game.score, game.target_score);
     let label = "Score: ";
     let total_len = label.len() + score_text.len();
@@ -547,7 +616,7 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
         }
     }
 
-    // ── Progress bar (row 1, right-aligned) ─────────────────────────
+    // Progress bar (row 1, right-aligned)
     let bar_width = 12usize;
     let bar_start = (render_width as usize).saturating_sub(bar_width + 2);
     let filled = if game.target_score > 0 {
@@ -598,13 +667,6 @@ fn render_play_field(frame: &mut Frame, area: Rect, game: &FlappyBirdGame) {
             };
         }
     }
-
-    // ── Render buffer to terminal ───────────────────────────────────
-    render_buffer(
-        frame,
-        Rect::new(area.x, area.y, render_width, render_height),
-        &buffer,
-    );
 }
 
 /// Render the status bar below the play field.

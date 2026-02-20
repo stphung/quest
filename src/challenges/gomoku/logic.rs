@@ -226,38 +226,18 @@ pub fn process_human_move(game: &mut GomokuGame) -> bool {
     true
 }
 
-/// Apply game result: update stats, grant rewards, and add combat log entries.
-/// Returns Some(MinigameWinInfo) if the player won, None otherwise.
-pub fn apply_game_result(state: &mut GameState) -> Option<crate::challenges::MinigameWinInfo> {
-    use crate::challenges::menu::DifficultyInfo;
-    use crate::challenges::{apply_challenge_rewards, GameResultInfo};
-
-    let game = match state.active_minigame.as_ref() {
-        Some(ActiveMinigame::Gomoku(g)) => g,
-        _ => return None,
-    };
-    let result = game.game_result?;
-    let difficulty = game.difficulty;
-    let reward = difficulty.reward();
-
-    let (won, loss_message) = match result {
-        GomokuResult::Win => (true, ""),
-        GomokuResult::Loss => (false, "The strategist nods respectfully and departs."),
-        GomokuResult::Draw => (false, "A rare draw. The strategist seems impressed."),
-    };
-
-    apply_challenge_rewards(
-        state,
-        GameResultInfo {
-            won,
-            game_type: crate::achievements::MinigameType::Gomoku,
-            difficulty: difficulty.difficulty_enum(),
-            reward,
-            icon: "\u{25CE}",
-            win_message: "Victory! The strategist bows in defeat.",
-            loss_message,
-        },
-    )
+impl_apply_game_result! {
+    variant: Gomoku;
+    result_body: |result, state, reward| {
+        match result {
+            GomokuResult::Win => (true, ""),
+            GomokuResult::Loss => (false, "The strategist nods respectfully and departs."),
+            GomokuResult::Draw => (false, "A rare draw. The strategist seems impressed."),
+        }
+    }
+    game_type: crate::achievements::MinigameType::Gomoku;
+    icon: "\u{25CE}";
+    win_message: "Victory! The strategist bows in defeat.";
 }
 
 /// Process AI thinking (called each tick).

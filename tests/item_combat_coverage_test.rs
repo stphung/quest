@@ -2,11 +2,12 @@
 //! Targets coverage improvements across these four modules.
 
 use quest::character::combat_bonuses::PrestigeCombatBonuses;
-use quest::combat::types::{
+use quest::combat::enemy_generation::{
     generate_boss_for_current_zone, generate_dungeon_boss, generate_dungeon_elite,
     generate_dungeon_enemy, generate_enemy_for_current_zone, generate_enemy_name,
-    generate_subzone_boss, generate_zone_enemy, generate_zone_enemy_name, CombatState, Enemy,
+    generate_subzone_boss, generate_zone_enemy, generate_zone_enemy_name,
 };
+use quest::combat::types::{CombatState, Enemy};
 use quest::items::scoring::affix_power_weight;
 use quest::items::types::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
 use quest::zones::get_all_zones;

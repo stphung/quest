@@ -509,58 +509,38 @@ impl DifficultyInfo for JezzballDifficulty {
     }
 }
 
-/// Apply game result via shared challenge reward system.
-pub fn apply_game_result(state: &mut GameState) -> Option<MinigameWinInfo> {
-    let (result, difficulty, captured, target) = {
-        if let Some(ActiveMinigame::Jezzball(ref game)) = state.active_minigame {
-            (
-                game.game_result,
-                game.difficulty,
-                game.captured_percent,
-                game.target_percent,
-            )
+impl_apply_game_result! {
+    variant: Jezzball;
+    result_body: |result, state, reward| {
+        let won = matches!(result, JezzballResult::Win);
+        let (captured, target) = match state.active_minigame.as_ref() {
+            Some(crate::challenges::ActiveMinigame::Jezzball(g)) => {
+                (g.captured_percent, g.target_percent)
+            }
+            _ => (0.0, 0),
+        };
+        if won {
+            state.combat_state.add_log_entry(
+                format!("\u{25A3} Arena secured: {:.0}% captured (target {}%).", captured, target),
+                false,
+                true,
+            );
         } else {
-            return None;
+            state.combat_state.add_log_entry(
+                format!(
+                    "\u{25A3} Containment failed at {:.0}% captured ({} lives used).",
+                    captured.floor(),
+                    MAX_LIVES
+                ),
+                false,
+                true,
+            );
         }
-    };
-
-    let result = result?;
-    let won = matches!(result, JezzballResult::Win);
-    let reward = difficulty.reward();
-
-    if won {
-        state.combat_state.add_log_entry(
-            format!(
-                "▣ Arena secured: {:.0}% captured (target {}%).",
-                captured, target
-            ),
-            false,
-            true,
-        );
-    } else {
-        state.combat_state.add_log_entry(
-            format!(
-                "▣ Containment failed at {:.0}% captured ({} lives used).",
-                captured.floor(),
-                MAX_LIVES
-            ),
-            false,
-            true,
-        );
+        (won, "The arena remains uncontrolled.")
     }
-
-    crate::challenges::apply_challenge_rewards(
-        state,
-        GameResultInfo {
-            won,
-            game_type: crate::achievements::MinigameType::Jezzball,
-            difficulty: difficulty.difficulty_enum(),
-            reward,
-            icon: "▣",
-            win_message: "Containment Breach conquered!",
-            loss_message: "The arena remains uncontrolled.",
-        },
-    )
+    game_type: crate::achievements::MinigameType::Jezzball;
+    icon: "\u{25A3}";
+    win_message: "Containment Breach conquered!";
 }
 
 #[cfg(test)]

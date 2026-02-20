@@ -1,6 +1,6 @@
 use super::constants::*;
 use super::game_state::GameState;
-use crate::combat::types::{
+use crate::combat::enemy_generation::{
     generate_boss_for_current_zone, generate_dungeon_boss, generate_dungeon_elite,
     generate_dungeon_enemy, generate_enemy_for_current_zone,
 };

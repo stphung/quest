@@ -30,6 +30,94 @@ macro_rules! difficulty_enum_impl {
     };
 }
 
+/// Generate a standard `apply_game_result` function for a challenge minigame.
+///
+/// The `result_body` block receives these bindings and must evaluate to `(bool, &str)`:
+/// - `result`: the game result enum value (e.g., `ChessResult::Win`)
+/// - `state`: `&mut GameState` (for custom stats tracking or logging)
+/// - `reward`: `ChallengeReward` (for chess stats that reference prestige earned)
+///
+/// # Usage
+/// ```ignore
+/// impl_apply_game_result! {
+///     variant: Gomoku;
+///     result_body: |result, state, reward| {
+///         match result {
+///             GomokuResult::Win => (true, ""),
+///             GomokuResult::Loss => (false, "The strategist nods respectfully."),
+///             GomokuResult::Draw => (false, "A rare draw."),
+///         }
+///     }
+///     game_type: MinigameType::Gomoku;
+///     icon: "\u{25CE}";
+///     win_message: "Victory!";
+/// }
+/// ```
+///
+/// For a custom function name (e.g., Go uses `apply_go_result`):
+/// ```ignore
+/// impl_apply_game_result! {
+///     fn apply_go_result;
+///     variant: Go;
+///     ...
+/// }
+/// ```
+macro_rules! impl_apply_game_result {
+    (
+        fn $fn_name:ident;
+        variant: $Variant:ident;
+        result_body: |$result_var:ident, $state_var:ident, $reward_var:ident| { $($body:tt)* }
+        game_type: $game_type:expr;
+        icon: $icon:expr;
+        win_message: $win_msg:expr;
+    ) => {
+        pub fn $fn_name(
+            $state_var: &mut crate::core::game_state::GameState,
+        ) -> Option<crate::challenges::MinigameWinInfo> {
+            use crate::challenges::menu::DifficultyInfo;
+            use crate::challenges::{apply_challenge_rewards, ActiveMinigame, GameResultInfo};
+
+            let (game_result_opt, difficulty) = match $state_var.active_minigame.as_ref() {
+                Some(ActiveMinigame::$Variant(g)) => (g.game_result, g.difficulty),
+                _ => return None,
+            };
+            let $result_var = game_result_opt?;
+            let $reward_var = difficulty.reward();
+
+            let (won, loss_message): (bool, &str) = { $($body)* };
+
+            apply_challenge_rewards(
+                $state_var,
+                GameResultInfo {
+                    won,
+                    game_type: $game_type,
+                    difficulty: difficulty.difficulty_enum(),
+                    reward: $reward_var,
+                    icon: $icon,
+                    win_message: $win_msg,
+                    loss_message,
+                },
+            )
+        }
+    };
+    (
+        variant: $Variant:ident;
+        result_body: |$result_var:ident, $state_var:ident, $reward_var:ident| { $($body:tt)* }
+        game_type: $game_type:expr;
+        icon: $icon:expr;
+        win_message: $win_msg:expr;
+    ) => {
+        impl_apply_game_result! {
+            fn apply_game_result;
+            variant: $Variant;
+            result_body: |$result_var, $state_var, $reward_var| { $($body)* }
+            game_type: $game_type;
+            icon: $icon;
+            win_message: $win_msg;
+        }
+    };
+}
+
 pub mod chess;
 pub mod flappy;
 pub mod go;

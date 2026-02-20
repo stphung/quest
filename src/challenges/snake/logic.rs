@@ -224,56 +224,32 @@ impl DifficultyInfo for SnakeDifficulty {
     }
 }
 
-/// Apply game result using the shared challenge reward system.
-/// Returns `Some(MinigameWinInfo)` if the player won, `None` otherwise.
-pub fn apply_game_result(state: &mut GameState) -> Option<MinigameWinInfo> {
-    let (result, difficulty, score, target) = {
-        if let Some(ActiveMinigame::Snake(ref game)) = state.active_minigame {
-            (
-                game.game_result,
-                game.difficulty,
-                game.score,
-                game.target_score,
-            )
+impl_apply_game_result! {
+    variant: Snake;
+    result_body: |result, state, reward| {
+        let won = matches!(result, SnakeResult::Win);
+        let (score, target) = match state.active_minigame.as_ref() {
+            Some(ActiveMinigame::Snake(g)) => (g.score, g.target_score),
+            _ => (0, 0),
+        };
+        if won {
+            state.combat_state.add_log_entry(
+                format!("~ You conquered the Serpent's Path! ({}/{} food)", score, target),
+                false,
+                true,
+            );
         } else {
-            return None;
+            state.combat_state.add_log_entry(
+                format!("~ The serpent falls after {} food.", score),
+                false,
+                true,
+            );
         }
-    };
-
-    let result = result?;
-    let won = matches!(result, SnakeResult::Win);
-    let reward = difficulty.reward();
-
-    // Log score-specific message before the shared reward system logs its messages
-    if won {
-        state.combat_state.add_log_entry(
-            format!(
-                "~ You conquered the Serpent's Path! ({}/{} food)",
-                score, target
-            ),
-            false,
-            true,
-        );
-    } else {
-        state.combat_state.add_log_entry(
-            format!("~ The serpent falls after {} food.", score),
-            false,
-            true,
-        );
+        (won, "The serpent has fallen.")
     }
-
-    crate::challenges::apply_challenge_rewards(
-        state,
-        GameResultInfo {
-            won,
-            game_type: crate::achievements::MinigameType::Snake,
-            difficulty: difficulty.difficulty_enum(),
-            reward,
-            icon: "~",
-            win_message: "Serpent's Path conquered!",
-            loss_message: "The serpent has fallen.",
-        },
-    )
+    game_type: crate::achievements::MinigameType::Snake;
+    icon: "~";
+    win_message: "Serpent's Path conquered!";
 }
 
 #[cfg(test)]
