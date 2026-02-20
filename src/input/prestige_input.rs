@@ -10,7 +10,7 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent};
 pub(super) fn handle_vault_selection(
     key: KeyEvent,
     state: &mut GameState,
-    haven: &Haven,
+    haven: &mut Haven,
     overlay: &mut GameOverlay,
 ) -> InputResult {
     if let GameOverlay::VaultSelection {
@@ -56,6 +56,8 @@ pub(super) fn handle_vault_selection(
                 // At max selections: prestige immediately.
                 // Under max: require a second Enter to confirm.
                 if selected_slots.len() >= vault_slots || *confirm_pending {
+                    // Remember selections for next time
+                    haven.last_vault_selections = selected_slots.clone();
                     crate::character::prestige::perform_prestige_with_vault(state, selected_slots);
                     *overlay = GameOverlay::None;
                     state.combat_state.add_log_entry(
@@ -95,9 +97,21 @@ pub(super) fn handle_prestige_confirm(
     match key.code {
         KeyCode::Char('y') | KeyCode::Char('Y') => {
             if haven.vault_tier() > 0 {
+                // Pre-populate with last vault selections (filtered to slots with items,
+                // truncated to current vault capacity)
+                let vault_slots =
+                    haven.get_bonus(crate::haven::HavenBonusType::VaultSlots) as usize;
+                let pre_selected: Vec<items::EquipmentSlot> = haven
+                    .last_vault_selections
+                    .iter()
+                    .filter(|slot| state.equipment.get(**slot).is_some())
+                    .take(vault_slots)
+                    .copied()
+                    .collect();
+
                 *overlay = GameOverlay::VaultSelection {
                     selected_index: 0,
-                    selected_slots: Vec::new(),
+                    selected_slots: pre_selected,
                     confirm_pending: false,
                 };
             } else {
