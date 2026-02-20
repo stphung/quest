@@ -367,11 +367,15 @@ mod tests {
         let died = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
         assert!(died);
 
-        // Boss encounter should be reset with retry mechanic
+        // Zone boss death resets to subzone 1 (fresh start)
         assert!(!state.zone_progression.fighting_boss);
         assert_eq!(
-            state.zone_progression.kills_in_subzone,
-            KILLS_FOR_BOSS.saturating_sub(KILLS_FOR_BOSS_RETRY)
+            state.zone_progression.current_subzone_id, 1,
+            "Death to zone boss should reset to subzone 1"
+        );
+        assert_eq!(
+            state.zone_progression.kills_in_subzone, 0,
+            "Kills should be fully reset after zone boss death"
         );
 
         // Enemy should be cleared (not reset)
