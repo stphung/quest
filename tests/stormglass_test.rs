@@ -144,61 +144,6 @@ fn test_soulforge_consolation_out_of_range() {
     assert_eq!(earning::soulforge_consolation(11), 0);
 }
 
-// ── Spending: prestige rank cost formula ───────────────────────────────
-
-#[test]
-fn test_prestige_rank_cost_at_zero() {
-    // floor(500 * (1 + 0.5 * 0)) = 500
-    assert_eq!(spending::prestige_rank_cost(0), 500);
-}
-
-#[test]
-fn test_prestige_rank_cost_at_5() {
-    // floor(500 * (1 + 0.5 * 5)) = floor(500 * 3.5) = 1750
-    assert_eq!(spending::prestige_rank_cost(5), 1750);
-}
-
-#[test]
-fn test_prestige_rank_cost_at_10() {
-    // floor(500 * (1 + 0.5 * 10)) = floor(500 * 6) = 3000
-    assert_eq!(spending::prestige_rank_cost(10), 3000);
-}
-
-#[test]
-fn test_prestige_rank_cost_at_20() {
-    // floor(500 * (1 + 0.5 * 20)) = floor(500 * 11) = 5500
-    assert_eq!(spending::prestige_rank_cost(20), 5500);
-}
-
-#[test]
-fn test_prestige_rank_cost_at_50() {
-    // floor(500 * (1 + 0.5 * 50)) = floor(500 * 26) = 13000
-    assert_eq!(spending::prestige_rank_cost(50), 13000);
-}
-
-#[test]
-fn test_prestige_rank_cost_at_100() {
-    // floor(500 * (1 + 0.5 * 100)) = floor(500 * 51) = 25500
-    assert_eq!(spending::prestige_rank_cost(100), 25500);
-}
-
-#[test]
-fn test_prestige_rank_cost_monotonically_increases() {
-    let mut prev = spending::prestige_rank_cost(0);
-    for rank in 1..=50 {
-        let cost = spending::prestige_rank_cost(rank);
-        assert!(
-            cost >= prev,
-            "Cost should increase: P{} = {} but P{} = {}",
-            rank - 1,
-            prev,
-            rank,
-            cost
-        );
-        prev = cost;
-    }
-}
-
 // ── Spending: generate trial options ───────────────────────────────────
 
 #[test]
@@ -257,38 +202,6 @@ fn test_game_state_new_defaults() {
     let state = GameState::new("Test".to_string(), 0);
     assert_eq!(state.stormglass, 0);
     assert!(!state.stormglass_discovered);
-}
-
-// ── Prestige rank: grant_prestige_rank_no_reset ────────────────────────
-
-#[test]
-fn test_grant_prestige_rank_no_reset_increments_rank() {
-    let mut state = GameState::new("Test".to_string(), 0);
-    state.character_level = 10;
-    state.prestige_rank = 5;
-    state.total_prestige_count = 5;
-
-    quest::character::prestige_actions::grant_prestige_rank_no_reset(&mut state);
-
-    assert_eq!(state.prestige_rank, 6);
-    assert_eq!(state.total_prestige_count, 6);
-    // Character level should NOT be reset
-    assert_eq!(state.character_level, 10);
-}
-
-#[test]
-fn test_grant_prestige_rank_no_reset_preserves_equipment() {
-    use quest::items::generation::generate_item;
-    use quest::items::types::EquipmentSlot;
-
-    let mut state = GameState::new("Test".to_string(), 0);
-    let item = generate_item(EquipmentSlot::Weapon, Rarity::Rare, 50);
-    let slot = item.slot;
-    state.equipment.set(slot, Some(item));
-
-    quest::character::prestige_actions::grant_prestige_rank_no_reset(&mut state);
-
-    assert!(state.equipment.get(slot).is_some());
 }
 
 // ── ExchangeUiState ────────────────────────────────────────────────────

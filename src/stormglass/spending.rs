@@ -6,14 +6,6 @@ use rand::Rng;
 
 use super::types::*;
 
-/// Calculate the Stormglass cost to purchase a prestige rank.
-/// Formula: floor(500 * (1 + 0.5 * rank))
-/// Linear scaling — each rank costs 250 SG more than the last.
-pub fn prestige_rank_cost(current_rank: u32) -> u64 {
-    let rank = current_rank as f64;
-    (PRESTIGE_RANK_BASE_COST * (1.0 + 0.5 * rank)).floor() as u64
-}
-
 /// Returns the (ticks, cost, label) for a Chrono Surge option, or None if out of range.
 pub fn chrono_surge_cost(option_index: usize) -> Option<(u64, u64, &'static str)> {
     CHRONO_SURGE_OPTIONS.get(option_index).copied()

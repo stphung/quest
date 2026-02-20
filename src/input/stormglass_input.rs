@@ -1,10 +1,9 @@
 //! Input handling for the Stormglass Exchange overlay.
 
 use crate::challenges::menu::create_challenge;
-use crate::character::prestige_actions::grant_prestige_rank_no_reset;
 use crate::core::game_state::GameState;
 use crate::input::InputResult;
-use crate::stormglass::spending::{chrono_surge_cost, generate_trial_options, prestige_rank_cost};
+use crate::stormglass::spending::{chrono_surge_cost, generate_trial_options};
 use crate::stormglass::types::{
     ExchangePhase, ExchangeUiState, CHRONO_SURGE_OPTIONS, EXCHANGE_MENU_ITEMS, INVOKE_TRIAL_COST,
 };
@@ -44,7 +43,7 @@ fn handle_menu(
         KeyCode::Enter => {
             match exchange_ui.selected_item {
                 0 => {
-                    // Invoke Trial (50 SG)
+                    // Invoke Trial
                     if state.stormglass >= INVOKE_TRIAL_COST {
                         state.stormglass -= INVOKE_TRIAL_COST;
                         let mut rng = rand::rng();
@@ -60,24 +59,6 @@ fn handle_menu(
                     }
                 }
                 1 => {
-                    // Prestige Rank purchase
-                    let cost = prestige_rank_cost(state.prestige_rank);
-                    if state.stormglass >= cost {
-                        state.stormglass -= cost;
-                        grant_prestige_rank_no_reset(state);
-                        state.combat_state.add_log_entry(
-                            format!(
-                                "\u{1F48E} Stormglass Exchange: Prestige rank increased to P{}!",
-                                state.prestige_rank
-                            ),
-                            false,
-                            true,
-                        );
-                        exchange_ui.close();
-                        return InputResult::NeedsSave;
-                    }
-                }
-                2 => {
                     // Chrono Surge — enter duration selection
                     exchange_ui.surge_selected = 0;
                     exchange_ui.phase = ExchangePhase::ChronoSurge;

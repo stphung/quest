@@ -69,14 +69,6 @@ pub fn perform_prestige(state: &mut GameState) {
         .reset_for_prestige(state.prestige_rank);
 }
 
-/// Grants a prestige rank without resetting character progress.
-/// Used by the Stormglass Exchange to purchase ranks with currency.
-pub fn grant_prestige_rank_no_reset(state: &mut GameState) {
-    state.prestige_rank += 1;
-    state.total_prestige_count += 1;
-    state.invalidate_derived_stats();
-}
-
 /// Performs prestige with Vault item preservation.
 /// `preserved_slots` contains the equipment slots to keep (limited by Vault tier externally).
 pub fn perform_prestige_with_vault(

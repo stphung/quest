@@ -28,7 +28,6 @@ pub const SOULFORGE_CONSOLATION: [u64; 10] = [0, 0, 0, 0, 5, 10, 15, 25, 40, 75]
 
 // ── Spending ───────────────────────────────────────────────────────────
 pub const INVOKE_TRIAL_COST: u64 = 250;
-pub const PRESTIGE_RANK_BASE_COST: f64 = 500.0;
 
 // ── Chrono Surge ─────────────────────────────────────────────────────
 /// (ticks, stormglass_cost, display_label)
@@ -107,8 +106,8 @@ impl Default for ExchangeUiState {
     }
 }
 
-/// Number of menu items in the Exchange (Invoke Trial, Prestige Rank, Chrono Surge).
-pub const EXCHANGE_MENU_ITEMS: usize = 3;
+/// Number of menu items in the Exchange (Invoke Trial, Chrono Surge).
+pub const EXCHANGE_MENU_ITEMS: usize = 2;
 
 /// Tracks an active Chrono Surge in progress.
 pub struct ChronoSurgeState {

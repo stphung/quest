@@ -1,7 +1,6 @@
 //! Stormglass Exchange UI rendering: storm-themed modal overlay.
 
 use crate::core::game_state::GameState;
-use crate::stormglass::spending::prestige_rank_cost;
 use crate::stormglass::types::{
     ChronoSurgeState, ChronoSurgeSummary, ExchangePhase, ExchangeUiState, CHRONO_SURGE_OPTIONS,
     INVOKE_TRIAL_COST,
@@ -185,24 +184,12 @@ fn render_exchange_menu(
     clear_row_chars(&mut buffer, 9); // description line 2
     clear_row_chars(&mut buffer, (h as i32) - 1); // help
 
-    // Menu items (rows 4-7)
-    let pr_cost = prestige_rank_cost(state.prestige_rank);
-    let pr_label = format!(
-        "Prestige P{} \u{2192} P{}",
-        state.prestige_rank,
-        state.prestige_rank + 1
-    );
-
-    let items: [(String, String, bool); 3] = [
+    // Menu items (rows 4-6)
+    let items: [(String, String, bool); 2] = [
         (
             "Invoke Trial".to_string(),
             format!("{} SG", INVOKE_TRIAL_COST),
             state.stormglass >= INVOKE_TRIAL_COST,
-        ),
-        (
-            pr_label,
-            format!("{} SG", pr_cost),
-            state.stormglass >= pr_cost,
         ),
         ("Chrono Surge".to_string(), ">>>".to_string(), true),
     ];
@@ -284,7 +271,6 @@ fn render_exchange_menu(
     if h > 9 {
         let desc = match exchange_ui.selected_item {
             0 => "Spend Stormglass to unlock a choice of three challenges.",
-            1 => "Spend Stormglass to advance your prestige rank, keeping all progress.",
             _ => "Bend time itself. Earn XP and loot, but no Stormglass.",
         };
         let desc_area = Rect::new(inner.x, inner.y + 8, inner.width, 2);
@@ -635,7 +621,7 @@ pub fn render_chrono_surge_summary(
     let stats = [
         format!("\u{2694}  Kills: {}", summary.kills),
         format!("\u{2B06}  Levels gained: +{}", summary.levels_gained),
-        format!("\u{1F528}  Items equipped: {}", summary.items_equipped),
+        format!("\u{1F528} Items equipped: {}", summary.items_equipped),
     ];
 
     let start_row = 2i32;
