@@ -16,6 +16,7 @@ concurrency:
 jobs:
   check:
     name: Check & Test
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,7 +33,6 @@ jobs:
 
   build:
     name: Build ${{ matrix.target }}
-    needs: check
     if: github.event_name == 'push'
     runs-on: ${{ matrix.os }}
     strategy:
