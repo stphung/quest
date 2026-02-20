@@ -761,7 +761,7 @@ pub fn draw_footer(
 
     let stormglass_text = if stormglass_discovered {
         Span::styled(
-            "    [G] Stormglass",
+            "    [G] Stormglass Exchange",
             Style::default().fg(Color::Rgb(100, 180, 255)),
         )
     } else {
