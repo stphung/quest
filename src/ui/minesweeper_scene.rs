@@ -63,11 +63,18 @@ fn render_grid(frame: &mut Frame, area: Rect, game: &MinesweeperGame) {
             let cell = &game.grid[row][col];
             let is_cursor = game.cursor == (row, col);
 
-            let (text, color) = get_cell_display(cell);
+            let (text, color) = get_cell_display(cell, row, col);
 
             let mut style = Style::default().fg(color);
+
+            // Hidden and flagged cells get a dark background
+            if !cell.revealed {
+                style = style.bg(Color::Rgb(40, 40, 50));
+            }
+
+            // Cursor overrides background
             if is_cursor && !game_over {
-                style = style.bg(Color::DarkGray);
+                style = style.bg(Color::Yellow).add_modifier(Modifier::BOLD);
             }
 
             spans.push(Span::styled(text, style));
@@ -82,23 +89,28 @@ fn render_grid(frame: &mut Frame, area: Rect, game: &MinesweeperGame) {
 }
 
 /// Get the display text and color for a cell.
-fn get_cell_display(cell: &Cell) -> (&'static str, Color) {
+fn get_cell_display(cell: &Cell, row: usize, col: usize) -> (&'static str, Color) {
     if cell.flagged && !cell.revealed {
-        return ("F ", Color::Red);
+        return ("\u{2691} ", Color::Red);
     }
 
     if !cell.revealed {
-        return ("# ", Color::Gray);
+        let color = if (row + col).is_multiple_of(2) {
+            Color::Gray
+        } else {
+            Color::Rgb(120, 120, 130)
+        };
+        return ("\u{25a0} ", color);
     }
 
     // Cell is revealed
     if cell.has_mine {
-        return ("* ", Color::Red);
+        return ("\u{2620} ", Color::Red);
     }
 
     // Revealed number or empty
     match cell.adjacent_mines {
-        0 => (". ", Color::DarkGray),
+        0 => ("\u{00b7} ", Color::DarkGray),
         1 => ("1 ", Color::Blue),
         2 => ("2 ", Color::Green),
         3 => ("3 ", Color::Red),
@@ -183,19 +195,19 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &MinesweeperGame) {
                 .add_modifier(Modifier::BOLD),
         )),
         Line::from(vec![
-            Span::styled(" # ", Style::default().fg(Color::Gray)),
+            Span::styled(" \u{25a0} ", Style::default().fg(Color::Gray)),
             Span::styled("Hidden", Style::default().fg(Color::DarkGray)),
         ]),
         Line::from(vec![
-            Span::styled(" F ", Style::default().fg(Color::Red)),
+            Span::styled(" \u{2691} ", Style::default().fg(Color::Red)),
             Span::styled("Flag", Style::default().fg(Color::DarkGray)),
         ]),
         Line::from(vec![
-            Span::styled(" * ", Style::default().fg(Color::Red)),
+            Span::styled(" \u{2620} ", Style::default().fg(Color::Red)),
             Span::styled("Trap", Style::default().fg(Color::DarkGray)),
         ]),
         Line::from(vec![
-            Span::styled(" . ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" \u{00b7} ", Style::default().fg(Color::DarkGray)),
             Span::styled("Empty", Style::default().fg(Color::DarkGray)),
         ]),
         Line::from(vec![
