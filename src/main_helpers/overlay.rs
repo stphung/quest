@@ -162,6 +162,13 @@ pub fn draw_game_overlays(
         GameOverlay::Help => {
             ui::help_overlay::draw_help_overlay(frame);
         }
+        GameOverlay::BugReport {
+            ref summary,
+            clipboard_ready,
+            ref error,
+        } => {
+            ui::bug_report_scene::draw_bug_report_overlay(frame, summary, *clipboard_ready, error);
+        }
         GameOverlay::None => {}
     }
 
