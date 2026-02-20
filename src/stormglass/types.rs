@@ -33,10 +33,10 @@ pub const PRESTIGE_RANK_BASE_COST: f64 = 500.0;
 // ── Chrono Surge ─────────────────────────────────────────────────────
 /// (ticks, stormglass_cost, display_label)
 pub const CHRONO_SURGE_OPTIONS: [(u64, u64, &str); 4] = [
-    (9_000, 25, "15 minutes"),
-    (36_000, 100, "1 hour"),
-    (144_000, 350, "4 hours"),
-    (288_000, 600, "8 hours"),
+    (9_000, 500, "15 minutes"),
+    (36_000, 2_000, "1 hour"),
+    (144_000, 8_000, "4 hours"),
+    (288_000, 16_000, "8 hours"),
 ];
 
 /// Target animation duration for all surge options (in seconds).

@@ -148,43 +148,38 @@ fn test_soulforge_consolation_out_of_range() {
 
 #[test]
 fn test_prestige_rank_cost_at_zero() {
-    // floor(500 * (1 + 0.5 * 0^0.7)) = floor(500 * 1) = 500
+    // floor(500 * (1 + 0.5 * 0)) = 500
     assert_eq!(spending::prestige_rank_cost(0), 500);
 }
 
 #[test]
 fn test_prestige_rank_cost_at_5() {
-    let cost = spending::prestige_rank_cost(5);
-    // floor(500 * (1 + 0.5 * 5^0.7)) ≈ 1271
-    assert!(cost > 1200 && cost < 1400, "P5 cost was {}", cost);
+    // floor(500 * (1 + 0.5 * 5)) = floor(500 * 3.5) = 1750
+    assert_eq!(spending::prestige_rank_cost(5), 1750);
 }
 
 #[test]
 fn test_prestige_rank_cost_at_10() {
-    let cost = spending::prestige_rank_cost(10);
-    // floor(500 * (1 + 0.5 * 10^0.7)) ≈ 1752
-    assert!(cost > 1600 && cost < 1900, "P10 cost was {}", cost);
+    // floor(500 * (1 + 0.5 * 10)) = floor(500 * 6) = 3000
+    assert_eq!(spending::prestige_rank_cost(10), 3000);
 }
 
 #[test]
 fn test_prestige_rank_cost_at_20() {
-    let cost = spending::prestige_rank_cost(20);
-    // floor(500 * (1 + 0.5 * 20^0.7)) ≈ 2543
-    assert!(cost > 2400 && cost < 2700, "P20 cost was {}", cost);
+    // floor(500 * (1 + 0.5 * 20)) = floor(500 * 11) = 5500
+    assert_eq!(spending::prestige_rank_cost(20), 5500);
 }
 
 #[test]
 fn test_prestige_rank_cost_at_50() {
-    let cost = spending::prestige_rank_cost(50);
-    // floor(500 * (1 + 0.5 * 50^0.7)) ≈ 4365
-    assert!(cost > 4000 && cost < 5000, "P50 cost was {}", cost);
+    // floor(500 * (1 + 0.5 * 50)) = floor(500 * 26) = 13000
+    assert_eq!(spending::prestige_rank_cost(50), 13000);
 }
 
 #[test]
 fn test_prestige_rank_cost_at_100() {
-    let cost = spending::prestige_rank_cost(100);
-    // floor(500 * (1 + 0.5 * 100^0.7)) ≈ 6779
-    assert!(cost > 6000 && cost < 7500, "P100 cost was {}", cost);
+    // floor(500 * (1 + 0.5 * 100)) = floor(500 * 51) = 25500
+    assert_eq!(spending::prestige_rank_cost(100), 25500);
 }
 
 #[test]
@@ -382,16 +377,16 @@ fn test_item_drop_salvage_awards_stormglass() {
 fn test_chrono_surge_costs_all_four_options() {
     // Verify all 4 duration options return correct (ticks, cost, label)
     let opt0 = spending::chrono_surge_cost(0).unwrap();
-    assert_eq!(opt0, (9_000, 25, "15 minutes"));
+    assert_eq!(opt0, (9_000, 500, "15 minutes"));
 
     let opt1 = spending::chrono_surge_cost(1).unwrap();
-    assert_eq!(opt1, (36_000, 100, "1 hour"));
+    assert_eq!(opt1, (36_000, 2_000, "1 hour"));
 
     let opt2 = spending::chrono_surge_cost(2).unwrap();
-    assert_eq!(opt2, (144_000, 350, "4 hours"));
+    assert_eq!(opt2, (144_000, 8_000, "4 hours"));
 
     let opt3 = spending::chrono_surge_cost(3).unwrap();
-    assert_eq!(opt3, (288_000, 600, "8 hours"));
+    assert_eq!(opt3, (288_000, 16_000, "8 hours"));
 }
 
 #[test]
@@ -533,22 +528,22 @@ fn test_chrono_surge_batch_accumulates_stats() {
 fn test_chrono_surge_deducts_stormglass() {
     let mut state = GameState::new("Test".to_string(), 0);
     state.stormglass_discovered = true;
-    state.stormglass = 200;
+    state.stormglass = 1000;
 
-    let (_, cost, _) = spending::chrono_surge_cost(0).unwrap(); // 25 SG
+    let (_, cost, _) = spending::chrono_surge_cost(0).unwrap(); // 500 SG
     assert!(state.stormglass >= cost);
 
     state.stormglass -= cost;
-    assert_eq!(state.stormglass, 175);
+    assert_eq!(state.stormglass, 500);
 }
 
 #[test]
 fn test_chrono_surge_cannot_afford() {
     let mut state = GameState::new("Test".to_string(), 0);
     state.stormglass_discovered = true;
-    state.stormglass = 10;
+    state.stormglass = 100;
 
-    let (_, cost, _) = spending::chrono_surge_cost(0).unwrap(); // 25 SG
+    let (_, cost, _) = spending::chrono_surge_cost(0).unwrap(); // 500 SG
     assert!(state.stormglass < cost, "Should not be able to afford");
 }
 
