@@ -32,9 +32,18 @@ pub fn update_combat(
         return events;
     }
 
-    // --- Phase 1: Accumulate both timers ---
+    // --- Phase 1: Accumulate timers ---
     state.combat_state.player_attack_timer += delta_time;
     state.combat_state.enemy_attack_timer += delta_time;
+
+    // --- Phase 1b: Boss enrage timer ---
+    if state.zone_progression.fighting_boss {
+        state.combat_state.boss_fight_timer += delta_time;
+        if state.combat_state.boss_fight_timer >= BOSS_ENRAGE_SECONDS {
+            events.extend(resolve_boss_enrage(state, achievements));
+            return events;
+        }
+    }
 
     // Attack speed multiplier: higher = faster attacks
     let player_interval = ATTACK_INTERVAL_SECONDS
@@ -75,4 +84,42 @@ pub fn update_combat(
     }
 
     events
+}
+
+/// Resolves boss enrage: instant kills the player and resets combat state.
+///
+/// Always retreats the player to subzone 1 of the current zone.
+/// For weapon-gated bosses this prevents an infinite loop; for normal bosses
+/// it signals the player isn't strong enough yet.
+fn resolve_boss_enrage(
+    state: &mut GameState,
+    achievements: &crate::achievements::Achievements,
+) -> Vec<CombatEvent> {
+    let weapon_blocked = state
+        .zone_progression
+        .boss_weapon_blocked(achievements)
+        .is_some();
+    let enemy_name = state
+        .combat_state
+        .current_enemy
+        .as_ref()
+        .map(|e| e.name.clone())
+        .unwrap_or_else(|| "Boss".to_string());
+
+    // Reset combat state
+    state.combat_state.player_current_hp = state.combat_state.player_max_hp;
+    state.combat_state.player_attack_timer = 0.0;
+    state.combat_state.enemy_attack_timer = 0.0;
+    state.combat_state.boss_fight_timer = 0.0;
+    state.combat_state.current_enemy = None;
+
+    // Retreat to first subzone of current zone
+    state.zone_progression.fighting_boss = false;
+    state.zone_progression.kills_in_subzone = 0;
+    state.zone_progression.current_subzone_id = 1;
+
+    vec![CombatEvent::BossEnrage {
+        weapon_blocked,
+        enemy_name,
+    }]
 }

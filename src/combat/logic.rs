@@ -2651,4 +2651,259 @@ mod tests {
         let hp_lost = initial_hp - state.combat_state.player_current_hp;
         assert_eq!(hp_lost, expected_damage, "Zero DR should not change damage");
     }
+
+    // =========================================================================
+    // Boss Enrage Timer Tests
+    // =========================================================================
+
+    #[test]
+    fn test_boss_enrage_timer_increments_during_boss_fight() {
+        let mut state = GameState::new("Enrage".to_string(), 0);
+        state.zone_progression.fighting_boss = true;
+        state.combat_state.current_enemy = Some(Enemy::new("Boss".to_string(), 9999, 1));
+        let derived = default_derived(&state);
+        let mut achievements = Achievements::default();
+
+        // Suppress attacks so we only test timer accumulation
+        state.combat_state.player_attack_timer = 0.0;
+        state.combat_state.enemy_attack_timer = 0.0;
+
+        update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &default_prestige(),
+            &mut achievements,
+            &derived,
+            &GodItemCombatBonuses::default(),
+        );
+
+        assert!(
+            (state.combat_state.boss_fight_timer - 0.1).abs() < f64::EPSILON,
+            "Timer should increment by delta_time during boss fight"
+        );
+    }
+
+    #[test]
+    fn test_boss_enrage_timer_does_not_increment_for_normal_mobs() {
+        let mut state = GameState::new("NoEnrage".to_string(), 0);
+        state.zone_progression.fighting_boss = false;
+        state.combat_state.current_enemy = Some(Enemy::new("Mob".to_string(), 9999, 1));
+        let derived = default_derived(&state);
+        let mut achievements = Achievements::default();
+
+        state.combat_state.player_attack_timer = 0.0;
+        state.combat_state.enemy_attack_timer = 0.0;
+
+        update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &default_prestige(),
+            &mut achievements,
+            &derived,
+            &GodItemCombatBonuses::default(),
+        );
+
+        assert_eq!(
+            state.combat_state.boss_fight_timer, 0.0,
+            "Timer should not increment for non-boss fights"
+        );
+    }
+
+    #[test]
+    fn test_boss_enrage_triggers_at_threshold() {
+        let mut state = GameState::new("Enrage".to_string(), 0);
+        state.zone_progression.fighting_boss = true;
+        state.zone_progression.current_zone_id = 1;
+        state.zone_progression.current_subzone_id = 3;
+        state.combat_state.current_enemy =
+            Some(Enemy::new("Sporeling Queen".to_string(), 9999, 1));
+        let derived = default_derived(&state);
+        let mut achievements = Achievements::default();
+
+        // Set timer just below threshold
+        state.combat_state.boss_fight_timer = BOSS_ENRAGE_SECONDS - 0.05;
+        state.combat_state.player_attack_timer = 0.0;
+        state.combat_state.enemy_attack_timer = 0.0;
+
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &default_prestige(),
+            &mut achievements,
+            &derived,
+            &GodItemCombatBonuses::default(),
+        );
+
+        // Should trigger enrage
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, CombatEvent::BossEnrage { .. })),
+            "Should emit BossEnrage event"
+        );
+        // Player should be reset to subzone 1
+        assert_eq!(state.zone_progression.current_subzone_id, 1);
+        assert!(!state.zone_progression.fighting_boss);
+        assert_eq!(state.zone_progression.kills_in_subzone, 0);
+        // Combat state should be reset
+        assert!(state.combat_state.current_enemy.is_none());
+        assert_eq!(state.combat_state.boss_fight_timer, 0.0);
+        assert_eq!(
+            state.combat_state.player_current_hp,
+            state.combat_state.player_max_hp,
+            "Player HP should be restored after enrage"
+        );
+    }
+
+    #[test]
+    fn test_boss_enrage_weapon_gated_includes_flag() {
+        use crate::achievements::AchievementId;
+
+        let mut state = GameState::new("Enrage".to_string(), 0);
+        state.zone_progression.current_zone_id = 10;
+        state.zone_progression.current_subzone_id = 4;
+        state.zone_progression.unlock_zone(10);
+        state.zone_progression.fighting_boss = true;
+        state.combat_state.current_enemy =
+            Some(Enemy::new("The Undying Storm".to_string(), 99999, 1));
+        let derived = default_derived(&state);
+        let mut achievements = Achievements::default();
+        // No Stormbreaker achievement
+
+        state.combat_state.boss_fight_timer = BOSS_ENRAGE_SECONDS;
+        state.combat_state.player_attack_timer = 0.0;
+        state.combat_state.enemy_attack_timer = 0.0;
+
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &default_prestige(),
+            &mut achievements,
+            &derived,
+            &GodItemCombatBonuses::default(),
+        );
+
+        // Should be weapon-blocked enrage
+        let enrage = events
+            .iter()
+            .find(|e| matches!(e, CombatEvent::BossEnrage { .. }));
+        assert!(enrage.is_some());
+        if let Some(CombatEvent::BossEnrage {
+            weapon_blocked,
+            enemy_name,
+        }) = enrage
+        {
+            assert!(weapon_blocked, "Should flag weapon_blocked for Zone 10 boss");
+            assert_eq!(enemy_name, "The Undying Storm");
+        }
+
+        // Should retreat to subzone 1
+        assert_eq!(state.zone_progression.current_subzone_id, 1);
+        assert_eq!(state.zone_progression.kills_in_subzone, 0);
+
+        // Now test with Stormbreaker — should still retreat to subzone 1
+        let mut state2 = GameState::new("Enrage2".to_string(), 0);
+        state2.zone_progression.current_zone_id = 10;
+        state2.zone_progression.current_subzone_id = 4;
+        state2.zone_progression.unlock_zone(10);
+        state2.zone_progression.fighting_boss = true;
+        state2.combat_state.current_enemy =
+            Some(Enemy::new("The Undying Storm".to_string(), 99999, 1));
+        let derived2 = default_derived(&state2);
+        let mut achievements2 = Achievements::default();
+        achievements2.unlock(AchievementId::TheStormbreaker, None);
+
+        state2.combat_state.boss_fight_timer = BOSS_ENRAGE_SECONDS;
+
+        let events2 = update_combat(
+            &mut state2,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &default_prestige(),
+            &mut achievements2,
+            &derived2,
+            &GodItemCombatBonuses::default(),
+        );
+
+        let enrage2 = events2
+            .iter()
+            .find(|e| matches!(e, CombatEvent::BossEnrage { .. }));
+        assert!(enrage2.is_some());
+        if let Some(CombatEvent::BossEnrage { weapon_blocked, .. }) = enrage2 {
+            assert!(
+                !weapon_blocked,
+                "Should NOT flag weapon_blocked with Stormbreaker"
+            );
+        }
+        assert_eq!(state2.zone_progression.current_subzone_id, 1);
+    }
+
+    #[test]
+    fn test_boss_enrage_does_not_trigger_below_threshold() {
+        let mut state = GameState::new("NoEnrage".to_string(), 0);
+        state.zone_progression.fighting_boss = true;
+        state.zone_progression.current_subzone_id = 3;
+        state.combat_state.current_enemy =
+            Some(Enemy::new("Boss".to_string(), 9999, 1));
+        let derived = default_derived(&state);
+        let mut achievements = Achievements::default();
+
+        // Set timer well below threshold
+        state.combat_state.boss_fight_timer = 30.0;
+        state.combat_state.player_attack_timer = 0.0;
+        state.combat_state.enemy_attack_timer = 0.0;
+
+        let events = update_combat(
+            &mut state,
+            0.1,
+            &HavenCombatBonuses::default(),
+            &default_prestige(),
+            &mut achievements,
+            &derived,
+            &GodItemCombatBonuses::default(),
+        );
+
+        assert!(
+            !events
+                .iter()
+                .any(|e| matches!(e, CombatEvent::BossEnrage { .. })),
+            "Should NOT trigger enrage at 30s"
+        );
+        assert_eq!(state.zone_progression.current_subzone_id, 3);
+        assert!(state.zone_progression.fighting_boss);
+    }
+
+    #[test]
+    fn test_boss_fight_timer_resets_on_enemy_death() {
+        let mut state = GameState::new("Reset".to_string(), 0);
+        state.zone_progression.fighting_boss = true;
+        state.combat_state.boss_fight_timer = 30.0;
+        state.combat_state.current_enemy = Some(Enemy::new("Boss".to_string(), 1, 1));
+        let mut achievements = Achievements::default();
+
+        // Force player to kill the boss
+        let events = force_player_attack(&mut state, &HavenCombatBonuses::default(), &mut achievements);
+
+        // Boss should be dead, timer should be reset
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, CombatEvent::SubzoneBossDefeated { .. })),
+            "Boss should be defeated"
+        );
+        assert_eq!(
+            state.combat_state.boss_fight_timer, 0.0,
+            "Timer should reset on boss death"
+        );
+    }
+
+    #[test]
+    fn test_boss_fight_timer_defaults_to_zero_for_new_combat_state() {
+        let combat = CombatState::new(100);
+        assert_eq!(combat.boss_fight_timer, 0.0);
+    }
 }

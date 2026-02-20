@@ -122,6 +122,18 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
             }
+            TickEvent::BossEnrage { message } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, false);
+                game_state.ticker.push(TickerEntry {
+                    icon: "\u{1f525}",
+                    text: "Boss Enraged!".to_string(),
+                    color: Color::Red,
+                    bold: true,
+                    segments: None,
+                });
+            }
             TickEvent::PlayerDied { message } | TickEvent::PlayerDiedInDungeon { message } => {
                 game_state
                     .combat_state

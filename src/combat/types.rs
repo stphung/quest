@@ -94,6 +94,11 @@ pub struct CombatState {
     pub combat_log: VecDeque<CombatLogEntry>,
     #[serde(skip)]
     pub regen_start_hp: u32,
+    /// Accumulates time (seconds) the player has been fighting a boss.
+    /// Resets on boss death, player death, or new boss encounter.
+    /// When this exceeds `BOSS_ENRAGE_SECONDS`, the boss enrages and kills the player.
+    #[serde(skip)]
+    pub boss_fight_timer: f64,
     #[serde(skip)]
     pub player_damage_floats: Vec<DamageFlash>,
     #[serde(skip)]
@@ -119,6 +124,7 @@ impl CombatState {
             visual_effects: Vec::new(),
             combat_log: VecDeque::with_capacity(COMBAT_LOG_CAPACITY),
             regen_start_hp: 0,
+            boss_fight_timer: 0.0,
             player_damage_floats: Vec::new(),
             enemy_damage_floats: Vec::new(),
         }

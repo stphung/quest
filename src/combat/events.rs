@@ -74,6 +74,12 @@ pub enum CombatEvent {
     RegenComplete {
         healed: u32,
     },
+    /// Boss enraged after fight timer expired — instant kill.
+    /// If weapon_blocked, player retreats to subzone 1 of the current zone.
+    BossEnrage {
+        weapon_blocked: bool,
+        enemy_name: String,
+    },
     /// Subzone boss defeated (zone progression)
     SubzoneBossDefeated {
         xp_gained: u64,

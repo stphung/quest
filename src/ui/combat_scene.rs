@@ -1,6 +1,6 @@
 use super::responsive::{LayoutContext, SizeTier};
 use crate::combat::logic::effective_enemy_attack_interval;
-use crate::core::constants::ATTACK_INTERVAL_SECONDS;
+use crate::core::constants::{ATTACK_INTERVAL_SECONDS, BOSS_ENRAGE_SECONDS};
 use crate::core::game_state::GameState;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -127,13 +127,16 @@ fn draw_combat_full(
 
     let is_regen = game_state.combat_state.is_regenerating;
 
+    let is_boss = game_state.zone_progression.fighting_boss;
+    let status_lines = if is_boss { 2 } else { 1 };
+
     let mut constraints = vec![Constraint::Length(1)]; // Player HP
     if is_regen {
         constraints.push(Constraint::Length(1)); // Regen throbber
     }
     constraints.push(Constraint::Min(5)); // Sprite
     constraints.push(Constraint::Length(1)); // Enemy HP
-    constraints.push(Constraint::Length(1)); // Status
+    constraints.push(Constraint::Length(status_lines)); // Status (2 lines during boss)
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -176,6 +179,8 @@ fn draw_combat_compact(
     frame.render_widget(outer_block, area);
 
     let is_regen = game_state.combat_state.is_regenerating;
+    let is_boss = game_state.zone_progression.fighting_boss;
+    let status_lines = if is_boss { 2 } else { 1 };
 
     let mut constraints = vec![Constraint::Length(1)]; // Player HP
     if is_regen {
@@ -183,7 +188,7 @@ fn draw_combat_compact(
     }
     constraints.push(Constraint::Min(3)); // Sprite
     constraints.push(Constraint::Length(1)); // Enemy HP
-    constraints.push(Constraint::Length(1)); // Status
+    constraints.push(Constraint::Length(status_lines)); // Status (2 lines during boss)
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -375,7 +380,7 @@ pub(super) fn draw_combat_status(frame: &mut Frame, area: Rect, game_state: &Gam
             Style::default().fg(Color::Red)
         };
 
-        vec![Line::from(vec![
+        let mut lines = vec![Line::from(vec![
             Span::styled(
                 format!("{} In Combat", spinner),
                 Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
@@ -385,7 +390,26 @@ pub(super) fn draw_combat_status(frame: &mut Frame, area: Rect, game_state: &Gam
             Span::raw("  "),
             Span::styled(format!("Foe: {:.1}s", enemy_next), enemy_style),
             dps_span,
-        ])]
+        ])];
+
+        // Boss enrage countdown (second line)
+        if game_state.zone_progression.fighting_boss {
+            let remaining =
+                (BOSS_ENRAGE_SECONDS - game_state.combat_state.boss_fight_timer).max(0.0);
+            let enrage_style = if remaining < 5.0 {
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
+            } else if remaining < 10.0 {
+                Style::default().fg(Color::Yellow)
+            } else {
+                Style::default().fg(Color::Cyan)
+            };
+            lines.push(Line::from(vec![Span::styled(
+                format!("\u{26a1} ENRAGE: {:.0}s", remaining),
+                enrage_style,
+            )]));
+        }
+
+        lines
     } else {
         let message = waiting_message(game_state.character_xp);
         vec![Line::from(vec![

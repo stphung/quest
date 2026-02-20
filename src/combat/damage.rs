@@ -72,6 +72,7 @@ pub(crate) fn handle_enemy_death(
     // Remove enemy and start regeneration
     state.combat_state.current_enemy = None;
     state.combat_state.enemy_attack_timer = 0.0;
+    state.combat_state.boss_fight_timer = 0.0;
     state.combat_state.is_regenerating = true;
     state.combat_state.regen_timer = 0.0;
     state.combat_state.regen_start_hp = state.combat_state.player_current_hp;

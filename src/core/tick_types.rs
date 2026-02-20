@@ -52,6 +52,9 @@ pub enum TickEvent {
         message: String,
     },
 
+    /// Boss enraged after fight timer expired — instant kill.
+    BossEnrage { message: String },
+
     /// Player died in overworld combat (boss encounter reset).
     PlayerDied { message: String },
 
