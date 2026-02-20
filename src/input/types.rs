@@ -69,6 +69,12 @@ pub enum GameOverlay {
     StormglassDiscovery,
     /// Quit confirmation when pending challenges exist
     QuitConfirm,
+    /// Bug report overlay with game state summary
+    BugReport {
+        summary: String,
+        clipboard_ready: bool,
+        error: Option<String>,
+    },
 }
 
 /// Result of handling a game input event.

@@ -88,6 +88,11 @@ pub fn handle_game_input(
         return InputResult::Continue;
     }
 
+    // 0.8. Bug report overlay
+    if matches!(overlay, GameOverlay::BugReport { .. }) {
+        return handle_bug_report_overlay(key, overlay);
+    }
+
     // 1. Haven discovery modal (blocks all other input)
     if matches!(overlay, GameOverlay::HavenDiscovery) {
         return handle_haven_discovery(key, overlay);
@@ -216,6 +221,31 @@ fn handle_achievement_unlocked(key: KeyEvent, overlay: &mut GameOverlay) -> Inpu
     InputResult::Continue
 }
 
+fn handle_bug_report_overlay(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
+    match key.code {
+        KeyCode::Enter => {
+            if let GameOverlay::BugReport { ref summary, .. } = overlay {
+                let url = crate::utils::bug_report::build_issue_url(summary);
+                if let Err(e) = crate::utils::bug_report::open_browser(&url) {
+                    *overlay = GameOverlay::BugReport {
+                        summary: String::new(),
+                        clipboard_ready: false,
+                        error: Some(format!("Failed to open browser: {e}")),
+                    };
+                } else {
+                    *overlay = GameOverlay::None;
+                }
+            }
+            InputResult::Continue
+        }
+        KeyCode::Esc => {
+            *overlay = GameOverlay::None;
+            InputResult::Continue
+        }
+        _ => InputResult::Continue,
+    }
+}
+
 fn handle_debug_menu(
     key: KeyEvent,
     state: &mut GameState,
@@ -325,6 +355,22 @@ fn handle_base_game(
         }
         KeyCode::Char('?') => {
             *overlay = GameOverlay::Help;
+            InputResult::Continue
+        }
+        KeyCode::Char('!') => {
+            let report = crate::utils::bug_report::generate_bug_report(
+                state,
+                haven,
+                enhancement,
+                achievements,
+            );
+            let clipboard_err =
+                crate::utils::bug_report::copy_to_clipboard(&report.clipboard_content).err();
+            *overlay = GameOverlay::BugReport {
+                summary: report.summary,
+                clipboard_ready: clipboard_err.is_none(),
+                error: clipboard_err,
+            };
             InputResult::Continue
         }
         _ => InputResult::Continue,

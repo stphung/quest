@@ -2,6 +2,7 @@ pub mod achievement_browser_scene;
 mod achievement_details;
 mod achievement_list;
 mod achievement_tabs;
+pub mod bug_report_scene;
 pub mod challenge_menu_scene;
 pub mod character_creation;
 pub mod character_delete;
