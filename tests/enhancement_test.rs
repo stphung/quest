@@ -2,9 +2,9 @@
 
 use quest::enhancement::{
     apply_enhancement_result, enhancement_color_tier, enhancement_cost, enhancement_multiplier,
-    enhancement_prefix, fail_penalty, roll_enhancement, soulforge_discovery_chance, success_rate,
-    try_discover_soulforge, EnhancementProgress, MAX_ENHANCEMENT_LEVEL,
-    SOULFORGE_MIN_PRESTIGE_RANK,
+    enhancement_prefix, fail_penalty, roll_enhancement, soul_tithe_cost,
+    soulforge_discovery_chance, success_rate, try_discover_soulforge, EnhancementProgress,
+    SoulforgeUiState, MAX_ENHANCEMENT_LEVEL, SOULFORGE_MIN_PRESTIGE_RANK,
 };
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
@@ -103,9 +103,9 @@ fn test_success_rate_all_levels() {
             "Level +{lvl} should be 100%"
         );
     }
-    // +5: 60%, +6: 50%, +7: 40%
-    assert!((success_rate(5) - 0.60).abs() < f64::EPSILON);
-    assert!((success_rate(6) - 0.50).abs() < f64::EPSILON);
+    // +5: 70%, +6: 55%, +7: 40%
+    assert!((success_rate(5) - 0.70).abs() < f64::EPSILON);
+    assert!((success_rate(6) - 0.55).abs() < f64::EPSILON);
     assert!((success_rate(7) - 0.40).abs() < f64::EPSILON);
     // +8: 30%, +9: 20%, +10: 10%
     assert!((success_rate(8) - 0.30).abs() < f64::EPSILON);
@@ -130,16 +130,17 @@ fn test_enhancement_cost_all_levels() {
     for lvl in 1..=4 {
         assert_eq!(enhancement_cost(lvl), 1, "Level +{lvl} should cost 1 PR");
     }
-    // +5-7: 3 PR each
-    for lvl in 5..=7 {
+    // +5: 2 PR, +6-7: 3 PR each
+    assert_eq!(enhancement_cost(5), 2, "Level +5 should cost 2 PR");
+    for lvl in 6..=7 {
         assert_eq!(enhancement_cost(lvl), 3, "Level +{lvl} should cost 3 PR");
     }
-    // +8-9: 5 PR each
+    // +8-9: 4 PR each
     for lvl in 8..=9 {
-        assert_eq!(enhancement_cost(lvl), 5, "Level +{lvl} should cost 5 PR");
+        assert_eq!(enhancement_cost(lvl), 4, "Level +{lvl} should cost 4 PR");
     }
-    // +10: 10 PR
-    assert_eq!(enhancement_cost(10), 10);
+    // +10: 5 PR
+    assert_eq!(enhancement_cost(10), 5);
 }
 
 #[test]
@@ -1233,4 +1234,68 @@ fn test_enhancement_result_fields() {
     assert_eq!(result.old_level, 4);
     assert_eq!(result.new_level, 5);
     assert_eq!(result.cost, 3);
+}
+
+// =========================================================================
+// soul_tithe_cost()
+// =========================================================================
+
+#[test]
+fn test_soul_tithe_cost_all_levels() {
+    // +1-4: no soul tithe available
+    for lvl in 1..=4 {
+        assert_eq!(
+            soul_tithe_cost(lvl),
+            None,
+            "Level +{lvl} should have no soul tithe"
+        );
+    }
+    // +5: 4 PR, +6: 6 PR, +7: 8 PR
+    assert_eq!(soul_tithe_cost(5), Some(4));
+    assert_eq!(soul_tithe_cost(6), Some(6));
+    assert_eq!(soul_tithe_cost(7), Some(8));
+    // +8-10: no soul tithe available
+    for lvl in 8..=10 {
+        assert_eq!(
+            soul_tithe_cost(lvl),
+            None,
+            "Level +{lvl} should have no soul tithe"
+        );
+    }
+}
+
+#[test]
+fn test_soul_tithe_cost_boundaries() {
+    assert_eq!(soul_tithe_cost(0), None);
+    assert_eq!(soul_tithe_cost(11), None);
+    assert_eq!(soul_tithe_cost(255), None);
+}
+
+// =========================================================================
+// SoulforgeUiState soul_tithe field
+// =========================================================================
+
+#[test]
+fn test_soulforge_ui_soul_tithe_default() {
+    let ui = SoulforgeUiState::new();
+    assert!(!ui.soul_tithe, "Soul tithe should default to false");
+}
+
+#[test]
+fn test_soulforge_ui_soul_tithe_resets_on_open() {
+    let mut ui = SoulforgeUiState::new();
+    ui.soul_tithe = true;
+    ui.open();
+    assert!(!ui.soul_tithe, "Soul tithe should reset to false on open()");
+}
+
+#[test]
+fn test_soulforge_ui_soul_tithe_resets_on_close() {
+    let mut ui = SoulforgeUiState::new();
+    ui.soul_tithe = true;
+    ui.close();
+    assert!(
+        !ui.soul_tithe,
+        "Soul tithe should reset to false on close()"
+    );
 }

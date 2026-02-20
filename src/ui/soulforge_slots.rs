@@ -1,7 +1,8 @@
 //! Soulforge slot selection menu rendering.
 
 use crate::enhancement::{
-    enhancement_multiplier, fail_penalty, success_rate, EnhancementProgress, MAX_ENHANCEMENT_LEVEL,
+    enhancement_multiplier, fail_penalty, soul_tithe_cost, success_rate, EnhancementProgress,
+    MAX_ENHANCEMENT_LEVEL,
 };
 use crate::items::EquipmentSlot;
 use ratatui::style::Color;
@@ -217,6 +218,21 @@ pub(super) fn render_menu_content(
                 Color::Red,
             );
         }
+
+        // Detail line 3: Soul Tithe hint (only for +5/+6/+7)
+        if let Some(oc_cost) = soul_tithe_cost(target) {
+            let oc_label = "Soul Tithe: ";
+            put_text(buffer, detail_start_row + 2, 0, oc_label, Color::DarkGray);
+            let oc_col = oc_label.len() as i32;
+            let can_afford_oc = prestige_rank >= oc_cost;
+            let oc_color = if can_afford_oc {
+                Color::Rgb(100, 200, 255)
+            } else {
+                Color::DarkGray
+            };
+            let oc_text = format!("{} PR for 100% success", oc_cost);
+            put_text(buffer, detail_start_row + 2, oc_col, &oc_text, oc_color);
+        }
     }
 
     // Stats row
@@ -268,13 +284,24 @@ pub(super) fn render_confirming_content(
     let slot = SLOT_ORDER[slot_index];
     let current_level = enhancement.level(slot_index);
     let target_level = current_level + 1;
-    let cost = crate::enhancement::enhancement_cost(target_level);
+    let std_cost = crate::enhancement::enhancement_cost(target_level);
     let rate = success_rate(target_level);
     let bonus = enhancement_multiplier(target_level);
     let bonus_pct = (bonus - 1.0) * 100.0;
+    let oc_cost_opt = soul_tithe_cost(target_level);
+    let is_soul_tithe = soulforge_ui.soul_tithe && oc_cost_opt.is_some();
 
-    // Center 7 content lines vertically
-    let content_height = 7usize;
+    // Active cost/rate based on selected mode
+    let active_cost = if is_soul_tithe {
+        oc_cost_opt.unwrap()
+    } else {
+        std_cost
+    };
+    let active_rate = if is_soul_tithe { 1.0 } else { rate };
+
+    // Center content lines vertically (9 lines when soul tithe available, 7 otherwise)
+    let has_mode_selector = oc_cost_opt.is_some();
+    let content_height = if has_mode_selector { 10usize } else { 8usize };
     let top = if h > content_height {
         (h - content_height) / 2
     } else {
@@ -293,65 +320,162 @@ pub(super) fn render_confirming_content(
         Color::Rgb(title_rgb.0, title_rgb.1, title_rgb.2),
     );
 
+    // Mode selector row (only for +5/+6/+7)
+    let detail_row_offset = if has_mode_selector {
+        // Render mode selector at top+3
+        let row = (top + 3) as i32;
+        let oc_cost = oc_cost_opt.unwrap();
+
+        // Build the two mode labels
+        let std_label = format!("Standard: {:.0}% / {} PR", rate * 100.0, std_cost);
+        let oc_label = format!("Soul Tithe: 100% / {} PR", oc_cost);
+        let separator = "    ";
+        let full_len = std_label.len() + separator.len() + oc_label.len();
+        let start_col = (w as i32 - full_len as i32) / 2;
+        let mut col = start_col;
+
+        // Standard mode
+        let std_fg = if !is_soul_tithe {
+            Color::Yellow
+        } else {
+            Color::DarkGray
+        };
+        let std_prefix = if !is_soul_tithe { "\u{25b6} " } else { "  " };
+        put_text(buffer, row, col - 2, std_prefix, std_fg);
+        put_text(buffer, row, col, &std_label, std_fg);
+        col += std_label.len() as i32;
+
+        put_text(buffer, row, col, separator, Color::DarkGray);
+        col += separator.len() as i32;
+
+        // Soul Tithe mode
+        let can_afford_oc = prestige_rank >= oc_cost;
+        let oc_fg = if is_soul_tithe {
+            Color::Rgb(100, 200, 255)
+        } else if can_afford_oc {
+            Color::DarkGray
+        } else {
+            Color::Rgb(80, 80, 80)
+        };
+        let oc_prefix = if is_soul_tithe { "\u{25b6} " } else { "  " };
+        put_text(buffer, row, col - 2, oc_prefix, oc_fg);
+        put_text(buffer, row, col, &oc_label, oc_fg);
+
+        // Navigation hint
+        put_text_centered(
+            buffer,
+            row + 1,
+            w,
+            "[\u{2190}\u{2192}] Switch mode",
+            Color::DarkGray,
+        );
+
+        3 // detail lines shift down by 3 (mode selector + hint + spacer)
+    } else {
+        0
+    };
+
     // Success rate + Cost + Remaining ranks
-    let rate_color = if rate >= 0.5 {
+    let rate_color = if active_rate >= 1.0 {
         Color::Green
+    } else if active_rate >= 0.5 {
+        Color::Yellow
     } else {
         Color::Red
     };
-    let remaining = prestige_rank.saturating_sub(cost);
+    let remaining = prestige_rank.saturating_sub(active_cost);
     let detail_line = format!(
         "Success rate: {:.0}%  Cost: {} Prestige Ranks ({} \u{2192} {})",
-        rate * 100.0,
-        cost,
+        active_rate * 100.0,
+        active_cost,
         prestige_rank,
         remaining
     );
     {
-        let rate_str = format!("{:.0}%", rate * 100.0);
-        let cost_str = format!("{} Prestige Ranks", cost);
+        let rate_str = format!("{:.0}%", active_rate * 100.0);
+        let cost_str = format!("{} Prestige Ranks", active_cost);
         let remaining_str = format!("({} \u{2192} {})", prestige_rank, remaining);
         let full_len = detail_line.len();
         let start_col = (w as i32 - full_len as i32) / 2;
         let mut col = start_col;
 
+        let detail_row = (top + 3 + detail_row_offset) as i32;
+
         let label1 = "Success rate: ";
-        put_text(buffer, (top + 3) as i32, col, label1, Color::White);
+        put_text(buffer, detail_row, col, label1, Color::White);
         col += label1.len() as i32;
 
-        put_text(buffer, (top + 3) as i32, col, &rate_str, rate_color);
+        put_text(buffer, detail_row, col, &rate_str, rate_color);
         col += rate_str.len() as i32;
 
         let label2 = "  Cost: ";
-        put_text(buffer, (top + 3) as i32, col, label2, Color::White);
+        put_text(buffer, detail_row, col, label2, Color::White);
         col += label2.len() as i32;
 
-        put_text(buffer, (top + 3) as i32, col, &cost_str, Color::Cyan);
+        put_text(buffer, detail_row, col, &cost_str, Color::Cyan);
         col += cost_str.len() as i32;
 
         let label3 = " ";
-        put_text(buffer, (top + 3) as i32, col, label3, Color::Reset);
+        put_text(buffer, detail_row, col, label3, Color::Reset);
         col += label3.len() as i32;
 
-        put_text(
+        put_text(buffer, detail_row, col, &remaining_str, Color::DarkGray);
+    }
+
+    // On failure line
+    let failure_row = (top + 4 + detail_row_offset) as i32;
+    if is_soul_tithe {
+        put_text_centered(
             buffer,
-            (top + 3) as i32,
-            col,
-            &remaining_str,
-            Color::DarkGray,
+            failure_row,
+            w,
+            "On failure: guaranteed success",
+            Color::Green,
         );
+    } else {
+        let penalty = fail_penalty(target_level);
+        if penalty == 0 {
+            put_text_centered(
+                buffer,
+                failure_row,
+                w,
+                "On failure: safe (no level loss)",
+                Color::Green,
+            );
+        } else {
+            let result_level = current_level.saturating_sub(penalty);
+            let fail_text = format!(
+                "On failure: -{} level{} (+{} \u{2192} +{})",
+                penalty,
+                if penalty > 1 { "s" } else { "" },
+                current_level,
+                result_level
+            );
+            put_text_centered(buffer, failure_row, w, &fail_text, Color::Red);
+        }
     }
 
     // Bonus at target level
     let bonus_line = format!("Bonus at +{}: +{:.1}% Power", target_level, bonus_pct);
-    put_text_centered(buffer, (top + 4) as i32, w, &bonus_line, Color::Green);
-
-    // Help text
     put_text_centered(
         buffer,
-        (top + 6) as i32,
+        (top + 5 + detail_row_offset) as i32,
         w,
-        "[Enter] Confirm  [Esc] Cancel",
+        &bonus_line,
+        Color::Green,
+    );
+
+    // Help text
+    let help_text = if has_mode_selector {
+        "[Enter] Confirm  [\u{2190}\u{2192}] Mode  [Esc] Cancel"
+    } else {
+        "[Enter] Confirm  [Esc] Cancel"
+    };
+    put_text_centered(
+        buffer,
+        (top + 7 + detail_row_offset) as i32,
+        w,
+        help_text,
         Color::DarkGray,
     );
 }

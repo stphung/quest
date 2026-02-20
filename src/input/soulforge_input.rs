@@ -2,8 +2,8 @@
 
 use super::types::InputResult;
 use crate::enhancement::{
-    self, enhancement_cost, roll_enhancement, EnhancementResult, SoulforgePhase, SoulforgeUiState,
-    MAX_ENHANCEMENT_LEVEL,
+    self, enhancement_cost, roll_enhancement, soul_tithe_cost, EnhancementResult, SoulforgePhase,
+    SoulforgeUiState, MAX_ENHANCEMENT_LEVEL,
 };
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
@@ -46,15 +46,40 @@ pub(super) fn handle_soulforge(
             _ => InputResult::Continue,
         },
         SoulforgePhase::Confirming => match key.code {
+            KeyCode::Left | KeyCode::Right => {
+                let slot_index = soulforge_ui.selected_slot;
+                let current_level = enhancement.level(slot_index);
+                let target_level = current_level + 1;
+                // Only toggle if soul tithe is available for this level
+                if soul_tithe_cost(target_level).is_some() {
+                    soulforge_ui.soul_tithe = !soulforge_ui.soul_tithe;
+                    // If switching to soul tithe, verify affordability; revert if not
+                    if soulforge_ui.soul_tithe {
+                        if let Some(oc_cost) = soul_tithe_cost(target_level) {
+                            if prestige_rank < oc_cost {
+                                soulforge_ui.soul_tithe = false;
+                            }
+                        }
+                    }
+                }
+                InputResult::Continue
+            }
             KeyCode::Enter => {
                 let slot_index = soulforge_ui.selected_slot;
                 let current_level = enhancement.level(slot_index);
                 let target_level = current_level + 1;
-                let cost = enhancement_cost(target_level);
 
-                // Roll the outcome (applied after animation completes in main loop)
-                let mut rng = rand::rng();
-                let (success, new_level) = roll_enhancement(current_level, &mut rng);
+                let (success, new_level, cost) = if soulforge_ui.soul_tithe {
+                    // Soul Tithe: guaranteed success, higher cost
+                    let oc_cost = soul_tithe_cost(target_level).unwrap_or(0);
+                    (true, current_level + 1, oc_cost)
+                } else {
+                    // Standard: roll the outcome
+                    let cost = enhancement_cost(target_level);
+                    let mut rng = rand::rng();
+                    let (success, new_level) = roll_enhancement(current_level, &mut rng);
+                    (success, new_level, cost)
+                };
 
                 soulforge_ui.last_result = Some(EnhancementResult {
                     slot_index,
@@ -70,6 +95,7 @@ pub(super) fn handle_soulforge(
             }
             KeyCode::Esc => {
                 soulforge_ui.phase = SoulforgePhase::Menu;
+                soulforge_ui.soul_tithe = false;
                 InputResult::Continue
             }
             _ => InputResult::Continue,
@@ -81,6 +107,7 @@ pub(super) fn handle_soulforge(
         SoulforgePhase::ResultSuccess | SoulforgePhase::ResultFailure => {
             // Any key returns to menu
             soulforge_ui.phase = SoulforgePhase::Menu;
+            soulforge_ui.soul_tithe = false;
             InputResult::Continue
         }
     }

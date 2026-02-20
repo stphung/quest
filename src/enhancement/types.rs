@@ -52,15 +52,28 @@ pub const SOULFORGE_DISCOVERY_RANK_BONUS: f64 = 0.000007;
 
 pub const ENHANCEMENT_SUCCESS_RATES: [f64; 10] = [
     1.00, 1.00, 1.00, 1.00, // +1-4: 100%
-    0.60, 0.50, 0.40, // +5-7: 60%, 50%, 40%
+    0.70, 0.55, 0.40, // +5-7: 70%, 55%, 40%
     0.30, 0.20, 0.10, // +8-10: 30%, 20%, 10%
 ];
 
 pub const ENHANCEMENT_COSTS: [u32; 10] = [
     1, 1, 1, 1, // +1-4: 1 PR each
-    3, 3, 3, // +5-7: 3 PR each
-    5, 5,  // +8-9: 5 PR each
-    10, // +10: 10 PR
+    2, 3, 3, // +5: 2 PR, +6-7: 3 PR each
+    4, 4, // +8-9: 4 PR each
+    5, // +10: 5 PR
+];
+
+pub const ENHANCEMENT_SOUL_TITHE_COSTS: [Option<u32>; 10] = [
+    None,
+    None,
+    None,
+    None, // +1-4: no soul tithe (already 100%)
+    Some(4),
+    Some(6),
+    Some(8), // +5-7: soul tithe for guaranteed 100%
+    None,
+    None,
+    None, // +8-10: no soul tithe available
 ];
 
 pub const ENHANCEMENT_FAIL_PENALTY: [u8; 10] = [
@@ -86,6 +99,13 @@ pub fn enhancement_cost(target_level: u8) -> u32 {
         return 0;
     }
     ENHANCEMENT_COSTS[(target_level - 1) as usize]
+}
+
+pub fn soul_tithe_cost(target_level: u8) -> Option<u32> {
+    if target_level == 0 || target_level > MAX_ENHANCEMENT_LEVEL {
+        return None;
+    }
+    ENHANCEMENT_SOUL_TITHE_COSTS[(target_level - 1) as usize]
 }
 
 pub fn fail_penalty(target_level: u8) -> u8 {
@@ -163,6 +183,7 @@ pub struct SoulforgeUiState {
     pub phase: SoulforgePhase,
     pub animation_tick: u8,
     pub last_result: Option<EnhancementResult>,
+    pub soul_tithe: bool,
 }
 
 impl Default for SoulforgeUiState {
@@ -179,6 +200,7 @@ impl SoulforgeUiState {
             phase: SoulforgePhase::Menu,
             animation_tick: 0,
             last_result: None,
+            soul_tithe: false,
         }
     }
 
@@ -188,11 +210,13 @@ impl SoulforgeUiState {
         self.phase = SoulforgePhase::Menu;
         self.animation_tick = 0;
         self.last_result = None;
+        self.soul_tithe = false;
     }
 
     pub fn close(&mut self) {
         self.open = false;
         self.phase = SoulforgePhase::Menu;
         self.last_result = None;
+        self.soul_tithe = false;
     }
 }

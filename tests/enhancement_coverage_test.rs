@@ -274,7 +274,7 @@ fn test_roll_enhancement_fail_at_level_9_penalty_minus_1() {
 
 #[test]
 fn test_roll_enhancement_statistical_distribution() {
-    // Run many attempts at +5 (60% rate) and verify distribution is reasonable
+    // Run many attempts at +5 (70% rate) and verify distribution is reasonable
     let mut rng = ChaCha8Rng::seed_from_u64(12345);
     let mut successes = 0;
     let trials = 10000;
@@ -287,10 +287,10 @@ fn test_roll_enhancement_statistical_distribution() {
     }
 
     let rate = successes as f64 / trials as f64;
-    // 60% rate with 10k trials: expect ~6000 +/- ~150 (3 sigma)
+    // 70% rate with 10k trials: expect ~7000 +/- ~150 (3 sigma)
     assert!(
-        rate > 0.55 && rate < 0.65,
-        "Success rate for +5 should be around 60%, got {:.2}%",
+        rate > 0.65 && rate < 0.75,
+        "Success rate for +5 should be around 70%, got {:.2}%",
         rate * 100.0
     );
 }
@@ -734,8 +734,8 @@ fn test_enhancement_cost_total_to_max() {
     for level in 1..=MAX_ENHANCEMENT_LEVEL {
         total += enhancement_cost(level);
     }
-    // 1+1+1+1 + 3+3+3 + 5+5 + 10 = 4 + 9 + 10 + 10 = 33
-    assert_eq!(total, 33, "Total cost from +0 to +10 should be 33 PR");
+    // 1+1+1+1 + 2+3+3 + 4+4 + 5 = 4 + 8 + 8 + 5 = 25
+    assert_eq!(total, 25, "Total cost from +0 to +10 should be 25 PR");
 }
 
 #[test]
