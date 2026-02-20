@@ -2717,8 +2717,7 @@ mod tests {
         state.zone_progression.fighting_boss = true;
         state.zone_progression.current_zone_id = 1;
         state.zone_progression.current_subzone_id = 3;
-        state.combat_state.current_enemy =
-            Some(Enemy::new("Sporeling Queen".to_string(), 9999, 1));
+        state.combat_state.current_enemy = Some(Enemy::new("Sporeling Queen".to_string(), 9999, 1));
         let derived = default_derived(&state);
         let mut achievements = Achievements::default();
 
@@ -2752,8 +2751,7 @@ mod tests {
         assert!(state.combat_state.current_enemy.is_none());
         assert_eq!(state.combat_state.boss_fight_timer, 0.0);
         assert_eq!(
-            state.combat_state.player_current_hp,
-            state.combat_state.player_max_hp,
+            state.combat_state.player_current_hp, state.combat_state.player_max_hp,
             "Player HP should be restored after enrage"
         );
     }
@@ -2797,7 +2795,10 @@ mod tests {
             enemy_name,
         }) = enrage
         {
-            assert!(weapon_blocked, "Should flag weapon_blocked for Zone 10 boss");
+            assert!(
+                weapon_blocked,
+                "Should flag weapon_blocked for Zone 10 boss"
+            );
             assert_eq!(enemy_name, "The Undying Storm");
         }
 
@@ -2847,8 +2848,7 @@ mod tests {
         let mut state = GameState::new("NoEnrage".to_string(), 0);
         state.zone_progression.fighting_boss = true;
         state.zone_progression.current_subzone_id = 3;
-        state.combat_state.current_enemy =
-            Some(Enemy::new("Boss".to_string(), 9999, 1));
+        state.combat_state.current_enemy = Some(Enemy::new("Boss".to_string(), 9999, 1));
         let derived = default_derived(&state);
         let mut achievements = Achievements::default();
 
@@ -2886,7 +2886,11 @@ mod tests {
         let mut achievements = Achievements::default();
 
         // Force player to kill the boss
-        let events = force_player_attack(&mut state, &HavenCombatBonuses::default(), &mut achievements);
+        let events = force_player_attack(
+            &mut state,
+            &HavenCombatBonuses::default(),
+            &mut achievements,
+        );
 
         // Boss should be dead, timer should be reset
         assert!(
