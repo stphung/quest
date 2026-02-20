@@ -9,7 +9,9 @@ src/dungeon/
 ├── mod.rs         # Public re-exports
 ├── types.rs       # Room, RoomType, RoomState, Dungeon, DungeonSize
 ├── generation.rs  # Procedural dungeon generation with connected rooms
-└── logic.rs       # Navigation, room clearing, key system, boss encounters
+├── logic.rs       # Room clearing, key system, boss encounters
+├── pathfinding.rs # BFS-based dungeon navigation, auto-exploration (ROOM_MOVE_INTERVAL 2.5s, ROOM_TRAVEL_INTERVAL 0.8s)
+└── rewards.rs     # Dungeon boss XP rewards, item generation, treasure room handling
 ```
 
 ## Key Types
@@ -43,12 +45,13 @@ pub struct Dungeon {
 ```
 
 ### `DungeonSize`
-| Size   | Grid  | Prestige Requirement |
-|--------|-------|---------------------|
-| Small  | 5x5   | Any                 |
-| Medium | 7x7   | P5+                 |
-| Large  | 9x9   | P10+                |
-| Epic   | 11x11 | P15+                |
+| Size      | Grid  | Prestige Requirement |
+|-----------|-------|---------------------|
+| Small     | 5x5   | Any                 |
+| Medium    | 7x7   | P5+                 |
+| Large     | 9x9   | P10+                |
+| Epic      | 11x11 | P15+                |
+| Legendary | 13x13 | P20+                |
 
 ## Generation Algorithm (`generation.rs`)
 
@@ -66,10 +69,11 @@ pub fn generate_dungeon(level: u32, prestige_rank: u32, zone_id: u32) -> Dungeon
 8. Entrance and adjacent rooms start Revealed; all others Hidden
 9. Store `zone_id` on the Dungeon for enemy scaling
 
-## Navigation & Clearing (`logic.rs`)
+## Navigation & Clearing (`logic.rs`, `pathfinding.rs`)
 
 ### Movement
-- Player can move to Revealed or Cleared adjacent rooms
+- Auto-exploration uses BFS pathfinding (`pathfinding.rs`) to find the next room
+- Player moves between rooms on a timer (2.5s for new rooms, 0.8s for cleared rooms)
 - Moving to a new room reveals its adjacent Hidden rooms (fog of war)
 - Moving to a Combat/Elite room triggers combat
 

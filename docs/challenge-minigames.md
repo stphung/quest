@@ -13,15 +13,15 @@ This document describes the 10 challenge minigames as implemented. All challenge
 
 | Challenge | Weight | ~Probability |
 |-----------|--------|--------------|
-| Rune | 30 | ~19% |
-| Minesweeper | 28 | ~18% |
-| Snake | 22 | ~14% |
-| Flappy Bird | 20 | ~13% |
-| Sigil Surge | 20 | ~10% |
-| JezzBall | 18 | ~9% |
+| Rune | 30 | ~17% |
+| Minesweeper | 28 | ~16% |
+| Snake | 22 | ~12% |
+| Flappy Bird | 20 | ~11% |
+| Sigil Surge | 20 | ~11% |
+| JezzBall | 18 | ~10% |
 | Gomoku | 15 | ~8% |
-| Morris | 12 | ~8% |
-| Chess | 8 | ~5% |
+| Morris | 12 | ~7% |
+| Chess | 8 | ~4% |
 | Go | 7 | ~4% |
 
 ### Difficulty Tiers
@@ -40,6 +40,10 @@ All interactive minigames use a consistent forfeit flow:
 ### AI Thinking Convention (Standardized)
 
 All games with AI opponents use `process_ai_thinking()` as the function name in their respective `logic.rs` files (not game-specific names like `process_go_ai` or `tick_chess`). This is called from `tick.rs` stage 1 (Challenge AI processing).
+
+### Reward Application Macro
+
+The `impl_apply_game_result!` macro in `src/challenges/mod.rs` standardizes reward application across all challenge minigames. Each challenge invokes the macro to generate its `apply_game_result()` function, ensuring consistent prestige rank, fishing rank, and XP reward handling.
 
 ### Reward Summary
 
@@ -135,7 +139,7 @@ Grid with intersections. `●` = player (Black), `○` = AI (White). Cursor high
 - Win: 5+ in a row (horizontal, vertical, or diagonal)
 - Draw: Board fills with no winner (rare)
 
-### AI — Minimax with Alpha-Beta Pruning
+### AI — Minimax with Alpha-Beta Pruning (`gomoku/ai.rs`)
 
 | Difficulty | Search Depth | Prestige Reward |
 |------------|-------------|-----------------|
@@ -177,7 +181,7 @@ Three-phase game on a 24-position board (3 concentric squares with connecting sp
 
 **Win**: Reduce opponent to 2 pieces, or block all opponent moves. No draws.
 
-### AI — Minimax with Alpha-Beta Pruning
+### AI — Minimax with Alpha-Beta Pruning (`morris/ai.rs`)
 
 | Difficulty | Search Depth | Random Move % | Reward |
 |------------|-------------|---------------|--------|

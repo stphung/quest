@@ -134,14 +134,13 @@ final_xp = base_xp * (1.0 + haven_offline_xp_percent / 100)
 
 ### Enemy Generation
 
-- Enemy HP: 80-120% of player max HP
-- Enemy damage: calibrated for 5-10 second fights
+- Enemy stats: Static zone-based values from `ZONE_ENEMY_STATS` table in `core/constants.rs`. Each zone defines `(base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)` tuples; subzone depth adds incremental stats
 - Procedurally generated fantasy names from syllable combinations
 
 ### Death Consequences
 
 - **Death to regular enemy**: Instant respawn, no penalty
-- **Death to boss**: Resets boss encounter (fighting_boss=false, kills_in_subzone=0), preserves prestige
+- **Death to boss**: Resets boss encounter (fighting_boss=false, kills_in_subzone=5), only 5 more kills needed to retry. Preserves prestige
 - **Death in dungeon**: Exits dungeon, no prestige loss
 
 ## Prestige System
@@ -215,7 +214,7 @@ final_multiplier = base_multiplier + (CHA_mod * 0.1)
 
 **Recalculated:**
 - Zone unlocks (based on new prestige rank — higher prestige unlocks more zones immediately)
-- Attribute caps (10 + 5 * new_rank)
+- Attribute caps (20 + 5 * new_rank)
 
 ### Vault (Item Preservation)
 
@@ -372,6 +371,10 @@ The tick implementation is split across several files:
 - `tick_stages.rs` -- Processing stages 4-6 and helper functions (`process_item_drop`, `process_discoveries`, etc.)
 - `xp.rs` -- XP calculation, leveling logic, combat kill XP
 - `discoveries.rs` -- Discovery rolls for dungeons, fishing spots, Haven, Soulforge
+- `enemy_spawning.rs` -- Enemy generation and spawning (spawn_enemy_if_needed, try_discover_dungeon)
+- `offline.rs` -- Offline XP progression
+- `recent_drops.rs` -- RecentDrop struct and deque management
+- `ticker.rs` -- XP rate sampling and rolling window
 
 ### game_tick() Signature
 
@@ -399,6 +402,7 @@ pub struct TickResult {
     pub achievements_changed: bool,
     pub haven_changed: bool,
     pub enhancement_changed: bool,
+    pub god_items_changed: bool,
     pub achievement_modal_ready: Vec<AchievementId>,
 }
 ```

@@ -137,6 +137,10 @@ Rooms are connected via procedural generation ensuring all rooms are reachable. 
 
 Death in a dungeon exits the dungeon with no prestige loss — a safe environment for exploration.
 
+### Achievement Badge
+
+The dungeon panel title displays a dungeon achievement badge based on the highest unlocked DungeonMaster achievement tier.
+
 ## Haven System
 
 ### Overview
@@ -254,8 +258,8 @@ Account-level achievement system that persists across all characters. Stored in 
 ### Categories (6)
 
 **Combat:**
-- Slayer I-XV: 100, 500, 1K, 5K, 10K, 50K, 100K, 500K, 1M, 5M, 10M, 50M, 100M, 500M, 1B kills
-- Boss Hunter I-XV: 1, 10, 50, 100, 500, 1K, 5K, 10K, 50K, 100K, 500K, 1M, 2M, 5M, 10M boss kills
+- Slayer I-XV: 100, 500, 1K, 5K, 10K, 50K, 100K, 500K, 1M, 5M, 10M, 50M, 100M, 500M, 1B kills. Unique icon progression per tier displayed as badges in the combat panel title
+- Boss Hunter I-XV: 1, 10, 50, 100, 500, 1K, 5K, 10K, 50K, 100K, 500K, 1M, 2M, 5M, 10M boss kills. Unique icon progression per tier displayed as badges in the combat panel title
 
 **Level:**
 - Milestones: L10, L25, L50, L100, L150, L200, L250, L500, L750, L1000, L1500

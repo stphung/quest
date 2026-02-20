@@ -6,14 +6,17 @@ Turn-based auto-combat with zone-based enemy generation, prestige combat bonuses
 
 ```
 src/combat/
-├── mod.rs           # Public re-exports
-├── types.rs         # Enemy struct, CombatState, zone-based enemy generators
-├── logic.rs         # update_combat() orchestrator — coordinates attack phases
-├── player_attack.rs # Player damage pipeline (weapon gate → damage → crit → double strike)
-├── enemy_attack.rs  # Enemy attack resolution (defense, Bulwark DR, reflection, death)
-├── damage.rs        # Shared damage helpers, handle_enemy_death()
-├── events.rs        # CombatEvent enum, HavenCombatBonuses, GodItemCombatBonuses
-└── regen.rs         # HP regeneration after combat
+├── mod.rs              # Public re-exports
+├── types.rs            # Enemy struct, CombatState
+├── logic.rs            # Re-exports (update_combat, effective_enemy_attack_interval) + tests
+├── orchestration.rs    # update_combat() orchestrator — coordinates attack phases
+├── attacks.rs          # Attack interval calculations (effective_enemy_attack_interval)
+├── enemy_generation.rs # Zone/dungeon enemy generators (generate_zone_enemy, generate_dungeon_boss, etc.)
+├── player_attack.rs    # Player damage pipeline (weapon gate → damage → crit → double strike)
+├── enemy_attack.rs     # Enemy attack resolution (defense, Bulwark DR, reflection, death)
+├── damage.rs           # Shared damage helpers, handle_enemy_death()
+├── events.rs           # CombatEvent enum, HavenCombatBonuses, GodItemCombatBonuses
+└── regen.rs            # HP regeneration after combat
 ```
 
 ## Key Types
@@ -57,7 +60,7 @@ State machine for combat flow:
 
 Enemies scale from a static `ZONE_ENEMY_STATS` table in `core/constants.rs`, **not** from player HP. Each zone has `(base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)` tuples. Subzone depth adds incremental stats via `hp_step`/`dmg_step`/`def_step`.
 
-### Zone Enemy Generators (`types.rs`)
+### Zone Enemy Generators (`enemy_generation.rs`)
 
 | Function | Purpose |
 |----------|---------|
@@ -80,7 +83,7 @@ Zone 11 has dramatically higher stats than Zone 10 (~6.2x HP, ~4.6x DMG, ~4.8x D
 
 ## Prestige Combat Bonuses
 
-`update_combat()` receives a `&PrestigeCombatBonuses` (from `character/prestige.rs`) that provides flat bonuses scaling with prestige rank:
+`update_combat()` receives a `&PrestigeCombatBonuses` (from `character/combat_bonuses.rs`) that provides flat bonuses scaling with prestige rank:
 - **flat_damage**: Added after Haven % multiplier, before enemy defense subtraction
 - **flat_defense**: Added to DEX-based defense when calculating damage taken
 - **crit_chance**: Added to DEX-based crit chance (capped at PRESTIGE_CRIT_CAP = 15%)
@@ -123,7 +126,7 @@ Struct carrying god item passive effects into the combat loop:
 - **Core** (`core/tick.rs`): Drives the per-tick game loop, computes `PrestigeCombatBonuses::from_rank()`, applies `flat_hp` to combat HP
 - **Core** (`core/game_logic.rs`): Enemy spawning via zone-based generators, XP calculation, level-up logic
 - **Character** (`character/derived_stats.rs`): Player base damage, defense, HP, crit stats
-- **Character** (`character/prestige.rs`): `PrestigeCombatBonuses` struct with `from_rank()` constructor
+- **Character** (`character/combat_bonuses.rs`): `PrestigeCombatBonuses` struct with `from_rank()` constructor
 - **Items** (`items/drops.rs`): Mob drops via `try_drop_from_mob()`, boss drops via `try_drop_from_boss()`
 - **Zones** (`zones/progression.rs`): Zone-based stat lookup, boss definitions
 - **Dungeon** (`dungeon/logic.rs`): Dungeon room combat with zone-scaled enemies

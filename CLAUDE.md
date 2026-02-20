@@ -112,16 +112,28 @@ CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FI
 
 - `attributes.rs` — 6 RPG attributes (STR, DEX, CON, INT, WIS, CHA), modifier = `(value - 10) / 2`
 - `derived_stats.rs` — Combat stats calculated from attributes and enhancement levels (HP, damage, defense, crit, XP mult)
-- `prestige.rs` — Prestige tiers (Bronze→Eternal) with XP multipliers (`1+0.5×rank^0.7`, diminishing returns), attribute cap increases (`10+rank×5`), and `PrestigeCombatBonuses` (flat damage/defense/crit/HP from rank)
+- `calculation.rs` — Derived stats calculation engine (extracted from derived_stats.rs)
+- `prestige.rs` — Prestige XP multipliers (`1+0.5×rank^0.7`, diminishing returns), attribute cap increases (`10+rank×5`)
+- `combat_bonuses.rs` — `PrestigeCombatBonuses` (flat damage/defense/crit/HP from rank)
+- `multipliers.rs` — Prestige multiplier and scaling calculations
+- `prestige_actions.rs` — Prestige eligibility checks and execution
+- `tiers.rs` — Prestige tier definitions (Bronze→Eternal), names, level requirements
 - `manager.rs` — Character CRUD operations (create, delete, rename)
 - `persistence.rs` — JSON save/load operations (extracted from manager.rs)
 - `name_validation.rs` — Character name validation rules
-- `input.rs` — Character selection, creation, deletion, renaming input handling and UI states
+- `input.rs` — Character input routing (delegates to submodules)
+- `creation.rs` — Character creation input handling
+- `delete.rs` — Character delete input handling
+- `rename.rs` — Character rename input handling
+- `select.rs` — Character select input handling
 
 ### Combat Module (`src/combat/`) — [detailed docs](src/combat/CLAUDE.md)
 
-- `types.rs` — Enemy struct (with defense field), zone-based enemy generators, combat state machine
-- `logic.rs` — Turn-based combat orchestration with prestige bonuses and god item passives
+- `types.rs` — Enemy struct (with defense field), combat state machine
+- `logic.rs` — Combat helper functions (prestige bonuses, god item passives)
+- `orchestration.rs` — `update_combat()` orchestrator coordinating attack phases
+- `attacks.rs` — Attack interval calculations (effective_enemy_attack_interval)
+- `enemy_generation.rs` — Zone/dungeon enemy generators (generate_zone_enemy, generate_subzone_boss, etc.)
 - `player_attack.rs` — Player damage pipeline (weapon gate, Giant's Might, Haven, prestige, defense, crit, double strike)
 - `enemy_attack.rs` — Enemy attack resolution (defense, Divine Bulwark DR, reflection, death handling)
 - `damage.rs` — Shared damage calculation and enemy death handling
@@ -131,7 +143,10 @@ CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FI
 ### Zone System (`src/zones/`)
 
 - `data.rs` — 11 zones with 3-4 subzones each, prestige requirements, boss definitions
-- `progression.rs` — Zone/subzone progression state, kill tracking (10 kills → boss spawn, 5 kills to retry after boss death), weapon gates
+- `progression.rs` — Zone/subzone progression state, kill tracking (10 kills → boss spawn, 5 kills to retry after boss death)
+- `advancement.rs` — Zone/subzone advancement logic, `travel_to()`, `advance_to_next_subzone()`
+- `boss_defeat.rs` — `BossDefeatResult` enum and `on_boss_defeated()` handler
+- `gates.rs` — Weapon gate queries (`boss_weapon_blocked()`), zone unlock checks
 
 **Zone Tiers:**
 - P0: Meadow, Dark Forest (3 subzones each)
@@ -145,7 +160,9 @@ CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FI
 
 - `types.rs` — Room types (Entrance, Combat, Treasure, Elite, Boss), room state (Hidden, Revealed, Current, Cleared), dungeon sizes
 - `generation.rs` — Procedural dungeon generation with connected rooms
-- `logic.rs` — Dungeon navigation, room clearing, key system, safe death (no prestige loss)
+- `logic.rs` — Room clearing, key system, safe death (no prestige loss)
+- `pathfinding.rs` — BFS-based dungeon navigation, room exploration priority, auto-exploration
+- `rewards.rs` — Dungeon boss XP rewards, item generation, treasure room handling
 
 **Dungeon Sizes:** Small 5×5, Medium 7×7, Large 9×9, Epic 11×11 (based on prestige)
 
@@ -195,11 +212,12 @@ God items are created via debug menu (discovery/forging system not yet designed,
 
 ### Challenge Minigames (`src/challenges/`) — [detailed docs](src/challenges/CLAUDE.md)
 
+- `mod.rs` — `impl_apply_game_result!` macro standardizing `apply_game_result()` across all 10 challenge types
 - `menu.rs` — Generic challenge menu system (pending challenges, extensible challenge types)
 - `chess/` — Chess minigame (4 difficulty levels: Novice→Master, ~500-1350 ELO), requires P1+
 - `go/` — Go (Territory Control) on 9×9 board, MCTS AI with heuristics (500-20k simulations), requires P1+
-- `morris/` — Nine Men's Morris (board layout, mill detection, phases), requires P1+
-- `gomoku/` — Gomoku (Five in a Row) on 15×15 board, minimax AI (depth 2-5)
+- `morris/` — Nine Men's Morris (board layout, mill detection, phases), `ai.rs` (minimax with alpha-beta pruning), requires P1+
+- `gomoku/` — Gomoku (Five in a Row) on 15×15 board, `ai.rs` (minimax, depth 2-5)
 - `minesweeper/` — Trap Detection, 4 difficulties (9×9 to 20×16)
 - `rune/` — Rune Deciphering (Mastermind-style deduction), 4 difficulties
 - `snake/` — Serpent's Path (Snake) on 26×26 grid, 4 difficulties (Novice 10 food/200ms, Master 25 food/90ms), real-time ~60 FPS
@@ -222,6 +240,10 @@ Account-level base building that persists across prestiges. 14 rooms in a two-br
 - `data.rs` — Achievement database with descriptions and unlock conditions
 - `handlers.rs` — Event handlers (on_enemy_killed, on_boss_killed, on_level_up, etc.) and check_milestones
 - `milestones.rs` — MinigameType, MinigameDifficulty enums, milestone threshold arrays
+- `modal.rs` — Modal notification queue, 500ms accumulation window management
+- `notifications.rs` — Pending notification state, category-based notification counts
+- `stats.rs` — Achievement statistics, unlock percentages, progress queries, category breakdowns
+- `unlock.rs` — Core unlock machinery (is_unlocked, unlock, check_milestones)
 - `persistence.rs` — Save/load from `~/.quest/achievements.json`
 
 Account-level achievement system that persists across characters. 6 categories (Combat, Level, Progression, Challenges, Exploration, Stats). Tracks kills, boss kills, levels, prestige, zone completion, challenge wins, fishing ranks/catches, dungeon completions, Haven building, and Soulforge enhancements. Includes modal notification system with 500ms accumulation window.
@@ -247,20 +269,31 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 
 - `mod.rs` — Layout coordinator (stats panel left 50%, combat scene right 50%), centralized `rarity_color()` function
 - `game_common.rs` — Shared minigame layout, status bars, game-over overlays
-- `stats_panel.rs` — Character stats, attributes, equipment display, prestige info, XP rate + ETA
+- `stats_panel.rs` — Character stats display (delegates to submodules)
+- `stats_attributes.rs` — Attribute rendering helpers for stats panel
+- `stats_equipment.rs` — Equipment rendering helpers for stats panel
+- `stats_prestige.rs` — Prestige and fishing panel rendering helpers
 - `ticker.rs` — Scrolling loot ticker with independent per-entry scrolling
 - `combat_scene.rs` — Combat view with HP bars and enemy sprites
 - `combat_3d.rs` — 3D ASCII first-person dungeon renderer
 - `combat_effects.rs` — Visual effects (damage numbers, attack flashes)
 - `enemy_sprites.rs` — ASCII enemy sprite templates
+- `enemy_sprite_data.rs` — Enemy sprite constant data, archetype mapping tables, zone suffix lookups
 - `dungeon_map.rs` — Top-down dungeon minimap with fog of war
 - `fishing_scene.rs` — Fishing UI with phase display
-- `haven_scene.rs` — Haven base building overlay
+- `haven_scene.rs` — Haven base building overlay (delegates to submodules)
+- `haven_details.rs` — Haven room detail panel rendering
+- `haven_tree.rs` — Haven skill tree panel rendering
 - `prestige_confirm.rs` — Prestige confirmation dialog
-- `achievement_browser_scene.rs` — Achievement browsing and tracking
+- `achievement_browser_scene.rs` — Achievement browsing (delegates to submodules)
+- `achievement_details.rs` — Achievement browser detail panel and stats view
+- `achievement_list.rs` — Achievement browser list panel
+- `achievement_tabs.rs` — Achievement browser category tabs
 - `challenge_menu_scene.rs` — Challenge menu list/detail view
 - `responsive.rs` — Responsive layout with 5 size tiers (TooSmall/S/M/L/XL)
-- `soulforge_scene.rs` — Soulforge enhancement overlay
+- `soulforge_scene.rs` — Soulforge enhancement overlay (delegates to submodules)
+- `soulforge_effects.rs` — Soulforge hammering/success/failure animation effects
+- `soulforge_slots.rs` — Soulforge slot selection menu
 - `chess_scene.rs`, `go_scene.rs`, `morris_scene.rs`, `gomoku_scene.rs`, `minesweeper_scene.rs`, `rune_scene.rs`, `snake_scene.rs`, `flappy_scene.rs`, `jezzball_scene.rs`, `runic_shift_scene.rs` — Minigame UIs
 - `scene_fx.rs` — Shared utilities for layered ASCII scene rendering (scene buffer, backdrop effects)
 - `zone_bg.rs` — Stylized zone background scenes with 6-layer compositing pipeline for all 11 zones
@@ -370,14 +403,26 @@ quest/
 │   ├── character/           # Character system [CLAUDE.md]
 │   │   ├── attributes.rs    # 6 RPG attributes
 │   │   ├── derived_stats.rs # Stats from attributes
+│   │   ├── calculation.rs   # Derived stats calculation engine
 │   │   ├── prestige.rs      # Prestige system
+│   │   ├── combat_bonuses.rs # Prestige combat bonuses
+│   │   ├── multipliers.rs   # Prestige multiplier calculations
+│   │   ├── prestige_actions.rs # Prestige eligibility and execution
+│   │   ├── tiers.rs         # Prestige tier definitions
 │   │   ├── manager.rs       # Character CRUD operations
 │   │   ├── persistence.rs   # JSON save/load
 │   │   ├── name_validation.rs # Name validation rules
-│   │   └── input.rs         # Character management input
+│   │   ├── input.rs         # Character input routing
+│   │   ├── creation.rs      # Character creation input
+│   │   ├── delete.rs        # Character delete input
+│   │   ├── rename.rs        # Character rename input
+│   │   └── select.rs        # Character select input
 │   ├── combat/              # Combat system [CLAUDE.md]
 │   │   ├── types.rs         # Enemy, combat state
-│   │   ├── logic.rs         # Combat orchestration
+│   │   ├── logic.rs         # Combat helper functions
+│   │   ├── orchestration.rs # update_combat() orchestrator
+│   │   ├── attacks.rs       # Attack interval calculations
+│   │   ├── enemy_generation.rs # Zone/dungeon enemy generators
 │   │   ├── player_attack.rs # Player damage pipeline
 │   │   ├── enemy_attack.rs  # Enemy attack resolution
 │   │   ├── damage.rs        # Shared damage calculations
@@ -385,11 +430,16 @@ quest/
 │   │   └── regen.rs         # HP regeneration
 │   ├── zones/               # Zone system
 │   │   ├── data.rs          # Zone definitions
-│   │   └── progression.rs   # Zone progression
+│   │   ├── progression.rs   # Zone progression
+│   │   ├── advancement.rs   # Zone/subzone advancement and travel
+│   │   ├── boss_defeat.rs   # Boss defeat handling
+│   │   └── gates.rs         # Weapon gate queries, access checks
 │   ├── dungeon/             # Dungeon system [CLAUDE.md]
 │   │   ├── types.rs         # Room types, dungeon sizes
 │   │   ├── generation.rs    # Procedural generation
-│   │   └── logic.rs         # Navigation, clearing
+│   │   ├── logic.rs         # Room clearing, key system
+│   │   ├── pathfinding.rs   # BFS-based dungeon navigation
+│   │   └── rewards.rs       # Dungeon XP, item generation, treasure rooms
 │   ├── fishing/             # Fishing system
 │   │   ├── types.rs         # Fish, phases, ranks
 │   │   ├── generation.rs    # Fish generation
@@ -411,11 +461,12 @@ quest/
 │   ├── god_items/           # God Items system
 │   │   └── types.rs         # 3 god items, passives, bonuses, helper queries
 │   ├── challenges/          # Challenge minigames [CLAUDE.md]
-│   │   ├── menu.rs          # Challenge menu
+│   │   ├── mod.rs           # Challenge menu, impl_apply_game_result! macro
+│   │   ├── menu.rs          # Challenge menu UI
 │   │   ├── chess/           # Chess minigame
 │   │   ├── go/              # Go (Territory Control)
-│   │   ├── morris/          # Nine Men's Morris
-│   │   ├── gomoku/          # Gomoku (Five in a Row)
+│   │   ├── morris/          # Nine Men's Morris (ai.rs: minimax)
+│   │   ├── gomoku/          # Gomoku (Five in a Row, ai.rs: minimax)
 │   │   ├── minesweeper/     # Trap Detection
 │   │   ├── rune/            # Rune Deciphering
 │   │   ├── snake/           # Serpent's Path (Snake)
@@ -432,6 +483,10 @@ quest/
 │   │   ├── data.rs          # Achievement database
 │   │   ├── handlers.rs      # Event handlers, check_milestones
 │   │   ├── milestones.rs    # Minigame types, threshold arrays
+│   │   ├── modal.rs         # Modal notification queue
+│   │   ├── notifications.rs # Pending notification state
+│   │   ├── stats.rs         # Achievement statistics, progress queries
+│   │   ├── unlock.rs        # Core unlock machinery
 │   │   └── persistence.rs   # Save/load
 │   ├── utils/               # Utilities
 │   │   ├── build_info.rs    # Build metadata
@@ -440,19 +495,33 @@ quest/
 │   └── ui/                  # UI components [CLAUDE.md]
 │       ├── game_common.rs   # Shared minigame layout
 │       ├── responsive.rs    # Responsive layout tiers
-│       ├── stats_panel.rs   # Character stats
+│       ├── stats_panel.rs   # Character stats (delegates to submodules)
+│       ├── stats_attributes.rs # Attribute rendering helpers
+│       ├── stats_equipment.rs  # Equipment rendering helpers
+│       ├── stats_prestige.rs   # Prestige and fishing panel helpers
 │       ├── ticker.rs        # Scrolling loot ticker
 │       ├── combat_scene.rs  # Combat view
 │       ├── combat_3d.rs     # 3D dungeon renderer
+│       ├── enemy_sprites.rs # ASCII enemy sprite templates
+│       ├── enemy_sprite_data.rs # Sprite constant data, archetype mapping
+│       ├── achievement_browser_scene.rs # Achievement browsing (delegates to submodules)
+│       ├── achievement_details.rs # Achievement detail panel
+│       ├── achievement_list.rs    # Achievement list panel
+│       ├── achievement_tabs.rs    # Achievement category tabs
+│       ├── haven_scene.rs   # Haven overlay (delegates to submodules)
+│       ├── haven_details.rs # Haven room detail panel
+│       ├── haven_tree.rs    # Haven skill tree panel
+│       ├── soulforge_scene.rs # Soulforge enhancement overlay (delegates to submodules)
+│       ├── soulforge_effects.rs # Soulforge animation effects
+│       ├── soulforge_slots.rs   # Soulforge slot selection menu
 │       ├── snake_scene.rs   # Snake UI
 │       ├── flappy_scene.rs  # Flappy Bird UI
 │       ├── jezzball_scene.rs # JezzBall UI
-│       ├── soulforge_scene.rs # Soulforge enhancement UI
 │       ├── scene_fx.rs       # Shared utilities for layered ASCII scene rendering
 │       ├── zone_bg.rs        # Stylized zone background scenes (6-layer compositing)
 │       ├── *_scene.rs       # Various game scenes
 │       └── character_*.rs   # Character management UI
-├── tests/                   # Integration tests (16 test files, 2,900+ tests)
+├── tests/                   # Integration tests (26 test files, 3,750+ tests)
 │   ├── game_loop_orchestration_test.rs  # 36 behavior-locking tests for game_tick
 │   ├── tick_integration_test.rs         # Tick module integration tests
 │   ├── zone_progression_test.rs         # Zone advancement tests

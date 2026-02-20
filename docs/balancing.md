@@ -627,7 +627,7 @@ With Haven Armory bonus: `damage * (1 + armory_percent / 100)`
 
 ### Death Mechanics
 
-- **Death to zone boss**: Resets encounter (`fighting_boss=false`, `kills_in_subzone=0`), preserves prestige
+- **Death to zone boss**: Resets encounter (`fighting_boss=false`, `kills_in_subzone=5`), only 5 more kills needed to retry. Preserves prestige
 - **Death in dungeon**: Exits dungeon, no prestige loss, dungeon progress lost
 
 ### Boss Spawn
@@ -725,15 +725,15 @@ All challenges require P1+ to discover. Discovery is random (~2hr average per ch
 
 | Challenge | Weight | ~Probability |
 |-----------|--------|--------------|
-| Rune (Rune Deciphering) | 30 | ~19% |
-| Minesweeper (Trap Detection) | 28 | ~18% |
-| Snake (Serpent's Path) | 22 | ~14% |
-| Flappy Bird (Skyward Gauntlet) | 20 | ~13% |
-| JezzBall (Containment Breach) | 18 | ~11% |
-| Gomoku (Five in a Row) | 15 | ~9% |
-| Morris (Nine Men's Morris) | 12 | ~8% |
-| Chess | 8 | ~5% |
-| Sigil Surge (Runic Shift) | 20 | ~10% |
+| Rune (Rune Deciphering) | 30 | ~17% |
+| Minesweeper (Trap Detection) | 28 | ~16% |
+| Snake (Serpent's Path) | 22 | ~12% |
+| Flappy Bird (Skyward Gauntlet) | 20 | ~11% |
+| Sigil Surge (Runic Shift) | 20 | ~11% |
+| JezzBall (Containment Breach) | 18 | ~10% |
+| Gomoku (Five in a Row) | 15 | ~8% |
+| Morris (Nine Men's Morris) | 12 | ~7% |
+| Chess | 8 | ~4% |
 | Go (Territory Control) | 7 | ~4% |
 
 ### Challenge Rewards

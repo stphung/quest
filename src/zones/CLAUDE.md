@@ -8,7 +8,10 @@ Zone and subzone progression with prestige-gated tiers, boss encounters, and the
 src/zones/
 ├── mod.rs          # Public re-exports (Zone, Subzone, ZoneProgression, BossDefeatResult)
 ├── data.rs         # Zone/subzone definitions, boss data, lookup functions
-└── progression.rs  # Progression state, kill tracking, boss defeat logic, prestige reset
+├── progression.rs  # Progression state, kill tracking, prestige reset
+├── advancement.rs  # Zone/subzone advancement logic, travel_to(), advance_to_next_subzone()
+├── boss_defeat.rs  # BossDefeatResult enum and on_boss_defeated() handler
+└── gates.rs        # boss_weapon_blocked(), zone unlock queries
 ```
 
 ## Key Types
@@ -49,7 +52,7 @@ Serializable state tracking the player's position and progress:
 - `fighting_boss: bool` -- whether a boss fight is active
 - `has_stormbreaker: bool` -- legacy flag (achievement-based check preferred)
 
-### `BossDefeatResult` (`progression.rs`)
+### `BossDefeatResult` (`boss_defeat.rs`)
 Enum returned by `on_boss_defeated()`:
 - **SubzoneComplete** -- advanced to next subzone
 - **ZoneComplete** -- completed zone, advanced to next
@@ -136,7 +139,7 @@ Infinite post-game zone unlocked by completing Zone 10:
 - **Core** (`core/tick.rs`): Calls `record_kill()` and `on_boss_defeated()` during game tick processing
 - **Core** (`core/game_logic.rs`): Enemy spawning uses zone/subzone data for stat scaling
 - **Core** (`core/game_state.rs`): `GameState` owns a `ZoneProgression` instance
-- **Combat** (`combat/types.rs`, `combat/logic.rs`): Enemy generation reads current zone, boss flag drives boss spawning
+- **Combat** (`combat/enemy_generation.rs`, `combat/orchestration.rs`): Enemy generation reads current zone, boss flag drives boss spawning
 - **Items** (`items/drops.rs`): Item level = `zone_id * 10` (Zone 1 = ilvl 10, Zone 10 = ilvl 100)
 - **Character** (`character/prestige.rs`): Prestige reset triggers `reset_for_prestige()`
 - **Achievements** (`achievements/types.rs`): `TheStormbreaker` gates Zone 10 boss, `StormsEnd` unlocked on Zone 10 completion

@@ -164,6 +164,7 @@ pub struct TickResult {
     pub achievements_changed: bool,
     pub haven_changed: bool,
     pub enhancement_changed: bool,
+    pub god_items_changed: bool,
     pub achievement_modal_ready: Vec<AchievementId>,
 }
 ```
@@ -282,8 +283,7 @@ cap = 20 + (prestige_rank x 5)
 
 ### Enemy Generation
 
-- HP: 80-120% of player max HP
-- Damage: Calibrated for 5-10 second fights
+- Stats: Static zone-based values from `ZONE_ENEMY_STATS` table in `core/constants.rs`. Each zone defines `(base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)` tuples; subzone depth adds incremental stats
 - Names: Procedurally generated from syllable combinations
 
 ---
@@ -586,7 +586,7 @@ All god items have ilvl 100, +40% XP affix, and high fixed attribute bonuses (+4
 - 0.000014 per tick (~2 hour average)
 - Requires P1+ (not in dungeon, fishing, or another minigame)
 - Haven Library bonus: up to +50%
-- Weighted distribution: 10 challenge types with weights favoring quick games (Rune 30, Minesweeper 28, Snake 22, Flappy Bird 20, Sigil Surge 20, JezzBall 18, Gomoku 15, Morris 12, Chess 8, Go 7)
+- Weighted distribution (total weight 180): 10 challenge types with weights favoring quick games (Rune 30, Minesweeper 28, Snake 22, Flappy Bird 20, Sigil Surge 20, JezzBall 18, Gomoku 15, Morris 12, Chess 8, Go 7)
 
 ### Games & AI
 
@@ -794,22 +794,26 @@ Options: Trigger Dungeon, Fishing, all 10 challenge types, Haven Discovery, Soul
 
 ### Integration Tests
 
-16 integration test files in `tests/`:
+26 integration test files in `tests/`:
 - `game_loop_orchestration_test.rs` -- 36 behavior-locking tests for game tick pipeline
 - `game_tick_behavior_test.rs` / `game_tick_supplemental_test.rs` -- Tick processing behavior
 - `tick_integration_test.rs` -- Cross-system tick integration
-- `tick_stage_coverage_test.rs` -- Tick stage coverage tests
+- `tick_stage_coverage_test.rs` / `tick_stages_coverage_test.rs` -- Tick stage coverage tests
 - `behavior_lock_fishing_dungeon_test.rs` -- Fishing/dungeon mutual exclusion
 - `prestige_cycle_test.rs` -- Prestige reset and progression
 - `zone_progression_test.rs` -- Zone advancement and gating
-- `fishing_integration_test.rs` -- Fishing session lifecycle
+- `fishing_integration_test.rs` / `fishing_core_coverage_test.rs` -- Fishing session lifecycle and coverage
 - `dungeon_completion_test.rs` -- Dungeon room clearing and completion
 - `storm_forge_test.rs` -- Stormbreaker forging chain
-- `item_pipeline_test.rs` -- Item generation and equipping
+- `item_pipeline_test.rs` / `item_combat_coverage_test.rs` -- Item generation, equipping, and combat coverage
 - `chess_integration_test.rs` -- Chess minigame
-- `enhancement_test.rs` -- Soulforge enhancement system
+- `enhancement_test.rs` / `enhancement_coverage_test.rs` -- Soulforge enhancement system
 - `god_items_test.rs` -- God items system
 - `game_loop_test.rs` -- Core game loop behavior
+- `achievement_coverage_test.rs` / `achievement_handlers_test.rs` / `achievements_expanded_test.rs` -- Achievement system coverage
+- `character_coverage_test.rs` -- Character system coverage
+- `combat_submodules_test.rs` -- Combat submodule coverage
+- `haven_dungeon_coverage_test.rs` -- Haven and dungeon coverage
 
 ---
 
@@ -933,14 +937,26 @@ quest/
 │   ├── character/           # Character system
 │   │   ├── attributes.rs    # 6 RPG attributes
 │   │   ├── derived_stats.rs # Stats from attributes
+│   │   ├── calculation.rs   # Derived stats calculation engine
 │   │   ├── prestige.rs      # Prestige system
+│   │   ├── combat_bonuses.rs # Prestige combat bonuses
+│   │   ├── multipliers.rs   # Prestige multiplier calculations
+│   │   ├── prestige_actions.rs # Prestige eligibility and execution
+│   │   ├── tiers.rs         # Prestige tier definitions
 │   │   ├── manager.rs       # Character CRUD operations
 │   │   ├── persistence.rs   # JSON save/load (extracted from manager.rs)
 │   │   ├── name_validation.rs # Character name validation rules
-│   │   └── input.rs         # Character management input
+│   │   ├── input.rs         # Character input routing
+│   │   ├── creation.rs      # Character creation input
+│   │   ├── delete.rs        # Character delete input
+│   │   ├── rename.rs        # Character rename input
+│   │   └── select.rs        # Character select input
 │   ├── combat/              # Combat system
 │   │   ├── types.rs         # Enemy, combat state
-│   │   ├── logic.rs         # Combat orchestration
+│   │   ├── logic.rs         # Combat helper functions
+│   │   ├── orchestration.rs # update_combat() orchestrator
+│   │   ├── attacks.rs       # Attack interval calculations
+│   │   ├── enemy_generation.rs # Zone/dungeon enemy generators
 │   │   ├── player_attack.rs # Player damage pipeline
 │   │   ├── enemy_attack.rs  # Enemy attack resolution
 │   │   ├── damage.rs        # Shared damage calculation, enemy death handling
@@ -948,11 +964,16 @@ quest/
 │   │   └── regen.rs         # HP regeneration after combat
 │   ├── zones/               # Zone system
 │   │   ├── data.rs          # Zone definitions
-│   │   └── progression.rs   # Zone progression
+│   │   ├── progression.rs   # Zone progression
+│   │   ├── advancement.rs   # Zone/subzone advancement and travel
+│   │   ├── boss_defeat.rs   # Boss defeat handling
+│   │   └── gates.rs         # Weapon gate queries, access checks
 │   ├── dungeon/             # Dungeon system
 │   │   ├── types.rs         # Room types, dungeon sizes (5)
 │   │   ├── generation.rs    # Procedural generation
-│   │   └── logic.rs         # Navigation, clearing
+│   │   ├── logic.rs         # Room clearing, key system
+│   │   ├── pathfinding.rs   # BFS-based dungeon navigation
+│   │   └── rewards.rs       # Dungeon XP, item generation, treasure rooms
 │   ├── fishing/             # Fishing system
 │   │   ├── types.rs         # Fish, phases, ranks
 │   │   ├── generation.rs    # Fish generation, Leviathan
@@ -971,8 +992,8 @@ quest/
 │   │   ├── menu.rs          # Challenge menu
 │   │   ├── chess/           # Chess minigame
 │   │   ├── go/              # Go (Territory Control)
-│   │   ├── morris/          # Nine Men's Morris
-│   │   ├── gomoku/          # Gomoku (Five in a Row)
+│   │   ├── morris/          # Nine Men's Morris (includes ai.rs)
+│   │   ├── gomoku/          # Gomoku (Five in a Row, includes ai.rs)
 │   │   ├── minesweeper/     # Trap Detection
 │   │   ├── rune/            # Rune Deciphering
 │   │   ├── snake/           # Serpent's Path (Snake)
@@ -995,6 +1016,10 @@ quest/
 │   │   ├── data.rs          # Achievement database
 │   │   ├── handlers.rs      # Event handlers (on_kill, on_boss_kill, etc.)
 │   │   ├── milestones.rs    # Milestone definitions and thresholds
+│   │   ├── modal.rs         # Modal notification queue (500ms accumulation window)
+│   │   ├── notifications.rs # Notification state management
+│   │   ├── stats.rs         # Achievement statistics and progress tracking
+│   │   ├── unlock.rs        # Core unlock machinery (is_unlocked, unlock, check_milestones)
 │   │   └── persistence.rs   # Save/load
 │   ├── utils/               # Utilities
 │   │   ├── build_info.rs    # Build metadata
@@ -1004,22 +1029,33 @@ quest/
 │       ├── mod.rs           # Layout coordinator
 │       ├── game_common.rs   # Shared minigame layout
 │       ├── stats_panel.rs   # Character stats
+│       ├── stats_attributes.rs # Stats panel attribute rendering
+│       ├── stats_equipment.rs # Stats panel equipment rendering
+│       ├── stats_prestige.rs # Stats panel prestige info rendering
 │       ├── ticker.rs        # Scrolling loot ticker with independent per-entry scrolling
 │       ├── combat_scene.rs  # Combat view
 │       ├── combat_3d.rs     # 3D dungeon renderer
 │       ├── combat_effects.rs # Visual effects
 │       ├── enemy_sprites.rs # ASCII enemy sprites
+│       ├── enemy_sprite_data.rs # Sprite constant data
 │       ├── dungeon_map.rs   # Dungeon minimap
 │       ├── fishing_scene.rs # Fishing UI
 │       ├── haven_scene.rs   # Haven overlay
+│       ├── haven_details.rs # Haven room detail panel
+│       ├── haven_tree.rs    # Haven skill tree panel
 │       ├── prestige_confirm.rs # Prestige dialog
 │       ├── achievement_browser_scene.rs # Achievement browser
+│       ├── achievement_details.rs # Achievement detail panel
+│       ├── achievement_list.rs # Achievement list rendering
+│       ├── achievement_tabs.rs # Achievement tab navigation
 │       ├── challenge_menu_scene.rs # Challenge menu
 │       ├── chess_scene.rs, go_scene.rs, morris_scene.rs,
 │       │   gomoku_scene.rs, minesweeper_scene.rs, rune_scene.rs,
 │       │   snake_scene.rs, flappy_scene.rs, jezzball_scene.rs,
 │       │   runic_shift_scene.rs
 │       ├── soulforge_scene.rs # Soulforge enhancement overlay
+│       ├── soulforge_effects.rs # Soulforge animation effects
+│       ├── soulforge_slots.rs # Soulforge slot selection rendering
 │       ├── help_overlay.rs   # Help overlay with keybindings
 │       ├── scene_fx.rs       # Shared utilities for layered ASCII scene rendering
 │       ├── zone_bg.rs        # Stylized zone background scenes (6-layer compositing)
@@ -1027,14 +1063,18 @@ quest/
 │       ├── throbber.rs      # Spinner animations
 │       └── character_select.rs, character_creation.rs,
 │           character_delete.rs, character_rename.rs
-├── tests/                   # 16 integration test files
+├── tests/                   # 26 integration test files
 ├── .github/workflows/       # CI/CD pipeline
 ├── scripts/                 # Quality checks (ci-checks.sh)
 ├── docs/                    # Design documents
 │   ├── system-design.md     # This file
+│   ├── core-systems.md      # Core systems design
+│   ├── secondary-systems.md # Secondary systems design
 │   ├── balancing.md         # Game balance guide
+│   ├── challenge-minigames.md # Challenge minigames design
 │   ├── decisions.md         # Design decision log
-│   └── design/              # Detailed system designs
+│   ├── infrastructure.md   # Infrastructure design
+│   └── archive/             # Original dated design documents
 ├── Makefile                 # Dev helpers
 └── CLAUDE.md                # Project-level AI guide
 ```

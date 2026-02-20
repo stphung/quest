@@ -17,7 +17,7 @@ src/challenges/newgame/
 
 Optional additional files for complex AI:
 - `mcts.rs` - Monte Carlo Tree Search (see Go)
-- `ai.rs` - Other AI implementations
+- `ai.rs` - Minimax/alpha-beta AI (see Morris, Gomoku)
 
 ### 2. Required Types (`types.rs`)
 
@@ -75,16 +75,36 @@ pub fn process_input(game: &mut NewGameGame, input: NewGameInput) {
     // Then handle normal input
 }
 
-/// Apply game result to GameState (rewards/penalties)
-pub fn apply_game_result(state: &mut GameState) {
-    // Extract result, clear active_minigame, apply rewards
-}
+/// Apply game result — use the impl_apply_game_result! macro (see below)
 
 /// Tick the game (for AI moves, timers)
 pub fn tick_game(game: &mut NewGameGame) {
     // Handle AI thinking delay, then make AI move
 }
 ```
+
+### `impl_apply_game_result!` Macro (`mod.rs`)
+
+All 10 challenge types use the `impl_apply_game_result!` macro in `mod.rs` to generate their `apply_game_result()` function. Instead of manually implementing reward logic, invoke the macro:
+
+```rust
+impl_apply_game_result! {
+    variant: NewGame;
+    result_body: |result, state, reward| {
+        use newgame::types::NewGameResult;
+        let (won, loss_message) = match result {
+            NewGameResult::Win => (true, ""),
+            NewGameResult::Loss => (false, "Defeated!"),
+        };
+        (won, loss_message)
+    }
+    game_type: "newgame";
+    icon: "\u{265F}";           // Unicode icon for combat log
+    win_message: "Victory!";
+}
+```
+
+The macro generates `apply_newgame_result(state) -> Option<MinigameWinInfo>` which extracts the game result, applies rewards via `apply_challenge_rewards()`, and emits `MinigameWinInfo` for achievement tracking.
 
 ### 4. Integrate with Menu System (`menu.rs`)
 
@@ -274,8 +294,8 @@ Winning a minigame emits a `MinigameWinInfo` (defined in `mod.rs`) with `game_ty
 | Challenge | Board | AI Type | Special Features |
 |-----------|-------|---------|------------------|
 | Chess | 8x8 | chess-engine crate | Move history, piece selection |
-| Morris | 24 points | Minimax | Mill detection, 3 phases |
-| Gomoku | 15x15 | Minimax (depth 2-5) | Win line detection |
+| Morris | 24 points | Minimax (`ai.rs`) | Mill detection, 3 phases |
+| Gomoku | 15x15 | Minimax depth 2-5 (`ai.rs`) | Win line detection |
 | Minesweeper | Variable | N/A (puzzle) | Flood fill reveal, flags |
 | Rune | 4-6 slots | N/A (puzzle) | Mastermind-style feedback |
 | Go | 9x9 | MCTS | Captures, ko rule, territory scoring |
