@@ -65,6 +65,8 @@ pub enum GameOverlay {
     LeviathanEncounter {
         encounter_number: u8,
     },
+    /// Stormglass discovery celebration modal
+    StormglassDiscovery,
     /// Quit confirmation when pending challenges exist
     QuitConfirm,
 }
@@ -81,4 +83,6 @@ pub enum InputResult {
     NeedsSaveAll,
     /// Toggle the update details expanded state.
     ToggleUpdateDetails,
+    /// Start a Chrono Surge with the given number of ticks.
+    StartChronoSurge { ticks: u64 },
 }

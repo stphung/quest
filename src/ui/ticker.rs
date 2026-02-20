@@ -17,15 +17,34 @@ use ratatui::{
 ///
 /// Each entry is independently positioned based on when it was pushed.
 /// Entries enter from the right edge and scroll left across the viewport.
-pub fn draw_ticker(frame: &mut Frame, area: Rect, ticker: &Ticker) {
+/// When `stormglass` is Some, a fixed SG balance counter is shown on the left.
+pub fn draw_ticker(frame: &mut Frame, area: Rect, ticker: &Ticker, stormglass: Option<u64>) {
     if area.height == 0 || area.width == 0 {
         return;
     }
 
-    let visible_width = area.width as usize;
-    let visible = ticker.visible_entries(visible_width);
+    // Stormglass balance prefix
+    let sg_prefix: Vec<Span<'static>> = if let Some(sg) = stormglass {
+        vec![
+            Span::styled(
+                format!("\u{1F48E}{} SG", sg),
+                Style::default()
+                    .fg(Color::Rgb(100, 180, 255))
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" \u{2502} ", Style::default().fg(Color::DarkGray)),
+        ]
+    } else {
+        vec![]
+    };
 
-    if visible.is_empty() {
+    // Calculate prefix width (character count)
+    let prefix_width: usize = sg_prefix.iter().map(|s| s.content.chars().count()).sum();
+    let ticker_width = (area.width as usize).saturating_sub(prefix_width);
+
+    let visible = ticker.visible_entries(ticker_width);
+
+    if visible.is_empty() && sg_prefix.is_empty() {
         let line = Line::from(Span::styled(
             "  Awaiting adventure...",
             Style::default().fg(Color::DarkGray),
@@ -34,21 +53,37 @@ pub fn draw_ticker(frame: &mut Frame, area: Rect, ticker: &Ticker) {
         return;
     }
 
-    // Build a viewport buffer — each cell is either a styled char or empty
-    let mut buffer: Vec<Option<(char, Style)>> = vec![None; visible_width];
+    if visible.is_empty() {
+        // Just show the SG counter with placeholder
+        let mut spans = sg_prefix;
+        spans.push(Span::styled(
+            "Awaiting adventure...",
+            Style::default().fg(Color::DarkGray),
+        ));
+        let line = Line::from(spans);
+        frame.render_widget(Paragraph::new(line), area);
+        return;
+    }
+
+    // Build a viewport buffer for the ticker portion
+    let mut buffer: Vec<Option<(char, Style)>> = vec![None; ticker_width];
 
     for (entry, pos) in &visible {
         let chars = entry_to_styled_chars(entry);
         for (i, (ch, style)) in chars.into_iter().enumerate() {
             let col = *pos + i as isize;
-            if col >= 0 && (col as usize) < visible_width {
+            if col >= 0 && (col as usize) < ticker_width {
                 buffer[col as usize] = Some((ch, style));
             }
         }
     }
 
-    let spans = buffer_to_spans(&buffer);
-    let line = Line::from(spans);
+    let ticker_spans = buffer_to_spans(&buffer);
+
+    // Combine prefix + ticker spans
+    let mut all_spans = sg_prefix;
+    all_spans.extend(ticker_spans);
+    let line = Line::from(all_spans);
     frame.render_widget(Paragraph::new(line), area);
 }
 

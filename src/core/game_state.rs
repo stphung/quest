@@ -76,12 +76,21 @@ pub struct GameState {
     /// Persistent chess stats (survives prestige, saved to disk)
     #[serde(default)]
     pub chess_stats: ChessStats,
+    /// Stormglass currency balance (character-level, saved to disk)
+    #[serde(default)]
+    pub stormglass: u64,
+    /// Whether the player has discovered Stormglass (first gear salvage)
+    #[serde(default)]
+    pub stormglass_discovered: bool,
     /// Active challenge minigame (transient, not saved)
     #[serde(skip)]
     pub active_minigame: Option<ActiveMinigame>,
     /// Session kill count (transient, not saved)
     #[serde(skip)]
     pub session_kills: u64,
+    /// When true, suppresses challenge discovery during Chrono Surge
+    #[serde(skip)]
+    pub chrono_surge_active: bool,
     /// Recent item drops for display (transient, not saved)
     #[serde(skip)]
     pub recent_drops: VecDeque<RecentDrop>,
@@ -138,6 +147,8 @@ impl GameState {
             zone_progression: ZoneProgression::new(),
             challenge_menu: ChallengeMenu::new(),
             chess_stats: ChessStats::default(),
+            stormglass: 0,
+            stormglass_discovered: false,
             active_minigame: None,
             session_kills: 0,
             recent_drops: VecDeque::with_capacity(5),
@@ -149,6 +160,7 @@ impl GameState {
             xp_rate_samples: VecDeque::new(),
             xp_this_second: 0,
             game_over_shown_at: None,
+            chrono_surge_active: false,
         }
     }
 

@@ -40,6 +40,7 @@ mod stats_attributes;
 mod stats_equipment;
 mod stats_panel;
 mod stats_prestige;
+pub mod stormglass_scene;
 mod throbber;
 pub mod ticker;
 mod zone_bg;
@@ -96,6 +97,7 @@ pub fn draw_ui_with_update(
     update_check_completed: bool,
     haven_discovered: bool,
     soulforge_discovered: bool,
+    stormglass_discovered: bool,
     achievements: &crate::achievements::Achievements,
     enhancement_levels: &[u8; 7],
 ) {
@@ -117,6 +119,7 @@ pub fn draw_ui_with_update(
                 update_check_completed,
                 haven_discovered,
                 soulforge_discovered,
+                stormglass_discovered,
                 achievements,
                 enhancement_levels,
             );
@@ -128,6 +131,7 @@ pub fn draw_ui_with_update(
                 game_state,
                 haven_discovered,
                 soulforge_discovered,
+                stormglass_discovered,
                 achievements,
             );
         }
@@ -151,6 +155,7 @@ fn draw_xl_l_layout(
     update_check_completed: bool,
     haven_discovered: bool,
     soulforge_discovered: bool,
+    stormglass_discovered: bool,
     achievements: &crate::achievements::Achievements,
     enhancement_levels: &[u8; 7],
 ) {
@@ -230,7 +235,12 @@ fn draw_xl_l_layout(
     );
 
     // Draw ticker
-    ticker::draw_ticker(frame, info_area, &game_state.ticker);
+    let sg = if game_state.stormglass_discovered {
+        Some(game_state.stormglass)
+    } else {
+        None
+    };
+    ticker::draw_ticker(frame, info_area, &game_state.ticker, sg);
 
     // Draw update drawer if expanded
     if let (Some(drawer_area), Some(info)) = (update_drawer_area, update_info) {
@@ -247,6 +257,7 @@ fn draw_xl_l_layout(
         update_check_completed,
         haven_discovered,
         soulforge_discovered,
+        stormglass_discovered,
         achievements.pending_count(),
         ctx,
     );
@@ -263,6 +274,7 @@ fn draw_m_layout(
     game_state: &GameState,
     haven_discovered: bool,
     soulforge_discovered: bool,
+    stormglass_discovered: bool,
     achievements: &crate::achievements::Achievements,
 ) {
     let area = frame.area();
@@ -305,7 +317,14 @@ fn draw_m_layout(
     idx += 1;
 
     // Event ticker
-    ticker::draw_ticker(frame, chunks[idx], &game_state.ticker);
+    {
+        let sg = if game_state.stormglass_discovered {
+            Some(game_state.stormglass)
+        } else {
+            None
+        };
+        ticker::draw_ticker(frame, chunks[idx], &game_state.ticker, sg);
+    }
     idx += 1;
 
     // Compact footer
@@ -315,6 +334,7 @@ fn draw_m_layout(
         game_state,
         haven_discovered,
         soulforge_discovered,
+        stormglass_discovered,
         achievements.pending_count(),
     );
 }
@@ -382,7 +402,14 @@ fn draw_s_layout(
     combat_scene::draw_combat_scene(frame, chunks[4], game_state, achievements, ctx);
 
     // Event ticker
-    ticker::draw_ticker(frame, chunks[5], &game_state.ticker);
+    {
+        let sg = if game_state.stormglass_discovered {
+            Some(game_state.stormglass)
+        } else {
+            None
+        };
+        ticker::draw_ticker(frame, chunks[5], &game_state.ticker, sg);
+    }
 
     // Minimal footer
     stats_panel::draw_footer_minimal(frame, chunks[6], game_state);

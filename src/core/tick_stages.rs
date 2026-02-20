@@ -85,6 +85,8 @@ pub fn process_dungeon_events<R: Rng>(
                             "Kept current gear"
                         };
                         let power = item.power();
+                        let treasure_rarity = item.rarity;
+                        let treasure_name = item.display_name.clone();
                         let msg = format!("\u{1f48e} Found: {} [{}]", item.display_name, status);
                         result.events.push(TickEvent::DungeonTreasureFound {
                             item_name: item.display_name,
@@ -94,6 +96,33 @@ pub fn process_dungeon_events<R: Rng>(
                             power,
                             equipped,
                             message: msg,
+                        });
+
+                        // Stormglass: salvage non-equipped treasure items
+                        if !equipped {
+                            let sg_amount =
+                                crate::stormglass::earning::salvage_value(treasure_rarity);
+                            state.stormglass += sg_amount;
+
+                            if !state.stormglass_discovered {
+                                state.stormglass_discovered = true;
+                                result.events.push(TickEvent::StormglassDiscovered);
+                            }
+
+                            result.events.push(TickEvent::StormglassSalvaged {
+                                item_name: treasure_name,
+                                rarity: treasure_rarity,
+                                amount: sg_amount,
+                            });
+                        }
+                    }
+
+                    // Stormglass: dungeon cache from treasure room
+                    if let Some(dungeon) = &state.active_dungeon {
+                        let cache_amount = crate::stormglass::earning::dungeon_cache(dungeon.size);
+                        state.stormglass += cache_amount;
+                        result.events.push(TickEvent::StormglassDungeonCache {
+                            amount: cache_amount,
                         });
                     }
                 }
@@ -539,7 +568,7 @@ pub(super) fn process_item_drop(
             stats.clone(),
         );
         result.events.push(TickEvent::ItemDropped {
-            item_name,
+            item_name: item_name.clone(),
             rarity,
             tier,
             ilvl,
@@ -549,6 +578,24 @@ pub(super) fn process_item_drop(
             stats,
             from_boss: was_boss,
         });
+
+        // Stormglass: salvage non-equipped items
+        if !equipped {
+            let sg_amount = crate::stormglass::earning::salvage_value(rarity);
+            state.stormglass += sg_amount;
+
+            // First salvage triggers discovery
+            if !state.stormglass_discovered {
+                state.stormglass_discovered = true;
+                result.events.push(TickEvent::StormglassDiscovered);
+            }
+
+            result.events.push(TickEvent::StormglassSalvaged {
+                item_name,
+                rarity,
+                amount: sg_amount,
+            });
+        }
     }
 }
 

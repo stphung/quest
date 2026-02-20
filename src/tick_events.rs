@@ -17,6 +17,7 @@ use ratatui::style::Color;
 pub struct TickEventFlags {
     pub haven_discovered: bool,
     pub soulforge_discovered: bool,
+    pub stormglass_discovered: bool,
 }
 
 /// Maps tick events to combat log entries and visual effects.
@@ -24,6 +25,7 @@ pub struct TickEventFlags {
 pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> TickEventFlags {
     let mut haven_discovered = false;
     let mut soulforge_discovered = false;
+    let mut stormglass_discovered = false;
     for event in events {
         match event {
             TickEvent::PlayerAttack {
@@ -475,6 +477,31 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
             TickEvent::SoulforgeDiscovered => {
                 soulforge_discovered = true;
             }
+            TickEvent::StormglassDiscovered => {
+                stormglass_discovered = true;
+            }
+            TickEvent::StormglassSalvaged {
+                item_name, amount, ..
+            } => {
+                let sg_color = Color::Rgb(100, 180, 255);
+                game_state.ticker.push(TickerEntry {
+                    icon: "\u{1F48E}",
+                    text: format!("Salvaged {} \u{2192} +{} SG", item_name, amount),
+                    color: sg_color,
+                    bold: false,
+                    segments: None,
+                });
+            }
+            TickEvent::StormglassDungeonCache { amount } => {
+                let sg_color = Color::Rgb(100, 180, 255);
+                game_state.ticker.push(TickerEntry {
+                    icon: "\u{1F48E}",
+                    text: format!("Found {} Stormglass!", amount),
+                    color: sg_color,
+                    bold: true,
+                    segments: None,
+                });
+            }
             TickEvent::LeveledUp { new_level } => {
                 game_state.ticker.push(TickerEntry {
                     icon: "\u{2B06}",
@@ -489,5 +516,6 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
     TickEventFlags {
         haven_discovered,
         soulforge_discovered,
+        stormglass_discovered,
     }
 }

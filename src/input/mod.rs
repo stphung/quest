@@ -6,6 +6,7 @@ mod haven_input;
 mod minigame_input;
 mod prestige_input;
 mod soulforge_input;
+mod stormglass_input;
 pub mod types;
 
 // Re-export all types for backward compatibility
@@ -20,12 +21,14 @@ use crate::character::prestige::can_prestige;
 use crate::core::game_state::GameState;
 use crate::enhancement;
 use crate::haven::Haven;
+use crate::stormglass::types::ExchangeUiState;
 use crate::utils::debug_menu::DebugMenu;
 use haven_input::handle_haven;
 use minigame_input::handle_minigame;
 use prestige_input::{handle_prestige_confirm, handle_vault_selection};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use soulforge_input::handle_soulforge;
+use stormglass_input::handle_stormglass_exchange;
 
 /// Main dispatcher for Game screen input. Handles the priority chain.
 #[allow(clippy::too_many_arguments)]
@@ -35,6 +38,7 @@ pub fn handle_game_input(
     haven: &mut Haven,
     haven_ui: &mut HavenUiState,
     soulforge_ui: &mut SoulforgeUiState,
+    exchange_ui: &mut ExchangeUiState,
     enhancement: &mut enhancement::EnhancementProgress,
     overlay: &mut GameOverlay,
     debug_menu: &mut DebugMenu,
@@ -94,7 +98,12 @@ pub fn handle_game_input(
         return handle_soulforge_discovery(key, overlay);
     }
 
-    // 1b. Achievement unlocked modal (blocks all other input)
+    // 1b. Stormglass discovery modal (blocks all other input)
+    if matches!(overlay, GameOverlay::StormglassDiscovery) {
+        return handle_stormglass_discovery(key, overlay);
+    }
+
+    // 1c. Achievement unlocked modal (blocks all other input)
     if matches!(overlay, GameOverlay::AchievementUnlocked { .. }) {
         return handle_achievement_unlocked(key, overlay);
     }
@@ -107,6 +116,11 @@ pub fn handle_game_input(
     // 2.5. Soulforge overlay
     if soulforge_ui.open {
         return handle_soulforge(key, soulforge_ui, enhancement, state.prestige_rank);
+    }
+
+    // 2.7. Stormglass Exchange overlay
+    if exchange_ui.open {
+        return handle_stormglass_exchange(key, exchange_ui, state);
     }
 
     // 3. Vault item selection
@@ -164,6 +178,7 @@ pub fn handle_game_input(
         haven,
         haven_ui,
         soulforge_ui,
+        exchange_ui,
         enhancement,
         overlay,
         achievements,
@@ -180,6 +195,13 @@ fn handle_haven_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> InputResu
 }
 
 fn handle_soulforge_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
+    if matches!(key.code, KeyCode::Enter | KeyCode::Esc) {
+        *overlay = GameOverlay::None;
+    }
+    InputResult::Continue
+}
+
+fn handle_stormglass_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
     if matches!(key.code, KeyCode::Enter | KeyCode::Esc) {
         *overlay = GameOverlay::None;
     }
@@ -215,6 +237,8 @@ fn handle_debug_menu(
                 *overlay = GameOverlay::HavenDiscovery;
             } else if msg == "Soulforge discovered!" {
                 *overlay = GameOverlay::SoulforgeDiscovery;
+            } else if msg == "Stormglass discovered!" {
+                *overlay = GameOverlay::StormglassDiscovery;
             }
         }
         KeyCode::Esc => debug_menu.close(),
@@ -243,6 +267,7 @@ fn handle_base_game(
     haven: &Haven,
     haven_ui: &mut HavenUiState,
     soulforge_ui: &mut SoulforgeUiState,
+    exchange_ui: &mut ExchangeUiState,
     enhancement: &enhancement::EnhancementProgress,
     overlay: &mut GameOverlay,
     achievements: &mut crate::achievements::Achievements,
@@ -281,6 +306,12 @@ fn handle_base_game(
         KeyCode::Char('s') | KeyCode::Char('S') => {
             if enhancement.discovered {
                 soulforge_ui.open();
+            }
+            InputResult::Continue
+        }
+        KeyCode::Char('g') | KeyCode::Char('G') => {
+            if state.stormglass_discovered {
+                exchange_ui.open();
             }
             InputResult::Continue
         }

@@ -5,6 +5,7 @@ use crate::core::game_state::GameState;
 use crate::enhancement;
 use crate::haven;
 use crate::input::{GameOverlay, HavenUiState, SoulforgeUiState};
+use crate::stormglass::types::{ChronoSurgeState, ChronoSurgeSummary, ExchangeUiState};
 use crate::ui;
 use crate::utils;
 use std::time::{Duration, Instant};
@@ -84,12 +85,15 @@ pub fn draw_game_overlays(
     haven: &haven::Haven,
     haven_ui: &HavenUiState,
     soulforge_ui: &SoulforgeUiState,
+    exchange_ui: &ExchangeUiState,
     enhancement: &enhancement::EnhancementProgress,
     global_achievements: &achievements::Achievements,
     debug_mode: bool,
     debug_menu: &utils::debug_menu::DebugMenu,
     last_save_instant: Option<Instant>,
     last_save_time: Option<chrono::DateTime<chrono::Local>>,
+    chrono_surge: Option<&ChronoSurgeState>,
+    chrono_summary: Option<&ChronoSurgeSummary>,
     ctx: &ui::responsive::LayoutContext,
 ) {
     let area = frame.area();
@@ -105,6 +109,9 @@ pub fn draw_game_overlays(
         }
         GameOverlay::SoulforgeDiscovery => {
             ui::soulforge_scene::render_soulforge_discovery_modal(frame, area, ctx);
+        }
+        GameOverlay::StormglassDiscovery => {
+            ui::stormglass_scene::render_stormglass_discovery_modal(frame, area, ctx);
         }
         GameOverlay::AchievementUnlocked { ref achievements } => {
             ui::achievement_browser_scene::render_achievement_unlocked_modal(
@@ -204,6 +211,21 @@ pub fn draw_game_overlays(
             state.prestige_rank,
             ctx,
         );
+    }
+
+    // Stormglass Exchange overlay
+    if exchange_ui.open {
+        ui::stormglass_scene::render_stormglass_exchange(frame, area, exchange_ui, state, ctx);
+    }
+
+    // Chrono Surge active: status banner at bottom
+    if let Some(surge) = chrono_surge {
+        ui::stormglass_scene::render_chrono_surge_banner(frame, area, surge, ctx);
+    }
+
+    // Chrono Surge summary modal
+    if let Some(summary) = chrono_summary {
+        ui::stormglass_scene::render_chrono_surge_summary(frame, area, summary, ctx);
     }
 
     // Debug indicator / save indicator
