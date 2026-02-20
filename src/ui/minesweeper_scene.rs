@@ -63,7 +63,7 @@ fn render_grid(frame: &mut Frame, area: Rect, game: &MinesweeperGame) {
             let cell = &game.grid[row][col];
             let is_cursor = game.cursor == (row, col);
 
-            let (text, color) = get_cell_display(cell, row, col);
+            let (text, color) = get_cell_display(cell);
 
             let mut style = Style::default().fg(color);
 
@@ -89,18 +89,13 @@ fn render_grid(frame: &mut Frame, area: Rect, game: &MinesweeperGame) {
 }
 
 /// Get the display text and color for a cell.
-fn get_cell_display(cell: &Cell, row: usize, col: usize) -> (&'static str, Color) {
+fn get_cell_display(cell: &Cell) -> (&'static str, Color) {
     if cell.flagged && !cell.revealed {
         return ("\u{2691} ", Color::Red);
     }
 
     if !cell.revealed {
-        let color = if (row + col).is_multiple_of(2) {
-            Color::Gray
-        } else {
-            Color::Rgb(120, 120, 130)
-        };
-        return ("\u{25a0} ", color);
+        return ("\u{25a0} ", Color::Gray);
     }
 
     // Cell is revealed
