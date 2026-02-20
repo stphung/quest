@@ -27,7 +27,7 @@ pub const DUNGEON_CACHE_LEGENDARY: u64 = 75;
 pub const SOULFORGE_CONSOLATION: [u64; 10] = [0, 0, 0, 0, 5, 10, 15, 25, 40, 75];
 
 // ── Spending ───────────────────────────────────────────────────────────
-pub const INVOKE_TRIAL_COST: u64 = 250;
+pub const INVOKE_TRIAL_COST: u64 = 3_000;
 
 // ── Chrono Surge ─────────────────────────────────────────────────────
 /// (ticks, stormglass_cost, display_label)
