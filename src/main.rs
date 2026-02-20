@@ -439,6 +439,8 @@ fn main() -> io::Result<()> {
                                     // No SG during surge — restore to pre-skip value
                                     state.stormglass = sg_before_skip;
                                     state.chrono_surge_active = false;
+                                    // Reset ticker so it starts fresh after the surge
+                                    state.ticker.clear();
                                     let surge = chrono_surge.take().unwrap();
                                     chrono_summary = Some(ChronoSurgeSummary {
                                         kills: surge.kills,
@@ -645,9 +647,9 @@ fn main() -> io::Result<()> {
                                 }
                             }
 
-                            // Apply events to UI state (combat log, ticker, visual effects)
-                            // so the game view updates in fast-forward
-                            apply_tick_events(&mut state, &tick_result.events);
+                            // Skip apply_tick_events during surge — the surge overlay
+                            // shows its own stats, and flooding the ticker with thousands
+                            // of entries breaks scroll positioning after the surge ends.
 
                             if tick_result.achievements_changed
                                 || tick_result.haven_changed
@@ -664,19 +666,6 @@ fn main() -> io::Result<()> {
                         // prevents salvage from materializing
                         state.stormglass = sg_before_batch;
 
-                        // Advance loot ticker (once per frame, not per tick)
-                        if let Ok((cols, _)) = ratatui::crossterm::terminal::size() {
-                            state.ticker.viewport_width = cols as usize;
-                        }
-                        state.ticker.tick();
-
-                        // Expire visual effects
-                        let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
-                        state
-                            .combat_state
-                            .visual_effects
-                            .retain_mut(|effect| effect.update(delta_time));
-
                         if needs_save && !debug_mode {
                             save_all(
                                 &character_manager,
@@ -691,6 +680,8 @@ fn main() -> io::Result<()> {
                         let done = chrono_surge.as_ref().unwrap().ticks_remaining == 0;
                         if done {
                             state.chrono_surge_active = false;
+                            // Reset ticker so it starts fresh after the surge
+                            state.ticker.clear();
                             let surge = chrono_surge.take().unwrap();
                             chrono_summary = Some(ChronoSurgeSummary {
                                 kills: surge.kills,

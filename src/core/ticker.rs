@@ -75,6 +75,13 @@ impl Ticker {
         }
     }
 
+    /// Clear all entries and reset scroll state.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.scroll_offset = 0.0;
+        self.current_speed = TICKER_SCROLL_SPEED;
+    }
+
     #[cfg(test)]
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
