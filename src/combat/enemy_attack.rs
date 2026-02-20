@@ -100,16 +100,15 @@ pub(crate) fn resolve_enemy_attack(
 
                     // Zone boss death: reset to subzone 1 as if just arriving
                     // Subzone boss death: 5 kills to retry in same subzone
-                    let is_zone_boss = crate::zones::get_zone(
-                        state.zone_progression.current_zone_id,
-                    )
-                    .and_then(|zone| {
-                        zone.subzones
-                            .iter()
-                            .find(|s| s.id == state.zone_progression.current_subzone_id)
-                    })
-                    .map(|sub| sub.boss.is_zone_boss)
-                    .unwrap_or(false);
+                    let is_zone_boss =
+                        crate::zones::get_zone(state.zone_progression.current_zone_id)
+                            .and_then(|zone| {
+                                zone.subzones
+                                    .iter()
+                                    .find(|s| s.id == state.zone_progression.current_subzone_id)
+                            })
+                            .map(|sub| sub.boss.is_zone_boss)
+                            .unwrap_or(false);
 
                     if is_zone_boss {
                         state.zone_progression.current_subzone_id = 1;
