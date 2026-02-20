@@ -10,6 +10,9 @@ use std::collections::HashMap;
 pub struct Haven {
     pub discovered: bool,
     pub rooms: HashMap<HavenRoomId, u8>,
+    /// Equipment slots preserved in the last vault prestige (for pre-selection).
+    #[serde(default)]
+    pub last_vault_selections: Vec<crate::items::EquipmentSlot>,
 }
 
 impl Default for Haven {
@@ -21,6 +24,7 @@ impl Default for Haven {
         Haven {
             discovered: false,
             rooms,
+            last_vault_selections: Vec::new(),
         }
     }
 }
@@ -716,5 +720,36 @@ mod tests {
         let haven = haven_with_vault_at_tier(3);
         let vault_bonus = haven.get_bonus(HavenBonusType::VaultSlots);
         assert_eq!(vault_bonus, 5.0);
+    }
+
+    // =========================================================================
+    // Vault Last Selections Tests
+    // =========================================================================
+
+    #[test]
+    fn test_last_vault_selections_default_empty() {
+        let haven = Haven::new();
+        assert!(haven.last_vault_selections.is_empty());
+    }
+
+    #[test]
+    fn test_last_vault_selections_persists_through_serde() {
+        use crate::items::EquipmentSlot;
+        let mut haven = Haven::new();
+        haven.last_vault_selections = vec![EquipmentSlot::Weapon, EquipmentSlot::Ring];
+
+        let json = serde_json::to_string(&haven).unwrap();
+        let loaded: Haven = serde_json::from_str(&json).unwrap();
+        assert_eq!(loaded.last_vault_selections.len(), 2);
+        assert_eq!(loaded.last_vault_selections[0], EquipmentSlot::Weapon);
+        assert_eq!(loaded.last_vault_selections[1], EquipmentSlot::Ring);
+    }
+
+    #[test]
+    fn test_last_vault_selections_missing_in_old_save() {
+        // Simulate loading a save file that predates the field
+        let json = r#"{"discovered":true,"rooms":{"Hearthstone":1}}"#;
+        let loaded: Haven = serde_json::from_str(json).unwrap();
+        assert!(loaded.last_vault_selections.is_empty());
     }
 }
