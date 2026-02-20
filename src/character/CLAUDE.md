@@ -6,14 +6,23 @@ Character attributes, derived stats, prestige progression, and multi-character p
 
 ```
 src/character/
-├── mod.rs             # Public re-exports
-├── attributes.rs      # 6 RPG attributes, modifiers, cap enforcement
-├── derived_stats.rs   # Combat stats calculated from attributes
-├── prestige.rs        # Prestige tiers, multipliers, tier progression
-├── manager.rs         # Character CRUD orchestration (create/delete/rename), struct definitions
-├── persistence.rs     # JSON save/load file I/O operations (extracted from manager.rs)
-├── name_validation.rs # Character name validation rules and sanitization
-└── input.rs           # Character select/create/delete/rename input handling
+├── mod.rs              # Public re-exports
+├── attributes.rs       # 6 RPG attributes, modifiers, cap enforcement
+├── derived_stats.rs    # Combat stats calculated from attributes (re-exports from calculation.rs)
+├── calculation.rs      # Derived stats calculation engine (extracted from derived_stats.rs)
+├── prestige.rs         # Re-exports from combat_bonuses.rs, tiers.rs, prestige_actions.rs
+├── combat_bonuses.rs   # PrestigeCombatBonuses struct and from_rank() (extracted from prestige.rs)
+├── multipliers.rs      # Prestige multiplier and scaling calculations
+├── prestige_actions.rs # Prestige eligibility checks and execution (can_prestige, perform_prestige)
+├── tiers.rs            # Prestige tier definitions, names, level requirements
+├── manager.rs          # Character CRUD orchestration (create/delete/rename), struct definitions
+├── persistence.rs      # JSON save/load file I/O operations (extracted from manager.rs)
+├── name_validation.rs  # Character name validation rules and sanitization
+├── input.rs            # Re-exports from creation.rs, delete.rs, rename.rs, select.rs
+├── creation.rs         # Character creation screen input handling
+├── delete.rs           # Character delete confirmation input handling
+├── rename.rs           # Character rename screen input handling
+└── select.rs           # Character select screen input handling
 ```
 
 ## Key Types
@@ -72,21 +81,22 @@ XP curve: `100 * level^1.5` (XP needed for next level)
 
 ## Prestige Flow
 
-1. Player must meet level threshold (`can_prestige()` in `prestige.rs`)
+1. Player must meet level threshold (`can_prestige()` in `prestige_actions.rs`)
 2. Confirmation dialog shown (`ui/prestige_confirm.rs`)
 3. `perform_prestige()` resets: level → 1, XP → 0, zone → first, attributes → base
 4. Preserves: prestige_rank (incremented), equipment, achievements, haven
 5. New attribute cap = 20 + (5 * new_prestige_rank)
 
-## Input Handling (`input.rs`)
+## Input Handling (`input.rs`, `creation.rs`, `delete.rs`, `rename.rs`, `select.rs`)
 
-Character management screens use a state machine:
-- `CharacterSelectState` — List, preview, navigate
-- `CharacterCreationState` — Name input with real-time validation
-- `CharacterDeleteState` — Requires typing exact name to confirm
-- `CharacterRenameState` — Name input with validation against existing names
+Each character management screen has its own module with input enum, result enum, and process function. `input.rs` re-exports all types for backward compatibility.
 
-These states are managed in `main.rs` and rendered by corresponding `ui/character_*.rs` files.
+- `select.rs` — `SelectInput`/`SelectResult`, character list navigation
+- `creation.rs` — `CreationInput`/`CreationResult`, name input with real-time validation
+- `delete.rs` — `DeleteInput`/`DeleteResult`, requires typing exact name to confirm
+- `rename.rs` — `RenameInput`/`RenameResult`, name input with validation against existing names
+
+These are rendered by corresponding `ui/character_*.rs` files.
 
 ## Patterns
 
@@ -99,7 +109,7 @@ These states are managed in `main.rs` and rendered by corresponding `ui/characte
 6. Update scoring weights in `items/scoring.rs`
 7. Update UI display in `ui/stats_panel.rs`
 
-### `PrestigeCombatBonuses` (`prestige.rs`)
+### `PrestigeCombatBonuses` (`combat_bonuses.rs`)
 
 Flat combat bonuses computed from prestige rank, applied during combat each tick:
 

@@ -6,44 +6,55 @@ Terminal UI rendering using Ratatui + Crossterm. All rendering is separated from
 
 ```
 src/ui/
-├── mod.rs                    # Main draw_ui_with_update(), layout coordinator
-├── responsive.rs             # Responsive layout: SizeTier enum, LayoutContext, size thresholds
-├── game_common.rs            # Shared minigame layout components (IMPORTANT)
-├── stats_panel.rs            # Left panel: character stats, attributes, equipment
-├── ticker.rs                 # Scrolling loot ticker with independent per-entry scrolling
-├── throbber.rs               # Spinner animations and atmospheric messages
+├── mod.rs                      # Main draw_ui_with_update(), layout coordinator
+├── responsive.rs               # Responsive layout: SizeTier enum, LayoutContext, size thresholds
+├── game_common.rs              # Shared minigame layout components (IMPORTANT)
+├── stats_panel.rs              # Left panel: layout orchestration (delegates to helpers below)
+├── stats_attributes.rs         # Attribute rendering helpers for stats panel
+├── stats_equipment.rs          # Equipment rendering helpers for stats panel
+├── stats_prestige.rs           # Prestige and fishing panel rendering helpers
+├── ticker.rs                   # Scrolling loot ticker with independent per-entry scrolling
+├── throbber.rs                 # Spinner animations and atmospheric messages
 │
-├── combat_scene.rs           # Combat view orchestration
-├── combat_3d.rs              # First-person 3D ASCII dungeon renderer
-├── combat_effects.rs         # Visual effects (damage numbers, flashes)
-├── enemy_sprites.rs          # ASCII enemy sprite templates
-├── dungeon_map.rs            # Top-down dungeon minimap with fog of war
-├── fishing_scene.rs          # Fishing UI with phase display
-├── prestige_confirm.rs       # Prestige confirmation dialog
-├── haven_scene.rs            # Haven base building overlay
-├── achievement_browser_scene.rs # Achievement browsing
-├── debug_menu_scene.rs       # Debug menu overlay
-├── help_overlay.rs           # Help/controls overlay
+├── combat_scene.rs             # Combat view orchestration
+├── combat_3d.rs                # First-person 3D ASCII dungeon renderer
+├── combat_effects.rs           # Visual effects (damage numbers, flashes)
+├── enemy_sprites.rs            # ASCII enemy sprite templates and archetype logic
+├── enemy_sprite_data.rs        # Enemy sprite constant data, archetype mapping tables, zone suffix lookups
+├── dungeon_map.rs              # Top-down dungeon minimap with fog of war
+├── fishing_scene.rs            # Fishing UI with phase display
+├── prestige_confirm.rs         # Prestige confirmation dialog
+├── haven_scene.rs              # Haven base building overlay (delegates to helpers below)
+├── haven_details.rs            # Haven room detail panel rendering
+├── haven_tree.rs               # Haven skill tree panel rendering
+├── achievement_browser_scene.rs # Achievement browsing (delegates to helpers below)
+├── achievement_details.rs      # Achievement browser detail panel and stats view
+├── achievement_list.rs         # Achievement browser list panel
+├── achievement_tabs.rs         # Achievement browser category tabs
+├── debug_menu_scene.rs         # Debug menu overlay
+├── help_overlay.rs             # Help/controls overlay
 │
-├── challenge_menu_scene.rs   # Challenge menu list/detail view
-├── chess_scene.rs            # Chess board with letter notation (K/Q/R/B/N/P)
-├── go_scene.rs               # Go board with territory display
-├── morris_scene.rs           # Nine Men's Morris with help panel
-├── gomoku_scene.rs           # Gomoku board with cursor
-├── minesweeper_scene.rs      # Minesweeper grid with game-over overlay
-├── rune_scene.rs             # Rune Deciphering with guess history
-├── flappy_scene.rs           # Flappy Bird side-scroller (cyan border, pipe obstacles, bird)
-├── snake_scene.rs            # Snake game (green border, 26×26 grid, body gradient, food)
-├── jezzball_scene.rs         # JezzBall game (containment breach, wall-building, ball physics)
-├── runic_shift_scene.rs     # Sigil Surge game (panel-matching, rune grid)
-├── soulforge_scene.rs        # Soulforge enhancement overlay
-├── scene_fx.rs               # Shared utilities for layered ASCII scene rendering
-├── zone_bg.rs                # Stylized zone background scenes (6-layer compositing, all 11 zones)
+├── challenge_menu_scene.rs     # Challenge menu list/detail view
+├── chess_scene.rs              # Chess board with letter notation (K/Q/R/B/N/P)
+├── go_scene.rs                 # Go board with territory display
+├── morris_scene.rs             # Nine Men's Morris with help panel
+├── gomoku_scene.rs             # Gomoku board with cursor
+├── minesweeper_scene.rs        # Minesweeper grid with game-over overlay
+├── rune_scene.rs               # Rune Deciphering with guess history
+├── flappy_scene.rs             # Flappy Bird side-scroller (cyan border, pipe obstacles, bird)
+├── snake_scene.rs              # Snake game (green border, 26×26 grid, body gradient, food)
+├── jezzball_scene.rs           # JezzBall game (containment breach, wall-building, ball physics)
+├── runic_shift_scene.rs        # Sigil Surge game (panel-matching, rune grid)
+├── soulforge_scene.rs          # Soulforge enhancement overlay (delegates to helpers below)
+├── soulforge_effects.rs        # Soulforge hammering/success/failure animation effects
+├── soulforge_slots.rs          # Soulforge slot selection menu
+├── scene_fx.rs                 # Shared utilities for layered ASCII scene rendering
+├── zone_bg.rs                  # Stylized zone background scenes (6-layer compositing, all 11 zones)
 │
-├── character_select.rs       # Character list with preview panel
-├── character_creation.rs     # Name input with real-time validation
-├── character_delete.rs       # Delete confirmation (type name to confirm)
-└── character_rename.rs       # Rename with validation
+├── character_select.rs         # Character list with preview panel
+├── character_creation.rs       # Name input with real-time validation
+├── character_delete.rs         # Delete confirmation (type name to confirm)
+└── character_rename.rs         # Rename with validation
 ```
 
 ## Responsive Layout (`responsive.rs`)

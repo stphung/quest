@@ -206,6 +206,9 @@ When active, a `[DEBUG]` indicator shows in the UI corner.
 12. **Trigger Sigil Surge Challenge** — Adds sigil surge to challenge menu
 13. **Trigger Haven Discovery** — Discovers Haven immediately
 14. **Trigger Soulforge Discovery** — Discovers Soulforge immediately
+15. **Forge Asprika (God Item)** — Creates and equips Asprika god item
+16. **Forge Sleipnir (God Item)** — Creates and equips Sleipnir god item
+17. **Forge Megingjord (God Item)** — Creates and equips Megingjord god item
 
 Each option calls existing generation functions to bypass the normal RNG discovery system. Useful for testing features without waiting for random events.
 
@@ -218,7 +221,7 @@ Yellow border popup overlay, centered on screen. Matches challenge menu styling.
 When `--debug` is active:
 - **Saves disabled**: File I/O (`save_character()`, `save_haven()`, `save_achievements()`) is skipped
 - **`last_save_time` always synced**: The in-memory `state.last_save_time = Utc::now().timestamp()` is updated every autosave cycle regardless of debug mode, preventing the suspension detection system from false-triggering
-- **Save signals suppressed**: `TickResult.achievements_changed`, `haven_changed`, and `enhancement_changed` flags are suppressed in `tick.rs` when `debug_mode` is true
+- **Save signals suppressed**: `TickResult.achievements_changed`, `haven_changed`, `enhancement_changed`, and `god_items_changed` flags are suppressed in `tick.rs` when `debug_mode` is true
 
 ### Suspension Detection
 

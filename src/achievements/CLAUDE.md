@@ -6,12 +6,16 @@ Account-level achievement tracking that persists across all characters. Tracks m
 
 ```
 src/achievements/
-├── mod.rs          # Public re-exports
-├── types.rs        # Data structures, AchievementId enum, Achievements state, core unlock machinery
-├── data.rs         # Static achievement definitions (ALL_ACHIEVEMENTS constant)
-├── handlers.rs     # Event handlers (on_enemy_killed, on_boss_killed, on_level_up, etc.), sync_* methods
-├── milestones.rs   # MinigameType, MinigameDifficulty enums, milestone threshold arrays (SLAYER, BOSS_HUNTER, etc.)
-└── persistence.rs  # Save/load from ~/.quest/achievements.json
+├── mod.rs            # Public re-exports
+├── types.rs          # Data structures, AchievementId enum, Achievements state struct
+├── data.rs           # Static achievement definitions (ALL_ACHIEVEMENTS constant)
+├── handlers.rs       # Event handlers (on_enemy_killed, on_boss_killed, on_level_up, etc.), sync_* methods
+├── milestones.rs     # MinigameType, MinigameDifficulty enums, milestone threshold arrays (SLAYER, BOSS_HUNTER, etc.)
+├── modal.rs          # Modal notification queue, 500ms accumulation window management
+├── notifications.rs  # Pending notification state, category-based notification counts
+├── stats.rs          # Achievement statistics, unlock percentages, progress queries, category breakdowns
+├── unlock.rs         # Core unlock machinery (is_unlocked, unlock, unlock_with_name, check_milestones)
+└── persistence.rs    # Save/load from ~/.quest/achievements.json
 ```
 
 ## Key Types

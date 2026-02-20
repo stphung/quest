@@ -188,15 +188,15 @@ This enables systematic balance validation: "does a P0 character reach Zone 2 in
 
 ## Challenge Discovery Weight Rebalance
 
-**Decision**: Rebalance challenge discovery weights from the original 6-game distribution to accommodate 9 games (adding Snake, Flappy Bird, and JezzBall).
+**Decision**: Rebalance challenge discovery weights from the original 6-game distribution to accommodate 10 games (adding Snake, Flappy Bird, JezzBall, and Sigil Surge).
 
 **Original distribution** (6 games, total weight 110):
 - Minesweeper: 30, Rune: 25, Gomoku: 20, Morris: 15, Chess: 10, Go: 10
 
-**New distribution** (9 games, total weight 160):
-- Rune: 30, Minesweeper: 28, Snake: 22, Flappy Bird: 20, JezzBall: 18, Gomoku: 15, Morris: 12, Chess: 8, Go: 7
+**New distribution** (10 games, total weight 180):
+- Rune: 30, Minesweeper: 28, Snake: 22, Flappy Bird: 20, Sigil Surge: 20, JezzBall: 18, Gomoku: 15, Morris: 12, Chess: 8, Go: 7
 
-**Rationale**: The rebalance follows the principle that quick, accessible games should appear more frequently. Action games (Snake, Flappy Bird, JezzBall) are placed in the middle tier since they offer moderate play sessions. Strategy games (Chess, Go) were reduced slightly to make room for the new entries while maintaining their "rare discovery" feel. Rune was promoted to the top weight as the fastest challenge (~2 minutes).
+**Rationale**: The rebalance follows the principle that quick, accessible games should appear more frequently. Action games (Snake, Flappy Bird, JezzBall, Sigil Surge) are placed in the middle tier since they offer moderate play sessions. Strategy games (Chess, Go) were reduced slightly to make room for the new entries while maintaining their "rare discovery" feel. Rune was promoted to the top weight as the fastest challenge (~2 minutes).
 
 ## Phase 2 Large Module Refactoring (PRs #288, #291, #292)
 
@@ -217,4 +217,33 @@ This enables systematic balance validation: "does a P0 character reach Zone 2 in
 
 **Pattern**: Move focused logic into sibling files within the same module, keep the original file as a thin orchestrator, and re-export all public symbols from `mod.rs` for backward compatibility. No public API changes.
 
-**Result**: All 1302 tests pass. No changes to module public APIs. Callers unaffected.
+**Result**: All tests pass. No changes to module public APIs. Callers unaffected.
+
+## Phase 3 Large Module Refactoring (PR #294)
+
+**Decision**: Extract ~23 additional submodules from 10 files across character, combat, zones, dungeon, achievements, and UI modules.
+
+**What changed**:
+- `character/prestige.rs` split into `prestige.rs`, `combat_bonuses.rs`, `multipliers.rs`, `prestige_actions.rs`, `tiers.rs`
+- `character/derived_stats.rs` extracted `calculation.rs` for the stats calculation engine
+- `character/input.rs` split into `input.rs` (router), `creation.rs`, `delete.rs`, `rename.rs`, `select.rs`
+- `combat/logic.rs` extracted `orchestration.rs` (update_combat), `attacks.rs` (intervals), `enemy_generation.rs` (zone/dungeon generators)
+- `zones/progression.rs` extracted `advancement.rs`, `boss_defeat.rs`, `gates.rs`
+- `dungeon/logic.rs` extracted `pathfinding.rs`, `rewards.rs`
+- `achievements/types.rs` extracted `modal.rs`, `notifications.rs`, `stats.rs`, `unlock.rs`
+- UI modules extracted rendering submodules: `stats_attributes.rs`, `stats_equipment.rs`, `stats_prestige.rs`, `haven_details.rs`, `haven_tree.rs`, `achievement_details.rs`, `achievement_list.rs`, `achievement_tabs.rs`, `soulforge_effects.rs`, `soulforge_slots.rs`, `enemy_sprite_data.rs`
+
+**Why**: Continuation of Phase 2 refactoring. Remaining large files still exceeded maintainability thresholds. Same pattern: extract focused logic into sibling files, keep original as thin orchestrator, re-export all public symbols.
+
+**Result**: All 3,754 tests pass. No changes to module public APIs. Callers unaffected.
+
+## PR #300: Challenge Macro and Final Submodule Extractions
+
+**Decision**: Introduce `impl_apply_game_result!` macro and extract remaining AI submodules.
+
+**What changed**:
+- Added `impl_apply_game_result!` macro in `src/challenges/mod.rs` to standardize reward application across all 10 challenge minigames
+- Extracted `morris/ai.rs` and `gomoku/ai.rs` as separate AI submodules
+- Extracted `combat/enemy_generation.rs` for zone/dungeon enemy generators
+
+**Why**: The reward application code was duplicated across all challenge modules with minor variations. The macro eliminates this duplication and ensures consistent behavior. AI extraction follows the same submodule pattern established in Phases 2 and 3.
