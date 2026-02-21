@@ -168,19 +168,19 @@ const LEVIATHAN_REQUIRED_ENCOUNTERS: u8 = 10;
 const LEVIATHAN_CATCH_CHANCE: f64 = 0.25;
 
 /// Progressive encounter chances for the Storm Leviathan hunt.
-/// The beast learns and becomes harder to find with each encounter.
-/// Total of 10 encounters needed, taking roughly a month of casual play.
+/// Narrative arc: elusive opening, the beast grows bold mid-hunt, tightening finale.
+/// ~498 expected legendaries total (~14-20 hours with Haven, ~35-40 without).
 const LEVIATHAN_ENCOUNTER_CHANCES: [f64; 10] = [
-    0.08,   // Encounter 1: 8%   - "Ripples"
-    0.06,   // Encounter 2: 6%   - "The Shadow"
-    0.05,   // Encounter 3: 5%   - "Emergence"
-    0.04,   // Encounter 4: 4%   - "Known"
-    0.03,   // Encounter 5: 3%   - "First Strike"
-    0.02,   // Encounter 6: 2%   - "Fury"
-    0.015,  // Encounter 7: 1.5% - "Blood in Water"
-    0.01,   // Encounter 8: 1%   - "The Long Night"
-    0.005,  // Encounter 9: 0.5% - "Exhaustion"
-    0.0025, // Encounter 10: 0.25% - "Legend"
+    0.05,  // Encounter 1: 5%   - "Ripples"
+    0.03,  // Encounter 2: 3%   - "The Shadow"
+    0.04,  // Encounter 3: 4%   - "Emergence"
+    0.05,  // Encounter 4: 5%   - "Known"
+    0.04,  // Encounter 5: 4%   - "First Strike"
+    0.03,  // Encounter 6: 3%   - "Fury"
+    0.02,  // Encounter 7: 2%   - "Blood in Water"
+    0.015, // Encounter 8: 1.5% - "The Long Night"
+    0.01,  // Encounter 9: 1%   - "Exhaustion"
+    0.008, // Encounter 10: 0.8% - "Legend"
 ];
 
 /// Result of a Storm Leviathan roll during fishing.
@@ -527,18 +527,38 @@ mod tests {
     // ==================== Storm Leviathan Tests ====================
 
     #[test]
-    fn test_leviathan_encounter_chances_decreasing() {
-        // Each encounter chance should be less than or equal to the previous
-        for i in 1..LEVIATHAN_ENCOUNTER_CHANCES.len() {
+    fn test_leviathan_encounter_chances_narrative_arc() {
+        // All chances must be valid probabilities
+        for (i, chance) in LEVIATHAN_ENCOUNTER_CHANCES.iter().enumerate() {
             assert!(
-                LEVIATHAN_ENCOUNTER_CHANCES[i] <= LEVIATHAN_ENCOUNTER_CHANCES[i - 1],
-                "Encounter {} chance ({}) should be <= encounter {} chance ({})",
+                *chance > 0.0 && *chance <= 1.0,
+                "Encounter {} chance {} should be between 0 and 1",
+                i + 1,
+                chance
+            );
+        }
+
+        // Narrative arc: encounters 3-4 should rise (beast grows bold)
+        const { assert!(LEVIATHAN_ENCOUNTER_CHANCES[2] > LEVIATHAN_ENCOUNTER_CHANCES[1]) };
+        const { assert!(LEVIATHAN_ENCOUNTER_CHANCES[3] > LEVIATHAN_ENCOUNTER_CHANCES[2]) };
+
+        // Finale: encounters 5-10 should be strictly decreasing
+        for i in 5..LEVIATHAN_ENCOUNTER_CHANCES.len() {
+            assert!(
+                LEVIATHAN_ENCOUNTER_CHANCES[i] < LEVIATHAN_ENCOUNTER_CHANCES[i - 1],
+                "Encounter {} chance ({}) should be < encounter {} chance ({}) in finale",
                 i + 1,
                 LEVIATHAN_ENCOUNTER_CHANCES[i],
                 i,
                 LEVIATHAN_ENCOUNTER_CHANCES[i - 1]
             );
         }
+
+        // Last encounter should still be a meaningful chance (not vanishingly small)
+        assert!(
+            *LEVIATHAN_ENCOUNTER_CHANCES.last().unwrap() >= 0.005,
+            "Final encounter chance should be >= 0.5%"
+        );
     }
 
     #[test]
