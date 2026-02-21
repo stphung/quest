@@ -46,7 +46,13 @@ pub fn draw_stats_panel(
             draw_prestige_info(frame, chunks[1], game_state, achievements);
             draw_fishing_panel(frame, chunks[2], game_state, achievements);
             draw_attributes_compact(frame, chunks[3], game_state);
-            draw_equipment_names_only(frame, chunks[4], game_state, enhancement_levels);
+            draw_equipment_names_only(
+                frame,
+                chunks[4],
+                game_state,
+                enhancement_levels,
+                &game_state.storm_sigils,
+            );
         }
         _ => {}
     }
