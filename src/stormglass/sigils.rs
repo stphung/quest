@@ -260,7 +260,7 @@ pub struct StormSigils {
 impl StormSigils {
     pub fn new() -> Self {
         Self {
-            slots_unlocked: 1, // Slot 1 available immediately
+            slots_unlocked: 0, // All slots start locked
             sigils: vec![None; MAX_SIGIL_SLOTS],
         }
     }
@@ -499,9 +499,9 @@ mod tests {
     }
 
     #[test]
-    fn test_storm_sigils_new_has_one_slot() {
+    fn test_storm_sigils_new_has_zero_slots() {
         let sigils = StormSigils::new();
-        assert_eq!(sigils.slots_unlocked, 1);
+        assert_eq!(sigils.slots_unlocked, 0);
         assert_eq!(sigils.sigils.len(), MAX_SIGIL_SLOTS);
         assert_eq!(sigils.inscribed_count(), 0);
     }
@@ -568,7 +568,10 @@ mod tests {
     #[test]
     fn test_next_unlock_cost() {
         let mut sigils = StormSigils::new();
-        // 1 slot unlocked, next is slot index 1 → 50k
+        // 0 slots unlocked, next is slot index 0 → 25k
+        assert_eq!(sigils.next_unlock_cost(), Some(25_000));
+
+        sigils.slots_unlocked = 1;
         assert_eq!(sigils.next_unlock_cost(), Some(50_000));
 
         sigils.slots_unlocked = 2;
@@ -664,7 +667,7 @@ mod tests {
     #[test]
     fn test_storm_sigils_default() {
         let sigils = StormSigils::default();
-        assert_eq!(sigils.slots_unlocked, 1);
+        assert_eq!(sigils.slots_unlocked, 0);
         assert_eq!(sigils.sigils.len(), MAX_SIGIL_SLOTS);
     }
 

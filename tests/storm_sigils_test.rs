@@ -261,9 +261,9 @@ fn test_sigil_bonuses_empty_returns_zeros() {
 // ── StormSigils::new() ─────────────────────────────────────────────────
 
 #[test]
-fn test_storm_sigils_new_has_one_slot_unlocked() {
+fn test_storm_sigils_new_has_zero_slots_unlocked() {
     let sigils = StormSigils::new();
-    assert_eq!(sigils.slots_unlocked, 1);
+    assert_eq!(sigils.slots_unlocked, 0);
     assert_eq!(sigils.sigils.len(), MAX_SIGIL_SLOTS);
     assert_eq!(sigils.inscribed_count(), 0);
     for slot in &sigils.sigils {
@@ -379,7 +379,10 @@ fn test_slot_unlock_costs_match_design() {
 fn test_next_unlock_cost_progression() {
     let mut sigils = StormSigils::new();
 
-    // 1 slot unlocked → next costs 50k (index 1)
+    // 0 slots unlocked → next costs 25k (index 0)
+    assert_eq!(sigils.next_unlock_cost(), Some(25_000));
+
+    sigils.slots_unlocked = 1;
     assert_eq!(sigils.next_unlock_cost(), Some(50_000));
 
     sigils.slots_unlocked = 2;

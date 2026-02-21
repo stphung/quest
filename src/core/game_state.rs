@@ -560,15 +560,15 @@ mod tests {
         assert_eq!(loaded.fishing.rank, 1);
         assert_eq!(loaded.zone_progression.current_zone_id, 1);
         assert_eq!(loaded.chess_stats.games_played, 0);
-        // storm_sigils should default to 1 slot unlocked, no sigils inscribed
-        assert_eq!(loaded.storm_sigils.slots_unlocked, 1);
+        // storm_sigils should default to 0 slots unlocked, no sigils inscribed
+        assert_eq!(loaded.storm_sigils.slots_unlocked, 0);
         assert_eq!(loaded.storm_sigils.inscribed_count(), 0);
     }
 
     #[test]
     fn test_storm_sigils_initialized_in_new() {
         let gs = GameState::new("Sigil Hero".to_string(), 0);
-        assert_eq!(gs.storm_sigils.slots_unlocked, 1);
+        assert_eq!(gs.storm_sigils.slots_unlocked, 0);
         assert_eq!(gs.storm_sigils.sigils.len(), 5);
         assert_eq!(gs.storm_sigils.inscribed_count(), 0);
     }

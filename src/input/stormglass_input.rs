@@ -237,9 +237,11 @@ fn handle_sigils_list(
         KeyCode::Enter => {
             let slot = exchange_ui.sigil_selected_slot;
             if slot >= sigils.slots_unlocked as usize {
-                // Locked slot (next unlockable) — go to unlock confirm
-                if sigils.next_unlock_cost().is_some() {
-                    exchange_ui.phase = ExchangePhase::SigilUnlockConfirm;
+                // Locked slot (next unlockable) — go to unlock confirm (requires SG)
+                if let Some(cost) = sigils.next_unlock_cost() {
+                    if state.stormglass >= cost {
+                        exchange_ui.phase = ExchangePhase::SigilUnlockConfirm;
+                    }
                 }
             } else if sigils.sigils[slot].is_some() {
                 // Inscribed slot — reroll (requires SG)
