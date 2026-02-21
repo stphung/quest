@@ -135,15 +135,17 @@ pub fn render_stormglass_exchange(
         }
         ExchangePhase::ChronoSurge => render_chrono_surge_select(frame, area, exchange_ui, state),
         ExchangePhase::SigilsList => render_sigils_list(frame, area, exchange_ui, state),
-        // Storm Sigils sub-phases — stubs, implemented in Tasks 5-6
-        ExchangePhase::SigilUnlockConfirm
-        | ExchangePhase::SigilInscribeConfirm
-        | ExchangePhase::SigilRerollConfirm
-        | ExchangePhase::SigilPick
-        | ExchangePhase::SigilForfeitConfirm
-        | ExchangePhase::SigilResult => {
-            render_sigils_stub(frame, area, exchange_ui);
+        ExchangePhase::SigilUnlockConfirm => render_sigil_unlock_confirm(frame, area, state),
+        ExchangePhase::SigilInscribeConfirm => render_sigil_inscribe_confirm(frame, area, state),
+        ExchangePhase::SigilRerollConfirm => {
+            render_sigil_reroll_confirm(frame, area, exchange_ui, state)
         }
+        ExchangePhase::SigilPick => render_sigil_pick(frame, area, exchange_ui),
+        ExchangePhase::SigilForfeitConfirm => {
+            render_sigil_pick(frame, area, exchange_ui);
+            render_sigil_forfeit_confirm(frame, area);
+        }
+        ExchangePhase::SigilResult => render_sigil_result(frame, area, exchange_ui),
     }
 }
 
@@ -1042,8 +1044,8 @@ fn render_sigils_list(
     }
 }
 
-/// Stub renderer for Storm Sigils phases (replaced by Tasks 5-6).
-fn render_sigils_stub(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiState) {
+/// Render the unlock confirmation dialog.
+fn render_sigil_unlock_confirm(frame: &mut Frame, area: Rect, state: &GameState) {
     let overlay_width = 52u16.min(area.width.saturating_sub(4));
     let overlay_height = 14u16.min(area.height.saturating_sub(2));
     let x = area.x + (area.width.saturating_sub(overlay_width)) / 2;
@@ -1052,20 +1054,9 @@ fn render_sigils_stub(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiSta
 
     frame.render_widget(Clear, overlay_area);
 
-    let phase_name = match exchange_ui.phase {
-        ExchangePhase::SigilsList => "Sigils List",
-        ExchangePhase::SigilUnlockConfirm => "Unlock Confirm",
-        ExchangePhase::SigilInscribeConfirm => "Inscribe Confirm",
-        ExchangePhase::SigilRerollConfirm => "Reroll Confirm",
-        ExchangePhase::SigilPick => "Pick Sigil",
-        ExchangePhase::SigilForfeitConfirm => "Forfeit Confirm",
-        ExchangePhase::SigilResult => "Sigil Result",
-        _ => "Storm Sigils",
-    };
-
     let block = Block::default()
         .title(Line::from(Span::styled(
-            format!(" \u{1F48E} {} \u{1F48E} ", phase_name),
+            " \u{1F48E} Unlock Sigil Slot? \u{1F48E} ",
             Style::default()
                 .fg(ELECTRIC_BLUE)
                 .add_modifier(Modifier::BOLD),
@@ -1087,13 +1078,594 @@ fn render_sigils_stub(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiSta
     let millis = current_millis();
     paint_storm_backdrop(&mut buffer, millis, &StormBackdropParams::normal());
 
-    let mid = (h as i32) / 2;
-    clear_row_chars(&mut buffer, mid);
-    put_text_centered(&mut buffer, mid, w, "Coming soon...", Color::DarkGray);
+    clear_row_chars(&mut buffer, 1);
+    clear_row_chars(&mut buffer, 2);
+    clear_row_chars(&mut buffer, 4);
+    clear_row_chars(&mut buffer, 5);
+    clear_row_chars(&mut buffer, 6);
+    clear_row_chars(&mut buffer, 8);
+    clear_row_chars(&mut buffer, (h as i32) - 1);
+
+    let cost = state.storm_sigils.next_unlock_cost().unwrap_or(0);
+    let balance = state.stormglass;
+    let after = balance.saturating_sub(cost);
+
+    put_text(
+        &mut buffer,
+        4,
+        4,
+        &format!("Balance:  {} SG", balance),
+        Color::White,
+    );
+    put_text(
+        &mut buffer,
+        5,
+        4,
+        &format!("Cost:    -{} SG", cost),
+        Color::LightRed,
+    );
+    put_text(
+        &mut buffer,
+        6,
+        4,
+        &format!("After:    {} SG", after),
+        ELECTRIC_BLUE,
+    );
+
+    put_text_centered(
+        &mut buffer,
+        8,
+        w,
+        "Unlock the next sigil slot?",
+        Color::DarkGray,
+    );
 
     let help_row = (h as i32) - 1;
-    clear_row_chars(&mut buffer, help_row);
-    put_text_centered(&mut buffer, help_row, w, "[Esc] Back", Color::DarkGray);
+    let help_y_col = 4i32;
+    put_text(&mut buffer, help_row, help_y_col, "[", Color::DarkGray);
+    put_text(&mut buffer, help_row, help_y_col + 1, "Y", Color::Green);
+    put_text(
+        &mut buffer,
+        help_row,
+        help_y_col + 2,
+        "] Unlock  [",
+        Color::DarkGray,
+    );
+    put_text(&mut buffer, help_row, help_y_col + 13, "N", Color::LightRed);
+    put_text(
+        &mut buffer,
+        help_row,
+        help_y_col + 14,
+        "] Cancel",
+        Color::DarkGray,
+    );
+
+    render_buffer(frame, inner, &buffer);
+
+    // Flavor text
+    let pulse_t = ((millis as f64 / 2000.0).sin() * 0.5 + 0.5).clamp(0.0, 1.0);
+    let flavor_rgb = lerp_rgb((100, 140, 200), (150, 200, 255), pulse_t);
+    let flavor_fg = Color::Rgb(flavor_rgb.0, flavor_rgb.1, flavor_rgb.2);
+    if h > 2 {
+        let flavor_area = Rect::new(inner.x, inner.y + 1, inner.width, 2);
+        let flavor = Paragraph::new(Span::styled(
+            "A new sigil slot awaits within the storm.",
+            Style::default()
+                .fg(flavor_fg)
+                .add_modifier(Modifier::ITALIC),
+        ))
+        .alignment(Alignment::Center)
+        .wrap(ratatui::widgets::Wrap { trim: true });
+        frame.render_widget(flavor, flavor_area);
+    }
+}
+
+/// Render the inscribe confirmation dialog.
+fn render_sigil_inscribe_confirm(frame: &mut Frame, area: Rect, state: &GameState) {
+    let overlay_width = 52u16.min(area.width.saturating_sub(4));
+    let overlay_height = 14u16.min(area.height.saturating_sub(2));
+    let x = area.x + (area.width.saturating_sub(overlay_width)) / 2;
+    let y = area.y + (area.height.saturating_sub(overlay_height)) / 2;
+    let overlay_area = Rect::new(x, y, overlay_width, overlay_height);
+
+    frame.render_widget(Clear, overlay_area);
+
+    let block = Block::default()
+        .title(Line::from(Span::styled(
+            " \u{1F48E} Inscribe Sigil? \u{1F48E} ",
+            Style::default()
+                .fg(ELECTRIC_BLUE)
+                .add_modifier(Modifier::BOLD),
+        )))
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(ELECTRIC_BLUE));
+
+    let inner = block.inner(overlay_area);
+    frame.render_widget(block, overlay_area);
+
+    let w = inner.width as usize;
+    let h = inner.height as usize;
+    if w == 0 || h == 0 {
+        return;
+    }
+
+    let mut buffer = vec![vec![SceneCell::default(); w]; h];
+    let millis = current_millis();
+    paint_storm_backdrop(&mut buffer, millis, &StormBackdropParams::normal());
+
+    clear_row_chars(&mut buffer, 1);
+    clear_row_chars(&mut buffer, 2);
+    clear_row_chars(&mut buffer, 4);
+    clear_row_chars(&mut buffer, 5);
+    clear_row_chars(&mut buffer, 6);
+    clear_row_chars(&mut buffer, 8);
+    clear_row_chars(&mut buffer, (h as i32) - 1);
+
+    let cost = crate::stormglass::sigils::INSCRIBE_COST;
+    let balance = state.stormglass;
+    let after = balance.saturating_sub(cost);
+
+    put_text(
+        &mut buffer,
+        4,
+        4,
+        &format!("Balance:  {} SG", balance),
+        Color::White,
+    );
+    put_text(
+        &mut buffer,
+        5,
+        4,
+        &format!("Cost:    -{} SG", cost),
+        Color::LightRed,
+    );
+    put_text(
+        &mut buffer,
+        6,
+        4,
+        &format!("After:    {} SG", after),
+        ELECTRIC_BLUE,
+    );
+
+    put_text_centered(
+        &mut buffer,
+        8,
+        w,
+        "You will choose one of three random sigils.",
+        Color::DarkGray,
+    );
+
+    let help_row = (h as i32) - 1;
+    let help_y_col = 4i32;
+    put_text(&mut buffer, help_row, help_y_col, "[", Color::DarkGray);
+    put_text(&mut buffer, help_row, help_y_col + 1, "Y", Color::Green);
+    put_text(
+        &mut buffer,
+        help_row,
+        help_y_col + 2,
+        "] Inscribe  [",
+        Color::DarkGray,
+    );
+    put_text(&mut buffer, help_row, help_y_col + 15, "N", Color::LightRed);
+    put_text(
+        &mut buffer,
+        help_row,
+        help_y_col + 16,
+        "] Cancel",
+        Color::DarkGray,
+    );
+
+    render_buffer(frame, inner, &buffer);
+
+    let pulse_t = ((millis as f64 / 2000.0).sin() * 0.5 + 0.5).clamp(0.0, 1.0);
+    let flavor_rgb = lerp_rgb((100, 140, 200), (150, 200, 255), pulse_t);
+    let flavor_fg = Color::Rgb(flavor_rgb.0, flavor_rgb.1, flavor_rgb.2);
+    if h > 2 {
+        let flavor_area = Rect::new(inner.x, inner.y + 1, inner.width, 2);
+        let flavor = Paragraph::new(Span::styled(
+            "The storm fractures. Three sigils will emerge.",
+            Style::default()
+                .fg(flavor_fg)
+                .add_modifier(Modifier::ITALIC),
+        ))
+        .alignment(Alignment::Center)
+        .wrap(ratatui::widgets::Wrap { trim: true });
+        frame.render_widget(flavor, flavor_area);
+    }
+}
+
+/// Render the reroll confirmation dialog.
+fn render_sigil_reroll_confirm(
+    frame: &mut Frame,
+    area: Rect,
+    exchange_ui: &ExchangeUiState,
+    state: &GameState,
+) {
+    let overlay_width = 52u16.min(area.width.saturating_sub(4));
+    let overlay_height = 14u16.min(area.height.saturating_sub(2));
+    let x = area.x + (area.width.saturating_sub(overlay_width)) / 2;
+    let y = area.y + (area.height.saturating_sub(overlay_height)) / 2;
+    let overlay_area = Rect::new(x, y, overlay_width, overlay_height);
+
+    frame.render_widget(Clear, overlay_area);
+
+    let block = Block::default()
+        .title(Line::from(Span::styled(
+            " \u{1F48E} Reroll Sigil? \u{1F48E} ",
+            Style::default()
+                .fg(ELECTRIC_BLUE)
+                .add_modifier(Modifier::BOLD),
+        )))
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(ELECTRIC_BLUE));
+
+    let inner = block.inner(overlay_area);
+    frame.render_widget(block, overlay_area);
+
+    let w = inner.width as usize;
+    let h = inner.height as usize;
+    if w == 0 || h == 0 {
+        return;
+    }
+
+    let mut buffer = vec![vec![SceneCell::default(); w]; h];
+    let millis = current_millis();
+    paint_storm_backdrop(&mut buffer, millis, &StormBackdropParams::normal());
+
+    clear_row_chars(&mut buffer, 1);
+    clear_row_chars(&mut buffer, 2);
+    clear_row_chars(&mut buffer, 4);
+    clear_row_chars(&mut buffer, 5);
+    clear_row_chars(&mut buffer, 6);
+    clear_row_chars(&mut buffer, 8);
+    clear_row_chars(&mut buffer, 9);
+    clear_row_chars(&mut buffer, (h as i32) - 1);
+
+    let cost = crate::stormglass::sigils::INSCRIBE_COST;
+    let balance = state.stormglass;
+    let after = balance.saturating_sub(cost);
+
+    put_text(
+        &mut buffer,
+        4,
+        4,
+        &format!("Balance:  {} SG", balance),
+        Color::White,
+    );
+    put_text(
+        &mut buffer,
+        5,
+        4,
+        &format!("Cost:    -{} SG", cost),
+        Color::LightRed,
+    );
+    put_text(
+        &mut buffer,
+        6,
+        4,
+        &format!("After:    {} SG", after),
+        ELECTRIC_BLUE,
+    );
+
+    // Show current sigil being destroyed
+    let slot = exchange_ui.sigil_target_slot;
+    if let Some(sigil) = &state.storm_sigils.sigils[slot] {
+        let current_text = format!(
+            "Destroying: {} {}",
+            sigil.effect.sigil_name(),
+            sigil.effect.format_value(sigil.value)
+        );
+        put_text_centered(&mut buffer, 8, w, &current_text, Color::LightRed);
+    }
+    put_text_centered(
+        &mut buffer,
+        9,
+        w,
+        "Current sigil will be lost forever.",
+        Color::DarkGray,
+    );
+
+    let help_row = (h as i32) - 1;
+    let help_y_col = 4i32;
+    put_text(&mut buffer, help_row, help_y_col, "[", Color::DarkGray);
+    put_text(&mut buffer, help_row, help_y_col + 1, "Y", Color::Green);
+    put_text(
+        &mut buffer,
+        help_row,
+        help_y_col + 2,
+        "] Reroll  [",
+        Color::DarkGray,
+    );
+    put_text(&mut buffer, help_row, help_y_col + 13, "N", Color::LightRed);
+    put_text(
+        &mut buffer,
+        help_row,
+        help_y_col + 14,
+        "] Cancel",
+        Color::DarkGray,
+    );
+
+    render_buffer(frame, inner, &buffer);
+
+    let pulse_t = ((millis as f64 / 2000.0).sin() * 0.5 + 0.5).clamp(0.0, 1.0);
+    let flavor_rgb = lerp_rgb((100, 140, 200), (150, 200, 255), pulse_t);
+    let flavor_fg = Color::Rgb(flavor_rgb.0, flavor_rgb.1, flavor_rgb.2);
+    if h > 2 {
+        let flavor_area = Rect::new(inner.x, inner.y + 1, inner.width, 2);
+        let flavor = Paragraph::new(Span::styled(
+            "The old sigil shatters as the storm reshapes.",
+            Style::default()
+                .fg(flavor_fg)
+                .add_modifier(Modifier::ITALIC),
+        ))
+        .alignment(Alignment::Center)
+        .wrap(ratatui::widgets::Wrap { trim: true });
+        frame.render_widget(flavor, flavor_area);
+    }
+}
+
+/// Render the pick-1-of-3 sigil selection screen.
+fn render_sigil_pick(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiState) {
+    let overlay_width = 52u16.min(area.width.saturating_sub(4));
+    let overlay_height = 14u16.min(area.height.saturating_sub(2));
+    let x = area.x + (area.width.saturating_sub(overlay_width)) / 2;
+    let y = area.y + (area.height.saturating_sub(overlay_height)) / 2;
+    let overlay_area = Rect::new(x, y, overlay_width, overlay_height);
+
+    frame.render_widget(Clear, overlay_area);
+
+    let block = Block::default()
+        .title(Line::from(Span::styled(
+            " \u{1F48E} Choose a Sigil \u{1F48E} ",
+            Style::default()
+                .fg(ELECTRIC_BLUE)
+                .add_modifier(Modifier::BOLD),
+        )))
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(ELECTRIC_BLUE));
+
+    let inner = block.inner(overlay_area);
+    frame.render_widget(block, overlay_area);
+
+    let w = inner.width as usize;
+    let h = inner.height as usize;
+    if w == 0 || h == 0 {
+        return;
+    }
+
+    let mut buffer = vec![vec![SceneCell::default(); w]; h];
+    let millis = current_millis();
+    paint_storm_backdrop(&mut buffer, millis, &StormBackdropParams::normal());
+
+    clear_row_chars(&mut buffer, 1);
+    clear_row_chars(&mut buffer, 2);
+    for i in 0..3 {
+        clear_row_chars(&mut buffer, 4 + i);
+    }
+    clear_row_chars(&mut buffer, (h as i32) - 1);
+
+    // 3 sigil choices
+    let choice_start_row = 4i32;
+    for (i, choice) in exchange_ui.sigil_choices.iter().enumerate() {
+        let row = choice_start_row + i as i32;
+        if row >= h as i32 {
+            break;
+        }
+        let is_selected = i == exchange_ui.sigil_pick_selected;
+
+        let mut col = 1i32;
+        if is_selected {
+            put_text(&mut buffer, row, col, "> ", Color::Yellow);
+        }
+        col += 2;
+
+        if let Some(sigil) = choice {
+            // Effect value
+            let value_str = sigil.effect.format_value(sigil.value);
+            put_text(&mut buffer, row, col, &value_str, Color::White);
+            col += value_str.len() as i32 + 2;
+
+            // Grade with color
+            let grade_str = sigil.grade.label();
+            let grade_fg = sigil_grade_color(sigil.grade);
+            let mut grade_style = Style::default().fg(grade_fg);
+            if sigil.grade.is_plus() {
+                grade_style = grade_style.add_modifier(Modifier::BOLD);
+            } else if sigil.grade.is_minus() {
+                grade_style = grade_style.add_modifier(Modifier::DIM);
+            }
+            // Put grade text with style
+            for (j, ch) in grade_str.chars().enumerate() {
+                if (col + j as i32) >= 0 && ((col + j as i32) as usize) < w {
+                    let cell = &mut buffer[row as usize][(col + j as i32) as usize];
+                    cell.ch = ch;
+                    cell.fg = grade_style.fg.unwrap_or(Color::White);
+                }
+            }
+
+            // Right-aligned range info
+            let (min, max) = sigil.effect.range();
+            let range_str = format!("(range: {:.0}-{:.0}%)", min, max);
+            let range_col = (w as i32) - range_str.len() as i32 - 1;
+            put_text(&mut buffer, row, range_col, &range_str, Color::DarkGray);
+        }
+
+        // Selected row highlight
+        if is_selected {
+            let highlight_bg = Color::Rgb(15, 25, 55);
+            if (row as usize) < h {
+                for cell in buffer[row as usize].iter_mut() {
+                    cell.bg = highlight_bg;
+                }
+            }
+        }
+    }
+
+    // Help row
+    let help_row = (h as i32) - 1;
+    put_text_centered(
+        &mut buffer,
+        help_row,
+        w,
+        "[\u{2191}\u{2193}] Select  [Enter] Inscribe  [Esc] Forfeit",
+        Color::DarkGray,
+    );
+
+    render_buffer(frame, inner, &buffer);
+
+    // Flavor text
+    let pulse_t = ((millis as f64 / 2000.0).sin() * 0.5 + 0.5).clamp(0.0, 1.0);
+    let flavor_rgb = lerp_rgb((100, 140, 200), (150, 200, 255), pulse_t);
+    let flavor_fg = Color::Rgb(flavor_rgb.0, flavor_rgb.1, flavor_rgb.2);
+    if h > 2 {
+        let flavor_area = Rect::new(inner.x, inner.y + 1, inner.width, 2);
+        let flavor = Paragraph::new(Span::styled(
+            "The storm fractures. Three sigils emerge.",
+            Style::default()
+                .fg(flavor_fg)
+                .add_modifier(Modifier::ITALIC),
+        ))
+        .alignment(Alignment::Center)
+        .wrap(ratatui::widgets::Wrap { trim: true });
+        frame.render_widget(flavor, flavor_area);
+    }
+}
+
+/// Render the forfeit confirmation overlay (shown on top of pick screen).
+fn render_sigil_forfeit_confirm(frame: &mut Frame, area: Rect) {
+    let modal_width = 42u16.min(area.width.saturating_sub(4));
+    let modal_height = 8u16.min(area.height.saturating_sub(2));
+    let x = area.x + (area.width.saturating_sub(modal_width)) / 2;
+    let y = area.y + (area.height.saturating_sub(modal_height)) / 2;
+    let modal_area = Rect::new(x, y, modal_width, modal_height);
+
+    frame.render_widget(Clear, modal_area);
+
+    let block = Block::default()
+        .title(Line::from(Span::styled(
+            " Abandon Sigil? ",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )))
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Yellow));
+
+    let inner = block.inner(modal_area);
+    frame.render_widget(block, modal_area);
+
+    let text = Paragraph::new(vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            "25,000 SG already spent.",
+            Style::default().fg(Color::Yellow),
+        )),
+        Line::from(Span::styled(
+            "The Stormglass cannot be reclaimed.",
+            Style::default().fg(Color::White),
+        )),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("[", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Enter",
+                Style::default()
+                    .fg(Color::LightRed)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("] Leave  [", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Esc",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("] Stay", Style::default().fg(Color::DarkGray)),
+        ]),
+    ])
+    .alignment(Alignment::Center);
+    frame.render_widget(text, inner);
+}
+
+/// Render the sigil result screen after inscribing.
+fn render_sigil_result(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiState) {
+    let overlay_width = 52u16.min(area.width.saturating_sub(4));
+    let overlay_height = 14u16.min(area.height.saturating_sub(2));
+    let x = area.x + (area.width.saturating_sub(overlay_width)) / 2;
+    let y = area.y + (area.height.saturating_sub(overlay_height)) / 2;
+    let overlay_area = Rect::new(x, y, overlay_width, overlay_height);
+
+    frame.render_widget(Clear, overlay_area);
+
+    let block = Block::default()
+        .title(Line::from(Span::styled(
+            " \u{1F48E} Sigil Inscribed! \u{1F48E} ",
+            Style::default()
+                .fg(ELECTRIC_BLUE)
+                .add_modifier(Modifier::BOLD),
+        )))
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(ELECTRIC_BLUE));
+
+    let inner = block.inner(overlay_area);
+    frame.render_widget(block, overlay_area);
+
+    let w = inner.width as usize;
+    let h = inner.height as usize;
+    if w == 0 || h == 0 {
+        return;
+    }
+
+    let mut buffer = vec![vec![SceneCell::default(); w]; h];
+    let millis = current_millis();
+    paint_storm_backdrop(&mut buffer, millis, &StormBackdropParams::normal());
+
+    for i in 0..h {
+        clear_row_chars(&mut buffer, i as i32);
+    }
+
+    if let Some(sigil) = &exchange_ui.sigil_result {
+        // Sigil name centered
+        let name = sigil.effect.sigil_name();
+        let grade_fg = sigil_grade_color(sigil.grade);
+        put_text_centered(&mut buffer, 3, w, name, grade_fg);
+
+        // Value centered
+        let value_str = sigil.effect.format_value(sigil.value);
+        put_text_centered(&mut buffer, 5, w, &value_str, Color::White);
+
+        // Grade centered with color
+        let grade_str = sigil.grade.label();
+        let grade_col = ((w as i32) - grade_str.len() as i32) / 2;
+        for (j, ch) in grade_str.chars().enumerate() {
+            let col = grade_col + j as i32;
+            if col >= 0 && (col as usize) < w {
+                let cell = &mut buffer[7][col as usize];
+                cell.ch = ch;
+                cell.fg = grade_fg;
+            }
+        }
+
+        // Range info
+        let (min, max) = sigil.effect.range();
+        let range_str = format!("Range: {:.0}-{:.0}%", min, max);
+        put_text_centered(&mut buffer, 9, w, &range_str, Color::DarkGray);
+    }
+
+    // Help
+    let help_row = (h as i32) - 1;
+    put_text_centered(
+        &mut buffer,
+        help_row,
+        w,
+        "[Enter] Continue",
+        Color::DarkGray,
+    );
 
     render_buffer(frame, inner, &buffer);
 }

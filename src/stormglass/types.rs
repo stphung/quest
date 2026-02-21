@@ -47,19 +47,13 @@ pub enum ExchangePhase {
     InvokeTrial,
     InvokeTrialForfeitConfirm,
     ChronoSurge,
-    // Storm Sigils phases (constructed incrementally by Tasks 4-6)
+    // Storm Sigils phases
     SigilsList,
-    #[allow(dead_code)]
     SigilUnlockConfirm,
-    #[allow(dead_code)]
     SigilInscribeConfirm,
-    #[allow(dead_code)]
     SigilRerollConfirm,
-    #[allow(dead_code)]
     SigilPick,
-    #[allow(dead_code)]
     SigilForfeitConfirm,
-    #[allow(dead_code)]
     SigilResult,
 }
 
