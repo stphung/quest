@@ -134,6 +134,16 @@ pub fn render_stormglass_exchange(
             render_invoke_trial_forfeit_confirm(frame, area);
         }
         ExchangePhase::ChronoSurge => render_chrono_surge_select(frame, area, exchange_ui, state),
+        // Storm Sigils phases — stubs, implemented in Tasks 4-6
+        ExchangePhase::SigilsList
+        | ExchangePhase::SigilUnlockConfirm
+        | ExchangePhase::SigilInscribeConfirm
+        | ExchangePhase::SigilRerollConfirm
+        | ExchangePhase::SigilPick
+        | ExchangePhase::SigilForfeitConfirm
+        | ExchangePhase::SigilResult => {
+            render_sigils_stub(frame, area, exchange_ui);
+        }
     }
 }
 
@@ -191,13 +201,14 @@ fn render_exchange_menu(
     clear_row_chars(&mut buffer, (h as i32) - 1); // help
 
     // Menu items (rows 4-6)
-    let items: [(String, String, bool); 2] = [
+    let items: [(String, String, bool); 3] = [
         (
             "Invoke Trial".to_string(),
             format!("{} SG", INVOKE_TRIAL_COST),
             state.stormglass >= INVOKE_TRIAL_COST,
         ),
         ("Chrono Surge".to_string(), ">>>".to_string(), true),
+        ("Storm Sigils".to_string(), ">>>".to_string(), true),
     ];
 
     let menu_start_row = 4i32;
@@ -277,7 +288,8 @@ fn render_exchange_menu(
     if h > 9 {
         let desc = match exchange_ui.selected_item {
             0 => "Spend Stormglass to unlock a choice of three challenges.",
-            _ => "Bend time itself. Earn XP and loot, but no Stormglass.",
+            1 => "Bend time itself. Earn XP and loot, but no Stormglass.",
+            _ => "Inscribe sigils of power onto your soul. Permanent bonuses.",
         };
         let desc_area = Rect::new(inner.x, inner.y + 8, inner.width, 2);
         let desc_widget = Paragraph::new(Span::styled(
@@ -824,6 +836,62 @@ pub fn render_chrono_surge_summary(
         "[Enter] Continue",
         Color::DarkGray,
     );
+
+    render_buffer(frame, inner, &buffer);
+}
+
+/// Stub renderer for Storm Sigils phases (replaced by Tasks 4-6).
+fn render_sigils_stub(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiState) {
+    let overlay_width = 52u16.min(area.width.saturating_sub(4));
+    let overlay_height = 14u16.min(area.height.saturating_sub(2));
+    let x = area.x + (area.width.saturating_sub(overlay_width)) / 2;
+    let y = area.y + (area.height.saturating_sub(overlay_height)) / 2;
+    let overlay_area = Rect::new(x, y, overlay_width, overlay_height);
+
+    frame.render_widget(Clear, overlay_area);
+
+    let phase_name = match exchange_ui.phase {
+        ExchangePhase::SigilsList => "Sigils List",
+        ExchangePhase::SigilUnlockConfirm => "Unlock Confirm",
+        ExchangePhase::SigilInscribeConfirm => "Inscribe Confirm",
+        ExchangePhase::SigilRerollConfirm => "Reroll Confirm",
+        ExchangePhase::SigilPick => "Pick Sigil",
+        ExchangePhase::SigilForfeitConfirm => "Forfeit Confirm",
+        ExchangePhase::SigilResult => "Sigil Result",
+        _ => "Storm Sigils",
+    };
+
+    let block = Block::default()
+        .title(Line::from(Span::styled(
+            format!(" \u{1F48E} {} \u{1F48E} ", phase_name),
+            Style::default()
+                .fg(ELECTRIC_BLUE)
+                .add_modifier(Modifier::BOLD),
+        )))
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(ELECTRIC_BLUE));
+
+    let inner = block.inner(overlay_area);
+    frame.render_widget(block, overlay_area);
+
+    let w = inner.width as usize;
+    let h = inner.height as usize;
+    if w == 0 || h == 0 {
+        return;
+    }
+
+    let mut buffer = vec![vec![SceneCell::default(); w]; h];
+    let millis = current_millis();
+    paint_storm_backdrop(&mut buffer, millis, &StormBackdropParams::normal());
+
+    let mid = (h as i32) / 2;
+    clear_row_chars(&mut buffer, mid);
+    put_text_centered(&mut buffer, mid, w, "Coming soon...", Color::DarkGray);
+
+    let help_row = (h as i32) - 1;
+    clear_row_chars(&mut buffer, help_row);
+    put_text_centered(&mut buffer, help_row, w, "[Esc] Back", Color::DarkGray);
 
     render_buffer(frame, inner, &buffer);
 }

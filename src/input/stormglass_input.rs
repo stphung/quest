@@ -23,6 +23,19 @@ pub fn handle_stormglass_exchange(
             handle_invoke_trial_forfeit_confirm(key, exchange_ui)
         }
         ExchangePhase::ChronoSurge => handle_chrono_surge_select(key, exchange_ui, state),
+        // Storm Sigils phases — stubs for now, implemented in Tasks 4-6
+        ExchangePhase::SigilsList
+        | ExchangePhase::SigilUnlockConfirm
+        | ExchangePhase::SigilInscribeConfirm
+        | ExchangePhase::SigilRerollConfirm
+        | ExchangePhase::SigilPick
+        | ExchangePhase::SigilForfeitConfirm
+        | ExchangePhase::SigilResult => {
+            if key.code == KeyCode::Esc {
+                exchange_ui.phase = ExchangePhase::Menu;
+            }
+            InputResult::Continue
+        }
     }
 }
 
@@ -60,6 +73,11 @@ fn handle_menu(
                     // Chrono Surge — enter duration selection
                     exchange_ui.surge_selected = 0;
                     exchange_ui.phase = ExchangePhase::ChronoSurge;
+                }
+                2 => {
+                    // Storm Sigils — enter sigils list
+                    exchange_ui.sigil_selected_slot = 0;
+                    exchange_ui.phase = ExchangePhase::SigilsList;
                 }
                 _ => {}
             }
