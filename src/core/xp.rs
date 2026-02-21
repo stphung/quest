@@ -1,7 +1,7 @@
 use super::constants::*;
 use super::game_state::GameState;
 use crate::character::attributes::AttributeType;
-use rand::RngExt;
+use rand::{Rng, RngExt};
 
 /// Calculates the XP required to reach the next level
 pub fn xp_for_next_level(level: u32) -> u64 {
@@ -22,8 +22,10 @@ pub fn xp_gain_per_tick(prestige_rank: u32, wis_modifier: i32, cha_modifier: i32
 }
 
 /// Distributes 3 attribute points randomly among non-capped attributes
-pub fn distribute_level_up_points(state: &mut GameState) -> Vec<AttributeType> {
-    let mut rng = rand::rng();
+pub fn distribute_level_up_points<R: Rng>(
+    rng: &mut R,
+    state: &mut GameState,
+) -> Vec<AttributeType> {
     let cap = state.get_attribute_cap();
     let mut increased = Vec::new();
 
@@ -49,7 +51,11 @@ pub fn distribute_level_up_points(state: &mut GameState) -> Vec<AttributeType> {
 
 /// Applies XP to the character and processes any level-ups
 /// Returns (number of level-ups, attributes increased)
-pub fn apply_tick_xp(state: &mut GameState, xp_gain: f64) -> (u32, Vec<AttributeType>) {
+pub fn apply_tick_xp<R: Rng>(
+    rng: &mut R,
+    state: &mut GameState,
+    xp_gain: f64,
+) -> (u32, Vec<AttributeType>) {
     state.xp_this_second += xp_gain as u64;
     state.character_xp += xp_gain as u64;
     state.combat_seconds_this_tick = true;
@@ -65,7 +71,7 @@ pub fn apply_tick_xp(state: &mut GameState, xp_gain: f64) -> (u32, Vec<Attribute
             state.character_level += 1;
             levelups += 1;
 
-            let increased = distribute_level_up_points(state);
+            let increased = distribute_level_up_points(rng, state);
             all_increased.extend(increased);
 
             // Mark derived stats as needing recalculation on next tick
@@ -80,8 +86,12 @@ pub fn apply_tick_xp(state: &mut GameState, xp_gain: f64) -> (u32, Vec<Attribute
 
 /// Calculates XP bonus from killing an enemy
 /// `haven_xp_gain_percent` is the Training Yard bonus (0.0 if not built)
-pub fn combat_kill_xp(passive_xp_rate: f64, haven_xp_gain_percent: f64) -> u64 {
-    let ticks = rand::rng().random_range(COMBAT_XP_MIN_TICKS..=COMBAT_XP_MAX_TICKS);
+pub fn combat_kill_xp<R: Rng>(
+    rng: &mut R,
+    passive_xp_rate: f64,
+    haven_xp_gain_percent: f64,
+) -> u64 {
+    let ticks = rng.random_range(COMBAT_XP_MIN_TICKS..=COMBAT_XP_MAX_TICKS);
     let base_xp = passive_xp_rate * ticks as f64;
     // Apply Haven Training Yard bonus
     (base_xp * (1.0 + haven_xp_gain_percent / 100.0)) as u64
@@ -90,6 +100,12 @@ pub fn combat_kill_xp(passive_xp_rate: f64, haven_xp_gain_percent: f64) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    fn seeded_rng() -> ChaCha8Rng {
+        ChaCha8Rng::seed_from_u64(42)
+    }
 
     #[test]
     fn test_xp_for_next_level() {
@@ -121,8 +137,9 @@ mod tests {
 
     #[test]
     fn test_distribute_level_up_points() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
-        let increased = distribute_level_up_points(&mut state);
+        let increased = distribute_level_up_points(&mut rng, &mut state);
 
         // Should distribute 3 points
         assert_eq!(increased.len(), 3);
@@ -137,6 +154,7 @@ mod tests {
 
     #[test]
     fn test_distribute_respects_caps() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
 
         // Set all attributes to cap - 1 (prestige 0 = cap 20)
@@ -144,7 +162,7 @@ mod tests {
             state.attributes.set(attr, 19);
         }
 
-        let increased = distribute_level_up_points(&mut state);
+        let increased = distribute_level_up_points(&mut rng, &mut state);
         assert_eq!(increased.len(), 3);
 
         // All should be at cap now (20)
@@ -155,8 +173,9 @@ mod tests {
 
     #[test]
     fn test_apply_tick_xp_no_levelup() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
-        let (levelups, increased) = apply_tick_xp(&mut state, 50.0);
+        let (levelups, increased) = apply_tick_xp(&mut rng, &mut state, 50.0);
 
         assert_eq!(levelups, 0);
         assert_eq!(increased.len(), 0);
@@ -166,8 +185,9 @@ mod tests {
 
     #[test]
     fn test_apply_tick_xp_single_levelup() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
-        let (levelups, increased) = apply_tick_xp(&mut state, 100.0);
+        let (levelups, increased) = apply_tick_xp(&mut rng, &mut state, 100.0);
 
         assert_eq!(levelups, 1);
         assert_eq!(increased.len(), 3);
@@ -177,11 +197,12 @@ mod tests {
 
     #[test]
     fn test_apply_tick_xp_multiple_levelups() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
 
         // Give enough XP for multiple level ups
         // Level 1->2: 100, Level 2->3: 282, Total: 382
-        let (levelups, increased) = apply_tick_xp(&mut state, 400.0);
+        let (levelups, increased) = apply_tick_xp(&mut rng, &mut state, 400.0);
 
         assert_eq!(levelups, 2);
         assert_eq!(increased.len(), 6); // 3 points per level * 2 levels
@@ -190,19 +211,21 @@ mod tests {
 
     #[test]
     fn test_combat_kill_xp() {
-        let xp = combat_kill_xp(1.0, 0.0);
+        let mut rng = seeded_rng();
+        let xp = combat_kill_xp(&mut rng, 1.0, 0.0);
         assert!((200..=400).contains(&xp));
     }
 
     #[test]
     fn test_combat_kill_xp_with_haven_bonus() {
+        let mut rng = seeded_rng();
         let mut total_no_bonus = 0u64;
         let mut total_with_bonus = 0u64;
         let trials = 1000;
 
         for _ in 0..trials {
-            total_no_bonus += combat_kill_xp(1.0, 0.0);
-            total_with_bonus += combat_kill_xp(1.0, 30.0);
+            total_no_bonus += combat_kill_xp(&mut rng, 1.0, 0.0);
+            total_with_bonus += combat_kill_xp(&mut rng, 1.0, 30.0);
         }
 
         let avg_no_bonus = total_no_bonus as f64 / trials as f64;
@@ -236,13 +259,14 @@ mod tests {
 
     #[test]
     fn test_distribute_when_all_at_cap() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
 
         for attr in AttributeType::all() {
             state.attributes.set(attr, 20);
         }
 
-        let increased = distribute_level_up_points(&mut state);
+        let increased = distribute_level_up_points(&mut rng, &mut state);
         assert!(increased.len() < 3);
     }
 
@@ -325,6 +349,7 @@ mod tests {
 
     #[test]
     fn test_distribute_when_all_at_cap_returns_empty() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let cap = state.get_attribute_cap();
 
@@ -332,7 +357,7 @@ mod tests {
             state.attributes.set(attr, cap);
         }
 
-        let increased = distribute_level_up_points(&mut state);
+        let increased = distribute_level_up_points(&mut rng, &mut state);
         assert!(
             increased.is_empty(),
             "Should distribute zero points when all attributes at cap"
@@ -345,6 +370,7 @@ mod tests {
 
     #[test]
     fn test_distribute_when_only_one_below_cap() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let cap = state.get_attribute_cap();
 
@@ -353,7 +379,7 @@ mod tests {
         }
         state.attributes.set(AttributeType::Strength, cap - 3);
 
-        let increased = distribute_level_up_points(&mut state);
+        let increased = distribute_level_up_points(&mut rng, &mut state);
         assert_eq!(increased.len(), 3);
 
         for attr in &increased {
@@ -364,6 +390,7 @@ mod tests {
 
     #[test]
     fn test_distribute_with_high_prestige_cap() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         state.prestige_rank = 10;
         let cap = state.get_attribute_cap();
@@ -373,7 +400,7 @@ mod tests {
             state.attributes.set(attr, 69);
         }
 
-        let increased = distribute_level_up_points(&mut state);
+        let increased = distribute_level_up_points(&mut rng, &mut state);
         assert_eq!(increased.len(), 3);
 
         for attr in &increased {
@@ -383,11 +410,12 @@ mod tests {
 
     #[test]
     fn test_distribute_with_p20_cap() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         state.prestige_rank = 20;
         assert_eq!(state.get_attribute_cap(), 120);
 
-        let increased = distribute_level_up_points(&mut state);
+        let increased = distribute_level_up_points(&mut rng, &mut state);
         assert_eq!(increased.len(), 3);
     }
 }

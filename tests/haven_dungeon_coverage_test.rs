@@ -8,6 +8,16 @@ use quest::haven::types::{Haven, HavenBonuses};
 use quest::haven::{tier_cost, HavenRoomId};
 use quest::items::Rarity;
 use quest::AchievementId;
+use rand::SeedableRng;
+use rand_chacha::ChaCha8Rng;
+
+fn seeded_rng() -> ChaCha8Rng {
+    ChaCha8Rng::seed_from_u64(42)
+}
+
+fn test_rng() -> ChaCha8Rng {
+    ChaCha8Rng::seed_from_u64(42)
+}
 
 // =========================================================================
 // Haven Room Definitions Tests
@@ -348,41 +358,45 @@ fn test_all_array_contains_no_duplicates() {
 
 #[test]
 fn test_boss_xp_reward_within_range_small() {
-    // calculate_boss_xp_reward uses thread_rng, so we can only check range
+    let mut rng = test_rng();
     for _ in 0..20 {
-        let xp = quest::dungeon::calculate_boss_xp_reward(DungeonSize::Small);
+        let xp = quest::dungeon::calculate_boss_xp_reward(&mut rng, DungeonSize::Small);
         assert!((1000..=1500).contains(&xp), "Small XP {} out of range", xp);
     }
 }
 
 #[test]
 fn test_boss_xp_reward_within_range_medium() {
+    let mut rng = test_rng();
     for _ in 0..20 {
-        let xp = quest::dungeon::calculate_boss_xp_reward(DungeonSize::Medium);
+        let xp = quest::dungeon::calculate_boss_xp_reward(&mut rng, DungeonSize::Medium);
         assert!((2000..=3000).contains(&xp), "Medium XP {} out of range", xp);
     }
 }
 
 #[test]
 fn test_boss_xp_reward_within_range_large() {
+    let mut rng = test_rng();
     for _ in 0..20 {
-        let xp = quest::dungeon::calculate_boss_xp_reward(DungeonSize::Large);
+        let xp = quest::dungeon::calculate_boss_xp_reward(&mut rng, DungeonSize::Large);
         assert!((4000..=6000).contains(&xp), "Large XP {} out of range", xp);
     }
 }
 
 #[test]
 fn test_boss_xp_reward_within_range_epic() {
+    let mut rng = test_rng();
     for _ in 0..20 {
-        let xp = quest::dungeon::calculate_boss_xp_reward(DungeonSize::Epic);
+        let xp = quest::dungeon::calculate_boss_xp_reward(&mut rng, DungeonSize::Epic);
         assert!((8000..=12000).contains(&xp), "Epic XP {} out of range", xp);
     }
 }
 
 #[test]
 fn test_boss_xp_reward_within_range_legendary() {
+    let mut rng = test_rng();
     for _ in 0..20 {
-        let xp = quest::dungeon::calculate_boss_xp_reward(DungeonSize::Legendary);
+        let xp = quest::dungeon::calculate_boss_xp_reward(&mut rng, DungeonSize::Legendary);
         assert!(
             (15000..=25000).contains(&xp),
             "Legendary XP {} out of range",
@@ -393,13 +407,14 @@ fn test_boss_xp_reward_within_range_legendary() {
 
 #[test]
 fn test_boss_xp_reward_scales_with_size() {
+    let mut rng = test_rng();
     // Larger dungeons should give more XP on average
     let small_avg: u64 = (0..50)
-        .map(|_| quest::dungeon::calculate_boss_xp_reward(DungeonSize::Small))
+        .map(|_| quest::dungeon::calculate_boss_xp_reward(&mut rng, DungeonSize::Small))
         .sum::<u64>()
         / 50;
     let epic_avg: u64 = (0..50)
-        .map(|_| quest::dungeon::calculate_boss_xp_reward(DungeonSize::Epic))
+        .map(|_| quest::dungeon::calculate_boss_xp_reward(&mut rng, DungeonSize::Epic))
         .sum::<u64>()
         / 50;
     assert!(
@@ -412,16 +427,18 @@ fn test_boss_xp_reward_scales_with_size() {
 
 #[test]
 fn test_generate_treasure_item_returns_valid_item() {
-    let item = quest::dungeon::generate_treasure_item(0, 1, 0, 0.0);
+    let mut rng = test_rng();
+    let item = quest::dungeon::generate_treasure_item(&mut rng, 0, 1, 0, 0.0);
     assert!(!item.base_name.is_empty());
     assert!(item.ilvl > 0);
 }
 
 #[test]
 fn test_generate_treasure_item_zone_scaling() {
+    let mut rng = test_rng();
     // Higher zone should produce higher ilvl items
-    let item_z1 = quest::dungeon::generate_treasure_item(0, 1, 0, 0.0);
-    let item_z10 = quest::dungeon::generate_treasure_item(0, 10, 0, 0.0);
+    let item_z1 = quest::dungeon::generate_treasure_item(&mut rng, 0, 1, 0, 0.0);
+    let item_z10 = quest::dungeon::generate_treasure_item(&mut rng, 0, 10, 0, 0.0);
     assert!(
         item_z10.ilvl > item_z1.ilvl,
         "Zone 10 ilvl {} should exceed zone 1 ilvl {}",
@@ -432,10 +449,11 @@ fn test_generate_treasure_item_zone_scaling() {
 
 #[test]
 fn test_generate_treasure_item_rarity_boost() {
+    let mut rng = test_rng();
     // With maximum rarity boost, items should tend toward higher rarity
     let mut high_rarity_count = 0;
     for _ in 0..100 {
-        let item = quest::dungeon::generate_treasure_item(0, 5, 4, 0.0);
+        let item = quest::dungeon::generate_treasure_item(&mut rng, 0, 5, 4, 0.0);
         if matches!(
             item.rarity,
             Rarity::Epic | Rarity::Legendary | Rarity::Mythic
@@ -453,6 +471,7 @@ fn test_generate_treasure_item_rarity_boost() {
 
 #[test]
 fn test_on_treasure_room_entered_without_dungeon() {
+    let mut rng = seeded_rng();
     use quest::core::GameState;
 
     let mut state = GameState::new("TestHero".to_string(), chrono::Utc::now().timestamp());
@@ -460,7 +479,7 @@ fn test_on_treasure_room_entered_without_dungeon() {
     assert!(state.active_dungeon.is_none());
 
     // Should still return Some (generates item using default rarity boost)
-    let result = quest::dungeon::on_treasure_room_entered(&mut state, 0.0);
+    let result = quest::dungeon::on_treasure_room_entered(&mut rng, &mut state, 0.0);
     assert!(result.is_some());
     let (item, _equipped) = result.unwrap();
     assert!(!item.base_name.is_empty());
@@ -468,12 +487,13 @@ fn test_on_treasure_room_entered_without_dungeon() {
 
 #[test]
 fn test_on_treasure_room_entered_with_dungeon() {
+    let mut rng = seeded_rng();
     use quest::core::GameState;
 
     let mut state = GameState::new("TestHero".to_string(), chrono::Utc::now().timestamp());
     state.active_dungeon = Some(Dungeon::new(DungeonSize::Epic));
 
-    let result = quest::dungeon::on_treasure_room_entered(&mut state, 0.0);
+    let result = quest::dungeon::on_treasure_room_entered(&mut rng, &mut state, 0.0);
     assert!(result.is_some());
     let (item, _equipped) = result.unwrap();
     assert!(!item.base_name.is_empty());
@@ -510,15 +530,16 @@ fn test_add_dungeon_xp_without_dungeon_is_noop() {
 
 #[test]
 fn test_on_treasure_room_entered_collects_items() {
+    let mut rng = seeded_rng();
     use quest::core::GameState;
 
     let mut state = GameState::new("TestHero".to_string(), chrono::Utc::now().timestamp());
     state.active_dungeon = Some(Dungeon::new(DungeonSize::Medium));
 
     // Enter multiple treasure rooms
-    quest::dungeon::on_treasure_room_entered(&mut state, 0.0);
-    quest::dungeon::on_treasure_room_entered(&mut state, 0.0);
-    quest::dungeon::on_treasure_room_entered(&mut state, 0.0);
+    quest::dungeon::on_treasure_room_entered(&mut rng, &mut state, 0.0);
+    quest::dungeon::on_treasure_room_entered(&mut rng, &mut state, 0.0);
+    quest::dungeon::on_treasure_room_entered(&mut rng, &mut state, 0.0);
 
     let dungeon = state.active_dungeon.as_ref().unwrap();
     assert_eq!(dungeon.collected_items.len(), 3);

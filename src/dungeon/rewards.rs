@@ -4,13 +4,12 @@ use crate::core::game_state::GameState;
 use crate::items::{
     generate_item, ilvl_for_zone, roll_random_slot, roll_rarity_for_mob, Item, Rarity,
 };
-use rand::RngExt;
+use rand::{Rng, RngExt};
 
 use super::types::DungeonSize;
 
 /// Calculates the XP reward for defeating a dungeon boss
-pub fn calculate_boss_xp_reward(size: DungeonSize) -> u64 {
-    let mut rng = rand::rng();
+pub fn calculate_boss_xp_reward<R: Rng>(rng: &mut R, size: DungeonSize) -> u64 {
     let (min_xp, max_xp) = size.boss_xp_range();
     rng.random_range(min_xp..=max_xp)
 }
@@ -18,19 +17,18 @@ pub fn calculate_boss_xp_reward(size: DungeonSize) -> u64 {
 /// Generates a treasure room item with rarity boost based on dungeon size.
 /// `zone_id` determines item level (ilvl = zone_id * 10).
 /// Haven Workshop bonus applies to base rarity before dungeon size boost.
-pub fn generate_treasure_item(
+pub fn generate_treasure_item<R: Rng>(
+    rng: &mut R,
     prestige_rank: u32,
     zone_id: usize,
     rarity_boost: u32,
     haven_rarity_percent: f64,
 ) -> Item {
-    let mut rng = rand::rng();
-
     // Roll a random slot
-    let slot = roll_random_slot(&mut rng);
+    let slot = roll_random_slot(rng);
 
     // Roll rarity with Haven bonus, then boost based on dungeon tier
-    let base_rarity = roll_rarity_for_mob(prestige_rank, haven_rarity_percent, &mut rng);
+    let base_rarity = roll_rarity_for_mob(prestige_rank, haven_rarity_percent, rng);
     let boosted_rarity = boost_rarity(base_rarity, rarity_boost);
 
     // Item level based on zone
@@ -80,7 +78,8 @@ pub fn collect_dungeon_item(state: &mut GameState, item: Item) {
 
 /// Called when player enters a treasure room - generates and collects an item
 /// Returns (item, was_equipped)
-pub fn on_treasure_room_entered(
+pub fn on_treasure_room_entered<R: Rng>(
+    rng: &mut R,
     state: &mut GameState,
     haven_rarity_percent: f64,
 ) -> Option<(Item, bool)> {
@@ -95,6 +94,7 @@ pub fn on_treasure_room_entered(
     let zone_id = state.zone_progression.current_zone_id as usize;
 
     let item = generate_treasure_item(
+        rng,
         state.prestige_rank,
         zone_id,
         rarity_boost,

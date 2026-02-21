@@ -16,6 +16,12 @@ use quest::achievements::{
     AchievementCategory, AchievementId, Achievements, MinigameDifficulty, MinigameType,
 };
 use quest::haven::types::HavenRoomId;
+use rand::SeedableRng;
+use rand_chacha::ChaCha8Rng;
+
+fn seeded_rng() -> ChaCha8Rng {
+    ChaCha8Rng::seed_from_u64(42)
+}
 
 // =========================================================================
 // T1: Enhancement achievement integration tests
@@ -476,6 +482,7 @@ fn test_multiple_unlock_batch_through_prestige() {
 
 #[test]
 fn test_offline_progression_does_not_call_achievement_handlers() {
+    let mut rng = seeded_rng();
     // KNOWN GAP: process_offline_progression() in src/core/offline.rs
     // does NOT call achievement handlers (on_enemy_killed, on_level_up, etc.).
     //
@@ -510,7 +517,7 @@ fn test_offline_progression_does_not_call_achievement_handlers() {
     state.last_save_time = chrono::Utc::now().timestamp() - (24 * 3600);
 
     // Process offline progression — this grants XP but does NOT call achievement handlers
-    let report = process_offline_progression(&mut state, 0.0);
+    let report = process_offline_progression(&mut rng, &mut state, 0.0);
 
     // Verify we actually got level-ups (offline progression did work)
     assert!(

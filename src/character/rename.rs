@@ -73,6 +73,13 @@ mod tests {
     use super::*;
     use crate::items::Equipment;
 
+    fn temp_manager() -> (CharacterManager, tempfile::TempDir) {
+        let dir = tempfile::tempdir().expect("Failed to create temp dir");
+        let manager =
+            CharacterManager::with_dir(dir.path().to_path_buf()).expect("Failed to create manager");
+        (manager, dir)
+    }
+
     fn create_test_character() -> CharacterInfo {
         CharacterInfo {
             character_id: "id1".to_string(),
@@ -91,7 +98,7 @@ mod tests {
     #[test]
     fn test_rename_char_input_adds_character() {
         let mut screen = CharacterRenameScreen::new();
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
         let character = create_test_character();
 
         let result =
@@ -104,7 +111,7 @@ mod tests {
     #[test]
     fn test_rename_backspace_removes_character() {
         let mut screen = CharacterRenameScreen::new();
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
         let character = create_test_character();
 
         process_rename_input(&mut screen, RenameInput::Char('A'), &manager, &character);
@@ -119,7 +126,7 @@ mod tests {
     #[test]
     fn test_rename_submit_with_empty_name_continues() {
         let mut screen = CharacterRenameScreen::new();
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
         let character = create_test_character();
 
         let result = process_rename_input(&mut screen, RenameInput::Submit, &manager, &character);
@@ -130,7 +137,7 @@ mod tests {
     #[test]
     fn test_rename_cancel_returns_cancelled() {
         let mut screen = CharacterRenameScreen::new();
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
         let character = create_test_character();
 
         let result = process_rename_input(&mut screen, RenameInput::Cancel, &manager, &character);
@@ -141,7 +148,7 @@ mod tests {
     #[test]
     fn test_rename_other_continues() {
         let mut screen = CharacterRenameScreen::new();
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
         let character = create_test_character();
 
         let result = process_rename_input(&mut screen, RenameInput::Other, &manager, &character);
@@ -152,7 +159,7 @@ mod tests {
     #[test]
     fn test_rename_submit_with_invalid_name_continues() {
         let mut screen = CharacterRenameScreen::new();
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
         let character = create_test_character();
 
         // Type an invalid name (special characters)

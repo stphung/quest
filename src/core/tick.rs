@@ -145,6 +145,7 @@ pub fn game_tick<R: Rng>(
         damage_percent: crate::god_items::equipped_god_item_damage_percent(&state.equipment),
     };
     let combat_events = update_combat(
+        rng,
         state,
         delta_time,
         &haven_combat,

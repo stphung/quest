@@ -2,6 +2,7 @@ use crate::character::derived_stats::DerivedStats;
 use crate::character::prestige::PrestigeCombatBonuses;
 use crate::core::constants::*;
 use crate::core::game_state::GameState;
+use rand::Rng;
 
 use super::events::{CombatEvent, GodItemCombatBonuses, HavenCombatBonuses};
 
@@ -20,7 +21,8 @@ use super::events::{CombatEvent, GodItemCombatBonuses, HavenCombatBonuses};
 /// The caller should append these events and, if the function returns
 /// a non-empty vec, should return them (early return on enemy death
 /// or player death).
-pub(crate) fn resolve_enemy_attack(
+pub(crate) fn resolve_enemy_attack<R: Rng>(
+    rng: &mut R,
     state: &mut GameState,
     haven: &HavenCombatBonuses,
     prestige_bonuses: &PrestigeCombatBonuses,
@@ -64,7 +66,7 @@ pub(crate) fn resolve_enemy_attack(
         // Check if reflection killed the enemy
         if !enemy.is_alive() {
             let (death_events, _) =
-                super::damage::handle_enemy_death(state, achievements, haven.xp_gain_percent);
+                super::damage::handle_enemy_death(rng, state, achievements, haven.xp_gain_percent);
             events.extend(death_events);
             return events;
         }

@@ -8,6 +8,7 @@ use super::game_logic::{apply_tick_xp, xp_gain_per_tick};
 use super::game_state::GameState;
 use crate::character::attributes::AttributeType;
 use chrono::Utc;
+use rand::Rng;
 
 /// Report of offline progression results
 #[derive(Debug, Default, Clone)]
@@ -52,7 +53,8 @@ pub fn calculate_offline_xp(
 /// Processes offline progression and updates game state.
 ///
 /// `haven_offline_xp_percent` is the Hearthstone bonus (0.0 if not built).
-pub fn process_offline_progression(
+pub fn process_offline_progression<R: Rng>(
+    rng: &mut R,
     state: &mut GameState,
     haven_offline_xp_percent: f64,
 ) -> OfflineReport {
@@ -74,7 +76,7 @@ pub fn process_offline_progression(
     );
 
     let level_before = state.character_level;
-    let (total_level_ups, _) = apply_tick_xp(state, offline_xp);
+    let (total_level_ups, _) = apply_tick_xp(rng, state, offline_xp);
     let level_after = state.character_level;
 
     state.last_save_time = current_time;
@@ -96,6 +98,12 @@ pub fn process_offline_progression(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    fn seeded_rng() -> ChaCha8Rng {
+        ChaCha8Rng::seed_from_u64(42)
+    }
 
     #[test]
     fn test_calculate_offline_xp_basic() {
@@ -171,13 +179,14 @@ mod tests {
 
     #[test]
     fn test_process_offline_progression_updates_last_save_time() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Suspend Test".to_string(), 0);
 
         // Set last_save_time to 2 hours ago
         let two_hours_ago = chrono::Utc::now().timestamp() - 7200;
         state.last_save_time = two_hours_ago;
 
-        let _report = process_offline_progression(&mut state, 0.0);
+        let _report = process_offline_progression(&mut rng, &mut state, 0.0);
 
         // After processing, last_save_time should be updated to approximately now
         let now = chrono::Utc::now().timestamp();
@@ -195,12 +204,13 @@ mod tests {
 
     #[test]
     fn test_process_offline_progression_zero_elapsed_returns_default() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Zero Elapsed Test".to_string(), 0);
 
         // Set last_save_time to exactly now (zero elapsed)
         state.last_save_time = chrono::Utc::now().timestamp();
 
-        let report = process_offline_progression(&mut state, 0.0);
+        let report = process_offline_progression(&mut rng, &mut state, 0.0);
 
         assert_eq!(
             report.xp_gained, 0,
@@ -214,12 +224,13 @@ mod tests {
 
     #[test]
     fn test_process_offline_progression_negative_elapsed_returns_default() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Negative Elapsed Test".to_string(), 0);
 
         // Set last_save_time to the future (negative elapsed)
         state.last_save_time = chrono::Utc::now().timestamp() + 3600;
 
-        let report = process_offline_progression(&mut state, 0.0);
+        let report = process_offline_progression(&mut rng, &mut state, 0.0);
 
         assert_eq!(
             report.xp_gained, 0,
@@ -479,12 +490,13 @@ mod tests {
 
     #[test]
     fn test_offline_progression_causes_level_ups() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Offline Level Test".to_string(), 0);
 
         // Set last_save_time to 24 hours ago for significant XP gain
         state.last_save_time = chrono::Utc::now().timestamp() - (24 * 3600);
 
-        let report = process_offline_progression(&mut state, 0.0);
+        let report = process_offline_progression(&mut rng, &mut state, 0.0);
 
         assert!(
             report.total_level_ups > 0,
@@ -505,10 +517,11 @@ mod tests {
 
     #[test]
     fn test_offline_progression_report_fields_consistent() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Report Test".to_string(), 0);
         state.last_save_time = chrono::Utc::now().timestamp() - 3600;
 
-        let report = process_offline_progression(&mut state, 25.0);
+        let report = process_offline_progression(&mut rng, &mut state, 25.0);
 
         assert!(report.elapsed_seconds > 0, "Should have positive elapsed");
         assert!(report.xp_gained > 0, "Should have gained XP");
@@ -557,13 +570,14 @@ mod tests {
 
     #[test]
     fn test_last_save_time_sync_prevents_double_counting() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Double Count Test".to_string(), 0);
 
         // Set last_save_time to 1 hour ago
         state.last_save_time = chrono::Utc::now().timestamp() - 3600;
 
         // First call: should process the full hour of offline time
-        let report1 = process_offline_progression(&mut state, 0.0);
+        let report1 = process_offline_progression(&mut rng, &mut state, 0.0);
         assert!(
             report1.xp_gained > 0,
             "First call should gain XP from the 1-hour gap"
@@ -579,7 +593,7 @@ mod tests {
 
         // Second call immediately after: should gain zero or near-zero XP
         // because last_save_time was just synced
-        let report2 = process_offline_progression(&mut state, 0.0);
+        let report2 = process_offline_progression(&mut rng, &mut state, 0.0);
         assert!(
             report2.xp_gained < report1.xp_gained / 100,
             "Second immediate call should gain negligible XP (got {} vs first call {}), \

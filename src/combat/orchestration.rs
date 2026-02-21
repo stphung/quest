@@ -2,6 +2,7 @@ use crate::character::derived_stats::DerivedStats;
 use crate::character::prestige::PrestigeCombatBonuses;
 use crate::core::constants::*;
 use crate::core::game_state::GameState;
+use rand::Rng;
 
 use super::attacks::effective_enemy_attack_interval;
 use super::events::{CombatEvent, GodItemCombatBonuses, HavenCombatBonuses};
@@ -11,7 +12,9 @@ use super::events::{CombatEvent, GodItemCombatBonuses, HavenCombatBonuses};
 /// `prestige_bonuses` contains flat combat bonuses from prestige rank
 /// `achievements` is used to check for Stormbreaker achievement (Zone 10 boss)
 /// `derived` contains pre-computed derived stats (avoids redundant recalculation)
-pub fn update_combat(
+#[allow(clippy::too_many_arguments)]
+pub fn update_combat<R: Rng>(
+    rng: &mut R,
     state: &mut GameState,
     delta_time: f64,
     haven: &HavenCombatBonuses,
@@ -57,6 +60,7 @@ pub fn update_combat(
     // --- Phase 3: Player attack (if ready) ---
     if player_attacks {
         let (attack_events, enemy_died) = super::player_attack::resolve_player_attack(
+            rng,
             state,
             haven,
             prestige_bonuses,
@@ -73,6 +77,7 @@ pub fn update_combat(
     // --- Phase 4: Enemy attack (if ready) ---
     if enemy_attacks {
         let attack_events = super::enemy_attack::resolve_enemy_attack(
+            rng,
             state,
             haven,
             prestige_bonuses,

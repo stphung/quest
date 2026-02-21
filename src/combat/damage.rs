@@ -1,5 +1,6 @@
 use crate::core::game_state::GameState;
 use crate::dungeon::types::RoomType;
+use rand::Rng;
 
 use super::events::CombatEvent;
 
@@ -9,7 +10,8 @@ use super::events::CombatEvent;
 /// updates achievements, and cleans up combat state (removes enemy, starts regen).
 ///
 /// Returns `(events, is_boss_kill)`.
-pub(crate) fn handle_enemy_death(
+pub(crate) fn handle_enemy_death<R: Rng>(
+    rng: &mut R,
     state: &mut GameState,
     achievements: &mut crate::achievements::Achievements,
     haven_xp_gain_percent: f64,
@@ -23,6 +25,7 @@ pub(crate) fn handle_enemy_death(
         .attributes
         .modifier(crate::character::attributes::AttributeType::Charisma);
     let xp_gained = crate::core::game_logic::combat_kill_xp(
+        rng,
         crate::core::game_logic::xp_gain_per_tick(state.prestige_rank, wis_mod, cha_mod),
         haven_xp_gain_percent,
     );

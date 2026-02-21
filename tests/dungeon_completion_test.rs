@@ -12,6 +12,12 @@ use quest::dungeon::{Dungeon, DungeonSize, RoomState, RoomType};
 use quest::items::generation::generate_item;
 use quest::GameState;
 use quest::{EquipmentSlot, Rarity};
+use rand::SeedableRng;
+use rand_chacha::ChaCha8Rng;
+
+fn seeded_rng() -> ChaCha8Rng {
+    ChaCha8Rng::seed_from_u64(42)
+}
 
 /// Helper to find a room of a specific type in the dungeon
 fn find_room_of_type(dungeon: &Dungeon, room_type: RoomType) -> Option<(usize, usize)> {
@@ -47,6 +53,7 @@ fn count_rooms_of_type(dungeon: &Dungeon, room_type: RoomType) -> usize {
 /// Test complete dungeon exploration and boss defeat
 #[test]
 fn test_complete_dungeon_run() {
+    let mut rng = seeded_rng();
     let mut state = GameState::new("Dungeon Explorer".to_string(), 0);
     state.character_level = 10;
 
@@ -119,7 +126,7 @@ fn test_complete_dungeon_run() {
                     }
                     RoomType::Treasure => {
                         // Auto-cleared, collect item
-                        let result = on_treasure_room_entered(&mut state, 0.0);
+                        let result = on_treasure_room_entered(&mut rng, &mut state, 0.0);
                         assert!(result.is_some());
                     }
                     RoomType::Entrance => {
@@ -307,6 +314,7 @@ fn test_dungeon_size_scaling() {
 /// Test treasure room item collection
 #[test]
 fn test_treasure_room_rewards() {
+    let mut rng = seeded_rng();
     let mut state = GameState::new("Treasure Hunter".to_string(), 0);
     state.character_level = 20;
     state.prestige_rank = 3;
@@ -314,7 +322,7 @@ fn test_treasure_room_rewards() {
     state.active_dungeon = Some(generate_dungeon(20, 3, 1));
 
     // Simulate entering treasure room
-    let result = on_treasure_room_entered(&mut state, 0.0);
+    let result = on_treasure_room_entered(&mut rng, &mut state, 0.0);
 
     assert!(result.is_some());
     let (item, was_equipped) = result.unwrap();

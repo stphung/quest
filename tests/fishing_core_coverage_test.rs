@@ -25,6 +25,10 @@ use quest::GameState;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 
+fn seeded_rng() -> ChaCha8Rng {
+    ChaCha8Rng::seed_from_u64(42)
+}
+
 // =============================================================================
 // Helpers
 // =============================================================================
@@ -793,12 +797,13 @@ fn test_item_drop_ilvl_matches_zone() {
 
 #[test]
 fn test_discover_dungeon_blocked_when_in_dungeon() {
+    let mut rng = seeded_rng();
     let mut state = fresh_state();
     state.active_dungeon = Some(quest::dungeon::generation::generate_dungeon(1, 0, 1));
 
     // Uses internal thread_rng, so just test repeatedly
     for _ in 0..200 {
-        let result = quest::core::discoveries::try_discover_dungeon(&mut state);
+        let result = quest::core::discoveries::try_discover_dungeon(&mut rng, &mut state);
         assert!(!result, "Should never discover dungeon when already in one");
     }
 }
@@ -809,6 +814,7 @@ fn test_discover_dungeon_blocked_when_in_dungeon() {
 
 #[test]
 fn test_discover_dungeon_creates_valid_dungeon() {
+    let mut rng = seeded_rng();
     let mut state = fresh_state();
     state.character_level = 10;
     state.prestige_rank = 2;
@@ -816,7 +822,7 @@ fn test_discover_dungeon_creates_valid_dungeon() {
     let mut discovered = false;
     for _ in 0..1000 {
         state.active_dungeon = None;
-        if quest::core::discoveries::try_discover_dungeon(&mut state) {
+        if quest::core::discoveries::try_discover_dungeon(&mut rng, &mut state) {
             discovered = true;
             let dungeon = state.active_dungeon.as_ref().unwrap();
             assert!(!dungeon.grid.is_empty(), "Dungeon grid should not be empty");
@@ -840,12 +846,13 @@ fn test_discover_dungeon_creates_valid_dungeon() {
 
 #[test]
 fn test_discover_dungeon_probability_approximately_1_percent() {
+    let mut rng = seeded_rng();
     let trials = 5000;
     let mut discoveries = 0;
 
     for _ in 0..trials {
         let mut state = fresh_state();
-        if quest::core::discoveries::try_discover_dungeon(&mut state) {
+        if quest::core::discoveries::try_discover_dungeon(&mut rng, &mut state) {
             discoveries += 1;
         }
     }

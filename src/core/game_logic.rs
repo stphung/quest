@@ -15,6 +15,8 @@ pub use super::discoveries::try_discover_dungeon;
 
 #[cfg(test)]
 mod tests {
+    use rand::SeedableRng;
+
     /// Verify that all re-exports from game_logic.rs resolve correctly.
     /// This test ensures backward compatibility after extraction.
     #[test]
@@ -27,9 +29,11 @@ mod tests {
         // Enemy spawning - just verify the function exists (needs GameState to call)
         let _fn_ptr: fn(&mut crate::core::game_state::GameState) = super::spawn_enemy_if_needed;
 
-        // Dungeon discovery - verify the function exists
-        let _fn_ptr: fn(&mut crate::core::game_state::GameState) -> bool =
-            super::try_discover_dungeon;
+        // Dungeon discovery - verify the function exists (generic, so verify monomorphizes)
+        let mut rng = rand::rngs::StdRng::seed_from_u64(0);
+        let _fn_ptr = |state: &mut crate::core::game_state::GameState| -> bool {
+            super::try_discover_dungeon(&mut rng, state)
+        };
 
         // Offline progression - verify the type exists
         fn _accepts_report(_r: super::OfflineReport) {}
