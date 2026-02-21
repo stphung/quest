@@ -247,7 +247,7 @@ fn test_item_drop_salvage_awards_stormglass() {
 
     // Make character strong enough to kill enemies and trigger item drops
     state.character_level = 10;
-    state.prestige_rank = 5;
+    state.prestige_rank = 15;
     state.attributes.set(AttributeType::Strength, 50);
     state.attributes.set(AttributeType::Intelligence, 50);
     let d = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
@@ -493,7 +493,7 @@ fn test_first_salvage_discovers_stormglass() {
     assert!(!state.stormglass_discovered);
 
     state.character_level = 10;
-    state.prestige_rank = 5;
+    state.prestige_rank = 15;
     state.attributes.set(AttributeType::Strength, 50);
     state.attributes.set(AttributeType::Intelligence, 50);
     let d = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
@@ -536,4 +536,63 @@ fn test_first_salvage_discovers_stormglass() {
     if state.stormglass_discovered {
         assert!(state.stormglass > 0);
     }
+}
+
+#[test]
+fn test_pre_p15_salvage_does_not_discover_stormglass() {
+    use quest::achievements::Achievements;
+    use quest::character::attributes::AttributeType;
+    use quest::character::derived_stats::DerivedStats;
+    use quest::core::tick::game_tick;
+    use quest::core::tick_types::TickEvent;
+    use quest::enhancement::EnhancementProgress;
+    use quest::haven::Haven;
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    let mut state = GameState::new("Test".to_string(), 0);
+    // P5 — below the P15 threshold
+    state.prestige_rank = 5;
+    state.character_level = 10;
+    state.attributes.set(AttributeType::Strength, 50);
+    state.attributes.set(AttributeType::Intelligence, 50);
+    let d = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
+    state.combat_state.update_max_hp(d.max_hp);
+    state.combat_state.player_current_hp = state.combat_state.player_max_hp;
+
+    let mut tick_counter = 0u32;
+    let mut enhancement = EnhancementProgress::new();
+    let mut haven = Haven::default();
+    let mut achievements = Achievements::default();
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+
+    // Run many ticks — items will drop but stormglass should never be discovered
+    for _ in 0..10000 {
+        let result = game_tick(
+            &mut state,
+            &mut tick_counter,
+            &mut haven,
+            &mut enhancement,
+            &mut achievements,
+            false,
+            &mut rng,
+        );
+        for event in &result.events {
+            assert!(
+                !matches!(event, TickEvent::StormglassDiscovered),
+                "Stormglass should not be discovered before P15"
+            );
+            assert!(
+                !matches!(event, TickEvent::StormglassSalvaged { .. }),
+                "Items should not be salvaged for SG before P15"
+            );
+            assert!(
+                !matches!(event, TickEvent::StormglassDungeonCache { .. }),
+                "Dungeon cache should not award SG before P15"
+            );
+        }
+    }
+
+    assert!(!state.stormglass_discovered);
+    assert_eq!(state.stormglass, 0);
 }

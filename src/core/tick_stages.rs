@@ -6,7 +6,7 @@
 use super::tick_types::{TickEvent, TickResult};
 use crate::achievements::Achievements;
 use crate::combat::{CombatEvent, HavenCombatBonuses};
-use crate::core::constants::{FINAL_ZONE_ID, TICKS_PER_SECOND};
+use crate::core::constants::{FINAL_ZONE_ID, STORMGLASS_MIN_PRESTIGE_RANK, TICKS_PER_SECOND};
 use crate::core::game_logic::{apply_tick_xp, try_discover_dungeon};
 use crate::core::game_state::GameState;
 use crate::dungeon::logic::{
@@ -99,8 +99,8 @@ pub fn process_dungeon_events<R: Rng>(
                             message: msg,
                         });
 
-                        // Stormglass: salvage non-equipped treasure items
-                        if !equipped {
+                        // Stormglass: salvage non-equipped treasure items (requires P15+)
+                        if !equipped && state.prestige_rank >= STORMGLASS_MIN_PRESTIGE_RANK {
                             let sg_amount =
                                 crate::stormglass::earning::salvage_value(treasure_rarity);
                             state.stormglass += sg_amount;
@@ -118,13 +118,16 @@ pub fn process_dungeon_events<R: Rng>(
                         }
                     }
 
-                    // Stormglass: dungeon cache from treasure room
-                    if let Some(dungeon) = &state.active_dungeon {
-                        let cache_amount = crate::stormglass::earning::dungeon_cache(dungeon.size);
-                        state.stormglass += cache_amount;
-                        result.events.push(TickEvent::StormglassDungeonCache {
-                            amount: cache_amount,
-                        });
+                    // Stormglass: dungeon cache from treasure room (requires P15+)
+                    if state.prestige_rank >= STORMGLASS_MIN_PRESTIGE_RANK {
+                        if let Some(dungeon) = &state.active_dungeon {
+                            let cache_amount =
+                                crate::stormglass::earning::dungeon_cache(dungeon.size);
+                            state.stormglass += cache_amount;
+                            result.events.push(TickEvent::StormglassDungeonCache {
+                                amount: cache_amount,
+                            });
+                        }
                     }
                 }
             }
@@ -601,8 +604,8 @@ pub(super) fn process_item_drop(
             from_boss: was_boss,
         });
 
-        // Stormglass: salvage non-equipped items
-        if !equipped {
+        // Stormglass: salvage non-equipped items (requires P15+)
+        if !equipped && state.prestige_rank >= STORMGLASS_MIN_PRESTIGE_RANK {
             let sg_amount = crate::stormglass::earning::salvage_value(rarity);
             state.stormglass += sg_amount;
 
