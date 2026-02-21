@@ -17,7 +17,11 @@ pub fn handle_stormglass_exchange(
 ) -> InputResult {
     match exchange_ui.phase {
         ExchangePhase::Menu => handle_menu(key, exchange_ui, state),
+        ExchangePhase::InvokeTrialConfirm => handle_invoke_trial_confirm(key, exchange_ui, state),
         ExchangePhase::InvokeTrial => handle_invoke_trial(key, exchange_ui, state),
+        ExchangePhase::InvokeTrialForfeitConfirm => {
+            handle_invoke_trial_forfeit_confirm(key, exchange_ui)
+        }
         ExchangePhase::ChronoSurge => handle_chrono_surge_select(key, exchange_ui, state),
     }
 }
@@ -43,19 +47,13 @@ fn handle_menu(
         KeyCode::Enter => {
             match exchange_ui.selected_item {
                 0 => {
-                    // Invoke Trial
+                    // Invoke Trial — show confirmation first
                     if state.stormglass >= INVOKE_TRIAL_COST {
-                        state.stormglass -= INVOKE_TRIAL_COST;
-                        let mut rng = rand::rng();
-                        let pending: Vec<_> = state
-                            .challenge_menu
-                            .challenges
-                            .iter()
-                            .map(|c| c.challenge_type.clone())
-                            .collect();
-                        exchange_ui.trial_options = generate_trial_options(&mut rng, &pending);
-                        exchange_ui.trial_selected = 0;
-                        exchange_ui.phase = ExchangePhase::InvokeTrial;
+                        // Guard: if all 10 challenge types are already pending, do nothing
+                        if state.challenge_menu.challenges.len() >= 10 {
+                            return InputResult::Continue;
+                        }
+                        exchange_ui.phase = ExchangePhase::InvokeTrialConfirm;
                     }
                 }
                 1 => {
@@ -111,6 +109,53 @@ fn handle_chrono_surge_select(
     }
 }
 
+fn handle_invoke_trial_confirm(
+    key: KeyEvent,
+    exchange_ui: &mut ExchangeUiState,
+    state: &mut GameState,
+) -> InputResult {
+    match key.code {
+        KeyCode::Char('y') | KeyCode::Char('Y') => {
+            // Deduct SG and generate trial options
+            state.stormglass -= INVOKE_TRIAL_COST;
+            let mut rng = rand::rng();
+            let pending: Vec<_> = state
+                .challenge_menu
+                .challenges
+                .iter()
+                .map(|c| c.challenge_type.clone())
+                .collect();
+            exchange_ui.trial_options = generate_trial_options(&mut rng, &pending);
+            exchange_ui.trial_selected = 0;
+            exchange_ui.phase = ExchangePhase::InvokeTrial;
+            InputResult::Continue
+        }
+        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+            exchange_ui.phase = ExchangePhase::Menu;
+            InputResult::Continue
+        }
+        _ => InputResult::Continue,
+    }
+}
+
+fn handle_invoke_trial_forfeit_confirm(
+    key: KeyEvent,
+    exchange_ui: &mut ExchangeUiState,
+) -> InputResult {
+    match key.code {
+        KeyCode::Enter => {
+            // Confirm forfeit — SG already gone
+            exchange_ui.close();
+            InputResult::Continue
+        }
+        _ => {
+            // Esc or any other key — return to trial selection
+            exchange_ui.phase = ExchangePhase::InvokeTrial;
+            InputResult::Continue
+        }
+    }
+}
+
 fn handle_invoke_trial(
     key: KeyEvent,
     exchange_ui: &mut ExchangeUiState,
@@ -142,8 +187,8 @@ fn handle_invoke_trial(
             InputResult::Continue
         }
         KeyCode::Esc => {
-            // Forfeit — SG already spent, just close
-            exchange_ui.close();
+            // Forfeit — show confirmation before closing
+            exchange_ui.phase = ExchangePhase::InvokeTrialForfeitConfirm;
             InputResult::Continue
         }
         _ => InputResult::Continue,

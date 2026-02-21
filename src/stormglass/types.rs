@@ -48,7 +48,9 @@ pub const CHRONO_SURGE_ANIMATION_SECONDS: u64 = 10;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExchangePhase {
     Menu,
+    InvokeTrialConfirm,
     InvokeTrial,
+    InvokeTrialForfeitConfirm,
     ChronoSurge,
 }
 

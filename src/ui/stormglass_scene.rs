@@ -126,7 +126,13 @@ pub fn render_stormglass_exchange(
 ) {
     match exchange_ui.phase {
         ExchangePhase::Menu => render_exchange_menu(frame, area, exchange_ui, state),
+        ExchangePhase::InvokeTrialConfirm => render_invoke_trial_confirm(frame, area, state),
         ExchangePhase::InvokeTrial => render_invoke_trial(frame, area, exchange_ui),
+        ExchangePhase::InvokeTrialForfeitConfirm => {
+            // Render the trial selection underneath, then overlay the forfeit confirm
+            render_invoke_trial(frame, area, exchange_ui);
+            render_invoke_trial_forfeit_confirm(frame, area);
+        }
         ExchangePhase::ChronoSurge => render_chrono_surge_select(frame, area, exchange_ui, state),
     }
 }
@@ -284,6 +290,170 @@ fn render_exchange_menu(
         .wrap(ratatui::widgets::Wrap { trim: true });
         frame.render_widget(desc_widget, desc_area);
     }
+}
+
+fn render_invoke_trial_confirm(frame: &mut Frame, area: Rect, state: &GameState) {
+    // Center overlay: 52 wide, 14 tall
+    let overlay_width = 52u16.min(area.width.saturating_sub(4));
+    let overlay_height = 14u16.min(area.height.saturating_sub(2));
+    let x = area.x + (area.width.saturating_sub(overlay_width)) / 2;
+    let y = area.y + (area.height.saturating_sub(overlay_height)) / 2;
+    let overlay_area = Rect::new(x, y, overlay_width, overlay_height);
+
+    frame.render_widget(Clear, overlay_area);
+
+    let block = Block::default()
+        .title(Line::from(Span::styled(
+            " \u{1F48E} Invoke Trial? \u{1F48E} ",
+            Style::default()
+                .fg(ELECTRIC_BLUE)
+                .add_modifier(Modifier::BOLD),
+        )))
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(ELECTRIC_BLUE));
+
+    let inner = block.inner(overlay_area);
+    frame.render_widget(block, overlay_area);
+
+    let w = inner.width as usize;
+    let h = inner.height as usize;
+    if w == 0 || h == 0 {
+        return;
+    }
+
+    let mut buffer = vec![vec![SceneCell::default(); w]; h];
+    let millis = current_millis();
+    paint_storm_backdrop(&mut buffer, millis, &StormBackdropParams::normal());
+
+    // Clear text rows
+    clear_row_chars(&mut buffer, 1); // flavor
+    clear_row_chars(&mut buffer, 2); // flavor
+    clear_row_chars(&mut buffer, 4); // balance
+    clear_row_chars(&mut buffer, 5); // cost
+    clear_row_chars(&mut buffer, 6); // after
+    clear_row_chars(&mut buffer, 8); // description
+    clear_row_chars(&mut buffer, (h as i32) - 1); // help
+
+    // Balance / Cost / After breakdown (rows 4-6)
+    let balance = state.stormglass;
+    let after = balance.saturating_sub(INVOKE_TRIAL_COST);
+
+    let balance_str = format!("Balance:  {} SG", balance);
+    put_text(&mut buffer, 4, 4, &balance_str, Color::White);
+
+    let cost_str = format!("Cost:    -{} SG", INVOKE_TRIAL_COST);
+    put_text(&mut buffer, 5, 4, &cost_str, Color::LightRed);
+
+    let after_str = format!("After:    {} SG", after);
+    put_text(&mut buffer, 6, 4, &after_str, ELECTRIC_BLUE);
+
+    // Description
+    put_text_centered(
+        &mut buffer,
+        8,
+        w,
+        "You will choose one of three random challenges.",
+        Color::DarkGray,
+    );
+
+    // Help row
+    let help_row = (h as i32) - 1;
+    // Build the help text with colored segments
+    let help_y_col = 4i32;
+    put_text(&mut buffer, help_row, help_y_col, "[", Color::DarkGray);
+    put_text(&mut buffer, help_row, help_y_col + 1, "Y", Color::Green);
+    put_text(
+        &mut buffer,
+        help_row,
+        help_y_col + 2,
+        "] Invoke  [",
+        Color::DarkGray,
+    );
+    put_text(&mut buffer, help_row, help_y_col + 13, "N", Color::LightRed);
+    put_text(
+        &mut buffer,
+        help_row,
+        help_y_col + 14,
+        "] Cancel",
+        Color::DarkGray,
+    );
+
+    render_buffer(frame, inner, &buffer);
+
+    // Flavor text overlay (rows 1-2)
+    let pulse_t = ((millis as f64 / 2000.0).sin() * 0.5 + 0.5).clamp(0.0, 1.0);
+    let flavor_rgb = lerp_rgb((100, 140, 200), (150, 200, 255), pulse_t);
+    let flavor_fg = Color::Rgb(flavor_rgb.0, flavor_rgb.1, flavor_rgb.2);
+    if h > 2 {
+        let flavor_area = Rect::new(inner.x, inner.y + 1, inner.width, 2);
+        let flavor = Paragraph::new(Span::styled(
+            "The storm fractures. Three trials will emerge.",
+            Style::default()
+                .fg(flavor_fg)
+                .add_modifier(Modifier::ITALIC),
+        ))
+        .alignment(Alignment::Center)
+        .wrap(ratatui::widgets::Wrap { trim: true });
+        frame.render_widget(flavor, flavor_area);
+    }
+}
+
+fn render_invoke_trial_forfeit_confirm(frame: &mut Frame, area: Rect) {
+    // Small modal overlay: ~42 wide, ~8 tall, centered
+    let modal_width = 42u16.min(area.width.saturating_sub(4));
+    let modal_height = 8u16.min(area.height.saturating_sub(2));
+    let x = area.x + (area.width.saturating_sub(modal_width)) / 2;
+    let y = area.y + (area.height.saturating_sub(modal_height)) / 2;
+    let modal_area = Rect::new(x, y, modal_width, modal_height);
+
+    frame.render_widget(Clear, modal_area);
+
+    let block = Block::default()
+        .title(Line::from(Span::styled(
+            " Abandon Trial? ",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )))
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Yellow));
+
+    let inner = block.inner(modal_area);
+    frame.render_widget(block, modal_area);
+
+    let text = Paragraph::new(vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            "3,000 SG already spent.",
+            Style::default().fg(Color::Yellow),
+        )),
+        Line::from(Span::styled(
+            "The Stormglass cannot be reclaimed.",
+            Style::default().fg(Color::White),
+        )),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("[", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Enter",
+                Style::default()
+                    .fg(Color::LightRed)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("] Leave  [", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Esc",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("] Stay", Style::default().fg(Color::DarkGray)),
+        ]),
+    ])
+    .alignment(Alignment::Center);
+    frame.render_widget(text, inner);
 }
 
 fn render_invoke_trial(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiState) {
