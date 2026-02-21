@@ -115,6 +115,9 @@ pub struct GameState {
     /// XP accumulated during the current second (rotated into xp_rate_samples each second)
     #[serde(skip)]
     pub xp_this_second: u64,
+    /// True if any combat XP was earned during the current second (controls rate sampling)
+    #[serde(skip)]
+    pub combat_seconds_this_tick: bool,
     /// When the game-over screen was first shown (for dismiss cooldown)
     #[serde(skip)]
     pub game_over_shown_at: Option<std::time::Instant>,
@@ -159,6 +162,7 @@ impl GameState {
             derived_stats_dirty: true,
             xp_rate_samples: VecDeque::new(),
             xp_this_second: 0,
+            combat_seconds_this_tick: false,
             game_over_shown_at: None,
             chrono_surge_active: false,
         }
@@ -170,7 +174,7 @@ impl GameState {
         self.active_dungeon.is_some()
     }
 
-    /// Returns XP per hour based on rolling 5-minute window, or None if < 10s of data.
+    /// Returns XP per hour based on rolling 15-minute combat-only window, or None if < 10s of data.
     pub fn xp_per_hour(&self) -> Option<u64> {
         if self.xp_rate_samples.len() < 10 {
             return None;

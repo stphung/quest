@@ -62,6 +62,7 @@ pub fn perform_prestige(state: &mut GameState) {
     // Clear XP rate tracking so ETA recalculates from fresh post-prestige data
     state.xp_rate_samples.clear();
     state.xp_this_second = 0;
+    state.combat_seconds_this_tick = false;
 
     // Reset zone progression but keep unlocks based on new prestige rank
     state
