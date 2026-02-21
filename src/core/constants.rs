@@ -23,6 +23,7 @@ pub const COMBAT_XP_MIN_TICKS: u64 = 200;
 pub const COMBAT_XP_MAX_TICKS: u64 = 400;
 pub const OFFLINE_MULTIPLIER: f64 = 0.25;
 pub const MAX_OFFLINE_SECONDS: i64 = 7 * 24 * 60 * 60;
+pub const XP_RATE_WINDOW_SECONDS: usize = 900; // 15 min of combat time
 
 // Character attributes
 pub const BASE_ATTRIBUTE_VALUE: u32 = 10;

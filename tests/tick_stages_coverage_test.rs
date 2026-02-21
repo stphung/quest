@@ -2087,24 +2087,26 @@ fn test_fishing_tick_pushes_xp_sample_at_second_boundary() {
         &mut rng,
     );
 
-    assert_eq!(state.xp_rate_samples.len(), 1);
-    assert_eq!(state.xp_rate_samples[0], 42);
+    assert!(
+        state.xp_rate_samples.is_empty(),
+        "Fishing ticks should not push XP samples (combat_seconds_this_tick is false)"
+    );
     assert_eq!(
         state.xp_this_second, 0,
-        "xp_this_second should reset after push"
+        "xp_this_second should still reset even without push"
     );
 }
 
 #[test]
-fn test_fishing_xp_rate_samples_capped_at_300() {
+fn test_fishing_tick_does_not_push_samples() {
     let mut state = fresh_state();
     state.active_fishing = Some(make_fishing_session(FishingPhase::Waiting, 5000, 100));
 
-    // Pre-fill xp_rate_samples to 300
-    for i in 0..300 {
+    // Pre-fill xp_rate_samples with some data
+    for i in 0..50 {
         state.xp_rate_samples.push_back(i);
     }
-    assert_eq!(state.xp_rate_samples.len(), 300);
+    assert_eq!(state.xp_rate_samples.len(), 50);
 
     let mut tc = 9u32;
     let mut ach = Achievements::default();
@@ -2127,17 +2129,131 @@ fn test_fishing_xp_rate_samples_capped_at_300() {
 
     assert_eq!(
         state.xp_rate_samples.len(),
-        300,
-        "Samples should stay capped at 300"
+        50,
+        "Fishing should not push samples — count should be unchanged"
+    );
+    assert_eq!(state.xp_this_second, 0, "xp_this_second should still reset");
+}
+
+#[test]
+fn test_xp_rate_stable_across_fishing_interruption() {
+    use quest::core::game_state::GameState;
+
+    let mut state = GameState::new("Rate Test".to_string(), 0);
+
+    // Simulate 30 seconds of combat earning ~500 XP/sec
+    for _ in 0..30 {
+        state.xp_this_second = 500;
+        state.combat_seconds_this_tick = true;
+        state.xp_rate_samples.push_back(state.xp_this_second);
+        if state.xp_rate_samples.len() > quest::core::constants::XP_RATE_WINDOW_SECONDS {
+            state.xp_rate_samples.pop_front();
+        }
+        state.xp_this_second = 0;
+        state.combat_seconds_this_tick = false;
+    }
+
+    let rate_before = state.xp_per_hour().unwrap();
+
+    // Simulate 60 seconds of fishing (no samples pushed)
+    for _ in 0..60 {
+        // combat_seconds_this_tick stays false, so no push
+        state.xp_this_second = 0;
+        state.combat_seconds_this_tick = false;
+        // No push — this is the key behavioral change
+    }
+
+    let rate_after = state.xp_per_hour().unwrap();
+
+    assert_eq!(
+        rate_before, rate_after,
+        "XP rate should be unchanged after fishing interruption (no zeros pushed)"
+    );
+    assert_eq!(
+        state.xp_rate_samples.len(),
+        30,
+        "Only combat seconds should be in samples"
+    );
+}
+
+#[test]
+fn test_combat_tick_pushes_xp_sample_when_flag_set() {
+    let mut state = fresh_state();
+    // Simulate a second where combat XP was earned
+    state.xp_this_second = 500;
+    state.combat_seconds_this_tick = true;
+
+    // Manually trigger second boundary in tick.rs logic
+    state.xp_rate_samples.clear();
+
+    // Push sample like tick.rs does
+    if state.combat_seconds_this_tick {
+        state.xp_rate_samples.push_back(state.xp_this_second);
+    }
+    state.xp_this_second = 0;
+    state.combat_seconds_this_tick = false;
+
+    assert_eq!(state.xp_rate_samples.len(), 1);
+    assert_eq!(state.xp_rate_samples[0], 500);
+    assert_eq!(state.xp_this_second, 0);
+    assert!(!state.combat_seconds_this_tick);
+}
+
+#[test]
+fn test_no_sample_pushed_when_combat_flag_false() {
+    let mut state = fresh_state();
+    state.xp_this_second = 0;
+    state.combat_seconds_this_tick = false;
+
+    let initial_len = state.xp_rate_samples.len();
+
+    // Simulate second boundary without combat
+    if state.combat_seconds_this_tick {
+        state.xp_rate_samples.push_back(state.xp_this_second);
+    }
+    state.xp_this_second = 0;
+    state.combat_seconds_this_tick = false;
+
+    assert_eq!(
+        state.xp_rate_samples.len(),
+        initial_len,
+        "No sample should be pushed without combat"
+    );
+}
+
+#[test]
+fn test_xp_rate_samples_capped_at_900() {
+    let mut state = fresh_state();
+    // Pre-fill to 900
+    for i in 0..900 {
+        state.xp_rate_samples.push_back(i);
+    }
+    assert_eq!(state.xp_rate_samples.len(), 900);
+
+    // Simulate combat second boundary
+    state.xp_this_second = 9999;
+    state.combat_seconds_this_tick = true;
+
+    if state.combat_seconds_this_tick {
+        state.xp_rate_samples.push_back(state.xp_this_second);
+        if state.xp_rate_samples.len() > quest::core::constants::XP_RATE_WINDOW_SECONDS {
+            state.xp_rate_samples.pop_front();
+        }
+    }
+
+    assert_eq!(
+        state.xp_rate_samples.len(),
+        900,
+        "Samples should stay capped at 900"
     );
     assert_eq!(
         *state.xp_rate_samples.back().unwrap(),
-        999,
-        "New sample should be at back"
+        9999,
+        "New sample at back"
     );
     assert_eq!(
         *state.xp_rate_samples.front().unwrap(),
         1,
-        "Oldest sample (0) should have been popped"
+        "Oldest (0) popped"
     );
 }

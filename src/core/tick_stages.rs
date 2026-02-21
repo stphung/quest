@@ -285,11 +285,14 @@ pub fn process_fishing_tick<R: Rng>(
     *tick_counter += 1;
     if *tick_counter >= TICKS_PER_SECOND {
         state.play_time_seconds += 1;
-        state.xp_rate_samples.push_back(state.xp_this_second);
-        state.xp_this_second = 0;
-        if state.xp_rate_samples.len() > 300 {
-            state.xp_rate_samples.pop_front();
+        if state.combat_seconds_this_tick {
+            state.xp_rate_samples.push_back(state.xp_this_second);
+            if state.xp_rate_samples.len() > crate::core::constants::XP_RATE_WINDOW_SECONDS {
+                state.xp_rate_samples.pop_front();
+            }
         }
+        state.xp_this_second = 0;
+        state.combat_seconds_this_tick = false;
         *tick_counter = 0;
     }
 

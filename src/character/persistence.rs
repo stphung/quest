@@ -83,6 +83,7 @@ impl CharacterManager {
             derived_stats_dirty: true,
             xp_rate_samples: std::collections::VecDeque::new(),
             xp_this_second: 0,
+            combat_seconds_this_tick: false,
             game_over_shown_at: None,
             stormglass: save_data.stormglass,
             stormglass_discovered: save_data.stormglass_discovered,
