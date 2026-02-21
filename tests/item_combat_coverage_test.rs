@@ -1110,7 +1110,8 @@ mod tick_tests {
             );
         }
 
-        // After 10 ticks (1 second), one XP rate sample should be recorded
-        assert_eq!(state.xp_rate_samples.len(), 1);
+        // After 10 ticks (1 second) with no combat, no XP rate sample should be recorded
+        // (combat_seconds_this_tick is false when no XP is earned)
+        assert_eq!(state.xp_rate_samples.len(), 0);
     }
 }
