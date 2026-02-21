@@ -202,40 +202,41 @@ fn render_exchange_menu(
     clear_row_chars(&mut buffer, 9); // description line 2
     clear_row_chars(&mut buffer, (h as i32) - 1); // help
 
-    // Menu items (rows 4-6)
-    let items: [(String, String, bool); 3] = [
+    // Menu items (rows 4-6): (icon, label, cost_text, affordable)
+    let items: [(&str, &str, String, bool); 3] = [
         (
-            "Invoke Trial".to_string(),
+            "\u{2694}\u{FE0F}", // ⚔️
+            "Invoke Trial",
             format!("{} SG", INVOKE_TRIAL_COST),
             state.stormglass >= INVOKE_TRIAL_COST,
         ),
-        ("\u{231B} Chrono Surge".to_string(), ">>>".to_string(), true),
-        ("\u{16B1} Storm Sigils".to_string(), ">>>".to_string(), true),
+        ("\u{231B}", "Chrono Surge", ">>>".to_string(), true), // ⏳
+        ("\u{16B1}", "Storm Sigils", ">>>".to_string(), true), // ᚱ
     ];
 
     let menu_start_row = 4i32;
-    for (i, (name, cost, affordable)) in items.iter().enumerate() {
+    let label_col = 5i32; // Fixed column for labels (after cursor + icon + gap)
+    for (i, (icon, label, cost, affordable)) in items.iter().enumerate() {
         let row = menu_start_row + i as i32;
         if row >= h as i32 {
             break;
         }
         let is_selected = i == exchange_ui.selected_item;
 
-        let mut col = 0i32;
-
         // Cursor
         if is_selected {
-            put_text(&mut buffer, row, col, "> ", Color::Yellow);
+            put_text(&mut buffer, row, 0, "> ", Color::Yellow);
         }
-        col += 2;
 
-        // Item name
-        let name_fg = if *affordable {
+        let fg = if *affordable {
             Color::White
         } else {
             Color::DarkGray
         };
-        put_text(&mut buffer, row, col, name, name_fg);
+
+        // Icon at fixed position, label at fixed column for alignment
+        put_text(&mut buffer, row, 2, icon, fg);
+        put_text(&mut buffer, row, label_col, label, fg);
 
         // Right-aligned cost
         let cost_fg = if *affordable {
@@ -318,7 +319,7 @@ fn render_invoke_trial_confirm(frame: &mut Frame, area: Rect, state: &GameState)
 
     let block = Block::default()
         .title(Line::from(Span::styled(
-            " \u{1F48E} Invoke Trial? \u{1F48E} ",
+            " \u{2694}\u{FE0F} Invoke Trial? \u{2694}\u{FE0F} ",
             Style::default()
                 .fg(ELECTRIC_BLUE)
                 .add_modifier(Modifier::BOLD),
@@ -482,7 +483,7 @@ fn render_invoke_trial(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiSt
 
     let block = Block::default()
         .title(Line::from(Span::styled(
-            " \u{1F48E} Invoke Trial \u{1F48E} ",
+            " \u{2694}\u{FE0F} Invoke Trial \u{2694}\u{FE0F} ",
             Style::default()
                 .fg(ELECTRIC_BLUE)
                 .add_modifier(Modifier::BOLD),
