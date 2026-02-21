@@ -937,9 +937,10 @@ fn render_sigils_list(
         if i < sigils.slots_unlocked as usize {
             // Unlocked slot
             if let Some(sigil) = &sigils.sigils[i] {
-                // Inscribed sigil: name + value + grade
-                let name = sigil.effect.sigil_name();
-                put_text(&mut buffer, row, col, name, Color::White);
+                // Inscribed sigil: icon + name + value + grade
+                let icon = sigil.effect.icon();
+                let icon_name = format!("{} {}", icon, sigil.effect.sigil_name());
+                put_text(&mut buffer, row, col, &icon_name, Color::White);
 
                 // Right-aligned: value + grade
                 let value_str = sigil.effect.format_value(sigil.value);
@@ -991,15 +992,20 @@ fn render_sigils_list(
     // Daily rotation lines (rows 9-11) — show today's available sigils with countdown
     if 11 < h as i32 {
         let pool = crate::stormglass::sigils::daily_sigil_pool();
-        let names: Vec<&str> = pool.iter().map(|e| e.short_name()).collect();
-
-        // Sigil names across two lines
-        let line1_names = &names[..3.min(names.len())];
-        let line1 = line1_names.join(" \u{00b7} ");
+        let labels: Vec<String> = pool
+            .iter()
+            .map(|e| format!("{} {}", e.icon(), e.short_name()))
+            .collect();
+        // Split into two lines: first 3, then remaining
+        let line1_parts: Vec<&str> = labels[..3.min(labels.len())]
+            .iter()
+            .map(|s| s.as_str())
+            .collect();
+        let line1 = line1_parts.join(" \u{00b7} ");
         put_text_centered(&mut buffer, 9, w, &line1, Color::DarkGray);
-        if names.len() > 3 {
-            let line2_names = &names[3..];
-            let line2 = line2_names.join(" \u{00b7} ");
+        if labels.len() > 3 {
+            let line2_parts: Vec<&str> = labels[3..].iter().map(|s| s.as_str()).collect();
+            let line2 = line2_parts.join(" \u{00b7} ");
             put_text_centered(&mut buffer, 10, w, &line2, Color::DarkGray);
         }
 
@@ -1354,7 +1360,8 @@ fn render_sigil_reroll_confirm(
     let slot = exchange_ui.sigil_target_slot;
     if let Some(sigil) = &state.storm_sigils.sigils[slot] {
         let current_text = format!(
-            "Destroying: {} {}",
+            "Destroying: {} {} {}",
+            sigil.effect.icon(),
             sigil.effect.sigil_name(),
             sigil.effect.format_value(sigil.value)
         );
@@ -1464,8 +1471,9 @@ fn render_sigil_pick(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiStat
         col += 2;
 
         if let Some(sigil) = choice {
-            // Effect value
-            let value_str = sigil.effect.format_value(sigil.value);
+            // Icon + effect value
+            let icon = sigil.effect.icon();
+            let value_str = format!("{} {}", icon, sigil.effect.format_value(sigil.value));
             put_text(&mut buffer, row, col, &value_str, Color::White);
             col += value_str.len() as i32 + 2;
 
@@ -1631,10 +1639,10 @@ fn render_sigil_result(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiSt
     }
 
     if let Some(sigil) = &exchange_ui.sigil_result {
-        // Sigil name centered
-        let name = sigil.effect.sigil_name();
+        // Sigil icon + name centered
+        let name = format!("{} {}", sigil.effect.icon(), sigil.effect.sigil_name());
         let grade_fg = sigil_grade_color(sigil.grade);
-        put_text_centered(&mut buffer, 3, w, name, grade_fg);
+        put_text_centered(&mut buffer, 3, w, &name, grade_fg);
 
         // Value centered
         let value_str = sigil.effect.format_value(sigil.value);

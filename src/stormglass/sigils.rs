@@ -132,6 +132,23 @@ impl SigilEffectType {
             Self::RegenDelayPercent => "Renewal",
         }
     }
+
+    /// Emoji icon for this sigil effect type.
+    pub fn icon(self) -> &'static str {
+        match self {
+            Self::XpPercent => "\u{1F4D6}",              // 📖
+            Self::DamagePercent => "\u{1F525}",          // 🔥
+            Self::DamageReductionPercent => "\u{1F6E1}", // 🛡️
+            Self::CritChancePercent => "\u{1F3AF}",      // 🎯
+            Self::DropRatePercent => "\u{1F340}",        // 🍀
+            Self::MaxHpPercent => "\u{2764}",            // ❤️
+            Self::FishingSpeedPercent => "\u{1F30A}",    // 🌊
+            Self::OfflineXpPercent => "\u{1F319}",       // 🌙
+            Self::AttackSpeedPercent => "\u{23E9}",      // ⏩
+            Self::DoubleStrikePercent => "\u{2694}",     // ⚔️
+            Self::RegenDelayPercent => "\u{1F49A}",      // 💚
+        }
+    }
 }
 
 // ── Tier Grading ────────────────────────────────────────────────────────
