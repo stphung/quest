@@ -904,16 +904,16 @@ fn render_sigils_list(
     for i in 0..5 {
         clear_row_chars(&mut buffer, 3 + i); // slot rows
     }
-    clear_row_chars(&mut buffer, 9); // blank
-    clear_row_chars(&mut buffer, 10); // unlock cost / info
-    clear_row_chars(&mut buffer, 11); // action hint
+    clear_row_chars(&mut buffer, 9); // daily rotation line 1
+    clear_row_chars(&mut buffer, 10); // daily rotation line 2
+    clear_row_chars(&mut buffer, 11); // rotation countdown
     clear_row_chars(&mut buffer, (h as i32) - 1); // help
 
     let sigils = &state.storm_sigils;
 
     // Slot rows (rows 3-7)
     let slot_start_row = 3i32;
-    use crate::stormglass::sigils::{INSCRIBE_COST, MAX_SIGIL_SLOTS};
+    use crate::stormglass::sigils::MAX_SIGIL_SLOTS;
 
     for i in 0..MAX_SIGIL_SLOTS {
         let row = slot_start_row + i as i32;
@@ -987,47 +987,32 @@ fn render_sigils_list(
         }
     }
 
-    // Daily rotation lines (rows 9-10) — show today's available sigils
-    if 10 < h as i32 {
+    // Daily rotation lines (rows 9-11) — show today's available sigils with countdown
+    if 11 < h as i32 {
         let pool = crate::stormglass::sigils::daily_sigil_pool();
         let names: Vec<&str> = pool.iter().map(|e| e.short_name()).collect();
-        // Split into two lines: first 3, then remaining
+
+        // Sigil names across two lines
         let line1_names = &names[..3.min(names.len())];
-        let line1 = format!("Today: {}", line1_names.join(" \u{00b7} "));
+        let line1 = line1_names.join(" \u{00b7} ");
         put_text_centered(&mut buffer, 9, w, &line1, Color::DarkGray);
         if names.len() > 3 {
             let line2_names = &names[3..];
-            let line2 = format!("       {}", line2_names.join(" \u{00b7} "));
+            let line2 = line2_names.join(" \u{00b7} ");
             put_text_centered(&mut buffer, 10, w, &line2, Color::DarkGray);
         }
-    }
 
-    // Info line (row 11) — context-sensitive hint
-    let info_row = 11i32;
-    if info_row < h as i32 {
-        let slot = exchange_ui.sigil_selected_slot;
-        let info = if slot >= sigils.slots_unlocked as usize {
-            if let Some(cost) = sigils.next_unlock_cost() {
-                if state.stormglass >= cost {
-                    "Press Enter to unlock this slot.".to_string()
-                } else {
-                    format!("Need {} SG to unlock.", cost)
-                }
-            } else {
-                String::new()
-            }
-        } else if sigils.sigils[slot].is_some() {
-            if state.stormglass >= INSCRIBE_COST {
-                format!("Reroll: {} SG", INSCRIBE_COST)
-            } else {
-                format!("Need {} SG to reroll.", INSCRIBE_COST)
-            }
-        } else if state.stormglass >= INSCRIBE_COST {
-            format!("Inscribe: {} SG", INSCRIBE_COST)
-        } else {
-            format!("Need {} SG to inscribe.", INSCRIBE_COST)
-        };
-        put_text_centered(&mut buffer, info_row, w, &info, Color::DarkGray);
+        // Countdown to next rotation (midnight UTC)
+        let now = chrono::Utc::now();
+        let tomorrow = (now.date_naive() + chrono::Duration::days(1))
+            .and_hms_opt(0, 0, 0)
+            .unwrap();
+        let remaining = tomorrow - now.naive_utc();
+        let hours = remaining.num_hours();
+        let minutes = remaining.num_minutes() % 60;
+        let seconds = remaining.num_seconds() % 60;
+        let countdown = format!("\u{29d6} {hours}h {minutes:02}m {seconds:02}s until rotation");
+        put_text_centered(&mut buffer, 11, w, &countdown, Color::DarkGray);
     }
 
     // Help row at bottom
