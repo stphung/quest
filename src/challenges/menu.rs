@@ -157,7 +157,7 @@ impl ChallengeReward {
         }
 
         if self.stormglass > 0 {
-            parts.push(format!("+{} SG", self.stormglass));
+            parts.push(format!("+{} Stormglass", self.stormglass));
         }
 
         if parts.is_empty() {
@@ -907,7 +907,7 @@ mod tests {
             stormglass: 750,
             ..Default::default()
         };
-        assert_eq!(reward.description(), "Win: +750 SG");
+        assert_eq!(reward.description(), "Win: +750 Stormglass");
     }
 
     #[test]
@@ -927,15 +927,18 @@ mod tests {
 
     #[test]
     fn test_reward_description_mixed() {
-        // Prestige + SG
+        // Prestige + Stormglass
         let reward = ChallengeReward {
             prestige_ranks: 1,
             stormglass: 500,
             ..Default::default()
         };
-        assert_eq!(reward.description(), "Win: +1 Prestige Rank, +500 SG");
+        assert_eq!(
+            reward.description(),
+            "Win: +1 Prestige Rank, +500 Stormglass"
+        );
 
-        // All three (order: prestige -> fishing -> SG)
+        // All three (order: prestige -> fishing -> stormglass)
         let reward = ChallengeReward {
             prestige_ranks: 2,
             fishing_ranks: 1,
@@ -943,7 +946,7 @@ mod tests {
         };
         assert_eq!(
             reward.description(),
-            "Win: +2 Prestige Ranks, +1 Fish Rank, +1000 SG"
+            "Win: +2 Prestige Ranks, +1 Fish Rank, +1000 Stormglass"
         );
     }
 
