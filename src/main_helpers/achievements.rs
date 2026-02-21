@@ -74,17 +74,6 @@ pub fn track_input_achievements(
             Some(&state.character_name),
         );
 
-        // Stormglass: reward for challenge wins
-        if state.stormglass_discovered {
-            let sg_reward = crate::stormglass::earning::challenge_reward(win_info.difficulty);
-            state.stormglass += sg_reward;
-            state.combat_state.add_log_entry(
-                format!("\u{1F48E} Challenge won! +{} Stormglass", sg_reward),
-                false,
-                true,
-            );
-        }
-
         state.last_minigame_win = None;
     }
 }

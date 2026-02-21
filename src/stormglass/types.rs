@@ -9,12 +9,6 @@ pub const SALVAGE_RARE: u64 = 3;
 pub const SALVAGE_EPIC: u64 = 8;
 pub const SALVAGE_LEGENDARY: u64 = 25;
 
-// ── Challenge win rewards by difficulty ────────────────────────────────
-pub const CHALLENGE_NOVICE: u64 = 5;
-pub const CHALLENGE_APPRENTICE: u64 = 15;
-pub const CHALLENGE_JOURNEYMAN: u64 = 30;
-pub const CHALLENGE_MASTER: u64 = 75;
-
 // ── Dungeon treasure cache by size ────────────────────────────────────
 pub const DUNGEON_CACHE_SMALL: u64 = 5;
 pub const DUNGEON_CACHE_MEDIUM: u64 = 15;

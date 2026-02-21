@@ -21,26 +21,12 @@ pub fn render_morris_scene(
     frame: &mut Frame,
     area: Rect,
     game: &MorrisGame,
-    character_level: u32,
     ctx: &super::responsive::LayoutContext,
     show_dismiss_hint: bool,
 ) {
     // Check for game over - show board with banner
     if game.game_result.is_some() {
-        let xp_for_level = crate::core::game_logic::xp_for_next_level(character_level.max(1));
-        let xp_reward =
-            (xp_for_level as f64 * game.difficulty.reward_xp_percent() as f64 / 100.0) as u64;
-        let xp_reward = xp_reward.max(100);
-        let is_master = game.difficulty == crate::challenges::morris::MorrisDifficulty::Master;
-        render_morris_game_over(
-            frame,
-            area,
-            game,
-            xp_reward,
-            is_master,
-            ctx,
-            show_dismiss_hint,
-        );
+        render_morris_game_over(frame, area, game, ctx, show_dismiss_hint);
         return;
     }
 
@@ -549,8 +535,6 @@ fn render_morris_game_over(
     frame: &mut Frame,
     area: Rect,
     game: &MorrisGame,
-    xp_reward: u64,
-    is_master: bool,
     ctx: &super::responsive::LayoutContext,
     show_dismiss_hint: bool,
 ) {
@@ -569,11 +553,12 @@ fn render_morris_game_over(
     let result = game.game_result.unwrap();
     let (result_type, title, message, reward) = match result {
         MorrisResult::Win => {
-            let reward_text = if is_master {
-                format!("+{} XP, +1 Fishing Rank", xp_reward)
-            } else {
-                format!("+{} XP", xp_reward)
-            };
+            use crate::challenges::menu::DifficultyInfo;
+            let reward_text = game.difficulty.reward().description();
+            let reward_text = reward_text
+                .strip_prefix("Win: ")
+                .unwrap_or(&reward_text)
+                .to_string();
             (
                 GameResultType::Win,
                 "VICTORY!",

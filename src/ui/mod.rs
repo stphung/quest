@@ -589,14 +589,7 @@ fn draw_right_content(
             gomoku_scene::render_gomoku_scene(frame, area, game, ctx, show_dismiss_hint);
         }
         Some(ActiveMinigame::Morris(game)) => {
-            morris_scene::render_morris_scene(
-                frame,
-                area,
-                game,
-                game_state.character_level,
-                ctx,
-                show_dismiss_hint,
-            );
+            morris_scene::render_morris_scene(frame, area, game, ctx, show_dismiss_hint);
         }
         Some(ActiveMinigame::Chess(game)) => {
             chess_scene::render_chess_scene(frame, area, game, ctx, show_dismiss_hint);
