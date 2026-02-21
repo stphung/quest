@@ -4,9 +4,7 @@
 
 use quest::achievements::Achievements;
 use quest::character::attributes::AttributeType;
-use quest::character::prestige::{
-    can_prestige, get_prestige_tier, perform_prestige, PrestigeCombatBonuses,
-};
+use quest::character::prestige::{can_prestige, get_prestige_tier, perform_prestige};
 use quest::core::game_logic::{apply_tick_xp, xp_for_next_level};
 use quest::GameState;
 use rand::SeedableRng;
@@ -242,8 +240,9 @@ fn test_combat_to_prestige_full_loop() {
     let mut rng = seeded_rng();
     use quest::character::derived_stats::DerivedStats;
     use quest::character::prestige::{can_prestige, perform_prestige};
+    use quest::combat::events::CombatBonuses;
     use quest::combat::logic::update_combat;
-    use quest::combat::{CombatEvent, GodItemCombatBonuses, HavenCombatBonuses};
+    use quest::combat::CombatEvent;
     use quest::core::game_logic::spawn_enemy_if_needed;
     use quest::TICK_INTERVAL_MS;
 
@@ -273,11 +272,9 @@ fn test_combat_to_prestige_full_loop() {
             &mut rng,
             &mut state,
             delta_time,
-            &HavenCombatBonuses::default(),
-            &PrestigeCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
 
         // Apply XP from kills (mimics main.rs game loop)
@@ -357,11 +354,9 @@ fn test_combat_to_prestige_full_loop() {
             &mut rng,
             &mut state,
             delta_time,
-            &HavenCombatBonuses::default(),
-            &PrestigeCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
         for event in &events {
             if matches!(event, CombatEvent::EnemyDied { .. }) {

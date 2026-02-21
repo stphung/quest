@@ -1,43 +1,49 @@
 use crate::zones::BossDefeatResult;
 
-/// Haven bonuses that affect combat
-#[derive(Debug, Clone, Default)]
-pub struct HavenCombatBonuses {
-    /// Alchemy Lab: +% HP regen speed
-    pub hp_regen_percent: f64,
-    /// Bedroom: -% HP regen delay (reduces wait time before regen starts)
-    pub hp_regen_delay_reduction: f64,
-    /// Armory: +% damage
+/// Unified combat bonuses from all sources (Haven, god items, prestige).
+///
+/// The damage pipeline applies two separate damage% multipliers at different stages:
+/// 1. `early_damage_percent` — applied to base damage first (e.g. Giant's Might)
+/// 2. `damage_percent` — applied after early_damage_percent (e.g. Haven Armory)
+///
+/// Numeric fields default to 0 (no bonus).
+#[derive(Debug, Clone, Copy, Default)]
+pub struct CombatBonuses {
+    // --- Damage pipeline (player_attack.rs) ---
+    /// +% base damage, applied first (e.g. Giant's Might 150%)
+    pub early_damage_percent: f64,
+    /// +% damage, applied after early_damage_percent (e.g. Haven Armory)
     pub damage_percent: f64,
-    /// Watchtower: +% crit chance
+    /// Flat damage added after % multipliers, before enemy defense (prestige)
+    pub flat_damage: u32,
+    /// +% crit chance (e.g. Haven Watchtower + prestige crit)
     pub crit_chance_percent: f64,
-    /// War Room: +% chance to strike twice
+    /// +% chance to strike twice (e.g. Haven War Room)
     pub double_strike_chance: f64,
-    /// Training Yard: +% XP from kills
+    /// +% XP from kills (e.g. Haven Training Yard)
     pub xp_gain_percent: f64,
-}
 
-/// God item bonuses that affect combat
-pub struct GodItemCombatBonuses {
-    /// Asprika: Divine Bulwark damage reduction percent
+    // --- Defense pipeline (enemy_attack.rs) ---
+    /// Flat defense added to derived defense (prestige)
+    pub flat_defense: u32,
+    /// Damage reduction % applied after defense subtraction (e.g. Divine Bulwark 30%)
     pub damage_reduction_percent: f64,
-    /// Sleipnir: Windborne attack speed percent bonus
-    pub attack_speed_percent: f64,
-    /// Sleipnir: Swiftstrider regen duration reduction percent
-    pub regen_reduction_percent: f64,
-    /// Megingjord: Giant's Might damage percent bonus
-    pub damage_percent: f64,
-}
 
-impl Default for GodItemCombatBonuses {
-    fn default() -> Self {
-        Self {
-            damage_reduction_percent: 0.0,
-            attack_speed_percent: 0.0,
-            regen_reduction_percent: 0.0,
-            damage_percent: 0.0,
-        }
-    }
+    // --- HP (tick.rs) ---
+    /// Flat HP added to combat max HP (prestige)
+    pub flat_hp: u32,
+
+    // --- Attack speed (orchestration.rs) ---
+    /// +% attack speed (e.g. Windborne 100%)
+    pub attack_speed_percent: f64,
+
+    // --- Regeneration (regen.rs) ---
+    /// +% HP regen speed (e.g. Haven Alchemy Lab)
+    pub hp_regen_percent: f64,
+    /// -% HP regen delay (e.g. Haven Bedroom)
+    pub hp_regen_delay_reduction: f64,
+    /// -% regen duration (e.g. Sleipnir Swiftstrider)
+    pub regen_reduction_percent: f64,
 }
 
 pub enum CombatEvent {

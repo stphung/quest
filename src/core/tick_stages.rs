@@ -5,7 +5,7 @@
 
 use super::tick_types::{TickEvent, TickResult};
 use crate::achievements::Achievements;
-use crate::combat::{CombatEvent, HavenCombatBonuses};
+use crate::combat::CombatEvent;
 use crate::core::constants::{FINAL_ZONE_ID, STORMGLASS_MIN_PRESTIGE_RANK, TICKS_PER_SECOND};
 use crate::core::game_logic::{apply_tick_xp, try_discover_dungeon};
 use crate::core::game_state::GameState;

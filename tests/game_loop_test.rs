@@ -5,9 +5,9 @@
 
 use quest::achievements::Achievements;
 use quest::character::derived_stats::DerivedStats;
-use quest::character::prestige::PrestigeCombatBonuses;
+use quest::combat::events::CombatBonuses;
 use quest::combat::logic::update_combat;
-use quest::combat::{CombatEvent, GodItemCombatBonuses, HavenCombatBonuses};
+use quest::combat::CombatEvent;
 use quest::core::game_logic::{
     process_offline_progression, spawn_enemy_if_needed, xp_for_next_level,
 };
@@ -18,11 +18,6 @@ use rand_chacha::ChaCha8Rng;
 
 fn test_rng() -> ChaCha8Rng {
     ChaCha8Rng::seed_from_u64(42)
-}
-
-/// Default Haven combat bonuses for testing (no bonuses)
-fn default_haven_bonuses() -> HavenCombatBonuses {
-    HavenCombatBonuses::default()
 }
 
 /// Simulate a single game tick (100ms of game time)
@@ -47,11 +42,9 @@ fn simulate_tick_with_rng<R: rand::Rng>(state: &mut GameState, rng: &mut R) -> V
         rng,
         state,
         delta_time,
-        &default_haven_bonuses(),
-        &PrestigeCombatBonuses::default(),
+        &CombatBonuses::default(),
         &mut achievements,
         &derived,
-        &GodItemCombatBonuses::default(),
     )
 }
 

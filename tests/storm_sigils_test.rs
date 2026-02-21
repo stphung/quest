@@ -1,9 +1,8 @@
 //! Integration tests for Storm Sigils core types, grading, and generation.
 
 use quest::achievements::Achievements;
-use quest::character::combat_bonuses::PrestigeCombatBonuses;
 use quest::character::derived_stats::DerivedStats;
-use quest::combat::events::{CombatEvent, GodItemCombatBonuses, HavenCombatBonuses};
+use quest::combat::events::{CombatBonuses, CombatEvent};
 use quest::combat::logic::update_combat;
 use quest::combat::types::Enemy;
 use quest::core::constants::ATTACK_INTERVAL_SECONDS;
@@ -621,23 +620,13 @@ fn test_max_sigil_slots() {
 fn force_player_attack_damage(
     rng: &mut ChaCha8Rng,
     state: &mut GameState,
-    haven: &HavenCombatBonuses,
-    god_items: &GodItemCombatBonuses,
+    bonuses: &CombatBonuses,
 ) -> u32 {
     let d = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
     state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
     state.combat_state.enemy_attack_timer = 0.0;
     let mut ach = Achievements::default();
-    let events = update_combat(
-        rng,
-        state,
-        0.0,
-        haven,
-        &PrestigeCombatBonuses::default(),
-        &mut ach,
-        &d,
-        god_items,
-    );
+    let events = update_combat(rng, state, 0.0, bonuses, &mut ach, &d);
     events
         .iter()
         .filter_map(|e| match e {
@@ -675,12 +664,7 @@ fn test_sigil_damage_bonus_increases_player_damage() {
     let mut state = state_with_target();
 
     // Baseline: no sigils
-    let damage_base = force_player_attack_damage(
-        &mut rng,
-        &mut state,
-        &HavenCombatBonuses::default(),
-        &GodItemCombatBonuses::default(),
-    );
+    let damage_base = force_player_attack_damage(&mut rng, &mut state, &CombatBonuses::default());
 
     // Reset enemy HP
     state
@@ -690,20 +674,17 @@ fn test_sigil_damage_bonus_increases_player_damage() {
         .unwrap()
         .reset_hp();
 
-    // With sigil: +15% damage via HavenCombatBonuses (how tick.rs injects it)
-    let bonuses = SigilBonuses {
+    // With sigil: +15% damage (how tick.rs injects it via CombatBonuses.damage_percent)
+    let sigil_bonuses = SigilBonuses {
         damage_percent: 15.0,
         ..Default::default()
     };
-    let mut haven_with = HavenCombatBonuses::default();
-    haven_with.damage_percent += bonuses.damage_percent;
+    let bonuses_with = CombatBonuses {
+        damage_percent: sigil_bonuses.damage_percent,
+        ..CombatBonuses::default()
+    };
 
-    let damage_with = force_player_attack_damage(
-        &mut rng,
-        &mut state,
-        &haven_with,
-        &GodItemCombatBonuses::default(),
-    );
+    let damage_with = force_player_attack_damage(&mut rng, &mut state, &bonuses_with);
 
     assert!(
         damage_with > damage_base,
@@ -721,7 +702,6 @@ fn test_sigil_dr_bonus_reduces_enemy_damage() {
         Some(Enemy::new_with_defense("Hitter".to_string(), 99999, 100, 0));
 
     let d = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
-    let prestige = PrestigeCombatBonuses::default();
     let mut ach = Achievements::default();
 
     // Force enemy attack (no player attack)
@@ -733,11 +713,9 @@ fn test_sigil_dr_bonus_reduces_enemy_damage() {
         &mut rng,
         &mut state,
         0.1,
-        &HavenCombatBonuses::default(),
-        &prestige,
+        &CombatBonuses::default(),
         &mut ach,
         &d,
-        &GodItemCombatBonuses::default(),
     );
     let damage_base: u32 = events_base
         .iter()
@@ -752,21 +730,12 @@ fn test_sigil_dr_bonus_reduces_enemy_damage() {
     state.combat_state.enemy_attack_timer = 2.0;
     state.combat_state.player_attack_timer = 0.0;
 
-    // With sigil DR: 5% reduction via GodItemCombatBonuses (how tick.rs injects it)
-    let god_with_dr = GodItemCombatBonuses {
+    // With sigil DR: 5% reduction (how tick.rs injects it via CombatBonuses.damage_reduction_percent)
+    let bonuses_with_dr = CombatBonuses {
         damage_reduction_percent: 5.0,
-        ..Default::default()
+        ..CombatBonuses::default()
     };
-    let events_with = update_combat(
-        &mut rng,
-        &mut state,
-        0.1,
-        &HavenCombatBonuses::default(),
-        &prestige,
-        &mut ach,
-        &d,
-        &god_with_dr,
-    );
+    let events_with = update_combat(&mut rng, &mut state, 0.1, &bonuses_with_dr, &mut ach, &d);
     let damage_with: u32 = events_with
         .iter()
         .filter_map(|e| match e {
