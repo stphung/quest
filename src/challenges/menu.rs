@@ -157,7 +157,7 @@ impl ChallengeReward {
         }
 
         if self.stormglass > 0 {
-            parts.push(format!("+{} Stormglass", self.stormglass));
+            parts.push(format!("\u{1F48E}+{} Stormglass", self.stormglass));
         }
 
         if parts.is_empty() {
@@ -907,7 +907,7 @@ mod tests {
             stormglass: 750,
             ..Default::default()
         };
-        assert_eq!(reward.description(), "Win: +750 Stormglass");
+        assert_eq!(reward.description(), "Win: \u{1F48E}+750 Stormglass");
     }
 
     #[test]
@@ -935,7 +935,7 @@ mod tests {
         };
         assert_eq!(
             reward.description(),
-            "Win: +1 Prestige Rank, +500 Stormglass"
+            "Win: +1 Prestige Rank, \u{1F48E}+500 Stormglass"
         );
 
         // All three (order: prestige -> fishing -> stormglass)
@@ -946,7 +946,7 @@ mod tests {
         };
         assert_eq!(
             reward.description(),
-            "Win: +2 Prestige Ranks, +1 Fish Rank, +1000 Stormglass"
+            "Win: +2 Prestige Ranks, +1 Fish Rank, \u{1F48E}+1000 Stormglass"
         );
     }
 
