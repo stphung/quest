@@ -10,6 +10,7 @@ use crate::dungeon::types::Dungeon;
 use crate::fishing::types::{FishingSession, FishingState};
 use crate::items::equipment::Equipment;
 use crate::items::types::Rarity;
+use crate::stormglass::sigils::StormSigils;
 use crate::zones::ZoneProgression;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
@@ -82,6 +83,9 @@ pub struct GameState {
     /// Whether the player has discovered Stormglass (first gear salvage)
     #[serde(default)]
     pub stormglass_discovered: bool,
+    /// Storm Sigils — persistent sigil slots (character-level, survives prestige)
+    #[serde(default)]
+    pub storm_sigils: StormSigils,
     /// Active challenge minigame (transient, not saved)
     #[serde(skip)]
     pub active_minigame: Option<ActiveMinigame>,
@@ -152,6 +156,7 @@ impl GameState {
             chess_stats: ChessStats::default(),
             stormglass: 0,
             stormglass_discovered: false,
+            storm_sigils: StormSigils::new(),
             active_minigame: None,
             session_kills: 0,
             recent_drops: VecDeque::with_capacity(5),
@@ -555,5 +560,81 @@ mod tests {
         assert_eq!(loaded.fishing.rank, 1);
         assert_eq!(loaded.zone_progression.current_zone_id, 1);
         assert_eq!(loaded.chess_stats.games_played, 0);
+        // storm_sigils should default to 0 slots unlocked, no sigils inscribed
+        assert_eq!(loaded.storm_sigils.slots_unlocked, 0);
+        assert_eq!(loaded.storm_sigils.inscribed_count(), 0);
+    }
+
+    #[test]
+    fn test_storm_sigils_initialized_in_new() {
+        let gs = GameState::new("Sigil Hero".to_string(), 0);
+        assert_eq!(gs.storm_sigils.slots_unlocked, 0);
+        assert_eq!(gs.storm_sigils.sigils.len(), 5);
+        assert_eq!(gs.storm_sigils.inscribed_count(), 0);
+    }
+
+    #[test]
+    fn test_storm_sigils_serde_round_trip() {
+        use crate::stormglass::sigils::{Sigil, SigilEffectType, SigilGrade};
+
+        let mut gs = GameState::new("Sigil Hero".to_string(), 0);
+        gs.storm_sigils.slots_unlocked = 3;
+        gs.storm_sigils.sigils[0] = Some(Sigil {
+            effect: SigilEffectType::XpPercent,
+            value: 18.5,
+            grade: SigilGrade::A,
+        });
+        gs.storm_sigils.sigils[1] = Some(Sigil {
+            effect: SigilEffectType::DamagePercent,
+            value: 7.2,
+            grade: SigilGrade::C,
+        });
+
+        let json = serde_json::to_string(&gs).unwrap();
+        let loaded: GameState = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(loaded.storm_sigils.slots_unlocked, 3);
+        assert_eq!(loaded.storm_sigils.inscribed_count(), 2);
+        let s0 = loaded.storm_sigils.sigils[0].as_ref().unwrap();
+        assert_eq!(s0.effect, SigilEffectType::XpPercent);
+        assert!((s0.value - 18.5).abs() < 1e-10);
+        assert_eq!(s0.grade, SigilGrade::A);
+        let s1 = loaded.storm_sigils.sigils[1].as_ref().unwrap();
+        assert_eq!(s1.effect, SigilEffectType::DamagePercent);
+        assert!((s1.value - 7.2).abs() < 1e-10);
+        assert!(loaded.storm_sigils.sigils[2].is_none());
+    }
+
+    #[test]
+    fn test_storm_sigils_preserved_through_prestige() {
+        use crate::character::prestige_actions::perform_prestige;
+        use crate::stormglass::sigils::{Sigil, SigilEffectType, SigilGrade};
+
+        let mut gs = GameState::new("Prestige Hero".to_string(), 0);
+        // Make character eligible for prestige (level 10 required for first prestige)
+        gs.character_level = 10;
+        gs.prestige_rank = 0;
+
+        // Inscribe a sigil before prestige
+        gs.storm_sigils.slots_unlocked = 2;
+        gs.storm_sigils.sigils[0] = Some(Sigil {
+            effect: SigilEffectType::CritChancePercent,
+            value: 5.5,
+            grade: SigilGrade::APlus,
+        });
+
+        perform_prestige(&mut gs);
+
+        // Verify prestige happened
+        assert_eq!(gs.prestige_rank, 1);
+        assert_eq!(gs.character_level, 1);
+
+        // Verify sigils survived
+        assert_eq!(gs.storm_sigils.slots_unlocked, 2);
+        assert_eq!(gs.storm_sigils.inscribed_count(), 1);
+        let sigil = gs.storm_sigils.sigils[0].as_ref().unwrap();
+        assert_eq!(sigil.effect, SigilEffectType::CritChancePercent);
+        assert!((sigil.value - 5.5).abs() < 1e-10);
+        assert_eq!(sigil.grade, SigilGrade::APlus);
     }
 }

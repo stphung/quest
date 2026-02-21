@@ -32,6 +32,9 @@ pub const DEBUG_OPTIONS: &[&str] = &[
     "Forge Megingjord (God Item)",
     "Grant 1000 Stormglass",
     "Discover Stormglass",
+    "Grant 100k Stormglass",
+    "Inscribe Random Sigils (All Slots)",
+    "Inscribe S+ Sigil (Slot 1)",
 ];
 
 /// Debug menu state
@@ -102,6 +105,9 @@ impl DebugMenu {
             16 => trigger_forge_megingjord(state, enhancement),
             17 => trigger_grant_stormglass(state),
             18 => trigger_discover_stormglass(state),
+            19 => trigger_grant_100k_stormglass(state),
+            20 => trigger_inscribe_random_sigils(state),
+            21 => trigger_inscribe_s_plus_sigil(state),
             _ => "Unknown option",
         };
         self.close();
@@ -331,6 +337,44 @@ fn trigger_discover_stormglass(state: &mut GameState) -> &'static str {
     }
     state.stormglass_discovered = true;
     "Stormglass discovered!"
+}
+
+fn trigger_grant_100k_stormglass(state: &mut GameState) -> &'static str {
+    state.stormglass += 100_000;
+    state.stormglass_discovered = true;
+    "Granted 100,000 Stormglass!"
+}
+
+fn trigger_inscribe_random_sigils(state: &mut GameState) -> &'static str {
+    use crate::stormglass::sigils::{generate_sigil_choices, MAX_SIGIL_SLOTS};
+
+    // Unlock all slots first
+    state.storm_sigils.slots_unlocked = MAX_SIGIL_SLOTS as u8;
+    // Fill each slot with a random sigil (pick first of 3 choices)
+    let mut rng = rand::rng();
+    for slot in 0..MAX_SIGIL_SLOTS {
+        let choices = generate_sigil_choices(&mut rng);
+        state.storm_sigils.sigils[slot] = Some(choices[0].clone());
+    }
+    "All 5 sigil slots unlocked and inscribed!"
+}
+
+fn trigger_inscribe_s_plus_sigil(state: &mut GameState) -> &'static str {
+    use crate::stormglass::sigils::{Sigil, SigilEffectType, SigilGrade};
+
+    // Ensure at least 1 slot is unlocked
+    if state.storm_sigils.slots_unlocked == 0 {
+        state.storm_sigils.slots_unlocked = 1;
+    }
+    // Inscribe S+ Sigil of Fury (max damage%) in slot 0
+    let effect = SigilEffectType::DamagePercent;
+    let (_, max) = effect.range();
+    state.storm_sigils.sigils[0] = Some(Sigil {
+        effect,
+        value: max,
+        grade: SigilGrade::SPlus,
+    });
+    "S+ Sigil of Fury inscribed in slot 1!"
 }
 
 #[cfg(test)]

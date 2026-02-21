@@ -7,7 +7,13 @@ use crate::haven;
 /// Process offline XP and add combat log entries. Returns the report if XP was gained.
 pub fn apply_offline_xp(state: &mut GameState, haven: &haven::Haven) -> Option<OfflineReport> {
     let haven_offline_bonus = haven.get_bonus(haven::HavenBonusType::OfflineXpPercent);
-    let report = process_offline_progression(&mut rand::rng(), state, haven_offline_bonus);
+    let sigil_offline_bonus =
+        crate::stormglass::sigils::SigilBonuses::compute(&state.storm_sigils).offline_xp_percent;
+    let report = process_offline_progression(
+        &mut rand::rng(),
+        state,
+        haven_offline_bonus + sigil_offline_bonus,
+    );
     if report.xp_gained > 0 {
         let hours = report.elapsed_seconds / 3600;
         let minutes = (report.elapsed_seconds % 3600) / 60;

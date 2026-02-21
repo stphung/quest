@@ -36,6 +36,7 @@ impl CharacterManager {
             chess_stats: state.chess_stats.clone(),
             stormglass: state.stormglass,
             stormglass_discovered: state.stormglass_discovered,
+            storm_sigils: state.storm_sigils.clone(),
         };
 
         let json = serde_json::to_string_pretty(&save_data)
@@ -87,6 +88,7 @@ impl CharacterManager {
             game_over_shown_at: None,
             stormglass: save_data.stormglass,
             stormglass_discovered: save_data.stormglass_discovered,
+            storm_sigils: save_data.storm_sigils,
             chrono_surge_active: false,
         })
     }

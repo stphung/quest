@@ -33,6 +33,8 @@ pub(super) struct CharacterSaveData {
     pub(super) stormglass: u64,
     #[serde(default)]
     pub(super) stormglass_discovered: bool,
+    #[serde(default)]
+    pub(super) storm_sigils: crate::stormglass::sigils::StormSigils,
 }
 
 #[derive(Debug, Clone)]
@@ -125,6 +127,7 @@ mod tests {
             game_over_shown_at: None,
             stormglass: 0,
             stormglass_discovered: false,
+            storm_sigils: crate::stormglass::sigils::StormSigils::new(),
             chrono_surge_active: false,
         }
     }

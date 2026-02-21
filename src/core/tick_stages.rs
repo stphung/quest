@@ -99,8 +99,12 @@ pub fn process_dungeon_events<R: Rng>(
                             message: msg,
                         });
 
-                        // Stormglass: salvage non-equipped treasure items (requires P15+)
-                        if !equipped && state.prestige_rank >= STORMGLASS_MIN_PRESTIGE_RANK {
+                        // Stormglass: salvage non-equipped treasure items
+                        // Discovery requires P15+; once discovered, salvage always works
+                        if !equipped
+                            && (state.stormglass_discovered
+                                || state.prestige_rank >= STORMGLASS_MIN_PRESTIGE_RANK)
+                        {
                             let sg_amount =
                                 crate::stormglass::earning::salvage_value(treasure_rarity);
                             state.stormglass += sg_amount;
@@ -118,8 +122,10 @@ pub fn process_dungeon_events<R: Rng>(
                         }
                     }
 
-                    // Stormglass: dungeon cache from treasure room (requires P15+)
-                    if state.prestige_rank >= STORMGLASS_MIN_PRESTIGE_RANK {
+                    // Stormglass: dungeon cache from treasure room
+                    if state.stormglass_discovered
+                        || state.prestige_rank >= STORMGLASS_MIN_PRESTIGE_RANK
+                    {
                         if let Some(dungeon) = &state.active_dungeon {
                             let cache_amount =
                                 crate::stormglass::earning::dungeon_cache(dungeon.size);
@@ -604,8 +610,11 @@ pub(super) fn process_item_drop(
             from_boss: was_boss,
         });
 
-        // Stormglass: salvage non-equipped items (requires P15+)
-        if !equipped && state.prestige_rank >= STORMGLASS_MIN_PRESTIGE_RANK {
+        // Stormglass: salvage non-equipped items
+        // Discovery requires P15+; once discovered, salvage always works
+        if !equipped
+            && (state.stormglass_discovered || state.prestige_rank >= STORMGLASS_MIN_PRESTIGE_RANK)
+        {
             let sg_amount = crate::stormglass::earning::salvage_value(rarity);
             state.stormglass += sg_amount;
 

@@ -567,3 +567,67 @@ fn test_pre_p15_salvage_does_not_discover_stormglass() {
     assert!(!state.stormglass_discovered);
     assert_eq!(state.stormglass, 0);
 }
+
+/// Regression: once Stormglass is discovered, salvaging should keep working
+/// even if prestige_rank drops below 15 (e.g. from spending ranks on Haven).
+#[test]
+fn test_salvage_continues_after_prestige_rank_drops_below_15() {
+    use quest::achievements::Achievements;
+    use quest::character::attributes::AttributeType;
+    use quest::character::derived_stats::DerivedStats;
+    use quest::core::tick::game_tick;
+    use quest::core::tick_types::TickEvent;
+    use quest::enhancement::EnhancementProgress;
+    use quest::haven::Haven;
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    let mut state = GameState::new("Test".to_string(), 0);
+    // Simulate a player who discovered Stormglass at P15+ but spent ranks on Haven
+    state.stormglass_discovered = true;
+    state.stormglass = 100;
+    state.prestige_rank = 6; // Below the P15 threshold
+    state.character_level = 10;
+    state.attributes.set(AttributeType::Strength, 50);
+    state.attributes.set(AttributeType::Intelligence, 50);
+    let d = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
+    state.combat_state.update_max_hp(d.max_hp);
+    state.combat_state.player_current_hp = state.combat_state.player_max_hp;
+
+    let mut tick_counter = 0u32;
+    let mut enhancement = EnhancementProgress::new();
+    let mut haven = Haven::default();
+    let mut achievements = Achievements::default();
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+
+    let initial_sg = state.stormglass;
+    let mut saw_salvage = false;
+
+    for _ in 0..10000 {
+        let result = game_tick(
+            &mut state,
+            &mut tick_counter,
+            &mut haven,
+            &mut enhancement,
+            &mut achievements,
+            false,
+            &mut rng,
+        );
+        for event in &result.events {
+            if matches!(event, TickEvent::StormglassSalvaged { .. }) {
+                saw_salvage = true;
+            }
+        }
+    }
+
+    assert!(
+        saw_salvage,
+        "Should still salvage items after stormglass_discovered even with prestige_rank < 15"
+    );
+    assert!(
+        state.stormglass > initial_sg,
+        "Stormglass balance should have increased from salvage. Started: {}, now: {}",
+        initial_sg,
+        state.stormglass
+    );
+}
