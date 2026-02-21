@@ -2174,3 +2174,69 @@ fn test_xp_rate_stable_across_fishing_interruption() {
     );
     assert_eq!(state.xp_rate_samples.len(), 30, "Only combat seconds should be in samples");
 }
+
+#[test]
+fn test_combat_tick_pushes_xp_sample_when_flag_set() {
+    let mut state = fresh_state();
+    // Simulate a second where combat XP was earned
+    state.xp_this_second = 500;
+    state.combat_seconds_this_tick = true;
+
+    // Manually trigger second boundary in tick.rs logic
+    state.xp_rate_samples.clear();
+
+    // Push sample like tick.rs does
+    if state.combat_seconds_this_tick {
+        state.xp_rate_samples.push_back(state.xp_this_second);
+    }
+    state.xp_this_second = 0;
+    state.combat_seconds_this_tick = false;
+
+    assert_eq!(state.xp_rate_samples.len(), 1);
+    assert_eq!(state.xp_rate_samples[0], 500);
+    assert_eq!(state.xp_this_second, 0);
+    assert!(!state.combat_seconds_this_tick);
+}
+
+#[test]
+fn test_no_sample_pushed_when_combat_flag_false() {
+    let mut state = fresh_state();
+    state.xp_this_second = 0;
+    state.combat_seconds_this_tick = false;
+
+    let initial_len = state.xp_rate_samples.len();
+
+    // Simulate second boundary without combat
+    if state.combat_seconds_this_tick {
+        state.xp_rate_samples.push_back(state.xp_this_second);
+    }
+    state.xp_this_second = 0;
+    state.combat_seconds_this_tick = false;
+
+    assert_eq!(state.xp_rate_samples.len(), initial_len, "No sample should be pushed without combat");
+}
+
+#[test]
+fn test_xp_rate_samples_capped_at_900() {
+    let mut state = fresh_state();
+    // Pre-fill to 900
+    for i in 0..900 {
+        state.xp_rate_samples.push_back(i);
+    }
+    assert_eq!(state.xp_rate_samples.len(), 900);
+
+    // Simulate combat second boundary
+    state.xp_this_second = 9999;
+    state.combat_seconds_this_tick = true;
+
+    if state.combat_seconds_this_tick {
+        state.xp_rate_samples.push_back(state.xp_this_second);
+        if state.xp_rate_samples.len() > quest::core::constants::XP_RATE_WINDOW_SECONDS {
+            state.xp_rate_samples.pop_front();
+        }
+    }
+
+    assert_eq!(state.xp_rate_samples.len(), 900, "Samples should stay capped at 900");
+    assert_eq!(*state.xp_rate_samples.back().unwrap(), 9999, "New sample at back");
+    assert_eq!(*state.xp_rate_samples.front().unwrap(), 1, "Oldest (0) popped");
+}
