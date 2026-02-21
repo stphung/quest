@@ -2132,10 +2132,7 @@ fn test_fishing_tick_does_not_push_samples() {
         50,
         "Fishing should not push samples — count should be unchanged"
     );
-    assert_eq!(
-        state.xp_this_second, 0,
-        "xp_this_second should still reset"
-    );
+    assert_eq!(state.xp_this_second, 0, "xp_this_second should still reset");
 }
 
 #[test]
@@ -2172,7 +2169,11 @@ fn test_xp_rate_stable_across_fishing_interruption() {
         rate_before, rate_after,
         "XP rate should be unchanged after fishing interruption (no zeros pushed)"
     );
-    assert_eq!(state.xp_rate_samples.len(), 30, "Only combat seconds should be in samples");
+    assert_eq!(
+        state.xp_rate_samples.len(),
+        30,
+        "Only combat seconds should be in samples"
+    );
 }
 
 #[test]
@@ -2213,7 +2214,11 @@ fn test_no_sample_pushed_when_combat_flag_false() {
     state.xp_this_second = 0;
     state.combat_seconds_this_tick = false;
 
-    assert_eq!(state.xp_rate_samples.len(), initial_len, "No sample should be pushed without combat");
+    assert_eq!(
+        state.xp_rate_samples.len(),
+        initial_len,
+        "No sample should be pushed without combat"
+    );
 }
 
 #[test]
@@ -2236,7 +2241,19 @@ fn test_xp_rate_samples_capped_at_900() {
         }
     }
 
-    assert_eq!(state.xp_rate_samples.len(), 900, "Samples should stay capped at 900");
-    assert_eq!(*state.xp_rate_samples.back().unwrap(), 9999, "New sample at back");
-    assert_eq!(*state.xp_rate_samples.front().unwrap(), 1, "Oldest (0) popped");
+    assert_eq!(
+        state.xp_rate_samples.len(),
+        900,
+        "Samples should stay capped at 900"
+    );
+    assert_eq!(
+        *state.xp_rate_samples.back().unwrap(),
+        9999,
+        "New sample at back"
+    );
+    assert_eq!(
+        *state.xp_rate_samples.front().unwrap(),
+        1,
+        "Oldest (0) popped"
+    );
 }
