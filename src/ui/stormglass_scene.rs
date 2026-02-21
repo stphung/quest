@@ -209,8 +209,8 @@ fn render_exchange_menu(
             format!("{} SG", INVOKE_TRIAL_COST),
             state.stormglass >= INVOKE_TRIAL_COST,
         ),
-        ("Chrono Surge".to_string(), ">>>".to_string(), true),
-        ("Storm Sigils".to_string(), ">>>".to_string(), true),
+        ("\u{231B} Chrono Surge".to_string(), ">>>".to_string(), true),
+        ("\u{16B1} Storm Sigils".to_string(), ">>>".to_string(), true),
     ];
 
     let menu_start_row = 4i32;
@@ -586,7 +586,7 @@ fn render_chrono_surge_select(
     frame.render_widget(Clear, overlay_area);
 
     let title = format!(
-        " \u{1F48E} Chrono Surge  [\u{1F48E}{} SG] ",
+        " \u{231B} Chrono Surge  [\u{1F48E}{} SG] ",
         state.stormglass
     );
     let block = Block::default()
@@ -735,7 +735,7 @@ pub fn render_chrono_surge_banner(
     let lines = vec![
         Line::from(vec![
             Span::styled(
-                "\u{1F48E} Chrono Surge ",
+                "\u{231B} Chrono Surge ",
                 Style::default()
                     .fg(ELECTRIC_BLUE)
                     .add_modifier(Modifier::BOLD),
@@ -774,7 +774,7 @@ pub fn render_chrono_surge_summary(
 
     let block = Block::default()
         .title(Line::from(Span::styled(
-            " \u{1F48E} Chrono Surge Complete \u{1F48E} ",
+            " \u{231B} Chrono Surge Complete \u{231B} ",
             Style::default()
                 .fg(ELECTRIC_BLUE)
                 .add_modifier(Modifier::BOLD),
@@ -871,7 +871,7 @@ fn render_sigils_list(
     frame.render_widget(Clear, overlay_area);
 
     let title = format!(
-        " \u{1F48E} Storm Sigils  [\u{1F48E}{} SG] ",
+        " \u{16B1} Storm Sigils  [\u{1F48E}{} SG] ",
         state.stormglass
     );
     let block = Block::default()

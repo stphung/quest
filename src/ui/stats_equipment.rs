@@ -144,7 +144,7 @@ pub(super) fn draw_equipment_names_only(
 fn draw_sigil_sub_panel(frame: &mut Frame, area: Rect, storm_sigils: &StormSigils) {
     let inscribed = storm_sigils.inscribed_count();
     let title = format!(
-        " Storm Sigils ({}/{}) ",
+        " \u{16B1} Storm Sigils ({}/{}) ",
         inscribed, storm_sigils.slots_unlocked
     );
     let block = Block::default()
