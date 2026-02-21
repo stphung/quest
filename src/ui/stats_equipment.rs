@@ -158,7 +158,7 @@ fn draw_sigil_sub_panel(frame: &mut Frame, area: Rect, storm_sigils: &StormSigil
     let mut lines = Vec::new();
 
     for sigil in storm_sigils.sigils.iter().flatten() {
-        let name = sigil.effect.sigil_name();
+        let name = format!("{} {}", sigil.effect.icon(), sigil.effect.sigil_name());
         let value_str = format!("+{:.1}%", sigil.value);
         let grade_str = sigil.grade.label();
         let grade_color = sigil_grade_color(sigil.grade);
@@ -167,12 +167,14 @@ fn draw_sigil_sub_panel(frame: &mut Frame, area: Rect, storm_sigils: &StormSigil
         let right_part = format!("{}  {}", value_str, grade_str);
         let right_len = right_part.len();
         let name_max = width.saturating_sub(right_len + 4); // 2 indent + 2 gap
-        let display_name = if name.len() > name_max && name_max > 3 {
-            format!("{}...", &name[..name_max - 3])
+        let char_count = name.chars().count();
+        let display_name = if char_count > name_max && name_max > 3 {
+            let truncated: String = name.chars().take(name_max - 3).collect();
+            format!("{truncated}...")
         } else {
-            name.to_string()
+            name
         };
-        let pad = name_max.saturating_sub(display_name.len());
+        let pad = name_max.saturating_sub(display_name.chars().count());
 
         let grade_style = if grade_str.ends_with('+') {
             Style::default()
