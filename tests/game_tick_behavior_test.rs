@@ -49,8 +49,13 @@ fn default_fishing_bonuses() -> HavenFishingBonuses {
     HavenFishingBonuses::default()
 }
 
+fn seeded_rng() -> ChaCha8Rng {
+    ChaCha8Rng::seed_from_u64(42)
+}
+
 /// Replicate the game_tick combat path: sync max HP, spawn, update_combat
 fn simulate_combat_tick(
+    rng: &mut impl rand::Rng,
     state: &mut GameState,
     achievements: &mut Achievements,
 ) -> Vec<CombatEvent> {
@@ -66,6 +71,7 @@ fn simulate_combat_tick(
 
     // Update combat (game_tick line 1219)
     update_combat(
+        rng,
         state,
         delta_time,
         &default_haven_bonuses(),
@@ -78,8 +84,9 @@ fn simulate_combat_tick(
 
 /// Run combat ticks until an enemy dies, returning the XP gained
 fn run_until_enemy_dies(state: &mut GameState, achievements: &mut Achievements) -> Option<u64> {
+    let mut rng = seeded_rng();
     for _ in 0..5000 {
-        let events = simulate_combat_tick(state, achievements);
+        let events = simulate_combat_tick(&mut rng, state, achievements);
         for event in events {
             if let CombatEvent::EnemyDied { xp_gained } = event {
                 return Some(xp_gained);
@@ -94,12 +101,13 @@ fn run_until_boss_defeated(
     state: &mut GameState,
     achievements: &mut Achievements,
 ) -> Option<(u64, BossDefeatResult)> {
+    let mut rng = seeded_rng();
     for _ in 0..10_000 {
-        let events = simulate_combat_tick(state, achievements);
+        let events = simulate_combat_tick(&mut rng, state, achievements);
         for event in events {
             match event {
                 CombatEvent::EnemyDied { xp_gained } => {
-                    apply_tick_xp(state, xp_gained as f64);
+                    apply_tick_xp(&mut rng, state, xp_gained as f64);
                 }
                 CombatEvent::SubzoneBossDefeated { xp_gained, result } => {
                     return Some((xp_gained, result));
@@ -130,6 +138,7 @@ fn create_strong_character(name: &str) -> GameState {
 
 #[test]
 fn test_combat_kill_applies_xp_and_tracks_session_kills() {
+    let mut rng = seeded_rng();
     let mut state = create_strong_character("XP Kill Test");
     let mut achievements = Achievements::default();
 
@@ -140,7 +149,7 @@ fn test_combat_kill_applies_xp_and_tracks_session_kills() {
         run_until_enemy_dies(&mut state, &mut achievements).expect("Should kill an enemy");
 
     // game_tick applies XP from EnemyDied (line 1279)
-    apply_tick_xp(&mut state, xp_gained as f64);
+    apply_tick_xp(&mut rng, &mut state, xp_gained as f64);
     // game_tick increments session_kills (line 1284)
     state.session_kills += 1;
 
@@ -157,6 +166,7 @@ fn test_combat_kill_applies_xp_and_tracks_session_kills() {
 
 #[test]
 fn test_combat_kill_xp_can_cause_level_up() {
+    let mut rng = seeded_rng();
     let mut state = GameState::new("Level Up Kill Test".to_string(), 0);
     let mut achievements = Achievements::default();
 
@@ -168,7 +178,7 @@ fn test_combat_kill_xp_can_cause_level_up() {
         run_until_enemy_dies(&mut state, &mut achievements).expect("Should kill an enemy");
 
     let level_before = state.character_level;
-    apply_tick_xp(&mut state, xp_gained as f64);
+    apply_tick_xp(&mut rng, &mut state, xp_gained as f64);
 
     // The kill XP should push us over the level threshold
     assert!(
@@ -179,6 +189,7 @@ fn test_combat_kill_xp_can_cause_level_up() {
 
 #[test]
 fn test_level_up_triggers_achievement_sync() {
+    let mut rng = seeded_rng();
     let mut state = GameState::new("Achievement Level Test".to_string(), 0);
     let mut achievements = Achievements::default();
 
@@ -190,7 +201,7 @@ fn test_level_up_triggers_achievement_sync() {
         run_until_enemy_dies(&mut state, &mut achievements).expect("Should kill an enemy");
 
     let level_before = state.character_level;
-    apply_tick_xp(&mut state, xp_gained as f64);
+    apply_tick_xp(&mut rng, &mut state, xp_gained as f64);
 
     // game_tick syncs achievements on level up (line 1281-1282)
     if state.character_level > level_before {
@@ -291,13 +302,14 @@ fn test_mob_drop_adds_to_recent_drops() {
 
 #[test]
 fn test_kill_can_trigger_dungeon_discovery() {
+    let mut rng = seeded_rng();
     let mut state = GameState::new("Dungeon Discovery Test".to_string(), 0);
 
     // try_discover_dungeon has a random chance per call
     // Call it many times to verify it can trigger
     let mut discovered = false;
     for _ in 0..1000 {
-        if try_discover_dungeon(&mut state) {
+        if try_discover_dungeon(&mut rng, &mut state) {
             discovered = true;
             break;
         }
@@ -315,6 +327,7 @@ fn test_kill_can_trigger_dungeon_discovery() {
 
 #[test]
 fn test_dungeon_discovery_blocked_while_in_dungeon() {
+    let mut rng = seeded_rng();
     let mut state = GameState::new("Dungeon Block Test".to_string(), 0);
 
     // Put player in a dungeon
@@ -322,7 +335,7 @@ fn test_dungeon_discovery_blocked_while_in_dungeon() {
     state.active_dungeon = Some(dungeon);
 
     // game_tick checks active_dungeon.is_none() before trying (line 1322)
-    let discovered = try_discover_dungeon(&mut state);
+    let discovered = try_discover_dungeon(&mut rng, &mut state);
     assert!(
         !discovered,
         "Should not discover dungeon while already in one"
@@ -349,6 +362,7 @@ fn test_fishing_discovery_requires_no_dungeon_or_fishing() {
 
 #[test]
 fn test_subzone_boss_defeat_advances_subzone() {
+    let mut rng = seeded_rng();
     let mut state = create_strong_character("Boss Advance Test");
     let mut achievements = Achievements::default();
 
@@ -362,7 +376,7 @@ fn test_subzone_boss_defeat_advances_subzone() {
     let (xp_gained, defeat_result) = result.unwrap();
 
     // Apply XP (game_tick line 1434)
-    apply_tick_xp(&mut state, xp_gained as f64);
+    apply_tick_xp(&mut rng, &mut state, xp_gained as f64);
 
     // game_tick line 1440: increment session kills on boss defeat
     state.session_kills += 1;
@@ -550,6 +564,7 @@ fn test_dungeon_tick_produces_events() {
 
 #[test]
 fn test_dungeon_treasure_room_gives_item() {
+    let mut rng = seeded_rng();
     let mut state = GameState::new("Dungeon Treasure Test".to_string(), 0);
     state.character_level = 10;
 
@@ -583,7 +598,7 @@ fn test_dungeon_treasure_room_gives_item() {
         dungeon.current_room_cleared = false;
 
         // on_treasure_room_entered generates an item and auto-equips (game_tick line 1069)
-        if let Some((item, equipped)) = on_treasure_room_entered(&mut state, 0.0) {
+        if let Some((item, equipped)) = on_treasure_room_entered(&mut rng, &mut state, 0.0) {
             assert!(
                 !item.display_name.is_empty(),
                 "Treasure item should have a name"
@@ -864,6 +879,7 @@ fn test_visual_effects_tick_down() {
 
 #[test]
 fn test_haven_combat_bonuses_passed_to_update_combat() {
+    let mut rng = seeded_rng();
     let mut state = create_strong_character("Haven Bonus Test");
     let mut achievements = Achievements::default();
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
@@ -889,6 +905,7 @@ fn test_haven_combat_bonuses_passed_to_update_combat() {
 
     // Run combat with haven bonuses
     let events = update_combat(
+        &mut rng,
         &mut state,
         delta_time,
         &haven_combat,
@@ -956,6 +973,7 @@ fn test_dungeon_combat_room_cleared_after_kill() {
 
 #[test]
 fn test_full_combat_kill_orchestration() {
+    let mut rng = seeded_rng();
     let mut state = create_strong_character("Full Orchestration Test");
     let mut achievements = Achievements::default();
 
@@ -967,7 +985,7 @@ fn test_full_combat_kill_orchestration() {
 
     // Apply XP (game_tick line 1279)
     let level_before = state.character_level;
-    apply_tick_xp(&mut state, xp_gained as f64);
+    apply_tick_xp(&mut rng, &mut state, xp_gained as f64);
 
     // Check level up → achievement (game_tick lines 1281-1283)
     if state.character_level > level_before {

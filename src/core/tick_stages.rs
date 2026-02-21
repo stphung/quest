@@ -27,14 +27,15 @@ use rand::{Rng, RngExt};
 
 /// Apply XP to the player and emit a LeveledUp event if the character leveled up.
 /// Also notifies the achievement system about any new levels reached.
-fn apply_xp_and_check_levelup(
+fn apply_xp_and_check_levelup<R: Rng>(
+    rng: &mut R,
     state: &mut GameState,
     xp: f64,
     achievements: &mut Achievements,
     result: &mut TickResult,
 ) {
     let level_before = state.character_level;
-    apply_tick_xp(state, xp);
+    apply_tick_xp(rng, state, xp);
     if state.character_level > level_before {
         for lvl in (level_before + 1)..=state.character_level {
             achievements.on_level_up(lvl, Some(&state.character_name));
@@ -77,7 +78,7 @@ pub fn process_dungeon_events<R: Rng>(
                 // Handle treasure room
                 if room_type == RoomType::Treasure {
                     if let Some((item, equipped)) =
-                        on_treasure_room_entered(state, haven_bonuses.item_rarity_percent)
+                        on_treasure_room_entered(rng, state, haven_bonuses.item_rarity_percent)
                     {
                         let status = if equipped {
                             "Equipped!"
@@ -371,7 +372,7 @@ pub fn process_combat_events<R: Rng>(
                 });
 
                 // Apply XP and check level up
-                apply_xp_and_check_levelup(state, xp_gained as f64, achievements, result);
+                apply_xp_and_check_levelup(rng, state, xp_gained as f64, achievements, result);
                 state.session_kills += 1;
 
                 // Track XP in dungeon and mark room cleared
@@ -398,7 +399,7 @@ pub fn process_combat_events<R: Rng>(
                     message,
                 });
 
-                apply_xp_and_check_levelup(state, xp_gained as f64, achievements, result);
+                apply_xp_and_check_levelup(rng, state, xp_gained as f64, achievements, result);
                 add_dungeon_xp(state, xp_gained);
 
                 // Give key
@@ -418,7 +419,7 @@ pub fn process_combat_events<R: Rng>(
 
                 // Calculate boss bonus XP
                 let (bonus_xp, total_xp, items) = if let Some(dungeon) = &state.active_dungeon {
-                    let bonus = calculate_boss_xp_reward(dungeon.size);
+                    let bonus = calculate_boss_xp_reward(rng, dungeon.size);
                     let total = dungeon.xp_earned + xp_gained + bonus;
                     let item_count = dungeon.collected_items.len();
                     (bonus, total, item_count)
@@ -427,6 +428,7 @@ pub fn process_combat_events<R: Rng>(
                 };
 
                 apply_xp_and_check_levelup(
+                    rng,
                     state,
                     (xp_gained + bonus_xp) as f64,
                     achievements,
@@ -483,7 +485,7 @@ pub fn process_combat_events<R: Rng>(
                 xp_gained,
                 result: defeat_result,
             } => {
-                apply_xp_and_check_levelup(state, xp_gained as f64, achievements, result);
+                apply_xp_and_check_levelup(rng, state, xp_gained as f64, achievements, result);
                 state.session_kills += 1;
 
                 // Track zone achievements
@@ -626,7 +628,7 @@ pub(super) fn process_discoveries<R: Rng>(
     result: &mut TickResult,
 ) {
     // Try dungeon discovery (only outside dungeons)
-    let discovered_dungeon = state.active_dungeon.is_none() && try_discover_dungeon(state);
+    let discovered_dungeon = state.active_dungeon.is_none() && try_discover_dungeon(rng, state);
     if discovered_dungeon {
         result.events.push(TickEvent::DungeonDiscovered {
             message: "\u{1f300} You notice a dark passage leading underground...".to_string(),

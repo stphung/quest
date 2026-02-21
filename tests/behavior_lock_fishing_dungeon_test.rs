@@ -24,6 +24,10 @@ use quest::TICK_INTERVAL_MS;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 
+fn seeded_rng() -> ChaCha8Rng {
+    ChaCha8Rng::seed_from_u64(42)
+}
+
 // =============================================================================
 // Helper Functions
 // =============================================================================
@@ -578,12 +582,13 @@ fn test_dungeon_player_death_clears_dungeon_no_prestige_loss() {
 
 #[test]
 fn test_dungeon_treasure_room_gives_item() {
+    let mut rng = seeded_rng();
     // Behavior: EnteredRoom with Treasure type triggers on_treasure_room_entered (line 1068-1078)
     let mut state = create_test_state();
     state.active_dungeon = Some(generate_dungeon(10, 0, 1));
 
     // on_treasure_room_entered generates an item and auto-equips if better
-    let result = on_treasure_room_entered(&mut state, 0.0);
+    let result = on_treasure_room_entered(&mut rng, &mut state, 0.0);
     assert!(result.is_some(), "Treasure room should produce an item");
 
     let (item, _equipped) = result.unwrap();

@@ -1,16 +1,14 @@
 use super::constants::*;
 use super::game_state::GameState;
-use rand::RngExt;
+use rand::{Rng, RngExt};
 
 /// Attempts to discover a dungeon after killing an enemy
 /// Returns true if a dungeon was discovered and entered
-pub fn try_discover_dungeon(state: &mut GameState) -> bool {
+pub fn try_discover_dungeon<R: Rng>(rng: &mut R, state: &mut GameState) -> bool {
     // Don't discover if already in a dungeon
     if state.active_dungeon.is_some() {
         return false;
     }
-
-    let mut rng = rand::rng();
 
     if rng.random::<f64>() >= DUNGEON_DISCOVERY_CHANCE {
         return false;
@@ -32,26 +30,34 @@ pub fn try_discover_dungeon(state: &mut GameState) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    fn seeded_rng() -> ChaCha8Rng {
+        ChaCha8Rng::seed_from_u64(42)
+    }
 
     #[test]
     fn test_try_discover_dungeon_skips_when_in_dungeon() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
 
         state.active_dungeon = Some(crate::dungeon::generation::generate_dungeon(1, 0, 1));
 
         for _ in 0..100 {
-            assert!(!try_discover_dungeon(&mut state));
+            assert!(!try_discover_dungeon(&mut rng, &mut state));
         }
     }
 
     #[test]
     fn test_try_discover_dungeon_probability() {
+        let mut rng = seeded_rng();
         let mut discoveries = 0;
         let trials = 3_000;
 
         for _ in 0..trials {
             let mut state = GameState::new("Test Hero".to_string(), 0);
-            if try_discover_dungeon(&mut state) {
+            if try_discover_dungeon(&mut rng, &mut state) {
                 discoveries += 1;
             }
         }
@@ -65,13 +71,14 @@ mod tests {
 
     #[test]
     fn test_try_discover_dungeon_creates_valid_dungeon() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         state.character_level = 10;
         state.prestige_rank = 1;
 
         let mut discovered = false;
         for _ in 0..1000 {
-            if try_discover_dungeon(&mut state) {
+            if try_discover_dungeon(&mut rng, &mut state) {
                 discovered = true;
                 break;
             }
@@ -87,11 +94,12 @@ mod tests {
 
     #[test]
     fn test_discovery_blocked_during_active_dungeon() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         state.active_dungeon = Some(crate::dungeon::generation::generate_dungeon(1, 0, 1));
 
         for _ in 0..100 {
-            assert!(!try_discover_dungeon(&mut state));
+            assert!(!try_discover_dungeon(&mut rng, &mut state));
         }
     }
 }

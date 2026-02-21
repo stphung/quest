@@ -16,12 +16,18 @@ mod tests {
     use crate::core::constants::*;
     use crate::core::game_state::GameState;
     use crate::dungeon::types::RoomType;
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
 
     use crate::achievements::Achievements;
 
     // =========================================================================
     // Test Helpers
     // =========================================================================
+
+    fn seeded_rng() -> ChaCha8Rng {
+        ChaCha8Rng::seed_from_u64(42)
+    }
 
     fn default_prestige() -> PrestigeCombatBonuses {
         PrestigeCombatBonuses::default()
@@ -33,6 +39,7 @@ mod tests {
 
     /// Forces a player attack by setting the player timer, suppressing enemy attack.
     fn force_player_attack(
+        rng: &mut impl rand::Rng,
         state: &mut GameState,
         haven: &HavenCombatBonuses,
         achievements: &mut Achievements,
@@ -41,6 +48,7 @@ mod tests {
         state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
         state.combat_state.enemy_attack_timer = 0.0;
         update_combat(
+            rng,
             state,
             0.1,
             haven,
@@ -53,6 +61,7 @@ mod tests {
 
     /// Forces an enemy attack by setting the enemy timer, suppressing player attack.
     fn force_enemy_attack(
+        rng: &mut impl rand::Rng,
         state: &mut GameState,
         haven: &HavenCombatBonuses,
         achievements: &mut Achievements,
@@ -61,6 +70,7 @@ mod tests {
         state.combat_state.player_attack_timer = 0.0;
         state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         update_combat(
+            rng,
             state,
             0.1,
             haven,
@@ -73,6 +83,7 @@ mod tests {
 
     /// Forces both player and enemy to attack in the same tick.
     fn force_both_attacks(
+        rng: &mut impl rand::Rng,
         state: &mut GameState,
         haven: &HavenCombatBonuses,
         achievements: &mut Achievements,
@@ -81,6 +92,7 @@ mod tests {
         state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
         state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         update_combat(
+            rng,
             state,
             0.1,
             haven,
@@ -122,10 +134,12 @@ mod tests {
 
     #[test]
     fn test_update_combat_no_enemy() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
         let derived = default_derived(&state);
         let events = update_combat(
+            &mut rng,
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -139,6 +153,7 @@ mod tests {
 
     #[test]
     fn test_update_combat_attack_interval() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
         state.combat_state.current_enemy = Some(Enemy::new("Test".to_string(), 100, 5));
@@ -146,6 +161,7 @@ mod tests {
 
         // Not enough time passed
         let events = update_combat(
+            &mut rng,
             &mut state,
             0.5,
             &HavenCombatBonuses::default(),
@@ -158,6 +174,7 @@ mod tests {
 
         // Enough time for player attack (1.5s total), but not enemy (needs 2.0s)
         let events = update_combat(
+            &mut rng,
             &mut state,
             1.0,
             &HavenCombatBonuses::default(),
@@ -171,6 +188,7 @@ mod tests {
 
     #[test]
     fn test_player_died_resets() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
         state.combat_state.player_current_hp = 1;
@@ -178,6 +196,7 @@ mod tests {
 
         // Force both attacks (need enemy to attack to kill player)
         let events = force_both_attacks(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -200,6 +219,7 @@ mod tests {
 
     #[test]
     fn test_regeneration_after_kill() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
         state.combat_state.player_current_hp = 10;
@@ -207,6 +227,7 @@ mod tests {
 
         // Force player attack to kill enemy
         let events = force_player_attack(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -225,6 +246,7 @@ mod tests {
         // Update to complete regen
         let derived = default_derived(&state);
         update_combat(
+            &mut rng,
             &mut state,
             HP_REGEN_DURATION_SECONDS,
             &HavenCombatBonuses::default(),
@@ -242,6 +264,7 @@ mod tests {
 
     #[test]
     fn test_player_died_in_dungeon() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
         state.combat_state.player_current_hp = 1;
@@ -253,6 +276,7 @@ mod tests {
 
         // Force both attacks (need enemy to attack to kill player)
         let events = force_both_attacks(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -281,6 +305,7 @@ mod tests {
 
     #[test]
     fn test_weapon_blocked_boss_no_damage() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default(); // No TheStormbreaker achievement
 
@@ -295,6 +320,7 @@ mod tests {
 
         // Force player attack (blocked, but we only check player side)
         let events = force_player_attack(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -313,6 +339,7 @@ mod tests {
 
     #[test]
     fn test_weapon_blocked_boss_still_attacks_back() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default(); // No TheStormbreaker achievement
 
@@ -326,6 +353,7 @@ mod tests {
 
         // Force both attacks (enemy attacks independently now)
         let events = force_both_attacks(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -343,6 +371,7 @@ mod tests {
 
     #[test]
     fn test_death_to_weapon_blocked_boss_resets_encounter() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default(); // No TheStormbreaker achievement
 
@@ -358,6 +387,7 @@ mod tests {
 
         // Force both attacks (enemy kills player)
         let events = force_both_attacks(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -384,6 +414,7 @@ mod tests {
 
     #[test]
     fn test_defense_reduces_enemy_damage() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
 
@@ -399,6 +430,7 @@ mod tests {
 
         // Force both attacks (need enemy to attack to test defense)
         force_both_attacks(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -415,6 +447,7 @@ mod tests {
 
     #[test]
     fn test_defense_reduces_damage_to_minimum_floor() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
 
@@ -429,6 +462,7 @@ mod tests {
 
         // Force both attacks (need enemy to attack to test defense)
         force_both_attacks(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -440,6 +474,7 @@ mod tests {
 
     #[test]
     fn test_subzone_boss_defeat() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
 
@@ -453,6 +488,7 @@ mod tests {
 
         // Force player attack to kill boss
         let events = force_player_attack(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -470,6 +506,7 @@ mod tests {
 
     #[test]
     fn test_regular_kill_records_progress() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
 
@@ -480,6 +517,7 @@ mod tests {
 
         // Force player attack to kill
         let events = force_player_attack(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -497,6 +535,7 @@ mod tests {
 
     #[test]
     fn test_regeneration_skips_combat() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
         state.combat_state.is_regenerating = true;
@@ -509,6 +548,7 @@ mod tests {
         state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         let derived = default_derived(&state);
         let events = update_combat(
+            &mut rng,
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -528,6 +568,7 @@ mod tests {
 
     #[test]
     fn test_gradual_regeneration() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
         state.combat_state.is_regenerating = true;
@@ -538,6 +579,7 @@ mod tests {
         // Partial regen (half duration)
         let derived = default_derived(&state);
         update_combat(
+            &mut rng,
             &mut state,
             HP_REGEN_DURATION_SECONDS / 2.0,
             &HavenCombatBonuses::default(),
@@ -555,6 +597,7 @@ mod tests {
 
     #[test]
     fn test_death_to_any_boss_resets_encounter() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
 
@@ -570,6 +613,7 @@ mod tests {
 
         // Force both attacks (enemy kills player)
         let events = force_both_attacks(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -592,6 +636,7 @@ mod tests {
 
     #[test]
     fn test_crit_doubles_damage() {
+        let mut rng = seeded_rng();
         // Verify that when a crit occurs, damage is exactly 2x base total_damage
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
@@ -611,6 +656,7 @@ mod tests {
         state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
         state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
         let events = update_combat(
+            &mut rng,
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -634,6 +680,7 @@ mod tests {
 
     #[test]
     fn test_zero_crit_chance_never_crits() {
+        let mut rng = seeded_rng();
         // With base attributes (DEX 10, mod 0), crit_chance = 5%.
         // Set DEX very low so crit_chance_percent = 0.
         // crit_chance_percent = (5 + dex_mod).max(0); need dex_mod <= -5 => DEX <= 0
@@ -657,6 +704,7 @@ mod tests {
             s.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
             let d = default_derived(&s);
             let events = update_combat(
+                &mut rng,
                 &mut s,
                 0.1,
                 &HavenCombatBonuses::default(),
@@ -679,6 +727,7 @@ mod tests {
 
     #[test]
     fn test_player_total_damage_matches_derived_stats() {
+        let mut rng = seeded_rng();
         // With no crit (low DEX), verify damage equals derived total_damage
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
@@ -700,6 +749,7 @@ mod tests {
         state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
         state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
         let events = update_combat(
+            &mut rng,
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -722,6 +772,7 @@ mod tests {
 
     #[test]
     fn test_enemy_damage_exactly_reduced_by_defense() {
+        let mut rng = seeded_rng();
         // Verify enemy_damage = enemy.damage.saturating_sub(defense) precisely
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
@@ -740,6 +791,7 @@ mod tests {
 
         // Force enemy attack to test damage reduction
         force_enemy_attack(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -751,6 +803,7 @@ mod tests {
 
     #[test]
     fn test_multi_turn_combat_kills_enemy() {
+        let mut rng = seeded_rng();
         // Run combat over multiple turns until the enemy dies
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
@@ -781,6 +834,7 @@ mod tests {
         // Simulate up to 20 attack cycles
         for _ in 0..20 {
             let events = force_both_attacks(
+                &mut rng,
                 &mut state,
                 &HavenCombatBonuses::default(),
                 &mut achievements,
@@ -807,6 +861,7 @@ mod tests {
             if state.combat_state.is_regenerating {
                 let d = default_derived(&state);
                 update_combat(
+                    &mut rng,
                     &mut state,
                     HP_REGEN_DURATION_SECONDS,
                     &HavenCombatBonuses::default(),
@@ -911,13 +966,14 @@ mod tests {
 
     #[test]
     fn test_combat_kill_xp_within_expected_range() {
+        let mut rng = seeded_rng();
         // combat_kill_xp returns xp_per_tick * random(200..400)
         let xp_per_tick = crate::core::game_logic::xp_gain_per_tick(0, 0, 0);
         let min_expected = xp_per_tick * COMBAT_XP_MIN_TICKS as f64;
         let max_expected = xp_per_tick * COMBAT_XP_MAX_TICKS as f64;
 
         for _ in 0..100 {
-            let xp = crate::core::game_logic::combat_kill_xp(xp_per_tick, 0.0);
+            let xp = crate::core::game_logic::combat_kill_xp(&mut rng, xp_per_tick, 0.0);
             assert!(
                 xp >= min_expected as u64 && xp <= max_expected as u64,
                 "XP {} should be in range [{}, {}]",
@@ -930,6 +986,7 @@ mod tests {
 
     #[test]
     fn test_xp_gained_on_enemy_death() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
         let initial_xp = state.character_xp;
@@ -939,6 +996,7 @@ mod tests {
         state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
         let derived = default_derived(&state);
         let events = update_combat(
+            &mut rng,
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -1008,6 +1066,7 @@ mod tests {
 
     #[test]
     fn test_enemy_min_damage_with_high_defense() {
+        let mut rng = seeded_rng();
         // When defense >= enemy damage, player takes minimum 1 damage (min floor)
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
@@ -1024,6 +1083,7 @@ mod tests {
         state.combat_state.current_enemy = Some(Enemy::new("Weak".to_string(), 10000, 5));
         // Force both attacks so enemy actually attacks
         force_both_attacks(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -1035,6 +1095,7 @@ mod tests {
 
     #[test]
     fn test_death_to_regular_enemy_resets_enemy_hp() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
         state.zone_progression.fighting_boss = false;
@@ -1047,6 +1108,7 @@ mod tests {
 
         // Force both attacks (enemy kills player)
         let events = force_both_attacks(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -1062,6 +1124,7 @@ mod tests {
 
     #[test]
     fn test_prestige_rank_preserved_on_death() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
 
@@ -1078,6 +1141,7 @@ mod tests {
 
         // Force both attacks (enemy kills player)
         let events = force_both_attacks(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -1093,6 +1157,7 @@ mod tests {
 
     #[test]
     fn test_crit_multiplier_from_equipment() {
+        let mut rng = seeded_rng();
         use crate::items::types::{
             Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity,
         };
@@ -1130,6 +1195,7 @@ mod tests {
         state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
         let mut achievements = Achievements::default();
         let events = update_combat(
+            &mut rng,
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -1153,6 +1219,7 @@ mod tests {
 
     #[test]
     fn test_attack_speed_reduces_interval() {
+        let mut rng = seeded_rng();
         use crate::items::types::{
             Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity,
         };
@@ -1184,6 +1251,7 @@ mod tests {
         state.combat_state.player_attack_timer = 1.0;
         let derived = default_derived(&state);
         let events = update_combat(
+            &mut rng,
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -1201,6 +1269,7 @@ mod tests {
 
     #[test]
     fn test_attack_speed_normal_interval_without_affix() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
         state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
@@ -1209,6 +1278,7 @@ mod tests {
         state.combat_state.player_attack_timer = 1.0;
         let derived = default_derived(&state);
         let events = update_combat(
+            &mut rng,
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -1226,6 +1296,7 @@ mod tests {
 
     #[test]
     fn test_hp_regen_speed_with_affix() {
+        let mut rng = seeded_rng();
         use crate::items::types::{
             Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity,
         };
@@ -1259,6 +1330,7 @@ mod tests {
         // After 1.25 seconds, should be fully healed
         let derived = default_derived(&state);
         update_combat(
+            &mut rng,
             &mut state,
             1.25,
             &HavenCombatBonuses::default(),
@@ -1274,6 +1346,7 @@ mod tests {
 
     #[test]
     fn test_hp_regen_normal_duration_without_affix() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
 
@@ -1285,6 +1358,7 @@ mod tests {
         // Without regen bonus, 1.25 seconds is not enough (need 2.5)
         let derived = default_derived(&state);
         update_combat(
+            &mut rng,
             &mut state,
             1.25,
             &HavenCombatBonuses::default(),
@@ -1301,6 +1375,7 @@ mod tests {
 
     #[test]
     fn test_haven_hp_regen_bonus() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
 
@@ -1317,6 +1392,7 @@ mod tests {
         };
         let derived = default_derived(&state);
         update_combat(
+            &mut rng,
             &mut state,
             1.25,
             &haven,
@@ -1332,6 +1408,7 @@ mod tests {
 
     #[test]
     fn test_haven_hp_regen_stacks_with_equipment() {
+        let mut rng = seeded_rng();
         use crate::items::types::{
             Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity,
         };
@@ -1370,6 +1447,7 @@ mod tests {
         let mut achievements = Achievements::default();
         let derived = default_derived(&state);
         update_combat(
+            &mut rng,
             &mut state,
             0.84,
             &haven,
@@ -1385,6 +1463,7 @@ mod tests {
 
     #[test]
     fn test_damage_reflection_hurts_attacker() {
+        let mut rng = seeded_rng();
         use crate::character::attributes::AttributeType;
         use crate::items::types::{
             Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity,
@@ -1422,6 +1501,7 @@ mod tests {
         ));
         // Force both attacks (enemy attacks -> reflection triggers)
         force_both_attacks(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -1445,6 +1525,7 @@ mod tests {
 
     #[test]
     fn test_damage_reflection_can_kill_enemy() {
+        let mut rng = seeded_rng();
         use crate::items::types::{
             Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity,
         };
@@ -1476,6 +1557,7 @@ mod tests {
         let mut achievements = Achievements::default();
         // Force both attacks - player kills enemy outright (5 HP < player damage)
         let events = force_both_attacks(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -1490,6 +1572,7 @@ mod tests {
 
     #[test]
     fn test_damage_reflection_zero_when_no_damage_taken() {
+        let mut rng = seeded_rng();
         use crate::items::types::{
             Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity,
         };
@@ -1527,6 +1610,7 @@ mod tests {
         let initial_player_hp = state.combat_state.player_current_hp;
         // Force both attacks (enemy attacks with min floor 1 damage, reflection triggers)
         force_both_attacks(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -1550,6 +1634,7 @@ mod tests {
 
     #[test]
     fn test_haven_damage_bonus() {
+        let mut rng = seeded_rng();
         use crate::character::attributes::AttributeType;
 
         let mut state = GameState::new("Test Hero".to_string(), 0);
@@ -1565,6 +1650,7 @@ mod tests {
         // First, attack with no Haven bonus
         let derived = default_derived(&state);
         let events_no_bonus = update_combat(
+            &mut rng,
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -1594,6 +1680,7 @@ mod tests {
         };
         let derived = default_derived(&state);
         let events_with_bonus = update_combat(
+            &mut rng,
             &mut state,
             0.1,
             &haven,
@@ -1624,6 +1711,7 @@ mod tests {
 
     #[test]
     fn test_haven_crit_chance_bonus() {
+        let mut rng = seeded_rng();
         use crate::character::attributes::AttributeType;
 
         // Run many trials to verify crit rate increase
@@ -1640,6 +1728,7 @@ mod tests {
 
             let d = default_derived(&state);
             let events = update_combat(
+                &mut rng,
                 &mut state,
                 0.1,
                 &HavenCombatBonuses::default(),
@@ -1669,6 +1758,7 @@ mod tests {
             };
             let d = default_derived(&state);
             let events = update_combat(
+                &mut rng,
                 &mut state,
                 0.1,
                 &haven,
@@ -1697,6 +1787,7 @@ mod tests {
 
     #[test]
     fn test_haven_double_strike() {
+        let mut rng = seeded_rng();
         use crate::character::attributes::AttributeType;
 
         // Run many trials to verify double strike rate
@@ -1716,6 +1807,7 @@ mod tests {
             };
             let d = default_derived(&state);
             let events = update_combat(
+                &mut rng,
                 &mut state,
                 0.1,
                 &haven,
@@ -1746,6 +1838,7 @@ mod tests {
 
     #[test]
     fn test_haven_regen_delay_reduction() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
 
@@ -1761,6 +1854,7 @@ mod tests {
         };
         let derived = default_derived(&state);
         update_combat(
+            &mut rng,
             &mut state,
             1.25,
             &haven,
@@ -1776,6 +1870,7 @@ mod tests {
 
     #[test]
     fn test_haven_combined_combat_bonuses() {
+        let mut rng = seeded_rng();
         use crate::character::attributes::AttributeType;
 
         // Test multiple bonuses together
@@ -1796,6 +1891,7 @@ mod tests {
 
         let derived = default_derived(&state);
         let events = update_combat(
+            &mut rng,
             &mut state,
             0.1,
             &haven,
@@ -1816,6 +1912,7 @@ mod tests {
 
     #[test]
     fn test_dungeon_combat_kills_do_not_affect_zone_progression() {
+        let mut rng = seeded_rng();
         let mut state = setup_dungeon_with_room_type(RoomType::Combat);
         let mut achievements = Achievements::default();
         state.combat_state.current_enemy = Some(Enemy::new("Goblin".to_string(), 1, 1));
@@ -1823,6 +1920,7 @@ mod tests {
         let initial_kills = state.zone_progression.kills_in_subzone;
 
         let events = force_player_attack(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -1870,6 +1968,7 @@ mod tests {
 
     #[test]
     fn test_dungeon_combat_room_kill_emits_enemy_died() {
+        let mut rng = seeded_rng();
         let mut state = setup_dungeon_with_room_type(RoomType::Combat);
         let mut achievements = Achievements::default();
         state.combat_state.current_enemy = Some(Enemy::new("Goblin".to_string(), 1, 0));
@@ -1877,6 +1976,7 @@ mod tests {
         state.combat_state.player_max_hp = 1000;
 
         let events = force_player_attack(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -1898,6 +1998,7 @@ mod tests {
 
     #[test]
     fn test_dungeon_elite_room_kill_emits_elite_defeated() {
+        let mut rng = seeded_rng();
         let mut state = setup_dungeon_with_room_type(RoomType::Elite);
         let mut achievements = Achievements::default();
         state.combat_state.current_enemy = Some(Enemy::new("Elite Guard".to_string(), 1, 0));
@@ -1905,6 +2006,7 @@ mod tests {
         state.combat_state.player_max_hp = 1000;
 
         let events = force_player_attack(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -1926,6 +2028,7 @@ mod tests {
 
     #[test]
     fn test_dungeon_boss_room_kill_emits_boss_defeated() {
+        let mut rng = seeded_rng();
         let mut state = setup_dungeon_with_room_type(RoomType::Boss);
         let mut achievements = Achievements::default();
         state.combat_state.current_enemy = Some(Enemy::new("Dungeon Boss".to_string(), 1, 0));
@@ -1933,6 +2036,7 @@ mod tests {
         state.combat_state.player_max_hp = 1000;
 
         let events = force_player_attack(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -1954,6 +2058,7 @@ mod tests {
 
     #[test]
     fn test_dungeon_combat_room_kill_xp_in_valid_range() {
+        let mut rng = seeded_rng();
         let mut state = setup_dungeon_with_room_type(RoomType::Combat);
         let mut achievements = Achievements::default();
         state.combat_state.current_enemy = Some(Enemy::new("Goblin".to_string(), 1, 0));
@@ -1961,6 +2066,7 @@ mod tests {
         state.combat_state.player_max_hp = 1000;
 
         let events = force_player_attack(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -1979,6 +2085,7 @@ mod tests {
 
     #[test]
     fn test_dungeon_elite_room_kill_xp_in_valid_range() {
+        let mut rng = seeded_rng();
         let mut state = setup_dungeon_with_room_type(RoomType::Elite);
         let mut achievements = Achievements::default();
         state.combat_state.current_enemy = Some(Enemy::new("Elite Guard".to_string(), 1, 0));
@@ -1986,6 +2093,7 @@ mod tests {
         state.combat_state.player_max_hp = 1000;
 
         let events = force_player_attack(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -2004,6 +2112,7 @@ mod tests {
 
     #[test]
     fn test_dungeon_boss_room_kill_xp_in_valid_range() {
+        let mut rng = seeded_rng();
         let mut state = setup_dungeon_with_room_type(RoomType::Boss);
         let mut achievements = Achievements::default();
         state.combat_state.current_enemy = Some(Enemy::new("Dungeon Boss".to_string(), 1, 0));
@@ -2011,6 +2120,7 @@ mod tests {
         state.combat_state.player_max_hp = 1000;
 
         let events = force_player_attack(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -2029,12 +2139,14 @@ mod tests {
 
     #[test]
     fn test_player_died_in_dungeon_emits_correct_event_and_exits() {
+        let mut rng = seeded_rng();
         let mut state = setup_dungeon_with_room_type(RoomType::Combat);
         let mut achievements = Achievements::default();
         state.combat_state.player_current_hp = 1;
         state.combat_state.current_enemy = Some(Enemy::new("Deadly Mob".to_string(), 100, 50));
 
         let events = force_both_attacks(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -2056,6 +2168,7 @@ mod tests {
 
     #[test]
     fn test_dungeon_elite_kill_does_not_affect_zone_progression() {
+        let mut rng = seeded_rng();
         let mut state = setup_dungeon_with_room_type(RoomType::Elite);
         let mut achievements = Achievements::default();
         let initial_kills = state.zone_progression.kills_in_subzone;
@@ -2064,6 +2177,7 @@ mod tests {
         state.combat_state.player_max_hp = 1000;
 
         force_player_attack(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -2075,6 +2189,7 @@ mod tests {
 
     #[test]
     fn test_dungeon_boss_kill_does_not_affect_zone_progression() {
+        let mut rng = seeded_rng();
         let mut state = setup_dungeon_with_room_type(RoomType::Boss);
         let mut achievements = Achievements::default();
         let initial_kills = state.zone_progression.kills_in_subzone;
@@ -2083,6 +2198,7 @@ mod tests {
         state.combat_state.player_max_hp = 1000;
 
         force_player_attack(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -2094,6 +2210,7 @@ mod tests {
 
     #[test]
     fn test_dungeon_kill_with_overworld_boss_flag_still_emits_dungeon_events() {
+        let mut rng = seeded_rng();
         // Edge case: if zone_progression.fighting_boss is true but player is
         // in a dungeon, dungeon event logic should take priority.
         let mut state = setup_dungeon_with_room_type(RoomType::Combat);
@@ -2105,6 +2222,7 @@ mod tests {
         state.combat_state.player_max_hp = 1000;
 
         let events = force_player_attack(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -2122,6 +2240,7 @@ mod tests {
 
     #[test]
     fn test_dungeon_death_preserves_prestige_rank() {
+        let mut rng = seeded_rng();
         let mut state = setup_dungeon_with_room_type(RoomType::Combat);
         let mut achievements = Achievements::default();
         state.prestige_rank = 7;
@@ -2129,6 +2248,7 @@ mod tests {
         state.combat_state.current_enemy = Some(Enemy::new("Deadly Mob".to_string(), 100, 50));
 
         force_both_attacks(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -2139,6 +2259,7 @@ mod tests {
 
     #[test]
     fn test_dungeon_entrance_room_kill_emits_enemy_died() {
+        let mut rng = seeded_rng();
         // Entrance rooms normally have no combat, but if an enemy is somehow
         // present, the fallback path should emit EnemyDied (not a special event)
         let mut state = setup_dungeon_with_room_type(RoomType::Entrance);
@@ -2148,6 +2269,7 @@ mod tests {
         state.combat_state.player_max_hp = 1000;
 
         let events = force_player_attack(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -2173,6 +2295,7 @@ mod tests {
 
     #[test]
     fn test_enemy_attacks_independently_of_player() {
+        let mut rng = seeded_rng();
         // Only enemy timer fires; player timer stays below threshold.
         // Should see EnemyAttack but NOT PlayerAttack.
         let mut state = GameState::new("Test Hero".to_string(), 0);
@@ -2181,6 +2304,7 @@ mod tests {
         let initial_hp = state.combat_state.player_current_hp;
 
         let events = force_enemy_attack(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -2198,6 +2322,7 @@ mod tests {
 
     #[test]
     fn test_player_attacks_independently_of_enemy() {
+        let mut rng = seeded_rng();
         // Only player timer fires; enemy timer stays below threshold.
         // Should see PlayerAttack but NOT EnemyAttack.
         let mut state = GameState::new("Test Hero".to_string(), 0);
@@ -2206,6 +2331,7 @@ mod tests {
         let initial_hp = state.combat_state.player_current_hp;
 
         let events = force_player_attack(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -2223,6 +2349,7 @@ mod tests {
 
     #[test]
     fn test_both_timers_fire_player_goes_first() {
+        let mut rng = seeded_rng();
         // Both timers fire on the same tick. Player's attack kills the enemy.
         // Enemy should NOT get to attack (player advantage).
         let mut state = GameState::new("Test Hero".to_string(), 0);
@@ -2232,6 +2359,7 @@ mod tests {
         let initial_hp = state.combat_state.player_current_hp;
 
         let events = force_both_attacks(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -2255,6 +2383,7 @@ mod tests {
 
     #[test]
     fn test_both_timers_fire_enemy_survives_attacks_back() {
+        let mut rng = seeded_rng();
         // Both timers fire on the same tick. Enemy survives player's attack.
         // Should see PlayerAttack THEN EnemyAttack, in that order.
         let mut state = GameState::new("Test Hero".to_string(), 0);
@@ -2264,6 +2393,7 @@ mod tests {
         let initial_hp = state.combat_state.player_current_hp;
 
         let events = force_both_attacks(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -2376,6 +2506,7 @@ mod tests {
 
     #[test]
     fn test_enemy_timer_resets_on_new_enemy_spawn() {
+        let mut rng = seeded_rng();
         // After killing an enemy, entering regen, and spawning a new enemy,
         // enemy_attack_timer should be 0.0
         let mut state = GameState::new("Test Hero".to_string(), 0);
@@ -2384,6 +2515,7 @@ mod tests {
 
         // Kill the enemy
         force_player_attack(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -2394,6 +2526,7 @@ mod tests {
         // Complete regen
         let derived = default_derived(&state);
         update_combat(
+            &mut rng,
             &mut state,
             HP_REGEN_DURATION_SECONDS,
             &HavenCombatBonuses::default(),
@@ -2415,6 +2548,7 @@ mod tests {
 
     #[test]
     fn test_both_timers_reset_on_player_death() {
+        let mut rng = seeded_rng();
         // After death, both timers should be 0.0
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
@@ -2422,6 +2556,7 @@ mod tests {
         state.combat_state.current_enemy = Some(Enemy::new("Killer".to_string(), 10000, 50));
 
         force_both_attacks(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,
@@ -2439,6 +2574,7 @@ mod tests {
 
     #[test]
     fn test_regen_blocks_both_timers() {
+        let mut rng = seeded_rng();
         // During regen, neither timer should advance
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
@@ -2455,6 +2591,7 @@ mod tests {
         // Tick during regen
         let derived = default_derived(&state);
         update_combat(
+            &mut rng,
             &mut state,
             0.5,
             &HavenCombatBonuses::default(),
@@ -2505,6 +2642,7 @@ mod tests {
 
     #[test]
     fn test_divine_bulwark_reduces_enemy_damage() {
+        let mut rng = seeded_rng();
         // Set up a scenario where the enemy attacks the player.
         // Without DR (0.0): damage = enemy.damage - defense, min 1
         // With 30% DR: damage = 70% of post-defense damage, min 1
@@ -2524,6 +2662,7 @@ mod tests {
         state.combat_state.player_attack_timer = 0.0;
         state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         let events = update_combat(
+            &mut rng,
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -2551,6 +2690,7 @@ mod tests {
         state.combat_state.player_attack_timer = 0.0;
         state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         let events_dr = update_combat(
+            &mut rng,
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -2584,6 +2724,7 @@ mod tests {
 
     #[test]
     fn test_divine_bulwark_minimum_damage_is_one() {
+        let mut rng = seeded_rng();
         // Even with very high DR, enemy should still deal at least 1 damage
         let mut state = GameState::new("DR Min Test".to_string(), 0);
         let mut achievements = Achievements::default();
@@ -2603,6 +2744,7 @@ mod tests {
         state.combat_state.player_attack_timer = 0.0;
         state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         let events = update_combat(
+            &mut rng,
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -2628,6 +2770,7 @@ mod tests {
 
     #[test]
     fn test_divine_bulwark_zero_dr_unchanged() {
+        let mut rng = seeded_rng();
         // With 0.0 DR, damage should be identical to the normal path
         let mut state = GameState::new("Zero DR Test".to_string(), 0);
         let mut achievements = Achievements::default();
@@ -2644,6 +2787,7 @@ mod tests {
         state.combat_state.player_attack_timer = 0.0;
         state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
         update_combat(
+            &mut rng,
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -2662,6 +2806,7 @@ mod tests {
 
     #[test]
     fn test_boss_enrage_timer_increments_during_boss_fight() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Enrage".to_string(), 0);
         state.zone_progression.fighting_boss = true;
         state.combat_state.current_enemy = Some(Enemy::new("Boss".to_string(), 9999, 1));
@@ -2673,6 +2818,7 @@ mod tests {
         state.combat_state.enemy_attack_timer = 0.0;
 
         update_combat(
+            &mut rng,
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -2690,6 +2836,7 @@ mod tests {
 
     #[test]
     fn test_boss_enrage_timer_does_not_increment_for_normal_mobs() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("NoEnrage".to_string(), 0);
         state.zone_progression.fighting_boss = false;
         state.combat_state.current_enemy = Some(Enemy::new("Mob".to_string(), 9999, 1));
@@ -2700,6 +2847,7 @@ mod tests {
         state.combat_state.enemy_attack_timer = 0.0;
 
         update_combat(
+            &mut rng,
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -2717,6 +2865,7 @@ mod tests {
 
     #[test]
     fn test_boss_enrage_triggers_at_threshold() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Enrage".to_string(), 0);
         state.zone_progression.fighting_boss = true;
         state.zone_progression.current_zone_id = 1;
@@ -2731,6 +2880,7 @@ mod tests {
         state.combat_state.enemy_attack_timer = 0.0;
 
         let events = update_combat(
+            &mut rng,
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -2762,6 +2912,7 @@ mod tests {
 
     #[test]
     fn test_boss_enrage_weapon_gated_includes_flag() {
+        let mut rng = seeded_rng();
         use crate::achievements::AchievementId;
 
         let mut state = GameState::new("Enrage".to_string(), 0);
@@ -2780,6 +2931,7 @@ mod tests {
         state.combat_state.enemy_attack_timer = 0.0;
 
         let events = update_combat(
+            &mut rng,
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -2825,6 +2977,7 @@ mod tests {
         state2.combat_state.boss_fight_timer = BOSS_ENRAGE_SECONDS;
 
         let events2 = update_combat(
+            &mut rng,
             &mut state2,
             0.1,
             &HavenCombatBonuses::default(),
@@ -2849,6 +3002,7 @@ mod tests {
 
     #[test]
     fn test_boss_enrage_does_not_trigger_below_threshold() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("NoEnrage".to_string(), 0);
         state.zone_progression.fighting_boss = true;
         state.zone_progression.current_subzone_id = 3;
@@ -2862,6 +3016,7 @@ mod tests {
         state.combat_state.enemy_attack_timer = 0.0;
 
         let events = update_combat(
+            &mut rng,
             &mut state,
             0.1,
             &HavenCombatBonuses::default(),
@@ -2883,6 +3038,7 @@ mod tests {
 
     #[test]
     fn test_boss_fight_timer_resets_on_enemy_death() {
+        let mut rng = seeded_rng();
         let mut state = GameState::new("Reset".to_string(), 0);
         state.zone_progression.fighting_boss = true;
         state.combat_state.boss_fight_timer = 30.0;
@@ -2891,6 +3047,7 @@ mod tests {
 
         // Force player to kill the boss
         let events = force_player_attack(
+            &mut rng,
             &mut state,
             &HavenCombatBonuses::default(),
             &mut achievements,

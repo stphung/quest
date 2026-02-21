@@ -9,10 +9,17 @@ use quest::character::prestige::{
 };
 use quest::core::game_logic::{apply_tick_xp, xp_for_next_level};
 use quest::GameState;
+use rand::SeedableRng;
+use rand_chacha::ChaCha8Rng;
+
+fn seeded_rng() -> ChaCha8Rng {
+    ChaCha8Rng::seed_from_u64(42)
+}
 
 /// Test a complete prestige cycle from level 1 to first prestige
 #[test]
 fn test_complete_prestige_cycle_first_prestige() {
+    let mut rng = seeded_rng();
     // Create a fresh character
     let mut state = GameState::new("Integration Test Hero".to_string(), 0);
 
@@ -32,7 +39,7 @@ fn test_complete_prestige_cycle_first_prestige() {
     // Apply XP in chunks to simulate gameplay
     let chunk_size = total_xp_needed / 5;
     for _ in 0..5 {
-        let (levelups, increased_attrs) = apply_tick_xp(&mut state, chunk_size as f64);
+        let (levelups, increased_attrs) = apply_tick_xp(&mut rng, &mut state, chunk_size as f64);
 
         // Verify level-ups grant attribute points
         if levelups > 0 {
@@ -42,7 +49,7 @@ fn test_complete_prestige_cycle_first_prestige() {
 
     // Apply any remaining XP to ensure we hit level 10
     while state.character_level < 10 {
-        apply_tick_xp(&mut state, 1000.0);
+        apply_tick_xp(&mut rng, &mut state, 1000.0);
     }
 
     assert!(state.character_level >= 10);
@@ -117,11 +124,12 @@ fn test_complete_prestige_cycle_first_prestige() {
 /// Test multiple prestige cycles
 #[test]
 fn test_multiple_prestige_cycles() {
+    let mut rng = seeded_rng();
     let mut state = GameState::new("Multi-Prestige Hero".to_string(), 0);
 
     // First prestige: level 10
     while state.character_level < 10 {
-        apply_tick_xp(&mut state, 10000.0);
+        apply_tick_xp(&mut rng, &mut state, 10000.0);
     }
     assert!(can_prestige(&state));
     perform_prestige(&mut state);
@@ -130,7 +138,7 @@ fn test_multiple_prestige_cycles() {
 
     // Second prestige: level 25
     while state.character_level < 25 {
-        apply_tick_xp(&mut state, 50000.0);
+        apply_tick_xp(&mut rng, &mut state, 50000.0);
     }
     assert!(can_prestige(&state));
     perform_prestige(&mut state);
@@ -140,7 +148,7 @@ fn test_multiple_prestige_cycles() {
 
     // Third prestige: level 50
     while state.character_level < 50 {
-        apply_tick_xp(&mut state, 200000.0);
+        apply_tick_xp(&mut rng, &mut state, 200000.0);
     }
     assert!(can_prestige(&state));
     perform_prestige(&mut state);
@@ -161,6 +169,7 @@ fn test_multiple_prestige_cycles() {
 /// Test prestige preserves fishing progress
 #[test]
 fn test_prestige_preserves_fishing() {
+    let mut rng = seeded_rng();
     let mut state = GameState::new("Fisher Hero".to_string(), 0);
 
     // Set up fishing progress
@@ -170,7 +179,7 @@ fn test_prestige_preserves_fishing() {
 
     // Level up and prestige
     while state.character_level < 10 {
-        apply_tick_xp(&mut state, 10000.0);
+        apply_tick_xp(&mut rng, &mut state, 10000.0);
     }
     perform_prestige(&mut state);
 
@@ -186,13 +195,14 @@ fn test_prestige_preserves_fishing() {
 /// Test prestige at exactly required level
 #[test]
 fn test_prestige_at_exact_level() {
+    let mut rng = seeded_rng();
     let mut state = GameState::new("Precise Hero".to_string(), 0);
 
     // Get to exactly level 10
     while state.character_level < 10 {
         let needed = xp_for_next_level(state.character_level);
         let remaining = needed - state.character_xp;
-        apply_tick_xp(&mut state, remaining as f64);
+        apply_tick_xp(&mut rng, &mut state, remaining as f64);
     }
 
     assert_eq!(state.character_level, 10);
@@ -206,11 +216,12 @@ fn test_prestige_at_exact_level() {
 /// Test cannot prestige when not eligible
 #[test]
 fn test_cannot_prestige_when_ineligible() {
+    let mut rng = seeded_rng();
     let mut state = GameState::new("Impatient Hero".to_string(), 0);
 
     // Level to 9 (just below requirement)
     while state.character_level < 9 {
-        apply_tick_xp(&mut state, 10000.0);
+        apply_tick_xp(&mut rng, &mut state, 10000.0);
     }
 
     assert_eq!(state.character_level, 9);
@@ -228,6 +239,7 @@ fn test_cannot_prestige_when_ineligible() {
 /// Test full combat → XP → level-up → prestige loop end-to-end
 #[test]
 fn test_combat_to_prestige_full_loop() {
+    let mut rng = seeded_rng();
     use quest::character::derived_stats::DerivedStats;
     use quest::character::prestige::{can_prestige, perform_prestige};
     use quest::combat::logic::update_combat;
@@ -258,6 +270,7 @@ fn test_combat_to_prestige_full_loop() {
 
         // Combat tick
         let events = update_combat(
+            &mut rng,
             &mut state,
             delta_time,
             &HavenCombatBonuses::default(),
@@ -272,7 +285,7 @@ fn test_combat_to_prestige_full_loop() {
             if let CombatEvent::EnemyDied { xp_gained }
             | CombatEvent::SubzoneBossDefeated { xp_gained, .. } = event
             {
-                apply_tick_xp(&mut state, *xp_gained as f64);
+                apply_tick_xp(&mut rng, &mut state, *xp_gained as f64);
                 total_kills += 1;
             }
         }
@@ -341,6 +354,7 @@ fn test_combat_to_prestige_full_loop() {
         state.combat_state.update_max_hp(derived.max_hp);
         spawn_enemy_if_needed(&mut state);
         let events = update_combat(
+            &mut rng,
             &mut state,
             delta_time,
             &HavenCombatBonuses::default(),
@@ -365,6 +379,7 @@ fn test_combat_to_prestige_full_loop() {
 /// Test prestige clears XP rate samples so ETA recalculates from fresh data
 #[test]
 fn test_prestige_clears_xp_rate_tracking() {
+    let mut rng = seeded_rng();
     let mut state = GameState::new("ETA Reset Hero".to_string(), 0);
 
     // Simulate XP rate tracking with stale high-level data
@@ -378,7 +393,7 @@ fn test_prestige_clears_xp_rate_tracking() {
 
     // Level up and prestige
     while state.character_level < 10 {
-        apply_tick_xp(&mut state, 10000.0);
+        apply_tick_xp(&mut rng, &mut state, 10000.0);
     }
     perform_prestige(&mut state);
 

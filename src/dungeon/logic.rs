@@ -177,6 +177,12 @@ mod tests {
         add_dungeon_xp, calculate_boss_xp_reward, collect_dungeon_item, generate_treasure_item,
     };
     use super::*;
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    fn seeded_rng() -> ChaCha8Rng {
+        ChaCha8Rng::seed_from_u64(42)
+    }
 
     /// Finds the first room of the given type in the dungeon.
     fn find_room_of_type(dungeon: &Dungeon, room_type: RoomType) -> Option<(usize, usize)> {
@@ -267,49 +273,54 @@ mod tests {
 
     #[test]
     fn test_calculate_boss_xp_reward_small() {
-        let xp = calculate_boss_xp_reward(DungeonSize::Small);
+        let mut rng = seeded_rng();
+        let xp = calculate_boss_xp_reward(&mut rng, DungeonSize::Small);
         assert!((1000..=1500).contains(&xp));
     }
 
     #[test]
     fn test_calculate_boss_xp_reward_medium() {
-        let xp = calculate_boss_xp_reward(DungeonSize::Medium);
+        let mut rng = seeded_rng();
+        let xp = calculate_boss_xp_reward(&mut rng, DungeonSize::Medium);
         assert!((2000..=3000).contains(&xp));
     }
 
     #[test]
     fn test_calculate_boss_xp_reward_large() {
-        let xp = calculate_boss_xp_reward(DungeonSize::Large);
+        let mut rng = seeded_rng();
+        let xp = calculate_boss_xp_reward(&mut rng, DungeonSize::Large);
         assert!((4000..=6000).contains(&xp));
     }
 
     #[test]
     fn test_generate_treasure_item() {
+        let mut rng = seeded_rng();
         // prestige_rank=0, zone_id=5 (ilvl 50), rarity_boost=1
-        let item = generate_treasure_item(0, 5, 1, 0.0);
+        let item = generate_treasure_item(&mut rng, 0, 5, 1, 0.0);
         assert!(!item.display_name.is_empty());
         assert_eq!(item.ilvl, 50);
     }
 
     #[test]
     fn test_boost_rarity() {
+        let mut rng = seeded_rng();
         use super::super::rewards::generate_treasure_item as _gt;
         // Test boost_rarity indirectly through generate_treasure_item, or test directly
         // Since boost_rarity is private to rewards.rs, test via the public API
 
         // +1 boost: Common -> Magic (prestige 0, always Common base, boost=1 -> Magic)
         // We'll verify the function doesn't panic and produces valid items
-        let item1 = _gt(0, 5, 1, 0.0);
+        let item1 = _gt(&mut rng, 0, 5, 1, 0.0);
         assert!(!item1.display_name.is_empty());
 
-        let item2 = _gt(0, 5, 2, 0.0);
+        let item2 = _gt(&mut rng, 0, 5, 2, 0.0);
         assert!(!item2.display_name.is_empty());
 
-        let item3 = _gt(0, 5, 3, 0.0);
+        let item3 = _gt(&mut rng, 0, 5, 3, 0.0);
         assert!(!item3.display_name.is_empty());
 
         // Cap: very large boost should not panic
-        let item4 = _gt(0, 5, 10, 0.0);
+        let item4 = _gt(&mut rng, 0, 5, 10, 0.0);
         assert!(!item4.display_name.is_empty());
     }
 
@@ -1097,6 +1108,7 @@ mod tests {
 
     #[test]
     fn test_boss_xp_reward_scales_with_size() {
+        let mut rng = seeded_rng();
         // Sample many rewards to verify ordering
         let mut small_total = 0u64;
         let mut medium_total = 0u64;
@@ -1105,10 +1117,10 @@ mod tests {
         let samples = 100;
 
         for _ in 0..samples {
-            small_total += calculate_boss_xp_reward(DungeonSize::Small);
-            medium_total += calculate_boss_xp_reward(DungeonSize::Medium);
-            large_total += calculate_boss_xp_reward(DungeonSize::Large);
-            epic_total += calculate_boss_xp_reward(DungeonSize::Epic);
+            small_total += calculate_boss_xp_reward(&mut rng, DungeonSize::Small);
+            medium_total += calculate_boss_xp_reward(&mut rng, DungeonSize::Medium);
+            large_total += calculate_boss_xp_reward(&mut rng, DungeonSize::Large);
+            epic_total += calculate_boss_xp_reward(&mut rng, DungeonSize::Epic);
         }
 
         assert!(
@@ -1127,7 +1139,8 @@ mod tests {
 
     #[test]
     fn test_calculate_boss_xp_reward_epic() {
-        let xp = calculate_boss_xp_reward(DungeonSize::Epic);
+        let mut rng = seeded_rng();
+        let xp = calculate_boss_xp_reward(&mut rng, DungeonSize::Epic);
         assert!((8000..=12000).contains(&xp));
     }
 

@@ -21,6 +21,7 @@ use quest::core::game_state::GameState;
 use quest::dungeon::generation::generate_dungeon;
 use quest::dungeon::types::RoomType;
 use quest::zones::get_all_zones;
+use rand::SeedableRng;
 
 // ═══════════════════════════════════════════════════════════════════
 // Helpers
@@ -44,6 +45,9 @@ fn default_god_items() -> GodItemCombatBonuses {
 
 fn default_prestige() -> PrestigeCombatBonuses {
     PrestigeCombatBonuses::default()
+}
+fn seeded_rng() -> rand_chacha::ChaCha8Rng {
+    rand_chacha::ChaCha8Rng::seed_from_u64(42)
 }
 
 /// Creates a state with an enemy set up for combat.
@@ -78,6 +82,7 @@ fn state_player_about_to_die() -> GameState {
 
 /// Force a player attack by setting timer to interval, suppressing enemy.
 fn force_player_attack(
+    rng: &mut impl rand::Rng,
     state: &mut GameState,
     haven: &HavenCombatBonuses,
     prestige: &PrestigeCombatBonuses,
@@ -88,6 +93,7 @@ fn force_player_attack(
     state.combat_state.enemy_attack_timer = 0.0;
     let mut achievements = Achievements::default();
     update_combat(
+        rng,
         state,
         0.0, // zero delta so enemy timer stays at 0
         haven,
@@ -100,6 +106,7 @@ fn force_player_attack(
 
 /// Force an enemy attack by setting enemy timer high, suppressing player.
 fn force_enemy_attack(
+    rng: &mut impl rand::Rng,
     state: &mut GameState,
     haven: &HavenCombatBonuses,
     prestige: &PrestigeCombatBonuses,
@@ -110,6 +117,7 @@ fn force_enemy_attack(
     state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
     let mut achievements = Achievements::default();
     update_combat(
+        rng,
         state,
         0.0,
         haven,
@@ -400,13 +408,14 @@ fn find_room_position(
 
 #[test]
 fn regen_is_triggered_after_enemy_death() {
+    let mut rng = seeded_rng();
     let mut state = state_with_weak_enemy();
     let haven = default_haven();
     let prestige = default_prestige();
     let god_items = default_god_items();
 
     // Kill the enemy
-    let events = force_player_attack(&mut state, &haven, &prestige, &god_items);
+    let events = force_player_attack(&mut rng, &mut state, &haven, &prestige, &god_items);
 
     // Check that enemy died
     let has_kill_event = events
@@ -422,6 +431,7 @@ fn regen_is_triggered_after_enemy_death() {
 
 #[test]
 fn regen_advances_timer_during_regeneration() {
+    let mut rng = seeded_rng();
     let mut state = fresh_state();
     state.combat_state.is_regenerating = true;
     state.combat_state.regen_timer = 0.0;
@@ -433,6 +443,7 @@ fn regen_advances_timer_during_regeneration() {
     let mut ach = Achievements::default();
 
     let _events = update_combat(
+        &mut rng,
         &mut state,
         0.5,
         &default_haven(),
@@ -453,6 +464,7 @@ fn regen_advances_timer_during_regeneration() {
 
 #[test]
 fn regen_completes_after_full_duration() {
+    let mut rng = seeded_rng();
     let mut state = fresh_state();
     state.combat_state.is_regenerating = true;
     state.combat_state.regen_timer = 0.0;
@@ -465,6 +477,7 @@ fn regen_completes_after_full_duration() {
 
     // Pass enough time to complete regen (2.5s default)
     let events = update_combat(
+        &mut rng,
         &mut state,
         HP_REGEN_DURATION_SECONDS + 0.1,
         &default_haven(),
@@ -492,6 +505,7 @@ fn regen_completes_after_full_duration() {
 
 #[test]
 fn regen_with_haven_bonus_completes_faster() {
+    let mut rng = seeded_rng();
     let mut state = fresh_state();
     state.combat_state.is_regenerating = true;
     state.combat_state.regen_timer = 0.0;
@@ -507,6 +521,7 @@ fn regen_with_haven_bonus_completes_faster() {
 
     // At 50% reduction, effective duration is ~1.25s. Use 1.5s.
     let _events = update_combat(
+        &mut rng,
         &mut state,
         1.5,
         &haven,
@@ -524,6 +539,7 @@ fn regen_with_haven_bonus_completes_faster() {
 
 #[test]
 fn regen_with_god_item_bonus_completes_faster() {
+    let mut rng = seeded_rng();
     let mut state = fresh_state();
     state.combat_state.is_regenerating = true;
     state.combat_state.regen_timer = 0.0;
@@ -538,6 +554,7 @@ fn regen_with_god_item_bonus_completes_faster() {
     let mut ach = Achievements::default();
 
     let _events = update_combat(
+        &mut rng,
         &mut state,
         1.5,
         &default_haven(),
@@ -555,6 +572,7 @@ fn regen_with_god_item_bonus_completes_faster() {
 
 #[test]
 fn regen_at_full_hp_emits_zero_heal() {
+    let mut rng = seeded_rng();
     let mut state = fresh_state();
     state.combat_state.is_regenerating = true;
     state.combat_state.regen_timer = 0.0;
@@ -567,6 +585,7 @@ fn regen_at_full_hp_emits_zero_heal() {
 
     // Complete the regen
     let events = update_combat(
+        &mut rng,
         &mut state,
         HP_REGEN_DURATION_SECONDS + 0.1,
         &default_haven(),
@@ -593,6 +612,7 @@ fn regen_at_full_hp_emits_zero_heal() {
 
 #[test]
 fn update_combat_returns_empty_when_no_enemy() {
+    let mut rng = seeded_rng();
     let mut state = fresh_state();
     // No enemy, not regenerating
     assert!(state.combat_state.current_enemy.is_none());
@@ -602,6 +622,7 @@ fn update_combat_returns_empty_when_no_enemy() {
     let mut ach = Achievements::default();
 
     let events = update_combat(
+        &mut rng,
         &mut state,
         0.1,
         &default_haven(),
@@ -616,6 +637,7 @@ fn update_combat_returns_empty_when_no_enemy() {
 
 #[test]
 fn update_combat_delegates_to_regen_when_regenerating() {
+    let mut rng = seeded_rng();
     let mut state = fresh_state();
     state.combat_state.is_regenerating = true;
     state.combat_state.regen_timer = 0.0;
@@ -627,6 +649,7 @@ fn update_combat_delegates_to_regen_when_regenerating() {
 
     // When regenerating, update_combat should delegate to process_regen
     let _events = update_combat(
+        &mut rng,
         &mut state,
         0.1,
         &default_haven(),
@@ -642,6 +665,7 @@ fn update_combat_delegates_to_regen_when_regenerating() {
 
 #[test]
 fn update_combat_accumulates_both_timers() {
+    let mut rng = seeded_rng();
     let mut state = state_with_enemy(9999, 1, 0);
     // Both timers at zero
     state.combat_state.player_attack_timer = 0.0;
@@ -651,6 +675,7 @@ fn update_combat_accumulates_both_timers() {
     let mut ach = Achievements::default();
 
     update_combat(
+        &mut rng,
         &mut state,
         0.5,
         &default_haven(),
@@ -673,6 +698,7 @@ fn update_combat_accumulates_both_timers() {
 
 #[test]
 fn update_combat_player_attacks_when_timer_ready() {
+    let mut rng = seeded_rng();
     let mut state = state_with_enemy(9999, 1, 0);
     // Set player timer just below threshold, then tick forward
     state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS - 0.05;
@@ -682,6 +708,7 @@ fn update_combat_player_attacks_when_timer_ready() {
     let mut ach = Achievements::default();
 
     let events = update_combat(
+        &mut rng,
         &mut state,
         0.1,
         &default_haven(),
@@ -707,6 +734,7 @@ fn update_combat_player_attacks_when_timer_ready() {
 
 #[test]
 fn update_combat_enemy_attacks_when_timer_ready() {
+    let mut rng = seeded_rng();
     let mut state = state_with_enemy(9999, 10, 0);
     state.combat_state.player_attack_timer = 0.0;
     state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS - 0.05;
@@ -715,6 +743,7 @@ fn update_combat_enemy_attacks_when_timer_ready() {
     let mut ach = Achievements::default();
 
     let events = update_combat(
+        &mut rng,
         &mut state,
         0.1,
         &default_haven(),
@@ -732,6 +761,7 @@ fn update_combat_enemy_attacks_when_timer_ready() {
 
 #[test]
 fn update_combat_player_kills_enemy_skips_enemy_attack() {
+    let mut rng = seeded_rng();
     // If player kills enemy, enemy attack should not happen even if timer is ready
     let mut state = state_with_weak_enemy();
     state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
@@ -741,6 +771,7 @@ fn update_combat_player_kills_enemy_skips_enemy_attack() {
     let mut ach = Achievements::default();
 
     let events = update_combat(
+        &mut rng,
         &mut state,
         0.0,
         &default_haven(),
@@ -770,12 +801,13 @@ fn update_combat_player_kills_enemy_skips_enemy_attack() {
 
 #[test]
 fn handle_enemy_death_awards_xp() {
+    let mut rng = seeded_rng();
     let mut state = state_with_weak_enemy();
     let haven = default_haven();
     let prestige = default_prestige();
     let god_items = default_god_items();
 
-    let events = force_player_attack(&mut state, &haven, &prestige, &god_items);
+    let events = force_player_attack(&mut rng, &mut state, &haven, &prestige, &god_items);
 
     let xp_event = events.iter().find_map(|e| match e {
         CombatEvent::EnemyDied { xp_gained } => Some(*xp_gained),
@@ -787,13 +819,14 @@ fn handle_enemy_death_awards_xp() {
 
 #[test]
 fn handle_enemy_death_starts_regen() {
+    let mut rng = seeded_rng();
     let mut state = state_with_weak_enemy();
     state.combat_state.player_current_hp = 30; // Take some damage first
     let haven = default_haven();
     let prestige = default_prestige();
     let god_items = default_god_items();
 
-    force_player_attack(&mut state, &haven, &prestige, &god_items);
+    force_player_attack(&mut rng, &mut state, &haven, &prestige, &god_items);
 
     assert!(state.combat_state.is_regenerating);
     assert!(state.combat_state.current_enemy.is_none());
@@ -803,6 +836,7 @@ fn handle_enemy_death_starts_regen() {
 
 #[test]
 fn handle_enemy_death_records_kill_for_zone_progression() {
+    let mut rng = seeded_rng();
     let mut state = state_with_weak_enemy();
     let initial_kills = state.zone_progression.kills_in_subzone;
 
@@ -810,7 +844,7 @@ fn handle_enemy_death_records_kill_for_zone_progression() {
     let prestige = default_prestige();
     let god_items = default_god_items();
 
-    force_player_attack(&mut state, &haven, &prestige, &god_items);
+    force_player_attack(&mut rng, &mut state, &haven, &prestige, &god_items);
 
     // Kill tracking should increase
     assert!(
@@ -822,6 +856,7 @@ fn handle_enemy_death_records_kill_for_zone_progression() {
 
 #[test]
 fn handle_enemy_death_in_dungeon_does_not_affect_zone_progression() {
+    let mut rng = seeded_rng();
     let mut state = state_with_weak_enemy();
     state.active_dungeon = Some(generate_dungeon(1, 0, 1));
     let initial_kills = state.zone_progression.kills_in_subzone;
@@ -830,7 +865,7 @@ fn handle_enemy_death_in_dungeon_does_not_affect_zone_progression() {
     let prestige = default_prestige();
     let god_items = default_god_items();
 
-    force_player_attack(&mut state, &haven, &prestige, &god_items);
+    force_player_attack(&mut rng, &mut state, &haven, &prestige, &god_items);
 
     // Zone progression should not change in dungeons
     assert_eq!(
@@ -845,12 +880,13 @@ fn handle_enemy_death_in_dungeon_does_not_affect_zone_progression() {
 
 #[test]
 fn player_attack_deals_damage_to_enemy() {
+    let mut rng = seeded_rng();
     let mut state = state_with_enemy(100, 1, 0);
     let haven = default_haven();
     let prestige = default_prestige();
     let god_items = default_god_items();
 
-    let events = force_player_attack(&mut state, &haven, &prestige, &god_items);
+    let events = force_player_attack(&mut rng, &mut state, &haven, &prestige, &god_items);
 
     let has_attack = events
         .iter()
@@ -867,6 +903,7 @@ fn player_attack_deals_damage_to_enemy() {
 
 #[test]
 fn player_attack_damage_pipeline_with_haven_bonus() {
+    let mut rng = seeded_rng();
     let mut state = state_with_enemy(9999, 1, 0);
     let mut haven = default_haven();
     haven.damage_percent = 100.0; // +100% damage
@@ -875,7 +912,13 @@ fn player_attack_damage_pipeline_with_haven_bonus() {
     let god_items = default_god_items();
 
     // Get damage without haven bonus first
-    let events_no_haven = force_player_attack(&mut state, &default_haven(), &prestige, &god_items);
+    let events_no_haven = force_player_attack(
+        &mut rng,
+        &mut state,
+        &default_haven(),
+        &prestige,
+        &god_items,
+    );
     let damage_no_haven = extract_player_damage(&events_no_haven);
 
     // Reset enemy
@@ -887,7 +930,7 @@ fn player_attack_damage_pipeline_with_haven_bonus() {
         .reset_hp();
 
     // Get damage with haven bonus
-    let events_haven = force_player_attack(&mut state, &haven, &prestige, &god_items);
+    let events_haven = force_player_attack(&mut rng, &mut state, &haven, &prestige, &god_items);
     let damage_haven = extract_player_damage(&events_haven);
 
     assert!(
@@ -900,6 +943,7 @@ fn player_attack_damage_pipeline_with_haven_bonus() {
 
 #[test]
 fn player_attack_damage_pipeline_with_god_item_bonus() {
+    let mut rng = seeded_rng();
     let mut state = state_with_enemy(9999, 1, 0);
     let haven = default_haven();
     let prestige = default_prestige();
@@ -907,7 +951,13 @@ fn player_attack_damage_pipeline_with_god_item_bonus() {
     god_items.damage_percent = 150.0; // Giant's Might
 
     // Get damage without god item bonus
-    let events_base = force_player_attack(&mut state, &haven, &prestige, &default_god_items());
+    let events_base = force_player_attack(
+        &mut rng,
+        &mut state,
+        &haven,
+        &prestige,
+        &default_god_items(),
+    );
     let damage_base = extract_player_damage(&events_base);
 
     // Reset enemy
@@ -919,7 +969,7 @@ fn player_attack_damage_pipeline_with_god_item_bonus() {
         .reset_hp();
 
     // Get damage with god item bonus
-    let events_god = force_player_attack(&mut state, &haven, &prestige, &god_items);
+    let events_god = force_player_attack(&mut rng, &mut state, &haven, &prestige, &god_items);
     let damage_god = extract_player_damage(&events_god);
 
     assert!(
@@ -932,13 +982,20 @@ fn player_attack_damage_pipeline_with_god_item_bonus() {
 
 #[test]
 fn player_attack_damage_pipeline_with_prestige_bonus() {
+    let mut rng = seeded_rng();
     let mut state = state_with_enemy(9999, 1, 0);
     let haven = default_haven();
     let prestige_high = PrestigeCombatBonuses::from_rank(10);
     let god_items = default_god_items();
 
     // Get damage without prestige bonus
-    let events_base = force_player_attack(&mut state, &haven, &default_prestige(), &god_items);
+    let events_base = force_player_attack(
+        &mut rng,
+        &mut state,
+        &haven,
+        &default_prestige(),
+        &god_items,
+    );
     let damage_base = extract_player_damage(&events_base);
 
     // Reset enemy
@@ -950,7 +1007,8 @@ fn player_attack_damage_pipeline_with_prestige_bonus() {
         .reset_hp();
 
     // Get damage with prestige bonus
-    let events_prestige = force_player_attack(&mut state, &haven, &prestige_high, &god_items);
+    let events_prestige =
+        force_player_attack(&mut rng, &mut state, &haven, &prestige_high, &god_items);
     let damage_prestige = extract_player_damage(&events_prestige);
 
     assert!(
@@ -963,13 +1021,14 @@ fn player_attack_damage_pipeline_with_prestige_bonus() {
 
 #[test]
 fn player_attack_respects_enemy_defense() {
+    let mut rng = seeded_rng();
     // Enemy with high defense should reduce damage
     let mut state = state_with_enemy(9999, 1, 1000);
     let haven = default_haven();
     let prestige = default_prestige();
     let god_items = default_god_items();
 
-    let events = force_player_attack(&mut state, &haven, &prestige, &god_items);
+    let events = force_player_attack(&mut rng, &mut state, &haven, &prestige, &god_items);
     let damage = extract_player_damage(&events);
 
     // With 1000 defense and ~10 base damage, should be clamped to min 1
@@ -983,6 +1042,7 @@ fn player_attack_respects_enemy_defense() {
 
 #[test]
 fn player_attack_resets_attack_timer() {
+    let mut rng = seeded_rng();
     let mut state = state_with_enemy(9999, 1, 0);
     state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
 
@@ -990,7 +1050,7 @@ fn player_attack_resets_attack_timer() {
     let prestige = default_prestige();
     let god_items = default_god_items();
 
-    force_player_attack(&mut state, &haven, &prestige, &god_items);
+    force_player_attack(&mut rng, &mut state, &haven, &prestige, &god_items);
 
     assert!(
         state.combat_state.player_attack_timer < 0.01,
@@ -1004,6 +1064,7 @@ fn player_attack_resets_attack_timer() {
 
 #[test]
 fn enemy_attack_deals_damage_to_player() {
+    let mut rng = seeded_rng();
     let mut state = state_with_enemy(9999, 10, 0); // Enemy with 10 damage (non-lethal)
     let haven = default_haven();
     let prestige = default_prestige();
@@ -1011,7 +1072,7 @@ fn enemy_attack_deals_damage_to_player() {
 
     let initial_hp = state.combat_state.player_current_hp;
 
-    let events = force_enemy_attack(&mut state, &haven, &prestige, &god_items);
+    let events = force_enemy_attack(&mut rng, &mut state, &haven, &prestige, &god_items);
 
     let has_enemy_attack = events
         .iter()
@@ -1028,6 +1089,7 @@ fn enemy_attack_deals_damage_to_player() {
 
 #[test]
 fn enemy_attack_respects_player_defense() {
+    let mut rng = seeded_rng();
     // High defense player
     let mut state = state_with_enemy(9999, 5, 0);
     state.attributes.set(AttributeType::Dexterity, 30); // High DEX = high defense
@@ -1036,7 +1098,7 @@ fn enemy_attack_respects_player_defense() {
     let prestige_high = PrestigeCombatBonuses::from_rank(20); // Good flat defense
     let god_items = default_god_items();
 
-    let events = force_enemy_attack(&mut state, &haven, &prestige_high, &god_items);
+    let events = force_enemy_attack(&mut rng, &mut state, &haven, &prestige_high, &god_items);
 
     let damage_taken = extract_enemy_damage(&events);
     // With high defense vs 5 enemy damage, should clamp to min 1
@@ -1048,18 +1110,25 @@ fn enemy_attack_respects_player_defense() {
 
 #[test]
 fn enemy_attack_divine_bulwark_reduces_damage() {
+    let mut rng = seeded_rng();
     let mut state = state_with_enemy(9999, 100, 0);
     let haven = default_haven();
     let prestige = default_prestige();
     let mut god_items = default_god_items();
     god_items.damage_reduction_percent = 30.0; // Asprika: 30% DR
 
-    let events = force_enemy_attack(&mut state, &haven, &prestige, &god_items);
+    let events = force_enemy_attack(&mut rng, &mut state, &haven, &prestige, &god_items);
     let damage_with_dr = extract_enemy_damage(&events);
 
     // Without DR
     let mut state2 = state_with_enemy(9999, 100, 0);
-    let events2 = force_enemy_attack(&mut state2, &haven, &prestige, &default_god_items());
+    let events2 = force_enemy_attack(
+        &mut rng,
+        &mut state2,
+        &haven,
+        &prestige,
+        &default_god_items(),
+    );
     let damage_without_dr = extract_enemy_damage(&events2);
 
     assert!(
@@ -1072,6 +1141,7 @@ fn enemy_attack_divine_bulwark_reduces_damage() {
 
 #[test]
 fn enemy_attack_resets_attack_timer() {
+    let mut rng = seeded_rng();
     let mut state = state_with_enemy(9999, 10, 0);
     state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
 
@@ -1079,7 +1149,7 @@ fn enemy_attack_resets_attack_timer() {
     let prestige = default_prestige();
     let god_items = default_god_items();
 
-    force_enemy_attack(&mut state, &haven, &prestige, &god_items);
+    force_enemy_attack(&mut rng, &mut state, &haven, &prestige, &god_items);
 
     assert!(
         state.combat_state.enemy_attack_timer < 0.01,
@@ -1089,12 +1159,13 @@ fn enemy_attack_resets_attack_timer() {
 
 #[test]
 fn player_death_resets_hp_to_max() {
+    let mut rng = seeded_rng();
     let mut state = state_player_about_to_die();
     let haven = default_haven();
     let prestige = default_prestige();
     let god_items = default_god_items();
 
-    let events = force_enemy_attack(&mut state, &haven, &prestige, &god_items);
+    let events = force_enemy_attack(&mut rng, &mut state, &haven, &prestige, &god_items);
 
     let has_death = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
     assert!(has_death, "Player should have died");
@@ -1108,6 +1179,7 @@ fn player_death_resets_hp_to_max() {
 
 #[test]
 fn player_death_in_dungeon_exits_dungeon() {
+    let mut rng = seeded_rng();
     let mut state = state_player_about_to_die();
     state.active_dungeon = Some(generate_dungeon(1, 0, 1));
 
@@ -1115,7 +1187,7 @@ fn player_death_in_dungeon_exits_dungeon() {
     let prestige = default_prestige();
     let god_items = default_god_items();
 
-    let events = force_enemy_attack(&mut state, &haven, &prestige, &god_items);
+    let events = force_enemy_attack(&mut rng, &mut state, &haven, &prestige, &god_items);
 
     let has_dungeon_death = events
         .iter()
@@ -1130,6 +1202,7 @@ fn player_death_in_dungeon_exits_dungeon() {
 
 #[test]
 fn player_death_to_subzone_boss_sets_retry_kills() {
+    let mut rng = seeded_rng();
     let mut state = state_player_about_to_die();
     // Zone 1, subzone 1 — NOT a zone boss (zone boss is subzone 3)
     state.zone_progression.current_zone_id = 1;
@@ -1141,7 +1214,7 @@ fn player_death_to_subzone_boss_sets_retry_kills() {
     let prestige = default_prestige();
     let god_items = default_god_items();
 
-    force_enemy_attack(&mut state, &haven, &prestige, &god_items);
+    force_enemy_attack(&mut rng, &mut state, &haven, &prestige, &god_items);
 
     // Boss flag should be cleared
     assert!(
@@ -1161,6 +1234,7 @@ fn player_death_to_subzone_boss_sets_retry_kills() {
 
 #[test]
 fn player_death_to_zone_boss_resets_to_subzone_1() {
+    let mut rng = seeded_rng();
     let mut state = state_player_about_to_die();
     // Zone 1, subzone 3 — the zone boss (Sporeling Queen)
     state.zone_progression.current_zone_id = 1;
@@ -1172,7 +1246,7 @@ fn player_death_to_zone_boss_resets_to_subzone_1() {
     let prestige = default_prestige();
     let god_items = default_god_items();
 
-    force_enemy_attack(&mut state, &haven, &prestige, &god_items);
+    force_enemy_attack(&mut rng, &mut state, &haven, &prestige, &god_items);
 
     assert!(!state.zone_progression.fighting_boss);
     // Sent back to subzone 1
@@ -1189,6 +1263,7 @@ fn player_death_to_zone_boss_resets_to_subzone_1() {
 
 #[test]
 fn player_death_to_undying_storm_resets_to_lightning_fields() {
+    let mut rng = seeded_rng();
     let mut state = state_player_about_to_die();
     // Zone 10 (Storm Citadel), subzone 4 (Apex Spire) — The Undying Storm
     state.zone_progression.current_zone_id = 10;
@@ -1200,7 +1275,7 @@ fn player_death_to_undying_storm_resets_to_lightning_fields() {
     let prestige = default_prestige();
     let god_items = default_god_items();
 
-    force_enemy_attack(&mut state, &haven, &prestige, &god_items);
+    force_enemy_attack(&mut rng, &mut state, &haven, &prestige, &god_items);
 
     assert!(!state.zone_progression.fighting_boss);
     // Sent back to subzone 1 (Lightning Fields)
@@ -1213,6 +1288,7 @@ fn player_death_to_undying_storm_resets_to_lightning_fields() {
 
 #[test]
 fn player_death_to_zone_boss_preserves_zone_id() {
+    let mut rng = seeded_rng();
     let mut state = state_player_about_to_die();
     // Zone 5 (Volcanic Wastes), subzone 4 (Magma Core) — Infernal Titan (zone boss)
     state.zone_progression.current_zone_id = 5;
@@ -1224,7 +1300,7 @@ fn player_death_to_zone_boss_preserves_zone_id() {
     let prestige = default_prestige();
     let god_items = default_god_items();
 
-    force_enemy_attack(&mut state, &haven, &prestige, &god_items);
+    force_enemy_attack(&mut rng, &mut state, &haven, &prestige, &god_items);
 
     // Stays in same zone, just reset to subzone 1
     assert_eq!(
@@ -1240,6 +1316,7 @@ fn player_death_to_zone_boss_preserves_zone_id() {
 
 #[test]
 fn player_death_to_expanse_zone_boss_resets_to_subzone_1() {
+    let mut rng = seeded_rng();
     let mut state = state_player_about_to_die();
     // Zone 11 (The Expanse), subzone 4 (The Endless) — Avatar of Infinity (zone boss)
     state.zone_progression.current_zone_id = 11;
@@ -1251,7 +1328,7 @@ fn player_death_to_expanse_zone_boss_resets_to_subzone_1() {
     let prestige = default_prestige();
     let god_items = default_god_items();
 
-    force_enemy_attack(&mut state, &haven, &prestige, &god_items);
+    force_enemy_attack(&mut rng, &mut state, &haven, &prestige, &god_items);
 
     assert_eq!(
         state.zone_progression.current_zone_id, 11,
@@ -1266,6 +1343,7 @@ fn player_death_to_expanse_zone_boss_resets_to_subzone_1() {
 
 #[test]
 fn player_death_to_mid_subzone_boss_in_4_subzone_zone_uses_retry() {
+    let mut rng = seeded_rng();
     let mut state = state_player_about_to_die();
     // Zone 5 (Volcanic Wastes), subzone 2 (Lava Rivers) — Magma Serpent (NOT zone boss)
     state.zone_progression.current_zone_id = 5;
@@ -1277,7 +1355,7 @@ fn player_death_to_mid_subzone_boss_in_4_subzone_zone_uses_retry() {
     let prestige = default_prestige();
     let god_items = default_god_items();
 
-    force_enemy_attack(&mut state, &haven, &prestige, &god_items);
+    force_enemy_attack(&mut rng, &mut state, &haven, &prestige, &god_items);
 
     // Stays in same subzone with retry mechanic
     assert_eq!(state.zone_progression.current_zone_id, 5);
@@ -1294,6 +1372,7 @@ fn player_death_to_mid_subzone_boss_in_4_subzone_zone_uses_retry() {
 
 #[test]
 fn player_death_to_zone_boss_emits_player_died_event() {
+    let mut rng = seeded_rng();
     let mut state = state_player_about_to_die();
     // Zone 1, subzone 3 — Sporeling Queen (zone boss)
     state.zone_progression.current_zone_id = 1;
@@ -1305,7 +1384,7 @@ fn player_death_to_zone_boss_emits_player_died_event() {
     let prestige = default_prestige();
     let god_items = default_god_items();
 
-    let events = force_enemy_attack(&mut state, &haven, &prestige, &god_items);
+    let events = force_enemy_attack(&mut rng, &mut state, &haven, &prestige, &god_items);
 
     assert!(
         events.iter().any(|e| matches!(e, CombatEvent::PlayerDied)),
@@ -1315,6 +1394,7 @@ fn player_death_to_zone_boss_emits_player_died_event() {
 
 #[test]
 fn player_death_to_normal_enemy_resets_enemy_hp() {
+    let mut rng = seeded_rng();
     let mut state = fresh_state();
     state.combat_state.player_current_hp = 1;
     state.combat_state.current_enemy =
@@ -1324,7 +1404,7 @@ fn player_death_to_normal_enemy_resets_enemy_hp() {
     let prestige = default_prestige();
     let god_items = default_god_items();
 
-    force_enemy_attack(&mut state, &haven, &prestige, &god_items);
+    force_enemy_attack(&mut rng, &mut state, &haven, &prestige, &god_items);
 
     // Enemy should still exist with full HP (reset on player death)
     let enemy = state.combat_state.current_enemy.as_ref();
@@ -1341,6 +1421,7 @@ fn player_death_to_normal_enemy_resets_enemy_hp() {
 
 #[test]
 fn player_death_resets_both_timers() {
+    let mut rng = seeded_rng();
     let mut state = state_player_about_to_die();
     state.combat_state.player_attack_timer = 1.0;
     state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
@@ -1349,7 +1430,7 @@ fn player_death_resets_both_timers() {
     let prestige = default_prestige();
     let god_items = default_god_items();
 
-    force_enemy_attack(&mut state, &haven, &prestige, &god_items);
+    force_enemy_attack(&mut rng, &mut state, &haven, &prestige, &god_items);
 
     assert_eq!(
         state.combat_state.player_attack_timer, 0.0,
@@ -1363,6 +1444,7 @@ fn player_death_resets_both_timers() {
 
 #[test]
 fn damage_reflection_hurts_enemy() {
+    let mut rng = seeded_rng();
     // Create a player with damage reflection gear
     let mut state = state_with_enemy(100, 50, 0);
     // We need DerivedStats with damage_reflection_percent > 0
@@ -1373,7 +1455,7 @@ fn damage_reflection_hurts_enemy() {
     let prestige = default_prestige();
     let god_items = default_god_items();
 
-    let events = force_enemy_attack(&mut state, &haven, &prestige, &god_items);
+    let events = force_enemy_attack(&mut rng, &mut state, &haven, &prestige, &god_items);
 
     // Without reflection gear, there should be no DamageReflected event
     let has_reflection = events
@@ -1384,6 +1466,7 @@ fn damage_reflection_hurts_enemy() {
 
 #[test]
 fn damage_reflection_with_gear_reflects_damage() {
+    let mut rng = seeded_rng();
     use quest::items::types::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
 
     let mut state = state_with_enemy(100, 50, 0);
@@ -1414,7 +1497,9 @@ fn damage_reflection_with_gear_reflects_damage() {
     state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
     let mut ach = Achievements::default();
 
-    let events = update_combat(&mut state, 0.0, &haven, &prestige, &mut ach, &d, &god_items);
+    let events = update_combat(
+        &mut rng, &mut state, 0.0, &haven, &prestige, &mut ach, &d, &god_items,
+    );
 
     let has_reflection = events
         .iter()
@@ -1441,6 +1526,7 @@ fn damage_reflection_with_gear_reflects_damage() {
 
 #[test]
 fn full_combat_cycle_attack_kill_regen() {
+    let mut rng = seeded_rng();
     let mut state = state_with_weak_enemy();
     state.combat_state.player_current_hp = 30; // Take some damage
     let haven = default_haven();
@@ -1448,14 +1534,16 @@ fn full_combat_cycle_attack_kill_regen() {
     let god_items = default_god_items();
 
     // Phase 1: Player attacks and kills enemy
-    let _events = force_player_attack(&mut state, &haven, &prestige, &god_items);
+    let _events = force_player_attack(&mut rng, &mut state, &haven, &prestige, &god_items);
     assert!(state.combat_state.is_regenerating);
     assert!(state.combat_state.current_enemy.is_none());
 
     // Phase 2: Regen tick
     let d = derived(&state);
     let mut ach = Achievements::default();
-    update_combat(&mut state, 0.5, &haven, &prestige, &mut ach, &d, &god_items);
+    update_combat(
+        &mut rng, &mut state, 0.5, &haven, &prestige, &mut ach, &d, &god_items,
+    );
     assert!(state.combat_state.is_regenerating, "Still regenerating");
     assert!(
         state.combat_state.player_current_hp > 30,
@@ -1464,6 +1552,7 @@ fn full_combat_cycle_attack_kill_regen() {
 
     // Phase 3: Complete regen
     let _events = update_combat(
+        &mut rng,
         &mut state,
         HP_REGEN_DURATION_SECONDS,
         &haven,
@@ -1481,6 +1570,7 @@ fn full_combat_cycle_attack_kill_regen() {
 
 #[test]
 fn both_player_and_enemy_attack_same_tick() {
+    let mut rng = seeded_rng();
     let mut state = state_with_enemy(9999, 10, 0);
     // Set both timers ready
     state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
@@ -1490,6 +1580,7 @@ fn both_player_and_enemy_attack_same_tick() {
     let mut ach = Achievements::default();
 
     let events = update_combat(
+        &mut rng,
         &mut state,
         0.0,
         &default_haven(),
@@ -1514,6 +1605,7 @@ fn both_player_and_enemy_attack_same_tick() {
 
 #[test]
 fn god_item_attack_speed_reduces_player_interval() {
+    let mut rng = seeded_rng();
     let mut state = state_with_enemy(9999, 1, 0);
     let haven = default_haven();
     let prestige = default_prestige();
@@ -1528,7 +1620,9 @@ fn god_item_attack_speed_reduces_player_interval() {
     let d = derived(&state);
     let mut ach = Achievements::default();
 
-    let events = update_combat(&mut state, 0.1, &haven, &prestige, &mut ach, &d, &god_items);
+    let events = update_combat(
+        &mut rng, &mut state, 0.1, &haven, &prestige, &mut ach, &d, &god_items,
+    );
 
     let has_attack = events
         .iter()

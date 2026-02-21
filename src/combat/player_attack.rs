@@ -1,7 +1,7 @@
 use crate::character::derived_stats::DerivedStats;
 use crate::character::prestige::PrestigeCombatBonuses;
 use crate::core::game_state::GameState;
-use rand::RngExt;
+use rand::{Rng, RngExt};
 
 use super::events::{CombatEvent, GodItemCombatBonuses, HavenCombatBonuses};
 
@@ -21,7 +21,8 @@ use super::events::{CombatEvent, GodItemCombatBonuses, HavenCombatBonuses};
 ///
 /// Returns `(events, enemy_died)`. If the enemy died, the caller should
 /// return early (no further combat phases this tick).
-pub(crate) fn resolve_player_attack(
+pub(crate) fn resolve_player_attack<R: Rng>(
+    rng: &mut R,
     state: &mut GameState,
     haven: &HavenCombatBonuses,
     prestige_bonuses: &PrestigeCombatBonuses,
@@ -64,14 +65,14 @@ pub(crate) fn resolve_player_attack(
     let total_crit_chance = derived.crit_chance_percent
         + haven.crit_chance_percent as u32
         + prestige_bonuses.crit_chance as u32;
-    let crit_roll = rand::rng().random_range(0..100);
+    let crit_roll = rng.random_range(0..100);
     if crit_roll < total_crit_chance {
         damage = (damage as f64 * derived.crit_multiplier) as u32;
         was_crit = true;
     }
 
     // Roll for double strike (War Room bonus)
-    let double_strike_roll = rand::rng().random::<f64>() * 100.0;
+    let double_strike_roll = rng.random::<f64>() * 100.0;
     let num_strikes = if double_strike_roll < haven.double_strike_chance {
         2
     } else {
@@ -96,7 +97,7 @@ pub(crate) fn resolve_player_attack(
         // Check if enemy died
         if !enemy.is_alive() {
             let (death_events, _) =
-                super::damage::handle_enemy_death(state, achievements, haven.xp_gain_percent);
+                super::damage::handle_enemy_death(rng, state, achievements, haven.xp_gain_percent);
             events.extend(death_events);
             return (events, true);
         }

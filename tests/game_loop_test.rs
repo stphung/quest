@@ -13,6 +13,12 @@ use quest::core::game_logic::{
 };
 use quest::GameState;
 use quest::TICK_INTERVAL_MS;
+use rand::SeedableRng;
+use rand_chacha::ChaCha8Rng;
+
+fn test_rng() -> ChaCha8Rng {
+    ChaCha8Rng::seed_from_u64(42)
+}
 
 /// Default Haven combat bonuses for testing (no bonuses)
 fn default_haven_bonuses() -> HavenCombatBonuses {
@@ -21,6 +27,10 @@ fn default_haven_bonuses() -> HavenCombatBonuses {
 
 /// Simulate a single game tick (100ms of game time)
 fn simulate_tick(state: &mut GameState) -> Vec<CombatEvent> {
+    simulate_tick_with_rng(state, &mut test_rng())
+}
+
+fn simulate_tick_with_rng<R: rand::Rng>(state: &mut GameState, rng: &mut R) -> Vec<CombatEvent> {
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
     let mut achievements = Achievements::default();
 
@@ -34,6 +44,7 @@ fn simulate_tick(state: &mut GameState) -> Vec<CombatEvent> {
 
     // Update combat and return events
     update_combat(
+        rng,
         state,
         delta_time,
         &default_haven_bonuses(),
@@ -196,6 +207,7 @@ fn test_enemy_death_grants_xp() {
     use quest::core::game_logic::apply_tick_xp;
 
     let mut state = GameState::new("XP Test".to_string(), 0);
+    let mut rng = test_rng();
 
     // Set high STR so player always kills the enemy before dying,
     // regardless of RNG rolls (crit, double strike).
@@ -212,11 +224,11 @@ fn test_enemy_death_grants_xp() {
     let mut enemy_killed = false;
     let mut xp_from_kill = 0u64;
     for _ in 0..1000 {
-        let events = simulate_tick(&mut state);
+        let events = simulate_tick_with_rng(&mut state, &mut rng);
         for event in events {
             if let CombatEvent::EnemyDied { xp_gained } = event {
                 // Apply XP like main.rs does
-                apply_tick_xp(&mut state, xp_gained as f64);
+                apply_tick_xp(&mut rng, &mut state, xp_gained as f64);
                 xp_from_kill = xp_gained;
                 enemy_killed = true;
                 break;
@@ -294,11 +306,12 @@ fn test_level_up_occurs_with_enough_xp() {
     use quest::core::game_logic::apply_tick_xp;
 
     let mut state = GameState::new("Level Up Test".to_string(), 0);
+    let mut rng = test_rng();
 
     assert_eq!(state.character_level, 1);
 
     let xp_needed = xp_for_next_level(1);
-    let (level_ups, _) = apply_tick_xp(&mut state, xp_needed as f64 + 100.0);
+    let (level_ups, _) = apply_tick_xp(&mut rng, &mut state, xp_needed as f64 + 100.0);
 
     assert!(level_ups >= 1, "Should have leveled up");
     assert!(state.character_level >= 2, "Level should increase");
@@ -310,6 +323,7 @@ fn test_level_up_grants_attribute_points() {
     use quest::core::game_logic::apply_tick_xp;
 
     let mut state = GameState::new("Attr Point Test".to_string(), 0);
+    let mut rng = test_rng();
 
     let initial_total: u32 = AttributeType::all()
         .iter()
@@ -319,7 +333,7 @@ fn test_level_up_grants_attribute_points() {
     // Level up multiple times
     for level in 1..5 {
         let xp_needed = xp_for_next_level(level);
-        apply_tick_xp(&mut state, xp_needed as f64 + 100.0);
+        apply_tick_xp(&mut rng, &mut state, xp_needed as f64 + 100.0);
     }
 
     let final_total: u32 = AttributeType::all()
@@ -345,11 +359,12 @@ fn test_level_up_grants_attribute_points() {
 #[test]
 fn test_offline_progression_grants_xp() {
     let mut state = GameState::new("Offline Test".to_string(), 0);
+    let mut rng = test_rng();
 
     // Set last save time to 1 hour ago
     state.last_save_time = chrono::Utc::now().timestamp() - 3600;
 
-    let report = process_offline_progression(&mut state, 0.0);
+    let report = process_offline_progression(&mut rng, &mut state, 0.0);
 
     assert!(
         report.xp_gained > 0,
@@ -361,12 +376,13 @@ fn test_offline_progression_grants_xp() {
 #[test]
 fn test_offline_progression_with_long_absence() {
     let mut state = GameState::new("Offline Cap Test".to_string(), 0);
+    let mut rng = test_rng();
 
     // Set last save time to 10 days ago
     let ten_days_seconds: i64 = 10 * 24 * 3600;
     state.last_save_time = chrono::Utc::now().timestamp() - ten_days_seconds;
 
-    let report = process_offline_progression(&mut state, 0.0);
+    let report = process_offline_progression(&mut rng, &mut state, 0.0);
 
     // elapsed_seconds shows actual time, but XP is calculated with 7-day cap internally
     assert!(
@@ -379,12 +395,13 @@ fn test_offline_progression_with_long_absence() {
 #[test]
 fn test_offline_progression_can_level_up() {
     let mut state = GameState::new("Offline Level Test".to_string(), 0);
+    let mut rng = test_rng();
 
     // Set last save time to several hours ago for substantial XP
     state.last_save_time = chrono::Utc::now().timestamp() - 10000;
 
     let initial_level = state.character_level;
-    let report = process_offline_progression(&mut state, 0.0);
+    let report = process_offline_progression(&mut rng, &mut state, 0.0);
 
     if report.total_level_ups > 0 {
         assert!(
@@ -397,11 +414,12 @@ fn test_offline_progression_can_level_up() {
 #[test]
 fn test_short_offline_time_still_processes() {
     let mut state = GameState::new("Short Offline Test".to_string(), 0);
+    let mut rng = test_rng();
 
     // Set last save time to 30 seconds ago
     state.last_save_time = chrono::Utc::now().timestamp() - 30;
 
-    let report = process_offline_progression(&mut state, 0.0);
+    let report = process_offline_progression(&mut rng, &mut state, 0.0);
 
     // Even short times are processed (threshold check is at display level in main.rs)
     assert!(
@@ -471,6 +489,7 @@ fn test_zone_advancement_subzone_to_subzone() {
     use quest::zones::BossDefeatResult;
 
     let mut state = GameState::new("Zone Advance Test".to_string(), 0);
+    let mut rng = test_rng();
 
     // Set high STR/INT for reliable boss kills (testing zone mechanics, not difficulty).
     // Boss HP scales with player_max_hp (3x for zone boss), so keep CON at base (10)
@@ -491,14 +510,14 @@ fn test_zone_advancement_subzone_to_subzone() {
     let mut boss_defeated = false;
     let mut defeat_result = None;
     for _ in 0..20_000 {
-        let events = simulate_tick(&mut state);
+        let events = simulate_tick_with_rng(&mut state, &mut rng);
         for event in &events {
             match event {
                 CombatEvent::EnemyDied { xp_gained } => {
-                    apply_tick_xp(&mut state, *xp_gained as f64);
+                    apply_tick_xp(&mut rng, &mut state, *xp_gained as f64);
                 }
                 CombatEvent::SubzoneBossDefeated { xp_gained, result } => {
-                    apply_tick_xp(&mut state, *xp_gained as f64);
+                    apply_tick_xp(&mut rng, &mut state, *xp_gained as f64);
                     defeat_result = Some(result.clone());
                     boss_defeated = true;
                 }
@@ -534,6 +553,7 @@ fn test_zone_advancement_full_zone_clear() {
     use quest::zones::BossDefeatResult;
 
     let mut state = GameState::new("Full Zone Clear Test".to_string(), 0);
+    let mut rng = test_rng();
 
     // Set high STR/INT for reliable boss kills (testing zone mechanics, not difficulty).
     // Boss HP scales with player_max_hp (3x for zone boss), so keep CON at base (10)
@@ -552,14 +572,14 @@ fn test_zone_advancement_full_zone_clear() {
         // Run combat until boss is defeated (handles kills, boss spawn, and boss death)
         let mut subzone_boss_defeated = false;
         for _ in 0..10_000 {
-            let events = simulate_tick(&mut state);
+            let events = simulate_tick_with_rng(&mut state, &mut rng);
             for event in &events {
                 match event {
                     CombatEvent::EnemyDied { xp_gained } => {
-                        apply_tick_xp(&mut state, *xp_gained as f64);
+                        apply_tick_xp(&mut rng, &mut state, *xp_gained as f64);
                     }
                     CombatEvent::SubzoneBossDefeated { xp_gained, result } => {
-                        apply_tick_xp(&mut state, *xp_gained as f64);
+                        apply_tick_xp(&mut rng, &mut state, *xp_gained as f64);
 
                         if expected_subzone < 3 {
                             assert!(

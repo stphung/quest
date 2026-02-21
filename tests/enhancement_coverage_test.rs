@@ -555,11 +555,8 @@ fn test_persistence_corrupt_json_various() {
 fn test_persistence_file_io_roundtrip() {
     use std::fs;
 
-    let tmp = std::env::temp_dir().join(format!("quest_enhancement_test_{}", std::process::id()));
-    let _ = fs::remove_dir_all(&tmp);
-    fs::create_dir_all(&tmp).unwrap();
-
-    let path = tmp.join("enhancement.json");
+    let tmp = tempfile::tempdir().expect("Failed to create temp dir");
+    let path = tmp.path().join("enhancement.json");
 
     let mut ep = EnhancementProgress::new();
     ep.discovered = true;
@@ -584,22 +581,16 @@ fn test_persistence_file_io_roundtrip() {
     assert_eq!(restored.total_successes, 25);
     assert_eq!(restored.total_failures, 17);
     assert_eq!(restored.highest_level_reached, 8);
-
-    // Cleanup
-    let _ = fs::remove_dir_all(&tmp);
 }
 
 #[test]
 fn test_persistence_missing_file_produces_default() {
     use std::fs;
 
-    let path = std::env::temp_dir().join(format!(
-        "quest_enhancement_test_missing_{}/enhancement.json",
-        std::process::id()
-    ));
+    let tmp = tempfile::tempdir().expect("Failed to create temp dir");
+    let path = tmp.path().join("nonexistent_enhancement.json");
 
-    // Ensure file does not exist
-    let _ = fs::remove_file(&path);
+    // File does not exist in fresh temp dir
 
     // Simulate load_enhancement pattern: read_to_string fails -> new()
     let result = match fs::read_to_string(&path) {
@@ -615,14 +606,8 @@ fn test_persistence_missing_file_produces_default() {
 fn test_persistence_corrupt_file_produces_default() {
     use std::fs;
 
-    let tmp = std::env::temp_dir().join(format!(
-        "quest_enhancement_test_corrupt_{}",
-        std::process::id()
-    ));
-    let _ = fs::remove_dir_all(&tmp);
-    fs::create_dir_all(&tmp).unwrap();
-
-    let path = tmp.join("enhancement.json");
+    let tmp = tempfile::tempdir().expect("Failed to create temp dir");
+    let path = tmp.path().join("enhancement.json");
     fs::write(&path, "THIS IS NOT VALID JSON!!!").unwrap();
 
     // Simulate load_enhancement pattern
@@ -633,31 +618,24 @@ fn test_persistence_corrupt_file_produces_default() {
 
     assert!(!result.discovered);
     assert_eq!(result.levels, [0; 7]);
-
-    let _ = fs::remove_dir_all(&tmp);
 }
 
 #[test]
 fn test_persistence_save_creates_directory() {
     use std::fs;
 
-    let tmp = std::env::temp_dir().join(format!(
-        "quest_enhancement_test_mkdir_{}/subdir",
-        std::process::id()
-    ));
-    let _ = fs::remove_dir_all(tmp.parent().unwrap());
+    let tmp = tempfile::tempdir().expect("Failed to create temp dir");
+    let subdir = tmp.path().join("subdir");
 
-    // Create parent dir and file
-    fs::create_dir_all(&tmp).unwrap();
-    let path = tmp.join("enhancement.json");
+    // Create subdir and file
+    fs::create_dir_all(&subdir).unwrap();
+    let path = subdir.join("enhancement.json");
 
     let ep = EnhancementProgress::new();
     let json = serde_json::to_string_pretty(&ep).unwrap();
     fs::write(&path, &json).unwrap();
 
     assert!(path.exists());
-
-    let _ = fs::remove_dir_all(tmp.parent().unwrap());
 }
 
 // =========================================================================
