@@ -300,7 +300,8 @@ fn handle_sigil_inscribe_confirm(
             if state.stormglass >= INSCRIBE_COST {
                 state.stormglass -= INSCRIBE_COST;
                 let mut rng = rand::rng();
-                let choices = crate::stormglass::sigils::generate_sigil_choices(&mut rng);
+                let pool = crate::stormglass::sigils::daily_sigil_pool();
+                let choices = crate::stormglass::sigils::generate_sigil_choices(&mut rng, &pool);
                 exchange_ui.sigil_choices = choices.map(Some);
                 exchange_ui.sigil_pick_selected = 0;
                 exchange_ui.phase = ExchangePhase::SigilPick;
@@ -328,7 +329,8 @@ fn handle_sigil_reroll_confirm(
                 let slot = exchange_ui.sigil_target_slot;
                 state.storm_sigils.sigils[slot] = None;
                 let mut rng = rand::rng();
-                let choices = crate::stormglass::sigils::generate_sigil_choices(&mut rng);
+                let pool = crate::stormglass::sigils::daily_sigil_pool();
+                let choices = crate::stormglass::sigils::generate_sigil_choices(&mut rng, &pool);
                 exchange_ui.sigil_choices = choices.map(Some);
                 exchange_ui.sigil_pick_selected = 0;
                 exchange_ui.phase = ExchangePhase::SigilPick;

@@ -346,14 +346,15 @@ fn trigger_grant_100k_stormglass(state: &mut GameState) -> &'static str {
 }
 
 fn trigger_inscribe_random_sigils(state: &mut GameState) -> &'static str {
-    use crate::stormglass::sigils::{generate_sigil_choices, MAX_SIGIL_SLOTS};
+    use crate::stormglass::sigils::{generate_sigil_choices, SigilEffectType, MAX_SIGIL_SLOTS};
 
     // Unlock all slots first
     state.storm_sigils.slots_unlocked = MAX_SIGIL_SLOTS as u8;
     // Fill each slot with a random sigil (pick first of 3 choices)
+    // Debug uses ALL types, bypassing daily rotation
     let mut rng = rand::rng();
     for slot in 0..MAX_SIGIL_SLOTS {
-        let choices = generate_sigil_choices(&mut rng);
+        let choices = generate_sigil_choices(&mut rng, &SigilEffectType::ALL);
         state.storm_sigils.sigils[slot] = Some(choices[0].clone());
     }
     "All 5 sigil slots unlocked and inscribed!"
