@@ -199,21 +199,21 @@ impl DifficultyInfo for FlappyBirdDifficulty {
     fn reward(&self) -> ChallengeReward {
         match self {
             FlappyBirdDifficulty::Novice => ChallengeReward {
-                xp_percent: 50,
+                stormglass: 500,
                 ..Default::default()
             },
             FlappyBirdDifficulty::Apprentice => ChallengeReward {
-                xp_percent: 100,
+                stormglass: 1_200,
                 ..Default::default()
             },
             FlappyBirdDifficulty::Journeyman => ChallengeReward {
                 prestige_ranks: 1,
-                xp_percent: 75,
+                stormglass: 2_500,
                 ..Default::default()
             },
             FlappyBirdDifficulty::Master => ChallengeReward {
                 prestige_ranks: 2,
-                xp_percent: 150,
+                stormglass: 6_000,
                 fishing_ranks: 1,
             },
         }
@@ -555,14 +555,14 @@ mod tests {
         assert_eq!(
             FlappyBirdDifficulty::Novice.reward(),
             ChallengeReward {
-                xp_percent: 50,
+                stormglass: 500,
                 ..Default::default()
             }
         );
         assert_eq!(
             FlappyBirdDifficulty::Apprentice.reward(),
             ChallengeReward {
-                xp_percent: 100,
+                stormglass: 1_200,
                 ..Default::default()
             }
         );
@@ -570,7 +570,7 @@ mod tests {
             FlappyBirdDifficulty::Journeyman.reward(),
             ChallengeReward {
                 prestige_ranks: 1,
-                xp_percent: 75,
+                stormglass: 2_500,
                 ..Default::default()
             }
         );
@@ -578,7 +578,7 @@ mod tests {
             FlappyBirdDifficulty::Master.reward(),
             ChallengeReward {
                 prestige_ranks: 2,
-                xp_percent: 150,
+                stormglass: 6_000,
                 fishing_ranks: 1,
             }
         );

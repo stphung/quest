@@ -158,22 +158,22 @@ mod tests {
     fn test_difficulty_rewards() {
         use crate::challenges::menu::DifficultyInfo;
 
-        // Novice/Apprentice: XP only
+        // Novice/Apprentice: stormglass only
         let novice = GomokuDifficulty::Novice.reward();
-        assert_eq!(novice.xp_percent, 75);
+        assert_eq!(novice.stormglass, 800);
         assert_eq!(novice.prestige_ranks, 0);
 
         let apprentice = GomokuDifficulty::Apprentice.reward();
-        assert_eq!(apprentice.xp_percent, 100);
+        assert_eq!(apprentice.stormglass, 2_000);
         assert_eq!(apprentice.prestige_ranks, 0);
 
-        // Journeyman/Master: XP + Prestige
+        // Journeyman/Master: stormglass + Prestige
         let journeyman = GomokuDifficulty::Journeyman.reward();
-        assert_eq!(journeyman.xp_percent, 50);
+        assert_eq!(journeyman.stormglass, 4_000);
         assert_eq!(journeyman.prestige_ranks, 1);
 
         let master = GomokuDifficulty::Master.reward();
-        assert_eq!(master.xp_percent, 100);
+        assert_eq!(master.stormglass, 10_000);
         assert_eq!(master.prestige_ranks, 2);
     }
 

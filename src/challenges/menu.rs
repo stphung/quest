@@ -134,7 +134,7 @@ fn decline_selected_challenge(state: &mut GameState) {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ChallengeReward {
     pub prestige_ranks: u32,
-    pub xp_percent: u32,
+    pub stormglass: u64,
     pub fishing_ranks: u32,
 }
 
@@ -156,8 +156,8 @@ impl ChallengeReward {
             parts.push(format!("+{} Fish Ranks", self.fishing_ranks));
         }
 
-        if self.xp_percent > 0 {
-            parts.push(format!("+{}% level XP", self.xp_percent));
+        if self.stormglass > 0 {
+            parts.push(format!("+{} SG", self.stormglass));
         }
 
         if parts.is_empty() {
@@ -201,6 +201,12 @@ impl DifficultyInfo for ChessDifficulty {
     fn reward(&self) -> ChallengeReward {
         ChallengeReward {
             prestige_ranks: self.reward_prestige(),
+            stormglass: match self {
+                ChessDifficulty::Novice => 1_000,
+                ChessDifficulty::Apprentice => 2_500,
+                ChessDifficulty::Journeyman => 5_000,
+                ChessDifficulty::Master => 12_500,
+            },
             ..Default::default()
         }
     }
@@ -216,14 +222,24 @@ impl DifficultyInfo for MorrisDifficulty {
     }
 
     fn reward(&self) -> ChallengeReward {
-        ChallengeReward {
-            xp_percent: self.reward_xp_percent(),
-            fishing_ranks: if *self == MorrisDifficulty::Master {
-                1
-            } else {
-                0
+        match self {
+            MorrisDifficulty::Novice => ChallengeReward {
+                stormglass: 800,
+                ..Default::default()
             },
-            ..Default::default()
+            MorrisDifficulty::Apprentice => ChallengeReward {
+                stormglass: 2_000,
+                ..Default::default()
+            },
+            MorrisDifficulty::Journeyman => ChallengeReward {
+                stormglass: 4_000,
+                ..Default::default()
+            },
+            MorrisDifficulty::Master => ChallengeReward {
+                fishing_ranks: 1,
+                stormglass: 10_000,
+                ..Default::default()
+            },
         }
     }
 }
@@ -236,21 +252,21 @@ impl DifficultyInfo for GomokuDifficulty {
     fn reward(&self) -> ChallengeReward {
         match self {
             GomokuDifficulty::Novice => ChallengeReward {
-                xp_percent: 75,
+                stormglass: 800,
                 ..Default::default()
             },
             GomokuDifficulty::Apprentice => ChallengeReward {
-                xp_percent: 100,
+                stormglass: 2_000,
                 ..Default::default()
             },
             GomokuDifficulty::Journeyman => ChallengeReward {
                 prestige_ranks: 1,
-                xp_percent: 50,
+                stormglass: 4_000,
                 ..Default::default()
             },
             GomokuDifficulty::Master => ChallengeReward {
                 prestige_ranks: 2,
-                xp_percent: 100,
+                stormglass: 10_000,
                 ..Default::default()
             },
         }
@@ -265,20 +281,20 @@ impl DifficultyInfo for MinesweeperDifficulty {
     fn reward(&self) -> ChallengeReward {
         match self {
             MinesweeperDifficulty::Novice => ChallengeReward {
-                xp_percent: 50,
+                stormglass: 500,
                 ..Default::default()
             },
             MinesweeperDifficulty::Apprentice => ChallengeReward {
-                xp_percent: 75,
+                stormglass: 1_200,
                 ..Default::default()
             },
             MinesweeperDifficulty::Journeyman => ChallengeReward {
-                xp_percent: 100,
+                stormglass: 2_500,
                 ..Default::default()
             },
             MinesweeperDifficulty::Master => ChallengeReward {
                 prestige_ranks: 1,
-                xp_percent: 200,
+                stormglass: 6_000,
                 ..Default::default()
             },
         }
@@ -298,22 +314,22 @@ impl DifficultyInfo for RuneDifficulty {
     fn reward(&self) -> ChallengeReward {
         match self {
             RuneDifficulty::Novice => ChallengeReward {
-                xp_percent: 25,
+                stormglass: 300,
                 ..Default::default()
             },
             RuneDifficulty::Apprentice => ChallengeReward {
-                xp_percent: 50,
+                stormglass: 800,
                 ..Default::default()
             },
             RuneDifficulty::Journeyman => ChallengeReward {
                 fishing_ranks: 1,
-                xp_percent: 75,
+                stormglass: 1_500,
                 ..Default::default()
             },
             RuneDifficulty::Master => ChallengeReward {
                 prestige_ranks: 1,
                 fishing_ranks: 2,
-                ..Default::default()
+                stormglass: 4_000,
             },
         }
     }
@@ -341,6 +357,12 @@ impl DifficultyInfo for GoDifficulty {
     fn reward(&self) -> ChallengeReward {
         ChallengeReward {
             prestige_ranks: self.reward_prestige(),
+            stormglass: match self {
+                GoDifficulty::Novice => 1_000,
+                GoDifficulty::Apprentice => 2_500,
+                GoDifficulty::Journeyman => 5_000,
+                GoDifficulty::Master => 12_500,
+            },
             ..Default::default()
         }
     }
@@ -880,12 +902,12 @@ mod tests {
     }
 
     #[test]
-    fn test_reward_description_xp_only() {
+    fn test_reward_description_stormglass_only() {
         let reward = ChallengeReward {
-            xp_percent: 75,
+            stormglass: 750,
             ..Default::default()
         };
-        assert_eq!(reward.description(), "Win: +75% level XP");
+        assert_eq!(reward.description(), "Win: +750 SG");
     }
 
     #[test]
@@ -905,23 +927,23 @@ mod tests {
 
     #[test]
     fn test_reward_description_mixed() {
-        // Prestige + XP
+        // Prestige + SG
         let reward = ChallengeReward {
             prestige_ranks: 1,
-            xp_percent: 50,
+            stormglass: 500,
             ..Default::default()
         };
-        assert_eq!(reward.description(), "Win: +1 Prestige Rank, +50% level XP");
+        assert_eq!(reward.description(), "Win: +1 Prestige Rank, +500 SG");
 
-        // All three (order: prestige -> fishing -> XP)
+        // All three (order: prestige -> fishing -> SG)
         let reward = ChallengeReward {
             prestige_ranks: 2,
             fishing_ranks: 1,
-            xp_percent: 100,
+            stormglass: 1000,
         };
         assert_eq!(
             reward.description(),
-            "Win: +2 Prestige Ranks, +1 Fish Rank, +100% level XP"
+            "Win: +2 Prestige Ranks, +1 Fish Rank, +1000 SG"
         );
     }
 

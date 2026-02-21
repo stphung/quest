@@ -381,21 +381,23 @@ mod tests {
     fn test_difficulty_rewards_via_trait() {
         use crate::challenges::menu::DifficultyInfo;
 
-        // Chess rewards prestige only
+        // Chess rewards prestige + stormglass
         let novice = ChessDifficulty::Novice.reward();
         assert_eq!(novice.prestige_ranks, 1);
-        assert_eq!(novice.xp_percent, 0);
+        assert_eq!(novice.stormglass, 1_000);
         assert_eq!(novice.fishing_ranks, 0);
 
         let apprentice = ChessDifficulty::Apprentice.reward();
         assert_eq!(apprentice.prestige_ranks, 2);
+        assert_eq!(apprentice.stormglass, 2_500);
 
         let journeyman = ChessDifficulty::Journeyman.reward();
         assert_eq!(journeyman.prestige_ranks, 3);
+        assert_eq!(journeyman.stormglass, 5_000);
 
         let master = ChessDifficulty::Master.reward();
         assert_eq!(master.prestige_ranks, 5);
-        assert_eq!(master.xp_percent, 0);
+        assert_eq!(master.stormglass, 12_500);
         assert_eq!(master.fishing_ranks, 0);
     }
 

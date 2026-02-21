@@ -658,8 +658,8 @@ mod integration_tests {
             state.active_minigame.is_none(),
             "Minigame should be cleared"
         );
-        // Apprentice: xp_percent=100, so full level XP
-        let expected_xp = (xp_for_level * 100) / 100;
+        // Apprentice: stormglass=2000, fallback XP% = 2000/10 = 200%
+        let expected_xp = (xp_for_level * 200) / 100;
         assert_eq!(state.character_xp, initial_xp + expected_xp);
     }
 

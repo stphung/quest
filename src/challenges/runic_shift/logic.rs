@@ -564,21 +564,21 @@ impl DifficultyInfo for RunicShiftDifficulty {
     fn reward(&self) -> ChallengeReward {
         match self {
             RunicShiftDifficulty::Novice => ChallengeReward {
-                xp_percent: 50,
+                stormglass: 500,
                 ..Default::default()
             },
             RunicShiftDifficulty::Apprentice => ChallengeReward {
-                xp_percent: 100,
+                stormglass: 1_200,
                 ..Default::default()
             },
             RunicShiftDifficulty::Journeyman => ChallengeReward {
                 prestige_ranks: 1,
-                xp_percent: 75,
+                stormglass: 2_500,
                 ..Default::default()
             },
             RunicShiftDifficulty::Master => ChallengeReward {
                 prestige_ranks: 2,
-                xp_percent: 150,
+                stormglass: 6_000,
                 fishing_ranks: 1,
             },
         }

@@ -730,8 +730,10 @@ mod tests {
         let processed = apply_game_result(&mut state);
 
         assert!(processed.is_some()); // Win returns Some(MinigameWinInfo)
-                                      // Master = 200% of xp_for_next_level(10) = 6324
-        assert_eq!(state.character_xp, old_xp + 6324);
+                                      // Master: stormglass=10000, fallback XP% = 10000/10 = 1000%
+        let xp_for_level = crate::core::game_logic::xp_for_next_level(10);
+        let expected_xp = (xp_for_level * 1000) / 100;
+        assert_eq!(state.character_xp, old_xp + expected_xp);
         // Master grants +1 fishing rank
         assert_eq!(state.fishing.rank, old_fishing_rank + 1);
         assert!(state.active_minigame.is_none());
