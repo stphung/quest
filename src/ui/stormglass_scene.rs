@@ -987,8 +987,17 @@ fn render_sigils_list(
         }
     }
 
-    // Info line (row 10) — context-sensitive hint
-    let info_row = 10i32;
+    // Daily rotation line (row 9) — show today's available sigils
+    let daily_row = 9i32;
+    if daily_row < h as i32 {
+        let pool = crate::stormglass::sigils::daily_sigil_pool();
+        let names: Vec<&str> = pool.iter().map(|e| e.short_name()).collect();
+        let daily_text = format!("Today: {}", names.join(", "));
+        put_text_centered(&mut buffer, daily_row, w, &daily_text, Color::DarkGray);
+    }
+
+    // Info line (row 11) — context-sensitive hint
+    let info_row = 11i32;
     if info_row < h as i32 {
         let slot = exchange_ui.sigil_selected_slot;
         let info = if slot >= sigils.slots_unlocked as usize {

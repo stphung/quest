@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 // ── Constants ────────────────────────────────────────────────────────────
 pub const MAX_SIGIL_SLOTS: usize = 5;
 pub const INSCRIBE_COST: u64 = 25_000;
+pub const DAILY_POOL_SIZE: usize = 5;
 
 /// Slot unlock costs: 25k, 50k, 100k, 200k, 400k (2x exponential)
 pub const SLOT_UNLOCK_COSTS: [u64; MAX_SIGIL_SLOTS] = [25_000, 50_000, 100_000, 200_000, 400_000];
@@ -113,6 +114,23 @@ impl SigilEffectType {
     pub fn format_range(self) -> String {
         let (min, max) = self.range();
         format!("{:.0}-{:.0}%", min, max)
+    }
+
+    /// Short label for daily rotation display (e.g., "Fury", "Wisdom").
+    pub fn short_name(self) -> &'static str {
+        match self {
+            Self::XpPercent => "Wisdom",
+            Self::DamagePercent => "Fury",
+            Self::DamageReductionPercent => "Bulwark",
+            Self::CritChancePercent => "Precision",
+            Self::DropRatePercent => "Fortune",
+            Self::MaxHpPercent => "Vitality",
+            Self::FishingSpeedPercent => "Tide",
+            Self::OfflineXpPercent => "Echoes",
+            Self::AttackSpeedPercent => "Swiftness",
+            Self::DoubleStrikePercent => "Twin Strike",
+            Self::RegenDelayPercent => "Renewal",
+        }
     }
 }
 
@@ -312,13 +330,41 @@ pub fn roll_sigil(effect: SigilEffectType, uniform_roll: f64) -> Sigil {
 }
 
 /// Generate 3 random sigil choices for the pick-1-of-3 screen.
-/// Each sigil rolls an independent random effect type and value.
-pub fn generate_sigil_choices<R: rand::Rng>(rng: &mut R) -> [Sigil; 3] {
-    let types = SigilEffectType::ALL;
+/// Each sigil rolls from the given pool of available effect types.
+pub fn generate_sigil_choices<R: rand::Rng>(rng: &mut R, pool: &[SigilEffectType]) -> [Sigil; 3] {
     std::array::from_fn(|_| {
-        let effect = types[rng.random_range(0..types.len())];
+        let effect = pool[rng.random_range(0..pool.len())];
         roll_sigil(effect, rng.random::<f64>())
     })
+}
+
+// ── Daily Sigil Rotation ──────────────────────────────────────────────
+
+/// Compute the daily sigil pool for a given day number.
+/// Returns a deterministic selection of DAILY_POOL_SIZE effect types.
+/// The same day always produces the same pool.
+pub fn daily_sigil_pool_for_day(day: i32) -> Vec<SigilEffectType> {
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    let mut types = SigilEffectType::ALL.to_vec();
+    let mut rng = ChaCha8Rng::seed_from_u64((day as u64).wrapping_mul(2654435761));
+
+    // Fisher-Yates partial shuffle to select DAILY_POOL_SIZE elements
+    for i in 0..DAILY_POOL_SIZE {
+        let j = i + rng.random_range(0..types.len() - i);
+        types.swap(i, j);
+    }
+
+    types.truncate(DAILY_POOL_SIZE);
+    types
+}
+
+/// Get today's daily sigil pool.
+pub fn daily_sigil_pool() -> Vec<SigilEffectType> {
+    use chrono::Datelike;
+    let day = chrono::Utc::now().date_naive().num_days_from_ce();
+    daily_sigil_pool_for_day(day)
 }
 
 // ── Bonus Aggregation ───────────────────────────────────────────────────
@@ -464,7 +510,7 @@ mod tests {
     #[test]
     fn test_generate_sigil_choices_produces_three() {
         let mut rng = ChaCha8Rng::seed_from_u64(42);
-        let choices = generate_sigil_choices(&mut rng);
+        let choices = generate_sigil_choices(&mut rng, &SigilEffectType::ALL);
         assert_eq!(choices.len(), 3);
         for sigil in &choices {
             let (min, max) = sigil.effect.range();
@@ -783,5 +829,89 @@ mod tests {
             sigil.value
         );
         assert!(sigil.grade >= SigilGrade::SPlus);
+    }
+
+    #[test]
+    fn test_daily_sigil_pool_returns_correct_size() {
+        let pool = daily_sigil_pool_for_day(739000);
+        assert_eq!(pool.len(), DAILY_POOL_SIZE);
+    }
+
+    #[test]
+    fn test_daily_sigil_pool_deterministic() {
+        let pool1 = daily_sigil_pool_for_day(739000);
+        let pool2 = daily_sigil_pool_for_day(739000);
+        assert_eq!(pool1, pool2);
+    }
+
+    #[test]
+    fn test_daily_sigil_pool_different_days_differ() {
+        let pool1 = daily_sigil_pool_for_day(739000);
+        let pool2 = daily_sigil_pool_for_day(739001);
+        assert_ne!(pool1, pool2, "Adjacent days should have different pools");
+    }
+
+    #[test]
+    fn test_daily_sigil_pool_no_duplicates() {
+        // Check several days for uniqueness within each pool
+        for day in 739000..739010 {
+            let pool = daily_sigil_pool_for_day(day);
+            for i in 0..pool.len() {
+                for j in (i + 1)..pool.len() {
+                    assert_ne!(
+                        pool[i], pool[j],
+                        "Day {} has duplicate types: {:?}",
+                        day, pool
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_daily_sigil_pool_all_types_appear_over_time() {
+        use std::collections::HashSet;
+        let mut seen = HashSet::new();
+        // Over 100 days, all 11 types should appear at least once
+        for day in 739000..739100 {
+            let pool = daily_sigil_pool_for_day(day);
+            for effect in pool {
+                seen.insert(format!("{:?}", effect));
+            }
+        }
+        assert_eq!(
+            seen.len(),
+            SigilEffectType::ALL.len(),
+            "Not all types appeared in 100 days: {:?}",
+            seen
+        );
+    }
+
+    #[test]
+    fn test_generate_sigil_choices_respects_pool() {
+        let pool = vec![SigilEffectType::XpPercent, SigilEffectType::DamagePercent];
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
+        for _ in 0..20 {
+            let choices = generate_sigil_choices(&mut rng, &pool);
+            for sigil in &choices {
+                assert!(
+                    sigil.effect == SigilEffectType::XpPercent
+                        || sigil.effect == SigilEffectType::DamagePercent,
+                    "Got {:?} which is not in the pool",
+                    sigil.effect
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_sigil_effect_short_name() {
+        for effect in SigilEffectType::ALL {
+            assert!(
+                !effect.short_name().is_empty(),
+                "{:?} has empty short name",
+                effect
+            );
+        }
     }
 }

@@ -170,7 +170,7 @@ fn test_roll_sigil_value_rounded_to_one_decimal() {
 #[test]
 fn test_generate_sigil_choices_produces_three() {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
-    let choices = generate_sigil_choices(&mut rng);
+    let choices = generate_sigil_choices(&mut rng, &SigilEffectType::ALL);
     assert_eq!(choices.len(), 3);
 }
 
@@ -178,7 +178,7 @@ fn test_generate_sigil_choices_produces_three() {
 fn test_generate_sigil_choices_all_valid() {
     let mut rng = ChaCha8Rng::seed_from_u64(123);
     for _ in 0..100 {
-        let choices = generate_sigil_choices(&mut rng);
+        let choices = generate_sigil_choices(&mut rng, &SigilEffectType::ALL);
         for sigil in &choices {
             let (min, max) = sigil.effect.range();
             assert!(
@@ -197,8 +197,8 @@ fn test_generate_sigil_choices_all_valid() {
 fn test_generate_sigil_choices_deterministic_with_seed() {
     let mut rng1 = ChaCha8Rng::seed_from_u64(42);
     let mut rng2 = ChaCha8Rng::seed_from_u64(42);
-    let choices1 = generate_sigil_choices(&mut rng1);
-    let choices2 = generate_sigil_choices(&mut rng2);
+    let choices1 = generate_sigil_choices(&mut rng1, &SigilEffectType::ALL);
+    let choices2 = generate_sigil_choices(&mut rng2, &SigilEffectType::ALL);
     for (a, b) in choices1.iter().zip(choices2.iter()) {
         assert_eq!(a.effect, b.effect);
         assert!((a.value - b.value).abs() < 1e-10);
@@ -985,5 +985,80 @@ fn test_multiple_sigils_stack_in_game_tick() {
         hp_stacked,
         hp_base,
         expected_min
+    );
+}
+
+// ── Daily Sigil Pool ───────────────────────────────────────────────────
+
+#[test]
+fn test_daily_pool_size_is_correct() {
+    let pool = daily_sigil_pool_for_day(739000);
+    assert_eq!(pool.len(), DAILY_POOL_SIZE);
+}
+
+#[test]
+fn test_daily_pool_is_deterministic() {
+    let pool1 = daily_sigil_pool_for_day(739000);
+    let pool2 = daily_sigil_pool_for_day(739000);
+    assert_eq!(pool1, pool2);
+}
+
+#[test]
+fn test_daily_pool_varies_by_day() {
+    let pool1 = daily_sigil_pool_for_day(739000);
+    let pool2 = daily_sigil_pool_for_day(739001);
+    assert_ne!(pool1, pool2);
+}
+
+#[test]
+fn test_daily_pool_contains_no_duplicates() {
+    for day in 739000..739030 {
+        let pool = daily_sigil_pool_for_day(day);
+        for i in 0..pool.len() {
+            for j in (i + 1)..pool.len() {
+                assert_ne!(
+                    pool[i], pool[j],
+                    "Day {} pool has duplicate: {:?}",
+                    day, pool
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn test_generate_choices_only_from_pool() {
+    // With a restricted pool, all generated sigils must be from that pool
+    let pool = vec![
+        SigilEffectType::XpPercent,
+        SigilEffectType::CritChancePercent,
+    ];
+    let mut rng = ChaCha8Rng::seed_from_u64(99);
+    for _ in 0..50 {
+        let choices = generate_sigil_choices(&mut rng, &pool);
+        for sigil in &choices {
+            assert!(
+                sigil.effect == SigilEffectType::XpPercent
+                    || sigil.effect == SigilEffectType::CritChancePercent,
+                "Sigil {:?} not in pool",
+                sigil.effect
+            );
+        }
+    }
+}
+
+#[test]
+fn test_daily_pool_covers_all_types_over_many_days() {
+    use std::collections::HashSet;
+    let mut seen = HashSet::new();
+    for day in 739000..739100 {
+        for effect in daily_sigil_pool_for_day(day) {
+            seen.insert(format!("{:?}", effect));
+        }
+    }
+    assert_eq!(
+        seen.len(),
+        SigilEffectType::ALL.len(),
+        "All 11 types should appear within 100 days"
     );
 }
