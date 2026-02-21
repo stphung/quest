@@ -494,7 +494,7 @@ impl DifficultyInfo for JezzballDifficulty {
             },
             JezzballDifficulty::Master => ChallengeReward {
                 prestige_ranks: 2,
-                stormglass: 6_000,
+                stormglass: 4_000,
                 ..Default::default()
             },
         }
@@ -784,7 +784,7 @@ mod tests {
             JezzballDifficulty::Master.reward(),
             ChallengeReward {
                 prestige_ranks: 2,
-                stormglass: 6_000,
+                stormglass: 4_000,
                 ..Default::default()
             }
         );

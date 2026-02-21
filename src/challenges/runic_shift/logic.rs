@@ -578,7 +578,7 @@ impl DifficultyInfo for RunicShiftDifficulty {
             },
             RunicShiftDifficulty::Master => ChallengeReward {
                 prestige_ranks: 2,
-                stormglass: 6_000,
+                stormglass: 4_000,
                 fishing_ranks: 1,
             },
         }

@@ -213,7 +213,7 @@ impl DifficultyInfo for FlappyBirdDifficulty {
             },
             FlappyBirdDifficulty::Master => ChallengeReward {
                 prestige_ranks: 2,
-                stormglass: 6_000,
+                stormglass: 4_000,
                 fishing_ranks: 1,
             },
         }
@@ -578,7 +578,7 @@ mod tests {
             FlappyBirdDifficulty::Master.reward(),
             ChallengeReward {
                 prestige_ranks: 2,
-                stormglass: 6_000,
+                stormglass: 4_000,
                 fishing_ranks: 1,
             }
         );
