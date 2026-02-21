@@ -109,7 +109,7 @@ pub struct GameState {
     /// Dirty flag: set when attributes, equipment, or enhancement levels change
     #[serde(skip)]
     pub derived_stats_dirty: bool,
-    /// Rolling XP rate: XP gained per second over the last 5 minutes
+    /// Rolling XP rate: XP gained per second over the last 15 minutes of combat time
     #[serde(skip)]
     pub xp_rate_samples: VecDeque<u64>,
     /// XP accumulated during the current second (rotated into xp_rate_samples each second)
