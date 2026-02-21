@@ -52,9 +52,10 @@ pub fn render_runic_shift_scene(
     game: &RunicShiftGame,
     ctx: &super::responsive::LayoutContext,
     show_dismiss_hint: bool,
+    stormglass_discovered: bool,
 ) {
     if game.game_result.is_some() {
-        render_runic_shift_game_over(frame, area, game, show_dismiss_hint);
+        render_runic_shift_game_over(frame, area, game, show_dismiss_hint, stormglass_discovered);
         return;
     }
 
@@ -568,6 +569,7 @@ fn render_runic_shift_game_over(
     area: Rect,
     game: &RunicShiftGame,
     show_dismiss_hint: bool,
+    stormglass_discovered: bool,
 ) {
     let Some(result) = game.game_result else {
         return;
@@ -603,7 +605,7 @@ fn render_runic_shift_game_over(
     };
 
     let reward_text = if result == RunicShiftResult::Win {
-        game.difficulty.reward().description()
+        game.difficulty.reward().description(stormglass_discovered)
     } else {
         "No reward".to_string()
     };

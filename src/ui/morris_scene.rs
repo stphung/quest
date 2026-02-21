@@ -23,10 +23,18 @@ pub fn render_morris_scene(
     game: &MorrisGame,
     ctx: &super::responsive::LayoutContext,
     show_dismiss_hint: bool,
+    stormglass_discovered: bool,
 ) {
     // Check for game over - show board with banner
     if game.game_result.is_some() {
-        render_morris_game_over(frame, area, game, ctx, show_dismiss_hint);
+        render_morris_game_over(
+            frame,
+            area,
+            game,
+            ctx,
+            show_dismiss_hint,
+            stormglass_discovered,
+        );
         return;
     }
 
@@ -537,6 +545,7 @@ fn render_morris_game_over(
     game: &MorrisGame,
     ctx: &super::responsive::LayoutContext,
     show_dismiss_hint: bool,
+    stormglass_discovered: bool,
 ) {
     use ratatui::widgets::Clear;
 
@@ -554,7 +563,7 @@ fn render_morris_game_over(
     let (result_type, title, message, reward) = match result {
         MorrisResult::Win => {
             use crate::challenges::menu::DifficultyInfo;
-            let reward_text = game.difficulty.reward().description();
+            let reward_text = game.difficulty.reward().description(stormglass_discovered);
             let reward_text = reward_text
                 .strip_prefix("Win: ")
                 .unwrap_or(&reward_text)

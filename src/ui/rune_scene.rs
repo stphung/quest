@@ -20,10 +20,11 @@ pub fn render_rune(
     game: &RuneGame,
     ctx: &super::responsive::LayoutContext,
     show_dismiss_hint: bool,
+    stormglass_discovered: bool,
 ) {
     // Game over overlay
     if game.game_result.is_some() {
-        render_rune_game_over(frame, area, game, show_dismiss_hint);
+        render_rune_game_over(frame, area, game, show_dismiss_hint, stormglass_discovered);
         return;
     }
 
@@ -249,7 +250,13 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &RuneGame) {
     frame.render_widget(text, inner);
 }
 
-fn render_rune_game_over(frame: &mut Frame, area: Rect, game: &RuneGame, show_dismiss_hint: bool) {
+fn render_rune_game_over(
+    frame: &mut Frame,
+    area: Rect,
+    game: &RuneGame,
+    show_dismiss_hint: bool,
+    stormglass_discovered: bool,
+) {
     use crate::challenges::menu::DifficultyInfo;
 
     let result = game.game_result.as_ref().unwrap();
@@ -259,7 +266,7 @@ fn render_rune_game_over(frame: &mut Frame, area: Rect, game: &RuneGame, show_di
             GameResultType::Win,
             ":: RUNES DECIPHERED! ::",
             "You cracked the ancient code!".to_string(),
-            game.difficulty.reward().description(),
+            game.difficulty.reward().description(stormglass_discovered),
         ),
         RuneResult::Loss => {
             // Build the code string to show in message

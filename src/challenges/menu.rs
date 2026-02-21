@@ -140,8 +140,9 @@ pub struct ChallengeReward {
 
 impl ChallengeReward {
     /// Generate display text from structured data
-    /// Order: Prestige -> Fishing -> XP
-    pub fn description(&self) -> String {
+    /// Order: Prestige -> Fishing -> Stormglass/XP
+    /// When `stormglass_discovered` is false, Stormglass amounts are shown as XP% instead.
+    pub fn description(&self, stormglass_discovered: bool) -> String {
         let mut parts = Vec::new();
 
         if self.prestige_ranks == 1 {
@@ -157,7 +158,12 @@ impl ChallengeReward {
         }
 
         if self.stormglass > 0 {
-            parts.push(format!("\u{1F48E}+{} Stormglass", self.stormglass));
+            if stormglass_discovered {
+                parts.push(format!("\u{1F48E}+{} Stormglass", self.stormglass));
+            } else {
+                let xp_percent = self.stormglass / 10;
+                parts.push(format!("+{}% level XP", xp_percent));
+            }
         }
 
         if parts.is_empty() {
@@ -892,13 +898,13 @@ mod tests {
             prestige_ranks: 1,
             ..Default::default()
         };
-        assert_eq!(reward.description(), "Win: +1 Prestige Rank");
+        assert_eq!(reward.description(true), "Win: +1 Prestige Rank");
 
         let reward = ChallengeReward {
             prestige_ranks: 5,
             ..Default::default()
         };
-        assert_eq!(reward.description(), "Win: +5 Prestige Ranks");
+        assert_eq!(reward.description(true), "Win: +5 Prestige Ranks");
     }
 
     #[test]
@@ -907,7 +913,7 @@ mod tests {
             stormglass: 750,
             ..Default::default()
         };
-        assert_eq!(reward.description(), "Win: \u{1F48E}+750 Stormglass");
+        assert_eq!(reward.description(true), "Win: \u{1F48E}+750 Stormglass");
     }
 
     #[test]
@@ -916,13 +922,13 @@ mod tests {
             fishing_ranks: 1,
             ..Default::default()
         };
-        assert_eq!(reward.description(), "Win: +1 Fish Rank");
+        assert_eq!(reward.description(true), "Win: +1 Fish Rank");
 
         let reward = ChallengeReward {
             fishing_ranks: 2,
             ..Default::default()
         };
-        assert_eq!(reward.description(), "Win: +2 Fish Ranks");
+        assert_eq!(reward.description(true), "Win: +2 Fish Ranks");
     }
 
     #[test]
@@ -934,7 +940,7 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            reward.description(),
+            reward.description(true),
             "Win: +1 Prestige Rank, \u{1F48E}+500 Stormglass"
         );
 
@@ -945,7 +951,7 @@ mod tests {
             stormglass: 1000,
         };
         assert_eq!(
-            reward.description(),
+            reward.description(true),
             "Win: +2 Prestige Ranks, +1 Fish Rank, \u{1F48E}+1000 Stormglass"
         );
     }
@@ -953,7 +959,29 @@ mod tests {
     #[test]
     fn test_reward_description_empty() {
         let reward = ChallengeReward::default();
-        assert_eq!(reward.description(), "No reward");
+        assert_eq!(reward.description(true), "No reward");
+    }
+
+    #[test]
+    fn test_reward_description_xp_fallback() {
+        let reward = ChallengeReward {
+            stormglass: 1000,
+            ..Default::default()
+        };
+        assert_eq!(reward.description(false), "Win: +100% level XP");
+    }
+
+    #[test]
+    fn test_reward_description_mixed_xp_fallback() {
+        let reward = ChallengeReward {
+            prestige_ranks: 1,
+            stormglass: 500,
+            ..Default::default()
+        };
+        assert_eq!(
+            reward.description(false),
+            "Win: +1 Prestige Rank, +50% level XP"
+        );
     }
 
     // ============ Process Input Tests ============

@@ -65,10 +65,11 @@ pub fn render_flappy_scene(
     game: &FlappyBirdGame,
     ctx: &super::responsive::LayoutContext,
     show_dismiss_hint: bool,
+    stormglass_discovered: bool,
 ) {
     // Game over overlay takes priority
     if game.game_result.is_some() {
-        render_flappy_game_over(frame, area, game, show_dismiss_hint);
+        render_flappy_game_over(frame, area, game, show_dismiss_hint, stormglass_discovered);
         return;
     }
 
@@ -794,12 +795,13 @@ fn render_flappy_game_over(
     area: Rect,
     game: &FlappyBirdGame,
     show_dismiss_hint: bool,
+    stormglass_discovered: bool,
 ) {
     let result = game.game_result.as_ref().unwrap();
 
     let (result_type, title, message, reward) = match result {
         FlappyBirdResult::Win => {
-            let reward_text = game.difficulty.reward().description();
+            let reward_text = game.difficulty.reward().description(stormglass_discovered);
             (
                 GameResultType::Win,
                 ":: SKYWARD GAUNTLET CONQUERED! ::",
