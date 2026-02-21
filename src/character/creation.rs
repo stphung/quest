@@ -82,10 +82,17 @@ pub fn process_creation_input(
 mod tests {
     use super::*;
 
+    fn temp_manager() -> (CharacterManager, tempfile::TempDir) {
+        let dir = tempfile::tempdir().expect("Failed to create temp dir");
+        let manager =
+            CharacterManager::with_dir(dir.path().to_path_buf()).expect("Failed to create manager");
+        (manager, dir)
+    }
+
     #[test]
     fn test_creation_char_input_adds_character() {
         let mut screen = CharacterCreationScreen::new();
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
 
         let result = process_creation_input(&mut screen, CreationInput::Char('H'), &manager, false);
 
@@ -97,7 +104,7 @@ mod tests {
     #[test]
     fn test_creation_multiple_chars() {
         let mut screen = CharacterCreationScreen::new();
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
 
         process_creation_input(&mut screen, CreationInput::Char('H'), &manager, false);
         process_creation_input(&mut screen, CreationInput::Char('e'), &manager, false);
@@ -111,7 +118,7 @@ mod tests {
     #[test]
     fn test_creation_backspace_removes_character() {
         let mut screen = CharacterCreationScreen::new();
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
 
         process_creation_input(&mut screen, CreationInput::Char('A'), &manager, false);
         process_creation_input(&mut screen, CreationInput::Char('B'), &manager, false);
@@ -125,7 +132,7 @@ mod tests {
     #[test]
     fn test_creation_backspace_on_empty_does_nothing() {
         let mut screen = CharacterCreationScreen::new();
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
 
         let result = process_creation_input(&mut screen, CreationInput::Backspace, &manager, false);
 
@@ -137,7 +144,7 @@ mod tests {
     #[test]
     fn test_creation_cancel_with_existing_characters_returns_cancelled() {
         let mut screen = CharacterCreationScreen::new();
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
 
         let result = process_creation_input(&mut screen, CreationInput::Cancel, &manager, true);
 
@@ -147,7 +154,7 @@ mod tests {
     #[test]
     fn test_creation_cancel_without_existing_characters_continues() {
         let mut screen = CharacterCreationScreen::new();
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
 
         let result = process_creation_input(&mut screen, CreationInput::Cancel, &manager, false);
 
@@ -157,7 +164,7 @@ mod tests {
     #[test]
     fn test_creation_submit_with_empty_name_continues() {
         let mut screen = CharacterCreationScreen::new();
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
 
         let result = process_creation_input(&mut screen, CreationInput::Submit, &manager, false);
 
@@ -167,7 +174,7 @@ mod tests {
     #[test]
     fn test_creation_other_input_continues() {
         let mut screen = CharacterCreationScreen::new();
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
 
         let result = process_creation_input(&mut screen, CreationInput::Other, &manager, false);
 

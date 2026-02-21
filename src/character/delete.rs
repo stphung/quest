@@ -69,6 +69,13 @@ mod tests {
     use super::*;
     use crate::items::Equipment;
 
+    fn temp_manager() -> (CharacterManager, tempfile::TempDir) {
+        let dir = tempfile::tempdir().expect("Failed to create temp dir");
+        let manager =
+            CharacterManager::with_dir(dir.path().to_path_buf()).expect("Failed to create manager");
+        (manager, dir)
+    }
+
     fn create_test_character() -> CharacterInfo {
         CharacterInfo {
             character_id: "id1".to_string(),
@@ -87,7 +94,7 @@ mod tests {
     #[test]
     fn test_delete_char_input_adds_character() {
         let mut screen = CharacterDeleteScreen::new();
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
         let character = create_test_character();
 
         let result =
@@ -100,7 +107,7 @@ mod tests {
     #[test]
     fn test_delete_backspace_removes_character() {
         let mut screen = CharacterDeleteScreen::new();
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
         let character = create_test_character();
 
         process_delete_input(&mut screen, DeleteInput::Char('A'), &manager, &character);
@@ -115,7 +122,7 @@ mod tests {
     #[test]
     fn test_delete_submit_without_match_continues() {
         let mut screen = CharacterDeleteScreen::new();
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
         let character = create_test_character();
 
         process_delete_input(&mut screen, DeleteInput::Char('W'), &manager, &character);
@@ -132,7 +139,7 @@ mod tests {
     #[test]
     fn test_delete_cancel_returns_cancelled() {
         let mut screen = CharacterDeleteScreen::new();
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
         let character = create_test_character();
 
         let result = process_delete_input(&mut screen, DeleteInput::Cancel, &manager, &character);
@@ -143,7 +150,7 @@ mod tests {
     #[test]
     fn test_delete_other_continues() {
         let mut screen = CharacterDeleteScreen::new();
-        let manager = CharacterManager::new().unwrap();
+        let (manager, _dir) = temp_manager();
         let character = create_test_character();
 
         let result = process_delete_input(&mut screen, DeleteInput::Other, &manager, &character);
