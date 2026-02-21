@@ -3,6 +3,7 @@
 use crate::challenges::menu::create_challenge;
 use crate::core::game_state::GameState;
 use crate::input::InputResult;
+use crate::stormglass::sigils::INSCRIBE_COST;
 use crate::stormglass::spending::{chrono_surge_cost, generate_trial_options};
 use crate::stormglass::types::{
     ExchangePhase, ExchangeUiState, CHRONO_SURGE_OPTIONS, EXCHANGE_MENU_ITEMS, INVOKE_TRIAL_COST,
@@ -23,16 +24,16 @@ pub fn handle_stormglass_exchange(
             handle_invoke_trial_forfeit_confirm(key, exchange_ui)
         }
         ExchangePhase::ChronoSurge => handle_chrono_surge_select(key, exchange_ui, state),
-        // Storm Sigils phases — stubs for now, implemented in Tasks 4-6
-        ExchangePhase::SigilsList
-        | ExchangePhase::SigilUnlockConfirm
+        ExchangePhase::SigilsList => handle_sigils_list(key, exchange_ui, state),
+        // Storm Sigils sub-phases — stubs for now, implemented in Tasks 5-6
+        ExchangePhase::SigilUnlockConfirm
         | ExchangePhase::SigilInscribeConfirm
         | ExchangePhase::SigilRerollConfirm
         | ExchangePhase::SigilPick
         | ExchangePhase::SigilForfeitConfirm
         | ExchangePhase::SigilResult => {
             if key.code == KeyCode::Esc {
-                exchange_ui.phase = ExchangePhase::Menu;
+                exchange_ui.phase = ExchangePhase::SigilsList;
             }
             InputResult::Continue
         }
@@ -207,6 +208,60 @@ fn handle_invoke_trial(
         KeyCode::Esc => {
             // Forfeit — show confirmation before closing
             exchange_ui.phase = ExchangePhase::InvokeTrialForfeitConfirm;
+            InputResult::Continue
+        }
+        _ => InputResult::Continue,
+    }
+}
+
+fn handle_sigils_list(
+    key: KeyEvent,
+    exchange_ui: &mut ExchangeUiState,
+    state: &mut GameState,
+) -> InputResult {
+    let sigils = &state.storm_sigils;
+    // Max selectable index: up to 1 beyond unlocked slots (for unlock action),
+    // but capped at MAX_SIGIL_SLOTS - 1
+    let max_slot =
+        (sigils.slots_unlocked as usize).min(crate::stormglass::sigils::MAX_SIGIL_SLOTS - 1);
+
+    match key.code {
+        KeyCode::Up => {
+            if exchange_ui.sigil_selected_slot > 0 {
+                exchange_ui.sigil_selected_slot -= 1;
+            }
+            InputResult::Continue
+        }
+        KeyCode::Down => {
+            if exchange_ui.sigil_selected_slot < max_slot {
+                exchange_ui.sigil_selected_slot += 1;
+            }
+            InputResult::Continue
+        }
+        KeyCode::Enter => {
+            let slot = exchange_ui.sigil_selected_slot;
+            if slot >= sigils.slots_unlocked as usize {
+                // Locked slot (next unlockable) — go to unlock confirm
+                if sigils.next_unlock_cost().is_some() {
+                    exchange_ui.phase = ExchangePhase::SigilUnlockConfirm;
+                }
+            } else if sigils.sigils[slot].is_some() {
+                // Inscribed slot — reroll (requires SG)
+                if state.stormglass >= INSCRIBE_COST {
+                    exchange_ui.sigil_target_slot = slot;
+                    exchange_ui.phase = ExchangePhase::SigilRerollConfirm;
+                }
+            } else {
+                // Empty slot — inscribe (requires SG)
+                if state.stormglass >= INSCRIBE_COST {
+                    exchange_ui.sigil_target_slot = slot;
+                    exchange_ui.phase = ExchangePhase::SigilInscribeConfirm;
+                }
+            }
+            InputResult::Continue
+        }
+        KeyCode::Esc => {
+            exchange_ui.phase = ExchangePhase::Menu;
             InputResult::Continue
         }
         _ => InputResult::Continue,
