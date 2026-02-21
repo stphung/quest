@@ -586,6 +586,10 @@ fn test_pre_p15_salvage_does_not_discover_stormglass() {
                 !matches!(event, TickEvent::StormglassSalvaged { .. }),
                 "Items should not be salvaged for SG before P15"
             );
+            assert!(
+                !matches!(event, TickEvent::StormglassDungeonCache { .. }),
+                "Dungeon cache should not award SG before P15"
+            );
         }
     }
 
