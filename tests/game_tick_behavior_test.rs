@@ -116,6 +116,7 @@ fn create_strong_character(name: &str) -> GameState {
     let mut state = GameState::new(name.to_string(), 0);
     state.attributes.set(AttributeType::Strength, 50);
     state.attributes.set(AttributeType::Intelligence, 50);
+    state.attributes.set(AttributeType::Constitution, 50);
     let derived =
         DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
     state.combat_state.update_max_hp(derived.max_hp);
@@ -384,8 +385,10 @@ fn test_zone_complete_triggers_achievement() {
     let mut achievements = Achievements::default();
 
     // Fast-forward to last subzone of zone 1 (zone 1 has 3 subzones)
+    // Set fighting_boss and kills to skip the mob phase and go straight to boss
     state.zone_progression.current_subzone_id = 3;
-    state.zone_progression.kills_in_subzone = 0;
+    state.zone_progression.kills_in_subzone = 10;
+    state.zone_progression.fighting_boss = true;
 
     // Kill enemies until boss is defeated
     let result = run_until_boss_defeated(&mut state, &mut achievements);
