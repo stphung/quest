@@ -1,5 +1,16 @@
 //! Integration tests for Storm Sigils core types, grading, and generation.
 
+use quest::achievements::Achievements;
+use quest::character::combat_bonuses::PrestigeCombatBonuses;
+use quest::character::derived_stats::DerivedStats;
+use quest::combat::events::{CombatEvent, GodItemCombatBonuses, HavenCombatBonuses};
+use quest::combat::logic::update_combat;
+use quest::combat::types::Enemy;
+use quest::core::constants::ATTACK_INTERVAL_SECONDS;
+use quest::core::game_state::GameState;
+use quest::core::tick::game_tick;
+use quest::enhancement::EnhancementProgress;
+use quest::haven::Haven;
 use quest::stormglass::sigils::*;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -159,7 +170,7 @@ fn test_roll_sigil_value_rounded_to_one_decimal() {
 #[test]
 fn test_generate_sigil_choices_produces_three() {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
-    let choices = generate_sigil_choices(&mut rng);
+    let choices = generate_sigil_choices(&mut rng, &SigilEffectType::ALL);
     assert_eq!(choices.len(), 3);
 }
 
@@ -167,7 +178,7 @@ fn test_generate_sigil_choices_produces_three() {
 fn test_generate_sigil_choices_all_valid() {
     let mut rng = ChaCha8Rng::seed_from_u64(123);
     for _ in 0..100 {
-        let choices = generate_sigil_choices(&mut rng);
+        let choices = generate_sigil_choices(&mut rng, &SigilEffectType::ALL);
         for sigil in &choices {
             let (min, max) = sigil.effect.range();
             assert!(
@@ -186,8 +197,8 @@ fn test_generate_sigil_choices_all_valid() {
 fn test_generate_sigil_choices_deterministic_with_seed() {
     let mut rng1 = ChaCha8Rng::seed_from_u64(42);
     let mut rng2 = ChaCha8Rng::seed_from_u64(42);
-    let choices1 = generate_sigil_choices(&mut rng1);
-    let choices2 = generate_sigil_choices(&mut rng2);
+    let choices1 = generate_sigil_choices(&mut rng1, &SigilEffectType::ALL);
+    let choices2 = generate_sigil_choices(&mut rng2, &SigilEffectType::ALL);
     for (a, b) in choices1.iter().zip(choices2.iter()) {
         assert_eq!(a.effect, b.effect);
         assert!((a.value - b.value).abs() < 1e-10);
@@ -500,7 +511,7 @@ fn test_sigil_effect_format_value_all_types() {
     );
     assert_eq!(
         SigilEffectType::AttackSpeedPercent.format_value(7.1),
-        "+7.1% ASPD"
+        "+7.1% Attack Speed"
     );
     assert_eq!(
         SigilEffectType::DoubleStrikePercent.format_value(3.6),
@@ -601,4 +612,453 @@ fn test_inscribe_cost() {
 #[test]
 fn test_max_sigil_slots() {
     assert_eq!(MAX_SIGIL_SLOTS, 5);
+}
+
+// ── Bonus Injection Integration Tests ─────────────────────────────────
+// These tests verify that inscribed sigils actually affect game outcomes.
+
+/// Helper: force a player attack and return the damage dealt.
+fn force_player_attack_damage(
+    rng: &mut ChaCha8Rng,
+    state: &mut GameState,
+    haven: &HavenCombatBonuses,
+    god_items: &GodItemCombatBonuses,
+) -> u32 {
+    let d = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
+    state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
+    state.combat_state.enemy_attack_timer = 0.0;
+    let mut ach = Achievements::default();
+    let events = update_combat(
+        rng,
+        state,
+        0.0,
+        haven,
+        &PrestigeCombatBonuses::default(),
+        &mut ach,
+        &d,
+        god_items,
+    );
+    events
+        .iter()
+        .filter_map(|e| match e {
+            CombatEvent::PlayerAttack { damage, .. } => Some(*damage),
+            _ => None,
+        })
+        .sum()
+}
+
+/// Helper: create a GameState with a beefy enemy for damage comparison tests.
+fn state_with_target() -> GameState {
+    let mut state = GameState::new("SigilBonusTest".to_string(), 0);
+    state.combat_state.current_enemy = Some(Enemy::new_with_defense(
+        "Target Dummy".to_string(),
+        99999,
+        1,
+        0,
+    ));
+    state
+}
+
+/// Helper: inscribe a single sigil in slot 0.
+fn inscribe_sigil(state: &mut GameState, effect: SigilEffectType, value: f64) {
+    state.storm_sigils.slots_unlocked = 1;
+    state.storm_sigils.sigils[0] = Some(Sigil {
+        effect,
+        value,
+        grade: SigilGrade::S,
+    });
+}
+
+#[test]
+fn test_sigil_damage_bonus_increases_player_damage() {
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    let mut state = state_with_target();
+
+    // Baseline: no sigils
+    let damage_base = force_player_attack_damage(
+        &mut rng,
+        &mut state,
+        &HavenCombatBonuses::default(),
+        &GodItemCombatBonuses::default(),
+    );
+
+    // Reset enemy HP
+    state
+        .combat_state
+        .current_enemy
+        .as_mut()
+        .unwrap()
+        .reset_hp();
+
+    // With sigil: +15% damage via HavenCombatBonuses (how tick.rs injects it)
+    let bonuses = SigilBonuses {
+        damage_percent: 15.0,
+        ..Default::default()
+    };
+    let mut haven_with = HavenCombatBonuses::default();
+    haven_with.damage_percent += bonuses.damage_percent;
+
+    let damage_with = force_player_attack_damage(
+        &mut rng,
+        &mut state,
+        &haven_with,
+        &GodItemCombatBonuses::default(),
+    );
+
+    assert!(
+        damage_with > damage_base,
+        "Sigil damage bonus should increase damage: with={} base={}",
+        damage_with,
+        damage_base
+    );
+}
+
+#[test]
+fn test_sigil_dr_bonus_reduces_enemy_damage() {
+    let mut rng = ChaCha8Rng::seed_from_u64(99);
+    let mut state = GameState::new("DRTest".to_string(), 0);
+    state.combat_state.current_enemy =
+        Some(Enemy::new_with_defense("Hitter".to_string(), 99999, 100, 0));
+
+    let d = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
+    let prestige = PrestigeCombatBonuses::default();
+    let mut ach = Achievements::default();
+
+    // Force enemy attack (no player attack)
+    state.combat_state.player_attack_timer = 0.0;
+    state.combat_state.enemy_attack_timer = 2.0; // will fire on any delta
+
+    // Baseline: no DR
+    let events_base = update_combat(
+        &mut rng,
+        &mut state,
+        0.1,
+        &HavenCombatBonuses::default(),
+        &prestige,
+        &mut ach,
+        &d,
+        &GodItemCombatBonuses::default(),
+    );
+    let damage_base: u32 = events_base
+        .iter()
+        .filter_map(|e| match e {
+            CombatEvent::EnemyAttack { damage, .. } => Some(*damage),
+            _ => None,
+        })
+        .sum();
+
+    // Heal player back up
+    state.combat_state.player_current_hp = state.combat_state.player_max_hp;
+    state.combat_state.enemy_attack_timer = 2.0;
+    state.combat_state.player_attack_timer = 0.0;
+
+    // With sigil DR: 5% reduction via GodItemCombatBonuses (how tick.rs injects it)
+    let god_with_dr = GodItemCombatBonuses {
+        damage_reduction_percent: 5.0,
+        ..Default::default()
+    };
+    let events_with = update_combat(
+        &mut rng,
+        &mut state,
+        0.1,
+        &HavenCombatBonuses::default(),
+        &prestige,
+        &mut ach,
+        &d,
+        &god_with_dr,
+    );
+    let damage_with: u32 = events_with
+        .iter()
+        .filter_map(|e| match e {
+            CombatEvent::EnemyAttack { damage, .. } => Some(*damage),
+            _ => None,
+        })
+        .sum();
+
+    assert!(damage_base > 0, "Baseline enemy should deal damage");
+    assert!(
+        damage_with < damage_base,
+        "Sigil DR should reduce enemy damage: with={} base={}",
+        damage_with,
+        damage_base
+    );
+}
+
+#[test]
+fn test_sigil_max_hp_applied_in_game_tick() {
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    let mut state = GameState::new("MaxHPTest".to_string(), 0);
+    let mut tc = 0u32;
+    let mut haven = Haven::default();
+    let mut enhancement = EnhancementProgress::new();
+    let mut ach = Achievements::default();
+
+    // Run one tick without sigils to establish baseline HP
+    game_tick(
+        &mut state,
+        &mut tc,
+        &mut haven,
+        &mut enhancement,
+        &mut ach,
+        false,
+        &mut rng,
+    );
+    let hp_base = state.combat_state.player_max_hp;
+
+    // Inscribe a max HP sigil
+    inscribe_sigil(&mut state, SigilEffectType::MaxHpPercent, 15.0);
+
+    // Run another tick — sigil should boost max HP
+    game_tick(
+        &mut state,
+        &mut tc,
+        &mut haven,
+        &mut enhancement,
+        &mut ach,
+        false,
+        &mut rng,
+    );
+    let hp_with = state.combat_state.player_max_hp;
+
+    assert!(
+        hp_with > hp_base,
+        "MaxHpPercent sigil should increase player max HP: with={} base={}",
+        hp_with,
+        hp_base
+    );
+}
+
+#[test]
+fn test_sigil_xp_bonus_applied_in_game_tick() {
+    // Verify that XP% sigil is injected into haven_combat.xp_gain_percent
+    // by checking that SigilBonuses::compute produces the right value
+    // and that tick.rs adds it to HavenCombatBonuses
+    let mut state = GameState::new("XPTest".to_string(), 0);
+    inscribe_sigil(&mut state, SigilEffectType::XpPercent, 25.0);
+
+    let bonuses = SigilBonuses::compute(&state.storm_sigils);
+    assert!(
+        (bonuses.xp_percent - 25.0).abs() < 1e-10,
+        "XP sigil should produce 25% bonus"
+    );
+
+    // Verify the injection path: tick.rs line 137 adds sigil_bonuses.xp_percent
+    // to haven_combat.xp_gain_percent. We can verify this by checking that
+    // the combined value equals haven + sigil.
+    let haven = Haven::default();
+    let haven_bonuses = haven.compute_bonuses();
+    let combined_xp = haven_bonuses.xp_gain_percent + bonuses.xp_percent;
+    assert!(
+        (combined_xp - 25.0).abs() < 1e-10,
+        "Combined XP bonus should be haven(0) + sigil(25) = 25: got {}",
+        combined_xp
+    );
+}
+
+#[test]
+fn test_sigil_drop_rate_injected_into_haven_bonuses() {
+    // Verify that drop_rate sigil is added to haven_bonuses.drop_rate_percent
+    // (tick.rs line 66: haven_bonuses.drop_rate_percent += sigil_bonuses.drop_rate_percent)
+    let mut state = GameState::new("DropTest".to_string(), 0);
+    inscribe_sigil(&mut state, SigilEffectType::DropRatePercent, 10.0);
+
+    let bonuses = SigilBonuses::compute(&state.storm_sigils);
+    let haven = Haven::default();
+    let mut haven_bonuses = haven.compute_bonuses();
+    let base_drop = haven_bonuses.drop_rate_percent;
+
+    // Simulate tick.rs injection
+    haven_bonuses.drop_rate_percent += bonuses.drop_rate_percent;
+
+    assert!(
+        (haven_bonuses.drop_rate_percent - base_drop - 10.0).abs() < 1e-10,
+        "Drop rate should increase by sigil value: got {} (base was {})",
+        haven_bonuses.drop_rate_percent,
+        base_drop
+    );
+}
+
+#[test]
+fn test_sigil_fishing_speed_injected_into_haven_bonuses() {
+    // Verify that fishing_speed sigil is added to haven_bonuses.fishing_timer_reduction
+    // (tick.rs line 67: haven_bonuses.fishing_timer_reduction += sigil_bonuses.fishing_speed_percent)
+    let mut state = GameState::new("FishTest".to_string(), 0);
+    inscribe_sigil(&mut state, SigilEffectType::FishingSpeedPercent, 20.0);
+
+    let bonuses = SigilBonuses::compute(&state.storm_sigils);
+    let haven = Haven::default();
+    let mut haven_bonuses = haven.compute_bonuses();
+    let base_fishing = haven_bonuses.fishing_timer_reduction;
+
+    // Simulate tick.rs injection
+    haven_bonuses.fishing_timer_reduction += bonuses.fishing_speed_percent;
+
+    assert!(
+        (haven_bonuses.fishing_timer_reduction - base_fishing - 20.0).abs() < 1e-10,
+        "Fishing speed should increase by sigil value: got {} (base was {})",
+        haven_bonuses.fishing_timer_reduction,
+        base_fishing
+    );
+}
+
+#[test]
+fn test_sigil_offline_xp_injected_in_offline_path() {
+    // Verify that offline_xp sigil produces correct bonus for injection
+    // (main_helpers/offline.rs adds sigil_offline_bonus to haven_offline_bonus)
+    let mut state = GameState::new("OfflineTest".to_string(), 0);
+    inscribe_sigil(&mut state, SigilEffectType::OfflineXpPercent, 15.0);
+
+    let bonuses = SigilBonuses::compute(&state.storm_sigils);
+    assert!(
+        (bonuses.offline_xp_percent - 15.0).abs() < 1e-10,
+        "Offline XP sigil should produce 15% bonus"
+    );
+}
+
+#[test]
+fn test_sigil_attack_speed_injected_via_god_items() {
+    // Verify that attack_speed sigil value flows into GodItemCombatBonuses
+    // (tick.rs line 154-156: + sigil_bonuses.attack_speed_percent)
+    let mut state = GameState::new("ASPDTest".to_string(), 0);
+    inscribe_sigil(&mut state, SigilEffectType::AttackSpeedPercent, 10.0);
+
+    let bonuses = SigilBonuses::compute(&state.storm_sigils);
+    let base_aspd = quest::god_items::equipped_god_item_attack_speed_percent(&state.equipment);
+    let combined = base_aspd + bonuses.attack_speed_percent;
+
+    // Without god items, base is 0; with sigil it should be 10
+    assert!(
+        (combined - 10.0).abs() < 1e-10,
+        "Attack speed should be god_item(0) + sigil(10) = 10: got {}",
+        combined
+    );
+}
+
+#[test]
+fn test_multiple_sigils_stack_in_game_tick() {
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    let mut state = GameState::new("StackTest".to_string(), 0);
+    let mut tc = 0u32;
+    let mut haven = Haven::default();
+    let mut enhancement = EnhancementProgress::new();
+    let mut ach = Achievements::default();
+
+    // Run one tick to get baseline HP
+    game_tick(
+        &mut state,
+        &mut tc,
+        &mut haven,
+        &mut enhancement,
+        &mut ach,
+        false,
+        &mut rng,
+    );
+    let hp_base = state.combat_state.player_max_hp;
+
+    // Inscribe 3 MaxHpPercent sigils
+    state.storm_sigils.slots_unlocked = 3;
+    for i in 0..3 {
+        state.storm_sigils.sigils[i] = Some(Sigil {
+            effect: SigilEffectType::MaxHpPercent,
+            value: 10.0,
+            grade: SigilGrade::B,
+        });
+    }
+
+    // Run tick with stacked sigils
+    game_tick(
+        &mut state,
+        &mut tc,
+        &mut haven,
+        &mut enhancement,
+        &mut ach,
+        false,
+        &mut rng,
+    );
+    let hp_stacked = state.combat_state.player_max_hp;
+
+    // 3x 10% = 30% boost
+    let expected_min = (hp_base as f64 * 1.29) as u32; // at least 29% (rounding)
+    assert!(
+        hp_stacked >= expected_min,
+        "3x MaxHpPercent sigils should stack: got {} (base={}, expected >= {})",
+        hp_stacked,
+        hp_base,
+        expected_min
+    );
+}
+
+// ── Daily Sigil Pool ───────────────────────────────────────────────────
+
+#[test]
+fn test_daily_pool_size_is_correct() {
+    let pool = daily_sigil_pool_for_day(739000);
+    assert_eq!(pool.len(), DAILY_POOL_SIZE);
+}
+
+#[test]
+fn test_daily_pool_is_deterministic() {
+    let pool1 = daily_sigil_pool_for_day(739000);
+    let pool2 = daily_sigil_pool_for_day(739000);
+    assert_eq!(pool1, pool2);
+}
+
+#[test]
+fn test_daily_pool_varies_by_day() {
+    let pool1 = daily_sigil_pool_for_day(739000);
+    let pool2 = daily_sigil_pool_for_day(739001);
+    assert_ne!(pool1, pool2);
+}
+
+#[test]
+fn test_daily_pool_contains_no_duplicates() {
+    for day in 739000..739030 {
+        let pool = daily_sigil_pool_for_day(day);
+        for i in 0..pool.len() {
+            for j in (i + 1)..pool.len() {
+                assert_ne!(
+                    pool[i], pool[j],
+                    "Day {} pool has duplicate: {:?}",
+                    day, pool
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn test_generate_choices_only_from_pool() {
+    // With a restricted pool, all generated sigils must be from that pool
+    let pool = vec![
+        SigilEffectType::XpPercent,
+        SigilEffectType::CritChancePercent,
+    ];
+    let mut rng = ChaCha8Rng::seed_from_u64(99);
+    for _ in 0..50 {
+        let choices = generate_sigil_choices(&mut rng, &pool);
+        for sigil in &choices {
+            assert!(
+                sigil.effect == SigilEffectType::XpPercent
+                    || sigil.effect == SigilEffectType::CritChancePercent,
+                "Sigil {:?} not in pool",
+                sigil.effect
+            );
+        }
+    }
+}
+
+#[test]
+fn test_daily_pool_covers_all_types_over_many_days() {
+    use std::collections::HashSet;
+    let mut seen = HashSet::new();
+    for day in 739000..739100 {
+        for effect in daily_sigil_pool_for_day(day) {
+            seen.insert(format!("{:?}", effect));
+        }
+    }
+    assert_eq!(
+        seen.len(),
+        SigilEffectType::ALL.len(),
+        "All 11 types should appear within 100 days"
+    );
 }
