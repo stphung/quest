@@ -5,12 +5,11 @@ pub use super::orchestration::update_combat;
 #[cfg(test)]
 mod tests {
     use crate::character::derived_stats::DerivedStats;
-    use crate::character::prestige::PrestigeCombatBonuses;
     use crate::combat::attacks::effective_enemy_attack_interval;
     use crate::combat::enemy_generation::{
         generate_dungeon_boss, generate_dungeon_elite, generate_dungeon_enemy, generate_zone_enemy,
     };
-    use crate::combat::events::{CombatEvent, GodItemCombatBonuses, HavenCombatBonuses};
+    use crate::combat::events::{CombatBonuses, CombatEvent};
     use crate::combat::orchestration::update_combat;
     use crate::combat::types::{CombatState, Enemy};
     use crate::core::constants::*;
@@ -29,10 +28,6 @@ mod tests {
         ChaCha8Rng::seed_from_u64(42)
     }
 
-    fn default_prestige() -> PrestigeCombatBonuses {
-        PrestigeCombatBonuses::default()
-    }
-
     fn default_derived(state: &GameState) -> DerivedStats {
         DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7])
     }
@@ -41,66 +36,39 @@ mod tests {
     fn force_player_attack(
         rng: &mut impl rand::Rng,
         state: &mut GameState,
-        haven: &HavenCombatBonuses,
+        bonuses: &CombatBonuses,
         achievements: &mut Achievements,
     ) -> Vec<CombatEvent> {
         let derived = default_derived(state);
         state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
         state.combat_state.enemy_attack_timer = 0.0;
-        update_combat(
-            rng,
-            state,
-            0.1,
-            haven,
-            &default_prestige(),
-            achievements,
-            &derived,
-            &GodItemCombatBonuses::default(),
-        )
+        update_combat(rng, state, 0.1, bonuses, achievements, &derived)
     }
 
     /// Forces an enemy attack by setting the enemy timer, suppressing player attack.
     fn force_enemy_attack(
         rng: &mut impl rand::Rng,
         state: &mut GameState,
-        haven: &HavenCombatBonuses,
+        bonuses: &CombatBonuses,
         achievements: &mut Achievements,
     ) -> Vec<CombatEvent> {
         let derived = default_derived(state);
         state.combat_state.player_attack_timer = 0.0;
         state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
-        update_combat(
-            rng,
-            state,
-            0.1,
-            haven,
-            &default_prestige(),
-            achievements,
-            &derived,
-            &GodItemCombatBonuses::default(),
-        )
+        update_combat(rng, state, 0.1, bonuses, achievements, &derived)
     }
 
     /// Forces both player and enemy to attack in the same tick.
     fn force_both_attacks(
         rng: &mut impl rand::Rng,
         state: &mut GameState,
-        haven: &HavenCombatBonuses,
+        bonuses: &CombatBonuses,
         achievements: &mut Achievements,
     ) -> Vec<CombatEvent> {
         let derived = default_derived(state);
         state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
         state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
-        update_combat(
-            rng,
-            state,
-            0.1,
-            haven,
-            &default_prestige(),
-            achievements,
-            &derived,
-            &GodItemCombatBonuses::default(),
-        )
+        update_combat(rng, state, 0.1, bonuses, achievements, &derived)
     }
 
     /// Asserts that at least one event matching the predicate exists.
@@ -142,11 +110,9 @@ mod tests {
             &mut rng,
             &mut state,
             0.1,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses::default(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
         assert_eq!(events.len(), 0);
     }
@@ -164,11 +130,9 @@ mod tests {
             &mut rng,
             &mut state,
             0.5,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses::default(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
         assert_eq!(events.len(), 0);
 
@@ -177,11 +141,9 @@ mod tests {
             &mut rng,
             &mut state,
             1.0,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses::default(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
         assert!(!events.is_empty()); // Player attack (enemy not yet at 2.0s)
     }
@@ -198,7 +160,7 @@ mod tests {
         let events = force_both_attacks(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -229,7 +191,7 @@ mod tests {
         let events = force_player_attack(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -249,11 +211,9 @@ mod tests {
             &mut rng,
             &mut state,
             HP_REGEN_DURATION_SECONDS,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses::default(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
         assert_eq!(
             state.combat_state.player_current_hp,
@@ -278,7 +238,7 @@ mod tests {
         let events = force_both_attacks(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -322,7 +282,7 @@ mod tests {
         let events = force_player_attack(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -355,7 +315,7 @@ mod tests {
         let events = force_both_attacks(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -389,7 +349,7 @@ mod tests {
         let events = force_both_attacks(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -432,7 +392,7 @@ mod tests {
         force_both_attacks(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -464,7 +424,7 @@ mod tests {
         force_both_attacks(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -490,7 +450,7 @@ mod tests {
         let events = force_player_attack(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -519,7 +479,7 @@ mod tests {
         let events = force_player_attack(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -551,11 +511,9 @@ mod tests {
             &mut rng,
             &mut state,
             0.1,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses::default(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
 
         // No combat events during regen
@@ -582,11 +540,9 @@ mod tests {
             &mut rng,
             &mut state,
             HP_REGEN_DURATION_SECONDS / 2.0,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses::default(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
 
         // HP should be partially restored (roughly halfway)
@@ -615,7 +571,7 @@ mod tests {
         let events = force_both_attacks(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -659,11 +615,9 @@ mod tests {
             &mut rng,
             &mut state,
             0.1,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses::default(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
 
         // Find the PlayerAttack event
@@ -707,11 +661,9 @@ mod tests {
                 &mut rng,
                 &mut s,
                 0.1,
-                &HavenCombatBonuses::default(),
-                &default_prestige(),
+                &CombatBonuses::default(),
                 &mut achievements,
                 &d,
-                &GodItemCombatBonuses::default(),
             );
 
             for e in &events {
@@ -752,11 +704,9 @@ mod tests {
             &mut rng,
             &mut state,
             0.1,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses::default(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
 
         let attack_event = events
@@ -793,7 +743,7 @@ mod tests {
         force_enemy_attack(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -836,7 +786,7 @@ mod tests {
             let events = force_both_attacks(
                 &mut rng,
                 &mut state,
-                &HavenCombatBonuses::default(),
+                &CombatBonuses::default(),
                 &mut achievements,
             );
             turns += 1;
@@ -864,11 +814,9 @@ mod tests {
                     &mut rng,
                     &mut state,
                     HP_REGEN_DURATION_SECONDS,
-                    &HavenCombatBonuses::default(),
-                    &default_prestige(),
+                    &CombatBonuses::default(),
                     &mut achievements,
                     &d,
-                    &GodItemCombatBonuses::default(),
                 );
             }
         }
@@ -999,11 +947,9 @@ mod tests {
             &mut rng,
             &mut state,
             0.1,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses::default(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
 
         let xp_event = events.iter().find_map(|e| match e {
@@ -1085,7 +1031,7 @@ mod tests {
         force_both_attacks(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -1110,7 +1056,7 @@ mod tests {
         let events = force_both_attacks(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -1143,7 +1089,7 @@ mod tests {
         let events = force_both_attacks(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -1198,11 +1144,9 @@ mod tests {
             &mut rng,
             &mut state,
             0.1,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses::default(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
 
         let attack = events
@@ -1254,11 +1198,9 @@ mod tests {
             &mut rng,
             &mut state,
             0.1,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses::default(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
 
         let attacked = events
@@ -1281,11 +1223,9 @@ mod tests {
             &mut rng,
             &mut state,
             0.1,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses::default(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
 
         let attacked = events
@@ -1333,11 +1273,9 @@ mod tests {
             &mut rng,
             &mut state,
             1.25,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses::default(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
 
         assert_eq!(state.combat_state.player_current_hp, 100);
@@ -1361,11 +1299,9 @@ mod tests {
             &mut rng,
             &mut state,
             1.25,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses::default(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
 
         // Should still be regenerating, not fully healed
@@ -1386,7 +1322,7 @@ mod tests {
 
         // With +100% Haven regen bonus (2x multiplier), duration is 2.5 / 2 = 1.25 seconds
         // After 1.25 seconds, should be fully healed
-        let haven = HavenCombatBonuses {
+        let haven = CombatBonuses {
             hp_regen_percent: 100.0,
             ..Default::default()
         };
@@ -1396,10 +1332,8 @@ mod tests {
             &mut state,
             1.25,
             &haven,
-            &default_prestige(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
 
         assert_eq!(state.combat_state.player_current_hp, 100);
@@ -1440,7 +1374,7 @@ mod tests {
         // Equipment: 2x multiplier, Haven +50%: 1.5x multiplier
         // Combined: 2.0 * 1.5 = 3x multiplier
         // Duration: 2.5 / 3 = 0.833 seconds
-        let haven = HavenCombatBonuses {
+        let haven = CombatBonuses {
             hp_regen_percent: 50.0,
             ..Default::default()
         };
@@ -1451,10 +1385,8 @@ mod tests {
             &mut state,
             0.84,
             &haven,
-            &default_prestige(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
 
         assert_eq!(state.combat_state.player_current_hp, 100);
@@ -1503,7 +1435,7 @@ mod tests {
         force_both_attacks(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -1559,7 +1491,7 @@ mod tests {
         let events = force_both_attacks(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -1612,7 +1544,7 @@ mod tests {
         force_both_attacks(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -1653,11 +1585,9 @@ mod tests {
             &mut rng,
             &mut state,
             0.1,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses::default(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
         let damage_no_bonus = events_no_bonus
             .iter()
@@ -1674,7 +1604,7 @@ mod tests {
         state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
         state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        let haven = HavenCombatBonuses {
+        let haven = CombatBonuses {
             damage_percent: 50.0,
             ..Default::default()
         };
@@ -1684,10 +1614,8 @@ mod tests {
             &mut state,
             0.1,
             &haven,
-            &default_prestige(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
         let damage_with_bonus = events_with_bonus
             .iter()
@@ -1731,11 +1659,9 @@ mod tests {
                 &mut rng,
                 &mut state,
                 0.1,
-                &HavenCombatBonuses::default(),
-                &default_prestige(),
+                &CombatBonuses::default(),
                 &mut achievements,
                 &d,
-                &GodItemCombatBonuses::default(),
             );
             if events
                 .iter()
@@ -1752,21 +1678,12 @@ mod tests {
             state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
             state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
 
-            let haven = HavenCombatBonuses {
+            let haven = CombatBonuses {
                 crit_chance_percent: 20.0, // +20% crit
                 ..Default::default()
             };
             let d = default_derived(&state);
-            let events = update_combat(
-                &mut rng,
-                &mut state,
-                0.1,
-                &haven,
-                &default_prestige(),
-                &mut achievements,
-                &d,
-                &GodItemCombatBonuses::default(),
-            );
+            let events = update_combat(&mut rng, &mut state, 0.1, &haven, &mut achievements, &d);
             if events
                 .iter()
                 .any(|e| matches!(e, CombatEvent::PlayerAttack { was_crit: true, .. }))
@@ -1801,21 +1718,12 @@ mod tests {
             state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
             state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
 
-            let haven = HavenCombatBonuses {
+            let haven = CombatBonuses {
                 double_strike_chance: 35.0, // +35% double strike (T3 War Room)
                 ..Default::default()
             };
             let d = default_derived(&state);
-            let events = update_combat(
-                &mut rng,
-                &mut state,
-                0.1,
-                &haven,
-                &default_prestige(),
-                &mut achievements,
-                &d,
-                &GodItemCombatBonuses::default(),
-            );
+            let events = update_combat(&mut rng, &mut state, 0.1, &haven, &mut achievements, &d);
 
             // Count PlayerAttack events (should be 2 if double strike procs)
             let attack_count = events
@@ -1848,7 +1756,7 @@ mod tests {
         state.combat_state.player_max_hp = 100;
 
         // With -50% regen delay, base duration is 2.5 * 0.5 = 1.25 seconds
-        let haven = HavenCombatBonuses {
+        let haven = CombatBonuses {
             hp_regen_delay_reduction: 50.0,
             ..Default::default()
         };
@@ -1858,10 +1766,8 @@ mod tests {
             &mut state,
             1.25,
             &haven,
-            &default_prestige(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
 
         assert_eq!(state.combat_state.player_current_hp, 100);
@@ -1880,13 +1786,14 @@ mod tests {
         state.combat_state.current_enemy = Some(Enemy::new("Target".to_string(), 10000, 0));
         state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
 
-        let haven = HavenCombatBonuses {
+        let haven = CombatBonuses {
             damage_percent: 25.0,
             crit_chance_percent: 10.0,
             double_strike_chance: 10.0,
             hp_regen_percent: 50.0,
             hp_regen_delay_reduction: 30.0,
             xp_gain_percent: 20.0,
+            ..CombatBonuses::default()
         };
 
         let derived = default_derived(&state);
@@ -1895,10 +1802,8 @@ mod tests {
             &mut state,
             0.1,
             &haven,
-            &default_prestige(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
 
         // Should have at least one attack
@@ -1922,7 +1827,7 @@ mod tests {
         let events = force_player_attack(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -1978,7 +1883,7 @@ mod tests {
         let events = force_player_attack(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -2008,7 +1913,7 @@ mod tests {
         let events = force_player_attack(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -2038,7 +1943,7 @@ mod tests {
         let events = force_player_attack(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -2068,7 +1973,7 @@ mod tests {
         let events = force_player_attack(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -2095,7 +2000,7 @@ mod tests {
         let events = force_player_attack(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -2122,7 +2027,7 @@ mod tests {
         let events = force_player_attack(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -2148,7 +2053,7 @@ mod tests {
         let events = force_both_attacks(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -2179,7 +2084,7 @@ mod tests {
         force_player_attack(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -2200,7 +2105,7 @@ mod tests {
         force_player_attack(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -2224,7 +2129,7 @@ mod tests {
         let events = force_player_attack(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -2250,7 +2155,7 @@ mod tests {
         force_both_attacks(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -2271,7 +2176,7 @@ mod tests {
         let events = force_player_attack(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -2306,7 +2211,7 @@ mod tests {
         let events = force_enemy_attack(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -2333,7 +2238,7 @@ mod tests {
         let events = force_player_attack(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -2361,7 +2266,7 @@ mod tests {
         let events = force_both_attacks(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -2395,7 +2300,7 @@ mod tests {
         let events = force_both_attacks(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -2517,7 +2422,7 @@ mod tests {
         force_player_attack(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
         assert!(state.combat_state.is_regenerating);
@@ -2529,11 +2434,9 @@ mod tests {
             &mut rng,
             &mut state,
             HP_REGEN_DURATION_SECONDS,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses::default(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
         assert!(!state.combat_state.is_regenerating);
 
@@ -2558,7 +2461,7 @@ mod tests {
         force_both_attacks(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 
@@ -2594,11 +2497,9 @@ mod tests {
             &mut rng,
             &mut state,
             0.5,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses::default(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
 
         // Timers should NOT have advanced (regen blocks combat)
@@ -2654,7 +2555,7 @@ mod tests {
             Some(Enemy::new("Attacker".to_string(), 10000, enemy_base_damage));
 
         let derived = default_derived(&state);
-        let total_defense = derived.defense + default_prestige().flat_defense;
+        let total_defense = derived.defense; // flat_defense from bonuses, default is 0
         let post_defense_damage = enemy_base_damage.saturating_sub(total_defense).max(1);
 
         // -- Test WITHOUT DR --
@@ -2665,11 +2566,9 @@ mod tests {
             &mut rng,
             &mut state,
             0.1,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses::default(),
             &mut achievements,
-            &derived,
-            &GodItemCombatBonuses::default(), // no DR
+            &derived, // no DR
         );
         let hp_lost_no_dr = initial_hp - state.combat_state.player_current_hp;
         assert_eq!(
@@ -2693,14 +2592,12 @@ mod tests {
             &mut rng,
             &mut state,
             0.1,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses {
+                damage_reduction_percent: 30.0,
+                ..CombatBonuses::default()
+            },
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses {
-                damage_reduction_percent: 30.0,
-                ..GodItemCombatBonuses::default()
-            }, // 30% DR from Divine Bulwark
         );
         let hp_lost_with_dr = initial_hp - state.combat_state.player_current_hp;
         let expected_dr_damage = ((post_defense_damage as f64) * 0.70) as u32;
@@ -2747,14 +2644,12 @@ mod tests {
             &mut rng,
             &mut state,
             0.1,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses {
+                damage_reduction_percent: 99.0,
+                ..CombatBonuses::default()
+            },
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses {
-                damage_reduction_percent: 99.0,
-                ..GodItemCombatBonuses::default()
-            }, // 99% DR — should still deal 1 damage
         );
         let hp_lost = initial_hp - state.combat_state.player_current_hp;
         assert_eq!(
@@ -2780,7 +2675,7 @@ mod tests {
             Some(Enemy::new("Normal".to_string(), 10000, enemy_base_damage));
 
         let derived = default_derived(&state);
-        let total_defense = derived.defense + default_prestige().flat_defense;
+        let total_defense = derived.defense; // flat_defense from bonuses, default is 0
         let expected_damage = enemy_base_damage.saturating_sub(total_defense).max(1);
 
         let initial_hp = state.combat_state.player_current_hp;
@@ -2790,11 +2685,9 @@ mod tests {
             &mut rng,
             &mut state,
             0.1,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses::default(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
         let hp_lost = initial_hp - state.combat_state.player_current_hp;
         assert_eq!(hp_lost, expected_damage, "Zero DR should not change damage");
@@ -2821,11 +2714,9 @@ mod tests {
             &mut rng,
             &mut state,
             0.1,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses::default(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
 
         assert!(
@@ -2850,11 +2741,9 @@ mod tests {
             &mut rng,
             &mut state,
             0.1,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses::default(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
 
         assert_eq!(
@@ -2883,11 +2772,9 @@ mod tests {
             &mut rng,
             &mut state,
             0.1,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses::default(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
 
         // Should trigger enrage
@@ -2934,11 +2821,9 @@ mod tests {
             &mut rng,
             &mut state,
             0.1,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses::default(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
 
         // Should be weapon-blocked enrage
@@ -2980,11 +2865,9 @@ mod tests {
             &mut rng,
             &mut state2,
             0.1,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses::default(),
             &mut achievements2,
             &derived2,
-            &GodItemCombatBonuses::default(),
         );
 
         let enrage2 = events2
@@ -3019,11 +2902,9 @@ mod tests {
             &mut rng,
             &mut state,
             0.1,
-            &HavenCombatBonuses::default(),
-            &default_prestige(),
+            &CombatBonuses::default(),
             &mut achievements,
             &derived,
-            &GodItemCombatBonuses::default(),
         );
 
         assert!(
@@ -3049,7 +2930,7 @@ mod tests {
         let events = force_player_attack(
             &mut rng,
             &mut state,
-            &HavenCombatBonuses::default(),
+            &CombatBonuses::default(),
             &mut achievements,
         );
 

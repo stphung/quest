@@ -19,9 +19,9 @@
 use quest::achievements::Achievements;
 use quest::character::attributes::AttributeType;
 use quest::character::derived_stats::DerivedStats;
-use quest::character::prestige::PrestigeCombatBonuses;
+use quest::combat::events::CombatBonuses;
 use quest::combat::logic::update_combat;
-use quest::combat::{CombatEvent, GodItemCombatBonuses, HavenCombatBonuses};
+use quest::combat::CombatEvent;
 use quest::core::game_logic::{
     apply_tick_xp, spawn_enemy_if_needed, try_discover_dungeon, xp_for_next_level,
 };
@@ -39,9 +39,9 @@ use quest::TICK_INTERVAL_MS;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 
-/// Default Haven combat bonuses for testing (no bonuses)
-fn default_haven_bonuses() -> HavenCombatBonuses {
-    HavenCombatBonuses::default()
+/// Default combat bonuses for testing (no bonuses)
+fn default_combat_bonuses() -> CombatBonuses {
+    CombatBonuses::default()
 }
 
 /// Default Haven fishing bonuses for testing (no bonuses)
@@ -74,11 +74,9 @@ fn simulate_combat_tick(
         rng,
         state,
         delta_time,
-        &default_haven_bonuses(),
-        &PrestigeCombatBonuses::default(),
+        &default_combat_bonuses(),
         achievements,
         &derived,
-        &GodItemCombatBonuses::default(),
     )
 }
 
@@ -884,14 +882,15 @@ fn test_haven_combat_bonuses_passed_to_update_combat() {
     let mut achievements = Achievements::default();
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
 
-    // Create haven bonuses like game_tick does (lines 1211-1218)
-    let haven_combat = HavenCombatBonuses {
+    // Create combat bonuses like game_tick does
+    let combat_bonuses = CombatBonuses {
         hp_regen_percent: 25.0,
         hp_regen_delay_reduction: 10.0,
         damage_percent: 15.0,
         crit_chance_percent: 5.0,
         double_strike_chance: 3.0,
         xp_gain_percent: 10.0,
+        ..CombatBonuses::default()
     };
 
     // Sync derived stats
@@ -903,16 +902,14 @@ fn test_haven_combat_bonuses_passed_to_update_combat() {
     spawn_enemy_if_needed(&mut state);
     assert!(state.combat_state.current_enemy.is_some());
 
-    // Run combat with haven bonuses
+    // Run combat with combat bonuses
     let events = update_combat(
         &mut rng,
         &mut state,
         delta_time,
-        &haven_combat,
-        &PrestigeCombatBonuses::default(),
+        &combat_bonuses,
         &mut achievements,
         &derived,
-        &GodItemCombatBonuses::default(),
     );
 
     // Verify combat ran (may or may not produce events depending on timer)

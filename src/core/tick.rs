@@ -10,8 +10,8 @@ use super::tick_stages;
 pub use super::tick_types::{TickEvent, TickResult};
 use crate::achievements::Achievements;
 use crate::challenges::ActiveMinigame;
+use crate::combat::events::CombatBonuses;
 use crate::combat::logic::update_combat;
-use crate::combat::{GodItemCombatBonuses, HavenCombatBonuses};
 use crate::core::constants::{HAVEN_MIN_PRESTIGE_RANK, TICKS_PER_SECOND, TICK_INTERVAL_MS};
 use crate::core::game_logic::spawn_enemy_if_needed;
 use crate::core::game_state::GameState;
@@ -127,28 +127,20 @@ pub fn game_tick<R: Rng>(
     }
 
     // ── 6. Combat ───────────────────────────────────────────────
-    let haven_combat = HavenCombatBonuses {
+    let prestige_combat = state.cached_prestige_bonuses;
+    let combat_bonuses = CombatBonuses {
+        // Haven bonuses
         hp_regen_percent: haven_bonuses.hp_regen_percent,
         hp_regen_delay_reduction: haven_bonuses.hp_regen_delay_reduction,
         damage_percent: haven_bonuses.damage_percent + sigil_bonuses.damage_percent,
-        crit_chance_percent: haven_bonuses.crit_chance_percent + sigil_bonuses.crit_chance_percent,
+        crit_chance_percent: haven_bonuses.crit_chance_percent
+            + sigil_bonuses.crit_chance_percent
+            + prestige_combat.crit_chance,
         double_strike_chance: haven_bonuses.double_strike_chance
             + sigil_bonuses.double_strike_percent,
         xp_gain_percent: haven_bonuses.xp_gain_percent + sigil_bonuses.xp_percent,
-    };
-    let prestige_combat = state.cached_prestige_bonuses;
-    // Apply prestige flat HP bonus to combat max HP (not in DerivedStats to avoid enemy scaling)
-    if prestige_combat.flat_hp > 0 {
-        let boosted_max = derived.max_hp + prestige_combat.flat_hp;
-        state.combat_state.update_max_hp(boosted_max);
-    }
-    // Apply sigil max HP% bonus on top of current max HP
-    if sigil_bonuses.max_hp_percent > 0.0 {
-        let current_max = state.combat_state.player_max_hp;
-        let boosted = (current_max as f64 * (1.0 + sigil_bonuses.max_hp_percent / 100.0)) as u32;
-        state.combat_state.update_max_hp(boosted);
-    }
-    let god_items_combat = GodItemCombatBonuses {
+        // God item bonuses
+        early_damage_percent: crate::god_items::equipped_god_item_damage_percent(&state.equipment),
         damage_reduction_percent: crate::god_items::equipped_god_item_dr(&state.equipment)
             + sigil_bonuses.damage_reduction_percent,
         attack_speed_percent: crate::god_items::equipped_god_item_attack_speed_percent(
@@ -157,17 +149,29 @@ pub fn game_tick<R: Rng>(
         regen_reduction_percent: crate::god_items::equipped_god_item_regen_reduction_percent(
             &state.equipment,
         ) + sigil_bonuses.regen_delay_percent,
-        damage_percent: crate::god_items::equipped_god_item_damage_percent(&state.equipment),
+        // Prestige flat bonuses
+        flat_damage: prestige_combat.flat_damage,
+        flat_defense: prestige_combat.flat_defense,
+        flat_hp: prestige_combat.flat_hp,
     };
+    // Apply flat HP bonus to combat max HP (not in DerivedStats to avoid enemy scaling)
+    if combat_bonuses.flat_hp > 0 {
+        let boosted_max = derived.max_hp + combat_bonuses.flat_hp;
+        state.combat_state.update_max_hp(boosted_max);
+    }
+    // Apply sigil max HP% bonus on top of current max HP
+    if sigil_bonuses.max_hp_percent > 0.0 {
+        let current_max = state.combat_state.player_max_hp;
+        let boosted = (current_max as f64 * (1.0 + sigil_bonuses.max_hp_percent / 100.0)) as u32;
+        state.combat_state.update_max_hp(boosted);
+    }
     let combat_events = update_combat(
         rng,
         state,
         delta_time,
-        &haven_combat,
-        &prestige_combat,
+        &combat_bonuses,
         achievements,
         &derived,
-        &god_items_combat,
     );
 
     tick_stages::process_combat_events(

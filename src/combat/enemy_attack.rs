@@ -1,17 +1,16 @@
 use crate::character::derived_stats::DerivedStats;
-use crate::character::prestige::PrestigeCombatBonuses;
 use crate::core::constants::*;
 use crate::core::game_state::GameState;
 use rand::Rng;
 
-use super::events::{CombatEvent, GodItemCombatBonuses, HavenCombatBonuses};
+use super::events::{CombatBonuses, CombatEvent};
 
 /// Resolves a single enemy attack against the player.
 ///
 /// Handles the full enemy damage pipeline:
-/// 1. Total defense (derived + prestige flat defense)
+/// 1. Total defense (derived + flat_defense bonus)
 /// 2. Base damage after defense subtraction (min 1)
-/// 3. Divine Bulwark damage reduction % (god item, min 1)
+/// 3. damage_reduction_percent % applied after defense subtraction (e.g. Divine Bulwark, min 1)
 /// 4. Apply damage to player HP
 /// 5. Damage reflection back to attacker
 /// 6. Check if reflection killed the enemy
@@ -24,22 +23,20 @@ use super::events::{CombatEvent, GodItemCombatBonuses, HavenCombatBonuses};
 pub(crate) fn resolve_enemy_attack<R: Rng>(
     rng: &mut R,
     state: &mut GameState,
-    haven: &HavenCombatBonuses,
-    prestige_bonuses: &PrestigeCombatBonuses,
+    bonuses: &CombatBonuses,
     achievements: &mut crate::achievements::Achievements,
     derived: &DerivedStats,
-    god_items: &GodItemCombatBonuses,
 ) -> Vec<CombatEvent> {
     let mut events = Vec::new();
 
     state.combat_state.enemy_attack_timer = 0.0;
 
     if let Some(enemy) = state.combat_state.current_enemy.as_mut() {
-        let total_defense = derived.defense + prestige_bonuses.flat_defense;
+        let total_defense = derived.defense + bonuses.flat_defense;
         let base_damage = enemy.damage.saturating_sub(total_defense).max(1);
-        // Apply Divine Bulwark (god item damage reduction)
-        let enemy_damage = if god_items.damage_reduction_percent > 0.0 {
-            (((base_damage as f64) * (1.0 - god_items.damage_reduction_percent / 100.0)) as u32)
+        // Apply damage reduction (e.g. Divine Bulwark)
+        let enemy_damage = if bonuses.damage_reduction_percent > 0.0 {
+            (((base_damage as f64) * (1.0 - bonuses.damage_reduction_percent / 100.0)) as u32)
                 .max(1)
         } else {
             base_damage
@@ -65,8 +62,12 @@ pub(crate) fn resolve_enemy_attack<R: Rng>(
 
         // Check if reflection killed the enemy
         if !enemy.is_alive() {
-            let (death_events, _) =
-                super::damage::handle_enemy_death(rng, state, achievements, haven.xp_gain_percent);
+            let (death_events, _) = super::damage::handle_enemy_death(
+                rng,
+                state,
+                achievements,
+                bonuses.xp_gain_percent,
+            );
             events.extend(death_events);
             return events;
         }

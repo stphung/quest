@@ -1,33 +1,28 @@
 use crate::character::derived_stats::DerivedStats;
-use crate::character::prestige::PrestigeCombatBonuses;
 use crate::core::constants::*;
 use crate::core::game_state::GameState;
 use rand::Rng;
 
 use super::attacks::effective_enemy_attack_interval;
-use super::events::{CombatEvent, GodItemCombatBonuses, HavenCombatBonuses};
+use super::events::{CombatBonuses, CombatEvent};
 
 /// Updates combat state, returns events that occurred
-/// `haven` contains all Haven bonuses that affect combat
-/// `prestige_bonuses` contains flat combat bonuses from prestige rank
+/// `bonuses` contains all combined combat bonuses from Haven, god items, prestige, and sigils.
 /// `achievements` is used to check for Stormbreaker achievement (Zone 10 boss)
 /// `derived` contains pre-computed derived stats (avoids redundant recalculation)
-#[allow(clippy::too_many_arguments)]
 pub fn update_combat<R: Rng>(
     rng: &mut R,
     state: &mut GameState,
     delta_time: f64,
-    haven: &HavenCombatBonuses,
-    prestige_bonuses: &PrestigeCombatBonuses,
+    bonuses: &CombatBonuses,
     achievements: &mut crate::achievements::Achievements,
     derived: &DerivedStats,
-    god_items: &GodItemCombatBonuses,
 ) -> Vec<CombatEvent> {
     let mut events = Vec::new();
 
     // Handle regeneration after enemy death
     if state.combat_state.is_regenerating {
-        return super::regen::process_regen(state, delta_time, haven, god_items, derived);
+        return super::regen::process_regen(state, delta_time, bonuses, derived);
     }
 
     // No combat if no enemy
@@ -50,7 +45,7 @@ pub fn update_combat<R: Rng>(
 
     // Attack speed multiplier: higher = faster attacks
     let player_interval = ATTACK_INTERVAL_SECONDS
-        / (derived.attack_speed_multiplier + god_items.attack_speed_percent / 100.0);
+        / (derived.attack_speed_multiplier + bonuses.attack_speed_percent / 100.0);
     let enemy_interval = effective_enemy_attack_interval(state);
 
     // --- Phase 2: Determine who attacks this tick ---
@@ -59,15 +54,8 @@ pub fn update_combat<R: Rng>(
 
     // --- Phase 3: Player attack (if ready) ---
     if player_attacks {
-        let (attack_events, enemy_died) = super::player_attack::resolve_player_attack(
-            rng,
-            state,
-            haven,
-            prestige_bonuses,
-            achievements,
-            derived,
-            god_items,
-        );
+        let (attack_events, enemy_died) =
+            super::player_attack::resolve_player_attack(rng, state, bonuses, achievements, derived);
         events.extend(attack_events);
         if enemy_died {
             return events;
@@ -76,15 +64,8 @@ pub fn update_combat<R: Rng>(
 
     // --- Phase 4: Enemy attack (if ready) ---
     if enemy_attacks {
-        let attack_events = super::enemy_attack::resolve_enemy_attack(
-            rng,
-            state,
-            haven,
-            prestige_bonuses,
-            achievements,
-            derived,
-            god_items,
-        );
+        let attack_events =
+            super::enemy_attack::resolve_enemy_attack(rng, state, bonuses, achievements, derived);
         events.extend(attack_events);
     }
 
