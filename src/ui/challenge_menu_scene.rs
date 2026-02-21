@@ -25,11 +25,12 @@ pub fn render_challenge_menu(
     area: Rect,
     menu: &ChallengeMenu,
     _ctx: &super::responsive::LayoutContext,
+    stormglass_discovered: bool,
 ) {
     frame.render_widget(Clear, area);
 
     if menu.viewing_detail && !menu.challenges.is_empty() {
-        render_detail_view(frame, area, menu);
+        render_detail_view(frame, area, menu, stormglass_discovered);
     } else {
         render_list_view(frame, area, menu);
     }
@@ -85,7 +86,12 @@ fn render_list_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
     }
 }
 
-fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
+fn render_detail_view(
+    frame: &mut Frame,
+    area: Rect,
+    menu: &ChallengeMenu,
+    stormglass_discovered: bool,
+) {
     let challenge = &menu.challenges[menu.selected_index];
 
     let block = Block::default()
@@ -146,6 +152,7 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
                 chunks[2],
                 &ChessDifficulty::ALL,
                 menu.selected_difficulty,
+                stormglass_discovered,
             );
         }
         ChallengeType::Morris => {
@@ -154,6 +161,7 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
                 chunks[2],
                 &MorrisDifficulty::ALL,
                 menu.selected_difficulty,
+                stormglass_discovered,
             );
         }
         ChallengeType::Gomoku => {
@@ -162,6 +170,7 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
                 chunks[2],
                 &GomokuDifficulty::ALL,
                 menu.selected_difficulty,
+                stormglass_discovered,
             );
         }
         ChallengeType::Minesweeper => {
@@ -170,6 +179,7 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
                 chunks[2],
                 &MinesweeperDifficulty::ALL,
                 menu.selected_difficulty,
+                stormglass_discovered,
             );
         }
         ChallengeType::Rune => {
@@ -178,6 +188,7 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
                 chunks[2],
                 &RuneDifficulty::ALL,
                 menu.selected_difficulty,
+                stormglass_discovered,
             );
         }
         ChallengeType::Go => {
@@ -186,6 +197,7 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
                 chunks[2],
                 &GoDifficulty::ALL,
                 menu.selected_difficulty,
+                stormglass_discovered,
             );
         }
         ChallengeType::FlappyBird => {
@@ -194,6 +206,7 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
                 chunks[2],
                 &FlappyBirdDifficulty::ALL,
                 menu.selected_difficulty,
+                stormglass_discovered,
             );
         }
         ChallengeType::RunicShift => {
@@ -202,6 +215,7 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
                 chunks[2],
                 &RunicShiftDifficulty::ALL,
                 menu.selected_difficulty,
+                stormglass_discovered,
             );
         }
         ChallengeType::Jezzball => {
@@ -210,6 +224,7 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
                 chunks[2],
                 &JezzballDifficulty::ALL,
                 menu.selected_difficulty,
+                stormglass_discovered,
             );
         }
         ChallengeType::Snake => {
@@ -218,6 +233,7 @@ fn render_detail_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
                 chunks[2],
                 &SnakeDifficulty::ALL,
                 menu.selected_difficulty,
+                stormglass_discovered,
             );
         }
     }
@@ -306,6 +322,7 @@ fn render_difficulty_selector<D: DifficultyInfo>(
     area: Rect,
     options: &[D],
     selected: usize,
+    stormglass_discovered: bool,
 ) {
     let title = Paragraph::new("Select difficulty:").style(
         Style::default()
@@ -368,7 +385,10 @@ fn render_difficulty_selector<D: DifficultyInfo>(
         // Line 2: reward (indented)
         let reward_line = Paragraph::new(Line::from(vec![
             Span::styled("    ", Style::default()),
-            Span::styled(diff.reward().description(), reward_style),
+            Span::styled(
+                diff.reward().description(stormglass_discovered),
+                reward_style,
+            ),
         ]));
         let reward_area = Rect {
             x: area.x,

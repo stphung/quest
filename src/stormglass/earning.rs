@@ -1,6 +1,5 @@
 //! Pure functions for calculating Stormglass earnings.
 
-use crate::achievements::milestones::MinigameDifficulty;
 use crate::dungeon::types::DungeonSize;
 use crate::items::types::Rarity;
 
@@ -15,16 +14,6 @@ pub fn salvage_value(rarity: Rarity) -> u64 {
         Rarity::Epic => SALVAGE_EPIC,
         Rarity::Legendary => SALVAGE_LEGENDARY,
         Rarity::Mythic => SALVAGE_LEGENDARY, // God items are never salvaged in practice
-    }
-}
-
-/// Returns the Stormglass reward for winning a challenge at the given difficulty.
-pub fn challenge_reward(difficulty: MinigameDifficulty) -> u64 {
-    match difficulty {
-        MinigameDifficulty::Novice => CHALLENGE_NOVICE,
-        MinigameDifficulty::Apprentice => CHALLENGE_APPRENTICE,
-        MinigameDifficulty::Journeyman => CHALLENGE_JOURNEYMAN,
-        MinigameDifficulty::Master => CHALLENGE_MASTER,
     }
 }
 

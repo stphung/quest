@@ -578,43 +578,80 @@ fn draw_right_content(
         .game_over_shown_at
         .is_some_and(|t| t.elapsed() >= std::time::Duration::from_secs(2));
 
+    let sg_discovered = game_state.stormglass_discovered;
+
     match &game_state.active_minigame {
         Some(ActiveMinigame::Rune(game)) => {
-            rune_scene::render_rune(frame, area, game, ctx, show_dismiss_hint);
+            rune_scene::render_rune(frame, area, game, ctx, show_dismiss_hint, sg_discovered);
         }
         Some(ActiveMinigame::Minesweeper(game)) => {
             minesweeper_scene::render_minesweeper(frame, area, game, ctx, show_dismiss_hint);
         }
         Some(ActiveMinigame::Gomoku(game)) => {
-            gomoku_scene::render_gomoku_scene(frame, area, game, ctx, show_dismiss_hint);
+            gomoku_scene::render_gomoku_scene(
+                frame,
+                area,
+                game,
+                ctx,
+                show_dismiss_hint,
+                sg_discovered,
+            );
         }
         Some(ActiveMinigame::Morris(game)) => {
             morris_scene::render_morris_scene(
                 frame,
                 area,
                 game,
-                game_state.character_level,
                 ctx,
                 show_dismiss_hint,
+                sg_discovered,
             );
         }
         Some(ActiveMinigame::Chess(game)) => {
             chess_scene::render_chess_scene(frame, area, game, ctx, show_dismiss_hint);
         }
         Some(ActiveMinigame::Go(game)) => {
-            go_scene::render_go_scene(frame, area, game, ctx, show_dismiss_hint);
+            go_scene::render_go_scene(frame, area, game, ctx, show_dismiss_hint, sg_discovered);
         }
         Some(ActiveMinigame::FlappyBird(game)) => {
-            flappy_scene::render_flappy_scene(frame, area, game, ctx, show_dismiss_hint);
+            flappy_scene::render_flappy_scene(
+                frame,
+                area,
+                game,
+                ctx,
+                show_dismiss_hint,
+                sg_discovered,
+            );
         }
         Some(ActiveMinigame::Jezzball(game)) => {
-            jezzball_scene::render_jezzball_scene(frame, area, game, ctx, show_dismiss_hint);
+            jezzball_scene::render_jezzball_scene(
+                frame,
+                area,
+                game,
+                ctx,
+                show_dismiss_hint,
+                sg_discovered,
+            );
         }
         Some(ActiveMinigame::Snake(game)) => {
-            snake_scene::render_snake_scene(frame, area, game, ctx, show_dismiss_hint);
+            snake_scene::render_snake_scene(
+                frame,
+                area,
+                game,
+                ctx,
+                show_dismiss_hint,
+                sg_discovered,
+            );
         }
         Some(ActiveMinigame::RunicShift(game)) => {
-            runic_shift_scene::render_runic_shift_scene(frame, area, game, ctx, show_dismiss_hint);
+            runic_shift_scene::render_runic_shift_scene(
+                frame,
+                area,
+                game,
+                ctx,
+                show_dismiss_hint,
+                sg_discovered,
+            );
         }
         None => {
             if game_state.challenge_menu.is_open {
@@ -623,6 +660,7 @@ fn draw_right_content(
                     area,
                     &game_state.challenge_menu,
                     ctx,
+                    game_state.stormglass_discovered,
                 );
             } else if let Some(ref session) = game_state.active_fishing {
                 fishing_scene::render_fishing_scene(frame, area, session, &game_state.fishing, ctx);

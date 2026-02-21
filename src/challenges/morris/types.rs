@@ -131,17 +131,6 @@ impl MorrisDifficulty {
             _ => 0.0,
         }
     }
-
-    /// XP reward as a percentage of XP needed for current level.
-    /// e.g. 25 means 25% of `xp_for_next_level(current_level)`.
-    pub fn reward_xp_percent(&self) -> u32 {
-        match self {
-            Self::Novice => 50,
-            Self::Apprentice => 100,
-            Self::Journeyman => 150,
-            Self::Master => 200,
-        }
-    }
 }
 
 /// Result of a completed Morris game
@@ -426,12 +415,6 @@ mod tests {
         assert_eq!(MorrisDifficulty::Journeyman.random_move_chance(), 0.0);
         assert_eq!(MorrisDifficulty::Master.random_move_chance(), 0.0);
 
-        // XP reward percentages
-        assert_eq!(MorrisDifficulty::Novice.reward_xp_percent(), 50);
-        assert_eq!(MorrisDifficulty::Apprentice.reward_xp_percent(), 100);
-        assert_eq!(MorrisDifficulty::Journeyman.reward_xp_percent(), 150);
-        assert_eq!(MorrisDifficulty::Master.reward_xp_percent(), 200);
-
         // Names
         assert_eq!(MorrisDifficulty::Novice.name(), "Novice");
         assert_eq!(MorrisDifficulty::Apprentice.name(), "Apprentice");
@@ -443,22 +426,22 @@ mod tests {
     fn test_difficulty_rewards_via_trait() {
         use crate::challenges::menu::DifficultyInfo;
 
-        // Morris rewards XP, with fishing rank at Master
+        // Morris rewards stormglass, with fishing rank at Master
         let novice = MorrisDifficulty::Novice.reward();
-        assert_eq!(novice.xp_percent, 50);
+        assert_eq!(novice.stormglass, 800);
         assert_eq!(novice.prestige_ranks, 0);
         assert_eq!(novice.fishing_ranks, 0);
 
         let apprentice = MorrisDifficulty::Apprentice.reward();
-        assert_eq!(apprentice.xp_percent, 100);
+        assert_eq!(apprentice.stormglass, 2_000);
         assert_eq!(apprentice.fishing_ranks, 0);
 
         let journeyman = MorrisDifficulty::Journeyman.reward();
-        assert_eq!(journeyman.xp_percent, 150);
+        assert_eq!(journeyman.stormglass, 4_000);
         assert_eq!(journeyman.fishing_ranks, 0);
 
         let master = MorrisDifficulty::Master.reward();
-        assert_eq!(master.xp_percent, 200);
+        assert_eq!(master.stormglass, 10_000);
         assert_eq!(master.fishing_ranks, 1);
         assert_eq!(master.prestige_ranks, 0);
     }

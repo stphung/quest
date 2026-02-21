@@ -195,20 +195,20 @@ impl DifficultyInfo for SnakeDifficulty {
     fn reward(&self) -> ChallengeReward {
         match self {
             SnakeDifficulty::Novice => ChallengeReward {
-                xp_percent: 25,
+                stormglass: 300,
                 ..Default::default()
             },
             SnakeDifficulty::Apprentice => ChallengeReward {
-                xp_percent: 75,
+                stormglass: 800,
                 ..Default::default()
             },
             SnakeDifficulty::Journeyman => ChallengeReward {
-                xp_percent: 100,
+                stormglass: 1_500,
                 ..Default::default()
             },
             SnakeDifficulty::Master => ChallengeReward {
                 prestige_ranks: 1,
-                xp_percent: 100,
+                stormglass: 4_000,
                 ..Default::default()
             },
         }
@@ -550,21 +550,21 @@ mod tests {
         assert_eq!(
             SnakeDifficulty::Novice.reward(),
             ChallengeReward {
-                xp_percent: 25,
+                stormglass: 300,
                 ..Default::default()
             }
         );
         assert_eq!(
             SnakeDifficulty::Apprentice.reward(),
             ChallengeReward {
-                xp_percent: 75,
+                stormglass: 800,
                 ..Default::default()
             }
         );
         assert_eq!(
             SnakeDifficulty::Journeyman.reward(),
             ChallengeReward {
-                xp_percent: 100,
+                stormglass: 1_500,
                 ..Default::default()
             }
         );
@@ -572,7 +572,7 @@ mod tests {
             SnakeDifficulty::Master.reward(),
             ChallengeReward {
                 prestige_ranks: 1,
-                xp_percent: 100,
+                stormglass: 4_000,
                 ..Default::default()
             }
         );

@@ -42,9 +42,10 @@ pub fn render_snake_scene(
     game: &SnakeGame,
     ctx: &super::responsive::LayoutContext,
     show_dismiss_hint: bool,
+    stormglass_discovered: bool,
 ) {
     if game.game_result.is_some() {
-        render_snake_game_over(frame, area, game, show_dismiss_hint);
+        render_snake_game_over(frame, area, game, show_dismiss_hint, stormglass_discovered);
         return;
     }
 
@@ -375,12 +376,13 @@ fn render_snake_game_over(
     area: Rect,
     game: &SnakeGame,
     show_dismiss_hint: bool,
+    stormglass_discovered: bool,
 ) {
     let result = game.game_result.as_ref().unwrap();
 
     let (result_type, title, message, reward) = match result {
         SnakeResult::Win => {
-            let reward_text = game.difficulty.reward().description();
+            let reward_text = game.difficulty.reward().description(stormglass_discovered);
             (
                 GameResultType::Win,
                 ":: SERPENT'S PATH CONQUERED! ::",

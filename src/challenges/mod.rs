@@ -221,15 +221,22 @@ pub fn apply_challenge_rewards(
     if info.won {
         let old_prestige = state.prestige_rank;
 
-        // XP reward
-        let xp_gained = if info.reward.xp_percent > 0 {
-            let xp_for_level =
-                crate::core::game_logic::xp_for_next_level(state.character_level.max(1));
-            let xp = (xp_for_level * info.reward.xp_percent as u64) / 100;
-            state.character_xp += xp;
-            xp
+        // Stormglass reward (or XP fallback if not discovered)
+        let (sg_gained, xp_gained) = if info.reward.stormglass > 0 {
+            if state.stormglass_discovered {
+                state.stormglass += info.reward.stormglass;
+                (info.reward.stormglass, 0u64)
+            } else {
+                // Fallback: stormglass / 10 = XP% of next level
+                let xp_percent = info.reward.stormglass / 10;
+                let xp_for_level =
+                    crate::core::game_logic::xp_for_next_level(state.character_level.max(1));
+                let xp = (xp_for_level * xp_percent) / 100;
+                state.character_xp += xp;
+                (0u64, xp)
+            }
         } else {
-            0
+            (0u64, 0u64)
         };
 
         // Prestige reward
@@ -267,6 +274,13 @@ pub fn apply_challenge_rewards(
                     state.fishing.rank,
                     state.fishing.rank_name()
                 ),
+                false,
+                true,
+            );
+        }
+        if sg_gained > 0 {
+            state.combat_state.add_log_entry(
+                format!("{} +{} Stormglass", info.icon, sg_gained),
                 false,
                 true,
             );
@@ -358,10 +372,11 @@ mod tests {
     #[test]
     fn test_apply_rewards_grants_xp() {
         let mut state = GameState::new("Test".to_string(), 0);
+        state.stormglass_discovered = false;
         state.character_level = 5;
         let old_xp = state.character_xp;
         let reward = menu::ChallengeReward {
-            xp_percent: 50,
+            stormglass: 500,
             ..Default::default()
         };
 
@@ -371,13 +386,13 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_rewards_zero_xp_percent_grants_no_xp() {
+    fn test_apply_rewards_zero_stormglass_grants_nothing() {
         let mut state = GameState::new("Test".to_string(), 0);
         state.character_level = 5;
         let old_xp = state.character_xp;
         let reward = menu::ChallengeReward {
             prestige_ranks: 1,
-            xp_percent: 0,
+            stormglass: 0,
             ..Default::default()
         };
 
@@ -451,7 +466,7 @@ mod tests {
         let old_fishing = state.fishing.rank;
         let reward = menu::ChallengeReward {
             prestige_ranks: 3,
-            xp_percent: 100,
+            stormglass: 1000,
             fishing_ranks: 2,
         };
 
@@ -468,13 +483,13 @@ mod tests {
         state.combat_state.combat_log.clear();
         let reward = menu::ChallengeReward {
             prestige_ranks: 1,
-            xp_percent: 50,
+            stormglass: 500,
             ..Default::default()
         };
 
         apply_challenge_rewards(&mut state, make_info(true, reward));
 
-        // Should have win message + prestige + XP entries
+        // Should have win message + prestige + SG/XP entries
         assert!(state.combat_state.combat_log.len() >= 2);
         assert!(state.combat_state.combat_log[0]
             .message
@@ -493,5 +508,36 @@ mod tests {
         assert!(state.combat_state.combat_log[0]
             .message
             .contains("You lost."));
+    }
+
+    #[test]
+    fn test_apply_rewards_grants_stormglass_when_discovered() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.stormglass_discovered = true;
+        state.stormglass = 100;
+        let old_xp = state.character_xp;
+        let reward = menu::ChallengeReward {
+            stormglass: 1000,
+            ..Default::default()
+        };
+        apply_challenge_rewards(&mut state, make_info(true, reward));
+        assert_eq!(state.stormglass, 1100);
+        assert_eq!(state.character_xp, old_xp);
+    }
+
+    #[test]
+    fn test_apply_rewards_xp_fallback_when_not_discovered() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.stormglass_discovered = false;
+        state.character_level = 5;
+        let old_xp = state.character_xp;
+        let old_sg = state.stormglass;
+        let reward = menu::ChallengeReward {
+            stormglass: 1000,
+            ..Default::default()
+        };
+        apply_challenge_rewards(&mut state, make_info(true, reward));
+        assert!(state.character_xp > old_xp);
+        assert_eq!(state.stormglass, old_sg);
     }
 }

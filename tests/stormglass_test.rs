@@ -1,6 +1,5 @@
 //! Tests for the Stormglass currency system.
 
-use quest::achievements::milestones::MinigameDifficulty;
 use quest::core::game_state::GameState;
 use quest::items::types::Rarity;
 use quest::stormglass::{earning, spending, types};
@@ -37,34 +36,6 @@ fn test_salvage_value_mythic_fallback() {
     // God/Mythic items should never be salvaged (auto-equip preserves them),
     // but if they were, they'd return the same as Legendary
     assert_eq!(earning::salvage_value(Rarity::Mythic), 25);
-}
-
-// ── Earning: challenge rewards by difficulty ────────────────────────────
-
-#[test]
-fn test_challenge_reward_novice() {
-    assert_eq!(earning::challenge_reward(MinigameDifficulty::Novice), 5);
-}
-
-#[test]
-fn test_challenge_reward_apprentice() {
-    assert_eq!(
-        earning::challenge_reward(MinigameDifficulty::Apprentice),
-        15
-    );
-}
-
-#[test]
-fn test_challenge_reward_journeyman() {
-    assert_eq!(
-        earning::challenge_reward(MinigameDifficulty::Journeyman),
-        30
-    );
-}
-
-#[test]
-fn test_challenge_reward_master() {
-    assert_eq!(earning::challenge_reward(MinigameDifficulty::Master), 75);
 }
 
 // ── Earning: dungeon cache by size ─────────────────────────────────────

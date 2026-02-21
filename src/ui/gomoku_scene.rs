@@ -21,10 +21,18 @@ pub fn render_gomoku_scene(
     game: &GomokuGame,
     ctx: &super::responsive::LayoutContext,
     show_dismiss_hint: bool,
+    stormglass_discovered: bool,
 ) {
     // Game over overlay
     if game.game_result.is_some() {
-        render_gomoku_game_over(frame, area, game, ctx, show_dismiss_hint);
+        render_gomoku_game_over(
+            frame,
+            area,
+            game,
+            ctx,
+            show_dismiss_hint,
+            stormglass_discovered,
+        );
         return;
     }
 
@@ -221,6 +229,7 @@ fn render_gomoku_game_over(
     game: &GomokuGame,
     ctx: &super::responsive::LayoutContext,
     show_dismiss_hint: bool,
+    stormglass_discovered: bool,
 ) {
     use crate::challenges::menu::DifficultyInfo;
     use ratatui::widgets::Clear;
@@ -249,9 +258,11 @@ fn render_gomoku_game_over(
     };
 
     let reward = match result {
-        crate::challenges::gomoku::GomokuResult::Win => {
-            game.difficulty.reward().description().replace("Win: ", "")
-        }
+        crate::challenges::gomoku::GomokuResult::Win => game
+            .difficulty
+            .reward()
+            .description(stormglass_discovered)
+            .replace("Win: ", ""),
         _ => String::new(),
     };
 

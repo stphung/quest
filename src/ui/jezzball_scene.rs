@@ -51,9 +51,10 @@ pub fn render_jezzball_scene(
     game: &JezzballGame,
     ctx: &super::responsive::LayoutContext,
     show_dismiss_hint: bool,
+    stormglass_discovered: bool,
 ) {
     if game.game_result.is_some() {
-        render_jezzball_game_over(frame, area, game, show_dismiss_hint);
+        render_jezzball_game_over(frame, area, game, show_dismiss_hint, stormglass_discovered);
         return;
     }
 
@@ -431,12 +432,13 @@ fn render_jezzball_game_over(
     area: Rect,
     game: &JezzballGame,
     show_dismiss_hint: bool,
+    stormglass_discovered: bool,
 ) {
     let result = game.game_result.expect("game_result checked before call");
 
     let (result_type, title, message, reward) = match result {
         JezzballResult::Win => {
-            let reward_text = game.difficulty.reward().description();
+            let reward_text = game.difficulty.reward().description(stormglass_discovered);
             (
                 GameResultType::Win,
                 ":: CONTAINMENT ACHIEVED ::",

@@ -259,7 +259,7 @@ All games with AI use a standardized `process_ai_thinking()` function name (not 
 ```rust
 ChallengeReward {
     prestige_ranks: 1,  // Direct prestige gain
-    xp_percent: 0,      // % of XP needed for next level
+    stormglass: 0,      // Stormglass reward (XP fallback if not discovered)
     fishing_ranks: 0,   // Fishing rank gain
 }
 ```

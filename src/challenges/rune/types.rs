@@ -310,21 +310,21 @@ mod tests {
         use crate::challenges::menu::DifficultyInfo;
 
         let novice = RuneDifficulty::Novice.reward();
-        assert_eq!(novice.xp_percent, 25);
+        assert_eq!(novice.stormglass, 300);
         assert_eq!(novice.prestige_ranks, 0);
         assert_eq!(novice.fishing_ranks, 0);
 
         let apprentice = RuneDifficulty::Apprentice.reward();
-        assert_eq!(apprentice.xp_percent, 50);
+        assert_eq!(apprentice.stormglass, 800);
 
         let journeyman = RuneDifficulty::Journeyman.reward();
         assert_eq!(journeyman.fishing_ranks, 1);
-        assert_eq!(journeyman.xp_percent, 75);
+        assert_eq!(journeyman.stormglass, 1_500);
 
         let master = RuneDifficulty::Master.reward();
         assert_eq!(master.prestige_ranks, 1);
         assert_eq!(master.fishing_ranks, 2);
-        assert_eq!(master.xp_percent, 0);
+        assert_eq!(master.stormglass, 4_000);
     }
 
     #[test]

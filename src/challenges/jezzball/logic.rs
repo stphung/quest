@@ -480,21 +480,21 @@ impl DifficultyInfo for JezzballDifficulty {
     fn reward(&self) -> ChallengeReward {
         match self {
             JezzballDifficulty::Novice => ChallengeReward {
-                xp_percent: 25,
+                stormglass: 500,
                 ..Default::default()
             },
             JezzballDifficulty::Apprentice => ChallengeReward {
-                xp_percent: 75,
+                stormglass: 1_200,
                 ..Default::default()
             },
             JezzballDifficulty::Journeyman => ChallengeReward {
                 prestige_ranks: 1,
-                xp_percent: 100,
+                stormglass: 2_500,
                 ..Default::default()
             },
             JezzballDifficulty::Master => ChallengeReward {
                 prestige_ranks: 2,
-                xp_percent: 100,
+                stormglass: 4_000,
                 ..Default::default()
             },
         }
@@ -768,7 +768,7 @@ mod tests {
         assert_eq!(
             JezzballDifficulty::Novice.reward(),
             ChallengeReward {
-                xp_percent: 25,
+                stormglass: 500,
                 ..Default::default()
             }
         );
@@ -776,7 +776,7 @@ mod tests {
             JezzballDifficulty::Journeyman.reward(),
             ChallengeReward {
                 prestige_ranks: 1,
-                xp_percent: 100,
+                stormglass: 2_500,
                 ..Default::default()
             }
         );
@@ -784,7 +784,7 @@ mod tests {
             JezzballDifficulty::Master.reward(),
             ChallengeReward {
                 prestige_ranks: 2,
-                xp_percent: 100,
+                stormglass: 4_000,
                 ..Default::default()
             }
         );
