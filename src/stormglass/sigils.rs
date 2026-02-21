@@ -100,7 +100,7 @@ impl SigilEffectType {
                     Self::MaxHpPercent => "HP",
                     Self::FishingSpeedPercent => "Fishing Speed",
                     Self::OfflineXpPercent => "Offline XP",
-                    Self::AttackSpeedPercent => "ASPD",
+                    Self::AttackSpeedPercent => "Attack Speed",
                     Self::DoubleStrikePercent => "Double Strike",
                     Self::RegenDelayPercent => unreachable!(),
                 };
