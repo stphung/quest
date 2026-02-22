@@ -801,7 +801,7 @@ fn test_discover_dungeon_blocked_when_in_dungeon() {
     let mut state = fresh_state();
     state.active_dungeon = Some(quest::dungeon::generation::generate_dungeon(1, 0, 1));
 
-    // Uses internal thread_rng, so just test repeatedly
+    // Uses seeded RNG, so test repeatedly for coverage
     for _ in 0..200 {
         let result = quest::core::discoveries::try_discover_dungeon(&mut rng, &mut state);
         assert!(!result, "Should never discover dungeon when already in one");
@@ -858,7 +858,7 @@ fn test_discover_dungeon_probability_approximately_1_percent() {
     }
 
     let rate = discoveries as f64 / trials as f64;
-    // Allow range 0.3% to 2.5% (wide tolerance for thread_rng)
+    // Allow range 0.3% to 2.5% (wide tolerance for seeded RNG)
     assert!(
         (0.003..=0.025).contains(&rate),
         "Discovery rate {:.4} should be approximately 1%",

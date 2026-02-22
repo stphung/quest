@@ -403,7 +403,7 @@ mod tests {
     #[test]
     fn test_ai_returns_legal_move() {
         let game = MorrisGame::new(MorrisDifficulty::Novice);
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
 
         let legal_moves = get_legal_moves(&game);
         let ai_move = get_ai_move(&game, &mut rng);
@@ -415,7 +415,7 @@ mod tests {
 
     #[test]
     fn test_ai_different_difficulties() {
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
 
         // Only test Novice and Apprentice (depth 2-3) on empty board.
         // Master/Journeyman (depth 4-5) are very slow with 24 legal moves.
@@ -537,7 +537,7 @@ mod tests {
     fn test_process_ai_thinking_not_thinking() {
         let mut game = MorrisGame::new(MorrisDifficulty::Novice);
         game.ai_thinking = false;
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
 
         process_ai_thinking(&mut game, &mut rng);
 
@@ -552,7 +552,7 @@ mod tests {
         game.ai_thinking = true;
         game.ai_think_ticks = 0;
         game.ai_pending_move = None;
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
 
         // First tick should compute the move
         process_ai_thinking(&mut game, &mut rng);

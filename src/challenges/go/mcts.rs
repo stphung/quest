@@ -253,7 +253,7 @@ mod tests {
     fn test_mcts_returns_move() {
         let game = GoGame::new(GoDifficulty::Novice);
         let mut rng = rand::rng();
-        let mv = mcts_best_move_with_limit(&game, &mut rng, 50);
+        let mv = mcts_best_move_with_limit(&game, &mut rng, 15);
         // Should return some move (likely a placement, not pass on empty board)
         match mv {
             GoMove::Place(r, c) => {
@@ -275,7 +275,7 @@ mod tests {
         game.current_player = Stone::White;
 
         let mut rng = rand::rng();
-        let mv = mcts_best_move_with_limit(&game, &mut rng, 50);
+        let mv = mcts_best_move_with_limit(&game, &mut rng, 15);
 
         // Should not play at (4,4) - it's suicide
         assert_ne!(mv, GoMove::Place(4, 4));

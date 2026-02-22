@@ -445,6 +445,8 @@ mod ai_tests {
     use super::super::GomokuDifficulty;
     use super::*;
     use crate::challenges::gomoku::GomokuGame;
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
 
     #[test]
     fn test_ai_takes_winning_move() {
@@ -455,7 +457,7 @@ mod ai_tests {
         game.board[7][5] = Some(Player::Ai);
         game.board[7][6] = Some(Player::Ai);
 
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
         let best = find_best_move(&game, &mut rng);
         assert!(
             best == Some((7, 2)) || best == Some((7, 7)),
@@ -472,7 +474,7 @@ mod ai_tests {
         game.board[7][5] = Some(Player::Human);
         game.board[7][6] = Some(Player::Human);
 
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
         let best = find_best_move(&game, &mut rng);
         assert!(
             best == Some((7, 2)) || best == Some((7, 7)),
