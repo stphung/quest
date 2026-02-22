@@ -1,10 +1,12 @@
 //! Update check helpers.
 
-use crate::core::constants::{UPDATE_CHECK_INTERVAL_SECONDS, UPDATE_CHECK_JITTER_SECONDS};
+use crate::core::constants::{
+    UPDATE_CHECK_INTERVAL_SECONDS, UPDATE_CHECK_JITTER_SECONDS, WIKI_URL,
+};
 use crate::ui::throbber::block_spinner_char;
 use crate::utils::updater::UpdateInfo;
 use rand::RngExt;
-use ratatui::crossterm::event;
+use ratatui::crossterm::event::{self, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph};
@@ -223,25 +225,75 @@ fn build_startup_splash_text(
     }
 
     text.push(Line::from(""));
-    text.push(Line::from(vec![Span::styled(
-        "  Press any key to continue...",
-        Style::default()
-            .fg(Color::Green)
-            .add_modifier(Modifier::BOLD),
-    )]));
+    text.push(Line::from(vec![
+        Span::styled(
+            "  [Enter]",
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" Continue    ", Style::default().fg(Color::Gray)),
+        Span::styled(
+            "[W]",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" Quest Wiki    ", Style::default().fg(Color::Gray)),
+        Span::styled(
+            "[Esc]",
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" Quit", Style::default().fg(Color::Gray)),
+    ]));
 
     text
 }
 
+enum StartupKeyAction {
+    Continue,
+    Quit,
+    OpenWiki,
+    Ignore,
+}
+
+fn startup_key_action(key_event: KeyEvent) -> StartupKeyAction {
+    if key_event.kind != KeyEventKind::Press {
+        return StartupKeyAction::Ignore;
+    }
+
+    match key_event.code {
+        KeyCode::Enter => StartupKeyAction::Continue,
+        KeyCode::Esc => StartupKeyAction::Quit,
+        KeyCode::Char('w') | KeyCode::Char('W') => StartupKeyAction::OpenWiki,
+        _ => StartupKeyAction::Ignore,
+    }
+}
+
+fn wiki_url_for_browser() -> String {
+    if WIKI_URL.starts_with("http://") || WIKI_URL.starts_with("https://") {
+        WIKI_URL.to_string()
+    } else {
+        format!("https://{WIKI_URL}")
+    }
+}
+
+pub enum StartupSplashResult {
+    Continue,
+    Quit,
+}
+
 /// Show the startup splash screen while update data loads in the background.
-/// Pressing any key continues immediately; update loading never blocks launch.
+/// Pressing Enter continues immediately; Esc quits from startup.
 pub fn show_startup_splash_screen(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     update_check_handle: &mut Option<JoinHandle<Option<UpdateInfo>>>,
-) -> io::Result<()> {
+) -> io::Result<StartupSplashResult> {
     let mut update_info: Option<UpdateInfo> = None;
 
-    loop {
+    let action = loop {
         if update_info.is_none() {
             let finished = update_check_handle
                 .as_ref()
@@ -257,12 +309,62 @@ pub fn show_startup_splash_screen(
         let text = build_startup_splash_text(update_info.as_ref(), update_loading);
         draw_startup_modal(terminal, text)?;
 
-        if event::poll(Duration::from_millis(100))?
-            && matches!(event::read()?, event::Event::Key(_))
-        {
-            break;
+        if event::poll(Duration::from_millis(100))? {
+            if let event::Event::Key(key_event) = event::read()? {
+                match startup_key_action(key_event) {
+                    StartupKeyAction::Continue => break StartupSplashResult::Continue,
+                    StartupKeyAction::Quit => break StartupSplashResult::Quit,
+                    StartupKeyAction::OpenWiki => {
+                        let _ = crate::utils::bug_report::open_browser(&wiki_url_for_browser());
+                    }
+                    StartupKeyAction::Ignore => {}
+                }
+            }
         }
+    };
+
+    Ok(action)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::crossterm::event::KeyModifiers;
+
+    #[test]
+    fn test_startup_key_action_continue_on_enter() {
+        let key = KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE);
+        assert!(matches!(
+            startup_key_action(key),
+            StartupKeyAction::Continue
+        ));
     }
 
-    Ok(())
+    #[test]
+    fn test_startup_key_action_open_wiki_on_w() {
+        let key = KeyEvent::new(KeyCode::Char('w'), KeyModifiers::NONE);
+        assert!(matches!(
+            startup_key_action(key),
+            StartupKeyAction::OpenWiki
+        ));
+    }
+
+    #[test]
+    fn test_startup_key_action_quit_on_escape() {
+        let key = KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE);
+        assert!(matches!(startup_key_action(key), StartupKeyAction::Quit));
+    }
+
+    #[test]
+    fn test_startup_key_action_ignore_other_keys() {
+        let key = KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE);
+        assert!(matches!(startup_key_action(key), StartupKeyAction::Ignore));
+    }
+
+    #[test]
+    fn test_wiki_url_for_browser_has_scheme() {
+        let url = wiki_url_for_browser();
+        assert!(url.starts_with("https://") || url.starts_with("http://"));
+        assert!(url.ends_with(WIKI_URL));
+    }
 }
