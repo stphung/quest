@@ -10,6 +10,7 @@ pub mod challenges;
 pub mod character;
 pub mod combat;
 pub mod core;
+pub mod deep;
 pub mod dungeon;
 pub mod enhancement;
 pub mod fishing;
