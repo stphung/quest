@@ -136,7 +136,7 @@ pub fn render_stormglass_exchange(
         ExchangePhase::ChronoSurge => render_chrono_surge_select(frame, area, exchange_ui, state),
         ExchangePhase::SigilsList => render_sigils_list(frame, area, exchange_ui, state),
         ExchangePhase::SigilUnlockConfirm => render_sigil_unlock_confirm(frame, area, state),
-        ExchangePhase::SigilInscribeConfirm => render_sigil_inscribe_confirm(frame, area, state),
+        ExchangePhase::SigilEtchConfirm => render_sigil_etch_confirm(frame, area, state),
         ExchangePhase::SigilRerollConfirm => {
             render_sigil_reroll_confirm(frame, area, exchange_ui, state)
         }
@@ -292,7 +292,7 @@ fn render_exchange_menu(
         let desc = match exchange_ui.selected_item {
             0 => "Spend Stormglass to unlock a choice of three challenges.",
             1 => "Bend time itself. Earn XP and loot, but no Stormglass.",
-            _ => "Inscribe sigils of power onto your soul. Permanent bonuses.",
+            _ => "Etch sigils of power onto your soul. Permanent bonuses.",
         };
         let desc_area = Rect::new(inner.x, inner.y + 8, inner.width, 2);
         let desc_widget = Paragraph::new(Span::styled(
@@ -864,7 +864,7 @@ fn render_sigils_list(
     state: &GameState,
 ) {
     let overlay_width = 52u16.min(area.width.saturating_sub(4));
-    let overlay_height = 18u16.min(area.height.saturating_sub(2));
+    let overlay_height = 17u16.min(area.height.saturating_sub(2));
     let x = area.x + (area.width.saturating_sub(overlay_width)) / 2;
     let y = area.y + (area.height.saturating_sub(overlay_height)) / 2;
     let overlay_area = Rect::new(x, y, overlay_width, overlay_height);
@@ -872,7 +872,7 @@ fn render_sigils_list(
     frame.render_widget(Clear, overlay_area);
 
     let title = format!(
-        " \u{16B1} Storm Sigils  [\u{1F48E}{} SG] ",
+        " \u{16B1} Etch Storm Sigils  [\u{1F48E}{} SG] ",
         state.stormglass
     );
     let block = Block::default()
@@ -937,7 +937,7 @@ fn render_sigils_list(
         if i < sigils.slots_unlocked as usize {
             // Unlocked slot
             if let Some(sigil) = &sigils.sigils[i] {
-                // Inscribed sigil: icon + name + value + grade
+                // Etched sigil: icon + name + value + grade
                 let icon = sigil.effect.icon();
                 let icon_name = format!("{} {}", icon, sigil.effect.sigil_name());
                 put_text(&mut buffer, row, col, &icon_name, Color::White);
@@ -1167,10 +1167,10 @@ fn render_sigil_unlock_confirm(frame: &mut Frame, area: Rect, state: &GameState)
     }
 }
 
-/// Render the inscribe confirmation dialog.
-fn render_sigil_inscribe_confirm(frame: &mut Frame, area: Rect, state: &GameState) {
+/// Render the etch confirmation dialog.
+fn render_sigil_etch_confirm(frame: &mut Frame, area: Rect, state: &GameState) {
     let overlay_width = 52u16.min(area.width.saturating_sub(4));
-    let overlay_height = 14u16.min(area.height.saturating_sub(2));
+    let overlay_height = 16u16.min(area.height.saturating_sub(2));
     let x = area.x + (area.width.saturating_sub(overlay_width)) / 2;
     let y = area.y + (area.height.saturating_sub(overlay_height)) / 2;
     let overlay_area = Rect::new(x, y, overlay_width, overlay_height);
@@ -1179,7 +1179,7 @@ fn render_sigil_inscribe_confirm(frame: &mut Frame, area: Rect, state: &GameStat
 
     let block = Block::default()
         .title(Line::from(Span::styled(
-            " \u{1F48E} Inscribe Sigil? \u{1F48E} ",
+            " \u{1F48E} Etch Sigil? \u{1F48E} ",
             Style::default()
                 .fg(ELECTRIC_BLUE)
                 .add_modifier(Modifier::BOLD),
@@ -1207,9 +1207,11 @@ fn render_sigil_inscribe_confirm(frame: &mut Frame, area: Rect, state: &GameStat
     clear_row_chars(&mut buffer, 5);
     clear_row_chars(&mut buffer, 6);
     clear_row_chars(&mut buffer, 8);
+    clear_row_chars(&mut buffer, 10);
+    clear_row_chars(&mut buffer, 11);
     clear_row_chars(&mut buffer, (h as i32) - 1);
 
-    let cost = crate::stormglass::sigils::INSCRIBE_COST;
+    let cost = crate::stormglass::sigils::ETCH_COST;
     let balance = state.stormglass;
     let after = balance.saturating_sub(cost);
 
@@ -1239,9 +1241,21 @@ fn render_sigil_inscribe_confirm(frame: &mut Frame, area: Rect, state: &GameStat
         &mut buffer,
         8,
         w,
-        "You will choose one of three random sigils.",
+        "You will choose from today's pool:",
         Color::DarkGray,
     );
+
+    // Daily sigil pool names (rows 10-11, with padding rows 9 and 12)
+    let pool = crate::stormglass::sigils::daily_sigil_pool();
+    let names: Vec<&str> = pool.iter().map(|e| e.short_name()).collect();
+    let line1_names = &names[..3.min(names.len())];
+    let line1 = line1_names.join(" \u{00b7} ");
+    put_text_centered(&mut buffer, 10, w, &line1, Color::DarkGray);
+    if names.len() > 3 {
+        let line2_names = &names[3..];
+        let line2 = line2_names.join(" \u{00b7} ");
+        put_text_centered(&mut buffer, 11, w, &line2, Color::DarkGray);
+    }
 
     let help_row = (h as i32) - 1;
     let help_y_col = 4i32;
@@ -1251,14 +1265,14 @@ fn render_sigil_inscribe_confirm(frame: &mut Frame, area: Rect, state: &GameStat
         &mut buffer,
         help_row,
         help_y_col + 2,
-        "] Inscribe  [",
+        "] Etch  [",
         Color::DarkGray,
     );
-    put_text(&mut buffer, help_row, help_y_col + 15, "N", Color::LightRed);
+    put_text(&mut buffer, help_row, help_y_col + 9, "N", Color::LightRed);
     put_text(
         &mut buffer,
         help_row,
-        help_y_col + 16,
+        help_y_col + 10,
         "] Cancel",
         Color::DarkGray,
     );
@@ -1330,7 +1344,7 @@ fn render_sigil_reroll_confirm(
     clear_row_chars(&mut buffer, 9);
     clear_row_chars(&mut buffer, (h as i32) - 1);
 
-    let cost = crate::stormglass::sigils::INSCRIBE_COST;
+    let cost = crate::stormglass::sigils::ETCH_COST;
     let balance = state.stormglass;
     let after = balance.saturating_sub(cost);
 
@@ -1519,7 +1533,7 @@ fn render_sigil_pick(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiStat
         &mut buffer,
         help_row,
         w,
-        "[\u{2191}\u{2193}] Select  [Enter] Inscribe  [Esc] Forfeit",
+        "[\u{2191}\u{2193}] Select  [Enter] Etch  [Esc] Forfeit",
         Color::DarkGray,
     );
 
@@ -1612,7 +1626,7 @@ fn render_sigil_result(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiSt
 
     let block = Block::default()
         .title(Line::from(Span::styled(
-            " \u{1F48E} Sigil Inscribed! \u{1F48E} ",
+            " \u{1F48E} Sigil Etched! \u{1F48E} ",
             Style::default()
                 .fg(ELECTRIC_BLUE)
                 .add_modifier(Modifier::BOLD),

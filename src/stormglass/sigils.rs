@@ -1,8 +1,8 @@
 //! Storm Sigil types, grading, generation, and bonus aggregation.
 //!
 //! Storm Sigils are character-level persistent sigil slots that survive prestige
-//! resets. Players spend Stormglass to unlock slots, inscribe sigils, and reroll
-//! for better values. Each inscribe/reroll presents 3 randomly rolled sigils and
+//! resets. Players spend Stormglass to unlock slots, etch sigils, and reroll
+//! for better values. Each etch/reroll presents 3 randomly rolled sigils and
 //! the player picks one. Rolls are graded S through F based on percentile.
 
 use rand::RngExt;
@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 // ── Constants ────────────────────────────────────────────────────────────
 pub const MAX_SIGIL_SLOTS: usize = 5;
-pub const INSCRIBE_COST: u64 = 25_000;
+pub const ETCH_COST: u64 = 25_000;
 pub const DAILY_POOL_SIZE: usize = 5;
 
 /// Slot unlock costs: 25k, 50k, 100k, 200k, 400k (2x exponential)
@@ -277,7 +277,7 @@ impl SigilGrade {
 
 // ── Sigil Data ──────────────────────────────────────────────────────────
 
-/// A single inscribed sigil.
+/// A single etched sigil.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Sigil {
     pub effect: SigilEffectType,
@@ -300,8 +300,8 @@ impl StormSigils {
         }
     }
 
-    /// Number of inscribed (non-empty) sigils.
-    pub fn inscribed_count(&self) -> usize {
+    /// Number of etched (non-empty) sigils.
+    pub fn etched_count(&self) -> usize {
         self.sigils.iter().filter(|s| s.is_some()).count()
     }
 
@@ -386,7 +386,7 @@ pub fn daily_sigil_pool() -> Vec<SigilEffectType> {
 
 // ── Bonus Aggregation ───────────────────────────────────────────────────
 
-/// Aggregated bonuses from all inscribed sigils, for parameter injection.
+/// Aggregated bonuses from all etched sigils, for parameter injection.
 #[derive(Debug, Clone, Default)]
 pub struct SigilBonuses {
     pub xp_percent: f64,
@@ -403,7 +403,7 @@ pub struct SigilBonuses {
 }
 
 impl SigilBonuses {
-    /// Compute aggregate bonuses from all inscribed sigils.
+    /// Compute aggregate bonuses from all etched sigils.
     pub fn compute(sigils: &StormSigils) -> Self {
         let mut bonuses = Self::default();
         for sigil in sigils.sigils.iter().flatten() {
@@ -566,7 +566,7 @@ mod tests {
         let sigils = StormSigils::new();
         assert_eq!(sigils.slots_unlocked, 0);
         assert_eq!(sigils.sigils.len(), MAX_SIGIL_SLOTS);
-        assert_eq!(sigils.inscribed_count(), 0);
+        assert_eq!(sigils.etched_count(), 0);
     }
 
     #[test]
@@ -708,23 +708,23 @@ mod tests {
     }
 
     #[test]
-    fn test_storm_sigils_inscribed_count() {
+    fn test_storm_sigils_etched_count() {
         let mut sigils = StormSigils::new();
-        assert_eq!(sigils.inscribed_count(), 0);
+        assert_eq!(sigils.etched_count(), 0);
 
         sigils.sigils[0] = Some(Sigil {
             effect: SigilEffectType::XpPercent,
             value: 10.0,
             grade: SigilGrade::C,
         });
-        assert_eq!(sigils.inscribed_count(), 1);
+        assert_eq!(sigils.etched_count(), 1);
 
         sigils.sigils[2] = Some(Sigil {
             effect: SigilEffectType::DamagePercent,
             value: 5.0,
             grade: SigilGrade::D,
         });
-        assert_eq!(sigils.inscribed_count(), 2);
+        assert_eq!(sigils.etched_count(), 2);
     }
 
     #[test]
@@ -769,7 +769,7 @@ mod tests {
         assert!(loaded.sigils[0].is_some());
         assert!(loaded.sigils[1].is_some());
         assert!(loaded.sigils[2].is_none());
-        assert_eq!(loaded.inscribed_count(), 2);
+        assert_eq!(loaded.etched_count(), 2);
     }
 
     #[test]
