@@ -20,6 +20,15 @@ use super::scene_fx::{
 /// Electric blue color used throughout Stormglass UI.
 const ELECTRIC_BLUE: Color = Color::Rgb(100, 180, 255);
 
+/// Rune circle purple color.
+const RUNE_PURPLE: Color = Color::Rgb(180, 160, 255);
+/// Inscription flash color (warm white).
+const INSCRIPTION_FLASH: Color = Color::Rgb(255, 255, 200);
+/// Phase timing boundaries in milliseconds.
+const PHASE1_END_MS: u128 = 1400;
+const PHASE2_END_MS: u128 = 2800;
+const PHASE3_END_MS: u128 = 3500;
+
 /// Parameters controlling the storm backdrop appearance.
 struct StormBackdropParams {
     top_rgb: (u8, u8, u8),
@@ -140,7 +149,7 @@ pub fn render_stormglass_exchange(
         ExchangePhase::SigilRerollConfirm => {
             render_sigil_reroll_confirm(frame, area, exchange_ui, state)
         }
-        ExchangePhase::SigilRolling => render_sigil_pick(frame, area, exchange_ui), // TODO: animation rendering
+        ExchangePhase::SigilRolling => render_sigil_rolling(frame, area, exchange_ui),
         ExchangePhase::SigilPick => render_sigil_pick(frame, area, exchange_ui),
         ExchangePhase::SigilForfeitConfirm => {
             render_sigil_pick(frame, area, exchange_ui);
@@ -1426,6 +1435,346 @@ fn render_sigil_reroll_confirm(
         .alignment(Alignment::Center)
         .wrap(ratatui::widgets::Wrap { trim: true });
         frame.render_widget(flavor, flavor_area);
+    }
+}
+
+/// Render the sigil rolling animation (4 phases over 4 seconds).
+fn render_sigil_rolling(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiState) {
+    let overlay_width = 52u16.min(area.width.saturating_sub(4));
+    let overlay_height = 16u16.min(area.height.saturating_sub(2));
+    let x = area.x + (area.width.saturating_sub(overlay_width)) / 2;
+    let y = area.y + (area.height.saturating_sub(overlay_height)) / 2;
+    let overlay_area = Rect::new(x, y, overlay_width, overlay_height);
+
+    frame.render_widget(Clear, overlay_area);
+
+    let block = Block::default()
+        .title(Line::from(Span::styled(
+            " \u{1F48E} Sigil Inscription \u{1F48E} ",
+            Style::default()
+                .fg(ELECTRIC_BLUE)
+                .add_modifier(Modifier::BOLD),
+        )))
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(ELECTRIC_BLUE));
+
+    let inner = block.inner(overlay_area);
+    frame.render_widget(block, overlay_area);
+
+    let w = inner.width as usize;
+    let h = inner.height as usize;
+    if w == 0 || h == 0 {
+        return;
+    }
+
+    let millis = current_millis();
+    let anim_start = exchange_ui.sigil_animation_start_ms.unwrap_or(millis);
+    let elapsed = millis.saturating_sub(anim_start);
+
+    // Intensified storm backdrop: more particles and faster speed during phase 1
+    let intensity = if elapsed < PHASE1_END_MS {
+        (elapsed as f64 / PHASE1_END_MS as f64).clamp(0.0, 1.0)
+    } else {
+        1.0
+    };
+    let params = StormBackdropParams {
+        top_rgb: (
+            lerp_rgb((10, 15, 40), (20, 10, 50), intensity).0,
+            lerp_rgb((10, 15, 40), (20, 10, 50), intensity).1,
+            lerp_rgb((10, 15, 40), (20, 10, 50), intensity).2,
+        ),
+        bottom_rgb: (
+            lerp_rgb((5, 5, 15), (10, 5, 30), intensity).0,
+            lerp_rgb((5, 5, 15), (10, 5, 30), intensity).1,
+            lerp_rgb((5, 5, 15), (10, 5, 30), intensity).2,
+        ),
+        particle_count: 8 + (intensity * 12.0) as usize,
+        particle_speed: 1.5 + intensity * 2.5,
+        shimmer: true,
+    };
+
+    let mut buffer = vec![vec![SceneCell::default(); w]; h];
+    paint_storm_backdrop(&mut buffer, millis, &params);
+
+    if elapsed < PHASE1_END_MS {
+        render_rolling_phase1(&mut buffer, w, h, millis, elapsed);
+    } else if elapsed < PHASE2_END_MS {
+        let phase_elapsed = elapsed - PHASE1_END_MS;
+        render_rolling_phase2(&mut buffer, w, h, exchange_ui, phase_elapsed);
+    } else if elapsed < PHASE3_END_MS {
+        let phase_elapsed = elapsed - PHASE2_END_MS;
+        render_rolling_phase3(&mut buffer, w, h, exchange_ui, phase_elapsed);
+    } else {
+        render_rolling_phase4(&mut buffer, w, h, exchange_ui);
+    }
+
+    // Help row: "[Any key] Skip" after 200ms
+    if elapsed > 200 {
+        let help_row = (h as i32) - 1;
+        clear_row_chars(&mut buffer, help_row);
+        put_text_centered(&mut buffer, help_row, w, "[Any key] Skip", Color::DarkGray);
+    }
+
+    render_buffer(frame, inner, &buffer);
+}
+
+/// Phase 1: Energy Gathering (0-1400ms) — rune circle orbiting center, pulsing text.
+fn render_rolling_phase1(
+    buffer: &mut [Vec<SceneCell>],
+    w: usize,
+    h: usize,
+    millis: u128,
+    elapsed: u128,
+) {
+    let progress = (elapsed as f64 / PHASE1_END_MS as f64).clamp(0.0, 1.0);
+
+    // Center of the buffer
+    let cx = w as f64 / 2.0;
+    let cy = h as f64 / 2.0;
+
+    // Clear center rows for text
+    for r in 0..h {
+        clear_row_chars(buffer, r as i32);
+    }
+
+    // Orbiting rune circle characters with progressive detail
+    let circle_chars: &[char] = if progress < 0.25 {
+        &['\u{00b7}'] // ·
+    } else if progress < 0.5 {
+        &['\u{00b7}', '\u{25e6}'] // · ◦
+    } else if progress < 0.75 {
+        &['\u{25e6}', '\u{25cb}'] // ◦ ○
+    } else {
+        &['\u{25cb}', '\u{25ce}'] // ○ ◎
+    };
+
+    let radius = 3.0 + progress * 2.0;
+    let orbit_speed = millis as f64 / 400.0;
+    let num_runes = 8 + (progress * 4.0) as usize;
+
+    for i in 0..num_runes {
+        let angle = orbit_speed + (i as f64 * std::f64::consts::TAU / num_runes as f64);
+        // Converge inward as progress increases
+        let r = radius * (1.0 - progress * 0.3);
+        let rx = cx + angle.cos() * r * 2.0; // x stretched for terminal aspect ratio
+        let ry = cy + angle.sin() * r;
+        let ch = circle_chars[i % circle_chars.len()];
+
+        let fade = 0.4 + 0.6 * progress;
+        let rgb = lerp_rgb((80, 60, 160), (180, 160, 255), fade);
+        put_cell(
+            buffer,
+            ry as i32,
+            rx as i32,
+            ch,
+            Color::Rgb(rgb.0, rgb.1, rgb.2),
+        );
+    }
+
+    // Orbiting glyphs converging inward
+    let glyphs = ['\u{26A1}', '\u{2726}', '\u{25C8}']; // ⚡ ✦ ◈
+    for (i, &glyph) in glyphs.iter().enumerate() {
+        let angle = orbit_speed * 0.7 + (i as f64 * std::f64::consts::TAU / 3.0);
+        let glyph_r = (5.0 - progress * 3.5).max(1.0);
+        let gx = cx + angle.cos() * glyph_r * 2.0;
+        let gy = cy + angle.sin() * glyph_r;
+        put_cell(buffer, gy as i32, gx as i32, glyph, ELECTRIC_BLUE);
+    }
+
+    // Center text: "Gathering energy..." with pulsing purple
+    let pulse = ((millis as f64 / 300.0).sin() * 0.5 + 0.5).clamp(0.0, 1.0);
+    let pulse_rgb = lerp_rgb((120, 100, 200), (220, 200, 255), pulse);
+    let pulse_fg = Color::Rgb(pulse_rgb.0, pulse_rgb.1, pulse_rgb.2);
+
+    let text = "Gathering energy...";
+    let center_row = cy as i32;
+    put_text_centered(buffer, center_row, w, text, pulse_fg);
+}
+
+/// Phase 2: Sigil Etching (1400-2800ms) — sigil values etch character-by-character.
+fn render_rolling_phase2(
+    buffer: &mut [Vec<SceneCell>],
+    w: usize,
+    h: usize,
+    exchange_ui: &ExchangeUiState,
+    phase_elapsed: u128,
+) {
+    // Clear all rows for clean rendering
+    for r in 0..h {
+        clear_row_chars(buffer, r as i32);
+    }
+
+    // Header
+    put_text_centered(buffer, 1, w, "Inscribing sigils...", RUNE_PURPLE);
+
+    let choice_start_row = 4i32;
+    let stagger_ms: u128 = 150;
+    let phase_duration = PHASE2_END_MS - PHASE1_END_MS; // 1400ms
+
+    for (i, choice) in exchange_ui.sigil_choices.iter().enumerate() {
+        let row = choice_start_row + i as i32;
+        if row >= h as i32 {
+            break;
+        }
+
+        if let Some(sigil) = choice {
+            let value_str = sigil.effect.format_value(sigil.value);
+            let total_chars = value_str.chars().count();
+            let sigil_start = stagger_ms * i as u128;
+
+            if phase_elapsed < sigil_start {
+                // Not started yet
+                continue;
+            }
+
+            let sigil_elapsed = phase_elapsed - sigil_start;
+            // Time per character: distribute across available time
+            let char_duration = (phase_duration - stagger_ms * 2) / total_chars.max(1) as u128;
+            let chars_visible = if char_duration == 0 {
+                total_chars
+            } else {
+                ((sigil_elapsed / char_duration) as usize).min(total_chars)
+            };
+
+            let partial: String = value_str.chars().take(chars_visible).collect();
+            let col = 5i32;
+            put_text(buffer, row, col, &partial, Color::White);
+
+            // Typing cursor at end of partial text
+            if chars_visible < total_chars {
+                let cursor_col = col + chars_visible as i32;
+                put_cell(buffer, row, cursor_col, '\u{2588}', Color::White); // █
+            }
+
+            // Brief inscription flash when a sigil completes
+            let complete = chars_visible >= total_chars;
+            if complete {
+                let flash_window = 120; // ms
+                let complete_time = sigil_start + char_duration * total_chars as u128;
+                if phase_elapsed < complete_time + flash_window {
+                    // Flash the row
+                    if (row as usize) < h {
+                        for cell in buffer[row as usize].iter_mut() {
+                            if cell.ch != ' ' {
+                                cell.fg = INSCRIPTION_FLASH;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Phase 3: Grade Reveal (2800-3500ms) — full values shown, grades fade in.
+fn render_rolling_phase3(
+    buffer: &mut [Vec<SceneCell>],
+    w: usize,
+    h: usize,
+    exchange_ui: &ExchangeUiState,
+    phase_elapsed: u128,
+) {
+    for r in 0..h {
+        clear_row_chars(buffer, r as i32);
+    }
+
+    put_text_centered(buffer, 1, w, "Sigils revealed!", RUNE_PURPLE);
+
+    let choice_start_row = 4i32;
+    let stagger_ms: u128 = 150;
+    let phase_duration = PHASE3_END_MS - PHASE2_END_MS; // 700ms
+
+    for (i, choice) in exchange_ui.sigil_choices.iter().enumerate() {
+        let row = choice_start_row + i as i32;
+        if row >= h as i32 {
+            break;
+        }
+
+        if let Some(sigil) = choice {
+            // Full value string always shown
+            let value_str = sigil.effect.format_value(sigil.value);
+            let col = 5i32;
+            put_text(buffer, row, col, &value_str, Color::White);
+
+            // Grade fades in with stagger
+            let grade_start = stagger_ms * i as u128;
+            if phase_elapsed >= grade_start {
+                let grade_elapsed = phase_elapsed - grade_start;
+                let fade_duration = (phase_duration - stagger_ms * 2).max(1);
+                let fade = (grade_elapsed as f64 / fade_duration as f64).clamp(0.0, 1.0);
+
+                let grade_str = sigil.grade.label();
+                let grade_fg = sigil_grade_color(sigil.grade);
+
+                // Lerp from dark gray to the final grade color
+                let base_rgb = (60, 60, 60);
+                let target_rgb = match grade_fg {
+                    Color::Rgb(r, g, b) => (r, g, b),
+                    Color::Green => (0, 200, 0),
+                    Color::Cyan => (0, 200, 200),
+                    Color::White => (200, 200, 200),
+                    Color::Gray => (128, 128, 128),
+                    Color::DarkGray => (80, 80, 80),
+                    Color::Red => (200, 0, 0),
+                    _ => (200, 200, 200),
+                };
+                let faded_rgb = lerp_rgb(base_rgb, target_rgb, fade);
+                let faded_fg = Color::Rgb(faded_rgb.0, faded_rgb.1, faded_rgb.2);
+
+                let grade_col = (w as i32) - grade_str.len() as i32 - 1;
+                put_text(buffer, row, grade_col, grade_str, faded_fg);
+            }
+        }
+    }
+}
+
+/// Phase 4: Transition (3500-4000ms) — everything solidified, cursor on first choice.
+fn render_rolling_phase4(
+    buffer: &mut [Vec<SceneCell>],
+    w: usize,
+    h: usize,
+    exchange_ui: &ExchangeUiState,
+) {
+    for r in 0..h {
+        clear_row_chars(buffer, r as i32);
+    }
+
+    put_text_centered(buffer, 1, w, "Choose your sigil.", RUNE_PURPLE);
+
+    let choice_start_row = 4i32;
+
+    for (i, choice) in exchange_ui.sigil_choices.iter().enumerate() {
+        let row = choice_start_row + i as i32;
+        if row >= h as i32 {
+            break;
+        }
+
+        if let Some(sigil) = choice {
+            let col = 5i32;
+
+            // Cursor on first choice
+            if i == 0 {
+                put_text(buffer, row, 1, "> ", Color::Yellow);
+            }
+
+            let value_str = sigil.effect.format_value(sigil.value);
+            put_text(buffer, row, col, &value_str, Color::White);
+
+            // Grade with final color
+            let grade_str = sigil.grade.label();
+            let grade_fg = sigil_grade_color(sigil.grade);
+            let grade_col = (w as i32) - grade_str.len() as i32 - 1;
+            put_text(buffer, row, grade_col, grade_str, grade_fg);
+
+            // Highlight first row
+            if i == 0 && (row as usize) < h {
+                let highlight_bg = Color::Rgb(15, 25, 55);
+                for cell in buffer[row as usize].iter_mut() {
+                    cell.bg = highlight_bg;
+                }
+            }
+        }
     }
 }
 
