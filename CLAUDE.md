@@ -272,7 +272,7 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 
 - `build_info.rs` — Build metadata (commit, date) embedded at compile time
 - `updater.rs` — Self-update from GitHub releases (30min check interval ±5min jitter)
-- `debug_menu.rs` — Debug menu for testing discoveries (activate with `--debug` flag, toggle with backtick). Options: trigger dungeons, fishing, all 10 challenge types, Haven discovery, Soulforge discovery, forge god items (Asprika, Sleipnir, Megingjord)
+- `debug_menu.rs` — Debug menu with tabbed categories (Challenges, World, Resources, Items) for testing discoveries. Activate with `--debug` flag, toggle with backtick. 22 options: trigger dungeons, fishing, all 10 challenge types, Haven discovery, Soulforge discovery, forge god items, grant/discover Stormglass, etch sigils
 
 ### UI (`src/ui/`) — [detailed docs](src/ui/CLAUDE.md)
 
@@ -282,6 +282,7 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 - `stats_attributes.rs` — Attribute rendering helpers for stats panel
 - `stats_equipment.rs` — Equipment rendering helpers for stats panel
 - `stats_prestige.rs` — Prestige and fishing panel rendering helpers
+- `stats_sigils.rs` — Storm Sigils rendering helpers for stats panel
 - `ticker.rs` — Scrolling loot ticker with independent per-entry scrolling
 - `combat_scene.rs` — Combat view with HP bars and enemy sprites
 - `combat_3d.rs` — 3D ASCII first-person dungeon renderer
@@ -304,10 +305,10 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 - `soulforge_effects.rs` — Soulforge hammering/success/failure animation effects
 - `soulforge_slots.rs` — Soulforge slot selection menu
 - `chess_scene.rs`, `go_scene.rs`, `morris_scene.rs`, `gomoku_scene.rs`, `minesweeper_scene.rs`, `rune_scene.rs`, `snake_scene.rs`, `flappy_scene.rs`, `jezzball_scene.rs`, `runic_shift_scene.rs` — Minigame UIs
-- `stormglass_scene.rs` — Stormglass currency and Storm Sigils overlay
+- `stormglass_scene.rs` — Stormglass Exchange overlay with animations (Invoke Trial rolling, Chrono Surge speed ramp/fast-forward, Storm Sigils daily rotation)
 - `scene_fx.rs` — Shared utilities for layered ASCII scene rendering (scene buffer, backdrop effects, wide character support)
 - `zone_bg.rs` — Stylized zone background scenes with 6-layer compositing pipeline for all 11 zones
-- `debug_menu_scene.rs` — Debug menu overlay
+- `debug_menu_scene.rs` — Debug menu overlay with tabbed categories
 - `help_overlay.rs` — Help/controls overlay
 - `throbber.rs` — Shared spinner animations and atmospheric messages
 - `character_select.rs`, `character_creation.rs`, `character_delete.rs`, `character_rename.rs` — Character management UI
@@ -517,6 +518,7 @@ quest/
 │       ├── stats_attributes.rs # Attribute rendering helpers
 │       ├── stats_equipment.rs  # Equipment rendering helpers
 │       ├── stats_prestige.rs   # Prestige and fishing panel helpers
+│       ├── stats_sigils.rs     # Storm Sigils rendering helpers
 │       ├── ticker.rs        # Scrolling loot ticker
 │       ├── combat_scene.rs  # Combat view
 │       ├── combat_3d.rs     # 3D dungeon renderer
@@ -535,9 +537,10 @@ quest/
 │       ├── snake_scene.rs   # Snake UI
 │       ├── flappy_scene.rs  # Flappy Bird UI
 │       ├── jezzball_scene.rs # JezzBall UI
-│       ├── stormglass_scene.rs # Stormglass currency and sigils overlay
+│       ├── stormglass_scene.rs # Stormglass Exchange overlay with animations
 │       ├── scene_fx.rs       # Shared utilities for layered ASCII scene rendering
 │       ├── zone_bg.rs        # Stylized zone background scenes (6-layer compositing)
+│       ├── debug_menu_scene.rs # Debug menu with tabbed categories
 │       ├── *_scene.rs       # Various game scenes
 │       └── character_*.rs   # Character management UI
 ├── tests/                   # Integration tests (30 test files, 4,000+ tests)

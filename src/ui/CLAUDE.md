@@ -13,6 +13,7 @@ src/ui/
 ├── stats_attributes.rs         # Attribute rendering helpers for stats panel
 ├── stats_equipment.rs          # Equipment rendering helpers for stats panel
 ├── stats_prestige.rs           # Prestige and fishing panel rendering helpers
+├── stats_sigils.rs             # Storm Sigils rendering helpers for stats panel
 ├── ticker.rs                   # Scrolling loot ticker with independent per-entry scrolling
 ├── throbber.rs                 # Spinner animations and atmospheric messages
 │
@@ -31,7 +32,7 @@ src/ui/
 ├── achievement_details.rs      # Achievement browser detail panel and stats view
 ├── achievement_list.rs         # Achievement browser list panel
 ├── achievement_tabs.rs         # Achievement browser category tabs
-├── debug_menu_scene.rs         # Debug menu overlay
+├── debug_menu_scene.rs         # Debug menu overlay with tabbed categories (Challenges, World, Resources, Items)
 ├── help_overlay.rs             # Help/controls overlay
 │
 ├── challenge_menu_scene.rs     # Challenge menu list/detail view
@@ -48,7 +49,7 @@ src/ui/
 ├── soulforge_scene.rs          # Soulforge enhancement overlay (delegates to helpers below)
 ├── soulforge_effects.rs        # Soulforge hammering/success/failure animation effects
 ├── soulforge_slots.rs          # Soulforge slot selection menu
-├── stormglass_scene.rs         # Stormglass Exchange overlay (Invoke Trial, Chrono Surge, Storm Sigils)
+├── stormglass_scene.rs         # Stormglass Exchange overlay with animations (Invoke Trial rolling, Chrono Surge speed ramp/fast-forward, Storm Sigils daily rotation)
 ├── scene_fx.rs                 # Shared utilities for layered ASCII scene rendering (wide char support, SceneCell::new(), put_text_centered(), display_width())
 ├── zone_bg.rs                  # Stylized zone background scenes (6-layer compositing, all 11 zones)
 │
