@@ -182,7 +182,7 @@ fn test_enhancement_all_single_slot_milestones() {
         (7, AchievementId::SoulforgeSavant),
         (8, AchievementId::SoulforgeMaster),
         (9, AchievementId::SoulforgeGrandmaster),
-        (10, AchievementId::MasterSmith),
+        (10, AchievementId::SoulforgeAscendant),
     ];
 
     for &(level, achievement_id) in milestones {

@@ -143,7 +143,7 @@ pub fn render_achievement_browser(
         );
     }
 
-    let help = Paragraph::new("[</>] Category  [Up/Down] Select  [Esc] Close")
+    let help = Paragraph::new("[</>] Category  [Up/Down] Select  [T] Titles  [Esc] Close")
         .style(Style::default().fg(Color::DarkGray))
         .alignment(Alignment::Center);
     frame.render_widget(help, chunks[2]);

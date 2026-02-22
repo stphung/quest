@@ -336,7 +336,7 @@ impl Achievements {
             self.unlock_with_name(AchievementId::SoulforgeGrandmaster, character_name);
         }
         if new_level >= 10 {
-            self.unlock_with_name(AchievementId::MasterSmith, character_name);
+            self.unlock_with_name(AchievementId::SoulforgeAscendant, character_name);
         }
         if all_levels.iter().all(|&l| l >= 4) {
             self.unlock_with_name(AchievementId::FullyTempered, character_name);

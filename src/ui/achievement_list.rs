@@ -1,6 +1,6 @@
 //! Achievement browser list panel rendering.
 
-use crate::achievements::{get_achievements_by_category, Achievements};
+use crate::achievements::{get_achievements_by_category, get_title_text, Achievements};
 use ratatui::{
     layout::{Alignment, Rect},
     style::{Color, Modifier, Style},
@@ -73,6 +73,13 @@ pub(super) fn render_achievement_list(
                 Span::raw(format!("{} ", def.icon)),
                 Span::styled(def.name, style),
             ];
+
+            if let Some(title) = get_title_text(def.id) {
+                spans.push(Span::styled(
+                    format!("  \u{2726} {title}"),
+                    Style::default().fg(Color::Magenta),
+                ));
+            }
 
             if is_new {
                 spans.push(Span::styled(

@@ -216,7 +216,7 @@ pub enum AchievementId {
     SoulforgeSavant,      // Reach +7 on any slot
     SoulforgeMaster,      // Reach +8 on any slot
     SoulforgeGrandmaster, // Reach +9 on any slot
-    MasterSmith,          // Reach +10 on any slot
+    SoulforgeAscendant,   // Reach +10 on any slot
     SoulConvergence,      // Reach +7 on all 7 slots
     PersistentHammering,  // 100 total enhancement attempts
 }
@@ -449,6 +449,10 @@ pub struct Achievements {
     /// Global border style applied to panel UI.
     #[serde(default)]
     pub ui_border_style: UiBorderStyle,
+
+    /// Currently selected title (account-wide).
+    #[serde(default)]
+    pub selected_title: Option<AchievementId>,
 
     /// Achievements unlocked but not yet viewed (not persisted) - for UI indicator
     #[serde(skip)]

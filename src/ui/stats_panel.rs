@@ -85,9 +85,20 @@ fn draw_header(
     let rank = get_adventurer_rank(game_state.character_level);
     let play_time = format_play_time(game_state.play_time_seconds);
 
-    let header_title = match highest_level_badge(achievements) {
-        Some(icon) => format!(" {} {} ", game_state.character_name, icon),
-        None => format!(" {} ", game_state.character_name),
+    let title_suffix = achievements.selected_title.and_then(|id| {
+        if achievements.is_unlocked(id) {
+            crate::achievements::titles::get_title_text(id)
+        } else {
+            None
+        }
+    });
+    let name_with_title = match title_suffix {
+        Some(title) => format!("{}, {}", game_state.character_name, title),
+        None => game_state.character_name.clone(),
+    };
+    let header_title = match title_badge(achievements) {
+        Some(icon) => format!(" {} {} ", name_with_title, icon),
+        None => format!(" {} ", name_with_title),
     };
     let header_block = Block::default().borders(Borders::ALL).title(header_title);
     let header_block = super::themed_block(header_block);
@@ -355,29 +366,14 @@ fn highest_zone_badge(achievements: &crate::achievements::Achievements) -> Optio
 }
 
 /// Returns the icon of the highest unlocked level achievement, if any.
-fn highest_level_badge(achievements: &crate::achievements::Achievements) -> Option<&'static str> {
-    use crate::achievements::AchievementId;
-
-    let level_achievements = [
-        AchievementId::Level1500,
-        AchievementId::Level1000,
-        AchievementId::Level750,
-        AchievementId::Level500,
-        AchievementId::Level250,
-        AchievementId::Level200,
-        AchievementId::Level150,
-        AchievementId::Level100,
-        AchievementId::Level50,
-        AchievementId::Level25,
-        AchievementId::Level10,
-    ];
-
-    for id in level_achievements {
-        if achievements.is_unlocked(id) {
-            return crate::achievements::data::get_achievement_def(id).map(|def| def.icon);
-        }
+/// Get the icon of the achievement that grants the selected title.
+fn title_badge(achievements: &crate::achievements::Achievements) -> Option<&'static str> {
+    let id = achievements.selected_title?;
+    if !achievements.is_unlocked(id) {
+        return None;
     }
-    None
+    crate::achievements::titles::get_title_text(id)?;
+    crate::achievements::data::get_achievement_def(id).map(|def| def.icon)
 }
 
 /// Draws a compact stats bar for M tier.
@@ -386,6 +382,7 @@ pub(super) fn draw_compact_stats_bar(
     area: Rect,
     game_state: &GameState,
     _ctx: &LayoutContext,
+    achievements: &crate::achievements::Achievements,
 ) {
     use crate::zones::get_all_zones;
 
@@ -406,9 +403,19 @@ pub(super) fn draw_compact_stats_bar(
         .map(|z| z.subzones.len())
         .unwrap_or(0);
 
+    let compact_name = match achievements.selected_title.and_then(|id| {
+        if achievements.is_unlocked(id) {
+            crate::achievements::titles::get_title_text(id)
+        } else {
+            None
+        }
+    }) {
+        Some(title) => format!(" {}, {} ", game_state.character_name, title),
+        None => format!(" {} ", game_state.character_name),
+    };
     let spans = vec![
         Span::styled(
-            format!(" {} ", game_state.character_name),
+            compact_name,
             Style::default()
                 .fg(Color::White)
                 .add_modifier(Modifier::BOLD),

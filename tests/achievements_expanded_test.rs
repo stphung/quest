@@ -1127,7 +1127,7 @@ fn test_on_enhancement_upgraded_all_slots_10_unlocks_everything() {
     assert!(ach.is_unlocked(AchievementId::SoulforgeSavant));
     assert!(ach.is_unlocked(AchievementId::SoulforgeMaster));
     assert!(ach.is_unlocked(AchievementId::SoulforgeGrandmaster));
-    assert!(ach.is_unlocked(AchievementId::MasterSmith));
+    assert!(ach.is_unlocked(AchievementId::SoulforgeAscendant));
     assert!(ach.is_unlocked(AchievementId::FullyTempered));
     assert!(ach.is_unlocked(AchievementId::SoulConvergence));
     assert!(ach.is_unlocked(AchievementId::PersistentHammering));

@@ -58,6 +58,7 @@ use ui::character_delete::CharacterDeleteScreen;
 use ui::character_rename::CharacterRenameScreen;
 use ui::character_select::CharacterSelectScreen;
 use ui::draw_ui_with_update;
+use ui::title_browser_scene::TitleBrowserState;
 use utils::updater::{UpdateInfo, UpdateInfoStatus};
 
 #[derive(Clone, Copy, PartialEq)]
@@ -182,6 +183,7 @@ fn main() -> io::Result<()> {
 
     // Load global achievements (shared across all characters)
     let mut global_achievements = achievements::load_achievements();
+    crate::achievements::titles::validate_selected_title(&mut global_achievements);
     global_achievements.refresh_progress();
 
     // List existing characters
@@ -206,6 +208,7 @@ fn main() -> io::Result<()> {
     let mut soulforge_ui = SoulforgeUiState::new();
     let mut exchange_ui = stormglass::types::ExchangeUiState::new();
     let mut achievement_browser = AchievementBrowserState::new();
+    let mut title_browser = TitleBrowserState::new();
     let mut help_overlay_showing = false;
 
     // Setup terminal
@@ -263,6 +266,7 @@ fn main() -> io::Result<()> {
                     &mut enhancement,
                     &mut global_achievements,
                     &mut achievement_browser,
+                    &mut title_browser,
                     &mut help_overlay_showing,
                 )?;
                 match transition {

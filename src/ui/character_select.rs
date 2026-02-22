@@ -1,3 +1,4 @@
+use crate::achievements::Achievements;
 use crate::character::manager::CharacterInfo;
 use crate::character::prestige::get_prestige_tier;
 use crate::enhancement::EnhancementProgress;
@@ -23,6 +24,7 @@ impl CharacterSelectScreen {
         Self { selected_index: 0 }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn draw(
         &self,
         f: &mut Frame,
@@ -30,17 +32,18 @@ impl CharacterSelectScreen {
         characters: &[CharacterInfo],
         haven: &Haven,
         enhancement: &EnhancementProgress,
+        achievements: &Achievements,
         ctx: &super::responsive::LayoutContext,
     ) {
         match ctx.tier {
             SizeTier::S | SizeTier::TooSmall => {
-                self.draw_small(f, area, characters, haven, enhancement);
+                self.draw_small(f, area, characters, haven, enhancement, achievements);
             }
             SizeTier::M => {
-                self.draw_medium(f, area, characters, haven, enhancement);
+                self.draw_medium(f, area, characters, haven, enhancement, achievements);
             }
             _ => {
-                self.draw_large(f, area, characters, haven, enhancement);
+                self.draw_large(f, area, characters, haven, enhancement, achievements);
             }
         }
     }
@@ -52,6 +55,7 @@ impl CharacterSelectScreen {
         characters: &[CharacterInfo],
         haven: &Haven,
         enhancement: &EnhancementProgress,
+        achievements: &Achievements,
     ) {
         let show_haven = haven.discovered;
         let show_soulforge = enhancement.discovered;
@@ -102,10 +106,10 @@ impl CharacterSelectScreen {
             .split(chunks[1]);
 
         // Draw character list
-        self.draw_character_list(f, main_chunks[0], characters);
+        self.draw_character_list(f, main_chunks[0], characters, achievements);
 
         // Draw character details
-        self.draw_character_details(f, main_chunks[1], characters);
+        self.draw_character_details(f, main_chunks[1], characters, achievements);
 
         // Draw bottom panels (Haven + Soulforge)
         let controls_idx = if show_bottom {
@@ -126,6 +130,7 @@ impl CharacterSelectScreen {
         characters: &[CharacterInfo],
         _haven: &Haven,
         _enhancement: &EnhancementProgress,
+        achievements: &Achievements,
     ) {
         // M tier: reduced margins, no Haven tree, compact layout
         let constraints = vec![
@@ -160,10 +165,10 @@ impl CharacterSelectScreen {
             .split(chunks[1]);
 
         // Draw character list
-        self.draw_character_list(f, main_chunks[0], characters);
+        self.draw_character_list(f, main_chunks[0], characters, achievements);
 
         // Draw character details
-        self.draw_character_details(f, main_chunks[1], characters);
+        self.draw_character_details(f, main_chunks[1], characters, achievements);
 
         // Controls (compact)
         self.draw_controls(f, chunks[2], characters, true);
@@ -176,6 +181,7 @@ impl CharacterSelectScreen {
         characters: &[CharacterInfo],
         _haven: &Haven,
         _enhancement: &EnhancementProgress,
+        achievements: &Achievements,
     ) {
         // S tier: minimal list view, no details panel, no Haven tree
         let constraints = vec![
@@ -202,7 +208,7 @@ impl CharacterSelectScreen {
         f.render_widget(title, chunks[0]);
 
         // Character list only (no details panel)
-        self.draw_character_list_compact(f, chunks[1], characters);
+        self.draw_character_list_compact(f, chunks[1], characters, achievements);
 
         // Compact controls
         self.draw_controls(f, chunks[2], characters, true);
@@ -274,7 +280,28 @@ impl CharacterSelectScreen {
         }
     }
 
-    fn draw_character_list_compact(&self, f: &mut Frame, area: Rect, characters: &[CharacterInfo]) {
+    /// Resolve the display name, appending the selected title if one is active and unlocked.
+    fn display_name(&self, character: &CharacterInfo, achievements: &Achievements) -> String {
+        let title_suffix = achievements.selected_title.and_then(|id| {
+            if achievements.is_unlocked(id) {
+                crate::achievements::titles::get_title_text(id)
+            } else {
+                None
+            }
+        });
+        match title_suffix {
+            Some(title) => format!("{}, {}", character.character_name, title),
+            None => character.character_name.clone(),
+        }
+    }
+
+    fn draw_character_list_compact(
+        &self,
+        f: &mut Frame,
+        area: Rect,
+        characters: &[CharacterInfo],
+        achievements: &Achievements,
+    ) {
         // S tier: simple list with no borders, no spacing between entries
         if characters.is_empty() {
             let empty_message = Paragraph::new("No characters. Press [N] to create.")
@@ -295,9 +322,10 @@ impl CharacterSelectScreen {
             let text = if character.is_corrupted {
                 format!("{} {} (CORRUPTED)", marker, character.filename)
             } else {
+                let name = self.display_name(character, achievements);
                 format!(
                     "{} {} Lv{} {}",
-                    marker, character.character_name, character.character_level, prestige_name
+                    marker, name, character.character_level, prestige_name
                 )
             };
 
@@ -316,7 +344,13 @@ impl CharacterSelectScreen {
         f.render_widget(list_widget, area);
     }
 
-    fn draw_character_list(&self, f: &mut Frame, area: Rect, characters: &[CharacterInfo]) {
+    fn draw_character_list(
+        &self,
+        f: &mut Frame,
+        area: Rect,
+        characters: &[CharacterInfo],
+        achievements: &Achievements,
+    ) {
         let block = Block::default()
             .borders(Borders::ALL)
             .title("Characters")
@@ -342,9 +376,10 @@ impl CharacterSelectScreen {
             let text = if character.is_corrupted {
                 format!("{} (CORRUPTED)", character.filename)
             } else {
+                let name = self.display_name(character, achievements);
                 format!(
                     "{} (Lv {} {})",
-                    character.character_name, character.character_level, prestige_name
+                    name, character.character_level, prestige_name
                 )
             };
 
@@ -364,7 +399,13 @@ impl CharacterSelectScreen {
         f.render_widget(list_widget, inner_area);
     }
 
-    fn draw_character_details(&self, f: &mut Frame, area: Rect, characters: &[CharacterInfo]) {
+    fn draw_character_details(
+        &self,
+        f: &mut Frame,
+        area: Rect,
+        characters: &[CharacterInfo],
+        achievements: &Achievements,
+    ) {
         let block = Block::default()
             .borders(Borders::ALL)
             .title("Character Details")
@@ -407,9 +448,10 @@ impl CharacterSelectScreen {
             format!("{}m", minutes)
         };
 
+        let name = self.display_name(character, achievements);
         let mut lines = vec![
             Line::from(Span::styled(
-                &character.character_name,
+                name,
                 Style::default()
                     .fg(Color::Cyan)
                     .add_modifier(Modifier::BOLD),

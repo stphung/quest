@@ -138,15 +138,28 @@ pub fn draw_game_overlays(
                 ctx,
             );
         }
-        GameOverlay::Achievements { browser } => {
-            ui::achievement_browser_scene::render_achievement_browser(
-                frame,
-                area,
-                global_achievements,
-                browser,
-                enhancement,
-                ctx,
-            );
+        GameOverlay::Achievements {
+            browser,
+            title_browser,
+        } => {
+            if title_browser.showing {
+                ui::title_browser_scene::render_title_browser(
+                    frame,
+                    area,
+                    global_achievements,
+                    title_browser,
+                    &state.character_name,
+                );
+            } else {
+                ui::achievement_browser_scene::render_achievement_browser(
+                    frame,
+                    area,
+                    global_achievements,
+                    browser,
+                    enhancement,
+                    ctx,
+                );
+            }
         }
         GameOverlay::LeviathanEncounter { encounter_number } => {
             ui::fishing_scene::render_leviathan_encounter_modal(

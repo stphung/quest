@@ -943,7 +943,7 @@ fn test_soulforge_grandmaster_at_level_9() {
 fn test_master_smith_at_level_10() {
     let mut ach = Achievements::default();
     ach.on_enhancement_upgraded(10, &[10, 0, 0, 0, 0, 0, 0], 10, Some("Hero"));
-    assert!(ach.is_unlocked(AchievementId::MasterSmith));
+    assert!(ach.is_unlocked(AchievementId::SoulforgeAscendant));
 }
 
 #[test]
@@ -1005,7 +1005,7 @@ fn test_enhancement_level_10_unlocks_entire_chain() {
     assert!(ach.is_unlocked(AchievementId::SoulforgeSavant));
     assert!(ach.is_unlocked(AchievementId::SoulforgeMaster));
     assert!(ach.is_unlocked(AchievementId::SoulforgeGrandmaster));
-    assert!(ach.is_unlocked(AchievementId::MasterSmith));
+    assert!(ach.is_unlocked(AchievementId::SoulforgeAscendant));
     assert!(ach.is_unlocked(AchievementId::FullyTempered));
     assert!(ach.is_unlocked(AchievementId::SoulConvergence));
     assert!(ach.is_unlocked(AchievementId::PersistentHammering));
