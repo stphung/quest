@@ -29,8 +29,10 @@ pub(super) fn draw_equipment_names_only(
     enhancement_levels: &[u8; 7],
 ) {
     let block = Block::default().borders(Borders::ALL).title(" Equipment ");
+    let block = super::themed_block(block);
     let inner = block.inner(area);
     frame.render_widget(block, area);
+    super::apply_themed_border_fx(frame, area, Color::White, super::BorderFxContext);
 
     let width = inner.width as usize;
     // Right-side columns: " Legendary  T9  100  ⚡999" = 27 chars fixed

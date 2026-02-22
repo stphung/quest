@@ -98,10 +98,9 @@ pub fn render_achievement_browser(
             achievements.unlock_percentage()
         ))
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow));
-
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
+        .border_style(Style::default().fg(super::themed_border_color(Color::Yellow)));
+    let inner =
+        super::render_themed_block(frame, area, block, Color::Yellow, super::BorderFxContext);
 
     // Layout: Category tabs at top, list on left, detail on right, help at bottom
     let chunks = Layout::default()
@@ -185,10 +184,14 @@ pub fn render_achievement_unlocked_modal(
     let block = Block::default()
         .title(title)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow));
-
-    let inner = block.inner(modal_area);
-    frame.render_widget(block, modal_area);
+        .border_style(Style::default().fg(super::themed_border_color(Color::Yellow)));
+    let inner = super::render_themed_block(
+        frame,
+        modal_area,
+        block,
+        Color::Yellow,
+        super::BorderFxContext,
+    );
 
     let mut lines = vec![Line::from("")];
 

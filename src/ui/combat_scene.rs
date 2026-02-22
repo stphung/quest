@@ -118,12 +118,14 @@ fn draw_combat_full(
     let title = combat_title(achievements);
     let outer_block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Red))
+        .border_style(Style::default().fg(super::themed_border_color(Color::Red)))
         .title(title)
         .title_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD));
+    let outer_block = super::themed_block(outer_block);
 
     let inner = outer_block.inner(area);
     frame.render_widget(outer_block, area);
+    super::apply_themed_border_fx(frame, area, Color::Red, super::BorderFxContext);
 
     let is_regen = game_state.combat_state.is_regenerating;
 
@@ -172,11 +174,13 @@ fn draw_combat_compact(
     let title = combat_title(achievements);
     let outer_block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Red))
+        .border_style(Style::default().fg(super::themed_border_color(Color::Red)))
         .title(title);
+    let outer_block = super::themed_block(outer_block);
 
     let inner = outer_block.inner(area);
     frame.render_widget(outer_block, area);
+    super::apply_themed_border_fx(frame, area, Color::Red, super::BorderFxContext);
 
     let is_regen = game_state.combat_state.is_regenerating;
     let is_boss = game_state.zone_progression.fighting_boss;

@@ -157,7 +157,15 @@ pub fn handle_game_input(
             return InputResult::Continue;
         }
         if debug_menu.is_open {
-            return handle_debug_menu(key, state, haven, enhancement, overlay, debug_menu);
+            return handle_debug_menu(
+                key,
+                state,
+                haven,
+                enhancement,
+                achievements,
+                overlay,
+                debug_menu,
+            );
         }
     }
 
@@ -252,6 +260,7 @@ fn handle_debug_menu(
     state: &mut GameState,
     haven: &mut Haven,
     enhancement: &mut enhancement::EnhancementProgress,
+    achievements: &mut crate::achievements::Achievements,
     overlay: &mut GameOverlay,
     debug_menu: &mut DebugMenu,
 ) -> InputResult {
@@ -261,7 +270,7 @@ fn handle_debug_menu(
         KeyCode::Up => debug_menu.navigate_up(),
         KeyCode::Down => debug_menu.navigate_down(),
         KeyCode::Enter => {
-            let msg = debug_menu.trigger_selected(state, haven, enhancement);
+            let msg = debug_menu.trigger_selected(state, haven, enhancement, achievements);
             state
                 .combat_state
                 .add_log_entry(format!("[DEBUG] {}", msg), false, true);

@@ -2,6 +2,7 @@
 //!
 //! Activated with `--debug` flag. Press backtick to toggle menu.
 
+use crate::achievements::{UiBorderStyle, SELECTABLE_UI_BORDER_STYLES};
 use crate::challenges::menu::{create_challenge, ChallengeType};
 use crate::core::game_state::GameState;
 use crate::dungeon::generation::generate_dungeon;
@@ -11,36 +12,212 @@ use crate::god_items;
 use crate::haven::Haven;
 use crate::items;
 
-/// Menu options available in debug mode
-pub const DEBUG_OPTIONS: &[&str] = &[
-    "Trigger Dungeon",
-    "Trigger Fishing",
-    "Trigger Chess Challenge",
-    "Trigger Morris Challenge",
-    "Trigger Gomoku Challenge",
-    "Trigger Minesweeper Challenge",
-    "Trigger Rune Challenge",
-    "Trigger Go Challenge",
-    "Trigger Flappy Bird Challenge",
-    "Trigger JezzBall Challenge",
-    "Trigger Snake Challenge",
-    "Trigger Sigil Surge Challenge",
-    "Trigger Haven Discovery",
-    "Trigger Soulforge Discovery",
-    "Forge Asprika (God Item)",
-    "Forge Sleipnir (God Item)",
-    "Forge Megingjord (God Item)",
-    "Grant 1000 Stormglass",
-    "Discover Stormglass",
-    "Grant 100k Stormglass",
-    "Etch Random Sigils (All Slots)",
-    "Etch S+ Sigil (Slot 1)",
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DebugAction {
+    TriggerDungeon,
+    TriggerFishing,
+    TriggerChessChallenge,
+    TriggerMorrisChallenge,
+    TriggerGomokuChallenge,
+    TriggerMinesweeperChallenge,
+    TriggerRuneChallenge,
+    TriggerGoChallenge,
+    TriggerFlappyChallenge,
+    TriggerJezzballChallenge,
+    TriggerSnakeChallenge,
+    TriggerRunicShiftChallenge,
+    TriggerHavenDiscovery,
+    TriggerSoulforgeDiscovery,
+    TriggerForgeAsprika,
+    TriggerForgeSleipnir,
+    TriggerForgeMegingjord,
+    TriggerGrantStormglass,
+    TriggerDiscoverStormglass,
+    TriggerGrant100kStormglass,
+    TriggerEtchRandomSigils,
+    TriggerEtchSPlusSigil,
+}
+
+const DEBUG_ACTIONS: &[DebugAction] = &[
+    DebugAction::TriggerDungeon,
+    DebugAction::TriggerFishing,
+    DebugAction::TriggerChessChallenge,
+    DebugAction::TriggerMorrisChallenge,
+    DebugAction::TriggerGomokuChallenge,
+    DebugAction::TriggerMinesweeperChallenge,
+    DebugAction::TriggerRuneChallenge,
+    DebugAction::TriggerGoChallenge,
+    DebugAction::TriggerFlappyChallenge,
+    DebugAction::TriggerJezzballChallenge,
+    DebugAction::TriggerSnakeChallenge,
+    DebugAction::TriggerRunicShiftChallenge,
+    DebugAction::TriggerHavenDiscovery,
+    DebugAction::TriggerSoulforgeDiscovery,
+    DebugAction::TriggerForgeAsprika,
+    DebugAction::TriggerForgeSleipnir,
+    DebugAction::TriggerForgeMegingjord,
+    DebugAction::TriggerGrantStormglass,
+    DebugAction::TriggerDiscoverStormglass,
+    DebugAction::TriggerGrant100kStormglass,
+    DebugAction::TriggerEtchRandomSigils,
+    DebugAction::TriggerEtchSPlusSigil,
 ];
 
-const CHALLENGE_OPTION_INDICES: &[usize] = &[2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-const WORLD_OPTION_INDICES: &[usize] = &[0, 1, 12, 13];
-const RESOURCE_OPTION_INDICES: &[usize] = &[17, 18, 19, 20, 21];
-const ITEM_OPTION_INDICES: &[usize] = &[14, 15, 16];
+const CHALLENGE_ACTIONS: &[DebugAction] = &[
+    DebugAction::TriggerChessChallenge,
+    DebugAction::TriggerMorrisChallenge,
+    DebugAction::TriggerGomokuChallenge,
+    DebugAction::TriggerMinesweeperChallenge,
+    DebugAction::TriggerRuneChallenge,
+    DebugAction::TriggerGoChallenge,
+    DebugAction::TriggerFlappyChallenge,
+    DebugAction::TriggerJezzballChallenge,
+    DebugAction::TriggerSnakeChallenge,
+    DebugAction::TriggerRunicShiftChallenge,
+];
+const WORLD_ACTIONS: &[DebugAction] = &[
+    DebugAction::TriggerDungeon,
+    DebugAction::TriggerFishing,
+    DebugAction::TriggerHavenDiscovery,
+    DebugAction::TriggerSoulforgeDiscovery,
+];
+const RESOURCE_ACTIONS: &[DebugAction] = &[
+    DebugAction::TriggerGrantStormglass,
+    DebugAction::TriggerDiscoverStormglass,
+    DebugAction::TriggerGrant100kStormglass,
+    DebugAction::TriggerEtchRandomSigils,
+    DebugAction::TriggerEtchSPlusSigil,
+];
+const ITEM_ACTIONS: &[DebugAction] = &[
+    DebugAction::TriggerForgeAsprika,
+    DebugAction::TriggerForgeSleipnir,
+    DebugAction::TriggerForgeMegingjord,
+];
+const BORDER_OPTION_START_INDEX: usize = DEBUG_ACTIONS.len();
+
+impl DebugAction {
+    const fn option_index(self) -> usize {
+        match self {
+            Self::TriggerDungeon => 0,
+            Self::TriggerFishing => 1,
+            Self::TriggerChessChallenge => 2,
+            Self::TriggerMorrisChallenge => 3,
+            Self::TriggerGomokuChallenge => 4,
+            Self::TriggerMinesweeperChallenge => 5,
+            Self::TriggerRuneChallenge => 6,
+            Self::TriggerGoChallenge => 7,
+            Self::TriggerFlappyChallenge => 8,
+            Self::TriggerJezzballChallenge => 9,
+            Self::TriggerSnakeChallenge => 10,
+            Self::TriggerRunicShiftChallenge => 11,
+            Self::TriggerHavenDiscovery => 12,
+            Self::TriggerSoulforgeDiscovery => 13,
+            Self::TriggerForgeAsprika => 14,
+            Self::TriggerForgeSleipnir => 15,
+            Self::TriggerForgeMegingjord => 16,
+            Self::TriggerGrantStormglass => 17,
+            Self::TriggerDiscoverStormglass => 18,
+            Self::TriggerGrant100kStormglass => 19,
+            Self::TriggerEtchRandomSigils => 20,
+            Self::TriggerEtchSPlusSigil => 21,
+        }
+    }
+
+    const fn label(self) -> &'static str {
+        match self {
+            Self::TriggerDungeon => "Trigger Dungeon",
+            Self::TriggerFishing => "Trigger Fishing",
+            Self::TriggerChessChallenge => "Trigger Chess Challenge",
+            Self::TriggerMorrisChallenge => "Trigger Morris Challenge",
+            Self::TriggerGomokuChallenge => "Trigger Gomoku Challenge",
+            Self::TriggerMinesweeperChallenge => "Trigger Minesweeper Challenge",
+            Self::TriggerRuneChallenge => "Trigger Rune Challenge",
+            Self::TriggerGoChallenge => "Trigger Go Challenge",
+            Self::TriggerFlappyChallenge => "Trigger Flappy Bird Challenge",
+            Self::TriggerJezzballChallenge => "Trigger JezzBall Challenge",
+            Self::TriggerSnakeChallenge => "Trigger Snake Challenge",
+            Self::TriggerRunicShiftChallenge => "Trigger Sigil Surge Challenge",
+            Self::TriggerHavenDiscovery => "Trigger Haven Discovery",
+            Self::TriggerSoulforgeDiscovery => "Trigger Soulforge Discovery",
+            Self::TriggerForgeAsprika => "Forge Asprika (God Item)",
+            Self::TriggerForgeSleipnir => "Forge Sleipnir (God Item)",
+            Self::TriggerForgeMegingjord => "Forge Megingjord (God Item)",
+            Self::TriggerGrantStormglass => "Grant 1000 Stormglass",
+            Self::TriggerDiscoverStormglass => "Discover Stormglass",
+            Self::TriggerGrant100kStormglass => "Grant 100k Stormglass",
+            Self::TriggerEtchRandomSigils => "Etch Random Sigils (All Slots)",
+            Self::TriggerEtchSPlusSigil => "Etch S+ Sigil (Slot 1)",
+        }
+    }
+
+    fn run(
+        self,
+        state: &mut GameState,
+        haven: &mut Haven,
+        enhancement: &mut EnhancementProgress,
+    ) -> &'static str {
+        match self {
+            Self::TriggerDungeon => trigger_dungeon(state),
+            Self::TriggerFishing => trigger_fishing(state),
+            Self::TriggerChessChallenge => trigger_chess_challenge(state),
+            Self::TriggerMorrisChallenge => trigger_morris_challenge(state),
+            Self::TriggerGomokuChallenge => trigger_gomoku_challenge(state),
+            Self::TriggerMinesweeperChallenge => trigger_minesweeper_challenge(state),
+            Self::TriggerRuneChallenge => trigger_rune_challenge(state),
+            Self::TriggerGoChallenge => trigger_go_challenge(state),
+            Self::TriggerFlappyChallenge => trigger_flappy_challenge(state),
+            Self::TriggerJezzballChallenge => trigger_jezzball_challenge(state),
+            Self::TriggerSnakeChallenge => trigger_snake_challenge(state),
+            Self::TriggerRunicShiftChallenge => trigger_runic_shift_challenge(state),
+            Self::TriggerHavenDiscovery => trigger_haven_discovery(haven),
+            Self::TriggerSoulforgeDiscovery => trigger_soulforge_discovery(enhancement),
+            Self::TriggerForgeAsprika => trigger_forge_asprika(state, enhancement),
+            Self::TriggerForgeSleipnir => trigger_forge_sleipnir(state, enhancement),
+            Self::TriggerForgeMegingjord => trigger_forge_megingjord(state, enhancement),
+            Self::TriggerGrantStormglass => trigger_grant_stormglass(state),
+            Self::TriggerDiscoverStormglass => trigger_discover_stormglass(state),
+            Self::TriggerGrant100kStormglass => trigger_grant_100k_stormglass(state),
+            Self::TriggerEtchRandomSigils => trigger_etch_random_sigils(state),
+            Self::TriggerEtchSPlusSigil => trigger_etch_s_plus_sigil(state),
+        }
+    }
+}
+
+fn action_for_option_index(option_index: usize) -> Option<DebugAction> {
+    DEBUG_ACTIONS.get(option_index).copied()
+}
+
+fn is_border_preview_option(option_index: usize) -> bool {
+    border_style_for_option_index(option_index).is_some()
+}
+
+pub fn border_style_for_option_index(option_index: usize) -> Option<UiBorderStyle> {
+    if option_index < BORDER_OPTION_START_INDEX {
+        return None;
+    }
+    let idx = option_index - BORDER_OPTION_START_INDEX;
+    SELECTABLE_UI_BORDER_STYLES.get(idx).copied()
+}
+
+pub fn option_label_for_index(option_index: usize) -> &'static str {
+    if let Some(action) = action_for_option_index(option_index) {
+        action.label()
+    } else if let Some(style) = border_style_for_option_index(option_index) {
+        style.debug_option_label()
+    } else {
+        "Unknown option"
+    }
+}
+
+pub fn option_count_for_category(category: DebugCategory) -> usize {
+    match category {
+        DebugCategory::Challenges => CHALLENGE_ACTIONS.len(),
+        DebugCategory::World => WORLD_ACTIONS.len(),
+        DebugCategory::Resources => RESOURCE_ACTIONS.len(),
+        DebugCategory::Items => ITEM_ACTIONS.len(),
+        DebugCategory::Borders => SELECTABLE_UI_BORDER_STYLES.len(),
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DebugCategory {
@@ -48,6 +225,7 @@ pub enum DebugCategory {
     World,
     Resources,
     Items,
+    Borders,
 }
 
 impl DebugCategory {
@@ -57,15 +235,7 @@ impl DebugCategory {
             Self::World => "World",
             Self::Resources => "Resources",
             Self::Items => "Items",
-        }
-    }
-
-    pub const fn option_indices(self) -> &'static [usize] {
-        match self {
-            Self::Challenges => CHALLENGE_OPTION_INDICES,
-            Self::World => WORLD_OPTION_INDICES,
-            Self::Resources => RESOURCE_OPTION_INDICES,
-            Self::Items => ITEM_OPTION_INDICES,
+            Self::Borders => "Borders",
         }
     }
 }
@@ -75,6 +245,7 @@ pub const DEBUG_CATEGORIES: &[DebugCategory] = &[
     DebugCategory::World,
     DebugCategory::Resources,
     DebugCategory::Items,
+    DebugCategory::Borders,
 ];
 
 /// Debug menu state
@@ -112,8 +283,15 @@ impl DebugMenu {
         DEBUG_CATEGORIES[self.selected_category]
     }
 
-    pub fn visible_option_indices(&self) -> &'static [usize] {
-        self.current_category().option_indices()
+    pub fn visible_option_indices(&self) -> Vec<usize> {
+        let count = option_count_for_category(self.current_category());
+        (0..count)
+            .map(|i| self.global_option_index_for_visible(i))
+            .collect()
+    }
+
+    pub fn selected_border_style(&self) -> Option<UiBorderStyle> {
+        border_style_for_option_index(self.selected_option_global_index())
     }
 
     pub fn navigate_prev_category(&mut self) {
@@ -137,13 +315,23 @@ impl DebugMenu {
     }
 
     pub fn navigate_down(&mut self) {
-        if self.selected_index + 1 < self.visible_option_indices().len() {
+        if self.selected_index + 1 < option_count_for_category(self.current_category()) {
             self.selected_index += 1;
         }
     }
 
+    fn global_option_index_for_visible(&self, visible_index: usize) -> usize {
+        match self.current_category() {
+            DebugCategory::Challenges => CHALLENGE_ACTIONS[visible_index].option_index(),
+            DebugCategory::World => WORLD_ACTIONS[visible_index].option_index(),
+            DebugCategory::Resources => RESOURCE_ACTIONS[visible_index].option_index(),
+            DebugCategory::Items => ITEM_ACTIONS[visible_index].option_index(),
+            DebugCategory::Borders => BORDER_OPTION_START_INDEX + visible_index,
+        }
+    }
+
     fn selected_option_global_index(&self) -> usize {
-        self.visible_option_indices()[self.selected_index]
+        self.global_option_index_for_visible(self.selected_index)
     }
 
     /// Trigger the selected debug action. Returns a message describing what happened.
@@ -152,32 +340,20 @@ impl DebugMenu {
         state: &mut GameState,
         haven: &mut Haven,
         enhancement: &mut EnhancementProgress,
+        achievements: &mut crate::achievements::Achievements,
     ) -> &'static str {
-        let msg = match self.selected_option_global_index() {
-            0 => trigger_dungeon(state),
-            1 => trigger_fishing(state),
-            2 => trigger_chess_challenge(state),
-            3 => trigger_morris_challenge(state),
-            4 => trigger_gomoku_challenge(state),
-            5 => trigger_minesweeper_challenge(state),
-            6 => trigger_rune_challenge(state),
-            7 => trigger_go_challenge(state),
-            8 => trigger_flappy_challenge(state),
-            9 => trigger_jezzball_challenge(state),
-            10 => trigger_snake_challenge(state),
-            11 => trigger_runic_shift_challenge(state),
-            12 => trigger_haven_discovery(haven),
-            13 => trigger_soulforge_discovery(enhancement),
-            14 => trigger_forge_asprika(state, enhancement),
-            15 => trigger_forge_sleipnir(state, enhancement),
-            16 => trigger_forge_megingjord(state, enhancement),
-            17 => trigger_grant_stormglass(state),
-            18 => trigger_discover_stormglass(state),
-            19 => trigger_grant_100k_stormglass(state),
-            20 => trigger_etch_random_sigils(state),
-            21 => trigger_etch_s_plus_sigil(state),
-            _ => "Unknown option",
-        };
+        let selected_option = self.selected_option_global_index();
+        if is_border_preview_option(selected_option) {
+            if let Some(style) = border_style_for_option_index(selected_option) {
+                achievements.ui_border_style = style;
+                return style.border_set_message();
+            }
+            return "Border preview updated.";
+        }
+
+        let msg = action_for_option_index(selected_option)
+            .map(|action| action.run(state, haven, enhancement))
+            .unwrap_or("Unknown option");
         self.close();
         msg
     }
@@ -465,15 +641,15 @@ mod tests {
         for _ in 0..32 {
             menu.navigate_down();
         }
-        assert_eq!(menu.selected_index, CHALLENGE_OPTION_INDICES.len() - 1);
+        assert_eq!(menu.selected_index, CHALLENGE_ACTIONS.len() - 1);
         assert_eq!(menu.selected_option_global_index(), 11);
 
         // Can't go past end
         menu.navigate_down();
-        assert_eq!(menu.selected_index, CHALLENGE_OPTION_INDICES.len() - 1);
+        assert_eq!(menu.selected_index, CHALLENGE_ACTIONS.len() - 1);
 
         menu.navigate_up();
-        assert_eq!(menu.selected_index, CHALLENGE_OPTION_INDICES.len() - 2);
+        assert_eq!(menu.selected_index, CHALLENGE_ACTIONS.len() - 2);
 
         // Can't go before start
         for _ in 0..32 {
@@ -500,7 +676,50 @@ mod tests {
         assert_eq!(menu.selected_option_global_index(), 2);
 
         menu.navigate_prev_category();
+        assert_eq!(menu.current_category(), DebugCategory::Borders);
+
+        menu.navigate_prev_category();
         assert_eq!(menu.current_category(), DebugCategory::Items);
+    }
+
+    #[test]
+    fn test_border_preview_does_not_close_menu() {
+        let mut menu = DebugMenu::new();
+        menu.open();
+        for _ in 0..4 {
+            menu.navigate_next_category();
+        }
+        assert_eq!(menu.current_category(), DebugCategory::Borders);
+
+        let mut state = GameState::new("Test".to_string(), 0);
+        let mut haven = Haven::new();
+        let mut enhancement = EnhancementProgress::new();
+        let mut achievements = crate::achievements::Achievements::default();
+        let msg =
+            menu.trigger_selected(&mut state, &mut haven, &mut enhancement, &mut achievements);
+
+        assert_eq!(msg, "Border style set: Classic");
+        assert!(menu.is_open);
+        assert_eq!(achievements.ui_border_style, UiBorderStyle::Classic);
+    }
+
+    #[test]
+    fn test_border_style_mapping_complete() {
+        assert_eq!(
+            option_count_for_category(DebugCategory::Borders),
+            SELECTABLE_UI_BORDER_STYLES.len()
+        );
+        for idx in BORDER_OPTION_START_INDEX
+            ..(BORDER_OPTION_START_INDEX + SELECTABLE_UI_BORDER_STYLES.len())
+        {
+            assert!(border_style_for_option_index(idx).is_some());
+        }
+        assert_eq!(
+            border_style_for_option_index(
+                BORDER_OPTION_START_INDEX + SELECTABLE_UI_BORDER_STYLES.len() - 1
+            ),
+            Some(UiBorderStyle::HeavyQuadDashed),
+        );
     }
 
     #[test]

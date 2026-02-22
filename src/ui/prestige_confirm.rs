@@ -113,15 +113,19 @@ pub fn draw_prestige_confirm(
         ),
     ]));
 
-    let paragraph = Paragraph::new(lines)
-        .block(
-            Block::default()
-                .title(title)
-                .title_alignment(Alignment::Center)
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Yellow)),
-        )
-        .alignment(Alignment::Left);
+    let block = Block::default()
+        .title(title)
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(super::themed_border_color(Color::Yellow)));
+    let inner = super::render_themed_block(
+        frame,
+        dialog_area,
+        block,
+        Color::Yellow,
+        super::BorderFxContext,
+    );
+    let paragraph = Paragraph::new(lines).alignment(Alignment::Left);
 
-    frame.render_widget(paragraph, dialog_area);
+    frame.render_widget(paragraph, inner);
 }

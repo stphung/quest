@@ -22,10 +22,17 @@ pub(super) fn draw_sigils_panel(
     );
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Rgb(100, 180, 255)))
+        .border_style(Style::default().fg(super::themed_border_color(Color::Rgb(100, 180, 255))))
         .title(title);
+    let block = super::themed_block(block);
     let inner = block.inner(area);
     frame.render_widget(block, area);
+    super::apply_themed_border_fx(
+        frame,
+        area,
+        Color::Rgb(100, 180, 255),
+        super::BorderFxContext,
+    );
 
     let width = inner.width as usize;
     let mut lines = Vec::new();

@@ -208,10 +208,13 @@ impl CharacterCreationScreen {
             }
         };
 
-        let input_widget = Paragraph::new(input_text)
-            .block(Block::default().borders(Borders::ALL))
-            .style(Style::default().fg(Color::White));
-        f.render_widget(input_widget, area);
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(super::themed_border_color(Color::DarkGray)));
+        let inner =
+            super::render_themed_block(f, area, block, Color::DarkGray, super::BorderFxContext);
+        let input_widget = Paragraph::new(input_text).style(Style::default().fg(Color::White));
+        f.render_widget(input_widget, inner);
     }
 
     fn render_validation(&self, f: &mut Frame, area: Rect) {
