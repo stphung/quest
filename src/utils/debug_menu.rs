@@ -718,7 +718,7 @@ mod tests {
             border_style_for_option_index(
                 BORDER_OPTION_START_INDEX + SELECTABLE_UI_BORDER_STYLES.len() - 1
             ),
-            Some(UiBorderStyle::HeavyQuadDashed),
+            Some(UiBorderStyle::HeaderRail),
         );
     }
 

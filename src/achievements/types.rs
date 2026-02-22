@@ -295,6 +295,9 @@ pub enum UiBorderStyle {
     QuadDashed,
     #[serde(alias = "ElementalEmber")]
     HeavyQuadDashed,
+    HeavyCorner,
+    MicroDash,
+    HeaderRail,
 }
 
 pub const SELECTABLE_UI_BORDER_STYLES: &[UiBorderStyle] = &[
@@ -308,6 +311,9 @@ pub const SELECTABLE_UI_BORDER_STYLES: &[UiBorderStyle] = &[
     UiBorderStyle::HeavyTripleDashed,
     UiBorderStyle::QuadDashed,
     UiBorderStyle::HeavyQuadDashed,
+    UiBorderStyle::HeavyCorner,
+    UiBorderStyle::MicroDash,
+    UiBorderStyle::HeaderRail,
 ];
 
 impl UiBorderStyle {
@@ -323,6 +329,9 @@ impl UiBorderStyle {
             Self::HeavyTripleDashed => 7,
             Self::QuadDashed => 8,
             Self::HeavyQuadDashed => 9,
+            Self::HeavyCorner => 32,
+            Self::MicroDash => 33,
+            Self::HeaderRail => 35,
         }
     }
 
@@ -337,6 +346,11 @@ impl UiBorderStyle {
             7 => Self::HeavyTripleDashed,
             8 => Self::QuadDashed,
             9 => Self::HeavyQuadDashed,
+            32 => Self::HeavyCorner,
+            33 => Self::MicroDash,
+            // Removed style fallback.
+            34 => Self::Classic,
+            35 => Self::HeaderRail,
             // Backward-compat fallback for removed styles.
             10 => Self::Classic,
             11 => Self::Classic,
@@ -370,6 +384,9 @@ impl UiBorderStyle {
             Self::HeavyTripleDashed => "Heavy Triple Dash",
             Self::QuadDashed => "Quad Dashed",
             Self::HeavyQuadDashed => "Heavy Quad Dash",
+            Self::HeavyCorner => "Heavy Corner",
+            Self::MicroDash => "Micro Dash",
+            Self::HeaderRail => "Header Rail",
         }
     }
 
@@ -385,6 +402,9 @@ impl UiBorderStyle {
             Self::HeavyTripleDashed => "Set Border: Heavy Triple Dash",
             Self::QuadDashed => "Set Border: Quad Dashed",
             Self::HeavyQuadDashed => "Set Border: Heavy Quad Dash",
+            Self::HeavyCorner => "Set Border: Heavy Corner",
+            Self::MicroDash => "Set Border: Micro Dash",
+            Self::HeaderRail => "Set Border: Header Rail",
         }
     }
 
@@ -400,6 +420,9 @@ impl UiBorderStyle {
             Self::HeavyTripleDashed => "Border style set: Heavy Triple Dash",
             Self::QuadDashed => "Border style set: Quad Dashed",
             Self::HeavyQuadDashed => "Border style set: Heavy Quad Dash",
+            Self::HeavyCorner => "Border style set: Heavy Corner",
+            Self::MicroDash => "Border style set: Micro Dash",
+            Self::HeaderRail => "Border style set: Header Rail",
         }
     }
 }

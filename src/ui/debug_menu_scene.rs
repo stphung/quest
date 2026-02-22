@@ -191,6 +191,9 @@ fn render_border_preview(
         UiBorderStyle::HeavyTripleDashed => "Max-contrast elite frame",
         UiBorderStyle::QuadDashed => "Fine technical dash pattern",
         UiBorderStyle::HeavyQuadDashed => "Dense legendary dash pattern",
+        UiBorderStyle::HeavyCorner => "Heavy corners with clean lines",
+        UiBorderStyle::MicroDash => "Subtle minimalist dash frame",
+        UiBorderStyle::HeaderRail => "Strong top rail for hierarchy",
     };
 
     let preview_block = Block::default()
@@ -279,6 +282,9 @@ fn preview_border_color(style: UiBorderStyle) -> Color {
         UiBorderStyle::HeavyTripleDashed => Color::Yellow,
         UiBorderStyle::QuadDashed => Color::Yellow,
         UiBorderStyle::HeavyQuadDashed => Color::Yellow,
+        UiBorderStyle::HeavyCorner => Color::Yellow,
+        UiBorderStyle::MicroDash => Color::Yellow,
+        UiBorderStyle::HeaderRail => Color::Yellow,
     }
 }
 

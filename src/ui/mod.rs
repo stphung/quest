@@ -86,6 +86,9 @@ pub(super) fn border_type_for_style(style: crate::achievements::UiBorderStyle) -
         crate::achievements::UiBorderStyle::HeavyTripleDashed => BorderType::HeavyTripleDashed,
         crate::achievements::UiBorderStyle::QuadDashed => BorderType::LightQuadrupleDashed,
         crate::achievements::UiBorderStyle::HeavyQuadDashed => BorderType::HeavyQuadrupleDashed,
+        crate::achievements::UiBorderStyle::HeavyCorner => BorderType::Plain,
+        crate::achievements::UiBorderStyle::MicroDash => BorderType::Plain,
+        crate::achievements::UiBorderStyle::HeaderRail => BorderType::Plain,
     }
 }
 
@@ -124,13 +127,110 @@ pub(super) fn apply_themed_border_fx(
 }
 
 pub(super) fn apply_border_fx_for_style(
-    _frame: &mut Frame,
-    _area: Rect,
-    _border_color: Color,
-    _style: crate::achievements::UiBorderStyle,
+    frame: &mut Frame,
+    area: Rect,
+    border_color: Color,
+    style: crate::achievements::UiBorderStyle,
     _ctx: BorderFxContext,
 ) {
-    // No additional border overlays for the core style set.
+    if area.width < 2 || area.height < 2 {
+        return;
+    }
+
+    match style {
+        crate::achievements::UiBorderStyle::HeavyCorner => {
+            apply_heavy_corner_overlay(frame, area, border_color)
+        }
+        crate::achievements::UiBorderStyle::MicroDash => {
+            apply_micro_dash_overlay(frame, area, border_color)
+        }
+        crate::achievements::UiBorderStyle::HeaderRail => {
+            apply_header_rail_overlay(frame, area, border_color)
+        }
+        _ => {}
+    }
+}
+
+fn apply_heavy_corner_overlay(frame: &mut Frame, area: Rect, border_color: Color) {
+    let left = area.x;
+    let top = area.y;
+    let right = area.x + area.width - 1;
+    let bottom = area.y + area.height - 1;
+
+    set_border_cell_symbol(frame, left, top, "┏", border_color);
+    set_border_cell_symbol(frame, right, top, "┓", border_color);
+    set_border_cell_symbol(frame, left, bottom, "┗", border_color);
+    set_border_cell_symbol(frame, right, bottom, "┛", border_color);
+}
+
+fn apply_micro_dash_overlay(frame: &mut Frame, area: Rect, border_color: Color) {
+    let left = area.x;
+    let top = area.y;
+    let right = area.x + area.width - 1;
+    let bottom = area.y + area.height - 1;
+
+    for x in (left + 1)..right {
+        if let Some(cell) = frame.buffer_mut().cell_mut((x, top)) {
+            if is_horizontal_border_symbol(cell.symbol()) {
+                cell.set_symbol("┄")
+                    .set_style(Style::default().fg(border_color));
+            }
+        }
+        if let Some(cell) = frame.buffer_mut().cell_mut((x, bottom)) {
+            if is_horizontal_border_symbol(cell.symbol()) {
+                cell.set_symbol("┄")
+                    .set_style(Style::default().fg(border_color));
+            }
+        }
+    }
+
+    for y in (top + 1)..bottom {
+        if let Some(cell) = frame.buffer_mut().cell_mut((left, y)) {
+            if is_vertical_border_symbol(cell.symbol()) {
+                cell.set_symbol("┆")
+                    .set_style(Style::default().fg(border_color));
+            }
+        }
+        if let Some(cell) = frame.buffer_mut().cell_mut((right, y)) {
+            if is_vertical_border_symbol(cell.symbol()) {
+                cell.set_symbol("┆")
+                    .set_style(Style::default().fg(border_color));
+            }
+        }
+    }
+}
+
+fn apply_header_rail_overlay(frame: &mut Frame, area: Rect, border_color: Color) {
+    let left = area.x;
+    let top = area.y;
+    let right = area.x + area.width - 1;
+
+    set_border_cell_symbol(frame, left, top, "┏", border_color);
+    set_border_cell_symbol(frame, right, top, "┓", border_color);
+
+    for x in (left + 1)..right {
+        if let Some(cell) = frame.buffer_mut().cell_mut((x, top)) {
+            if is_horizontal_border_symbol(cell.symbol()) {
+                cell.set_symbol("━")
+                    .set_style(Style::default().fg(border_color));
+            }
+        }
+    }
+}
+
+fn set_border_cell_symbol(frame: &mut Frame, x: u16, y: u16, symbol: &'static str, color: Color) {
+    if let Some(cell) = frame.buffer_mut().cell_mut((x, y)) {
+        cell.set_symbol(symbol)
+            .set_style(Style::default().fg(color));
+    }
+}
+
+fn is_horizontal_border_symbol(symbol: &str) -> bool {
+    matches!(symbol, "─" | "━" | "═" | "┄" | "┅" | "┈" | "┉" | "▀")
+}
+
+fn is_vertical_border_symbol(symbol: &str) -> bool {
+    matches!(symbol, "│" | "┃" | "║" | "┆" | "┇" | "┊" | "┋" | "▌")
 }
 
 #[derive(Clone, Copy)]
@@ -144,8 +244,8 @@ pub(super) struct PanelBorderChars {
 }
 
 pub(super) fn panel_border_chars() -> PanelBorderChars {
-    match border_type_for_style(current_ui_border_style()) {
-        BorderType::Rounded => PanelBorderChars {
+    match current_ui_border_style() {
+        crate::achievements::UiBorderStyle::Rounded => PanelBorderChars {
             tl: '╭',
             tr: '╮',
             bl: '╰',
@@ -153,7 +253,7 @@ pub(super) fn panel_border_chars() -> PanelBorderChars {
             h: '─',
             v: '│',
         },
-        BorderType::Double => PanelBorderChars {
+        crate::achievements::UiBorderStyle::Double => PanelBorderChars {
             tl: '╔',
             tr: '╗',
             bl: '╚',
@@ -161,7 +261,7 @@ pub(super) fn panel_border_chars() -> PanelBorderChars {
             h: '═',
             v: '║',
         },
-        BorderType::Thick => PanelBorderChars {
+        crate::achievements::UiBorderStyle::Thick => PanelBorderChars {
             tl: '┏',
             tr: '┓',
             bl: '┗',
@@ -169,7 +269,8 @@ pub(super) fn panel_border_chars() -> PanelBorderChars {
             h: '━',
             v: '┃',
         },
-        BorderType::LightDoubleDashed | BorderType::LightTripleDashed => PanelBorderChars {
+        crate::achievements::UiBorderStyle::Dashed
+        | crate::achievements::UiBorderStyle::TripleDashed => PanelBorderChars {
             tl: '┌',
             tr: '┐',
             bl: '└',
@@ -177,7 +278,8 @@ pub(super) fn panel_border_chars() -> PanelBorderChars {
             h: '┄',
             v: '┆',
         },
-        BorderType::HeavyDoubleDashed | BorderType::HeavyTripleDashed => PanelBorderChars {
+        crate::achievements::UiBorderStyle::HeavyDashed
+        | crate::achievements::UiBorderStyle::HeavyTripleDashed => PanelBorderChars {
             tl: '┏',
             tr: '┓',
             bl: '┗',
@@ -185,7 +287,7 @@ pub(super) fn panel_border_chars() -> PanelBorderChars {
             h: '┅',
             v: '┇',
         },
-        BorderType::LightQuadrupleDashed => PanelBorderChars {
+        crate::achievements::UiBorderStyle::QuadDashed => PanelBorderChars {
             tl: '┌',
             tr: '┐',
             bl: '└',
@@ -193,7 +295,7 @@ pub(super) fn panel_border_chars() -> PanelBorderChars {
             h: '┈',
             v: '┊',
         },
-        BorderType::HeavyQuadrupleDashed => PanelBorderChars {
+        crate::achievements::UiBorderStyle::HeavyQuadDashed => PanelBorderChars {
             tl: '┏',
             tr: '┓',
             bl: '┗',
@@ -201,15 +303,24 @@ pub(super) fn panel_border_chars() -> PanelBorderChars {
             h: '┉',
             v: '┋',
         },
-        BorderType::QuadrantOutside | BorderType::QuadrantInside => PanelBorderChars {
-            tl: '▛',
-            tr: '▜',
-            bl: '▙',
-            br: '▟',
-            h: '▀',
-            v: '▌',
+        crate::achievements::UiBorderStyle::HeavyCorner => PanelBorderChars {
+            tl: '┏',
+            tr: '┓',
+            bl: '┗',
+            br: '┛',
+            h: '─',
+            v: '│',
         },
-        BorderType::Plain => PanelBorderChars {
+        crate::achievements::UiBorderStyle::MicroDash => PanelBorderChars {
+            tl: '┌',
+            tr: '┐',
+            bl: '└',
+            br: '┘',
+            h: '┄',
+            v: '┆',
+        },
+        crate::achievements::UiBorderStyle::HeaderRail
+        | crate::achievements::UiBorderStyle::Classic => PanelBorderChars {
             tl: '┌',
             tr: '┐',
             bl: '└',
