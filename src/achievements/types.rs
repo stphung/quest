@@ -280,6 +280,10 @@ pub struct Achievements {
     pub zones_fully_cleared: u32,
     pub expanse_cycles_completed: u64,
 
+    /// Currently selected title (account-wide).
+    #[serde(default)]
+    pub selected_title: Option<AchievementId>,
+
     /// Achievements unlocked but not yet viewed (not persisted) - for UI indicator
     #[serde(skip)]
     pub pending_notifications: Vec<AchievementId>,

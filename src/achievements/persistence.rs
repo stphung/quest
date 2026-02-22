@@ -81,4 +81,24 @@ mod tests {
         let path = result.unwrap();
         assert!(path.to_string_lossy().contains("achievements.json"));
     }
+
+    #[test]
+    fn test_selected_title_persists() {
+        let mut achievements = Achievements::default();
+        achievements.unlock(AchievementId::SlayerV, Some("Hero".to_string()));
+        achievements.selected_title = Some(AchievementId::SlayerV);
+
+        let json = serde_json::to_string_pretty(&achievements).unwrap();
+        let loaded: Achievements = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(loaded.selected_title, Some(AchievementId::SlayerV));
+    }
+
+    #[test]
+    fn test_selected_title_defaults_to_none() {
+        // Simulate loading old save without selected_title field
+        let json = r#"{"unlocked":{},"progress":{},"total_kills":0,"total_bosses_defeated":0,"total_fish_caught":0,"total_dungeons_completed":0,"total_minigame_wins":0,"highest_prestige_rank":0,"highest_level":0,"highest_fishing_rank":0,"zones_fully_cleared":0,"expanse_cycles_completed":0}"#;
+        let loaded: Achievements = serde_json::from_str(json).unwrap();
+        assert_eq!(loaded.selected_title, None);
+    }
 }
