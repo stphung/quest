@@ -28,6 +28,7 @@ pub fn handle_stormglass_exchange(
     match exchange_ui.phase {
         ExchangePhase::Menu => handle_menu(key, exchange_ui, state),
         ExchangePhase::InvokeTrialConfirm => handle_invoke_trial_confirm(key, exchange_ui, state),
+        ExchangePhase::InvokeTrialRolling => handle_invoke_trial_rolling(key, exchange_ui),
         ExchangePhase::InvokeTrial => handle_invoke_trial(key, exchange_ui, state),
         ExchangePhase::InvokeTrialForfeitConfirm => {
             handle_invoke_trial_forfeit_confirm(key, exchange_ui)
@@ -150,7 +151,8 @@ fn handle_invoke_trial_confirm(
                 .collect();
             exchange_ui.trial_options = generate_trial_options(&mut rng, &pending);
             exchange_ui.trial_selected = 0;
-            exchange_ui.phase = ExchangePhase::InvokeTrial;
+            exchange_ui.invoke_animation_start_ms = Some(current_millis());
+            exchange_ui.phase = ExchangePhase::InvokeTrialRolling;
             InputResult::Continue
         }
         KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
@@ -216,6 +218,26 @@ fn handle_invoke_trial(
         }
         _ => InputResult::Continue,
     }
+}
+
+/// Minimum display time before invoke animation skip is accepted.
+const INVOKE_ANIMATION_SKIP_FLOOR_MS: u128 = 200;
+
+/// Total invoke animation duration before auto-transitioning to trial select.
+pub(crate) const INVOKE_ANIMATION_DURATION_MS: u128 = 4200;
+
+fn handle_invoke_trial_rolling(key: KeyEvent, exchange_ui: &mut ExchangeUiState) -> InputResult {
+    let _ = key; // any key triggers skip (after floor check)
+    let elapsed = exchange_ui
+        .invoke_animation_start_ms
+        .map(|start| current_millis().saturating_sub(start))
+        .unwrap_or(0);
+
+    if elapsed >= INVOKE_ANIMATION_SKIP_FLOOR_MS {
+        exchange_ui.invoke_animation_start_ms = None;
+        exchange_ui.phase = ExchangePhase::InvokeTrial;
+    }
+    InputResult::Continue
 }
 
 fn handle_sigils_list(
@@ -445,6 +467,19 @@ fn handle_sigil_rolling(key: KeyEvent, exchange_ui: &mut ExchangeUiState) -> Inp
 /// Check if sigil animation has completed and should auto-transition to pick.
 /// Called from the main game loop each tick.
 pub fn check_sigil_animation_timeout(exchange_ui: &mut ExchangeUiState) {
+    if exchange_ui.phase == ExchangePhase::InvokeTrialRolling {
+        let elapsed = exchange_ui
+            .invoke_animation_start_ms
+            .map(|start| current_millis().saturating_sub(start))
+            .unwrap_or(0);
+
+        if elapsed >= INVOKE_ANIMATION_DURATION_MS {
+            exchange_ui.invoke_animation_start_ms = None;
+            exchange_ui.phase = ExchangePhase::InvokeTrial;
+        }
+        return;
+    }
+
     if exchange_ui.phase != ExchangePhase::SigilRolling {
         return;
     }
