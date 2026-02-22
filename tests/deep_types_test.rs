@@ -420,14 +420,14 @@ fn test_active_mission_start_time_is_raw_i64() {
 fn test_supply_run_reward_range_is_correct() {
     assert_eq!(SUPPLY_RUN_REWARD_MIN, 35);
     assert_eq!(SUPPLY_RUN_REWARD_MAX, 55);
-    assert!(SUPPLY_RUN_REWARD_MIN < SUPPLY_RUN_REWARD_MAX);
+    const { assert!(SUPPLY_RUN_REWARD_MIN < SUPPLY_RUN_REWARD_MAX) }
 }
 
 #[test]
 fn test_supply_run_cost_range_is_correct() {
     assert_eq!(SUPPLY_RUN_COST_MIN, 20);
     assert_eq!(SUPPLY_RUN_COST_MAX, 30);
-    assert!(SUPPLY_RUN_COST_MIN < SUPPLY_RUN_COST_MAX);
+    const { assert!(SUPPLY_RUN_COST_MIN < SUPPLY_RUN_COST_MAX) }
 }
 
 #[test]
@@ -450,25 +450,25 @@ fn test_supply_run_avg_profit_is_positive() {
 fn test_breakthrough_cost_range_is_correct() {
     assert_eq!(BREAKTHROUGH_COST_MIN, 80);
     assert_eq!(BREAKTHROUGH_COST_MAX, 150);
-    assert!(BREAKTHROUGH_COST_MIN < BREAKTHROUGH_COST_MAX);
+    const { assert!(BREAKTHROUGH_COST_MIN < BREAKTHROUGH_COST_MAX) }
 }
 
 #[test]
 fn test_breakthrough_rewards_scale_with_depth() {
     // Each deeper tier should reward more than the previous.
-    assert!(BREAKTHROUGH_REWARD_WARRENS > BREAKTHROUGH_REWARD_SHALLOWS);
-    assert!(BREAKTHROUGH_REWARD_HOLLOWS_PLUS > BREAKTHROUGH_REWARD_WARRENS);
     assert_eq!(BREAKTHROUGH_REWARD_SHALLOWS, 200);
     assert_eq!(BREAKTHROUGH_REWARD_WARRENS, 250);
     assert_eq!(BREAKTHROUGH_REWARD_HOLLOWS_PLUS, 350);
+    const { assert!(BREAKTHROUGH_REWARD_WARRENS > BREAKTHROUGH_REWARD_SHALLOWS) }
+    const { assert!(BREAKTHROUGH_REWARD_HOLLOWS_PLUS > BREAKTHROUGH_REWARD_WARRENS) }
 }
 
 #[test]
 fn test_breakthrough_reward_exceeds_max_cost_at_every_tier() {
     // Even the cheapest breakthrough should be profitable.
-    assert!(BREAKTHROUGH_REWARD_SHALLOWS > BREAKTHROUGH_COST_MAX);
-    assert!(BREAKTHROUGH_REWARD_WARRENS > BREAKTHROUGH_COST_MAX);
-    assert!(BREAKTHROUGH_REWARD_HOLLOWS_PLUS > BREAKTHROUGH_COST_MAX);
+    const { assert!(BREAKTHROUGH_REWARD_SHALLOWS > BREAKTHROUGH_COST_MAX) }
+    const { assert!(BREAKTHROUGH_REWARD_WARRENS > BREAKTHROUGH_COST_MAX) }
+    const { assert!(BREAKTHROUGH_REWARD_HOLLOWS_PLUS > BREAKTHROUGH_COST_MAX) }
 }
 
 // =========================================================================
@@ -488,9 +488,9 @@ fn test_recruit_cost_ranges_are_correct() {
 #[test]
 fn test_recruit_cost_tiers_are_ordered() {
     // Basic < Specific <= Premium (specific max == premium min by design)
-    assert!(RECRUIT_COST_BASIC_MAX < RECRUIT_COST_SPECIFIC_MIN);
-    assert!(RECRUIT_COST_SPECIFIC_MIN < RECRUIT_COST_PREMIUM_MIN);
-    assert!(RECRUIT_COST_PREMIUM_MIN <= RECRUIT_COST_PREMIUM_MAX);
+    const { assert!(RECRUIT_COST_BASIC_MAX < RECRUIT_COST_SPECIFIC_MIN) }
+    const { assert!(RECRUIT_COST_SPECIFIC_MIN < RECRUIT_COST_PREMIUM_MIN) }
+    const { assert!(RECRUIT_COST_PREMIUM_MIN <= RECRUIT_COST_PREMIUM_MAX) }
 }
 
 // =========================================================================
@@ -541,8 +541,8 @@ fn test_outpost_income_exact_values() {
 
 #[test]
 fn test_outpost_income_increases_with_depth() {
-    assert!(OUTPOST_INCOME_WARRENS > OUTPOST_INCOME_SHALLOWS);
-    assert!(OUTPOST_INCOME_HOLLOWS_PLUS > OUTPOST_INCOME_WARRENS);
+    const { assert!(OUTPOST_INCOME_WARRENS > OUTPOST_INCOME_SHALLOWS) }
+    const { assert!(OUTPOST_INCOME_HOLLOWS_PLUS > OUTPOST_INCOME_WARRENS) }
 }
 
 // =========================================================================
