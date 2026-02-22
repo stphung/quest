@@ -212,21 +212,24 @@ fn render_exchange_menu(
     clear_row_chars(&mut buffer, 9); // description line 2
     clear_row_chars(&mut buffer, (h as i32) - 1); // help
 
-    // Menu items (rows 4-6): (icon, label, cost_text, affordable)
-    let items: [(&str, &str, String, bool); 3] = [
+    // Menu items (rows 4-6): (icon, icon_display_width, label, cost_text, affordable)
+    // icon_display_width accounts for emoji vs narrow chars in the terminal.
+    let items: [(&str, i32, &str, String, bool); 3] = [
         (
             "\u{2694}\u{FE0F}", // ⚔️
+            2,
             "Invoke Trial",
             format!("{} SG", INVOKE_TRIAL_COST),
             state.stormglass >= INVOKE_TRIAL_COST,
         ),
-        ("\u{231B}", "Chrono Surge", ">>>".to_string(), true), // ⏳
-        ("\u{16B1}", "Storm Sigils", ">>>".to_string(), true), // ᚱ
+        ("\u{231B}", 2, "Chrono Surge", ">>>".to_string(), true), // ⌛
+        ("\u{16B1}", 1, "Storm Sigils", ">>>".to_string(), true), // ᚱ
     ];
 
     let menu_start_row = 4i32;
-    let label_col = 5i32; // Fixed column for labels (after cursor + icon + gap)
-    for (i, (icon, label, cost, affordable)) in items.iter().enumerate() {
+    let icon_col = 2i32;
+    let label_col = icon_col + 3; // Enough room for widest icon (2) + 1 gap
+    for (i, (icon, _icon_w, label, cost, affordable)) in items.iter().enumerate() {
         let row = menu_start_row + i as i32;
         if row >= h as i32 {
             break;
@@ -244,8 +247,12 @@ fn render_exchange_menu(
             Color::DarkGray
         };
 
-        // Icon at fixed position, label at fixed column for alignment
-        put_text(&mut buffer, row, 2, icon, fg);
+        // Place icon with put_cell to control exactly one cell,
+        // then label at a fixed column so all rows align.
+        // For multi-codepoint emoji (e.g. ⚔️), only place the base char;
+        // the terminal renders it as a wide glyph spanning 2 cells.
+        let base_char = icon.chars().next().unwrap_or(' ');
+        put_cell(&mut buffer, row, icon_col, base_char, fg);
         put_text(&mut buffer, row, label_col, label, fg);
 
         // Right-aligned cost
