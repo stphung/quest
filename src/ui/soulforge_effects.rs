@@ -3,14 +3,10 @@
 use crate::enhancement::{enhancement_multiplier, EnhancementProgress, SoulforgeUiState};
 use ratatui::style::Color;
 
-use super::scene_fx::{current_millis, hash2d, lerp_rgb, put_cell, put_text, SceneCell};
+use super::scene_fx::{
+    current_millis, hash2d, lerp_rgb, put_cell, put_text, put_text_centered, SceneCell,
+};
 use super::soulforge_slots::SLOT_ORDER;
-
-/// Write a string centered horizontally in the buffer.
-fn put_text_centered(buffer: &mut [Vec<SceneCell>], row: i32, width: usize, text: &str, fg: Color) {
-    let col = (width as i32 - text.chars().count() as i32) / 2;
-    put_text(buffer, row, col, text, fg);
-}
 
 /// Render spark particles that spray from a point.
 fn render_sparks(

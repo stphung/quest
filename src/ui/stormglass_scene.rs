@@ -14,7 +14,8 @@ use ratatui::{
 };
 
 use super::scene_fx::{
-    current_millis, hash2d, lerp_rgb, put_cell, put_text, render_buffer, SceneCell,
+    current_millis, display_width, hash2d, lerp_rgb, put_cell, put_text, put_text_centered,
+    render_buffer, SceneCell,
 };
 
 /// Electric blue color used throughout Stormglass UI.
@@ -119,12 +120,6 @@ fn clear_row_chars(buffer: &mut [Vec<SceneCell>], row: i32) {
     }
 }
 
-/// Write a string centered horizontally in the buffer.
-fn put_text_centered(buffer: &mut [Vec<SceneCell>], row: i32, width: usize, text: &str, fg: Color) {
-    let col = (width as i32 - text.chars().count() as i32) / 2;
-    put_text(buffer, row, col, text, fg);
-}
-
 /// Render the full Stormglass Exchange overlay as a centered modal.
 pub fn render_stormglass_exchange(
     frame: &mut Frame,
@@ -174,10 +169,7 @@ fn render_exchange_menu(
 
     frame.render_widget(Clear, overlay_area);
 
-    let title = format!(
-        " \u{1F48E} Stormglass Exchange  [\u{1F48E}{} SG] ",
-        state.stormglass
-    );
+    let title = " \u{1F48E} Stormglass Exchange \u{1F48E} ";
     let block = Block::default()
         .title(Line::from(Span::styled(
             title,
@@ -604,10 +596,7 @@ fn render_chrono_surge_select(
 
     frame.render_widget(Clear, overlay_area);
 
-    let title = format!(
-        " \u{231B} Chrono Surge  [\u{1F48E}{} SG] ",
-        state.stormglass
-    );
+    let title = " \u{231B} Chrono Surge \u{231B} ";
     let block = Block::default()
         .title(Line::from(Span::styled(
             title,
@@ -889,10 +878,7 @@ fn render_sigils_list(
 
     frame.render_widget(Clear, overlay_area);
 
-    let title = format!(
-        " \u{16B1} Etch Storm Sigils  [\u{1F48E}{} SG] ",
-        state.stormglass
-    );
+    let title = " \u{16B1} Etch Storm Sigils \u{16B1} ";
     let block = Block::default()
         .title(Line::from(Span::styled(
             title,
@@ -1082,7 +1068,7 @@ fn render_sigil_unlock_confirm(frame: &mut Frame, area: Rect, state: &GameState)
 
     let block = Block::default()
         .title(Line::from(Span::styled(
-            " \u{1F48E} Unlock Sigil Slot? \u{1F48E} ",
+            " \u{16B1} Unlock Sigil Slot? \u{16B1} ",
             Style::default()
                 .fg(ELECTRIC_BLUE)
                 .add_modifier(Modifier::BOLD),
@@ -1198,7 +1184,7 @@ fn render_sigil_etch_confirm(frame: &mut Frame, area: Rect, state: &GameState) {
 
     let block = Block::default()
         .title(Line::from(Span::styled(
-            " \u{1F48E} Etch Sigil? \u{1F48E} ",
+            " \u{16B1} Etch Sigil? \u{16B1} ",
             Style::default()
                 .fg(ELECTRIC_BLUE)
                 .add_modifier(Modifier::BOLD),
@@ -1264,15 +1250,18 @@ fn render_sigil_etch_confirm(frame: &mut Frame, area: Rect, state: &GameState) {
         Color::DarkGray,
     );
 
-    // Daily sigil pool names (rows 10-11, with padding rows 9 and 12)
+    // Daily sigil pool names with icons (rows 10-11, with padding rows 9 and 12)
     let pool = crate::stormglass::sigils::daily_sigil_pool();
-    let names: Vec<&str> = pool.iter().map(|e| e.short_name()).collect();
+    let names: Vec<String> = pool
+        .iter()
+        .map(|e| format!("{} {}", e.icon(), e.short_name()))
+        .collect();
     let line1_names = &names[..3.min(names.len())];
-    let line1 = line1_names.join(" \u{00b7} ");
+    let line1 = line1_names.join("  ");
     put_text_centered(&mut buffer, 10, w, &line1, Color::DarkGray);
     if names.len() > 3 {
         let line2_names = &names[3..];
-        let line2 = line2_names.join(" \u{00b7} ");
+        let line2 = line2_names.join("  ");
         put_text_centered(&mut buffer, 11, w, &line2, Color::DarkGray);
     }
 
@@ -1332,7 +1321,7 @@ fn render_sigil_reroll_confirm(
 
     let block = Block::default()
         .title(Line::from(Span::styled(
-            " \u{1F48E} Reroll Sigil? \u{1F48E} ",
+            " \u{16B1} Reroll Sigil? \u{16B1} ",
             Style::default()
                 .fg(ELECTRIC_BLUE)
                 .add_modifier(Modifier::BOLD),
@@ -1459,7 +1448,7 @@ fn render_sigil_rolling(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiS
 
     let block = Block::default()
         .title(Line::from(Span::styled(
-            " \u{1F48E} Sigil Inscription \u{1F48E} ",
+            " \u{16B1} Sigil Inscription \u{16B1} ",
             Style::default()
                 .fg(ELECTRIC_BLUE)
                 .add_modifier(Modifier::BOLD),
@@ -1654,9 +1643,9 @@ fn render_rolling_phase2(
             let col = 3i32;
             put_text(buffer, row, col, &partial, Color::White);
 
-            // Typing cursor at end of partial text
+            // Typing cursor at end of partial text (use display width for position)
             if chars_visible < total_chars {
-                let cursor_col = col + chars_visible as i32;
+                let cursor_col = col + display_width(&partial) as i32;
                 put_cell(buffer, row, cursor_col, '\u{2588}', Color::White); // █
             }
 
@@ -1850,7 +1839,7 @@ fn render_sigil_pick(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiStat
 
     let block = Block::default()
         .title(Line::from(Span::styled(
-            " \u{1F48E} Choose a Sigil \u{1F48E} ",
+            " \u{16B1} Choose a Sigil \u{16B1} ",
             Style::default()
                 .fg(ELECTRIC_BLUE)
                 .add_modifier(Modifier::BOLD),
@@ -1987,7 +1976,7 @@ fn render_sigil_result(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiSt
 
     let block = Block::default()
         .title(Line::from(Span::styled(
-            " \u{1F48E} Sigil Etched! \u{1F48E} ",
+            " \u{16B1} Sigil Etched! \u{16B1} ",
             Style::default()
                 .fg(ELECTRIC_BLUE)
                 .add_modifier(Modifier::BOLD),

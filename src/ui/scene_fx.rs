@@ -8,6 +8,7 @@ use ratatui::{
     Frame,
 };
 use std::time::{SystemTime, UNIX_EPOCH};
+use unicode_width::UnicodeWidthChar;
 
 /// Cell in a scene render buffer.
 #[derive(Clone, Copy)]
@@ -15,6 +16,21 @@ pub struct SceneCell {
     pub ch: char,
     pub fg: Color,
     pub bg: Color,
+    /// True if this cell is the continuation of a wide (2-column) character
+    /// in the previous cell. Skipped during rendering.
+    pub wide_cont: bool,
+}
+
+impl SceneCell {
+    /// Create a new cell with the given character, foreground, and background colors.
+    pub fn new(ch: char, fg: Color, bg: Color) -> Self {
+        Self {
+            ch,
+            fg,
+            bg,
+            wide_cont: false,
+        }
+    }
 }
 
 impl Default for SceneCell {
@@ -23,6 +39,7 @@ impl Default for SceneCell {
             ch: ' ',
             fg: Color::Reset,
             bg: Color::Reset,
+            wide_cont: false,
         }
     }
 }
@@ -68,14 +85,57 @@ pub fn put_cell(buffer: &mut [Vec<SceneCell>], row: i32, col: i32, ch: char, fg:
     }
 
     let bg = buffer[row][col].bg;
-    buffer[row][col] = SceneCell { ch, fg, bg };
+    buffer[row][col] = SceneCell {
+        ch,
+        fg,
+        bg,
+        wide_cont: false,
+    };
 }
 
-/// Write a string into the scene buffer at (row, col). Each char occupies 1 cell.
+/// Write a string into the scene buffer at (row, col).
+/// Wide characters (emoji, CJK) occupy 2 buffer cells: the character cell
+/// plus a continuation cell that is skipped during rendering.
 pub fn put_text(buffer: &mut [Vec<SceneCell>], row: i32, col: i32, text: &str, fg: Color) {
-    for (i, ch) in text.chars().enumerate() {
-        put_cell(buffer, row, col + i as i32, ch, fg);
+    let mut pos = 0i32;
+    for ch in text.chars() {
+        put_cell(buffer, row, col + pos, ch, fg);
+        let w = UnicodeWidthChar::width(ch).unwrap_or(1);
+        if w == 2 {
+            // Mark next cell as continuation of this wide character
+            let cont_col = (col + pos + 1) as usize;
+            let r = row as usize;
+            if row >= 0 && r < buffer.len() && cont_col < buffer[r].len() {
+                let bg = buffer[r][cont_col].bg;
+                buffer[r][cont_col] = SceneCell {
+                    ch: ' ',
+                    fg,
+                    bg,
+                    wide_cont: true,
+                };
+            }
+        }
+        pos += w as i32;
     }
+}
+
+/// Display width of a string in terminal columns (accounts for wide characters).
+pub fn display_width(text: &str) -> usize {
+    text.chars()
+        .map(|ch| UnicodeWidthChar::width(ch).unwrap_or(1))
+        .sum()
+}
+
+/// Write a string centered horizontally in the buffer (display-width-aware).
+pub fn put_text_centered(
+    buffer: &mut [Vec<SceneCell>],
+    row: i32,
+    width: usize,
+    text: &str,
+    fg: Color,
+) {
+    let col = (width as i32 - display_width(text) as i32) / 2;
+    put_text(buffer, row, col.max(0), text, fg);
 }
 
 /// Draws a simple line with `/`, `\` or `|` glyphs based on slope.
@@ -119,6 +179,8 @@ pub fn draw_line(
 }
 
 /// Flushes a scene buffer to the frame with run-length style batching by color.
+/// Continuation cells (after wide characters) are skipped so the terminal
+/// renders wide chars at their correct 2-column width.
 pub fn render_buffer(frame: &mut Frame, area: Rect, buffer: &[Vec<SceneCell>]) {
     for (row, row_data) in buffer.iter().enumerate() {
         if row as u16 >= area.height {
@@ -131,6 +193,12 @@ pub fn render_buffer(frame: &mut Frame, area: Rect, buffer: &[Vec<SceneCell>]) {
         let mut current_text = String::new();
 
         for cell in row_data.iter().take(area.width as usize) {
+            // Skip continuation cells — the wide char in the previous cell
+            // already occupies 2 terminal columns.
+            if cell.wide_cont {
+                continue;
+            }
+
             if (cell.fg != current_fg || cell.bg != current_bg) && !current_text.is_empty() {
                 spans.push(Span::styled(
                     std::mem::take(&mut current_text),

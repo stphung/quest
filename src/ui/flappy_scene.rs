@@ -188,11 +188,8 @@ fn render_sky_and_background(
         let col = orb_col + dx;
         let row = orb_row + dy;
         if row >= 0 && (row as usize) < ground_row && col >= 0 && col < render_width as i32 {
-            buffer[row as usize][col as usize] = SceneCell {
-                ch,
-                fg,
-                bg: buffer[row as usize][col as usize].bg,
-            };
+            buffer[row as usize][col as usize] =
+                SceneCell::new(ch, fg, buffer[row as usize][col as usize].bg);
         }
     }
 
@@ -207,15 +204,15 @@ fn render_sky_and_background(
             for (col, cell) in row_cells.iter_mut().enumerate().take(render_width as usize) {
                 if hash2d(row, col).is_multiple_of(97) && cell.ch == ' ' {
                     let bright = hash2d(row + twinkle_tick, col + twinkle_tick).is_multiple_of(3);
-                    *cell = SceneCell {
-                        ch: if bright { '*' } else { '.' },
-                        fg: if bright {
+                    *cell = SceneCell::new(
+                        if bright { '*' } else { '.' },
+                        if bright {
                             Color::Rgb(245, 245, 255)
                         } else {
                             Color::Rgb(185, 190, 230)
                         },
-                        bg: cell.bg,
-                    };
+                        cell.bg,
+                    );
                 }
             }
         }
@@ -240,11 +237,11 @@ fn render_sky_and_background(
                 let col = (cx + i) % render_width as usize;
                 if buffer[ry][col].ch == ' ' {
                     let tint = lerp_channel(shade, 205, 1.0 - dusk);
-                    buffer[ry][col] = SceneCell {
+                    buffer[ry][col] = SceneCell::new(
                         ch,
-                        fg: Color::Rgb(tint, tint, tint.saturating_add(6)),
-                        bg: buffer[ry][col].bg,
-                    };
+                        Color::Rgb(tint, tint, tint.saturating_add(6)),
+                        buffer[ry][col].bg,
+                    );
                 }
             }
         }
@@ -284,11 +281,7 @@ fn render_sky_and_background(
             for row in top.max(0)..=horizon as i32 {
                 let row = row as usize;
                 if row < ground_row && buffer[row][col].ch == ' ' {
-                    buffer[row][col] = SceneCell {
-                        ch,
-                        fg: color,
-                        bg: buffer[row][col].bg,
-                    };
+                    buffer[row][col] = SceneCell::new(ch, color, buffer[row][col].bg);
                 }
             }
         }
@@ -304,15 +297,15 @@ fn render_ground(
     ground_row: usize,
 ) {
     for (i, cell) in buffer[ground_row].iter_mut().enumerate().take(render_width) {
-        *cell = SceneCell {
-            ch: if (i + (game.tick_count as usize / 2)).is_multiple_of(4) {
+        *cell = SceneCell::new(
+            if (i + (game.tick_count as usize / 2)).is_multiple_of(4) {
                 GROUND_SUB
             } else {
                 GROUND_CHAR
             },
-            fg: Color::Rgb(98, 74, 52),
-            bg: Color::Rgb(52, 38, 28),
-        };
+            Color::Rgb(98, 74, 52),
+            Color::Rgb(52, 38, 28),
+        );
     }
     if ground_row > 0 {
         for (i, cell) in buffer[ground_row - 1]
@@ -321,15 +314,15 @@ fn render_ground(
             .take(render_width)
         {
             let bg = cell.bg;
-            *cell = SceneCell {
-                ch: if (i + game.tick_count as usize).is_multiple_of(6) {
+            *cell = SceneCell::new(
+                if (i + game.tick_count as usize).is_multiple_of(6) {
                     '┬'
                 } else {
                     GROUND_SUB
                 },
-                fg: Color::Rgb(86, 120, 64),
+                Color::Rgb(86, 120, 64),
                 bg,
-            };
+            );
         }
     }
 }
@@ -423,15 +416,15 @@ fn render_pipes(
                     )
                 };
 
-                buffer_row[col] = SceneCell {
+                buffer_row[col] = SceneCell::new(
                     ch,
                     fg,
-                    bg: if matches!(bg, Color::Reset) {
+                    if matches!(bg, Color::Reset) {
                         backdrop
                     } else {
                         bg
                     },
-                };
+                );
             }
         }
     }
@@ -482,11 +475,11 @@ fn render_bird(
             if *trail_col >= 0 && *trail_col < render_width as i32 {
                 let col = *trail_col as usize;
                 if buffer[row][col].ch == ' ' {
-                    buffer[row][col] = SceneCell {
-                        ch: if idx == 0 { '·' } else { '.' },
-                        fg: Color::Rgb(220, 196, 98),
-                        bg: buffer[row][col].bg,
-                    };
+                    buffer[row][col] = SceneCell::new(
+                        if idx == 0 { '·' } else { '.' },
+                        Color::Rgb(220, 196, 98),
+                        buffer[row][col].bg,
+                    );
                 }
             }
         }
@@ -495,39 +488,29 @@ fn render_bird(
         if bird_col >= 0 && bird_col < render_width as i32 {
             let col = bird_col as usize;
             if buffer[shadow_row][col].ch == ' ' {
-                buffer[shadow_row][col] = SceneCell {
-                    ch: '.',
-                    fg: Color::Rgb(70, 74, 82),
-                    bg: buffer[shadow_row][col].bg,
-                };
+                buffer[shadow_row][col] =
+                    SceneCell::new('.', Color::Rgb(70, 74, 82), buffer[shadow_row][col].bg);
             }
         }
 
         // Wing/tail
         if bird_col >= 1 && (bird_col - 1) < render_width as i32 {
             let col = (bird_col - 1) as usize;
-            buffer[row][col] = SceneCell {
-                ch: wing,
-                fg: bird_color,
-                bg: buffer[row][col].bg,
-            };
+            buffer[row][col] = SceneCell::new(wing, bird_color, buffer[row][col].bg);
         }
         // Body
         if bird_col >= 0 && bird_col < render_width as i32 {
-            buffer[row][bird_col as usize] = SceneCell {
-                ch: body,
-                fg: bird_color,
-                bg: buffer[row][bird_col as usize].bg,
-            };
+            buffer[row][bird_col as usize] =
+                SceneCell::new(body, bird_color, buffer[row][bird_col as usize].bg);
         }
         // Beak
         let beak_col = bird_col + 1;
         if beak_col >= 0 && beak_col < render_width as i32 {
-            buffer[row][beak_col as usize] = SceneCell {
-                ch: beak,
-                fg: Color::Rgb(255, 170, 68),
-                bg: buffer[row][beak_col as usize].bg,
-            };
+            buffer[row][beak_col as usize] = SceneCell::new(
+                beak,
+                Color::Rgb(255, 170, 68),
+                buffer[row][beak_col as usize].bg,
+            );
         }
     }
 }
@@ -553,32 +536,24 @@ fn render_hud(
         for (i, ch) in lives_str.chars().enumerate() {
             let col = 1 + i;
             if col < render_width as usize {
-                buffer[0][col] = SceneCell {
+                buffer[0][col] = SceneCell::new(
                     ch,
-                    fg: if ch == '\u{2665}' {
+                    if ch == '\u{2665}' {
                         Color::Rgb(255, 90, 90)
                     } else {
                         Color::Rgb(100, 60, 60)
                     },
-                    bg: Color::Rgb(18, 26, 44),
-                };
+                    Color::Rgb(18, 26, 44),
+                );
             }
         }
         // Background for lives plate
         if render_width > 0 {
-            buffer[0][0] = SceneCell {
-                ch: ' ',
-                fg: Color::Reset,
-                bg: Color::Rgb(18, 26, 44),
-            };
+            buffer[0][0] = SceneCell::new(' ', Color::Reset, Color::Rgb(18, 26, 44));
         }
         let end = (1 + MAX_LIVES as usize + 1).min(render_width as usize);
         if end < render_width as usize {
-            buffer[0][end - 1] = SceneCell {
-                ch: ' ',
-                fg: Color::Reset,
-                bg: Color::Rgb(18, 26, 44),
-            };
+            buffer[0][end - 1] = SceneCell::new(' ', Color::Reset, Color::Rgb(18, 26, 44));
         }
     }
 
@@ -599,21 +574,13 @@ fn render_hud(
     for (i, ch) in label.chars().enumerate() {
         let col = score_start + i;
         if col < render_width as usize {
-            buffer[0][col] = SceneCell {
-                ch,
-                fg: Color::Rgb(150, 170, 192),
-                bg: buffer[0][col].bg,
-            };
+            buffer[0][col] = SceneCell::new(ch, Color::Rgb(150, 170, 192), buffer[0][col].bg);
         }
     }
     for (i, ch) in score_text.chars().enumerate() {
         let col = score_start + label.len() + i;
         if col < render_width as usize {
-            buffer[0][col] = SceneCell {
-                ch,
-                fg: Color::White,
-                bg: buffer[0][col].bg,
-            };
+            buffer[0][col] = SceneCell::new(ch, Color::White, buffer[0][col].bg);
         }
     }
 
@@ -629,11 +596,8 @@ fn render_hud(
     if render_height > 1 {
         // Opening bracket
         if bar_start > 0 {
-            buffer[1][bar_start - 1] = SceneCell {
-                ch: '[',
-                fg: Color::Rgb(150, 170, 192),
-                bg: buffer[1][bar_start - 1].bg,
-            };
+            buffer[1][bar_start - 1] =
+                SceneCell::new('[', Color::Rgb(150, 170, 192), buffer[1][bar_start - 1].bg);
         }
         for i in 0..bar_width {
             let col = bar_start + i;
@@ -645,27 +609,18 @@ fn render_hud(
                         i as f64 / (bar_width - 1) as f64
                     };
                     let fill = lerp_rgb((90, 218, 255), (124, 255, 170), progress_t);
-                    buffer[1][col] = SceneCell {
-                        ch: '█',
-                        fg: Color::Rgb(fill.0, fill.1, fill.2),
-                        bg: buffer[1][col].bg,
-                    };
+                    buffer[1][col] =
+                        SceneCell::new('█', Color::Rgb(fill.0, fill.1, fill.2), buffer[1][col].bg);
                 } else {
-                    buffer[1][col] = SceneCell {
-                        ch: '░',
-                        fg: Color::Rgb(82, 96, 116),
-                        bg: buffer[1][col].bg,
-                    };
+                    buffer[1][col] =
+                        SceneCell::new('░', Color::Rgb(82, 96, 116), buffer[1][col].bg);
                 }
             }
         }
         let bracket_col = bar_start + bar_width;
         if bracket_col < render_width as usize {
-            buffer[1][bracket_col] = SceneCell {
-                ch: ']',
-                fg: Color::Rgb(150, 170, 192),
-                bg: buffer[1][bracket_col].bg,
-            };
+            buffer[1][bracket_col] =
+                SceneCell::new(']', Color::Rgb(150, 170, 192), buffer[1][bracket_col].bg);
         }
     }
 }
