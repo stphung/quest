@@ -192,29 +192,25 @@ When active, a `[DEBUG]` indicator shows in the UI corner.
 
 ### Menu Options
 
-1. **Trigger Dungeon** — Spawns a dungeon immediately
-2. **Trigger Fishing** — Starts a fishing session immediately
-3. **Trigger Chess Challenge** — Adds chess to challenge menu
-4. **Trigger Morris Challenge** — Adds morris to challenge menu
-5. **Trigger Gomoku Challenge** — Adds gomoku to challenge menu
-6. **Trigger Minesweeper Challenge** — Adds minesweeper to challenge menu
-7. **Trigger Rune Challenge** — Adds rune challenge to challenge menu
-8. **Trigger Go Challenge** — Adds go to challenge menu
-9. **Trigger Flappy Bird Challenge** — Adds flappy bird to challenge menu
-10. **Trigger JezzBall Challenge** — Adds jezzball to challenge menu
-11. **Trigger Snake Challenge** — Adds snake to challenge menu
-12. **Trigger Sigil Surge Challenge** — Adds sigil surge to challenge menu
-13. **Trigger Haven Discovery** — Discovers Haven immediately
-14. **Trigger Soulforge Discovery** — Discovers Soulforge immediately
-15. **Forge Asprika (God Item)** — Creates and equips Asprika god item
-16. **Forge Sleipnir (God Item)** — Creates and equips Sleipnir god item
-17. **Forge Megingjord (God Item)** — Creates and equips Megingjord god item
+The debug menu uses a tabbed category structure. Left/Right arrows switch tabs, Up/Down navigate within a tab, Enter triggers.
+
+**Challenges tab:**
+- Trigger Chess, Morris, Gomoku, Minesweeper, Rune, Go, Flappy Bird, JezzBall, Snake, Sigil Surge challenges
+
+**World tab:**
+- Trigger Dungeon, Trigger Fishing, Trigger Haven Discovery, Trigger Soulforge Discovery
+
+**Resources tab:**
+- Grant 1000 Stormglass, Discover Stormglass, Grant 100k Stormglass, Etch Random Sigils (All Slots), Etch S+ Sigil (Slot 1)
+
+**Items tab:**
+- Forge Asprika, Forge Sleipnir, Forge Megingjord (God Items)
 
 Each option calls existing generation functions to bypass the normal RNG discovery system. Useful for testing features without waiting for random events.
 
 ### UI Style
 
-Yellow border popup overlay, centered on screen. Matches challenge menu styling.
+Yellow border popup overlay with tabbed header, centered on screen with fixed panel size.
 
 ### Debug Mode Behavior
 

@@ -124,6 +124,14 @@ pub fn spinner_char() -> char {
     SPINNER[((millis / 100) % 10) as usize]
 }
 
+const BLOCK_SPINNER: [char; 8] = ['▖', '▘', '▝', '▗', '▖', '▘', '▝', '▗'];
+
+/// Returns a block-based spinner character based on system time.
+pub fn block_spinner_char() -> char {
+    let millis = current_millis();
+    BLOCK_SPINNER[((millis / 100) % BLOCK_SPINNER.len() as u128) as usize]
+}
+
 /// Returns a waiting message based on a seed value.
 /// The message stays stable for the same seed, changing only when the seed changes.
 pub fn waiting_message(seed: u64) -> &'static str {

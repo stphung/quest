@@ -13,6 +13,7 @@ use ratatui::{
     widgets::{Block, Borders, Gauge, Paragraph},
     Frame,
 };
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Returns the icon of the highest unlocked prestige achievement, if any.
 pub(super) fn highest_prestige_badge(
@@ -89,6 +90,27 @@ pub(super) fn format_eta(seconds: u64) -> String {
     } else {
         format!("~{}d", days)
     }
+}
+
+fn current_millis() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+}
+
+fn prestige_ready_gauge_style() -> Style {
+    const PULSE_COLORS: [Color; 5] = [
+        Color::Rgb(190, 118, 255),
+        Color::Rgb(208, 138, 255),
+        Color::Rgb(228, 168, 245),
+        Color::Rgb(248, 198, 185),
+        Color::Rgb(255, 221, 120),
+    ];
+    let idx = ((current_millis() / 220) % PULSE_COLORS.len() as u128) as usize;
+    Style::default()
+        .fg(PULSE_COLORS[idx])
+        .add_modifier(Modifier::BOLD)
 }
 
 /// Draws prestige information with CHA bonus
@@ -181,12 +203,15 @@ pub(super) fn draw_prestige_info(
         next_prestige.rank,
         prestige_eta
     );
+    let prestige_ready = game_state.character_level >= next_prestige.required_level;
     let prestige_gauge = Gauge::default()
-        .gauge_style(
+        .gauge_style(if prestige_ready {
+            prestige_ready_gauge_style()
+        } else {
             Style::default()
                 .fg(Color::Rgb(180, 100, 255))
-                .add_modifier(Modifier::BOLD),
-        )
+                .add_modifier(Modifier::BOLD)
+        })
         .label(prestige_label)
         .ratio(prestige_ratio);
 

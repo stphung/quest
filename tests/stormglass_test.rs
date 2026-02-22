@@ -3,6 +3,8 @@
 use quest::core::game_state::GameState;
 use quest::items::types::Rarity;
 use quest::stormglass::{earning, spending, types};
+use rand::SeedableRng;
+use rand_chacha::ChaCha8Rng;
 
 // ── Earning: salvage values by rarity ──────────────────────────────────
 
@@ -119,14 +121,14 @@ fn test_soulforge_consolation_out_of_range() {
 
 #[test]
 fn test_generate_trial_options_returns_3() {
-    let mut rng = rand::rng();
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
     let options = spending::generate_trial_options(&mut rng, &[]);
     assert_eq!(options.len(), 3);
 }
 
 #[test]
 fn test_generate_trial_options_unique_types() {
-    let mut rng = rand::rng();
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
     let options = spending::generate_trial_options(&mut rng, &[]);
     let types: Vec<_> = options.iter().map(|o| &o.challenge_type).collect();
     for i in 0..types.len() {
@@ -141,7 +143,7 @@ fn test_generate_trial_options_unique_types() {
 
 #[test]
 fn test_generate_trial_options_has_display_names() {
-    let mut rng = rand::rng();
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
     let options = spending::generate_trial_options(&mut rng, &[]);
     for option in &options {
         assert!(!option.display_name.is_empty());
@@ -151,7 +153,7 @@ fn test_generate_trial_options_has_display_names() {
 #[test]
 fn test_generate_trial_options_excludes_pending() {
     use quest::challenges::menu::ChallengeType;
-    let mut rng = rand::rng();
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
     let exclude = vec![
         ChallengeType::Chess,
         ChallengeType::Morris,

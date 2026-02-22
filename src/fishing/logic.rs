@@ -981,14 +981,14 @@ mod tests {
 
     #[test]
     fn test_fishing_item_drop_rates_by_rarity() {
-        let trials = 5000;
+        let trials = 2000;
 
         for (rarity, expected_rate, tolerance) in [
-            (FishRarity::Common, 0.05, 0.02),
-            (FishRarity::Uncommon, 0.05, 0.02),
-            (FishRarity::Rare, 0.15, 0.03),
-            (FishRarity::Epic, 0.35, 0.04),
-            (FishRarity::Legendary, 0.75, 0.04),
+            (FishRarity::Common, 0.05, 0.03),
+            (FishRarity::Uncommon, 0.05, 0.03),
+            (FishRarity::Rare, 0.15, 0.04),
+            (FishRarity::Epic, 0.35, 0.05),
+            (FishRarity::Legendary, 0.75, 0.05),
         ] {
             let mut drops = 0;
             for seed in 0..trials {

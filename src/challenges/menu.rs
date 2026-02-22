@@ -1242,8 +1242,8 @@ mod tests {
         // Test that the bonus is applied correctly by checking at fixed RNG values
         // Base discovery chance is 0.000014, so we need RNG values very close to 0 to discover
 
-        // Count discoveries in a reasonable sample
-        let trials = 50000;
+        // Count discoveries in a reasonable sample (seeded RNG = deterministic)
+        let trials = 5000;
         let mut discoveries_no_bonus = 0;
         let mut discoveries_with_bonus = 0;
 

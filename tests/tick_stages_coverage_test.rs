@@ -1507,6 +1507,39 @@ fn test_fishing_tick_produces_catch_events() {
 }
 
 #[test]
+fn test_fishing_tick_can_level_up_character() {
+    let mut state = fresh_state();
+    state.character_level = 1;
+    state.character_xp = 99; // Any fish catch gives at least 50 XP
+    state.active_fishing = Some(make_fishing_session(FishingPhase::Reeling, 1, 1));
+    let mut tc = 0u32;
+    let mut result = TickResult::default();
+    let mut ach = Achievements::default();
+    let mut rng = seeded_rng(123);
+    let bonuses = default_haven_bonuses();
+
+    tick_stages::process_fishing_tick(
+        &mut state,
+        &mut tc,
+        0.1,
+        &bonuses,
+        &mut ach,
+        false,
+        &mut result,
+        &mut rng,
+    );
+
+    assert!(
+        state.character_level >= 2,
+        "Fishing XP should trigger level-up processing"
+    );
+    assert!(
+        has_event(&result, |e| matches!(e, TickEvent::LeveledUp { .. })),
+        "Fishing tick should emit LeveledUp event when crossing XP threshold"
+    );
+}
+
+#[test]
 fn test_fishing_tick_fish_caught_adds_recent_drop() {
     let mut state = fresh_state();
     state.active_fishing = Some(make_fishing_session(FishingPhase::Waiting, 200, 10));

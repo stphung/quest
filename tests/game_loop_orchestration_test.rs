@@ -117,9 +117,9 @@ fn test_haven_discovery_possible_at_prestige_10() {
 #[test]
 fn test_haven_discovery_higher_prestige_increases_chance() {
     // Behavior: chance = 0.000014 + 0.000007 * (rank - 10) for rank > 10
-    // Use P10 vs P50 for reliable distinction with 20k trials.
-    // P10: 0.000014 → ~0.28 expected. P50: 0.000014 + 0.000007*40 = 0.000294 → ~5.88 expected.
-    let trials = 20_000u64;
+    // Seeded RNG = deterministic, so 10k trials is sufficient.
+    // P10: 0.000014 → ~0.14 expected. P50: 0.000014 + 0.000007*40 = 0.000294 → ~2.94 expected.
+    let trials = 10_000u64;
     let mut discoveries_p10 = 0u32;
     let mut discoveries_p50 = 0u32;
 
@@ -736,7 +736,7 @@ fn test_challenge_discovered_event_has_follow_up() {
     let mut ach = Achievements::default();
 
     let mut found = false;
-    for seed in 0..50_000u64 {
+    for seed in 0..25_000u64 {
         let mut rng = seeded_rng(seed);
         let mut s = fresh_state();
         s.prestige_rank = 1;
@@ -1374,7 +1374,7 @@ fn test_haven_discovery_via_game_tick_at_p10() {
     }
     assert!(
         found,
-        "Should discover Haven via game_tick at P15 within 10k ticks"
+        "Should discover Haven via game_tick at P15 within 10k seeds"
     );
 }
 

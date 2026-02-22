@@ -1039,6 +1039,7 @@ quest/
 │       ├── stats_attributes.rs # Stats panel attribute rendering
 │       ├── stats_equipment.rs # Stats panel equipment rendering
 │       ├── stats_prestige.rs # Stats panel prestige info rendering
+│       ├── stats_sigils.rs  # Stats panel Storm Sigils rendering
 │       ├── ticker.rs        # Scrolling loot ticker with independent per-entry scrolling
 │       ├── combat_scene.rs  # Combat view
 │       ├── combat_3d.rs     # 3D dungeon renderer
@@ -1064,10 +1065,10 @@ quest/
 │       ├── soulforge_effects.rs # Soulforge animation effects
 │       ├── soulforge_slots.rs # Soulforge slot selection rendering
 │       ├── help_overlay.rs   # Help overlay with keybindings
-│       ├── stormglass_scene.rs # Stormglass currency and sigils overlay
+│       ├── stormglass_scene.rs # Stormglass Exchange overlay with animations
 │       ├── scene_fx.rs       # Shared utilities for layered ASCII scene rendering
 │       ├── zone_bg.rs        # Stylized zone background scenes (6-layer compositing)
-│       ├── debug_menu_scene.rs # Debug overlay
+│       ├── debug_menu_scene.rs # Debug menu with tabbed categories
 │       ├── throbber.rs      # Spinner animations
 │       └── character_select.rs, character_creation.rs,
 │           character_delete.rs, character_rename.rs

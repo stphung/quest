@@ -248,6 +248,8 @@ impl_apply_game_result! {
 mod tests {
     use super::*;
     use crate::challenges::menu::{ChallengeType, PendingChallenge};
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
 
     fn make_chess_challenge() -> PendingChallenge {
         PendingChallenge {
@@ -304,7 +306,7 @@ mod tests {
     #[test]
     fn test_ai_makes_legal_move() {
         let board = chess_engine::Board::default();
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
 
         let ai_move = get_ai_move(&board, ChessDifficulty::Novice, &mut rng);
 
@@ -319,7 +321,7 @@ mod tests {
     #[test]
     fn test_ai_move_different_difficulties() {
         let board = chess_engine::Board::default();
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
 
         // All difficulties should return legal moves
         for difficulty in ChessDifficulty::ALL {
