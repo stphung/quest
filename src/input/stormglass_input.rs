@@ -65,7 +65,7 @@ fn handle_menu(
         KeyCode::Enter => {
             match exchange_ui.selected_item {
                 0 => {
-                    // Invoke Trial — show confirmation first
+                    // Invoke Challenge — show confirmation first
                     if state.stormglass >= INVOKE_TRIAL_COST {
                         // Guard: if all 10 challenge types are already pending, do nothing
                         if state.challenge_menu.challenges.len() >= 10 {

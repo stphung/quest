@@ -212,24 +212,30 @@ fn render_exchange_menu(
     clear_row_chars(&mut buffer, 9); // description line 2
     clear_row_chars(&mut buffer, (h as i32) - 1); // help
 
-    // Menu items (rows 4-6): (icon, icon_display_width, label, cost_text, affordable)
-    // icon_display_width accounts for emoji vs narrow chars in the terminal.
-    let items: [(&str, i32, &str, String, bool); 3] = [
+    // Menu items (rows 4-6): (display_text, cost_text, affordable)
+    // Wide emoji icons (2 terminal cols) get 1 space before label;
+    // narrow icons (1 terminal col) get 2 spaces — so labels align.
+    let items: [(&str, String, bool); 3] = [
         (
-            "\u{2694}\u{FE0F}", // ⚔️
-            2,
-            "Invoke Trial",
+            "\u{1F3B2} Invoke Challenge", // 🎲 (2-wide) + 1 space
             format!("{} SG", INVOKE_TRIAL_COST),
             state.stormglass >= INVOKE_TRIAL_COST,
         ),
-        ("\u{231B}", 2, "Chrono Surge", ">>>".to_string(), true), // ⌛
-        ("\u{16B1}", 1, "Storm Sigils", ">>>".to_string(), true), // ᚱ
+        (
+            "\u{231B} Chrono Surge", // ⌛ (2-wide) + 1 space
+            ">>>".to_string(),
+            true,
+        ),
+        (
+            "\u{16B1}  Storm Sigils", // ᚱ (1-wide) + 2 spaces
+            ">>>".to_string(),
+            true,
+        ),
     ];
 
     let menu_start_row = 4i32;
-    let icon_col = 2i32;
-    let label_col = icon_col + 3; // Enough room for widest icon (2) + 1 gap
-    for (i, (icon, _icon_w, label, cost, affordable)) in items.iter().enumerate() {
+    let text_col = 2i32;
+    for (i, (display, cost, affordable)) in items.iter().enumerate() {
         let row = menu_start_row + i as i32;
         if row >= h as i32 {
             break;
@@ -247,13 +253,8 @@ fn render_exchange_menu(
             Color::DarkGray
         };
 
-        // Place icon with put_cell to control exactly one cell,
-        // then label at a fixed column so all rows align.
-        // For multi-codepoint emoji (e.g. ⚔️), only place the base char;
-        // the terminal renders it as a wide glyph spanning 2 cells.
-        let base_char = icon.chars().next().unwrap_or(' ');
-        put_cell(&mut buffer, row, icon_col, base_char, fg);
-        put_text(&mut buffer, row, label_col, label, fg);
+        // Icon + label as one string so terminal width is handled naturally
+        put_text(&mut buffer, row, text_col, display, fg);
 
         // Right-aligned cost
         let cost_fg = if *affordable {
@@ -307,7 +308,7 @@ fn render_exchange_menu(
     // Description overlay (rows 8-9) — changes based on selected item
     if h > 9 {
         let desc = match exchange_ui.selected_item {
-            0 => "Spend Stormglass to unlock a choice of three challenges.",
+            0 => "Spend Stormglass to invoke a choice of three challenges.",
             1 => "Bend time itself. Earn XP and loot, but no Stormglass.",
             _ => "Etch sigils of power onto your soul. Permanent bonuses.",
         };
@@ -336,7 +337,7 @@ fn render_invoke_trial_confirm(frame: &mut Frame, area: Rect, state: &GameState)
 
     let block = Block::default()
         .title(Line::from(Span::styled(
-            " \u{2694}\u{FE0F} Invoke Trial? \u{2694}\u{FE0F} ",
+            " \u{1F3B2} Invoke Challenge? \u{1F3B2} ",
             Style::default()
                 .fg(ELECTRIC_BLUE)
                 .add_modifier(Modifier::BOLD),
@@ -500,7 +501,7 @@ fn render_invoke_trial(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiSt
 
     let block = Block::default()
         .title(Line::from(Span::styled(
-            " \u{2694}\u{FE0F} Invoke Trial \u{2694}\u{FE0F} ",
+            " \u{1F3B2} Invoke Challenge \u{1F3B2} ",
             Style::default()
                 .fg(ELECTRIC_BLUE)
                 .add_modifier(Modifier::BOLD),
