@@ -12,7 +12,6 @@ mod haven;
 mod input;
 mod items;
 mod main_helpers;
-mod settings;
 mod stormglass;
 mod tick_events;
 mod ui;
@@ -147,8 +146,6 @@ fn main() -> io::Result<()> {
         }
     }
 
-    let mut app_settings = settings::load_settings();
-
     // Check for updates in background and feed startup splash when ready.
     let mut update_available = Some(std::thread::spawn(utils::updater::check_update_info));
 
@@ -199,7 +196,7 @@ fn main() -> io::Result<()> {
     let mut terminal = Terminal::new(backend)?;
 
     if matches!(
-        show_startup_splash_screen(&mut terminal, &mut update_available, &mut app_settings)?,
+        show_startup_splash_screen(&mut terminal, &mut update_available)?,
         StartupSplashResult::Quit
     ) {
         disable_raw_mode()?;
@@ -946,8 +943,7 @@ fn main() -> io::Result<()> {
                     }
 
                     let prestige_ready = can_prestige(&state);
-                    if app_settings.sound_on_prestige_ready && !was_prestige_ready && prestige_ready
-                    {
+                    if !was_prestige_ready && prestige_ready {
                         utils::audio::play_prestige_ready_sound();
                     }
                     was_prestige_ready = prestige_ready;
