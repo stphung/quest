@@ -72,18 +72,18 @@ fn handle_menu(
                         if state.challenge_menu.challenges.len() >= 10 {
                             return InputResult::Continue;
                         }
-                        exchange_ui.phase = ExchangePhase::InvokeTrialConfirm;
+                        exchange_ui.set_phase(ExchangePhase::InvokeTrialConfirm);
                     }
                 }
                 1 => {
                     // Chrono Surge — enter duration selection
                     exchange_ui.surge_selected = 0;
-                    exchange_ui.phase = ExchangePhase::ChronoSurge;
+                    exchange_ui.set_phase(ExchangePhase::ChronoSurge);
                 }
                 2 => {
                     // Storm Sigils — enter sigils list
                     exchange_ui.sigil_selected_slot = 0;
-                    exchange_ui.phase = ExchangePhase::SigilsList;
+                    exchange_ui.set_phase(ExchangePhase::SigilsList);
                 }
                 _ => {}
             }
@@ -126,7 +126,7 @@ fn handle_chrono_surge_select(
             InputResult::Continue
         }
         KeyCode::Esc => {
-            exchange_ui.phase = ExchangePhase::Menu;
+            exchange_ui.set_phase(ExchangePhase::Menu);
             InputResult::Continue
         }
         _ => InputResult::Continue,
@@ -152,11 +152,11 @@ fn handle_invoke_trial_confirm(
             exchange_ui.trial_options = generate_trial_options(&mut rng, &pending);
             exchange_ui.trial_selected = 0;
             exchange_ui.invoke_animation_start_ms = Some(current_millis());
-            exchange_ui.phase = ExchangePhase::InvokeTrialRolling;
+            exchange_ui.set_phase(ExchangePhase::InvokeTrialRolling);
             InputResult::Continue
         }
         KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
-            exchange_ui.phase = ExchangePhase::Menu;
+            exchange_ui.set_phase(ExchangePhase::Menu);
             InputResult::Continue
         }
         _ => InputResult::Continue,
@@ -175,7 +175,7 @@ fn handle_invoke_trial_forfeit_confirm(
         }
         _ => {
             // Esc or any other key — return to trial selection
-            exchange_ui.phase = ExchangePhase::InvokeTrial;
+            exchange_ui.set_phase(ExchangePhase::InvokeTrial);
             InputResult::Continue
         }
     }
@@ -213,7 +213,7 @@ fn handle_invoke_trial(
         }
         KeyCode::Esc => {
             // Forfeit — show confirmation before closing
-            exchange_ui.phase = ExchangePhase::InvokeTrialForfeitConfirm;
+            exchange_ui.set_phase(ExchangePhase::InvokeTrialForfeitConfirm);
             InputResult::Continue
         }
         _ => InputResult::Continue,
@@ -235,7 +235,7 @@ fn handle_invoke_trial_rolling(key: KeyEvent, exchange_ui: &mut ExchangeUiState)
 
     if elapsed >= INVOKE_ANIMATION_SKIP_FLOOR_MS {
         exchange_ui.invoke_animation_start_ms = None;
-        exchange_ui.phase = ExchangePhase::InvokeTrial;
+        exchange_ui.set_phase(ExchangePhase::InvokeTrial);
     }
     InputResult::Continue
 }
@@ -270,26 +270,26 @@ fn handle_sigils_list(
                 // Locked slot (next unlockable) — go to unlock confirm (requires SG)
                 if let Some(cost) = sigils.next_unlock_cost() {
                     if state.stormglass >= cost {
-                        exchange_ui.phase = ExchangePhase::SigilUnlockConfirm;
+                        exchange_ui.set_phase(ExchangePhase::SigilUnlockConfirm);
                     }
                 }
             } else if sigils.sigils[slot].is_some() {
                 // Etched slot — reroll (requires SG)
                 if state.stormglass >= ETCH_COST {
                     exchange_ui.sigil_target_slot = slot;
-                    exchange_ui.phase = ExchangePhase::SigilRerollConfirm;
+                    exchange_ui.set_phase(ExchangePhase::SigilRerollConfirm);
                 }
             } else {
                 // Empty slot — etch (requires SG)
                 if state.stormglass >= ETCH_COST {
                     exchange_ui.sigil_target_slot = slot;
-                    exchange_ui.phase = ExchangePhase::SigilEtchConfirm;
+                    exchange_ui.set_phase(ExchangePhase::SigilEtchConfirm);
                 }
             }
             InputResult::Continue
         }
         KeyCode::Esc => {
-            exchange_ui.phase = ExchangePhase::Menu;
+            exchange_ui.set_phase(ExchangePhase::Menu);
             InputResult::Continue
         }
         _ => InputResult::Continue,
@@ -309,11 +309,11 @@ fn handle_sigil_unlock_confirm(
                     state.storm_sigils.slots_unlocked += 1;
                 }
             }
-            exchange_ui.phase = ExchangePhase::SigilsList;
+            exchange_ui.set_phase(ExchangePhase::SigilsList);
             InputResult::Continue
         }
         KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
-            exchange_ui.phase = ExchangePhase::SigilsList;
+            exchange_ui.set_phase(ExchangePhase::SigilsList);
             InputResult::Continue
         }
         _ => InputResult::Continue,
@@ -336,12 +336,12 @@ fn handle_sigil_etch_confirm(
                 exchange_ui.sigil_pick_selected = 0;
                 exchange_ui.sigil_animation_start_ms = Some(current_millis());
                 exchange_ui.sigil_animation_skipped = false;
-                exchange_ui.phase = ExchangePhase::SigilRolling;
+                exchange_ui.set_phase(ExchangePhase::SigilRolling);
             }
             InputResult::Continue
         }
         KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
-            exchange_ui.phase = ExchangePhase::SigilsList;
+            exchange_ui.set_phase(ExchangePhase::SigilsList);
             InputResult::Continue
         }
         _ => InputResult::Continue,
@@ -367,12 +367,12 @@ fn handle_sigil_reroll_confirm(
                 exchange_ui.sigil_pick_selected = 0;
                 exchange_ui.sigil_animation_start_ms = Some(current_millis());
                 exchange_ui.sigil_animation_skipped = false;
-                exchange_ui.phase = ExchangePhase::SigilRolling;
+                exchange_ui.set_phase(ExchangePhase::SigilRolling);
             }
             InputResult::Continue
         }
         KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
-            exchange_ui.phase = ExchangePhase::SigilsList;
+            exchange_ui.set_phase(ExchangePhase::SigilsList);
             InputResult::Continue
         }
         _ => InputResult::Continue,
@@ -403,12 +403,12 @@ fn handle_sigil_pick(
                 let slot = exchange_ui.sigil_target_slot;
                 exchange_ui.sigil_result = Some(sigil.clone());
                 state.storm_sigils.sigils[slot] = Some(sigil);
-                exchange_ui.phase = ExchangePhase::SigilResult;
+                exchange_ui.set_phase(ExchangePhase::SigilResult);
             }
             InputResult::Continue
         }
         KeyCode::Esc => {
-            exchange_ui.phase = ExchangePhase::SigilForfeitConfirm;
+            exchange_ui.set_phase(ExchangePhase::SigilForfeitConfirm);
             InputResult::Continue
         }
         _ => InputResult::Continue,
@@ -420,12 +420,12 @@ fn handle_sigil_forfeit_confirm(key: KeyEvent, exchange_ui: &mut ExchangeUiState
         KeyCode::Enter => {
             // Confirm forfeit — SG already gone, slot stays empty
             exchange_ui.sigil_choices = [None, None, None];
-            exchange_ui.phase = ExchangePhase::SigilsList;
+            exchange_ui.set_phase(ExchangePhase::SigilsList);
             InputResult::Continue
         }
         _ => {
             // Esc or any other key — return to pick screen
-            exchange_ui.phase = ExchangePhase::SigilPick;
+            exchange_ui.set_phase(ExchangePhase::SigilPick);
             InputResult::Continue
         }
     }
@@ -436,7 +436,7 @@ fn handle_sigil_result(key: KeyEvent, exchange_ui: &mut ExchangeUiState) -> Inpu
         KeyCode::Enter | KeyCode::Esc => {
             exchange_ui.sigil_result = None;
             exchange_ui.sigil_choices = [None, None, None];
-            exchange_ui.phase = ExchangePhase::SigilsList;
+            exchange_ui.set_phase(ExchangePhase::SigilsList);
             InputResult::Continue
         }
         _ => InputResult::Continue,
@@ -459,7 +459,7 @@ fn handle_sigil_rolling(key: KeyEvent, exchange_ui: &mut ExchangeUiState) -> Inp
     if elapsed >= SIGIL_ANIMATION_SKIP_FLOOR_MS {
         exchange_ui.sigil_animation_start_ms = None;
         exchange_ui.sigil_animation_skipped = false;
-        exchange_ui.phase = ExchangePhase::SigilPick;
+        exchange_ui.set_phase(ExchangePhase::SigilPick);
     }
     InputResult::Continue
 }
@@ -475,7 +475,7 @@ pub fn check_sigil_animation_timeout(exchange_ui: &mut ExchangeUiState) {
 
         if elapsed >= INVOKE_ANIMATION_DURATION_MS {
             exchange_ui.invoke_animation_start_ms = None;
-            exchange_ui.phase = ExchangePhase::InvokeTrial;
+            exchange_ui.set_phase(ExchangePhase::InvokeTrial);
         }
         return;
     }
@@ -491,6 +491,6 @@ pub fn check_sigil_animation_timeout(exchange_ui: &mut ExchangeUiState) {
     if elapsed >= SIGIL_ANIMATION_DURATION_MS {
         exchange_ui.sigil_animation_start_ms = None;
         exchange_ui.sigil_animation_skipped = false;
-        exchange_ui.phase = ExchangePhase::SigilPick;
+        exchange_ui.set_phase(ExchangePhase::SigilPick);
     }
 }

@@ -2,6 +2,7 @@
 
 use crate::challenges::menu::ChallengeType;
 use crate::stormglass::sigils::Sigil;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 // ── Earning rates by rarity ────────────────────────────────────────────
 pub const SALVAGE_COMMON: u64 = 1;
@@ -72,6 +73,8 @@ pub struct ExchangeUiState {
     pub open: bool,
     pub selected_item: usize,
     pub phase: ExchangePhase,
+    previous_phase: Option<ExchangePhase>,
+    phase_entered_at_ms: Option<u128>,
     pub trial_options: Vec<TrialOption>,
     pub trial_selected: usize,
     pub invoke_animation_start_ms: Option<u128>,
@@ -87,11 +90,20 @@ pub struct ExchangeUiState {
 }
 
 impl ExchangeUiState {
+    fn current_millis() -> u128 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis()
+    }
+
     pub fn new() -> Self {
         Self {
             open: false,
             selected_item: 0,
             phase: ExchangePhase::Menu,
+            previous_phase: None,
+            phase_entered_at_ms: None,
             trial_options: Vec::new(),
             trial_selected: 0,
             invoke_animation_start_ms: None,
@@ -110,6 +122,8 @@ impl ExchangeUiState {
         self.open = true;
         self.selected_item = 0;
         self.phase = ExchangePhase::Menu;
+        self.previous_phase = None;
+        self.phase_entered_at_ms = Some(Self::current_millis());
         self.trial_options.clear();
         self.trial_selected = 0;
         self.invoke_animation_start_ms = None;
@@ -126,6 +140,8 @@ impl ExchangeUiState {
     pub fn close(&mut self) {
         self.open = false;
         self.phase = ExchangePhase::Menu;
+        self.previous_phase = None;
+        self.phase_entered_at_ms = None;
         self.trial_options.clear();
         self.trial_selected = 0;
         self.invoke_animation_start_ms = None;
@@ -137,6 +153,26 @@ impl ExchangeUiState {
         self.sigil_target_slot = 0;
         self.sigil_animation_start_ms = None;
         self.sigil_animation_skipped = false;
+    }
+
+    /// Set the active phase and reset phase-entry animation timing when it changes.
+    pub fn set_phase(&mut self, phase: ExchangePhase) {
+        if self.phase != phase {
+            self.previous_phase = Some(self.phase);
+            self.phase = phase;
+            self.phase_entered_at_ms = Some(Self::current_millis());
+        }
+    }
+
+    /// Previous phase before the most recent phase transition.
+    pub fn previous_phase(&self) -> Option<ExchangePhase> {
+        self.previous_phase
+    }
+
+    /// Milliseconds elapsed since entering the current phase.
+    pub fn phase_elapsed_ms(&self) -> Option<u128> {
+        self.phase_entered_at_ms
+            .map(|start| Self::current_millis().saturating_sub(start))
     }
 }
 

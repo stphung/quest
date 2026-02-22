@@ -131,6 +131,7 @@ pub fn handle_select_frame(
                 area,
                 haven,
                 haven_ui.selected_room,
+                haven_ui.open_elapsed_ms(),
                 0, // No character selected, so prestige rank = 0
                 global_achievements,
                 &ctx,

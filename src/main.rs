@@ -39,7 +39,13 @@ use ratatui::crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
 use ratatui::crossterm::ExecutableCommand;
-use ratatui::{backend::CrosstermBackend, Terminal};
+use ratatui::{
+    backend::CrosstermBackend,
+    layout::Rect,
+    style::{Color, Style},
+    widgets::{Block, Borders, Paragraph},
+    Terminal,
+};
 use std::io;
 use std::time::{Duration, Instant};
 use stormglass::types::{ChronoSurgeState, ChronoSurgeSummary};
@@ -59,6 +65,41 @@ enum Screen {
     CharacterDelete,
     CharacterRename,
     Game,
+}
+
+fn play_screen_transition(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> {
+    const STEPS: u16 = 6;
+    for step in 0..=STEPS {
+        let progress = step as f32 / STEPS as f32;
+        terminal.draw(|frame| {
+            let area = frame.area();
+            let band = ((progress * area.height as f32) / 2.0).ceil() as u16;
+            if band > 0 && area.width > 0 {
+                let row = " ".repeat(area.width as usize);
+                for y in 0..band {
+                    frame.render_widget(
+                        Paragraph::new(row.as_str()).style(Style::default().bg(Color::Black)),
+                        Rect::new(area.x, area.y + y, area.width, 1),
+                    );
+                }
+                let bottom_start = area.y + area.height.saturating_sub(band);
+                for y in bottom_start..(area.y + area.height) {
+                    frame.render_widget(
+                        Paragraph::new(row.as_str()).style(Style::default().bg(Color::Black)),
+                        Rect::new(area.x, y, area.width, 1),
+                    );
+                }
+            }
+            frame.render_widget(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::DarkGray)),
+                area,
+            );
+        })?;
+        std::thread::sleep(Duration::from_millis(14));
+    }
+    Ok(())
 }
 
 fn main() -> io::Result<()> {
@@ -161,6 +202,7 @@ fn main() -> io::Result<()> {
     let mut prev_screen = current_screen;
     loop {
         if current_screen != prev_screen {
+            play_screen_transition(&mut terminal)?;
             terminal.clear()?;
             prev_screen = current_screen;
         }
