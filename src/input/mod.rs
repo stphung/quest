@@ -79,11 +79,13 @@ pub fn handle_game_input(
                     if let Some(title_def) = unlocked.get(title_browser.selected_index) {
                         achievements.selected_title = Some(title_def.achievement_id);
                         title_browser.close();
+                        return InputResult::NeedsSave;
                     }
                 }
                 KeyCode::Backspace => {
                     achievements.selected_title = None;
                     title_browser.close();
+                    return InputResult::NeedsSave;
                 }
                 _ => {}
             }

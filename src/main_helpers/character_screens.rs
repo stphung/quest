@@ -218,11 +218,13 @@ pub fn handle_select_frame(
                                 global_achievements.selected_title =
                                     Some(title_def.achievement_id);
                                 title_browser.close();
+                                let _ = achievements::save_achievements(global_achievements);
                             }
                         }
                         KeyCode::Backspace => {
                             global_achievements.selected_title = None;
                             title_browser.close();
+                            let _ = achievements::save_achievements(global_achievements);
                         }
                         _ => {}
                     }

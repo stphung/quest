@@ -60,3 +60,72 @@ pub fn get_unlocked_titles(achievements: &super::types::Achievements) -> Vec<&'s
         .filter(|t| achievements.is_unlocked(t.achievement_id))
         .collect()
 }
+
+/// Validate the selected title — clear it if the achievement isn't unlocked.
+pub fn validate_selected_title(achievements: &mut super::types::Achievements) {
+    if let Some(id) = achievements.selected_title {
+        if !achievements.is_unlocked(id) || get_title_text(id).is_none() {
+            achievements.selected_title = None;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::achievements::types::Achievements;
+
+    #[test]
+    fn test_get_title_text_exists() {
+        assert_eq!(get_title_text(AchievementId::Eternal), Some("Eternal"));
+        assert_eq!(get_title_text(AchievementId::SlayerV), Some("Slayer"));
+    }
+
+    #[test]
+    fn test_get_title_text_none_for_non_title() {
+        assert_eq!(get_title_text(AchievementId::SlayerI), None);
+        assert_eq!(get_title_text(AchievementId::Level10), None);
+    }
+
+    #[test]
+    fn test_get_unlocked_titles_empty() {
+        let achievements = Achievements::default();
+        assert!(get_unlocked_titles(&achievements).is_empty());
+    }
+
+    #[test]
+    fn test_get_unlocked_titles_filters() {
+        let mut achievements = Achievements::default();
+        achievements.unlock(AchievementId::SlayerV, Some("Hero".to_string()));
+        achievements.unlock(AchievementId::SlayerI, Some("Hero".to_string())); // no title
+        let titles = get_unlocked_titles(&achievements);
+        assert_eq!(titles.len(), 1);
+        assert_eq!(titles[0].title_text, "Slayer");
+    }
+
+    #[test]
+    fn test_validate_clears_invalid() {
+        let mut achievements = Achievements::default();
+        achievements.selected_title = Some(AchievementId::Eternal);
+        validate_selected_title(&mut achievements);
+        assert_eq!(achievements.selected_title, None);
+    }
+
+    #[test]
+    fn test_validate_keeps_valid() {
+        let mut achievements = Achievements::default();
+        achievements.unlock(AchievementId::SlayerV, Some("Hero".to_string()));
+        achievements.selected_title = Some(AchievementId::SlayerV);
+        validate_selected_title(&mut achievements);
+        assert_eq!(achievements.selected_title, Some(AchievementId::SlayerV));
+    }
+
+    #[test]
+    fn test_validate_clears_non_title_achievement() {
+        let mut achievements = Achievements::default();
+        achievements.unlock(AchievementId::SlayerI, Some("Hero".to_string()));
+        achievements.selected_title = Some(AchievementId::SlayerI);
+        validate_selected_title(&mut achievements);
+        assert_eq!(achievements.selected_title, None);
+    }
+}

@@ -183,6 +183,7 @@ fn main() -> io::Result<()> {
 
     // Load global achievements (shared across all characters)
     let mut global_achievements = achievements::load_achievements();
+    crate::achievements::titles::validate_selected_title(&mut global_achievements);
     global_achievements.refresh_progress();
 
     // List existing characters
