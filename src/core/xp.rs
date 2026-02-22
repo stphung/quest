@@ -60,6 +60,15 @@ pub fn apply_tick_xp<R: Rng>(
     state.character_xp += xp_gain as u64;
     state.combat_seconds_this_tick = true;
 
+    process_level_ups_from_current_xp(rng, state)
+}
+
+/// Processes pending level-ups using the current `state.character_xp`.
+/// Returns (number of level-ups, attributes increased).
+pub fn process_level_ups_from_current_xp<R: Rng>(
+    rng: &mut R,
+    state: &mut GameState,
+) -> (u32, Vec<AttributeType>) {
     let mut levelups = 0;
     let mut all_increased = Vec::new();
 
