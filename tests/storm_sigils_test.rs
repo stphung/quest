@@ -1031,3 +1031,42 @@ fn test_daily_pool_covers_all_types_over_many_days() {
         "All 11 types should appear within 100 days"
     );
 }
+
+// ── Animation State Machine Tests ──────────────────────────────────────
+
+#[test]
+fn test_sigil_rolling_phase_exists() {
+    use quest::stormglass::types::ExchangePhase;
+    let phase = ExchangePhase::SigilRolling;
+    assert_eq!(phase, ExchangePhase::SigilRolling);
+}
+
+#[test]
+fn test_exchange_ui_animation_fields_default() {
+    use quest::stormglass::types::ExchangeUiState;
+    let ui = ExchangeUiState::new();
+    assert!(ui.sigil_animation_start_ms.is_none());
+    assert!(!ui.sigil_animation_skipped);
+}
+
+#[test]
+fn test_exchange_ui_open_resets_animation_fields() {
+    use quest::stormglass::types::ExchangeUiState;
+    let mut ui = ExchangeUiState::new();
+    ui.sigil_animation_start_ms = Some(12345);
+    ui.sigil_animation_skipped = true;
+    ui.open();
+    assert!(ui.sigil_animation_start_ms.is_none());
+    assert!(!ui.sigil_animation_skipped);
+}
+
+#[test]
+fn test_exchange_ui_close_resets_animation_fields() {
+    use quest::stormglass::types::ExchangeUiState;
+    let mut ui = ExchangeUiState::new();
+    ui.sigil_animation_start_ms = Some(99999);
+    ui.sigil_animation_skipped = true;
+    ui.close();
+    assert!(ui.sigil_animation_start_ms.is_none());
+    assert!(!ui.sigil_animation_skipped);
+}
