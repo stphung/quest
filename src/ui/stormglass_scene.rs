@@ -33,6 +33,8 @@ const INVOKE_PHASE3_END_MS: u128 = 4200;
 const PHASE1_END_MS: u128 = 1400;
 const PHASE2_END_MS: u128 = 2800;
 const PHASE3_END_MS: u128 = 3500;
+const PHASE_WIPE_MS: u128 = 180;
+const SUBMENU_PUSH_MS: u128 = 170;
 
 /// Temporal-tech accent colors for Chrono Surge visuals.
 const TIMEWARP_CYAN: Color = Color::Rgb(120, 220, 255);
@@ -141,6 +143,213 @@ fn chrono_ticks_to_duration_label(ticks: u64) -> String {
     }
 }
 
+fn centered_overlay_rect(area: Rect, width: u16, height: u16) -> Rect {
+    let overlay_width = width.min(area.width.saturating_sub(4));
+    let overlay_height = height.min(area.height.saturating_sub(2));
+    let x = area.x + (area.width.saturating_sub(overlay_width)) / 2;
+    let y = area.y + (area.height.saturating_sub(overlay_height)) / 2;
+    Rect::new(x, y, overlay_width, overlay_height)
+}
+
+fn phase_overlay_rect(area: Rect, phase: ExchangePhase) -> Rect {
+    match phase {
+        ExchangePhase::Menu => centered_overlay_rect(area, 52, 16),
+        ExchangePhase::InvokeTrialConfirm
+        | ExchangePhase::InvokeTrialRolling
+        | ExchangePhase::InvokeTrial
+        | ExchangePhase::InvokeTrialForfeitConfirm
+        | ExchangePhase::SigilUnlockConfirm
+        | ExchangePhase::SigilRerollConfirm
+        | ExchangePhase::SigilRolling
+        | ExchangePhase::SigilPick
+        | ExchangePhase::SigilForfeitConfirm
+        | ExchangePhase::SigilResult => centered_overlay_rect(area, 52, 14),
+        ExchangePhase::ChronoSurge => centered_overlay_rect(area, 52, 16),
+        ExchangePhase::SigilEtchConfirm => centered_overlay_rect(area, 52, 16),
+        ExchangePhase::SigilsList => centered_overlay_rect(area, 52, 17),
+    }
+}
+
+fn should_render_submenu_transition(exchange_ui: &ExchangeUiState) -> bool {
+    matches!(
+        exchange_ui.phase,
+        ExchangePhase::ChronoSurge | ExchangePhase::SigilsList
+    ) && exchange_ui.previous_phase() == Some(ExchangePhase::Menu)
+}
+
+fn submenu_source_row(overlay_area: Rect, phase: ExchangePhase) -> u16 {
+    // Menu rows are rendered at inner rows 4..=6. Anchor submenu reveal to the
+    // selected row's Y position so the panel appears to push out from that row.
+    let menu_item_idx = match phase {
+        ExchangePhase::ChronoSurge => 1u16,
+        ExchangePhase::SigilsList => 2u16,
+        _ => 1u16,
+    };
+    let source = overlay_area.y + 1 + 4 + menu_item_idx;
+    source.min(overlay_area.y + overlay_area.height.saturating_sub(1))
+}
+
+fn render_phase_wipe(
+    frame: &mut Frame,
+    overlay_area: Rect,
+    phase_elapsed_ms: Option<u128>,
+    millis: u128,
+) {
+    let Some(elapsed) = phase_elapsed_ms else {
+        return;
+    };
+    if elapsed >= PHASE_WIPE_MS || overlay_area.width == 0 || overlay_area.height == 0 {
+        return;
+    }
+
+    let progress = (elapsed as f32 / PHASE_WIPE_MS as f32).clamp(0.0, 1.0);
+    let revealed = ((overlay_area.height as f32 * progress).ceil() as u16).min(overlay_area.height);
+    let hidden_h = overlay_area.height.saturating_sub(revealed);
+    if hidden_h == 0 {
+        return;
+    }
+
+    let hidden_y = overlay_area.y + revealed;
+    let row_text = " ".repeat(overlay_area.width as usize);
+    for dy in 0..hidden_h {
+        frame.render_widget(
+            Paragraph::new(row_text.as_str()).style(Style::default().bg(Color::Rgb(4, 8, 22))),
+            Rect::new(overlay_area.x, hidden_y + dy, overlay_area.width, 1),
+        );
+    }
+
+    // Bright storm edge moving across the wipe boundary.
+    let edge_col = ((millis / 14) as u16) % overlay_area.width.max(1);
+    let edge_row = hidden_y;
+    if edge_row < overlay_area.y + overlay_area.height {
+        frame.render_widget(
+            Paragraph::new(row_text.as_str()).style(Style::default().bg(Color::Rgb(20, 40, 86))),
+            Rect::new(overlay_area.x, edge_row, overlay_area.width, 1),
+        );
+        let mut edge_line = vec![' '; overlay_area.width as usize];
+        edge_line[edge_col as usize] = '·';
+        let edge_str: String = edge_line.into_iter().collect();
+        frame.render_widget(
+            Paragraph::new(edge_str).style(
+                Style::default()
+                    .fg(ELECTRIC_BLUE)
+                    .bg(Color::Rgb(20, 40, 86)),
+            ),
+            Rect::new(overlay_area.x, edge_row, overlay_area.width, 1),
+        );
+    }
+}
+
+fn render_submenu_transition(
+    frame: &mut Frame,
+    overlay_area: Rect,
+    source_row: u16,
+    phase: ExchangePhase,
+    phase_elapsed_ms: Option<u128>,
+    millis: u128,
+) {
+    let Some(elapsed) = phase_elapsed_ms else {
+        return;
+    };
+    if elapsed >= SUBMENU_PUSH_MS || overlay_area.width == 0 || overlay_area.height == 0 {
+        return;
+    }
+
+    let progress = (elapsed as f32 / SUBMENU_PUSH_MS as f32).clamp(0.0, 1.0);
+    let max_half = ((overlay_area.height.saturating_sub(1)) / 2) as i32;
+    let half_span = ((max_half as f32) * progress).floor() as i32;
+
+    let min_y = overlay_area.y as i32;
+    let max_y = (overlay_area.y + overlay_area.height.saturating_sub(1)) as i32;
+    let center_y = (source_row as i32).clamp(min_y, max_y);
+    let reveal_top = (center_y - half_span).clamp(min_y, max_y);
+    let reveal_bottom = (center_y + half_span).clamp(min_y, max_y);
+
+    let row_text = " ".repeat(overlay_area.width as usize);
+    let is_chrono = matches!(phase, ExchangePhase::ChronoSurge);
+    let veil_bg = if is_chrono {
+        Color::Rgb(4, 10, 30)
+    } else {
+        Color::Rgb(14, 10, 34)
+    };
+    let edge_bg = if is_chrono {
+        Color::Rgb(18, 52, 102)
+    } else {
+        Color::Rgb(44, 30, 88)
+    };
+    let edge_fg = if is_chrono {
+        ELECTRIC_BLUE
+    } else {
+        RUNE_PURPLE
+    };
+
+    if reveal_top > min_y {
+        for y in min_y..reveal_top {
+            frame.render_widget(
+                Paragraph::new(row_text.as_str()).style(Style::default().bg(veil_bg)),
+                Rect::new(overlay_area.x, y as u16, overlay_area.width, 1),
+            );
+        }
+    }
+    if reveal_bottom < max_y {
+        for y in (reveal_bottom + 1)..=max_y {
+            frame.render_widget(
+                Paragraph::new(row_text.as_str()).style(Style::default().bg(veil_bg)),
+                Rect::new(overlay_area.x, y as u16, overlay_area.width, 1),
+            );
+        }
+    }
+
+    let edge_col = ((millis / 14) as u16) % overlay_area.width.max(1);
+    let rune_cycle: [char; 4] = ['ᚱ', 'ᚨ', 'ᛟ', 'ᚲ'];
+    let rune_idx = ((millis / 90) as usize) % rune_cycle.len();
+    for edge_row in [reveal_top as u16, reveal_bottom as u16] {
+        frame.render_widget(
+            Paragraph::new(row_text.as_str()).style(Style::default().bg(edge_bg)),
+            Rect::new(overlay_area.x, edge_row, overlay_area.width, 1),
+        );
+        let mut edge_line = vec![' '; overlay_area.width as usize];
+        if is_chrono {
+            edge_line[edge_col as usize] = '•';
+            let sweep_col =
+                ((edge_col + overlay_area.width / 3) % overlay_area.width.max(1)) as usize;
+            edge_line[sweep_col] = '─';
+        } else {
+            edge_line[edge_col as usize] = rune_cycle[rune_idx];
+            let pair_col =
+                ((edge_col + overlay_area.width / 2) % overlay_area.width.max(1)) as usize;
+            edge_line[pair_col] = rune_cycle[(rune_idx + 2) % rune_cycle.len()];
+        }
+        let edge_str: String = edge_line.into_iter().collect();
+        frame.render_widget(
+            Paragraph::new(edge_str).style(Style::default().fg(edge_fg).bg(edge_bg)),
+            Rect::new(overlay_area.x, edge_row, overlay_area.width, 1),
+        );
+
+        if reveal_top == reveal_bottom {
+            break;
+        }
+    }
+
+    // Chrono flavor: extra scanline inside the revealed band.
+    if is_chrono && reveal_bottom > reveal_top + 2 {
+        let scan_row = ((reveal_top + reveal_bottom) / 2) as u16;
+        let scan_bg = Color::Rgb(14, 38, 78);
+        frame.render_widget(
+            Paragraph::new(row_text.as_str()).style(Style::default().bg(scan_bg)),
+            Rect::new(overlay_area.x, scan_row, overlay_area.width, 1),
+        );
+        let mut scan_line = vec![' '; overlay_area.width as usize];
+        scan_line[((millis / 9) as u16 % overlay_area.width.max(1)) as usize] = '•';
+        let scan_str: String = scan_line.into_iter().collect();
+        frame.render_widget(
+            Paragraph::new(scan_str)
+                .style(Style::default().fg(Color::Rgb(170, 232, 255)).bg(scan_bg)),
+            Rect::new(overlay_area.x, scan_row, overlay_area.width, 1),
+        );
+    }
+}
+
 /// Render the full Stormglass Exchange overlay as a centered modal.
 pub fn render_stormglass_exchange(
     frame: &mut Frame,
@@ -173,6 +382,24 @@ pub fn render_stormglass_exchange(
             render_sigil_forfeit_confirm(frame, area);
         }
         ExchangePhase::SigilResult => render_sigil_result(frame, area, exchange_ui),
+    }
+
+    // Special "menu row push" for entering Chrono/Sigils submenus from menu.
+    // Fall back to the standard wipe for all other transitions.
+    let overlay_area = phase_overlay_rect(area, exchange_ui.phase);
+    let phase_elapsed = exchange_ui.phase_elapsed_ms();
+    let millis = current_millis();
+    if should_render_submenu_transition(exchange_ui) {
+        render_submenu_transition(
+            frame,
+            overlay_area,
+            submenu_source_row(overlay_area, exchange_ui.phase),
+            exchange_ui.phase,
+            phase_elapsed,
+            millis,
+        );
+    } else {
+        render_phase_wipe(frame, overlay_area, phase_elapsed, millis);
     }
 }
 
@@ -285,6 +512,23 @@ fn render_exchange_menu(
             if (row as usize) < h {
                 for cell in buffer[row as usize].iter_mut() {
                     cell.bg = highlight_bg;
+                }
+            }
+
+            // Electric edge sweep moving across the selected row.
+            let sweep = ((millis / 45) as usize) % w.max(1);
+            let trail_1 = (sweep + w - 1) % w.max(1);
+            let trail_2 = (sweep + w - 2) % w.max(1);
+            let row_cells = &mut buffer[row as usize];
+            for (col, bg, fg) in [
+                (trail_2, Color::Rgb(20, 34, 68), Color::Rgb(120, 170, 255)),
+                (trail_1, Color::Rgb(28, 48, 92), Color::Rgb(150, 200, 255)),
+                (sweep, Color::Rgb(36, 64, 120), Color::Rgb(200, 235, 255)),
+            ] {
+                row_cells[col].bg = bg;
+                row_cells[col].fg = fg;
+                if row_cells[col].ch == ' ' {
+                    row_cells[col].ch = '·';
                 }
             }
         }
@@ -1359,6 +1603,8 @@ fn render_sigils_list(
     clear_row_chars(&mut buffer, (h as i32) - 1); // help
 
     let sigils = &state.storm_sigils;
+    let ring_chars = ['\u{25e6}', '\u{25cb}', '\u{25ce}', '\u{25cb}']; // ◦ ○ ◎ ○
+    let ring_idx = ((millis / 140) as usize) % ring_chars.len();
 
     // Slot rows (rows 3-7)
     let slot_start_row = 3i32;
@@ -1374,7 +1620,15 @@ fn render_sigils_list(
         // Cursor
         let mut col = 1i32;
         if is_selected {
+            put_cell(&mut buffer, row, 0, ring_chars[ring_idx], ELECTRIC_BLUE);
             put_text(&mut buffer, row, col, "> ", Color::Yellow);
+            put_cell(
+                &mut buffer,
+                row,
+                2,
+                ring_chars[(ring_idx + 2) % ring_chars.len()],
+                ELECTRIC_BLUE,
+            );
         }
         col += 2;
 
@@ -1429,7 +1683,11 @@ fn render_sigils_list(
 
         // Selected row highlight
         if is_selected {
-            let highlight_bg = Color::Rgb(15, 25, 55);
+            let highlight_bg = if (millis / 180).is_multiple_of(2) {
+                Color::Rgb(18, 30, 68)
+            } else {
+                Color::Rgb(12, 22, 50)
+            };
             if (row as usize) < h {
                 for cell in buffer[row as usize].iter_mut() {
                     cell.bg = highlight_bg;

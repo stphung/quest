@@ -33,7 +33,7 @@ fn highest_haven_badge(achievements: &crate::achievements::Achievements) -> Opti
     None
 }
 
-/// Paint a warm hearth glow backdrop: gentle gradient + slow-drifting motes.
+/// Paint a stone-toned backdrop: slate gradient + drifting dust motes.
 fn paint_hearth_backdrop(buffer: &mut [Vec<SceneCell>], millis: u128) {
     let height = buffer.len();
     if height == 0 {
@@ -41,9 +41,9 @@ fn paint_hearth_backdrop(buffer: &mut [Vec<SceneCell>], millis: u128) {
     }
     let width = buffer[0].len();
 
-    // 1. Background gradient: near-black at top, warm grey-sage at bottom
-    let top_rgb = (8u8, 8u8, 8u8);
-    let bottom_rgb = (30u8, 35u8, 28u8);
+    // 1. Background gradient: near-black at top, weathered stone at bottom
+    let top_rgb = (6u8, 8u8, 12u8);
+    let bottom_rgb = (34u8, 40u8, 48u8);
     for (row, row_cells) in buffer.iter_mut().enumerate() {
         let t = if height <= 1 {
             0.0
@@ -57,12 +57,12 @@ fn paint_hearth_backdrop(buffer: &mut [Vec<SceneCell>], millis: u128) {
         }
     }
 
-    // 2. Slow-drifting motes (8 particles, ~0.5x Soulforge speed)
+    // 2. Slow-drifting dust motes
     let mote_chars: &[char] = &['\u{00b7}', '\u{2022}']; // · •
     let mote_count = 8;
-    let mote_speed = 2.5;
-    let mote_hot = (70u8, 85u8, 60u8);
-    let mote_cool = (30u8, 35u8, 28u8);
+    let mote_speed = 2.1;
+    let mote_hot = (152u8, 164u8, 182u8);
+    let mote_cool = (78u8, 88u8, 102u8);
 
     for i in 0..mote_count {
         let seed = hash2d(i, 0);
@@ -82,6 +82,59 @@ fn paint_hearth_backdrop(buffer: &mut [Vec<SceneCell>], millis: u128) {
             ch,
             Color::Rgb(rgb.0, rgb.1, rgb.2),
         );
+    }
+}
+
+/// Opening flourish: brief stone sheen and extra dust burst on Haven open.
+fn paint_opening_hearth_fx(buffer: &mut [Vec<SceneCell>], millis: u128, open_elapsed_ms: u128) {
+    const OPEN_FX_MS: f64 = 650.0;
+    if open_elapsed_ms as f64 >= OPEN_FX_MS {
+        return;
+    }
+
+    let height = buffer.len();
+    if height == 0 {
+        return;
+    }
+    let width = buffer[0].len();
+    let progress = (open_elapsed_ms as f64 / OPEN_FX_MS).clamp(0.0, 1.0);
+    let strength = 1.0 - progress;
+
+    // Add a cool stone sheen from bottom to top.
+    for (row, row_cells) in buffer.iter_mut().enumerate() {
+        let row_t = if height <= 1 {
+            0.0
+        } else {
+            row as f64 / (height - 1) as f64
+        };
+        let sheen = (strength * (0.2 + 0.8 * row_t)).clamp(0.0, 1.0);
+        for cell in row_cells.iter_mut() {
+            let current_rgb = match cell.bg {
+                Color::Rgb(r, g, b) => (r, g, b),
+                _ => (8, 8, 8),
+            };
+            let stoned = lerp_rgb(current_rgb, (102, 112, 128), sheen * 0.72);
+            cell.bg = Color::Rgb(stoned.0, stoned.1, stoned.2);
+        }
+    }
+
+    // Extra dust burst that quickly settles into the normal motes.
+    let dust_count = (3.0 + strength * 16.0) as usize;
+    let dust_chars: &[char] = &['\u{00b7}', '\u{2022}', ':'];
+    for i in 0..dust_count {
+        let seed = hash2d(i, 97);
+        let col = (seed as usize) % width;
+        let phase = (seed as f64) * 0.37;
+        let rise = (phase + millis as f64 * 0.011) % (height as f64 + 6.0);
+        let row = (height as f64 - 1.0 - rise).floor() as i32;
+        if row < 0 {
+            continue;
+        }
+
+        let t = (rise / height.max(1) as f64).clamp(0.0, 1.0);
+        let rgb = lerp_rgb((202, 214, 236), (98, 110, 126), t);
+        let ch = dust_chars[(hash2d(i, 311) as usize) % dust_chars.len()];
+        put_cell(buffer, row, col as i32, ch, Color::Rgb(rgb.0, rgb.1, rgb.2));
     }
 }
 
@@ -159,11 +212,13 @@ pub fn render_haven_indicator(
 }
 
 /// Render the Haven skill tree screen
+#[allow(clippy::too_many_arguments)]
 pub fn render_haven_tree(
     frame: &mut Frame,
     area: Rect,
     haven: &Haven,
     selected_room: usize,
+    open_elapsed_ms: Option<u128>,
     prestige_rank: u32,
     achievements: &crate::achievements::Achievements,
     _ctx: &super::responsive::LayoutContext,
@@ -177,7 +232,7 @@ pub fn render_haven_tree(
     let block = Block::default()
         .title(haven_title)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Cyan));
+        .border_style(Style::default().fg(Color::Rgb(138, 148, 166)));
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -192,6 +247,9 @@ pub fn render_haven_tree(
     let mut buffer = vec![vec![SceneCell::default(); width]; height];
     let millis = current_millis();
     paint_hearth_backdrop(&mut buffer, millis);
+    if let Some(elapsed) = open_elapsed_ms {
+        paint_opening_hearth_fx(&mut buffer, millis, elapsed);
+    }
 
     // Layout: summary (row 0-1), main content, help (last row)
     let summary_rows = 2usize;

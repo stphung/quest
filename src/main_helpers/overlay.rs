@@ -179,6 +179,7 @@ pub fn draw_game_overlays(
             area,
             haven,
             haven_ui.selected_room,
+            haven_ui.open_elapsed_ms(),
             state.prestige_rank,
             global_achievements,
             ctx,
