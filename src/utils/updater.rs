@@ -24,6 +24,14 @@ pub struct ReleaseInfo {
 #[derive(Debug, Clone)]
 pub struct ChangelogEntry {
     pub message: String,
+    pub committed_at: Option<String>,
+}
+
+/// A commit summary for timeline/history displays.
+#[derive(Debug, Clone)]
+pub struct CommitSummary {
+    pub text: String,
+    pub committed_at: Option<String>,
 }
 
 /// Result of checking for updates
@@ -69,6 +77,22 @@ struct GitHubCommit {
 #[derive(Deserialize)]
 struct GitHubCommitDetail {
     message: String,
+    author: Option<GitHubCommitPerson>,
+    committer: Option<GitHubCommitPerson>,
+}
+
+#[derive(Deserialize)]
+struct GitHubCommitPerson {
+    date: Option<String>,
+}
+
+fn commit_date_iso(commit: &GitHubCommit) -> Option<String> {
+    commit
+        .commit
+        .committer
+        .as_ref()
+        .and_then(|p| p.date.clone())
+        .or_else(|| commit.commit.author.as_ref().and_then(|p| p.date.clone()))
 }
 
 /// Parse release tag to extract full commit hash.
@@ -157,7 +181,11 @@ fn fetch_changelog(from: &str, to: &str) -> Result<Vec<ChangelogEntry>, Box<dyn 
         .map(|c| {
             // Take first line of commit message
             let message = c.commit.message.lines().next().unwrap_or("").to_string();
-            ChangelogEntry { message }
+            let committed_at = commit_date_iso(&c);
+            ChangelogEntry {
+                message,
+                committed_at,
+            }
         })
         .collect();
 
@@ -374,12 +402,14 @@ pub struct UpdateInfo {
     pub new_version: String,
     pub new_commit: String,
     pub changelog: Vec<String>,
+    pub changelog_times: Vec<Option<String>>,
     pub changelog_total: usize,
     pub current_and_previous: Vec<String>,
+    pub current_and_previous_times: Vec<Option<String>>,
 }
 
 /// Fetch commit summaries from a branch/revision head (newest first).
-fn fetch_commit_summaries(head: &str, limit: usize) -> Result<Vec<String>, Box<dyn Error>> {
+fn fetch_commit_summaries(head: &str, limit: usize) -> Result<Vec<CommitSummary>, Box<dyn Error>> {
     let url = format!(
         "https://api.github.com/repos/{}/{}/commits?sha={}&per_page={}",
         GITHUB_OWNER, GITHUB_REPO, head, limit
@@ -395,11 +425,13 @@ fn fetch_commit_summaries(head: &str, limit: usize) -> Result<Vec<String>, Box<d
         .into_iter()
         .map(|c| {
             let msg = c.commit.message.lines().next().unwrap_or("").to_string();
-            if msg.is_empty() {
+            let text = if msg.is_empty() {
                 short_commit(&c.sha)
             } else {
                 format!("{}  {}", short_commit(&c.sha), msg)
-            }
+            };
+            let committed_at = commit_date_iso(&c);
+            CommitSummary { text, committed_at }
         })
         .collect())
 }
@@ -417,28 +449,55 @@ pub fn check_update_info() -> Option<UpdateInfo> {
             changelog,
         } => {
             let total = changelog.len();
-            let pending_changelog: Vec<String> = changelog
+            let pending_changelog: Vec<ChangelogEntry> = changelog
                 .into_iter()
                 .take(30) // Keep a larger preview for splash sections
                 .map(|e| {
                     // Take first line only (multi-line commit messages)
-                    e.message.lines().next().unwrap_or(&e.message).to_string()
+                    let message = e.message.lines().next().unwrap_or(&e.message).to_string();
+                    ChangelogEntry {
+                        message,
+                        committed_at: e.committed_at,
+                    }
                 })
                 .collect();
+            let changelog_text = pending_changelog
+                .iter()
+                .map(|e| e.message.clone())
+                .collect::<Vec<_>>();
+            let changelog_times = pending_changelog
+                .iter()
+                .map(|e| e.committed_at.clone())
+                .collect::<Vec<_>>();
 
             // Show "your current build + 5 before it" as a version timeline.
             let current_commit_short = short_commit(&current_commit);
-            let current_and_previous = fetch_commit_summaries(&current_commit, 6)
-                .unwrap_or_else(|_| vec![format!("{}  (current build)", current_commit_short)]);
+            let current_and_previous =
+                fetch_commit_summaries(&current_commit, 6).unwrap_or_else(|_| {
+                    vec![CommitSummary {
+                        text: format!("{}  (current build)", current_commit_short),
+                        committed_at: None,
+                    }]
+                });
+            let current_and_previous_text = current_and_previous
+                .iter()
+                .map(|e| e.text.clone())
+                .collect::<Vec<_>>();
+            let current_and_previous_times = current_and_previous
+                .iter()
+                .map(|e| e.committed_at.clone())
+                .collect::<Vec<_>>();
 
             Some(UpdateInfo {
                 current_version: current_date,
                 current_commit: current_commit_short,
                 new_version: latest.date,
                 new_commit: short_commit(&latest.commit),
-                changelog: pending_changelog,
+                changelog: changelog_text,
+                changelog_times,
                 changelog_total: total,
-                current_and_previous,
+                current_and_previous: current_and_previous_text,
+                current_and_previous_times,
             })
         }
         _ => None,
