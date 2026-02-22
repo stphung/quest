@@ -25,6 +25,10 @@ const ELECTRIC_BLUE: Color = Color::Rgb(100, 180, 255);
 const RUNE_PURPLE: Color = Color::Rgb(180, 160, 255);
 /// Inscription flash color (warm white).
 const INSCRIPTION_FLASH: Color = Color::Rgb(255, 255, 200);
+/// Invoke Challenge animation timing boundaries in milliseconds.
+const INVOKE_PHASE1_END_MS: u128 = 1300;
+const INVOKE_PHASE2_END_MS: u128 = 2900;
+const INVOKE_PHASE3_END_MS: u128 = 4200;
 /// Phase timing boundaries in milliseconds.
 const PHASE1_END_MS: u128 = 1400;
 const PHASE2_END_MS: u128 = 2800;
@@ -131,6 +135,7 @@ pub fn render_stormglass_exchange(
     match exchange_ui.phase {
         ExchangePhase::Menu => render_exchange_menu(frame, area, exchange_ui, state),
         ExchangePhase::InvokeTrialConfirm => render_invoke_trial_confirm(frame, area, state),
+        ExchangePhase::InvokeTrialRolling => render_invoke_trial_rolling(frame, area, exchange_ui),
         ExchangePhase::InvokeTrial => render_invoke_trial(frame, area, exchange_ui),
         ExchangePhase::InvokeTrialForfeitConfirm => {
             // Render the trial selection underneath, then overlay the forfeit confirm
@@ -481,6 +486,250 @@ fn render_invoke_trial_forfeit_confirm(frame: &mut Frame, area: Rect) {
     frame.render_widget(text, inner);
 }
 
+fn render_invoke_trial_rolling(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiState) {
+    let overlay_width = 52u16.min(area.width.saturating_sub(4));
+    let overlay_height = 14u16.min(area.height.saturating_sub(2));
+    let x = area.x + (area.width.saturating_sub(overlay_width)) / 2;
+    let y = area.y + (area.height.saturating_sub(overlay_height)) / 2;
+    let overlay_area = Rect::new(x, y, overlay_width, overlay_height);
+
+    frame.render_widget(Clear, overlay_area);
+
+    let block = Block::default()
+        .title(Line::from(Span::styled(
+            " \u{1F3B2} Casting the Lot \u{1F3B2} ",
+            Style::default()
+                .fg(ELECTRIC_BLUE)
+                .add_modifier(Modifier::BOLD),
+        )))
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(ELECTRIC_BLUE));
+
+    let inner = block.inner(overlay_area);
+    frame.render_widget(block, overlay_area);
+
+    let w = inner.width as usize;
+    let h = inner.height as usize;
+    if w == 0 || h == 0 {
+        return;
+    }
+
+    let millis = current_millis();
+    let anim_start = exchange_ui.invoke_animation_start_ms.unwrap_or(millis);
+    let elapsed = millis.saturating_sub(anim_start);
+
+    let intensity = (elapsed as f64 / INVOKE_PHASE3_END_MS as f64).clamp(0.0, 1.0);
+    let params = StormBackdropParams {
+        top_rgb: lerp_rgb((10, 15, 40), (20, 24, 55), intensity),
+        bottom_rgb: lerp_rgb((5, 5, 15), (8, 10, 28), intensity),
+        particle_count: 10 + (intensity * 10.0) as usize,
+        particle_speed: 1.7 + intensity * 1.4,
+        shimmer: true,
+    };
+    let mut buffer = vec![vec![SceneCell::default(); w]; h];
+    paint_storm_backdrop(&mut buffer, millis, &params);
+
+    if elapsed < INVOKE_PHASE1_END_MS {
+        render_invoke_rolling_phase1(&mut buffer, w, h, millis, elapsed);
+    } else if elapsed < INVOKE_PHASE2_END_MS {
+        let phase_elapsed = elapsed - INVOKE_PHASE1_END_MS;
+        render_invoke_rolling_phase2(&mut buffer, w, h, exchange_ui, millis, phase_elapsed);
+    } else {
+        render_invoke_rolling_phase3(&mut buffer, w, h, exchange_ui, millis);
+    }
+
+    if elapsed > 200 {
+        let help_row = (h as i32) - 1;
+        clear_row_chars(&mut buffer, help_row);
+        put_text_centered(&mut buffer, help_row, w, "[Any key] Skip", Color::DarkGray);
+    }
+
+    render_buffer(frame, inner, &buffer);
+}
+
+fn render_invoke_rolling_phase1(
+    buffer: &mut [Vec<SceneCell>],
+    w: usize,
+    h: usize,
+    millis: u128,
+    elapsed: u128,
+) {
+    for row in 0..h {
+        clear_row_chars(buffer, row as i32);
+    }
+
+    let progress = (elapsed as f64 / INVOKE_PHASE1_END_MS as f64).clamp(0.0, 1.0);
+    let cx = w as f64 / 2.0;
+    let cy = h as f64 / 2.0;
+
+    let dice = [
+        '\u{2680}', '\u{2681}', '\u{2682}', '\u{2683}', '\u{2684}', '\u{2685}',
+    ];
+    let orbit_speed = millis as f64 / 260.0;
+    let radius = 4.8 - progress * 2.8;
+
+    for i in 0..6 {
+        let angle = orbit_speed + (i as f64 * std::f64::consts::TAU / 6.0);
+        let x = cx + angle.cos() * radius * 2.0;
+        let y = cy + angle.sin() * radius;
+        let face = dice[((millis / 90 + i as u128) % dice.len() as u128) as usize];
+        let glow = lerp_rgb((120, 150, 210), (220, 240, 255), progress);
+        put_cell(
+            buffer,
+            y.round() as i32,
+            x.round() as i32,
+            face,
+            Color::Rgb(glow.0, glow.1, glow.2),
+        );
+    }
+
+    put_cell(
+        buffer,
+        cy.round() as i32,
+        cx.round() as i32,
+        '\u{2726}',
+        ELECTRIC_BLUE,
+    );
+    put_text_centered(buffer, 1, w, "Casting storm-lot...", ELECTRIC_BLUE);
+    put_text_centered(
+        buffer,
+        2,
+        w,
+        "Thunder picks three trials.",
+        Color::Rgb(170, 200, 240),
+    );
+}
+
+fn render_invoke_rolling_phase2(
+    buffer: &mut [Vec<SceneCell>],
+    w: usize,
+    h: usize,
+    exchange_ui: &ExchangeUiState,
+    millis: u128,
+    phase_elapsed: u128,
+) {
+    for row in 0..h {
+        clear_row_chars(buffer, row as i32);
+    }
+
+    put_text_centered(buffer, 1, w, "Reading the fracture...", ELECTRIC_BLUE);
+    put_text_centered(
+        buffer,
+        2,
+        w,
+        "Names coalesce from static.",
+        Color::Rgb(150, 180, 220),
+    );
+
+    let row_start = 4i32;
+    let stagger_ms: u128 = 170;
+    let phase_duration = INVOKE_PHASE2_END_MS - INVOKE_PHASE1_END_MS;
+    let reveal_duration = (phase_duration.saturating_sub(stagger_ms * 2)).max(1);
+    for (i, trial) in exchange_ui.trial_options.iter().enumerate() {
+        let row = row_start + i as i32;
+        if row >= h as i32 {
+            break;
+        }
+
+        let row_elapsed = phase_elapsed.saturating_sub(stagger_ms * i as u128);
+        let reveal_t = (row_elapsed as f64 / reveal_duration as f64).clamp(0.0, 1.0);
+        let total_chars = trial.display_name.chars().count();
+        let reveal_chars = ((total_chars as f64) * reveal_t).round() as usize;
+        let row_seed = (millis as usize / 80).wrapping_add(i * 97);
+        let scrambled = scramble_trial_name(&trial.display_name, reveal_chars, row_seed);
+
+        let fg_rgb = lerp_rgb((90, 110, 150), (235, 245, 255), reveal_t);
+        put_text(
+            buffer,
+            row,
+            3,
+            &scrambled,
+            Color::Rgb(fg_rgb.0, fg_rgb.1, fg_rgb.2),
+        );
+
+        if reveal_t < 1.0 {
+            let scan_col = 3 + ((display_width(&trial.display_name) as f64 * reveal_t) as i32);
+            put_cell(buffer, row, scan_col, '\u{2502}', ELECTRIC_BLUE);
+        }
+    }
+}
+
+fn render_invoke_rolling_phase3(
+    buffer: &mut [Vec<SceneCell>],
+    w: usize,
+    h: usize,
+    exchange_ui: &ExchangeUiState,
+    millis: u128,
+) {
+    for row in 0..h {
+        clear_row_chars(buffer, row as i32);
+    }
+
+    put_text_centered(
+        buffer,
+        1,
+        w,
+        "The fracture stabilizes. Choose a trial.",
+        Color::Rgb(190, 220, 255),
+    );
+    render_trial_option_rows(buffer, h, exchange_ui, Some(0));
+
+    // Pulse selected row border glyphs to hint imminent transition.
+    let pulse = ((millis as f64 / 180.0).sin() * 0.5 + 0.5).clamp(0.0, 1.0);
+    let pulse_rgb = lerp_rgb((120, 140, 190), (220, 240, 255), pulse);
+    put_cell(
+        buffer,
+        4,
+        0,
+        '\u{25B8}',
+        Color::Rgb(pulse_rgb.0, pulse_rgb.1, pulse_rgb.2),
+    );
+}
+
+fn scramble_trial_name(name: &str, reveal_chars: usize, seed: usize) -> String {
+    let masks = ['?', '*', ':', '+', '/', '\\', '|'];
+    name.chars()
+        .enumerate()
+        .map(|(i, ch)| {
+            if i < reveal_chars || ch == ' ' || ch == '\'' || ch == '-' {
+                ch
+            } else {
+                masks
+                    [hash2d(seed.wrapping_add(i), i.wrapping_add(seed * 13)) as usize % masks.len()]
+            }
+        })
+        .collect()
+}
+
+fn render_trial_option_rows(
+    buffer: &mut [Vec<SceneCell>],
+    h: usize,
+    exchange_ui: &ExchangeUiState,
+    selected: Option<usize>,
+) {
+    let trial_start_row = 4i32;
+    for (i, trial) in exchange_ui.trial_options.iter().enumerate() {
+        let row = trial_start_row + i as i32;
+        if row >= h as i32 {
+            break;
+        }
+        let is_selected = selected.is_some_and(|idx| idx == i);
+
+        if is_selected {
+            put_text(buffer, row, 1, "> ", Color::Yellow);
+        }
+        put_text(buffer, row, 3, &trial.display_name, Color::White);
+
+        if is_selected && (row as usize) < h {
+            let highlight_bg = Color::Rgb(15, 25, 55);
+            for cell in buffer[row as usize].iter_mut() {
+                cell.bg = highlight_bg;
+            }
+        }
+    }
+}
+
 fn render_invoke_trial(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiState) {
     // Center overlay: 52 wide, 14 tall
     let overlay_width = 52u16.min(area.width.saturating_sub(4));
@@ -540,33 +789,12 @@ fn render_invoke_trial(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiSt
     );
 
     // Trial options (rows 4-6)
-    let trial_start_row = 4i32;
-    for (i, trial) in exchange_ui.trial_options.iter().enumerate() {
-        let row = trial_start_row + i as i32;
-        if row >= h as i32 {
-            break;
-        }
-        let is_selected = i == exchange_ui.trial_selected;
-
-        let mut col = 1i32;
-
-        if is_selected {
-            put_text(&mut buffer, row, col, "> ", Color::Yellow);
-        }
-        col += 2;
-
-        put_text(&mut buffer, row, col, &trial.display_name, Color::White);
-
-        // Selected row highlight
-        if is_selected {
-            let highlight_bg = Color::Rgb(15, 25, 55);
-            if (row as usize) < h {
-                for cell in buffer[row as usize].iter_mut() {
-                    cell.bg = highlight_bg;
-                }
-            }
-        }
-    }
+    render_trial_option_rows(
+        &mut buffer,
+        h,
+        exchange_ui,
+        Some(exchange_ui.trial_selected),
+    );
 
     // Help row at bottom
     let help_row = (h as i32) - 1;

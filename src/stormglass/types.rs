@@ -44,6 +44,7 @@ pub const CHRONO_SURGE_ANIMATION_SECONDS: u64 = 10;
 pub enum ExchangePhase {
     Menu,
     InvokeTrialConfirm,
+    InvokeTrialRolling, // animation phase before trial pick
     InvokeTrial,
     InvokeTrialForfeitConfirm,
     ChronoSurge,
@@ -73,6 +74,7 @@ pub struct ExchangeUiState {
     pub phase: ExchangePhase,
     pub trial_options: Vec<TrialOption>,
     pub trial_selected: usize,
+    pub invoke_animation_start_ms: Option<u128>,
     pub surge_selected: usize,
     // Storm Sigils UI state
     pub sigil_selected_slot: usize,
@@ -92,6 +94,7 @@ impl ExchangeUiState {
             phase: ExchangePhase::Menu,
             trial_options: Vec::new(),
             trial_selected: 0,
+            invoke_animation_start_ms: None,
             surge_selected: 0,
             sigil_selected_slot: 0,
             sigil_choices: [None, None, None],
@@ -109,6 +112,7 @@ impl ExchangeUiState {
         self.phase = ExchangePhase::Menu;
         self.trial_options.clear();
         self.trial_selected = 0;
+        self.invoke_animation_start_ms = None;
         self.surge_selected = 0;
         self.sigil_selected_slot = 0;
         self.sigil_choices = [None, None, None];
@@ -124,6 +128,7 @@ impl ExchangeUiState {
         self.phase = ExchangePhase::Menu;
         self.trial_options.clear();
         self.trial_selected = 0;
+        self.invoke_animation_start_ms = None;
         self.surge_selected = 0;
         self.sigil_selected_slot = 0;
         self.sigil_choices = [None, None, None];
