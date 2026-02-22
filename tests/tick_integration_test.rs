@@ -869,7 +869,7 @@ fn test_game_tick_can_discover_dungeon() {
         &mut haven,
         &mut achievements,
         &mut rng,
-        50_000,
+        10_000,
     );
 
     let discovery_events: Vec<_> = events

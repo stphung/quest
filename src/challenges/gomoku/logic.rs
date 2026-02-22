@@ -337,6 +337,8 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
 
     // ============ process_input Tests ============
 
@@ -506,7 +508,7 @@ mod integration_tests {
         game.ai_thinking = true;
         game.ai_think_ticks = 0;
 
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
         // First tick should NOT make a move (delay not met)
         process_ai_thinking(&mut game, &mut rng);
 
@@ -530,7 +532,7 @@ mod integration_tests {
         game.ai_thinking = true;
         game.ai_think_ticks = 0;
 
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
         // Tick enough times for AI to make its move (Novice: 5 + 2*2 = 9 ticks min)
         for _ in 0..20 {
             process_ai_thinking(&mut game, &mut rng);
@@ -557,7 +559,7 @@ mod integration_tests {
         let mut game = GomokuGame::new(GomokuDifficulty::Novice);
         game.ai_thinking = false;
 
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
         process_ai_thinking(&mut game, &mut rng);
 
         // Nothing should change
@@ -571,7 +573,7 @@ mod integration_tests {
         game.ai_thinking = true;
         game.game_result = Some(GomokuResult::Win);
 
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
         for _ in 0..20 {
             process_ai_thinking(&mut game, &mut rng);
         }
@@ -594,7 +596,7 @@ mod integration_tests {
         game.ai_thinking = true;
         game.ai_think_ticks = 0;
 
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
         for _ in 0..20 {
             process_ai_thinking(&mut game, &mut rng);
             if !game.ai_thinking {
@@ -621,7 +623,7 @@ mod integration_tests {
         assert_eq!(game.current_player, Player::Ai);
 
         // AI thinks and places
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
         for _ in 0..20 {
             process_ai_thinking(&mut game, &mut rng);
             if !game.ai_thinking {

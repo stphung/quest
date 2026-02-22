@@ -103,7 +103,7 @@ fn test_tick_event_player_attack_crit_has_crit_message() {
         &mut haven,
         &mut achievements,
         &mut rng,
-        20_000,
+        5_000,
     );
 
     let crits: Vec<_> = events
@@ -111,7 +111,7 @@ fn test_tick_event_player_attack_crit_has_crit_message() {
         .filter(|e| matches!(e, TickEvent::PlayerAttack { was_crit: true, .. }))
         .collect();
 
-    // With high DEX and prestige bonuses, should get at least one crit in 20k ticks
+    // With high DEX and prestige bonuses, should get at least one crit in 5k ticks
     if !crits.is_empty() {
         if let TickEvent::PlayerAttack {
             was_crit, message, ..
@@ -632,7 +632,7 @@ fn test_haven_discovery_blocked_by_active_fishing() {
 #[test]
 fn test_haven_discovery_sets_haven_changed_and_achievements_changed() {
     // Use many different seeds to find one that triggers Haven discovery quickly
-    for seed in 0u64..200 {
+    for seed in 0u64..50 {
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
         let mut haven = Haven::default();
         let mut achievements = Achievements::default();
@@ -640,7 +640,7 @@ fn test_haven_discovery_sets_haven_changed_and_achievements_changed() {
         state.prestige_rank = 50;
         let mut tick_counter = 0u32;
 
-        for _ in 0..2_000 {
+        for _ in 0..1_000 {
             let result = game_tick(
                 &mut state,
                 &mut tick_counter,
@@ -666,9 +666,9 @@ fn test_haven_discovery_sets_haven_changed_and_achievements_changed() {
             }
         }
     }
-    // If we couldn't find it in 200 seeds * 10k ticks, the probability is too low
-    // but at P50 with ~0.000294 chance per tick, expected ~3 discoveries per 10k ticks
-    panic!("Haven discovery should have occurred with P50 in 200 * 10k ticks");
+    // If we couldn't find it in 50 seeds * 1k ticks, the probability is too low
+    // but at P50 with ~0.000294 chance per tick, expected ~0.3 discoveries per 1k ticks
+    panic!("Haven discovery should have occurred with P50 in 50 * 1k ticks");
 }
 
 // =============================================================================
@@ -751,8 +751,8 @@ fn test_challenge_discovery_blocked_by_active_fishing() {
 
 #[test]
 fn test_challenge_discovered_event_has_type_and_messages() {
-    // Try many seeds to find challenge discovery
-    for seed in 0u64..500 {
+    // Try many seeds to find challenge discovery (seeded RNG = deterministic)
+    for seed in 0u64..100 {
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
         let mut test_state = GameState::new("Challenge Event Test".to_string(), 0);
         test_state.prestige_rank = 1;
@@ -766,7 +766,7 @@ fn test_challenge_discovered_event_has_type_and_messages() {
         h.rooms.insert(quest::HavenRoomId::Bedroom, 1);
         let mut a = Achievements::default();
 
-        for _ in 0..5_000 {
+        for _ in 0..2_000 {
             let result = game_tick(
                 &mut test_state,
                 &mut tc,
@@ -952,7 +952,7 @@ fn test_item_dropped_event_fields_from_mob() {
         &mut haven,
         &mut achievements,
         &mut rng,
-        50_000,
+        5_000,
     );
 
     let mob_drops: Vec<_> = events

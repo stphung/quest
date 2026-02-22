@@ -255,13 +255,15 @@ impl_apply_game_result! {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
 
     /// Novice move interval (200ms) for tests.
     const NOVICE_INTERVAL: u64 = 200;
 
     /// Create a game that has already been started (skips the "Press Space" screen).
     fn started_game(difficulty: SnakeDifficulty) -> SnakeGame {
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
         let mut game = SnakeGame::new(difficulty, &mut rng);
         game.waiting_to_start = false;
         game
@@ -269,7 +271,7 @@ mod tests {
 
     #[test]
     fn test_waiting_to_start_blocks_input() {
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
         let mut game = SnakeGame::new(SnakeDifficulty::Novice, &mut rng);
         assert!(game.waiting_to_start);
 
@@ -288,7 +290,7 @@ mod tests {
 
     #[test]
     fn test_waiting_to_start_blocks_physics() {
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
         let mut game = SnakeGame::new(SnakeDifficulty::Novice, &mut rng);
         let head_before = game.snake[0];
 
@@ -617,7 +619,7 @@ mod tests {
         state.character_level = 5;
         let initial_xp = state.character_xp;
 
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
         let mut game = SnakeGame::new(SnakeDifficulty::Apprentice, &mut rng);
         game.game_result = Some(SnakeResult::Win);
         game.score = 15;
@@ -640,7 +642,7 @@ mod tests {
         let mut state = GameState::new("Test".to_string(), 0);
         let initial_xp = state.character_xp;
 
-        let mut rng = rand::rng();
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
         let mut game = SnakeGame::new(SnakeDifficulty::Novice, &mut rng);
         game.game_result = Some(SnakeResult::Loss);
         state.active_minigame = Some(ActiveMinigame::Snake(game));

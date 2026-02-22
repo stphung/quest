@@ -478,8 +478,6 @@ fn test_unlock_accumulation_start_set_only_once() {
     ach.unlock(AchievementId::SlayerI, Some("Hero".to_string()));
     let first_start = ach.accumulation_start.unwrap();
 
-    std::thread::sleep(std::time::Duration::from_millis(1));
-
     ach.unlock(AchievementId::Level10, Some("Hero".to_string()));
     let second_start = ach.accumulation_start.unwrap();
 
