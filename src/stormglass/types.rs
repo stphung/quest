@@ -50,7 +50,7 @@ pub enum ExchangePhase {
     // Storm Sigils phases
     SigilsList,
     SigilUnlockConfirm,
-    SigilInscribeConfirm,
+    SigilEtchConfirm,
     SigilRerollConfirm,
     SigilPick,
     SigilForfeitConfirm,

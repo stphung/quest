@@ -275,7 +275,7 @@ fn test_storm_sigils_new_has_zero_slots_unlocked() {
     let sigils = StormSigils::new();
     assert_eq!(sigils.slots_unlocked, 0);
     assert_eq!(sigils.sigils.len(), MAX_SIGIL_SLOTS);
-    assert_eq!(sigils.inscribed_count(), 0);
+    assert_eq!(sigils.etched_count(), 0);
     for slot in &sigils.sigils {
         assert!(slot.is_none());
     }
@@ -287,7 +287,7 @@ fn test_storm_sigils_default_matches_new() {
     let from_default = StormSigils::default();
     assert_eq!(from_new.slots_unlocked, from_default.slots_unlocked);
     assert_eq!(from_new.sigils.len(), from_default.sigils.len());
-    assert_eq!(from_new.inscribed_count(), from_default.inscribed_count());
+    assert_eq!(from_new.etched_count(), from_default.etched_count());
 }
 
 // ── Grade Labels ────────────────────────────────────────────────────────
@@ -469,7 +469,7 @@ fn test_storm_sigils_serde_round_trip() {
     let json = serde_json::to_string(&sigils).unwrap();
     let loaded: StormSigils = serde_json::from_str(&json).unwrap();
     assert_eq!(loaded.slots_unlocked, 3);
-    assert_eq!(loaded.inscribed_count(), 2);
+    assert_eq!(loaded.etched_count(), 2);
     assert!(loaded.sigils[0].is_some());
     assert!(loaded.sigils[1].is_some());
     assert!(loaded.sigils[2].is_none());
@@ -604,8 +604,8 @@ fn test_grade_ordering_f_through_s() {
 // ── Constants ───────────────────────────────────────────────────────────
 
 #[test]
-fn test_inscribe_cost() {
-    assert_eq!(INSCRIBE_COST, 25_000);
+fn test_etch_cost() {
+    assert_eq!(ETCH_COST, 25_000);
 }
 
 #[test]
@@ -614,7 +614,7 @@ fn test_max_sigil_slots() {
 }
 
 // ── Bonus Injection Integration Tests ─────────────────────────────────
-// These tests verify that inscribed sigils actually affect game outcomes.
+// These tests verify that etched sigils actually affect game outcomes.
 
 /// Helper: force a player attack and return the damage dealt.
 fn force_player_attack_damage(
@@ -648,8 +648,8 @@ fn state_with_target() -> GameState {
     state
 }
 
-/// Helper: inscribe a single sigil in slot 0.
-fn inscribe_sigil(state: &mut GameState, effect: SigilEffectType, value: f64) {
+/// Helper: etch a single sigil in slot 0.
+fn etch_sigil(state: &mut GameState, effect: SigilEffectType, value: f64) {
     state.storm_sigils.slots_unlocked = 1;
     state.storm_sigils.sigils[0] = Some(Sigil {
         effect,
@@ -774,8 +774,8 @@ fn test_sigil_max_hp_applied_in_game_tick() {
     );
     let hp_base = state.combat_state.player_max_hp;
 
-    // Inscribe a max HP sigil
-    inscribe_sigil(&mut state, SigilEffectType::MaxHpPercent, 15.0);
+    // Etch a max HP sigil
+    etch_sigil(&mut state, SigilEffectType::MaxHpPercent, 15.0);
 
     // Run another tick — sigil should boost max HP
     game_tick(
@@ -803,7 +803,7 @@ fn test_sigil_xp_bonus_applied_in_game_tick() {
     // by checking that SigilBonuses::compute produces the right value
     // and that tick.rs adds it to HavenCombatBonuses
     let mut state = GameState::new("XPTest".to_string(), 0);
-    inscribe_sigil(&mut state, SigilEffectType::XpPercent, 25.0);
+    etch_sigil(&mut state, SigilEffectType::XpPercent, 25.0);
 
     let bonuses = SigilBonuses::compute(&state.storm_sigils);
     assert!(
@@ -829,7 +829,7 @@ fn test_sigil_drop_rate_injected_into_haven_bonuses() {
     // Verify that drop_rate sigil is added to haven_bonuses.drop_rate_percent
     // (tick.rs line 66: haven_bonuses.drop_rate_percent += sigil_bonuses.drop_rate_percent)
     let mut state = GameState::new("DropTest".to_string(), 0);
-    inscribe_sigil(&mut state, SigilEffectType::DropRatePercent, 10.0);
+    etch_sigil(&mut state, SigilEffectType::DropRatePercent, 10.0);
 
     let bonuses = SigilBonuses::compute(&state.storm_sigils);
     let haven = Haven::default();
@@ -852,7 +852,7 @@ fn test_sigil_fishing_speed_injected_into_haven_bonuses() {
     // Verify that fishing_speed sigil is added to haven_bonuses.fishing_timer_reduction
     // (tick.rs line 67: haven_bonuses.fishing_timer_reduction += sigil_bonuses.fishing_speed_percent)
     let mut state = GameState::new("FishTest".to_string(), 0);
-    inscribe_sigil(&mut state, SigilEffectType::FishingSpeedPercent, 20.0);
+    etch_sigil(&mut state, SigilEffectType::FishingSpeedPercent, 20.0);
 
     let bonuses = SigilBonuses::compute(&state.storm_sigils);
     let haven = Haven::default();
@@ -875,7 +875,7 @@ fn test_sigil_offline_xp_injected_in_offline_path() {
     // Verify that offline_xp sigil produces correct bonus for injection
     // (main_helpers/offline.rs adds sigil_offline_bonus to haven_offline_bonus)
     let mut state = GameState::new("OfflineTest".to_string(), 0);
-    inscribe_sigil(&mut state, SigilEffectType::OfflineXpPercent, 15.0);
+    etch_sigil(&mut state, SigilEffectType::OfflineXpPercent, 15.0);
 
     let bonuses = SigilBonuses::compute(&state.storm_sigils);
     assert!(
@@ -889,7 +889,7 @@ fn test_sigil_attack_speed_injected_via_god_items() {
     // Verify that attack_speed sigil value flows into GodItemCombatBonuses
     // (tick.rs line 154-156: + sigil_bonuses.attack_speed_percent)
     let mut state = GameState::new("ASPDTest".to_string(), 0);
-    inscribe_sigil(&mut state, SigilEffectType::AttackSpeedPercent, 10.0);
+    etch_sigil(&mut state, SigilEffectType::AttackSpeedPercent, 10.0);
 
     let bonuses = SigilBonuses::compute(&state.storm_sigils);
     let base_aspd = quest::god_items::equipped_god_item_attack_speed_percent(&state.equipment);
@@ -924,7 +924,7 @@ fn test_multiple_sigils_stack_in_game_tick() {
     );
     let hp_base = state.combat_state.player_max_hp;
 
-    // Inscribe 3 MaxHpPercent sigils
+    // Etch 3 MaxHpPercent sigils
     state.storm_sigils.slots_unlocked = 3;
     for i in 0..3 {
         state.storm_sigils.sigils[i] = Some(Sigil {

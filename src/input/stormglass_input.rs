@@ -3,7 +3,7 @@
 use crate::challenges::menu::create_challenge;
 use crate::core::game_state::GameState;
 use crate::input::InputResult;
-use crate::stormglass::sigils::INSCRIBE_COST;
+use crate::stormglass::sigils::ETCH_COST;
 use crate::stormglass::spending::{chrono_surge_cost, generate_trial_options};
 use crate::stormglass::types::{
     ExchangePhase, ExchangeUiState, CHRONO_SURGE_OPTIONS, EXCHANGE_MENU_ITEMS, INVOKE_TRIAL_COST,
@@ -26,9 +26,7 @@ pub fn handle_stormglass_exchange(
         ExchangePhase::ChronoSurge => handle_chrono_surge_select(key, exchange_ui, state),
         ExchangePhase::SigilsList => handle_sigils_list(key, exchange_ui, state),
         ExchangePhase::SigilUnlockConfirm => handle_sigil_unlock_confirm(key, exchange_ui, state),
-        ExchangePhase::SigilInscribeConfirm => {
-            handle_sigil_inscribe_confirm(key, exchange_ui, state)
-        }
+        ExchangePhase::SigilEtchConfirm => handle_sigil_etch_confirm(key, exchange_ui, state),
         ExchangePhase::SigilRerollConfirm => handle_sigil_reroll_confirm(key, exchange_ui, state),
         ExchangePhase::SigilPick => handle_sigil_pick(key, exchange_ui, state),
         ExchangePhase::SigilForfeitConfirm => handle_sigil_forfeit_confirm(key, exchange_ui),
@@ -244,16 +242,16 @@ fn handle_sigils_list(
                     }
                 }
             } else if sigils.sigils[slot].is_some() {
-                // Inscribed slot — reroll (requires SG)
-                if state.stormglass >= INSCRIBE_COST {
+                // Etched slot — reroll (requires SG)
+                if state.stormglass >= ETCH_COST {
                     exchange_ui.sigil_target_slot = slot;
                     exchange_ui.phase = ExchangePhase::SigilRerollConfirm;
                 }
             } else {
-                // Empty slot — inscribe (requires SG)
-                if state.stormglass >= INSCRIBE_COST {
+                // Empty slot — etch (requires SG)
+                if state.stormglass >= ETCH_COST {
                     exchange_ui.sigil_target_slot = slot;
-                    exchange_ui.phase = ExchangePhase::SigilInscribeConfirm;
+                    exchange_ui.phase = ExchangePhase::SigilEtchConfirm;
                 }
             }
             InputResult::Continue
@@ -290,15 +288,15 @@ fn handle_sigil_unlock_confirm(
     }
 }
 
-fn handle_sigil_inscribe_confirm(
+fn handle_sigil_etch_confirm(
     key: KeyEvent,
     exchange_ui: &mut ExchangeUiState,
     state: &mut GameState,
 ) -> InputResult {
     match key.code {
         KeyCode::Char('y') | KeyCode::Char('Y') => {
-            if state.stormglass >= INSCRIBE_COST {
-                state.stormglass -= INSCRIBE_COST;
+            if state.stormglass >= ETCH_COST {
+                state.stormglass -= ETCH_COST;
                 let mut rng = rand::rng();
                 let pool = crate::stormglass::sigils::daily_sigil_pool();
                 let choices = crate::stormglass::sigils::generate_sigil_choices(&mut rng, &pool);
@@ -323,8 +321,8 @@ fn handle_sigil_reroll_confirm(
 ) -> InputResult {
     match key.code {
         KeyCode::Char('y') | KeyCode::Char('Y') => {
-            if state.stormglass >= INSCRIBE_COST {
-                state.stormglass -= INSCRIBE_COST;
+            if state.stormglass >= ETCH_COST {
+                state.stormglass -= ETCH_COST;
                 // Destroy current sigil
                 let slot = exchange_ui.sigil_target_slot;
                 state.storm_sigils.sigils[slot] = None;

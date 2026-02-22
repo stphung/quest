@@ -23,7 +23,7 @@ pub(super) fn enhancement_style(level: u8) -> Style {
 
 /// Draws equipment with name + rarity color only, one line per slot (L tier).
 /// Table layout: Slot  Name  Rarity  Tier  ilvl (right-aligned columns).
-/// If sigils are inscribed, renders a sub-panel below equipment rows.
+/// If sigils are etched, renders a sub-panel below equipment rows.
 pub(super) fn draw_equipment_names_only(
     frame: &mut Frame,
     area: Rect,
@@ -36,10 +36,10 @@ pub(super) fn draw_equipment_names_only(
     frame.render_widget(block, area);
 
     // Split inner area: 7 lines for equipment, remainder for sigils
-    let inscribed = storm_sigils.inscribed_count();
-    let (equip_area, sigil_area) = if inscribed > 0 && inner.height > 9 {
-        // Sigil sub-panel needs: 1 blank + 1 title border + inscribed lines + 1 bottom border = inscribed + 3
-        let sigil_height = (inscribed as u16 + 3).min(inner.height.saturating_sub(7));
+    let etched = storm_sigils.etched_count();
+    let (equip_area, sigil_area) = if etched > 0 && inner.height > 9 {
+        // Sigil sub-panel needs: 1 blank + 1 title border + etched lines + 1 bottom border = etched + 3
+        let sigil_height = (etched as u16 + 3).min(inner.height.saturating_sub(7));
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
@@ -134,7 +134,7 @@ pub(super) fn draw_equipment_names_only(
     let paragraph = Paragraph::new(lines);
     frame.render_widget(paragraph, equip_area);
 
-    // Render sigil sub-panel if any are inscribed
+    // Render sigil sub-panel if any are etched
     if let Some(sigil_area) = sigil_area {
         draw_sigil_sub_panel(frame, sigil_area, storm_sigils);
     }
@@ -142,10 +142,10 @@ pub(super) fn draw_equipment_names_only(
 
 /// Renders the Storm Sigils sub-panel below equipment.
 fn draw_sigil_sub_panel(frame: &mut Frame, area: Rect, storm_sigils: &StormSigils) {
-    let inscribed = storm_sigils.inscribed_count();
+    let etched = storm_sigils.etched_count();
     let title = format!(
         " \u{16B1} Storm Sigils ({}/{}) ",
-        inscribed, storm_sigils.slots_unlocked
+        etched, storm_sigils.slots_unlocked
     );
     let block = Block::default()
         .borders(Borders::ALL)

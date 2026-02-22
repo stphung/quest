@@ -560,9 +560,9 @@ mod tests {
         assert_eq!(loaded.fishing.rank, 1);
         assert_eq!(loaded.zone_progression.current_zone_id, 1);
         assert_eq!(loaded.chess_stats.games_played, 0);
-        // storm_sigils should default to 0 slots unlocked, no sigils inscribed
+        // storm_sigils should default to 0 slots unlocked, no sigils etched
         assert_eq!(loaded.storm_sigils.slots_unlocked, 0);
-        assert_eq!(loaded.storm_sigils.inscribed_count(), 0);
+        assert_eq!(loaded.storm_sigils.etched_count(), 0);
     }
 
     #[test]
@@ -570,7 +570,7 @@ mod tests {
         let gs = GameState::new("Sigil Hero".to_string(), 0);
         assert_eq!(gs.storm_sigils.slots_unlocked, 0);
         assert_eq!(gs.storm_sigils.sigils.len(), 5);
-        assert_eq!(gs.storm_sigils.inscribed_count(), 0);
+        assert_eq!(gs.storm_sigils.etched_count(), 0);
     }
 
     #[test]
@@ -594,7 +594,7 @@ mod tests {
         let loaded: GameState = serde_json::from_str(&json).unwrap();
 
         assert_eq!(loaded.storm_sigils.slots_unlocked, 3);
-        assert_eq!(loaded.storm_sigils.inscribed_count(), 2);
+        assert_eq!(loaded.storm_sigils.etched_count(), 2);
         let s0 = loaded.storm_sigils.sigils[0].as_ref().unwrap();
         assert_eq!(s0.effect, SigilEffectType::XpPercent);
         assert!((s0.value - 18.5).abs() < 1e-10);
@@ -615,7 +615,7 @@ mod tests {
         gs.character_level = 10;
         gs.prestige_rank = 0;
 
-        // Inscribe a sigil before prestige
+        // Etch a sigil before prestige
         gs.storm_sigils.slots_unlocked = 2;
         gs.storm_sigils.sigils[0] = Some(Sigil {
             effect: SigilEffectType::CritChancePercent,
@@ -631,7 +631,7 @@ mod tests {
 
         // Verify sigils survived
         assert_eq!(gs.storm_sigils.slots_unlocked, 2);
-        assert_eq!(gs.storm_sigils.inscribed_count(), 1);
+        assert_eq!(gs.storm_sigils.etched_count(), 1);
         let sigil = gs.storm_sigils.sigils[0].as_ref().unwrap();
         assert_eq!(sigil.effect, SigilEffectType::CritChancePercent);
         assert!((sigil.value - 5.5).abs() < 1e-10);
