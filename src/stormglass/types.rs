@@ -52,6 +52,7 @@ pub enum ExchangePhase {
     SigilUnlockConfirm,
     SigilEtchConfirm,
     SigilRerollConfirm,
+    SigilRolling, // animation phase before pick
     SigilPick,
     SigilForfeitConfirm,
     SigilResult,
@@ -79,6 +80,8 @@ pub struct ExchangeUiState {
     pub sigil_pick_selected: usize,
     pub sigil_result: Option<Sigil>,
     pub sigil_target_slot: usize,
+    pub sigil_animation_start_ms: Option<u128>,
+    pub sigil_animation_skipped: bool,
 }
 
 impl ExchangeUiState {
@@ -95,6 +98,8 @@ impl ExchangeUiState {
             sigil_pick_selected: 0,
             sigil_result: None,
             sigil_target_slot: 0,
+            sigil_animation_start_ms: None,
+            sigil_animation_skipped: false,
         }
     }
 
@@ -110,6 +115,8 @@ impl ExchangeUiState {
         self.sigil_pick_selected = 0;
         self.sigil_result = None;
         self.sigil_target_slot = 0;
+        self.sigil_animation_start_ms = None;
+        self.sigil_animation_skipped = false;
     }
 
     pub fn close(&mut self) {
@@ -123,6 +130,8 @@ impl ExchangeUiState {
         self.sigil_pick_selected = 0;
         self.sigil_result = None;
         self.sigil_target_slot = 0;
+        self.sigil_animation_start_ms = None;
+        self.sigil_animation_skipped = false;
     }
 }
 

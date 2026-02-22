@@ -140,6 +140,7 @@ pub fn render_stormglass_exchange(
         ExchangePhase::SigilRerollConfirm => {
             render_sigil_reroll_confirm(frame, area, exchange_ui, state)
         }
+        ExchangePhase::SigilRolling => render_sigil_pick(frame, area, exchange_ui), // TODO: animation rendering
         ExchangePhase::SigilPick => render_sigil_pick(frame, area, exchange_ui),
         ExchangePhase::SigilForfeitConfirm => {
             render_sigil_pick(frame, area, exchange_ui);
