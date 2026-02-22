@@ -33,7 +33,9 @@ use main_helpers::offline::apply_offline_xp;
 use main_helpers::overlay::draw_game_overlays;
 use main_helpers::persistence::save_all;
 use main_helpers::scene::{current_scene_kind, is_realtime_minigame, is_wide_scene};
-use main_helpers::update::{jittered_update_interval, show_startup_splash_screen};
+use main_helpers::update::{
+    jittered_update_interval, show_startup_splash_screen, StartupSplashResult,
+};
 use ratatui::crossterm::event::{self, Event, KeyEventKind};
 use ratatui::crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
@@ -192,7 +194,15 @@ fn main() -> io::Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    show_startup_splash_screen(&mut terminal, &mut update_available)?;
+    if matches!(
+        show_startup_splash_screen(&mut terminal, &mut update_available)?,
+        StartupSplashResult::Quit
+    ) {
+        disable_raw_mode()?;
+        terminal.backend_mut().execute(LeaveAlternateScreen)?;
+        println!("Goodbye!");
+        return Ok(());
+    }
 
     // If update check is still running after splash dismiss, detach it.
     if let Some(handle) = update_available.take() {
