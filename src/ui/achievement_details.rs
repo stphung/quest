@@ -1,7 +1,7 @@
 //! Achievement browser detail panel and stats view rendering.
 
 use crate::achievements::{
-    get_achievements_by_category, AchievementCategory, AchievementId, Achievements,
+    get_achievements_by_category, get_title_text, AchievementCategory, AchievementId, Achievements,
 };
 use crate::character::prestige::get_prestige_tier;
 use crate::enhancement::EnhancementProgress;
@@ -195,6 +195,15 @@ pub(super) fn render_achievement_detail(
                 Span::styled(format!("{}%", percent), Style::default().fg(Color::Yellow)),
             ]));
         }
+    }
+
+    // Title grant info
+    if let Some(title) = get_title_text(def.id) {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            format!("\u{2726} Grants Title: \"{title}\""),
+            Style::default().fg(Color::Magenta),
+        )));
     }
 
     let para = Paragraph::new(lines).wrap(Wrap { trim: true });
