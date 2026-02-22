@@ -1600,8 +1600,8 @@ fn render_rolling_phase1(
     put_text_centered(buffer, center_row, w, text, pulse_fg);
 }
 
-/// Phase 2: Sigil Etching (1400-2800ms) — sigil values etch character-by-character.
-/// Uses the same icon + value format as the pick screen for seamless transition.
+/// Phase 2: Sigil Etching (1400-2800ms) — sigil names etch character-by-character.
+/// Uses icon + sigil name format matching the slots screen.
 fn render_rolling_phase2(
     buffer: &mut [Vec<SceneCell>],
     w: usize,
@@ -1628,9 +1628,9 @@ fn render_rolling_phase2(
         }
 
         if let Some(sigil) = choice {
-            // Match pick screen format: icon + value
+            // Match slots screen format: icon + sigil name
             let icon = sigil.effect.icon();
-            let display_str = format!("{} {}", icon, sigil.effect.format_value(sigil.value));
+            let display_str = format!("{} {}", icon, sigil.effect.sigil_name());
             let total_chars = display_str.chars().count();
             let sigil_start = stagger_ms * i as u128;
 
@@ -1649,7 +1649,7 @@ fn render_rolling_phase2(
             };
 
             let partial: String = display_str.chars().take(chars_visible).collect();
-            // Match pick screen col: cursor marker (2) + start at col 3
+            // Match slots col: cursor marker (2) + start at col 3
             let col = 3i32;
             put_text(buffer, row, col, &partial, Color::White);
 
@@ -1679,8 +1679,8 @@ fn render_rolling_phase2(
     }
 }
 
-/// Phase 3: Grade Reveal (2800-3500ms) — full values shown, grades fade in.
-/// Matches pick screen layout: icon + value, grade with modifiers, range info.
+/// Phase 3: Grade Reveal (2800-3500ms) — full names shown, value + grade fade in right-aligned.
+/// Matches slots screen layout: icon + sigil name left, value + grade right.
 fn render_rolling_phase3(
     buffer: &mut [Vec<SceneCell>],
     w: usize,
@@ -1705,23 +1705,28 @@ fn render_rolling_phase3(
         }
 
         if let Some(sigil) = choice {
-            // Match pick screen format: icon + value at col 3
+            // Match slots screen: icon + sigil name on left
             let icon = sigil.effect.icon();
-            let value_str = format!("{} {}", icon, sigil.effect.format_value(sigil.value));
+            let name_str = format!("{} {}", icon, sigil.effect.sigil_name());
             let col = 3i32;
-            put_text(buffer, row, col, &value_str, Color::White);
+            put_text(buffer, row, col, &name_str, Color::White);
 
-            // Grade fades in with stagger
+            // Right-aligned value + grade fade in with stagger
             let grade_start = stagger_ms * i as u128;
             if phase_elapsed >= grade_start {
                 let grade_elapsed = phase_elapsed - grade_start;
                 let fade_duration = (phase_duration - stagger_ms * 2).max(1);
                 let fade = (grade_elapsed as f64 / fade_duration as f64).clamp(0.0, 1.0);
 
+                let value_str = sigil.effect.format_value(sigil.value);
                 let grade_str = sigil.grade.label();
                 let grade_fg = sigil_grade_color(sigil.grade);
 
-                // Lerp from dark gray to the final grade color
+                // Value fades in white
+                let value_rgb = lerp_rgb((60, 60, 60), (200, 200, 200), fade);
+                let value_fg = Color::Rgb(value_rgb.0, value_rgb.1, value_rgb.2);
+
+                // Grade lerps from dark gray to final color
                 let base_rgb = (60, 60, 60);
                 let target_rgb = match grade_fg {
                     Color::Rgb(r, g, b) => (r, g, b),
@@ -1736,29 +1741,12 @@ fn render_rolling_phase3(
                 let faded_rgb = lerp_rgb(base_rgb, target_rgb, fade);
                 let faded_fg = Color::Rgb(faded_rgb.0, faded_rgb.1, faded_rgb.2);
 
-                // Place grade after value, matching pick screen position
-                let grade_col = col + value_str.len() as i32 + 2;
-                for (j, ch) in grade_str.chars().enumerate() {
-                    if (grade_col + j as i32) >= 0 && ((grade_col + j as i32) as usize) < w {
-                        let cell = &mut buffer[row as usize][(grade_col + j as i32) as usize];
-                        cell.ch = ch;
-                        cell.fg = faded_fg;
-                    }
-                }
-            }
-
-            // Right-aligned range info (fade in with grade)
-            let grade_start = stagger_ms * i as u128;
-            if phase_elapsed >= grade_start {
-                let grade_elapsed = phase_elapsed - grade_start;
-                let fade_duration = (phase_duration - stagger_ms * 2).max(1);
-                let fade = (grade_elapsed as f64 / fade_duration as f64).clamp(0.0, 1.0);
-                let (min, max) = sigil.effect.range();
-                let range_str = format!("(range: {:.0}-{:.0}%)", min, max);
-                let range_rgb = lerp_rgb((30, 30, 30), (100, 100, 100), fade);
-                let range_fg = Color::Rgb(range_rgb.0, range_rgb.1, range_rgb.2);
-                let range_col = (w as i32) - range_str.len() as i32 - 1;
-                put_text(buffer, row, range_col, &range_str, range_fg);
+                // Right-aligned: "value  grade"
+                let right_text = format!("{}  {}", value_str, grade_str);
+                let right_col = (w as i32) - right_text.len() as i32 - 1;
+                put_text(buffer, row, right_col, &value_str, value_fg);
+                let grade_col = (w as i32) - grade_str.len() as i32 - 1;
+                put_text(buffer, row, grade_col, grade_str, faded_fg);
             }
         }
     }
@@ -1776,9 +1764,6 @@ fn render_rolling_phase4(
         clear_row_chars(buffer, r as i32);
     }
 
-    // Match pick screen flavor text position and style
-    // (flavor text is rendered via Paragraph overlay in pick screen, but we
-    // use the same row here for visual continuity)
     put_text_centered(
         buffer,
         1,
@@ -1787,6 +1772,19 @@ fn render_rolling_phase4(
         RUNE_PURPLE,
     );
 
+    render_sigil_choice_rows(buffer, w, h, exchange_ui, 0);
+}
+
+/// Shared helper: render 3 sigil choice rows matching the slots screen layout.
+/// Icon + sigil name on the left, value + grade right-aligned.
+/// `selected` is the currently highlighted row index.
+fn render_sigil_choice_rows(
+    buffer: &mut [Vec<SceneCell>],
+    w: usize,
+    h: usize,
+    exchange_ui: &ExchangeUiState,
+    selected: usize,
+) {
     let choice_start_row = 4i32;
 
     for (i, choice) in exchange_ui.sigil_choices.iter().enumerate() {
@@ -1796,44 +1794,36 @@ fn render_rolling_phase4(
         }
 
         if let Some(sigil) = choice {
-            // Cursor on first choice — match pick screen col 1
-            let mut col = 1i32;
-            if i == 0 {
+            let is_selected = i == selected;
+
+            // Cursor
+            let col = 1i32;
+            if is_selected {
                 put_text(buffer, row, col, "> ", Color::Yellow);
             }
-            col += 2;
+            let name_col = col + 2;
 
-            // Icon + value — matches pick screen format
+            // Icon + sigil name (left side)
             let icon = sigil.effect.icon();
-            let value_str = format!("{} {}", icon, sigil.effect.format_value(sigil.value));
-            put_text(buffer, row, col, &value_str, Color::White);
-            col += value_str.len() as i32 + 2;
+            let name_str = format!("{} {}", icon, sigil.effect.sigil_name());
+            put_text(buffer, row, name_col, &name_str, Color::White);
 
-            // Grade with color and bold/dim modifiers — matches pick screen
+            // Right-aligned: value + grade (matching slots screen)
+            let value_str = sigil.effect.format_value(sigil.value);
             let grade_str = sigil.grade.label();
+            let right_text = format!("{}  {}", value_str, grade_str);
+            let right_col = (w as i32) - right_text.len() as i32 - 1;
+
+            // Value in white
+            put_text(buffer, row, right_col, &value_str, Color::White);
+
+            // Grade with tier color
+            let grade_col = (w as i32) - grade_str.len() as i32 - 1;
             let grade_fg = sigil_grade_color(sigil.grade);
-            let mut grade_style = Style::default().fg(grade_fg);
-            if sigil.grade.is_plus() {
-                grade_style = grade_style.add_modifier(Modifier::BOLD);
-            } else if sigil.grade.is_minus() {
-                grade_style = grade_style.add_modifier(Modifier::DIM);
-            }
-            for (j, ch) in grade_str.chars().enumerate() {
-                if (col + j as i32) >= 0 && ((col + j as i32) as usize) < w {
-                    let cell = &mut buffer[row as usize][(col + j as i32) as usize];
-                    cell.ch = ch;
-                    cell.fg = grade_style.fg.unwrap_or(Color::White);
-                }
-            }
+            put_text(buffer, row, grade_col, grade_str, grade_fg);
 
-            // Right-aligned range info — matches pick screen
-            let (min, max) = sigil.effect.range();
-            let range_str = format!("(range: {:.0}-{:.0}%)", min, max);
-            let range_col = (w as i32) - range_str.len() as i32 - 1;
-            put_text(buffer, row, range_col, &range_str, Color::DarkGray);
-
-            // Highlight first row — matches pick screen
-            if i == 0 && (row as usize) < h {
+            // Selected row highlight
+            if is_selected && (row as usize) < h {
                 let highlight_bg = Color::Rgb(15, 25, 55);
                 for cell in buffer[row as usize].iter_mut() {
                     cell.bg = highlight_bg;
@@ -1884,63 +1874,14 @@ fn render_sigil_pick(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiStat
     }
     clear_row_chars(&mut buffer, (h as i32) - 1);
 
-    // 3 sigil choices
-    let choice_start_row = 4i32;
-    for (i, choice) in exchange_ui.sigil_choices.iter().enumerate() {
-        let row = choice_start_row + i as i32;
-        if row >= h as i32 {
-            break;
-        }
-        let is_selected = i == exchange_ui.sigil_pick_selected;
-
-        let mut col = 1i32;
-        if is_selected {
-            put_text(&mut buffer, row, col, "> ", Color::Yellow);
-        }
-        col += 2;
-
-        if let Some(sigil) = choice {
-            // Icon + effect value
-            let icon = sigil.effect.icon();
-            let value_str = format!("{} {}", icon, sigil.effect.format_value(sigil.value));
-            put_text(&mut buffer, row, col, &value_str, Color::White);
-            col += value_str.len() as i32 + 2;
-
-            // Grade with color
-            let grade_str = sigil.grade.label();
-            let grade_fg = sigil_grade_color(sigil.grade);
-            let mut grade_style = Style::default().fg(grade_fg);
-            if sigil.grade.is_plus() {
-                grade_style = grade_style.add_modifier(Modifier::BOLD);
-            } else if sigil.grade.is_minus() {
-                grade_style = grade_style.add_modifier(Modifier::DIM);
-            }
-            // Put grade text with style
-            for (j, ch) in grade_str.chars().enumerate() {
-                if (col + j as i32) >= 0 && ((col + j as i32) as usize) < w {
-                    let cell = &mut buffer[row as usize][(col + j as i32) as usize];
-                    cell.ch = ch;
-                    cell.fg = grade_style.fg.unwrap_or(Color::White);
-                }
-            }
-
-            // Right-aligned range info
-            let (min, max) = sigil.effect.range();
-            let range_str = format!("(range: {:.0}-{:.0}%)", min, max);
-            let range_col = (w as i32) - range_str.len() as i32 - 1;
-            put_text(&mut buffer, row, range_col, &range_str, Color::DarkGray);
-        }
-
-        // Selected row highlight
-        if is_selected {
-            let highlight_bg = Color::Rgb(15, 25, 55);
-            if (row as usize) < h {
-                for cell in buffer[row as usize].iter_mut() {
-                    cell.bg = highlight_bg;
-                }
-            }
-        }
-    }
+    // 3 sigil choices — uses shared helper matching slots screen layout
+    render_sigil_choice_rows(
+        &mut buffer,
+        w,
+        h,
+        exchange_ui,
+        exchange_ui.sigil_pick_selected,
+    );
 
     // Help row
     let help_row = (h as i32) - 1;
