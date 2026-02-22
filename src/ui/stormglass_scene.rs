@@ -1205,8 +1205,6 @@ fn draw_single_overlay_glyph(frame: &mut Frame, area: Rect, x: i32, y: i32, ch: 
     frame.render_widget(glyph, Rect::new(x as u16, y as u16, 1, 1));
 }
 
-type StreamLayer = (usize, u128, usize, char, (u8, u8, u8), (u8, u8, u8));
-
 /// Render a global temporal-tech overlay while surge is fast-forwarding gameplay.
 /// Kept non-destructive (foreground glyphs only) so core gameplay remains readable.
 pub fn render_chrono_surge_time_warp(
@@ -1222,12 +1220,24 @@ pub fn render_chrono_surge_time_warp(
     let millis = current_millis();
     let progress = surge.progress();
     let pct = (progress * 100.0) as u32;
-    let velocity_scalar = surge.speed_multiplier();
-    let accel = ((velocity_scalar - 0.85) / (3.40 - 0.85)).clamp(0.0, 1.0);
-    let pulse_t = ((millis as f64 / 260.0).sin() * 0.5 + 0.5).clamp(0.0, 1.0);
+    // Chrono Rail: restrained launch, then hard velocity ramp in the back half.
+    // Draw count remains constant; only phase velocity increases.
+    let launch_curve = progress.powf(2.6);
+    let booster_curve = ((progress - 0.56).max(0.0) / 0.44).powf(2.4);
+    let global_speed_mult = (0.08
+        + surge.speed_multiplier() * (0.13 * progress)
+        + launch_curve * 2.70
+        + booster_curve * 3.60)
+        .clamp(0.08, 8.90);
+
+    let rail_clock = millis as f64 * (0.28 + global_speed_mult * 1.48);
+    let shimmer_millis =
+        (millis as f64 * (0.62 + global_speed_mult * 0.16 + launch_curve * 0.18)) as u128;
+
+    let pulse_t = ((shimmer_millis as f64 / 260.0).sin() * 0.5 + 0.5).clamp(0.0, 1.0);
     let pulse_rgb = lerp_rgb((120, 220, 255), (235, 245, 255), pulse_t);
     let pulse_color = Color::Rgb(pulse_rgb.0, pulse_rgb.1, pulse_rgb.2);
-    let accent_t = ((millis as f64 / 190.0).sin() * 0.5 + 0.5).clamp(0.0, 1.0);
+    let accent_t = ((shimmer_millis as f64 / 190.0).sin() * 0.5 + 0.5).clamp(0.0, 1.0);
     let accent_rgb = lerp_rgb((90, 160, 245), (170, 225, 255), accent_t);
     let accent_color = Color::Rgb(accent_rgb.0, accent_rgb.1, accent_rgb.2);
 
@@ -1255,101 +1265,107 @@ pub fn render_chrono_surge_time_warp(
     let right = (area.x + area.width.saturating_sub(2)) as i32;
     let inner_w = (right - left + 1).max(1);
     let field_h = (bottom - top + 1).max(1);
+    let cx = left + inner_w / 2;
+    let cy = top + field_h / 2;
+    let half_w = (inner_w / 2).max(1);
 
-    // Parallax streak layers moving right-to-left.
-    let layers: [StreamLayer; 4] = [
-        (1, 18, 12, '─', (220, 248, 255), (90, 150, 220)),
-        (2, 30, 9, '╌', (180, 230, 255), (70, 120, 190)),
-        (3, 45, 7, '·', (145, 205, 245), (55, 95, 160)),
-        (4, 65, 5, '·', (120, 185, 230), (45, 80, 140)),
-    ];
+    // Depth guide marks to imply tunnel perspective toward the center.
+    for depth in 1..=6 {
+        let t = depth as f64 / 7.0;
+        let x_l = left + (half_w as f64 * t) as i32;
+        let x_r = right - (half_w as f64 * t) as i32;
+        let y_top = top + ((cy - top) as f64 * t * 0.88) as i32;
+        let y_bot = bottom - ((bottom - cy) as f64 * t * 0.88) as i32;
+        let glyph = if depth % 2 == 0 { '╱' } else { '╲' };
+        let guide_t = ((shimmer_millis as f64 / (280.0 + depth as f64 * 22.0)).sin() * 0.5 + 0.5)
+            .clamp(0.0, 1.0);
+        let guide_rgb = lerp_rgb((55, 92, 150), (110, 170, 235), guide_t);
+        let guide_color = Color::Rgb(guide_rgb.0, guide_rgb.1, guide_rgb.2);
 
-    for (layer_idx, (row_step, speed_ms, streak_len, body_ch, hot_rgb, cool_rgb)) in
-        layers.iter().enumerate()
-    {
-        let start_row = top + (layer_idx as i32 % *row_step as i32);
-        let mut row_count = 0usize;
-        let dynamic_len = *streak_len + (accel * (*streak_len as f64 * 0.95)).round() as usize;
-        for y in (start_row..=bottom).step_by(*row_step) {
-            let phase_span = inner_w + dynamic_len as i32 + 8;
-            let accel_phase =
-                (accel * phase_span as f64 * (4.0 + layer_idx as f64 * 1.8)).round() as i32;
-            let phase = (((millis / *speed_ms) as i32)
-                + accel_phase
-                + row_count as i32 * (4 + layer_idx as i32)
-                + layer_idx as i32 * 13)
-                .rem_euclid(phase_span);
-            let head_x = right - phase;
+        draw_single_overlay_glyph(frame, area, x_l, y_top, glyph, guide_color);
+        draw_single_overlay_glyph(frame, area, x_l, y_bot, glyph, guide_color);
+        draw_single_overlay_glyph(frame, area, x_r, y_top, glyph, guide_color);
+        draw_single_overlay_glyph(frame, area, x_r, y_bot, glyph, guide_color);
+    }
 
-            for seg in 0..dynamic_len {
-                let x = head_x + seg as i32;
-                if x < left || x > right {
+    // Rail streaks travel from both sides into a center focal point.
+    let lane_count = 12usize;
+    let trail_len = (2.0 + launch_curve * 1.5 + booster_curve * 2.5)
+        .round()
+        .clamp(2.0, 6.0) as i32;
+    let phase_span = half_w + trail_len + 8;
+
+    for lane in 0..lane_count {
+        let lane_t = (lane + 1) as f64 / (lane_count + 1) as f64;
+        let base_y = top + (lane_t * (field_h - 1) as f64).round() as i32;
+        let wobble_amp = 0.8 + (lane % 3) as f64 * 0.35;
+        let lane_speed_ms = 28u128 + (lane as u128 * 5);
+
+        for side in [0usize, 1usize] {
+            let lane_clock_mult =
+                1.0 + lane as f64 * 0.07 + side as f64 * 0.06 + launch_curve * 0.22;
+            let side_clock = (rail_clock * lane_clock_mult) as u128;
+            let side_offset = (lane as i32 * 9) + side as i32 * 17;
+            let phase =
+                (((side_clock / lane_speed_ms) as i32) + side_offset).rem_euclid(phase_span.max(1));
+            let x = if side == 0 {
+                left + phase
+            } else {
+                right - phase
+            };
+
+            if (side == 0 && x > cx) || (side == 1 && x < cx) {
+                continue;
+            }
+
+            let depth_t = (phase as f64 / half_w as f64).clamp(0.0, 1.0);
+            let pull_t = depth_t.powf(1.25);
+            let wobble_phase = millis as f64 / 120.0 + lane as f64 * 0.85 + side as f64 * 0.60;
+            let wobble = wobble_phase.sin() * wobble_amp * (1.0 - pull_t);
+            let y_f = base_y as f64 + (cy - base_y) as f64 * pull_t * 0.88 + wobble;
+            let y = y_f.round() as i32;
+            if y < top || y > bottom {
+                continue;
+            }
+
+            for seg in 0..trail_len {
+                let tx = if side == 0 { x - seg } else { x + seg };
+                if tx < left || tx > right {
                     continue;
                 }
-                let seg_t = seg as f64 / dynamic_len.max(1) as f64;
-                let rgb = lerp_rgb(*hot_rgb, *cool_rgb, seg_t);
+
+                let seg_t = seg as f64 / trail_len.max(1) as f64;
+                let heat = ((1.0 - seg_t) * (0.38 + 0.62 * pull_t)).clamp(0.0, 1.0);
+                let rgb = lerp_rgb((58, 102, 182), (235, 248, 255), heat);
                 let color = Color::Rgb(rgb.0, rgb.1, rgb.2);
                 let ch = if seg == 0 {
-                    if accel > 0.72 {
-                        '◉'
-                    } else if layer_idx <= 1 {
-                        '✦'
+                    if pull_t > 0.85 {
+                        '✶'
+                    } else if pull_t > 0.65 {
+                        '◆'
                     } else {
                         '•'
                     }
                 } else if seg <= 2 {
-                    '•'
+                    '·'
                 } else {
-                    *body_ch
+                    '╌'
                 };
-                draw_single_overlay_glyph(frame, area, x, y, ch, color);
-            }
-            row_count += 1;
-        }
-    }
-
-    // Sparse temporal gates that sweep right-to-left.
-    let gate_row_step = if accel > 0.55 { 2 } else { 3 };
-    for gate in 0..4i32 {
-        let phase = (((millis / 95) as i32)
-            + gate * ((inner_w / 4).max(8))
-            + (accel * (inner_w + 12) as f64 * 5.0).round() as i32)
-            .rem_euclid(inner_w + 12);
-        let x = right - phase;
-        if x >= left && x <= right {
-            for y in (top..=bottom).step_by(gate_row_step) {
-                let ch = if (y + gate) % 2 == 0 { '┊' } else { '╎' };
-                draw_single_overlay_glyph(frame, area, x, y, ch, TIMEWARP_MID);
+                draw_single_overlay_glyph(frame, area, tx, y, ch, color);
             }
         }
     }
 
-    // Fast shards with tiny trails.
-    let shard_count = 16 + (accel * 24.0).round() as usize;
-    let shard_trail = 2 + (accel * 4.0).round() as i32;
-    for i in 0..shard_count {
-        let seed = hash2d(i, (millis / 55) as usize);
-        let y = top + (seed as i32 % field_h);
-        let phase = (((millis / 24) as i32)
-            + (seed as i32 % 41)
-            + (accel * (inner_w + 10) as f64 * 7.0).round() as i32)
-            .rem_euclid(inner_w + 10);
-        let x = right - phase;
-        if x < left || x > right {
-            continue;
-        }
-        let color = if i % 3 == 0 {
-            pulse_color
-        } else {
-            accent_color
-        };
-        let shard_head = if accel > 0.75 { '◁' } else { '◀' };
-        draw_single_overlay_glyph(frame, area, x, y, shard_head, color);
-        for t in 1..=shard_trail {
-            let trail_ch = if t <= 2 { '·' } else { '╌' };
-            draw_single_overlay_glyph(frame, area, x + t, y, trail_ch, TIMEWARP_MID);
-        }
-    }
+    // Center focal point pulses brighter as boost kicks in.
+    let core_pulse_t = ((shimmer_millis as f64 / 140.0).sin() * 0.5 + 0.5).clamp(0.0, 1.0);
+    let core_rgb = lerp_rgb((150, 225, 255), (255, 255, 255), core_pulse_t);
+    let core_color = Color::Rgb(core_rgb.0, core_rgb.1, core_rgb.2);
+    let core_char = if booster_curve > 0.30 { '✹' } else { '◎' };
+    draw_single_overlay_glyph(frame, area, cx, cy, core_char, core_color);
+    draw_single_overlay_glyph(frame, area, cx - 1, cy, '◌', TIMEWARP_MID);
+    draw_single_overlay_glyph(frame, area, cx + 1, cy, '◌', TIMEWARP_MID);
+    draw_single_overlay_glyph(frame, area, cx, cy - 1, '◌', accent_color);
+    draw_single_overlay_glyph(frame, area, cx, cy + 1, '◌', accent_color);
 }
 
 pub fn render_chrono_surge_banner(

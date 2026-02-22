@@ -408,6 +408,17 @@ pub struct UpdateInfo {
     pub current_and_previous_times: Vec<Option<String>>,
 }
 
+/// Result of in-game background update checks.
+#[derive(Debug, Clone)]
+pub enum UpdateInfoStatus {
+    /// A newer release is available.
+    UpdateAvailable(UpdateInfo),
+    /// Current build matches or is newer than latest release.
+    UpToDate,
+    /// Could not determine update status (network/auth/etc.).
+    CheckFailed(String),
+}
+
 /// Fetch commit summaries from a branch/revision head (newest first).
 fn fetch_commit_summaries(head: &str, limit: usize) -> Result<Vec<CommitSummary>, Box<dyn Error>> {
     let url = format!(
@@ -437,8 +448,7 @@ fn fetch_commit_summaries(head: &str, limit: usize) -> Result<Vec<CommitSummary>
 }
 
 /// Check for updates and return full info including changelog.
-/// Returns Some(UpdateInfo) if update available, None otherwise.
-pub fn check_update_info() -> Option<UpdateInfo> {
+pub fn check_update_info() -> UpdateInfoStatus {
     use crate::utils::build_info::{BUILD_COMMIT, BUILD_DATE};
 
     match check_for_updates(BUILD_COMMIT, BUILD_DATE) {
@@ -488,7 +498,7 @@ pub fn check_update_info() -> Option<UpdateInfo> {
                 .map(|e| e.committed_at.clone())
                 .collect::<Vec<_>>();
 
-            Some(UpdateInfo {
+            UpdateInfoStatus::UpdateAvailable(UpdateInfo {
                 current_version: current_date,
                 current_commit: current_commit_short,
                 new_version: latest.date,
@@ -500,7 +510,8 @@ pub fn check_update_info() -> Option<UpdateInfo> {
                 current_and_previous_times,
             })
         }
-        _ => None,
+        UpdateCheck::UpToDate => UpdateInfoStatus::UpToDate,
+        UpdateCheck::CheckFailed(err) => UpdateInfoStatus::CheckFailed(err),
     }
 }
 
