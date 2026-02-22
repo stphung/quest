@@ -3,6 +3,8 @@ mod challenges;
 mod character;
 mod combat;
 mod core;
+#[allow(dead_code)]
+mod deep;
 mod dungeon;
 mod enhancement;
 mod fishing;
@@ -177,6 +179,9 @@ fn main() -> io::Result<()> {
 
     // Load account-level Enhancement (soulforge) state
     let mut enhancement = enhancement::load_enhancement();
+
+    // Load account-level Deep (mercenary expedition) state
+    let mut deep = deep::persistence::load_deep();
 
     // Load account-level God Item progress
 
@@ -540,6 +545,7 @@ fn main() -> io::Result<()> {
                                 &mut global_achievements,
                                 update_info.is_some(),
                                 update_expanded,
+                                &mut deep,
                             );
 
                             track_input_achievements(

@@ -19,6 +19,7 @@ use crate::achievements::get_achievements_by_category;
 use crate::challenges::menu::{process_input as process_menu_input, MenuInput};
 use crate::character::prestige::can_prestige;
 use crate::core::game_state::GameState;
+use crate::deep::types::TheDeepState;
 use crate::enhancement;
 use crate::haven::Haven;
 use crate::stormglass::types::ExchangeUiState;
@@ -47,6 +48,7 @@ pub fn handle_game_input(
     achievements: &mut crate::achievements::Achievements,
     update_available: bool,
     update_expanded: bool,
+    deep: &mut TheDeepState,
 ) -> InputResult {
     // 0. Offline welcome overlay (any key dismisses)
     if matches!(overlay, GameOverlay::OfflineWelcome { .. }) {
@@ -157,7 +159,7 @@ pub fn handle_game_input(
             return InputResult::Continue;
         }
         if debug_menu.is_open {
-            return handle_debug_menu(key, state, haven, enhancement, overlay, debug_menu);
+            return handle_debug_menu(key, state, haven, enhancement, overlay, debug_menu, deep);
         }
     }
 
@@ -254,6 +256,7 @@ fn handle_debug_menu(
     enhancement: &mut enhancement::EnhancementProgress,
     overlay: &mut GameOverlay,
     debug_menu: &mut DebugMenu,
+    deep: &mut TheDeepState,
 ) -> InputResult {
     match key.code {
         KeyCode::Tab | KeyCode::Right => debug_menu.navigate_next_category(),
@@ -261,7 +264,7 @@ fn handle_debug_menu(
         KeyCode::Up => debug_menu.navigate_up(),
         KeyCode::Down => debug_menu.navigate_down(),
         KeyCode::Enter => {
-            let msg = debug_menu.trigger_selected(state, haven, enhancement);
+            let msg = debug_menu.trigger_selected(state, haven, enhancement, deep);
             state
                 .combat_state
                 .add_log_entry(format!("[DEBUG] {}", msg), false, true);

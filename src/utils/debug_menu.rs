@@ -4,6 +4,7 @@
 
 use crate::challenges::menu::{create_challenge, ChallengeType};
 use crate::core::game_state::GameState;
+use crate::deep::types::TheDeepState;
 use crate::dungeon::generation::generate_dungeon;
 use crate::enhancement::EnhancementProgress;
 use crate::fishing::generation::generate_fishing_session;
@@ -35,10 +36,11 @@ pub const DEBUG_OPTIONS: &[&str] = &[
     "Grant 100k Stormglass",
     "Etch Random Sigils (All Slots)",
     "Etch S+ Sigil (Slot 1)",
+    "Discover The Deep",
 ];
 
 const CHALLENGE_OPTION_INDICES: &[usize] = &[2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-const WORLD_OPTION_INDICES: &[usize] = &[0, 1, 12, 13];
+const WORLD_OPTION_INDICES: &[usize] = &[0, 1, 12, 13, 22];
 const RESOURCE_OPTION_INDICES: &[usize] = &[17, 18, 19, 20, 21];
 const ITEM_OPTION_INDICES: &[usize] = &[14, 15, 16];
 
@@ -152,6 +154,7 @@ impl DebugMenu {
         state: &mut GameState,
         haven: &mut Haven,
         enhancement: &mut EnhancementProgress,
+        deep: &mut TheDeepState,
     ) -> &'static str {
         let msg = match self.selected_option_global_index() {
             0 => trigger_dungeon(state),
@@ -176,6 +179,7 @@ impl DebugMenu {
             19 => trigger_grant_100k_stormglass(state),
             20 => trigger_etch_random_sigils(state),
             21 => trigger_etch_s_plus_sigil(state),
+            22 => trigger_deep_discovery(deep),
             _ => "Unknown option",
         };
         self.close();
@@ -331,6 +335,14 @@ fn trigger_soulforge_discovery(enhancement: &mut EnhancementProgress) -> &'stati
     }
     enhancement.discovered = true;
     "Soulforge discovered!"
+}
+
+fn trigger_deep_discovery(deep: &mut TheDeepState) -> &'static str {
+    if deep.discovered {
+        return "The Deep already discovered!";
+    }
+    deep.discovered = true;
+    "The Deep discovered!"
 }
 
 fn trigger_forge_asprika(state: &mut GameState, enhancement: &EnhancementProgress) -> &'static str {
