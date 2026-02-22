@@ -189,28 +189,16 @@ fn render_pixel_sprite(
                     (Some(fg), None) => {
                         // Top opaque, bottom transparent → ▀ upper half-block
                         let bg = buffer[dest_row][buf_col].bg;
-                        buffer[dest_row][buf_col] = SceneCell {
-                            ch: '\u{2580}', // ▀
-                            fg,
-                            bg,
-                        };
+                        buffer[dest_row][buf_col] = SceneCell::new('\u{2580}', fg, bg);
                     }
                     (None, Some(fg)) => {
                         // Top transparent, bottom opaque → ▄ lower half-block
                         let bg = buffer[dest_row][buf_col].bg;
-                        buffer[dest_row][buf_col] = SceneCell {
-                            ch: '\u{2584}', // ▄
-                            fg,
-                            bg,
-                        };
+                        buffer[dest_row][buf_col] = SceneCell::new('\u{2584}', fg, bg);
                     }
                     (Some(top_fg), Some(bot_fg)) => {
                         // Both opaque → ▀ with top as fg, bottom as bg
-                        buffer[dest_row][buf_col] = SceneCell {
-                            ch: '\u{2580}', // ▀
-                            fg: top_fg,
-                            bg: bot_fg,
-                        };
+                        buffer[dest_row][buf_col] = SceneCell::new('\u{2580}', top_fg, bot_fg);
                     }
                 }
             }
@@ -248,6 +236,6 @@ where
         let row_u = row as usize;
         let fg = color(ch);
         let bg = buffer[row_u][col].bg;
-        buffer[row_u][col] = SceneCell { ch, fg, bg };
+        buffer[row_u][col] = SceneCell::new(ch, fg, bg);
     }
 }

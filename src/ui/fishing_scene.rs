@@ -177,15 +177,15 @@ fn render_sky_and_shoreline(
             for (col, cell) in row_cells.iter_mut().enumerate() {
                 if hash2d(row, col).is_multiple_of(97) && cell.ch == ' ' {
                     let bright = hash2d(row + twinkle_tick, col + twinkle_tick).is_multiple_of(3);
-                    *cell = SceneCell {
-                        ch: if bright { '*' } else { '.' },
-                        fg: if bright {
+                    *cell = SceneCell::new(
+                        if bright { '*' } else { '.' },
+                        if bright {
                             Color::Rgb(244, 246, 255)
                         } else {
                             Color::Rgb(184, 190, 232)
                         },
-                        bg: cell.bg,
-                    };
+                        cell.bg,
+                    );
                 }
             }
         }
@@ -209,11 +209,11 @@ fn render_sky_and_shoreline(
             let col = (cx + i) % width;
             if buffer[row][col].ch == ' ' {
                 let tint = lerp_channel(shade, 208, 1.0 - dusk);
-                buffer[row][col] = SceneCell {
+                buffer[row][col] = SceneCell::new(
                     ch,
-                    fg: Color::Rgb(tint, tint, tint.saturating_add(8)),
-                    bg: buffer[row][col].bg,
-                };
+                    Color::Rgb(tint, tint, tint.saturating_add(8)),
+                    buffer[row][col].bg,
+                );
             }
         }
     }
@@ -289,15 +289,15 @@ fn render_water_surface(
             if ch != ' ' {
                 let shimmer =
                     (((col as f64 * 0.09 + wave_tick * 0.19).sin() + 1.0) * 0.5 * 18.0) as u8;
-                *cell = SceneCell {
+                *cell = SceneCell::new(
                     ch,
-                    fg: Color::Rgb(
+                    Color::Rgb(
                         crest.0.saturating_add(shimmer),
                         crest.1.saturating_add(shimmer / 2),
                         crest.2.saturating_add(shimmer / 3),
                     ),
-                    bg: cell.bg,
-                };
+                    cell.bg,
+                );
             }
         }
     }
@@ -337,11 +337,11 @@ fn render_sailboat(
         }
         let (ru, cu) = (r as usize, c as usize);
         if ru < buf.len() && cu < buf[ru].len() {
-            buf[ru][cu] = SceneCell {
+            buf[ru][cu] = SceneCell::new(
                 ch,
-                fg: Color::Rgb(fg.0, fg.1, fg.2),
-                bg: Color::Rgb(bg.0, bg.1, bg.2),
-            };
+                Color::Rgb(fg.0, fg.1, fg.2),
+                Color::Rgb(bg.0, bg.1, bg.2),
+            );
         }
     };
 

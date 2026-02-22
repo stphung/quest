@@ -14,11 +14,21 @@ use ratatui::{
 };
 
 use super::scene_fx::{
-    current_millis, hash2d, lerp_rgb, put_cell, put_text, render_buffer, SceneCell,
+    current_millis, display_width, hash2d, lerp_rgb, put_cell, put_text, put_text_centered,
+    render_buffer, SceneCell,
 };
 
 /// Electric blue color used throughout Stormglass UI.
 const ELECTRIC_BLUE: Color = Color::Rgb(100, 180, 255);
+
+/// Rune circle purple color.
+const RUNE_PURPLE: Color = Color::Rgb(180, 160, 255);
+/// Inscription flash color (warm white).
+const INSCRIPTION_FLASH: Color = Color::Rgb(255, 255, 200);
+/// Phase timing boundaries in milliseconds.
+const PHASE1_END_MS: u128 = 1400;
+const PHASE2_END_MS: u128 = 2800;
+const PHASE3_END_MS: u128 = 3500;
 
 /// Parameters controlling the storm backdrop appearance.
 struct StormBackdropParams {
@@ -110,12 +120,6 @@ fn clear_row_chars(buffer: &mut [Vec<SceneCell>], row: i32) {
     }
 }
 
-/// Write a string centered horizontally in the buffer.
-fn put_text_centered(buffer: &mut [Vec<SceneCell>], row: i32, width: usize, text: &str, fg: Color) {
-    let col = (width as i32 - text.chars().count() as i32) / 2;
-    put_text(buffer, row, col, text, fg);
-}
-
 /// Render the full Stormglass Exchange overlay as a centered modal.
 pub fn render_stormglass_exchange(
     frame: &mut Frame,
@@ -140,6 +144,7 @@ pub fn render_stormglass_exchange(
         ExchangePhase::SigilRerollConfirm => {
             render_sigil_reroll_confirm(frame, area, exchange_ui, state)
         }
+        ExchangePhase::SigilRolling => render_sigil_rolling(frame, area, exchange_ui),
         ExchangePhase::SigilPick => render_sigil_pick(frame, area, exchange_ui),
         ExchangePhase::SigilForfeitConfirm => {
             render_sigil_pick(frame, area, exchange_ui);
@@ -164,10 +169,7 @@ fn render_exchange_menu(
 
     frame.render_widget(Clear, overlay_area);
 
-    let title = format!(
-        " \u{1F48E} Stormglass Exchange  [\u{1F48E}{} SG] ",
-        state.stormglass
-    );
+    let title = " \u{1F48E} Stormglass Exchange \u{1F48E} ";
     let block = Block::default()
         .title(Line::from(Span::styled(
             title,
@@ -202,21 +204,30 @@ fn render_exchange_menu(
     clear_row_chars(&mut buffer, 9); // description line 2
     clear_row_chars(&mut buffer, (h as i32) - 1); // help
 
-    // Menu items (rows 4-6): (icon, label, cost_text, affordable)
-    let items: [(&str, &str, String, bool); 3] = [
+    // Menu items (rows 4-6): (display_text, cost_text, affordable)
+    // Wide emoji icons (2 terminal cols) get 1 space before label;
+    // narrow icons (1 terminal col) get 2 spaces — so labels align.
+    let items: [(&str, String, bool); 3] = [
         (
-            "\u{2694}\u{FE0F}", // ⚔️
-            "Invoke Trial",
+            "\u{1F3B2} Invoke Challenge", // 🎲 (2-wide) + 1 space
             format!("{} SG", INVOKE_TRIAL_COST),
             state.stormglass >= INVOKE_TRIAL_COST,
         ),
-        ("\u{231B}", "Chrono Surge", ">>>".to_string(), true), // ⏳
-        ("\u{16B1}", "Storm Sigils", ">>>".to_string(), true), // ᚱ
+        (
+            "\u{231B} Chrono Surge", // ⌛ (2-wide) + 1 space
+            ">>>".to_string(),
+            true,
+        ),
+        (
+            "\u{16B1}  Etch Storm Sigils", // ᚱ (1-wide) + 2 spaces
+            ">>>".to_string(),
+            true,
+        ),
     ];
 
     let menu_start_row = 4i32;
-    let label_col = 5i32; // Fixed column for labels (after cursor + icon + gap)
-    for (i, (icon, label, cost, affordable)) in items.iter().enumerate() {
+    let text_col = 2i32;
+    for (i, (display, cost, affordable)) in items.iter().enumerate() {
         let row = menu_start_row + i as i32;
         if row >= h as i32 {
             break;
@@ -234,9 +245,8 @@ fn render_exchange_menu(
             Color::DarkGray
         };
 
-        // Icon at fixed position, label at fixed column for alignment
-        put_text(&mut buffer, row, 2, icon, fg);
-        put_text(&mut buffer, row, label_col, label, fg);
+        // Icon + label as one string so terminal width is handled naturally
+        put_text(&mut buffer, row, text_col, display, fg);
 
         // Right-aligned cost
         let cost_fg = if *affordable {
@@ -290,7 +300,7 @@ fn render_exchange_menu(
     // Description overlay (rows 8-9) — changes based on selected item
     if h > 9 {
         let desc = match exchange_ui.selected_item {
-            0 => "Spend Stormglass to unlock a choice of three challenges.",
+            0 => "Spend Stormglass to invoke a choice of three challenges.",
             1 => "Bend time itself. Earn XP and loot, but no Stormglass.",
             _ => "Etch sigils of power onto your soul. Permanent bonuses.",
         };
@@ -319,7 +329,7 @@ fn render_invoke_trial_confirm(frame: &mut Frame, area: Rect, state: &GameState)
 
     let block = Block::default()
         .title(Line::from(Span::styled(
-            " \u{2694}\u{FE0F} Invoke Trial? \u{2694}\u{FE0F} ",
+            " \u{1F3B2} Invoke Challenge? \u{1F3B2} ",
             Style::default()
                 .fg(ELECTRIC_BLUE)
                 .add_modifier(Modifier::BOLD),
@@ -483,7 +493,7 @@ fn render_invoke_trial(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiSt
 
     let block = Block::default()
         .title(Line::from(Span::styled(
-            " \u{2694}\u{FE0F} Invoke Trial \u{2694}\u{FE0F} ",
+            " \u{1F3B2} Invoke Challenge \u{1F3B2} ",
             Style::default()
                 .fg(ELECTRIC_BLUE)
                 .add_modifier(Modifier::BOLD),
@@ -586,10 +596,7 @@ fn render_chrono_surge_select(
 
     frame.render_widget(Clear, overlay_area);
 
-    let title = format!(
-        " \u{231B} Chrono Surge  [\u{1F48E}{} SG] ",
-        state.stormglass
-    );
+    let title = " \u{231B} Chrono Surge \u{231B} ";
     let block = Block::default()
         .title(Line::from(Span::styled(
             title,
@@ -871,10 +878,7 @@ fn render_sigils_list(
 
     frame.render_widget(Clear, overlay_area);
 
-    let title = format!(
-        " \u{16B1} Etch Storm Sigils  [\u{1F48E}{} SG] ",
-        state.stormglass
-    );
+    let title = " \u{16B1} Etch Storm Sigils \u{16B1} ";
     let block = Block::default()
         .title(Line::from(Span::styled(
             title,
@@ -942,19 +946,20 @@ fn render_sigils_list(
                 let icon_name = format!("{} {}", icon, sigil.effect.sigil_name());
                 put_text(&mut buffer, row, col, &icon_name, Color::White);
 
-                // Right-aligned: value + grade
+                // Right-aligned: value + grade (pad grade to 2 chars for alignment)
                 let value_str = sigil.effect.format_value(sigil.value);
                 let grade_str = sigil.grade.label();
-                let right_text = format!("{}  {}", value_str, grade_str);
+                let grade_padded = format!("{:<2}", grade_str);
+                let right_text = format!("{}  {}", value_str, grade_padded);
                 let right_col = (w as i32) - right_text.len() as i32 - 1;
 
                 // Value in white
                 put_text(&mut buffer, row, right_col, &value_str, Color::White);
 
-                // Grade with tier color and modifier
-                let grade_col = (w as i32) - grade_str.len() as i32 - 1;
+                // Grade with tier color
+                let grade_col = (w as i32) - grade_padded.len() as i32 - 1;
                 let grade_fg = sigil_grade_color(sigil.grade);
-                put_text(&mut buffer, row, grade_col, grade_str, grade_fg);
+                put_text(&mut buffer, row, grade_col, &grade_padded, grade_fg);
             } else {
                 // Empty slot
                 put_text(&mut buffer, row, col, "(empty)", Color::DarkGray);
@@ -1063,7 +1068,7 @@ fn render_sigil_unlock_confirm(frame: &mut Frame, area: Rect, state: &GameState)
 
     let block = Block::default()
         .title(Line::from(Span::styled(
-            " \u{1F48E} Unlock Sigil Slot? \u{1F48E} ",
+            " \u{16B1} Unlock Sigil Slot? \u{16B1} ",
             Style::default()
                 .fg(ELECTRIC_BLUE)
                 .add_modifier(Modifier::BOLD),
@@ -1179,7 +1184,7 @@ fn render_sigil_etch_confirm(frame: &mut Frame, area: Rect, state: &GameState) {
 
     let block = Block::default()
         .title(Line::from(Span::styled(
-            " \u{1F48E} Etch Sigil? \u{1F48E} ",
+            " \u{16B1} Etch Sigil? \u{16B1} ",
             Style::default()
                 .fg(ELECTRIC_BLUE)
                 .add_modifier(Modifier::BOLD),
@@ -1245,15 +1250,18 @@ fn render_sigil_etch_confirm(frame: &mut Frame, area: Rect, state: &GameState) {
         Color::DarkGray,
     );
 
-    // Daily sigil pool names (rows 10-11, with padding rows 9 and 12)
+    // Daily sigil pool names with icons (rows 10-11, with padding rows 9 and 12)
     let pool = crate::stormglass::sigils::daily_sigil_pool();
-    let names: Vec<&str> = pool.iter().map(|e| e.short_name()).collect();
+    let names: Vec<String> = pool
+        .iter()
+        .map(|e| format!("{} {}", e.icon(), e.short_name()))
+        .collect();
     let line1_names = &names[..3.min(names.len())];
-    let line1 = line1_names.join(" \u{00b7} ");
+    let line1 = line1_names.join("  ");
     put_text_centered(&mut buffer, 10, w, &line1, Color::DarkGray);
     if names.len() > 3 {
         let line2_names = &names[3..];
-        let line2 = line2_names.join(" \u{00b7} ");
+        let line2 = line2_names.join("  ");
         put_text_centered(&mut buffer, 11, w, &line2, Color::DarkGray);
     }
 
@@ -1313,7 +1321,7 @@ fn render_sigil_reroll_confirm(
 
     let block = Block::default()
         .title(Line::from(Span::styled(
-            " \u{1F48E} Reroll Sigil? \u{1F48E} ",
+            " \u{16B1} Reroll Sigil? \u{16B1} ",
             Style::default()
                 .fg(ELECTRIC_BLUE)
                 .add_modifier(Modifier::BOLD),
@@ -1428,6 +1436,397 @@ fn render_sigil_reroll_confirm(
     }
 }
 
+/// Render the sigil rolling animation (4 phases over 4 seconds).
+fn render_sigil_rolling(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiState) {
+    let overlay_width = 52u16.min(area.width.saturating_sub(4));
+    let overlay_height = 14u16.min(area.height.saturating_sub(2));
+    let x = area.x + (area.width.saturating_sub(overlay_width)) / 2;
+    let y = area.y + (area.height.saturating_sub(overlay_height)) / 2;
+    let overlay_area = Rect::new(x, y, overlay_width, overlay_height);
+
+    frame.render_widget(Clear, overlay_area);
+
+    let block = Block::default()
+        .title(Line::from(Span::styled(
+            " \u{16B1} Sigil Inscription \u{16B1} ",
+            Style::default()
+                .fg(ELECTRIC_BLUE)
+                .add_modifier(Modifier::BOLD),
+        )))
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(ELECTRIC_BLUE));
+
+    let inner = block.inner(overlay_area);
+    frame.render_widget(block, overlay_area);
+
+    let w = inner.width as usize;
+    let h = inner.height as usize;
+    if w == 0 || h == 0 {
+        return;
+    }
+
+    let millis = current_millis();
+    let anim_start = exchange_ui.sigil_animation_start_ms.unwrap_or(millis);
+    let elapsed = millis.saturating_sub(anim_start);
+
+    // Intensified storm backdrop: more particles and faster speed during phase 1
+    let intensity = if elapsed < PHASE1_END_MS {
+        (elapsed as f64 / PHASE1_END_MS as f64).clamp(0.0, 1.0)
+    } else {
+        1.0
+    };
+    let params = StormBackdropParams {
+        top_rgb: (
+            lerp_rgb((10, 15, 40), (20, 10, 50), intensity).0,
+            lerp_rgb((10, 15, 40), (20, 10, 50), intensity).1,
+            lerp_rgb((10, 15, 40), (20, 10, 50), intensity).2,
+        ),
+        bottom_rgb: (
+            lerp_rgb((5, 5, 15), (10, 5, 30), intensity).0,
+            lerp_rgb((5, 5, 15), (10, 5, 30), intensity).1,
+            lerp_rgb((5, 5, 15), (10, 5, 30), intensity).2,
+        ),
+        particle_count: 8 + (intensity * 12.0) as usize,
+        particle_speed: 1.5 + intensity * 2.5,
+        shimmer: true,
+    };
+
+    let mut buffer = vec![vec![SceneCell::default(); w]; h];
+    paint_storm_backdrop(&mut buffer, millis, &params);
+
+    if elapsed < PHASE1_END_MS {
+        render_rolling_phase1(&mut buffer, w, h, millis, elapsed);
+    } else if elapsed < PHASE2_END_MS {
+        let phase_elapsed = elapsed - PHASE1_END_MS;
+        render_rolling_phase2(&mut buffer, w, h, exchange_ui, phase_elapsed);
+    } else if elapsed < PHASE3_END_MS {
+        let phase_elapsed = elapsed - PHASE2_END_MS;
+        render_rolling_phase3(&mut buffer, w, h, exchange_ui, phase_elapsed);
+    } else {
+        render_rolling_phase4(&mut buffer, w, h, exchange_ui);
+    }
+
+    // Help row: "[Any key] Skip" after 200ms
+    if elapsed > 200 {
+        let help_row = (h as i32) - 1;
+        clear_row_chars(&mut buffer, help_row);
+        put_text_centered(&mut buffer, help_row, w, "[Any key] Skip", Color::DarkGray);
+    }
+
+    render_buffer(frame, inner, &buffer);
+}
+
+/// Phase 1: Energy Gathering (0-1400ms) — rune circle orbiting center, pulsing text.
+fn render_rolling_phase1(
+    buffer: &mut [Vec<SceneCell>],
+    w: usize,
+    h: usize,
+    millis: u128,
+    elapsed: u128,
+) {
+    let progress = (elapsed as f64 / PHASE1_END_MS as f64).clamp(0.0, 1.0);
+
+    // Center of the buffer
+    let cx = w as f64 / 2.0;
+    let cy = h as f64 / 2.0;
+
+    // Clear center rows for text
+    for r in 0..h {
+        clear_row_chars(buffer, r as i32);
+    }
+
+    // Orbiting rune circle characters with progressive detail
+    let circle_chars: &[char] = if progress < 0.25 {
+        &['\u{00b7}'] // ·
+    } else if progress < 0.5 {
+        &['\u{00b7}', '\u{25e6}'] // · ◦
+    } else if progress < 0.75 {
+        &['\u{25e6}', '\u{25cb}'] // ◦ ○
+    } else {
+        &['\u{25cb}', '\u{25ce}'] // ○ ◎
+    };
+
+    let radius = 3.0 + progress * 2.0;
+    let orbit_speed = millis as f64 / 400.0;
+    let num_runes = 8 + (progress * 4.0) as usize;
+
+    for i in 0..num_runes {
+        let angle = orbit_speed + (i as f64 * std::f64::consts::TAU / num_runes as f64);
+        // Converge inward as progress increases
+        let r = radius * (1.0 - progress * 0.3);
+        let rx = cx + angle.cos() * r * 2.0; // x stretched for terminal aspect ratio
+        let ry = cy + angle.sin() * r;
+        let ch = circle_chars[i % circle_chars.len()];
+
+        let fade = 0.4 + 0.6 * progress;
+        let rgb = lerp_rgb((80, 60, 160), (180, 160, 255), fade);
+        put_cell(
+            buffer,
+            ry as i32,
+            rx as i32,
+            ch,
+            Color::Rgb(rgb.0, rgb.1, rgb.2),
+        );
+    }
+
+    // Orbiting glyphs converging inward
+    let glyphs = ['\u{26A1}', '\u{2726}', '\u{25C8}']; // ⚡ ✦ ◈
+    for (i, &glyph) in glyphs.iter().enumerate() {
+        let angle = orbit_speed * 0.7 + (i as f64 * std::f64::consts::TAU / 3.0);
+        let glyph_r = (5.0 - progress * 3.5).max(1.0);
+        let gx = cx + angle.cos() * glyph_r * 2.0;
+        let gy = cy + angle.sin() * glyph_r;
+        put_cell(buffer, gy as i32, gx as i32, glyph, ELECTRIC_BLUE);
+    }
+
+    // Center text: "Gathering energy..." with pulsing purple
+    let pulse = ((millis as f64 / 300.0).sin() * 0.5 + 0.5).clamp(0.0, 1.0);
+    let pulse_rgb = lerp_rgb((120, 100, 200), (220, 200, 255), pulse);
+    let pulse_fg = Color::Rgb(pulse_rgb.0, pulse_rgb.1, pulse_rgb.2);
+
+    let text = "Gathering energy...";
+    let center_row = cy as i32;
+    put_text_centered(buffer, center_row, w, text, pulse_fg);
+}
+
+/// Phase 2: Sigil Etching (1400-2800ms) — sigil names etch character-by-character.
+/// Uses icon + sigil name format matching the slots screen.
+fn render_rolling_phase2(
+    buffer: &mut [Vec<SceneCell>],
+    w: usize,
+    h: usize,
+    exchange_ui: &ExchangeUiState,
+    phase_elapsed: u128,
+) {
+    // Clear all rows for clean rendering
+    for r in 0..h {
+        clear_row_chars(buffer, r as i32);
+    }
+
+    // Header
+    put_text_centered(buffer, 1, w, "Inscribing sigils...", RUNE_PURPLE);
+
+    let choice_start_row = 4i32;
+    let stagger_ms: u128 = 150;
+    let phase_duration = PHASE2_END_MS - PHASE1_END_MS; // 1400ms
+
+    for (i, choice) in exchange_ui.sigil_choices.iter().enumerate() {
+        let row = choice_start_row + i as i32;
+        if row >= h as i32 {
+            break;
+        }
+
+        if let Some(sigil) = choice {
+            // Match slots screen format: icon + sigil name
+            let icon = sigil.effect.icon();
+            let display_str = format!("{} {}", icon, sigil.effect.sigil_name());
+            let total_chars = display_str.chars().count();
+            let sigil_start = stagger_ms * i as u128;
+
+            if phase_elapsed < sigil_start {
+                // Not started yet
+                continue;
+            }
+
+            let sigil_elapsed = phase_elapsed - sigil_start;
+            // Time per character: distribute across available time
+            let char_duration = (phase_duration - stagger_ms * 2) / total_chars.max(1) as u128;
+            let chars_visible = if char_duration == 0 {
+                total_chars
+            } else {
+                ((sigil_elapsed / char_duration) as usize).min(total_chars)
+            };
+
+            let partial: String = display_str.chars().take(chars_visible).collect();
+            // Match slots col: cursor marker (2) + start at col 3
+            let col = 3i32;
+            put_text(buffer, row, col, &partial, Color::White);
+
+            // Typing cursor at end of partial text (use display width for position)
+            if chars_visible < total_chars {
+                let cursor_col = col + display_width(&partial) as i32;
+                put_cell(buffer, row, cursor_col, '\u{2588}', Color::White); // █
+            }
+
+            // Brief inscription flash when a sigil completes
+            let complete = chars_visible >= total_chars;
+            if complete {
+                let flash_window = 120; // ms
+                let complete_time = sigil_start + char_duration * total_chars as u128;
+                if phase_elapsed < complete_time + flash_window {
+                    // Flash the row
+                    if (row as usize) < h {
+                        for cell in buffer[row as usize].iter_mut() {
+                            if cell.ch != ' ' {
+                                cell.fg = INSCRIPTION_FLASH;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Phase 3: Grade Reveal (2800-3500ms) — full names shown, value + grade fade in right-aligned.
+/// Matches slots screen layout: icon + sigil name left, value + grade right.
+fn render_rolling_phase3(
+    buffer: &mut [Vec<SceneCell>],
+    w: usize,
+    h: usize,
+    exchange_ui: &ExchangeUiState,
+    phase_elapsed: u128,
+) {
+    for r in 0..h {
+        clear_row_chars(buffer, r as i32);
+    }
+
+    put_text_centered(buffer, 1, w, "Sigils revealed!", RUNE_PURPLE);
+
+    let choice_start_row = 4i32;
+    let stagger_ms: u128 = 150;
+    let phase_duration = PHASE3_END_MS - PHASE2_END_MS; // 700ms
+
+    for (i, choice) in exchange_ui.sigil_choices.iter().enumerate() {
+        let row = choice_start_row + i as i32;
+        if row >= h as i32 {
+            break;
+        }
+
+        if let Some(sigil) = choice {
+            // Match slots screen: icon + sigil name on left
+            let icon = sigil.effect.icon();
+            let name_str = format!("{} {}", icon, sigil.effect.sigil_name());
+            let col = 3i32;
+            put_text(buffer, row, col, &name_str, Color::White);
+
+            // Right-aligned value + grade fade in with stagger
+            let grade_start = stagger_ms * i as u128;
+            if phase_elapsed >= grade_start {
+                let grade_elapsed = phase_elapsed - grade_start;
+                let fade_duration = (phase_duration - stagger_ms * 2).max(1);
+                let fade = (grade_elapsed as f64 / fade_duration as f64).clamp(0.0, 1.0);
+
+                let value_str = sigil.effect.format_value(sigil.value);
+                let grade_str = sigil.grade.label();
+                let grade_fg = sigil_grade_color(sigil.grade);
+
+                // Value fades in white
+                let value_rgb = lerp_rgb((60, 60, 60), (200, 200, 200), fade);
+                let value_fg = Color::Rgb(value_rgb.0, value_rgb.1, value_rgb.2);
+
+                // Grade lerps from dark gray to final color
+                let base_rgb = (60, 60, 60);
+                let target_rgb = match grade_fg {
+                    Color::Rgb(r, g, b) => (r, g, b),
+                    Color::Green => (0, 200, 0),
+                    Color::Cyan => (0, 200, 200),
+                    Color::White => (200, 200, 200),
+                    Color::Gray => (128, 128, 128),
+                    Color::DarkGray => (80, 80, 80),
+                    Color::Red => (200, 0, 0),
+                    _ => (200, 200, 200),
+                };
+                let faded_rgb = lerp_rgb(base_rgb, target_rgb, fade);
+                let faded_fg = Color::Rgb(faded_rgb.0, faded_rgb.1, faded_rgb.2);
+
+                // Right-aligned: "value  grade" (pad grade to 2 chars)
+                let grade_padded = format!("{:<2}", grade_str);
+                let right_text = format!("{}  {}", value_str, grade_padded);
+                let right_col = (w as i32) - right_text.len() as i32 - 1;
+                put_text(buffer, row, right_col, &value_str, value_fg);
+                let grade_col = (w as i32) - grade_padded.len() as i32 - 1;
+                put_text(buffer, row, grade_col, &grade_padded, faded_fg);
+            }
+        }
+    }
+}
+
+/// Phase 4: Transition (3500-4000ms) — everything solidified, cursor on first choice.
+/// Renders identically to the pick screen for a seamless transition.
+fn render_rolling_phase4(
+    buffer: &mut [Vec<SceneCell>],
+    w: usize,
+    h: usize,
+    exchange_ui: &ExchangeUiState,
+) {
+    for r in 0..h {
+        clear_row_chars(buffer, r as i32);
+    }
+
+    put_text_centered(
+        buffer,
+        1,
+        w,
+        "The storm fractures. Three sigils emerge.",
+        RUNE_PURPLE,
+    );
+
+    render_sigil_choice_rows(buffer, w, h, exchange_ui, 0);
+}
+
+/// Shared helper: render 3 sigil choice rows matching the slots screen layout.
+/// Icon + sigil name on the left, value + grade right-aligned.
+/// `selected` is the currently highlighted row index.
+fn render_sigil_choice_rows(
+    buffer: &mut [Vec<SceneCell>],
+    w: usize,
+    h: usize,
+    exchange_ui: &ExchangeUiState,
+    selected: usize,
+) {
+    let choice_start_row = 4i32;
+
+    for (i, choice) in exchange_ui.sigil_choices.iter().enumerate() {
+        let row = choice_start_row + i as i32;
+        if row >= h as i32 {
+            break;
+        }
+
+        if let Some(sigil) = choice {
+            let is_selected = i == selected;
+
+            // Cursor
+            let col = 1i32;
+            if is_selected {
+                put_text(buffer, row, col, "> ", Color::Yellow);
+            }
+            let name_col = col + 2;
+
+            // Icon + sigil name (left side)
+            let icon = sigil.effect.icon();
+            let name_str = format!("{} {}", icon, sigil.effect.sigil_name());
+            put_text(buffer, row, name_col, &name_str, Color::White);
+
+            // Right-aligned: value + grade (matching slots screen)
+            // Pad grade to 2 chars so the letter column stays aligned
+            // ("A" → "A ", "S+" → "S+", "B-" → "B-")
+            let value_str = sigil.effect.format_value(sigil.value);
+            let grade_str = sigil.grade.label();
+            let grade_padded = format!("{:<2}", grade_str);
+            let right_text = format!("{}  {}", value_str, grade_padded);
+            let right_col = (w as i32) - right_text.len() as i32 - 1;
+
+            // Value in white
+            put_text(buffer, row, right_col, &value_str, Color::White);
+
+            // Grade with tier color (at fixed 2-char-wide position)
+            let grade_col = (w as i32) - grade_padded.len() as i32 - 1;
+            let grade_fg = sigil_grade_color(sigil.grade);
+            put_text(buffer, row, grade_col, &grade_padded, grade_fg);
+
+            // Selected row highlight
+            if is_selected && (row as usize) < h {
+                let highlight_bg = Color::Rgb(15, 25, 55);
+                for cell in buffer[row as usize].iter_mut() {
+                    cell.bg = highlight_bg;
+                }
+            }
+        }
+    }
+}
+
 /// Render the pick-1-of-3 sigil selection screen.
 fn render_sigil_pick(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiState) {
     let overlay_width = 52u16.min(area.width.saturating_sub(4));
@@ -1440,7 +1839,7 @@ fn render_sigil_pick(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiStat
 
     let block = Block::default()
         .title(Line::from(Span::styled(
-            " \u{1F48E} Choose a Sigil \u{1F48E} ",
+            " \u{16B1} Choose a Sigil \u{16B1} ",
             Style::default()
                 .fg(ELECTRIC_BLUE)
                 .add_modifier(Modifier::BOLD),
@@ -1469,63 +1868,14 @@ fn render_sigil_pick(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiStat
     }
     clear_row_chars(&mut buffer, (h as i32) - 1);
 
-    // 3 sigil choices
-    let choice_start_row = 4i32;
-    for (i, choice) in exchange_ui.sigil_choices.iter().enumerate() {
-        let row = choice_start_row + i as i32;
-        if row >= h as i32 {
-            break;
-        }
-        let is_selected = i == exchange_ui.sigil_pick_selected;
-
-        let mut col = 1i32;
-        if is_selected {
-            put_text(&mut buffer, row, col, "> ", Color::Yellow);
-        }
-        col += 2;
-
-        if let Some(sigil) = choice {
-            // Icon + effect value
-            let icon = sigil.effect.icon();
-            let value_str = format!("{} {}", icon, sigil.effect.format_value(sigil.value));
-            put_text(&mut buffer, row, col, &value_str, Color::White);
-            col += value_str.len() as i32 + 2;
-
-            // Grade with color
-            let grade_str = sigil.grade.label();
-            let grade_fg = sigil_grade_color(sigil.grade);
-            let mut grade_style = Style::default().fg(grade_fg);
-            if sigil.grade.is_plus() {
-                grade_style = grade_style.add_modifier(Modifier::BOLD);
-            } else if sigil.grade.is_minus() {
-                grade_style = grade_style.add_modifier(Modifier::DIM);
-            }
-            // Put grade text with style
-            for (j, ch) in grade_str.chars().enumerate() {
-                if (col + j as i32) >= 0 && ((col + j as i32) as usize) < w {
-                    let cell = &mut buffer[row as usize][(col + j as i32) as usize];
-                    cell.ch = ch;
-                    cell.fg = grade_style.fg.unwrap_or(Color::White);
-                }
-            }
-
-            // Right-aligned range info
-            let (min, max) = sigil.effect.range();
-            let range_str = format!("(range: {:.0}-{:.0}%)", min, max);
-            let range_col = (w as i32) - range_str.len() as i32 - 1;
-            put_text(&mut buffer, row, range_col, &range_str, Color::DarkGray);
-        }
-
-        // Selected row highlight
-        if is_selected {
-            let highlight_bg = Color::Rgb(15, 25, 55);
-            if (row as usize) < h {
-                for cell in buffer[row as usize].iter_mut() {
-                    cell.bg = highlight_bg;
-                }
-            }
-        }
-    }
+    // 3 sigil choices — uses shared helper matching slots screen layout
+    render_sigil_choice_rows(
+        &mut buffer,
+        w,
+        h,
+        exchange_ui,
+        exchange_ui.sigil_pick_selected,
+    );
 
     // Help row
     let help_row = (h as i32) - 1;
@@ -1626,7 +1976,7 @@ fn render_sigil_result(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiSt
 
     let block = Block::default()
         .title(Line::from(Span::styled(
-            " \u{1F48E} Sigil Etched! \u{1F48E} ",
+            " \u{16B1} Sigil Etched! \u{16B1} ",
             Style::default()
                 .fg(ELECTRIC_BLUE)
                 .add_modifier(Modifier::BOLD),

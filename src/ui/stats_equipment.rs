@@ -158,23 +158,19 @@ fn draw_sigil_sub_panel(frame: &mut Frame, area: Rect, storm_sigils: &StormSigil
     let mut lines = Vec::new();
 
     for sigil in storm_sigils.sigils.iter().flatten() {
-        let name = format!("{} {}", sigil.effect.icon(), sigil.effect.sigil_name());
-        let value_str = format!("+{:.1}%", sigil.value);
+        // Compact layout: "  📖 Wisdom  +12.3% XP  A+"
+        let icon = sigil.effect.icon();
+        let short = sigil.effect.short_name();
+        let value_label = sigil.effect.format_value(sigil.value);
         let grade_str = sigil.grade.label();
+        let grade_padded = format!("{:<2}", grade_str);
         let grade_color = sigil_grade_color(sigil.grade);
 
-        // Layout: "  Name              +12.3%  A+"
-        let right_part = format!("{}  {}", value_str, grade_str);
-        let right_len = right_part.len();
-        let name_max = width.saturating_sub(right_len + 4); // 2 indent + 2 gap
-        let char_count = name.chars().count();
-        let display_name = if char_count > name_max && name_max > 3 {
-            let truncated: String = name.chars().take(name_max - 3).collect();
-            format!("{truncated}...")
-        } else {
-            name
-        };
-        let pad = name_max.saturating_sub(display_name.chars().count());
+        let left = format!("{} {}", icon, short);
+        let right = format!("{}  {}", value_label, grade_padded);
+        let left_display_w = unicode_width::UnicodeWidthStr::width(left.as_str());
+        let right_len = right.len();
+        let pad = width.saturating_sub(left_display_w + right_len + 3); // 2 indent + 1 gap min
 
         let grade_style = if grade_str.ends_with('+') {
             Style::default()
@@ -188,13 +184,10 @@ fn draw_sigil_sub_panel(frame: &mut Frame, area: Rect, storm_sigils: &StormSigil
 
         lines.push(Line::from(vec![
             Span::raw("  "),
-            Span::styled(display_name, Style::default().fg(Color::White)),
-            Span::raw(" ".repeat(pad)),
-            Span::styled(
-                format!("  {}", value_str),
-                Style::default().fg(Color::Rgb(100, 180, 255)),
-            ),
-            Span::styled(format!("  {}", grade_str), grade_style),
+            Span::styled(left, Style::default().fg(Color::White)),
+            Span::raw(" ".repeat(pad.max(1))),
+            Span::styled(value_label, Style::default().fg(Color::Rgb(100, 180, 255))),
+            Span::styled(format!("  {}", grade_padded), grade_style),
         ]));
     }
 

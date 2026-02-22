@@ -11,7 +11,7 @@ pub fn chrono_surge_cost(option_index: usize) -> Option<(u64, u64, &'static str)
     CHRONO_SURGE_OPTIONS.get(option_index).copied()
 }
 
-/// All challenge types available for Invoke Trial.
+/// All challenge types available for Invoke Challenge.
 const TRIAL_CHALLENGE_TYPES: [ChallengeType; 10] = [
     ChallengeType::Chess,
     ChallengeType::Morris,

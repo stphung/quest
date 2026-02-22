@@ -9,6 +9,15 @@ use crate::stormglass::types::{
     ExchangePhase, ExchangeUiState, CHRONO_SURGE_OPTIONS, EXCHANGE_MENU_ITEMS, INVOKE_TRIAL_COST,
 };
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+/// Current time in milliseconds since UNIX epoch.
+fn current_millis() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+}
 
 /// Handle input while the Stormglass Exchange overlay is open.
 pub fn handle_stormglass_exchange(
@@ -28,6 +37,7 @@ pub fn handle_stormglass_exchange(
         ExchangePhase::SigilUnlockConfirm => handle_sigil_unlock_confirm(key, exchange_ui, state),
         ExchangePhase::SigilEtchConfirm => handle_sigil_etch_confirm(key, exchange_ui, state),
         ExchangePhase::SigilRerollConfirm => handle_sigil_reroll_confirm(key, exchange_ui, state),
+        ExchangePhase::SigilRolling => handle_sigil_rolling(key, exchange_ui),
         ExchangePhase::SigilPick => handle_sigil_pick(key, exchange_ui, state),
         ExchangePhase::SigilForfeitConfirm => handle_sigil_forfeit_confirm(key, exchange_ui),
         ExchangePhase::SigilResult => handle_sigil_result(key, exchange_ui),
@@ -55,7 +65,7 @@ fn handle_menu(
         KeyCode::Enter => {
             match exchange_ui.selected_item {
                 0 => {
-                    // Invoke Trial — show confirmation first
+                    // Invoke Challenge — show confirmation first
                     if state.stormglass >= INVOKE_TRIAL_COST {
                         // Guard: if all 10 challenge types are already pending, do nothing
                         if state.challenge_menu.challenges.len() >= 10 {
@@ -302,7 +312,9 @@ fn handle_sigil_etch_confirm(
                 let choices = crate::stormglass::sigils::generate_sigil_choices(&mut rng, &pool);
                 exchange_ui.sigil_choices = choices.map(Some);
                 exchange_ui.sigil_pick_selected = 0;
-                exchange_ui.phase = ExchangePhase::SigilPick;
+                exchange_ui.sigil_animation_start_ms = Some(current_millis());
+                exchange_ui.sigil_animation_skipped = false;
+                exchange_ui.phase = ExchangePhase::SigilRolling;
             }
             InputResult::Continue
         }
@@ -331,7 +343,9 @@ fn handle_sigil_reroll_confirm(
                 let choices = crate::stormglass::sigils::generate_sigil_choices(&mut rng, &pool);
                 exchange_ui.sigil_choices = choices.map(Some);
                 exchange_ui.sigil_pick_selected = 0;
-                exchange_ui.phase = ExchangePhase::SigilPick;
+                exchange_ui.sigil_animation_start_ms = Some(current_millis());
+                exchange_ui.sigil_animation_skipped = false;
+                exchange_ui.phase = ExchangePhase::SigilRolling;
             }
             InputResult::Continue
         }
@@ -404,5 +418,44 @@ fn handle_sigil_result(key: KeyEvent, exchange_ui: &mut ExchangeUiState) -> Inpu
             InputResult::Continue
         }
         _ => InputResult::Continue,
+    }
+}
+
+/// Minimum display time before skip is accepted (prevents key-repeat instant-skip).
+const SIGIL_ANIMATION_SKIP_FLOOR_MS: u128 = 200;
+
+/// Total animation duration before auto-transitioning to pick.
+pub(crate) const SIGIL_ANIMATION_DURATION_MS: u128 = 4000;
+
+fn handle_sigil_rolling(key: KeyEvent, exchange_ui: &mut ExchangeUiState) -> InputResult {
+    let _ = key; // any key triggers skip (after floor check)
+    let elapsed = exchange_ui
+        .sigil_animation_start_ms
+        .map(|start| current_millis().saturating_sub(start))
+        .unwrap_or(0);
+
+    if elapsed >= SIGIL_ANIMATION_SKIP_FLOOR_MS {
+        exchange_ui.sigil_animation_start_ms = None;
+        exchange_ui.sigil_animation_skipped = false;
+        exchange_ui.phase = ExchangePhase::SigilPick;
+    }
+    InputResult::Continue
+}
+
+/// Check if sigil animation has completed and should auto-transition to pick.
+/// Called from the main game loop each tick.
+pub fn check_sigil_animation_timeout(exchange_ui: &mut ExchangeUiState) {
+    if exchange_ui.phase != ExchangePhase::SigilRolling {
+        return;
+    }
+    let elapsed = exchange_ui
+        .sigil_animation_start_ms
+        .map(|start| current_millis().saturating_sub(start))
+        .unwrap_or(0);
+
+    if elapsed >= SIGIL_ANIMATION_DURATION_MS {
+        exchange_ui.sigil_animation_start_ms = None;
+        exchange_ui.sigil_animation_skipped = false;
+        exchange_ui.phase = ExchangePhase::SigilPick;
     }
 }

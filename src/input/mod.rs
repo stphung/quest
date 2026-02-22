@@ -28,6 +28,7 @@ use minigame_input::handle_minigame;
 use prestige_input::{handle_prestige_confirm, handle_vault_selection};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use soulforge_input::handle_soulforge;
+pub use stormglass_input::check_sigil_animation_timeout;
 use stormglass_input::handle_stormglass_exchange;
 
 /// Main dispatcher for Game screen input. Handles the priority chain.

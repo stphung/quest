@@ -7,7 +7,7 @@ use crate::enhancement::{
 use crate::items::EquipmentSlot;
 use ratatui::style::Color;
 
-use super::scene_fx::{lerp_rgb, put_text, SceneCell};
+use super::scene_fx::{lerp_rgb, put_text, put_text_centered, SceneCell};
 
 pub(super) const SLOT_ORDER: [EquipmentSlot; 7] = [
     EquipmentSlot::Weapon,
@@ -478,10 +478,4 @@ pub(super) fn render_confirming_content(
         help_text,
         Color::DarkGray,
     );
-}
-
-/// Write a string centered horizontally in the buffer.
-fn put_text_centered(buffer: &mut [Vec<SceneCell>], row: i32, width: usize, text: &str, fg: Color) {
-    let col = (width as i32 - text.chars().count() as i32) / 2;
-    put_text(buffer, row, col, text, fg);
 }

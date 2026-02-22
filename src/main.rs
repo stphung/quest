@@ -314,6 +314,9 @@ fn main() -> io::Result<()> {
                     }
                     prev_scene_kind = scene_kind;
 
+                    // Check if sigil rolling animation has timed out
+                    crate::input::check_sigil_animation_timeout(&mut exchange_ui);
+
                     // Draw UI
                     terminal.draw(|frame| {
                         let ctx = ui::responsive::LayoutContext::from_frame(frame);
