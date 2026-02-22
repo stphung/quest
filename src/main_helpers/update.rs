@@ -3,6 +3,7 @@
 use crate::core::constants::{
     UPDATE_CHECK_INTERVAL_SECONDS, UPDATE_CHECK_JITTER_SECONDS, WIKI_URL,
 };
+use crate::settings::AppSettings;
 use crate::ui::throbber::block_spinner_char;
 use crate::utils::updater::UpdateInfo;
 use rand::RngExt;
@@ -14,6 +15,8 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 use std::thread::JoinHandle;
 use std::time::Duration;
+
+const SPLASH_SETTINGS_COUNT: usize = 1;
 
 /// Returns the update check interval with random jitter applied.
 /// Jitter spreads checks across [base - jitter, base + jitter] to avoid
@@ -49,6 +52,9 @@ fn draw_startup_modal(
 fn build_startup_splash_text(
     update_info: Option<&UpdateInfo>,
     update_loading: bool,
+    settings: &AppSettings,
+    settings_menu_open: bool,
+    selected_setting_index: usize,
 ) -> Vec<Line<'static>> {
     let q = Style::default()
         .fg(Color::Rgb(78, 217, 255))
@@ -225,29 +231,81 @@ fn build_startup_splash_text(
     }
 
     text.push(Line::from(""));
+    text.push(Line::from(vec![Span::styled(
+        "  Settings",
+        Style::default()
+            .fg(Color::Magenta)
+            .add_modifier(Modifier::BOLD),
+    )]));
+
+    let selected_style = Style::default()
+        .fg(Color::Yellow)
+        .add_modifier(Modifier::BOLD);
+    let normal_style = Style::default().fg(Color::White);
+    let marker_style = Style::default().fg(Color::DarkGray);
+    let indicator_style = Style::default()
+        .fg(Color::Cyan)
+        .add_modifier(Modifier::BOLD);
+    let setting_style = if settings_menu_open && selected_setting_index == 0 {
+        selected_style
+    } else {
+        normal_style
+    };
+    let marker = if settings_menu_open && selected_setting_index == 0 {
+        "  > "
+    } else {
+        "    "
+    };
+    let indicator = if settings.sound_on_prestige_ready {
+        "ON"
+    } else {
+        "OFF"
+    };
+
     text.push(Line::from(vec![
-        Span::styled(
-            "  [Enter]",
-            Style::default()
-                .fg(Color::Green)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(" Continue    ", Style::default().fg(Color::Gray)),
-        Span::styled(
-            "[W]",
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(" Quest Wiki    ", Style::default().fg(Color::Gray)),
-        Span::styled(
-            "[Esc]",
-            Style::default()
-                .fg(Color::DarkGray)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(" Quit", Style::default().fg(Color::Gray)),
+        Span::styled(marker, marker_style),
+        Span::styled("Sound on prestige ready: ", setting_style),
+        Span::styled(indicator, indicator_style),
     ]));
+
+    text.push(Line::from(""));
+    if settings_menu_open {
+        text.push(Line::from(vec![Span::styled(
+            "  [↑/↓] Select  [←/→/Enter/Space] Toggle  [S/Esc] Close  [C] Continue  [W] Quest Wiki  [Q] Quit",
+            Style::default().fg(Color::Green),
+        )]));
+    } else {
+        text.push(Line::from(vec![
+            Span::styled(
+                "  [Enter]",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" Continue    ", Style::default().fg(Color::Gray)),
+            Span::styled(
+                "[S]",
+                Style::default()
+                    .fg(Color::Magenta)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" Settings    ", Style::default().fg(Color::Gray)),
+            Span::styled(
+                "[W]",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" Quest Wiki    ", Style::default().fg(Color::Gray)),
+            Span::styled(
+                "[Esc]",
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" Quit", Style::default().fg(Color::Gray)),
+        ]));
+    }
 
     text
 }
@@ -256,6 +314,7 @@ enum StartupKeyAction {
     Continue,
     Quit,
     OpenWiki,
+    OpenSettings,
     Ignore,
 }
 
@@ -268,6 +327,7 @@ fn startup_key_action(key_event: KeyEvent) -> StartupKeyAction {
         KeyCode::Enter => StartupKeyAction::Continue,
         KeyCode::Esc => StartupKeyAction::Quit,
         KeyCode::Char('w') | KeyCode::Char('W') => StartupKeyAction::OpenWiki,
+        KeyCode::Char('s') | KeyCode::Char('S') => StartupKeyAction::OpenSettings,
         _ => StartupKeyAction::Ignore,
     }
 }
@@ -286,12 +346,16 @@ pub enum StartupSplashResult {
 }
 
 /// Show the startup splash screen while update data loads in the background.
-/// Pressing Enter continues immediately; Esc quits from startup.
+/// Press Enter to continue, Esc to quit, and S to open splash settings.
 pub fn show_startup_splash_screen(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     update_check_handle: &mut Option<JoinHandle<Option<UpdateInfo>>>,
+    settings: &mut AppSettings,
 ) -> io::Result<StartupSplashResult> {
     let mut update_info: Option<UpdateInfo> = None;
+    let mut settings_menu_open = false;
+    let mut selected_setting_index = 0usize;
+    let mut settings_changed = false;
 
     let action = loop {
         if update_info.is_none() {
@@ -306,22 +370,72 @@ pub fn show_startup_splash_screen(
         }
 
         let update_loading = update_info.is_none() && update_check_handle.is_some();
-        let text = build_startup_splash_text(update_info.as_ref(), update_loading);
+        let text = build_startup_splash_text(
+            update_info.as_ref(),
+            update_loading,
+            settings,
+            settings_menu_open,
+            selected_setting_index,
+        );
         draw_startup_modal(terminal, text)?;
 
         if event::poll(Duration::from_millis(100))? {
-            if let event::Event::Key(key_event) = event::read()? {
-                match startup_key_action(key_event) {
-                    StartupKeyAction::Continue => break StartupSplashResult::Continue,
-                    StartupKeyAction::Quit => break StartupSplashResult::Quit,
-                    StartupKeyAction::OpenWiki => {
+            let event::Event::Key(key_event) = event::read()? else {
+                continue;
+            };
+            if key_event.kind != KeyEventKind::Press {
+                continue;
+            }
+
+            if settings_menu_open {
+                match key_event.code {
+                    KeyCode::Up => {
+                        selected_setting_index = selected_setting_index.saturating_sub(1);
+                    }
+                    KeyCode::Down => {
+                        selected_setting_index =
+                            (selected_setting_index + 1).min(SPLASH_SETTINGS_COUNT - 1);
+                    }
+                    KeyCode::Left | KeyCode::Right | KeyCode::Enter | KeyCode::Char(' ') => {
+                        if selected_setting_index == 0 {
+                            settings.sound_on_prestige_ready = !settings.sound_on_prestige_ready;
+                            settings_changed = true;
+                        }
+                    }
+                    KeyCode::Esc | KeyCode::Char('s') | KeyCode::Char('S') => {
+                        settings_menu_open = false;
+                    }
+                    KeyCode::Char('c') | KeyCode::Char('C') => {
+                        break StartupSplashResult::Continue;
+                    }
+                    KeyCode::Char('q') | KeyCode::Char('Q') => {
+                        break StartupSplashResult::Quit;
+                    }
+                    KeyCode::Char('w') | KeyCode::Char('W') => {
                         let _ = crate::utils::bug_report::open_browser(&wiki_url_for_browser());
                     }
-                    StartupKeyAction::Ignore => {}
+                    _ => {}
                 }
+                continue;
+            }
+
+            match startup_key_action(key_event) {
+                StartupKeyAction::Continue => break StartupSplashResult::Continue,
+                StartupKeyAction::Quit => break StartupSplashResult::Quit,
+                StartupKeyAction::OpenWiki => {
+                    let _ = crate::utils::bug_report::open_browser(&wiki_url_for_browser());
+                }
+                StartupKeyAction::OpenSettings => {
+                    settings_menu_open = true;
+                }
+                StartupKeyAction::Ignore => {}
             }
         }
     };
+
+    if settings_changed {
+        crate::settings::save_settings(settings).ok();
+    }
 
     Ok(action)
 }
@@ -346,6 +460,15 @@ mod tests {
         assert!(matches!(
             startup_key_action(key),
             StartupKeyAction::OpenWiki
+        ));
+    }
+
+    #[test]
+    fn test_startup_key_action_open_settings_on_s() {
+        let key = KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE);
+        assert!(matches!(
+            startup_key_action(key),
+            StartupKeyAction::OpenSettings
         ));
     }
 

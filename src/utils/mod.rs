@@ -2,6 +2,7 @@
 
 #![allow(unused_imports)]
 
+pub mod audio;
 pub mod bug_report;
 pub mod build_info;
 pub mod debug_menu;
