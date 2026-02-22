@@ -960,19 +960,20 @@ fn render_sigils_list(
                 let icon_name = format!("{} {}", icon, sigil.effect.sigil_name());
                 put_text(&mut buffer, row, col, &icon_name, Color::White);
 
-                // Right-aligned: value + grade
+                // Right-aligned: value + grade (pad grade to 2 chars for alignment)
                 let value_str = sigil.effect.format_value(sigil.value);
                 let grade_str = sigil.grade.label();
-                let right_text = format!("{}  {}", value_str, grade_str);
+                let grade_padded = format!("{:<2}", grade_str);
+                let right_text = format!("{}  {}", value_str, grade_padded);
                 let right_col = (w as i32) - right_text.len() as i32 - 1;
 
                 // Value in white
                 put_text(&mut buffer, row, right_col, &value_str, Color::White);
 
-                // Grade with tier color and modifier
-                let grade_col = (w as i32) - grade_str.len() as i32 - 1;
+                // Grade with tier color
+                let grade_col = (w as i32) - grade_padded.len() as i32 - 1;
                 let grade_fg = sigil_grade_color(sigil.grade);
-                put_text(&mut buffer, row, grade_col, grade_str, grade_fg);
+                put_text(&mut buffer, row, grade_col, &grade_padded, grade_fg);
             } else {
                 // Empty slot
                 put_text(&mut buffer, row, col, "(empty)", Color::DarkGray);
@@ -1741,12 +1742,13 @@ fn render_rolling_phase3(
                 let faded_rgb = lerp_rgb(base_rgb, target_rgb, fade);
                 let faded_fg = Color::Rgb(faded_rgb.0, faded_rgb.1, faded_rgb.2);
 
-                // Right-aligned: "value  grade"
-                let right_text = format!("{}  {}", value_str, grade_str);
+                // Right-aligned: "value  grade" (pad grade to 2 chars)
+                let grade_padded = format!("{:<2}", grade_str);
+                let right_text = format!("{}  {}", value_str, grade_padded);
                 let right_col = (w as i32) - right_text.len() as i32 - 1;
                 put_text(buffer, row, right_col, &value_str, value_fg);
-                let grade_col = (w as i32) - grade_str.len() as i32 - 1;
-                put_text(buffer, row, grade_col, grade_str, faded_fg);
+                let grade_col = (w as i32) - grade_padded.len() as i32 - 1;
+                put_text(buffer, row, grade_col, &grade_padded, faded_fg);
             }
         }
     }
@@ -1809,18 +1811,21 @@ fn render_sigil_choice_rows(
             put_text(buffer, row, name_col, &name_str, Color::White);
 
             // Right-aligned: value + grade (matching slots screen)
+            // Pad grade to 2 chars so the letter column stays aligned
+            // ("A" → "A ", "S+" → "S+", "B-" → "B-")
             let value_str = sigil.effect.format_value(sigil.value);
             let grade_str = sigil.grade.label();
-            let right_text = format!("{}  {}", value_str, grade_str);
+            let grade_padded = format!("{:<2}", grade_str);
+            let right_text = format!("{}  {}", value_str, grade_padded);
             let right_col = (w as i32) - right_text.len() as i32 - 1;
 
             // Value in white
             put_text(buffer, row, right_col, &value_str, Color::White);
 
-            // Grade with tier color
-            let grade_col = (w as i32) - grade_str.len() as i32 - 1;
+            // Grade with tier color (at fixed 2-char-wide position)
+            let grade_col = (w as i32) - grade_padded.len() as i32 - 1;
             let grade_fg = sigil_grade_color(sigil.grade);
-            put_text(buffer, row, grade_col, grade_str, grade_fg);
+            put_text(buffer, row, grade_col, &grade_padded, grade_fg);
 
             // Selected row highlight
             if is_selected && (row as usize) < h {
