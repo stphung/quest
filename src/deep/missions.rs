@@ -505,7 +505,7 @@ pub fn available_missions<R: Rng>(
     // This handles the early-game case where no layers are cleared yet.
     // Only SupplyRun and Recon are available at 0.0 familiarity; we may add
     // duplicate types to guarantee the minimum pool size.
-    while pool.len() < 3 {
+    while pool.len() < target_count {
         let fallback_types = [MissionType::SupplyRun, MissionType::Recon];
         let ft = fallback_types[rng.random_range(0..fallback_types.len())];
         pool.push(create_mission(ft, frontier_layer, state, now_unix, rng));
