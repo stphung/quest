@@ -33,7 +33,7 @@ use main_helpers::offline::apply_offline_xp;
 use main_helpers::overlay::draw_game_overlays;
 use main_helpers::persistence::save_all;
 use main_helpers::scene::{current_scene_kind, is_realtime_minigame, is_wide_scene};
-use main_helpers::update::{jittered_update_interval, show_startup_update_notification};
+use main_helpers::update::{jittered_update_interval, show_startup_splash_screen};
 use ratatui::crossterm::event::{self, Event, KeyEventKind};
 use ratatui::crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
@@ -143,8 +143,8 @@ fn main() -> io::Result<()> {
         }
     }
 
-    // Check for updates in background (non-blocking notification)
-    let update_available = std::thread::spawn(utils::updater::check_update_info);
+    // Check for updates in background and feed startup splash when ready.
+    let mut update_available = Some(std::thread::spawn(utils::updater::check_update_info));
 
     // Initialize CharacterManager
     let character_manager = CharacterManager::new()?;
@@ -192,9 +192,13 @@ fn main() -> io::Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    // Show update notification if available
-    if let Ok(Some(update_info)) = update_available.join() {
-        show_startup_update_notification(&mut terminal, &update_info)?;
+    show_startup_splash_screen(&mut terminal, &mut update_available)?;
+
+    // If update check is still running after splash dismiss, detach it.
+    if let Some(handle) = update_available.take() {
+        if handle.is_finished() {
+            let _ = handle.join();
+        }
     }
 
     // Main loop — clear terminal on screen transitions to prevent

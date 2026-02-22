@@ -62,6 +62,7 @@ struct GitHubCompare {
 
 #[derive(Deserialize)]
 struct GitHubCommit {
+    sha: String,
     commit: GitHubCommitDetail,
 }
 
@@ -368,10 +369,39 @@ pub fn replace_binary(new_binary: &Path) -> Result<(), Box<dyn Error>> {
 /// Full update information for in-game display
 #[derive(Debug, Clone)]
 pub struct UpdateInfo {
+    pub current_version: String,
+    pub current_commit: String,
     pub new_version: String,
     pub new_commit: String,
     pub changelog: Vec<String>,
     pub changelog_total: usize,
+    pub current_and_previous: Vec<String>,
+}
+
+/// Fetch commit summaries from a branch/revision head (newest first).
+fn fetch_commit_summaries(head: &str, limit: usize) -> Result<Vec<String>, Box<dyn Error>> {
+    let url = format!(
+        "https://api.github.com/repos/{}/{}/commits?sha={}&per_page={}",
+        GITHUB_OWNER, GITHUB_REPO, head, limit
+    );
+
+    let response: Vec<GitHubCommit> = ureq::get(&url)
+        .header("User-Agent", "quest-updater")
+        .call()?
+        .into_body()
+        .read_json()?;
+
+    Ok(response
+        .into_iter()
+        .map(|c| {
+            let msg = c.commit.message.lines().next().unwrap_or("").to_string();
+            if msg.is_empty() {
+                short_commit(&c.sha)
+            } else {
+                format!("{}  {}", short_commit(&c.sha), msg)
+            }
+        })
+        .collect())
 }
 
 /// Check for updates and return full info including changelog.
@@ -381,21 +411,34 @@ pub fn check_update_info() -> Option<UpdateInfo> {
 
     match check_for_updates(BUILD_COMMIT, BUILD_DATE) {
         UpdateCheck::UpdateAvailable {
-            latest, changelog, ..
+            current_commit,
+            current_date,
+            latest,
+            changelog,
         } => {
             let total = changelog.len();
+            let pending_changelog: Vec<String> = changelog
+                .into_iter()
+                .take(30) // Keep a larger preview for splash sections
+                .map(|e| {
+                    // Take first line only (multi-line commit messages)
+                    e.message.lines().next().unwrap_or(&e.message).to_string()
+                })
+                .collect();
+
+            // Show "your current build + 5 before it" as a version timeline.
+            let current_commit_short = short_commit(&current_commit);
+            let current_and_previous = fetch_commit_summaries(&current_commit, 6)
+                .unwrap_or_else(|_| vec![format!("{}  (current build)", current_commit_short)]);
+
             Some(UpdateInfo {
+                current_version: current_date,
+                current_commit: current_commit_short,
                 new_version: latest.date,
                 new_commit: short_commit(&latest.commit),
-                changelog: changelog
-                    .into_iter()
-                    .take(5) // Limit to 5 entries for in-game display
-                    .map(|e| {
-                        // Take first line only (multi-line commit messages)
-                        e.message.lines().next().unwrap_or(&e.message).to_string()
-                    })
-                    .collect(),
+                changelog: pending_changelog,
                 changelog_total: total,
+                current_and_previous,
             })
         }
         _ => None,
