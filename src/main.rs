@@ -306,6 +306,7 @@ fn main() -> io::Result<()> {
                     .take()
                     .expect("Game state should be initialized when entering Game screen");
                 let mut was_prestige_ready = can_prestige(&state);
+                let mut prestige_ready_sound_enabled = false;
 
                 // Run the game loop
                 let mut last_tick = Instant::now();
@@ -389,6 +390,7 @@ fn main() -> io::Result<()> {
                             state.stormglass_discovered,
                             &global_achievements,
                             &enhancement.levels,
+                            prestige_ready_sound_enabled,
                         );
                         draw_game_overlays(
                             frame,
@@ -540,6 +542,7 @@ fn main() -> io::Result<()> {
                                 &mut global_achievements,
                                 update_info.is_some(),
                                 update_expanded,
+                                &mut prestige_ready_sound_enabled,
                             );
 
                             track_input_achievements(
@@ -943,7 +946,7 @@ fn main() -> io::Result<()> {
                     }
 
                     let prestige_ready = can_prestige(&state);
-                    if !was_prestige_ready && prestige_ready {
+                    if prestige_ready_sound_enabled && !was_prestige_ready && prestige_ready {
                         utils::audio::play_prestige_ready_sound();
                     }
                     was_prestige_ready = prestige_ready;

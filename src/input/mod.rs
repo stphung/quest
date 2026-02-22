@@ -47,6 +47,7 @@ pub fn handle_game_input(
     achievements: &mut crate::achievements::Achievements,
     update_available: bool,
     update_expanded: bool,
+    prestige_ready_sound_enabled: &mut bool,
 ) -> InputResult {
     // 0. Offline welcome overlay (any key dismisses)
     if matches!(overlay, GameOverlay::OfflineWelcome { .. }) {
@@ -190,6 +191,7 @@ pub fn handle_game_input(
         achievements,
         update_available,
         update_expanded,
+        prestige_ready_sound_enabled,
     )
 }
 
@@ -306,6 +308,7 @@ fn handle_base_game(
     achievements: &mut crate::achievements::Achievements,
     update_available: bool,
     update_expanded: bool,
+    prestige_ready_sound_enabled: &mut bool,
 ) -> InputResult {
     match key.code {
         KeyCode::Esc => {
@@ -354,6 +357,10 @@ fn handle_base_game(
             *overlay = GameOverlay::Achievements {
                 browser: crate::ui::achievement_browser_scene::AchievementBrowserState::new(),
             };
+            InputResult::Continue
+        }
+        KeyCode::Char('v') | KeyCode::Char('V') => {
+            *prestige_ready_sound_enabled = !*prestige_ready_sound_enabled;
             InputResult::Continue
         }
         KeyCode::Char('?') => {

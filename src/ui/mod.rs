@@ -102,6 +102,7 @@ pub fn draw_ui_with_update(
     stormglass_discovered: bool,
     achievements: &crate::achievements::Achievements,
     enhancement_levels: &[u8; 7],
+    prestige_ready_sound_enabled: bool,
 ) {
     let ctx = LayoutContext::from_frame(frame);
 
@@ -124,6 +125,7 @@ pub fn draw_ui_with_update(
                 stormglass_discovered,
                 achievements,
                 enhancement_levels,
+                prestige_ready_sound_enabled,
             );
         }
         SizeTier::M => {
@@ -135,10 +137,17 @@ pub fn draw_ui_with_update(
                 soulforge_discovered,
                 stormglass_discovered,
                 achievements,
+                prestige_ready_sound_enabled,
             );
         }
         SizeTier::S => {
-            draw_s_layout(frame, &ctx, game_state, achievements);
+            draw_s_layout(
+                frame,
+                &ctx,
+                game_state,
+                achievements,
+                prestige_ready_sound_enabled,
+            );
         }
         SizeTier::TooSmall => {
             // Already handled above
@@ -160,6 +169,7 @@ fn draw_xl_l_layout(
     stormglass_discovered: bool,
     achievements: &crate::achievements::Achievements,
     enhancement_levels: &[u8; 7],
+    prestige_ready_sound_enabled: bool,
 ) {
     let size = frame.area();
 
@@ -261,6 +271,7 @@ fn draw_xl_l_layout(
         soulforge_discovered,
         stormglass_discovered,
         achievements.pending_count(),
+        prestige_ready_sound_enabled,
         ctx,
     );
 
@@ -270,6 +281,7 @@ fn draw_xl_l_layout(
 
 /// M tier stacked single-column layout.
 /// Compact stats bar + optional attrs + XP bar + full-width activity + compact info + footer
+#[allow(clippy::too_many_arguments)]
 fn draw_m_layout(
     frame: &mut Frame,
     ctx: &LayoutContext,
@@ -278,6 +290,7 @@ fn draw_m_layout(
     soulforge_discovered: bool,
     stormglass_discovered: bool,
     achievements: &crate::achievements::Achievements,
+    prestige_ready_sound_enabled: bool,
 ) {
     let area = frame.area();
     let show_attrs = ctx.rows >= 26;
@@ -338,6 +351,7 @@ fn draw_m_layout(
         soulforge_discovered,
         stormglass_discovered,
         achievements.pending_count(),
+        prestige_ready_sound_enabled,
     );
 }
 
@@ -348,6 +362,7 @@ fn draw_s_layout(
     ctx: &LayoutContext,
     game_state: &GameState,
     achievements: &crate::achievements::Achievements,
+    prestige_ready_sound_enabled: bool,
 ) {
     let area = frame.area();
 
@@ -370,7 +385,12 @@ fn draw_s_layout(
 
         stats_panel::draw_compact_stats_bar(frame, chunks[0], game_state, ctx);
         draw_right_content(frame, chunks[1], game_state, achievements, ctx);
-        stats_panel::draw_footer_minimal(frame, chunks[2], game_state);
+        stats_panel::draw_footer_minimal(
+            frame,
+            chunks[2],
+            game_state,
+            prestige_ready_sound_enabled,
+        );
         return;
     }
 
@@ -414,7 +434,7 @@ fn draw_s_layout(
     }
 
     // Minimal footer
-    stats_panel::draw_footer_minimal(frame, chunks[6], game_state);
+    stats_panel::draw_footer_minimal(frame, chunks[6], game_state, prestige_ready_sound_enabled);
 }
 
 /// Draws player HP bar for S tier (borderless, single line) with optional damage flash.

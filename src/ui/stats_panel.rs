@@ -488,6 +488,7 @@ pub(super) fn draw_xp_bar_compact(frame: &mut Frame, area: Rect, game_state: &Ga
 }
 
 /// Draws a compact footer for M tier.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn draw_footer_compact(
     frame: &mut Frame,
     area: Rect,
@@ -496,6 +497,7 @@ pub(super) fn draw_footer_compact(
     soulforge_discovered: bool,
     stormglass_discovered: bool,
     pending_achievements: usize,
+    prestige_ready_sound_enabled: bool,
 ) {
     use crate::character::prestige::can_prestige;
 
@@ -552,6 +554,17 @@ pub(super) fn draw_footer_compact(
         Span::raw("")
     };
 
+    let sound_span = if prestige_ready_sound_enabled {
+        Span::styled(
+            " [V]Sound:ON",
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        )
+    } else {
+        Span::styled(" [V]Sound:OFF", Style::default().fg(Color::DarkGray))
+    };
+
     let line = Line::from(vec![
         Span::styled("[Esc]Quit", Style::default().fg(Color::Red)),
         Span::raw(" "),
@@ -561,6 +574,7 @@ pub(super) fn draw_footer_compact(
         stormglass_span,
         ach_span,
         challenge_span,
+        sound_span,
         Span::styled(" [?]Help", Style::default().fg(Color::DarkGray)),
     ]);
 
@@ -569,7 +583,12 @@ pub(super) fn draw_footer_compact(
 }
 
 /// Draws a minimal footer for S tier.
-pub(super) fn draw_footer_minimal(frame: &mut Frame, area: Rect, game_state: &GameState) {
+pub(super) fn draw_footer_minimal(
+    frame: &mut Frame,
+    area: Rect,
+    game_state: &GameState,
+    prestige_ready_sound_enabled: bool,
+) {
     use crate::character::prestige::can_prestige;
 
     let can_prestige_now = can_prestige(game_state);
@@ -584,9 +603,21 @@ pub(super) fn draw_footer_minimal(frame: &mut Frame, area: Rect, game_state: &Ga
         Span::styled(" P:Prestige", Style::default().fg(Color::DarkGray))
     };
 
+    let sound_span = if prestige_ready_sound_enabled {
+        Span::styled(
+            " V:SndOn",
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        )
+    } else {
+        Span::styled(" V:SndOff", Style::default().fg(Color::DarkGray))
+    };
+
     let line = Line::from(vec![
         Span::styled("Esc:Quit", Style::default().fg(Color::Red)),
         prestige_span,
+        sound_span,
         Span::styled(" ?:Help", Style::default().fg(Color::DarkGray)),
         Span::styled(" Tab:More", Style::default().fg(Color::DarkGray)),
     ]);
@@ -711,6 +742,7 @@ pub fn draw_footer(
     soulforge_discovered: bool,
     stormglass_discovered: bool,
     pending_achievements: usize,
+    prestige_ready_sound_enabled: bool,
     _ctx: &LayoutContext,
 ) {
     use crate::character::prestige::can_prestige;
@@ -795,6 +827,17 @@ pub fn draw_footer(
         Span::styled("[A] Achievements", Style::default().fg(Color::Magenta))
     };
 
+    let sound_text = if prestige_ready_sound_enabled {
+        Span::styled(
+            "    [V] Sound: ON",
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        )
+    } else {
+        Span::styled("    [V] Sound: OFF", Style::default().fg(Color::DarkGray))
+    };
+
     let footer_text = vec![
         Line::from(vec![
             Span::styled("[Esc] Quit", Style::default().fg(Color::Red)),
@@ -808,6 +851,7 @@ pub fn draw_footer(
             achievements_text,
             challenge_text,
             update_status_text,
+            sound_text,
             Span::styled("    [?] Help", Style::default().fg(Color::DarkGray)),
         ]),
     ];
