@@ -58,7 +58,7 @@ use ui::character_delete::CharacterDeleteScreen;
 use ui::character_rename::CharacterRenameScreen;
 use ui::character_select::CharacterSelectScreen;
 use ui::draw_ui_with_update;
-use utils::updater::UpdateInfo;
+use utils::updater::{UpdateInfo, UpdateInfoStatus};
 
 #[derive(Clone, Copy, PartialEq)]
 enum Screen {
@@ -102,6 +102,27 @@ fn play_screen_transition(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>)
         std::thread::sleep(Duration::from_millis(14));
     }
     Ok(())
+}
+
+fn tally_chrono_surge_events(surge: &mut ChronoSurgeState, events: &[core::tick::TickEvent]) {
+    for event in events {
+        match event {
+            core::tick::TickEvent::EnemyDefeated { .. }
+            | core::tick::TickEvent::SubzoneBossDefeated { .. }
+            | core::tick::TickEvent::DungeonBossDefeated { .. }
+            | core::tick::TickEvent::DungeonEliteDefeated { .. } => {
+                surge.kills += 1;
+            }
+            core::tick::TickEvent::ItemDropped { equipped: true, .. }
+            | core::tick::TickEvent::DungeonTreasureFound { equipped: true, .. } => {
+                surge.items_equipped += 1;
+            }
+            core::tick::TickEvent::LeveledUp { .. } => {
+                surge.levels_gained += 1;
+            }
+            _ => {}
+        }
+    }
 }
 
 fn main() -> io::Result<()> {
@@ -331,16 +352,28 @@ fn main() -> io::Result<()> {
                 // Update check state - start initial background check immediately
                 let mut update_info: Option<UpdateInfo> = None;
                 let mut update_check_completed = false;
+                let mut update_check_failed = false;
                 let mut update_expanded = false;
-                let mut update_check_handle: Option<std::thread::JoinHandle<Option<UpdateInfo>>> =
+                let mut update_check_handle: Option<std::thread::JoinHandle<UpdateInfoStatus>> =
                     Some(std::thread::spawn(utils::updater::check_update_info));
 
                 'game_loop: loop {
                     // Check if background update check completed
                     if let Some(handle) = update_check_handle.take() {
                         if handle.is_finished() {
-                            if let Ok(info) = handle.join() {
-                                update_info = info;
+                            match handle.join() {
+                                Ok(UpdateInfoStatus::UpdateAvailable(info)) => {
+                                    update_info = Some(info);
+                                    update_check_failed = false;
+                                }
+                                Ok(UpdateInfoStatus::UpToDate) => {
+                                    update_info = None;
+                                    update_check_failed = false;
+                                }
+                                Ok(UpdateInfoStatus::CheckFailed(_)) | Err(_) => {
+                                    update_info = None;
+                                    update_check_failed = true;
+                                }
                             }
                             update_check_completed = true;
                         } else {
@@ -382,6 +415,7 @@ fn main() -> io::Result<()> {
                             update_info.as_ref(),
                             update_expanded,
                             update_check_completed,
+                            update_check_failed,
                             haven.discovered,
                             enhancement.discovered,
                             state.stormglass_discovered,
@@ -459,41 +493,9 @@ fn main() -> io::Result<()> {
                                             debug_mode,
                                             &mut rng,
                                         );
-                                        for event in &tick_result.events {
-                                            match event {
-                                                core::tick::TickEvent::EnemyDefeated { .. }
-                                                | core::tick::TickEvent::SubzoneBossDefeated {
-                                                    ..
-                                                }
-                                                | core::tick::TickEvent::DungeonBossDefeated {
-                                                    ..
-                                                }
-                                                | core::tick::TickEvent::DungeonEliteDefeated {
-                                                    ..
-                                                } => {
-                                                    chrono_surge.as_mut().unwrap().kills += 1;
-                                                }
-                                                core::tick::TickEvent::ItemDropped {
-                                                    equipped: true,
-                                                    ..
-                                                }
-                                                | core::tick::TickEvent::DungeonTreasureFound {
-                                                    equipped: true,
-                                                    ..
-                                                } => {
-                                                    chrono_surge
-                                                        .as_mut()
-                                                        .unwrap()
-                                                        .items_equipped += 1;
-                                                }
-                                                core::tick::TickEvent::LeveledUp { .. } => {
-                                                    chrono_surge.as_mut().unwrap().levels_gained +=
-                                                        1;
-                                                }
-                                                _ => {}
-                                            }
-                                        }
-                                        chrono_surge.as_mut().unwrap().ticks_remaining -= 1;
+                                        let surge = chrono_surge.as_mut().unwrap();
+                                        tally_chrono_surge_events(surge, &tick_result.events);
+                                        surge.ticks_remaining -= 1;
                                     }
                                     // No SG during surge — restore to pre-skip value
                                     state.stormglass = sg_before_skip;
@@ -679,34 +681,10 @@ fn main() -> io::Result<()> {
                                 &mut rng,
                             );
 
-                            // Count surge stats from events
-                            for event in &tick_result.events {
-                                match event {
-                                    core::tick::TickEvent::EnemyDefeated { .. }
-                                    | core::tick::TickEvent::SubzoneBossDefeated { .. }
-                                    | core::tick::TickEvent::DungeonBossDefeated { .. }
-                                    | core::tick::TickEvent::DungeonEliteDefeated { .. } => {
-                                        chrono_surge.as_mut().unwrap().kills += 1;
-                                    }
-                                    core::tick::TickEvent::ItemDropped {
-                                        equipped: true, ..
-                                    }
-                                    | core::tick::TickEvent::DungeonTreasureFound {
-                                        equipped: true,
-                                        ..
-                                    } => {
-                                        chrono_surge.as_mut().unwrap().items_equipped += 1;
-                                    }
-                                    core::tick::TickEvent::LeveledUp { .. } => {
-                                        chrono_surge.as_mut().unwrap().levels_gained += 1;
-                                    }
-                                    _ => {}
-                                }
-                            }
-
-                            // Apply events to UI state — ticker zooms at surge speed
-                            apply_tick_events(&mut state, &tick_result.events);
-                            state.ticker.tick();
+                            // Keep surge path headless (same semantics as [Esc] skip):
+                            // collect summary counters only and avoid per-tick UI work.
+                            let surge = chrono_surge.as_mut().unwrap();
+                            tally_chrono_surge_events(surge, &tick_result.events);
 
                             if tick_result.achievements_changed
                                 || tick_result.haven_changed
@@ -716,7 +694,7 @@ fn main() -> io::Result<()> {
                                 needs_save = true;
                             }
 
-                            chrono_surge.as_mut().unwrap().ticks_remaining -= 1;
+                            surge.ticks_remaining -= 1;
                         }
 
                         // No SG earned during Chrono Surge — temporal displacement
@@ -970,6 +948,7 @@ fn main() -> io::Result<()> {
                         update_check_handle =
                             Some(std::thread::spawn(utils::updater::check_update_info));
                         update_check_completed = false; // Reset to show "Checking..." again
+                        update_check_failed = false;
                         last_update_check = Instant::now();
                         next_update_check_interval = jittered_update_interval();
                     }

@@ -707,6 +707,7 @@ pub fn draw_footer(
     update_info: Option<&UpdateInfo>,
     _update_expanded: bool,
     update_check_completed: bool,
+    update_check_failed: bool,
     haven_discovered: bool,
     soulforge_discovered: bool,
     stormglass_discovered: bool,
@@ -741,13 +742,21 @@ pub fn draw_footer(
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         )
-    } else if update_check_completed {
-        Span::styled("    \u{2713} Up to date", Style::default().fg(Color::Green))
-    } else {
+    } else if !update_check_completed {
         use super::throbber::spinner_char;
         Span::styled(
             format!("    {} Checking...", spinner_char()),
             Style::default().fg(Color::DarkGray),
+        )
+    } else if update_check_failed {
+        Span::styled(
+            "    ⚠ Update check failed",
+            Style::default().fg(Color::LightRed),
+        )
+    } else {
+        Span::styled(
+            "    \u{2713} On latest version",
+            Style::default().fg(Color::Green),
         )
     };
 

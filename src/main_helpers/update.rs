@@ -4,8 +4,7 @@ use crate::core::constants::{
     UPDATE_CHECK_INTERVAL_SECONDS, UPDATE_CHECK_JITTER_SECONDS, WIKI_URL,
 };
 use crate::ui::throbber::block_spinner_char;
-use crate::utils::updater::UpdateInfo;
-use chrono::{DateTime, NaiveDate, TimeZone, Utc};
+use crate::utils::updater::UpdateInfoStatus;
 use rand::RngExt;
 use ratatui::crossterm::event::{self, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::style::{Color, Modifier, Style};
@@ -47,61 +46,12 @@ fn draw_startup_modal(
         .map(|_| ())
 }
 
-fn parse_timestamp_utc(timestamp: &str) -> Option<DateTime<Utc>> {
-    if let Ok(dt) = DateTime::parse_from_rfc3339(timestamp) {
-        return Some(dt.with_timezone(&Utc));
-    }
-
-    let date = NaiveDate::parse_from_str(timestamp, "%Y-%m-%d").ok()?;
-    let naive = date.and_hms_opt(0, 0, 0)?;
-    Some(Utc.from_utc_datetime(&naive))
-}
-
-fn compact_relative_label(timestamp: &str, sign: char, now: &DateTime<Utc>) -> Option<String> {
-    const MINUTE: i64 = 60;
-    const HOUR: i64 = 60 * MINUTE;
-    const DAY: i64 = 24 * HOUR;
-    const WEEK: i64 = 7 * DAY;
-    const MONTH: i64 = 30 * DAY;
-    const YEAR: i64 = 365 * DAY;
-
-    let then = parse_timestamp_utc(timestamp)?;
-    let seconds = now.signed_duration_since(then).num_seconds().abs();
-    let (value, unit) = if seconds >= YEAR {
-        (seconds / YEAR, "y")
-    } else if seconds >= MONTH {
-        (seconds / MONTH, "m")
-    } else if seconds >= WEEK {
-        (seconds / WEEK, "w")
-    } else if seconds >= DAY {
-        (seconds / DAY, "d")
-    } else if seconds >= HOUR {
-        (seconds / HOUR, "h")
-    } else {
-        (seconds / MINUTE, "min")
-    };
-
-    Some(format!("[{}{}{}]", sign, value, unit))
-}
-
-fn with_relative_prefix(
-    item: &str,
-    timestamp: Option<&str>,
-    sign: char,
-    now: &DateTime<Utc>,
-) -> String {
-    if let Some(label) = timestamp.and_then(|ts| compact_relative_label(ts, sign, now)) {
-        format!("{} {}", label, item)
-    } else {
-        item.to_string()
-    }
-}
-
 fn build_startup_splash_text(
-    update_info: Option<&UpdateInfo>,
+    update_status: Option<&UpdateInfoStatus>,
     update_loading: bool,
 ) -> Vec<Line<'static>> {
-    let now = Utc::now();
+    use crate::utils::build_info::{BUILD_COMMIT, BUILD_DATE};
+
     let q = Style::default()
         .fg(Color::Rgb(78, 217, 255))
         .add_modifier(Modifier::BOLD);
@@ -181,10 +131,11 @@ fn build_startup_splash_text(
         Line::from(""),
     ];
 
-    let upstream_title = if let Some(info) = update_info {
-        format!("  Upstream (v{} ({}))", info.new_version, info.new_commit)
-    } else {
-        "  Upstream".to_string()
+    let upstream_title = match update_status {
+        Some(UpdateInfoStatus::UpdateAvailable(info)) => {
+            format!("  Upstream (v{} ({}))", info.new_version, info.new_commit)
+        }
+        _ => "  Upstream".to_string(),
     };
     text.push(Line::from(vec![Span::styled(
         upstream_title,
@@ -201,53 +152,75 @@ fn build_startup_splash_text(
             ),
             Style::default().fg(Color::DarkGray),
         )]));
-    } else if let Some(info) = update_info {
-        if info.changelog.is_empty() {
-            text.push(Line::from(vec![Span::styled(
-                "    You're already up to date.",
-                Style::default().fg(Color::Gray),
-            )]));
-        } else {
-            let max_upstream_items = 5;
-            for (idx, item) in info.changelog.iter().take(max_upstream_items).enumerate() {
-                let item_text = with_relative_prefix(
-                    item,
-                    info.changelog_times.get(idx).and_then(|s| s.as_deref()),
-                    '-',
-                    &now,
-                );
+    } else {
+        match update_status {
+            Some(UpdateInfoStatus::UpdateAvailable(info)) => {
+                if info.changelog.is_empty() {
+                    text.push(Line::from(vec![Span::styled(
+                        "    You're already up to date.",
+                        Style::default().fg(Color::Gray),
+                    )]));
+                } else {
+                    let max_upstream_items = 5;
+                    for item in info.changelog.iter().take(max_upstream_items) {
+                        text.push(Line::from(vec![
+                            Span::styled("    • ", Style::default().fg(Color::DarkGray)),
+                            Span::styled(item.clone(), Style::default().fg(Color::White)),
+                        ]));
+                    }
+                    if info.changelog_total > max_upstream_items {
+                        text.push(Line::from(vec![Span::styled(
+                            "    ...and more",
+                            Style::default().fg(Color::DarkGray),
+                        )]));
+                    }
+                }
+
+                text.push(Line::from(""));
+                text.push(Line::from(vec![Span::styled(
+                    "  Run 'quest update' when you're ready.",
+                    Style::default().fg(Color::Green),
+                )]));
+            }
+            Some(UpdateInfoStatus::UpToDate) => {
                 text.push(Line::from(vec![
-                    Span::styled("    • ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(item_text, Style::default().fg(Color::White)),
+                    Span::styled("    ✓ ", Style::default().fg(Color::Green)),
+                    Span::styled(
+                        "You're running the latest version.",
+                        Style::default().fg(Color::Gray),
+                    ),
                 ]));
             }
-            if info.changelog_total > max_upstream_items {
+            Some(UpdateInfoStatus::CheckFailed(err)) => {
+                let error = err
+                    .lines()
+                    .next()
+                    .unwrap_or("unknown error")
+                    .chars()
+                    .take(72)
+                    .collect::<String>();
                 text.push(Line::from(vec![Span::styled(
-                    "    ...and more",
+                    format!("    Could not check for updates: {}", error),
                     Style::default().fg(Color::DarkGray),
                 )]));
             }
+            None => {
+                text.push(Line::from(vec![Span::styled(
+                    "    Could not load update details right now.",
+                    Style::default().fg(Color::Gray),
+                )]));
+            }
         }
-
-        text.push(Line::from(""));
-        text.push(Line::from(vec![Span::styled(
-            "  Run 'quest update' when you're ready.",
-            Style::default().fg(Color::Green),
-        )]));
-    } else {
-        text.push(Line::from(vec![Span::styled(
-            "    Could not load update details right now.",
-            Style::default().fg(Color::Gray),
-        )]));
     }
 
-    let installed_title = if let Some(info) = update_info {
-        format!(
-            "  Installed (v{} ({}))",
-            info.current_version, info.current_commit
-        )
-    } else {
-        "  Installed".to_string()
+    let installed_title = match update_status {
+        Some(UpdateInfoStatus::UpdateAvailable(info)) => {
+            format!(
+                "  Installed (v{} ({}))",
+                info.current_version, info.current_commit
+            )
+        }
+        _ => format!("  Installed (v{} ({}))", BUILD_DATE, BUILD_COMMIT),
     };
     text.push(Line::from(""));
     text.push(Line::from(vec![Span::styled(
@@ -262,32 +235,41 @@ fn build_startup_splash_text(
             format!("    {} Loading version history...", block_spinner_char()),
             Style::default().fg(Color::DarkGray),
         )]));
-    } else if let Some(info) = update_info {
-        for (idx, item) in info.current_and_previous.iter().enumerate() {
-            let item_text = with_relative_prefix(
-                item,
-                info.current_and_previous_times
-                    .get(idx)
-                    .and_then(|s| s.as_deref()),
-                '-',
-                &now,
-            );
-            text.push(Line::from(vec![
-                Span::styled("    • ", Style::default().fg(Color::DarkGray)),
-                Span::styled(item_text, Style::default().fg(Color::White)),
-            ]));
-        }
-        if info.current_and_previous.is_empty() {
-            text.push(Line::from(vec![Span::styled(
-                "    No version history available.",
-                Style::default().fg(Color::Gray),
-            )]));
-        }
     } else {
-        text.push(Line::from(vec![Span::styled(
-            "    Version history unavailable.",
-            Style::default().fg(Color::Gray),
-        )]));
+        match update_status {
+            Some(UpdateInfoStatus::UpdateAvailable(info)) => {
+                for item in &info.current_and_previous {
+                    text.push(Line::from(vec![
+                        Span::styled("    • ", Style::default().fg(Color::DarkGray)),
+                        Span::styled(item.clone(), Style::default().fg(Color::White)),
+                    ]));
+                }
+                if info.current_and_previous.is_empty() {
+                    text.push(Line::from(vec![Span::styled(
+                        "    No version history available.",
+                        Style::default().fg(Color::Gray),
+                    )]));
+                }
+            }
+            Some(UpdateInfoStatus::UpToDate) => {
+                text.push(Line::from(vec![Span::styled(
+                    "    Current build is already on the latest release.",
+                    Style::default().fg(Color::Gray),
+                )]));
+            }
+            Some(UpdateInfoStatus::CheckFailed(_)) => {
+                text.push(Line::from(vec![Span::styled(
+                    "    Current build loaded; upstream status unavailable.",
+                    Style::default().fg(Color::Gray),
+                )]));
+            }
+            None => {
+                text.push(Line::from(vec![Span::styled(
+                    "    Version history unavailable.",
+                    Style::default().fg(Color::Gray),
+                )]));
+            }
+        }
     }
 
     text.push(Line::from(""));
@@ -355,24 +337,26 @@ pub enum StartupSplashResult {
 /// Pressing Enter continues immediately; Esc quits from startup.
 pub fn show_startup_splash_screen(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-    update_check_handle: &mut Option<JoinHandle<Option<UpdateInfo>>>,
+    update_check_handle: &mut Option<JoinHandle<UpdateInfoStatus>>,
 ) -> io::Result<StartupSplashResult> {
-    let mut update_info: Option<UpdateInfo> = None;
+    let mut update_status: Option<UpdateInfoStatus> = None;
 
     let action = loop {
-        if update_info.is_none() {
+        if update_status.is_none() {
             let finished = update_check_handle
                 .as_ref()
                 .is_some_and(std::thread::JoinHandle::is_finished);
             if finished {
                 if let Some(handle) = update_check_handle.take() {
-                    update_info = handle.join().ok().flatten();
+                    update_status = Some(handle.join().unwrap_or_else(|_| {
+                        UpdateInfoStatus::CheckFailed("update check thread panicked".to_string())
+                    }));
                 }
             }
         }
 
-        let update_loading = update_info.is_none() && update_check_handle.is_some();
-        let text = build_startup_splash_text(update_info.as_ref(), update_loading);
+        let update_loading = update_status.is_none() && update_check_handle.is_some();
+        let text = build_startup_splash_text(update_status.as_ref(), update_loading);
         draw_startup_modal(terminal, text)?;
 
         if event::poll(Duration::from_millis(100))? {
@@ -432,34 +416,5 @@ mod tests {
         let url = wiki_url_for_browser();
         assert!(url.starts_with("https://") || url.starts_with("http://"));
         assert!(url.ends_with(WIKI_URL));
-    }
-
-    #[test]
-    fn compact_relative_label_uses_flooring() {
-        let now = Utc.with_ymd_and_hms(2026, 2, 22, 12, 0, 0).unwrap();
-        let ts = "2026-01-07T12:00:00Z"; // 1 month + 15 days
-        assert_eq!(
-            compact_relative_label(ts, '-', &now).as_deref(),
-            Some("[-1m]")
-        );
-    }
-
-    #[test]
-    fn compact_relative_label_supports_week_unit() {
-        let now = Utc.with_ymd_and_hms(2026, 2, 22, 12, 0, 0).unwrap();
-        let ts = "2026-02-15T12:00:00Z";
-        assert_eq!(
-            compact_relative_label(ts, '-', &now).as_deref(),
-            Some("[-1w]")
-        );
-    }
-
-    #[test]
-    fn compact_relative_label_parses_date_only() {
-        let now = Utc.with_ymd_and_hms(2026, 2, 22, 12, 0, 0).unwrap();
-        assert_eq!(
-            compact_relative_label("2026-02-22", '+', &now).as_deref(),
-            Some("[+12h]")
-        );
     }
 }
