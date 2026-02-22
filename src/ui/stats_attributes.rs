@@ -42,8 +42,10 @@ pub(super) fn draw_attributes_compact(
     let attrs_block = Block::default()
         .borders(Borders::ALL)
         .title(format!(" Attributes ({}) ", cap));
+    let attrs_block = super::themed_block(attrs_block);
     let inner = attrs_block.inner(area);
     frame.render_widget(attrs_block, area);
+    super::apply_themed_border_fx(frame, area, Color::White, super::BorderFxContext);
 
     // Pair attributes: STR/INT, DEX/WIS, CON/CHA
     let pairs = [

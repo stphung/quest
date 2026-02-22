@@ -90,8 +90,10 @@ fn draw_header(
         None => format!(" {} ", game_state.character_name),
     };
     let header_block = Block::default().borders(Borders::ALL).title(header_title);
+    let header_block = super::themed_block(header_block);
     let inner = header_block.inner(area);
     frame.render_widget(header_block, area);
+    super::apply_themed_border_fx(frame, area, Color::White, super::BorderFxContext);
 
     let header_text = vec![Line::from(vec![
         Span::styled(
@@ -313,16 +315,17 @@ pub(super) fn draw_zone_info(
         None => " Location ".to_string(),
     };
     let zone_widget = Paragraph::new(zone_lines)
-        .block(
+        .block(super::themed_block(
             Block::default()
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(zone_color))
+                .border_style(Style::default().fg(super::themed_border_color(zone_color)))
                 .title(location_title),
-        )
+        ))
         .wrap(Wrap { trim: true })
         .alignment(Alignment::Center);
 
     frame.render_widget(zone_widget, area);
+    super::apply_themed_border_fx(frame, area, zone_color, super::BorderFxContext);
 }
 
 /// Returns the icon of the highest unlocked zone completion achievement, if any.
@@ -683,19 +686,22 @@ pub fn draw_update_drawer(frame: &mut Frame, area: Rect, info: &UpdateInfo) {
         Span::styled("[U] Close", Style::default().fg(Color::Yellow)),
     ]));
 
-    let drawer = Paragraph::new(lines).wrap(Wrap { trim: false }).block(
-        Block::default()
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Yellow))
-            .title(Span::styled(
-                " \u{1f195} Update Available ",
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            )),
-    );
+    let drawer = Paragraph::new(lines)
+        .wrap(Wrap { trim: false })
+        .block(super::themed_block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(super::themed_border_color(Color::Yellow)))
+                .title(Span::styled(
+                    " \u{1f195} Update Available ",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                )),
+        ));
 
     frame.render_widget(drawer, area);
+    super::apply_themed_border_fx(frame, area, Color::Yellow, super::BorderFxContext);
 }
 
 /// Draws the footer with control instructions and version info
@@ -822,8 +828,11 @@ pub fn draw_footer(
     ];
 
     let footer = Paragraph::new(footer_text)
-        .block(Block::default().borders(Borders::ALL).title(version_title))
+        .block(super::themed_block(
+            Block::default().borders(Borders::ALL).title(version_title),
+        ))
         .alignment(Alignment::Center);
 
     frame.render_widget(footer, area);
+    super::apply_themed_border_fx(frame, area, Color::White, super::BorderFxContext);
 }

@@ -243,11 +243,15 @@ impl CharacterRenameScreen {
             }
         };
 
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(super::themed_border_color(Color::DarkGray)));
+        let inner =
+            super::render_themed_block(f, area, block, Color::DarkGray, super::BorderFxContext);
         let input_widget = Paragraph::new(input_text)
-            .block(Block::default().borders(Borders::ALL))
             .style(Style::default().fg(Color::White))
             .alignment(Alignment::Center);
-        f.render_widget(input_widget, area);
+        f.render_widget(input_widget, inner);
     }
 
     fn render_validation(&self, f: &mut Frame, area: Rect) {
@@ -271,10 +275,10 @@ impl CharacterRenameScreen {
     fn draw_character_details(&self, f: &mut Frame, area: Rect, character: &CharacterInfo) {
         let block = Block::default()
             .borders(Borders::ALL)
-            .title("Character to Rename");
-
-        let inner_area = block.inner(area);
-        f.render_widget(block, area);
+            .title("Character to Rename")
+            .border_style(Style::default().fg(super::themed_border_color(Color::DarkGray)));
+        let inner_area =
+            super::render_themed_block(f, area, block, Color::DarkGray, super::BorderFxContext);
 
         let prestige_name = get_prestige_tier(character.prestige_rank).name;
 

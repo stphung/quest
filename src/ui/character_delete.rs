@@ -208,14 +208,14 @@ impl CharacterDeleteScreen {
             Line::from("This action is PERMANENT and IRREVERSIBLE."),
             Line::from("All progress will be lost forever."),
         ];
-        let warning_widget = Paragraph::new(warning_lines)
-            .alignment(Alignment::Center)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
-            );
-        f.render_widget(warning_widget, area);
+        let block = Block::default().borders(Borders::ALL).border_style(
+            Style::default()
+                .fg(super::themed_border_color(Color::Red))
+                .add_modifier(Modifier::BOLD),
+        );
+        let inner = super::render_themed_block(f, area, block, Color::Red, super::BorderFxContext);
+        let warning_widget = Paragraph::new(warning_lines).alignment(Alignment::Center);
+        f.render_widget(warning_widget, inner);
     }
 
     fn render_input_field(&self, f: &mut Frame, area: Rect) {
@@ -231,20 +231,24 @@ impl CharacterDeleteScreen {
             }
         };
 
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(super::themed_border_color(Color::DarkGray)));
+        let inner =
+            super::render_themed_block(f, area, block, Color::DarkGray, super::BorderFxContext);
         let input_widget = Paragraph::new(input_text)
-            .block(Block::default().borders(Borders::ALL))
             .style(Style::default().fg(Color::White))
             .alignment(Alignment::Center);
-        f.render_widget(input_widget, area);
+        f.render_widget(input_widget, inner);
     }
 
     fn draw_character_details(&self, f: &mut Frame, area: Rect, character: &CharacterInfo) {
         let block = Block::default()
             .borders(Borders::ALL)
-            .title("Character to Delete");
-
-        let inner_area = block.inner(area);
-        f.render_widget(block, area);
+            .title("Character to Delete")
+            .border_style(Style::default().fg(super::themed_border_color(Color::DarkGray)));
+        let inner_area =
+            super::render_themed_block(f, area, block, Color::DarkGray, super::BorderFxContext);
 
         let prestige_name = get_prestige_tier(character.prestige_rank).name;
 

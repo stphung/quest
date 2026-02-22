@@ -428,10 +428,15 @@ fn render_exchange_menu(
         )))
         .title_alignment(Alignment::Center)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(ELECTRIC_BLUE));
+        .border_style(Style::default().fg(super::themed_border_color(ELECTRIC_BLUE)));
 
-    let inner = block.inner(overlay_area);
-    frame.render_widget(block, overlay_area);
+    let inner = super::render_themed_block(
+        frame,
+        overlay_area,
+        block,
+        ELECTRIC_BLUE,
+        super::BorderFxContext,
+    );
 
     let w = inner.width as usize;
     let h = inner.height as usize;
@@ -602,10 +607,15 @@ fn render_invoke_trial_confirm(frame: &mut Frame, area: Rect, state: &GameState)
         )))
         .title_alignment(Alignment::Center)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(ELECTRIC_BLUE));
+        .border_style(Style::default().fg(super::themed_border_color(ELECTRIC_BLUE)));
 
-    let inner = block.inner(overlay_area);
-    frame.render_widget(block, overlay_area);
+    let inner = super::render_themed_block(
+        frame,
+        overlay_area,
+        block,
+        ELECTRIC_BLUE,
+        super::BorderFxContext,
+    );
 
     let w = inner.width as usize;
     let h = inner.height as usize;
@@ -709,10 +719,15 @@ fn render_invoke_trial_forfeit_confirm(frame: &mut Frame, area: Rect) {
         )))
         .title_alignment(Alignment::Center)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow));
+        .border_style(Style::default().fg(super::themed_border_color(Color::Yellow)));
 
-    let inner = block.inner(modal_area);
-    frame.render_widget(block, modal_area);
+    let inner = super::render_themed_block(
+        frame,
+        modal_area,
+        block,
+        Color::Yellow,
+        super::BorderFxContext,
+    );
 
     let text = Paragraph::new(vec![
         Line::from(""),
@@ -765,10 +780,15 @@ fn render_invoke_trial_rolling(frame: &mut Frame, area: Rect, exchange_ui: &Exch
         )))
         .title_alignment(Alignment::Center)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(ELECTRIC_BLUE));
+        .border_style(Style::default().fg(super::themed_border_color(ELECTRIC_BLUE)));
 
-    let inner = block.inner(overlay_area);
-    frame.render_widget(block, overlay_area);
+    let inner = super::render_themed_block(
+        frame,
+        overlay_area,
+        block,
+        ELECTRIC_BLUE,
+        super::BorderFxContext,
+    );
 
     let w = inner.width as usize;
     let h = inner.height as usize;
@@ -1010,10 +1030,15 @@ fn render_invoke_trial(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiSt
         )))
         .title_alignment(Alignment::Center)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(ELECTRIC_BLUE));
+        .border_style(Style::default().fg(super::themed_border_color(ELECTRIC_BLUE)));
 
-    let inner = block.inner(overlay_area);
-    frame.render_widget(block, overlay_area);
+    let inner = super::render_themed_block(
+        frame,
+        overlay_area,
+        block,
+        ELECTRIC_BLUE,
+        super::BorderFxContext,
+    );
 
     let w = inner.width as usize;
     let h = inner.height as usize;
@@ -1095,10 +1120,15 @@ fn render_chrono_surge_select(
         )))
         .title_alignment(Alignment::Center)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(ELECTRIC_BLUE));
+        .border_style(Style::default().fg(super::themed_border_color(ELECTRIC_BLUE)));
 
-    let inner = block.inner(overlay_area);
-    frame.render_widget(block, overlay_area);
+    let inner = super::render_themed_block(
+        frame,
+        overlay_area,
+        block,
+        ELECTRIC_BLUE,
+        super::BorderFxContext,
+    );
 
     let w = inner.width as usize;
     let h = inner.height as usize;
@@ -1493,10 +1523,15 @@ pub fn render_chrono_surge_summary(
         )))
         .title_alignment(Alignment::Center)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(ELECTRIC_BLUE));
+        .border_style(Style::default().fg(super::themed_border_color(ELECTRIC_BLUE)));
 
-    let inner = block.inner(overlay_area);
-    frame.render_widget(block, overlay_area);
+    let inner = super::render_themed_block(
+        frame,
+        overlay_area,
+        block,
+        ELECTRIC_BLUE,
+        super::BorderFxContext,
+    );
 
     let w = inner.width as usize;
     let h = inner.height as usize;
@@ -1592,10 +1627,15 @@ fn render_sigils_list(
         )))
         .title_alignment(Alignment::Center)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(ELECTRIC_BLUE));
+        .border_style(Style::default().fg(super::themed_border_color(ELECTRIC_BLUE)));
 
-    let inner = block.inner(overlay_area);
-    frame.render_widget(block, overlay_area);
+    let inner = super::render_themed_block(
+        frame,
+        overlay_area,
+        block,
+        ELECTRIC_BLUE,
+        super::BorderFxContext,
+    );
 
     let w = inner.width as usize;
     let h = inner.height as usize;
@@ -1793,10 +1833,15 @@ fn render_sigil_unlock_confirm(frame: &mut Frame, area: Rect, state: &GameState)
         )))
         .title_alignment(Alignment::Center)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(ELECTRIC_BLUE));
+        .border_style(Style::default().fg(super::themed_border_color(ELECTRIC_BLUE)));
 
-    let inner = block.inner(overlay_area);
-    frame.render_widget(block, overlay_area);
+    let inner = super::render_themed_block(
+        frame,
+        overlay_area,
+        block,
+        ELECTRIC_BLUE,
+        super::BorderFxContext,
+    );
 
     let w = inner.width as usize;
     let h = inner.height as usize;
@@ -1909,10 +1954,15 @@ fn render_sigil_etch_confirm(frame: &mut Frame, area: Rect, state: &GameState) {
         )))
         .title_alignment(Alignment::Center)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(ELECTRIC_BLUE));
+        .border_style(Style::default().fg(super::themed_border_color(ELECTRIC_BLUE)));
 
-    let inner = block.inner(overlay_area);
-    frame.render_widget(block, overlay_area);
+    let inner = super::render_themed_block(
+        frame,
+        overlay_area,
+        block,
+        ELECTRIC_BLUE,
+        super::BorderFxContext,
+    );
 
     let w = inner.width as usize;
     let h = inner.height as usize;
@@ -2046,10 +2096,15 @@ fn render_sigil_reroll_confirm(
         )))
         .title_alignment(Alignment::Center)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(ELECTRIC_BLUE));
+        .border_style(Style::default().fg(super::themed_border_color(ELECTRIC_BLUE)));
 
-    let inner = block.inner(overlay_area);
-    frame.render_widget(block, overlay_area);
+    let inner = super::render_themed_block(
+        frame,
+        overlay_area,
+        block,
+        ELECTRIC_BLUE,
+        super::BorderFxContext,
+    );
 
     let w = inner.width as usize;
     let h = inner.height as usize;
@@ -2173,10 +2228,15 @@ fn render_sigil_rolling(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiS
         )))
         .title_alignment(Alignment::Center)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(ELECTRIC_BLUE));
+        .border_style(Style::default().fg(super::themed_border_color(ELECTRIC_BLUE)));
 
-    let inner = block.inner(overlay_area);
-    frame.render_widget(block, overlay_area);
+    let inner = super::render_themed_block(
+        frame,
+        overlay_area,
+        block,
+        ELECTRIC_BLUE,
+        super::BorderFxContext,
+    );
 
     let w = inner.width as usize;
     let h = inner.height as usize;
@@ -2564,10 +2624,15 @@ fn render_sigil_pick(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiStat
         )))
         .title_alignment(Alignment::Center)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(ELECTRIC_BLUE));
+        .border_style(Style::default().fg(super::themed_border_color(ELECTRIC_BLUE)));
 
-    let inner = block.inner(overlay_area);
-    frame.render_widget(block, overlay_area);
+    let inner = super::render_themed_block(
+        frame,
+        overlay_area,
+        block,
+        ELECTRIC_BLUE,
+        super::BorderFxContext,
+    );
 
     let w = inner.width as usize;
     let h = inner.height as usize;
@@ -2644,10 +2709,15 @@ fn render_sigil_forfeit_confirm(frame: &mut Frame, area: Rect) {
         )))
         .title_alignment(Alignment::Center)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow));
+        .border_style(Style::default().fg(super::themed_border_color(Color::Yellow)));
 
-    let inner = block.inner(modal_area);
-    frame.render_widget(block, modal_area);
+    let inner = super::render_themed_block(
+        frame,
+        modal_area,
+        block,
+        Color::Yellow,
+        super::BorderFxContext,
+    );
 
     let text = Paragraph::new(vec![
         Line::from(""),
@@ -2701,10 +2771,15 @@ fn render_sigil_result(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiSt
         )))
         .title_alignment(Alignment::Center)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(ELECTRIC_BLUE));
+        .border_style(Style::default().fg(super::themed_border_color(ELECTRIC_BLUE)));
 
-    let inner = block.inner(overlay_area);
-    frame.render_widget(block, overlay_area);
+    let inner = super::render_themed_block(
+        frame,
+        overlay_area,
+        block,
+        ELECTRIC_BLUE,
+        super::BorderFxContext,
+    );
 
     let w = inner.width as usize;
     let h = inner.height as usize;
@@ -2778,10 +2853,15 @@ pub fn render_stormglass_discovery_modal(
     let block = Block::default()
         .title(" \u{25b6} New System Unlocked \u{25c0} ")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow));
+        .border_style(Style::default().fg(super::themed_border_color(Color::Yellow)));
 
-    let inner = block.inner(modal_area);
-    frame.render_widget(block, modal_area);
+    let inner = super::render_themed_block(
+        frame,
+        modal_area,
+        block,
+        Color::Yellow,
+        super::BorderFxContext,
+    );
 
     let text = Paragraph::new(vec![
         Line::from(""),

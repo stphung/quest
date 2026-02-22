@@ -260,6 +260,173 @@ pub struct UnlockedAchievement {
     pub character_name: Option<String>,
 }
 
+/// Global UI border style shared across all characters.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum UiBorderStyle {
+    #[default]
+    #[serde(alias = "RuneCrawl")]
+    #[serde(alias = "ImpactRipples")]
+    #[serde(alias = "BossThreatMode")]
+    #[serde(alias = "Quadrant")]
+    #[serde(alias = "QuadrantInside")]
+    #[serde(alias = "IronRivets")]
+    #[serde(alias = "RoyalCrest")]
+    #[serde(alias = "SentinelSpikes")]
+    #[serde(alias = "ArcaneSeals")]
+    #[serde(alias = "MeridianMarks")]
+    #[serde(alias = "CathedralFrame")]
+    #[serde(alias = "BastionBraces")]
+    #[serde(alias = "CelestialPins")]
+    #[serde(alias = "ForgeBolts")]
+    #[serde(alias = "RelicWard")]
+    Classic,
+    #[serde(alias = "ElementalFrost")]
+    Rounded,
+    #[serde(alias = "ElementalStorm")]
+    #[serde(alias = "DualLayerIllusion")]
+    Double,
+    #[serde(alias = "ElementalVoid")]
+    Thick,
+    Dashed,
+    HeavyDashed,
+    TripleDashed,
+    HeavyTripleDashed,
+    #[serde(alias = "NeonPulse")]
+    QuadDashed,
+    #[serde(alias = "ElementalEmber")]
+    HeavyQuadDashed,
+    HeavyCorner,
+    MicroDash,
+    HeaderRail,
+}
+
+pub const SELECTABLE_UI_BORDER_STYLES: &[UiBorderStyle] = &[
+    UiBorderStyle::Classic,
+    UiBorderStyle::Rounded,
+    UiBorderStyle::Double,
+    UiBorderStyle::Thick,
+    UiBorderStyle::Dashed,
+    UiBorderStyle::HeavyDashed,
+    UiBorderStyle::TripleDashed,
+    UiBorderStyle::HeavyTripleDashed,
+    UiBorderStyle::QuadDashed,
+    UiBorderStyle::HeavyQuadDashed,
+    UiBorderStyle::HeavyCorner,
+    UiBorderStyle::MicroDash,
+    UiBorderStyle::HeaderRail,
+];
+
+impl UiBorderStyle {
+    pub const fn storage_id(self) -> u8 {
+        match self {
+            Self::Classic => 0,
+            Self::Rounded => 1,
+            Self::Double => 2,
+            Self::Thick => 3,
+            Self::Dashed => 4,
+            Self::HeavyDashed => 5,
+            Self::TripleDashed => 6,
+            Self::HeavyTripleDashed => 7,
+            Self::QuadDashed => 8,
+            Self::HeavyQuadDashed => 9,
+            Self::HeavyCorner => 32,
+            Self::MicroDash => 33,
+            Self::HeaderRail => 35,
+        }
+    }
+
+    pub const fn from_storage_id(id: u8) -> Self {
+        match id {
+            1 => Self::Rounded,
+            2 => Self::Double,
+            3 => Self::Thick,
+            4 => Self::Dashed,
+            5 => Self::HeavyDashed,
+            6 => Self::TripleDashed,
+            7 => Self::HeavyTripleDashed,
+            8 => Self::QuadDashed,
+            9 => Self::HeavyQuadDashed,
+            32 => Self::HeavyCorner,
+            33 => Self::MicroDash,
+            // Removed style fallback.
+            34 => Self::Classic,
+            35 => Self::HeaderRail,
+            // Backward-compat fallback for removed styles.
+            10 => Self::Classic,
+            11 => Self::Classic,
+            12 => Self::Classic,
+            13 => Self::Classic,
+            14 => Self::Classic,
+            15 => Self::Double,
+            22 => Self::Classic,
+            23 => Self::Classic,
+            24 => Self::Classic,
+            25 => Self::Classic,
+            26 => Self::Classic,
+            27 => Self::Classic,
+            28 => Self::Classic,
+            29 => Self::Classic,
+            30 => Self::Classic,
+            31 => Self::Classic,
+            _ => Self::Classic,
+        }
+    }
+
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Classic => "Classic",
+            Self::Rounded => "Rounded",
+            Self::Double => "Double",
+            Self::Thick => "Thick",
+            Self::Dashed => "Dashed",
+            Self::HeavyDashed => "Heavy Dashed",
+            Self::TripleDashed => "Triple Dashed",
+            Self::HeavyTripleDashed => "Heavy Triple Dash",
+            Self::QuadDashed => "Quad Dashed",
+            Self::HeavyQuadDashed => "Heavy Quad Dash",
+            Self::HeavyCorner => "Heavy Corner",
+            Self::MicroDash => "Micro Dash",
+            Self::HeaderRail => "Header Rail",
+        }
+    }
+
+    pub const fn debug_option_label(self) -> &'static str {
+        match self {
+            Self::Classic => "Set Border: Classic",
+            Self::Rounded => "Set Border: Rounded",
+            Self::Double => "Set Border: Double",
+            Self::Thick => "Set Border: Thick",
+            Self::Dashed => "Set Border: Dashed",
+            Self::HeavyDashed => "Set Border: Heavy Dashed",
+            Self::TripleDashed => "Set Border: Triple Dashed",
+            Self::HeavyTripleDashed => "Set Border: Heavy Triple Dash",
+            Self::QuadDashed => "Set Border: Quad Dashed",
+            Self::HeavyQuadDashed => "Set Border: Heavy Quad Dash",
+            Self::HeavyCorner => "Set Border: Heavy Corner",
+            Self::MicroDash => "Set Border: Micro Dash",
+            Self::HeaderRail => "Set Border: Header Rail",
+        }
+    }
+
+    pub const fn border_set_message(self) -> &'static str {
+        match self {
+            Self::Classic => "Border style set: Classic",
+            Self::Rounded => "Border style set: Rounded",
+            Self::Double => "Border style set: Double",
+            Self::Thick => "Border style set: Thick",
+            Self::Dashed => "Border style set: Dashed",
+            Self::HeavyDashed => "Border style set: Heavy Dashed",
+            Self::TripleDashed => "Border style set: Triple Dashed",
+            Self::HeavyTripleDashed => "Border style set: Heavy Triple Dash",
+            Self::QuadDashed => "Border style set: Quad Dashed",
+            Self::HeavyQuadDashed => "Border style set: Heavy Quad Dash",
+            Self::HeavyCorner => "Border style set: Heavy Corner",
+            Self::MicroDash => "Border style set: Micro Dash",
+            Self::HeaderRail => "Border style set: Header Rail",
+        }
+    }
+}
+
 /// Global achievement state (saved to disk).
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Achievements {
@@ -279,6 +446,9 @@ pub struct Achievements {
     pub highest_fishing_rank: u32,
     pub zones_fully_cleared: u32,
     pub expanse_cycles_completed: u64,
+    /// Global border style applied to panel UI.
+    #[serde(default)]
+    pub ui_border_style: UiBorderStyle,
 
     /// Achievements unlocked but not yet viewed (not persisted) - for UI indicator
     #[serde(skip)]
@@ -336,6 +506,52 @@ mod tests {
         assert_eq!(AchievementCategory::Challenges.name(), "Challenges");
         assert_eq!(AchievementCategory::Exploration.name(), "Exploration");
         assert_eq!(AchievementCategory::Stats.name(), "Stats");
+    }
+
+    #[test]
+    fn test_ui_border_style_defaults_to_classic() {
+        let achievements = Achievements::default();
+        assert_eq!(achievements.ui_border_style, UiBorderStyle::Classic);
+    }
+
+    #[test]
+    fn test_ui_border_style_storage_roundtrip_for_selectable_styles() {
+        for style in SELECTABLE_UI_BORDER_STYLES {
+            let id = style.storage_id();
+            assert_eq!(UiBorderStyle::from_storage_id(id), *style);
+        }
+    }
+
+    #[test]
+    fn test_ui_border_style_legacy_aliases_deserialize() {
+        let legacy_neon: UiBorderStyle = serde_json::from_str("\"NeonPulse\"").unwrap();
+        assert_eq!(legacy_neon, UiBorderStyle::QuadDashed);
+
+        let legacy_ember: UiBorderStyle = serde_json::from_str("\"ElementalEmber\"").unwrap();
+        assert_eq!(legacy_ember, UiBorderStyle::HeavyQuadDashed);
+
+        let legacy_frost: UiBorderStyle = serde_json::from_str("\"ElementalFrost\"").unwrap();
+        assert_eq!(legacy_frost, UiBorderStyle::Rounded);
+
+        let legacy_rune_crawl: UiBorderStyle = serde_json::from_str("\"RuneCrawl\"").unwrap();
+        assert_eq!(legacy_rune_crawl, UiBorderStyle::Classic);
+
+        let legacy_impact_ripples: UiBorderStyle =
+            serde_json::from_str("\"ImpactRipples\"").unwrap();
+        assert_eq!(legacy_impact_ripples, UiBorderStyle::Classic);
+
+        let legacy_boss_threat: UiBorderStyle = serde_json::from_str("\"BossThreatMode\"").unwrap();
+        assert_eq!(legacy_boss_threat, UiBorderStyle::Classic);
+
+        let legacy_quadrant: UiBorderStyle = serde_json::from_str("\"Quadrant\"").unwrap();
+        assert_eq!(legacy_quadrant, UiBorderStyle::Classic);
+
+        let legacy_relic_ward: UiBorderStyle = serde_json::from_str("\"RelicWard\"").unwrap();
+        assert_eq!(legacy_relic_ward, UiBorderStyle::Classic);
+
+        let legacy_dual_layer: UiBorderStyle =
+            serde_json::from_str("\"DualLayerIllusion\"").unwrap();
+        assert_eq!(legacy_dual_layer, UiBorderStyle::Double);
     }
 
     // =========================================================================

@@ -125,9 +125,11 @@ pub(super) fn draw_prestige_info(
         None => " Prestige ".to_string(),
     };
     let prestige_block = Block::default().borders(Borders::ALL).title(title);
+    let prestige_block = super::themed_block(prestige_block);
 
     let inner = prestige_block.inner(area);
     frame.render_widget(prestige_block, area);
+    super::apply_themed_border_fx(frame, area, Color::White, super::BorderFxContext);
 
     let tier = get_prestige_tier(game_state.prestige_rank);
     let cha_mod = game_state.attributes.modifier(AttributeType::Charisma);
@@ -249,9 +251,11 @@ pub(super) fn draw_fishing_panel(
         None => " Fishing ".to_string(),
     };
     let block = Block::default().borders(Borders::ALL).title(title);
+    let block = super::themed_block(block);
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
+    super::apply_themed_border_fx(frame, area, Color::White, super::BorderFxContext);
 
     let fish_required = FishingState::fish_required_for_rank(game_state.fishing.rank);
     let fish_progress = game_state.fishing.fish_toward_next_rank;

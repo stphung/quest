@@ -16,4 +16,6 @@ pub mod unlock;
 pub use data::{get_achievement_def, get_achievements_by_category};
 pub use milestones::{MinigameDifficulty, MinigameType};
 pub use persistence::{load_achievements, save_achievements};
-pub use types::{AchievementCategory, AchievementId, Achievements};
+pub use types::{
+    AchievementCategory, AchievementId, Achievements, UiBorderStyle, SELECTABLE_UI_BORDER_STYLES,
+};

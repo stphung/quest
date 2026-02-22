@@ -241,7 +241,13 @@ pub fn draw_game_overlays(
     if debug_mode {
         ui::debug_menu_scene::render_debug_indicator(frame, area, ctx);
         if debug_menu.is_open {
-            ui::debug_menu_scene::render_debug_menu(frame, area, debug_menu, ctx);
+            ui::debug_menu_scene::render_debug_menu(
+                frame,
+                area,
+                debug_menu,
+                global_achievements.ui_border_style,
+                ctx,
+            );
         }
     } else {
         let is_saving = last_save_instant
