@@ -361,6 +361,9 @@ fn handle_base_game(
         }
         KeyCode::Char('v') | KeyCode::Char('V') => {
             *prestige_ready_sound_enabled = !*prestige_ready_sound_enabled;
+            if *prestige_ready_sound_enabled {
+                crate::utils::audio::play_sound_enabled_confirmation();
+            }
             InputResult::Continue
         }
         KeyCode::Char('?') => {
