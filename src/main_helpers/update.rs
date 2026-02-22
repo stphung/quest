@@ -5,6 +5,7 @@ use crate::core::constants::{
 };
 use crate::ui::throbber::block_spinner_char;
 use crate::utils::updater::UpdateInfoStatus;
+use chrono::{DateTime, NaiveDate, TimeZone, Utc};
 use rand::RngExt;
 use ratatui::crossterm::event::{self, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::style::{Color, Modifier, Style};
@@ -46,11 +47,62 @@ fn draw_startup_modal(
         .map(|_| ())
 }
 
+fn parse_timestamp_utc(timestamp: &str) -> Option<DateTime<Utc>> {
+    if let Ok(dt) = DateTime::parse_from_rfc3339(timestamp) {
+        return Some(dt.with_timezone(&Utc));
+    }
+
+    let date = NaiveDate::parse_from_str(timestamp, "%Y-%m-%d").ok()?;
+    let naive = date.and_hms_opt(0, 0, 0)?;
+    Some(Utc.from_utc_datetime(&naive))
+}
+
+fn compact_relative_label(timestamp: &str, sign: char, now: &DateTime<Utc>) -> Option<String> {
+    const MINUTE: i64 = 60;
+    const HOUR: i64 = 60 * MINUTE;
+    const DAY: i64 = 24 * HOUR;
+    const WEEK: i64 = 7 * DAY;
+    const MONTH: i64 = 30 * DAY;
+    const YEAR: i64 = 365 * DAY;
+
+    let then = parse_timestamp_utc(timestamp)?;
+    let seconds = now.signed_duration_since(then).num_seconds().abs();
+    let (value, unit) = if seconds >= YEAR {
+        (seconds / YEAR, "y")
+    } else if seconds >= MONTH {
+        (seconds / MONTH, "m")
+    } else if seconds >= WEEK {
+        (seconds / WEEK, "w")
+    } else if seconds >= DAY {
+        (seconds / DAY, "d")
+    } else if seconds >= HOUR {
+        (seconds / HOUR, "h")
+    } else {
+        (seconds / MINUTE, "min")
+    };
+
+    Some(format!("[{}{}{}]", sign, value, unit))
+}
+
+fn with_relative_prefix(
+    item: &str,
+    timestamp: Option<&str>,
+    sign: char,
+    now: &DateTime<Utc>,
+) -> String {
+    if let Some(label) = timestamp.and_then(|ts| compact_relative_label(ts, sign, now)) {
+        format!("{} {}", label, item)
+    } else {
+        item.to_string()
+    }
+}
+
 fn build_startup_splash_text(
     update_status: Option<&UpdateInfoStatus>,
     update_loading: bool,
 ) -> Vec<Line<'static>> {
     use crate::utils::build_info::{BUILD_COMMIT, BUILD_DATE};
+    let now = Utc::now();
 
     let q = Style::default()
         .fg(Color::Rgb(78, 217, 255))
@@ -162,10 +214,16 @@ fn build_startup_splash_text(
                     )]));
                 } else {
                     let max_upstream_items = 5;
-                    for item in info.changelog.iter().take(max_upstream_items) {
+                    for (idx, item) in info.changelog.iter().take(max_upstream_items).enumerate() {
+                        let item_text = with_relative_prefix(
+                            item,
+                            info.changelog_times.get(idx).and_then(|s| s.as_deref()),
+                            '-',
+                            &now,
+                        );
                         text.push(Line::from(vec![
                             Span::styled("    • ", Style::default().fg(Color::DarkGray)),
-                            Span::styled(item.clone(), Style::default().fg(Color::White)),
+                            Span::styled(item_text, Style::default().fg(Color::White)),
                         ]));
                     }
                     if info.changelog_total > max_upstream_items {
@@ -238,10 +296,18 @@ fn build_startup_splash_text(
     } else {
         match update_status {
             Some(UpdateInfoStatus::UpdateAvailable(info)) => {
-                for item in &info.current_and_previous {
+                for (idx, item) in info.current_and_previous.iter().enumerate() {
+                    let item_text = with_relative_prefix(
+                        item,
+                        info.current_and_previous_times
+                            .get(idx)
+                            .and_then(|s| s.as_deref()),
+                        '-',
+                        &now,
+                    );
                     text.push(Line::from(vec![
                         Span::styled("    • ", Style::default().fg(Color::DarkGray)),
-                        Span::styled(item.clone(), Style::default().fg(Color::White)),
+                        Span::styled(item_text, Style::default().fg(Color::White)),
                     ]));
                 }
                 if info.current_and_previous.is_empty() {
