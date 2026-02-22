@@ -227,7 +227,7 @@ fn render_exchange_menu(
             true,
         ),
         (
-            "\u{16B1}  Storm Sigils", // ᚱ (1-wide) + 2 spaces
+            "\u{16B1}  Etch Storm Sigils", // ᚱ (1-wide) + 2 spaces
             ">>>".to_string(),
             true,
         ),
