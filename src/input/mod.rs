@@ -2,6 +2,7 @@
 //!
 //! Extracts the input dispatch logic from main.rs into a clean priority chain.
 
+pub mod deep_input;
 mod haven_input;
 mod minigame_input;
 mod prestige_input;

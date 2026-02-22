@@ -18,6 +18,9 @@ pub mod mercenaries;
 pub mod missions;
 pub mod persistence;
 pub mod types;
+pub mod ui_state;
 
 #[allow(unused_imports)]
 pub use types::*;
+#[allow(unused_imports)]
+pub use ui_state::*;
