@@ -605,7 +605,7 @@ fn main() -> io::Result<()> {
                     {
                         let batch = {
                             let surge = chrono_surge.as_ref().unwrap();
-                            surge.batch_size.min(surge.ticks_remaining)
+                            surge.current_batch_size().min(surge.ticks_remaining)
                         };
 
                         let mut rng = rand::rng();

@@ -148,7 +148,7 @@ pub const EXCHANGE_MENU_ITEMS: usize = 3;
 pub struct ChronoSurgeState {
     pub ticks_remaining: u64,
     pub ticks_total: u64,
-    /// Ticks per 100ms frame — computed so animation lasts CHRONO_SURGE_ANIMATION_SECONDS.
+    /// Baseline ticks per 100ms frame before acceleration is applied.
     pub batch_size: u64,
     pub kills: u64,
     pub levels_gained: u32,
@@ -176,6 +176,21 @@ impl ChronoSurgeState {
             return 1.0;
         }
         (self.ticks_total - self.ticks_remaining) as f64 / self.ticks_total as f64
+    }
+
+    /// Pure acceleration curve for Chrono Surge (no deceleration phase).
+    pub fn speed_multiplier(&self) -> f64 {
+        let p = self.progress().clamp(0.0, 1.0);
+        let start_speed = 0.85;
+        let peak_speed = 3.40;
+        start_speed + (peak_speed - start_speed) * p.powf(1.6)
+    }
+
+    /// Current per-frame batch after applying the acceleration ramp.
+    pub fn current_batch_size(&self) -> u64 {
+        ((self.batch_size as f64) * self.speed_multiplier())
+            .round()
+            .max(1.0) as u64
     }
 }
 

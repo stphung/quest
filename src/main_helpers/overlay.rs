@@ -227,6 +227,7 @@ pub fn draw_game_overlays(
 
     // Chrono Surge active: status banner at bottom
     if let Some(surge) = chrono_surge {
+        ui::stormglass_scene::render_chrono_surge_time_warp(frame, area, surge, ctx);
         ui::stormglass_scene::render_chrono_surge_banner(frame, area, surge, ctx);
     }
 

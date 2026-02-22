@@ -30,6 +30,11 @@ const PHASE1_END_MS: u128 = 1400;
 const PHASE2_END_MS: u128 = 2800;
 const PHASE3_END_MS: u128 = 3500;
 
+/// Temporal-tech accent colors for Chrono Surge visuals.
+const TIMEWARP_CYAN: Color = Color::Rgb(120, 220, 255);
+const TIMEWARP_MID: Color = Color::Rgb(70, 150, 230);
+const TIMEWARP_DEEP: Color = Color::Rgb(20, 40, 90);
+
 /// Parameters controlling the storm backdrop appearance.
 struct StormBackdropParams {
     top_rgb: (u8, u8, u8),
@@ -117,6 +122,18 @@ fn clear_row_chars(buffer: &mut [Vec<SceneCell>], row: i32) {
             cell.ch = ' ';
             cell.fg = Color::Reset;
         }
+    }
+}
+
+/// Convert surge ticks (10 ticks/sec) to a compact duration label.
+fn chrono_ticks_to_duration_label(ticks: u64) -> String {
+    let total_mins = ticks / 600;
+    let hours = total_mins / 60;
+    let mins = total_mins % 60;
+    if hours > 0 {
+        format!("{}h {}m", hours, mins)
+    } else {
+        format!("{}m", mins)
     }
 }
 
@@ -703,6 +720,166 @@ fn render_chrono_surge_select(
 
 /// Render the active Chrono Surge status banner along the bottom of the screen.
 /// The normal game view remains visible and updates in fast-forward.
+fn draw_single_overlay_glyph(frame: &mut Frame, area: Rect, x: i32, y: i32, ch: char, fg: Color) {
+    let min_x = area.x as i32;
+    let max_x = min_x + area.width as i32;
+    let min_y = area.y as i32;
+    let max_y = min_y + area.height as i32;
+    if x < min_x || x >= max_x || y < min_y || y >= max_y {
+        return;
+    }
+    let glyph = Paragraph::new(Span::styled(ch.to_string(), Style::default().fg(fg)))
+        .alignment(Alignment::Center);
+    frame.render_widget(glyph, Rect::new(x as u16, y as u16, 1, 1));
+}
+
+type StreamLayer = (usize, u128, usize, char, (u8, u8, u8), (u8, u8, u8));
+
+/// Render a global temporal-tech overlay while surge is fast-forwarding gameplay.
+/// Kept non-destructive (foreground glyphs only) so core gameplay remains readable.
+pub fn render_chrono_surge_time_warp(
+    frame: &mut Frame,
+    area: Rect,
+    surge: &ChronoSurgeState,
+    _ctx: &super::responsive::LayoutContext,
+) {
+    if area.width < 24 || area.height < 8 {
+        return;
+    }
+
+    let millis = current_millis();
+    let progress = surge.progress();
+    let pct = (progress * 100.0) as u32;
+    let velocity_scalar = surge.speed_multiplier();
+    let accel = ((velocity_scalar - 0.85) / (3.40 - 0.85)).clamp(0.0, 1.0);
+    let pulse_t = ((millis as f64 / 260.0).sin() * 0.5 + 0.5).clamp(0.0, 1.0);
+    let pulse_rgb = lerp_rgb((120, 220, 255), (235, 245, 255), pulse_t);
+    let pulse_color = Color::Rgb(pulse_rgb.0, pulse_rgb.1, pulse_rgb.2);
+    let accent_t = ((millis as f64 / 190.0).sin() * 0.5 + 0.5).clamp(0.0, 1.0);
+    let accent_rgb = lerp_rgb((90, 160, 245), (170, 225, 255), accent_t);
+    let accent_color = Color::Rgb(accent_rgb.0, accent_rgb.1, accent_rgb.2);
+
+    let badge = format!("⏩ x{} warp {:>3}%", surge.current_batch_size(), pct);
+    let badge_w = display_width(&badge) as u16;
+    let badge_x = area
+        .x
+        .saturating_add(area.width.saturating_sub(badge_w.saturating_add(1)));
+    let badge_y = area.y.saturating_add(1);
+    let badge_area = Rect::new(badge_x, badge_y, badge_w.min(area.width), 1);
+    let badge_widget = Paragraph::new(Span::styled(
+        badge,
+        Style::default()
+            .fg(pulse_color)
+            .add_modifier(Modifier::BOLD),
+    ));
+    frame.render_widget(badge_widget, badge_area);
+
+    let top = area.y.saturating_add(2) as i32;
+    let bottom = (area.y + area.height.saturating_sub(4)) as i32;
+    if bottom <= top {
+        return;
+    }
+    let left = area.x as i32 + 1;
+    let right = (area.x + area.width.saturating_sub(2)) as i32;
+    let inner_w = (right - left + 1).max(1);
+    let field_h = (bottom - top + 1).max(1);
+
+    // Parallax streak layers moving right-to-left.
+    let layers: [StreamLayer; 4] = [
+        (1, 18, 12, '─', (220, 248, 255), (90, 150, 220)),
+        (2, 30, 9, '╌', (180, 230, 255), (70, 120, 190)),
+        (3, 45, 7, '·', (145, 205, 245), (55, 95, 160)),
+        (4, 65, 5, '·', (120, 185, 230), (45, 80, 140)),
+    ];
+
+    for (layer_idx, (row_step, speed_ms, streak_len, body_ch, hot_rgb, cool_rgb)) in
+        layers.iter().enumerate()
+    {
+        let start_row = top + (layer_idx as i32 % *row_step as i32);
+        let mut row_count = 0usize;
+        let dynamic_len = *streak_len + (accel * (*streak_len as f64 * 0.95)).round() as usize;
+        for y in (start_row..=bottom).step_by(*row_step) {
+            let phase_span = inner_w + dynamic_len as i32 + 8;
+            let accel_phase =
+                (accel * phase_span as f64 * (4.0 + layer_idx as f64 * 1.8)).round() as i32;
+            let phase = (((millis / *speed_ms) as i32)
+                + accel_phase
+                + row_count as i32 * (4 + layer_idx as i32)
+                + layer_idx as i32 * 13)
+                .rem_euclid(phase_span);
+            let head_x = right - phase;
+
+            for seg in 0..dynamic_len {
+                let x = head_x + seg as i32;
+                if x < left || x > right {
+                    continue;
+                }
+                let seg_t = seg as f64 / dynamic_len.max(1) as f64;
+                let rgb = lerp_rgb(*hot_rgb, *cool_rgb, seg_t);
+                let color = Color::Rgb(rgb.0, rgb.1, rgb.2);
+                let ch = if seg == 0 {
+                    if accel > 0.72 {
+                        '◉'
+                    } else if layer_idx <= 1 {
+                        '✦'
+                    } else {
+                        '•'
+                    }
+                } else if seg <= 2 {
+                    '•'
+                } else {
+                    *body_ch
+                };
+                draw_single_overlay_glyph(frame, area, x, y, ch, color);
+            }
+            row_count += 1;
+        }
+    }
+
+    // Sparse temporal gates that sweep right-to-left.
+    let gate_row_step = if accel > 0.55 { 2 } else { 3 };
+    for gate in 0..4i32 {
+        let phase = (((millis / 95) as i32)
+            + gate * ((inner_w / 4).max(8))
+            + (accel * (inner_w + 12) as f64 * 5.0).round() as i32)
+            .rem_euclid(inner_w + 12);
+        let x = right - phase;
+        if x >= left && x <= right {
+            for y in (top..=bottom).step_by(gate_row_step) {
+                let ch = if (y + gate) % 2 == 0 { '┊' } else { '╎' };
+                draw_single_overlay_glyph(frame, area, x, y, ch, TIMEWARP_MID);
+            }
+        }
+    }
+
+    // Fast shards with tiny trails.
+    let shard_count = 16 + (accel * 24.0).round() as usize;
+    let shard_trail = 2 + (accel * 4.0).round() as i32;
+    for i in 0..shard_count {
+        let seed = hash2d(i, (millis / 55) as usize);
+        let y = top + (seed as i32 % field_h);
+        let phase = (((millis / 24) as i32)
+            + (seed as i32 % 41)
+            + (accel * (inner_w + 10) as f64 * 7.0).round() as i32)
+            .rem_euclid(inner_w + 10);
+        let x = right - phase;
+        if x < left || x > right {
+            continue;
+        }
+        let color = if i % 3 == 0 {
+            pulse_color
+        } else {
+            accent_color
+        };
+        let shard_head = if accel > 0.75 { '◁' } else { '◀' };
+        draw_single_overlay_glyph(frame, area, x, y, shard_head, color);
+        for t in 1..=shard_trail {
+            let trail_ch = if t <= 2 { '·' } else { '╌' };
+            draw_single_overlay_glyph(frame, area, x + t, y, trail_ch, TIMEWARP_MID);
+        }
+    }
+}
+
 pub fn render_chrono_surge_banner(
     frame: &mut Frame,
     area: Rect,
@@ -722,45 +899,84 @@ pub fn render_chrono_surge_banner(
 
     frame.render_widget(Clear, banner_area);
 
+    let millis = current_millis();
     let progress = surge.progress();
     let pct = (progress * 100.0) as u32;
 
-    // Progress bar
-    let bar_width = banner_area.width.saturating_sub(4) as usize;
+    // Progress bar as a "time-rift ribbon" with traveling pulse nodes.
+    let bar_width = (banner_area.width as usize)
+        .saturating_sub(28)
+        .clamp(12, 120);
     let filled = ((bar_width as f64) * progress) as usize;
-    let bar: String = format!(
-        "[{}{}] {}%",
-        "\u{2588}".repeat(filled),
-        "\u{2591}".repeat(bar_width.saturating_sub(filled)),
-        pct,
+    let mut bar_cells = vec!['┄'; bar_width];
+    let fill_len = filled.min(bar_width);
+    for (i, cell) in bar_cells.iter_mut().take(fill_len).enumerate() {
+        let dist_to_head = fill_len.saturating_sub(i);
+        *cell = if dist_to_head <= 2 {
+            '▓'
+        } else if dist_to_head <= 4 {
+            '▒'
+        } else {
+            '█'
+        };
+    }
+    if bar_width > 0 {
+        let pulse_a = ((millis / 55) as usize) % bar_width;
+        let pulse_b = (pulse_a + (bar_width / 3).max(1)) % bar_width;
+        for pulse in [pulse_a, pulse_b] {
+            if pulse < fill_len {
+                bar_cells[pulse] = '◉';
+            } else {
+                bar_cells[pulse] = '◌';
+            }
+        }
+        if fill_len < bar_width {
+            bar_cells[fill_len] = '⟫';
+        } else {
+            bar_cells[bar_width - 1] = '◆';
+        }
+    }
+    let bar = format!(
+        "[{}] {:>3}%",
+        bar_cells.into_iter().collect::<String>(),
+        pct
     );
 
+    let ticks_left_label = chrono_ticks_to_duration_label(surge.ticks_remaining);
+
     let stats_line = format!(
-        "\u{2694}{} kills  \u{2B06}+{} levels  \u{1F528}{} equipped",
-        surge.kills, surge.levels_gained, surge.items_equipped,
+        "\u{2694}{} kills  \u{2B06}+{} levels  \u{1F528}{} equipped  \u{23F3} {} left",
+        surge.kills, surge.levels_gained, surge.items_equipped, ticks_left_label,
     );
 
     let lines = vec![
         Line::from(vec![
             Span::styled(
-                "\u{231B} Chrono Surge ",
+                "\u{231B} Chrono Surge",
                 Style::default()
-                    .fg(ELECTRIC_BLUE)
+                    .fg(TIMEWARP_CYAN)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled(bar, Style::default().fg(ELECTRIC_BLUE)),
-            Span::styled("  [Esc] Skip", Style::default().fg(Color::DarkGray)),
+            Span::raw("  "),
+            Span::styled(bar, Style::default().fg(TIMEWARP_CYAN)),
+            Span::raw("  "),
+            Span::styled(
+                format!("\u{26A1}x{}", surge.current_batch_size()),
+                Style::default().fg(Color::Rgb(170, 230, 255)),
+            ),
+            Span::styled("  [Esc] Skip", Style::default().fg(Color::Gray)),
         ]),
         Line::from(Span::styled(
             stats_line,
-            Style::default().fg(Color::Rgb(180, 200, 230)),
+            Style::default().fg(Color::Rgb(180, 210, 240)),
         )),
     ];
 
     let paragraph = Paragraph::new(lines).alignment(Alignment::Center).block(
         Block::default()
             .borders(Borders::TOP)
-            .border_style(Style::default().fg(ELECTRIC_BLUE)),
+            .border_style(Style::default().fg(TIMEWARP_MID))
+            .style(Style::default().bg(TIMEWARP_DEEP)),
     );
     frame.render_widget(paragraph, banner_area);
 }
