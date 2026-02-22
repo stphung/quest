@@ -53,12 +53,12 @@ use std::time::{Duration, Instant};
 use stormglass::types::{ChronoSurgeState, ChronoSurgeSummary};
 use tick_events::apply_tick_events;
 use ui::achievement_browser_scene::AchievementBrowserState;
-use ui::title_browser_scene::TitleBrowserState;
 use ui::character_creation::CharacterCreationScreen;
 use ui::character_delete::CharacterDeleteScreen;
 use ui::character_rename::CharacterRenameScreen;
 use ui::character_select::CharacterSelectScreen;
 use ui::draw_ui_with_update;
+use ui::title_browser_scene::TitleBrowserState;
 use utils::updater::{UpdateInfo, UpdateInfoStatus};
 
 #[derive(Clone, Copy, PartialEq)]

@@ -17,11 +17,11 @@ use crate::haven;
 use crate::input::{HavenUiState, SoulforgeUiState};
 use crate::ui;
 use crate::ui::achievement_browser_scene::AchievementBrowserState;
-use crate::ui::title_browser_scene::TitleBrowserState;
 use crate::ui::character_creation::CharacterCreationScreen;
 use crate::ui::character_delete::CharacterDeleteScreen;
 use crate::ui::character_rename::CharacterRenameScreen;
 use crate::ui::character_select::CharacterSelectScreen;
+use crate::ui::title_browser_scene::TitleBrowserState;
 
 use chrono::Utc;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
@@ -125,7 +125,15 @@ pub fn handle_select_frame(
     terminal.draw(|f| {
         let area = f.area();
         let ctx = ui::responsive::LayoutContext::from_frame(f);
-        select_screen.draw(f, area, &characters, haven, enhancement, global_achievements, &ctx);
+        select_screen.draw(
+            f,
+            area,
+            &characters,
+            haven,
+            enhancement,
+            global_achievements,
+            &ctx,
+        );
         // Draw Haven management overlay if open
         if haven_ui.showing {
             ui::haven_scene::render_haven_tree(
@@ -215,8 +223,7 @@ pub fn handle_select_frame(
                         KeyCode::Down => title_browser.move_down(unlocked.len()),
                         KeyCode::Enter => {
                             if let Some(title_def) = unlocked.get(title_browser.selected_index) {
-                                global_achievements.selected_title =
-                                    Some(title_def.achievement_id);
+                                global_achievements.selected_title = Some(title_def.achievement_id);
                                 title_browser.close();
                                 let _ = achievements::save_achievements(global_achievements);
                             }

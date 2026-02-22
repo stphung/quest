@@ -85,15 +85,13 @@ fn draw_header(
     let rank = get_adventurer_rank(game_state.character_level);
     let play_time = format_play_time(game_state.play_time_seconds);
 
-    let title_suffix = achievements
-        .selected_title
-        .and_then(|id| {
-            if achievements.is_unlocked(id) {
-                crate::achievements::titles::get_title_text(id)
-            } else {
-                None
-            }
-        });
+    let title_suffix = achievements.selected_title.and_then(|id| {
+        if achievements.is_unlocked(id) {
+            crate::achievements::titles::get_title_text(id)
+        } else {
+            None
+        }
+    });
     let name_with_title = match title_suffix {
         Some(title) => format!("{}, {}", game_state.character_name, title),
         None => game_state.character_name.clone(),
@@ -417,15 +415,13 @@ pub(super) fn draw_compact_stats_bar(
         .map(|z| z.subzones.len())
         .unwrap_or(0);
 
-    let compact_name = match achievements
-        .selected_title
-        .and_then(|id| {
-            if achievements.is_unlocked(id) {
-                crate::achievements::titles::get_title_text(id)
-            } else {
-                None
-            }
-        }) {
+    let compact_name = match achievements.selected_title.and_then(|id| {
+        if achievements.is_unlocked(id) {
+            crate::achievements::titles::get_title_text(id)
+        } else {
+            None
+        }
+    }) {
         Some(title) => format!(" {}, {} ", game_state.character_name, title),
         None => format!(" {} ", game_state.character_name),
     };

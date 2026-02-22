@@ -11,38 +11,125 @@ pub struct TitleDef {
 /// All available titles, in display order.
 pub const ALL_TITLES: &[TitleDef] = &[
     // Level & Prestige
-    TitleDef { achievement_id: AchievementId::Level250, title_text: "Legendary" },
-    TitleDef { achievement_id: AchievementId::Level500, title_text: "Mythic" },
-    TitleDef { achievement_id: AchievementId::Level1000, title_text: "Immortal" },
-    TitleDef { achievement_id: AchievementId::Level1500, title_text: "Transcendent" },
-    TitleDef { achievement_id: AchievementId::PrestigeXXV, title_text: "Diamond" },
-    TitleDef { achievement_id: AchievementId::PrestigeL, title_text: "Emerald" },
-    TitleDef { achievement_id: AchievementId::PrestigeLXX, title_text: "Obsidian" },
-    TitleDef { achievement_id: AchievementId::Eternal, title_text: "Eternal" },
+    TitleDef {
+        achievement_id: AchievementId::Level250,
+        title_text: "Legendary",
+    },
+    TitleDef {
+        achievement_id: AchievementId::Level500,
+        title_text: "Mythic",
+    },
+    TitleDef {
+        achievement_id: AchievementId::Level1000,
+        title_text: "Immortal",
+    },
+    TitleDef {
+        achievement_id: AchievementId::Level1500,
+        title_text: "Transcendent",
+    },
+    TitleDef {
+        achievement_id: AchievementId::PrestigeXXV,
+        title_text: "Diamond",
+    },
+    TitleDef {
+        achievement_id: AchievementId::PrestigeL,
+        title_text: "Emerald",
+    },
+    TitleDef {
+        achievement_id: AchievementId::PrestigeLXX,
+        title_text: "Obsidian",
+    },
+    TitleDef {
+        achievement_id: AchievementId::Eternal,
+        title_text: "Eternal",
+    },
     // Combat
-    TitleDef { achievement_id: AchievementId::SlayerV, title_text: "Slayer" },
-    TitleDef { achievement_id: AchievementId::SlayerX, title_text: "Destroyer" },
-    TitleDef { achievement_id: AchievementId::SlayerXV, title_text: "Annihilator" },
-    TitleDef { achievement_id: AchievementId::BossHunterV, title_text: "Boss Hunter" },
-    TitleDef { achievement_id: AchievementId::BossHunterX, title_text: "Bane of Bosses" },
-    TitleDef { achievement_id: AchievementId::BossHunterXV, title_text: "Godslayer" },
+    TitleDef {
+        achievement_id: AchievementId::SlayerV,
+        title_text: "Slayer",
+    },
+    TitleDef {
+        achievement_id: AchievementId::SlayerX,
+        title_text: "Destroyer",
+    },
+    TitleDef {
+        achievement_id: AchievementId::SlayerXV,
+        title_text: "Annihilator",
+    },
+    TitleDef {
+        achievement_id: AchievementId::BossHunterV,
+        title_text: "Boss Hunter",
+    },
+    TitleDef {
+        achievement_id: AchievementId::BossHunterX,
+        title_text: "Bane of Bosses",
+    },
+    TitleDef {
+        achievement_id: AchievementId::BossHunterXV,
+        title_text: "Godslayer",
+    },
     // Challenges
-    TitleDef { achievement_id: AchievementId::GrandChampion, title_text: "Grand Champion" },
-    TitleDef { achievement_id: AchievementId::ChessMaster, title_text: "Grandmaster" },
-    TitleDef { achievement_id: AchievementId::GoMaster, title_text: "Sovereign" },
-    TitleDef { achievement_id: AchievementId::MorrisMaster, title_text: "Millwright" },
-    TitleDef { achievement_id: AchievementId::GomokuMaster, title_text: "Five-Stone Sage" },
-    TitleDef { achievement_id: AchievementId::MinesweeperMaster, title_text: "Trapbreaker" },
-    TitleDef { achievement_id: AchievementId::RuneMaster, title_text: "Runeweaver" },
-    TitleDef { achievement_id: AchievementId::FlappyMaster, title_text: "Skypiercer" },
-    TitleDef { achievement_id: AchievementId::SnakeMaster, title_text: "Serpent Lord" },
-    TitleDef { achievement_id: AchievementId::ContainmentBreachMaster, title_text: "Warden" },
-    TitleDef { achievement_id: AchievementId::SigilSurgeMaster, title_text: "Sigil Savant" },
+    TitleDef {
+        achievement_id: AchievementId::GrandChampion,
+        title_text: "Grand Champion",
+    },
+    TitleDef {
+        achievement_id: AchievementId::ChessMaster,
+        title_text: "Grandmaster",
+    },
+    TitleDef {
+        achievement_id: AchievementId::GoMaster,
+        title_text: "Sovereign",
+    },
+    TitleDef {
+        achievement_id: AchievementId::MorrisMaster,
+        title_text: "Millwright",
+    },
+    TitleDef {
+        achievement_id: AchievementId::GomokuMaster,
+        title_text: "Five-Stone Sage",
+    },
+    TitleDef {
+        achievement_id: AchievementId::MinesweeperMaster,
+        title_text: "Trapbreaker",
+    },
+    TitleDef {
+        achievement_id: AchievementId::RuneMaster,
+        title_text: "Runeweaver",
+    },
+    TitleDef {
+        achievement_id: AchievementId::FlappyMaster,
+        title_text: "Skypiercer",
+    },
+    TitleDef {
+        achievement_id: AchievementId::SnakeMaster,
+        title_text: "Serpent Lord",
+    },
+    TitleDef {
+        achievement_id: AchievementId::ContainmentBreachMaster,
+        title_text: "Warden",
+    },
+    TitleDef {
+        achievement_id: AchievementId::SigilSurgeMaster,
+        title_text: "Sigil Savant",
+    },
     // Exploration
-    TitleDef { achievement_id: AchievementId::StormLeviathan, title_text: "Leviathan Slayer" },
-    TitleDef { achievement_id: AchievementId::FishermanIV, title_text: "Master Angler" },
-    TitleDef { achievement_id: AchievementId::HavenArchitect, title_text: "Architect" },
-    TitleDef { achievement_id: AchievementId::MasterSmith, title_text: "Soulforged" },
+    TitleDef {
+        achievement_id: AchievementId::StormLeviathan,
+        title_text: "Leviathan Slayer",
+    },
+    TitleDef {
+        achievement_id: AchievementId::FishermanIV,
+        title_text: "Master Angler",
+    },
+    TitleDef {
+        achievement_id: AchievementId::HavenArchitect,
+        title_text: "Architect",
+    },
+    TitleDef {
+        achievement_id: AchievementId::MasterSmith,
+        title_text: "Soulforged",
+    },
 ];
 
 /// Get the title text for an achievement, if it grants a title.
@@ -105,8 +192,10 @@ mod tests {
 
     #[test]
     fn test_validate_clears_invalid() {
-        let mut achievements = Achievements::default();
-        achievements.selected_title = Some(AchievementId::Eternal);
+        let mut achievements = Achievements {
+            selected_title: Some(AchievementId::Eternal),
+            ..Default::default()
+        };
         validate_selected_title(&mut achievements);
         assert_eq!(achievements.selected_title, None);
     }
