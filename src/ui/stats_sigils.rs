@@ -1,0 +1,81 @@
+//! Storm Sigil rendering helpers for the stats panel.
+
+use crate::stormglass::sigils::{SigilGrade, StormSigils};
+use ratatui::{
+    style::{Color, Modifier, Style},
+    text::{Line, Span},
+    widgets::{Block, Borders, Paragraph},
+    Frame,
+};
+
+/// Draws the Storm Sigils panel as a dedicated section.
+/// Only call when `storm_sigils.etched_count() > 0`.
+pub(super) fn draw_sigils_panel(
+    frame: &mut Frame,
+    area: ratatui::layout::Rect,
+    storm_sigils: &StormSigils,
+) {
+    let etched = storm_sigils.etched_count();
+    let title = format!(
+        " \u{16B1} Storm Sigils ({}/{}) ",
+        etched, storm_sigils.slots_unlocked
+    );
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Rgb(100, 180, 255)))
+        .title(title);
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let width = inner.width as usize;
+    let mut lines = Vec::new();
+
+    for sigil in storm_sigils.sigils.iter().flatten() {
+        let icon = sigil.effect.icon();
+        let short = sigil.effect.short_name();
+        let value_label = sigil.effect.format_value(sigil.value);
+        let grade_str = sigil.grade.label();
+        let grade_padded = format!("{:<2}", grade_str);
+        let grade_color = sigil_grade_color(sigil.grade);
+
+        let left = format!("{} {}", icon, short);
+        let right = format!("{}  {}", value_label, grade_padded);
+        let left_display_w = unicode_width::UnicodeWidthStr::width(left.as_str());
+        let right_len = right.len();
+        let pad = width.saturating_sub(left_display_w + right_len + 3);
+
+        let grade_style = if grade_str.ends_with('+') {
+            Style::default()
+                .fg(grade_color)
+                .add_modifier(Modifier::BOLD)
+        } else if grade_str.ends_with('-') {
+            Style::default().fg(grade_color).add_modifier(Modifier::DIM)
+        } else {
+            Style::default().fg(grade_color)
+        };
+
+        lines.push(Line::from(vec![
+            Span::raw("  "),
+            Span::styled(left, Style::default().fg(Color::White)),
+            Span::raw(" ".repeat(pad.max(1))),
+            Span::styled(value_label, Style::default().fg(Color::Rgb(100, 180, 255))),
+            Span::styled(format!("  {}", grade_padded), grade_style),
+        ]));
+    }
+
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, inner);
+}
+
+/// Returns the color for a sigil grade tier letter.
+fn sigil_grade_color(grade: SigilGrade) -> Color {
+    match grade.tier_letter() {
+        'S' => Color::Rgb(255, 215, 0),
+        'A' => Color::Green,
+        'B' => Color::Cyan,
+        'C' => Color::White,
+        'D' => Color::Gray,
+        'E' => Color::DarkGray,
+        _ => Color::Red,
+    }
+}
