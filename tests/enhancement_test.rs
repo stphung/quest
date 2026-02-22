@@ -704,7 +704,7 @@ fn test_enhancement_achievements() {
 
     // +10 on one slot
     achievements.on_enhancement_upgraded(10, &[10, 4, 4, 4, 4, 4, 4], 50, char_name);
-    assert!(achievements.is_unlocked(quest::achievements::AchievementId::MasterSmith));
+    assert!(achievements.is_unlocked(quest::achievements::AchievementId::SoulforgeAscendant));
     assert!(!achievements.is_unlocked(quest::achievements::AchievementId::SoulConvergence));
 
     // +7 on all slots

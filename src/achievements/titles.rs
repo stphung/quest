@@ -12,45 +12,61 @@ pub struct TitleDef {
 pub const ALL_TITLES: &[TitleDef] = &[
     // Level & Prestige
     TitleDef {
+        achievement_id: AchievementId::Level100,
+        title_text: "Centurion",
+    },
+    TitleDef {
         achievement_id: AchievementId::Level250,
         title_text: "Legendary",
     },
     TitleDef {
-        achievement_id: AchievementId::Level500,
-        title_text: "Mythic",
-    },
-    TitleDef {
-        achievement_id: AchievementId::Level1000,
-        title_text: "Immortal",
+        achievement_id: AchievementId::Level750,
+        title_text: "Demigod",
     },
     TitleDef {
         achievement_id: AchievementId::Level1500,
         title_text: "Transcendent",
     },
     TitleDef {
+        achievement_id: AchievementId::PrestigeX,
+        title_text: "Silver-Forged",
+    },
+    TitleDef {
         achievement_id: AchievementId::PrestigeXXV,
-        title_text: "Diamond",
+        title_text: "Diamond-Forged",
     },
     TitleDef {
         achievement_id: AchievementId::PrestigeL,
-        title_text: "Emerald",
-    },
-    TitleDef {
-        achievement_id: AchievementId::PrestigeLXX,
-        title_text: "Obsidian",
+        title_text: "Emerald-Forged",
     },
     TitleDef {
         achievement_id: AchievementId::Eternal,
-        title_text: "Eternal",
+        title_text: "Everlasting",
+    },
+    TitleDef {
+        achievement_id: AchievementId::StormsEnd,
+        title_text: "Stormborn",
+    },
+    TitleDef {
+        achievement_id: AchievementId::BeyondInfinity,
+        title_text: "Voidwalker",
     },
     // Combat
     TitleDef {
         achievement_id: AchievementId::SlayerV,
-        title_text: "Slayer",
+        title_text: "Battleborn",
     },
     TitleDef {
         achievement_id: AchievementId::SlayerX,
         title_text: "Destroyer",
+    },
+    TitleDef {
+        achievement_id: AchievementId::SlayerXIII,
+        title_text: "Harbinger",
+    },
+    TitleDef {
+        achievement_id: AchievementId::SlayerXIV,
+        title_text: "Reaper",
     },
     TitleDef {
         achievement_id: AchievementId::SlayerXV,
@@ -58,11 +74,19 @@ pub const ALL_TITLES: &[TitleDef] = &[
     },
     TitleDef {
         achievement_id: AchievementId::BossHunterV,
-        title_text: "Boss Hunter",
+        title_text: "Throneseeker",
     },
     TitleDef {
         achievement_id: AchievementId::BossHunterX,
-        title_text: "Bane of Bosses",
+        title_text: "Dreadbane",
+    },
+    TitleDef {
+        achievement_id: AchievementId::BossHunterXIII,
+        title_text: "Titan Breaker",
+    },
+    TitleDef {
+        achievement_id: AchievementId::BossHunterXIV,
+        title_text: "Worldender",
     },
     TitleDef {
         achievement_id: AchievementId::BossHunterXV,
@@ -115,6 +139,30 @@ pub const ALL_TITLES: &[TitleDef] = &[
     },
     // Exploration
     TitleDef {
+        achievement_id: AchievementId::FishCatcherVIII,
+        title_text: "Leviathan's Rival",
+    },
+    TitleDef {
+        achievement_id: AchievementId::FishCatcherIX,
+        title_text: "Poseidon's Hand",
+    },
+    TitleDef {
+        achievement_id: AchievementId::FishCatcherX,
+        title_text: "Lord of the Deep",
+    },
+    TitleDef {
+        achievement_id: AchievementId::DungeonMasterVIII,
+        title_text: "Labyrinth Lord",
+    },
+    TitleDef {
+        achievement_id: AchievementId::DungeonMasterIX,
+        title_text: "Abyss Walker",
+    },
+    TitleDef {
+        achievement_id: AchievementId::DungeonMasterX,
+        title_text: "Undying Delver",
+    },
+    TitleDef {
         achievement_id: AchievementId::StormLeviathan,
         title_text: "Leviathan Slayer",
     },
@@ -127,7 +175,23 @@ pub const ALL_TITLES: &[TitleDef] = &[
         title_text: "Architect",
     },
     TitleDef {
-        achievement_id: AchievementId::MasterSmith,
+        achievement_id: AchievementId::FullyTempered,
+        title_text: "Tempered Soul",
+    },
+    TitleDef {
+        achievement_id: AchievementId::SoulConvergence,
+        title_text: "Radiant Soul",
+    },
+    TitleDef {
+        achievement_id: AchievementId::SoulforgeMaster,
+        title_text: "Emberforged",
+    },
+    TitleDef {
+        achievement_id: AchievementId::SoulforgeGrandmaster,
+        title_text: "Flameforged",
+    },
+    TitleDef {
+        achievement_id: AchievementId::SoulforgeAscendant,
         title_text: "Soulforged",
     },
 ];
@@ -164,8 +228,8 @@ mod tests {
 
     #[test]
     fn test_get_title_text_exists() {
-        assert_eq!(get_title_text(AchievementId::Eternal), Some("Eternal"));
-        assert_eq!(get_title_text(AchievementId::SlayerV), Some("Slayer"));
+        assert_eq!(get_title_text(AchievementId::Eternal), Some("Everlasting"));
+        assert_eq!(get_title_text(AchievementId::SlayerV), Some("Battleborn"));
     }
 
     #[test]
@@ -187,7 +251,7 @@ mod tests {
         achievements.unlock(AchievementId::SlayerI, Some("Hero".to_string())); // no title
         let titles = get_unlocked_titles(&achievements);
         assert_eq!(titles.len(), 1);
-        assert_eq!(titles[0].title_text, "Slayer");
+        assert_eq!(titles[0].title_text, "Battleborn");
     }
 
     #[test]

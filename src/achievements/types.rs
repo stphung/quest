@@ -216,7 +216,7 @@ pub enum AchievementId {
     SoulforgeSavant,      // Reach +7 on any slot
     SoulforgeMaster,      // Reach +8 on any slot
     SoulforgeGrandmaster, // Reach +9 on any slot
-    MasterSmith,          // Reach +10 on any slot
+    SoulforgeAscendant,   // Reach +10 on any slot
     SoulConvergence,      // Reach +7 on all 7 slots
     PersistentHammering,  // 100 total enhancement attempts
 }
