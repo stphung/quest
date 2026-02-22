@@ -55,10 +55,10 @@ Quest is a terminal-based idle RPG built in Rust using Ratatui for UI rendering 
     ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
     │   Zones  │ │  Items   │ │  Haven   │ │Achievemts│
     └──────────┘ └──────────┘ └──────────┘ └──────────┘
-    ┌──────────┐ ┌──────────┐
-    │Soulforge │ │God Items │
-    │(Enhance) │ │          │
-    └──────────┘ └──────────┘
+    ┌──────────┐ ┌──────────┐ ┌──────────┐
+    │Soulforge │ │God Items │ │Stormglass│
+    │(Enhance) │ │          │ │ (Sigils) │
+    └──────────┘ └──────────┘ └──────────┘
          │              │            │             │
          └──────────────┴────────────┴─────────────┘
                               │
@@ -71,7 +71,7 @@ Quest is a terminal-based idle RPG built in Rust using Ratatui for UI rendering 
 
 ### Key Architectural Patterns
 
-- **Event-driven tick processing**: `game_tick()` returns a `TickResult` containing `Vec<TickEvent>` (30 event variants). The presentation layer maps events to combat log entries, visual effects, and overlays. Game logic has zero UI imports.
+- **Event-driven tick processing**: `game_tick()` returns a `TickResult` containing `Vec<TickEvent>` (34 event variants). The presentation layer maps events to combat log entries, visual effects, and overlays. Game logic has zero UI imports.
 - **Generic RNG**: `game_tick<R: Rng>()` uses a generic type parameter because `rand::Rng` is not dyn-compatible. Production uses `thread_rng()`, tests use seeded `ChaCha8Rng` for determinism.
 - **Haven bonus injection**: Haven bonuses are passed as explicit parameters to game systems rather than accessed globally, keeping modules decoupled.
 
@@ -144,13 +144,14 @@ The game runs at **10 ticks per second** (100ms intervals). Each tick is process
 
 ### Key Types
 
-**`TickEvent`** (30 variants):
+**`TickEvent`** (34 variants):
 - Combat: `PlayerAttack`, `PlayerAttackBlocked`, `EnemyAttack`, `DamageReflected`, `RegenComplete`, `EnemyDefeated`, `PlayerDied`, `PlayerDiedInDungeon`
 - Items: `ItemDropped`
 - Zones: `SubzoneBossDefeated`
 - Dungeon: `DungeonRoomEntered`, `DungeonTreasureFound`, `DungeonKeyFound`, `DungeonBossUnlocked`, `DungeonBossDefeated`, `DungeonEliteDefeated`, `DungeonFailed`, `DungeonCompleted`
 - Fishing: `FishingMessage`, `FishCaught`, `FishingItemFound`, `FishingRankUp`, `StormLeviathanCaught`
-- Discovery: `ChallengeDiscovered`, `DungeonDiscovered`, `FishingSpotDiscovered`, `HavenDiscovered`, `SoulforgeDiscovered`
+- Discovery: `ChallengeDiscovered`, `DungeonDiscovered`, `FishingSpotDiscovered`, `HavenDiscovered`, `SoulforgeDiscovered`, `StormglassDiscovered`
+- Stormglass: `StormglassEarned`, `SigilActivated`, `SigilExpired`
 - Achievements: `AchievementUnlocked`
 - Level: `LeveledUp`
 
@@ -620,7 +621,7 @@ All challenges use 4 difficulty levels: Novice, Apprentice, Journeyman, Master.
 | JezzBall | +25% XP | +75% XP | +1 PR, +100% XP | +2 PR, +100% XP |
 | Sigil Surge | +50% XP | +100% XP | +1 PR, +75% XP | +2 PR, +150% XP, +1 FR |
 
-PR = Prestige Rank, FR = Fishing Rank, XP% = percentage of current level's XP requirement.
+PR = Prestige Rank, FR = Fishing Rank, XP% = percentage of current level's XP requirement. Challenge wins also award Stormglass currency (see [Secondary Systems](secondary-systems.md#stormglass-system)).
 
 ### Forfeit Pattern
 
@@ -794,7 +795,7 @@ Options: Trigger Dungeon, Fishing, all 10 challenge types, Haven Discovery, Soul
 
 ### Integration Tests
 
-26 integration test files in `tests/`:
+30 integration test files in `tests/`:
 - `game_loop_orchestration_test.rs` -- 36 behavior-locking tests for game tick pipeline
 - `game_tick_behavior_test.rs` / `game_tick_supplemental_test.rs` -- Tick processing behavior
 - `tick_integration_test.rs` -- Cross-system tick integration
@@ -907,7 +908,8 @@ quest/
 │   │   ├── haven_input.rs   # Haven overlay input
 │   │   ├── minigame_input.rs # Minigame input dispatch
 │   │   ├── prestige_input.rs # Prestige confirmation input
-│   │   └── soulforge_input.rs # Soulforge overlay input
+│   │   ├── soulforge_input.rs # Soulforge overlay input
+│   │   └── stormglass_input.rs # Stormglass overlay input
 │   ├── main_helpers/        # Extracted helpers from main.rs
 │   │   ├── mod.rs           # Re-exports
 │   │   ├── achievements.rs  # Achievement modal/save handling
@@ -960,7 +962,7 @@ quest/
 │   │   ├── player_attack.rs # Player damage pipeline
 │   │   ├── enemy_attack.rs  # Enemy attack resolution
 │   │   ├── damage.rs        # Shared damage calculation, enemy death handling
-│   │   ├── events.rs        # CombatEvent, HavenCombatBonuses, GodItemCombatBonuses
+│   │   ├── events.rs        # CombatEvent, CombatBonuses (unified struct)
 │   │   └── regen.rs         # HP regeneration after combat
 │   ├── zones/               # Zone system
 │   │   ├── data.rs          # Zone definitions
@@ -1009,6 +1011,11 @@ quest/
 │   │   ├── types.rs         # Enhancement progress, constants, success rates
 │   │   ├── logic.rs         # Enhancement rolls, discovery
 │   │   └── persistence.rs   # Save/load from ~/.quest/enhancement.json
+│   ├── stormglass/          # Stormglass currency and Storm Sigils
+│   │   ├── types.rs         # Stormglass state, daily rotation
+│   │   ├── sigils.rs        # Storm Sigil definitions and bonuses
+│   │   ├── earning.rs       # Stormglass earning from challenges
+│   │   └── spending.rs      # Stormglass spending on sigils
 │   ├── god_items/           # God Items system (Asprika, Sleipnir, Megingjord)
 │   │   └── types.rs         # God item definitions, passives, bonuses, query helpers
 │   ├── achievements/        # Achievement system
@@ -1057,13 +1064,14 @@ quest/
 │       ├── soulforge_effects.rs # Soulforge animation effects
 │       ├── soulforge_slots.rs # Soulforge slot selection rendering
 │       ├── help_overlay.rs   # Help overlay with keybindings
+│       ├── stormglass_scene.rs # Stormglass currency and sigils overlay
 │       ├── scene_fx.rs       # Shared utilities for layered ASCII scene rendering
 │       ├── zone_bg.rs        # Stylized zone background scenes (6-layer compositing)
 │       ├── debug_menu_scene.rs # Debug overlay
 │       ├── throbber.rs      # Spinner animations
 │       └── character_select.rs, character_creation.rs,
 │           character_delete.rs, character_rename.rs
-├── tests/                   # 26 integration test files
+├── tests/                   # 30 integration test files
 ├── .github/workflows/       # CI/CD pipeline
 ├── scripts/                 # Quality checks (ci-checks.sh)
 ├── docs/                    # Design documents

@@ -15,7 +15,7 @@ src/combat/
 ├── player_attack.rs    # Player damage pipeline (weapon gate → damage → crit → double strike)
 ├── enemy_attack.rs     # Enemy attack resolution (defense, Bulwark DR, reflection, death)
 ├── damage.rs           # Shared damage helpers, handle_enemy_death()
-├── events.rs           # CombatEvent enum, HavenCombatBonuses, GodItemCombatBonuses
+├── events.rs           # CombatEvent enum, CombatBonuses (unified struct)
 └── regen.rs            # HP regeneration after combat
 ```
 
@@ -81,13 +81,26 @@ Enemies scale from a static `ZONE_ENEMY_STATS` table in `core/constants.rs`, **n
 ### Zone 11: The Expanse (Endgame Wall)
 Zone 11 has dramatically higher stats than Zone 10 (~6.2x HP, ~4.6x DMG, ~4.8x DEF). Designed as an endgame wall requiring very high prestige ranks (P50+) to farm comfortably.
 
-## Prestige Combat Bonuses
+## Unified Combat Bonuses
 
-`update_combat()` receives a `&PrestigeCombatBonuses` (from `character/combat_bonuses.rs`) that provides flat bonuses scaling with prestige rank:
-- **flat_damage**: Added after Haven % multiplier, before enemy defense subtraction
-- **flat_defense**: Added to DEX-based defense when calculating damage taken
-- **crit_chance**: Added to DEX-based crit chance (capped at PRESTIGE_CRIT_CAP = 15%)
-- **flat_hp**: Applied to `combat_state.player_max_hp` in `core/tick.rs` (not in DerivedStats)
+`update_combat()` receives a single `&CombatBonuses` struct (defined in `events.rs`) that merges all bonus sources — Haven, god items, prestige, and sigils — into one parameter. Key fields:
+
+**Damage pipeline** (`player_attack.rs`):
+- **early_damage_percent**: Applied to base damage first (e.g. Giant's Might 150%)
+- **damage_percent**: Applied after early_damage_percent (e.g. Haven Armory, sigils)
+- **flat_damage**: Added after % multipliers, before enemy defense (prestige)
+- **crit_chance_percent**: Haven Watchtower + prestige crit + sigils
+- **double_strike_chance**: Haven War Room + sigils
+- **xp_gain_percent**: Haven Training Yard + sigils
+
+**Defense pipeline** (`enemy_attack.rs`):
+- **flat_defense**: Added to DEX-based defense (prestige)
+- **damage_reduction_percent**: After defense subtraction (e.g. Divine Bulwark 30%, sigils)
+
+**Other**:
+- **flat_hp**: Applied to `combat_state.player_max_hp` in `core/tick.rs`
+- **attack_speed_percent**: Windborne + sigils
+- **hp_regen_percent**, **hp_regen_delay_reduction**, **regen_reduction_percent**: Regen modifiers from Haven, sigils, Sleipnir
 
 ## Boss Encounters
 
@@ -96,41 +109,34 @@ Zone 11 has dramatically higher stats than Zone 10 (~6.2x HP, ~4.6x DMG, ~4.8x D
 - Defeating boss advances to next subzone
 - Death to boss sets `kills_in_subzone = KILLS_FOR_BOSS - KILLS_FOR_BOSS_RETRY` (only 5 more kills to retry, not 10)
 - Zone 10 final boss requires Stormbreaker weapon (checked via `TheStormbreaker` achievement in `zones/progression.rs`)
+- **Boss enrage timer**: After 60 seconds of fighting a boss, it enrages and instantly kills the player. Emits a `BossEnrage` combat event (mapped to `TickEvent::BossEnrage`)
 
 ## Key Function: `update_combat()`
 
 ```rust
-pub fn update_combat(
+pub fn update_combat<R: Rng>(
+    rng: &mut R,
     state: &mut GameState,
     delta_time: f64,
-    haven: &HavenCombatBonuses,
-    prestige_bonuses: &PrestigeCombatBonuses,
+    bonuses: &CombatBonuses,
     achievements: &mut Achievements,
     derived: &DerivedStats,
-    god_items: &GodItemCombatBonuses,
 ) -> Vec<CombatEvent>
 ```
 
-Called from `core/tick.rs` each tick. Returns `Vec<CombatEvent>` that tick.rs maps to `TickEvent` variants.
-
-### `GodItemCombatBonuses` (`events.rs`)
-
-Struct carrying god item passive effects into the combat loop:
-- `damage_reduction_percent` — Asprika's Divine Bulwark (applied after defense subtraction)
-- `attack_speed_percent` — Sleipnir's Windborne (added to attack speed multiplier)
-- `damage_percent` — Megingjord's Giant's Might (applied to base damage before Haven)
-- `regen_reduction_percent` — Sleipnir's Swiftstrider (reduces HP regen delay)
+Called from `core/tick.rs` each tick. Takes a generic `R: Rng` and a single unified `&CombatBonuses` that aggregates Haven, prestige, god item, and sigil bonuses. Returns `Vec<CombatEvent>` that tick.rs maps to `TickEvent` variants.
 
 ## Integration Points
 
-- **Core** (`core/tick.rs`): Drives the per-tick game loop, computes `PrestigeCombatBonuses::from_rank()`, applies `flat_hp` to combat HP
+- **Core** (`core/tick.rs`): Drives the per-tick game loop, builds unified `CombatBonuses` from all sources, applies `flat_hp` to combat HP
 - **Core** (`core/game_logic.rs`): Enemy spawning via zone-based generators, XP calculation, level-up logic
 - **Character** (`character/derived_stats.rs`): Player base damage, defense, HP, crit stats
 - **Character** (`character/combat_bonuses.rs`): `PrestigeCombatBonuses` struct with `from_rank()` constructor
 - **Items** (`items/drops.rs`): Mob drops via `try_drop_from_mob()`, boss drops via `try_drop_from_boss()`
 - **Zones** (`zones/progression.rs`): Zone-based stat lookup, boss definitions
 - **Dungeon** (`dungeon/logic.rs`): Dungeon room combat with zone-scaled enemies
-- **God Items** (`god_items/types.rs`): `equipped_god_item_*()` helper functions supply `GodItemCombatBonuses` values
+- **God Items** (`god_items/types.rs`): `equipped_god_item_*()` helper functions supply god item bonus values
+- **Stormglass** (`stormglass/sigils.rs`): `SigilBonuses` computed from etched sigils, injected into `CombatBonuses`
 - **UI** (`ui/combat_scene.rs`): HP bars, enemy sprites, visual effects
 
 ## Constants (from `core/constants.rs`)

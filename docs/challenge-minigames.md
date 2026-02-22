@@ -60,7 +60,7 @@ The `impl_apply_game_result!` macro in `src/challenges/mod.rs` standardizes rewa
 | JezzBall | +25% XP | +75% XP | +1 PR, +100% XP | +2 PR, +100% XP |
 | Sigil Surge | +50% XP | +100% XP | +1 PR, +75% XP | +2 PR, +150% XP, +1 FR |
 
-PR = Prestige Rank, FR = Fishing Rank, XP% = percentage of current level's XP requirement.
+PR = Prestige Rank, FR = Fishing Rank, XP% = percentage of current level's XP requirement. Challenge wins also award Stormglass currency (gated behind P15+), which can be spent on Storm Sigils for passive bonuses.
 
 ---
 

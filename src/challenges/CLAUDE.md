@@ -258,11 +258,13 @@ All games with AI use a standardized `process_ai_thinking()` function name (not 
 ### Rewards (`ChallengeReward`)
 ```rust
 ChallengeReward {
-    prestige_ranks: 1,  // Direct prestige gain
-    stormglass: 0,      // Stormglass reward (XP fallback if not discovered)
-    fishing_ranks: 0,   // Fishing rank gain
+    prestige_ranks: 1,     // Direct prestige gain
+    stormglass: 4_000,     // Stormglass currency (XP fallback if not yet discovered)
+    fishing_ranks: 0,      // Fishing rank gain
 }
 ```
+
+All challenges award Stormglass currency. Higher difficulties give more Stormglass (e.g., Novice 300-1000, Master 4000-10000). If the player has not yet discovered Stormglass, the reward falls back to XP.
 
 ## Discovery Weights
 

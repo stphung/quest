@@ -137,10 +137,14 @@ final_xp = base_xp * (1.0 + haven_offline_xp_percent / 100)
 - Enemy stats: Static zone-based values from `ZONE_ENEMY_STATS` table in `core/constants.rs`. Each zone defines `(base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)` tuples; subzone depth adds incremental stats
 - Procedurally generated fantasy names from syllable combinations
 
+### Boss Enrage
+
+Bosses enrage after 60 seconds of combat, increasing their damage output. This prevents indefinite stalling against bosses the player cannot defeat.
+
 ### Death Consequences
 
 - **Death to regular enemy**: Instant respawn, no penalty
-- **Death to boss**: Resets boss encounter (fighting_boss=false, kills_in_subzone=5), only 5 more kills needed to retry. Preserves prestige
+- **Death to boss**: Resets player to subzone 1 of the current zone. Preserves prestige
 - **Death in dungeon**: Exits dungeon, no prestige loss
 
 ## Prestige System
@@ -367,7 +371,7 @@ The game runs a 100ms tick loop. Each tick calls `game_tick()` in `src/core/tick
 
 The tick implementation is split across several files:
 - `tick.rs` -- Orchestrator: calls each stage in order, returns `TickResult`
-- `tick_types.rs` -- `TickEvent` enum (30 variants) and `TickResult` struct
+- `tick_types.rs` -- `TickEvent` enum (34 variants) and `TickResult` struct
 - `tick_stages.rs` -- Processing stages 4-6 and helper functions (`process_item_drop`, `process_discoveries`, etc.)
 - `xp.rs` -- XP calculation, leveling logic, combat kill XP
 - `discoveries.rs` -- Discovery rolls for dungeons, fishing spots, Haven, Soulforge
@@ -393,7 +397,7 @@ Generic `<R: Rng>` allows seeded RNG in tests (`ChaCha8Rng`) and `thread_rng()` 
 
 ### TickEvent and TickResult
 
-`TickEvent` is an enum with 30 variants describing everything that can happen in a single tick. The presentation layer (`main.rs` via `tick_events.rs`) maps these to combat log entries and visual effects. Game logic never touches UI types. Defined in `tick_types.rs`.
+`TickEvent` is an enum with 34 variants describing everything that can happen in a single tick. The presentation layer (`main.rs` via `tick_events.rs`) maps these to combat log entries and visual effects. Game logic never touches UI types. Defined in `tick_types.rs`.
 
 ```rust
 pub struct TickResult {
@@ -413,7 +417,8 @@ pub struct TickResult {
 - Zones: `SubzoneBossDefeated` (with `BossDefeatResult`)
 - Dungeon: room entry, treasure, keys, boss unlock, completion, failure
 - Fishing: messages, catches, item drops, rank-ups, Storm Leviathan
-- Discovery: challenges, dungeons, fishing spots, Haven, Soulforge
+- Discovery: challenges, dungeons, fishing spots, Haven, Soulforge, Stormglass
+- Stormglass: `StormglassEarned`, `SigilActivated`, `SigilExpired`
 - Progress: `LeveledUp`, `AchievementUnlocked`
 
 ### Processing Stages
@@ -483,12 +488,14 @@ Enhancement operates on the 7 equipment slots (Weapon, Armor, Helmet, Gloves, Bo
 | Target Level | Success Rate | Cost (PR) | Fail Penalty |
 |-------------|-------------|-----------|-------------|
 | +1 to +4 | 100% | 1 PR each | None (safe) |
-| +5 | 60% | 3 PR | -1 level |
-| +6 | 50% | 3 PR | -1 level |
+| +5 | 70% | 2 PR | -1 level |
+| +6 | 55% | 3 PR | -1 level |
 | +7 | 40% | 3 PR | -1 level |
-| +8 | 30% | 5 PR | -1 level |
-| +9 | 20% | 5 PR | -1 level |
-| +10 | 10% | 10 PR | -2 levels |
+| +8 | 30% | 4 PR | -1 level |
+| +9 | 20% | 4 PR | -1 level |
+| +10 | 10% | 5 PR | -2 levels |
+
+**Soul Tithe**: Levels +5/+6/+7 offer an alternative guaranteed-success option at higher PR cost (4/6/8 PR respectively) for 100% success rate.
 
 ### Cumulative Bonus Multiplier
 

@@ -48,7 +48,8 @@ src/ui/
 ├── soulforge_scene.rs          # Soulforge enhancement overlay (delegates to helpers below)
 ├── soulforge_effects.rs        # Soulforge hammering/success/failure animation effects
 ├── soulforge_slots.rs          # Soulforge slot selection menu
-├── scene_fx.rs                 # Shared utilities for layered ASCII scene rendering
+├── stormglass_scene.rs         # Stormglass Exchange overlay (Invoke Trial, Chrono Surge, Storm Sigils)
+├── scene_fx.rs                 # Shared utilities for layered ASCII scene rendering (wide char support, SceneCell::new(), put_text_centered(), display_width())
 ├── zone_bg.rs                  # Stylized zone background scenes (6-layer compositing, all 11 zones)
 │
 ├── character_select.rs         # Character list with preview panel

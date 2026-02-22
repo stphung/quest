@@ -249,6 +249,27 @@ The StormForge is the ultimate Haven room that enables forging the Stormbreaker 
 
 Haven bonuses are passed as explicit parameters to game systems rather than accessed globally. This keeps modules decoupled. Bonuses are computed per-tick from the Haven state and passed into the relevant functions (e.g., `HavenCombatBonuses`, `HavenFishingBonuses`). Changes to Haven state are signaled via `TickResult.haven_changed`, and the presentation layer (main.rs) handles persistence.
 
+## Stormglass System
+
+### Overview
+
+Stormglass is an account-level currency earned from completing challenge minigames. Gated behind P15+ (Transcendent tier). Players spend Stormglass to activate Storm Sigils -- a daily-rotating set of passive bonuses that provide combat and progression benefits.
+
+### Earning
+
+Challenge minigame wins award Stormglass currency in addition to their standard PR/FR rewards. The amount scales with challenge difficulty.
+
+### Storm Sigils
+
+Storm Sigils are passive bonuses that rotate on a daily basis. Players spend Stormglass to activate sigil slots, choosing from a set of available sigils each day. Active sigils provide bonuses that are injected into the combat and progression systems via the unified `CombatBonuses` struct.
+
+### Module Structure
+
+- `types.rs` -- Stormglass currency state, daily rotation tracking
+- `sigils.rs` -- Storm Sigil definitions, bonuses, and activation logic
+- `earning.rs` -- Stormglass earning from challenge rewards
+- `spending.rs` -- Stormglass spending on sigil slots
+
 ## Achievement System
 
 ### Overview
