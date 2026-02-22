@@ -4,6 +4,7 @@ use super::responsive::{LayoutContext, SizeTier};
 use super::stats_attributes::draw_attributes_compact;
 use super::stats_equipment::draw_equipment_names_only;
 use super::stats_prestige::{draw_fishing_panel, draw_prestige_info, format_eta};
+use super::stats_sigils::draw_sigils_panel;
 use crate::character::derived_stats::DerivedStats;
 use crate::character::prestige::{get_adventurer_rank, get_prestige_tier};
 use crate::core::game_logic::xp_for_next_level;
@@ -31,28 +32,37 @@ pub fn draw_stats_panel(
 ) {
     match ctx.height_tier {
         SizeTier::XL | SizeTier::L => {
+            let etched = game_state.storm_sigils.etched_count();
+            let mut constraints = vec![
+                Constraint::Length(4), // Header
+                Constraint::Length(5), // Prestige
+                Constraint::Length(4), // Fishing
+                Constraint::Length(5), // Attributes
+            ];
+            if etched > 0 {
+                constraints.push(Constraint::Length(etched as u16 + 2)); // Sigils
+            }
+            constraints.push(Constraint::Min(0)); // Equipment
+
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Length(4),
-                    Constraint::Length(5),
-                    Constraint::Length(4),
-                    Constraint::Length(5),
-                    Constraint::Min(0),
-                ])
+                .constraints(constraints)
                 .split(area);
 
-            draw_header(frame, chunks[0], game_state, achievements);
-            draw_prestige_info(frame, chunks[1], game_state, achievements);
-            draw_fishing_panel(frame, chunks[2], game_state, achievements);
-            draw_attributes_compact(frame, chunks[3], game_state);
-            draw_equipment_names_only(
-                frame,
-                chunks[4],
-                game_state,
-                enhancement_levels,
-                &game_state.storm_sigils,
-            );
+            let mut idx = 0;
+            draw_header(frame, chunks[idx], game_state, achievements);
+            idx += 1;
+            draw_prestige_info(frame, chunks[idx], game_state, achievements);
+            idx += 1;
+            draw_fishing_panel(frame, chunks[idx], game_state, achievements);
+            idx += 1;
+            draw_attributes_compact(frame, chunks[idx], game_state);
+            idx += 1;
+            if etched > 0 {
+                draw_sigils_panel(frame, chunks[idx], &game_state.storm_sigils);
+                idx += 1;
+            }
+            draw_equipment_names_only(frame, chunks[idx], game_state, enhancement_levels);
         }
         _ => {}
     }
