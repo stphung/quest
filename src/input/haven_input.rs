@@ -44,6 +44,9 @@ pub(super) fn handle_haven(
                 KeyCode::Esc => {
                     haven_ui.confirmation = HavenConfirmation::None;
                 }
+                KeyCode::Char('h') | KeyCode::Char('H') => {
+                    haven_ui.close();
+                }
                 _ => {}
             }
             InputResult::Continue
@@ -79,6 +82,9 @@ pub(super) fn handle_haven(
                 KeyCode::Esc => {
                     haven_ui.confirmation = HavenConfirmation::None;
                 }
+                KeyCode::Char('h') | KeyCode::Char('H') => {
+                    haven_ui.close();
+                }
                 _ => {}
             }
             InputResult::Continue
@@ -110,7 +116,7 @@ pub(super) fn handle_haven(
                         haven_ui.confirmation = HavenConfirmation::Build;
                     }
                 }
-                KeyCode::Esc => {
+                KeyCode::Esc | KeyCode::Char('h') | KeyCode::Char('H') => {
                     haven_ui.close();
                 }
                 _ => {}
