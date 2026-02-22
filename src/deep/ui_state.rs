@@ -65,6 +65,26 @@ pub enum DeepTab {
 }
 
 impl DeepTab {
+    /// Short label for display in the tab bar.
+    pub fn label(&self) -> &str {
+        match self {
+            DeepTab::Dashboard => "Dashboard",
+            DeepTab::Roster => "Roster",
+            DeepTab::Missions => "Missions",
+            DeepTab::Recruitment => "Recruit",
+        }
+    }
+
+    /// All tab variants in display order.
+    pub fn all() -> &'static [DeepTab] {
+        &[
+            DeepTab::Dashboard,
+            DeepTab::Roster,
+            DeepTab::Missions,
+            DeepTab::Recruitment,
+        ]
+    }
+
     /// Returns the next tab in the cycle.
     pub fn next(&self) -> DeepTab {
         match self {
