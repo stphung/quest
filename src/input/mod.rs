@@ -256,6 +256,8 @@ fn handle_debug_menu(
     debug_menu: &mut DebugMenu,
 ) -> InputResult {
     match key.code {
+        KeyCode::Tab | KeyCode::Right => debug_menu.navigate_next_category(),
+        KeyCode::BackTab | KeyCode::Left => debug_menu.navigate_prev_category(),
         KeyCode::Up => debug_menu.navigate_up(),
         KeyCode::Down => debug_menu.navigate_down(),
         KeyCode::Enter => {

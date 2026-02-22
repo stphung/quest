@@ -1,10 +1,10 @@
 //! Debug menu UI rendering.
 
-use crate::utils::debug_menu::{DebugMenu, DEBUG_OPTIONS};
+use crate::utils::debug_menu::{DebugMenu, DEBUG_CATEGORIES, DEBUG_OPTIONS};
 use ratatui::{
-    layout::Rect,
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::Line,
+    text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
     Frame,
 };
@@ -16,9 +16,28 @@ pub fn render_debug_menu(
     menu: &DebugMenu,
     _ctx: &super::responsive::LayoutContext,
 ) {
-    // Center the menu
-    let menu_width = 35;
-    let menu_height = (DEBUG_OPTIONS.len() + 4) as u16; // options + border + help
+    let visible_options = menu.visible_option_indices();
+    let max_options_in_any_tab = DEBUG_CATEGORIES
+        .iter()
+        .map(|category| category.option_indices().len())
+        .max()
+        .unwrap_or(1);
+    let max_width = area.width.saturating_sub(2);
+    let menu_width = if max_width >= 44 {
+        max_width.min(72)
+    } else {
+        max_width.max(1)
+    };
+
+    // tabs + options + help + borders
+    let max_height = area.height.saturating_sub(2);
+    let desired_height = (max_options_in_any_tab + 6) as u16;
+    let menu_height = if max_height >= 8 {
+        desired_height.min(max_height)
+    } else {
+        max_height.max(1)
+    };
+
     let x = area.x + (area.width.saturating_sub(menu_width)) / 2;
     let y = area.y + (area.height.saturating_sub(menu_height)) / 2;
 
@@ -40,11 +59,47 @@ pub fn render_debug_menu(
     let inner = block.inner(menu_area);
     frame.render_widget(block, menu_area);
 
-    // Menu items
-    let items: Vec<ListItem> = DEBUG_OPTIONS
+    let sections = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Min(1),
+            Constraint::Length(1),
+        ])
+        .split(inner);
+    let tabs_area = sections[0];
+    let list_area = sections[1];
+    let help_area = sections[2];
+
+    let mut tab_spans = Vec::new();
+    for (i, category) in DEBUG_CATEGORIES.iter().enumerate() {
+        if i > 0 {
+            tab_spans.push(Span::raw(" "));
+        }
+        let label = format!("[{}]", category.label());
+        let style = if i == menu.selected_category {
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::DarkGray)
+        };
+        tab_spans.push(Span::styled(label, style));
+    }
+    frame.render_widget(Paragraph::new(Line::from(tab_spans)), tabs_area);
+
+    let visible_rows = list_area.height as usize;
+    let start = if menu.selected_index >= visible_rows {
+        menu.selected_index + 1 - visible_rows
+    } else {
+        0
+    };
+    let items: Vec<ListItem> = visible_options
         .iter()
         .enumerate()
-        .map(|(i, option)| {
+        .skip(start)
+        .take(visible_rows)
+        .map(|(i, option_index)| {
             let prefix = if i == menu.selected_index { "> " } else { "  " };
             let style = if i == menu.selected_index {
                 Style::default()
@@ -53,25 +108,17 @@ pub fn render_debug_menu(
             } else {
                 Style::default().fg(Color::White)
             };
-            ListItem::new(format!("{}{}", prefix, option)).style(style)
+            ListItem::new(format!("{}{}", prefix, DEBUG_OPTIONS[*option_index])).style(style)
         })
         .collect();
 
     let list = List::new(items);
-    frame.render_widget(list, inner);
+    frame.render_widget(list, list_area);
 
-    // Help text at bottom
-    if inner.height > DEBUG_OPTIONS.len() as u16 {
-        let help_area = Rect {
-            x: inner.x,
-            y: inner.y + inner.height - 1,
-            width: inner.width,
-            height: 1,
-        };
-        let help = Paragraph::new("[↑/↓] Navigate  [Enter] Trigger  [`] Close")
+    let help =
+        Paragraph::new("[Tab/Shift+Tab] Category  [↑/↓] Navigate  [Enter] Trigger  [`] Close")
             .style(Style::default().fg(Color::DarkGray));
-        frame.render_widget(help, help_area);
-    }
+    frame.render_widget(help, help_area);
 }
 
 /// Render the debug mode indicator (shows saves are disabled)

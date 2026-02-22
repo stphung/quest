@@ -37,10 +37,51 @@ pub const DEBUG_OPTIONS: &[&str] = &[
     "Etch S+ Sigil (Slot 1)",
 ];
 
+const CHALLENGE_OPTION_INDICES: &[usize] = &[2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+const WORLD_OPTION_INDICES: &[usize] = &[0, 1, 12, 13];
+const RESOURCE_OPTION_INDICES: &[usize] = &[17, 18, 19, 20, 21];
+const ITEM_OPTION_INDICES: &[usize] = &[14, 15, 16];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DebugCategory {
+    Challenges,
+    World,
+    Resources,
+    Items,
+}
+
+impl DebugCategory {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Challenges => "Challenges",
+            Self::World => "World",
+            Self::Resources => "Resources",
+            Self::Items => "Items",
+        }
+    }
+
+    pub const fn option_indices(self) -> &'static [usize] {
+        match self {
+            Self::Challenges => CHALLENGE_OPTION_INDICES,
+            Self::World => WORLD_OPTION_INDICES,
+            Self::Resources => RESOURCE_OPTION_INDICES,
+            Self::Items => ITEM_OPTION_INDICES,
+        }
+    }
+}
+
+pub const DEBUG_CATEGORIES: &[DebugCategory] = &[
+    DebugCategory::Challenges,
+    DebugCategory::World,
+    DebugCategory::Resources,
+    DebugCategory::Items,
+];
+
 /// Debug menu state
 #[derive(Debug, Clone, Default)]
 pub struct DebugMenu {
     pub is_open: bool,
+    pub selected_category: usize,
     pub selected_index: usize,
 }
 
@@ -51,6 +92,7 @@ impl DebugMenu {
 
     pub fn open(&mut self) {
         self.is_open = true;
+        self.selected_category = 0;
         self.selected_index = 0;
     }
 
@@ -66,6 +108,28 @@ impl DebugMenu {
         }
     }
 
+    pub fn current_category(&self) -> DebugCategory {
+        DEBUG_CATEGORIES[self.selected_category]
+    }
+
+    pub fn visible_option_indices(&self) -> &'static [usize] {
+        self.current_category().option_indices()
+    }
+
+    pub fn navigate_prev_category(&mut self) {
+        if self.selected_category == 0 {
+            self.selected_category = DEBUG_CATEGORIES.len() - 1;
+        } else {
+            self.selected_category -= 1;
+        }
+        self.selected_index = 0;
+    }
+
+    pub fn navigate_next_category(&mut self) {
+        self.selected_category = (self.selected_category + 1) % DEBUG_CATEGORIES.len();
+        self.selected_index = 0;
+    }
+
     pub fn navigate_up(&mut self) {
         if self.selected_index > 0 {
             self.selected_index -= 1;
@@ -73,9 +137,13 @@ impl DebugMenu {
     }
 
     pub fn navigate_down(&mut self) {
-        if self.selected_index + 1 < DEBUG_OPTIONS.len() {
+        if self.selected_index + 1 < self.visible_option_indices().len() {
             self.selected_index += 1;
         }
+    }
+
+    fn selected_option_global_index(&self) -> usize {
+        self.visible_option_indices()[self.selected_index]
     }
 
     /// Trigger the selected debug action. Returns a message describing what happened.
@@ -85,7 +153,7 @@ impl DebugMenu {
         haven: &mut Haven,
         enhancement: &mut EnhancementProgress,
     ) -> &'static str {
-        let msg = match self.selected_index {
+        let msg = match self.selected_option_global_index() {
             0 => trigger_dungeon(state),
             1 => trigger_fishing(state),
             2 => trigger_chess_challenge(state),
@@ -383,31 +451,56 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_menu_navigation() {
+    fn test_menu_navigation_within_category() {
         let mut menu = DebugMenu::new();
         menu.open();
+        assert_eq!(menu.current_category(), DebugCategory::Challenges);
         assert_eq!(menu.selected_index, 0);
+        assert_eq!(menu.selected_option_global_index(), 2);
 
         menu.navigate_down();
         assert_eq!(menu.selected_index, 1);
+        assert_eq!(menu.selected_option_global_index(), 3);
 
         for _ in 0..32 {
             menu.navigate_down();
         }
-        assert_eq!(menu.selected_index, DEBUG_OPTIONS.len() - 1);
+        assert_eq!(menu.selected_index, CHALLENGE_OPTION_INDICES.len() - 1);
+        assert_eq!(menu.selected_option_global_index(), 11);
 
         // Can't go past end
         menu.navigate_down();
-        assert_eq!(menu.selected_index, DEBUG_OPTIONS.len() - 1);
+        assert_eq!(menu.selected_index, CHALLENGE_OPTION_INDICES.len() - 1);
 
         menu.navigate_up();
-        assert_eq!(menu.selected_index, DEBUG_OPTIONS.len() - 2);
+        assert_eq!(menu.selected_index, CHALLENGE_OPTION_INDICES.len() - 2);
 
         // Can't go before start
         for _ in 0..32 {
             menu.navigate_up();
         }
         assert_eq!(menu.selected_index, 0);
+    }
+
+    #[test]
+    fn test_category_navigation_resets_selection() {
+        let mut menu = DebugMenu::new();
+        menu.open();
+        menu.navigate_down();
+        assert_eq!(menu.selected_index, 1);
+
+        menu.navigate_next_category();
+        assert_eq!(menu.current_category(), DebugCategory::World);
+        assert_eq!(menu.selected_index, 0);
+        assert_eq!(menu.selected_option_global_index(), 0);
+
+        menu.navigate_prev_category();
+        assert_eq!(menu.current_category(), DebugCategory::Challenges);
+        assert_eq!(menu.selected_index, 0);
+        assert_eq!(menu.selected_option_global_index(), 2);
+
+        menu.navigate_prev_category();
+        assert_eq!(menu.current_category(), DebugCategory::Items);
     }
 
     #[test]
