@@ -63,7 +63,33 @@ pub fn handle_game_input(
     }
 
     // 0.5. Achievement browser overlay
-    if let GameOverlay::Achievements { ref mut browser } = overlay {
+    if let GameOverlay::Achievements {
+        ref mut browser,
+        ref mut title_browser,
+    } = overlay
+    {
+        // Title browser takes priority when open
+        if title_browser.showing {
+            let unlocked = crate::achievements::titles::get_unlocked_titles(achievements);
+            match key.code {
+                KeyCode::Esc => title_browser.close(),
+                KeyCode::Up => title_browser.move_up(),
+                KeyCode::Down => title_browser.move_down(unlocked.len()),
+                KeyCode::Enter => {
+                    if let Some(title_def) = unlocked.get(title_browser.selected_index) {
+                        achievements.selected_title = Some(title_def.achievement_id);
+                        title_browser.close();
+                    }
+                }
+                KeyCode::Backspace => {
+                    achievements.selected_title = None;
+                    title_browser.close();
+                }
+                _ => {}
+            }
+            return InputResult::Continue;
+        }
+
         match key.code {
             KeyCode::Esc | KeyCode::Char('a') | KeyCode::Char('A') => {
                 achievements.clear_recently_unlocked();
@@ -75,6 +101,9 @@ pub fn handle_game_input(
             KeyCode::Down => {
                 let count = get_achievements_by_category(browser.selected_category).len();
                 browser.move_down(count);
+            }
+            KeyCode::Char('t') | KeyCode::Char('T') => {
+                title_browser.open();
             }
             _ => {}
         }
@@ -353,6 +382,7 @@ fn handle_base_game(
             achievements.clear_pending_notifications();
             *overlay = GameOverlay::Achievements {
                 browser: crate::ui::achievement_browser_scene::AchievementBrowserState::new(),
+                title_browser: crate::ui::title_browser_scene::TitleBrowserState::new(),
             };
             InputResult::Continue
         }

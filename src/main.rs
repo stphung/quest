@@ -53,6 +53,7 @@ use std::time::{Duration, Instant};
 use stormglass::types::{ChronoSurgeState, ChronoSurgeSummary};
 use tick_events::apply_tick_events;
 use ui::achievement_browser_scene::AchievementBrowserState;
+use ui::title_browser_scene::TitleBrowserState;
 use ui::character_creation::CharacterCreationScreen;
 use ui::character_delete::CharacterDeleteScreen;
 use ui::character_rename::CharacterRenameScreen;
@@ -206,6 +207,7 @@ fn main() -> io::Result<()> {
     let mut soulforge_ui = SoulforgeUiState::new();
     let mut exchange_ui = stormglass::types::ExchangeUiState::new();
     let mut achievement_browser = AchievementBrowserState::new();
+    let mut title_browser = TitleBrowserState::new();
     let mut help_overlay_showing = false;
 
     // Setup terminal
@@ -263,6 +265,7 @@ fn main() -> io::Result<()> {
                     &mut enhancement,
                     &mut global_achievements,
                     &mut achievement_browser,
+                    &mut title_browser,
                     &mut help_overlay_showing,
                 )?;
                 match transition {

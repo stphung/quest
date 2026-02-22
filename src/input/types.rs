@@ -73,6 +73,7 @@ pub enum GameOverlay {
     },
     Achievements {
         browser: crate::ui::achievement_browser_scene::AchievementBrowserState,
+        title_browser: crate::ui::title_browser_scene::TitleBrowserState,
     },
     /// Achievement unlock celebration modal
     AchievementUnlocked {
