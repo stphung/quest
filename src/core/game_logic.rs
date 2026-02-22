@@ -4,7 +4,7 @@ pub use super::offline::{calculate_offline_xp, process_offline_progression, Offl
 // Re-export XP system types for backward compatibility
 pub use super::xp::{
     apply_tick_xp, combat_kill_xp, distribute_level_up_points, prestige_multiplier,
-    xp_for_next_level, xp_gain_per_tick,
+    process_level_ups_from_current_xp, xp_for_next_level, xp_gain_per_tick,
 };
 
 // Re-export enemy spawning for backward compatibility

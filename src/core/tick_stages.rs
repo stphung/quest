@@ -7,7 +7,9 @@ use super::tick_types::{TickEvent, TickResult};
 use crate::achievements::Achievements;
 use crate::combat::CombatEvent;
 use crate::core::constants::{FINAL_ZONE_ID, STORMGLASS_MIN_PRESTIGE_RANK, TICKS_PER_SECOND};
-use crate::core::game_logic::{apply_tick_xp, try_discover_dungeon};
+use crate::core::game_logic::{
+    apply_tick_xp, process_level_ups_from_current_xp, try_discover_dungeon,
+};
 use crate::core::game_state::GameState;
 use crate::dungeon::logic::{
     on_boss_defeated, on_elite_defeated, on_room_enemy_defeated, update_dungeon,
@@ -203,6 +205,7 @@ pub fn process_fishing_tick<R: Rng>(
         crate::god_items::equipped_god_item_fishing_reduction_percent(&state.equipment);
     let fishing_result =
         tick_fishing_with_haven_result(state, rng, &haven_fishing, god_item_fishing_reduction);
+    let level_before = state.character_level;
 
     // Storm Leviathan caught -> achievement
     if fishing_result.caught_storm_leviathan {
@@ -273,6 +276,17 @@ pub fn process_fishing_tick<R: Rng>(
                 .events
                 .push(TickEvent::FishingMessage { message: prefixed });
         }
+    }
+
+    // Fishing awards XP directly; resolve any pending level-ups from that XP.
+    let (level_ups, _) = process_level_ups_from_current_xp(rng, state);
+    if level_ups > 0 {
+        for lvl in (level_before + 1)..=state.character_level {
+            achievements.on_level_up(lvl, Some(&state.character_name));
+        }
+        result.events.push(TickEvent::LeveledUp {
+            new_level: state.character_level,
+        });
     }
 
     // Check fishing rank up
