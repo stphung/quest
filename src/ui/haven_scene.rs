@@ -229,13 +229,13 @@ pub fn render_haven_tree(
         Some(icon) => format!(" Haven {} ", icon),
         None => " Haven ".to_string(),
     };
+    let border_color = Color::Rgb(138, 148, 166);
     let block = Block::default()
         .title(haven_title)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Rgb(138, 148, 166)));
-
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
+        .border_style(Style::default().fg(super::themed_border_color(border_color)));
+    let inner =
+        super::render_themed_block(frame, area, block, border_color, super::BorderFxContext);
 
     let height = inner.height as usize;
     let width = inner.width as usize;
@@ -297,6 +297,35 @@ pub fn render_haven_tree(
 
     // Flush buffer to frame
     render_buffer(frame, inner, &buffer);
+
+    // Apply the currently selected border style accents to the internal panels.
+    let tree_area = Rect::new(
+        inner.x,
+        inner.y + content_top as u16,
+        tree_width as u16,
+        content_height as u16,
+    );
+    let detail_area = Rect::new(
+        inner.x + detail_left as u16,
+        inner.y + content_top as u16,
+        detail_width as u16,
+        content_height as u16,
+    );
+    super::apply_themed_border_fx(frame, tree_area, Color::DarkGray, super::BorderFxContext);
+    let detail_border_color = if HavenRoomId::ALL
+        .get(selected_room)
+        .is_some_and(|room| haven.is_room_unlocked(*room))
+    {
+        Color::Cyan
+    } else {
+        Color::DarkGray
+    };
+    super::apply_themed_border_fx(
+        frame,
+        detail_area,
+        detail_border_color,
+        super::BorderFxContext,
+    );
 }
 
 /// Render the Haven discovery modal
@@ -317,10 +346,14 @@ pub fn render_haven_discovery_modal(
     let block = Block::default()
         .title(" \u{25b6} New System Unlocked \u{25c0} ")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow));
-
-    let inner = block.inner(modal_area);
-    frame.render_widget(block, modal_area);
+        .border_style(Style::default().fg(super::themed_border_color(Color::Yellow)));
+    let inner = super::render_themed_block(
+        frame,
+        modal_area,
+        block,
+        Color::Yellow,
+        super::BorderFxContext,
+    );
 
     let text = Paragraph::new(vec![
         Line::from(""),
@@ -391,10 +424,14 @@ pub fn render_build_confirmation(
     let block = Block::default()
         .title(title)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow));
-
-    let inner = block.inner(modal_area);
-    frame.render_widget(block, modal_area);
+        .border_style(Style::default().fg(super::themed_border_color(Color::Yellow)));
+    let inner = super::render_themed_block(
+        frame,
+        modal_area,
+        block,
+        Color::Yellow,
+        super::BorderFxContext,
+    );
 
     let cost_style = if can_afford_it {
         Style::default().fg(Color::Green)
@@ -449,10 +486,14 @@ pub fn render_forge_confirmation(
     let block = Block::default()
         .title(" Forge Stormbreaker? ")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow));
-
-    let inner = block.inner(modal_area);
-    frame.render_widget(block, modal_area);
+        .border_style(Style::default().fg(super::themed_border_color(Color::Yellow)));
+    let inner = super::render_themed_block(
+        frame,
+        modal_area,
+        block,
+        Color::Yellow,
+        super::BorderFxContext,
+    );
 
     let (has_leviathan, has_prestige, can_forge) =
         crate::haven::can_forge_stormbreaker(achievements, prestige_rank);
@@ -550,10 +591,14 @@ pub fn render_vault_selection(
             if vault_slots == 1 { "" } else { "s" }
         ))
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow));
-
-    let inner = block.inner(modal_area);
-    frame.render_widget(block, modal_area);
+        .border_style(Style::default().fg(super::themed_border_color(Color::Yellow)));
+    let inner = super::render_themed_block(
+        frame,
+        modal_area,
+        block,
+        Color::Yellow,
+        super::BorderFxContext,
+    );
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -710,9 +755,14 @@ pub fn render_vault_selection(
 
         let confirm_block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Yellow));
-        let confirm_inner = confirm_block.inner(confirm_area);
-        frame.render_widget(confirm_block, confirm_area);
+            .border_style(Style::default().fg(super::themed_border_color(Color::Yellow)));
+        let confirm_inner = super::render_themed_block(
+            frame,
+            confirm_area,
+            confirm_block,
+            Color::Yellow,
+            super::BorderFxContext,
+        );
 
         let lines = vec![
             Line::from(""),

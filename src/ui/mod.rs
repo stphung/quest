@@ -55,12 +55,282 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Gauge, Paragraph},
+    widgets::{Block, BorderType, Borders, Gauge, Paragraph},
     Frame,
 };
+use std::sync::atomic::{AtomicU8, Ordering};
 
 use crate::items::types::Rarity;
 use responsive::{render_too_small, LayoutContext, SizeTier};
+
+static GLOBAL_UI_BORDER_STYLE: AtomicU8 = AtomicU8::new(0);
+
+fn set_global_ui_border_style(style: crate::achievements::UiBorderStyle) {
+    GLOBAL_UI_BORDER_STYLE.store(style.storage_id(), Ordering::Relaxed);
+}
+
+pub(super) fn current_ui_border_style() -> crate::achievements::UiBorderStyle {
+    crate::achievements::UiBorderStyle::from_storage_id(
+        GLOBAL_UI_BORDER_STYLE.load(Ordering::Relaxed),
+    )
+}
+
+pub(super) fn border_type_for_style(style: crate::achievements::UiBorderStyle) -> BorderType {
+    match style {
+        crate::achievements::UiBorderStyle::Classic => BorderType::Plain,
+        crate::achievements::UiBorderStyle::Rounded => BorderType::Rounded,
+        crate::achievements::UiBorderStyle::Double => BorderType::Double,
+        crate::achievements::UiBorderStyle::Thick => BorderType::Thick,
+        crate::achievements::UiBorderStyle::Dashed => BorderType::LightDoubleDashed,
+        crate::achievements::UiBorderStyle::HeavyDashed => BorderType::HeavyDoubleDashed,
+        crate::achievements::UiBorderStyle::TripleDashed => BorderType::LightTripleDashed,
+        crate::achievements::UiBorderStyle::HeavyTripleDashed => BorderType::HeavyTripleDashed,
+        crate::achievements::UiBorderStyle::QuadDashed => BorderType::LightQuadrupleDashed,
+        crate::achievements::UiBorderStyle::HeavyQuadDashed => BorderType::HeavyQuadrupleDashed,
+        crate::achievements::UiBorderStyle::HeavyCorner => BorderType::Plain,
+        crate::achievements::UiBorderStyle::MicroDash => BorderType::Plain,
+        crate::achievements::UiBorderStyle::HeaderRail => BorderType::Plain,
+    }
+}
+
+pub(super) fn themed_block<'a>(block: Block<'a>) -> Block<'a> {
+    block.border_type(border_type_for_style(current_ui_border_style()))
+}
+
+pub(super) fn render_themed_block<'a>(
+    frame: &mut Frame,
+    area: Rect,
+    block: Block<'a>,
+    border_color: Color,
+    ctx: BorderFxContext,
+) -> Rect {
+    let block = themed_block(block);
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+    apply_border_fx_for_style(frame, area, border_color, current_ui_border_style(), ctx);
+    inner
+}
+
+pub(super) fn themed_border_color(base: Color) -> Color {
+    base
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub(super) struct BorderFxContext;
+
+pub(super) fn apply_themed_border_fx(
+    frame: &mut Frame,
+    area: Rect,
+    border_color: Color,
+    ctx: BorderFxContext,
+) {
+    apply_border_fx_for_style(frame, area, border_color, current_ui_border_style(), ctx);
+}
+
+pub(super) fn apply_border_fx_for_style(
+    frame: &mut Frame,
+    area: Rect,
+    border_color: Color,
+    style: crate::achievements::UiBorderStyle,
+    _ctx: BorderFxContext,
+) {
+    if area.width < 2 || area.height < 2 {
+        return;
+    }
+
+    match style {
+        crate::achievements::UiBorderStyle::HeavyCorner => {
+            apply_heavy_corner_overlay(frame, area, border_color)
+        }
+        crate::achievements::UiBorderStyle::MicroDash => {
+            apply_micro_dash_overlay(frame, area, border_color)
+        }
+        crate::achievements::UiBorderStyle::HeaderRail => {
+            apply_header_rail_overlay(frame, area, border_color)
+        }
+        _ => {}
+    }
+}
+
+fn apply_heavy_corner_overlay(frame: &mut Frame, area: Rect, border_color: Color) {
+    let left = area.x;
+    let top = area.y;
+    let right = area.x + area.width - 1;
+    let bottom = area.y + area.height - 1;
+
+    set_border_cell_symbol(frame, left, top, "┏", border_color);
+    set_border_cell_symbol(frame, right, top, "┓", border_color);
+    set_border_cell_symbol(frame, left, bottom, "┗", border_color);
+    set_border_cell_symbol(frame, right, bottom, "┛", border_color);
+}
+
+fn apply_micro_dash_overlay(frame: &mut Frame, area: Rect, border_color: Color) {
+    let left = area.x;
+    let top = area.y;
+    let right = area.x + area.width - 1;
+    let bottom = area.y + area.height - 1;
+
+    for x in (left + 1)..right {
+        if let Some(cell) = frame.buffer_mut().cell_mut((x, top)) {
+            if is_horizontal_border_symbol(cell.symbol()) {
+                cell.set_symbol("┄")
+                    .set_style(Style::default().fg(border_color));
+            }
+        }
+        if let Some(cell) = frame.buffer_mut().cell_mut((x, bottom)) {
+            if is_horizontal_border_symbol(cell.symbol()) {
+                cell.set_symbol("┄")
+                    .set_style(Style::default().fg(border_color));
+            }
+        }
+    }
+
+    for y in (top + 1)..bottom {
+        if let Some(cell) = frame.buffer_mut().cell_mut((left, y)) {
+            if is_vertical_border_symbol(cell.symbol()) {
+                cell.set_symbol("┆")
+                    .set_style(Style::default().fg(border_color));
+            }
+        }
+        if let Some(cell) = frame.buffer_mut().cell_mut((right, y)) {
+            if is_vertical_border_symbol(cell.symbol()) {
+                cell.set_symbol("┆")
+                    .set_style(Style::default().fg(border_color));
+            }
+        }
+    }
+}
+
+fn apply_header_rail_overlay(frame: &mut Frame, area: Rect, border_color: Color) {
+    let left = area.x;
+    let top = area.y;
+    let right = area.x + area.width - 1;
+
+    set_border_cell_symbol(frame, left, top, "┏", border_color);
+    set_border_cell_symbol(frame, right, top, "┓", border_color);
+
+    for x in (left + 1)..right {
+        if let Some(cell) = frame.buffer_mut().cell_mut((x, top)) {
+            if is_horizontal_border_symbol(cell.symbol()) {
+                cell.set_symbol("━")
+                    .set_style(Style::default().fg(border_color));
+            }
+        }
+    }
+}
+
+fn set_border_cell_symbol(frame: &mut Frame, x: u16, y: u16, symbol: &'static str, color: Color) {
+    if let Some(cell) = frame.buffer_mut().cell_mut((x, y)) {
+        cell.set_symbol(symbol)
+            .set_style(Style::default().fg(color));
+    }
+}
+
+fn is_horizontal_border_symbol(symbol: &str) -> bool {
+    matches!(symbol, "─" | "━" | "═" | "┄" | "┅" | "┈" | "┉" | "▀")
+}
+
+fn is_vertical_border_symbol(symbol: &str) -> bool {
+    matches!(symbol, "│" | "┃" | "║" | "┆" | "┇" | "┊" | "┋" | "▌")
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct PanelBorderChars {
+    pub tl: char,
+    pub tr: char,
+    pub bl: char,
+    pub br: char,
+    pub h: char,
+    pub v: char,
+}
+
+pub(super) fn panel_border_chars() -> PanelBorderChars {
+    match current_ui_border_style() {
+        crate::achievements::UiBorderStyle::Rounded => PanelBorderChars {
+            tl: '╭',
+            tr: '╮',
+            bl: '╰',
+            br: '╯',
+            h: '─',
+            v: '│',
+        },
+        crate::achievements::UiBorderStyle::Double => PanelBorderChars {
+            tl: '╔',
+            tr: '╗',
+            bl: '╚',
+            br: '╝',
+            h: '═',
+            v: '║',
+        },
+        crate::achievements::UiBorderStyle::Thick => PanelBorderChars {
+            tl: '┏',
+            tr: '┓',
+            bl: '┗',
+            br: '┛',
+            h: '━',
+            v: '┃',
+        },
+        crate::achievements::UiBorderStyle::Dashed
+        | crate::achievements::UiBorderStyle::TripleDashed => PanelBorderChars {
+            tl: '┌',
+            tr: '┐',
+            bl: '└',
+            br: '┘',
+            h: '┄',
+            v: '┆',
+        },
+        crate::achievements::UiBorderStyle::HeavyDashed
+        | crate::achievements::UiBorderStyle::HeavyTripleDashed => PanelBorderChars {
+            tl: '┏',
+            tr: '┓',
+            bl: '┗',
+            br: '┛',
+            h: '┅',
+            v: '┇',
+        },
+        crate::achievements::UiBorderStyle::QuadDashed => PanelBorderChars {
+            tl: '┌',
+            tr: '┐',
+            bl: '└',
+            br: '┘',
+            h: '┈',
+            v: '┊',
+        },
+        crate::achievements::UiBorderStyle::HeavyQuadDashed => PanelBorderChars {
+            tl: '┏',
+            tr: '┓',
+            bl: '┗',
+            br: '┛',
+            h: '┉',
+            v: '┋',
+        },
+        crate::achievements::UiBorderStyle::HeavyCorner => PanelBorderChars {
+            tl: '┏',
+            tr: '┓',
+            bl: '┗',
+            br: '┛',
+            h: '─',
+            v: '│',
+        },
+        crate::achievements::UiBorderStyle::MicroDash => PanelBorderChars {
+            tl: '┌',
+            tr: '┐',
+            bl: '└',
+            br: '┘',
+            h: '┄',
+            v: '┆',
+        },
+        crate::achievements::UiBorderStyle::HeaderRail
+        | crate::achievements::UiBorderStyle::Classic => PanelBorderChars {
+            tl: '┌',
+            tr: '┐',
+            bl: '└',
+            br: '┘',
+            h: '─',
+            v: '│',
+        },
+    }
+}
 
 /// Maps item rarity to its display color. Single source of truth for all UI.
 pub fn rarity_color(rarity: Rarity) -> Color {
@@ -105,6 +375,8 @@ pub fn draw_ui_with_update(
     achievements: &crate::achievements::Achievements,
     enhancement_levels: &[u8; 7],
 ) {
+    set_global_ui_border_style(achievements.ui_border_style);
+
     let ctx = LayoutContext::from_frame(frame);
 
     if ctx.tier == SizeTier::TooSmall {
@@ -726,10 +998,8 @@ fn draw_dungeon_view(
     let block = Block::default()
         .title(dungeon_title)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Magenta));
-
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
+        .border_style(Style::default().fg(themed_border_color(Color::Magenta)));
+    let inner = render_themed_block(frame, area, block, Color::Magenta, BorderFxContext);
 
     // Layout: player HP, dungeon status, map, enemy HP, combat status
     let inner_chunks = Layout::default()

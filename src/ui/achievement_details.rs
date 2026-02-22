@@ -75,17 +75,17 @@ pub(super) fn render_achievement_detail(
     };
 
     let is_unlocked = achievements.is_unlocked(def.id);
+    let border_color = if is_unlocked {
+        Color::Green
+    } else {
+        Color::DarkGray
+    };
     let block = Block::default()
         .title(format!(" {} ", def.name))
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(if is_unlocked {
-            Color::Green
-        } else {
-            Color::DarkGray
-        }));
-
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
+        .border_style(Style::default().fg(super::themed_border_color(border_color)));
+    let inner =
+        super::render_themed_block(frame, area, block, border_color, super::BorderFxContext);
 
     let mut lines = Vec::new();
 
@@ -220,10 +220,9 @@ pub(super) fn render_stats_view(
 ) {
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray));
-
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
+        .border_style(Style::default().fg(super::themed_border_color(Color::DarkGray)));
+    let inner =
+        super::render_themed_block(frame, area, block, Color::DarkGray, super::BorderFxContext);
 
     let columns = Layout::default()
         .direction(Direction::Horizontal)

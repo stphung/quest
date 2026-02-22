@@ -139,10 +139,14 @@ pub fn render_soulforge(
     let block = Block::default()
         .title(title)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow));
-
-    let inner = block.inner(overlay_area);
-    frame.render_widget(block, overlay_area);
+        .border_style(Style::default().fg(super::themed_border_color(Color::Yellow)));
+    let inner = super::render_themed_block(
+        frame,
+        overlay_area,
+        block,
+        Color::Yellow,
+        super::BorderFxContext,
+    );
 
     match soulforge_ui.phase {
         SoulforgePhase::Menu => {
@@ -337,10 +341,14 @@ pub fn render_soulforge_discovery_modal(
     let block = Block::default()
         .title(" \u{25b6} New System Unlocked \u{25c0} ")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow));
-
-    let inner = block.inner(modal_area);
-    frame.render_widget(block, modal_area);
+        .border_style(Style::default().fg(super::themed_border_color(Color::Yellow)));
+    let inner = super::render_themed_block(
+        frame,
+        modal_area,
+        block,
+        Color::Yellow,
+        super::BorderFxContext,
+    );
 
     let text = Paragraph::new(vec![
         Line::from(""),

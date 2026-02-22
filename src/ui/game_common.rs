@@ -58,10 +58,9 @@ pub fn create_game_layout(
     let block = Block::default()
         .title(title)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(border_color));
-
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
+        .border_style(Style::default().fg(super::themed_border_color(border_color)));
+    let inner =
+        super::render_themed_block(frame, area, block, border_color, super::BorderFxContext);
 
     // Hide info panel when width tier is below L to give the board full width
     let effective_info_width = if ctx.width_tier >= SizeTier::L {
@@ -204,10 +203,8 @@ pub fn render_game_over_overlay(
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(title_color));
-
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
+        .border_style(Style::default().fg(super::themed_border_color(title_color)));
+    let inner = super::render_themed_block(frame, area, block, title_color, super::BorderFxContext);
 
     let content_height: u16 = 7;
     let y_offset = inner.y + (inner.height.saturating_sub(content_height)) / 2;
@@ -281,10 +278,14 @@ pub fn render_game_over_banner(
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(title_color));
-
-    let inner = block.inner(banner_area);
-    frame.render_widget(block, banner_area);
+        .border_style(Style::default().fg(super::themed_border_color(title_color)));
+    let inner = super::render_themed_block(
+        frame,
+        banner_area,
+        block,
+        title_color,
+        super::BorderFxContext,
+    );
 
     let mut lines = vec![Line::from(vec![
         Span::styled(
@@ -324,10 +325,8 @@ pub fn render_info_panel_frame(frame: &mut Frame, area: Rect) -> Rect {
     let block = Block::default()
         .title(" Info ")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray));
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-    inner
+        .border_style(Style::default().fg(super::themed_border_color(Color::DarkGray)));
+    super::render_themed_block(frame, area, block, Color::DarkGray, super::BorderFxContext)
 }
 
 /// Render the "Welcome Back" overlay for offline progression.
@@ -354,13 +353,17 @@ pub fn render_offline_welcome(
         .borders(Borders::ALL)
         .border_style(
             Style::default()
-                .fg(Color::Yellow)
+                .fg(super::themed_border_color(Color::Yellow))
                 .add_modifier(Modifier::BOLD),
         )
         .title(" Your quest continues... ");
-
-    let inner = block.inner(modal_area);
-    frame.render_widget(block, modal_area);
+    let inner = super::render_themed_block(
+        frame,
+        modal_area,
+        block,
+        Color::Yellow,
+        super::BorderFxContext,
+    );
 
     // Format time away
     let hours = report.elapsed_seconds / 3600;

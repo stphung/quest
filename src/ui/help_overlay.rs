@@ -54,15 +54,19 @@ pub fn draw_help_overlay(frame: &mut Frame) {
         )),
     ];
 
-    let paragraph = Paragraph::new(lines)
-        .block(
-            Block::default()
-                .title(title)
-                .title_alignment(Alignment::Center)
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Cyan)),
-        )
-        .alignment(Alignment::Left);
+    let block = Block::default()
+        .title(title)
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(super::themed_border_color(Color::Cyan)));
+    let inner = super::render_themed_block(
+        frame,
+        dialog_area,
+        block,
+        Color::Cyan,
+        super::BorderFxContext,
+    );
+    let paragraph = Paragraph::new(lines).alignment(Alignment::Left);
 
-    frame.render_widget(paragraph, dialog_area);
+    frame.render_widget(paragraph, inner);
 }

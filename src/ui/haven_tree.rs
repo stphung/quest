@@ -17,21 +17,22 @@ pub(super) fn render_skill_tree(
     selected_room: usize,
 ) {
     let border_fg = Color::DarkGray;
+    let glyphs = super::panel_border_chars();
     let right = left + panel_width as i32 - 1;
     let bottom = top + panel_height as i32 - 1;
 
     // Draw border
-    put_cell(buffer, top, left, '\u{250c}', border_fg);
-    put_cell(buffer, top, right, '\u{2510}', border_fg);
-    put_cell(buffer, bottom, left, '\u{2514}', border_fg);
-    put_cell(buffer, bottom, right, '\u{2518}', border_fg);
+    put_cell(buffer, top, left, glyphs.tl, border_fg);
+    put_cell(buffer, top, right, glyphs.tr, border_fg);
+    put_cell(buffer, bottom, left, glyphs.bl, border_fg);
+    put_cell(buffer, bottom, right, glyphs.br, border_fg);
     for c in (left + 1)..right {
-        put_cell(buffer, top, c, '\u{2500}', border_fg);
-        put_cell(buffer, bottom, c, '\u{2500}', border_fg);
+        put_cell(buffer, top, c, glyphs.h, border_fg);
+        put_cell(buffer, bottom, c, glyphs.h, border_fg);
     }
     for r in (top + 1)..bottom {
-        put_cell(buffer, r, left, '\u{2502}', border_fg);
-        put_cell(buffer, r, right, '\u{2502}', border_fg);
+        put_cell(buffer, r, left, glyphs.v, border_fg);
+        put_cell(buffer, r, right, glyphs.v, border_fg);
     }
     put_text(buffer, top, left + 1, " Buildings ", border_fg);
 

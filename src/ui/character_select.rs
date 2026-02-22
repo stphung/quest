@@ -351,10 +351,12 @@ impl CharacterSelectScreen {
         characters: &[CharacterInfo],
         achievements: &Achievements,
     ) {
-        let block = Block::default().borders(Borders::ALL).title("Characters");
-
-        let inner_area = block.inner(area);
-        f.render_widget(block, area);
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title("Characters")
+            .border_style(Style::default().fg(super::themed_border_color(Color::DarkGray)));
+        let inner_area =
+            super::render_themed_block(f, area, block, Color::DarkGray, super::BorderFxContext);
 
         if characters.is_empty() {
             let empty_message = Paragraph::new("No characters yet.\nPress [N] to create one.")
@@ -406,10 +408,10 @@ impl CharacterSelectScreen {
     ) {
         let block = Block::default()
             .borders(Borders::ALL)
-            .title("Character Details");
-
-        let inner_area = block.inner(area);
-        f.render_widget(block, area);
+            .title("Character Details")
+            .border_style(Style::default().fg(super::themed_border_color(Color::DarkGray)));
+        let inner_area =
+            super::render_themed_block(f, area, block, Color::DarkGray, super::BorderFxContext);
 
         if characters.is_empty() {
             return;
@@ -580,10 +582,10 @@ impl CharacterSelectScreen {
     fn draw_haven_tree_compact(&self, f: &mut Frame, area: Rect, haven: &Haven) {
         let block = Block::default()
             .borders(Borders::ALL)
-            .title(format!("Haven ({}/41)", self.count_haven_tiers(haven)));
-
-        let inner_area = block.inner(area);
-        f.render_widget(block, area);
+            .title(format!("Haven ({}/41)", self.count_haven_tiers(haven)))
+            .border_style(Style::default().fg(super::themed_border_color(Color::DarkGray)));
+        let inner_area =
+            super::render_themed_block(f, area, block, Color::DarkGray, super::BorderFxContext);
 
         let lines = self.build_haven_diamond_compact(haven);
         let tree_widget = Paragraph::new(lines).alignment(Alignment::Center);
@@ -591,10 +593,12 @@ impl CharacterSelectScreen {
     }
 
     fn draw_soulforge_summary(&self, f: &mut Frame, area: Rect, enhancement: &EnhancementProgress) {
-        let block = Block::default().borders(Borders::ALL).title("Soulforge");
-
-        let inner_area = block.inner(area);
-        f.render_widget(block, area);
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title("Soulforge")
+            .border_style(Style::default().fg(super::themed_border_color(Color::DarkGray)));
+        let inner_area =
+            super::render_themed_block(f, area, block, Color::DarkGray, super::BorderFxContext);
 
         let slots = [
             EquipmentSlot::Weapon,

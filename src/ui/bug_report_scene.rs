@@ -77,13 +77,14 @@ pub fn draw_bug_report_overlay(
             .add_modifier(Modifier::BOLD),
     ));
 
-    let paragraph = Paragraph::new(lines).block(
-        Block::default()
-            .title(title)
-            .title_alignment(Alignment::Center)
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Yellow)),
-    );
+    let block = Block::default()
+        .title(title)
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(super::themed_border_color(Color::Yellow)));
+    let inner =
+        super::render_themed_block(frame, area, block, Color::Yellow, super::BorderFxContext);
+    let paragraph = Paragraph::new(lines);
 
-    frame.render_widget(paragraph, area);
+    frame.render_widget(paragraph, inner);
 }

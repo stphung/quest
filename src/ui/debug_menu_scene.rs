@@ -1,8 +1,11 @@
 //! Debug menu UI rendering.
 
-use crate::utils::debug_menu::{DebugMenu, DEBUG_CATEGORIES, DEBUG_OPTIONS};
+use crate::achievements::UiBorderStyle;
+use crate::utils::debug_menu::{
+    option_count_for_category, option_label_for_index, DebugCategory, DebugMenu, DEBUG_CATEGORIES,
+};
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
@@ -14,12 +17,13 @@ pub fn render_debug_menu(
     frame: &mut Frame,
     area: Rect,
     menu: &DebugMenu,
+    active_border_style: UiBorderStyle,
     _ctx: &super::responsive::LayoutContext,
 ) {
     let visible_options = menu.visible_option_indices();
     let max_options_in_any_tab = DEBUG_CATEGORIES
         .iter()
-        .map(|category| category.option_indices().len())
+        .map(|category| option_count_for_category(*category))
         .max()
         .unwrap_or(1);
     let max_width = area.width.saturating_sub(2);
@@ -29,7 +33,7 @@ pub fn render_debug_menu(
         max_width.max(1)
     };
 
-    // tabs + options + help + borders
+    // tabs + content + help + borders
     let max_height = area.height.saturating_sub(2);
     let desired_height = (max_options_in_any_tab + 6) as u16;
     let menu_height = if max_height >= 8 {
@@ -54,10 +58,12 @@ pub fn render_debug_menu(
     let block = Block::default()
         .title(" Debug Menu ")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow));
+        .border_style(Style::default().fg(super::themed_border_color(Color::Yellow)));
+    let block = super::themed_block(block);
 
     let inner = block.inner(menu_area);
     frame.render_widget(block, menu_area);
+    super::apply_themed_border_fx(frame, menu_area, Color::Yellow, super::BorderFxContext);
 
     let sections = Layout::default()
         .direction(Direction::Vertical)
@@ -70,6 +76,7 @@ pub fn render_debug_menu(
     let tabs_area = sections[0];
     let list_area = sections[1];
     let help_area = sections[2];
+    let is_border_category = menu.current_category() == DebugCategory::Borders;
 
     let mut tab_spans = Vec::new();
     for (i, category) in DEBUG_CATEGORIES.iter().enumerate() {
@@ -88,7 +95,20 @@ pub fn render_debug_menu(
     }
     frame.render_widget(Paragraph::new(Line::from(tab_spans)), tabs_area);
 
-    let visible_rows = list_area.height as usize;
+    let (options_area, preview_area) = if is_border_category && list_area.height >= 10 {
+        let option_rows = (visible_options.len() as u16 + 1)
+            .min(list_area.height.saturating_sub(6))
+            .max(3);
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(option_rows), Constraint::Min(5)])
+            .split(list_area);
+        (chunks[0], Some(chunks[1]))
+    } else {
+        (list_area, None)
+    };
+
+    let visible_rows = options_area.height as usize;
     let start = if menu.selected_index >= visible_rows {
         menu.selected_index + 1 - visible_rows
     } else {
@@ -101,24 +121,171 @@ pub fn render_debug_menu(
         .take(visible_rows)
         .map(|(i, option_index)| {
             let prefix = if i == menu.selected_index { "> " } else { "  " };
+            let is_active_border_style =
+                crate::utils::debug_menu::border_style_for_option_index(*option_index)
+                    == Some(active_border_style);
             let style = if i == menu.selected_index {
                 Style::default()
                     .fg(Color::Yellow)
                     .add_modifier(Modifier::BOLD)
+            } else if is_active_border_style {
+                Style::default().fg(Color::Green)
             } else {
                 Style::default().fg(Color::White)
             };
-            ListItem::new(format!("{}{}", prefix, DEBUG_OPTIONS[*option_index])).style(style)
+            let active_tag = if is_active_border_style {
+                " [active]"
+            } else {
+                ""
+            };
+            ListItem::new(format!(
+                "{}{}{}",
+                prefix,
+                option_label_for_index(*option_index),
+                active_tag
+            ))
+            .style(style)
         })
         .collect();
 
     let list = List::new(items);
-    frame.render_widget(list, list_area);
+    frame.render_widget(list, options_area);
 
-    let help =
+    if let (Some(preview), Some(selected_style)) = (preview_area, menu.selected_border_style()) {
+        render_border_preview(frame, preview, selected_style, active_border_style);
+    }
+
+    let help = if is_border_category {
+        Paragraph::new("[Tab/Shift+Tab] Category  [↑/↓] Preview  [Enter] Set Style  [`] Close")
+            .style(Style::default().fg(Color::DarkGray))
+    } else {
         Paragraph::new("[Tab/Shift+Tab] Category  [↑/↓] Navigate  [Enter] Trigger  [`] Close")
-            .style(Style::default().fg(Color::DarkGray));
+            .style(Style::default().fg(Color::DarkGray))
+    };
     frame.render_widget(help, help_area);
+}
+
+fn render_border_preview(
+    frame: &mut Frame,
+    area: Rect,
+    preview_style: UiBorderStyle,
+    active_style: UiBorderStyle,
+) {
+    if area.width < 24 || area.height < 5 {
+        let msg = Paragraph::new("Grow terminal to preview border styles.")
+            .style(Style::default().fg(Color::DarkGray))
+            .alignment(Alignment::Center);
+        frame.render_widget(msg, area);
+        return;
+    }
+
+    let border_color = preview_border_color(preview_style);
+    let style_note = match preview_style {
+        UiBorderStyle::Classic => "Default utility frame",
+        UiBorderStyle::Rounded => "Softer premium corners",
+        UiBorderStyle::Double => "Prestige frame",
+        UiBorderStyle::Thick => "Heavy legendary emphasis",
+        UiBorderStyle::Dashed => "Light segmented frame",
+        UiBorderStyle::HeavyDashed => "Bold segmented frame",
+        UiBorderStyle::TripleDashed => "Refined ornate dash pattern",
+        UiBorderStyle::HeavyTripleDashed => "Max-contrast elite frame",
+        UiBorderStyle::QuadDashed => "Fine technical dash pattern",
+        UiBorderStyle::HeavyQuadDashed => "Dense legendary dash pattern",
+        UiBorderStyle::HeavyCorner => "Heavy corners with clean lines",
+        UiBorderStyle::MicroDash => "Subtle minimalist dash frame",
+        UiBorderStyle::HeaderRail => "Strong top rail for hierarchy",
+    };
+
+    let preview_block = Block::default()
+        .title(format!(" Border Preview: {} ", preview_style.label()))
+        .borders(Borders::ALL)
+        .border_type(super::border_type_for_style(preview_style))
+        .border_style(
+            Style::default()
+                .fg(border_color)
+                .add_modifier(Modifier::BOLD),
+        );
+    let preview_inner = preview_block.inner(area);
+    frame.render_widget(preview_block, area);
+    super::apply_border_fx_for_style(
+        frame,
+        area,
+        border_color,
+        preview_style,
+        super::BorderFxContext,
+    );
+
+    if preview_inner.height < 3 {
+        return;
+    }
+
+    let preview_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1), Constraint::Min(0)])
+        .split(preview_inner);
+    let active_line = if active_style == preview_style {
+        format!("{} (currently active)", style_note)
+    } else {
+        style_note.to_string()
+    };
+    frame.render_widget(
+        Paragraph::new(active_line)
+            .style(Style::default().fg(Color::DarkGray))
+            .alignment(Alignment::Center),
+        preview_chunks[0],
+    );
+
+    if preview_chunks[1].height < 3 {
+        return;
+    }
+
+    let sample = Block::default()
+        .title(" Reward Panel ")
+        .borders(Borders::ALL)
+        .border_type(super::border_type_for_style(preview_style))
+        .border_style(
+            Style::default()
+                .fg(border_color)
+                .add_modifier(Modifier::BOLD),
+        );
+    let sample_inner = sample.inner(preview_chunks[1]);
+    frame.render_widget(sample, preview_chunks[1]);
+    super::apply_border_fx_for_style(
+        frame,
+        preview_chunks[1],
+        border_color,
+        preview_style,
+        super::BorderFxContext,
+    );
+
+    if sample_inner.height > 0 {
+        let copy = Paragraph::new(vec![
+            Line::from("Legendary Reward Border"),
+            Line::from("Tier: Epic"),
+            Line::from("Press Enter to apply globally"),
+        ])
+        .alignment(Alignment::Center)
+        .style(Style::default().fg(Color::White));
+        frame.render_widget(copy, sample_inner);
+    }
+}
+
+fn preview_border_color(style: UiBorderStyle) -> Color {
+    match style {
+        UiBorderStyle::Classic => Color::Yellow,
+        UiBorderStyle::Rounded => Color::Yellow,
+        UiBorderStyle::Double => Color::Yellow,
+        UiBorderStyle::Thick => Color::Yellow,
+        UiBorderStyle::Dashed => Color::Yellow,
+        UiBorderStyle::HeavyDashed => Color::Yellow,
+        UiBorderStyle::TripleDashed => Color::Yellow,
+        UiBorderStyle::HeavyTripleDashed => Color::Yellow,
+        UiBorderStyle::QuadDashed => Color::Yellow,
+        UiBorderStyle::HeavyQuadDashed => Color::Yellow,
+        UiBorderStyle::HeavyCorner => Color::Yellow,
+        UiBorderStyle::MicroDash => Color::Yellow,
+        UiBorderStyle::HeaderRail => Color::Yellow,
+    }
 }
 
 /// Render the debug mode indicator (shows saves are disabled)

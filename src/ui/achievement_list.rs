@@ -20,10 +20,9 @@ pub(super) fn render_achievement_list(
 ) {
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray));
-
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
+        .border_style(Style::default().fg(super::themed_border_color(Color::DarkGray)));
+    let inner =
+        super::render_themed_block(frame, area, block, Color::DarkGray, super::BorderFxContext);
 
     let category_achievements = get_achievements_by_category(ui_state.selected_category);
     let total = category_achievements.len();

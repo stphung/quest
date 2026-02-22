@@ -40,10 +40,12 @@ fn render_list_view(frame: &mut Frame, area: Rect, menu: &ChallengeMenu) {
     let block = Block::default()
         .title(" Pending Challenges ")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow));
+        .border_style(Style::default().fg(super::themed_border_color(Color::Yellow)));
+    let block = super::themed_block(block);
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
+    super::apply_themed_border_fx(frame, area, Color::Yellow, super::BorderFxContext);
 
     if menu.challenges.is_empty() {
         let text =
@@ -97,10 +99,12 @@ fn render_detail_view(
     let block = Block::default()
         .title(format!(" {} ", challenge.title))
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow));
+        .border_style(Style::default().fg(super::themed_border_color(Color::Yellow)));
+    let block = super::themed_block(block);
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
+    super::apply_themed_border_fx(frame, area, Color::Yellow, super::BorderFxContext);
 
     // Split into body + help so body can flex while help stays anchored.
     let outer_chunks = Layout::default()

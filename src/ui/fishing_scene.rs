@@ -69,6 +69,11 @@ pub fn render_fishing_scene(
 /// Draws the header with fishing spot name.
 fn draw_header(frame: &mut Frame, area: Rect, session: &FishingSession) {
     let title = format!(" FISHING - {} ", session.spot_name);
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(title)
+        .border_style(Style::default().fg(super::themed_border_color(Color::Cyan)));
+    let inner = super::render_themed_block(frame, area, block, Color::Cyan, super::BorderFxContext);
 
     let header_text = vec![Line::from(vec![Span::styled(
         format!("Fishing at {}", session.spot_name),
@@ -77,11 +82,9 @@ fn draw_header(frame: &mut Frame, area: Rect, session: &FishingSession) {
             .add_modifier(Modifier::BOLD),
     )])];
 
-    let header = Paragraph::new(header_text)
-        .block(Block::default().borders(Borders::ALL).title(title))
-        .alignment(Alignment::Center);
+    let header = Paragraph::new(header_text).alignment(Alignment::Center);
 
-    frame.render_widget(header, area);
+    frame.render_widget(header, inner);
 }
 
 /// Draws the ASCII water scene with bobber.
@@ -563,13 +566,21 @@ fn draw_catch_progress(frame: &mut Frame, area: Rect, session: &FishingSession) 
         )]),
     ];
 
-    let progress_block = Block::default().borders(Borders::ALL).title(" Status ");
+    let progress_block = Block::default()
+        .borders(Borders::ALL)
+        .title(" Status ")
+        .border_style(Style::default().fg(super::themed_border_color(Color::Yellow)));
+    let inner = super::render_themed_block(
+        frame,
+        area,
+        progress_block,
+        Color::Yellow,
+        super::BorderFxContext,
+    );
 
-    let progress_paragraph = Paragraph::new(progress_text)
-        .block(progress_block)
-        .alignment(Alignment::Center);
+    let progress_paragraph = Paragraph::new(progress_text).alignment(Alignment::Center);
 
-    frame.render_widget(progress_paragraph, area);
+    frame.render_widget(progress_paragraph, inner);
 }
 
 /// Data for each Storm Leviathan encounter stage.
@@ -680,10 +691,14 @@ pub fn render_leviathan_encounter_modal(
     let block = Block::default()
         .title(title)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Cyan));
-
-    let inner = block.inner(modal_area);
-    frame.render_widget(block, modal_area);
+        .border_style(Style::default().fg(super::themed_border_color(Color::Cyan)));
+    let inner = super::render_themed_block(
+        frame,
+        modal_area,
+        block,
+        Color::Cyan,
+        super::BorderFxContext,
+    );
 
     let mut lines = vec![
         Line::from(""),
