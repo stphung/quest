@@ -4,8 +4,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Braille spinner characters for animated loading indicators.
 const SPINNER: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-/// Block spinner characters for high-contrast loading indicators.
-const BLOCK_SPINNER: [char; 8] = ['▖', '▘', '▝', '▗', '▖', '▘', '▝', '▗'];
 
 /// Atmospheric messages shown while waiting for enemies.
 const WAITING_MESSAGES: [&str; 100] = [
@@ -125,6 +123,8 @@ pub fn spinner_char() -> char {
     let millis = current_millis();
     SPINNER[((millis / 100) % 10) as usize]
 }
+
+const BLOCK_SPINNER: [char; 8] = ['▖', '▘', '▝', '▗', '▖', '▘', '▝', '▗'];
 
 /// Returns a block-based spinner character based on system time.
 pub fn block_spinner_char() -> char {
