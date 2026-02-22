@@ -3,6 +3,23 @@
 //! An endgame (P15+) account-level system where players recruit and manage a
 //! mercenary company, sending squads on long-duration wall-clock missions that
 //! push deeper into a vast underground structure called The Deep.
+//!
+//! ## Persistence boundary
+//!
+//! The prestige reset boundary is encoded in the type system rather than
+//! relying on a reset function to zero the right fields:
+//!
+//! - [`DeepAccountState`] — survives every prestige (guild rank, layer progress,
+//!   infrastructure, lifetime stats)
+//! - [`DeepRunState`] — one mercenary company per prestige cycle; replaced on
+//!   prestige with a fresh default
+//! - [`TheDeepState`] — top-level wrapper holding both, plus the discovery flag
+//!
+//! ## Time handling
+//!
+//! No chrono calls are made inside this module. Unix timestamps (`i64`) are
+//! stored as raw values. The caller (main.rs) injects the current time so that
+//! all deep logic remains deterministically testable.
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -11,55 +28,109 @@ use std::fmt;
 // Top-level state
 // =========================================================================
 
-/// Account-level Deep state, saved to ~/.quest/deep.json.
+/// Top-level Deep state, saved to ~/.quest/deep.json.
 ///
-/// Persistence model:
-/// - Persists across prestiges: guild_rank, layers (cleared state, infrastructure, familiarity),
-///   total_marks_earned
-/// - Resets on prestige: mercenaries, active_missions, completed_missions, warband_marks,
-///   recruitment_pool
+/// Wraps the two sub-states whose lifetimes differ at the prestige boundary.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TheDeepState {
     /// Whether the player has discovered The Deep.
     pub discovered: bool,
-    /// Persistent guild rank (persists across prestiges).
-    pub guild_rank: GuildRank,
-    /// Current warband marks (resets on prestige).
-    pub warband_marks: u32,
-    /// Active mercenary roster (resets on prestige).
-    pub mercenaries: Vec<Mercenary>,
-    /// Missions currently in progress (resets on prestige).
-    pub active_missions: Vec<ActiveMission>,
-    /// Missions completed and awaiting reward collection.
-    pub completed_missions: Vec<CompletedMission>,
-    /// Per-layer state (familiarity, cleared status, infrastructure — persists across prestiges).
-    pub layers: Vec<LayerState>,
-    /// Pool of mercenaries available to recruit (refreshes daily or on prestige).
-    pub recruitment_pool: Vec<Mercenary>,
-    /// Date (YYYY-MM-DD) of last recruitment pool refresh, for daily reset logic.
-    pub recruitment_refresh_date: Option<String>,
-    /// Lifetime Warband Marks earned across all prestiges.
-    pub total_marks_earned: u64,
+    /// Data that persists across every prestige (guild rank, layers, lifetime stats).
+    pub account: DeepAccountState,
+    /// Data for the current prestige cycle; replaced with a fresh default on prestige.
+    pub run: DeepRunState,
 }
 
 impl TheDeepState {
     pub fn new() -> Self {
         Self {
             discovered: false,
-            guild_rank: GuildRank::default(),
-            warband_marks: 0,
-            mercenaries: Vec::new(),
-            active_missions: Vec::new(),
-            completed_missions: Vec::new(),
-            layers: Vec::new(),
-            recruitment_pool: Vec::new(),
-            recruitment_refresh_date: None,
-            total_marks_earned: 0,
+            account: DeepAccountState::new(),
+            run: DeepRunState::new(),
         }
     }
 }
 
 impl Default for TheDeepState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// =========================================================================
+// Account-level state (persists across prestiges)
+// =========================================================================
+
+/// Data that persists across every prestige reset.
+///
+/// Contains: guild rank, per-layer progress (cleared/familiarity/infrastructure),
+/// and lifetime statistics.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeepAccountState {
+    /// Persistent guild rank — carries over to every new run.
+    pub guild_rank: GuildRank,
+    /// Per-layer state (cleared, familiarity, infrastructure).
+    /// Indexed by layer number; grows as the player pushes deeper.
+    pub layers: Vec<LayerState>,
+    /// Lifetime Warband Marks earned across all prestige cycles.
+    pub total_marks_earned: u64,
+}
+
+impl DeepAccountState {
+    pub fn new() -> Self {
+        Self {
+            guild_rank: GuildRank::default(),
+            layers: Vec::new(),
+            total_marks_earned: 0,
+        }
+    }
+}
+
+impl Default for DeepAccountState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// =========================================================================
+// Run-level state (resets on prestige)
+// =========================================================================
+
+/// Data for one prestige cycle's mercenary company.
+///
+/// Replaced with a fresh `DeepRunState::new()` on each prestige. The player
+/// starts each run at zero marks with an empty roster and fresh recruitment pool.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeepRunState {
+    /// Current warband marks (reset on prestige).
+    pub warband_marks: u32,
+    /// Active mercenary roster (reset on prestige).
+    pub mercenaries: Vec<Mercenary>,
+    /// Missions currently in progress (reset on prestige).
+    pub active_missions: Vec<ActiveMission>,
+    /// Completed missions awaiting reward collection.
+    pub completed_missions: Vec<CompletedMission>,
+    /// Recruitment pool available for hiring (refreshes daily or on prestige).
+    pub recruitment_pool: Vec<Mercenary>,
+    /// Date string (YYYY-MM-DD) of the last recruitment pool refresh.
+    /// Comparison with the current date is done by the caller — not here.
+    pub recruitment_refresh_date: Option<String>,
+}
+
+impl DeepRunState {
+    pub fn new() -> Self {
+        Self {
+            warband_marks: 0,
+            mercenaries: Vec::new(),
+            active_missions: Vec::new(),
+            completed_missions: Vec::new(),
+            recruitment_pool: Vec::new(),
+            recruitment_refresh_date: None,
+        }
+    }
+}
+
+impl Default for DeepRunState {
     fn default() -> Self {
         Self::new()
     }
@@ -86,7 +157,7 @@ pub struct Mercenary {
     pub resilience: u32,
     /// Current availability status.
     pub status: MercStatus,
-    /// Number of missions this merc has completed across this prestige cycle.
+    /// Number of missions this merc has completed in this prestige cycle.
     pub missions_completed: u32,
 }
 
@@ -151,6 +222,9 @@ pub enum MissionType {
 }
 
 /// An active mission in progress.
+///
+/// Time is represented as raw Unix timestamps (`i64`). The caller injects the
+/// current timestamp so that all mission logic is testable with fixed values.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActiveMission {
     /// Unique mission identifier.
@@ -161,7 +235,8 @@ pub struct ActiveMission {
     pub layer: u8,
     /// Mercenary IDs assigned to this mission.
     pub squad: Vec<u32>,
-    /// Unix timestamp when the mission was started.
+    /// Unix timestamp (seconds) when the mission was started.
+    /// Injected by the caller; never set by calling `Utc::now()` in this module.
     pub start_time: i64,
     /// Total mission duration in seconds (wall-clock time).
     pub duration_secs: u64,
@@ -187,7 +262,7 @@ pub struct MissionEvent {
 }
 
 /// Types of check-in events that can occur during a mission.
-/// Placeholder variants for now — will be expanded with flavor text by game designers.
+/// Placeholder variants — will be expanded with flavor text by game designers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EventType {
     /// Collapsed tunnel blocking the main path.
@@ -373,8 +448,8 @@ impl InfrastructureType {
 
 /// State for a single layer of The Deep.
 ///
-/// Layer state (familiarity, cleared, infrastructure) persists across prestiges.
-/// Maximum 2 infrastructure slots per layer.
+/// Layer state (familiarity, cleared, infrastructure) persists across prestiges
+/// inside [`DeepAccountState`]. Maximum 2 infrastructure slots per layer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LayerState {
     /// Which layer number (1-based).

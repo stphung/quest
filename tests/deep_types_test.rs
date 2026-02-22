@@ -1,8 +1,8 @@
 //! Integration tests for The Deep module — Phase 1 Foundation Types.
 
 use quest::deep::{
-    GuildRank, InfrastructureType, LayerState, LayerTier, MercArchetype, MercStatus, Mercenary,
-    MissionType, TheDeepState,
+    DeepAccountState, DeepRunState, GuildRank, InfrastructureType, LayerState, LayerTier,
+    MercArchetype, MercStatus, Mercenary, MissionType, TheDeepState,
 };
 
 // =========================================================================
@@ -13,15 +13,59 @@ use quest::deep::{
 fn test_the_deep_state_new_defaults() {
     let state = TheDeepState::new();
     assert!(!state.discovered);
-    assert_eq!(state.guild_rank, GuildRank::Freelancers);
-    assert_eq!(state.warband_marks, 0);
-    assert!(state.mercenaries.is_empty());
-    assert!(state.active_missions.is_empty());
-    assert!(state.completed_missions.is_empty());
-    assert!(state.layers.is_empty());
-    assert!(state.recruitment_pool.is_empty());
-    assert!(state.recruitment_refresh_date.is_none());
-    assert_eq!(state.total_marks_earned, 0);
+    // Account-level defaults
+    assert_eq!(state.account.guild_rank, GuildRank::Freelancers);
+    assert!(state.account.layers.is_empty());
+    assert_eq!(state.account.total_marks_earned, 0);
+    // Run-level defaults
+    assert_eq!(state.run.warband_marks, 0);
+    assert!(state.run.mercenaries.is_empty());
+    assert!(state.run.active_missions.is_empty());
+    assert!(state.run.completed_missions.is_empty());
+    assert!(state.run.recruitment_pool.is_empty());
+    assert!(state.run.recruitment_refresh_date.is_none());
+}
+
+#[test]
+fn test_deep_account_state_new_defaults() {
+    let account = DeepAccountState::new();
+    assert_eq!(account.guild_rank, GuildRank::Freelancers);
+    assert!(account.layers.is_empty());
+    assert_eq!(account.total_marks_earned, 0);
+}
+
+#[test]
+fn test_deep_run_state_new_defaults() {
+    let run = DeepRunState::new();
+    assert_eq!(run.warband_marks, 0);
+    assert!(run.mercenaries.is_empty());
+    assert!(run.active_missions.is_empty());
+    assert!(run.completed_missions.is_empty());
+    assert!(run.recruitment_pool.is_empty());
+    assert!(run.recruitment_refresh_date.is_none());
+}
+
+// =========================================================================
+// Prestige boundary: run state can be reset independently
+// =========================================================================
+
+#[test]
+fn test_prestige_resets_run_state_without_touching_account() {
+    let mut state = TheDeepState::new();
+    state.account.guild_rank = GuildRank::Company;
+    state.account.total_marks_earned = 5_000;
+    state.run.warband_marks = 1_200;
+    state.run.recruitment_refresh_date = Some("2026-02-22".to_string());
+
+    // Simulate prestige: replace run with a fresh default
+    state.run = DeepRunState::new();
+
+    // Account data untouched
+    assert_eq!(state.account.guild_rank, GuildRank::Company);
+    assert_eq!(state.account.total_marks_earned, 5_000);
+    // Run data wiped
+    assert_eq!(state.run.warband_marks, 0);
+    assert!(state.run.recruitment_refresh_date.is_none());
 }
 
 // =========================================================================
@@ -48,7 +92,6 @@ fn test_guild_rank_mission_slots() {
 
 #[test]
 fn test_guild_rank_upgrade_cost() {
-    // Freelancers needs marks to upgrade to Sellswords
     assert!(GuildRank::Freelancers.upgrade_cost().is_some());
     assert!(GuildRank::Sellswords.upgrade_cost().is_some());
     assert!(GuildRank::Company.upgrade_cost().is_some());
@@ -59,9 +102,7 @@ fn test_guild_rank_upgrade_cost() {
 
 #[test]
 fn test_guild_rank_required_layer() {
-    // Freelancers has no layer requirement (starting rank)
     assert!(GuildRank::Freelancers.required_layer().is_none());
-    // Others require breakthrough on specific layers
     assert_eq!(GuildRank::Sellswords.required_layer(), Some(3));
     assert_eq!(GuildRank::Company.required_layer(), Some(7));
     assert_eq!(GuildRank::Battalion.required_layer(), Some(13));
@@ -79,8 +120,7 @@ fn test_guild_rank_next() {
 
 #[test]
 fn test_guild_rank_default_is_freelancers() {
-    let rank = GuildRank::default();
-    assert_eq!(rank, GuildRank::Freelancers);
+    assert_eq!(GuildRank::default(), GuildRank::Freelancers);
 }
 
 // =========================================================================
@@ -89,7 +129,6 @@ fn test_guild_rank_default_is_freelancers() {
 
 #[test]
 fn test_infrastructure_cost_values() {
-    // All infrastructure types should have a positive cost
     assert!(InfrastructureType::Outpost.cost() > 0);
     assert!(InfrastructureType::SupplyCache.cost() > 0);
     assert!(InfrastructureType::Watchtower.cost() > 0);
@@ -161,19 +200,22 @@ fn test_the_deep_state_serde_roundtrip_default() {
     let json = serde_json::to_string(&state).expect("serialization failed");
     let loaded: TheDeepState = serde_json::from_str(&json).expect("deserialization failed");
     assert_eq!(loaded.discovered, state.discovered);
-    assert_eq!(loaded.guild_rank, state.guild_rank);
-    assert_eq!(loaded.warband_marks, state.warband_marks);
-    assert_eq!(loaded.total_marks_earned, state.total_marks_earned);
+    assert_eq!(loaded.account.guild_rank, state.account.guild_rank);
+    assert_eq!(
+        loaded.account.total_marks_earned,
+        state.account.total_marks_earned
+    );
+    assert_eq!(loaded.run.warband_marks, state.run.warband_marks);
 }
 
 #[test]
 fn test_the_deep_state_serde_roundtrip_with_data() {
     let mut state = TheDeepState::new();
     state.discovered = true;
-    state.warband_marks = 500;
-    state.total_marks_earned = 1000;
-    state.guild_rank = GuildRank::Company;
-    state.recruitment_refresh_date = Some("2026-02-22".to_string());
+    state.account.guild_rank = GuildRank::Company;
+    state.account.total_marks_earned = 1000;
+    state.run.warband_marks = 500;
+    state.run.recruitment_refresh_date = Some("2026-02-22".to_string());
 
     let merc = Mercenary {
         id: 1,
@@ -185,7 +227,7 @@ fn test_the_deep_state_serde_roundtrip_with_data() {
         status: MercStatus::Ready,
         missions_completed: 5,
     };
-    state.mercenaries.push(merc);
+    state.run.mercenaries.push(merc);
 
     let layer = LayerState {
         layer_number: 1,
@@ -193,26 +235,29 @@ fn test_the_deep_state_serde_roundtrip_with_data() {
         cleared: true,
         infrastructure: vec![InfrastructureType::Outpost],
     };
-    state.layers.push(layer);
+    state.account.layers.push(layer);
 
     let json = serde_json::to_string(&state).expect("serialization failed");
     let loaded: TheDeepState = serde_json::from_str(&json).expect("deserialization failed");
 
     assert!(loaded.discovered);
-    assert_eq!(loaded.warband_marks, 500);
-    assert_eq!(loaded.total_marks_earned, 1000);
-    assert_eq!(loaded.guild_rank, GuildRank::Company);
+    assert_eq!(loaded.account.guild_rank, GuildRank::Company);
+    assert_eq!(loaded.account.total_marks_earned, 1000);
+    assert_eq!(loaded.account.layers.len(), 1);
+    assert_eq!(loaded.account.layers[0].layer_number, 1);
+    assert!(loaded.account.layers[0].cleared);
+    assert_eq!(loaded.run.warband_marks, 500);
     assert_eq!(
-        loaded.recruitment_refresh_date,
+        loaded.run.recruitment_refresh_date,
         Some("2026-02-22".to_string())
     );
-    assert_eq!(loaded.mercenaries.len(), 1);
-    assert_eq!(loaded.mercenaries[0].name, "Aldric the Bold");
-    assert_eq!(loaded.mercenaries[0].archetype, MercArchetype::Vanguard);
-    assert_eq!(loaded.mercenaries[0].level, 3);
-    assert_eq!(loaded.layers.len(), 1);
-    assert_eq!(loaded.layers[0].layer_number, 1);
-    assert!(loaded.layers[0].cleared);
+    assert_eq!(loaded.run.mercenaries.len(), 1);
+    assert_eq!(loaded.run.mercenaries[0].name, "Aldric the Bold");
+    assert_eq!(
+        loaded.run.mercenaries[0].archetype,
+        MercArchetype::Vanguard
+    );
+    assert_eq!(loaded.run.mercenaries[0].level, 3);
 }
 
 // =========================================================================
@@ -255,7 +300,7 @@ fn test_layer_state_infrastructure_empty_by_default_construction() {
 }
 
 // =========================================================================
-// MissionType variants exist and are serializable
+// MissionType variants — serializable and comparable
 // =========================================================================
 
 #[test]
@@ -289,7 +334,7 @@ fn test_layer_tier_display() {
 }
 
 // =========================================================================
-// MercStatus variants serializable
+// MercStatus variants — serializable
 // =========================================================================
 
 #[test]
@@ -305,4 +350,30 @@ fn test_merc_status_serde_roundtrip() {
         let loaded: MercStatus = serde_json::from_str(&json).expect("deserialize failed");
         assert_eq!(loaded, status);
     }
+}
+
+// =========================================================================
+// Time handling — start_time is a plain i64, no chrono types in the struct
+// =========================================================================
+
+#[test]
+fn test_active_mission_start_time_is_raw_i64() {
+    use quest::deep::ActiveMission;
+    // Caller injects the timestamp — no Utc::now() in the deep module
+    let mission = ActiveMission {
+        id: 1,
+        mission_type: MissionType::Expedition,
+        layer: 5,
+        squad: vec![1, 2, 3],
+        start_time: 1_740_000_000_i64, // deterministic for tests
+        duration_secs: 8 * 3600,
+        cost: 100,
+        events: vec![],
+        events_resolved: 0,
+    };
+    assert_eq!(mission.start_time, 1_740_000_000_i64);
+    assert_eq!(mission.duration_secs, 28_800);
+    // End time is computable without any chrono import in the deep module
+    let end_time = mission.start_time + mission.duration_secs as i64;
+    assert_eq!(end_time, 1_740_028_800_i64);
 }
