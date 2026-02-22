@@ -8,6 +8,9 @@
 //! - Persists across prestiges: guild_rank, layers (cleared, infrastructure, familiarity)
 //! - Resets on prestige: mercenaries, active_missions, warband_marks
 
+pub mod layers;
+pub mod mercenaries;
+pub mod missions;
 pub mod types;
 
 pub use types::*;

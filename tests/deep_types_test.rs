@@ -1,8 +1,41 @@
 //! Integration tests for The Deep module — Phase 1 Foundation Types.
 
 use quest::deep::{
-    DeepAccountState, DeepRunState, GuildRank, InfrastructureType, LayerState, LayerTier,
-    MercArchetype, MercStatus, Mercenary, MissionType, TheDeepState,
+    // balance constants
+    DeepAccountState,
+    DeepRunState,
+    GuildRank,
+    InfrastructureType,
+    LayerState,
+    LayerTier,
+    MercArchetype,
+    MercStatus,
+    Mercenary,
+    MissionType,
+    TheDeepState,
+    BREAKTHROUGH_COST_MAX,
+    BREAKTHROUGH_COST_MIN,
+    BREAKTHROUGH_REWARD_HOLLOWS_PLUS,
+    BREAKTHROUGH_REWARD_SHALLOWS,
+    BREAKTHROUGH_REWARD_WARRENS,
+    FREE_STARTER_MERCS,
+    INFRA_COST_BRIDGE,
+    INFRA_COST_OUTPOST,
+    INFRA_COST_SUPPLY_CACHE,
+    INFRA_COST_WATCHTOWER,
+    OUTPOST_INCOME_HOLLOWS_PLUS,
+    OUTPOST_INCOME_SHALLOWS,
+    OUTPOST_INCOME_WARRENS,
+    RECRUIT_COST_BASIC_MAX,
+    RECRUIT_COST_BASIC_MIN,
+    RECRUIT_COST_PREMIUM_MAX,
+    RECRUIT_COST_PREMIUM_MIN,
+    RECRUIT_COST_SPECIFIC_MAX,
+    RECRUIT_COST_SPECIFIC_MIN,
+    SUPPLY_RUN_COST_MAX,
+    SUPPLY_RUN_COST_MIN,
+    SUPPLY_RUN_REWARD_MAX,
+    SUPPLY_RUN_REWARD_MIN,
 };
 
 // =========================================================================
@@ -226,6 +259,7 @@ fn test_the_deep_state_serde_roundtrip_with_data() {
         resilience: 60,
         status: MercStatus::Ready,
         missions_completed: 5,
+        injury_cooldown: 0,
     };
     state.run.mercenaries.push(merc);
 
@@ -376,4 +410,179 @@ fn test_active_mission_start_time_is_raw_i64() {
     // End time is computable without any chrono import in the deep module
     let end_time = mission.start_time + mission.duration_secs as i64;
     assert_eq!(end_time, 1_740_028_800_i64);
+}
+
+// =========================================================================
+// Balance constants — Supply Run
+// =========================================================================
+
+#[test]
+fn test_supply_run_reward_range_is_correct() {
+    assert_eq!(SUPPLY_RUN_REWARD_MIN, 35);
+    assert_eq!(SUPPLY_RUN_REWARD_MAX, 55);
+    assert!(SUPPLY_RUN_REWARD_MIN < SUPPLY_RUN_REWARD_MAX);
+}
+
+#[test]
+fn test_supply_run_cost_range_is_correct() {
+    assert_eq!(SUPPLY_RUN_COST_MIN, 20);
+    assert_eq!(SUPPLY_RUN_COST_MAX, 30);
+    assert!(SUPPLY_RUN_COST_MIN < SUPPLY_RUN_COST_MAX);
+}
+
+#[test]
+fn test_supply_run_avg_profit_is_positive() {
+    // Design target: ~22M avg profit per run.
+    // Min profit = REWARD_MIN - COST_MAX = 35 - 30 = 5
+    // Max profit = REWARD_MAX - COST_MIN = 55 - 20 = 35
+    // Avg profit ≈ (5 + 35) / 2 = 20 — close to the target of ~22.
+    let min_profit = SUPPLY_RUN_REWARD_MIN.saturating_sub(SUPPLY_RUN_COST_MAX);
+    let max_profit = SUPPLY_RUN_REWARD_MAX.saturating_sub(SUPPLY_RUN_COST_MIN);
+    assert!(min_profit > 0, "supply runs should always yield net profit");
+    assert!(max_profit > min_profit);
+}
+
+// =========================================================================
+// Balance constants — Breakthrough
+// =========================================================================
+
+#[test]
+fn test_breakthrough_cost_range_is_correct() {
+    assert_eq!(BREAKTHROUGH_COST_MIN, 80);
+    assert_eq!(BREAKTHROUGH_COST_MAX, 150);
+    assert!(BREAKTHROUGH_COST_MIN < BREAKTHROUGH_COST_MAX);
+}
+
+#[test]
+fn test_breakthrough_rewards_scale_with_depth() {
+    // Each deeper tier should reward more than the previous.
+    assert!(BREAKTHROUGH_REWARD_WARRENS > BREAKTHROUGH_REWARD_SHALLOWS);
+    assert!(BREAKTHROUGH_REWARD_HOLLOWS_PLUS > BREAKTHROUGH_REWARD_WARRENS);
+    assert_eq!(BREAKTHROUGH_REWARD_SHALLOWS, 200);
+    assert_eq!(BREAKTHROUGH_REWARD_WARRENS, 250);
+    assert_eq!(BREAKTHROUGH_REWARD_HOLLOWS_PLUS, 350);
+}
+
+#[test]
+fn test_breakthrough_reward_exceeds_max_cost_at_every_tier() {
+    // Even the cheapest breakthrough should be profitable.
+    assert!(BREAKTHROUGH_REWARD_SHALLOWS > BREAKTHROUGH_COST_MAX);
+    assert!(BREAKTHROUGH_REWARD_WARRENS > BREAKTHROUGH_COST_MAX);
+    assert!(BREAKTHROUGH_REWARD_HOLLOWS_PLUS > BREAKTHROUGH_COST_MAX);
+}
+
+// =========================================================================
+// Balance constants — Recruitment costs
+// =========================================================================
+
+#[test]
+fn test_recruit_cost_ranges_are_correct() {
+    assert_eq!(RECRUIT_COST_BASIC_MIN, 30);
+    assert_eq!(RECRUIT_COST_BASIC_MAX, 50);
+    assert_eq!(RECRUIT_COST_SPECIFIC_MIN, 60);
+    assert_eq!(RECRUIT_COST_SPECIFIC_MAX, 100);
+    assert_eq!(RECRUIT_COST_PREMIUM_MIN, 100);
+    assert_eq!(RECRUIT_COST_PREMIUM_MAX, 150);
+}
+
+#[test]
+fn test_recruit_cost_tiers_are_ordered() {
+    // Basic < Specific <= Premium (specific max == premium min by design)
+    assert!(RECRUIT_COST_BASIC_MAX < RECRUIT_COST_SPECIFIC_MIN);
+    assert!(RECRUIT_COST_SPECIFIC_MIN < RECRUIT_COST_PREMIUM_MIN);
+    assert!(RECRUIT_COST_PREMIUM_MIN <= RECRUIT_COST_PREMIUM_MAX);
+}
+
+// =========================================================================
+// Balance constants — Infrastructure costs
+// =========================================================================
+
+#[test]
+fn test_infrastructure_costs_match_constants() {
+    assert_eq!(InfrastructureType::Outpost.cost(), INFRA_COST_OUTPOST);
+    assert_eq!(InfrastructureType::SupplyCache.cost(), INFRA_COST_SUPPLY_CACHE);
+    assert_eq!(InfrastructureType::Watchtower.cost(), INFRA_COST_WATCHTOWER);
+    assert_eq!(InfrastructureType::Bridge.cost(), INFRA_COST_BRIDGE);
+}
+
+#[test]
+fn test_infrastructure_cost_exact_values() {
+    assert_eq!(InfrastructureType::Outpost.cost(), 100);
+    assert_eq!(InfrastructureType::SupplyCache.cost(), 100);
+    assert_eq!(InfrastructureType::Watchtower.cost(), 150);
+    assert_eq!(InfrastructureType::Bridge.cost(), 200);
+}
+
+// =========================================================================
+// Balance constants — Outpost passive income by layer
+// =========================================================================
+
+#[test]
+fn test_outpost_income_scales_by_layer_tier() {
+    // Shallows (L1-3): 15/day
+    assert_eq!(InfrastructureType::outpost_daily_income(1), OUTPOST_INCOME_SHALLOWS);
+    assert_eq!(InfrastructureType::outpost_daily_income(2), OUTPOST_INCOME_SHALLOWS);
+    assert_eq!(InfrastructureType::outpost_daily_income(3), OUTPOST_INCOME_SHALLOWS);
+    // Warrens (L4-7): 20/day
+    assert_eq!(InfrastructureType::outpost_daily_income(4), OUTPOST_INCOME_WARRENS);
+    assert_eq!(InfrastructureType::outpost_daily_income(7), OUTPOST_INCOME_WARRENS);
+    // Hollows+ (L8+): 25/day
+    assert_eq!(InfrastructureType::outpost_daily_income(8), OUTPOST_INCOME_HOLLOWS_PLUS);
+    assert_eq!(InfrastructureType::outpost_daily_income(13), OUTPOST_INCOME_HOLLOWS_PLUS);
+    assert_eq!(InfrastructureType::outpost_daily_income(26), OUTPOST_INCOME_HOLLOWS_PLUS);
+}
+
+#[test]
+fn test_outpost_income_exact_values() {
+    assert_eq!(OUTPOST_INCOME_SHALLOWS, 15);
+    assert_eq!(OUTPOST_INCOME_WARRENS, 20);
+    assert_eq!(OUTPOST_INCOME_HOLLOWS_PLUS, 25);
+}
+
+#[test]
+fn test_outpost_income_increases_with_depth() {
+    assert!(OUTPOST_INCOME_WARRENS > OUTPOST_INCOME_SHALLOWS);
+    assert!(OUTPOST_INCOME_HOLLOWS_PLUS > OUTPOST_INCOME_WARRENS);
+}
+
+// =========================================================================
+// Balance constants — Prestige recovery (free starter mercs)
+// =========================================================================
+
+#[test]
+fn test_free_starter_mercs_constant_is_five() {
+    assert_eq!(FREE_STARTER_MERCS, 5);
+}
+
+#[test]
+fn test_free_starter_mercs_all_ranks() {
+    // Rank 1: cap 5, gets min(5, 5) = 5 free (full roster)
+    assert_eq!(GuildRank::Freelancers.free_starter_mercs(), 5);
+    // Rank 2: cap 7, gets min(5, 7) = 5 free (recruits 2)
+    assert_eq!(GuildRank::Sellswords.free_starter_mercs(), 5);
+    // Rank 3: cap 9, gets min(5, 9) = 5 free (recruits 4)
+    assert_eq!(GuildRank::Company.free_starter_mercs(), 5);
+    // Rank 4: cap 12, gets min(5, 12) = 5 free (recruits 7)
+    assert_eq!(GuildRank::Battalion.free_starter_mercs(), 5);
+    // Rank 5: cap 15, gets min(5, 15) = 5 free (recruits 10)
+    assert_eq!(GuildRank::Legion.free_starter_mercs(), 5);
+}
+
+#[test]
+fn test_free_starter_mercs_never_exceeds_roster_cap() {
+    for rank in [
+        GuildRank::Freelancers,
+        GuildRank::Sellswords,
+        GuildRank::Company,
+        GuildRank::Battalion,
+        GuildRank::Legion,
+    ] {
+        assert!(
+            rank.free_starter_mercs() <= rank.roster_cap(),
+            "{:?}: free_starter_mercs ({}) must not exceed roster_cap ({})",
+            rank,
+            rank.free_starter_mercs(),
+            rank.roster_cap()
+        );
+    }
 }

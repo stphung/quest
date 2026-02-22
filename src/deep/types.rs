@@ -25,6 +25,69 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 // =========================================================================
+// Balance constants
+// =========================================================================
+
+// -- Supply Run rewards & costs --
+/// Minimum Warband Marks reward from a successful Supply Run.
+pub const SUPPLY_RUN_REWARD_MIN: u32 = 35;
+/// Maximum Warband Marks reward from a successful Supply Run.
+pub const SUPPLY_RUN_REWARD_MAX: u32 = 55;
+/// Minimum Warband Marks cost to launch a Supply Run.
+pub const SUPPLY_RUN_COST_MIN: u32 = 20;
+/// Maximum Warband Marks cost to launch a Supply Run.
+pub const SUPPLY_RUN_COST_MAX: u32 = 30;
+
+// -- Breakthrough rewards & costs --
+/// Minimum cost to launch a Breakthrough mission (scales up with layer).
+pub const BREAKTHROUGH_COST_MIN: u32 = 80;
+/// Maximum cost to launch a Breakthrough mission (scales up with layer).
+pub const BREAKTHROUGH_COST_MAX: u32 = 150;
+/// Marks reward for a Breakthrough on Layer 1-3 (The Shallows).
+pub const BREAKTHROUGH_REWARD_SHALLOWS: u32 = 200;
+/// Marks reward for a Breakthrough on Layer 4-7 (The Warrens).
+pub const BREAKTHROUGH_REWARD_WARRENS: u32 = 250;
+/// Marks reward for a Breakthrough on Layer 8+ (The Hollows and beyond).
+pub const BREAKTHROUGH_REWARD_HOLLOWS_PLUS: u32 = 350;
+
+// -- Merc recruitment costs --
+/// Cost to recruit a random-archetype mercenary.
+pub const RECRUIT_COST_BASIC_MIN: u32 = 30;
+/// Cost to recruit a random-archetype mercenary (upper bound).
+pub const RECRUIT_COST_BASIC_MAX: u32 = 50;
+/// Cost to recruit a mercenary of a specific archetype.
+pub const RECRUIT_COST_SPECIFIC_MIN: u32 = 60;
+/// Cost to recruit a mercenary of a specific archetype (upper bound).
+pub const RECRUIT_COST_SPECIFIC_MAX: u32 = 100;
+/// Cost to recruit a premium (high-stat) mercenary.
+pub const RECRUIT_COST_PREMIUM_MIN: u32 = 100;
+/// Cost to recruit a premium (high-stat) mercenary (upper bound).
+pub const RECRUIT_COST_PREMIUM_MAX: u32 = 150;
+
+// -- Infrastructure costs (Warband Marks, via construction mission) --
+/// Construction cost for an Outpost on a cleared layer.
+pub const INFRA_COST_OUTPOST: u32 = 100;
+/// Construction cost for a Supply Cache on a cleared layer.
+pub const INFRA_COST_SUPPLY_CACHE: u32 = 100;
+/// Construction cost for a Watchtower on a cleared layer.
+pub const INFRA_COST_WATCHTOWER: u32 = 150;
+/// Construction cost for a Bridge on a cleared layer.
+pub const INFRA_COST_BRIDGE: u32 = 200;
+
+// -- Outpost passive income (Marks/day, scales by layer tier) --
+/// Daily passive income from an Outpost on Layers 1-3 (The Shallows).
+pub const OUTPOST_INCOME_SHALLOWS: u32 = 15;
+/// Daily passive income from an Outpost on Layers 4-7 (The Warrens).
+pub const OUTPOST_INCOME_WARRENS: u32 = 20;
+/// Daily passive income from an Outpost on Layer 8+ (The Hollows and beyond).
+pub const OUTPOST_INCOME_HOLLOWS_PLUS: u32 = 25;
+
+// -- Prestige recovery --
+/// Free starter mercs on each new prestige run = min(this, guild_rank.roster_cap()).
+/// Rank 1 (cap 5) → 5 free; Rank 2 (cap 7) → 5 free + recruit 2; etc.
+pub const FREE_STARTER_MERCS: usize = 5;
+
+// =========================================================================
 // Top-level state
 // =========================================================================
 
@@ -159,6 +222,10 @@ pub struct Mercenary {
     pub status: MercStatus,
     /// Number of missions this merc has completed in this prestige cycle.
     pub missions_completed: u32,
+    /// Missions remaining before an injured merc returns to duty.
+    /// 0 when not injured. Set by `injure_mercenary`, decremented by `recover_mercenaries`.
+    #[serde(default)]
+    pub injury_cooldown: u8,
 }
 
 /// Determines a mercenary's stat distribution, role, and event unlock options.
@@ -397,6 +464,14 @@ impl GuildRank {
             GuildRank::Legion => None,
         }
     }
+
+    /// Number of free starter mercenaries provided at the beginning of each prestige run.
+    ///
+    /// Always `min(FREE_STARTER_MERCS, self.roster_cap())`. Rank 1 (cap 5) gets all
+    /// 5 free. Rank 2+ (cap 7+) still gets 5 free and must recruit the rest.
+    pub fn free_starter_mercs(&self) -> usize {
+        FREE_STARTER_MERCS.min(self.roster_cap())
+    }
 }
 
 // =========================================================================
@@ -422,10 +497,24 @@ impl InfrastructureType {
     /// Warband Marks cost to build this infrastructure via a construction mission.
     pub fn cost(&self) -> u32 {
         match self {
-            InfrastructureType::Outpost => 300,
-            InfrastructureType::SupplyCache => 250,
-            InfrastructureType::Watchtower => 200,
-            InfrastructureType::Bridge => 500,
+            InfrastructureType::Outpost => INFRA_COST_OUTPOST,
+            InfrastructureType::SupplyCache => INFRA_COST_SUPPLY_CACHE,
+            InfrastructureType::Watchtower => INFRA_COST_WATCHTOWER,
+            InfrastructureType::Bridge => INFRA_COST_BRIDGE,
+        }
+    }
+
+    /// Daily Warband Marks income generated by an Outpost on the given layer number.
+    ///
+    /// Income scales by layer tier per the balance design. This is a free function
+    /// on `InfrastructureType` because only Outposts generate passive income; callers
+    /// should gate on `self == InfrastructureType::Outpost` before calling.
+    pub fn outpost_daily_income(layer: u8) -> u32 {
+        match LayerTier::from_layer(layer) {
+            LayerTier::Shallows => OUTPOST_INCOME_SHALLOWS,
+            LayerTier::Warrens => OUTPOST_INCOME_WARRENS,
+            // Hollows and every deeper tier yield the highest rate
+            _ => OUTPOST_INCOME_HOLLOWS_PLUS,
         }
     }
 
