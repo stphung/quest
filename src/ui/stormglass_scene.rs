@@ -1441,7 +1441,7 @@ fn render_sigil_reroll_confirm(
 /// Render the sigil rolling animation (4 phases over 4 seconds).
 fn render_sigil_rolling(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiState) {
     let overlay_width = 52u16.min(area.width.saturating_sub(4));
-    let overlay_height = 16u16.min(area.height.saturating_sub(2));
+    let overlay_height = 14u16.min(area.height.saturating_sub(2));
     let x = area.x + (area.width.saturating_sub(overlay_width)) / 2;
     let y = area.y + (area.height.saturating_sub(overlay_height)) / 2;
     let overlay_area = Rect::new(x, y, overlay_width, overlay_height);
