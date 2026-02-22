@@ -85,9 +85,22 @@ fn draw_header(
     let rank = get_adventurer_rank(game_state.character_level);
     let play_time = format_play_time(game_state.play_time_seconds);
 
+    let title_suffix = achievements
+        .selected_title
+        .and_then(|id| {
+            if achievements.is_unlocked(id) {
+                crate::achievements::titles::get_title_text(id)
+            } else {
+                None
+            }
+        });
+    let name_with_title = match title_suffix {
+        Some(title) => format!("{}, {}", game_state.character_name, title),
+        None => game_state.character_name.clone(),
+    };
     let header_title = match highest_level_badge(achievements) {
-        Some(icon) => format!(" {} {} ", game_state.character_name, icon),
-        None => format!(" {} ", game_state.character_name),
+        Some(icon) => format!(" {} {} ", name_with_title, icon),
+        None => format!(" {} ", name_with_title),
     };
     let header_block = Block::default().borders(Borders::ALL).title(header_title);
     let inner = header_block.inner(area);
@@ -383,6 +396,7 @@ pub(super) fn draw_compact_stats_bar(
     area: Rect,
     game_state: &GameState,
     _ctx: &LayoutContext,
+    achievements: &crate::achievements::Achievements,
 ) {
     use crate::zones::get_all_zones;
 
@@ -403,9 +417,21 @@ pub(super) fn draw_compact_stats_bar(
         .map(|z| z.subzones.len())
         .unwrap_or(0);
 
+    let compact_name = match achievements
+        .selected_title
+        .and_then(|id| {
+            if achievements.is_unlocked(id) {
+                crate::achievements::titles::get_title_text(id)
+            } else {
+                None
+            }
+        }) {
+        Some(title) => format!(" {}, {} ", game_state.character_name, title),
+        None => format!(" {} ", game_state.character_name),
+    };
     let spans = vec![
         Span::styled(
-            format!(" {} ", game_state.character_name),
+            compact_name,
             Style::default()
                 .fg(Color::White)
                 .add_modifier(Modifier::BOLD),

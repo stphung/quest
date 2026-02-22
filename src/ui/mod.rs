@@ -45,6 +45,7 @@ mod stats_sigils;
 pub mod stormglass_scene;
 pub(crate) mod throbber;
 pub mod ticker;
+pub mod title_browser_scene;
 mod zone_bg;
 
 use crate::challenges::ActiveMinigame;
@@ -305,7 +306,7 @@ fn draw_m_layout(
     let mut idx = 0;
 
     // Compact stats bar
-    stats_panel::draw_compact_stats_bar(frame, chunks[idx], game_state, ctx);
+    stats_panel::draw_compact_stats_bar(frame, chunks[idx], game_state, ctx, achievements);
     idx += 1;
 
     // Optional attributes line
@@ -372,7 +373,7 @@ fn draw_s_layout(
             ])
             .split(area);
 
-        stats_panel::draw_compact_stats_bar(frame, chunks[0], game_state, ctx);
+        stats_panel::draw_compact_stats_bar(frame, chunks[0], game_state, ctx, achievements);
         draw_right_content(frame, chunks[1], game_state, achievements, ctx);
         stats_panel::draw_footer_minimal(frame, chunks[2], game_state);
         return;
@@ -393,7 +394,7 @@ fn draw_s_layout(
         .split(area);
 
     // Status line
-    stats_panel::draw_compact_stats_bar(frame, chunks[0], game_state, ctx);
+    stats_panel::draw_compact_stats_bar(frame, chunks[0], game_state, ctx, achievements);
 
     // XP bar
     stats_panel::draw_xp_bar_compact(frame, chunks[1], game_state);
