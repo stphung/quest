@@ -5,6 +5,7 @@ use std::time::Instant;
 
 use crate::character::manager::CharacterManager;
 use crate::core::game_state::GameState;
+use crate::history::HistoryRepo;
 use crate::input::InputResult;
 
 use super::persistence::save_all;
@@ -34,6 +35,7 @@ pub fn route_game_input(
     update_expanded: &mut bool,
     last_save_instant: &mut Option<Instant>,
     last_save_time: &mut Option<chrono::DateTime<Local>>,
+    history_repo: Option<&HistoryRepo>,
 ) -> InputAction {
     match result {
         InputResult::Continue => InputAction::Continue,
@@ -45,6 +47,8 @@ pub fn route_game_input(
                     global_achievements,
                     haven,
                     enhancement,
+                    None,
+                    history_repo,
                 );
             }
             InputAction::QuitToSelect
@@ -57,6 +61,8 @@ pub fn route_game_input(
                     global_achievements,
                     haven,
                     enhancement,
+                    None,
+                    history_repo,
                 );
                 *last_save_instant = Some(Instant::now());
                 *last_save_time = Some(Local::now());
