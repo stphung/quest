@@ -9,6 +9,7 @@ mod fishing;
 #[allow(dead_code)]
 mod god_items;
 mod haven;
+mod history;
 mod input;
 mod items;
 mod main_helpers;
@@ -126,6 +127,49 @@ fn tally_chrono_surge_events(surge: &mut ChronoSurgeState, events: &[core::tick:
     }
 }
 
+/// Extract a meaningful save event from tick events for git history commits.
+///
+/// Only milestone events trigger git commits — routine combat/XP events do not.
+/// Returns the first matching event found.
+fn extract_save_event(
+    events: &[core::tick::TickEvent],
+    state: &GameState,
+) -> Option<history::SaveEvent> {
+    use core::tick::TickEvent;
+    use history::SaveEvent;
+    use zones::BossDefeatResult;
+
+    for event in events {
+        match event {
+            TickEvent::LeveledUp { new_level } if new_level % 10 == 0 => {
+                return Some(SaveEvent::LevelUp(*new_level));
+            }
+            TickEvent::SubzoneBossDefeated { result, .. } => match result {
+                BossDefeatResult::ZoneComplete { old_zone, .. } => {
+                    return Some(SaveEvent::ZoneBossDefeated(old_zone.clone()));
+                }
+                BossDefeatResult::StormsEnd => {
+                    return Some(SaveEvent::ZoneBossDefeated(
+                        "Storm Citadel".to_string(),
+                    ));
+                }
+                _ => {}
+            },
+            TickEvent::DungeonCompleted { .. } => {
+                return Some(SaveEvent::DungeonCompleted("dungeon".to_string()));
+            }
+            TickEvent::FishingRankUp { .. } => {
+                return Some(SaveEvent::FishingRankUp(state.fishing.rank));
+            }
+            TickEvent::StormLeviathanCaught => {
+                return Some(SaveEvent::StormLeviathanCaught);
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
 fn main() -> io::Result<()> {
     // Handle CLI arguments
     let args: Vec<String> = std::env::args().collect();
@@ -172,6 +216,16 @@ fn main() -> io::Result<()> {
 
     // Initialize CharacterManager
     let character_manager = CharacterManager::new()?;
+
+    // Initialize git-based save history (non-fatal — game works without it)
+    let history_repo = if !debug_mode {
+        let quest_dir = dirs::home_dir()
+            .map(|d| d.join(".quest"))
+            .unwrap_or_default();
+        history::HistoryRepo::init(&quest_dir).ok()
+    } else {
+        None
+    };
 
     // Load account-level Haven state
     let mut haven = haven::load_haven();
@@ -519,6 +573,8 @@ fn main() -> io::Result<()> {
                                             &global_achievements,
                                             &haven,
                                             &enhancement,
+                                            None,
+                                            history_repo.as_ref(),
                                         );
                                         last_save_instant = Some(Instant::now());
                                         last_save_time = Some(Local::now());
@@ -576,6 +632,7 @@ fn main() -> io::Result<()> {
                                 &mut update_expanded,
                                 &mut last_save_instant,
                                 &mut last_save_time,
+                                history_repo.as_ref(),
                             ) {
                                 InputAction::QuitToSelect => {
                                     game_state = None;
@@ -654,6 +711,8 @@ fn main() -> io::Result<()> {
                                     &global_achievements,
                                     &haven,
                                     &enhancement,
+                                    None,
+                                    history_repo.as_ref(),
                                 );
                                 last_save_instant = Some(Instant::now());
                                 last_save_time = Some(Local::now());
@@ -712,6 +771,8 @@ fn main() -> io::Result<()> {
                                 &global_achievements,
                                 &haven,
                                 &enhancement,
+                                None,
+                                history_repo.as_ref(),
                             );
                         }
 
@@ -734,6 +795,8 @@ fn main() -> io::Result<()> {
                                     &global_achievements,
                                     &haven,
                                     &enhancement,
+                                    None,
+                                    history_repo.as_ref(),
                                 );
                                 last_save_instant = Some(Instant::now());
                                 last_save_time = Some(Local::now());
@@ -774,11 +837,15 @@ fn main() -> io::Result<()> {
                                 .visual_effects
                                 .retain_mut(|effect| effect.update(delta_time));
 
+                            // Extract milestone save event for git history
+                            let save_event = extract_save_event(&tick_result.events, &state);
+
                             // Persist all state if anything changed
                             if (tick_result.achievements_changed
                                 || tick_result.haven_changed
                                 || tick_result.enhancement_changed
-                                || tick_result.god_items_changed)
+                                || tick_result.god_items_changed
+                                || save_event.is_some())
                                 && !debug_mode
                             {
                                 save_all(
@@ -787,6 +854,8 @@ fn main() -> io::Result<()> {
                                     &global_achievements,
                                     &haven,
                                     &enhancement,
+                                    save_event.as_ref(),
+                                    history_repo.as_ref(),
                                 );
                             }
 
@@ -902,6 +971,8 @@ fn main() -> io::Result<()> {
                                                     &global_achievements,
                                                     &haven,
                                                     &enhancement,
+                                                    None,
+                                                    history_repo.as_ref(),
                                                 );
                                             }
                                         }
@@ -938,6 +1009,8 @@ fn main() -> io::Result<()> {
                                 &global_achievements,
                                 &haven,
                                 &enhancement,
+                                None,
+                                history_repo.as_ref(),
                             );
                             last_save_instant = Some(Instant::now());
                         }
