@@ -204,7 +204,7 @@ pub fn handle_select_frame(
                     KeyCode::Right | KeyCode::Char('.') | KeyCode::Char('>') => {
                         achievement_browser.next_category()
                     }
-                    KeyCode::Esc => {
+                    KeyCode::Esc | KeyCode::Char('a') | KeyCode::Char('A') => {
                         global_achievements.clear_recently_unlocked();
                         achievement_browser.close();
                     }
