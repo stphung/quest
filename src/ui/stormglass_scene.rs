@@ -1593,6 +1593,7 @@ fn render_rolling_phase1(
 }
 
 /// Phase 2: Sigil Etching (1400-2800ms) — sigil values etch character-by-character.
+/// Uses the same icon + value format as the pick screen for seamless transition.
 fn render_rolling_phase2(
     buffer: &mut [Vec<SceneCell>],
     w: usize,
@@ -1619,8 +1620,10 @@ fn render_rolling_phase2(
         }
 
         if let Some(sigil) = choice {
-            let value_str = sigil.effect.format_value(sigil.value);
-            let total_chars = value_str.chars().count();
+            // Match pick screen format: icon + value
+            let icon = sigil.effect.icon();
+            let display_str = format!("{} {}", icon, sigil.effect.format_value(sigil.value));
+            let total_chars = display_str.chars().count();
             let sigil_start = stagger_ms * i as u128;
 
             if phase_elapsed < sigil_start {
@@ -1637,8 +1640,9 @@ fn render_rolling_phase2(
                 ((sigil_elapsed / char_duration) as usize).min(total_chars)
             };
 
-            let partial: String = value_str.chars().take(chars_visible).collect();
-            let col = 5i32;
+            let partial: String = display_str.chars().take(chars_visible).collect();
+            // Match pick screen col: cursor marker (2) + start at col 3
+            let col = 3i32;
             put_text(buffer, row, col, &partial, Color::White);
 
             // Typing cursor at end of partial text
@@ -1668,6 +1672,7 @@ fn render_rolling_phase2(
 }
 
 /// Phase 3: Grade Reveal (2800-3500ms) — full values shown, grades fade in.
+/// Matches pick screen layout: icon + value, grade with modifiers, range info.
 fn render_rolling_phase3(
     buffer: &mut [Vec<SceneCell>],
     w: usize,
@@ -1692,9 +1697,10 @@ fn render_rolling_phase3(
         }
 
         if let Some(sigil) = choice {
-            // Full value string always shown
-            let value_str = sigil.effect.format_value(sigil.value);
-            let col = 5i32;
+            // Match pick screen format: icon + value at col 3
+            let icon = sigil.effect.icon();
+            let value_str = format!("{} {}", icon, sigil.effect.format_value(sigil.value));
+            let col = 3i32;
             put_text(buffer, row, col, &value_str, Color::White);
 
             // Grade fades in with stagger
@@ -1722,14 +1728,36 @@ fn render_rolling_phase3(
                 let faded_rgb = lerp_rgb(base_rgb, target_rgb, fade);
                 let faded_fg = Color::Rgb(faded_rgb.0, faded_rgb.1, faded_rgb.2);
 
-                let grade_col = (w as i32) - grade_str.len() as i32 - 1;
-                put_text(buffer, row, grade_col, grade_str, faded_fg);
+                // Place grade after value, matching pick screen position
+                let grade_col = col + value_str.len() as i32 + 2;
+                for (j, ch) in grade_str.chars().enumerate() {
+                    if (grade_col + j as i32) >= 0 && ((grade_col + j as i32) as usize) < w {
+                        let cell = &mut buffer[row as usize][(grade_col + j as i32) as usize];
+                        cell.ch = ch;
+                        cell.fg = faded_fg;
+                    }
+                }
+            }
+
+            // Right-aligned range info (fade in with grade)
+            let grade_start = stagger_ms * i as u128;
+            if phase_elapsed >= grade_start {
+                let grade_elapsed = phase_elapsed - grade_start;
+                let fade_duration = (phase_duration - stagger_ms * 2).max(1);
+                let fade = (grade_elapsed as f64 / fade_duration as f64).clamp(0.0, 1.0);
+                let (min, max) = sigil.effect.range();
+                let range_str = format!("(range: {:.0}-{:.0}%)", min, max);
+                let range_rgb = lerp_rgb((30, 30, 30), (100, 100, 100), fade);
+                let range_fg = Color::Rgb(range_rgb.0, range_rgb.1, range_rgb.2);
+                let range_col = (w as i32) - range_str.len() as i32 - 1;
+                put_text(buffer, row, range_col, &range_str, range_fg);
             }
         }
     }
 }
 
 /// Phase 4: Transition (3500-4000ms) — everything solidified, cursor on first choice.
+/// Renders identically to the pick screen for a seamless transition.
 fn render_rolling_phase4(
     buffer: &mut [Vec<SceneCell>],
     w: usize,
@@ -1740,7 +1768,16 @@ fn render_rolling_phase4(
         clear_row_chars(buffer, r as i32);
     }
 
-    put_text_centered(buffer, 1, w, "Choose your sigil.", RUNE_PURPLE);
+    // Match pick screen flavor text position and style
+    // (flavor text is rendered via Paragraph overlay in pick screen, but we
+    // use the same row here for visual continuity)
+    put_text_centered(
+        buffer,
+        1,
+        w,
+        "The storm fractures. Three sigils emerge.",
+        RUNE_PURPLE,
+    );
 
     let choice_start_row = 4i32;
 
@@ -1751,23 +1788,43 @@ fn render_rolling_phase4(
         }
 
         if let Some(sigil) = choice {
-            let col = 5i32;
-
-            // Cursor on first choice
+            // Cursor on first choice — match pick screen col 1
+            let mut col = 1i32;
             if i == 0 {
-                put_text(buffer, row, 1, "> ", Color::Yellow);
+                put_text(buffer, row, col, "> ", Color::Yellow);
             }
+            col += 2;
 
-            let value_str = sigil.effect.format_value(sigil.value);
+            // Icon + value — matches pick screen format
+            let icon = sigil.effect.icon();
+            let value_str = format!("{} {}", icon, sigil.effect.format_value(sigil.value));
             put_text(buffer, row, col, &value_str, Color::White);
+            col += value_str.len() as i32 + 2;
 
-            // Grade with final color
+            // Grade with color and bold/dim modifiers — matches pick screen
             let grade_str = sigil.grade.label();
             let grade_fg = sigil_grade_color(sigil.grade);
-            let grade_col = (w as i32) - grade_str.len() as i32 - 1;
-            put_text(buffer, row, grade_col, grade_str, grade_fg);
+            let mut grade_style = Style::default().fg(grade_fg);
+            if sigil.grade.is_plus() {
+                grade_style = grade_style.add_modifier(Modifier::BOLD);
+            } else if sigil.grade.is_minus() {
+                grade_style = grade_style.add_modifier(Modifier::DIM);
+            }
+            for (j, ch) in grade_str.chars().enumerate() {
+                if (col + j as i32) >= 0 && ((col + j as i32) as usize) < w {
+                    let cell = &mut buffer[row as usize][(col + j as i32) as usize];
+                    cell.ch = ch;
+                    cell.fg = grade_style.fg.unwrap_or(Color::White);
+                }
+            }
 
-            // Highlight first row
+            // Right-aligned range info — matches pick screen
+            let (min, max) = sigil.effect.range();
+            let range_str = format!("(range: {:.0}-{:.0}%)", min, max);
+            let range_col = (w as i32) - range_str.len() as i32 - 1;
+            put_text(buffer, row, range_col, &range_str, Color::DarkGray);
+
+            // Highlight first row — matches pick screen
             if i == 0 && (row as usize) < h {
                 let highlight_bg = Color::Rgb(15, 25, 55);
                 for cell in buffer[row as usize].iter_mut() {
