@@ -17,6 +17,7 @@ use crate::haven;
 use crate::input::{HavenUiState, SoulforgeUiState};
 use crate::ui;
 use crate::ui::achievement_browser_scene::AchievementBrowserState;
+use crate::ui::title_browser_scene::TitleBrowserState;
 use crate::ui::character_creation::CharacterCreationScreen;
 use crate::ui::character_delete::CharacterDeleteScreen;
 use crate::ui::character_rename::CharacterRenameScreen;
@@ -114,6 +115,7 @@ pub fn handle_select_frame(
     enhancement: &mut enhancement::EnhancementProgress,
     global_achievements: &mut achievements::Achievements,
     achievement_browser: &mut AchievementBrowserState,
+    title_browser: &mut TitleBrowserState,
     help_overlay_showing: &mut bool,
 ) -> io::Result<ScreenTransition> {
     // Refresh character list
@@ -123,7 +125,7 @@ pub fn handle_select_frame(
     terminal.draw(|f| {
         let area = f.area();
         let ctx = ui::responsive::LayoutContext::from_frame(f);
-        select_screen.draw(f, area, &characters, haven, enhancement, &ctx);
+        select_screen.draw(f, area, &characters, haven, enhancement, global_achievements, &ctx);
         // Draw Haven management overlay if open
         if haven_ui.showing {
             ui::haven_scene::render_haven_tree(
@@ -139,14 +141,24 @@ pub fn handle_select_frame(
         }
         // Draw achievement browser overlay if open
         if achievement_browser.showing {
-            ui::achievement_browser_scene::render_achievement_browser(
-                f,
-                area,
-                global_achievements,
-                achievement_browser,
-                enhancement,
-                &ctx,
-            );
+            if title_browser.showing {
+                ui::title_browser_scene::render_title_browser(
+                    f,
+                    area,
+                    global_achievements,
+                    title_browser,
+                    "", // No character selected on this screen
+                );
+            } else {
+                ui::achievement_browser_scene::render_achievement_browser(
+                    f,
+                    area,
+                    global_achievements,
+                    achievement_browser,
+                    enhancement,
+                    &ctx,
+                );
+            }
         }
         // Draw Soulforge overlay if open
         if soulforge_ui.open {
@@ -193,6 +205,30 @@ pub fn handle_select_frame(
 
             // Handle achievement browser (blocks other input when open)
             if achievement_browser.showing {
+                // Title browser takes priority when open
+                if title_browser.showing {
+                    let unlocked =
+                        crate::achievements::titles::get_unlocked_titles(global_achievements);
+                    match key_event.code {
+                        KeyCode::Esc => title_browser.close(),
+                        KeyCode::Up => title_browser.move_up(),
+                        KeyCode::Down => title_browser.move_down(unlocked.len()),
+                        KeyCode::Enter => {
+                            if let Some(title_def) = unlocked.get(title_browser.selected_index) {
+                                global_achievements.selected_title =
+                                    Some(title_def.achievement_id);
+                                title_browser.close();
+                            }
+                        }
+                        KeyCode::Backspace => {
+                            global_achievements.selected_title = None;
+                            title_browser.close();
+                        }
+                        _ => {}
+                    }
+                    return Ok(ScreenTransition::Stay);
+                }
+
                 let category_achievements = achievements::get_achievements_by_category(
                     achievement_browser.selected_category,
                 );
@@ -208,6 +244,9 @@ pub fn handle_select_frame(
                     KeyCode::Esc | KeyCode::Char('a') | KeyCode::Char('A') => {
                         global_achievements.clear_recently_unlocked();
                         achievement_browser.close();
+                    }
+                    KeyCode::Char('t') | KeyCode::Char('T') => {
+                        title_browser.open();
                     }
                     _ => {}
                 }
