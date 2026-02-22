@@ -298,13 +298,14 @@ Special costs: Fishing Dock T4 = 10 prestige ranks. Storm Forge = 25 prestige ra
 ### Interaction Matrix
 
 ```
-           | Prestige | Haven  | Items  | Fishing | Challenges
------------+----------+--------+--------+---------+----------
-Prestige   |    -     | Gates  | Reset  | Persist | Rewards PR
-Haven      | Currency |   -    | Rarity | Rank Cap| Discovery
-Items      | Lost*    | Vault  |   -    | Drops   |    -
-Fishing    | Persist  | Dock   | Drops  |    -    | Ranks
-Challenges | +Ranks   | Library|   -    | +Ranks  |    -
+           | Prestige | Haven  | Items  | Fishing | Challenges | Stormglass
+-----------+----------+--------+--------+---------+------------+-----------
+Prestige   |    -     | Gates  | Reset  | Persist | Rewards PR | Gates P15+
+Haven      | Currency |   -    | Rarity | Rank Cap| Discovery  |    -
+Items      | Lost*    | Vault  |   -    | Drops   |    -       |    -
+Fishing    | Persist  | Dock   | Drops  |    -    | Ranks      |    -
+Challenges | +Ranks   | Library|   -    | +Ranks  |    -       | +Currency
+Stormglass | Gated    |   -    |   -    |    -    | Source     | Sigil bonuses
 ```
 
 *Items are lost on prestige unless preserved by Vault (1/3/5 items at T1/T2/T3).
@@ -323,11 +324,11 @@ Fishing Rank 40 -> Storm Leviathan (10 encounters) -> Storm Forge -> Zone 10 bos
 ```
 This chain gates endgame. If fishing is too fast/slow, endgame timing shifts.
 
-**3. Challenges -> Prestige Shortcuts**
+**3. Challenges -> Prestige Shortcuts + Stormglass**
 ```
-Minigame wins -> +Prestige ranks -> Skip level grinding
+Minigame wins -> +Prestige ranks + Stormglass -> Skip level grinding + Sigil bonuses
 ```
-Skilled players can prestige faster via minigames.
+Skilled players can prestige faster via minigames and earn Stormglass currency for Storm Sigil bonuses.
 
 ---
 
@@ -552,12 +553,14 @@ Progressive 10-encounter hunt, only available at rank 40 on legendary fish catch
 | Target | Success | Cost (PR) | Fail Penalty | Expected PR/Success |
 |--------|---------|-----------|-------------|---------------------|
 | +1 to +4 | 100% | 1 PR each | None | 1 PR |
-| +5 | 60% | 3 PR | -1 level | 5 PR |
-| +6 | 50% | 3 PR | -1 level | 6 PR |
+| +5 | 70% | 2 PR | -1 level | 2.9 PR |
+| +6 | 55% | 3 PR | -1 level | 5.5 PR |
 | +7 | 40% | 3 PR | -1 level | 7.5 PR |
-| +8 | 30% | 5 PR | -1 level | 16.7 PR |
-| +9 | 20% | 5 PR | -1 level | 25 PR |
-| +10 | 10% | 10 PR | -2 levels | 100 PR |
+| +8 | 30% | 4 PR | -1 level | 13.3 PR |
+| +9 | 20% | 4 PR | -1 level | 20 PR |
+| +10 | 10% | 5 PR | -2 levels | 50 PR |
+
+**Soul Tithe**: Levels +5/+6/+7 offer an alternative guaranteed-success option at higher PR cost (4/6/8 PR respectively) for 100% success rate. This provides a deterministic path for risk-averse players.
 
 **Key insight**: Levels +1 through +4 are safe (100% success, no penalty). The risk/reward curve steepens dramatically above +7. Reaching +10 on a single slot requires significant prestige investment due to the 10% success rate and -2 penalty on failure.
 
@@ -578,10 +581,10 @@ The bonus curve accelerates at higher levels, making the high-risk enhancements 
 
 Minimum PR to max all 7 slots to +10 (assuming perfect luck):
 - +1 to +4: 4 PR x 7 slots = 28 PR
-- +5 to +7: 9 PR x 7 slots = 63 PR
-- +8 to +9: 10 PR x 7 slots = 70 PR
-- +10: 10 PR x 7 slots = 70 PR
-- **Total minimum**: 231 PR (with 100% success)
+- +5 to +7: 8 PR x 7 slots = 56 PR
+- +8 to +9: 8 PR x 7 slots = 56 PR
+- +10: 5 PR x 7 slots = 35 PR
+- **Total minimum**: 175 PR (with 100% success)
 - **Expected total**: Much higher due to failure rates above +4
 
 ### Balance Interactions
@@ -627,8 +630,12 @@ With Haven Armory bonus: `damage * (1 + armory_percent / 100)`
 
 ### Death Mechanics
 
-- **Death to zone boss**: Resets encounter (`fighting_boss=false`, `kills_in_subzone=5`), only 5 more kills needed to retry. Preserves prestige
+- **Death to zone boss**: Resets player to subzone 1 of the current zone. Preserves prestige
 - **Death in dungeon**: Exits dungeon, no prestige loss, dungeon progress lost
+
+### Boss Enrage
+
+Bosses enrage after 60 seconds of combat, increasing their damage output. This prevents indefinite stalling against bosses the player cannot defeat.
 
 ### Boss Spawn
 

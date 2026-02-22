@@ -82,7 +82,7 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 - `game_state.rs` — Main character state struct (level, XP, prestige, combat state, equipment)
 - `game_logic.rs` — Thin re-export wrapper (XP curve, leveling, spawning, offline logic extracted to submodules)
 - `tick.rs` — Per-tick game engine: `game_tick<R: Rng>()` with 12 processing stages. Zero UI imports, zero file I/O — fully decoupled from rendering
-- `tick_types.rs` — TickEvent enum (30 variants) and TickResult struct
+- `tick_types.rs` — TickEvent enum (34 variants) and TickResult struct
 - `tick_stages.rs` — Tick processing stages 4-6 and helper functions (process_item_drop, process_discoveries, etc.)
 - `xp.rs` — XP calculation, leveling logic, combat kill XP
 - `discoveries.rs` — Discovery rolls for dungeons, fishing spots, Haven, Soulforge
@@ -130,13 +130,13 @@ CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FI
 
 - `types.rs` — Enemy struct (with defense field), combat state machine
 - `logic.rs` — Combat helper functions (prestige bonuses, god item passives)
-- `orchestration.rs` — `update_combat()` orchestrator coordinating attack phases
+- `orchestration.rs` — `update_combat<R: Rng>()` orchestrator coordinating attack phases
 - `attacks.rs` — Attack interval calculations (effective_enemy_attack_interval)
 - `enemy_generation.rs` — Zone/dungeon enemy generators (generate_zone_enemy, generate_subzone_boss, etc.)
 - `player_attack.rs` — Player damage pipeline (weapon gate, Giant's Might, Haven, prestige, defense, crit, double strike)
 - `enemy_attack.rs` — Enemy attack resolution (defense, Divine Bulwark DR, reflection, death handling)
 - `damage.rs` — Shared damage calculation and enemy death handling
-- `events.rs` — CombatEvent enum, HavenCombatBonuses, GodItemCombatBonuses structs
+- `events.rs` — CombatEvent enum, CombatBonuses (unified struct replacing HavenCombatBonuses, GodItemCombatBonuses, PrestigeCombatBonuses)
 - `regen.rs` — HP regeneration after combat
 
 ### Zone System (`src/zones/`)
@@ -193,7 +193,16 @@ CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FI
 - `logic.rs` — Enhancement rolling, result application, Soulforge discovery chance/roll
 - `persistence.rs` — Save/load from `~/.quest/enhancement.json`
 
-Account-level equipment enhancement system (Soulforge) that persists across characters. Each of 7 equipment slots can be enhanced from +0 to +10. Levels +1-4 are 100% success rate; +5-10 have decreasing success rates (70% down to 10%) and failure penalties (-1 or -2 levels). Levels +5-7 offer a "Soul Tithe" option for guaranteed success at higher PR cost. Costs prestige ranks. Discovered at P15+. Enhancement multipliers boost equipment stats in `derived_stats.rs`.
+Account-level equipment enhancement system (Soulforge) that persists across characters. Each of 7 equipment slots can be enhanced from +0 to +10. Levels +1-4 are 100% success rate; +5-10 have decreasing success rates (70%/55%/40%/30%/20%/10%) and failure penalties (-1 or -2 levels). Levels +5-7 offer a "Soul Tithe" option for guaranteed success at higher PR cost (4/6/8 PR). Costs prestige ranks. Discovered at P15+. Enhancement multipliers boost equipment stats in `derived_stats.rs`.
+
+### Stormglass Module (`src/stormglass/`)
+
+- `types.rs` — Stormglass currency state, daily rotation tracking
+- `sigils.rs` — Storm Sigils definitions, bonuses, and activation logic
+- `earning.rs` — Stormglass earning from challenge rewards
+- `spending.rs` — Stormglass spending on sigil slots
+
+Stormglass is a currency earned from completing challenge minigames (replacing the former XP% rewards). Gated behind P15+. Players spend Stormglass to activate Storm Sigils -- a daily-rotating set of passive bonuses. Sigil slots provide combat and progression bonuses.
 
 ### God Items Module (`src/god_items/`)
 
@@ -211,7 +220,7 @@ God items are created via debug menu (discovery/forging system not yet designed,
 
 ### Challenge Minigames (`src/challenges/`) — [detailed docs](src/challenges/CLAUDE.md)
 
-- `mod.rs` — `impl_apply_game_result!` macro standardizing `apply_game_result()` across all 10 challenge types
+- `mod.rs` — `impl_apply_game_result!` macro standardizing `apply_game_result()` across all 10 challenge types. Challenge wins award Stormglass currency (in addition to PR/FR rewards)
 - `menu.rs` — Generic challenge menu system (pending challenges, extensible challenge types)
 - `chess/` — Chess minigame (4 difficulty levels: Novice→Master, ~500-1350 ELO), requires P1+
 - `go/` — Go (Territory Control) on 9×9 board, MCTS AI with heuristics (500-20k simulations), requires P1+
@@ -255,6 +264,7 @@ Account-level achievement system that persists across characters. 6 categories (
 - `haven_input.rs` — Haven overlay input handling
 - `prestige_input.rs` — Prestige confirmation input handling
 - `soulforge_input.rs` — Soulforge overlay input handling
+- `stormglass_input.rs` — Stormglass overlay input handling
 
 Routes keyboard input to the appropriate handler based on current game state. Dispatches to minigame input handlers, character management flows, haven overlay, and debug menu. When quitting with pending challenges, shows a confirmation dialog ([Enter] Leave / [Esc] Stay).
 
@@ -294,7 +304,8 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 - `soulforge_effects.rs` — Soulforge hammering/success/failure animation effects
 - `soulforge_slots.rs` — Soulforge slot selection menu
 - `chess_scene.rs`, `go_scene.rs`, `morris_scene.rs`, `gomoku_scene.rs`, `minesweeper_scene.rs`, `rune_scene.rs`, `snake_scene.rs`, `flappy_scene.rs`, `jezzball_scene.rs`, `runic_shift_scene.rs` — Minigame UIs
-- `scene_fx.rs` — Shared utilities for layered ASCII scene rendering (scene buffer, backdrop effects)
+- `stormglass_scene.rs` — Stormglass currency and Storm Sigils overlay
+- `scene_fx.rs` — Shared utilities for layered ASCII scene rendering (scene buffer, backdrop effects, wide character support)
 - `zone_bg.rs` — Stylized zone background scenes with 6-layer compositing pipeline for all 11 zones
 - `debug_menu_scene.rs` — Debug menu overlay
 - `help_overlay.rs` — Help/controls overlay
@@ -347,15 +358,16 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 - Enhancement levels: 0-10, success rates 100% (+1-4), 70%/55%/40% (+5-7), 30%/20%/10% (+8-10)
 - Enhancement costs: 1 PR (+1-4), 2/3/3 PR (+5-7), 4 PR (+8-9), 5 PR (+10)
 - Enhancement Soul Tithe: +5/+6/+7 can pay 4/6/8 PR for guaranteed 100% success
+- Stormglass: currency earned from challenge rewards, gated behind P15+
 
 ## Combat Mechanics
 
 - **Enemy scaling**: Static zone-based stats from `ZONE_ENEMY_STATS` table (not player-HP-based). Each zone has `(base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)` tuples; subzone depth adds incremental stats
-- **Prestige combat bonuses**: `PrestigeCombatBonuses::from_rank()` provides flat damage, flat defense, crit chance, and flat HP that scale with prestige rank via power-law formulas
-- **God item combat bonuses**: `GodItemCombatBonuses` struct injected into `update_combat()` — carries damage %, attack speed %, damage reduction %, and regen reduction % from equipped god items
+- **Combat bonuses**: `CombatBonuses` is a unified struct (replacing the former `PrestigeCombatBonuses`, `HavenCombatBonuses`, and `GodItemCombatBonuses`) injected into `update_combat()` — carries all bonus sources (prestige, Haven, god items, sigils) in a single parameter
 - **Damage pipeline**: base damage → Giant's Might % → Haven Armory % → prestige flat damage → enemy defense → min 1 → Divine Bulwark DR → crit (2x)
 - **Enemy attack intervals**: Vary by tier (2.0s normal, 1.8s boss, 1.5s zone boss, 1.6s dungeon elite, 1.4s dungeon boss)
-- **Death to Boss**: Sets `kills_in_subzone = KILLS_FOR_BOSS - KILLS_FOR_BOSS_RETRY` (only 5 more kills to retry), preserves prestige
+- **Boss enrage timer**: Bosses enrage after 60 seconds of combat, increasing their damage output
+- **Death to Boss**: Resets player to subzone 1 of the current zone, preserves prestige
 - **Death in Dungeon**: Exits dungeon, no prestige loss
 - **Weapon Gates**: Zone 10 final boss requires Stormbreaker (checked via TheStormbreaker achievement)
 - **Stormbreaker Path**: Max fishing rank → catch Storm Leviathan (10 encounters) → build Storm Forge in Haven → forge Stormbreaker
@@ -375,7 +387,8 @@ quest/
 │   │   ├── minigame_input.rs # Minigame input dispatch
 │   │   ├── haven_input.rs   # Haven overlay input
 │   │   ├── prestige_input.rs # Prestige confirmation input
-│   │   └── soulforge_input.rs # Soulforge overlay input
+│   │   ├── soulforge_input.rs # Soulforge overlay input
+│   │   └── stormglass_input.rs # Stormglass overlay input
 │   ├── main_helpers/        # Extracted main.rs helpers
 │   │   ├── character_screens.rs  # Character screen handlers
 │   │   ├── input_routing.rs      # Game input routing
@@ -426,7 +439,7 @@ quest/
 │   │   ├── player_attack.rs # Player damage pipeline
 │   │   ├── enemy_attack.rs  # Enemy attack resolution
 │   │   ├── damage.rs        # Shared damage calculations
-│   │   ├── events.rs        # CombatEvent, bonus structs
+│   │   ├── events.rs        # CombatEvent, CombatBonuses (unified)
 │   │   └── regen.rs         # HP regeneration
 │   ├── zones/               # Zone system
 │   │   ├── data.rs          # Zone definitions
@@ -458,6 +471,11 @@ quest/
 │   │   ├── types.rs         # Enhancement progress, constants, UI state
 │   │   ├── logic.rs         # Enhancement rolling, discovery
 │   │   └── persistence.rs   # Save/load
+│   ├── stormglass/          # Stormglass currency and Storm Sigils
+│   │   ├── types.rs         # Stormglass state, daily rotation
+│   │   ├── sigils.rs        # Storm Sigil definitions and bonuses
+│   │   ├── earning.rs       # Stormglass earning from challenges
+│   │   └── spending.rs      # Stormglass spending on sigils
 │   ├── god_items/           # God Items system
 │   │   └── types.rs         # 3 god items, passives, bonuses, helper queries
 │   ├── challenges/          # Challenge minigames [CLAUDE.md]
@@ -517,11 +535,12 @@ quest/
 │       ├── snake_scene.rs   # Snake UI
 │       ├── flappy_scene.rs  # Flappy Bird UI
 │       ├── jezzball_scene.rs # JezzBall UI
+│       ├── stormglass_scene.rs # Stormglass currency and sigils overlay
 │       ├── scene_fx.rs       # Shared utilities for layered ASCII scene rendering
 │       ├── zone_bg.rs        # Stylized zone background scenes (6-layer compositing)
 │       ├── *_scene.rs       # Various game scenes
 │       └── character_*.rs   # Character management UI
-├── tests/                   # Integration tests (26 test files, 3,750+ tests)
+├── tests/                   # Integration tests (30 test files, 4,000+ tests)
 │   ├── game_loop_orchestration_test.rs  # 36 behavior-locking tests for game_tick
 │   ├── tick_integration_test.rs         # Tick module integration tests
 │   ├── zone_progression_test.rs         # Zone advancement tests
@@ -536,4 +555,4 @@ quest/
 
 ## Dependencies
 
-Ratatui 0.30, Serde (JSON), Rand 0.10, Rand_chacha 0.10 (seeded RNG for simulator), Chrono, Directories, Chess-engine 0.1, ureq 3.2, flate2 1.1, zip 8.0
+Ratatui 0.30, Serde (JSON), Rand 0.10, Rand_chacha 0.10 (seeded RNG for simulator), Chrono, Directories, Chess-engine 0.1, ureq 3.2, flate2 1.1, zip 8.0, unicode-width 0.2
