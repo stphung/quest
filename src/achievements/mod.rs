@@ -12,8 +12,11 @@ pub mod persistence;
 pub mod stats;
 pub mod types;
 pub mod unlock;
+pub mod titles;
 
 pub use data::{get_achievement_def, get_achievements_by_category};
 pub use milestones::{MinigameDifficulty, MinigameType};
 pub use persistence::{load_achievements, save_achievements};
+#[allow(unused_imports)]
+pub use titles::{get_title_text, get_unlocked_titles};
 pub use types::{AchievementCategory, AchievementId, Achievements};
