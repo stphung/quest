@@ -43,7 +43,7 @@ mod stats_panel;
 mod stats_prestige;
 mod stats_sigils;
 pub mod stormglass_scene;
-mod throbber;
+pub(crate) mod throbber;
 pub mod ticker;
 mod zone_bg;
 
