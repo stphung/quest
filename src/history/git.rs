@@ -240,6 +240,61 @@ impl HistoryRepo {
         Ok(commits)
     }
 
+    /// Find the fork point (common ancestor) of two branches.
+    ///
+    /// Returns the most recent commit shared by both branches, or None if
+    /// the branches share no common history.
+    #[allow(dead_code)] // Used by integration tests; binary consumers coming in Graph/Compare views.
+    pub fn find_fork_point(
+        &self,
+        branch_a: &str,
+        branch_b: &str,
+    ) -> Result<Option<CommitInfo>, HistoryError> {
+        let commits_a = self.list_commits(branch_a)?;
+        let commits_b = self.list_commits(branch_b)?;
+
+        let ids_b: std::collections::HashSet<String> =
+            commits_b.iter().map(|c| c.id.clone()).collect();
+
+        // Walk branch_a's commits (newest first) to find first shared commit.
+        for commit in &commits_a {
+            if ids_b.contains(&commit.id) {
+                return Ok(Some(commit.clone()));
+            }
+        }
+
+        Ok(None)
+    }
+
+    /// Get all branches with their full commit histories for graph rendering.
+    ///
+    /// Returns a list of `(branch_name, commits_newest_first)` pairs.
+    /// "main" is always listed first.
+    #[allow(dead_code)] // Used by integration tests; binary consumers coming in Graph/Compare views.
+    pub fn all_commits_graph(&self) -> Result<Vec<(String, Vec<CommitInfo>)>, HistoryError> {
+        let branches = self.list_branches()?;
+        let mut result: Vec<(String, Vec<CommitInfo>)> = Vec::new();
+
+        // Main first.
+        for branch in &branches {
+            if branch.name == "main" {
+                let commits = self.list_commits(&branch.name)?;
+                result.push((branch.name.clone(), commits));
+                break;
+            }
+        }
+
+        // Then others.
+        for branch in &branches {
+            if branch.name != "main" {
+                let commits = self.list_commits(&branch.name)?;
+                result.push((branch.name.clone(), commits));
+            }
+        }
+
+        Ok(result)
+    }
+
     /// Reset the current branch to the given commit and force-checkout.
     ///
     /// This moves the current branch pointer back to the target commit,

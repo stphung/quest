@@ -298,6 +298,53 @@ fn delete_fails_on_nonexistent() {
     assert!(result.is_err());
 }
 
+// ── find_fork_point ────────────────────────────────────────────────────
+
+#[test]
+fn find_fork_point_shared_ancestor() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = HistoryRepo::init(dir.path()).unwrap();
+
+    std::fs::write(dir.path().join("data.txt"), "v1").unwrap();
+    repo.commit_raw("commit 1").unwrap();
+
+    std::fs::write(dir.path().join("data.txt"), "v2").unwrap();
+    repo.commit_raw("commit 2").unwrap();
+
+    let main_commits = repo.list_commits("main").unwrap();
+    let head_id = &main_commits[0].id;
+    repo.fork_timeline("branch-a", head_id).unwrap();
+
+    std::fs::write(dir.path().join("data.txt"), "v3-fork").unwrap();
+    repo.commit_raw("fork commit 1").unwrap();
+
+    repo.switch_timeline("main").unwrap();
+    std::fs::write(dir.path().join("data.txt"), "v3-main").unwrap();
+    repo.commit_raw("main commit 3").unwrap();
+
+    let fork_point = repo.find_fork_point("main", "branch-a").unwrap();
+    assert!(fork_point.is_some());
+    assert_eq!(fork_point.unwrap().id, *head_id);
+}
+
+// ── all_commits_graph ─────────────────────────────────────────────────
+
+#[test]
+fn all_commits_graph_returns_all_branches() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = HistoryRepo::init(dir.path()).unwrap();
+
+    std::fs::write(dir.path().join("data.txt"), "v1").unwrap();
+    repo.commit_raw("commit 1").unwrap();
+
+    let commits = repo.list_commits("main").unwrap();
+    repo.fork_timeline("alt", &commits[0].id).unwrap();
+
+    let graph = repo.all_commits_graph().unwrap();
+    assert_eq!(graph.len(), 2);
+    assert_eq!(graph[0].0, "main");
+}
+
 // ── fork + switch + delete lifecycle ───────────────────────────────────
 
 #[test]
