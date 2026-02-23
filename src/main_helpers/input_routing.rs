@@ -5,7 +5,7 @@ use std::time::Instant;
 
 use crate::character::manager::CharacterManager;
 use crate::core::game_state::GameState;
-use crate::history::HistoryRepo;
+use crate::history::{HistoryRepo, SaveEvent};
 use crate::input::InputResult;
 
 use super::persistence::save_all;
@@ -62,6 +62,22 @@ pub fn route_game_input(
                     haven,
                     enhancement,
                     None,
+                    history_repo,
+                );
+                *last_save_instant = Some(Instant::now());
+                *last_save_time = Some(Local::now());
+            }
+            InputAction::Continue
+        }
+        InputResult::NeedsSavePrestige { new_rank } => {
+            if !debug_mode {
+                save_all(
+                    character_manager,
+                    state,
+                    global_achievements,
+                    haven,
+                    enhancement,
+                    Some(&SaveEvent::PrestigeRank(new_rank)),
                     history_repo,
                 );
                 *last_save_instant = Some(Instant::now());
