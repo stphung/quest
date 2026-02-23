@@ -133,7 +133,7 @@ fn tally_chrono_surge_events(surge: &mut ChronoSurgeState, events: &[core::tick:
 /// Returns the first matching event found.
 fn extract_save_event(
     events: &[core::tick::TickEvent],
-    state: &GameState,
+    _state: &GameState,
 ) -> Option<history::SaveEvent> {
     use core::tick::TickEvent;
     use history::SaveEvent;
@@ -146,9 +146,7 @@ fn extract_save_event(
                     return Some(SaveEvent::ZoneBossDefeated(old_zone.clone()));
                 }
                 BossDefeatResult::StormsEnd => {
-                    return Some(SaveEvent::ZoneBossDefeated(
-                        "Storm Citadel".to_string(),
-                    ));
+                    return Some(SaveEvent::ZoneBossDefeated("Storm Citadel".to_string()));
                 }
                 _ => {}
             },
@@ -441,7 +439,10 @@ fn main() -> io::Result<()> {
                     // fullscreen overlay. The game UI uses emoji/wide characters
                     // that can desync ratatui's internal buffer from the actual
                     // terminal state; clearing resyncs them.
-                    let overlay_is_fullscreen = matches!(overlay, GameOverlay::Achievements { .. } | GameOverlay::Timeline { .. });
+                    let overlay_is_fullscreen = matches!(
+                        overlay,
+                        GameOverlay::Achievements { .. } | GameOverlay::Timeline { .. }
+                    );
                     if overlay_is_fullscreen != prev_overlay_was_fullscreen {
                         terminal.clear()?;
                         prev_overlay_was_fullscreen = overlay_is_fullscreen;
@@ -662,16 +663,13 @@ fn main() -> io::Result<()> {
                                         enhancement = enhancement::load_enhancement();
                                         global_achievements = achievements::load_achievements();
                                         global_achievements.refresh_progress();
-                                        deep = deep::persistence::load_deep();
 
                                         // Reload character state
-                                        let filename =
-                                            format!("{}.json", state.character_name);
+                                        let filename = format!("{}.json", state.character_name);
                                         if let Ok(mut reloaded) =
                                             character_manager.load_character(&filename)
                                         {
-                                            reloaded
-                                                .recalculate_derived_stats(&enhancement.levels);
+                                            reloaded.recalculate_derived_stats(&enhancement.levels);
                                             reloaded.recalculate_prestige_bonuses();
                                             reloaded.combat_state.add_log_entry(
                                                 "\u{23F3} Save restored".to_string(),
@@ -703,7 +701,6 @@ fn main() -> io::Result<()> {
                                         enhancement = enhancement::load_enhancement();
                                         global_achievements = achievements::load_achievements();
                                         global_achievements.refresh_progress();
-                                        deep = deep::persistence::load_deep();
 
                                         let filename = format!("{}.json", state.character_name);
                                         if let Ok(mut reloaded) =
@@ -712,9 +709,7 @@ fn main() -> io::Result<()> {
                                             reloaded.recalculate_derived_stats(&enhancement.levels);
                                             reloaded.recalculate_prestige_bonuses();
                                             reloaded.combat_state.add_log_entry(
-                                                format!(
-                                                    "\u{1F500} Timeline forked: {branch_name}"
-                                                ),
+                                                format!("\u{1F500} Timeline forked: {branch_name}"),
                                                 false,
                                                 true,
                                             );
@@ -739,7 +734,6 @@ fn main() -> io::Result<()> {
                                         enhancement = enhancement::load_enhancement();
                                         global_achievements = achievements::load_achievements();
                                         global_achievements.refresh_progress();
-                                        deep = deep::persistence::load_deep();
 
                                         let filename = format!("{}.json", state.character_name);
                                         if let Ok(mut reloaded) =
@@ -775,13 +769,10 @@ fn main() -> io::Result<()> {
                                             if let Ok(branches) = repo.list_branches() {
                                                 browser.branches = branches;
                                                 // Clamp selection
-                                                if browser.selected_branch
-                                                    >= browser.branches.len()
+                                                if browser.selected_branch >= browser.branches.len()
                                                 {
-                                                    browser.selected_branch = browser
-                                                        .branches
-                                                        .len()
-                                                        .saturating_sub(1);
+                                                    browser.selected_branch =
+                                                        browser.branches.len().saturating_sub(1);
                                                 }
                                                 // Refresh commits for new selection
                                                 if let Some(b) =

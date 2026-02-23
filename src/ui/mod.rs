@@ -13,7 +13,6 @@ mod combat_3d;
 pub mod combat_effects;
 mod combat_scene;
 pub mod debug_menu_scene;
-pub mod deep_scene;
 pub mod dungeon_map;
 mod enemy_sprite_data;
 mod enemy_sprites;
@@ -45,8 +44,8 @@ mod stats_prestige;
 mod stats_sigils;
 pub mod stormglass_scene;
 pub(crate) mod throbber;
-pub mod timeline_scene;
 pub mod ticker;
+pub mod timeline_scene;
 pub mod title_browser_scene;
 mod zone_bg;
 

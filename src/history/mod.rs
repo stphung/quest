@@ -7,8 +7,8 @@
 pub mod git;
 pub mod types;
 
+pub use git::validate_branch_name;
 #[allow(unused_imports)]
 pub use git::HistoryError;
 pub use git::HistoryRepo;
-pub use git::validate_branch_name;
 pub use types::*;

@@ -153,36 +153,54 @@ fn manual_save_description() {
 #[test]
 fn format_suffix_basic() {
     // 2h15m = 135 minutes = 8100 seconds
-    assert_eq!(format_suffix(18, 0, 2, 3, 8100), "Lv18 P0 Z2-3 2h15m");
+    assert_eq!(
+        format_suffix(18, 0, 2, 3, 8100, "Hero"),
+        "Lv18 P0 Z2-3 2h15m @Hero"
+    );
 }
 
 #[test]
 fn format_suffix_large_values() {
     // 45h10m = 45*60 + 10 = 2710 minutes = 162600 seconds
-    assert_eq!(format_suffix(50, 20, 8, 4, 162600), "Lv50 P20 Z8-4 45h10m");
+    assert_eq!(
+        format_suffix(50, 20, 8, 4, 162600, "Hero"),
+        "Lv50 P20 Z8-4 45h10m @Hero"
+    );
 }
 
 #[test]
 fn format_suffix_zero_playtime() {
-    assert_eq!(format_suffix(1, 0, 1, 1, 0), "Lv1 P0 Z1-1 0h00m");
+    assert_eq!(
+        format_suffix(1, 0, 1, 1, 0, "Hero"),
+        "Lv1 P0 Z1-1 0h00m @Hero"
+    );
 }
 
 #[test]
 fn format_suffix_exact_hour() {
     // 1 hour = 3600 seconds
-    assert_eq!(format_suffix(10, 1, 3, 2, 3600), "Lv10 P1 Z3-2 1h00m");
+    assert_eq!(
+        format_suffix(10, 1, 3, 2, 3600, "Hero"),
+        "Lv10 P1 Z3-2 1h00m @Hero"
+    );
 }
 
 #[test]
 fn format_suffix_minutes_only() {
     // 30 minutes = 1800 seconds
-    assert_eq!(format_suffix(5, 0, 1, 1, 1800), "Lv5 P0 Z1-1 0h30m");
+    assert_eq!(
+        format_suffix(5, 0, 1, 1, 1800, "Hero"),
+        "Lv5 P0 Z1-1 0h30m @Hero"
+    );
 }
 
 #[test]
 fn format_suffix_ignores_leftover_seconds() {
     // 3661 seconds = 1h01m (with 1 leftover second ignored)
-    assert_eq!(format_suffix(10, 0, 1, 1, 3661), "Lv10 P0 Z1-1 1h01m");
+    assert_eq!(
+        format_suffix(10, 0, 1, 1, 3661, "Hero"),
+        "Lv10 P0 Z1-1 1h01m @Hero"
+    );
 }
 
 // ── commit_message() ─────────────────────────────────────────────────────
@@ -190,33 +208,33 @@ fn format_suffix_ignores_leftover_seconds() {
 #[test]
 fn commit_message_zone_boss() {
     let event = SaveEvent::ZoneBossDefeated("Dark Forest".to_string());
-    let msg = event.commit_message(18, 0, 2, 3, 8100);
-    assert_eq!(msg, "Defeated Dark Forest boss | Lv18 P0 Z2-3 2h15m");
+    let msg = event.commit_message(18, 0, 2, 3, 8100, "Hero");
+    assert_eq!(msg, "Defeated Dark Forest boss | Lv18 P0 Z2-3 2h15m @Hero");
 }
 
 #[test]
 fn commit_message_manual_save() {
-    let msg = SaveEvent::ManualSave.commit_message(50, 20, 8, 4, 162600);
-    assert_eq!(msg, "Manual save | Lv50 P20 Z8-4 45h10m");
+    let msg = SaveEvent::ManualSave.commit_message(50, 20, 8, 4, 162600, "Hero");
+    assert_eq!(msg, "Manual save | Lv50 P20 Z8-4 45h10m @Hero");
 }
 
 #[test]
 fn commit_message_level_up() {
-    let msg = SaveEvent::LevelUp(25).commit_message(25, 3, 4, 2, 18000);
-    assert_eq!(msg, "Level up to 25 | Lv25 P3 Z4-2 5h00m");
+    let msg = SaveEvent::LevelUp(25).commit_message(25, 3, 4, 2, 18000, "Hero");
+    assert_eq!(msg, "Level up to 25 | Lv25 P3 Z4-2 5h00m @Hero");
 }
 
 #[test]
 fn commit_message_prestige() {
-    let msg = SaveEvent::PrestigeRank(10).commit_message(1, 10, 1, 1, 72000);
-    assert_eq!(msg, "Prestige to rank 10 | Lv1 P10 Z1-1 20h00m");
+    let msg = SaveEvent::PrestigeRank(10).commit_message(1, 10, 1, 1, 72000, "Hero");
+    assert_eq!(msg, "Prestige to rank 10 | Lv1 P10 Z1-1 20h00m @Hero");
 }
 
 #[test]
 fn commit_message_challenge_won() {
     let msg = SaveEvent::ChallengeWon("Go".to_string(), "Journeyman".to_string())
-        .commit_message(30, 5, 5, 3, 36000);
-    assert_eq!(msg, "Won Go at Journeyman | Lv30 P5 Z5-3 10h00m");
+        .commit_message(30, 5, 5, 3, 36000, "Hero");
+    assert_eq!(msg, "Won Go at Journeyman | Lv30 P5 Z5-3 10h00m @Hero");
 }
 
 // ── Clone / PartialEq ───────────────────────────────────────────────────

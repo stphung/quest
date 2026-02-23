@@ -88,7 +88,14 @@ impl HistoryRepo {
             let tree = repo.find_tree(tree_oid)?;
             let sig = Self::signature()?;
 
-            repo.commit(Some("HEAD"), &sig, &sig, "Initialize save history", &tree, &[])?;
+            repo.commit(
+                Some("HEAD"),
+                &sig,
+                &sig,
+                "Initialize save history",
+                &tree,
+                &[],
+            )?;
 
             // Rename master -> main if needed.
             if let Ok(mut master) = repo.find_branch("master", BranchType::Local) {
@@ -103,6 +110,7 @@ impl HistoryRepo {
     ///
     /// Returns `Err(HistoryError::NothingToCommit)` if the working tree has no
     /// changes since the last commit.
+    #[allow(clippy::too_many_arguments)]
     pub fn commit(
         &self,
         event: &SaveEvent,
@@ -126,17 +134,18 @@ impl HistoryRepo {
         let tree_oid = index.write_tree()?;
         let tree = self.repo.find_tree(tree_oid)?;
         let sig = Self::signature()?;
-        let message = event.commit_message(level, prestige, zone_id, subzone_id, play_time_seconds, character_name);
+        let message = event.commit_message(
+            level,
+            prestige,
+            zone_id,
+            subzone_id,
+            play_time_seconds,
+            character_name,
+        );
 
         let parent = self.head_commit()?;
-        self.repo.commit(
-            Some("HEAD"),
-            &sig,
-            &sig,
-            &message,
-            &tree,
-            &[&parent],
-        )?;
+        self.repo
+            .commit(Some("HEAD"), &sig, &sig, &message, &tree, &[&parent])?;
 
         Ok(())
     }
@@ -155,10 +164,7 @@ impl HistoryRepo {
 
         for branch_result in self.repo.branches(Some(BranchType::Local))? {
             let (branch, _) = branch_result?;
-            let name = branch
-                .name()?
-                .unwrap_or("(unnamed)")
-                .to_string();
+            let name = branch.name()?.unwrap_or("(unnamed)").to_string();
             let is_active = active_branch.as_deref() == Some(&name);
 
             let head_commit = branch
@@ -223,11 +229,8 @@ impl HistoryRepo {
             .map_err(|_| HistoryError::CommitNotFound(commit_id.to_string()))?;
 
         // Reset the current branch ref to point at the target commit.
-        self.repo.reset(
-            commit.as_object(),
-            git2::ResetType::Hard,
-            None,
-        )?;
+        self.repo
+            .reset(commit.as_object(), git2::ResetType::Hard, None)?;
 
         Ok(())
     }
@@ -236,11 +239,7 @@ impl HistoryRepo {
     ///
     /// Validates the branch name, ensures no duplicate exists, creates the
     /// branch pointing at `commit_id`, and performs a hard checkout.
-    pub fn fork_timeline(
-        &self,
-        branch_name: &str,
-        commit_id: &str,
-    ) -> Result<(), HistoryError> {
+    pub fn fork_timeline(&self, branch_name: &str, commit_id: &str) -> Result<(), HistoryError> {
         validate_branch_name(branch_name)?;
 
         // Check for duplicate.
@@ -327,8 +326,7 @@ impl HistoryRepo {
     /// Check whether the working tree has any staged or unstaged changes.
     fn has_changes(&self) -> Result<bool, HistoryError> {
         let mut opts = StatusOptions::new();
-        opts.include_untracked(true)
-            .recurse_untracked_dirs(true);
+        opts.include_untracked(true).recurse_untracked_dirs(true);
         let statuses = self.repo.statuses(Some(&mut opts))?;
         Ok(!statuses.is_empty())
     }
@@ -378,7 +376,6 @@ impl HistoryRepo {
             .map(|o| o.id())
             .map_err(|_| HistoryError::CommitNotFound(commit_id.to_string()))
     }
-
 }
 
 // ── Branch name validation ──────────────────────────────────────────────
@@ -474,7 +471,11 @@ fn parse_playtime(s: &str) -> u64 {
     };
     let hours: u64 = s[..h_pos].parse().unwrap_or(0);
     let minutes_str = &s[h_pos + 1..];
-    let minutes: u64 = minutes_str.strip_suffix('m').unwrap_or("0").parse().unwrap_or(0);
+    let minutes: u64 = minutes_str
+        .strip_suffix('m')
+        .unwrap_or("0")
+        .parse()
+        .unwrap_or(0);
     hours * 3600 + minutes * 60
 }
 

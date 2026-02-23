@@ -8,11 +8,8 @@ use tempfile::TempDir;
 /// Create a temp dir with a dummy JSON save file so git has something to commit.
 fn setup_quest_dir() -> TempDir {
     let dir = TempDir::new().expect("create temp dir");
-    fs::write(
-        dir.path().join("save.json"),
-        r#"{"level":1,"prestige":0}"#,
-    )
-    .expect("write save file");
+    fs::write(dir.path().join("save.json"), r#"{"level":1,"prestige":0}"#)
+        .expect("write save file");
     dir
 }
 
@@ -56,11 +53,7 @@ fn commit_adds_entry() {
     let repo = HistoryRepo::init(dir.path()).expect("init");
 
     // Modify a file so there is something to commit.
-    fs::write(
-        dir.path().join("save.json"),
-        r#"{"level":5,"prestige":0}"#,
-    )
-    .expect("write");
+    fs::write(dir.path().join("save.json"), r#"{"level":5,"prestige":0}"#).expect("write");
 
     repo.commit(&SaveEvent::LevelUp(5), 5, 0, 1, 1, 600, "Hero")
         .expect("commit");
@@ -340,7 +333,9 @@ fn fork_switch_delete_lifecycle() {
     assert_eq!(main_commits.len(), 3); // init + lv5 + lv10
 
     // Verify speedrun has its own history.
-    let speedrun_commits = repo.list_commits("speedrun").expect("list speedrun commits");
+    let speedrun_commits = repo
+        .list_commits("speedrun")
+        .expect("list speedrun commits");
     // Should have: init + lv5 (forked from main) + lv6 (added on fork)
     assert_eq!(speedrun_commits.len(), 3);
 

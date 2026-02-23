@@ -90,8 +90,7 @@ fn handle_browse(key: KeyEvent, state: &mut TimelineBrowserState) -> TimelineAct
                     }
                 }
                 PanelFocus::Right => {
-                    if !state.commits.is_empty()
-                        && state.selected_commit < state.commits.len() - 1
+                    if !state.commits.is_empty() && state.selected_commit < state.commits.len() - 1
                     {
                         state.selected_commit += 1;
                     }
@@ -208,12 +207,11 @@ fn handle_naming_fork(key: KeyEvent, state: &mut TimelineBrowserState) -> Timeli
             match validate_branch_name(&name) {
                 Ok(()) => {
                     // Extract commit_id from the mode before changing it.
-                    let commit_id =
-                        if let BrowserMode::NamingFork { commit_id } = &state.mode {
-                            commit_id.clone()
-                        } else {
-                            return TimelineAction::Continue;
-                        };
+                    let commit_id = if let BrowserMode::NamingFork { commit_id } = &state.mode {
+                        commit_id.clone()
+                    } else {
+                        return TimelineAction::Continue;
+                    };
                     state.mode = BrowserMode::Browse;
                     state.fork_name_input.clear();
                     state.fork_name_error = None;
