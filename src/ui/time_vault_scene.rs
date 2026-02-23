@@ -494,40 +494,48 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
                 ])
             }
         }
-        BrowserMode::Browse => match state.focus {
-            PanelFocus::Left => {
-                let mut spans = vec![
-                    Span::styled(" [Enter] ", Style::default().fg(Color::Cyan)),
-                    Span::styled("Switch", Style::default().fg(Color::DarkGray)),
-                ];
-                // Only show Delete if branch is deletable (not main, not active)
-                if !state.selected_branch_is_main() && !state.selected_branch_is_active() {
-                    spans.push(Span::raw("  "));
-                    spans.push(Span::styled("[D] ", Style::default().fg(Color::Cyan)));
-                    spans.push(Span::styled("Delete", Style::default().fg(Color::DarkGray)));
+        BrowserMode::Browse => {
+            let dot = Span::styled(
+                "  \u{00b7}  ",
+                Style::default().fg(Color::Rgb(40, 80, 120)),
+            );
+            match state.focus {
+                PanelFocus::Left => {
+                    let mut spans = vec![
+                        Span::styled(" [Enter] ", Style::default().fg(Color::Cyan)),
+                        Span::styled("Switch", Style::default().fg(Color::DarkGray)),
+                    ];
+                    if !state.selected_branch_is_main() && !state.selected_branch_is_active() {
+                        spans.push(dot.clone());
+                        spans.push(Span::styled("[D] ", Style::default().fg(Color::Cyan)));
+                        spans.push(Span::styled(
+                            "Delete",
+                            Style::default().fg(Color::DarkGray),
+                        ));
+                    }
+                    spans.push(dot.clone());
+                    spans.push(Span::styled("[Tab] ", Style::default().fg(Color::Cyan)));
+                    spans.push(Span::styled("Saves", Style::default().fg(Color::DarkGray)));
+                    spans.push(dot);
+                    spans.push(Span::styled("[Esc] ", Style::default().fg(Color::Cyan)));
+                    spans.push(Span::styled("Close", Style::default().fg(Color::DarkGray)));
+                    Line::from(spans)
                 }
-                spans.push(Span::raw("  "));
-                spans.push(Span::styled("[Tab] ", Style::default().fg(Color::Cyan)));
-                spans.push(Span::styled("Saves", Style::default().fg(Color::DarkGray)));
-                spans.push(Span::raw("  "));
-                spans.push(Span::styled("[Esc] ", Style::default().fg(Color::Cyan)));
-                spans.push(Span::styled("Close", Style::default().fg(Color::DarkGray)));
-                Line::from(spans)
+                PanelFocus::Right => Line::from(vec![
+                    Span::styled(" [Enter] ", Style::default().fg(Color::Cyan)),
+                    Span::styled("Restore", Style::default().fg(Color::DarkGray)),
+                    dot.clone(),
+                    Span::styled("[F] ", Style::default().fg(Color::Cyan)),
+                    Span::styled("Fork", Style::default().fg(Color::DarkGray)),
+                    dot.clone(),
+                    Span::styled("[Tab] ", Style::default().fg(Color::Cyan)),
+                    Span::styled("Branches", Style::default().fg(Color::DarkGray)),
+                    dot,
+                    Span::styled("[Esc] ", Style::default().fg(Color::Cyan)),
+                    Span::styled("Close", Style::default().fg(Color::DarkGray)),
+                ]),
             }
-            PanelFocus::Right => Line::from(vec![
-                Span::styled(" [Enter] ", Style::default().fg(Color::Cyan)),
-                Span::styled("Restore", Style::default().fg(Color::DarkGray)),
-                Span::raw("  "),
-                Span::styled("[F] ", Style::default().fg(Color::Cyan)),
-                Span::styled("Fork", Style::default().fg(Color::DarkGray)),
-                Span::raw("  "),
-                Span::styled("[Tab] ", Style::default().fg(Color::Cyan)),
-                Span::styled("Branches", Style::default().fg(Color::DarkGray)),
-                Span::raw("  "),
-                Span::styled("[Esc] ", Style::default().fg(Color::Cyan)),
-                Span::styled("Close", Style::default().fg(Color::DarkGray)),
-            ]),
-        },
+        }
     };
 
     let paragraph = Paragraph::new(controls).alignment(Alignment::Center);
