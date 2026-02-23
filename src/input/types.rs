@@ -20,6 +20,17 @@ pub struct HavenUiState {
     opened_at_ms: Option<u128>,
 }
 
+impl Default for HavenUiState {
+    fn default() -> Self {
+        Self {
+            showing: false,
+            selected_room: 0,
+            confirmation: HavenConfirmation::None,
+            opened_at_ms: None,
+        }
+    }
+}
+
 impl HavenUiState {
     fn current_millis() -> u128 {
         SystemTime::now()
@@ -29,12 +40,7 @@ impl HavenUiState {
     }
 
     pub fn new() -> Self {
-        Self {
-            showing: false,
-            selected_room: 0,
-            confirmation: HavenConfirmation::None,
-            opened_at_ms: None,
-        }
+        Self::default()
     }
 
     pub fn open(&mut self) {

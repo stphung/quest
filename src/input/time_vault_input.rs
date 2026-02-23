@@ -1,7 +1,9 @@
 //! Input handling for the Time Vault overlay.
 
 use crate::history::validate_branch_name;
-use crate::ui::time_vault_scene::{BrowserMode, ForkSource, PanelFocus, TimeVaultState};
+use crate::ui::time_vault_scene::{
+    BrowserMode, ForkSource, PanelFocus, TimeVaultState, ViewMode,
+};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 /// Actions that the Time Vault can request from the main loop.
@@ -34,8 +36,31 @@ pub enum TimeVaultAction {
 /// - **ConfirmDelete**: Enter confirms, Esc cancels.
 /// - **NamingFork**: Character input, Backspace, Enter validates, Esc cancels.
 pub fn handle_time_vault_input(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAction {
+    // When in base Browse mode (no dialog), intercept B/G/C for view switching.
+    if state.mode == BrowserMode::Browse {
+        match key.code {
+            KeyCode::Char('b') | KeyCode::Char('B') => {
+                state.view_mode = ViewMode::Browse;
+                return TimeVaultAction::Continue;
+            }
+            KeyCode::Char('g') | KeyCode::Char('G') => {
+                state.view_mode = ViewMode::Graph;
+                return TimeVaultAction::Continue;
+            }
+            KeyCode::Char('c') | KeyCode::Char('C') => {
+                state.view_mode = ViewMode::Compare;
+                return TimeVaultAction::Continue;
+            }
+            _ => {}
+        }
+    }
+
     match &state.mode {
-        BrowserMode::Browse => handle_browse(key, state),
+        BrowserMode::Browse => match state.view_mode {
+            ViewMode::Browse => handle_browse(key, state),
+            ViewMode::Graph => handle_graph_input(key, state),
+            ViewMode::Compare => handle_compare_input(key, state),
+        },
         BrowserMode::ConfirmRestore => handle_confirm_restore(key, state),
         BrowserMode::ConfirmSwitch => handle_confirm_switch(key, state),
         BrowserMode::ConfirmDelete { .. } => handle_confirm_delete(key, state),
@@ -302,6 +327,22 @@ fn handle_naming_fork(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAct
             }
             TimeVaultAction::Continue
         }
+        _ => TimeVaultAction::Continue,
+    }
+}
+
+/// Stub handler for graph view input. Only Esc closes for now.
+fn handle_graph_input(key: KeyEvent, _state: &mut TimeVaultState) -> TimeVaultAction {
+    match key.code {
+        KeyCode::Esc => TimeVaultAction::Close,
+        _ => TimeVaultAction::Continue,
+    }
+}
+
+/// Stub handler for compare view input. Only Esc closes for now.
+fn handle_compare_input(key: KeyEvent, _state: &mut TimeVaultState) -> TimeVaultAction {
+    match key.code {
+        KeyCode::Esc => TimeVaultAction::Close,
         _ => TimeVaultAction::Continue,
     }
 }

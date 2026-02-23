@@ -7,6 +7,7 @@ use ratatui::{
     Frame,
 };
 
+#[derive(Default)]
 #[allow(dead_code)]
 pub struct CharacterCreationScreen {
     pub name_input: String,
@@ -17,11 +18,7 @@ pub struct CharacterCreationScreen {
 #[allow(dead_code)]
 impl CharacterCreationScreen {
     pub fn new() -> Self {
-        Self {
-            name_input: String::new(),
-            cursor_position: 0,
-            validation_error: None,
-        }
+        Self::default()
     }
 
     pub fn draw(&self, f: &mut Frame, area: Rect, ctx: &super::responsive::LayoutContext) {

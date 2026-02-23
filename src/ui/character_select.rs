@@ -13,6 +13,7 @@ use ratatui::{
     Frame,
 };
 
+#[derive(Default)]
 #[allow(dead_code)]
 pub struct CharacterSelectScreen {
     pub selected_index: usize,
@@ -21,7 +22,7 @@ pub struct CharacterSelectScreen {
 #[allow(dead_code)]
 impl CharacterSelectScreen {
     pub fn new() -> Self {
-        Self { selected_index: 0 }
+        Self::default()
     }
 
     #[allow(clippy::too_many_arguments)]

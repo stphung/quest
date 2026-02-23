@@ -9,6 +9,7 @@ use ratatui::{
     Frame,
 };
 
+#[derive(Default)]
 #[allow(dead_code)]
 pub struct CharacterDeleteScreen {
     pub confirmation_input: String,
@@ -18,10 +19,7 @@ pub struct CharacterDeleteScreen {
 #[allow(dead_code)]
 impl CharacterDeleteScreen {
     pub fn new() -> Self {
-        Self {
-            confirmation_input: String::new(),
-            cursor_position: 0,
-        }
+        Self::default()
     }
 
     pub fn draw(

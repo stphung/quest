@@ -3,6 +3,7 @@
 //! Displays a two-panel overlay for browsing save branches
 //! and their snapshots. Players can restore, fork, and manage saves.
 
+use crate::history::graph_layout::GraphLayout;
 use crate::history::types::{CommitInfo, TimelineInfo};
 use ratatui::{
     layout::{Alignment, Rect},
@@ -34,6 +35,17 @@ pub enum PanelFocus {
     Right,
 }
 
+/// Which high-level view is active in the Time Vault.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ViewMode {
+    /// Two-panel branch/commit browser (default).
+    Browse,
+    /// DAG-style graph visualization of all branches.
+    Graph,
+    /// Side-by-side branch comparison.
+    Compare,
+}
+
 /// The current interaction mode of the Time Vault.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BrowserMode {
@@ -60,6 +72,49 @@ pub struct ForkSource {
     pub is_branch_tip: bool,
 }
 
+/// State for the graph (DAG) view.
+#[derive(Debug, Clone, Default)]
+#[allow(dead_code)]
+pub struct GraphState {
+    /// Currently selected column (branch) in the graph.
+    pub selected_col: usize,
+    /// Currently selected row (commit) in the graph.
+    pub selected_row: usize,
+    /// Vertical scroll offset for the graph.
+    pub scroll_offset: usize,
+    /// Computed graph layout, populated when entering graph view.
+    pub layout: Option<GraphLayout>,
+}
+
+/// Phase of the compare workflow.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[allow(dead_code)]
+pub enum ComparePhase {
+    /// Choosing the left (base) branch.
+    #[default]
+    SelectLeft,
+    /// Choosing the right (target) branch.
+    SelectRight,
+    /// Viewing the comparison results.
+    Viewing,
+}
+
+/// State for the compare view.
+#[derive(Debug, Clone, Default)]
+#[allow(dead_code)]
+pub struct CompareState {
+    /// Selected left (base) branch name.
+    pub left_branch: Option<String>,
+    /// Selected right (target) branch name.
+    pub right_branch: Option<String>,
+    /// Vertical scroll offset for the diff view.
+    pub scroll_offset: usize,
+    /// Current phase of the compare workflow.
+    pub phase: ComparePhase,
+    /// Cursor position in the branch selection list.
+    pub branch_cursor: usize,
+}
+
 /// UI state for the Time Vault overlay.
 pub struct TimeVaultState {
     pub branches: Vec<TimelineInfo>,
@@ -72,6 +127,14 @@ pub struct TimeVaultState {
     pub fork_name_error: Option<String>,
     pub fork_source: Option<ForkSource>,
     pub delete_confirm_input: String,
+    /// Which high-level view is active (Browse, Graph, Compare).
+    pub view_mode: ViewMode,
+    /// State for the graph (DAG) view.
+    #[allow(dead_code)]
+    pub graph: GraphState,
+    /// State for the compare view.
+    #[allow(dead_code)]
+    pub compare: CompareState,
 }
 
 impl TimeVaultState {
@@ -87,6 +150,9 @@ impl TimeVaultState {
             fork_name_error: None,
             fork_source: None,
             delete_confirm_input: String::new(),
+            view_mode: ViewMode::Browse,
+            graph: GraphState::default(),
+            compare: CompareState::default(),
         }
     }
 

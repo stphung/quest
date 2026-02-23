@@ -5,6 +5,7 @@
 //! fork save branches through the Time Vault overlay.
 
 pub mod git;
+pub mod graph_layout;
 pub mod types;
 
 pub use git::validate_branch_name;

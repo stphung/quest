@@ -9,6 +9,7 @@ use ratatui::{
     Frame,
 };
 
+#[derive(Default)]
 #[allow(dead_code)]
 pub struct CharacterRenameScreen {
     pub new_name_input: String,
@@ -19,11 +20,7 @@ pub struct CharacterRenameScreen {
 #[allow(dead_code)]
 impl CharacterRenameScreen {
     pub fn new() -> Self {
-        Self {
-            new_name_input: String::new(),
-            cursor_position: 0,
-            validation_error: None,
-        }
+        Self::default()
     }
 
     pub fn draw(

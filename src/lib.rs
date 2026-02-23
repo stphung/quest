@@ -16,13 +16,14 @@ pub mod fishing;
 pub mod god_items;
 pub mod haven;
 pub mod history;
+pub mod input;
 pub mod items;
 pub mod stormglass;
 pub mod utils;
 pub mod zones;
 
-// UI module is not exposed as it's tightly coupled to the terminal
-mod ui;
+// UI module — exposed for integration tests (types only; rendering is terminal-coupled)
+pub mod ui;
 
 // Re-export commonly used types at crate root for convenience
 pub use achievements::{AchievementCategory, AchievementId, Achievements};
