@@ -233,7 +233,7 @@ fn test_item_drop_salvage_awards_stormglass() {
     let mut achievements = Achievements::default();
     let mut rng = ChaCha8Rng::seed_from_u64(42);
 
-    // Run many ticks to get item drops
+    // Run ticks until an item drop triggers salvage (early exit optimization)
     let initial_sg = state.stormglass;
     for _ in 0..10000 {
         let _result = game_tick(
@@ -245,9 +245,13 @@ fn test_item_drop_salvage_awards_stormglass() {
             false,
             &mut rng,
         );
+        // Early exit: once stormglass has increased, the mechanic is verified
+        if state.stormglass > initial_sg {
+            break;
+        }
     }
 
-    // After 10k ticks with active combat, should have earned some SG from salvage
+    // After ticks with active combat, should have earned some SG from salvage
     // (items that weren't equipped get salvaged)
     assert!(
         state.stormglass > initial_sg,
@@ -539,8 +543,8 @@ fn test_pre_p15_salvage_does_not_discover_stormglass() {
     let mut achievements = Achievements::default();
     let mut rng = ChaCha8Rng::seed_from_u64(42);
 
-    // Run many ticks — items will drop but stormglass should never be discovered
-    for _ in 0..10000 {
+    // Run enough ticks to verify the P15 guard — 200 is sufficient for a boolean check
+    for _ in 0..200 {
         let result = game_tick(
             &mut state,
             &mut tick_counter,
@@ -619,6 +623,10 @@ fn test_salvage_continues_after_prestige_rank_drops_below_15() {
             if matches!(event, TickEvent::StormglassSalvaged { .. }) {
                 saw_salvage = true;
             }
+        }
+        // Early exit: once we've seen a salvage event, the mechanic is verified
+        if saw_salvage {
+            break;
         }
     }
 

@@ -719,14 +719,15 @@ fn test_challenge_discovery_blocked_during_active_minigame() {
 #[test]
 fn test_challenge_discovery_can_succeed_at_p1() {
     // Behavior: at P1+ with no blockers, discovery is possible
-    // Note: CHALLENGE_DISCOVERY_CHANCE is 0.000014 per tick, so need many trials
+    // Use a very high haven bonus to make discovery ~14% per call,
+    // reducing iterations from 100k to 100 while testing the same code path.
     let mut state = create_test_state();
     state.prestige_rank = 1;
 
     let mut discovered = false;
-    for seed in 0..100_000u64 {
+    for seed in 0..100u64 {
         let mut rng = create_seeded_rng(seed);
-        if try_discover_challenge(&mut state, &mut rng).is_some() {
+        if try_discover_challenge_with_haven(&mut state, &mut rng, 1_000_000.0).is_some() {
             discovered = true;
             break;
         }
@@ -760,9 +761,10 @@ fn test_challenge_discovery_returns_valid_challenge_type() {
 #[test]
 fn test_challenge_discovery_haven_bonus_increases_rate() {
     // Behavior: Haven ChallengeDiscoveryPercent boosts discovery (line 1033)
-    // CHALLENGE_DISCOVERY_CHANCE is 0.000014, so with 20k trials base ~0.28.
-    // Use a very high haven bonus (10000%) to make the boosted rate reliably higher.
-    let trials = 2_000u64;
+    // Use a very high haven bonus (1_000_000%) so the boosted rate (~14%) vastly
+    // exceeds the base rate (~0.0014%). 200 trials is more than sufficient to
+    // observe the difference reliably.
+    let trials = 200u64;
     let mut discoveries_base = 0u32;
     let mut discoveries_boosted = 0u32;
 
@@ -781,14 +783,14 @@ fn test_challenge_discovery_haven_bonus_increases_rate() {
         let mut state = create_test_state();
         state.prestige_rank = 1;
 
-        if try_discover_challenge_with_haven(&mut state, &mut rng, 10000.0).is_some() {
+        if try_discover_challenge_with_haven(&mut state, &mut rng, 1_000_000.0).is_some() {
             discoveries_boosted += 1;
         }
     }
 
     assert!(
         discoveries_boosted > discoveries_base,
-        "Haven +10000% should increase discoveries: base={}, boosted={}",
+        "Haven +1000000% should increase discoveries: base={}, boosted={}",
         discoveries_base,
         discoveries_boosted
     );
@@ -797,14 +799,16 @@ fn test_challenge_discovery_haven_bonus_increases_rate() {
 #[test]
 fn test_challenge_discovery_no_duplicates_in_menu() {
     // Behavior: already-pending challenge types are excluded (challenges/menu.rs line 523)
+    // Use a very high haven bonus to make discovery ~14% per call,
+    // reducing iterations from 100k to 100 per discovery.
     let mut state = create_test_state();
     state.prestige_rank = 1;
 
     // Discover first challenge
     let mut first_type_disc = None;
-    for seed in 0..100_000u64 {
+    for seed in 0..100u64 {
         let mut rng = create_seeded_rng(seed);
-        if let Some(ct) = try_discover_challenge(&mut state, &mut rng) {
+        if let Some(ct) = try_discover_challenge_with_haven(&mut state, &mut rng, 1_000_000.0) {
             first_type_disc = Some(std::mem::discriminant(&ct));
             // Add to pending challenges
             let challenge = quest::challenges::menu::create_challenge(&ct);
@@ -816,9 +820,9 @@ fn test_challenge_discovery_no_duplicates_in_menu() {
     assert!(first_type_disc.is_some(), "Should discover first challenge");
 
     // Try to discover again - should not get the same type
-    for seed in 0..100_000u64 {
+    for seed in 0..100u64 {
         let mut rng = create_seeded_rng(seed);
-        if let Some(ct) = try_discover_challenge(&mut state, &mut rng) {
+        if let Some(ct) = try_discover_challenge_with_haven(&mut state, &mut rng, 1_000_000.0) {
             assert_ne!(
                 std::mem::discriminant(&ct),
                 first_type_disc.unwrap(),

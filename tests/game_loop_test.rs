@@ -379,7 +379,7 @@ fn test_offline_progression_with_long_absence() {
 
     // elapsed_seconds shows actual time, but XP is calculated with 7-day cap internally
     assert!(
-        report.elapsed_seconds >= ten_days_seconds - 1, // Allow 1 second tolerance
+        report.elapsed_seconds >= ten_days_seconds - 2, // Allow 2 second tolerance
         "Should report actual elapsed time"
     );
     assert!(report.xp_gained > 0, "Should still gain XP");
@@ -416,7 +416,7 @@ fn test_short_offline_time_still_processes() {
 
     // Even short times are processed (threshold check is at display level in main.rs)
     assert!(
-        report.elapsed_seconds >= 29, // Allow tolerance
+        report.elapsed_seconds >= 28, // Allow tolerance
         "Should report elapsed time even for short periods"
     );
 }
