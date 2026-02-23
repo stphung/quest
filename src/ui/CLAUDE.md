@@ -32,6 +32,7 @@ src/ui/
 ├── achievement_details.rs      # Achievement browser detail panel and stats view
 ├── achievement_list.rs         # Achievement browser list panel
 ├── achievement_tabs.rs         # Achievement browser category tabs
+├── title_browser_scene.rs      # Title browser overlay (select display title from unlocked achievements)
 ├── debug_menu_scene.rs         # Debug menu overlay with tabbed categories (Challenges, World, Resources, Items)
 ├── help_overlay.rs             # Help/controls overlay
 │

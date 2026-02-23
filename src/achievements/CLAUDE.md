@@ -14,6 +14,7 @@ src/achievements/
 ├── modal.rs          # Modal notification queue, 500ms accumulation window management
 ├── notifications.rs  # Pending notification state, category-based notification counts
 ├── stats.rs          # Achievement statistics, unlock percentages, progress queries, category breakdowns
+├── titles.rs         # Title definitions — maps curated achievements to display text, title selection/validation
 ├── unlock.rs         # Core unlock machinery (is_unlocked, unlock, unlock_with_name, check_milestones)
 └── persistence.rs    # Save/load from ~/.quest/achievements.json
 ```
@@ -22,14 +23,14 @@ src/achievements/
 
 ### `AchievementId` (`types.rs`)
 
-Enum with 158 variants covering all trackable milestones. Organized by domain:
+Enum with 149 variants covering all trackable milestones. Organized by domain:
 
 - **Combat**: `SlayerI`..`SlayerXV` (100 to 1B kills), `BossHunterI`..`BossHunterXV` (1 to 10M bosses)
 - **Level**: `Level10`..`Level1500` (11 milestones)
 - **Prestige**: `FirstPrestige`..`Eternal` (P1 to P100, 12 milestones)
-- **Zones**: `Zone1Complete`..`Zone10Complete`, `TheStormbreaker`, `StormsEnd`, `ExpanseCycleI`..`ExpanseCycleIV`
+- **Zones**: `Zone1Complete`..`Zone10Complete`, `TheStormbreaker`, `StormsEnd`, `BeyondInfinity`
 - **Challenges**: 4 difficulties per game type (chess, morris, gomoku, minesweeper, rune, go, flappy_bird, snake, jezzball, runic_shift) + `GrandChampion` (100 wins)
-- **Enhancement**: `SoulforgeDiscovered`, `ApprenticeSmith` (+1), `FullyTempered` (+4 all), `JourneymanSmith` (+5), `SoulforgeAdept` (+6), `SoulforgeSavant` (+7), `SoulforgeMaster` (+8), `SoulforgeGrandmaster` (+9), `MasterSmith` (+10), `SoulConvergence` (+7 all)
+- **Enhancement**: `SoulforgeDiscovered`, `ApprenticeSmith` (+1), `FullyTempered` (+4 all), `JourneymanSmith` (+5), `SoulforgeAdept` (+6), `SoulforgeSavant` (+7), `SoulforgeMaster` (+8), `SoulforgeGrandmaster` (+9), `SoulforgeAscendant` (+10), `SoulConvergence` (+7 all), `PersistentHammering` (100 attempts)
 - **Fishing**: `GoneFishing`, `FishermanI`..`FishermanIV` (rank milestones), `FishCatcherI`..`FishCatcherX` (100 to 100M fish catches), `StormLeviathan`
 - **Dungeons**: `DungeonDiver`, `DungeonMasterI`..`DungeonMasterX` (10 to 1M dungeons)
 - **Haven**: `HavenDiscovered`, `HavenBuilderI`..`HavenBuilderII`, `HavenArchitect`
@@ -49,7 +50,9 @@ Main state struct (serialized to disk). Contains:
 - `unlocked: HashMap<AchievementId, UnlockedAchievement>` -- which achievements are unlocked and when
 - `progress: HashMap<AchievementId, AchievementProgress>` -- current/target for multi-stage achievements
 - Aggregate counters: `total_kills`, `total_bosses_defeated`, `total_fish_caught`, `total_dungeons_completed`, `total_minigame_wins`, `highest_prestige_rank`, `highest_level`, `highest_fishing_rank`, `zones_fully_cleared`, `expanse_cycles_completed`
-- Transient fields (`#[serde(skip)]`): `pending_notifications`, `newly_unlocked`, `modal_queue`, `accumulation_start`
+- `ui_border_style: UiBorderStyle` -- global border style for panel UI
+- `selected_title: Option<AchievementId>` -- currently selected character title (account-wide)
+- Transient fields (`#[serde(skip)]`): `pending_notifications`, `newly_unlocked`, `modal_queue`, `recently_unlocked`, `accumulation_start`
 
 ## How Achievements Are Unlocked
 
@@ -109,6 +112,19 @@ Additionally, `newly_unlocked` is drained each tick by `collect_achievement_even
 - **haven** (`haven/logic.rs`): Haven upgrades trigger `on_haven_all_t1/t2/architect` checks.
 - **zones** (`zones/data.rs`): `sync_zone_completions()` uses zone definitions to check which zones are fully cleared.
 - **UI** (`ui/achievement_browser_scene.rs`): Achievement browser overlay and unlock modal rendering.
+
+## Title System (`titles.rs`)
+
+Titles are display names earned by unlocking specific achievements. Players can select one title to display after their character name (e.g., "Hero, Godslayer"). Titles are account-wide and persist in `selected_title` on the `Achievements` struct.
+
+- `ALL_TITLES`: const slice of `TitleDef { achievement_id, title_text }` — 44 curated titles across combat, challenges, exploration, and enhancement categories
+- `get_title_text(id)`: returns the title text for an achievement, if it grants a title
+- `get_unlocked_titles(achievements)`: returns all titles the player has earned, in display order
+- `validate_selected_title(achievements)`: clears `selected_title` if the achievement isn't unlocked or doesn't grant a title (called on load)
+
+Title browser UI: `ui/title_browser_scene.rs` — overlay opened with [T] from the achievement browser. Shows unlocked titles, preview of name + title, select with Enter, clear with Backspace.
+
+Titles are shown in: stats panel header, character select screen, and achievement browser (✦ indicator on achievements that grant titles).
 
 ## Adding a New Achievement
 

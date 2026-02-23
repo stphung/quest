@@ -279,8 +279,8 @@ Account-level achievement system that persists across all characters. Stored in 
 ### Categories (6)
 
 **Combat:**
-- Slayer I-XV: 100, 500, 1K, 5K, 10K, 50K, 100K, 500K, 1M, 5M, 10M, 50M, 100M, 500M, 1B kills. Unique icon progression per tier displayed as badges in the combat panel title
-- Boss Hunter I-XV: 1, 10, 50, 100, 500, 1K, 5K, 10K, 50K, 100K, 500K, 1M, 2M, 5M, 10M boss kills. Unique icon progression per tier displayed as badges in the combat panel title
+- Slayer I-XV: 100, 500, 1K, 5K, 10K, 50K, 100K, 500K, 1M, 2.5M, 10M, 50M, 100M, 500M, 1B kills. Unique icon progression per tier displayed as badges in the combat panel title
+- Boss Hunter I-XV: 1, 10, 50, 100, 500, 1K, 5K, 10K, 25K, 75K, 250K, 750K, 2.5M, 5M, 10M boss kills. Unique icon progression per tier displayed as badges in the combat panel title
 
 **Level:**
 - Milestones: L10, L25, L50, L100, L150, L200, L250, L500, L750, L1000, L1500
@@ -294,7 +294,7 @@ Account-level achievement system that persists across all characters. Stored in 
 
 **Exploration:**
 - Zone1Complete through Zone10Complete
-- ExpanseCycleI-IV: 1, 100, 1K, 10K cycles of Zone 11
+- BeyondInfinity: Complete a cycle of Zone 11 (The Expanse)
 - StormLeviathan: Caught the Storm Leviathan
 - TheStormbreaker: Forged the Stormbreaker
 - StormsEnd: Defeated The Undying Storm with Stormbreaker
@@ -311,7 +311,7 @@ Account-level achievement system that persists across all characters. Stored in 
 - SoulforgeSavant: Enhance any equipment to +7
 - SoulforgeMaster: Enhance any equipment to +8
 - SoulforgeGrandmaster: Enhance any equipment to +9
-- MasterSmith: Enhance any equipment to +10
+- SoulforgeAscendant: Enhance any equipment to +10
 - SoulConvergence: Enhance all 7 equipment slots to +7
 - PersistentHammering: Attempt 100 enhancements
 
@@ -320,7 +320,15 @@ Account-level achievement system that persists across all characters. Stored in 
 - FishCatcherI-X: 100, 1K, 10K, 100K, 500K, 1M, 5M, 10M, 50M, 100M fish caught
 
 **Dungeons:**
-- DungeonDiver, DungeonMasterI-X: 1, 10, 50, 100, 1K, 5K, 10K, 50K, 100K, 500K, 1M dungeons cleared
+- DungeonDiver, DungeonMasterI-X: 1, 10, 50, 100, 1K, 5K, 10K, 25K, 100K, 500K, 1M dungeons cleared
 
 **Stats:**
 - Tracks cumulative gameplay statistics (kills, deaths, fish caught, dungeons cleared, etc.)
+
+### Title System
+
+Titles are display names earned by unlocking specific achievements. 44 curated titles across combat, challenges, exploration, and enhancement categories. Players select one title to display after their character name (e.g., "Hero, Godslayer"). Account-wide, persisted in `achievements.json`.
+
+- Title browser: overlay opened with [T] from achievement browser. Shows unlocked titles, preview, select with Enter, clear with Backspace
+- Titles shown in: stats panel header, character select screen, achievement browser (✦ indicator)
+- Defined in `src/achievements/titles.rs`
