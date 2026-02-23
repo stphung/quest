@@ -3,6 +3,12 @@ mod achievement_details;
 mod achievement_list;
 mod achievement_tabs;
 pub mod bug_report_scene;
+pub mod deep_scene;
+mod deep_missions;
+mod deep_roster;
+mod deep_layers;
+mod deep_events;
+mod deep_results;
 pub mod challenge_menu_scene;
 pub mod character_creation;
 pub mod character_delete;
@@ -371,6 +377,7 @@ pub fn draw_ui_with_update(
     haven_discovered: bool,
     soulforge_discovered: bool,
     stormglass_discovered: bool,
+    deep_discovered: bool,
     achievements: &crate::achievements::Achievements,
     enhancement_levels: &[u8; 7],
 ) {
@@ -395,6 +402,7 @@ pub fn draw_ui_with_update(
                 haven_discovered,
                 soulforge_discovered,
                 stormglass_discovered,
+                deep_discovered,
                 achievements,
                 enhancement_levels,
             );
@@ -407,6 +415,7 @@ pub fn draw_ui_with_update(
                 haven_discovered,
                 soulforge_discovered,
                 stormglass_discovered,
+                deep_discovered,
                 achievements,
             );
         }
@@ -431,6 +440,7 @@ fn draw_xl_l_layout(
     haven_discovered: bool,
     soulforge_discovered: bool,
     stormglass_discovered: bool,
+    deep_discovered: bool,
     achievements: &crate::achievements::Achievements,
     enhancement_levels: &[u8; 7],
 ) {
@@ -509,6 +519,7 @@ fn draw_xl_l_layout(
         haven_discovered,
         soulforge_discovered,
         stormglass_discovered,
+        deep_discovered,
         achievements.pending_count(),
         ctx,
     );
@@ -526,6 +537,7 @@ fn draw_m_layout(
     haven_discovered: bool,
     soulforge_discovered: bool,
     stormglass_discovered: bool,
+    deep_discovered: bool,
     achievements: &crate::achievements::Achievements,
 ) {
     let area = frame.area();
@@ -586,6 +598,7 @@ fn draw_m_layout(
         haven_discovered,
         soulforge_discovered,
         stormglass_discovered,
+        deep_discovered,
         achievements.pending_count(),
     );
 }

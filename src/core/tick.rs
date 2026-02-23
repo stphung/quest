@@ -30,6 +30,7 @@ use rand::Rng;
 ///   Caller owns this counter across ticks.
 /// - `haven` — Mutable Haven state for bonus calculations and discovery.
 /// - `enhancement` — Mutable Enhancement state for soulforge discovery.
+/// - `deep` — Mutable Deep state for mercenary expedition discovery.
 /// - `achievements` — Mutable achievement state for unlock tracking.
 /// - `debug_mode` — When true, suppresses achievement/haven-save signals.
 /// - `rng` — Random number generator (any `impl Rng`). Pass
@@ -45,6 +46,7 @@ use rand::Rng;
 /// - Persisting achievements to disk when `achievements_changed` is true
 /// - Persisting Haven to disk when `haven_changed` is true
 /// - Persisting Enhancement to disk when `enhancement_changed` is true
+/// - Persisting Deep to disk when `deep_changed` is true
 /// - Showing the Leviathan encounter modal when `leviathan_encounter` is `Some`
 /// - Showing achievement modal overlay when `achievement_modal_ready` is non-empty
 pub fn game_tick<R: Rng>(
@@ -52,6 +54,7 @@ pub fn game_tick<R: Rng>(
     tick_counter: &mut u32,
     haven: &mut Haven,
     enhancement: &mut crate::enhancement::EnhancementProgress,
+    deep: &mut crate::deep::DeepState,
     achievements: &mut Achievements,
     debug_mode: bool,
     rng: &mut R,
@@ -243,6 +246,22 @@ pub fn game_tick<R: Rng>(
         }
     }
 
+    // ── 11b. Deep discovery check ────────────────────────────────
+    // Independent roll per tick, only when eligible (P15+, no active content)
+    if !deep.persistent.discovered
+        && state.prestige_rank >= crate::deep::DEEP_MIN_PRESTIGE_RANK
+        && state.active_dungeon.is_none()
+        && state.active_fishing.is_none()
+        && state.active_minigame.is_none()
+        && crate::deep::try_discover_deep(deep, state.prestige_rank, rng)
+    {
+        result.events.push(TickEvent::DeepDiscovered);
+        result.deep_changed = true;
+        if !debug_mode {
+            result.achievements_changed = true;
+        }
+    }
+
     // ── 12. Achievement modal accumulation ────────────────────────
     if achievements.is_modal_ready() {
         result.achievement_modal_ready = achievements.take_modal_queue();
@@ -254,6 +273,7 @@ pub fn game_tick<R: Rng>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::deep::DeepState;
     use crate::enhancement::EnhancementProgress;
     use crate::haven::Haven;
     use rand::SeedableRng;
@@ -269,6 +289,7 @@ mod tests {
         let mut tick_counter = 0u32;
         let mut haven = Haven::default();
         let mut enhancement = EnhancementProgress::new();
+        let mut deep = DeepState::new();
         let mut achievements = Achievements::default();
         let mut rng = test_rng();
 
@@ -277,6 +298,7 @@ mod tests {
             &mut tick_counter,
             &mut haven,
             &mut enhancement,
+            &mut deep,
             &mut achievements,
             false,
             &mut rng,
@@ -296,6 +318,7 @@ mod tests {
         let mut tick_counter = 0u32;
         let mut haven = Haven::default();
         let mut enhancement = EnhancementProgress::new();
+        let mut deep = DeepState::new();
         let mut achievements = Achievements::default();
         let mut rng = test_rng();
 
@@ -307,6 +330,7 @@ mod tests {
                 &mut tick_counter,
                 &mut haven,
                 &mut enhancement,
+                &mut deep,
                 &mut achievements,
                 false,
                 &mut rng,
@@ -323,6 +347,7 @@ mod tests {
         let mut tick_counter = 0u32;
         let mut haven = Haven::default();
         let mut enhancement = EnhancementProgress::new();
+        let mut deep = DeepState::new();
         let mut achievements = Achievements::default();
         let mut rng = test_rng();
 
@@ -333,6 +358,7 @@ mod tests {
             &mut tick_counter,
             &mut haven,
             &mut enhancement,
+            &mut deep,
             &mut achievements,
             false,
             &mut rng,
@@ -357,6 +383,7 @@ mod tests {
         let mut tick_counter = 0u32;
         let mut haven = Haven::default();
         let mut enhancement = EnhancementProgress::new();
+        let mut deep = DeepState::new();
         let mut achievements = Achievements::default();
         let mut rng = test_rng();
 
@@ -367,6 +394,7 @@ mod tests {
                 &mut tick_counter,
                 &mut haven,
                 &mut enhancement,
+                &mut deep,
                 &mut achievements,
                 false,
                 &mut rng,

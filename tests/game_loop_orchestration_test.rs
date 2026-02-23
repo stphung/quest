@@ -71,6 +71,7 @@ fn run_game_tick(
         tc,
         haven,
         &mut EnhancementProgress::new(),
+        &mut quest::deep::DeepState::new(),
         ach,
         debug_mode,
         rng,

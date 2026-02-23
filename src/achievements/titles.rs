@@ -194,6 +194,27 @@ pub const ALL_TITLES: &[TitleDef] = &[
         achievement_id: AchievementId::SoulforgeAscendant,
         title_text: "Soulforged",
     },
+    // The Deep
+    TitleDef {
+        achievement_id: AchievementId::TheDeepDiscovered,
+        title_text: "Captain",
+    },
+    TitleDef {
+        achievement_id: AchievementId::GuildRank3,
+        title_text: "Commander",
+    },
+    TitleDef {
+        achievement_id: AchievementId::GuildRank5,
+        title_text: "Overlord",
+    },
+    TitleDef {
+        achievement_id: AchievementId::Layer25Cleared,
+        title_text: "Abyssal Pioneer",
+    },
+    TitleDef {
+        achievement_id: AchievementId::DeepMissionsC,
+        title_text: "Warmaster",
+    },
 ];
 
 /// Get the title text for an achievement, if it grants a title.

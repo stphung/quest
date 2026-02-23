@@ -3,11 +3,12 @@
 use crate::achievements;
 use crate::character::manager::CharacterManager;
 use crate::core::game_state::GameState;
+use crate::deep;
 use crate::enhancement;
 use crate::haven;
 use crate::history::{HistoryRepo, SaveEvent};
 
-/// Save all game state files (character, achievements, haven, enhancement).
+/// Save all game state files (character, achievements, haven, enhancement, deep).
 ///
 /// If a `save_event` and `history_repo` are both provided, a git commit is
 /// created after the JSON files are written.
@@ -17,6 +18,7 @@ pub fn save_all(
     global_achievements: &achievements::Achievements,
     haven: &haven::Haven,
     enhancement: &enhancement::EnhancementProgress,
+    deep: &deep::DeepState,
     save_event: Option<&SaveEvent>,
     history_repo: Option<&HistoryRepo>,
 ) {
@@ -27,6 +29,9 @@ pub fn save_all(
     }
     if enhancement.discovered {
         enhancement::save_enhancement(enhancement).ok();
+    }
+    if deep.persistent.discovered {
+        deep::save_deep(deep).ok();
     }
 
     if let (Some(event), Some(repo)) = (save_event, history_repo) {

@@ -507,6 +507,7 @@ pub(super) fn draw_footer_compact(
     haven_discovered: bool,
     soulforge_discovered: bool,
     stormglass_discovered: bool,
+    deep_discovered: bool,
     pending_achievements: usize,
 ) {
     use crate::character::prestige::can_prestige;
@@ -541,6 +542,12 @@ pub(super) fn draw_footer_compact(
         Span::raw("")
     };
 
+    let deep_span = if deep_discovered {
+        Span::styled(" [D]eep", Style::default().fg(Color::Rgb(80, 160, 220)))
+    } else {
+        Span::raw("")
+    };
+
     let ach_span = if pending_achievements > 0 {
         Span::styled(
             format!(" [A]Ach({})", pending_achievements),
@@ -557,6 +564,7 @@ pub(super) fn draw_footer_compact(
         haven_span,
         soulforge_span,
         stormglass_span,
+        deep_span,
         ach_span,
         Span::styled(" [T]Vault", Style::default().fg(Color::Cyan)),
         Span::styled(" [W]Wiki", Style::default().fg(Color::DarkGray)),
@@ -661,6 +669,7 @@ pub fn draw_footer(
     haven_discovered: bool,
     soulforge_discovered: bool,
     stormglass_discovered: bool,
+    deep_discovered: bool,
     pending_achievements: usize,
     _ctx: &LayoutContext,
 ) {
@@ -739,6 +748,15 @@ pub fn draw_footer(
         Span::raw("")
     };
 
+    let deep_text = if deep_discovered {
+        Span::styled(
+            "    [D] The Deep",
+            Style::default().fg(Color::Rgb(80, 160, 220)),
+        )
+    } else {
+        Span::raw("")
+    };
+
     let achievements_text = if pending_achievements > 0 {
         Span::styled(
             format!("[A] Achievements (\u{1f3c6} {} new!)", pending_achievements),
@@ -756,6 +774,7 @@ pub fn draw_footer(
             haven_text,
             soulforge_text,
             stormglass_text,
+            deep_text,
             update_status_text,
         ]),
         Line::from(vec![
