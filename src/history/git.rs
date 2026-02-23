@@ -218,6 +218,7 @@ impl HistoryRepo {
     }
 
     /// Checkout an existing branch (force).
+    #[allow(dead_code)]
     pub fn switch_branch(&self, branch_name: &str) -> Result<(), HistoryError> {
         // Verify the branch exists.
         self.repo

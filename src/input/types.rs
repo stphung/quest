@@ -92,6 +92,10 @@ pub enum GameOverlay {
         clipboard_ready: bool,
         error: Option<String>,
     },
+    /// Timeline browser for save history
+    Timeline {
+        browser: crate::ui::timeline_scene::TimelineBrowserState,
+    },
 }
 
 /// Result of handling a game input event.
@@ -108,4 +112,10 @@ pub enum InputResult {
     ToggleUpdateDetails,
     /// Start a Chrono Surge with the given number of ticks.
     StartChronoSurge { ticks: u64 },
+    /// Open the timeline browser (main.rs populates state from HistoryRepo).
+    OpenTimeline,
+    /// Restore game state to a specific commit in the timeline.
+    RestoreTimeline { commit_id: String },
+    /// Reload commits for a different branch in the timeline browser.
+    RefreshTimelineCommits { branch_name: String },
 }

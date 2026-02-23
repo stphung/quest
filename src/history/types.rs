@@ -8,6 +8,7 @@
 
 /// Describes the reason a save-state commit was created.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum SaveEvent {
     // Milestone progression
     LevelUp(u32),
@@ -128,5 +129,6 @@ pub struct TimelineInfo {
     /// Whether this is the currently checked-out branch.
     pub is_active: bool,
     /// Most recent commit on this branch, if any.
+    #[allow(dead_code)]
     pub head_commit: Option<CommitInfo>,
 }

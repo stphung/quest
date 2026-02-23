@@ -8,6 +8,7 @@ mod minigame_input;
 mod prestige_input;
 mod soulforge_input;
 mod stormglass_input;
+pub mod timeline_input;
 pub mod types;
 
 // Re-export all types for backward compatibility
@@ -95,6 +96,25 @@ pub fn handle_game_input(
     // 0.8. Bug report overlay
     if matches!(overlay, GameOverlay::BugReport { .. }) {
         return handle_bug_report_overlay(key, overlay);
+    }
+
+    // 0.85. Timeline browser overlay
+    if let GameOverlay::Timeline { ref mut browser } = overlay {
+        use timeline_input::{handle_timeline_input, TimelineAction};
+        match handle_timeline_input(key, browser) {
+            TimelineAction::Close => {
+                *overlay = GameOverlay::None;
+            }
+            TimelineAction::Continue => {}
+            TimelineAction::Restore { commit_id } => {
+                *overlay = GameOverlay::None;
+                return InputResult::RestoreTimeline { commit_id };
+            }
+            TimelineAction::RefreshCommits { branch_name } => {
+                return InputResult::RefreshTimelineCommits { branch_name };
+            }
+        }
+        return InputResult::Continue;
     }
 
     // 1. Haven discovery modal (blocks all other input)
@@ -359,6 +379,10 @@ fn handle_base_game(
                 browser: crate::ui::achievement_browser_scene::AchievementBrowserState::new(),
             };
             InputResult::Continue
+        }
+        KeyCode::Char('t') | KeyCode::Char('T') => {
+            // Timeline browser — main.rs populates state from HistoryRepo
+            InputResult::OpenTimeline
         }
         KeyCode::Char('?') => {
             *overlay = GameOverlay::Help;
