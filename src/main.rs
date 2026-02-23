@@ -682,6 +682,9 @@ fn main() -> io::Result<()> {
                                             state = reloaded;
                                         }
 
+                                        // Suppress offline XP on the reloaded save
+                                        state.last_save_time = Utc::now().timestamp();
+
                                         // Refresh vault browser in-place (overlay stays open)
                                         if let GameOverlay::TimeVault { ref mut browser } = overlay {
                                             if let Ok(branches) = repo.list_branches() {
@@ -737,6 +740,9 @@ fn main() -> io::Result<()> {
                                             state = reloaded;
                                         }
 
+                                        // Suppress offline XP on the reloaded save
+                                        state.last_save_time = Utc::now().timestamp();
+
                                         // Refresh vault browser in-place (overlay stays open)
                                         if let GameOverlay::TimeVault { ref mut browser } = overlay {
                                             if let Ok(branches) = repo.list_branches() {
@@ -789,6 +795,9 @@ fn main() -> io::Result<()> {
                                             );
                                             state = reloaded;
                                         }
+
+                                        // Suppress offline XP on the reloaded save
+                                        state.last_save_time = Utc::now().timestamp();
 
                                         // Refresh vault browser in-place (overlay stays open)
                                         if let GameOverlay::TimeVault { ref mut browser } = overlay {
@@ -920,7 +929,10 @@ fn main() -> io::Result<()> {
                     {
                         let elapsed_since_save = Utc::now().timestamp() - state.last_save_time;
                         if elapsed_since_save > 60
-                            && !matches!(overlay, GameOverlay::OfflineWelcome { .. })
+                            && !matches!(
+                                overlay,
+                                GameOverlay::OfflineWelcome { .. } | GameOverlay::TimeVault { .. }
+                            )
                         {
                             if let Some(report) = apply_offline_xp(&mut state, &haven) {
                                 overlay = GameOverlay::OfflineWelcome { report };
@@ -1090,17 +1102,22 @@ fn main() -> io::Result<()> {
                                 );
                             }
 
-                            if let Some(encounter_number) = tick_result.leviathan_encounter {
-                                overlay = GameOverlay::LeviathanEncounter { encounter_number };
-                            }
-                            if tick_flags.haven_discovered {
-                                overlay = GameOverlay::HavenDiscovery;
-                            }
-                            if tick_flags.soulforge_discovered {
-                                overlay = GameOverlay::SoulforgeDiscovery;
-                            }
-                            if tick_flags.stormglass_discovered {
-                                overlay = GameOverlay::StormglassDiscovery;
+                            // Discovery/encounter overlays should not clobber
+                            // an open Time Vault; they will fire on a later tick.
+                            let vault_open = matches!(overlay, GameOverlay::TimeVault { .. });
+                            if !vault_open {
+                                if let Some(encounter_number) = tick_result.leviathan_encounter {
+                                    overlay = GameOverlay::LeviathanEncounter { encounter_number };
+                                }
+                                if tick_flags.haven_discovered {
+                                    overlay = GameOverlay::HavenDiscovery;
+                                }
+                                if tick_flags.soulforge_discovered {
+                                    overlay = GameOverlay::SoulforgeDiscovery;
+                                }
+                                if tick_flags.stormglass_discovered {
+                                    overlay = GameOverlay::StormglassDiscovery;
+                                }
                             }
 
                             if matches!(overlay, GameOverlay::None)
