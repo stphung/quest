@@ -8,12 +8,15 @@
 //! game loop. Integration is tracked in task #29 (Wire Deep overlay into main).
 #![allow(dead_code)]
 
-use crate::deep::clock::{format_duration, is_mission_complete, mission_progress_percent, pending_events, time_remaining_secs};
-use crate::deep::infrastructure::total_outpost_daily_income;
-use crate::deep::types::{
-    GuildRank, MercStatus, MissionType, TheDeepState,
+use crate::deep::clock::{
+    format_duration, is_mission_complete, mission_progress_percent, pending_events,
+    time_remaining_secs,
 };
-use crate::deep::ui_state::{DeepTab, DeepUiState, EventResolveState, LaunchStep, MissionLaunchState};
+use crate::deep::infrastructure::total_outpost_daily_income;
+use crate::deep::types::{GuildRank, MercStatus, MissionType, TheDeepState};
+use crate::deep::ui_state::{
+    DeepTab, DeepUiState, EventResolveState, LaunchStep, MissionLaunchState,
+};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -223,7 +226,10 @@ fn render_tab_bar(frame: &mut Frame, area: Rect, ui: &DeepUiState) {
 
 fn render_divider(frame: &mut Frame, area: Rect, width: u16) {
     let line = "\u{2500}".repeat(width as usize);
-    let divider = Paragraph::new(Span::styled(line, Style::default().fg(Color::Rgb(40, 50, 70))));
+    let divider = Paragraph::new(Span::styled(
+        line,
+        Style::default().fg(Color::Rgb(40, 50, 70)),
+    ));
     frame.render_widget(divider, area);
 }
 
@@ -303,10 +309,7 @@ fn render_dashboard(frame: &mut Frame, area: Rect, deep: &TheDeepState, now_unix
             ),
         ]),
         Line::from(vec![
-            Span::styled(
-                "  Warband Marks: ",
-                Style::default().fg(Color::DarkGray),
-            ),
+            Span::styled("  Warband Marks: ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 format!("{}", deep.run.warband_marks),
                 Style::default().fg(Color::Yellow),
@@ -331,10 +334,7 @@ fn render_dashboard(frame: &mut Frame, area: Rect, deep: &TheDeepState, now_unix
 
     if completed_count > 0 {
         lines.push(Line::from(vec![
-            Span::styled(
-                "  Awaiting:   ",
-                Style::default().fg(Color::DarkGray),
-            ),
+            Span::styled("  Awaiting:   ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 format!("{} completed", completed_count),
                 Style::default()
@@ -358,10 +358,7 @@ fn render_dashboard(frame: &mut Frame, area: Rect, deep: &TheDeepState, now_unix
         ),
     ]));
     lines.push(Line::from(vec![
-        Span::styled(
-            "  Outpost Income: ",
-            Style::default().fg(Color::DarkGray),
-        ),
+        Span::styled("  Outpost Income: ", Style::default().fg(Color::DarkGray)),
         Span::styled(
             format!("{} Marks/day", total_income),
             Style::default().fg(Color::Yellow),
@@ -383,7 +380,11 @@ fn render_dashboard(frame: &mut Frame, area: Rect, deep: &TheDeepState, now_unix
             let time_str = format_duration(remaining);
             let pending = pending_events(mission, now_unix).len();
             let event_indicator = if pending > 0 {
-                format!(" [{} event{}]", pending, if pending == 1 { "" } else { "s" })
+                format!(
+                    " [{} event{}]",
+                    pending,
+                    if pending == 1 { "" } else { "s" }
+                )
             } else {
                 String::new()
             };
@@ -407,17 +408,18 @@ fn render_dashboard(frame: &mut Frame, area: Rect, deep: &TheDeepState, now_unix
         if let Some(next) = rank.next() {
             lines.push(Line::from(""));
             let can_afford = deep.run.warband_marks >= cost;
-            let color = if can_afford { Color::Green } else { Color::DarkGray };
+            let color = if can_afford {
+                Color::Green
+            } else {
+                Color::DarkGray
+            };
             lines.push(Line::from(vec![
                 Span::styled("  Upgrade to ", Style::default().fg(Color::DarkGray)),
                 Span::styled(
                     guild_rank_name(next),
                     Style::default().fg(guild_rank_color(next)),
                 ),
-                Span::styled(
-                    format!(": {} Marks", cost),
-                    Style::default().fg(color),
-                ),
+                Span::styled(format!(": {} Marks", cost), Style::default().fg(color)),
             ]));
         }
     }
@@ -496,7 +498,10 @@ fn render_roster(frame: &mut Frame, area: Rect, deep: &TheDeepState, ui: &DeepUi
         .row_highlight_style(Style::default().add_modifier(Modifier::BOLD));
 
     let mut state = TableState::default();
-    state.select(Some(ui.selected_index.min(deep.run.mercenaries.len().saturating_sub(1))));
+    state.select(Some(
+        ui.selected_index
+            .min(deep.run.mercenaries.len().saturating_sub(1)),
+    ));
     frame.render_stateful_widget(table, area, &mut state);
 }
 
@@ -529,12 +534,10 @@ fn render_missions(
                 Style::default().fg(Color::DarkGray),
             )),
             Line::from(""),
-            Line::from(vec![
-                Span::styled(
-                    format!("  Mission slots: {}", slots),
-                    Style::default().fg(Color::White),
-                ),
-            ]),
+            Line::from(vec![Span::styled(
+                format!("  Mission slots: {}", slots),
+                Style::default().fg(Color::White),
+            )]),
             Line::from(Span::styled(
                 "  Press [Enter] to launch a mission.",
                 Style::default().fg(Color::DarkGray),
@@ -598,10 +601,7 @@ fn render_missions(
                 ]));
                 lines.push(Line::from(vec![
                     Span::styled("     ", Style::default()),
-                    Span::styled(
-                        bar,
-                        Style::default().fg(progress_color(progress)),
-                    ),
+                    Span::styled(bar, Style::default().fg(progress_color(progress))),
                     Span::styled(
                         format!("  {}", time_str),
                         Style::default().fg(Color::DarkGray),
@@ -663,10 +663,7 @@ fn render_missions(
                     format!("  +{} Marks", cm.marks_earned),
                     Style::default().fg(Color::Yellow),
                 ),
-                Span::styled(
-                    "  [c] Collect",
-                    Style::default().fg(Color::DarkGray),
-                ),
+                Span::styled("  [c] Collect", Style::default().fg(Color::DarkGray)),
             ]));
         }
         let para = Paragraph::new(lines);
@@ -708,7 +705,10 @@ fn render_recruitment(frame: &mut Frame, area: Rect, deep: &TheDeepState, ui: &D
                 Color::White
             }),
         ),
-        Span::styled("   (cost per hire: 40 Marks)", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            "   (cost per hire: 40 Marks)",
+            Style::default().fg(Color::DarkGray),
+        ),
     ]);
 
     let header = Row::new(vec!["Name", "Archetype", "Power", "Resil", "Cost"])
@@ -749,9 +749,7 @@ fn render_recruitment(frame: &mut Frame, area: Rect, deep: &TheDeepState, ui: &D
         Constraint::Length(8),
     ];
 
-    let table = Table::new(rows, widths)
-        .header(header)
-        .column_spacing(1);
+    let table = Table::new(rows, widths).header(header).column_spacing(1);
 
     // Layout: cap line (1) + table (rest).
     let chunks = Layout::default()
@@ -865,7 +863,11 @@ fn render_launch_select_mission(
                         mission_type_name(*mt),
                         Style::default()
                             .fg(mission_type_color(*mt))
-                            .add_modifier(if is_sel { Modifier::BOLD } else { Modifier::empty() }),
+                            .add_modifier(if is_sel {
+                                Modifier::BOLD
+                            } else {
+                                Modifier::empty()
+                            }),
                     ),
                 ]),
                 Line::from(vec![
@@ -922,10 +924,7 @@ fn render_launch_select_squad(
                         Color::DarkGray
                     }),
                 ),
-                Span::styled(
-                    merc.name.as_str(),
-                    Style::default().fg(Color::White),
-                ),
+                Span::styled(merc.name.as_str(), Style::default().fg(Color::White)),
                 Span::styled(
                     format!(" ({}) Pw:{}", merc.archetype, merc.power),
                     Style::default().fg(Color::DarkGray),
@@ -995,7 +994,9 @@ fn render_launch_confirm(
             Span::styled("  Mission: ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 mission_type_name(mt),
-                Style::default().fg(mission_type_color(mt)).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(mission_type_color(mt))
+                    .add_modifier(Modifier::BOLD),
             ),
         ]),
         Line::from(vec![
@@ -1076,7 +1077,9 @@ fn render_event_resolve_overlay(
             Span::styled("  Event: ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 event_name,
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
             ),
             Span::styled(
                 format!("  ({}% through)", progress),
@@ -1108,10 +1111,7 @@ fn render_event_resolve_overlay(
                     Modifier::empty()
                 }),
             ),
-            Span::styled(
-                format!(" — {}", desc),
-                Style::default().fg(Color::DarkGray),
-            ),
+            Span::styled(format!(" — {}", desc), Style::default().fg(Color::DarkGray)),
         ]));
     }
 
