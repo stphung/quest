@@ -363,6 +363,12 @@ fn build_startup_splash_text(
         Span::styled(" Quit", Style::default().fg(Color::Gray)),
     ]));
 
+    text.push(Line::from(""));
+    text.push(Line::from(vec![Span::styled(
+        "  Contributors: @stphung \u{00b7} @dhsu",
+        Style::default().fg(Color::DarkGray),
+    )]));
+
     text
 }
 
