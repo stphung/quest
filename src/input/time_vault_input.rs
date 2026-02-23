@@ -121,10 +121,7 @@ fn handle_browse(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAction {
             }
         },
         KeyCode::Char('f') | KeyCode::Char('F') => {
-            let branch_name = state
-                .selected_branch_name()
-                .unwrap_or("?")
-                .to_string();
+            let branch_name = state.selected_branch_name().unwrap_or("?").to_string();
 
             let (commit_id, fork_source) = match state.focus {
                 PanelFocus::Right => {
