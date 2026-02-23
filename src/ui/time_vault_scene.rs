@@ -43,6 +43,8 @@ pub enum BrowserMode {
     ConfirmRestore,
     /// Waiting for confirmation to delete the selected branch.
     ConfirmDelete,
+    /// Waiting for confirmation to switch to the selected branch.
+    ConfirmSwitch,
     /// Typing a name for a new forked branch.
     NamingFork { commit_id: String },
 }
@@ -270,15 +272,19 @@ fn paint_branch_panel(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState, wid
             break;
         }
 
+        let is_selected = i == state.selected_branch;
         let marker = if branch.is_active {
-            "\u{25cf}" // filled circle
+            "\u{25cf}" // ● active
+        } else if is_selected {
+            "\u{25b8}" // ▸ selected non-active
         } else {
-            "\u{25cb}" // open circle
+            "\u{25cb}" // ○ inactive
         };
 
-        let is_selected = i == state.selected_branch;
         let marker_color = if branch.is_active {
             Color::Green
+        } else if is_selected {
+            Color::Yellow
         } else {
             Color::DarkGray
         };
@@ -306,9 +312,15 @@ fn paint_snapshot_panel(
     let height = buffer.len();
     let focused = state.focus == PanelFocus::Right;
 
-    // Panel title
+    // Panel title — shows which branch is being viewed
     let title_color = if focused { Color::Cyan } else { Color::White };
-    put_text(buffer, 0, x_offset as i32 + 1, "Snapshots", title_color);
+    let branch_name = state.selected_branch_name().unwrap_or("?");
+    let title = if state.selected_branch_is_active() {
+        format!("Snapshots ({})", branch_name)
+    } else {
+        format!("Snapshots (viewing: {})", branch_name)
+    };
+    put_text(buffer, 0, x_offset as i32 + 1, &title, title_color);
 
     // Thin separator
     let sep_color = if focused {
@@ -450,6 +462,29 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
                     .add_modifier(Modifier::BOLD),
             ),
         ]),
+        BrowserMode::ConfirmSwitch => {
+            let name = state.selected_branch_name().unwrap_or("?").to_string();
+            Line::from(vec![
+                Span::styled(
+                    format!(" Switch to '{name}'? "),
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::raw("  "),
+                Span::styled(
+                    "[Enter] Confirm ",
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                ),
+                Span::raw("  "),
+                Span::styled(
+                    "[Esc] Cancel ",
+                    Style::default()
+                        .fg(Color::Green)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ])
+        }
         BrowserMode::ConfirmDelete => {
             let name = state.selected_branch_name().unwrap_or("?").to_string();
             Line::from(vec![
@@ -521,19 +556,26 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
                     spans.push(Span::styled("Close", Style::default().fg(Color::DarkGray)));
                     Line::from(spans)
                 }
-                PanelFocus::Right => Line::from(vec![
-                    Span::styled(" [Enter] ", Style::default().fg(Color::Cyan)),
-                    Span::styled("Restore", Style::default().fg(Color::DarkGray)),
-                    dot.clone(),
-                    Span::styled("[F] ", Style::default().fg(Color::Cyan)),
-                    Span::styled("Fork", Style::default().fg(Color::DarkGray)),
-                    dot.clone(),
-                    Span::styled("[Tab] ", Style::default().fg(Color::Cyan)),
-                    Span::styled("Branches", Style::default().fg(Color::DarkGray)),
-                    dot,
-                    Span::styled("[Esc] ", Style::default().fg(Color::Cyan)),
-                    Span::styled("Close", Style::default().fg(Color::DarkGray)),
-                ]),
+                PanelFocus::Right => {
+                    let enter_label = if state.selected_branch_is_active() {
+                        "Restore"
+                    } else {
+                        "Switch to branch"
+                    };
+                    Line::from(vec![
+                        Span::styled(" [Enter] ", Style::default().fg(Color::Cyan)),
+                        Span::styled(enter_label, Style::default().fg(Color::DarkGray)),
+                        dot.clone(),
+                        Span::styled("[F] ", Style::default().fg(Color::Cyan)),
+                        Span::styled("Fork", Style::default().fg(Color::DarkGray)),
+                        dot.clone(),
+                        Span::styled("[Tab] ", Style::default().fg(Color::Cyan)),
+                        Span::styled("Branches", Style::default().fg(Color::DarkGray)),
+                        dot,
+                        Span::styled("[Esc] ", Style::default().fg(Color::Cyan)),
+                        Span::styled("Close", Style::default().fg(Color::DarkGray)),
+                    ])
+                }
             }
         }
     };

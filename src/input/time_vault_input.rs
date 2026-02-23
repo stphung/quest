@@ -37,6 +37,7 @@ pub fn handle_time_vault_input(key: KeyEvent, state: &mut TimeVaultState) -> Tim
     match &state.mode {
         BrowserMode::Browse => handle_browse(key, state),
         BrowserMode::ConfirmRestore => handle_confirm_restore(key, state),
+        BrowserMode::ConfirmSwitch => handle_confirm_switch(key, state),
         BrowserMode::ConfirmDelete => handle_confirm_delete(key, state),
         BrowserMode::NamingFork { .. } => handle_naming_fork(key, state),
     }
@@ -102,18 +103,19 @@ fn handle_browse(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAction {
             PanelFocus::Left => {
                 // Switch to selected branch (if not already active).
                 if !state.selected_branch_is_active() {
-                    if let Some(name) = state.selected_branch_name() {
-                        return TimeVaultAction::SwitchBranch {
-                            branch_name: name.to_string(),
-                        };
-                    }
+                    state.mode = BrowserMode::ConfirmSwitch;
                 }
                 TimeVaultAction::Continue
             }
             PanelFocus::Right => {
-                // Begin restore confirmation.
                 if !state.commits.is_empty() {
-                    state.mode = BrowserMode::ConfirmRestore;
+                    if state.selected_branch_is_active() {
+                        // Restore within the active branch.
+                        state.mode = BrowserMode::ConfirmRestore;
+                    } else {
+                        // Switch to the viewed branch first.
+                        state.mode = BrowserMode::ConfirmSwitch;
+                    }
                 }
                 TimeVaultAction::Continue
             }
@@ -152,6 +154,26 @@ fn handle_confirm_restore(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaul
                 let commit_id = id.to_string();
                 state.mode = BrowserMode::Browse;
                 TimeVaultAction::Restore { commit_id }
+            } else {
+                state.mode = BrowserMode::Browse;
+                TimeVaultAction::Continue
+            }
+        }
+        KeyCode::Esc => {
+            state.mode = BrowserMode::Browse;
+            TimeVaultAction::Continue
+        }
+        _ => TimeVaultAction::Continue,
+    }
+}
+
+fn handle_confirm_switch(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAction {
+    match key.code {
+        KeyCode::Enter => {
+            if let Some(name) = state.selected_branch_name() {
+                let branch_name = name.to_string();
+                state.mode = BrowserMode::Browse;
+                TimeVaultAction::SwitchBranch { branch_name }
             } else {
                 state.mode = BrowserMode::Browse;
                 TimeVaultAction::Continue
