@@ -390,6 +390,21 @@ fn paint_snapshot_panel(
         let is_last = vi == total_visible - 1 || row + 4 + 3 > height as i32;
         let (icon, icon_color) = event_icon_color(&commit.message);
 
+        // Highlight background for selected card
+        if is_selected && focused {
+            let highlight_bg = Color::Rgb(25, 40, 80);
+            for r in row..row + 3 {
+                let r = r as usize;
+                if r < height {
+                    for col in x_offset..x_offset + width {
+                        if col < buffer[r].len() {
+                            buffer[r][col].bg = highlight_bg;
+                        }
+                    }
+                }
+            }
+        }
+
         // Timeline node
         let node = if is_selected {
             "\u{25cf}" // filled circle
