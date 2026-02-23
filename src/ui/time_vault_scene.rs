@@ -233,6 +233,11 @@ pub fn draw_time_vault(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
     paint_branch_panel(&mut buffer, state, branch_width);
     paint_snapshot_panel(&mut buffer, state, snap_x, snap_w);
 
+    // Overlay confirmation dialog when not browsing
+    if state.mode != BrowserMode::Browse {
+        paint_confirm_dialog(&mut buffer, state);
+    }
+
     // Render the scene buffer into the inner area (above controls)
     let buffer_area = Rect::new(inner.x, inner.y, inner.width, inner.height.saturating_sub(1));
     render_buffer(frame, buffer_area, &buffer);
@@ -446,89 +451,152 @@ fn paint_snapshot_panel(
     }
 }
 
-/// Render the bottom controls bar.
-fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
-    let controls = match &state.mode {
-        BrowserMode::ConfirmRestore => Line::from(vec![
-            Span::styled(
-                " [Enter] Confirm Restore ",
-                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-            ),
-            Span::raw("  "),
-            Span::styled(
-                "[Esc] Cancel ",
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::BOLD),
-            ),
-        ]),
-        BrowserMode::ConfirmSwitch => {
-            let name = state.selected_branch_name().unwrap_or("?").to_string();
-            Line::from(vec![
-                Span::styled(
-                    format!(" Switch to '{name}'? "),
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::raw("  "),
-                Span::styled(
-                    "[Enter] Confirm ",
-                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-                ),
-                Span::raw("  "),
-                Span::styled(
-                    "[Esc] Cancel ",
-                    Style::default()
-                        .fg(Color::Green)
-                        .add_modifier(Modifier::BOLD),
-                ),
-            ])
-        }
-        BrowserMode::ConfirmDelete => {
-            let name = state.selected_branch_name().unwrap_or("?").to_string();
-            Line::from(vec![
-                Span::styled(
-                    format!(" [Enter] Delete '{name}' "),
-                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-                ),
-                Span::raw("  "),
-                Span::styled(
-                    "[Esc] Cancel ",
-                    Style::default()
-                        .fg(Color::Green)
-                        .add_modifier(Modifier::BOLD),
-                ),
-            ])
-        }
+/// Paint a centered confirmation dialog into the scene buffer.
+fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
+    let buf_h = buffer.len();
+    if buf_h == 0 {
+        return;
+    }
+    let buf_w = buffer[0].len();
+
+    // Dialog dimensions vary by mode
+    let dialog_w = 44usize.min(buf_w.saturating_sub(4));
+    let dialog_h = match &state.mode {
+        BrowserMode::ConfirmRestore => 10usize,
+        BrowserMode::ConfirmSwitch | BrowserMode::ConfirmDelete => 7,
         BrowserMode::NamingFork { .. } => {
-            let input_display = format!("Name: {}_ ", state.fork_name_input);
-            if let Some(err) = &state.fork_name_error {
-                Line::from(vec![
-                    Span::styled(
-                        format!(" {input_display}"),
-                        Style::default().fg(Color::Yellow),
-                    ),
-                    Span::raw("  "),
-                    Span::styled(err.clone(), Style::default().fg(Color::Red)),
-                    Span::raw("  "),
-                    Span::styled("[Esc] Cancel ", Style::default().fg(Color::Green)),
-                ])
+            if state.fork_name_error.is_some() {
+                9
             } else {
-                Line::from(vec![
-                    Span::styled(
-                        format!(" {input_display}"),
-                        Style::default().fg(Color::Yellow),
-                    ),
-                    Span::raw("  "),
-                    Span::styled("[Enter] ", Style::default().fg(Color::Cyan)),
-                    Span::styled("Create", Style::default().fg(Color::DarkGray)),
-                    Span::raw("  "),
-                    Span::styled("[Esc] ", Style::default().fg(Color::Cyan)),
-                    Span::styled("Cancel", Style::default().fg(Color::DarkGray)),
-                ])
+                8
             }
         }
+        BrowserMode::Browse => return,
+    }
+    .min(buf_h.saturating_sub(2));
+
+    // Center in buffer
+    let dx = (buf_w.saturating_sub(dialog_w)) / 2;
+    let dy = (buf_h.saturating_sub(dialog_h)) / 2;
+
+    let bg = Color::Rgb(12, 16, 40);
+    let border_color = Color::Cyan;
+
+    // Fill background
+    for row_cells in buffer.iter_mut().skip(dy).take(dialog_h) {
+        for cell in row_cells.iter_mut().skip(dx).take(dialog_w) {
+            *cell = SceneCell::new(' ', Color::Reset, bg);
+        }
+    }
+
+    // Border (box-drawing characters)
+    let top = dy as i32;
+    let bottom = (dy + dialog_h - 1) as i32;
+    let left = dx as i32;
+    let right = (dx + dialog_w - 1) as i32;
+
+    put_cell(buffer, top, left, '\u{250c}', border_color);
+    put_cell(buffer, top, right, '\u{2510}', border_color);
+    put_cell(buffer, bottom, left, '\u{2514}', border_color);
+    put_cell(buffer, bottom, right, '\u{2518}', border_color);
+    for col in (dx + 1)..(dx + dialog_w - 1) {
+        put_cell(buffer, top, col as i32, '\u{2500}', border_color);
+        put_cell(buffer, bottom, col as i32, '\u{2500}', border_color);
+    }
+    for row in (dy + 1)..(dy + dialog_h - 1) {
+        put_cell(buffer, row as i32, left, '\u{2502}', border_color);
+        put_cell(buffer, row as i32, right, '\u{2502}', border_color);
+    }
+
+    // Content area starts inside border + padding
+    let cx = left + 3;
+    let cy = top + 2;
+
+    match &state.mode {
+        BrowserMode::ConfirmRestore => {
+            put_text(buffer, cy, cx, "Restore to this save?", Color::White);
+
+            if let Some(commit) = state.commits.get(state.selected_commit) {
+                let (icon, icon_color) = event_icon_color(&commit.message);
+                let desc = commit.message.split(" | ").next().unwrap_or(&commit.message);
+
+                put_text(buffer, cy + 2, cx, icon, icon_color);
+                let iw = super::scene_fx::display_width(icon);
+                put_text(buffer, cy + 2, cx + iw as i32 + 1, desc, Color::Yellow);
+
+                let datetime = chrono::DateTime::from_timestamp(commit.timestamp, 0)
+                    .map(|dt| {
+                        dt.with_timezone(&chrono::Local)
+                            .format("%b %d, %Y  %l:%M %p")
+                            .to_string()
+                    })
+                    .unwrap_or_else(|| "Unknown".to_string());
+                put_text(buffer, cy + 3, cx, &datetime, Color::DarkGray);
+
+                let hours = commit.playtime / 3600;
+                let minutes = (commit.playtime % 3600) / 60;
+                let stats = format!(
+                    "Lv{} \u{00b7} P{} \u{00b7} Zone {} \u{00b7} {}h {:02}m",
+                    commit.level, commit.prestige, commit.zone, hours, minutes
+                );
+                put_text(buffer, cy + 4, cx, &stats, Color::DarkGray);
+            }
+
+            put_text(buffer, cy + 6, cx, "[Enter]", Color::Red);
+            put_text(buffer, cy + 6, cx + 8, "Confirm", Color::DarkGray);
+            put_text(buffer, cy + 6, cx + 18, "[Esc]", Color::Green);
+            put_text(buffer, cy + 6, cx + 24, "Cancel", Color::DarkGray);
+        }
+        BrowserMode::ConfirmSwitch => {
+            let name = state.selected_branch_name().unwrap_or("?");
+            let title = format!("Switch to '{}'?", name);
+            put_text(buffer, cy, cx, &title, Color::Yellow);
+
+            put_text(buffer, cy + 3, cx, "[Enter]", Color::Red);
+            put_text(buffer, cy + 3, cx + 8, "Confirm", Color::DarkGray);
+            put_text(buffer, cy + 3, cx + 18, "[Esc]", Color::Green);
+            put_text(buffer, cy + 3, cx + 24, "Cancel", Color::DarkGray);
+        }
+        BrowserMode::ConfirmDelete => {
+            let name = state.selected_branch_name().unwrap_or("?");
+            let title = format!("Delete branch '{}'?", name);
+            put_text(buffer, cy, cx, &title, Color::Red);
+            put_text(buffer, cy + 1, cx, "This cannot be undone.", Color::DarkGray);
+
+            put_text(buffer, cy + 3, cx, "[Enter]", Color::Red);
+            put_text(buffer, cy + 3, cx + 8, "Delete", Color::DarkGray);
+            put_text(buffer, cy + 3, cx + 17, "[Esc]", Color::Green);
+            put_text(buffer, cy + 3, cx + 23, "Cancel", Color::DarkGray);
+        }
+        BrowserMode::NamingFork { .. } => {
+            put_text(buffer, cy, cx, "Fork new branch", Color::White);
+
+            let input_display = format!("Name: {}_", state.fork_name_input);
+            put_text(buffer, cy + 2, cx, &input_display, Color::Yellow);
+
+            let mut ctrl_row = cy + 4;
+            if let Some(err) = &state.fork_name_error {
+                put_text(buffer, cy + 3, cx, err, Color::Red);
+                ctrl_row = cy + 5;
+            }
+
+            put_text(buffer, ctrl_row, cx, "[Enter]", Color::Cyan);
+            put_text(buffer, ctrl_row, cx + 8, "Create", Color::DarkGray);
+            put_text(buffer, ctrl_row, cx + 17, "[Esc]", Color::Cyan);
+            put_text(buffer, ctrl_row, cx + 23, "Cancel", Color::DarkGray);
+        }
+        BrowserMode::Browse => {}
+    }
+}
+
+/// Render the bottom controls bar.
+fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
+    // Non-Browse modes show the dialog overlay — no footer controls needed.
+    let controls = match &state.mode {
+        BrowserMode::ConfirmRestore
+        | BrowserMode::ConfirmSwitch
+        | BrowserMode::ConfirmDelete
+        | BrowserMode::NamingFork { .. } => return,
         BrowserMode::Browse => {
             let dot = Span::styled(
                 "  \u{00b7}  ",
