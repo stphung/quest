@@ -152,7 +152,7 @@ pub fn handle_game_input(
                 };
             }
             TimeVaultAction::SwitchBranch { branch_name } => {
-                *overlay = GameOverlay::None;
+                // Overlay stays open — main loop refreshes browser state.
                 return InputResult::SwitchSaveBranch { branch_name };
             }
             TimeVaultAction::DeleteBranch { branch_name } => {

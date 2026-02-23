@@ -240,7 +240,24 @@ pub fn handle_select_frame(
                                 *enhancement = enhancement::load_enhancement();
                                 *global_achievements = achievements::load_achievements();
                                 global_achievements.refresh_progress();
-                                *time_vault_browser = None;
+                                // Refresh vault browser in-place (overlay stays open)
+                                if let Some(ref mut b) = time_vault_browser {
+                                    if let Ok(branches) = repo.list_branches() {
+                                        b.branches = branches;
+                                        if b.selected_branch >= b.branches.len() {
+                                            b.selected_branch =
+                                                b.branches.len().saturating_sub(1);
+                                        }
+                                        if let Some(br) =
+                                            b.branches.get(b.selected_branch)
+                                        {
+                                            b.commits = repo
+                                                .list_commits(&br.name)
+                                                .unwrap_or_default();
+                                            b.selected_commit = 0;
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
