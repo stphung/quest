@@ -1019,13 +1019,14 @@ quest/
 │   ├── god_items/           # God Items system (Asprika, Sleipnir, Megingjord)
 │   │   └── types.rs         # God item definitions, passives, bonuses, query helpers
 │   ├── achievements/        # Achievement system
-│   │   ├── types.rs         # AchievementId (130+ variants), Achievements state
+│   │   ├── types.rs         # AchievementId (149 variants), Achievements state
 │   │   ├── data.rs          # Achievement database
 │   │   ├── handlers.rs      # Event handlers (on_kill, on_boss_kill, etc.)
 │   │   ├── milestones.rs    # Milestone definitions and thresholds
 │   │   ├── modal.rs         # Modal notification queue (500ms accumulation window)
 │   │   ├── notifications.rs # Notification state management
 │   │   ├── stats.rs         # Achievement statistics and progress tracking
+│   │   ├── titles.rs        # Title definitions (44 titles), selection, validation
 │   │   ├── unlock.rs        # Core unlock machinery (is_unlocked, unlock, check_milestones)
 │   │   └── persistence.rs   # Save/load
 │   ├── utils/               # Utilities
@@ -1056,6 +1057,7 @@ quest/
 │       ├── achievement_details.rs # Achievement detail panel
 │       ├── achievement_list.rs # Achievement list rendering
 │       ├── achievement_tabs.rs # Achievement tab navigation
+│       ├── title_browser_scene.rs # Title browser overlay
 │       ├── challenge_menu_scene.rs # Challenge menu
 │       ├── chess_scene.rs, go_scene.rs, morris_scene.rs,
 │       │   gomoku_scene.rs, minesweeper_scene.rs, rune_scene.rs,

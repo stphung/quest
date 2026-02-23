@@ -244,17 +244,18 @@ Account-level base building that persists across prestiges. 14 rooms in a two-br
 
 ### Achievement Module (`src/achievements/`)
 
-- `types.rs` — AchievementId enum, categories, unlock tracking
+- `types.rs` — AchievementId enum (149 variants), categories, unlock tracking, `selected_title` field
 - `data.rs` — Achievement database with descriptions and unlock conditions
 - `handlers.rs` — Event handlers (on_enemy_killed, on_boss_killed, on_level_up, etc.) and check_milestones
 - `milestones.rs` — MinigameType, MinigameDifficulty enums, milestone threshold arrays
 - `modal.rs` — Modal notification queue, 500ms accumulation window management
 - `notifications.rs` — Pending notification state, category-based notification counts
 - `stats.rs` — Achievement statistics, unlock percentages, progress queries, category breakdowns
+- `titles.rs` — Title definitions (44 titles), title selection/validation, maps achievements to display text
 - `unlock.rs` — Core unlock machinery (is_unlocked, unlock, check_milestones)
 - `persistence.rs` — Save/load from `~/.quest/achievements.json`
 
-Account-level achievement system that persists across characters. 6 categories (Combat, Level, Progression, Challenges, Exploration, Stats). Tracks kills, boss kills, levels, prestige, zone completion, challenge wins, fishing ranks/catches, dungeon completions, Haven building, and Soulforge enhancements. Includes modal notification system with 500ms accumulation window.
+Account-level achievement system that persists across characters. 6 categories (Combat, Level, Progression, Challenges, Exploration, Stats). Tracks kills, boss kills, levels, prestige, zone completion, challenge wins, fishing ranks/catches, dungeon completions, Haven building, and Soulforge enhancements. Includes modal notification system with 500ms accumulation window. Includes a title system where 44 curated achievements grant display titles (e.g., "Godslayer", "Everlasting") shown in stats panel and character select.
 
 ### Input Handling (`src/input/`)
 
@@ -299,6 +300,7 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 - `achievement_details.rs` — Achievement browser detail panel and stats view
 - `achievement_list.rs` — Achievement browser list panel
 - `achievement_tabs.rs` — Achievement browser category tabs
+- `title_browser_scene.rs` — Title browser overlay (select display title from unlocked achievements)
 - `challenge_menu_scene.rs` — Challenge menu list/detail view
 - `responsive.rs` — Responsive layout with 5 size tiers (TooSmall/S/M/L/XL)
 - `soulforge_scene.rs` — Soulforge enhancement overlay (delegates to submodules)
@@ -505,6 +507,7 @@ quest/
 │   │   ├── modal.rs         # Modal notification queue
 │   │   ├── notifications.rs # Pending notification state
 │   │   ├── stats.rs         # Achievement statistics, progress queries
+│   │   ├── titles.rs        # Title definitions and selection
 │   │   ├── unlock.rs        # Core unlock machinery
 │   │   └── persistence.rs   # Save/load
 │   ├── utils/               # Utilities
@@ -528,6 +531,7 @@ quest/
 │       ├── achievement_details.rs # Achievement detail panel
 │       ├── achievement_list.rs    # Achievement list panel
 │       ├── achievement_tabs.rs    # Achievement category tabs
+│       ├── title_browser_scene.rs # Title browser overlay
 │       ├── haven_scene.rs   # Haven overlay (delegates to submodules)
 │       ├── haven_details.rs # Haven room detail panel
 │       ├── haven_tree.rs    # Haven skill tree panel
