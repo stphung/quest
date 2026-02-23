@@ -182,6 +182,9 @@ pub fn draw_game_overlays(
         } => {
             ui::bug_report_scene::draw_bug_report_overlay(frame, summary, *clipboard_ready, error);
         }
+        GameOverlay::TimeVault { ref browser } => {
+            ui::time_vault_scene::draw_time_vault(frame, area, browser);
+        }
         GameOverlay::None => {}
     }
 

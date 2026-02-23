@@ -60,15 +60,18 @@ pub(super) fn handle_vault_selection(
                     haven.last_vault_selections = selected_slots.clone();
                     crate::character::prestige::perform_prestige_with_vault(state, selected_slots);
                     *overlay = GameOverlay::None;
+                    let new_rank = state.prestige_rank;
                     state.combat_state.add_log_entry(
                         format!(
                             "Prestiged to {}! (Vault preserved items)",
-                            get_prestige_tier(state.prestige_rank).name
+                            get_prestige_tier(new_rank).name
                         ),
                         false,
                         true,
                     );
-                    return InputResult::NeedsSave;
+                    return InputResult::NeedsSaveWithEvent(
+                        crate::history::SaveEvent::PrestigeRank(new_rank),
+                    );
                 } else {
                     *confirm_pending = true;
                 }
@@ -117,15 +120,15 @@ pub(super) fn handle_prestige_confirm(
             } else {
                 perform_prestige(state);
                 *overlay = GameOverlay::None;
+                let new_rank = state.prestige_rank;
                 state.combat_state.add_log_entry(
-                    format!(
-                        "Prestiged to {}!",
-                        get_prestige_tier(state.prestige_rank).name
-                    ),
+                    format!("Prestiged to {}!", get_prestige_tier(new_rank).name),
                     false,
                     true,
                 );
-                return InputResult::NeedsSave;
+                return InputResult::NeedsSaveWithEvent(crate::history::SaveEvent::PrestigeRank(
+                    new_rank,
+                ));
             }
         }
         KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {

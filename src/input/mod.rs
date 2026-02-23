@@ -7,6 +7,7 @@ mod minigame_input;
 mod prestige_input;
 mod soulforge_input;
 mod stormglass_input;
+pub mod time_vault_input;
 pub mod types;
 
 // Re-export all types for backward compatibility
@@ -123,6 +124,43 @@ pub fn handle_game_input(
     // 0.8. Bug report overlay
     if matches!(overlay, GameOverlay::BugReport { .. }) {
         return handle_bug_report_overlay(key, overlay);
+    }
+
+    // 0.85. Time Vault overlay
+    if let GameOverlay::TimeVault { ref mut browser } = overlay {
+        use time_vault_input::{handle_time_vault_input, TimeVaultAction};
+        match handle_time_vault_input(key, browser) {
+            TimeVaultAction::Close => {
+                *overlay = GameOverlay::None;
+            }
+            TimeVaultAction::Continue => {}
+            TimeVaultAction::Restore { commit_id } => {
+                // Overlay stays open — main loop refreshes browser state.
+                return InputResult::RestoreSave { commit_id };
+            }
+            TimeVaultAction::RefreshCommits { branch_name } => {
+                return InputResult::RefreshSaveHistoryCommits { branch_name };
+            }
+            TimeVaultAction::Fork {
+                commit_id,
+                branch_name,
+            } => {
+                // Overlay stays open — main loop refreshes browser state.
+                return InputResult::ForkSave {
+                    commit_id,
+                    branch_name,
+                };
+            }
+            TimeVaultAction::SwitchBranch { branch_name } => {
+                // Overlay stays open — main loop refreshes browser state.
+                return InputResult::SwitchSaveBranch { branch_name };
+            }
+            TimeVaultAction::DeleteBranch { branch_name } => {
+                // Overlay stays open for delete — just refresh.
+                return InputResult::DeleteSaveBranch { branch_name };
+            }
+        }
+        return InputResult::Continue;
     }
 
     // 1. Haven discovery modal (blocks all other input)
@@ -396,6 +434,10 @@ fn handle_base_game(
                 title_browser: crate::ui::title_browser_scene::TitleBrowserState::new(),
             };
             InputResult::Continue
+        }
+        KeyCode::Char('t') | KeyCode::Char('T') => {
+            // Time Vault — main.rs populates state from HistoryRepo
+            InputResult::OpenTimeVault
         }
         KeyCode::Char('?') => {
             *overlay = GameOverlay::Help;

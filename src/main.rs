@@ -9,6 +9,7 @@ mod fishing;
 #[allow(dead_code)]
 mod god_items;
 mod haven;
+mod history;
 mod input;
 mod items;
 mod main_helpers;
@@ -126,6 +127,44 @@ fn tally_chrono_surge_events(surge: &mut ChronoSurgeState, events: &[core::tick:
     }
 }
 
+/// Extract a meaningful save event from tick events for git history commits.
+///
+/// Only milestone events trigger git commits — routine combat/XP events do not.
+/// Returns the first matching event found.
+fn extract_save_event(
+    events: &[core::tick::TickEvent],
+    _state: &GameState,
+) -> Option<history::SaveEvent> {
+    use core::tick::TickEvent;
+    use history::SaveEvent;
+    use zones::BossDefeatResult;
+
+    for event in events {
+        match event {
+            TickEvent::SubzoneBossDefeated { result, .. } => match result {
+                BossDefeatResult::ZoneComplete { old_zone, .. } => {
+                    return Some(SaveEvent::ZoneBossDefeated(old_zone.clone()));
+                }
+                BossDefeatResult::StormsEnd => {
+                    return Some(SaveEvent::ZoneBossDefeated("Storm Citadel".to_string()));
+                }
+                _ => {}
+            },
+            TickEvent::DungeonCompleted { .. } => {
+                return Some(SaveEvent::DungeonCompleted("dungeon".to_string()));
+            }
+            TickEvent::StormLeviathanCaught => {
+                return Some(SaveEvent::StormLeviathanCaught);
+            }
+            TickEvent::AchievementUnlocked { ref name, .. } => {
+                return Some(SaveEvent::AchievementUnlocked(name.clone()));
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
 fn main() -> io::Result<()> {
     // Handle CLI arguments
     let args: Vec<String> = std::env::args().collect();
@@ -173,6 +212,16 @@ fn main() -> io::Result<()> {
     // Initialize CharacterManager
     let character_manager = CharacterManager::new()?;
 
+    // Initialize Time Vault (non-fatal — game works without it)
+    let history_repo = if !debug_mode {
+        let quest_dir = dirs::home_dir()
+            .map(|d| d.join(".quest"))
+            .unwrap_or_default();
+        history::HistoryRepo::init(&quest_dir).ok()
+    } else {
+        None
+    };
+
     // Load account-level Haven state
     let mut haven = haven::load_haven();
 
@@ -210,6 +259,7 @@ fn main() -> io::Result<()> {
     let mut achievement_browser = AchievementBrowserState::new();
     let mut title_browser = TitleBrowserState::new();
     let mut help_overlay_showing = false;
+    let mut time_vault_browser: Option<ui::time_vault_scene::TimeVaultState> = None;
 
     // Setup terminal
     enable_raw_mode()?;
@@ -219,7 +269,14 @@ fn main() -> io::Result<()> {
     let mut terminal = Terminal::new(backend)?;
 
     if matches!(
-        show_startup_splash_screen(&mut terminal, &mut update_available)?,
+        show_startup_splash_screen(
+            &mut terminal,
+            &mut update_available,
+            history_repo.as_ref(),
+            &mut haven,
+            &mut enhancement,
+            &mut global_achievements,
+        )?,
         StartupSplashResult::Quit
     ) {
         disable_raw_mode()?;
@@ -268,6 +325,8 @@ fn main() -> io::Result<()> {
                     &mut achievement_browser,
                     &mut title_browser,
                     &mut help_overlay_showing,
+                    history_repo.as_ref(),
+                    &mut time_vault_browser,
                 )?;
                 match transition {
                     ScreenTransition::GoToCreation => {
@@ -390,7 +449,10 @@ fn main() -> io::Result<()> {
                     // fullscreen overlay. The game UI uses emoji/wide characters
                     // that can desync ratatui's internal buffer from the actual
                     // terminal state; clearing resyncs them.
-                    let overlay_is_fullscreen = matches!(overlay, GameOverlay::Achievements { .. });
+                    let overlay_is_fullscreen = matches!(
+                        overlay,
+                        GameOverlay::Achievements { .. } | GameOverlay::TimeVault { .. }
+                    );
                     if overlay_is_fullscreen != prev_overlay_was_fullscreen {
                         terminal.clear()?;
                         prev_overlay_was_fullscreen = overlay_is_fullscreen;
@@ -513,12 +575,19 @@ fn main() -> io::Result<()> {
                                         ticks_total: surge.ticks_total,
                                     });
                                     if !debug_mode {
+                                        let surge_event = history::SaveEvent::ChronoSurge {
+                                            levels_gained: surge.levels_gained,
+                                            kills: surge.kills,
+                                            ticks: surge.ticks_total,
+                                        };
                                         save_all(
                                             &character_manager,
                                             &state,
                                             &global_achievements,
                                             &haven,
                                             &enhancement,
+                                            Some(&surge_event),
+                                            history_repo.as_ref(),
                                         );
                                         last_save_instant = Some(Instant::now());
                                         last_save_time = Some(Local::now());
@@ -565,6 +634,271 @@ fn main() -> io::Result<()> {
                                 continue;
                             }
 
+                            // Handle Time Vault actions before routing
+                            if let InputResult::OpenTimeVault = result {
+                                if let Some(ref repo) = history_repo {
+                                    if let Ok(branches) = repo.list_branches() {
+                                        let commits = branches
+                                            .first()
+                                            .and_then(|b| repo.list_commits(&b.name).ok())
+                                            .unwrap_or_default();
+                                        overlay = GameOverlay::TimeVault {
+                                            browser:
+                                                crate::ui::time_vault_scene::TimeVaultState::new(
+                                                    branches, commits,
+                                                ),
+                                        };
+                                    }
+                                }
+                                continue;
+                            }
+
+                            if let InputResult::RefreshSaveHistoryCommits { ref branch_name } =
+                                result
+                            {
+                                if let Some(ref repo) = history_repo {
+                                    if let Ok(commits) = repo.list_commits(branch_name) {
+                                        if let GameOverlay::TimeVault { ref mut browser } = overlay
+                                        {
+                                            browser.commits = commits;
+                                        }
+                                    }
+                                }
+                                continue;
+                            }
+
+                            if let InputResult::RestoreSave { ref commit_id } = result {
+                                if let Some(ref repo) = history_repo {
+                                    // Auto-save current state before restoring
+                                    save_all(
+                                        &character_manager,
+                                        &state,
+                                        &global_achievements,
+                                        &haven,
+                                        &enhancement,
+                                        Some(&history::SaveEvent::AutoSave),
+                                        Some(repo),
+                                    );
+                                    if repo.restore_to(commit_id).is_ok() {
+                                        // Reload all state from disk (git reset replaced files)
+                                        haven = haven::load_haven();
+                                        enhancement = enhancement::load_enhancement();
+                                        global_achievements = achievements::load_achievements();
+                                        global_achievements.refresh_progress();
+
+                                        // Reload character state
+                                        let filename = format!("{}.json", state.character_name);
+                                        if let Ok(mut reloaded) =
+                                            character_manager.load_character(&filename)
+                                        {
+                                            reloaded.recalculate_derived_stats(&enhancement.levels);
+                                            reloaded.recalculate_prestige_bonuses();
+                                            reloaded.combat_state.add_log_entry(
+                                                "\u{23F3} Save restored".to_string(),
+                                                false,
+                                                true,
+                                            );
+                                            state = reloaded;
+                                        }
+
+                                        // Suppress offline XP on the reloaded save
+                                        state.last_save_time = Utc::now().timestamp();
+
+                                        // Refresh vault browser in-place (overlay stays open)
+                                        if let GameOverlay::TimeVault { ref mut browser } = overlay
+                                        {
+                                            if let Ok(branches) = repo.list_branches() {
+                                                browser.branches = branches;
+                                                if browser.selected_branch >= browser.branches.len()
+                                                {
+                                                    browser.selected_branch =
+                                                        browser.branches.len().saturating_sub(1);
+                                                }
+                                                if let Some(b) =
+                                                    browser.branches.get(browser.selected_branch)
+                                                {
+                                                    browser.commits = repo
+                                                        .list_commits(&b.name)
+                                                        .unwrap_or_default();
+                                                    browser.selected_commit = 0;
+                                                }
+                                            }
+                                        }
+                                        if !debug_mode {
+                                            last_save_instant = Some(Instant::now());
+                                            last_save_time = Some(Local::now());
+                                        }
+                                    }
+                                }
+                                continue;
+                            }
+
+                            if let InputResult::ForkSave {
+                                ref commit_id,
+                                ref branch_name,
+                            } = result
+                            {
+                                if let Some(ref repo) = history_repo {
+                                    // Auto-save current state before forking
+                                    save_all(
+                                        &character_manager,
+                                        &state,
+                                        &global_achievements,
+                                        &haven,
+                                        &enhancement,
+                                        Some(&history::SaveEvent::AutoSave),
+                                        Some(repo),
+                                    );
+                                    if repo.fork_timeline(branch_name, commit_id).is_ok() {
+                                        // Full state reload (fork checks out the new branch)
+                                        haven = haven::load_haven();
+                                        enhancement = enhancement::load_enhancement();
+                                        global_achievements = achievements::load_achievements();
+                                        global_achievements.refresh_progress();
+
+                                        let filename = format!("{}.json", state.character_name);
+                                        if let Ok(mut reloaded) =
+                                            character_manager.load_character(&filename)
+                                        {
+                                            reloaded.recalculate_derived_stats(&enhancement.levels);
+                                            reloaded.recalculate_prestige_bonuses();
+                                            reloaded.combat_state.add_log_entry(
+                                                format!("\u{1F500} Timeline forked: {branch_name}"),
+                                                false,
+                                                true,
+                                            );
+                                            state = reloaded;
+                                        }
+
+                                        // Suppress offline XP on the reloaded save
+                                        state.last_save_time = Utc::now().timestamp();
+
+                                        // Refresh vault browser in-place (overlay stays open)
+                                        if let GameOverlay::TimeVault { ref mut browser } = overlay
+                                        {
+                                            if let Ok(branches) = repo.list_branches() {
+                                                browser.branches = branches;
+                                                if browser.selected_branch >= browser.branches.len()
+                                                {
+                                                    browser.selected_branch =
+                                                        browser.branches.len().saturating_sub(1);
+                                                }
+                                                if let Some(b) =
+                                                    browser.branches.get(browser.selected_branch)
+                                                {
+                                                    browser.commits = repo
+                                                        .list_commits(&b.name)
+                                                        .unwrap_or_default();
+                                                    browser.selected_commit = 0;
+                                                }
+                                            }
+                                        }
+                                        if !debug_mode {
+                                            last_save_instant = Some(Instant::now());
+                                            last_save_time = Some(Local::now());
+                                        }
+                                    }
+                                }
+                                continue;
+                            }
+
+                            if let InputResult::SwitchSaveBranch { ref branch_name } = result {
+                                if let Some(ref repo) = history_repo {
+                                    // Auto-save current state before switching
+                                    save_all(
+                                        &character_manager,
+                                        &state,
+                                        &global_achievements,
+                                        &haven,
+                                        &enhancement,
+                                        Some(&history::SaveEvent::AutoSave),
+                                        Some(repo),
+                                    );
+                                    if repo.switch_timeline(branch_name).is_ok() {
+                                        // Full state reload (switch checks out the branch)
+                                        haven = haven::load_haven();
+                                        enhancement = enhancement::load_enhancement();
+                                        global_achievements = achievements::load_achievements();
+                                        global_achievements.refresh_progress();
+
+                                        let filename = format!("{}.json", state.character_name);
+                                        if let Ok(mut reloaded) =
+                                            character_manager.load_character(&filename)
+                                        {
+                                            reloaded.recalculate_derived_stats(&enhancement.levels);
+                                            reloaded.recalculate_prestige_bonuses();
+                                            reloaded.combat_state.add_log_entry(
+                                                format!(
+                                                    "\u{1F500} Timeline switched: {branch_name}"
+                                                ),
+                                                false,
+                                                true,
+                                            );
+                                            state = reloaded;
+                                        }
+
+                                        // Suppress offline XP on the reloaded save
+                                        state.last_save_time = Utc::now().timestamp();
+
+                                        // Refresh vault browser in-place (overlay stays open)
+                                        if let GameOverlay::TimeVault { ref mut browser } = overlay
+                                        {
+                                            if let Ok(branches) = repo.list_branches() {
+                                                // Select the switched-to branch (sort order changes)
+                                                browser.selected_branch = branches
+                                                    .iter()
+                                                    .position(|b| b.name == *branch_name)
+                                                    .unwrap_or(0);
+                                                browser.branches = branches;
+                                                if let Some(b) =
+                                                    browser.branches.get(browser.selected_branch)
+                                                {
+                                                    browser.commits = repo
+                                                        .list_commits(&b.name)
+                                                        .unwrap_or_default();
+                                                    browser.selected_commit = 0;
+                                                }
+                                            }
+                                        }
+                                        if !debug_mode {
+                                            last_save_instant = Some(Instant::now());
+                                            last_save_time = Some(Local::now());
+                                        }
+                                    }
+                                }
+                                continue;
+                            }
+
+                            if let InputResult::DeleteSaveBranch { ref branch_name } = result {
+                                if let Some(ref repo) = history_repo {
+                                    if repo.delete_timeline(branch_name).is_ok() {
+                                        // Refresh browser in-place (overlay stays open)
+                                        if let GameOverlay::TimeVault { ref mut browser } = overlay
+                                        {
+                                            if let Ok(branches) = repo.list_branches() {
+                                                browser.branches = branches;
+                                                // Clamp selection
+                                                if browser.selected_branch >= browser.branches.len()
+                                                {
+                                                    browser.selected_branch =
+                                                        browser.branches.len().saturating_sub(1);
+                                                }
+                                                // Refresh commits for new selection
+                                                if let Some(b) =
+                                                    browser.branches.get(browser.selected_branch)
+                                                {
+                                                    browser.commits = repo
+                                                        .list_commits(&b.name)
+                                                        .unwrap_or_default();
+                                                    browser.selected_commit = 0;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                continue;
+                            }
+
                             match route_game_input(
                                 result,
                                 &state,
@@ -576,6 +910,7 @@ fn main() -> io::Result<()> {
                                 &mut update_expanded,
                                 &mut last_save_instant,
                                 &mut last_save_time,
+                                history_repo.as_ref(),
                             ) {
                                 InputAction::QuitToSelect => {
                                     game_state = None;
@@ -637,7 +972,10 @@ fn main() -> io::Result<()> {
                     {
                         let elapsed_since_save = Utc::now().timestamp() - state.last_save_time;
                         if elapsed_since_save > 60
-                            && !matches!(overlay, GameOverlay::OfflineWelcome { .. })
+                            && !matches!(
+                                overlay,
+                                GameOverlay::OfflineWelcome { .. } | GameOverlay::TimeVault { .. }
+                            )
                         {
                             if let Some(report) = apply_offline_xp(&mut state, &haven) {
                                 overlay = GameOverlay::OfflineWelcome { report };
@@ -654,6 +992,8 @@ fn main() -> io::Result<()> {
                                     &global_achievements,
                                     &haven,
                                     &enhancement,
+                                    None,
+                                    history_repo.as_ref(),
                                 );
                                 last_save_instant = Some(Instant::now());
                                 last_save_time = Some(Local::now());
@@ -712,6 +1052,8 @@ fn main() -> io::Result<()> {
                                 &global_achievements,
                                 &haven,
                                 &enhancement,
+                                None,
+                                history_repo.as_ref(),
                             );
                         }
 
@@ -728,12 +1070,19 @@ fn main() -> io::Result<()> {
                                 ticks_total: surge.ticks_total,
                             });
                             if !debug_mode {
+                                let surge_event = history::SaveEvent::ChronoSurge {
+                                    levels_gained: surge.levels_gained,
+                                    kills: surge.kills,
+                                    ticks: surge.ticks_total,
+                                };
                                 save_all(
                                     &character_manager,
                                     &state,
                                     &global_achievements,
                                     &haven,
                                     &enhancement,
+                                    Some(&surge_event),
+                                    history_repo.as_ref(),
                                 );
                                 last_save_instant = Some(Instant::now());
                                 last_save_time = Some(Local::now());
@@ -774,11 +1123,15 @@ fn main() -> io::Result<()> {
                                 .visual_effects
                                 .retain_mut(|effect| effect.update(delta_time));
 
+                            // Extract milestone save event for git history
+                            let save_event = extract_save_event(&tick_result.events, &state);
+
                             // Persist all state if anything changed
                             if (tick_result.achievements_changed
                                 || tick_result.haven_changed
                                 || tick_result.enhancement_changed
-                                || tick_result.god_items_changed)
+                                || tick_result.god_items_changed
+                                || save_event.is_some())
                                 && !debug_mode
                             {
                                 save_all(
@@ -787,20 +1140,27 @@ fn main() -> io::Result<()> {
                                     &global_achievements,
                                     &haven,
                                     &enhancement,
+                                    save_event.as_ref(),
+                                    history_repo.as_ref(),
                                 );
                             }
 
-                            if let Some(encounter_number) = tick_result.leviathan_encounter {
-                                overlay = GameOverlay::LeviathanEncounter { encounter_number };
-                            }
-                            if tick_flags.haven_discovered {
-                                overlay = GameOverlay::HavenDiscovery;
-                            }
-                            if tick_flags.soulforge_discovered {
-                                overlay = GameOverlay::SoulforgeDiscovery;
-                            }
-                            if tick_flags.stormglass_discovered {
-                                overlay = GameOverlay::StormglassDiscovery;
+                            // Discovery/encounter overlays should not clobber
+                            // an open Time Vault; they will fire on a later tick.
+                            let vault_open = matches!(overlay, GameOverlay::TimeVault { .. });
+                            if !vault_open {
+                                if let Some(encounter_number) = tick_result.leviathan_encounter {
+                                    overlay = GameOverlay::LeviathanEncounter { encounter_number };
+                                }
+                                if tick_flags.haven_discovered {
+                                    overlay = GameOverlay::HavenDiscovery;
+                                }
+                                if tick_flags.soulforge_discovered {
+                                    overlay = GameOverlay::SoulforgeDiscovery;
+                                }
+                                if tick_flags.stormglass_discovered {
+                                    overlay = GameOverlay::StormglassDiscovery;
+                                }
                             }
 
                             if matches!(overlay, GameOverlay::None)
@@ -894,7 +1254,15 @@ fn main() -> io::Result<()> {
                                             };
                                             soulforge_ui.animation_tick = 0;
 
-                                            // Persist changes
+                                            // Persist changes (only commit on success)
+                                            let soulforge_event = if result.success {
+                                                Some(history::SaveEvent::SoulforgeEnhanced(
+                                                    slot_name.to_string(),
+                                                    result.new_level,
+                                                ))
+                                            } else {
+                                                None
+                                            };
                                             if !debug_mode {
                                                 save_all(
                                                     &character_manager,
@@ -902,6 +1270,8 @@ fn main() -> io::Result<()> {
                                                     &global_achievements,
                                                     &haven,
                                                     &enhancement,
+                                                    soulforge_event.as_ref(),
+                                                    history_repo.as_ref(),
                                                 );
                                             }
                                         }
@@ -938,6 +1308,8 @@ fn main() -> io::Result<()> {
                                 &global_achievements,
                                 &haven,
                                 &enhancement,
+                                None,
+                                history_repo.as_ref(),
                             );
                             last_save_instant = Some(Instant::now());
                         }

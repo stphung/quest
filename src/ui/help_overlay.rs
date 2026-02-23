@@ -12,7 +12,7 @@ pub fn draw_help_overlay(frame: &mut Frame) {
     let size = frame.area();
 
     let dialog_width = 56.min(size.width.saturating_sub(4));
-    let dialog_height = 14.min(size.height.saturating_sub(4));
+    let dialog_height = 15.min(size.height.saturating_sub(4));
 
     let x = (size.width.saturating_sub(dialog_width)) / 2;
     let y = (size.height.saturating_sub(dialog_height)) / 2;
@@ -35,6 +35,7 @@ pub fn draw_help_overlay(frame: &mut Frame) {
             Style::default().add_modifier(Modifier::BOLD),
         )),
         Line::from("  [P] Prestige  [H] Haven  [S] Soulforge  [G] Stormglass"),
+        Line::from("  [T] Time Vault"),
         Line::from("  [A] Achievements    [Tab] Challenges"),
         Line::from("  [U] Toggle Updates  [!] Report Bug  [Esc] Quit"),
         Line::from(""),

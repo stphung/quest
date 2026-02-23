@@ -1,9 +1,16 @@
 //! Update check helpers.
 
+use crate::achievements;
 use crate::core::constants::{
     UPDATE_CHECK_INTERVAL_SECONDS, UPDATE_CHECK_JITTER_SECONDS, WIKI_URL,
 };
+use crate::enhancement;
+use crate::haven;
+use crate::history::HistoryRepo;
+use crate::input::time_vault_input::{handle_time_vault_input, TimeVaultAction};
+use crate::ui;
 use crate::ui::throbber::block_spinner_char;
+use crate::ui::time_vault_scene::TimeVaultState;
 use crate::utils::updater::UpdateInfoStatus;
 use chrono::{DateTime, NaiveDate, TimeZone, Utc};
 use rand::RngExt;
@@ -24,27 +31,6 @@ pub fn jittered_update_interval() -> Duration {
     let jitter = rng.random_range(0..=2 * UPDATE_CHECK_JITTER_SECONDS);
     let interval = UPDATE_CHECK_INTERVAL_SECONDS - UPDATE_CHECK_JITTER_SECONDS + jitter;
     Duration::from_secs(interval)
-}
-
-fn draw_startup_modal(
-    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-    text: Vec<Line<'static>>,
-) -> io::Result<()> {
-    terminal
-        .draw(|frame| {
-            let area = frame.area();
-            let block = Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Cyan))
-                .title(" Quest ");
-
-            let inner = block.inner(area);
-            frame.render_widget(block, area);
-
-            let paragraph = Paragraph::new(text).alignment(ratatui::layout::Alignment::Left);
-            frame.render_widget(paragraph, inner);
-        })
-        .map(|_| ())
 }
 
 fn parse_timestamp_utc(timestamp: &str) -> Option<DateTime<Utc>> {
@@ -348,6 +334,13 @@ fn build_startup_splash_text(
         ),
         Span::styled(" Continue    ", Style::default().fg(Color::Gray)),
         Span::styled(
+            "[T]",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" Time Vault    ", Style::default().fg(Color::Gray)),
+        Span::styled(
             "[W]",
             Style::default()
                 .fg(Color::Yellow)
@@ -376,6 +369,7 @@ enum StartupKeyAction {
     Continue,
     Quit,
     OpenWiki,
+    OpenTimeVault,
     Ignore,
 }
 
@@ -388,6 +382,7 @@ fn startup_key_action(key_event: KeyEvent) -> StartupKeyAction {
         KeyCode::Enter => StartupKeyAction::Continue,
         KeyCode::Esc => StartupKeyAction::Quit,
         KeyCode::Char('w') | KeyCode::Char('W') => StartupKeyAction::OpenWiki,
+        KeyCode::Char('t') | KeyCode::Char('T') => StartupKeyAction::OpenTimeVault,
         _ => StartupKeyAction::Ignore,
     }
 }
@@ -407,11 +402,17 @@ pub enum StartupSplashResult {
 
 /// Show the startup splash screen while update data loads in the background.
 /// Pressing Enter continues immediately; Esc quits from startup.
+#[allow(clippy::too_many_arguments)]
 pub fn show_startup_splash_screen(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     update_check_handle: &mut Option<JoinHandle<UpdateInfoStatus>>,
+    history_repo: Option<&HistoryRepo>,
+    haven: &mut haven::Haven,
+    enhancement: &mut enhancement::EnhancementProgress,
+    global_achievements: &mut achievements::Achievements,
 ) -> io::Result<StartupSplashResult> {
     let mut update_status: Option<UpdateInfoStatus> = None;
+    let mut time_vault_browser: Option<TimeVaultState> = None;
 
     let action = loop {
         if update_status.is_none() {
@@ -429,15 +430,105 @@ pub fn show_startup_splash_screen(
 
         let update_loading = update_status.is_none() && update_check_handle.is_some();
         let text = build_startup_splash_text(update_status.as_ref(), update_loading);
-        draw_startup_modal(terminal, text)?;
+        // Draw splash, then Time Vault overlay on top if open.
+        terminal.draw(|f| {
+            let area = f.area();
+            let block = Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Cyan))
+                .title(" Quest ");
+            let inner = block.inner(area);
+            f.render_widget(block, area);
+            let paragraph = Paragraph::new(text).alignment(ratatui::layout::Alignment::Left);
+            f.render_widget(paragraph, inner);
+
+            if let Some(ref browser) = time_vault_browser {
+                ui::time_vault_scene::draw_time_vault(f, area, browser);
+            }
+        })?;
 
         if event::poll(Duration::from_millis(100))? {
             if let event::Event::Key(key_event) = event::read()? {
+                // Handle Time Vault overlay when open.
+                if let Some(ref mut browser) = time_vault_browser {
+                    match handle_time_vault_input(key_event, browser) {
+                        TimeVaultAction::Close => {
+                            time_vault_browser = None;
+                        }
+                        TimeVaultAction::RefreshCommits { branch_name } => {
+                            if let Some(repo) = history_repo {
+                                if let Ok(commits) = repo.list_commits(&branch_name) {
+                                    browser.commits = commits;
+                                }
+                            }
+                        }
+                        TimeVaultAction::Restore { commit_id } => {
+                            if let Some(repo) = history_repo {
+                                let _ = repo.commit_raw("Auto-save");
+                                if repo.restore_to(&commit_id).is_ok() {
+                                    *haven = haven::load_haven();
+                                    *enhancement = enhancement::load_enhancement();
+                                    *global_achievements = achievements::load_achievements();
+                                    global_achievements.refresh_progress();
+                                    refresh_vault_browser(repo, browser, None);
+                                }
+                            }
+                        }
+                        TimeVaultAction::Fork {
+                            commit_id,
+                            branch_name,
+                        } => {
+                            if let Some(repo) = history_repo {
+                                let _ = repo.commit_raw("Auto-save");
+                                if repo.fork_timeline(&branch_name, &commit_id).is_ok() {
+                                    *haven = haven::load_haven();
+                                    *enhancement = enhancement::load_enhancement();
+                                    *global_achievements = achievements::load_achievements();
+                                    global_achievements.refresh_progress();
+                                    refresh_vault_browser(repo, browser, None);
+                                }
+                            }
+                        }
+                        TimeVaultAction::SwitchBranch { branch_name } => {
+                            if let Some(repo) = history_repo {
+                                let _ = repo.commit_raw("Auto-save");
+                                if repo.switch_timeline(&branch_name).is_ok() {
+                                    *haven = haven::load_haven();
+                                    *enhancement = enhancement::load_enhancement();
+                                    *global_achievements = achievements::load_achievements();
+                                    global_achievements.refresh_progress();
+                                    refresh_vault_browser(repo, browser, Some(&branch_name));
+                                }
+                            }
+                        }
+                        TimeVaultAction::DeleteBranch { branch_name } => {
+                            if let Some(repo) = history_repo {
+                                if repo.delete_timeline(&branch_name).is_ok() {
+                                    refresh_vault_browser(repo, browser, None);
+                                }
+                            }
+                        }
+                        TimeVaultAction::Continue => {}
+                    }
+                    continue;
+                }
+
                 match startup_key_action(key_event) {
                     StartupKeyAction::Continue => break StartupSplashResult::Continue,
                     StartupKeyAction::Quit => break StartupSplashResult::Quit,
                     StartupKeyAction::OpenWiki => {
                         let _ = crate::utils::bug_report::open_browser(&wiki_url_for_browser());
+                    }
+                    StartupKeyAction::OpenTimeVault => {
+                        if let Some(repo) = history_repo {
+                            if let Ok(branches) = repo.list_branches() {
+                                let commits = branches
+                                    .first()
+                                    .and_then(|b| repo.list_commits(&b.name).ok())
+                                    .unwrap_or_default();
+                                time_vault_browser = Some(TimeVaultState::new(branches, commits));
+                            }
+                        }
                     }
                     StartupKeyAction::Ignore => {}
                 }
@@ -446,6 +537,28 @@ pub fn show_startup_splash_screen(
     };
 
     Ok(action)
+}
+
+/// Refresh the Time Vault browser after a branch operation.
+/// If `select_branch` is provided, finds it by name; otherwise clamps selection.
+fn refresh_vault_browser(
+    repo: &HistoryRepo,
+    browser: &mut TimeVaultState,
+    select_branch: Option<&str>,
+) {
+    if let Ok(branches) = repo.list_branches() {
+        if let Some(name) = select_branch {
+            browser.selected_branch = branches.iter().position(|b| b.name == name).unwrap_or(0);
+        }
+        browser.branches = branches;
+        if browser.selected_branch >= browser.branches.len() {
+            browser.selected_branch = browser.branches.len().saturating_sub(1);
+        }
+        if let Some(b) = browser.branches.get(browser.selected_branch) {
+            browser.commits = repo.list_commits(&b.name).unwrap_or_default();
+            browser.selected_commit = 0;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -468,6 +581,15 @@ mod tests {
         assert!(matches!(
             startup_key_action(key),
             StartupKeyAction::OpenWiki
+        ));
+    }
+
+    #[test]
+    fn test_startup_key_action_time_vault_on_t() {
+        let key = KeyEvent::new(KeyCode::Char('t'), KeyModifiers::NONE);
+        assert!(matches!(
+            startup_key_action(key),
+            StartupKeyAction::OpenTimeVault
         ));
     }
 

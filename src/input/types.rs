@@ -93,6 +93,10 @@ pub enum GameOverlay {
         clipboard_ready: bool,
         error: Option<String>,
     },
+    /// Time Vault (save history browser)
+    TimeVault {
+        browser: crate::ui::time_vault_scene::TimeVaultState,
+    },
 }
 
 /// Result of handling a game input event.
@@ -101,12 +105,31 @@ pub enum InputResult {
     Continue,
     /// Player quit to character select. State should be saved first.
     QuitToSelect,
-    /// State was modified (prestige, haven build) and should be saved.
+    /// State was modified (haven build, etc.) and should be saved.
     NeedsSave,
+    /// State was modified and should be saved with a git history commit.
+    NeedsSaveWithEvent(crate::history::SaveEvent),
     /// Haven was modified along with state -- save both.
     NeedsSaveAll,
+    /// Haven was modified and should be saved with a git history commit.
+    NeedsSaveAllWithEvent(crate::history::SaveEvent),
     /// Toggle the update details expanded state.
     ToggleUpdateDetails,
     /// Start a Chrono Surge with the given number of ticks.
     StartChronoSurge { ticks: u64 },
+    /// Open the Time Vault (main.rs populates state from HistoryRepo).
+    OpenTimeVault,
+    /// Restore game state to a specific commit in save history.
+    RestoreSave { commit_id: String },
+    /// Reload commits for a different branch in the save history browser.
+    RefreshSaveHistoryCommits { branch_name: String },
+    /// Fork a new save branch at a specific commit.
+    ForkSave {
+        commit_id: String,
+        branch_name: String,
+    },
+    /// Switch the active save branch.
+    SwitchSaveBranch { branch_name: String },
+    /// Delete a save branch.
+    DeleteSaveBranch { branch_name: String },
 }
