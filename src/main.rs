@@ -444,7 +444,7 @@ fn main() -> io::Result<()> {
                     // fullscreen overlay. The game UI uses emoji/wide characters
                     // that can desync ratatui's internal buffer from the actual
                     // terminal state; clearing resyncs them.
-                    let overlay_is_fullscreen = matches!(overlay, GameOverlay::Achievements { .. });
+                    let overlay_is_fullscreen = matches!(overlay, GameOverlay::Achievements { .. } | GameOverlay::Timeline { .. });
                     if overlay_is_fullscreen != prev_overlay_was_fullscreen {
                         terminal.clear()?;
                         prev_overlay_was_fullscreen = overlay_is_fullscreen;
@@ -618,6 +618,77 @@ fn main() -> io::Result<()> {
                             if let InputResult::StartChronoSurge { ticks } = result {
                                 chrono_surge = Some(ChronoSurgeState::new(ticks));
                                 state.chrono_surge_active = true;
+                                continue;
+                            }
+
+                            // Handle Timeline browser actions before routing
+                            if let InputResult::OpenTimeline = result {
+                                if let Some(ref repo) = history_repo {
+                                    if let Ok(branches) = repo.list_branches() {
+                                        let commits = branches
+                                            .first()
+                                            .and_then(|b| repo.list_commits(&b.name).ok())
+                                            .unwrap_or_default();
+                                        overlay = GameOverlay::Timeline {
+                                            browser:
+                                                crate::ui::timeline_scene::TimelineBrowserState::new(
+                                                    branches, commits,
+                                                ),
+                                        };
+                                    }
+                                }
+                                continue;
+                            }
+
+                            if let InputResult::RefreshTimelineCommits { ref branch_name } = result
+                            {
+                                if let Some(ref repo) = history_repo {
+                                    if let Ok(commits) = repo.list_commits(branch_name) {
+                                        if let GameOverlay::Timeline { ref mut browser } = overlay {
+                                            browser.commits = commits;
+                                        }
+                                    }
+                                }
+                                continue;
+                            }
+
+                            if let InputResult::RestoreTimeline { ref commit_id } = result {
+                                if let Some(ref repo) = history_repo {
+                                    if let Ok(new_branch) = repo.restore_to(commit_id) {
+                                        // Reload all state from disk (git checkout replaced files)
+                                        haven = haven::load_haven();
+                                        enhancement = enhancement::load_enhancement();
+                                        global_achievements = achievements::load_achievements();
+                                        global_achievements.refresh_progress();
+                                        deep = deep::persistence::load_deep();
+
+                                        // Reload character state
+                                        let filename =
+                                            format!("{}.json", state.character_name);
+                                        if let Ok(mut reloaded) =
+                                            character_manager.load_character(&filename)
+                                        {
+                                            reloaded
+                                                .recalculate_derived_stats(&enhancement.levels);
+                                            reloaded.recalculate_prestige_bonuses();
+                                            reloaded.combat_state.add_log_entry(
+                                                format!(
+                                                    "\u{23F3} Restored to timeline: {}",
+                                                    new_branch
+                                                ),
+                                                false,
+                                                true,
+                                            );
+                                            state = reloaded;
+                                        }
+
+                                        overlay = GameOverlay::None;
+                                        if !debug_mode {
+                                            last_save_instant = Some(Instant::now());
+                                            last_save_time = Some(Local::now());
+                                        }
+                                    }
+                                }
                                 continue;
                             }
 

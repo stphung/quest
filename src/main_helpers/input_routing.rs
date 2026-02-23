@@ -76,5 +76,10 @@ pub fn route_game_input(
         // StartChronoSurge is handled directly in main.rs before reaching
         // route_game_input, but must be matched for exhaustiveness.
         InputResult::StartChronoSurge { .. } => InputAction::Continue,
+        // Timeline actions are handled directly in main.rs before reaching
+        // route_game_input, but must be matched for exhaustiveness.
+        InputResult::OpenTimeline
+        | InputResult::RestoreTimeline { .. }
+        | InputResult::RefreshTimelineCommits { .. } => InputAction::Continue,
     }
 }
