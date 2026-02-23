@@ -682,7 +682,25 @@ fn main() -> io::Result<()> {
                                             state = reloaded;
                                         }
 
-                                        overlay = GameOverlay::None;
+                                        // Refresh vault browser in-place (overlay stays open)
+                                        if let GameOverlay::TimeVault { ref mut browser } = overlay {
+                                            if let Ok(branches) = repo.list_branches() {
+                                                browser.branches = branches;
+                                                if browser.selected_branch >= browser.branches.len()
+                                                {
+                                                    browser.selected_branch =
+                                                        browser.branches.len().saturating_sub(1);
+                                                }
+                                                if let Some(b) =
+                                                    browser.branches.get(browser.selected_branch)
+                                                {
+                                                    browser.commits = repo
+                                                        .list_commits(&b.name)
+                                                        .unwrap_or_default();
+                                                    browser.selected_commit = 0;
+                                                }
+                                            }
+                                        }
                                         if !debug_mode {
                                             last_save_instant = Some(Instant::now());
                                             last_save_time = Some(Local::now());
@@ -719,7 +737,25 @@ fn main() -> io::Result<()> {
                                             state = reloaded;
                                         }
 
-                                        overlay = GameOverlay::None;
+                                        // Refresh vault browser in-place (overlay stays open)
+                                        if let GameOverlay::TimeVault { ref mut browser } = overlay {
+                                            if let Ok(branches) = repo.list_branches() {
+                                                browser.branches = branches;
+                                                if browser.selected_branch >= browser.branches.len()
+                                                {
+                                                    browser.selected_branch =
+                                                        browser.branches.len().saturating_sub(1);
+                                                }
+                                                if let Some(b) =
+                                                    browser.branches.get(browser.selected_branch)
+                                                {
+                                                    browser.commits = repo
+                                                        .list_commits(&b.name)
+                                                        .unwrap_or_default();
+                                                    browser.selected_commit = 0;
+                                                }
+                                            }
+                                        }
                                         if !debug_mode {
                                             last_save_instant = Some(Instant::now());
                                             last_save_time = Some(Local::now());

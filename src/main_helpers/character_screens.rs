@@ -202,9 +202,7 @@ pub fn handle_select_frame(
                     TimeVaultAction::RefreshCommits { branch_name } => {
                         if let Some(repo) = history_repo {
                             if let Ok(commits) = repo.list_commits(&branch_name) {
-                                if let Some(ref mut b) = time_vault_browser {
-                                    b.commits = commits;
-                                }
+                                browser.commits = commits;
                             }
                         }
                     }
@@ -215,7 +213,22 @@ pub fn handle_select_frame(
                                 *enhancement = enhancement::load_enhancement();
                                 *global_achievements = achievements::load_achievements();
                                 global_achievements.refresh_progress();
-                                *time_vault_browser = None;
+                                // Refresh vault browser in-place (overlay stays open)
+                                if let Ok(branches) = repo.list_branches() {
+                                    browser.branches = branches;
+                                    if browser.selected_branch >= browser.branches.len() {
+                                        browser.selected_branch =
+                                            browser.branches.len().saturating_sub(1);
+                                    }
+                                    if let Some(br) =
+                                        browser.branches.get(browser.selected_branch)
+                                    {
+                                        browser.commits = repo
+                                            .list_commits(&br.name)
+                                            .unwrap_or_default();
+                                        browser.selected_commit = 0;
+                                    }
+                                }
                             }
                         }
                     }
@@ -229,7 +242,22 @@ pub fn handle_select_frame(
                                 *enhancement = enhancement::load_enhancement();
                                 *global_achievements = achievements::load_achievements();
                                 global_achievements.refresh_progress();
-                                *time_vault_browser = None;
+                                // Refresh vault browser in-place (overlay stays open)
+                                if let Ok(branches) = repo.list_branches() {
+                                    browser.branches = branches;
+                                    if browser.selected_branch >= browser.branches.len() {
+                                        browser.selected_branch =
+                                            browser.branches.len().saturating_sub(1);
+                                    }
+                                    if let Some(br) =
+                                        browser.branches.get(browser.selected_branch)
+                                    {
+                                        browser.commits = repo
+                                            .list_commits(&br.name)
+                                            .unwrap_or_default();
+                                        browser.selected_commit = 0;
+                                    }
+                                }
                             }
                         }
                     }
@@ -241,21 +269,19 @@ pub fn handle_select_frame(
                                 *global_achievements = achievements::load_achievements();
                                 global_achievements.refresh_progress();
                                 // Refresh vault browser in-place (overlay stays open)
-                                if let Some(ref mut b) = time_vault_browser {
-                                    if let Ok(branches) = repo.list_branches() {
-                                        b.branches = branches;
-                                        if b.selected_branch >= b.branches.len() {
-                                            b.selected_branch =
-                                                b.branches.len().saturating_sub(1);
-                                        }
-                                        if let Some(br) =
-                                            b.branches.get(b.selected_branch)
-                                        {
-                                            b.commits = repo
-                                                .list_commits(&br.name)
-                                                .unwrap_or_default();
-                                            b.selected_commit = 0;
-                                        }
+                                if let Ok(branches) = repo.list_branches() {
+                                    browser.branches = branches;
+                                    if browser.selected_branch >= browser.branches.len() {
+                                        browser.selected_branch =
+                                            browser.branches.len().saturating_sub(1);
+                                    }
+                                    if let Some(br) =
+                                        browser.branches.get(browser.selected_branch)
+                                    {
+                                        browser.commits = repo
+                                            .list_commits(&br.name)
+                                            .unwrap_or_default();
+                                        browser.selected_commit = 0;
                                     }
                                 }
                             }
@@ -264,19 +290,17 @@ pub fn handle_select_frame(
                     TimeVaultAction::DeleteBranch { branch_name } => {
                         if let Some(repo) = history_repo {
                             if repo.delete_timeline(&branch_name).is_ok() {
-                                if let Some(ref mut b) = time_vault_browser {
-                                    if let Ok(branches) = repo.list_branches() {
-                                        b.branches = branches;
-                                        if b.selected_branch >= b.branches.len() {
-                                            b.selected_branch =
-                                                b.branches.len().saturating_sub(1);
-                                        }
-                                        if let Some(br) = b.branches.get(b.selected_branch) {
-                                            b.commits = repo
-                                                .list_commits(&br.name)
-                                                .unwrap_or_default();
-                                            b.selected_commit = 0;
-                                        }
+                                if let Ok(branches) = repo.list_branches() {
+                                    browser.branches = branches;
+                                    if browser.selected_branch >= browser.branches.len() {
+                                        browser.selected_branch =
+                                            browser.branches.len().saturating_sub(1);
+                                    }
+                                    if let Some(br) = browser.branches.get(browser.selected_branch) {
+                                        browser.commits = repo
+                                            .list_commits(&br.name)
+                                            .unwrap_or_default();
+                                        browser.selected_commit = 0;
                                     }
                                 }
                             }

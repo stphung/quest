@@ -135,7 +135,7 @@ pub fn handle_game_input(
             }
             TimeVaultAction::Continue => {}
             TimeVaultAction::Restore { commit_id } => {
-                *overlay = GameOverlay::None;
+                // Overlay stays open — main loop refreshes browser state.
                 return InputResult::RestoreSave { commit_id };
             }
             TimeVaultAction::RefreshCommits { branch_name } => {
@@ -145,7 +145,7 @@ pub fn handle_game_input(
                 commit_id,
                 branch_name,
             } => {
-                *overlay = GameOverlay::None;
+                // Overlay stays open — main loop refreshes browser state.
                 return InputResult::ForkSave {
                     commit_id,
                     branch_name,
