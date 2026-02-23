@@ -405,18 +405,13 @@ fn paint_snapshot_panel(
             }
         }
 
-        // Timeline node
-        let node = if is_selected {
-            "\u{25cf}" // filled circle
-        } else {
-            "\u{25cb}" // open circle
-        };
+        // Timeline node (always open — we are never "on" a commit)
         let node_color = if is_selected {
             Color::Yellow
         } else {
             Color::Cyan
         };
-        put_text(buffer, row, x + 2, node, node_color);
+        put_text(buffer, row, x + 2, "\u{25cb}", node_color); // ○ open circle
 
         // Icon
         put_text(buffer, row, x + 4, icon, icon_color);
