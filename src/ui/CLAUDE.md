@@ -35,6 +35,7 @@ src/ui/
 ├── title_browser_scene.rs      # Title browser overlay (select display title from unlocked achievements)
 ├── debug_menu_scene.rs         # Debug menu overlay with tabbed categories (Challenges, World, Resources, Items)
 ├── help_overlay.rs             # Help/controls overlay
+├── bug_report_scene.rs         # Bug report overlay with game-state preview and clipboard status
 │
 ├── challenge_menu_scene.rs     # Challenge menu list/detail view
 ├── chess_scene.rs              # Chess board with letter notation (K/Q/R/B/N/P)

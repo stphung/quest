@@ -312,6 +312,7 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 - `zone_bg.rs` — Stylized zone background scenes with 6-layer compositing pipeline for all 11 zones
 - `debug_menu_scene.rs` — Debug menu overlay with tabbed categories
 - `help_overlay.rs` — Help/controls overlay
+- `bug_report_scene.rs` — Bug report overlay with game-state preview and clipboard status
 - `throbber.rs` — Shared spinner animations and atmospheric messages
 - `character_select.rs`, `character_creation.rs`, `character_delete.rs`, `character_rename.rs` — Character management UI
 
@@ -400,7 +401,7 @@ quest/
 │   │   ├── overlay.rs            # Overlay management
 │   │   ├── persistence.rs        # Save/load orchestration
 │   │   ├── scene.rs              # Scene rendering dispatch
-│   │   └── update.rs             # Update checking
+│   │   └── update.rs             # Update checking, startup splash screen
 │   ├── bin/
 │   │   └── simulator.rs     # Headless game balance simulator
 │   ├── core/                # Core game systems
@@ -545,6 +546,7 @@ quest/
 │       ├── scene_fx.rs       # Shared utilities for layered ASCII scene rendering
 │       ├── zone_bg.rs        # Stylized zone background scenes (6-layer compositing)
 │       ├── debug_menu_scene.rs # Debug menu with tabbed categories
+│       ├── bug_report_scene.rs # Bug report overlay
 │       ├── *_scene.rs       # Various game scenes
 │       └── character_*.rs   # Character management UI
 ├── tests/                   # Integration tests (30 test files, 4,000+ tests)

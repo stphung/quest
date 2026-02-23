@@ -919,7 +919,7 @@ quest/
 │   │   ├── overlay.rs       # Overlay state management
 │   │   ├── persistence.rs   # Save/load orchestration
 │   │   ├── scene.rs         # Scene rendering dispatch
-│   │   └── update.rs        # Auto-update check handling
+│   │   └── update.rs        # Auto-update check handling, startup splash screen
 │   ├── tick_events.rs       # TickEvent → combat log + visual effects bridge
 │   ├── bin/
 │   │   └── simulator.rs     # Headless balance simulator binary
@@ -1067,6 +1067,7 @@ quest/
 │       ├── soulforge_effects.rs # Soulforge animation effects
 │       ├── soulforge_slots.rs # Soulforge slot selection rendering
 │       ├── help_overlay.rs   # Help overlay with keybindings
+│       ├── bug_report_scene.rs # Bug report overlay
 │       ├── stormglass_scene.rs # Stormglass Exchange overlay with animations
 │       ├── scene_fx.rs       # Shared utilities for layered ASCII scene rendering
 │       ├── zone_bg.rs        # Stylized zone background scenes (6-layer compositing)
