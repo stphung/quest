@@ -5,31 +5,25 @@
 
 use crate::history::types::{CommitInfo, TimelineInfo};
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
+    widgets::{Block, Borders, Clear, Paragraph},
     Frame,
 };
 
-#[allow(unused_imports)]
 use super::scene_fx::{
     current_millis, hash2d, lerp_rgb, put_cell, put_text, render_buffer, SceneCell,
 };
 
-#[allow(dead_code)]
 /// Temporal backdrop: dark navy top.
 const VAULT_TOP_RGB: (u8, u8, u8) = (8, 12, 35);
-#[allow(dead_code)]
 /// Temporal backdrop: near-black bottom.
 const VAULT_BOTTOM_RGB: (u8, u8, u8) = (3, 5, 15);
-#[allow(dead_code)]
 /// Dim cyan for timeline graph lines.
 const TIMELINE_DIM: Color = Color::Rgb(40, 80, 120);
-#[allow(dead_code)]
 /// Number of drifting particles.
 const PARTICLE_COUNT: usize = 5;
-#[allow(dead_code)]
 /// Particle drift speed (lower = slower).
 const PARTICLE_SPEED: f64 = 0.8;
 
@@ -106,7 +100,6 @@ impl TimeVaultState {
     }
 }
 
-#[allow(dead_code)]
 /// Paint the temporal vault backdrop: dark gradient with slow-drifting cyan particles.
 fn paint_vault_backdrop(buffer: &mut [Vec<SceneCell>], millis: u128) {
     let height = buffer.len();
@@ -164,7 +157,6 @@ fn paint_vault_backdrop(buffer: &mut [Vec<SceneCell>], millis: u128) {
     }
 }
 
-#[allow(dead_code)]
 /// Map a commit message to an event-type icon and color.
 fn event_icon_color(message: &str) -> (&'static str, Color) {
     let desc = message.split(" | ").next().unwrap_or(message);
@@ -202,6 +194,7 @@ pub fn draw_time_vault(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
 
     frame.render_widget(Clear, overlay_area);
 
+    // Render bordered block first to get inner area
     let outer_block = Block::default()
         .title(
             Line::from(Span::styled(
@@ -219,108 +212,128 @@ pub fn draw_time_vault(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
     let inner = outer_block.inner(overlay_area);
     frame.render_widget(outer_block, overlay_area);
 
-    // Split inner into: content area + controls bar
-    let v_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Min(3),    // Content
-            Constraint::Length(1), // Controls
-        ])
-        .split(inner);
-
-    let content_area = v_chunks[0];
-    let controls_area = v_chunks[1];
-
-    // Split content into left branch panel + right commit panel
-    let branch_width = 22u16.min(content_area.width / 3);
-    let h_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Length(branch_width), Constraint::Min(10)])
-        .split(content_area);
-
-    draw_branch_panel(frame, h_chunks[0], state, state.focus == PanelFocus::Left);
-    draw_commit_panel(frame, h_chunks[1], state, state.focus == PanelFocus::Right);
-    draw_controls(frame, controls_area, state);
-}
-
-/// Render the left branch list panel.
-fn draw_branch_panel(frame: &mut Frame, area: Rect, state: &TimeVaultState, focused: bool) {
-    let border_color = if focused {
-        Color::Cyan
-    } else {
-        Color::DarkGray
-    };
-    let title_color = if focused { Color::Cyan } else { Color::White };
-    let block = Block::default()
-        .title(Span::styled(
-            " Branches ",
-            Style::default()
-                .fg(title_color)
-                .add_modifier(Modifier::BOLD),
-        ))
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(border_color));
-
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-
-    let items: Vec<ListItem> = state
-        .branches
-        .iter()
-        .enumerate()
-        .map(|(i, branch)| {
-            let prefix = if branch.is_active { "* " } else { "  " };
-            let name = format!("{}{}", prefix, branch.name);
-            let style = if i == state.selected_branch {
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD)
-            } else if branch.is_active {
-                Style::default().fg(Color::Green)
-            } else {
-                Style::default().fg(Color::White)
-            };
-            ListItem::new(Span::styled(name, style))
-        })
-        .collect();
-
-    let list = List::new(items);
-    frame.render_widget(list, inner);
-}
-
-/// Render the right commit list panel.
-fn draw_commit_panel(frame: &mut Frame, area: Rect, state: &TimeVaultState, focused: bool) {
-    let border_color = if focused {
-        Color::Cyan
-    } else {
-        Color::DarkGray
-    };
-    let title_color = if focused { Color::Cyan } else { Color::White };
-    let block = Block::default()
-        .title(Span::styled(
-            " Saves ",
-            Style::default()
-                .fg(title_color)
-                .add_modifier(Modifier::BOLD),
-        ))
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(border_color));
-
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-
-    if state.commits.is_empty() {
-        let empty_msg = Paragraph::new(Span::styled(
-            "  No commits on this branch",
-            Style::default().fg(Color::DarkGray),
-        ));
-        frame.render_widget(empty_msg, inner);
+    // Buffer dimensions (inner minus 1 row for controls bar)
+    let buf_w = inner.width as usize;
+    let buf_h = inner.height.saturating_sub(1) as usize;
+    if buf_w < 10 || buf_h < 5 {
         return;
     }
 
-    // Each commit card takes 3 lines + 1 blank separator
-    let card_height = 4u16;
-    let visible_cards = (inner.height / card_height).max(1) as usize;
+    let mut buffer = vec![vec![SceneCell::default(); buf_w]; buf_h];
+    let millis = current_millis();
+    paint_vault_backdrop(&mut buffer, millis);
+
+    // Layout: branch panel on the left, snapshot panel on the right
+    let branch_width = 20usize.min(buf_w / 3);
+    let snap_x = branch_width + 1; // 1 col gap
+    let snap_w = buf_w.saturating_sub(snap_x);
+
+    paint_branch_panel(&mut buffer, state, branch_width);
+    paint_snapshot_panel(&mut buffer, state, snap_x, snap_w);
+
+    // Render the scene buffer into the inner area (above controls)
+    let buffer_area = Rect::new(inner.x, inner.y, inner.width, inner.height.saturating_sub(1));
+    render_buffer(frame, buffer_area, &buffer);
+
+    // Controls bar at the bottom
+    let controls_area = Rect::new(
+        inner.x,
+        inner.y + inner.height.saturating_sub(1),
+        inner.width,
+        1,
+    );
+    draw_controls(frame, controls_area, state);
+}
+
+/// Paint the branch list into the scene buffer.
+fn paint_branch_panel(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState, width: usize) {
+    let height = buffer.len();
+    let focused = state.focus == PanelFocus::Left;
+
+    // Panel title
+    let title_color = if focused { Color::Cyan } else { Color::White };
+    put_text(buffer, 0, 1, "Branches", title_color);
+
+    // Thin separator
+    let sep_color = if focused {
+        Color::Rgb(40, 80, 120)
+    } else {
+        Color::DarkGray
+    };
+    let sep: String = "\u{2500}".repeat(width.saturating_sub(1));
+    put_text(buffer, 1, 0, &sep, sep_color);
+
+    // Branch list
+    for (i, branch) in state.branches.iter().enumerate() {
+        let row = 2 + i as i32;
+        if row >= height as i32 {
+            break;
+        }
+
+        let marker = if branch.is_active {
+            "\u{25cf}" // filled circle
+        } else {
+            "\u{25cb}" // open circle
+        };
+
+        let is_selected = i == state.selected_branch;
+        let marker_color = if branch.is_active {
+            Color::Green
+        } else {
+            Color::DarkGray
+        };
+        let name_style = if is_selected {
+            Color::Yellow
+        } else if branch.is_active {
+            Color::Green
+        } else {
+            Color::White
+        };
+
+        put_text(buffer, row, 1, marker, marker_color);
+        let label = format!(" {}", branch.name);
+        put_text(buffer, row, 3, &label, name_style);
+    }
+}
+
+/// Paint the snapshot timeline into the scene buffer.
+fn paint_snapshot_panel(
+    buffer: &mut [Vec<SceneCell>],
+    state: &TimeVaultState,
+    x_offset: usize,
+    width: usize,
+) {
+    let height = buffer.len();
+    let focused = state.focus == PanelFocus::Right;
+
+    // Panel title
+    let title_color = if focused { Color::Cyan } else { Color::White };
+    put_text(buffer, 0, x_offset as i32 + 1, "Snapshots", title_color);
+
+    // Thin separator
+    let sep_color = if focused {
+        Color::Rgb(40, 80, 120)
+    } else {
+        Color::DarkGray
+    };
+    let sep: String = "\u{2500}".repeat(width.saturating_sub(1));
+    put_text(buffer, 1, x_offset as i32, &sep, sep_color);
+
+    if state.commits.is_empty() {
+        put_text(
+            buffer,
+            3,
+            x_offset as i32 + 2,
+            "No snapshots yet",
+            Color::DarkGray,
+        );
+        return;
+    }
+
+    // Each card: 4 rows (description, date, stats, separator)
+    let card_height = 4usize;
+    let available_rows = height.saturating_sub(2); // below title+sep
+    let visible_cards = (available_rows / card_height).max(1);
 
     // Scroll so selected commit is visible
     let scroll_offset = if state.selected_commit >= visible_cards {
@@ -329,40 +342,67 @@ fn draw_commit_panel(frame: &mut Frame, area: Rect, state: &TimeVaultState, focu
         0
     };
 
-    let mut y = inner.y;
-    for (i, commit) in state.commits.iter().enumerate().skip(scroll_offset) {
-        if y + 3 > inner.y + inner.height {
+    let x = x_offset as i32;
+    let mut row = 2i32; // start below title + separator
+    let total_visible = state.commits.len().saturating_sub(scroll_offset);
+
+    for (vi, (i, commit)) in state
+        .commits
+        .iter()
+        .enumerate()
+        .skip(scroll_offset)
+        .enumerate()
+    {
+        if row + 3 > height as i32 {
             break;
         }
 
         let is_selected = i == state.selected_commit;
-        let highlight = if is_selected {
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD)
+        let is_last = vi == total_visible - 1 || row + 4 + 3 > height as i32;
+        let (icon, icon_color) = event_icon_color(&commit.message);
+
+        // Timeline node
+        let node = if is_selected {
+            "\u{25cf}" // filled circle
         } else {
-            Style::default().fg(Color::White)
+            "\u{25cb}" // open circle
         };
+        let node_color = if is_selected {
+            Color::Yellow
+        } else {
+            Color::Cyan
+        };
+        put_text(buffer, row, x + 2, node, node_color);
+
+        // Icon
+        put_text(buffer, row, x + 4, icon, icon_color);
+
+        // Description
+        let desc = commit.message.split(" | ").next().unwrap_or(&commit.message);
+        let desc_color = if is_selected {
+            Color::Yellow
+        } else {
+            Color::White
+        };
+        let icon_width = super::scene_fx::display_width(icon);
+        put_text(
+            buffer,
+            row,
+            x + 4 + icon_width as i32 + 1,
+            desc,
+            desc_color,
+        );
+
+        // Timeline connector for rows below
         let dim = if is_selected {
-            Style::default().fg(Color::Yellow)
+            Color::Yellow
         } else {
-            Style::default().fg(Color::DarkGray)
+            Color::DarkGray
         };
 
-        // Line 1: Event description (part before " | ")
-        let description = commit
-            .message
-            .split(" | ")
-            .next()
-            .unwrap_or(&commit.message);
-        let selector = if is_selected { "> " } else { "  " };
-        let line1 = Line::from(Span::styled(
-            format!("{}{}", selector, description),
-            highlight,
-        ));
-        frame.render_widget(Paragraph::new(line1), Rect::new(inner.x, y, inner.width, 1));
-
-        // Line 2: Formatted date/time
+        // Date line
+        let connector = if is_last { " " } else { "\u{2502}" }; // vertical line
+        put_text(buffer, row + 1, x + 2, connector, TIMELINE_DIM);
         let datetime = chrono::DateTime::from_timestamp(commit.timestamp, 0)
             .map(|dt| {
                 dt.with_timezone(&chrono::Local)
@@ -370,27 +410,27 @@ fn draw_commit_panel(frame: &mut Frame, area: Rect, state: &TimeVaultState, focu
                     .to_string()
             })
             .unwrap_or_else(|| "Unknown".to_string());
-        let line2 = Line::from(Span::styled(format!("    {}", datetime), dim));
-        frame.render_widget(
-            Paragraph::new(line2),
-            Rect::new(inner.x, y + 1, inner.width, 1),
-        );
+        put_text(buffer, row + 1, x + 6, &datetime, dim);
 
-        // Line 3: Status line
+        // Stats line
+        let connector2 = if is_last { " " } else { "\u{2502}" }; // vertical line
+        put_text(buffer, row + 2, x + 2, connector2, TIMELINE_DIM);
         let hours = commit.playtime / 3600;
         let minutes = (commit.playtime % 3600) / 60;
-        let playtime_str = format!("{}h {:02}m", hours, minutes);
-        let status = format!(
-            "    Lv{} | P{} | Zone {} | {}",
-            commit.level, commit.prestige, commit.zone, playtime_str
+        let stats = format!(
+            "Lv{} \u{00b7} P{} \u{00b7} Zone {} \u{00b7} {}h {:02}m",
+            commit.level, commit.prestige, commit.zone, hours, minutes
         );
-        let line3 = Line::from(Span::styled(status, dim));
-        frame.render_widget(
-            Paragraph::new(line3),
-            Rect::new(inner.x, y + 2, inner.width, 1),
-        );
+        put_text(buffer, row + 2, x + 6, &stats, dim);
 
-        y += card_height;
+        // Separator line (thin line with connector)
+        if !is_last {
+            put_text(buffer, row + 3, x + 2, "\u{2502}", TIMELINE_DIM); // vertical line
+            let card_sep: String = "\u{2500}".repeat(width.saturating_sub(8));
+            put_text(buffer, row + 3, x + 4, &card_sep, Color::Rgb(30, 50, 80));
+        }
+
+        row += card_height as i32;
     }
 }
 
