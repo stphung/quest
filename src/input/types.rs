@@ -104,8 +104,10 @@ pub enum InputResult {
     Continue,
     /// Player quit to character select. State should be saved first.
     QuitToSelect,
-    /// State was modified (prestige, haven build) and should be saved.
+    /// State was modified (haven build, etc.) and should be saved.
     NeedsSave,
+    /// State was modified by prestige and should be saved with a history commit.
+    NeedsSavePrestige { new_rank: u32 },
     /// Haven was modified along with state -- save both.
     NeedsSaveAll,
     /// Toggle the update details expanded state.
