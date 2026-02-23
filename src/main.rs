@@ -142,9 +142,6 @@ fn extract_save_event(
 
     for event in events {
         match event {
-            TickEvent::LeveledUp { new_level } if new_level % 10 == 0 => {
-                return Some(SaveEvent::LevelUp(*new_level));
-            }
             TickEvent::SubzoneBossDefeated { result, .. } => match result {
                 BossDefeatResult::ZoneComplete { old_zone, .. } => {
                     return Some(SaveEvent::ZoneBossDefeated(old_zone.clone()));
@@ -156,9 +153,6 @@ fn extract_save_event(
             },
             TickEvent::DungeonCompleted { .. } => {
                 return Some(SaveEvent::DungeonCompleted("dungeon".to_string()));
-            }
-            TickEvent::FishingRankUp { .. } => {
-                return Some(SaveEvent::FishingRankUp(state.fishing.rank));
             }
             TickEvent::StormLeviathanCaught => {
                 return Some(SaveEvent::StormLeviathanCaught);
