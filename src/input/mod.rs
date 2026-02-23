@@ -113,6 +113,24 @@ pub fn handle_game_input(
             TimelineAction::RefreshCommits { branch_name } => {
                 return InputResult::RefreshTimelineCommits { branch_name };
             }
+            TimelineAction::ForkTimeline {
+                commit_id,
+                branch_name,
+            } => {
+                *overlay = GameOverlay::None;
+                return InputResult::ForkTimeline {
+                    commit_id,
+                    branch_name,
+                };
+            }
+            TimelineAction::SwitchTimeline { branch_name } => {
+                *overlay = GameOverlay::None;
+                return InputResult::SwitchTimeline { branch_name };
+            }
+            TimelineAction::DeleteTimeline { branch_name } => {
+                // Overlay stays open for delete — just refresh.
+                return InputResult::DeleteTimeline { branch_name };
+            }
         }
         return InputResult::Continue;
     }

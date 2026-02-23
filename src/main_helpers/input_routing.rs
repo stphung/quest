@@ -97,6 +97,9 @@ pub fn route_game_input(
         // route_game_input, but must be matched for exhaustiveness.
         InputResult::OpenTimeline
         | InputResult::RestoreTimeline { .. }
-        | InputResult::RefreshTimelineCommits { .. } => InputAction::Continue,
+        | InputResult::RefreshTimelineCommits { .. }
+        | InputResult::ForkTimeline { .. }
+        | InputResult::SwitchTimeline { .. }
+        | InputResult::DeleteTimeline { .. } => InputAction::Continue,
     }
 }

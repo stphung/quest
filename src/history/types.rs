@@ -18,6 +18,7 @@ pub enum SaveEvent {
     DungeonCompleted(String),
     FishingRankUp(u32),
     StormLeviathanCaught,
+    AchievementUnlocked(String),
 
     // State-changing actions
     HavenRoomBuilt(String),
@@ -29,6 +30,13 @@ pub enum SaveEvent {
     CharacterDeleted(String),
     EquipmentUpgrade(String),
     StormSigilActivated(String),
+
+    // Chrono Surge
+    ChronoSurge {
+        levels_gained: u32,
+        kills: u64,
+        ticks: u64,
+    },
 
     // Manual
     ManualSave,
@@ -46,6 +54,7 @@ impl SaveEvent {
             SaveEvent::DungeonCompleted(size) => format!("Completed {size} dungeon"),
             SaveEvent::FishingRankUp(rank) => format!("Fishing rank up to {rank}"),
             SaveEvent::StormLeviathanCaught => "Caught the Storm Leviathan".to_string(),
+            SaveEvent::AchievementUnlocked(name) => format!("Achievement: {name}"),
             SaveEvent::HavenRoomBuilt(room) => format!("Built {room} in Haven"),
             SaveEvent::HavenRoomUpgraded(room, tier) => format!("Upgraded {room} to T{tier}"),
             SaveEvent::SoulforgeEnhanced(slot, level) => {
@@ -58,6 +67,21 @@ impl SaveEvent {
             SaveEvent::EquipmentUpgrade(name) => format!("Equipped {name}"),
             SaveEvent::StormSigilActivated(name) => {
                 format!("Activated Storm Sigil: {name}")
+            }
+            SaveEvent::ChronoSurge {
+                levels_gained,
+                kills,
+                ticks,
+            } => {
+                let total_seconds = ticks / 10;
+                let hours = total_seconds / 3600;
+                let minutes = (total_seconds % 3600) / 60;
+                let duration = if hours > 0 {
+                    format!("{hours}h{minutes:02}m")
+                } else {
+                    format!("{minutes}m")
+                };
+                format!("Chrono Surge {duration} (+{levels_gained} levels, {kills} kills)")
             }
             SaveEvent::ManualSave => "Manual save".to_string(),
         }
@@ -74,15 +98,23 @@ impl SaveEvent {
         zone_id: u32,
         subzone_id: u32,
         play_time_seconds: u64,
+        character_name: &str,
     ) -> String {
-        let suffix = format_suffix(level, prestige, zone_id, subzone_id, play_time_seconds);
+        let suffix = format_suffix(
+            level,
+            prestige,
+            zone_id,
+            subzone_id,
+            play_time_seconds,
+            character_name,
+        );
         format!("{} | {}", self.description(), suffix)
     }
 }
 
 // ── Suffix formatting ────────────────────────────────────────────────────
 
-/// Format the snapshot suffix: "Lv{level} P{prestige} Z{zone}-{subzone} {time}".
+/// Format the snapshot suffix: "Lv{level} P{prestige} Z{zone}-{subzone} {time} @{name}".
 ///
 /// Time is formatted as `{h}h{mm}m` (e.g. "2h15m", "45h10m").
 pub fn format_suffix(
@@ -91,11 +123,12 @@ pub fn format_suffix(
     zone_id: u32,
     subzone_id: u32,
     play_time_seconds: u64,
+    character_name: &str,
 ) -> String {
     let total_minutes = play_time_seconds / 60;
     let hours = total_minutes / 60;
     let minutes = total_minutes % 60;
-    format!("Lv{level} P{prestige} Z{zone_id}-{subzone_id} {hours}h{minutes:02}m")
+    format!("Lv{level} P{prestige} Z{zone_id}-{subzone_id} {hours}h{minutes:02}m @{character_name}")
 }
 
 // ── CommitInfo ───────────────────────────────────────────────────────────

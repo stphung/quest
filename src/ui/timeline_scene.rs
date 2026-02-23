@@ -12,13 +12,36 @@ use ratatui::{
     Frame,
 };
 
+/// Which panel has keyboard focus.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PanelFocus {
+    Left,
+    Right,
+}
+
+/// The current interaction mode of the timeline browser.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BrowserMode {
+    /// Normal browsing — arrow keys navigate, Tab switches focus.
+    Browse,
+    /// Waiting for confirmation to restore the selected commit.
+    ConfirmRestore,
+    /// Waiting for confirmation to delete the selected branch.
+    ConfirmDelete,
+    /// Typing a name for a new forked timeline.
+    NamingFork { commit_id: String },
+}
+
 /// UI state for the timeline browser overlay.
 pub struct TimelineBrowserState {
     pub branches: Vec<TimelineInfo>,
     pub selected_branch: usize,
     pub commits: Vec<CommitInfo>,
     pub selected_commit: usize,
-    pub confirm_pending: bool,
+    pub focus: PanelFocus,
+    pub mode: BrowserMode,
+    pub fork_name_input: String,
+    pub fork_name_error: Option<String>,
 }
 
 impl TimelineBrowserState {
@@ -28,8 +51,33 @@ impl TimelineBrowserState {
             selected_branch: 0,
             commits,
             selected_commit: 0,
-            confirm_pending: false,
+            focus: PanelFocus::Right,
+            mode: BrowserMode::Browse,
+            fork_name_input: String::new(),
+            fork_name_error: None,
         }
+    }
+
+    /// Name of the currently selected branch, if any.
+    pub fn selected_branch_name(&self) -> Option<&str> {
+        self.branches.get(self.selected_branch).map(|b| b.name.as_str())
+    }
+
+    /// Short SHA of the currently selected commit, if any.
+    pub fn selected_commit_id(&self) -> Option<&str> {
+        self.commits.get(self.selected_commit).map(|c| c.id.as_str())
+    }
+
+    /// Whether the selected branch is "main".
+    pub fn selected_branch_is_main(&self) -> bool {
+        self.selected_branch_name() == Some("main")
+    }
+
+    /// Whether the selected branch is the currently active branch.
+    pub fn selected_branch_is_active(&self) -> bool {
+        self.branches
+            .get(self.selected_branch)
+            .is_some_and(|b| b.is_active)
     }
 }
 
@@ -80,22 +128,24 @@ pub fn draw_timeline_browser(frame: &mut Frame, area: Rect, state: &TimelineBrow
         .constraints([Constraint::Length(branch_width), Constraint::Min(10)])
         .split(content_area);
 
-    draw_branch_panel(frame, h_chunks[0], state);
-    draw_commit_panel(frame, h_chunks[1], state);
+    draw_branch_panel(frame, h_chunks[0], state, state.focus == PanelFocus::Left);
+    draw_commit_panel(frame, h_chunks[1], state, state.focus == PanelFocus::Right);
     draw_controls(frame, controls_area, state);
 }
 
 /// Render the left branch list panel.
-fn draw_branch_panel(frame: &mut Frame, area: Rect, state: &TimelineBrowserState) {
+fn draw_branch_panel(frame: &mut Frame, area: Rect, state: &TimelineBrowserState, focused: bool) {
+    let border_color = if focused { Color::Cyan } else { Color::DarkGray };
+    let title_color = if focused { Color::Cyan } else { Color::White };
     let block = Block::default()
         .title(Span::styled(
             " Timelines ",
             Style::default()
-                .fg(Color::White)
+                .fg(title_color)
                 .add_modifier(Modifier::BOLD),
         ))
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray));
+        .border_style(Style::default().fg(border_color));
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -125,16 +175,18 @@ fn draw_branch_panel(frame: &mut Frame, area: Rect, state: &TimelineBrowserState
 }
 
 /// Render the right commit list panel.
-fn draw_commit_panel(frame: &mut Frame, area: Rect, state: &TimelineBrowserState) {
+fn draw_commit_panel(frame: &mut Frame, area: Rect, state: &TimelineBrowserState, focused: bool) {
+    let border_color = if focused { Color::Cyan } else { Color::DarkGray };
+    let title_color = if focused { Color::Cyan } else { Color::White };
     let block = Block::default()
         .title(Span::styled(
-            " Commits ",
+            " Saves ",
             Style::default()
-                .fg(Color::White)
+                .fg(title_color)
                 .add_modifier(Modifier::BOLD),
         ))
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray));
+        .border_style(Style::default().fg(border_color));
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -226,8 +278,8 @@ fn draw_commit_panel(frame: &mut Frame, area: Rect, state: &TimelineBrowserState
 
 /// Render the bottom controls bar.
 fn draw_controls(frame: &mut Frame, area: Rect, state: &TimelineBrowserState) {
-    let controls = if state.confirm_pending {
-        Line::from(vec![
+    let controls = match &state.mode {
+        BrowserMode::ConfirmRestore => Line::from(vec![
             Span::styled(
                 " [Enter] Confirm Restore ",
                 Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
@@ -239,21 +291,88 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimelineBrowserState) {
                     .fg(Color::Green)
                     .add_modifier(Modifier::BOLD),
             ),
-        ])
-    } else {
-        Line::from(vec![
-            Span::styled(" [Enter] ", Style::default().fg(Color::Cyan)),
-            Span::styled("Restore", Style::default().fg(Color::DarkGray)),
-            Span::raw("  "),
-            Span::styled("[</>] ", Style::default().fg(Color::Cyan)),
-            Span::styled("Branch", Style::default().fg(Color::DarkGray)),
-            Span::raw("  "),
-            Span::styled("[Up/Dn] ", Style::default().fg(Color::Cyan)),
-            Span::styled("Scroll", Style::default().fg(Color::DarkGray)),
-            Span::raw("  "),
-            Span::styled("[Esc] ", Style::default().fg(Color::Cyan)),
-            Span::styled("Close", Style::default().fg(Color::DarkGray)),
-        ])
+        ]),
+        BrowserMode::ConfirmDelete => {
+            let name = state
+                .selected_branch_name()
+                .unwrap_or("?")
+                .to_string();
+            Line::from(vec![
+                Span::styled(
+                    format!(" [Enter] Delete '{name}' "),
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                ),
+                Span::raw("  "),
+                Span::styled(
+                    "[Esc] Cancel ",
+                    Style::default()
+                        .fg(Color::Green)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ])
+        }
+        BrowserMode::NamingFork { .. } => {
+            let input_display = format!("Name: {}_ ", state.fork_name_input);
+            if let Some(err) = &state.fork_name_error {
+                Line::from(vec![
+                    Span::styled(
+                        format!(" {input_display}"),
+                        Style::default().fg(Color::Yellow),
+                    ),
+                    Span::raw("  "),
+                    Span::styled(err.clone(), Style::default().fg(Color::Red)),
+                    Span::raw("  "),
+                    Span::styled("[Esc] Cancel ", Style::default().fg(Color::Green)),
+                ])
+            } else {
+                Line::from(vec![
+                    Span::styled(
+                        format!(" {input_display}"),
+                        Style::default().fg(Color::Yellow),
+                    ),
+                    Span::raw("  "),
+                    Span::styled("[Enter] ", Style::default().fg(Color::Cyan)),
+                    Span::styled("Create", Style::default().fg(Color::DarkGray)),
+                    Span::raw("  "),
+                    Span::styled("[Esc] ", Style::default().fg(Color::Cyan)),
+                    Span::styled("Cancel", Style::default().fg(Color::DarkGray)),
+                ])
+            }
+        }
+        BrowserMode::Browse => match state.focus {
+            PanelFocus::Left => {
+                let mut spans = vec![
+                    Span::styled(" [Enter] ", Style::default().fg(Color::Cyan)),
+                    Span::styled("Switch", Style::default().fg(Color::DarkGray)),
+                ];
+                // Only show Delete if branch is deletable (not main, not active)
+                if !state.selected_branch_is_main() && !state.selected_branch_is_active() {
+                    spans.push(Span::raw("  "));
+                    spans.push(Span::styled("[D] ", Style::default().fg(Color::Cyan)));
+                    spans.push(Span::styled("Delete", Style::default().fg(Color::DarkGray)));
+                }
+                spans.push(Span::raw("  "));
+                spans.push(Span::styled("[Tab] ", Style::default().fg(Color::Cyan)));
+                spans.push(Span::styled("Saves", Style::default().fg(Color::DarkGray)));
+                spans.push(Span::raw("  "));
+                spans.push(Span::styled("[Esc] ", Style::default().fg(Color::Cyan)));
+                spans.push(Span::styled("Close", Style::default().fg(Color::DarkGray)));
+                Line::from(spans)
+            }
+            PanelFocus::Right => Line::from(vec![
+                Span::styled(" [Enter] ", Style::default().fg(Color::Cyan)),
+                Span::styled("Restore", Style::default().fg(Color::DarkGray)),
+                Span::raw("  "),
+                Span::styled("[F] ", Style::default().fg(Color::Cyan)),
+                Span::styled("Fork", Style::default().fg(Color::DarkGray)),
+                Span::raw("  "),
+                Span::styled("[Tab] ", Style::default().fg(Color::Cyan)),
+                Span::styled("Timelines", Style::default().fg(Color::DarkGray)),
+                Span::raw("  "),
+                Span::styled("[Esc] ", Style::default().fg(Color::Cyan)),
+                Span::styled("Close", Style::default().fg(Color::DarkGray)),
+            ]),
+        },
     };
 
     let paragraph = Paragraph::new(controls).alignment(Alignment::Center);
