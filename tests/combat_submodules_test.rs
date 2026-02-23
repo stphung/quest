@@ -1449,7 +1449,10 @@ fn test_mob_fight_timeout_triggers_retreat() {
         }
     }
 
-    assert!(retreat_triggered, "Mob fight timeout should trigger retreat");
+    assert!(
+        retreat_triggered,
+        "Mob fight timeout should trigger retreat"
+    );
     assert!(
         state.combat_state.current_enemy.is_none(),
         "Enemy should be cleared after retreat"
@@ -1514,7 +1517,10 @@ fn test_consecutive_deaths_triggers_retreat() {
         retreat_triggered,
         "Should retreat after reaching death loop threshold"
     );
-    assert_eq!(state.consecutive_deaths, 0, "Deaths should reset after retreat");
+    assert_eq!(
+        state.consecutive_deaths, 0,
+        "Deaths should reset after retreat"
+    );
 }
 
 #[test]

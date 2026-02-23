@@ -567,14 +567,10 @@ pub fn process_combat_events<R: Rng>(
                 });
             }
             CombatEvent::CombatRetreat { zone_name } => {
-                let message = format!(
-                    "\u{1f3c3} Overwhelmed! You retreat to {}...",
-                    zone_name
-                );
-                result.events.push(TickEvent::CombatRetreat {
-                    zone_name,
-                    message,
-                });
+                let message = format!("\u{1f3c3} Overwhelmed! You retreat to {}...", zone_name);
+                result
+                    .events
+                    .push(TickEvent::CombatRetreat { zone_name, message });
             }
         }
     }
