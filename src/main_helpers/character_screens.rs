@@ -208,6 +208,8 @@ pub fn handle_select_frame(
                     }
                     TimeVaultAction::Restore { commit_id } => {
                         if let Some(repo) = history_repo {
+                            // Auto-save before restoring
+                            let _ = repo.commit_raw("Auto-save");
                             if repo.restore_to(&commit_id).is_ok() {
                                 *haven = haven::load_haven();
                                 *enhancement = enhancement::load_enhancement();
@@ -237,6 +239,8 @@ pub fn handle_select_frame(
                         branch_name,
                     } => {
                         if let Some(repo) = history_repo {
+                            // Auto-save before forking
+                            let _ = repo.commit_raw("Auto-save");
                             if repo.fork_timeline(&branch_name, &commit_id).is_ok() {
                                 *haven = haven::load_haven();
                                 *enhancement = enhancement::load_enhancement();
@@ -263,6 +267,8 @@ pub fn handle_select_frame(
                     }
                     TimeVaultAction::SwitchBranch { branch_name } => {
                         if let Some(repo) = history_repo {
+                            // Auto-save before switching
+                            let _ = repo.commit_raw("Auto-save");
                             if repo.switch_timeline(&branch_name).is_ok() {
                                 *haven = haven::load_haven();
                                 *enhancement = enhancement::load_enhancement();

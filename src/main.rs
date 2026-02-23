@@ -269,7 +269,14 @@ fn main() -> io::Result<()> {
     let mut terminal = Terminal::new(backend)?;
 
     if matches!(
-        show_startup_splash_screen(&mut terminal, &mut update_available)?,
+        show_startup_splash_screen(
+            &mut terminal,
+            &mut update_available,
+            history_repo.as_ref(),
+            &mut haven,
+            &mut enhancement,
+            &mut global_achievements,
+        )?,
         StartupSplashResult::Quit
     ) {
         disable_raw_mode()?;
@@ -660,6 +667,16 @@ fn main() -> io::Result<()> {
 
                             if let InputResult::RestoreSave { ref commit_id } = result {
                                 if let Some(ref repo) = history_repo {
+                                    // Auto-save current state before restoring
+                                    save_all(
+                                        &character_manager,
+                                        &state,
+                                        &global_achievements,
+                                        &haven,
+                                        &enhancement,
+                                        Some(&history::SaveEvent::AutoSave),
+                                        Some(repo),
+                                    );
                                     if repo.restore_to(commit_id).is_ok() {
                                         // Reload all state from disk (git reset replaced files)
                                         haven = haven::load_haven();
@@ -719,6 +736,16 @@ fn main() -> io::Result<()> {
                             } = result
                             {
                                 if let Some(ref repo) = history_repo {
+                                    // Auto-save current state before forking
+                                    save_all(
+                                        &character_manager,
+                                        &state,
+                                        &global_achievements,
+                                        &haven,
+                                        &enhancement,
+                                        Some(&history::SaveEvent::AutoSave),
+                                        Some(repo),
+                                    );
                                     if repo.fork_timeline(branch_name, commit_id).is_ok() {
                                         // Full state reload (fork checks out the new branch)
                                         haven = haven::load_haven();
@@ -773,6 +800,16 @@ fn main() -> io::Result<()> {
 
                             if let InputResult::SwitchSaveBranch { ref branch_name } = result {
                                 if let Some(ref repo) = history_repo {
+                                    // Auto-save current state before switching
+                                    save_all(
+                                        &character_manager,
+                                        &state,
+                                        &global_achievements,
+                                        &haven,
+                                        &enhancement,
+                                        Some(&history::SaveEvent::AutoSave),
+                                        Some(repo),
+                                    );
                                     if repo.switch_timeline(branch_name).is_ok() {
                                         // Full state reload (switch checks out the branch)
                                         haven = haven::load_haven();

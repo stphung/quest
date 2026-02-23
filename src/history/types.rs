@@ -37,8 +37,9 @@ pub enum SaveEvent {
         ticks: u64,
     },
 
-    // Manual
+    // Manual / automatic
     ManualSave,
+    AutoSave,
 }
 
 impl SaveEvent {
@@ -83,6 +84,7 @@ impl SaveEvent {
                 format!("Chrono Surge {duration} (+{levels_gained} levels, {kills} kills)")
             }
             SaveEvent::ManualSave => "Manual save".to_string(),
+            SaveEvent::AutoSave => "Auto-save".to_string(),
         }
     }
 

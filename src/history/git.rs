@@ -150,6 +150,30 @@ impl HistoryRepo {
         Ok(())
     }
 
+    /// Create a commit with a raw message string.
+    ///
+    /// Used for auto-saves (e.g. before switching branches) when full game
+    /// state metadata may not be available. No-op if there are no changes.
+    pub fn commit_raw(&self, message: &str) -> Result<(), HistoryError> {
+        if !self.has_changes()? {
+            return Err(HistoryError::NothingToCommit);
+        }
+
+        let mut index = self.repo.index()?;
+        index.add_all(["*"].iter(), IndexAddOption::DEFAULT, None)?;
+        index.write()?;
+
+        let tree_oid = index.write_tree()?;
+        let tree = self.repo.find_tree(tree_oid)?;
+        let sig = Self::signature()?;
+
+        let parent = self.head_commit()?;
+        self.repo
+            .commit(Some("HEAD"), &sig, &sig, message, &tree, &[&parent])?;
+
+        Ok(())
+    }
+
     /// List all branches with head commit info.
     ///
     /// The currently active branch is listed first, then the rest
