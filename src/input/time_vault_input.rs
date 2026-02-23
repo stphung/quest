@@ -121,15 +121,18 @@ fn handle_browse(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAction {
             }
         },
         KeyCode::Char('f') | KeyCode::Char('F') => {
-            // Fork only from right panel with a selected commit.
-            if state.focus == PanelFocus::Right {
-                if let Some(commit_id) = state.selected_commit_id() {
-                    state.mode = BrowserMode::NamingFork {
-                        commit_id: commit_id.to_string(),
-                    };
-                    state.fork_name_input.clear();
-                    state.fork_name_error = None;
-                }
+            let commit_id = match state.focus {
+                PanelFocus::Right => state.selected_commit_id().map(|s| s.to_string()),
+                PanelFocus::Left => state
+                    .branches
+                    .get(state.selected_branch)
+                    .and_then(|b| b.head_commit.as_ref())
+                    .map(|c| c.id.clone()),
+            };
+            if let Some(commit_id) = commit_id {
+                state.mode = BrowserMode::NamingFork { commit_id };
+                state.fork_name_input.clear();
+                state.fork_name_error = None;
             }
             TimeVaultAction::Continue
         }

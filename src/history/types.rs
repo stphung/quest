@@ -161,6 +161,5 @@ pub struct TimelineInfo {
     /// Whether this is the currently checked-out branch.
     pub is_active: bool,
     /// Most recent commit on this branch, if any.
-    #[allow(dead_code)]
     pub head_commit: Option<CommitInfo>,
 }

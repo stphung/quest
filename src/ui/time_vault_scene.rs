@@ -294,8 +294,6 @@ fn paint_branch_panel(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState, wid
 
         let marker = if branch.is_active {
             "\u{25cf}" // ● active
-        } else if is_selected {
-            "\u{25b8}" // ▸ selected non-active
         } else {
             "\u{25cb}" // ○ inactive
         };
@@ -621,6 +619,9 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
                     let mut spans = vec![
                         Span::styled(" [Enter] ", Style::default().fg(Color::Cyan)),
                         Span::styled("Switch", Style::default().fg(Color::DarkGray)),
+                        dot.clone(),
+                        Span::styled("[F] ", Style::default().fg(Color::Cyan)),
+                        Span::styled("Fork", Style::default().fg(Color::DarkGray)),
                     ];
                     if !state.selected_branch_is_main() && !state.selected_branch_is_active() {
                         spans.push(dot.clone());
