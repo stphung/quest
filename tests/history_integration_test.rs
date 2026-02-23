@@ -35,27 +35,26 @@ fn full_save_restore_round_trip() {
     assert_eq!(commits.len(), 4);
     assert!(commits[0].message.contains("Prestige to rank 1"));
 
-    // Restore to level 10 commit (newest-first: [0]=Prestige, [1]=LevelUp, [2]=Created, [3]=Init)
+    // Restore to level 10 commit (resets main back)
     let level10_id = &commits[1].id;
-    let new_branch = repo.restore_to(level10_id).unwrap();
-    assert_eq!(new_branch, "timeline-1");
+    repo.restore_to(level10_id).unwrap();
 
     // Verify file contents match level 10
     let content = fs::read_to_string(dir.path().join("char.json")).unwrap();
     assert!(content.contains("\"level\":10"));
 
-    // Switch back to main
-    repo.switch_branch("main").unwrap();
-    let content = fs::read_to_string(dir.path().join("char.json")).unwrap();
-    assert!(content.contains("\"level\":50"));
-
-    // Verify 2 branches
+    // Still only one branch (main) — no new branches created
     let branches = repo.list_branches().unwrap();
-    assert_eq!(branches.len(), 2);
+    assert_eq!(branches.len(), 1);
+    assert_eq!(branches[0].name, "main");
+
+    // main now has 3 commits (init + created + level up), prestige commit is gone
+    let commits_after = repo.list_commits("main").unwrap();
+    assert_eq!(commits_after.len(), 3);
 }
 
 #[test]
-fn multiple_timelines() {
+fn restore_then_continue() {
     let dir = TempDir::new().unwrap();
     let repo = HistoryRepo::init(dir.path()).unwrap();
 
@@ -71,25 +70,26 @@ fn multiple_timelines() {
     repo.commit(&SaveEvent::LevelUp(30), 30, 0, 3, 1, 300)
         .unwrap();
 
-    // Restore to v1 -> creates timeline-1
+    // Restore to v1 (resets main)
     let commits = repo.list_commits("main").unwrap();
     let v1_id = &commits[2].id; // third newest = LevelUp(10)
     repo.restore_to(v1_id).unwrap();
 
-    // Make progress on timeline-1
-    fs::write(dir.path().join("save.json"), "t1-v2").unwrap();
+    // Verify main was reset to 2 commits (init + v1)
+    let commits_after = repo.list_commits("main").unwrap();
+    assert_eq!(commits_after.len(), 2);
+
+    // Continue playing from restored state — new commits go on main
+    fs::write(dir.path().join("save.json"), "v1-alt").unwrap();
     repo.commit(&SaveEvent::PrestigeRank(1), 50, 1, 1, 1, 400)
         .unwrap();
 
-    // Restore again from timeline-1 -> creates timeline-2
-    let t1_commits = repo.list_commits("timeline-1").unwrap();
-    let t1_first = &t1_commits[1].id; // the v1 commit
-    repo.restore_to(t1_first).unwrap();
+    // main now has 3 commits (init + v1 + prestige)
+    let final_commits = repo.list_commits("main").unwrap();
+    assert_eq!(final_commits.len(), 3);
+    assert!(final_commits[0].message.contains("Prestige to rank 1"));
 
-    // Should now have 3 branches
+    // Still only one branch
     let branches = repo.list_branches().unwrap();
-    assert_eq!(branches.len(), 3);
-    assert!(branches.iter().any(|b| b.name == "main"));
-    assert!(branches.iter().any(|b| b.name == "timeline-1"));
-    assert!(branches.iter().any(|b| b.name == "timeline-2"));
+    assert_eq!(branches.len(), 1);
 }

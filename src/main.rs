@@ -648,8 +648,8 @@ fn main() -> io::Result<()> {
 
                             if let InputResult::RestoreTimeline { ref commit_id } = result {
                                 if let Some(ref repo) = history_repo {
-                                    if let Ok(new_branch) = repo.restore_to(commit_id) {
-                                        // Reload all state from disk (git checkout replaced files)
+                                    if repo.restore_to(commit_id).is_ok() {
+                                        // Reload all state from disk (git reset replaced files)
                                         haven = haven::load_haven();
                                         enhancement = enhancement::load_enhancement();
                                         global_achievements = achievements::load_achievements();
@@ -666,10 +666,7 @@ fn main() -> io::Result<()> {
                                                 .recalculate_derived_stats(&enhancement.levels);
                                             reloaded.recalculate_prestige_bonuses();
                                             reloaded.combat_state.add_log_entry(
-                                                format!(
-                                                    "\u{23F3} Restored to timeline: {}",
-                                                    new_branch
-                                                ),
+                                                "\u{23F3} Save restored".to_string(),
                                                 false,
                                                 true,
                                             );

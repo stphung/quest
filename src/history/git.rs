@@ -2,7 +2,7 @@
 //!
 //! `HistoryRepo` wraps `git2::Repository` to provide high-level operations for
 //! save-state versioning: initializing a repo, committing snapshots, listing
-//! branches/commits, restoring to earlier states, and switching timelines.
+//! branches/commits, and restoring to earlier states.
 
 use std::path::Path;
 
@@ -199,33 +199,25 @@ impl HistoryRepo {
         Ok(commits)
     }
 
-    /// Create a new `timeline-N` branch from the given commit, and check it
-    /// out. Returns the new branch name.
-    pub fn restore_to(&self, commit_id: &str) -> Result<String, HistoryError> {
+    /// Reset the current branch to the given commit and force-checkout.
+    ///
+    /// This moves the current branch pointer back to the target commit,
+    /// discarding any commits after it. The old commits remain in git's
+    /// reflog for recovery if needed.
+    pub fn restore_to(&self, commit_id: &str) -> Result<(), HistoryError> {
         let oid = self.resolve_commit_id(commit_id)?;
         let commit = self
             .repo
             .find_commit(oid)
             .map_err(|_| HistoryError::CommitNotFound(commit_id.to_string()))?;
 
-        let branch_name = self.next_timeline_name()?;
-        self.repo
-            .branch(&branch_name, &commit, false)?;
+        // Reset the current branch ref to point at the target commit.
+        self.repo.reset(
+            commit.as_object(),
+            git2::ResetType::Hard,
+            None,
+        )?;
 
-        self.checkout_branch(&branch_name)?;
-
-        Ok(branch_name)
-    }
-
-    /// Checkout an existing branch (force).
-    #[allow(dead_code)]
-    pub fn switch_branch(&self, branch_name: &str) -> Result<(), HistoryError> {
-        // Verify the branch exists.
-        self.repo
-            .find_branch(branch_name, BranchType::Local)
-            .map_err(|_| HistoryError::BranchNotFound(branch_name.to_string()))?;
-
-        self.checkout_branch(branch_name)?;
         Ok(())
     }
 
@@ -291,34 +283,6 @@ impl HistoryRepo {
             .map_err(|_| HistoryError::CommitNotFound(commit_id.to_string()))
     }
 
-    /// Determine the next `timeline-N` branch name.
-    fn next_timeline_name(&self) -> Result<String, HistoryError> {
-        let mut max = 0u32;
-        for branch_result in self.repo.branches(Some(BranchType::Local))? {
-            let (branch, _) = branch_result?;
-            if let Some(name) = branch.name()? {
-                if let Some(suffix) = name.strip_prefix("timeline-") {
-                    if let Ok(n) = suffix.parse::<u32>() {
-                        max = max.max(n);
-                    }
-                }
-            }
-        }
-        Ok(format!("timeline-{}", max + 1))
-    }
-
-    /// Force-checkout a branch by name, setting HEAD and updating the working
-    /// directory.
-    fn checkout_branch(&self, branch_name: &str) -> Result<(), HistoryError> {
-        let refname = format!("refs/heads/{branch_name}");
-        self.repo.set_head(&refname)?;
-
-        let mut checkout = git2::build::CheckoutBuilder::new();
-        checkout.force();
-        self.repo.checkout_head(Some(&mut checkout))?;
-
-        Ok(())
-    }
 }
 
 // ── Commit suffix parsing ───────────────────────────────────────────────
