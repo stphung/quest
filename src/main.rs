@@ -259,6 +259,7 @@ fn main() -> io::Result<()> {
     let mut achievement_browser = AchievementBrowserState::new();
     let mut title_browser = TitleBrowserState::new();
     let mut help_overlay_showing = false;
+    let mut time_vault_browser: Option<ui::time_vault_scene::TimeVaultState> = None;
 
     // Setup terminal
     enable_raw_mode()?;
@@ -317,6 +318,8 @@ fn main() -> io::Result<()> {
                     &mut achievement_browser,
                     &mut title_browser,
                     &mut help_overlay_showing,
+                    history_repo.as_ref(),
+                    &mut time_vault_browser,
                 )?;
                 match transition {
                     ScreenTransition::GoToCreation => {

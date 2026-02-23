@@ -14,6 +14,8 @@ use crate::character::manager::CharacterManager;
 use crate::core::game_state::GameState;
 use crate::enhancement;
 use crate::haven;
+use crate::history::HistoryRepo;
+use crate::input::time_vault_input::{handle_time_vault_input, TimeVaultAction};
 use crate::input::{HavenUiState, SoulforgeUiState};
 use crate::ui;
 use crate::ui::achievement_browser_scene::AchievementBrowserState;
@@ -21,6 +23,7 @@ use crate::ui::character_creation::CharacterCreationScreen;
 use crate::ui::character_delete::CharacterDeleteScreen;
 use crate::ui::character_rename::CharacterRenameScreen;
 use crate::ui::character_select::CharacterSelectScreen;
+use crate::ui::time_vault_scene::TimeVaultState;
 use crate::ui::title_browser_scene::TitleBrowserState;
 
 use chrono::Utc;
@@ -117,6 +120,8 @@ pub fn handle_select_frame(
     achievement_browser: &mut AchievementBrowserState,
     title_browser: &mut TitleBrowserState,
     help_overlay_showing: &mut bool,
+    history_repo: Option<&HistoryRepo>,
+    time_vault_browser: &mut Option<TimeVaultState>,
 ) -> io::Result<ScreenTransition> {
     // Refresh character list
     let characters = character_manager.list_characters()?;
@@ -176,6 +181,10 @@ pub fn handle_select_frame(
         if *help_overlay_showing {
             ui::help_overlay::draw_help_overlay(f);
         }
+        // Draw Time Vault overlay if open
+        if let Some(ref browser) = time_vault_browser {
+            ui::time_vault_scene::draw_time_vault(f, area, browser);
+        }
     })?;
 
     // Handle input
@@ -184,6 +193,83 @@ pub fn handle_select_frame(
             if key_event.kind != KeyEventKind::Press {
                 return Ok(ScreenTransition::Stay);
             }
+            // Handle Time Vault overlay (blocks other input when open)
+            if let Some(ref mut browser) = time_vault_browser {
+                match handle_time_vault_input(key_event, browser) {
+                    TimeVaultAction::Close => {
+                        *time_vault_browser = None;
+                    }
+                    TimeVaultAction::RefreshCommits { branch_name } => {
+                        if let Some(repo) = history_repo {
+                            if let Ok(commits) = repo.list_commits(&branch_name) {
+                                if let Some(ref mut b) = time_vault_browser {
+                                    b.commits = commits;
+                                }
+                            }
+                        }
+                    }
+                    TimeVaultAction::Restore { commit_id } => {
+                        if let Some(repo) = history_repo {
+                            if repo.restore_to(&commit_id).is_ok() {
+                                *haven = haven::load_haven();
+                                *enhancement = enhancement::load_enhancement();
+                                *global_achievements = achievements::load_achievements();
+                                global_achievements.refresh_progress();
+                                *time_vault_browser = None;
+                            }
+                        }
+                    }
+                    TimeVaultAction::Fork {
+                        commit_id,
+                        branch_name,
+                    } => {
+                        if let Some(repo) = history_repo {
+                            if repo.fork_timeline(&branch_name, &commit_id).is_ok() {
+                                *haven = haven::load_haven();
+                                *enhancement = enhancement::load_enhancement();
+                                *global_achievements = achievements::load_achievements();
+                                global_achievements.refresh_progress();
+                                *time_vault_browser = None;
+                            }
+                        }
+                    }
+                    TimeVaultAction::SwitchBranch { branch_name } => {
+                        if let Some(repo) = history_repo {
+                            if repo.switch_timeline(&branch_name).is_ok() {
+                                *haven = haven::load_haven();
+                                *enhancement = enhancement::load_enhancement();
+                                *global_achievements = achievements::load_achievements();
+                                global_achievements.refresh_progress();
+                                *time_vault_browser = None;
+                            }
+                        }
+                    }
+                    TimeVaultAction::DeleteBranch { branch_name } => {
+                        if let Some(repo) = history_repo {
+                            if repo.delete_timeline(&branch_name).is_ok() {
+                                if let Some(ref mut b) = time_vault_browser {
+                                    if let Ok(branches) = repo.list_branches() {
+                                        b.branches = branches;
+                                        if b.selected_branch >= b.branches.len() {
+                                            b.selected_branch =
+                                                b.branches.len().saturating_sub(1);
+                                        }
+                                        if let Some(br) = b.branches.get(b.selected_branch) {
+                                            b.commits = repo
+                                                .list_commits(&br.name)
+                                                .unwrap_or_default();
+                                            b.selected_commit = 0;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    TimeVaultAction::Continue => {}
+                }
+                return Ok(ScreenTransition::Stay);
+            }
+
             // Handle Soulforge overlay (blocks other input when open)
             if soulforge_ui.open {
                 match key_event.code {
@@ -272,6 +358,20 @@ pub fn handle_select_frame(
             // Help overlay shortcut
             if key_event.code == KeyCode::Char('?') {
                 *help_overlay_showing = true;
+                return Ok(ScreenTransition::Stay);
+            }
+
+            // Time Vault shortcut
+            if matches!(key_event.code, KeyCode::Char('t') | KeyCode::Char('T')) {
+                if let Some(repo) = history_repo {
+                    if let Ok(branches) = repo.list_branches() {
+                        let commits = branches
+                            .first()
+                            .and_then(|b| repo.list_commits(&b.name).ok())
+                            .unwrap_or_default();
+                        *time_vault_browser = Some(TimeVaultState::new(branches, commits));
+                    }
+                }
                 return Ok(ScreenTransition::Stay);
             }
 
