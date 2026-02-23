@@ -181,6 +181,19 @@ fn build_startup_splash_text(
             Style::default().fg(Color::Gray),
         )]),
         Line::from(""),
+        Line::from(vec![Span::styled(
+            "  ─── Forged By ─────────────────────────────",
+            Style::default().add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(vec![
+            Span::raw("  Steven Phung (@stphung) "),
+            Span::styled("Creator", accent),
+        ]),
+        Line::from(vec![
+            Span::raw("  DH (@dhsu)              "),
+            Span::styled("Contributor", accent),
+        ]),
+        Line::from(""),
     ];
 
     let upstream_title = match update_status {

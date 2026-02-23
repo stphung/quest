@@ -87,8 +87,6 @@ pub enum GameOverlay {
     StormglassDiscovery,
     /// Quit confirmation when pending challenges exist
     QuitConfirm,
-    /// Credits screen overlay
-    Credits,
     /// Bug report overlay with game state summary
     BugReport {
         summary: String,

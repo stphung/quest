@@ -172,9 +172,6 @@ pub fn draw_game_overlays(
         GameOverlay::QuitConfirm => {
             draw_quit_confirm(frame, state.challenge_menu.challenges.len());
         }
-        GameOverlay::Credits => {
-            ui::credits_scene::draw_credits_overlay(frame);
-        }
         GameOverlay::Help => {
             ui::help_overlay::draw_help_overlay(frame);
         }
