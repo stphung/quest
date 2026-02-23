@@ -121,6 +121,14 @@ pub(crate) fn resolve_enemy_attack<R: Rng>(
                             KILLS_FOR_BOSS.saturating_sub(KILLS_FOR_BOSS_RETRY);
                     }
                 } else if let Some(enemy) = state.combat_state.current_enemy.as_mut() {
+                    // Track consecutive deaths for death loop detection
+                    state.consecutive_deaths += 1;
+
+                    // Check death loop threshold — trigger retreat
+                    if state.consecutive_deaths >= DEATH_LOOP_THRESHOLD {
+                        return super::orchestration::resolve_combat_retreat(state);
+                    }
+
                     enemy.reset_hp();
                 }
             } else {
