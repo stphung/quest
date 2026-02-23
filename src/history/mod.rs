@@ -1,8 +1,8 @@
-//! Git-based save history system.
+//! Time Vault — git-based save versioning system.
 //!
-//! Every meaningful game event (level up, prestige, boss defeat, etc.) creates
-//! a git commit containing the full save state. Players can browse the timeline
-//! and restore any previous snapshot.
+//! Every meaningful game event (prestige, boss defeat, etc.) creates a git
+//! commit containing the full save state. Players can browse, restore, and
+//! fork save branches through the Time Vault overlay.
 
 pub mod git;
 pub mod types;

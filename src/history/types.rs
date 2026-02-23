@@ -1,8 +1,7 @@
-//! Core types for the git-based save history system.
+//! Core types for the Time Vault save versioning system.
 //!
 //! `SaveEvent` describes *why* a commit was made (milestone, action, or manual).
-//! `CommitInfo` and `TimelineInfo` carry read-back metadata for the timeline
-//! browser UI.
+//! `CommitInfo` and `TimelineInfo` carry read-back metadata for the Time Vault UI.
 
 // ── SaveEvent ────────────────────────────────────────────────────────────
 

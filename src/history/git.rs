@@ -1,4 +1,4 @@
-//! Git-backed save history repository.
+//! Time Vault git repository backend.
 //!
 //! `HistoryRepo` wraps `git2::Repository` to provide high-level operations for
 //! save-state versioning: initializing a repo, committing snapshots, listing

@@ -93,9 +93,9 @@ pub enum GameOverlay {
         clipboard_ready: bool,
         error: Option<String>,
     },
-    /// Timeline browser for save history
-    Timeline {
-        browser: crate::ui::timeline_scene::TimelineBrowserState,
+    /// Time Vault (save history browser)
+    TimeVault {
+        browser: crate::ui::time_vault_scene::TimeVaultState,
     },
 }
 
@@ -117,19 +117,19 @@ pub enum InputResult {
     ToggleUpdateDetails,
     /// Start a Chrono Surge with the given number of ticks.
     StartChronoSurge { ticks: u64 },
-    /// Open the timeline browser (main.rs populates state from HistoryRepo).
-    OpenTimeline,
-    /// Restore game state to a specific commit in the timeline.
-    RestoreTimeline { commit_id: String },
-    /// Reload commits for a different branch in the timeline browser.
-    RefreshTimelineCommits { branch_name: String },
-    /// Fork a new timeline at a specific commit.
-    ForkTimeline {
+    /// Open the Time Vault (main.rs populates state from HistoryRepo).
+    OpenTimeVault,
+    /// Restore game state to a specific commit in save history.
+    RestoreSave { commit_id: String },
+    /// Reload commits for a different branch in the save history browser.
+    RefreshSaveHistoryCommits { branch_name: String },
+    /// Fork a new save branch at a specific commit.
+    ForkSave {
         commit_id: String,
         branch_name: String,
     },
-    /// Switch the active timeline (branch).
-    SwitchTimeline { branch_name: String },
-    /// Delete a timeline (branch).
-    DeleteTimeline { branch_name: String },
+    /// Switch the active save branch.
+    SwitchSaveBranch { branch_name: String },
+    /// Delete a save branch.
+    DeleteSaveBranch { branch_name: String },
 }

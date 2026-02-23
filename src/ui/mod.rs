@@ -45,7 +45,7 @@ mod stats_sigils;
 pub mod stormglass_scene;
 pub(crate) mod throbber;
 pub mod ticker;
-pub mod timeline_scene;
+pub mod time_vault_scene;
 pub mod title_browser_scene;
 mod zone_bg;
 

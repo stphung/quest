@@ -93,13 +93,13 @@ pub fn route_game_input(
         // StartChronoSurge is handled directly in main.rs before reaching
         // route_game_input, but must be matched for exhaustiveness.
         InputResult::StartChronoSurge { .. } => InputAction::Continue,
-        // Timeline actions are handled directly in main.rs before reaching
+        // Time Vault actions are handled directly in main.rs before reaching
         // route_game_input, but must be matched for exhaustiveness.
-        InputResult::OpenTimeline
-        | InputResult::RestoreTimeline { .. }
-        | InputResult::RefreshTimelineCommits { .. }
-        | InputResult::ForkTimeline { .. }
-        | InputResult::SwitchTimeline { .. }
-        | InputResult::DeleteTimeline { .. } => InputAction::Continue,
+        InputResult::OpenTimeVault
+        | InputResult::RestoreSave { .. }
+        | InputResult::RefreshSaveHistoryCommits { .. }
+        | InputResult::ForkSave { .. }
+        | InputResult::SwitchSaveBranch { .. }
+        | InputResult::DeleteSaveBranch { .. } => InputAction::Continue,
     }
 }

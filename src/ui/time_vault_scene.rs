@@ -1,7 +1,7 @@
-//! Timeline browser overlay UI.
+//! Time Vault overlay UI.
 //!
-//! Displays a two-panel overlay for browsing save history branches (timelines)
-//! and their commits. Players can restore any previous snapshot.
+//! Displays a two-panel overlay for browsing save branches
+//! and their snapshots. Players can restore, fork, and manage saves.
 
 use crate::history::types::{CommitInfo, TimelineInfo};
 use ratatui::{
@@ -19,7 +19,7 @@ pub enum PanelFocus {
     Right,
 }
 
-/// The current interaction mode of the timeline browser.
+/// The current interaction mode of the Time Vault.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BrowserMode {
     /// Normal browsing — arrow keys navigate, Tab switches focus.
@@ -28,12 +28,12 @@ pub enum BrowserMode {
     ConfirmRestore,
     /// Waiting for confirmation to delete the selected branch.
     ConfirmDelete,
-    /// Typing a name for a new forked timeline.
+    /// Typing a name for a new forked branch.
     NamingFork { commit_id: String },
 }
 
-/// UI state for the timeline browser overlay.
-pub struct TimelineBrowserState {
+/// UI state for the Time Vault overlay.
+pub struct TimeVaultState {
     pub branches: Vec<TimelineInfo>,
     pub selected_branch: usize,
     pub commits: Vec<CommitInfo>,
@@ -44,7 +44,7 @@ pub struct TimelineBrowserState {
     pub fork_name_error: Option<String>,
 }
 
-impl TimelineBrowserState {
+impl TimeVaultState {
     pub fn new(branches: Vec<TimelineInfo>, commits: Vec<CommitInfo>) -> Self {
         Self {
             branches,
@@ -85,8 +85,8 @@ impl TimelineBrowserState {
     }
 }
 
-/// Render the timeline browser overlay.
-pub fn draw_timeline_browser(frame: &mut Frame, area: Rect, state: &TimelineBrowserState) {
+/// Render the Time Vault overlay.
+pub fn draw_time_vault(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
     // Full-screen overlay with padding
     let w = area.width.saturating_sub(4).min(90);
     let h = area.height.saturating_sub(4);
@@ -99,7 +99,7 @@ pub fn draw_timeline_browser(frame: &mut Frame, area: Rect, state: &TimelineBrow
     let outer_block = Block::default()
         .title(
             Line::from(Span::styled(
-                " TIMELINE BROWSER ",
+                " TIME VAULT ",
                 Style::default()
                     .fg(Color::Cyan)
                     .add_modifier(Modifier::BOLD),
@@ -138,7 +138,7 @@ pub fn draw_timeline_browser(frame: &mut Frame, area: Rect, state: &TimelineBrow
 }
 
 /// Render the left branch list panel.
-fn draw_branch_panel(frame: &mut Frame, area: Rect, state: &TimelineBrowserState, focused: bool) {
+fn draw_branch_panel(frame: &mut Frame, area: Rect, state: &TimeVaultState, focused: bool) {
     let border_color = if focused {
         Color::Cyan
     } else {
@@ -147,7 +147,7 @@ fn draw_branch_panel(frame: &mut Frame, area: Rect, state: &TimelineBrowserState
     let title_color = if focused { Color::Cyan } else { Color::White };
     let block = Block::default()
         .title(Span::styled(
-            " Timelines ",
+            " Branches ",
             Style::default()
                 .fg(title_color)
                 .add_modifier(Modifier::BOLD),
@@ -183,7 +183,7 @@ fn draw_branch_panel(frame: &mut Frame, area: Rect, state: &TimelineBrowserState
 }
 
 /// Render the right commit list panel.
-fn draw_commit_panel(frame: &mut Frame, area: Rect, state: &TimelineBrowserState, focused: bool) {
+fn draw_commit_panel(frame: &mut Frame, area: Rect, state: &TimeVaultState, focused: bool) {
     let border_color = if focused {
         Color::Cyan
     } else {
@@ -289,7 +289,7 @@ fn draw_commit_panel(frame: &mut Frame, area: Rect, state: &TimelineBrowserState
 }
 
 /// Render the bottom controls bar.
-fn draw_controls(frame: &mut Frame, area: Rect, state: &TimelineBrowserState) {
+fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
     let controls = match &state.mode {
         BrowserMode::ConfirmRestore => Line::from(vec![
             Span::styled(
@@ -376,7 +376,7 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimelineBrowserState) {
                 Span::styled("Fork", Style::default().fg(Color::DarkGray)),
                 Span::raw("  "),
                 Span::styled("[Tab] ", Style::default().fg(Color::Cyan)),
-                Span::styled("Timelines", Style::default().fg(Color::DarkGray)),
+                Span::styled("Branches", Style::default().fg(Color::DarkGray)),
                 Span::raw("  "),
                 Span::styled("[Esc] ", Style::default().fg(Color::Cyan)),
                 Span::styled("Close", Style::default().fg(Color::DarkGray)),

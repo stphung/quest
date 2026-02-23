@@ -7,7 +7,7 @@ mod minigame_input;
 mod prestige_input;
 mod soulforge_input;
 mod stormglass_input;
-pub mod timeline_input;
+pub mod time_vault_input;
 pub mod types;
 
 // Re-export all types for backward compatibility
@@ -126,38 +126,38 @@ pub fn handle_game_input(
         return handle_bug_report_overlay(key, overlay);
     }
 
-    // 0.85. Timeline browser overlay
-    if let GameOverlay::Timeline { ref mut browser } = overlay {
-        use timeline_input::{handle_timeline_input, TimelineAction};
-        match handle_timeline_input(key, browser) {
-            TimelineAction::Close => {
+    // 0.85. Time Vault overlay
+    if let GameOverlay::TimeVault { ref mut browser } = overlay {
+        use time_vault_input::{handle_time_vault_input, TimeVaultAction};
+        match handle_time_vault_input(key, browser) {
+            TimeVaultAction::Close => {
                 *overlay = GameOverlay::None;
             }
-            TimelineAction::Continue => {}
-            TimelineAction::Restore { commit_id } => {
+            TimeVaultAction::Continue => {}
+            TimeVaultAction::Restore { commit_id } => {
                 *overlay = GameOverlay::None;
-                return InputResult::RestoreTimeline { commit_id };
+                return InputResult::RestoreSave { commit_id };
             }
-            TimelineAction::RefreshCommits { branch_name } => {
-                return InputResult::RefreshTimelineCommits { branch_name };
+            TimeVaultAction::RefreshCommits { branch_name } => {
+                return InputResult::RefreshSaveHistoryCommits { branch_name };
             }
-            TimelineAction::ForkTimeline {
+            TimeVaultAction::Fork {
                 commit_id,
                 branch_name,
             } => {
                 *overlay = GameOverlay::None;
-                return InputResult::ForkTimeline {
+                return InputResult::ForkSave {
                     commit_id,
                     branch_name,
                 };
             }
-            TimelineAction::SwitchTimeline { branch_name } => {
+            TimeVaultAction::SwitchBranch { branch_name } => {
                 *overlay = GameOverlay::None;
-                return InputResult::SwitchTimeline { branch_name };
+                return InputResult::SwitchSaveBranch { branch_name };
             }
-            TimelineAction::DeleteTimeline { branch_name } => {
+            TimeVaultAction::DeleteBranch { branch_name } => {
                 // Overlay stays open for delete — just refresh.
-                return InputResult::DeleteTimeline { branch_name };
+                return InputResult::DeleteSaveBranch { branch_name };
             }
         }
         return InputResult::Continue;
@@ -436,8 +436,8 @@ fn handle_base_game(
             InputResult::Continue
         }
         KeyCode::Char('t') | KeyCode::Char('T') => {
-            // Timeline browser — main.rs populates state from HistoryRepo
-            InputResult::OpenTimeline
+            // Time Vault — main.rs populates state from HistoryRepo
+            InputResult::OpenTimeVault
         }
         KeyCode::Char('?') => {
             *overlay = GameOverlay::Help;

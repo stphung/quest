@@ -35,7 +35,7 @@ pub fn draw_help_overlay(frame: &mut Frame) {
             Style::default().add_modifier(Modifier::BOLD),
         )),
         Line::from("  [P] Prestige  [H] Haven  [S] Soulforge  [G] Stormglass"),
-        Line::from("  [T] Timeline Browser (save history)"),
+        Line::from("  [T] Time Vault"),
         Line::from("  [A] Achievements    [Tab] Challenges"),
         Line::from("  [U] Toggle Updates  [!] Report Bug  [Esc] Quit"),
         Line::from(""),

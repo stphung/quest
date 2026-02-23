@@ -212,7 +212,7 @@ fn main() -> io::Result<()> {
     // Initialize CharacterManager
     let character_manager = CharacterManager::new()?;
 
-    // Initialize git-based save history (non-fatal — game works without it)
+    // Initialize Time Vault (non-fatal — game works without it)
     let history_repo = if !debug_mode {
         let quest_dir = dirs::home_dir()
             .map(|d| d.join(".quest"))
@@ -441,7 +441,7 @@ fn main() -> io::Result<()> {
                     // terminal state; clearing resyncs them.
                     let overlay_is_fullscreen = matches!(
                         overlay,
-                        GameOverlay::Achievements { .. } | GameOverlay::Timeline { .. }
+                        GameOverlay::Achievements { .. } | GameOverlay::TimeVault { .. }
                     );
                     if overlay_is_fullscreen != prev_overlay_was_fullscreen {
                         terminal.clear()?;
@@ -624,17 +624,17 @@ fn main() -> io::Result<()> {
                                 continue;
                             }
 
-                            // Handle Timeline browser actions before routing
-                            if let InputResult::OpenTimeline = result {
+                            // Handle Time Vault actions before routing
+                            if let InputResult::OpenTimeVault = result {
                                 if let Some(ref repo) = history_repo {
                                     if let Ok(branches) = repo.list_branches() {
                                         let commits = branches
                                             .first()
                                             .and_then(|b| repo.list_commits(&b.name).ok())
                                             .unwrap_or_default();
-                                        overlay = GameOverlay::Timeline {
+                                        overlay = GameOverlay::TimeVault {
                                             browser:
-                                                crate::ui::timeline_scene::TimelineBrowserState::new(
+                                                crate::ui::time_vault_scene::TimeVaultState::new(
                                                     branches, commits,
                                                 ),
                                         };
@@ -643,11 +643,11 @@ fn main() -> io::Result<()> {
                                 continue;
                             }
 
-                            if let InputResult::RefreshTimelineCommits { ref branch_name } = result
+                            if let InputResult::RefreshSaveHistoryCommits { ref branch_name } = result
                             {
                                 if let Some(ref repo) = history_repo {
                                     if let Ok(commits) = repo.list_commits(branch_name) {
-                                        if let GameOverlay::Timeline { ref mut browser } = overlay {
+                                        if let GameOverlay::TimeVault { ref mut browser } = overlay {
                                             browser.commits = commits;
                                         }
                                     }
@@ -655,7 +655,7 @@ fn main() -> io::Result<()> {
                                 continue;
                             }
 
-                            if let InputResult::RestoreTimeline { ref commit_id } = result {
+                            if let InputResult::RestoreSave { ref commit_id } = result {
                                 if let Some(ref repo) = history_repo {
                                     if repo.restore_to(commit_id).is_ok() {
                                         // Reload all state from disk (git reset replaced files)
@@ -689,7 +689,7 @@ fn main() -> io::Result<()> {
                                 continue;
                             }
 
-                            if let InputResult::ForkTimeline {
+                            if let InputResult::ForkSave {
                                 ref commit_id,
                                 ref branch_name,
                             } = result
@@ -726,7 +726,7 @@ fn main() -> io::Result<()> {
                                 continue;
                             }
 
-                            if let InputResult::SwitchTimeline { ref branch_name } = result {
+                            if let InputResult::SwitchSaveBranch { ref branch_name } = result {
                                 if let Some(ref repo) = history_repo {
                                     if repo.switch_timeline(branch_name).is_ok() {
                                         // Full state reload (switch checks out the branch)
@@ -761,11 +761,11 @@ fn main() -> io::Result<()> {
                                 continue;
                             }
 
-                            if let InputResult::DeleteTimeline { ref branch_name } = result {
+                            if let InputResult::DeleteSaveBranch { ref branch_name } = result {
                                 if let Some(ref repo) = history_repo {
                                     if repo.delete_timeline(branch_name).is_ok() {
                                         // Refresh browser in-place (overlay stays open)
-                                        if let GameOverlay::Timeline { ref mut browser } = overlay {
+                                        if let GameOverlay::TimeVault { ref mut browser } = overlay {
                                             if let Ok(branches) = repo.list_branches() {
                                                 browser.branches = branches;
                                                 // Clamp selection
