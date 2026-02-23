@@ -802,12 +802,12 @@ fn main() -> io::Result<()> {
                                         // Refresh vault browser in-place (overlay stays open)
                                         if let GameOverlay::TimeVault { ref mut browser } = overlay {
                                             if let Ok(branches) = repo.list_branches() {
+                                                // Select the switched-to branch (sort order changes)
+                                                browser.selected_branch = branches
+                                                    .iter()
+                                                    .position(|b| b.name == *branch_name)
+                                                    .unwrap_or(0);
                                                 browser.branches = branches;
-                                                if browser.selected_branch >= browser.branches.len()
-                                                {
-                                                    browser.selected_branch =
-                                                        browser.branches.len().saturating_sub(1);
-                                                }
                                                 if let Some(b) =
                                                     browser.branches.get(browser.selected_branch)
                                                 {
