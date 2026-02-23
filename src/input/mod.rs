@@ -120,6 +120,17 @@ pub fn handle_game_input(
         return InputResult::Continue;
     }
 
+    // 0.76. Credits overlay
+    if matches!(overlay, GameOverlay::Credits) {
+        if matches!(
+            key.code,
+            KeyCode::Esc | KeyCode::Char('c') | KeyCode::Char('C')
+        ) {
+            *overlay = GameOverlay::None;
+        }
+        return InputResult::Continue;
+    }
+
     // 0.8. Bug report overlay
     if matches!(overlay, GameOverlay::BugReport { .. }) {
         return handle_bug_report_overlay(key, overlay);
@@ -399,6 +410,10 @@ fn handle_base_game(
         }
         KeyCode::Char('?') => {
             *overlay = GameOverlay::Help;
+            InputResult::Continue
+        }
+        KeyCode::Char('c') | KeyCode::Char('C') => {
+            *overlay = GameOverlay::Credits;
             InputResult::Continue
         }
         KeyCode::Char('!') => {

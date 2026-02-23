@@ -36,7 +36,7 @@ pub fn draw_help_overlay(frame: &mut Frame) {
         )),
         Line::from("  [P] Prestige  [H] Haven  [S] Soulforge  [G] Stormglass"),
         Line::from("  [A] Achievements    [Tab] Challenges"),
-        Line::from("  [U] Toggle Updates  [!] Report Bug  [Esc] Quit"),
+        Line::from("  [U] Toggle Updates  [C] Credits  [!] Bug  [Esc] Quit"),
         Line::from(""),
         Line::from(Span::styled(
             "  Quest Wiki",
