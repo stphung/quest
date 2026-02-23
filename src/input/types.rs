@@ -95,7 +95,7 @@ pub enum GameOverlay {
     },
     /// Time Vault (save history browser)
     TimeVault {
-        browser: crate::ui::time_vault_scene::TimeVaultState,
+        browser: Box<crate::ui::time_vault_scene::TimeVaultState>,
     },
 }
 

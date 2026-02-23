@@ -49,6 +49,17 @@ pub enum BrowserMode {
     NamingFork { commit_id: String },
 }
 
+/// Context about the source commit when forking a new branch.
+#[derive(Debug, Clone)]
+pub struct ForkSource {
+    /// Name of the branch being forked from.
+    pub branch_name: String,
+    /// The commit being forked from.
+    pub commit: CommitInfo,
+    /// True if forking from the branch tip (head), false if from a specific commit.
+    pub is_branch_tip: bool,
+}
+
 /// UI state for the Time Vault overlay.
 pub struct TimeVaultState {
     pub branches: Vec<TimelineInfo>,
@@ -59,6 +70,7 @@ pub struct TimeVaultState {
     pub mode: BrowserMode,
     pub fork_name_input: String,
     pub fork_name_error: Option<String>,
+    pub fork_source: Option<ForkSource>,
 }
 
 impl TimeVaultState {
@@ -72,6 +84,7 @@ impl TimeVaultState {
             mode: BrowserMode::Browse,
             fork_name_input: String::new(),
             fork_name_error: None,
+            fork_source: None,
         }
     }
 
@@ -491,9 +504,9 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
         BrowserMode::ConfirmSwitch | BrowserMode::ConfirmDelete => 7,
         BrowserMode::NamingFork { .. } => {
             if state.fork_name_error.is_some() {
-                9
+                14
             } else {
-                8
+                13
             }
         }
         BrowserMode::Browse => return,
@@ -606,13 +619,54 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
         BrowserMode::NamingFork { .. } => {
             put_text(buffer, cy, cx, "Fork new branch", Color::White);
 
-            let input_display = format!("Name: {}_", state.fork_name_input);
-            put_text(buffer, cy + 2, cx, &input_display, Color::Yellow);
+            // Show fork source details
+            if let Some(source) = &state.fork_source {
+                let label = if source.is_branch_tip {
+                    format!("From tip of '{}':", source.branch_name)
+                } else {
+                    format!("From commit on '{}':", source.branch_name)
+                };
+                put_text(buffer, cy + 2, cx, &label, Color::DarkGray);
 
-            let mut ctrl_row = cy + 4;
+                let (icon, icon_color) = event_icon_color(&source.commit.message);
+                let desc = source
+                    .commit
+                    .message
+                    .split(" | ")
+                    .next()
+                    .unwrap_or(&source.commit.message);
+                put_text(buffer, cy + 3, cx, icon, icon_color);
+                let iw = super::scene_fx::display_width(icon);
+                put_text(buffer, cy + 3, cx + iw as i32 + 1, desc, Color::Yellow);
+
+                let datetime = chrono::DateTime::from_timestamp(source.commit.timestamp, 0)
+                    .map(|dt| {
+                        dt.with_timezone(&chrono::Local)
+                            .format("%b %d, %Y  %l:%M %p")
+                            .to_string()
+                    })
+                    .unwrap_or_else(|| "Unknown".to_string());
+                let hours = source.commit.playtime / 3600;
+                let minutes = (source.commit.playtime % 3600) / 60;
+                let stats = format!(
+                    "{} \u{00b7} Lv{} P{} Z{} \u{00b7} {}h{:02}m",
+                    datetime,
+                    source.commit.level,
+                    source.commit.prestige,
+                    source.commit.zone,
+                    hours,
+                    minutes,
+                );
+                put_text(buffer, cy + 4, cx, &stats, Color::DarkGray);
+            }
+
+            let input_display = format!("Name: {}_", state.fork_name_input);
+            put_text(buffer, cy + 6, cx, &input_display, Color::Yellow);
+
+            let mut ctrl_row = cy + 8;
             if let Some(err) = &state.fork_name_error {
-                put_text(buffer, cy + 3, cx, err, Color::Red);
-                ctrl_row = cy + 5;
+                put_text(buffer, cy + 7, cx, err, Color::Red);
+                ctrl_row = cy + 9;
             }
 
             put_text(buffer, ctrl_row, cx, "[Enter]", Color::Cyan);

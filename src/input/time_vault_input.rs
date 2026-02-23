@@ -1,7 +1,7 @@
 //! Input handling for the Time Vault overlay.
 
 use crate::history::validate_branch_name;
-use crate::ui::time_vault_scene::{BrowserMode, PanelFocus, TimeVaultState};
+use crate::ui::time_vault_scene::{BrowserMode, ForkSource, PanelFocus, TimeVaultState};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 /// Actions that the Time Vault can request from the main loop.
@@ -121,18 +121,41 @@ fn handle_browse(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAction {
             }
         },
         KeyCode::Char('f') | KeyCode::Char('F') => {
-            let commit_id = match state.focus {
-                PanelFocus::Right => state.selected_commit_id().map(|s| s.to_string()),
-                PanelFocus::Left => state
-                    .branches
-                    .get(state.selected_branch)
-                    .and_then(|b| b.head_commit.as_ref())
-                    .map(|c| c.id.clone()),
+            let branch_name = state
+                .selected_branch_name()
+                .unwrap_or("?")
+                .to_string();
+
+            let (commit_id, fork_source) = match state.focus {
+                PanelFocus::Right => {
+                    let commit = state.commits.get(state.selected_commit).cloned();
+                    let id = commit.as_ref().map(|c| c.id.clone());
+                    let source = commit.map(|c| ForkSource {
+                        branch_name: branch_name.clone(),
+                        commit: c,
+                        is_branch_tip: false,
+                    });
+                    (id, source)
+                }
+                PanelFocus::Left => {
+                    let head = state
+                        .branches
+                        .get(state.selected_branch)
+                        .and_then(|b| b.head_commit.clone());
+                    let id = head.as_ref().map(|c| c.id.clone());
+                    let source = head.map(|c| ForkSource {
+                        branch_name: branch_name.clone(),
+                        commit: c,
+                        is_branch_tip: true,
+                    });
+                    (id, source)
+                }
             };
             if let Some(commit_id) = commit_id {
                 state.mode = BrowserMode::NamingFork { commit_id };
                 state.fork_name_input.clear();
                 state.fork_name_error = None;
+                state.fork_source = fork_source;
             }
             TimeVaultAction::Continue
         }
@@ -216,6 +239,7 @@ fn handle_naming_fork(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAct
             state.mode = BrowserMode::Browse;
             state.fork_name_input.clear();
             state.fork_name_error = None;
+            state.fork_source = None;
             TimeVaultAction::Continue
         }
         KeyCode::Backspace => {
@@ -240,6 +264,7 @@ fn handle_naming_fork(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAct
                     state.mode = BrowserMode::Browse;
                     state.fork_name_input.clear();
                     state.fork_name_error = None;
+                    state.fork_source = None;
                     TimeVaultAction::Fork {
                         commit_id,
                         branch_name: name,
