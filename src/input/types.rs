@@ -107,10 +107,12 @@ pub enum InputResult {
     QuitToSelect,
     /// State was modified (haven build, etc.) and should be saved.
     NeedsSave,
-    /// State was modified by prestige and should be saved with a history commit.
-    NeedsSavePrestige { new_rank: u32 },
+    /// State was modified and should be saved with a git history commit.
+    NeedsSaveWithEvent(crate::history::SaveEvent),
     /// Haven was modified along with state -- save both.
     NeedsSaveAll,
+    /// Haven was modified and should be saved with a git history commit.
+    NeedsSaveAllWithEvent(crate::history::SaveEvent),
     /// Toggle the update details expanded state.
     ToggleUpdateDetails,
     /// Start a Chrono Surge with the given number of ticks.

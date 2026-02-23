@@ -1034,7 +1034,15 @@ fn main() -> io::Result<()> {
                                             };
                                             soulforge_ui.animation_tick = 0;
 
-                                            // Persist changes
+                                            // Persist changes (only commit on success)
+                                            let soulforge_event = if result.success {
+                                                Some(history::SaveEvent::SoulforgeEnhanced(
+                                                    slot_name.to_string(),
+                                                    result.new_level,
+                                                ))
+                                            } else {
+                                                None
+                                            };
                                             if !debug_mode {
                                                 save_all(
                                                     &character_manager,
@@ -1042,7 +1050,7 @@ fn main() -> io::Result<()> {
                                                     &global_achievements,
                                                     &haven,
                                                     &enhancement,
-                                                    None,
+                                                    soulforge_event.as_ref(),
                                                     history_repo.as_ref(),
                                                 );
                                             }

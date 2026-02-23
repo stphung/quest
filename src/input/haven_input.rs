@@ -55,7 +55,7 @@ pub(super) fn handle_haven(
             match key.code {
                 KeyCode::Enter => {
                     let room = haven::HavenRoomId::ALL[haven_ui.selected_room];
-                    if let Some((_tier, p_spent)) =
+                    if let Some((tier, p_spent)) =
                         haven::try_build_room(room, haven, &mut state.prestige_rank)
                     {
                         // Check Haven tier achievements after upgrade
@@ -64,18 +64,23 @@ pub(super) fn handle_haven(
                             &haven.rooms,
                             Some(&state.character_name),
                         );
-                        // Haven saved via NeedsSaveAll (skipped in debug mode)
+                        // Haven saved via NeedsSaveAllWithEvent (skipped in debug mode)
+                        let room_name = room.name().to_string();
                         state.combat_state.add_log_entry(
                             format!(
                                 "\u{1f3e0} Built {} (spent {} Prestige Ranks)",
-                                room.name(),
-                                p_spent
+                                room_name, p_spent
                             ),
                             false,
                             true,
                         );
                         haven_ui.confirmation = HavenConfirmation::None;
-                        return InputResult::NeedsSaveAll;
+                        let event = if tier > 1 {
+                            crate::history::SaveEvent::HavenRoomUpgraded(room_name, tier)
+                        } else {
+                            crate::history::SaveEvent::HavenRoomBuilt(room_name)
+                        };
+                        return InputResult::NeedsSaveAllWithEvent(event);
                     }
                     haven_ui.confirmation = HavenConfirmation::None;
                 }

@@ -33,12 +33,23 @@ use crate::challenges::runic_shift::logic::{
 use crate::challenges::snake::logic::{
     apply_game_result as apply_snake_result, process_input as process_snake_input, SnakeInput,
 };
-use crate::challenges::ActiveMinigame;
+use crate::challenges::{ActiveMinigame, MinigameWinInfo};
 use crate::core::game_state::GameState;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 /// Duration to ignore input after game-over screen appears.
 pub(super) const GAME_OVER_COOLDOWN: std::time::Duration = std::time::Duration::from_secs(2);
+
+/// Convert a minigame win into a save-with-event result, or Continue for losses.
+fn result_for_challenge(win_info: &Option<MinigameWinInfo>) -> InputResult {
+    match win_info {
+        Some(info) => InputResult::NeedsSaveWithEvent(crate::history::SaveEvent::ChallengeWon(
+            format!("{:?}", info.game_type),
+            format!("{:?}", info.difficulty),
+        )),
+        None => InputResult::Continue,
+    }
+}
 
 pub(super) fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResult {
     if let Some(ref minigame) = state.active_minigame {
@@ -67,7 +78,7 @@ pub(super) fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResu
             ActiveMinigame::Rune(rune_game) => {
                 if rune_game.game_result.is_some() {
                     state.last_minigame_win = apply_rune_result(state);
-                    return InputResult::Continue;
+                    return result_for_challenge(&state.last_minigame_win);
                 }
                 let input = match key.code {
                     KeyCode::Left => RuneInput::Left,
@@ -85,7 +96,7 @@ pub(super) fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResu
             ActiveMinigame::Minesweeper(minesweeper_game) => {
                 if minesweeper_game.game_result.is_some() {
                     state.last_minigame_win = apply_minesweeper_result(state);
-                    return InputResult::Continue;
+                    return result_for_challenge(&state.last_minigame_win);
                 }
                 let input = match key.code {
                     KeyCode::Up => MinesweeperInput::Up,
@@ -103,7 +114,7 @@ pub(super) fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResu
             ActiveMinigame::Gomoku(gomoku_game) => {
                 if gomoku_game.game_result.is_some() {
                     state.last_minigame_win = apply_gomoku_result(state);
-                    return InputResult::Continue;
+                    return result_for_challenge(&state.last_minigame_win);
                 }
                 let input = match key.code {
                     KeyCode::Up => GomokuInput::Up,
@@ -119,7 +130,7 @@ pub(super) fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResu
             ActiveMinigame::Chess(chess_game) => {
                 if chess_game.game_result.is_some() {
                     state.last_minigame_win = apply_chess_result(state);
-                    return InputResult::Continue;
+                    return result_for_challenge(&state.last_minigame_win);
                 }
                 let input = match key.code {
                     KeyCode::Up => ChessInput::Up,
@@ -135,7 +146,7 @@ pub(super) fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResu
             ActiveMinigame::Morris(morris_game) => {
                 if morris_game.game_result.is_some() {
                     state.last_minigame_win = apply_morris_result(state);
-                    return InputResult::Continue;
+                    return result_for_challenge(&state.last_minigame_win);
                 }
                 let input = match key.code {
                     KeyCode::Up => MorrisInput::Up,
@@ -151,7 +162,7 @@ pub(super) fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResu
             ActiveMinigame::Go(go_game) => {
                 if go_game.game_result.is_some() {
                     state.last_minigame_win = apply_go_result(state);
-                    return InputResult::Continue;
+                    return result_for_challenge(&state.last_minigame_win);
                 }
                 let input = match key.code {
                     KeyCode::Up => GoInput::Up,
@@ -168,7 +179,7 @@ pub(super) fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResu
             ActiveMinigame::FlappyBird(flappy_game) => {
                 if flappy_game.game_result.is_some() {
                     state.last_minigame_win = apply_flappy_result(state);
-                    return InputResult::Continue;
+                    return result_for_challenge(&state.last_minigame_win);
                 }
                 let input = match key.code {
                     KeyCode::Char(' ') | KeyCode::Up => FlappyBirdInput::Flap,
@@ -180,7 +191,7 @@ pub(super) fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResu
             ActiveMinigame::Jezzball(jezzball_game) => {
                 if jezzball_game.game_result.is_some() {
                     state.last_minigame_win = apply_jezzball_result(state);
-                    return InputResult::Continue;
+                    return result_for_challenge(&state.last_minigame_win);
                 }
                 let input = match key.code {
                     KeyCode::Up => JezzballInput::Up,
@@ -197,7 +208,7 @@ pub(super) fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResu
             ActiveMinigame::Snake(snake_game) => {
                 if snake_game.game_result.is_some() {
                     state.last_minigame_win = apply_snake_result(state);
-                    return InputResult::Continue;
+                    return result_for_challenge(&state.last_minigame_win);
                 }
                 let input = match key.code {
                     KeyCode::Up => SnakeInput::Up,
@@ -213,7 +224,7 @@ pub(super) fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResu
             ActiveMinigame::RunicShift(runic_shift_game) => {
                 if runic_shift_game.game_result.is_some() {
                     state.last_minigame_win = apply_runic_shift_result(state);
-                    return InputResult::Continue;
+                    return result_for_challenge(&state.last_minigame_win);
                 }
                 let input = match key.code {
                     KeyCode::Up => RunicShiftInput::Up,
