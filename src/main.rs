@@ -3,6 +3,8 @@ mod challenges;
 mod character;
 mod combat;
 mod core;
+#[allow(unused_imports)]
+mod deep;
 mod dungeon;
 mod enhancement;
 mod fishing;
@@ -242,6 +244,9 @@ fn main() -> io::Result<()> {
     // Load account-level Enhancement (soulforge) state
     let mut enhancement = enhancement::load_enhancement();
 
+    // Load account-level Deep state (mercenary expedition system)
+    let mut deep_state = deep::load_deep();
+
     // Load account-level God Item progress
 
     // Load global achievements (shared across all characters)
@@ -295,6 +300,7 @@ fn main() -> io::Result<()> {
     let mut haven_ui = HavenUiState::new();
     let mut soulforge_ui = SoulforgeUiState::new();
     let mut exchange_ui = stormglass::types::ExchangeUiState::new();
+    let mut deep_ui = deep::DeepUiState::new();
     let mut achievement_browser = AchievementBrowserState::new();
     let mut title_browser = TitleBrowserState::new();
     let mut help_overlay_showing = false;
@@ -641,6 +647,7 @@ fn main() -> io::Result<()> {
                             haven.discovered,
                             enhancement.discovered,
                             state.stormglass_discovered,
+                            deep_state.persistent.discovered,
                             &global_achievements,
                             &enhancement.levels,
                         );
@@ -652,6 +659,8 @@ fn main() -> io::Result<()> {
                             &haven_ui,
                             &soulforge_ui,
                             &exchange_ui,
+                            &deep_state,
+                            &deep_ui,
                             &enhancement,
                             &global_achievements,
                             debug_mode,
@@ -711,6 +720,7 @@ fn main() -> io::Result<()> {
                                             &mut tick_counter,
                                             &mut haven,
                                             &mut enhancement,
+                                            &mut deep_state,
                                             &mut global_achievements,
                                             debug_mode,
                                             &mut rng,
@@ -743,6 +753,7 @@ fn main() -> io::Result<()> {
                                             &global_achievements,
                                             &haven,
                                             &enhancement,
+                                            &deep_state,
                                             Some(&surge_event),
                                             history_repo.as_ref(),
                                         );
@@ -763,6 +774,8 @@ fn main() -> io::Result<()> {
                                 &mut haven_ui,
                                 &mut soulforge_ui,
                                 &mut exchange_ui,
+                                &mut deep_state,
+                                &mut deep_ui,
                                 &mut enhancement,
                                 &mut overlay,
                                 &mut debug_menu,
@@ -870,6 +883,7 @@ fn main() -> io::Result<()> {
                                         &global_achievements,
                                         &haven,
                                         &enhancement,
+                                        &deep_state,
                                         Some(&history::SaveEvent::AutoSave),
                                         Some(repo),
                                     );
@@ -941,6 +955,7 @@ fn main() -> io::Result<()> {
                                         &global_achievements,
                                         &haven,
                                         &enhancement,
+                                        &deep_state,
                                         Some(&history::SaveEvent::AutoSave),
                                         Some(repo),
                                     );
@@ -1009,6 +1024,7 @@ fn main() -> io::Result<()> {
                                         &global_achievements,
                                         &haven,
                                         &enhancement,
+                                        &deep_state,
                                         Some(&history::SaveEvent::AutoSave),
                                         Some(repo),
                                     );
@@ -1553,6 +1569,7 @@ fn main() -> io::Result<()> {
                                 &global_achievements,
                                 &haven,
                                 &enhancement,
+                                &deep_state,
                                 debug_mode,
                                 &mut update_expanded,
                                 &mut last_save_instant,
@@ -1639,6 +1656,7 @@ fn main() -> io::Result<()> {
                                     &global_achievements,
                                     &haven,
                                     &enhancement,
+                                    &deep_state,
                                     None,
                                     history_repo.as_ref(),
                                 );
@@ -1667,6 +1685,7 @@ fn main() -> io::Result<()> {
                                 &mut tick_counter,
                                 &mut haven,
                                 &mut enhancement,
+                                &mut deep_state,
                                 &mut global_achievements,
                                 debug_mode,
                                 &mut rng,
@@ -1699,6 +1718,7 @@ fn main() -> io::Result<()> {
                                 &global_achievements,
                                 &haven,
                                 &enhancement,
+                                &deep_state,
                                 None,
                                 history_repo.as_ref(),
                             );
@@ -1729,6 +1749,7 @@ fn main() -> io::Result<()> {
                                     &global_achievements,
                                     &haven,
                                     &enhancement,
+                                    &deep_state,
                                     Some(&surge_event),
                                     history_repo.as_ref(),
                                 );
@@ -1751,6 +1772,7 @@ fn main() -> io::Result<()> {
                                 &mut tick_counter,
                                 &mut haven,
                                 &mut enhancement,
+                                &mut deep_state,
                                 &mut global_achievements,
                                 debug_mode,
                                 &mut rng,
@@ -1779,6 +1801,7 @@ fn main() -> io::Result<()> {
                                 || tick_result.haven_changed
                                 || tick_result.enhancement_changed
                                 || tick_result.god_items_changed
+                                || tick_result.deep_changed
                                 || save_event.is_some())
                                 && !debug_mode
                             {
@@ -1788,6 +1811,7 @@ fn main() -> io::Result<()> {
                                     &global_achievements,
                                     &haven,
                                     &enhancement,
+                                    &deep_state,
                                     save_event.as_ref(),
                                     history_repo.as_ref(),
                                 );
@@ -1955,6 +1979,7 @@ fn main() -> io::Result<()> {
                                                     &global_achievements,
                                                     &haven,
                                                     &enhancement,
+                                                    &deep_state,
                                                     soulforge_event.as_ref(),
                                                     history_repo.as_ref(),
                                                 );
@@ -1993,6 +2018,7 @@ fn main() -> io::Result<()> {
                                 &global_achievements,
                                 &haven,
                                 &enhancement,
+                                &deep_state,
                                 None,
                                 history_repo.as_ref(),
                             );

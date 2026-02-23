@@ -5,6 +5,7 @@
 use crate::achievements::{UiBorderStyle, SELECTABLE_UI_BORDER_STYLES};
 use crate::challenges::menu::{create_challenge, ChallengeType};
 use crate::core::game_state::GameState;
+use crate::deep::DeepState;
 use crate::dungeon::generation::generate_dungeon;
 use crate::enhancement::EnhancementProgress;
 use crate::fishing::generation::generate_fishing_session;
@@ -37,6 +38,7 @@ enum DebugAction {
     TriggerEtchRandomSigils,
     TriggerEtchSPlusSigil,
     TriggerForceOvercharge,
+    TriggerDeepDiscovery,
 }
 
 const DEBUG_ACTIONS: &[DebugAction] = &[
@@ -63,6 +65,7 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerEtchRandomSigils,
     DebugAction::TriggerEtchSPlusSigil,
     DebugAction::TriggerForceOvercharge,
+    DebugAction::TriggerDeepDiscovery,
 ];
 
 const CHALLENGE_ACTIONS: &[DebugAction] = &[
@@ -82,6 +85,7 @@ const WORLD_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerFishing,
     DebugAction::TriggerHavenDiscovery,
     DebugAction::TriggerSoulforgeDiscovery,
+    DebugAction::TriggerDeepDiscovery,
 ];
 const RESOURCE_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerGrantStormglass,
@@ -124,6 +128,7 @@ impl DebugAction {
             Self::TriggerEtchRandomSigils => 20,
             Self::TriggerEtchSPlusSigil => 21,
             Self::TriggerForceOvercharge => 22,
+            Self::TriggerDeepDiscovery => 23,
         }
     }
 
@@ -152,6 +157,7 @@ impl DebugAction {
             Self::TriggerEtchRandomSigils => "Etch Random Sigils (All Slots)",
             Self::TriggerEtchSPlusSigil => "Etch S+ Sigil (Slot 1)",
             Self::TriggerForceOvercharge => "Force Next Surge Overcharged",
+            Self::TriggerDeepDiscovery => "Discover The Deep",
         }
     }
 
@@ -160,6 +166,7 @@ impl DebugAction {
         state: &mut GameState,
         haven: &mut Haven,
         enhancement: &mut EnhancementProgress,
+        deep: &mut DeepState,
     ) -> &'static str {
         match self {
             Self::TriggerDungeon => trigger_dungeon(state),
@@ -185,6 +192,7 @@ impl DebugAction {
             Self::TriggerEtchRandomSigils => trigger_etch_random_sigils(state),
             Self::TriggerEtchSPlusSigil => trigger_etch_s_plus_sigil(state),
             Self::TriggerForceOvercharge => trigger_force_overcharge(state),
+            Self::TriggerDeepDiscovery => trigger_deep_discovery(deep, state.prestige_rank),
         }
     }
 }
@@ -346,6 +354,7 @@ impl DebugMenu {
         state: &mut GameState,
         haven: &mut Haven,
         enhancement: &mut EnhancementProgress,
+        deep: &mut DeepState,
         achievements: &mut crate::achievements::Achievements,
     ) -> &'static str {
         let selected_option = self.selected_option_global_index();
@@ -358,7 +367,7 @@ impl DebugMenu {
         }
 
         let msg = action_for_option_index(selected_option)
-            .map(|action| action.run(state, haven, enhancement))
+            .map(|action| action.run(state, haven, enhancement, deep))
             .unwrap_or("Unknown option");
         self.close();
         msg
@@ -610,6 +619,24 @@ fn trigger_etch_random_sigils(state: &mut GameState) -> &'static str {
     "All 5 sigil slots unlocked and etched!"
 }
 
+fn trigger_deep_discovery(deep: &mut DeepState, _prestige_rank: u32) -> &'static str {
+    if deep.persistent.discovered {
+        return "The Deep already discovered!";
+    }
+    deep.persistent.discovered = true;
+    // Generate starter roster if empty
+    if deep.prestige.roster.is_empty() {
+        let mut rng = rand::rng();
+        let starters = crate::deep::mercenaries::generate_starter_roster(
+            deep.persistent.guild_rank,
+            || deep.persistent.next_merc_id(),
+            &mut rng,
+        );
+        deep.prestige.roster.extend(starters);
+    }
+    "The Deep discovered!"
+}
+
 fn trigger_etch_s_plus_sigil(state: &mut GameState) -> &'static str {
     use crate::stormglass::sigils::{Sigil, SigilEffectType, SigilGrade};
 
@@ -705,9 +732,15 @@ mod tests {
         let mut state = GameState::new("Test".to_string(), 0);
         let mut haven = Haven::new();
         let mut enhancement = EnhancementProgress::new();
+        let mut deep = DeepState::new();
         let mut achievements = crate::achievements::Achievements::default();
-        let msg =
-            menu.trigger_selected(&mut state, &mut haven, &mut enhancement, &mut achievements);
+        let msg = menu.trigger_selected(
+            &mut state,
+            &mut haven,
+            &mut enhancement,
+            &mut deep,
+            &mut achievements,
+        );
 
         assert_eq!(msg, "Border style set: Classic");
         assert!(menu.is_open);

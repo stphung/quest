@@ -18,6 +18,7 @@ pub struct TickEventFlags {
     pub haven_discovered: bool,
     pub soulforge_discovered: bool,
     pub stormglass_discovered: bool,
+    pub deep_discovered: bool,
 }
 
 /// Maps tick events to combat log entries and visual effects.
@@ -26,6 +27,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
     let mut haven_discovered = false;
     let mut soulforge_discovered = false;
     let mut stormglass_discovered = false;
+    let mut deep_discovered = false;
     for event in events {
         match event {
             TickEvent::PlayerAttack {
@@ -492,6 +494,81 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
             TickEvent::StormglassDiscovered => {
                 stormglass_discovered = true;
             }
+            TickEvent::DeepDiscovered => {
+                deep_discovered = true;
+            }
+            TickEvent::DeepMissionComplete { message } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, true);
+                game_state.ticker.push(TickerEntry {
+                    icon: "\u{1F4DC}",
+                    text: "Mission Complete!".to_string(),
+                    color: Color::Cyan,
+                    bold: true,
+                    segments: None,
+                });
+            }
+            TickEvent::DeepEventPending { message } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, true);
+                game_state.ticker.push(TickerEntry {
+                    icon: "\u{26A1}",
+                    text: "Deep Event!".to_string(),
+                    color: Color::Yellow,
+                    bold: true,
+                    segments: None,
+                });
+            }
+            TickEvent::DeepMercInjured { message } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, false);
+                game_state.ticker.push(TickerEntry {
+                    icon: "\u{1FA79}",
+                    text: "Merc Injured".to_string(),
+                    color: Color::Yellow,
+                    bold: false,
+                    segments: None,
+                });
+            }
+            TickEvent::DeepMercLost { message } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, false);
+                game_state.ticker.push(TickerEntry {
+                    icon: "\u{1FAA6}",
+                    text: "Merc Lost!".to_string(),
+                    color: Color::Red,
+                    bold: true,
+                    segments: None,
+                });
+            }
+            TickEvent::DeepBreakthrough { message } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, true);
+                game_state.ticker.push(TickerEntry {
+                    icon: "\u{2B50}",
+                    text: "Breakthrough!".to_string(),
+                    color: Color::Magenta,
+                    bold: true,
+                    segments: None,
+                });
+            }
+            TickEvent::DeepGuildRankUp { message } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, true);
+                game_state.ticker.push(TickerEntry {
+                    icon: "\u{2694}",
+                    text: "Guild Rank Up!".to_string(),
+                    color: Color::Cyan,
+                    bold: true,
+                    segments: None,
+                });
+            }
             TickEvent::StormglassSalvaged {
                 item_name, amount, ..
             } => {
@@ -541,5 +618,6 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
         haven_discovered,
         soulforge_discovered,
         stormglass_discovered,
+        deep_discovered,
     }
 }

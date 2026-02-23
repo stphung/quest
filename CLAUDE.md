@@ -75,6 +75,7 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 - [`src/haven/CLAUDE.md`](src/haven/CLAUDE.md) — Account-level base building, bonus system
 - [`src/achievements/CLAUDE.md`](src/achievements/CLAUDE.md) — Achievement tracking, persistence
 - [`src/enhancement/CLAUDE.md`](src/enhancement/CLAUDE.md) — Soulforge enhancement system
+- [`src/deep/CLAUDE.md`](src/deep/CLAUDE.md) — The Deep mercenary expedition system
 - [`src/ui/CLAUDE.md`](src/ui/CLAUDE.md) — Shared game layout components, color conventions
 
 ### Core Module (`src/core/`)
@@ -194,6 +195,16 @@ CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FI
 - `persistence.rs` — Save/load from `~/.quest/enhancement.json`
 
 Account-level equipment enhancement system (Soulforge) that persists across characters. Each of 7 equipment slots can be enhanced from +0 to +10. Levels +1-4 are 100% success rate; +5-10 have decreasing success rates (70%/55%/40%/30%/20%/10%) and failure penalties (-1 or -2 levels). Levels +5-7 offer a "Soul Tithe" option for guaranteed success at higher PR cost (4/6/8 PR). Costs prestige ranks. Discovered at P15+. Enhancement multipliers boost equipment stats in `derived_stats.rs`.
+
+### The Deep Module (`src/deep/`) — [detailed docs](src/deep/CLAUDE.md)
+
+- `types.rs` — All data structures: `DeepState`, `DeepPersistent`, `DeepPrestige`, `GuildRank`, `Mercenary`, `MercArchetype`, `MercStatus`, `Layer`, `LayerRecord`, `LayerTier`, `Infrastructure`, `Mission`, `MissionType`, `MissionStatus`, `MissionOutcome`, `CheckInEvent`, `EventChoice`, `MissionResult`, `AvailableMission`, `RecruitPool`, `DeepUiState`, `DeepView`, discovery constants
+- `mercenaries.rs` — Merc generation (quality tiers, stat variance), recruit pool generation, starter roster, leveling (XP curve, stat growth), injury system (Light/Moderate/Severe), roster management, name generation (40 first names x 10 archetype epithets)
+- `layers.rs` — Layer difficulty (power thresholds L1-25 + Void scaling), familiarity system (Unknown/Mapped/Familiar/Mastered), mission durations (base + multiplicative modifiers), infrastructure building (validation, costs, Watchtower familiarity bonus)
+- `persistence.rs` — Save/load from `~/.quest/deep.json`
+- `discovery.rs` — Discovery roll logic, starter roster initialisation (3 mercs: Vanguard, Scout, Medic)
+
+An endgame (P15+) system where players recruit and manage a mercenary company, sending squads on long-duration missions (2-24h wall-clock time) into a vast underground structure. Two-tier persistence: `DeepPersistent` (guild rank, cleared layers, infrastructure — survives prestige) and `DeepPrestige` (mercs, missions, Warband Marks — resets on prestige). Five mercenary archetypes (Vanguard, Scout, Arcanist, Medic, Saboteur) with 4 quality tiers. Six layer tiers (Shallows through The Void). Five mission types (Supply Run, Recon, Expedition, Breakthrough, Construction). Four infrastructure types (Outpost, SupplyCache, Watchtower, Bridge). Discovered at P15+ with same formula as Soulforge.
 
 ### Stormglass Module (`src/stormglass/`)
 
@@ -494,6 +505,12 @@ quest/
 │   │   ├── types.rs         # Enhancement progress, constants, UI state
 │   │   ├── logic.rs         # Enhancement rolling, discovery
 │   │   └── persistence.rs   # Save/load
+│   ├── deep/                # The Deep — Mercenary Expedition System [CLAUDE.md]
+│   │   ├── types.rs         # All data structures (DeepState, Mercenary, Mission, etc.)
+│   │   ├── mercenaries.rs   # Merc generation, recruitment, leveling, injuries
+│   │   ├── layers.rs        # Layer difficulty, familiarity, infrastructure, durations
+│   │   ├── persistence.rs   # Save/load from ~/.quest/deep.json
+│   │   └── discovery.rs     # Discovery roll logic, starter roster
 │   ├── stormglass/          # Stormglass currency and Storm Sigils
 │   │   ├── types.rs         # Stormglass state, daily rotation
 │   │   ├── sigils.rs        # Storm Sigil definitions and bonuses

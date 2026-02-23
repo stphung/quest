@@ -31,6 +31,7 @@ pub fn route_game_input(
     global_achievements: &crate::achievements::Achievements,
     haven: &crate::haven::Haven,
     enhancement: &crate::enhancement::EnhancementProgress,
+    deep: &crate::deep::DeepState,
     debug_mode: bool,
     update_expanded: &mut bool,
     last_save_instant: &mut Option<Instant>,
@@ -47,6 +48,7 @@ pub fn route_game_input(
                     global_achievements,
                     haven,
                     enhancement,
+                    deep,
                     None,
                     history_repo,
                 );
@@ -61,6 +63,7 @@ pub fn route_game_input(
                     global_achievements,
                     haven,
                     enhancement,
+                    deep,
                     None,
                     history_repo,
                 );
@@ -78,6 +81,7 @@ pub fn route_game_input(
                     global_achievements,
                     haven,
                     enhancement,
+                    deep,
                     Some(event),
                     history_repo,
                 );

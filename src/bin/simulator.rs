@@ -438,6 +438,7 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
         haven.discovered = true;
     }
     let mut enhancement = EnhancementProgress::new();
+    let mut deep_state = quest::deep::DeepState::new();
     let mut achievements = Achievements::default();
 
     // Force-unlock Stormbreaker achievement if requested
@@ -478,6 +479,7 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
             &mut tick_counter,
             &mut haven,
             &mut enhancement,
+            &mut deep_state,
             &mut achievements,
             false,
             &mut rng,

@@ -3,6 +3,7 @@
 use super::types::{GameOverlay, InputResult};
 use crate::character::prestige::{get_prestige_tier, perform_prestige};
 use crate::core::game_state::GameState;
+use crate::deep::DeepState;
 use crate::haven::Haven;
 use crate::items;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
@@ -11,6 +12,7 @@ pub(super) fn handle_vault_selection(
     key: KeyEvent,
     state: &mut GameState,
     haven: &mut Haven,
+    deep: &mut DeepState,
     overlay: &mut GameOverlay,
 ) -> InputResult {
     if let GameOverlay::VaultSelection {
@@ -59,6 +61,9 @@ pub(super) fn handle_vault_selection(
                     // Remember selections for next time
                     haven.last_vault_selections = selected_slots.clone();
                     crate::character::prestige::perform_prestige_with_vault(state, selected_slots);
+                    // Reset prestige-scoped Deep state while preserving guild rank,
+                    // layer progression, and infrastructure.
+                    deep.on_prestige();
                     *overlay = GameOverlay::None;
                     let new_rank = state.prestige_rank;
                     state.combat_state.add_log_entry(
@@ -95,6 +100,7 @@ pub(super) fn handle_prestige_confirm(
     key: KeyEvent,
     state: &mut GameState,
     haven: &Haven,
+    deep: &mut DeepState,
     overlay: &mut GameOverlay,
 ) -> InputResult {
     match key.code {
@@ -119,6 +125,9 @@ pub(super) fn handle_prestige_confirm(
                 };
             } else {
                 perform_prestige(state);
+                // Reset prestige-scoped Deep state while preserving guild rank,
+                // layer progression, and infrastructure.
+                deep.on_prestige();
                 *overlay = GameOverlay::None;
                 let new_rank = state.prestige_rank;
                 state.combat_state.add_log_entry(

@@ -85,6 +85,8 @@ pub enum GameOverlay {
     },
     /// Stormglass discovery celebration modal
     StormglassDiscovery,
+    /// The Deep discovery celebration modal
+    DeepDiscovery,
     /// Quit confirmation when pending challenges exist
     QuitConfirm,
     /// Bug report overlay with game state summary

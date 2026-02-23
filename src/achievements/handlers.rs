@@ -13,9 +13,10 @@
 //!   for milestones already passed in a pre-existing save.
 
 use super::milestones::{
-    MinigameDifficulty, MinigameType, BOSS_HUNTER_MILESTONES, DUNGEON_MILESTONES,
-    FISHERMAN_MILESTONES, FISH_CATCHER_MILESTONES, GRAND_CHAMPION_MILESTONES, LEVEL_MILESTONES,
-    PRESTIGE_MILESTONES, SLAYER_MILESTONES,
+    MinigameDifficulty, MinigameType, BOSS_HUNTER_MILESTONES, DEEP_GUILD_RANK_MILESTONES,
+    DEEP_LAYER_MILESTONES, DEEP_MISSION_MILESTONES, DUNGEON_MILESTONES, FISHERMAN_MILESTONES,
+    FISH_CATCHER_MILESTONES, GRAND_CHAMPION_MILESTONES, LEVEL_MILESTONES, PRESTIGE_MILESTONES,
+    SLAYER_MILESTONES,
 };
 use super::types::{AchievementId, Achievements};
 
@@ -300,6 +301,57 @@ impl Achievements {
     }
 
     // =========================================================================
+    // The Deep Event Handlers
+    // =========================================================================
+
+    /// Called when The Deep is first discovered.
+    pub fn on_deep_discovered(&mut self, character_name: Option<&str>) {
+        self.unlock_with_name(AchievementId::TheDeepDiscovered, character_name);
+    }
+
+    /// Called when a Deep mission is completed.
+    /// Unlocks mission completion milestone achievements.
+    pub fn on_deep_mission_complete(&mut self, character_name: Option<&str>) {
+        self.total_deep_missions_completed += 1;
+
+        self.check_milestones(
+            self.total_deep_missions_completed,
+            DEEP_MISSION_MILESTONES,
+            character_name,
+        );
+    }
+
+    /// Called when a breakthrough mission is completed in The Deep.
+    /// Unlocks FirstBreakthrough and checks layer milestones.
+    pub fn on_deep_breakthrough(&mut self, new_layer: u32, character_name: Option<&str>) {
+        self.unlock_with_name(AchievementId::FirstBreakthrough, character_name);
+
+        if new_layer > self.highest_deep_layer {
+            self.highest_deep_layer = new_layer;
+        }
+
+        self.check_milestones(new_layer as u64, DEEP_LAYER_MILESTONES, character_name);
+    }
+
+    /// Called when the guild rank increases in The Deep.
+    pub fn on_deep_guild_rank_up(&mut self, new_rank: u32, character_name: Option<&str>) {
+        if new_rank > self.highest_guild_rank {
+            self.highest_guild_rank = new_rank;
+        }
+
+        self.check_milestones(
+            new_rank as u64,
+            DEEP_GUILD_RANK_MILESTONES,
+            character_name,
+        );
+    }
+
+    /// Called when a mercenary is permanently lost in The Deep.
+    pub fn on_deep_merc_lost(&mut self, character_name: Option<&str>) {
+        self.unlock_with_name(AchievementId::FirstMercLost, character_name);
+    }
+
+    // =========================================================================
     // Enhancement/Soulforge Event Handlers
     // =========================================================================
 
@@ -435,6 +487,7 @@ impl Achievements {
             (self.total_dungeons_completed, DUNGEON_MILESTONES),
             (self.total_fish_caught, FISH_CATCHER_MILESTONES),
             (self.total_minigame_wins, GRAND_CHAMPION_MILESTONES),
+            (self.total_deep_missions_completed, DEEP_MISSION_MILESTONES),
         ];
 
         for (current, milestones) in series {
