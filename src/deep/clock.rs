@@ -33,7 +33,9 @@ pub fn mission_progress_percent(mission: &ActiveMission, now_unix: i64) -> u8 {
 
 /// Returns `true` if the mission has completed (wall-clock duration elapsed).
 pub fn is_mission_complete(mission: &ActiveMission, now_unix: i64) -> bool {
-    let end = mission.start_time.saturating_add(mission.duration_secs as i64);
+    let end = mission
+        .start_time
+        .saturating_add(mission.duration_secs as i64);
     now_unix >= end
 }
 
@@ -50,9 +52,7 @@ pub fn pending_events(mission: &ActiveMission, now_unix: i64) -> Vec<usize> {
         .events
         .iter()
         .enumerate()
-        .filter(|(_, e): &(usize, &MissionEvent)| {
-            !e.resolved && progress >= e.trigger_at_percent
-        })
+        .filter(|(_, e): &(usize, &MissionEvent)| !e.resolved && progress >= e.trigger_at_percent)
         .map(|(i, _)| i)
         .collect()
 }
@@ -63,7 +63,9 @@ pub fn pending_events(mission: &ActiveMission, now_unix: i64) -> Vec<usize> {
 
 /// Returns seconds remaining until the mission completes, or 0 if already done.
 pub fn time_remaining_secs(mission: &ActiveMission, now_unix: i64) -> u64 {
-    let end = mission.start_time.saturating_add(mission.duration_secs as i64);
+    let end = mission
+        .start_time
+        .saturating_add(mission.duration_secs as i64);
     if now_unix >= end {
         0
     } else {
@@ -117,7 +119,9 @@ pub fn format_duration(secs: u64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::deep::types::{ActiveMission, EventResolution, EventType, MissionEvent, MissionType};
+    use crate::deep::types::{
+        ActiveMission, EventResolution, EventType, MissionEvent, MissionType,
+    };
 
     fn make_mission(start_time: i64, duration_secs: u64) -> ActiveMission {
         ActiveMission {
@@ -243,9 +247,9 @@ mod tests {
         let mut m = make_mission(0, 4000);
         // Three events: 25%, 50%, 75%
         m.events = vec![
-            make_event(25, false),  // index 0 — should trigger at 50% progress
-            make_event(50, true),   // index 1 — resolved, should NOT appear
-            make_event(75, false),  // index 2 — not triggered yet
+            make_event(25, false), // index 0 — should trigger at 50% progress
+            make_event(50, true),  // index 1 — resolved, should NOT appear
+            make_event(75, false), // index 2 — not triggered yet
         ];
         let now = 2000; // 50% progress
         assert_eq!(pending_events(&m, now), vec![0]);

@@ -1,13 +1,13 @@
 //! Integration tests for The Deep — infrastructure building system.
 
+use quest::deep::infrastructure::{
+    build_infrastructure, can_build_infrastructure, infrastructure_on_layer,
+    total_outpost_daily_income,
+};
 use quest::deep::{
     DeepAccountState, DeepRunState, GuildRank, InfrastructureType, LayerState, TheDeepState,
     INFRA_COST_BRIDGE, INFRA_COST_OUTPOST, INFRA_COST_SUPPLY_CACHE, INFRA_COST_WATCHTOWER,
     OUTPOST_INCOME_HOLLOWS_PLUS, OUTPOST_INCOME_SHALLOWS, OUTPOST_INCOME_WARRENS,
-};
-use quest::deep::infrastructure::{
-    build_infrastructure, can_build_infrastructure, infrastructure_on_layer,
-    total_outpost_daily_income,
 };
 
 // =========================================================================
@@ -294,10 +294,7 @@ fn total_outpost_daily_income_counts_shallows_layer() {
     layer.infrastructure.push(InfrastructureType::Outpost);
     state.account.layers.push(layer);
 
-    assert_eq!(
-        total_outpost_daily_income(&state),
-        OUTPOST_INCOME_SHALLOWS
-    );
+    assert_eq!(total_outpost_daily_income(&state), OUTPOST_INCOME_SHALLOWS);
 }
 
 #[test]
@@ -307,10 +304,7 @@ fn total_outpost_daily_income_counts_warrens_layer() {
     layer.infrastructure.push(InfrastructureType::Outpost);
     state.account.layers.push(layer);
 
-    assert_eq!(
-        total_outpost_daily_income(&state),
-        OUTPOST_INCOME_WARRENS
-    );
+    assert_eq!(total_outpost_daily_income(&state), OUTPOST_INCOME_WARRENS);
 }
 
 #[test]

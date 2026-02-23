@@ -65,7 +65,7 @@ pub fn draw_timeline_browser(frame: &mut Frame, area: Rect, state: &TimelineBrow
     let v_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Min(3), // Content
+            Constraint::Min(3),    // Content
             Constraint::Length(1), // Controls
         ])
         .split(inner);
@@ -77,10 +77,7 @@ pub fn draw_timeline_browser(frame: &mut Frame, area: Rect, state: &TimelineBrow
     let branch_width = 22u16.min(content_area.width / 3);
     let h_chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Length(branch_width),
-            Constraint::Min(10),
-        ])
+        .constraints([Constraint::Length(branch_width), Constraint::Min(10)])
         .split(content_area);
 
     draw_branch_panel(frame, h_chunks[0], state);
@@ -163,12 +160,7 @@ fn draw_commit_panel(frame: &mut Frame, area: Rect, state: &TimelineBrowserState
     };
 
     let mut y = inner.y;
-    for (i, commit) in state
-        .commits
-        .iter()
-        .enumerate()
-        .skip(scroll_offset)
-    {
+    for (i, commit) in state.commits.iter().enumerate().skip(scroll_offset) {
         if y + 3 > inner.y + inner.height {
             break;
         }
@@ -198,10 +190,7 @@ fn draw_commit_panel(frame: &mut Frame, area: Rect, state: &TimelineBrowserState
             format!("{}{}", selector, description),
             highlight,
         ));
-        frame.render_widget(
-            Paragraph::new(line1),
-            Rect::new(inner.x, y, inner.width, 1),
-        );
+        frame.render_widget(Paragraph::new(line1), Rect::new(inner.x, y, inner.width, 1));
 
         // Line 2: Formatted date/time
         let datetime = chrono::DateTime::from_timestamp(commit.timestamp, 0)
@@ -241,9 +230,7 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimelineBrowserState) {
         Line::from(vec![
             Span::styled(
                 " [Enter] Confirm Restore ",
-                Style::default()
-                    .fg(Color::Red)
-                    .add_modifier(Modifier::BOLD),
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
             ),
             Span::raw("  "),
             Span::styled(

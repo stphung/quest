@@ -150,9 +150,7 @@ fn extract_save_event(
                     return Some(SaveEvent::ZoneBossDefeated(old_zone.clone()));
                 }
                 BossDefeatResult::StormsEnd => {
-                    return Some(SaveEvent::ZoneBossDefeated(
-                        "Storm Citadel".to_string(),
-                    ));
+                    return Some(SaveEvent::ZoneBossDefeated("Storm Citadel".to_string()));
                 }
                 _ => {}
             },
@@ -445,7 +443,10 @@ fn main() -> io::Result<()> {
                     // fullscreen overlay. The game UI uses emoji/wide characters
                     // that can desync ratatui's internal buffer from the actual
                     // terminal state; clearing resyncs them.
-                    let overlay_is_fullscreen = matches!(overlay, GameOverlay::Achievements { .. } | GameOverlay::Timeline { .. });
+                    let overlay_is_fullscreen = matches!(
+                        overlay,
+                        GameOverlay::Achievements { .. } | GameOverlay::Timeline { .. }
+                    );
                     if overlay_is_fullscreen != prev_overlay_was_fullscreen {
                         terminal.clear()?;
                         prev_overlay_was_fullscreen = overlay_is_fullscreen;
@@ -665,13 +666,11 @@ fn main() -> io::Result<()> {
                                         deep = deep::persistence::load_deep();
 
                                         // Reload character state
-                                        let filename =
-                                            format!("{}.json", state.character_name);
+                                        let filename = format!("{}.json", state.character_name);
                                         if let Ok(mut reloaded) =
                                             character_manager.load_character(&filename)
                                         {
-                                            reloaded
-                                                .recalculate_derived_stats(&enhancement.levels);
+                                            reloaded.recalculate_derived_stats(&enhancement.levels);
                                             reloaded.recalculate_prestige_bonuses();
                                             reloaded.combat_state.add_log_entry(
                                                 format!(

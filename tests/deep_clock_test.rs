@@ -4,9 +4,7 @@ use quest::deep::clock::{
     format_duration, is_mission_complete, mission_progress_percent, pending_events,
     time_remaining_secs,
 };
-use quest::deep::types::{
-    ActiveMission, EventResolution, EventType, MissionEvent, MissionType,
-};
+use quest::deep::types::{ActiveMission, EventResolution, EventType, MissionEvent, MissionType};
 
 // =========================================================================
 // Helpers

@@ -9,8 +9,8 @@ use quest::deep::{
     InfrastructureType, LayerState, LayerTier, MercArchetype, MercStatus, Mercenary, MissionResult,
     MissionType, TheDeepState,
 };
-use rand_chacha::ChaCha8Rng;
 use rand::SeedableRng;
+use rand_chacha::ChaCha8Rng;
 
 // =========================================================================
 // Helpers
@@ -377,7 +377,10 @@ fn test_create_mission_supply_run_valid() {
     assert!(mission.duration_secs >= 7_200);
     assert!(mission.duration_secs <= 14_400);
     // Cost matches formula.
-    assert_eq!(mission.cost, calculate_mission_cost(MissionType::SupplyRun, 1));
+    assert_eq!(
+        mission.cost,
+        calculate_mission_cost(MissionType::SupplyRun, 1)
+    );
 }
 
 #[test]
@@ -430,11 +433,19 @@ fn test_create_mission_outpost_reduces_duration() {
     let now: i64 = 1_740_000_000;
 
     let with_outpost = create_mission(MissionType::Expedition, 3, &state, now, &mut rng_a);
-    let without_outpost =
-        create_mission(MissionType::Expedition, 3, &state_no_outpost, now, &mut rng_b);
+    let without_outpost = create_mission(
+        MissionType::Expedition,
+        3,
+        &state_no_outpost,
+        now,
+        &mut rng_b,
+    );
 
     // Same seed → same base roll; outpost gives 75 % of that.
-    assert_eq!(with_outpost.duration_secs, without_outpost.duration_secs * 3 / 4);
+    assert_eq!(
+        with_outpost.duration_secs,
+        without_outpost.duration_secs * 3 / 4
+    );
 }
 
 // =========================================================================
@@ -629,9 +640,19 @@ fn test_resolve_mission_breakthrough_marks_layer_cleared() {
     let completed = resolve_mission(&mut state, 0, &mut rng2);
     assert_eq!(completed.result, MissionResult::Success);
 
-    let layer_state = state.account.layers.iter().find(|l| l.layer_number == layer_id);
-    assert!(layer_state.is_some(), "layer state should exist after breakthrough");
-    assert!(layer_state.unwrap().cleared, "layer should be cleared after breakthrough success");
+    let layer_state = state
+        .account
+        .layers
+        .iter()
+        .find(|l| l.layer_number == layer_id);
+    assert!(
+        layer_state.is_some(),
+        "layer state should exist after breakthrough"
+    );
+    assert!(
+        layer_state.unwrap().cleared,
+        "layer should be cleared after breakthrough success"
+    );
 }
 
 #[test]
@@ -691,7 +712,10 @@ fn test_resolve_mission_increases_familiarity() {
         .iter()
         .find(|l| l.layer_number == layer_id)
         .unwrap();
-    assert!(layer.familiarity > 0.0, "familiarity should increase after mission");
+    assert!(
+        layer.familiarity > 0.0,
+        "familiarity should increase after mission"
+    );
 }
 
 #[test]
@@ -754,7 +778,9 @@ fn test_available_missions_always_includes_supply_run() {
     let mut rng = seeded_rng();
     let missions = quest::deep::missions::available_missions(&state, 0, &mut rng);
 
-    let has_supply_run = missions.iter().any(|m| m.mission_type == MissionType::SupplyRun);
+    let has_supply_run = missions
+        .iter()
+        .any(|m| m.mission_type == MissionType::SupplyRun);
     assert!(has_supply_run, "pool must contain at least one SupplyRun");
 }
 

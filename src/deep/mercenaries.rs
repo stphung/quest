@@ -12,8 +12,8 @@ use rand::{Rng, RngExt};
 // =========================================================================
 
 const FIRST_NAMES: &[&str] = &[
-    "Kael", "Lyra", "Thorne", "Rook", "Maren", "Yssa", "Torvik", "Drev", "Pell", "Kal",
-    "Sable", "Fenwick", "Ashara", "Brin", "Corva", "Gavin", "Hestia", "Jax", "Naia", "Voss",
+    "Kael", "Lyra", "Thorne", "Rook", "Maren", "Yssa", "Torvik", "Drev", "Pell", "Kal", "Sable",
+    "Fenwick", "Ashara", "Brin", "Corva", "Gavin", "Hestia", "Jax", "Naia", "Voss",
 ];
 
 const SURNAMES: &[&str] = &[
@@ -176,10 +176,7 @@ pub const RECRUITMENT_COST: u32 = 40;
 /// - The player has enough Warband Marks
 ///
 /// On success, deducts the cost and moves the merc from pool to roster.
-pub fn recruit_mercenary(
-    state: &mut TheDeepState,
-    pool_index: usize,
-) -> Result<(), &'static str> {
+pub fn recruit_mercenary(state: &mut TheDeepState, pool_index: usize) -> Result<(), &'static str> {
     if pool_index >= state.run.recruitment_pool.len() {
         return Err("invalid pool index");
     }

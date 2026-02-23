@@ -12,7 +12,10 @@ fn save_load_roundtrip_default_state() {
     let loaded: TheDeepState = serde_json::from_str(&json).expect("deserialize");
 
     assert_eq!(loaded.discovered, state.discovered);
-    assert_eq!(loaded.account.total_marks_earned, state.account.total_marks_earned);
+    assert_eq!(
+        loaded.account.total_marks_earned,
+        state.account.total_marks_earned
+    );
     assert_eq!(loaded.run.warband_marks, state.run.warband_marks);
     assert_eq!(loaded.account.layers.len(), state.account.layers.len());
     assert_eq!(loaded.run.mercenaries.len(), state.run.mercenaries.len());

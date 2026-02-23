@@ -287,10 +287,7 @@ fn test_the_deep_state_serde_roundtrip_with_data() {
     );
     assert_eq!(loaded.run.mercenaries.len(), 1);
     assert_eq!(loaded.run.mercenaries[0].name, "Aldric the Bold");
-    assert_eq!(
-        loaded.run.mercenaries[0].archetype,
-        MercArchetype::Vanguard
-    );
+    assert_eq!(loaded.run.mercenaries[0].archetype, MercArchetype::Vanguard);
     assert_eq!(loaded.run.mercenaries[0].level, 3);
 }
 
@@ -500,7 +497,10 @@ fn test_recruit_cost_tiers_are_ordered() {
 #[test]
 fn test_infrastructure_costs_match_constants() {
     assert_eq!(InfrastructureType::Outpost.cost(), INFRA_COST_OUTPOST);
-    assert_eq!(InfrastructureType::SupplyCache.cost(), INFRA_COST_SUPPLY_CACHE);
+    assert_eq!(
+        InfrastructureType::SupplyCache.cost(),
+        INFRA_COST_SUPPLY_CACHE
+    );
     assert_eq!(InfrastructureType::Watchtower.cost(), INFRA_COST_WATCHTOWER);
     assert_eq!(InfrastructureType::Bridge.cost(), INFRA_COST_BRIDGE);
 }
@@ -520,16 +520,40 @@ fn test_infrastructure_cost_exact_values() {
 #[test]
 fn test_outpost_income_scales_by_layer_tier() {
     // Shallows (L1-3): 15/day
-    assert_eq!(InfrastructureType::outpost_daily_income(1), OUTPOST_INCOME_SHALLOWS);
-    assert_eq!(InfrastructureType::outpost_daily_income(2), OUTPOST_INCOME_SHALLOWS);
-    assert_eq!(InfrastructureType::outpost_daily_income(3), OUTPOST_INCOME_SHALLOWS);
+    assert_eq!(
+        InfrastructureType::outpost_daily_income(1),
+        OUTPOST_INCOME_SHALLOWS
+    );
+    assert_eq!(
+        InfrastructureType::outpost_daily_income(2),
+        OUTPOST_INCOME_SHALLOWS
+    );
+    assert_eq!(
+        InfrastructureType::outpost_daily_income(3),
+        OUTPOST_INCOME_SHALLOWS
+    );
     // Warrens (L4-7): 20/day
-    assert_eq!(InfrastructureType::outpost_daily_income(4), OUTPOST_INCOME_WARRENS);
-    assert_eq!(InfrastructureType::outpost_daily_income(7), OUTPOST_INCOME_WARRENS);
+    assert_eq!(
+        InfrastructureType::outpost_daily_income(4),
+        OUTPOST_INCOME_WARRENS
+    );
+    assert_eq!(
+        InfrastructureType::outpost_daily_income(7),
+        OUTPOST_INCOME_WARRENS
+    );
     // Hollows+ (L8+): 25/day
-    assert_eq!(InfrastructureType::outpost_daily_income(8), OUTPOST_INCOME_HOLLOWS_PLUS);
-    assert_eq!(InfrastructureType::outpost_daily_income(13), OUTPOST_INCOME_HOLLOWS_PLUS);
-    assert_eq!(InfrastructureType::outpost_daily_income(26), OUTPOST_INCOME_HOLLOWS_PLUS);
+    assert_eq!(
+        InfrastructureType::outpost_daily_income(8),
+        OUTPOST_INCOME_HOLLOWS_PLUS
+    );
+    assert_eq!(
+        InfrastructureType::outpost_daily_income(13),
+        OUTPOST_INCOME_HOLLOWS_PLUS
+    );
+    assert_eq!(
+        InfrastructureType::outpost_daily_income(26),
+        OUTPOST_INCOME_HOLLOWS_PLUS
+    );
 }
 
 #[test]

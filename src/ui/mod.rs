@@ -45,8 +45,8 @@ mod stats_prestige;
 mod stats_sigils;
 pub mod stormglass_scene;
 pub(crate) mod throbber;
-pub mod timeline_scene;
 pub mod ticker;
+pub mod timeline_scene;
 mod zone_bg;
 
 use crate::challenges::ActiveMinigame;

@@ -331,12 +331,18 @@ mod tests {
 
     #[test]
     fn cave_in_maps_to_saboteur() {
-        assert_eq!(archetype_for_event(EventType::CaveIn), MercArchetype::Saboteur);
+        assert_eq!(
+            archetype_for_event(EventType::CaveIn),
+            MercArchetype::Saboteur
+        );
     }
 
     #[test]
     fn ambush_maps_to_vanguard() {
-        assert_eq!(archetype_for_event(EventType::Ambush), MercArchetype::Vanguard);
+        assert_eq!(
+            archetype_for_event(EventType::Ambush),
+            MercArchetype::Vanguard
+        );
     }
 
     #[test]
@@ -349,7 +355,10 @@ mod tests {
 
     #[test]
     fn ancient_door_maps_to_scout() {
-        assert_eq!(archetype_for_event(EventType::AncientDoor), MercArchetype::Scout);
+        assert_eq!(
+            archetype_for_event(EventType::AncientDoor),
+            MercArchetype::Scout
+        );
     }
 
     #[test]

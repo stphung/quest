@@ -78,7 +78,14 @@ impl HistoryRepo {
             let tree = repo.find_tree(tree_oid)?;
             let sig = Self::signature()?;
 
-            repo.commit(Some("HEAD"), &sig, &sig, "Initialize save history", &tree, &[])?;
+            repo.commit(
+                Some("HEAD"),
+                &sig,
+                &sig,
+                "Initialize save history",
+                &tree,
+                &[],
+            )?;
 
             // Rename master -> main if needed.
             if let Ok(mut master) = repo.find_branch("master", BranchType::Local) {
@@ -118,14 +125,8 @@ impl HistoryRepo {
         let message = event.commit_message(level, prestige, zone_id, subzone_id, play_time_seconds);
 
         let parent = self.head_commit()?;
-        self.repo.commit(
-            Some("HEAD"),
-            &sig,
-            &sig,
-            &message,
-            &tree,
-            &[&parent],
-        )?;
+        self.repo
+            .commit(Some("HEAD"), &sig, &sig, &message, &tree, &[&parent])?;
 
         Ok(())
     }
@@ -144,10 +145,7 @@ impl HistoryRepo {
 
         for branch_result in self.repo.branches(Some(BranchType::Local))? {
             let (branch, _) = branch_result?;
-            let name = branch
-                .name()?
-                .unwrap_or("(unnamed)")
-                .to_string();
+            let name = branch.name()?.unwrap_or("(unnamed)").to_string();
             let is_active = active_branch.as_deref() == Some(&name);
 
             let head_commit = branch
@@ -209,8 +207,7 @@ impl HistoryRepo {
             .map_err(|_| HistoryError::CommitNotFound(commit_id.to_string()))?;
 
         let branch_name = self.next_timeline_name()?;
-        self.repo
-            .branch(&branch_name, &commit, false)?;
+        self.repo.branch(&branch_name, &commit, false)?;
 
         self.checkout_branch(&branch_name)?;
 
@@ -239,8 +236,7 @@ impl HistoryRepo {
     /// Check whether the working tree has any staged or unstaged changes.
     fn has_changes(&self) -> Result<bool, HistoryError> {
         let mut opts = StatusOptions::new();
-        opts.include_untracked(true)
-            .recurse_untracked_dirs(true);
+        opts.include_untracked(true).recurse_untracked_dirs(true);
         let statuses = self.repo.statuses(Some(&mut opts))?;
         Ok(!statuses.is_empty())
     }
@@ -376,7 +372,11 @@ fn parse_playtime(s: &str) -> u64 {
     };
     let hours: u64 = s[..h_pos].parse().unwrap_or(0);
     let minutes_str = &s[h_pos + 1..];
-    let minutes: u64 = minutes_str.strip_suffix('m').unwrap_or("0").parse().unwrap_or(0);
+    let minutes: u64 = minutes_str
+        .strip_suffix('m')
+        .unwrap_or("0")
+        .parse()
+        .unwrap_or(0);
     hours * 3600 + minutes * 60
 }
 

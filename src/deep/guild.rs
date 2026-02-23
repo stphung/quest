@@ -40,7 +40,9 @@ pub fn can_upgrade_guild(state: &TheDeepState) -> Result<(), &'static str> {
         return Err("Insufficient Warband Marks for guild upgrade");
     }
 
-    let next = current.next().expect("upgrade_cost is Some, so next is Some");
+    let next = current
+        .next()
+        .expect("upgrade_cost is Some, so next is Some");
     if let Some(required_layer) = next.required_layer() {
         let cleared = state
             .account

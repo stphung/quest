@@ -8,11 +8,8 @@ use tempfile::TempDir;
 /// Create a temp dir with a dummy JSON save file so git has something to commit.
 fn setup_quest_dir() -> TempDir {
     let dir = TempDir::new().expect("create temp dir");
-    fs::write(
-        dir.path().join("save.json"),
-        r#"{"level":1,"prestige":0}"#,
-    )
-    .expect("write save file");
+    fs::write(dir.path().join("save.json"), r#"{"level":1,"prestige":0}"#)
+        .expect("write save file");
     dir
 }
 
@@ -56,11 +53,7 @@ fn commit_adds_entry() {
     let repo = HistoryRepo::init(dir.path()).expect("init");
 
     // Modify a file so there is something to commit.
-    fs::write(
-        dir.path().join("save.json"),
-        r#"{"level":5,"prestige":0}"#,
-    )
-    .expect("write");
+    fs::write(dir.path().join("save.json"), r#"{"level":5,"prestige":0}"#).expect("write");
 
     repo.commit(&SaveEvent::LevelUp(5), 5, 0, 1, 1, 600)
         .expect("commit");
@@ -140,7 +133,10 @@ fn restore_creates_new_branch() {
     assert_eq!(branches.len(), 2);
 
     // Active branch should be timeline-1.
-    let active = branches.iter().find(|b| b.is_active).expect("active branch");
+    let active = branches
+        .iter()
+        .find(|b| b.is_active)
+        .expect("active branch");
     assert_eq!(active.name, "timeline-1");
 }
 

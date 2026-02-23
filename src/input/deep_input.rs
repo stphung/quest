@@ -133,13 +133,13 @@ fn handle_missions_enter(
     if ui.selected_index < active_count {
         // Selected an active mission: check for pending events
         let mission_idx = ui.selected_index;
-        let pending = crate::deep::clock::pending_events(&deep.run.active_missions[mission_idx], now_unix);
+        let pending =
+            crate::deep::clock::pending_events(&deep.run.active_missions[mission_idx], now_unix);
         if let Some(&event_idx) = pending.first() {
             let mission = &deep.run.active_missions[mission_idx];
             let all_mercs: Vec<&crate::deep::types::Mercenary> =
                 deep.run.mercenaries.iter().collect();
-            let archetype_available =
-                can_use_archetype_resolution(mission, event_idx, &all_mercs);
+            let archetype_available = can_use_archetype_resolution(mission, event_idx, &all_mercs);
 
             ui.event_resolve = Some(EventResolveState {
                 mission_index: mission_idx,
@@ -297,9 +297,7 @@ fn handle_mission_launch(
                 // Extract the data we need before borrowing deep mutably
                 let (mission_template, squad_ids) = if let Some(l) = &ui.mission_launch {
                     (
-                        l.available_pool
-                            .get(l.mission_index)
-                            .cloned(),
+                        l.available_pool.get(l.mission_index).cloned(),
                         l.selected_mercs.clone(),
                     )
                 } else {
@@ -347,11 +345,7 @@ fn handle_mission_launch(
 // Event resolve flow
 // =========================================================================
 
-fn handle_event_resolve(
-    key: KeyCode,
-    deep: &mut TheDeepState,
-    ui: &mut DeepUiState,
-) -> bool {
+fn handle_event_resolve(key: KeyCode, deep: &mut TheDeepState, ui: &mut DeepUiState) -> bool {
     let (mission_index, event_index, archetype_available) = match &ui.event_resolve {
         Some(e) => (e.mission_index, e.event_index, e.archetype_available),
         None => return true,

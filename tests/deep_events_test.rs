@@ -75,7 +75,10 @@ fn resolve_event_success_marks_resolved() {
 fn resolve_event_archetype_resolution() {
     let mut mission = make_mission_with_events(vec![make_cave_in_event(false)]);
     resolve_event(&mut mission, 0, EventResolution::Archetype).unwrap();
-    assert_eq!(mission.events[0].resolution, Some(EventResolution::Archetype));
+    assert_eq!(
+        mission.events[0].resolution,
+        Some(EventResolution::Archetype)
+    );
 }
 
 #[test]
@@ -207,12 +210,18 @@ fn auto_resolve_handles_multiple_pending_events() {
 
 #[test]
 fn cave_in_requires_saboteur() {
-    assert_eq!(archetype_for_event(EventType::CaveIn), MercArchetype::Saboteur);
+    assert_eq!(
+        archetype_for_event(EventType::CaveIn),
+        MercArchetype::Saboteur
+    );
 }
 
 #[test]
 fn ambush_requires_vanguard() {
-    assert_eq!(archetype_for_event(EventType::Ambush), MercArchetype::Vanguard);
+    assert_eq!(
+        archetype_for_event(EventType::Ambush),
+        MercArchetype::Vanguard
+    );
 }
 
 #[test]
@@ -225,7 +234,10 @@ fn flooded_passage_requires_arcanist() {
 
 #[test]
 fn ancient_door_requires_scout() {
-    assert_eq!(archetype_for_event(EventType::AncientDoor), MercArchetype::Scout);
+    assert_eq!(
+        archetype_for_event(EventType::AncientDoor),
+        MercArchetype::Scout
+    );
 }
 
 #[test]

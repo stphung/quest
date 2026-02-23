@@ -9,8 +9,8 @@ use rand::{Rng, RngExt};
 
 use crate::deep::layers::{available_mission_types, layer_difficulty};
 use crate::deep::types::{
-    ActiveMission, CompletedMission, EventType, InfrastructureType, LayerState, Mercenary,
-    MercStatus, MissionEvent, MissionResult, MissionType, TheDeepState,
+    ActiveMission, CompletedMission, EventType, InfrastructureType, LayerState, MercStatus,
+    Mercenary, MissionEvent, MissionResult, MissionType, TheDeepState,
 };
 
 // =========================================================================

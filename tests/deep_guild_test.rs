@@ -1,9 +1,7 @@
 //! Integration tests for The Deep — guild upgrade system.
 
-use quest::deep::{
-    DeepAccountState, DeepRunState, GuildRank, LayerState, TheDeepState,
-};
 use quest::deep::guild::{can_upgrade_guild, guild_upgrade_progress, upgrade_guild};
+use quest::deep::{DeepAccountState, DeepRunState, GuildRank, LayerState, TheDeepState};
 
 // =========================================================================
 // Helpers
@@ -65,10 +63,7 @@ fn can_upgrade_guild_fails_without_enough_marks() {
     state.account.layers.push(cleared_layer(3));
 
     let result = can_upgrade_guild(&state);
-    assert_eq!(
-        result,
-        Err("Insufficient Warband Marks for guild upgrade")
-    );
+    assert_eq!(result, Err("Insufficient Warband Marks for guild upgrade"));
 }
 
 #[test]
@@ -150,7 +145,11 @@ fn upgrade_guild_advances_through_all_ranks() {
     for (from, expected_to) in progression {
         let mut state = state_ready_to_upgrade(from);
         let new_rank = upgrade_guild(&mut state).unwrap();
-        assert_eq!(new_rank, expected_to, "Expected {:?} after upgrading from {:?}", expected_to, from);
+        assert_eq!(
+            new_rank, expected_to,
+            "Expected {:?} after upgrading from {:?}",
+            expected_to, from
+        );
         assert_eq!(state.account.guild_rank, expected_to);
     }
 }
@@ -171,10 +170,7 @@ fn upgrade_guild_fails_without_enough_marks() {
     state.account.layers.push(cleared_layer(3));
 
     let result = upgrade_guild(&mut state);
-    assert_eq!(
-        result,
-        Err("Insufficient Warband Marks for guild upgrade")
-    );
+    assert_eq!(result, Err("Insufficient Warband Marks for guild upgrade"));
     assert_eq!(state.account.guild_rank, GuildRank::Freelancers);
     assert_eq!(state.run.warband_marks, cost - 1);
 }
@@ -232,7 +228,10 @@ fn guild_upgrade_progress_at_legion_max_rank() {
     assert_eq!(progress.next_rank, None);
     assert_eq!(progress.marks_needed, None);
     assert_eq!(progress.layer_needed, None);
-    assert!(!progress.layer_cleared, "layer_cleared is false when no layer needed");
+    assert!(
+        !progress.layer_cleared,
+        "layer_cleared is false when no layer needed"
+    );
     assert_eq!(progress.marks_available, 50_000);
 }
 

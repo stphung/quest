@@ -102,9 +102,7 @@ fn test_generate_mercenary_legion_higher_stats_than_freelancers() {
         })
         .sum();
     let total_legion_power: u32 = (0..samples)
-        .map(|i| {
-            generate_mercenary(MercArchetype::Scout, GuildRank::Legion, i, &mut rng_l).power
-        })
+        .map(|i| generate_mercenary(MercArchetype::Scout, GuildRank::Legion, i, &mut rng_l).power)
         .sum();
 
     assert!(
@@ -278,7 +276,11 @@ fn test_generate_starting_roster_all_mercs_level_one() {
     let mut rng = seeded_rng();
     let roster = generate_starting_roster(GuildRank::Sellswords, &mut rng);
     for merc in &roster {
-        assert_eq!(merc.level, 1, "Starting merc {} should be level 1", merc.name);
+        assert_eq!(
+            merc.level, 1,
+            "Starting merc {} should be level 1",
+            merc.name
+        );
     }
 }
 
@@ -436,10 +438,7 @@ fn test_recruit_mercenary_fails_when_roster_full() {
     }
 
     let result = recruit_mercenary(&mut state, 0);
-    assert!(
-        result.is_err(),
-        "Recruiting into a full roster should fail"
-    );
+    assert!(result.is_err(), "Recruiting into a full roster should fail");
     // Marks and pool should be unchanged
     assert_eq!(state.run.warband_marks, 500);
 }
@@ -581,7 +580,10 @@ fn test_medic_downgrade_loss_to_injury() {
     let medic = make_merc(1, MercArchetype::Medic);
     let squad = vec![&medic];
     let result = apply_medic_downgrade(&squad, 2);
-    assert_eq!(result, 1, "Loss (2) should downgrade to injury (1) with Medic");
+    assert_eq!(
+        result, 1,
+        "Loss (2) should downgrade to injury (1) with Medic"
+    );
 }
 
 #[test]
@@ -589,7 +591,10 @@ fn test_medic_downgrade_injury_to_scratch() {
     let medic = make_merc(1, MercArchetype::Medic);
     let squad = vec![&medic];
     let result = apply_medic_downgrade(&squad, 1);
-    assert_eq!(result, 0, "Injury (1) should downgrade to scratch (0) with Medic");
+    assert_eq!(
+        result, 0,
+        "Injury (1) should downgrade to scratch (0) with Medic"
+    );
 }
 
 #[test]
@@ -617,10 +622,7 @@ fn test_lost_medic_does_not_downgrade() {
     medic.status = MercStatus::Lost;
     let squad = vec![&medic];
     let result = apply_medic_downgrade(&squad, 2);
-    assert_eq!(
-        result, 2,
-        "Lost Medic should not provide downgrade benefit"
-    );
+    assert_eq!(result, 2, "Lost Medic should not provide downgrade benefit");
 }
 
 #[test]
@@ -630,12 +632,18 @@ fn test_medic_in_mixed_squad_still_downgrades() {
     let arcanist = make_merc(3, MercArchetype::Arcanist);
     let squad = vec![&vanguard, &medic, &arcanist];
     let result = apply_medic_downgrade(&squad, 2);
-    assert_eq!(result, 1, "Medic in squad should downgrade regardless of other members");
+    assert_eq!(
+        result, 1,
+        "Medic in squad should downgrade regardless of other members"
+    );
 }
 
 #[test]
 fn test_apply_medic_downgrade_empty_squad_no_panic() {
     let squad: Vec<&Mercenary> = vec![];
     let result = apply_medic_downgrade(&squad, 2);
-    assert_eq!(result, 2, "Empty squad should not crash and should not downgrade");
+    assert_eq!(
+        result, 2,
+        "Empty squad should not crash and should not downgrade"
+    );
 }
