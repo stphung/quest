@@ -33,6 +33,7 @@ src/ui/
 ├── achievement_list.rs         # Achievement browser list panel
 ├── achievement_tabs.rs         # Achievement browser category tabs
 ├── title_browser_scene.rs      # Title browser overlay (select display title from unlocked achievements)
+├── time_vault_scene.rs         # Time Vault overlay: Browse (two-panel), Graph (DAG), Compare (side-by-side)
 ├── debug_menu_scene.rs         # Debug menu overlay with tabbed categories (Challenges, World, Resources, Items)
 ├── help_overlay.rs             # Help/controls overlay
 ├── bug_report_scene.rs         # Bug report overlay with game-state preview and clipboard status

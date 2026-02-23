@@ -2,7 +2,7 @@
 
 use crate::history::validate_branch_name;
 use crate::ui::time_vault_scene::{
-    BrowserMode, ForkSource, PanelFocus, TimeVaultState, ViewMode,
+    BrowserMode, ComparePhase, ForkSource, PanelFocus, TimeVaultState, ViewMode,
 };
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
@@ -55,6 +55,16 @@ pub fn handle_time_vault_input(key: KeyEvent, state: &mut TimeVaultState) -> Tim
                 return TimeVaultAction::BuildGraph;
             }
             KeyCode::Char('c') | KeyCode::Char('C') => {
+                // When in Graph view, pre-select the current column's branch.
+                if state.view_mode == ViewMode::Graph {
+                    if let Some(layout) = &state.graph.layout {
+                        if let Some(col) = layout.columns.get(state.graph.selected_col) {
+                            state.compare.left_branch = Some(col.branch_name.clone());
+                            state.compare.phase = ComparePhase::SelectRight;
+                            state.compare.branch_cursor = 0;
+                        }
+                    }
+                }
                 state.view_mode = ViewMode::Compare;
                 return TimeVaultAction::Continue;
             }
@@ -413,7 +423,6 @@ fn get_selected_graph_commit_id(state: &TimeVaultState) -> Option<String> {
 
 /// Handler for compare view input: branch picker and viewing navigation.
 fn handle_compare_input(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAction {
-    use crate::ui::time_vault_scene::ComparePhase;
     match state.compare.phase {
         ComparePhase::SelectLeft | ComparePhase::SelectRight => match key.code {
             KeyCode::Esc => {

@@ -257,6 +257,15 @@ Account-level base building that persists across prestiges. 14 rooms in a two-br
 
 Account-level achievement system that persists across characters. 6 categories (Combat, Level, Progression, Challenges, Exploration, Stats). Tracks kills, boss kills, levels, prestige, zone completion, challenge wins, fishing ranks/catches, dungeon completions, Haven building, and Soulforge enhancements. Includes modal notification system with 500ms accumulation window. Includes a title system where 44 curated achievements grant display titles (e.g., "Godslayer", "Everlasting") shown in stats panel and character select.
 
+### History Module (`src/history/`)
+
+- `mod.rs` — Public API re-exports
+- `types.rs` — CommitInfo, TimelineInfo, SaveEvent (20 variants), format_suffix(), commit_message()
+- `git.rs` — HistoryRepo wrapping git2::Repository: save(), list_branches(), list_commits(), create_branch(), delete_branch(), switch_branch(), restore_commit(), find_fork_point(), all_commits_graph()
+- `graph_layout.rs` — Pure-logic graph layout engine: GraphColumn, GraphRow, GraphNode, ForkConnector, GraphLayout, build_graph_layout()
+
+Git-based save history system. Each game save creates a git commit with a structured message (event description + suffix with level, prestige, zone, playtime, character name). Branches represent alternate timelines that players can fork, switch between, and compare. The graph layout engine converts branch+commit data into a positioned grid for visual rendering.
+
 ### Input Handling (`src/input/`)
 
 - `mod.rs` — Top-level input routing based on current game state
@@ -266,6 +275,7 @@ Account-level achievement system that persists across characters. 6 categories (
 - `prestige_input.rs` — Prestige confirmation input handling
 - `soulforge_input.rs` — Soulforge overlay input handling
 - `stormglass_input.rs` — Stormglass overlay input handling
+- `time_vault_input.rs` — Time Vault overlay input: Browse/Graph/Compare view dispatch, B/G/C tab switching, graph navigation, compare branch picker
 
 Routes keyboard input to the appropriate handler based on current game state. Dispatches to minigame input handlers, character management flows, haven overlay, and debug menu. When quitting with pending challenges, shows a confirmation dialog ([Enter] Leave / [Esc] Stay).
 
@@ -311,6 +321,7 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 - `scene_fx.rs` — Shared utilities for layered ASCII scene rendering (scene buffer, backdrop effects, wide character support)
 - `zone_bg.rs` — Stylized zone background scenes with 6-layer compositing pipeline for all 11 zones
 - `debug_menu_scene.rs` — Debug menu overlay with tabbed categories
+- `time_vault_scene.rs` — Time Vault overlay with three view modes: Browse (two-panel branch/commit browser), Graph (full-width DAG visualization), Compare (side-by-side branch comparison with stats/divergence/timeline)
 - `help_overlay.rs` — Help/controls overlay
 - `bug_report_scene.rs` — Bug report overlay with game-state preview and clipboard status
 - `throbber.rs` — Shared spinner animations and atmospheric messages
@@ -392,7 +403,8 @@ quest/
 │   │   ├── haven_input.rs   # Haven overlay input
 │   │   ├── prestige_input.rs # Prestige confirmation input
 │   │   ├── soulforge_input.rs # Soulforge overlay input
-│   │   └── stormglass_input.rs # Stormglass overlay input
+│   │   ├── stormglass_input.rs # Stormglass overlay input
+│   │   └── time_vault_input.rs # Time Vault overlay input (Browse/Graph/Compare)
 │   ├── main_helpers/        # Extracted main.rs helpers
 │   │   ├── character_screens.rs  # Character screen handlers
 │   │   ├── input_routing.rs      # Game input routing
@@ -511,6 +523,11 @@ quest/
 │   │   ├── titles.rs        # Title definitions and selection
 │   │   ├── unlock.rs        # Core unlock machinery
 │   │   └── persistence.rs   # Save/load
+│   ├── history/             # Git-based save history and branch visualization
+│   │   ├── mod.rs           # Public API re-exports
+│   │   ├── types.rs         # CommitInfo, TimelineInfo, SaveEvent
+│   │   ├── git.rs           # HistoryRepo (git2 wrapper), save/branch/restore ops
+│   │   └── graph_layout.rs  # Graph layout engine for DAG visualization
 │   ├── utils/               # Utilities
 │   │   ├── build_info.rs    # Build metadata
 │   │   ├── updater.rs       # Self-update
@@ -545,6 +562,7 @@ quest/
 │       ├── stormglass_scene.rs # Stormglass Exchange overlay with animations
 │       ├── scene_fx.rs       # Shared utilities for layered ASCII scene rendering
 │       ├── zone_bg.rs        # Stylized zone background scenes (6-layer compositing)
+│       ├── time_vault_scene.rs # Time Vault overlay (Browse/Graph/Compare views)
 │       ├── debug_menu_scene.rs # Debug menu with tabbed categories
 │       ├── bug_report_scene.rs # Bug report overlay
 │       ├── *_scene.rs       # Various game scenes
