@@ -138,4 +138,11 @@ pub enum InputResult {
     SwitchSaveBranch { branch_name: String },
     /// Delete a save branch.
     DeleteSaveBranch { branch_name: String },
+    /// Build the graph layout for the Time Vault graph view.
+    BuildGraph,
+    /// Load compare data (commits and fork point) for two branches.
+    LoadCompareData {
+        left_branch: String,
+        right_branch: String,
+    },
 }

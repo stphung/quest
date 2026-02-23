@@ -159,6 +159,18 @@ pub fn handle_game_input(
                 // Overlay stays open for delete — just refresh.
                 return InputResult::DeleteSaveBranch { branch_name };
             }
+            TimeVaultAction::BuildGraph => {
+                return InputResult::BuildGraph;
+            }
+            TimeVaultAction::LoadCompareData {
+                left_branch,
+                right_branch,
+            } => {
+                return InputResult::LoadCompareData {
+                    left_branch,
+                    right_branch,
+                };
+            }
         }
         return InputResult::Continue;
     }

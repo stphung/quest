@@ -307,6 +307,36 @@ pub fn handle_select_frame(
                             }
                         }
                     }
+                    TimeVaultAction::BuildGraph => {
+                        if let Some(repo) = history_repo {
+                            if let Ok(branch_data) = repo.all_commits_graph() {
+                                let layout =
+                                    crate::history::graph_layout::build_graph_layout(&branch_data);
+                                browser.graph.layout = Some(layout);
+                                browser.graph.selected_col = 0;
+                                browser.graph.selected_row = 0;
+                                browser.graph.scroll_offset = 0;
+                            }
+                        }
+                    }
+                    TimeVaultAction::LoadCompareData {
+                        left_branch,
+                        right_branch,
+                    } => {
+                        if let Some(repo) = history_repo {
+                            if let Ok(fork_point) =
+                                repo.find_fork_point(&left_branch, &right_branch)
+                            {
+                                browser.compare.fork_point = fork_point;
+                            }
+                            if let Ok(commits) = repo.list_commits(&left_branch) {
+                                browser.compare.left_commits = commits;
+                            }
+                            if let Ok(commits) = repo.list_commits(&right_branch) {
+                                browser.compare.right_commits = commits;
+                            }
+                        }
+                    }
                     TimeVaultAction::Continue => {}
                 }
                 return Ok(ScreenTransition::Stay);

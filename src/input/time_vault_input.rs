@@ -25,6 +25,13 @@ pub enum TimeVaultAction {
     SwitchBranch { branch_name: String },
     /// Delete a branch by name.
     DeleteBranch { branch_name: String },
+    /// Build the graph layout from repository data.
+    BuildGraph,
+    /// Load compare data (commits and fork point) for two branches.
+    LoadCompareData {
+        left_branch: String,
+        right_branch: String,
+    },
 }
 
 /// Handle keyboard input for the Time Vault overlay.
@@ -45,7 +52,7 @@ pub fn handle_time_vault_input(key: KeyEvent, state: &mut TimeVaultState) -> Tim
             }
             KeyCode::Char('g') | KeyCode::Char('G') => {
                 state.view_mode = ViewMode::Graph;
-                return TimeVaultAction::Continue;
+                return TimeVaultAction::BuildGraph;
             }
             KeyCode::Char('c') | KeyCode::Char('C') => {
                 state.view_mode = ViewMode::Compare;
@@ -331,18 +338,149 @@ fn handle_naming_fork(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAct
     }
 }
 
-/// Stub handler for graph view input. Only Esc closes for now.
-fn handle_graph_input(key: KeyEvent, _state: &mut TimeVaultState) -> TimeVaultAction {
+/// Handler for graph view navigation.
+fn handle_graph_input(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAction {
     match key.code {
         KeyCode::Esc => TimeVaultAction::Close,
+        KeyCode::Up => {
+            if state.graph.selected_row > 0 {
+                state.graph.selected_row -= 1;
+                if state.graph.selected_row < state.graph.scroll_offset {
+                    state.graph.scroll_offset = state.graph.selected_row;
+                }
+            }
+            TimeVaultAction::Continue
+        }
+        KeyCode::Down => {
+            let max_row = state
+                .graph
+                .layout
+                .as_ref()
+                .map(|l| l.rows.len().saturating_sub(1))
+                .unwrap_or(0);
+            if state.graph.selected_row < max_row {
+                state.graph.selected_row += 1;
+            }
+            TimeVaultAction::Continue
+        }
+        KeyCode::Left => {
+            if state.graph.selected_col > 0 {
+                state.graph.selected_col -= 1;
+            }
+            TimeVaultAction::Continue
+        }
+        KeyCode::Right => {
+            let max_col = state
+                .graph
+                .layout
+                .as_ref()
+                .map(|l| l.columns.len().saturating_sub(1))
+                .unwrap_or(0);
+            if state.graph.selected_col < max_col {
+                state.graph.selected_col += 1;
+            }
+            TimeVaultAction::Continue
+        }
+        KeyCode::Enter => {
+            if get_selected_graph_commit_id(state).is_some() {
+                state.mode = BrowserMode::ConfirmRestore;
+            }
+            TimeVaultAction::Continue
+        }
+        KeyCode::Char('f') | KeyCode::Char('F') => {
+            if let Some(commit_id) = get_selected_graph_commit_id(state) {
+                state.mode = BrowserMode::NamingFork { commit_id };
+                state.fork_name_input.clear();
+                state.fork_name_error = None;
+            }
+            TimeVaultAction::Continue
+        }
         _ => TimeVaultAction::Continue,
     }
 }
 
-/// Stub handler for compare view input. Only Esc closes for now.
-fn handle_compare_input(key: KeyEvent, _state: &mut TimeVaultState) -> TimeVaultAction {
-    match key.code {
-        KeyCode::Esc => TimeVaultAction::Close,
-        _ => TimeVaultAction::Continue,
+/// Get the commit ID of the currently selected graph node, if any.
+fn get_selected_graph_commit_id(state: &TimeVaultState) -> Option<String> {
+    state
+        .graph
+        .layout
+        .as_ref()
+        .and_then(|l| l.rows.get(state.graph.selected_row))
+        .and_then(|row| row.nodes.get(state.graph.selected_col))
+        .and_then(|node| node.as_ref())
+        .map(|n| n.commit.id.clone())
+}
+
+/// Handler for compare view input: branch picker and viewing navigation.
+fn handle_compare_input(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAction {
+    use crate::ui::time_vault_scene::ComparePhase;
+    match state.compare.phase {
+        ComparePhase::SelectLeft | ComparePhase::SelectRight => match key.code {
+            KeyCode::Esc => {
+                if state.compare.phase == ComparePhase::SelectRight {
+                    state.compare.phase = ComparePhase::SelectLeft;
+                    state.compare.right_branch = None;
+                    state.compare.branch_cursor = 0;
+                    TimeVaultAction::Continue
+                } else {
+                    state.compare = Default::default();
+                    TimeVaultAction::Close
+                }
+            }
+            KeyCode::Up => {
+                if state.compare.branch_cursor > 0 {
+                    state.compare.branch_cursor -= 1;
+                }
+                TimeVaultAction::Continue
+            }
+            KeyCode::Down => {
+                if !state.branches.is_empty()
+                    && state.compare.branch_cursor < state.branches.len() - 1
+                {
+                    state.compare.branch_cursor += 1;
+                }
+                TimeVaultAction::Continue
+            }
+            KeyCode::Enter => {
+                if let Some(branch) = state.branches.get(state.compare.branch_cursor) {
+                    let name = branch.name.clone();
+                    match state.compare.phase {
+                        ComparePhase::SelectLeft => {
+                            state.compare.left_branch = Some(name);
+                            state.compare.phase = ComparePhase::SelectRight;
+                            state.compare.branch_cursor = 0;
+                        }
+                        ComparePhase::SelectRight => {
+                            state.compare.right_branch = Some(name.clone());
+                            state.compare.phase = ComparePhase::Viewing;
+                            return TimeVaultAction::LoadCompareData {
+                                left_branch: state.compare.left_branch.clone().unwrap_or_default(),
+                                right_branch: name,
+                            };
+                        }
+                        _ => {}
+                    }
+                }
+                TimeVaultAction::Continue
+            }
+            _ => TimeVaultAction::Continue,
+        },
+        ComparePhase::Viewing => match key.code {
+            KeyCode::Esc => {
+                state.compare = Default::default();
+                TimeVaultAction::Close
+            }
+            KeyCode::Up => {
+                if state.compare.scroll_offset > 0 {
+                    state.compare.scroll_offset -= 1;
+                }
+                TimeVaultAction::Continue
+            }
+            KeyCode::Down => {
+                state.compare.scroll_offset += 1;
+                TimeVaultAction::Continue
+            }
+            _ => TimeVaultAction::Continue,
+        },
     }
 }

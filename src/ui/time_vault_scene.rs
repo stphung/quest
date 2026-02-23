@@ -113,6 +113,12 @@ pub struct CompareState {
     pub phase: ComparePhase,
     /// Cursor position in the branch selection list.
     pub branch_cursor: usize,
+    /// The fork point (common ancestor) between the two branches.
+    pub fork_point: Option<CommitInfo>,
+    /// Commits on the left branch (newest first).
+    pub left_commits: Vec<CommitInfo>,
+    /// Commits on the right branch (newest first).
+    pub right_commits: Vec<CommitInfo>,
 }
 
 /// UI state for the Time Vault overlay.
@@ -268,8 +274,13 @@ fn event_icon_color(message: &str) -> (&'static str, Color) {
 
 /// Render the Time Vault overlay.
 pub fn draw_time_vault(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
-    // Full-screen overlay with padding
-    let w = area.width.saturating_sub(4).min(90);
+    // Full-screen overlay with padding — wider in Graph and Compare modes
+    let max_w = if matches!(state.view_mode, ViewMode::Graph | ViewMode::Compare) {
+        area.width.saturating_sub(4)
+    } else {
+        90
+    };
+    let w = area.width.saturating_sub(4).min(max_w);
     let h = area.height.saturating_sub(4);
     let x = area.x + (area.width.saturating_sub(w)) / 2;
     let y = area.y + (area.height.saturating_sub(h)) / 2;
@@ -306,17 +317,33 @@ pub fn draw_time_vault(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
     let millis = current_millis();
     paint_vault_backdrop(&mut buffer, millis);
 
-    // Layout: branch panel on the left, snapshot panel on the right
-    let branch_width = 20usize.min(buf_w / 3);
-    let snap_x = branch_width + 1; // 1 col gap
-    let snap_w = buf_w.saturating_sub(snap_x);
+    // Tab bar on row 0 of the buffer
+    paint_tab_bar(&mut buffer, state);
 
-    paint_branch_panel(&mut buffer, state, branch_width);
-    paint_snapshot_panel(&mut buffer, state, snap_x, snap_w);
+    // Content area: everything below the tab bar (buffer[1..])
+    let content = &mut buffer[1..];
+
+    match state.view_mode {
+        ViewMode::Browse => {
+            // Layout: branch panel on the left, snapshot panel on the right
+            let branch_width = 20usize.min(buf_w / 3);
+            let snap_x = branch_width + 1; // 1 col gap
+            let snap_w = buf_w.saturating_sub(snap_x);
+
+            paint_branch_panel(content, state, branch_width);
+            paint_snapshot_panel(content, state, snap_x, snap_w);
+        }
+        ViewMode::Graph => {
+            paint_graph_view(content, state);
+        }
+        ViewMode::Compare => {
+            paint_compare_view(content, state);
+        }
+    }
 
     // Overlay confirmation dialog when not browsing
     if state.mode != BrowserMode::Browse {
-        paint_confirm_dialog(&mut buffer, state);
+        paint_confirm_dialog(content, state);
     }
 
     // Render the scene buffer into the inner area (above controls)
@@ -336,6 +363,407 @@ pub fn draw_time_vault(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
         1,
     );
     draw_controls(frame, controls_area, state);
+}
+
+/// Paint the tab bar showing [B]rowse  [G]raph  [C]ompare with the active tab highlighted.
+fn paint_tab_bar(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
+    if buffer.is_empty() {
+        return;
+    }
+    let tabs = [
+        ("B", "rowse", ViewMode::Browse),
+        ("G", "raph", ViewMode::Graph),
+        ("C", "ompare", ViewMode::Compare),
+    ];
+    let mut col = 2i32;
+    for (hotkey, label, mode) in &tabs {
+        let is_active = state.view_mode == *mode;
+        let key_color = Color::Cyan;
+        let label_color = if is_active {
+            Color::White
+        } else {
+            Color::DarkGray
+        };
+        put_text(buffer, 0, col, "[", Color::DarkGray);
+        col += 1;
+        put_text(buffer, 0, col, hotkey, key_color);
+        col += hotkey.len() as i32;
+        put_text(buffer, 0, col, "]", Color::DarkGray);
+        col += 1;
+        put_text(buffer, 0, col, label, label_color);
+        col += label.len() as i32 + 2;
+    }
+}
+
+/// Paint the graph (DAG) view showing all branches as columns with commit nodes.
+fn paint_graph_view(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
+    let height = buffer.len();
+    if height < 4 {
+        return;
+    }
+    let width = if buffer[0].is_empty() {
+        return;
+    } else {
+        buffer[0].len()
+    };
+
+    let layout = match &state.graph.layout {
+        Some(l) => l,
+        None => {
+            put_text(buffer, 2, 4, "No graph data loaded", Color::DarkGray);
+            return;
+        }
+    };
+
+    if layout.columns.is_empty() {
+        put_text(buffer, 2, 4, "No branches", Color::DarkGray);
+        return;
+    }
+
+    let col_width = 20usize;
+    let max_cols = (width / col_width).max(1);
+
+    // Column headers
+    for (ci, column) in layout.columns.iter().enumerate().take(max_cols) {
+        let x = (ci * col_width + 2) as i32;
+        let is_selected_col = ci == state.graph.selected_col;
+        let color = if is_selected_col {
+            Color::Cyan
+        } else {
+            Color::DarkGray
+        };
+        put_text(buffer, 0, x, &column.branch_name, color);
+        let sep: String = "\u{2500}".repeat(col_width.saturating_sub(2));
+        put_text(buffer, 1, x, &sep, Color::Rgb(30, 50, 80));
+    }
+
+    // Commit rows
+    let content_start = 2usize;
+    let rows_per_commit = 2usize;
+    let scroll = state.graph.scroll_offset;
+
+    for (vi, row) in layout.rows.iter().enumerate().skip(scroll) {
+        let screen_row = content_start + (vi - scroll) * rows_per_commit;
+        if screen_row + 1 >= height {
+            break;
+        }
+
+        for (ci, node_opt) in row.nodes.iter().enumerate().take(max_cols) {
+            let x = (ci * col_width + 2) as i32;
+
+            if let Some(node) = node_opt {
+                let is_selected = ci == state.graph.selected_col && vi == state.graph.selected_row;
+                let marker = if node.is_head { "\u{25cf}" } else { "\u{25cb}" };
+                let node_color = if is_selected {
+                    Color::Yellow
+                } else if node.is_head {
+                    Color::Green
+                } else {
+                    Color::Cyan
+                };
+                put_text(buffer, screen_row as i32, x, marker, node_color);
+
+                let label = format!(
+                    "Lv{} P{} Z{}",
+                    node.commit.level, node.commit.prestige, node.commit.zone
+                );
+                let label_color = if is_selected {
+                    Color::Yellow
+                } else {
+                    Color::White
+                };
+                put_text(buffer, screen_row as i32, x + 2, &label, label_color);
+
+                if is_selected {
+                    let highlight_bg = Color::Rgb(25, 40, 80);
+                    let r = screen_row;
+                    if r < height {
+                        for col_px in (ci * col_width)..(ci * col_width + col_width).min(width) {
+                            if col_px < buffer[r].len() {
+                                buffer[r][col_px].bg = highlight_bg;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Vertical connector
+            if screen_row + 1 < height && node_opt.is_some() {
+                let show_connector = layout
+                    .rows
+                    .iter()
+                    .skip(vi + 1)
+                    .any(|r| r.nodes.get(ci).and_then(|n| n.as_ref()).is_some());
+                if show_connector {
+                    put_text(buffer, (screen_row + 1) as i32, x, "\u{2502}", TIMELINE_DIM);
+                }
+            }
+        }
+    }
+
+    // Fork connectors
+    for fc in &layout.fork_connectors {
+        let vi = fc.row;
+        if vi < scroll {
+            continue;
+        }
+        let screen_row = content_start + (vi - scroll) * rows_per_commit;
+        if screen_row >= height {
+            continue;
+        }
+
+        let from_x = (fc.from_col * col_width + 2) as i32;
+        let to_x = (fc.to_col * col_width + 2) as i32;
+
+        put_text(buffer, screen_row as i32, from_x, "\u{251c}", TIMELINE_DIM);
+        for cx in (from_x + 1)..to_x {
+            put_text(buffer, screen_row as i32, cx, "\u{2500}", TIMELINE_DIM);
+        }
+        put_text(buffer, screen_row as i32, to_x, "\u{2518}", TIMELINE_DIM);
+    }
+}
+
+/// Paint the compare view: branch picker or side-by-side comparison.
+fn paint_compare_view(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
+    let height = buffer.len();
+    if height < 4 {
+        return;
+    }
+    let width = if buffer[0].is_empty() {
+        return;
+    } else {
+        buffer[0].len()
+    };
+
+    match state.compare.phase {
+        ComparePhase::SelectLeft | ComparePhase::SelectRight => {
+            paint_compare_branch_picker(buffer, state);
+        }
+        ComparePhase::Viewing => {
+            paint_compare_stats(buffer, state, width);
+        }
+    }
+}
+
+/// Paint the branch picker for SelectLeft/SelectRight phases.
+fn paint_compare_branch_picker(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
+    let prompt = match state.compare.phase {
+        ComparePhase::SelectLeft => "Select first branch to compare:",
+        ComparePhase::SelectRight => "Select second branch to compare:",
+        _ => return,
+    };
+    put_text(buffer, 1, 4, prompt, Color::White);
+
+    for (i, branch) in state.branches.iter().enumerate() {
+        let row = 3 + i as i32;
+        if row as usize >= buffer.len() {
+            break;
+        }
+
+        let is_selected = i == state.compare.branch_cursor;
+        let marker = if is_selected { "\u{25b6}" } else { " " };
+        let color = if is_selected {
+            Color::Yellow
+        } else {
+            Color::White
+        };
+
+        put_text(buffer, row, 4, marker, Color::Cyan);
+        put_text(buffer, row, 6, &branch.name, color);
+
+        if state.compare.left_branch.as_deref() == Some(&branch.name) {
+            put_text(
+                buffer,
+                row,
+                6 + branch.name.len() as i32 + 2,
+                "(left)",
+                Color::DarkGray,
+            );
+        }
+    }
+}
+
+/// Format a stat value from a CommitInfo for the compare stats view.
+fn format_stat_value(label: &str, commit: &CommitInfo) -> String {
+    match label {
+        "Level" => format!("{}", commit.level),
+        "Prestige" => format!("{}", commit.prestige),
+        "Zone" => format!("{}", commit.zone),
+        "Playtime" => {
+            let h = commit.playtime / 3600;
+            let m = (commit.playtime % 3600) / 60;
+            format!("{}h {:02}m", h, m)
+        }
+        _ => String::new(),
+    }
+}
+
+/// Paint the full comparison view: stats, divergence, and interleaved timeline.
+fn paint_compare_stats(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState, width: usize) {
+    let left_name = state.compare.left_branch.as_deref().unwrap_or("?");
+    let right_name = state.compare.right_branch.as_deref().unwrap_or("?");
+    let mid = width / 2;
+
+    // Headers
+    put_text(buffer, 0, 4, left_name, Color::Cyan);
+    put_text(buffer, 0, mid as i32 + 2, "vs", Color::DarkGray);
+    put_text(buffer, 0, mid as i32 + 6, right_name, Color::Cyan);
+
+    let left_head = state
+        .branches
+        .iter()
+        .find(|b| b.name == left_name)
+        .and_then(|b| b.head_commit.as_ref());
+    let right_head = state
+        .branches
+        .iter()
+        .find(|b| b.name == right_name)
+        .and_then(|b| b.head_commit.as_ref());
+
+    let sep: String = "\u{2500}".repeat(width.saturating_sub(4));
+    put_text(buffer, 1, 2, &sep, Color::Rgb(30, 50, 80));
+
+    // Stats rows
+    let labels = ["Level", "Prestige", "Zone", "Playtime"];
+    for (i, label) in labels.iter().enumerate() {
+        let row = 3 + i as i32;
+        if row as usize >= buffer.len() {
+            break;
+        }
+        put_text(buffer, row, 4, label, Color::DarkGray);
+
+        if let Some(commit) = left_head {
+            let val = format_stat_value(label, commit);
+            put_text(buffer, row, 16, &val, Color::White);
+        }
+        if let Some(commit) = right_head {
+            let val = format_stat_value(label, commit);
+            put_text(buffer, row, mid as i32 + 6, &val, Color::White);
+        }
+    }
+
+    // Divergence section
+    let div_start = 8i32;
+    if (div_start as usize) < buffer.len() {
+        let div_sep: String = "\u{2500}".repeat(width.saturating_sub(4));
+        put_text(buffer, div_start, 2, &div_sep, Color::Rgb(30, 50, 80));
+    }
+    if (div_start + 1) as usize >= buffer.len() {
+        return;
+    }
+    put_text(buffer, div_start + 1, 4, "Divergence", Color::Cyan);
+
+    if let Some(fork) = &state.compare.fork_point {
+        let fork_label = format!(
+            "Forked at: Lv{} P{} Z{}",
+            fork.level, fork.prestige, fork.zone
+        );
+        if ((div_start + 2) as usize) < buffer.len() {
+            put_text(buffer, div_start + 2, 4, &fork_label, Color::DarkGray);
+        }
+
+        let left_since = state
+            .compare
+            .left_commits
+            .iter()
+            .take_while(|c| c.id != fork.id)
+            .count();
+        let right_since = state
+            .compare
+            .right_commits
+            .iter()
+            .take_while(|c| c.id != fork.id)
+            .count();
+        let since_label = format!(
+            "Since fork: {} snapshots (left) vs {} snapshots (right)",
+            left_since, right_since
+        );
+        if ((div_start + 3) as usize) < buffer.len() {
+            put_text(buffer, div_start + 3, 4, &since_label, Color::DarkGray);
+        }
+    } else if ((div_start + 2) as usize) < buffer.len() {
+        put_text(
+            buffer,
+            div_start + 2,
+            4,
+            "No common ancestor found",
+            Color::DarkGray,
+        );
+    }
+
+    // Interleaved timeline
+    let tl_start = div_start + 5;
+    if (tl_start as usize) >= buffer.len() {
+        return;
+    }
+    let tl_sep: String = "\u{2500}".repeat(width.saturating_sub(4));
+    put_text(buffer, tl_start, 2, &tl_sep, Color::Rgb(30, 50, 80));
+    if (tl_start + 1) as usize >= buffer.len() {
+        return;
+    }
+    put_text(buffer, tl_start + 1, 4, "Timeline", Color::Cyan);
+
+    let fork_id = state.compare.fork_point.as_ref().map(|f| f.id.as_str());
+    let left_unique: Vec<&CommitInfo> = state
+        .compare
+        .left_commits
+        .iter()
+        .take_while(|c| fork_id.is_none_or(|fid| c.id != fid))
+        .collect();
+    let right_unique: Vec<&CommitInfo> = state
+        .compare
+        .right_commits
+        .iter()
+        .take_while(|c| fork_id.is_none_or(|fid| c.id != fid))
+        .collect();
+
+    let mut merged: Vec<(&CommitInfo, bool)> = Vec::new();
+    merged.extend(left_unique.iter().map(|c| (*c, true)));
+    merged.extend(right_unique.iter().map(|c| (*c, false)));
+    merged.sort_by(|a, b| b.0.timestamp.cmp(&a.0.timestamp));
+
+    let scroll = state.compare.scroll_offset;
+    let mut row = tl_start + 2;
+
+    for (commit, is_left) in merged.iter().skip(scroll) {
+        if row as usize >= buffer.len().saturating_sub(1) {
+            break;
+        }
+
+        let side_x = if *is_left { 4i32 } else { mid as i32 + 6 };
+        let side_color = if *is_left { Color::Cyan } else { Color::Yellow };
+
+        let (icon, icon_color) = event_icon_color(&commit.message);
+        let desc = commit
+            .message
+            .split(" | ")
+            .next()
+            .unwrap_or(&commit.message);
+
+        put_text(buffer, row, side_x, "\u{25cb}", side_color);
+        put_text(buffer, row, side_x + 2, icon, icon_color);
+        let iw = super::scene_fx::display_width(icon);
+        let desc_trunc: String = desc.chars().take(25).collect();
+        put_text(
+            buffer,
+            row,
+            side_x + 2 + iw as i32 + 1,
+            &desc_trunc,
+            Color::White,
+        );
+
+        row += 1;
+    }
+
+    // Fork point marker
+    if row < buffer.len() as i32 && state.compare.fork_point.is_some() {
+        let connector_len = mid.saturating_sub(8);
+        let fork_marker = format!(
+            "\u{251c}{}\u{2518}  (fork point)",
+            "\u{2500}".repeat(connector_len)
+        );
+        put_text(buffer, row, 4, &fork_marker, TIMELINE_DIM);
+    }
 }
 
 /// Paint the branch list into the scene buffer.
@@ -789,48 +1217,92 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
         | BrowserMode::NamingFork { .. } => return,
         BrowserMode::Browse => {
             let dot = Span::styled("  \u{00b7}  ", Style::default().fg(Color::Rgb(40, 80, 120)));
-            match state.focus {
-                PanelFocus::Left => {
-                    let mut spans = vec![
-                        Span::styled(" [Enter] ", Style::default().fg(Color::Cyan)),
-                        Span::styled("Switch", Style::default().fg(Color::DarkGray)),
+            match state.view_mode {
+                ViewMode::Graph => Line::from(vec![
+                    Span::styled(
+                        " \u{2190}\u{2191}\u{2193}\u{2192} ",
+                        Style::default().fg(Color::Cyan),
+                    ),
+                    Span::styled("Navigate", Style::default().fg(Color::DarkGray)),
+                    dot.clone(),
+                    Span::styled("[Enter] ", Style::default().fg(Color::Cyan)),
+                    Span::styled("Restore", Style::default().fg(Color::DarkGray)),
+                    dot.clone(),
+                    Span::styled("[F] ", Style::default().fg(Color::Cyan)),
+                    Span::styled("Fork", Style::default().fg(Color::DarkGray)),
+                    dot,
+                    Span::styled("[Esc] ", Style::default().fg(Color::Cyan)),
+                    Span::styled("Close", Style::default().fg(Color::DarkGray)),
+                ]),
+                ViewMode::Compare => match state.compare.phase {
+                    ComparePhase::SelectLeft | ComparePhase::SelectRight => Line::from(vec![
+                        Span::styled(" [\u{2191}\u{2193}] ", Style::default().fg(Color::Cyan)),
+                        Span::styled("Select", Style::default().fg(Color::DarkGray)),
+                        dot.clone(),
+                        Span::styled("[Enter] ", Style::default().fg(Color::Cyan)),
+                        Span::styled("Pick", Style::default().fg(Color::DarkGray)),
+                        dot,
+                        Span::styled("[Esc] ", Style::default().fg(Color::Cyan)),
+                        Span::styled("Back", Style::default().fg(Color::DarkGray)),
+                    ]),
+                    ComparePhase::Viewing => Line::from(vec![
+                        Span::styled(" [\u{2191}\u{2193}] ", Style::default().fg(Color::Cyan)),
+                        Span::styled("Scroll", Style::default().fg(Color::DarkGray)),
                         dot.clone(),
                         Span::styled("[B] ", Style::default().fg(Color::Cyan)),
-                        Span::styled("Branch", Style::default().fg(Color::DarkGray)),
-                    ];
-                    if !state.selected_branch_is_main() && !state.selected_branch_is_active() {
-                        spans.push(dot.clone());
-                        spans.push(Span::styled("[D] ", Style::default().fg(Color::Cyan)));
-                        spans.push(Span::styled("Delete", Style::default().fg(Color::DarkGray)));
-                    }
-                    spans.push(dot.clone());
-                    spans.push(Span::styled("[Tab] ", Style::default().fg(Color::Cyan)));
-                    spans.push(Span::styled("Saves", Style::default().fg(Color::DarkGray)));
-                    spans.push(dot);
-                    spans.push(Span::styled("[Esc] ", Style::default().fg(Color::Cyan)));
-                    spans.push(Span::styled("Close", Style::default().fg(Color::DarkGray)));
-                    Line::from(spans)
-                }
-                PanelFocus::Right => {
-                    let enter_label = if state.selected_branch_is_active() {
-                        "Restore"
-                    } else {
-                        "Switch to branch"
-                    };
-                    Line::from(vec![
-                        Span::styled(" [Enter] ", Style::default().fg(Color::Cyan)),
-                        Span::styled(enter_label, Style::default().fg(Color::DarkGray)),
+                        Span::styled("Browse", Style::default().fg(Color::DarkGray)),
                         dot.clone(),
-                        Span::styled("[B] ", Style::default().fg(Color::Cyan)),
-                        Span::styled("Branch", Style::default().fg(Color::DarkGray)),
-                        dot.clone(),
-                        Span::styled("[Tab] ", Style::default().fg(Color::Cyan)),
-                        Span::styled("Branches", Style::default().fg(Color::DarkGray)),
+                        Span::styled("[G] ", Style::default().fg(Color::Cyan)),
+                        Span::styled("Graph", Style::default().fg(Color::DarkGray)),
                         dot,
                         Span::styled("[Esc] ", Style::default().fg(Color::Cyan)),
                         Span::styled("Close", Style::default().fg(Color::DarkGray)),
-                    ])
-                }
+                    ]),
+                },
+                ViewMode::Browse => match state.focus {
+                    PanelFocus::Left => {
+                        let mut spans = vec![
+                            Span::styled(" [Enter] ", Style::default().fg(Color::Cyan)),
+                            Span::styled("Switch", Style::default().fg(Color::DarkGray)),
+                            dot.clone(),
+                            Span::styled("[F] ", Style::default().fg(Color::Cyan)),
+                            Span::styled("Fork", Style::default().fg(Color::DarkGray)),
+                        ];
+                        if !state.selected_branch_is_main() && !state.selected_branch_is_active() {
+                            spans.push(dot.clone());
+                            spans.push(Span::styled("[D] ", Style::default().fg(Color::Cyan)));
+                            spans
+                                .push(Span::styled("Delete", Style::default().fg(Color::DarkGray)));
+                        }
+                        spans.push(dot.clone());
+                        spans.push(Span::styled("[Tab] ", Style::default().fg(Color::Cyan)));
+                        spans.push(Span::styled("Saves", Style::default().fg(Color::DarkGray)));
+                        spans.push(dot);
+                        spans.push(Span::styled("[Esc] ", Style::default().fg(Color::Cyan)));
+                        spans.push(Span::styled("Close", Style::default().fg(Color::DarkGray)));
+                        Line::from(spans)
+                    }
+                    PanelFocus::Right => {
+                        let enter_label = if state.selected_branch_is_active() {
+                            "Restore"
+                        } else {
+                            "Switch to branch"
+                        };
+                        Line::from(vec![
+                            Span::styled(" [Enter] ", Style::default().fg(Color::Cyan)),
+                            Span::styled(enter_label, Style::default().fg(Color::DarkGray)),
+                            dot.clone(),
+                            Span::styled("[F] ", Style::default().fg(Color::Cyan)),
+                            Span::styled("Fork", Style::default().fg(Color::DarkGray)),
+                            dot.clone(),
+                            Span::styled("[Tab] ", Style::default().fg(Color::Cyan)),
+                            Span::styled("Branches", Style::default().fg(Color::DarkGray)),
+                            dot,
+                            Span::styled("[Esc] ", Style::default().fg(Color::Cyan)),
+                            Span::styled("Close", Style::default().fg(Color::DarkGray)),
+                        ])
+                    }
+                },
             }
         }
     };

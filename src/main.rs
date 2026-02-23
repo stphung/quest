@@ -902,6 +902,46 @@ fn main() -> io::Result<()> {
                                 continue;
                             }
 
+                            if let InputResult::BuildGraph = result {
+                                if let Some(ref repo) = history_repo {
+                                    if let Ok(branch_data) = repo.all_commits_graph() {
+                                        let layout =
+                                            history::graph_layout::build_graph_layout(&branch_data);
+                                        if let GameOverlay::TimeVault { ref mut browser } = overlay
+                                        {
+                                            browser.graph.layout = Some(layout);
+                                            browser.graph.selected_col = 0;
+                                            browser.graph.selected_row = 0;
+                                            browser.graph.scroll_offset = 0;
+                                        }
+                                    }
+                                }
+                                continue;
+                            }
+
+                            if let InputResult::LoadCompareData {
+                                ref left_branch,
+                                ref right_branch,
+                            } = result
+                            {
+                                if let Some(ref repo) = history_repo {
+                                    if let GameOverlay::TimeVault { ref mut browser } = overlay {
+                                        if let Ok(fork_point) =
+                                            repo.find_fork_point(left_branch, right_branch)
+                                        {
+                                            browser.compare.fork_point = fork_point;
+                                        }
+                                        if let Ok(commits) = repo.list_commits(left_branch) {
+                                            browser.compare.left_commits = commits;
+                                        }
+                                        if let Ok(commits) = repo.list_commits(right_branch) {
+                                            browser.compare.right_commits = commits;
+                                        }
+                                    }
+                                }
+                                continue;
+                            }
+
                             match route_game_input(
                                 result,
                                 &state,

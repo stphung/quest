@@ -100,6 +100,8 @@ pub fn route_game_input(
         | InputResult::RefreshSaveHistoryCommits { .. }
         | InputResult::ForkSave { .. }
         | InputResult::SwitchSaveBranch { .. }
-        | InputResult::DeleteSaveBranch { .. } => InputAction::Continue,
+        | InputResult::DeleteSaveBranch { .. }
+        | InputResult::BuildGraph
+        | InputResult::LoadCompareData { .. } => InputAction::Continue,
     }
 }
