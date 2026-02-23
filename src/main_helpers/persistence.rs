@@ -37,6 +37,7 @@ pub fn save_all(
             state.zone_progression.current_zone_id,
             state.zone_progression.current_subzone_id,
             state.play_time_seconds,
+            &state.character_name,
         );
     }
 }

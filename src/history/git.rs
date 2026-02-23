@@ -25,6 +25,10 @@ pub enum HistoryError {
     BranchNotFound(String),
     /// A commit SHA was not found.
     CommitNotFound(String),
+    /// A branch name failed validation.
+    InvalidBranchName(String),
+    /// A branch with this name already exists.
+    BranchAlreadyExists(String),
 }
 
 impl std::fmt::Display for HistoryError {
@@ -34,6 +38,12 @@ impl std::fmt::Display for HistoryError {
             HistoryError::NothingToCommit => write!(f, "nothing to commit"),
             HistoryError::BranchNotFound(name) => write!(f, "branch not found: {name}"),
             HistoryError::CommitNotFound(id) => write!(f, "commit not found: {id}"),
+            HistoryError::InvalidBranchName(name) => {
+                write!(f, "invalid branch name: {name}")
+            }
+            HistoryError::BranchAlreadyExists(name) => {
+                write!(f, "branch already exists: {name}")
+            }
         }
     }
 }
@@ -101,6 +111,7 @@ impl HistoryRepo {
         zone_id: u32,
         subzone_id: u32,
         play_time_seconds: u64,
+        character_name: &str,
     ) -> Result<(), HistoryError> {
         // Check if there are any changes.
         if !self.has_changes()? {
@@ -115,7 +126,7 @@ impl HistoryRepo {
         let tree_oid = index.write_tree()?;
         let tree = self.repo.find_tree(tree_oid)?;
         let sig = Self::signature()?;
-        let message = event.commit_message(level, prestige, zone_id, subzone_id, play_time_seconds);
+        let message = event.commit_message(level, prestige, zone_id, subzone_id, play_time_seconds, character_name);
 
         let parent = self.head_commit()?;
         self.repo.commit(
@@ -221,6 +232,91 @@ impl HistoryRepo {
         Ok(())
     }
 
+    /// Create a new branch at the given commit and check it out.
+    ///
+    /// Validates the branch name, ensures no duplicate exists, creates the
+    /// branch pointing at `commit_id`, and performs a hard checkout.
+    pub fn fork_timeline(
+        &self,
+        branch_name: &str,
+        commit_id: &str,
+    ) -> Result<(), HistoryError> {
+        validate_branch_name(branch_name)?;
+
+        // Check for duplicate.
+        if self
+            .repo
+            .find_branch(branch_name, BranchType::Local)
+            .is_ok()
+        {
+            return Err(HistoryError::BranchAlreadyExists(branch_name.to_string()));
+        }
+
+        let oid = self.resolve_commit_id(commit_id)?;
+        let commit = self
+            .repo
+            .find_commit(oid)
+            .map_err(|_| HistoryError::CommitNotFound(commit_id.to_string()))?;
+
+        // Create the branch at the target commit.
+        self.repo.branch(branch_name, &commit, false)?;
+
+        // Check out the new branch.
+        let refname = format!("refs/heads/{branch_name}");
+        self.repo.set_head(&refname)?;
+        self.repo
+            .checkout_head(Some(git2::build::CheckoutBuilder::default().force()))?;
+
+        Ok(())
+    }
+
+    /// Switch to an existing branch.
+    ///
+    /// Verifies the branch exists, updates HEAD, and performs a hard checkout.
+    pub fn switch_timeline(&self, branch_name: &str) -> Result<(), HistoryError> {
+        // Verify branch exists.
+        self.repo
+            .find_branch(branch_name, BranchType::Local)
+            .map_err(|_| HistoryError::BranchNotFound(branch_name.to_string()))?;
+
+        let refname = format!("refs/heads/{branch_name}");
+        self.repo.set_head(&refname)?;
+        self.repo
+            .checkout_head(Some(git2::build::CheckoutBuilder::default().force()))?;
+
+        Ok(())
+    }
+
+    /// Delete a branch.
+    ///
+    /// Rejects deletion of "main" and the currently active branch.
+    pub fn delete_timeline(&self, branch_name: &str) -> Result<(), HistoryError> {
+        if branch_name == "main" {
+            return Err(HistoryError::InvalidBranchName(
+                "cannot delete main".to_string(),
+            ));
+        }
+
+        // Check if it's the active branch.
+        let head_ref = self.repo.head().ok();
+        let active = head_ref
+            .as_ref()
+            .and_then(|r| r.shorthand().map(|s| s.to_string()));
+        if active.as_deref() == Some(branch_name) {
+            return Err(HistoryError::InvalidBranchName(
+                "cannot delete active branch".to_string(),
+            ));
+        }
+
+        let mut branch = self
+            .repo
+            .find_branch(branch_name, BranchType::Local)
+            .map_err(|_| HistoryError::BranchNotFound(branch_name.to_string()))?;
+
+        branch.delete()?;
+        Ok(())
+    }
+
     // ── Private helpers ─────────────────────────────────────────────────
 
     /// The committer/author signature used for all history commits.
@@ -283,6 +379,44 @@ impl HistoryRepo {
             .map_err(|_| HistoryError::CommitNotFound(commit_id.to_string()))
     }
 
+}
+
+// ── Branch name validation ──────────────────────────────────────────────
+
+/// Validate a branch name for use as a timeline name.
+///
+/// Rules: lowercase letters, digits, hyphens, underscores only; max 16 chars;
+/// cannot be empty, "main", or start with a hyphen.
+pub fn validate_branch_name(name: &str) -> Result<(), HistoryError> {
+    if name.is_empty() {
+        return Err(HistoryError::InvalidBranchName(
+            "name cannot be empty".to_string(),
+        ));
+    }
+    if name.len() > 16 {
+        return Err(HistoryError::InvalidBranchName(
+            "name too long (max 16 chars)".to_string(),
+        ));
+    }
+    if name == "main" {
+        return Err(HistoryError::InvalidBranchName(
+            "cannot use reserved name 'main'".to_string(),
+        ));
+    }
+    if name.starts_with('-') {
+        return Err(HistoryError::InvalidBranchName(
+            "name cannot start with a hyphen".to_string(),
+        ));
+    }
+    if !name
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
+    {
+        return Err(HistoryError::InvalidBranchName(
+            "only lowercase letters, digits, hyphens, underscores".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 // ── Commit suffix parsing ───────────────────────────────────────────────
@@ -387,5 +521,43 @@ mod tests {
     #[test]
     fn parse_playtime_minutes_only() {
         assert_eq!(parse_playtime("0h30m"), 1800);
+    }
+
+    #[test]
+    fn validate_name_valid() {
+        assert!(validate_branch_name("my-save").is_ok());
+        assert!(validate_branch_name("run_2").is_ok());
+        assert!(validate_branch_name("abc").is_ok());
+        assert!(validate_branch_name("a1b2c3d4e5f6g7h8").is_ok()); // 16 chars
+    }
+
+    #[test]
+    fn validate_name_empty() {
+        assert!(validate_branch_name("").is_err());
+    }
+
+    #[test]
+    fn validate_name_too_long() {
+        assert!(validate_branch_name("a1b2c3d4e5f6g7h8x").is_err()); // 17 chars
+    }
+
+    #[test]
+    fn validate_name_main() {
+        assert!(validate_branch_name("main").is_err());
+    }
+
+    #[test]
+    fn validate_name_leading_hyphen() {
+        assert!(validate_branch_name("-foo").is_err());
+    }
+
+    #[test]
+    fn validate_name_uppercase() {
+        assert!(validate_branch_name("MyBranch").is_err());
+    }
+
+    #[test]
+    fn validate_name_spaces() {
+        assert!(validate_branch_name("my branch").is_err());
     }
 }

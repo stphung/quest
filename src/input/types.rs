@@ -123,4 +123,10 @@ pub enum InputResult {
     RestoreTimeline { commit_id: String },
     /// Reload commits for a different branch in the timeline browser.
     RefreshTimelineCommits { branch_name: String },
+    /// Fork a new timeline at a specific commit.
+    ForkTimeline { commit_id: String, branch_name: String },
+    /// Switch the active timeline (branch).
+    SwitchTimeline { branch_name: String },
+    /// Delete a timeline (branch).
+    DeleteTimeline { branch_name: String },
 }

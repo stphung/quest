@@ -158,6 +158,9 @@ fn extract_save_event(
             TickEvent::StormLeviathanCaught => {
                 return Some(SaveEvent::StormLeviathanCaught);
             }
+            TickEvent::AchievementUnlocked { ref name, .. } => {
+                return Some(SaveEvent::AchievementUnlocked(name.clone()));
+            }
             _ => {}
         }
     }
@@ -561,13 +564,18 @@ fn main() -> io::Result<()> {
                                         ticks_total: surge.ticks_total,
                                     });
                                     if !debug_mode {
+                                        let surge_event = history::SaveEvent::ChronoSurge {
+                                            levels_gained: surge.levels_gained,
+                                            kills: surge.kills,
+                                            ticks: surge.ticks_total,
+                                        };
                                         save_all(
                                             &character_manager,
                                             &state,
                                             &global_achievements,
                                             &haven,
                                             &enhancement,
-                                            None,
+                                            Some(&surge_event),
                                             history_repo.as_ref(),
                                         );
                                         last_save_instant = Some(Instant::now());
@@ -677,6 +685,114 @@ fn main() -> io::Result<()> {
                                         if !debug_mode {
                                             last_save_instant = Some(Instant::now());
                                             last_save_time = Some(Local::now());
+                                        }
+                                    }
+                                }
+                                continue;
+                            }
+
+                            if let InputResult::ForkTimeline {
+                                ref commit_id,
+                                ref branch_name,
+                            } = result
+                            {
+                                if let Some(ref repo) = history_repo {
+                                    if repo.fork_timeline(branch_name, commit_id).is_ok() {
+                                        // Full state reload (fork checks out the new branch)
+                                        haven = haven::load_haven();
+                                        enhancement = enhancement::load_enhancement();
+                                        global_achievements = achievements::load_achievements();
+                                        global_achievements.refresh_progress();
+                                        deep = deep::persistence::load_deep();
+
+                                        let filename = format!("{}.json", state.character_name);
+                                        if let Ok(mut reloaded) =
+                                            character_manager.load_character(&filename)
+                                        {
+                                            reloaded.recalculate_derived_stats(&enhancement.levels);
+                                            reloaded.recalculate_prestige_bonuses();
+                                            reloaded.combat_state.add_log_entry(
+                                                format!(
+                                                    "\u{1F500} Timeline forked: {branch_name}"
+                                                ),
+                                                false,
+                                                true,
+                                            );
+                                            state = reloaded;
+                                        }
+
+                                        overlay = GameOverlay::None;
+                                        if !debug_mode {
+                                            last_save_instant = Some(Instant::now());
+                                            last_save_time = Some(Local::now());
+                                        }
+                                    }
+                                }
+                                continue;
+                            }
+
+                            if let InputResult::SwitchTimeline { ref branch_name } = result {
+                                if let Some(ref repo) = history_repo {
+                                    if repo.switch_timeline(branch_name).is_ok() {
+                                        // Full state reload (switch checks out the branch)
+                                        haven = haven::load_haven();
+                                        enhancement = enhancement::load_enhancement();
+                                        global_achievements = achievements::load_achievements();
+                                        global_achievements.refresh_progress();
+                                        deep = deep::persistence::load_deep();
+
+                                        let filename = format!("{}.json", state.character_name);
+                                        if let Ok(mut reloaded) =
+                                            character_manager.load_character(&filename)
+                                        {
+                                            reloaded.recalculate_derived_stats(&enhancement.levels);
+                                            reloaded.recalculate_prestige_bonuses();
+                                            reloaded.combat_state.add_log_entry(
+                                                format!(
+                                                    "\u{1F500} Timeline switched: {branch_name}"
+                                                ),
+                                                false,
+                                                true,
+                                            );
+                                            state = reloaded;
+                                        }
+
+                                        overlay = GameOverlay::None;
+                                        if !debug_mode {
+                                            last_save_instant = Some(Instant::now());
+                                            last_save_time = Some(Local::now());
+                                        }
+                                    }
+                                }
+                                continue;
+                            }
+
+                            if let InputResult::DeleteTimeline { ref branch_name } = result {
+                                if let Some(ref repo) = history_repo {
+                                    if repo.delete_timeline(branch_name).is_ok() {
+                                        // Refresh browser in-place (overlay stays open)
+                                        if let GameOverlay::Timeline { ref mut browser } = overlay {
+                                            if let Ok(branches) = repo.list_branches() {
+                                                browser.branches = branches;
+                                                // Clamp selection
+                                                if browser.selected_branch
+                                                    >= browser.branches.len()
+                                                {
+                                                    browser.selected_branch = browser
+                                                        .branches
+                                                        .len()
+                                                        .saturating_sub(1);
+                                                }
+                                                // Refresh commits for new selection
+                                                if let Some(b) =
+                                                    browser.branches.get(browser.selected_branch)
+                                                {
+                                                    browser.commits = repo
+                                                        .list_commits(&b.name)
+                                                        .unwrap_or_default();
+                                                    browser.selected_commit = 0;
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -851,13 +967,18 @@ fn main() -> io::Result<()> {
                                 ticks_total: surge.ticks_total,
                             });
                             if !debug_mode {
+                                let surge_event = history::SaveEvent::ChronoSurge {
+                                    levels_gained: surge.levels_gained,
+                                    kills: surge.kills,
+                                    ticks: surge.ticks_total,
+                                };
                                 save_all(
                                     &character_manager,
                                     &state,
                                     &global_achievements,
                                     &haven,
                                     &enhancement,
-                                    None,
+                                    Some(&surge_event),
                                     history_repo.as_ref(),
                                 );
                                 last_save_instant = Some(Instant::now());

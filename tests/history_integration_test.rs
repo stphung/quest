@@ -17,17 +17,18 @@ fn full_save_restore_round_trip() {
         1,
         1,
         0,
+        "Hero",
     )
     .unwrap();
 
     // Simulate: level up
     fs::write(dir.path().join("char.json"), r#"{"level":10,"zone":1}"#).unwrap();
-    repo.commit(&SaveEvent::LevelUp(10), 10, 0, 1, 3, 600)
+    repo.commit(&SaveEvent::LevelUp(10), 10, 0, 1, 3, 600, "Hero")
         .unwrap();
 
     // Simulate: prestige
     fs::write(dir.path().join("char.json"), r#"{"level":50,"zone":3}"#).unwrap();
-    repo.commit(&SaveEvent::PrestigeRank(1), 50, 1, 3, 2, 3600)
+    repo.commit(&SaveEvent::PrestigeRank(1), 50, 1, 3, 2, 3600, "Hero")
         .unwrap();
 
     // Verify 4 commits (init + 3)
@@ -59,15 +60,15 @@ fn restore_then_continue() {
     let repo = HistoryRepo::init(dir.path()).unwrap();
 
     fs::write(dir.path().join("save.json"), "v1").unwrap();
-    repo.commit(&SaveEvent::LevelUp(10), 10, 0, 1, 1, 100)
+    repo.commit(&SaveEvent::LevelUp(10), 10, 0, 1, 1, 100, "Hero")
         .unwrap();
 
     fs::write(dir.path().join("save.json"), "v2").unwrap();
-    repo.commit(&SaveEvent::LevelUp(20), 20, 0, 2, 1, 200)
+    repo.commit(&SaveEvent::LevelUp(20), 20, 0, 2, 1, 200, "Hero")
         .unwrap();
 
     fs::write(dir.path().join("save.json"), "v3").unwrap();
-    repo.commit(&SaveEvent::LevelUp(30), 30, 0, 3, 1, 300)
+    repo.commit(&SaveEvent::LevelUp(30), 30, 0, 3, 1, 300, "Hero")
         .unwrap();
 
     // Restore to v1 (resets main)
@@ -81,7 +82,7 @@ fn restore_then_continue() {
 
     // Continue playing from restored state — new commits go on main
     fs::write(dir.path().join("save.json"), "v1-alt").unwrap();
-    repo.commit(&SaveEvent::PrestigeRank(1), 50, 1, 1, 1, 400)
+    repo.commit(&SaveEvent::PrestigeRank(1), 50, 1, 1, 1, 400, "Hero")
         .unwrap();
 
     // main now has 3 commits (init + v1 + prestige)
