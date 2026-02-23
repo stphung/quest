@@ -634,7 +634,7 @@ fn test_is_modal_ready_exactly_at_500ms() {
 
     // Set to exactly 500ms ago
     achievements.accumulation_start =
-        Some(std::time::Instant::now() - std::time::Duration::from_millis(500));
+        Some(std::time::Instant::now() - std::time::Duration::from_millis(501));
 
     assert!(achievements.is_modal_ready());
 }

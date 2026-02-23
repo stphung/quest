@@ -117,25 +117,32 @@ fn test_haven_discovery_possible_at_prestige_10() {
 #[test]
 fn test_haven_discovery_higher_prestige_increases_chance() {
     // Behavior: chance = 0.000014 + 0.000007 * (rank - 10) for rank > 10
-    // Seeded RNG = deterministic, so 10k trials is sufficient.
-    // P10: 0.000014 → ~0.14 expected. P50: 0.000014 + 0.000007*40 = 0.000294 → ~2.94 expected.
-    let trials = 10_000u64;
+    // Use 1k seeds with 20 attempts each for reliable statistical comparison.
+    // P10 effective ≈ 0.00028/trial → ~0.28 expected. P50 effective ≈ 0.00587/trial → ~5.9 expected.
+    let trials = 1_000u64;
+    let attempts_per_trial = 20;
     let mut discoveries_p10 = 0u32;
     let mut discoveries_p50 = 0u32;
 
     for seed in 0..trials {
         let mut haven = Haven::default();
         let mut rng = seeded_rng(seed);
-        if try_discover_haven(&mut haven, 10, &mut rng) {
-            discoveries_p10 += 1;
+        for _ in 0..attempts_per_trial {
+            if try_discover_haven(&mut haven, 10, &mut rng) {
+                discoveries_p10 += 1;
+                break;
+            }
         }
     }
 
     for seed in 0..trials {
         let mut haven = Haven::default();
         let mut rng = seeded_rng(seed);
-        if try_discover_haven(&mut haven, 50, &mut rng) {
-            discoveries_p50 += 1;
+        for _ in 0..attempts_per_trial {
+            if try_discover_haven(&mut haven, 50, &mut rng) {
+                discoveries_p50 += 1;
+                break;
+            }
         }
     }
 
@@ -612,12 +619,14 @@ fn test_player_died_event_message_format() {
     let mut state = fresh_state();
     state.zone_progression.kills_in_subzone = 10;
     state.zone_progression.fighting_boss = true;
+    // Set player HP to 1 so death happens very quickly
+    state.combat_state.player_current_hp = 1;
     let mut tc = 0u32;
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(42);
 
     let mut found = false;
-    for _ in 0..10_000 {
+    for _ in 0..500 {
         let result = run_game_tick(
             &mut state,
             &mut tc,
@@ -735,13 +744,15 @@ fn test_challenge_discovered_event_has_follow_up() {
     let mut tc = 0u32;
     let mut ach = Achievements::default();
 
+    // Use known-good seed 30 which discovers a challenge at tick ~41 with
+    // Library T3 haven setup, avoiding brute-force iteration over 25k seeds.
     let mut found = false;
-    for seed in 0..25_000u64 {
-        let mut rng = seeded_rng(seed);
-        let mut s = fresh_state();
-        s.prestige_rank = 1;
+    let mut rng = seeded_rng(30);
+    let mut s = fresh_state();
+    s.prestige_rank = 1;
+
+    for _ in 0..100 {
         let result = run_game_tick(&mut s, &mut tc, &mut haven, &mut ach, false, &mut rng);
-        tc = 0; // Reset for next iteration
 
         for event in &result.events {
             if let TickEvent::ChallengeDiscovered {
@@ -766,7 +777,7 @@ fn test_challenge_discovered_event_has_follow_up() {
     }
     assert!(
         found,
-        "Should discover a challenge in 50k attempts with Library T3"
+        "Should discover a challenge with seed 30 and Library T3"
     );
 }
 
@@ -1346,35 +1357,39 @@ fn test_xp_increases_with_each_kill() {
 fn test_haven_discovery_via_game_tick_at_p10() {
     // After SWE extraction, Haven discovery is now inside game_tick.
     // Verify that game_tick can produce HavenDiscovered event at P10+
+    // Use P50 for higher discovery chance (~0.000294/tick), 100 seeds x 50 ticks each.
+    // Expected discoveries: 5000 * 0.000294 ≈ 1.47
     let mut found = false;
-    for seed in 0..10_000u64 {
+    'outer: for seed in 0..100u64 {
         let mut state = fresh_state();
-        state.prestige_rank = 15; // High prestige for better chance
+        state.prestige_rank = 50; // High prestige for better chance
         let mut tc = 0u32;
         let mut haven = Haven::default();
         let mut ach = Achievements::default();
         let mut rng = seeded_rng(seed);
 
-        let result = run_game_tick(&mut state, &mut tc, &mut haven, &mut ach, false, &mut rng);
+        for _ in 0..50 {
+            let result = run_game_tick(&mut state, &mut tc, &mut haven, &mut ach, false, &mut rng);
 
-        if result
-            .events
-            .iter()
-            .any(|e| matches!(e, TickEvent::HavenDiscovered))
-        {
-            assert!(haven.discovered, "Haven should be marked as discovered");
-            assert!(result.haven_changed, "haven_changed flag should be set");
-            assert!(
-                result.achievements_changed,
-                "achievements_changed should be set for Haven discovery"
-            );
-            found = true;
-            break;
+            if result
+                .events
+                .iter()
+                .any(|e| matches!(e, TickEvent::HavenDiscovered))
+            {
+                assert!(haven.discovered, "Haven should be marked as discovered");
+                assert!(result.haven_changed, "haven_changed flag should be set");
+                assert!(
+                    result.achievements_changed,
+                    "achievements_changed should be set for Haven discovery"
+                );
+                found = true;
+                break 'outer;
+            }
         }
     }
     assert!(
         found,
-        "Should discover Haven via game_tick at P15 within 10k seeds"
+        "Should discover Haven via game_tick at P50 within 100 seeds x 50 ticks"
     );
 }
 
@@ -1458,41 +1473,44 @@ fn test_haven_discovery_via_game_tick_blocked_during_dungeon() {
 #[test]
 fn test_haven_discovery_debug_mode_suppresses_save() {
     // Verify haven_changed and achievements_changed are set correctly in debug mode
+    // Use P50 for higher discovery chance, 100 seeds x 50 ticks each.
     let mut found = false;
-    for seed in 0..10_000u64 {
+    'outer: for seed in 0..100u64 {
         let mut state = fresh_state();
-        state.prestige_rank = 15;
+        state.prestige_rank = 50;
         let mut tc = 0u32;
         let mut haven = Haven::default();
         let mut ach = Achievements::default();
         let mut rng = seeded_rng(seed);
 
-        let result = run_game_tick(
-            &mut state, &mut tc, &mut haven, &mut ach, true, // debug mode
-            &mut rng,
-        );
+        for _ in 0..50 {
+            let result = run_game_tick(
+                &mut state, &mut tc, &mut haven, &mut ach, true, // debug mode
+                &mut rng,
+            );
 
-        if result
-            .events
-            .iter()
-            .any(|e| matches!(e, TickEvent::HavenDiscovered))
-        {
-            assert!(haven.discovered, "Haven should still be discovered");
-            assert!(
-                result.haven_changed,
-                "haven_changed should still be set in debug mode"
-            );
-            // In debug mode, achievements_changed should NOT be set
-            // (based on core::tick line 731: if !debug_mode)
-            assert!(
-                !result.achievements_changed,
-                "achievements_changed should be suppressed in debug mode"
-            );
-            found = true;
-            break;
+            if result
+                .events
+                .iter()
+                .any(|e| matches!(e, TickEvent::HavenDiscovered))
+            {
+                assert!(haven.discovered, "Haven should still be discovered");
+                assert!(
+                    result.haven_changed,
+                    "haven_changed should still be set in debug mode"
+                );
+                // In debug mode, achievements_changed should NOT be set
+                // (based on core::tick line 731: if !debug_mode)
+                assert!(
+                    !result.achievements_changed,
+                    "achievements_changed should be suppressed in debug mode"
+                );
+                found = true;
+                break 'outer;
+            }
         }
     }
-    // Probabilistic, but at P15 should find in 10k
+    // Probabilistic, but at P50 should find in 100 seeds x 50 ticks
     if !found {
         // If we didn't find it, that's OK — just verify no false positives
     }

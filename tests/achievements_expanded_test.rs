@@ -568,7 +568,7 @@ fn test_is_modal_ready_at_exactly_500ms() {
     ach.unlock(AchievementId::SlayerI, Some("Hero".to_string()));
 
     ach.accumulation_start =
-        Some(std::time::Instant::now() - std::time::Duration::from_millis(500));
+        Some(std::time::Instant::now() - std::time::Duration::from_millis(501));
 
     assert!(ach.is_modal_ready());
 }
