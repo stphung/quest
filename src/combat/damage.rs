@@ -72,6 +72,10 @@ pub(crate) fn handle_enemy_death<R: Rng>(
     // Track kill for achievements
     achievements.on_enemy_killed(is_boss_kill, Some(&state.character_name));
 
+    // Reset consecutive deaths counter on successful kill
+    state.consecutive_deaths = 0;
+    state.combat_state.current_fight_elapsed = 0.0;
+
     // Remove enemy and start regeneration
     state.combat_state.current_enemy = None;
     state.combat_state.enemy_attack_timer = 0.0;

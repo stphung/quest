@@ -43,6 +43,15 @@ pub fn update_combat<R: Rng>(
         }
     }
 
+    // --- Phase 1c: Mob fight timeout ---
+    if !state.zone_progression.fighting_boss {
+        state.combat_state.current_fight_elapsed += delta_time;
+        if state.combat_state.current_fight_elapsed >= MOB_FIGHT_TIMEOUT_SECONDS {
+            events.extend(resolve_combat_retreat(state));
+            return events;
+        }
+    }
+
     // Attack speed multiplier: higher = faster attacks
     let player_interval = ATTACK_INTERVAL_SECONDS
         / (derived.attack_speed_multiplier + bonuses.attack_speed_percent / 100.0);
@@ -70,6 +79,43 @@ pub fn update_combat<R: Rng>(
     }
 
     events
+}
+
+/// Resolves combat retreat: player is overwhelmed and retreats to the last safe zone.
+///
+/// Called when mob fight timeout or death loop threshold is reached.
+/// Finds the highest zone with a defeated boss and travels there.
+pub fn resolve_combat_retreat(state: &mut GameState) -> Vec<CombatEvent> {
+    // Find last safe zone: highest zone_id with a defeated boss
+    let safe_zone_id = state
+        .zone_progression
+        .defeated_bosses
+        .iter()
+        .map(|(zone_id, _)| *zone_id)
+        .max()
+        .unwrap_or(1); // Fall back to Zone 1
+
+    let zone_name = crate::zones::get_zone(safe_zone_id)
+        .map(|z| z.name.to_string())
+        .unwrap_or_else(|| "Meadow".to_string());
+
+    // Reset combat state
+    state.combat_state.player_current_hp = state.combat_state.player_max_hp;
+    state.combat_state.player_attack_timer = 0.0;
+    state.combat_state.enemy_attack_timer = 0.0;
+    state.combat_state.current_fight_elapsed = 0.0;
+    state.combat_state.current_enemy = None;
+
+    // Move to safe zone
+    state.zone_progression.current_zone_id = safe_zone_id;
+    state.zone_progression.current_subzone_id = 1;
+    state.zone_progression.kills_in_subzone = 0;
+    state.zone_progression.fighting_boss = false;
+
+    // Reset death counter
+    state.consecutive_deaths = 0;
+
+    vec![CombatEvent::CombatRetreat { zone_name }]
 }
 
 /// Resolves boss enrage: instant kills the player and resets combat state.

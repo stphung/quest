@@ -1421,3 +1421,170 @@ fn extract_enemy_damage(events: &[CombatEvent]) -> u32 {
         })
         .sum()
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// Combat Fitness: Death Loop Prevention (#320)
+// ═══════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_mob_fight_timeout_triggers_retreat() {
+    let mut state = state_with_enemy(99999, 1, 0); // Unkillable mob, low damage
+    let mut rng = seeded_rng();
+    let mut achievements = Achievements::default();
+    let d = derived(&state);
+    let bonuses = default_bonuses();
+
+    // Simulate fight lasting beyond MOB_FIGHT_TIMEOUT_SECONDS (30s)
+    // Each tick = 0.1s, so 301 ticks = 30.1s
+    let mut retreat_triggered = false;
+    for _ in 0..301 {
+        let events = update_combat(&mut rng, &mut state, 0.1, &bonuses, &mut achievements, &d);
+        for e in &events {
+            if matches!(e, CombatEvent::CombatRetreat { .. }) {
+                retreat_triggered = true;
+            }
+        }
+        if retreat_triggered {
+            break;
+        }
+    }
+
+    assert!(
+        retreat_triggered,
+        "Mob fight timeout should trigger retreat"
+    );
+    assert!(
+        state.combat_state.current_enemy.is_none(),
+        "Enemy should be cleared after retreat"
+    );
+}
+
+#[test]
+fn test_mob_fight_timeout_does_not_apply_to_bosses() {
+    let mut state = state_with_enemy(99999, 1, 0);
+    state.zone_progression.fighting_boss = true; // Mark as boss fight
+    let mut rng = seeded_rng();
+    let mut achievements = Achievements::default();
+    let d = derived(&state);
+    let bonuses = default_bonuses();
+
+    // Simulate 30+ seconds — should NOT trigger mob timeout (boss has its own enrage)
+    let mut mob_retreat_triggered = false;
+    for _ in 0..310 {
+        let events = update_combat(&mut rng, &mut state, 0.1, &bonuses, &mut achievements, &d);
+        for e in &events {
+            if matches!(e, CombatEvent::CombatRetreat { .. }) {
+                mob_retreat_triggered = true;
+            }
+        }
+        if mob_retreat_triggered {
+            break;
+        }
+    }
+
+    assert!(
+        !mob_retreat_triggered,
+        "Mob fight timeout should not trigger for boss fights"
+    );
+}
+
+#[test]
+fn test_consecutive_deaths_triggers_retreat() {
+    let mut rng = seeded_rng();
+    let mut achievements = Achievements::default();
+    let bonuses = default_bonuses();
+
+    // Set up a player who will die quickly: enemy does huge damage
+    let mut state = state_with_enemy(100, 9999, 0);
+    state.consecutive_deaths = DEATH_LOOP_THRESHOLD - 1; // One more death = retreat
+    let d = derived(&state);
+
+    // Run combat until the player dies
+    let mut retreat_triggered = false;
+    for _ in 0..100 {
+        let events = update_combat(&mut rng, &mut state, 0.1, &bonuses, &mut achievements, &d);
+        for e in &events {
+            if matches!(e, CombatEvent::CombatRetreat { .. }) {
+                retreat_triggered = true;
+            }
+        }
+        if retreat_triggered {
+            break;
+        }
+    }
+
+    assert!(
+        retreat_triggered,
+        "Should retreat after reaching death loop threshold"
+    );
+    assert_eq!(
+        state.consecutive_deaths, 0,
+        "Deaths should reset after retreat"
+    );
+}
+
+#[test]
+fn test_consecutive_deaths_reset_on_kill() {
+    let mut rng = seeded_rng();
+    let mut achievements = Achievements::default();
+    let bonuses = default_bonuses();
+
+    // Player with 2 consecutive deaths, fighting a weak enemy they can kill
+    let mut state = state_with_weak_enemy();
+    state.consecutive_deaths = 2;
+
+    // Advance combat until the enemy dies
+    for _ in 0..100 {
+        let d = derived(&state);
+        let events = update_combat(&mut rng, &mut state, 0.1, &bonuses, &mut achievements, &d);
+        let enemy_died = events.iter().any(|e| {
+            matches!(
+                e,
+                CombatEvent::EnemyDied { .. } | CombatEvent::SubzoneBossDefeated { .. }
+            )
+        });
+        if enemy_died {
+            break;
+        }
+    }
+
+    assert_eq!(
+        state.consecutive_deaths, 0,
+        "Consecutive deaths should reset when enemy is killed"
+    );
+}
+
+#[test]
+fn test_retreat_target_is_last_safe_zone() {
+    let mut state = state_with_enemy(99999, 1, 0);
+    // Player has cleared bosses in zone 3
+    state.zone_progression.defeated_bosses = vec![(1, 1), (1, 2), (1, 3), (2, 1), (3, 1)];
+    state.zone_progression.current_zone_id = 5;
+    state.zone_progression.current_subzone_id = 2;
+    state.zone_progression.unlock_zone(3);
+    state.zone_progression.unlock_zone(4);
+    state.zone_progression.unlock_zone(5);
+    let mut rng = seeded_rng();
+    let mut achievements = Achievements::default();
+    let d = derived(&state);
+    let bonuses = default_bonuses();
+
+    // Trigger mob fight timeout
+    let mut retreat_zone_name = String::new();
+    for _ in 0..310 {
+        let events = update_combat(&mut rng, &mut state, 0.1, &bonuses, &mut achievements, &d);
+        for e in &events {
+            if let CombatEvent::CombatRetreat { zone_name } = e {
+                retreat_zone_name = zone_name.clone();
+            }
+        }
+        if !retreat_zone_name.is_empty() {
+            break;
+        }
+    }
+
+    // Should retreat to zone 3 (highest with a defeated boss)
+    assert_eq!(state.zone_progression.current_zone_id, 3);
+    assert_eq!(state.zone_progression.current_subzone_id, 1);
+    assert!(!retreat_zone_name.is_empty());
+}

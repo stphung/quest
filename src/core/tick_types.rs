@@ -61,6 +61,9 @@ pub enum TickEvent {
     /// Player died in a dungeon (safe exit, no prestige loss).
     PlayerDiedInDungeon { message: String },
 
+    /// Player was overwhelmed and retreated to a safer zone.
+    CombatRetreat { zone_name: String, message: String },
+
     // ── Item Drops ──────────────────────────────────────────────
     /// An item was dropped and auto-equip was evaluated.
     ItemDropped {

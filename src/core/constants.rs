@@ -93,6 +93,10 @@ pub const REALTIME_FRAME_MS: u64 = 16; // ~60 FPS for action games
 pub const KILLS_FOR_BOSS: u32 = 10;
 pub const KILLS_FOR_BOSS_RETRY: u32 = 5;
 
+// Combat fitness: death loop and stalemate prevention
+pub const DEATH_LOOP_THRESHOLD: u32 = 3;
+pub const MOB_FIGHT_TIMEOUT_SECONDS: f64 = 30.0;
+
 // Zone enemy base stats: (base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)
 // Index 0 = Zone 1, Index 10 = Zone 11 (The Expanse)
 // hp_step/dmg_step/def_step are per-subzone depth increments above depth 1
