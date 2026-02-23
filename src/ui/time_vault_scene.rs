@@ -278,6 +278,20 @@ fn paint_branch_panel(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState, wid
         }
 
         let is_selected = i == state.selected_branch;
+
+        // Highlight background for selected row
+        if is_selected && focused {
+            let r = row as usize;
+            if r < height {
+                let highlight_bg = Color::Rgb(25, 40, 80);
+                for col in 0..width {
+                    if col < buffer[r].len() {
+                        buffer[r][col].bg = highlight_bg;
+                    }
+                }
+            }
+        }
+
         let marker = if branch.is_active {
             "\u{25cf}" // ● active
         } else if is_selected {
