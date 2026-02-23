@@ -12,6 +12,27 @@ use ratatui::{
     Frame,
 };
 
+#[allow(unused_imports)]
+use super::scene_fx::{
+    current_millis, hash2d, lerp_rgb, put_cell, put_text, render_buffer, SceneCell,
+};
+
+#[allow(dead_code)]
+/// Temporal backdrop: dark navy top.
+const VAULT_TOP_RGB: (u8, u8, u8) = (8, 12, 35);
+#[allow(dead_code)]
+/// Temporal backdrop: near-black bottom.
+const VAULT_BOTTOM_RGB: (u8, u8, u8) = (3, 5, 15);
+#[allow(dead_code)]
+/// Dim cyan for timeline graph lines.
+const TIMELINE_DIM: Color = Color::Rgb(40, 80, 120);
+#[allow(dead_code)]
+/// Number of drifting particles.
+const PARTICLE_COUNT: usize = 5;
+#[allow(dead_code)]
+/// Particle drift speed (lower = slower).
+const PARTICLE_SPEED: f64 = 0.8;
+
 /// Which panel has keyboard focus.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PanelFocus {
@@ -82,6 +103,91 @@ impl TimeVaultState {
         self.branches
             .get(self.selected_branch)
             .is_some_and(|b| b.is_active)
+    }
+}
+
+#[allow(dead_code)]
+/// Paint the temporal vault backdrop: dark gradient with slow-drifting cyan particles.
+fn paint_vault_backdrop(buffer: &mut [Vec<SceneCell>], millis: u128) {
+    let height = buffer.len();
+    if height == 0 {
+        return;
+    }
+    let width = buffer[0].len();
+
+    // 1. Background gradient (top to bottom)
+    for (row, row_cells) in buffer.iter_mut().enumerate() {
+        let t = if height <= 1 {
+            0.0
+        } else {
+            row as f64 / (height - 1) as f64
+        };
+        let rgb = lerp_rgb(VAULT_TOP_RGB, VAULT_BOTTOM_RGB, t);
+        let bg = Color::Rgb(rgb.0, rgb.1, rgb.2);
+        for cell in row_cells.iter_mut() {
+            cell.bg = bg;
+        }
+    }
+
+    // 2. Subtle particles drifting downward
+    let particle_chars: &[char] = &['\u{00b7}', '\u{2022}', '\u{2726}'];
+    let particle_hot: (u8, u8, u8) = (80, 160, 220);
+    let particle_cool: (u8, u8, u8) = (20, 40, 80);
+    for i in 0..PARTICLE_COUNT {
+        let seed = hash2d(i, 0);
+        let col = (seed as usize) % width;
+        let ch = particle_chars[(hash2d(i, 1) as usize) % particle_chars.len()];
+
+        let phase_offset = (seed as f64) * 0.73;
+        let pos = (phase_offset + millis as f64 * PARTICLE_SPEED / 1000.0) % height as f64;
+        let row = pos as i32;
+
+        let t = pos / height.max(1) as f64;
+        let rgb = lerp_rgb(particle_hot, particle_cool, t);
+        put_cell(buffer, row, col as i32, ch, Color::Rgb(rgb.0, rgb.1, rgb.2));
+    }
+
+    // 3. Faint temporal shimmer
+    let flash_phase = (millis / 120) as usize;
+    for i in 0..2 {
+        let seed = hash2d(flash_phase.wrapping_add(i), 99);
+        let row = (seed as usize) % height;
+        let col = (hash2d(flash_phase.wrapping_add(i), 111) as usize) % width;
+        let brightness = 40 + ((seed % 30) as u8);
+        put_cell(
+            buffer,
+            row as i32,
+            col as i32,
+            '\u{00b7}',
+            Color::Rgb(brightness, brightness + 30, brightness + 80),
+        );
+    }
+}
+
+#[allow(dead_code)]
+/// Map a commit message to an event-type icon and color.
+fn event_icon_color(message: &str) -> (&'static str, Color) {
+    let desc = message.split(" | ").next().unwrap_or(message);
+    if desc.starts_with("Defeated") {
+        ("\u{2694}", Color::LightRed)          // ⚔
+    } else if desc.starts_with("Prestige") {
+        ("\u{2605}", Color::Rgb(255, 215, 0))  // ★ gold
+    } else if desc.starts_with("Won ") {
+        ("\u{265f}", Color::Magenta)           // ♟
+    } else if desc.starts_with("Completed") {
+        ("\u{25c6}", Color::Green)             // ◆
+    } else if desc.starts_with("Caught") || desc.starts_with("Fishing") {
+        ("~", Color::Blue)
+    } else if desc.starts_with("Built") || desc.starts_with("Upgraded") {
+        ("\u{2302}", Color::Yellow)            // ⌂
+    } else if desc.starts_with("Enhanced") {
+        ("\u{2692}", Color::Cyan)              // ⚒
+    } else if desc.starts_with("Achievement") {
+        ("\u{2726}", Color::White)             // ✦
+    } else if desc.starts_with("Chrono Surge") {
+        ("\u{23e9}", Color::Cyan)              // ⏩
+    } else {
+        ("\u{00b7}", Color::DarkGray)          // ·
     }
 }
 
