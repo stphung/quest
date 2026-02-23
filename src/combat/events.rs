@@ -91,4 +91,8 @@ pub enum CombatEvent {
         xp_gained: u64,
         result: BossDefeatResult,
     },
+    /// Player was overwhelmed and auto-retreated to a safe zone.
+    CombatRetreat {
+        zone_name: String,
+    },
 }

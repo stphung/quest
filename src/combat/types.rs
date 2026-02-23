@@ -99,6 +99,10 @@ pub struct CombatState {
     /// When this exceeds `BOSS_ENRAGE_SECONDS`, the boss enrages and kills the player.
     #[serde(skip)]
     pub boss_fight_timer: f64,
+    /// Accumulates time (seconds) the player has been fighting the current regular mob.
+    /// Used for mob fight timeout detection. Resets when a new enemy spawns.
+    #[serde(skip)]
+    pub current_fight_elapsed: f64,
     #[serde(skip)]
     pub player_damage_floats: Vec<DamageFlash>,
     #[serde(skip)]
@@ -125,6 +129,7 @@ impl CombatState {
             combat_log: VecDeque::with_capacity(COMBAT_LOG_CAPACITY),
             regen_start_hp: 0,
             boss_fight_timer: 0.0,
+            current_fight_elapsed: 0.0,
             player_damage_floats: Vec::new(),
             enemy_damage_floats: Vec::new(),
         }
@@ -242,5 +247,20 @@ mod tests {
         // Default constructor should set defense to 0
         let basic = Enemy::new("Basic".to_string(), 50, 5);
         assert_eq!(basic.defense, 0);
+    }
+
+    #[test]
+    fn test_current_fight_elapsed_defaults_to_zero() {
+        let cs = CombatState::new(50);
+        assert!((cs.current_fight_elapsed - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_current_fight_elapsed_is_transient() {
+        let mut cs = CombatState::new(50);
+        cs.current_fight_elapsed = 25.0;
+        let json = serde_json::to_string(&cs).unwrap();
+        let loaded: CombatState = serde_json::from_str(&json).unwrap();
+        assert!((loaded.current_fight_elapsed - 0.0).abs() < f64::EPSILON);
     }
 }

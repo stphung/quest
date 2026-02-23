@@ -523,6 +523,18 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     segments: None,
                 });
             }
+            TickEvent::CombatRetreat { message, .. } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, false);
+                game_state.ticker.push(TickerEntry {
+                    icon: "\u{1f3c3}",
+                    text: message.clone(),
+                    color: Color::Yellow,
+                    bold: true,
+                    segments: None,
+                });
+            }
         }
     }
     TickEventFlags {

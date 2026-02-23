@@ -92,6 +92,9 @@ pub struct GameState {
     /// Session kill count (transient, not saved)
     #[serde(skip)]
     pub session_kills: u64,
+    /// Consecutive deaths to regular mobs without a kill (transient, for death loop detection)
+    #[serde(skip)]
+    pub consecutive_deaths: u32,
     /// When true, suppresses challenge discovery during Chrono Surge
     #[serde(skip)]
     pub chrono_surge_active: bool,
@@ -159,6 +162,7 @@ impl GameState {
             storm_sigils: StormSigils::new(),
             active_minigame: None,
             session_kills: 0,
+            consecutive_deaths: 0,
             recent_drops: VecDeque::with_capacity(5),
             ticker: Ticker::new(),
             last_minigame_win: None,
@@ -636,5 +640,16 @@ mod tests {
         assert_eq!(sigil.effect, SigilEffectType::CritChancePercent);
         assert!((sigil.value - 5.5).abs() < 1e-10);
         assert_eq!(sigil.grade, SigilGrade::APlus);
+    }
+
+    #[test]
+    fn test_consecutive_deaths_transient() {
+        let mut gs = GameState::new("Hero".to_string(), 0);
+        assert_eq!(gs.consecutive_deaths, 0);
+
+        gs.consecutive_deaths = 5;
+        let json = serde_json::to_string(&gs).unwrap();
+        let loaded: GameState = serde_json::from_str(&json).unwrap();
+        assert_eq!(loaded.consecutive_deaths, 0); // transient, not saved
     }
 }

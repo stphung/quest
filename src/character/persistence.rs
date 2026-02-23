@@ -76,6 +76,7 @@ impl CharacterManager {
             chess_stats: save_data.chess_stats,
             active_minigame: None,
             session_kills: 0,
+            consecutive_deaths: 0,
             recent_drops: std::collections::VecDeque::new(),
             ticker: crate::core::game_state::Ticker::new(),
             last_minigame_win: None,
