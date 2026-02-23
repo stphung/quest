@@ -222,12 +222,10 @@ pub fn handle_select_frame(
                                         browser.selected_branch =
                                             browser.branches.len().saturating_sub(1);
                                     }
-                                    if let Some(br) =
-                                        browser.branches.get(browser.selected_branch)
+                                    if let Some(br) = browser.branches.get(browser.selected_branch)
                                     {
-                                        browser.commits = repo
-                                            .list_commits(&br.name)
-                                            .unwrap_or_default();
+                                        browser.commits =
+                                            repo.list_commits(&br.name).unwrap_or_default();
                                         browser.selected_commit = 0;
                                     }
                                 }
@@ -253,12 +251,10 @@ pub fn handle_select_frame(
                                         browser.selected_branch =
                                             browser.branches.len().saturating_sub(1);
                                     }
-                                    if let Some(br) =
-                                        browser.branches.get(browser.selected_branch)
+                                    if let Some(br) = browser.branches.get(browser.selected_branch)
                                     {
-                                        browser.commits = repo
-                                            .list_commits(&br.name)
-                                            .unwrap_or_default();
+                                        browser.commits =
+                                            repo.list_commits(&br.name).unwrap_or_default();
                                         browser.selected_commit = 0;
                                     }
                                 }
@@ -282,12 +278,10 @@ pub fn handle_select_frame(
                                         .position(|b| b.name == branch_name)
                                         .unwrap_or(0);
                                     browser.branches = branches;
-                                    if let Some(br) =
-                                        browser.branches.get(browser.selected_branch)
+                                    if let Some(br) = browser.branches.get(browser.selected_branch)
                                     {
-                                        browser.commits = repo
-                                            .list_commits(&br.name)
-                                            .unwrap_or_default();
+                                        browser.commits =
+                                            repo.list_commits(&br.name).unwrap_or_default();
                                         browser.selected_commit = 0;
                                     }
                                 }
@@ -303,10 +297,10 @@ pub fn handle_select_frame(
                                         browser.selected_branch =
                                             browser.branches.len().saturating_sub(1);
                                     }
-                                    if let Some(br) = browser.branches.get(browser.selected_branch) {
-                                        browser.commits = repo
-                                            .list_commits(&br.name)
-                                            .unwrap_or_default();
+                                    if let Some(br) = browser.branches.get(browser.selected_branch)
+                                    {
+                                        browser.commits =
+                                            repo.list_commits(&br.name).unwrap_or_default();
                                         browser.selected_commit = 0;
                                     }
                                 }

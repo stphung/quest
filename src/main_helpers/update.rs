@@ -33,7 +33,6 @@ pub fn jittered_update_interval() -> Duration {
     Duration::from_secs(interval)
 }
 
-
 fn parse_timestamp_utc(timestamp: &str) -> Option<DateTime<Utc>> {
     if let Ok(dt) = DateTime::parse_from_rfc3339(timestamp) {
         return Some(dt.with_timezone(&Utc));
@@ -492,11 +491,7 @@ pub fn show_startup_splash_screen(
                                     *enhancement = enhancement::load_enhancement();
                                     *global_achievements = achievements::load_achievements();
                                     global_achievements.refresh_progress();
-                                    refresh_vault_browser(
-                                        repo,
-                                        browser,
-                                        Some(&branch_name),
-                                    );
+                                    refresh_vault_browser(repo, browser, Some(&branch_name));
                                 }
                             }
                         }
@@ -525,8 +520,7 @@ pub fn show_startup_splash_screen(
                                     .first()
                                     .and_then(|b| repo.list_commits(&b.name).ok())
                                     .unwrap_or_default();
-                                time_vault_browser =
-                                    Some(TimeVaultState::new(branches, commits));
+                                time_vault_browser = Some(TimeVaultState::new(branches, commits));
                             }
                         }
                     }
@@ -548,10 +542,7 @@ fn refresh_vault_browser(
 ) {
     if let Ok(branches) = repo.list_branches() {
         if let Some(name) = select_branch {
-            browser.selected_branch = branches
-                .iter()
-                .position(|b| b.name == name)
-                .unwrap_or(0);
+            browser.selected_branch = branches.iter().position(|b| b.name == name).unwrap_or(0);
         }
         browser.branches = branches;
         if browser.selected_branch >= browser.branches.len() {

@@ -163,25 +163,25 @@ fn paint_vault_backdrop(buffer: &mut [Vec<SceneCell>], millis: u128) {
 fn event_icon_color(message: &str) -> (&'static str, Color) {
     let desc = message.split(" | ").next().unwrap_or(message);
     if desc.starts_with("Defeated") {
-        ("\u{2694}", Color::LightRed)          // ⚔
+        ("\u{2694}", Color::LightRed) // ⚔
     } else if desc.starts_with("Prestige") {
-        ("\u{2605}", Color::Rgb(255, 215, 0))  // ★ gold
+        ("\u{2605}", Color::Rgb(255, 215, 0)) // ★ gold
     } else if desc.starts_with("Won ") {
-        ("\u{265f}", Color::Magenta)           // ♟
+        ("\u{265f}", Color::Magenta) // ♟
     } else if desc.starts_with("Completed") {
-        ("\u{25c6}", Color::Green)             // ◆
+        ("\u{25c6}", Color::Green) // ◆
     } else if desc.starts_with("Caught") || desc.starts_with("Fishing") {
         ("~", Color::Blue)
     } else if desc.starts_with("Built") || desc.starts_with("Upgraded") {
-        ("\u{2302}", Color::Yellow)            // ⌂
+        ("\u{2302}", Color::Yellow) // ⌂
     } else if desc.starts_with("Enhanced") {
-        ("\u{2692}", Color::Cyan)              // ⚒
+        ("\u{2692}", Color::Cyan) // ⚒
     } else if desc.starts_with("Achievement") {
-        ("\u{2726}", Color::White)             // ✦
+        ("\u{2726}", Color::White) // ✦
     } else if desc.starts_with("Chrono Surge") {
-        ("\u{23e9}", Color::Cyan)              // ⏩
+        ("\u{23e9}", Color::Cyan) // ⏩
     } else {
-        ("\u{00b7}", Color::DarkGray)          // ·
+        ("\u{00b7}", Color::DarkGray) // ·
     }
 }
 
@@ -239,7 +239,12 @@ pub fn draw_time_vault(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
     }
 
     // Render the scene buffer into the inner area (above controls)
-    let buffer_area = Rect::new(inner.x, inner.y, inner.width, inner.height.saturating_sub(1));
+    let buffer_area = Rect::new(
+        inner.x,
+        inner.y,
+        inner.width,
+        inner.height.saturating_sub(1),
+    );
     render_buffer(frame, buffer_area, &buffer);
 
     // Controls bar at the bottom
@@ -417,20 +422,18 @@ fn paint_snapshot_panel(
         put_text(buffer, row, x + 4, icon, icon_color);
 
         // Description
-        let desc = commit.message.split(" | ").next().unwrap_or(&commit.message);
+        let desc = commit
+            .message
+            .split(" | ")
+            .next()
+            .unwrap_or(&commit.message);
         let desc_color = if is_selected {
             Color::Yellow
         } else {
             Color::White
         };
         let icon_width = super::scene_fx::display_width(icon);
-        put_text(
-            buffer,
-            row,
-            x + 4 + icon_width as i32 + 1,
-            desc,
-            desc_color,
-        );
+        put_text(buffer, row, x + 4 + icon_width as i32 + 1, desc, desc_color);
 
         // Timeline connector for rows below
         let dim = if is_selected {
@@ -540,7 +543,11 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
 
             if let Some(commit) = state.commits.get(state.selected_commit) {
                 let (icon, icon_color) = event_icon_color(&commit.message);
-                let desc = commit.message.split(" | ").next().unwrap_or(&commit.message);
+                let desc = commit
+                    .message
+                    .split(" | ")
+                    .next()
+                    .unwrap_or(&commit.message);
 
                 put_text(buffer, cy + 2, cx, icon, icon_color);
                 let iw = super::scene_fx::display_width(icon);
@@ -583,7 +590,13 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
             let name = state.selected_branch_name().unwrap_or("?");
             let title = format!("Delete branch '{}'?", name);
             put_text(buffer, cy, cx, &title, Color::Red);
-            put_text(buffer, cy + 1, cx, "This cannot be undone.", Color::DarkGray);
+            put_text(
+                buffer,
+                cy + 1,
+                cx,
+                "This cannot be undone.",
+                Color::DarkGray,
+            );
 
             put_text(buffer, cy + 3, cx, "[Enter]", Color::Red);
             put_text(buffer, cy + 3, cx + 8, "Delete", Color::DarkGray);
@@ -620,10 +633,7 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
         | BrowserMode::ConfirmDelete
         | BrowserMode::NamingFork { .. } => return,
         BrowserMode::Browse => {
-            let dot = Span::styled(
-                "  \u{00b7}  ",
-                Style::default().fg(Color::Rgb(40, 80, 120)),
-            );
+            let dot = Span::styled("  \u{00b7}  ", Style::default().fg(Color::Rgb(40, 80, 120)));
             match state.focus {
                 PanelFocus::Left => {
                     let mut spans = vec![
@@ -636,10 +646,7 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
                     if !state.selected_branch_is_main() && !state.selected_branch_is_active() {
                         spans.push(dot.clone());
                         spans.push(Span::styled("[D] ", Style::default().fg(Color::Cyan)));
-                        spans.push(Span::styled(
-                            "Delete",
-                            Style::default().fg(Color::DarkGray),
-                        ));
+                        spans.push(Span::styled("Delete", Style::default().fg(Color::DarkGray)));
                     }
                     spans.push(dot.clone());
                     spans.push(Span::styled("[Tab] ", Style::default().fg(Color::Cyan)));

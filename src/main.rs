@@ -653,11 +653,13 @@ fn main() -> io::Result<()> {
                                 continue;
                             }
 
-                            if let InputResult::RefreshSaveHistoryCommits { ref branch_name } = result
+                            if let InputResult::RefreshSaveHistoryCommits { ref branch_name } =
+                                result
                             {
                                 if let Some(ref repo) = history_repo {
                                     if let Ok(commits) = repo.list_commits(branch_name) {
-                                        if let GameOverlay::TimeVault { ref mut browser } = overlay {
+                                        if let GameOverlay::TimeVault { ref mut browser } = overlay
+                                        {
                                             browser.commits = commits;
                                         }
                                     }
@@ -703,7 +705,8 @@ fn main() -> io::Result<()> {
                                         state.last_save_time = Utc::now().timestamp();
 
                                         // Refresh vault browser in-place (overlay stays open)
-                                        if let GameOverlay::TimeVault { ref mut browser } = overlay {
+                                        if let GameOverlay::TimeVault { ref mut browser } = overlay
+                                        {
                                             if let Ok(branches) = repo.list_branches() {
                                                 browser.branches = branches;
                                                 if browser.selected_branch >= browser.branches.len()
@@ -771,7 +774,8 @@ fn main() -> io::Result<()> {
                                         state.last_save_time = Utc::now().timestamp();
 
                                         // Refresh vault browser in-place (overlay stays open)
-                                        if let GameOverlay::TimeVault { ref mut browser } = overlay {
+                                        if let GameOverlay::TimeVault { ref mut browser } = overlay
+                                        {
                                             if let Ok(branches) = repo.list_branches() {
                                                 browser.branches = branches;
                                                 if browser.selected_branch >= browser.branches.len()
@@ -837,7 +841,8 @@ fn main() -> io::Result<()> {
                                         state.last_save_time = Utc::now().timestamp();
 
                                         // Refresh vault browser in-place (overlay stays open)
-                                        if let GameOverlay::TimeVault { ref mut browser } = overlay {
+                                        if let GameOverlay::TimeVault { ref mut browser } = overlay
+                                        {
                                             if let Ok(branches) = repo.list_branches() {
                                                 // Select the switched-to branch (sort order changes)
                                                 browser.selected_branch = branches
@@ -868,7 +873,8 @@ fn main() -> io::Result<()> {
                                 if let Some(ref repo) = history_repo {
                                     if repo.delete_timeline(branch_name).is_ok() {
                                         // Refresh browser in-place (overlay stays open)
-                                        if let GameOverlay::TimeVault { ref mut browser } = overlay {
+                                        if let GameOverlay::TimeVault { ref mut browser } = overlay
+                                        {
                                             if let Ok(branches) = repo.list_branches() {
                                                 browser.branches = branches;
                                                 // Clamp selection
