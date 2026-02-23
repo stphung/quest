@@ -106,7 +106,7 @@ fn list_commits_newest_first() {
 // ── restore_to ──────────────────────────────────────────────────────────
 
 #[test]
-fn restore_creates_new_branch() {
+fn restore_resets_branch_to_commit() {
     let dir = setup_quest_dir();
     let repo = HistoryRepo::init(dir.path()).expect("init");
 
@@ -120,57 +120,20 @@ fn restore_creates_new_branch() {
     assert_eq!(commits.len(), 2);
     let initial_commit_id = &commits[1].id;
 
-    // Restore to the initial commit.
-    let branch_name = repo.restore_to(initial_commit_id).expect("restore_to");
-    assert_eq!(branch_name, "timeline-1");
+    // Restore to the initial commit (resets main).
+    repo.restore_to(initial_commit_id).expect("restore_to");
 
     // File should have original content (from the initial commit).
     let content = fs::read_to_string(dir.path().join("save.json")).expect("read");
     assert_eq!(content, r#"{"level":1,"prestige":0}"#);
 
-    // Should now have 2 branches.
+    // Still only one branch (main), no new branches created.
     let branches = repo.list_branches().expect("list_branches");
-    assert_eq!(branches.len(), 2);
+    assert_eq!(branches.len(), 1);
+    assert_eq!(branches[0].name, "main");
 
-    // Active branch should be timeline-1.
-    let active = branches
-        .iter()
-        .find(|b| b.is_active)
-        .expect("active branch");
-    assert_eq!(active.name, "timeline-1");
-}
-
-// ── switch_branch ───────────────────────────────────────────────────────
-
-#[test]
-fn switch_branch_changes_files() {
-    let dir = setup_quest_dir();
-    let repo = HistoryRepo::init(dir.path()).expect("init");
-
-    // Commit on main with updated content.
-    fs::write(dir.path().join("save.json"), r#"{"level":20}"#).expect("write");
-    repo.commit(&SaveEvent::LevelUp(20), 20, 0, 3, 1, 7200)
-        .expect("commit on main");
-
-    // Restore to initial commit, creating timeline-1.
-    let commits = repo.list_commits("main").expect("list_commits");
-    let initial_id = &commits[1].id;
-    let timeline_name = repo.restore_to(initial_id).expect("restore_to");
-    assert_eq!(timeline_name, "timeline-1");
-
-    // Commit on timeline-1 with different content.
-    fs::write(dir.path().join("save.json"), r#"{"level":5,"alt":true}"#).expect("write");
-    repo.commit(&SaveEvent::LevelUp(5), 5, 0, 1, 2, 900)
-        .expect("commit on timeline-1");
-
-    // Switch back to main — file should have main's content.
-    repo.switch_branch("main").expect("switch to main");
-    let content = fs::read_to_string(dir.path().join("save.json")).expect("read");
-    assert_eq!(content, r#"{"level":20}"#);
-
-    // Switch to timeline-1 — file should have timeline-1's content.
-    repo.switch_branch("timeline-1")
-        .expect("switch to timeline-1");
-    let content = fs::read_to_string(dir.path().join("save.json")).expect("read");
-    assert_eq!(content, r#"{"level":5,"alt":true}"#);
+    // main should now have only the initial commit.
+    let commits_after = repo.list_commits("main").expect("list_commits");
+    assert_eq!(commits_after.len(), 1);
+    assert_eq!(commits_after[0].message, "Initialize save history");
 }
