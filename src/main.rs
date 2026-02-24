@@ -573,6 +573,7 @@ fn main() -> io::Result<()> {
                                         items_equipped: surge.items_equipped,
                                         ticks_completed: surge.ticks_total,
                                         ticks_total: surge.ticks_total,
+                                        overcharged: surge.overcharged,
                                     });
                                     if !debug_mode {
                                         let surge_event = history::SaveEvent::ChronoSurge {
@@ -629,7 +630,7 @@ fn main() -> io::Result<()> {
 
                             // Handle StartChronoSurge before routing
                             if let InputResult::StartChronoSurge { ticks } = result {
-                                chrono_surge = Some(ChronoSurgeState::new(ticks));
+                                chrono_surge = Some(ChronoSurgeState::new(ticks, false));
                                 state.chrono_surge_active = true;
                                 continue;
                             }
@@ -1071,6 +1072,7 @@ fn main() -> io::Result<()> {
                                 items_equipped: surge.items_equipped,
                                 ticks_completed: surge.ticks_total,
                                 ticks_total: surge.ticks_total,
+                                overcharged: surge.overcharged,
                             });
                             if !debug_mode {
                                 let surge_event = history::SaveEvent::ChronoSurge {

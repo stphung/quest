@@ -194,10 +194,12 @@ pub struct ChronoSurgeState {
     pub kills: u64,
     pub levels_gained: u32,
     pub items_equipped: u32,
+    /// Whether this surge was overcharged by an active Sigil of Overcharge.
+    pub overcharged: bool,
 }
 
 impl ChronoSurgeState {
-    pub fn new(ticks: u64) -> Self {
+    pub fn new(ticks: u64, overcharged: bool) -> Self {
         // 10 frames per second * animation seconds = total animation frames
         let animation_frames = CHRONO_SURGE_ANIMATION_SECONDS * 10;
         let batch_size = (ticks / animation_frames).max(1);
@@ -208,6 +210,7 @@ impl ChronoSurgeState {
             kills: 0,
             levels_gained: 0,
             items_equipped: 0,
+            overcharged,
         }
     }
 
@@ -243,4 +246,6 @@ pub struct ChronoSurgeSummary {
     pub items_equipped: u32,
     pub ticks_completed: u64,
     pub ticks_total: u64,
+    /// Whether this surge was overcharged by an active Sigil of Overcharge.
+    pub overcharged: bool,
 }
