@@ -619,7 +619,7 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
             put_text(buffer, cy + 3, cx + 23, "Cancel", Color::DarkGray);
         }
         BrowserMode::NamingFork { .. } => {
-            put_text(buffer, cy, cx, "Fork new branch", Color::White);
+            put_text(buffer, cy, cx, "Create new branch", Color::White);
 
             // Show fork source details
             if let Some(source) = &state.fork_source {
@@ -694,7 +694,7 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
                         Span::styled("Switch", Style::default().fg(Color::DarkGray)),
                         dot.clone(),
                         Span::styled("[F] ", Style::default().fg(Color::Cyan)),
-                        Span::styled("Fork", Style::default().fg(Color::DarkGray)),
+                        Span::styled("Branch", Style::default().fg(Color::DarkGray)),
                     ];
                     if !state.selected_branch_is_main() && !state.selected_branch_is_active() {
                         spans.push(dot.clone());
@@ -720,7 +720,7 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
                         Span::styled(enter_label, Style::default().fg(Color::DarkGray)),
                         dot.clone(),
                         Span::styled("[F] ", Style::default().fg(Color::Cyan)),
-                        Span::styled("Fork", Style::default().fg(Color::DarkGray)),
+                        Span::styled("Branch", Style::default().fg(Color::DarkGray)),
                         dot.clone(),
                         Span::styled("[Tab] ", Style::default().fg(Color::Cyan)),
                         Span::styled("Branches", Style::default().fg(Color::DarkGray)),

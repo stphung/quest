@@ -764,7 +764,9 @@ fn main() -> io::Result<()> {
                                             reloaded.recalculate_derived_stats(&enhancement.levels);
                                             reloaded.recalculate_prestige_bonuses();
                                             reloaded.combat_state.add_log_entry(
-                                                format!("\u{1F500} Timeline forked: {branch_name}"),
+                                                format!(
+                                                    "\u{1F500} Timeline branched: {branch_name}"
+                                                ),
                                                 false,
                                                 true,
                                             );
