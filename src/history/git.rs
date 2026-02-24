@@ -449,7 +449,7 @@ pub fn validate_branch_name(name: &str) -> Result<(), HistoryError> {
 ///
 /// Returns `(level, prestige, zone, playtime_seconds)` with zeros for
 /// any values that cannot be parsed.
-fn parse_commit_suffix(message: &str) -> (u32, u32, u32, u64) {
+pub fn parse_commit_suffix(message: &str) -> (u32, u32, u32, u64) {
     let suffix = match message.split(" | ").nth(1) {
         Some(s) => s,
         None => return (0, 0, 0, 0),
