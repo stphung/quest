@@ -940,10 +940,10 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
             put_text(buffer, row, cx, "[Enter]", Color::Cyan);
             put_text(buffer, row, cx + 8, "Select", Color::DarkGray);
             if state.cloud_repo_selected == create_idx {
-                put_text(buffer, row, cx + 17, "[V]", Color::Cyan);
-                put_text(buffer, row, cx + 21, "Toggle", Color::DarkGray);
-                put_text(buffer, row, cx + 30, "[Esc]", Color::Cyan);
-                put_text(buffer, row, cx + 36, "Cancel", Color::DarkGray);
+                put_text(buffer, row, cx + 17, "[Tab]", Color::Cyan);
+                put_text(buffer, row, cx + 23, "Toggle", Color::DarkGray);
+                put_text(buffer, row, cx + 32, "[Esc]", Color::Cyan);
+                put_text(buffer, row, cx + 38, "Cancel", Color::DarkGray);
             } else {
                 put_text(buffer, row, cx + 17, "[Esc]", Color::Cyan);
                 put_text(buffer, row, cx + 23, "Cancel", Color::DarkGray);

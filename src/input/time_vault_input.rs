@@ -519,9 +519,7 @@ fn handle_selecting_repo(key: KeyEvent, state: &mut TimeVaultState) -> TimeVault
             }
             TimeVaultAction::Continue
         }
-        KeyCode::Char('v') | KeyCode::Char('V')
-            if state.cloud_repo_selected >= state.cloud_repos.len() =>
-        {
+        KeyCode::Tab if state.cloud_repo_selected >= state.cloud_repos.len() => {
             state.cloud_new_repo_private = !state.cloud_new_repo_private;
             TimeVaultAction::Continue
         }
@@ -1227,7 +1225,7 @@ mod tests {
     }
 
     #[test]
-    fn select_repo_v_toggles_visibility() {
+    fn select_repo_tab_toggles_visibility() {
         let mut state = browsing_state();
         state.mode = BrowserMode::SelectingRepo;
         state.cloud_repos = vec![RepoInfo {
@@ -1237,24 +1235,26 @@ mod tests {
         // Select "Create new" entry (index >= repos.len())
         state.cloud_repo_selected = 1;
         assert!(state.cloud_new_repo_private); // default is true
-        handle_time_vault_input(key(KeyCode::Char('v')), &mut state);
+        handle_time_vault_input(key(KeyCode::Tab), &mut state);
         assert!(!state.cloud_new_repo_private);
-        handle_time_vault_input(key(KeyCode::Char('v')), &mut state);
+        handle_time_vault_input(key(KeyCode::Tab), &mut state);
         assert!(state.cloud_new_repo_private);
     }
 
     #[test]
-    fn select_repo_v_on_existing_is_char() {
+    fn select_repo_v_types_into_name() {
         let mut state = browsing_state();
         state.mode = BrowserMode::SelectingRepo;
         state.cloud_repos = vec![RepoInfo {
             name: "existing".to_string(),
             private: false,
         }];
-        state.cloud_repo_selected = 0; // Existing repo selected
+        state.cloud_repo_selected = 1; // "Create new" selected
+        state.cloud_repo_input.clear();
         let initial_private = state.cloud_new_repo_private;
         handle_time_vault_input(key(KeyCode::Char('v')), &mut state);
-        // 'v' on existing repo should NOT toggle visibility
+        // 'v' should type into the repo name, not toggle visibility
+        assert_eq!(state.cloud_repo_input, "v");
         assert_eq!(state.cloud_new_repo_private, initial_private);
     }
 
