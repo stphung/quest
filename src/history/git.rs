@@ -78,6 +78,9 @@ impl HistoryRepo {
             Repository::open(quest_dir)?
         };
 
+        // Ensure .gitignore exists with .cloud.json excluded.
+        Self::ensure_gitignore(quest_dir);
+
         if is_new {
             // Stage everything.
             let mut index = repo.index()?;
@@ -103,7 +106,37 @@ impl HistoryRepo {
             }
         }
 
+        // If .cloud.json was previously tracked, remove it from the index.
+        if let Ok(mut index) = repo.index() {
+            if index
+                .get_path(std::path::Path::new(".cloud.json"), 0)
+                .is_some()
+            {
+                let _ = index.remove_path(std::path::Path::new(".cloud.json"));
+                let _ = index.write();
+            }
+        }
+
         Ok(Self { repo })
+    }
+
+    /// Ensure a `.gitignore` exists that excludes `.cloud.json`.
+    fn ensure_gitignore(quest_dir: &Path) {
+        let path = quest_dir.join(".gitignore");
+        let entry = ".cloud.json";
+
+        if path.exists() {
+            if let Ok(contents) = std::fs::read_to_string(&path) {
+                if contents.lines().any(|l| l.trim() == entry) {
+                    return; // Already present.
+                }
+                // Append the entry.
+                let sep = if contents.ends_with('\n') { "" } else { "\n" };
+                let _ = std::fs::write(&path, format!("{contents}{sep}{entry}\n"));
+            }
+        } else {
+            let _ = std::fs::write(&path, format!("{entry}\n"));
+        }
     }
 
     /// Stage all changes and create a commit with a formatted message.
@@ -449,7 +482,7 @@ pub fn validate_branch_name(name: &str) -> Result<(), HistoryError> {
 ///
 /// Returns `(level, prestige, zone, playtime_seconds)` with zeros for
 /// any values that cannot be parsed.
-fn parse_commit_suffix(message: &str) -> (u32, u32, u32, u64) {
+pub fn parse_commit_suffix(message: &str) -> (u32, u32, u32, u64) {
     let suffix = match message.split(" | ").nth(1) {
         Some(s) => s,
         None => return (0, 0, 0, 0),

@@ -4,6 +4,8 @@
 //! commit containing the full save state. Players can browse, restore, and
 //! fork save branches through the Time Vault overlay.
 
+#[allow(dead_code)]
+pub mod cloud;
 pub mod git;
 pub mod types;
 

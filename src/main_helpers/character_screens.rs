@@ -14,6 +14,7 @@ use crate::character::manager::CharacterManager;
 use crate::core::game_state::GameState;
 use crate::enhancement;
 use crate::haven;
+use crate::history::cloud::{CloudConfig, CloudOpResult, CloudStatus};
 use crate::history::HistoryRepo;
 use crate::input::time_vault_input::{handle_time_vault_input, TimeVaultAction};
 use crate::input::{HavenUiState, SoulforgeUiState};
@@ -122,9 +123,120 @@ pub fn handle_select_frame(
     help_overlay_showing: &mut bool,
     history_repo: Option<&HistoryRepo>,
     time_vault_browser: &mut Option<TimeVaultState>,
+    quest_dir: &std::path::Path,
+    cloud_config: &mut Option<CloudConfig>,
+    cloud_status: &mut CloudStatus,
+    cloud_username: &mut Option<String>,
+    cloud_tx: &std::sync::mpsc::Sender<CloudOpResult>,
+    cloud_rx: &std::sync::mpsc::Receiver<CloudOpResult>,
+    cloud_op_in_flight: &mut bool,
 ) -> io::Result<ScreenTransition> {
+    // Poll cloud sync results
+    if *cloud_op_in_flight {
+        if let Ok(result) = cloud_rx.try_recv() {
+            *cloud_op_in_flight = false;
+            let was_cloud_restore = select_screen.cloud_restore_in_flight;
+            select_screen.cloud_restore_in_flight = false;
+            match result {
+                CloudOpResult::TokenValidated {
+                    username,
+                    token,
+                    repos,
+                } => {
+                    // Restore status based on whether we're already linked.
+                    *cloud_status = if cloud_config.is_some() {
+                        CloudStatus::Linked
+                    } else {
+                        CloudStatus::Offline
+                    };
+                    *cloud_username = Some(username);
+                    if let Some(ref mut browser) = time_vault_browser {
+                        browser.cloud_validated_token = Some(token);
+                        browser.cloud_repos = repos;
+                        browser.cloud_repo_selected = 0;
+                        browser.cloud_repo_input.clear();
+                        browser.cloud_username = cloud_username.clone();
+                        browser.cloud_current_repo = cloud_config
+                            .as_ref()
+                            .map(|c| crate::history::cloud::repo_name_from_url(&c.repo_url));
+                        browser.mode = crate::ui::time_vault_scene::BrowserMode::SelectingRepo;
+                    }
+                }
+                CloudOpResult::Linked(config) => {
+                    *cloud_username = Some(config.username.clone());
+                    *cloud_config = Some(config);
+                    // Check if remote has different data
+                    match crate::history::cloud::check_divergence(quest_dir) {
+                        Ok(Some(div)) => {
+                            *cloud_status = CloudStatus::OutOfSync;
+                            if let Some(ref mut browser) = time_vault_browser {
+                                browser.cloud_divergence = Some(div);
+                            }
+                        }
+                        _ => {
+                            *cloud_status = CloudStatus::Linked;
+                        }
+                    }
+                    // If this was a cloud restore (link_and_pull), close the prompt
+                    // and reload all state since saves were pulled from cloud.
+                    if was_cloud_restore {
+                        select_screen.cloud_restore_showing = false;
+                        select_screen.cloud_restore_dismissed = true;
+                        *haven = haven::load_haven();
+                        *enhancement = enhancement::load_enhancement();
+                        *global_achievements = achievements::load_achievements();
+                        crate::achievements::titles::validate_selected_title(global_achievements);
+                        global_achievements.refresh_progress();
+                    }
+                }
+                CloudOpResult::Pushed => {
+                    *cloud_status = CloudStatus::Linked;
+                }
+                CloudOpResult::Pulled => {
+                    *cloud_status = CloudStatus::Linked;
+                    *haven = haven::load_haven();
+                    *enhancement = enhancement::load_enhancement();
+                    *global_achievements = achievements::load_achievements();
+                    crate::achievements::titles::validate_selected_title(global_achievements);
+                    global_achievements.refresh_progress();
+                }
+                CloudOpResult::Unlinked => {
+                    *cloud_config = None;
+                    *cloud_username = None;
+                    *cloud_status = CloudStatus::Offline;
+                }
+                CloudOpResult::Diverged => {
+                    *cloud_status = CloudStatus::OutOfSync;
+                }
+                CloudOpResult::Failed(msg) => {
+                    if was_cloud_restore {
+                        // Show the error in the cloud restore prompt
+                        select_screen.cloud_restore_error = Some(msg);
+                        *cloud_status = CloudStatus::Offline;
+                    } else {
+                        *cloud_status = CloudStatus::Error(msg);
+                    }
+                }
+            }
+            if let Some(ref mut browser) = time_vault_browser {
+                browser.cloud_status = cloud_status.clone();
+                browser.cloud_username = cloud_username.clone();
+            }
+        }
+    }
+
     // Refresh character list
     let characters = character_manager.list_characters()?;
+
+    // Auto-show cloud restore prompt on first launch (no characters, cloud offline, not dismissed)
+    if characters.is_empty()
+        && matches!(cloud_status, CloudStatus::Offline)
+        && !select_screen.cloud_restore_dismissed
+        && !select_screen.cloud_restore_showing
+        && time_vault_browser.is_none()
+    {
+        select_screen.cloud_restore_showing = true;
+    }
 
     // Draw character select screen (includes Haven tree visualization)
     terminal.draw(|f| {
@@ -185,12 +297,96 @@ pub fn handle_select_frame(
         if let Some(ref browser) = time_vault_browser {
             ui::time_vault_scene::draw_time_vault(f, area, browser);
         }
+        // Draw cloud restore prompt overlay if showing
+        if select_screen.cloud_restore_showing {
+            select_screen.draw_cloud_restore_prompt(f, area);
+        }
     })?;
 
     // Handle input
     if event::poll(Duration::from_millis(50))? {
         if let Event::Key(key_event) = event::read()? {
             if key_event.kind != KeyEventKind::Press {
+                return Ok(ScreenTransition::Stay);
+            }
+            // Handle cloud restore prompt (blocks other input when open)
+            if select_screen.cloud_restore_showing {
+                if !select_screen.cloud_restore_in_flight {
+                    match key_event.code {
+                        KeyCode::Esc => {
+                            select_screen.cloud_restore_showing = false;
+                            select_screen.cloud_restore_dismissed = true;
+                            select_screen.cloud_restore_input.clear();
+                            select_screen.cloud_restore_repo =
+                                crate::history::cloud::DEFAULT_REPO_NAME.to_string();
+                            select_screen.cloud_restore_field = 0;
+                            select_screen.cloud_restore_error = None;
+                        }
+                        KeyCode::Tab | KeyCode::BackTab => {
+                            select_screen.cloud_restore_field =
+                                1 - select_screen.cloud_restore_field;
+                        }
+                        KeyCode::Backspace => {
+                            if select_screen.cloud_restore_field == 0 {
+                                select_screen.cloud_restore_input.pop();
+                            } else {
+                                select_screen.cloud_restore_repo.pop();
+                            }
+                            select_screen.cloud_restore_error = None;
+                        }
+                        KeyCode::Enter => {
+                            if select_screen.cloud_restore_input.is_empty() {
+                                select_screen.cloud_restore_error =
+                                    Some("Token cannot be empty".to_string());
+                            } else if select_screen.cloud_restore_repo.is_empty() {
+                                select_screen.cloud_restore_error =
+                                    Some("Repo name cannot be empty".to_string());
+                            } else if !*cloud_op_in_flight {
+                                let token = select_screen.cloud_restore_input.clone();
+                                let repo_name = select_screen.cloud_restore_repo.clone();
+                                select_screen.cloud_restore_input.clear();
+                                select_screen.cloud_restore_repo =
+                                    crate::history::cloud::DEFAULT_REPO_NAME.to_string();
+                                select_screen.cloud_restore_field = 0;
+                                select_screen.cloud_restore_error = None;
+                                select_screen.cloud_restore_in_flight = true;
+                                *cloud_status = CloudStatus::Syncing;
+                                *cloud_op_in_flight = true;
+                                let tx = cloud_tx.clone();
+                                let dir = quest_dir.to_path_buf();
+                                std::thread::spawn(move || {
+                                    let res = match crate::history::cloud::link_and_pull(
+                                        &dir, &token, &repo_name,
+                                    ) {
+                                        Ok(config) => CloudOpResult::Linked(config),
+                                        Err(e) => CloudOpResult::Failed(e),
+                                    };
+                                    let _ = tx.send(res);
+                                });
+                            }
+                        }
+                        KeyCode::Char(c) => {
+                            if select_screen.cloud_restore_field == 0 {
+                                if select_screen.cloud_restore_input.len() < 100 {
+                                    select_screen.cloud_restore_input.push(c);
+                                    select_screen.cloud_restore_error = None;
+                                }
+                            } else {
+                                let c = c.to_ascii_lowercase();
+                                if (c.is_ascii_lowercase()
+                                    || c.is_ascii_digit()
+                                    || c == '-'
+                                    || c == '_')
+                                    && select_screen.cloud_restore_repo.len() < 30
+                                {
+                                    select_screen.cloud_restore_repo.push(c);
+                                    select_screen.cloud_restore_error = None;
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
                 return Ok(ScreenTransition::Stay);
             }
             // Handle Time Vault overlay (blocks other input when open)
@@ -308,6 +504,213 @@ pub fn handle_select_frame(
                         }
                     }
                     TimeVaultAction::Continue => {}
+                    TimeVaultAction::ValidateToken { token } => {
+                        if !*cloud_op_in_flight {
+                            *cloud_op_in_flight = true;
+                            let tx = cloud_tx.clone();
+                            let tok = token;
+                            std::thread::spawn(move || {
+                                match crate::history::cloud::github_get_username(&tok) {
+                                    Ok(username) => {
+                                        let repos = crate::history::cloud::github_list_repos(&tok)
+                                            .unwrap_or_default();
+                                        let _ = tx.send(CloudOpResult::TokenValidated {
+                                            username,
+                                            token: tok,
+                                            repos,
+                                        });
+                                    }
+                                    Err(e) => {
+                                        let _ = tx.send(CloudOpResult::Failed(e));
+                                    }
+                                }
+                            });
+                            browser.cloud_status = CloudStatus::Syncing;
+                        }
+                    }
+                    TimeVaultAction::ChangeRepo => {
+                        if !*cloud_op_in_flight {
+                            if let Some(ref config) = cloud_config {
+                                *cloud_op_in_flight = true;
+                                let tx = cloud_tx.clone();
+                                let tok = config.token.clone();
+                                std::thread::spawn(move || {
+                                    match crate::history::cloud::github_get_username(&tok) {
+                                        Ok(username) => {
+                                            let repos =
+                                                crate::history::cloud::github_list_repos(&tok)
+                                                    .unwrap_or_default();
+                                            let _ = tx.send(CloudOpResult::TokenValidated {
+                                                username,
+                                                token: tok,
+                                                repos,
+                                            });
+                                        }
+                                        Err(e) => {
+                                            let _ = tx.send(CloudOpResult::Failed(e));
+                                        }
+                                    }
+                                });
+                                browser.cloud_status = CloudStatus::Syncing;
+                            }
+                        }
+                    }
+                    TimeVaultAction::LinkCloud { token, repo_name } => {
+                        if !*cloud_op_in_flight {
+                            *cloud_status = CloudStatus::Syncing;
+                            *cloud_op_in_flight = true;
+                            browser.cloud_status = cloud_status.clone();
+                            let tx = cloud_tx.clone();
+                            let dir = quest_dir.to_path_buf();
+                            let tok = token;
+                            let rname = repo_name;
+                            std::thread::spawn(move || {
+                                let res =
+                                    match crate::history::cloud::link_github(&dir, &tok, &rname) {
+                                        Ok(config) => CloudOpResult::Linked(config),
+                                        Err(e) => CloudOpResult::Failed(e),
+                                    };
+                                let _ = tx.send(res);
+                            });
+                        }
+                    }
+                    TimeVaultAction::PushCloud => {
+                        if !*cloud_op_in_flight {
+                            if let Some(ref config) = cloud_config {
+                                *cloud_status = CloudStatus::Syncing;
+                                *cloud_op_in_flight = true;
+                                browser.cloud_status = cloud_status.clone();
+                                let tx = cloud_tx.clone();
+                                let dir = quest_dir.to_path_buf();
+                                let tok = config.token.clone();
+                                std::thread::spawn(move || {
+                                    let res = match crate::history::cloud::push_all_branches(
+                                        &dir, &tok,
+                                    ) {
+                                        Ok(()) => CloudOpResult::Pushed,
+                                        Err(e) => CloudOpResult::Failed(e),
+                                    };
+                                    let _ = tx.send(res);
+                                });
+                            }
+                        }
+                    }
+                    TimeVaultAction::PullCloud => {
+                        if !*cloud_op_in_flight {
+                            if let Some(ref config) = cloud_config {
+                                *cloud_status = CloudStatus::Syncing;
+                                *cloud_op_in_flight = true;
+                                browser.cloud_status = cloud_status.clone();
+                                let tx = cloud_tx.clone();
+                                let dir = quest_dir.to_path_buf();
+                                let tok = config.token.clone();
+                                std::thread::spawn(move || {
+                                    let res = (|| -> CloudOpResult {
+                                        if let Err(e) = crate::history::cloud::fetch_all(&dir, &tok)
+                                        {
+                                            return CloudOpResult::Failed(e);
+                                        }
+                                        match crate::history::cloud::check_divergence(&dir) {
+                                            Ok(Some(_)) => CloudOpResult::Diverged,
+                                            Ok(None) => {
+                                                match crate::history::cloud::fast_forward_all(&dir)
+                                                {
+                                                    Ok(_) => CloudOpResult::Pulled,
+                                                    Err(e) => CloudOpResult::Failed(e),
+                                                }
+                                            }
+                                            Err(e) => CloudOpResult::Failed(e),
+                                        }
+                                    })();
+                                    let _ = tx.send(res);
+                                });
+                            }
+                        }
+                    }
+                    TimeVaultAction::UnlinkCloud => {
+                        let _ = crate::history::cloud::unlink(quest_dir);
+                        *cloud_config = None;
+                        *cloud_username = None;
+                        *cloud_status = CloudStatus::Offline;
+                        browser.cloud_status = cloud_status.clone();
+                        browser.cloud_username = None;
+                    }
+                    TimeVaultAction::ResolveKeepLocal => {
+                        if !*cloud_op_in_flight {
+                            if let Some(ref config) = cloud_config {
+                                *cloud_status = CloudStatus::Syncing;
+                                *cloud_op_in_flight = true;
+                                browser.cloud_status = cloud_status.clone();
+                                let tx = cloud_tx.clone();
+                                let dir = quest_dir.to_path_buf();
+                                let tok = config.token.clone();
+                                std::thread::spawn(move || {
+                                    let res = match crate::history::cloud::force_push_branch(
+                                        &dir, "main", &tok,
+                                    ) {
+                                        Ok(()) => CloudOpResult::Pushed,
+                                        Err(e) => CloudOpResult::Failed(e),
+                                    };
+                                    let _ = tx.send(res);
+                                });
+                            }
+                        }
+                    }
+                    TimeVaultAction::ResolveUseCloud => {
+                        if let Some(ref config) = cloud_config {
+                            let _ = crate::history::cloud::fetch_all(quest_dir, &config.token);
+                            let _ = crate::history::cloud::fast_forward_all(quest_dir);
+                            *haven = haven::load_haven();
+                            *enhancement = enhancement::load_enhancement();
+                            *global_achievements = achievements::load_achievements();
+                            crate::achievements::titles::validate_selected_title(
+                                global_achievements,
+                            );
+                            global_achievements.refresh_progress();
+                            *cloud_status = CloudStatus::Linked;
+                            browser.cloud_status = cloud_status.clone();
+                            if let Some(repo) = history_repo {
+                                if let Ok(branches) = repo.list_branches() {
+                                    browser.branches = branches;
+                                    if browser.selected_branch >= browser.branches.len() {
+                                        browser.selected_branch =
+                                            browser.branches.len().saturating_sub(1);
+                                    }
+                                    if let Some(br) = browser.branches.get(browser.selected_branch)
+                                    {
+                                        browser.commits =
+                                            repo.list_commits(&br.name).unwrap_or_default();
+                                        browser.selected_commit = 0;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    TimeVaultAction::ResolveKeepBoth => {
+                        let _ = crate::history::cloud::backup_and_reset(quest_dir, "main");
+                        *haven = haven::load_haven();
+                        *enhancement = enhancement::load_enhancement();
+                        *global_achievements = achievements::load_achievements();
+                        crate::achievements::titles::validate_selected_title(global_achievements);
+                        global_achievements.refresh_progress();
+                        *cloud_status = CloudStatus::Linked;
+                        browser.cloud_status = cloud_status.clone();
+                        browser.cloud_username = cloud_username.clone();
+                        if let Some(repo) = history_repo {
+                            if let Ok(branches) = repo.list_branches() {
+                                browser.branches = branches;
+                                if browser.selected_branch >= browser.branches.len() {
+                                    browser.selected_branch =
+                                        browser.branches.len().saturating_sub(1);
+                                }
+                                if let Some(br) = browser.branches.get(browser.selected_branch) {
+                                    browser.commits =
+                                        repo.list_commits(&br.name).unwrap_or_default();
+                                    browser.selected_commit = 0;
+                                }
+                            }
+                        }
+                    }
                 }
                 return Ok(ScreenTransition::Stay);
             }
@@ -411,7 +814,10 @@ pub fn handle_select_frame(
                             .first()
                             .and_then(|b| repo.list_commits(&b.name).ok())
                             .unwrap_or_default();
-                        *time_vault_browser = Some(TimeVaultState::new(branches, commits));
+                        let mut vault_state = TimeVaultState::new(branches, commits);
+                        vault_state.cloud_status = cloud_status.clone();
+                        vault_state.cloud_username = cloud_username.clone();
+                        *time_vault_browser = Some(vault_state);
                     }
                 }
                 return Ok(ScreenTransition::Stay);
