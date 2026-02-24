@@ -51,6 +51,7 @@ use ratatui::{
 };
 use std::io;
 use std::time::{Duration, Instant};
+use rand::RngExt;
 use stormglass::types::{ChronoSurgeState, ChronoSurgeSummary};
 use tick_events::apply_tick_events;
 use ui::achievement_browser_scene::AchievementBrowserState;
@@ -630,7 +631,19 @@ fn main() -> io::Result<()> {
 
                             // Handle StartChronoSurge before routing
                             if let InputResult::StartChronoSurge { ticks } = result {
-                                chrono_surge = Some(ChronoSurgeState::new(ticks, false));
+                                // Roll for overcharge proc from sigil bonus
+                                let overcharge_chance =
+                                    stormglass::sigils::SigilBonuses::compute(&state.storm_sigils)
+                                        .chrono_overcharge_percent;
+                                let mut rng = rand::rng();
+                                let overcharged = overcharge_chance > 0.0
+                                    && rng.random::<f64>() * 100.0 < overcharge_chance;
+                                let actual_ticks = if overcharged {
+                                    (ticks as f64 * 1.5) as u64
+                                } else {
+                                    ticks
+                                };
+                                chrono_surge = Some(ChronoSurgeState::new(actual_ticks, overcharged));
                                 state.chrono_surge_active = true;
                                 continue;
                             }
