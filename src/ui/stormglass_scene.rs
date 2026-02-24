@@ -1467,23 +1467,39 @@ pub fn render_chrono_surge_banner(
         surge.kills, surge.levels_gained, surge.items_equipped, ticks_left_label,
     );
 
+    let (title_text, title_color) = if surge.overcharged {
+        ("\u{26A1} OVERCHARGE", Color::Rgb(255, 215, 0)) // ⚡ gold
+    } else {
+        ("\u{231B} Chrono Surge", TIMEWARP_CYAN) // ⌛ cyan
+    };
+
+    let mut first_line_spans = vec![
+        Span::styled(
+            title_text,
+            Style::default()
+                .fg(title_color)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::raw("  "),
+        Span::styled(bar, Style::default().fg(TIMEWARP_CYAN)),
+        Span::raw("  "),
+        Span::styled(
+            format!("\u{26A1}x{}", surge.current_batch_size()),
+            Style::default().fg(Color::Rgb(170, 230, 255)),
+        ),
+    ];
+    if surge.overcharged {
+        first_line_spans.push(Span::styled(
+            "  +50%",
+            Style::default()
+                .fg(Color::Rgb(255, 215, 0))
+                .add_modifier(Modifier::BOLD),
+        ));
+    }
+    first_line_spans.push(Span::styled("  [Esc] Skip", Style::default().fg(Color::Gray)));
+
     let lines = vec![
-        Line::from(vec![
-            Span::styled(
-                "\u{231B} Chrono Surge",
-                Style::default()
-                    .fg(TIMEWARP_CYAN)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::raw("  "),
-            Span::styled(bar, Style::default().fg(TIMEWARP_CYAN)),
-            Span::raw("  "),
-            Span::styled(
-                format!("\u{26A1}x{}", surge.current_batch_size()),
-                Style::default().fg(Color::Rgb(170, 230, 255)),
-            ),
-            Span::styled("  [Esc] Skip", Style::default().fg(Color::Gray)),
-        ]),
+        Line::from(first_line_spans),
         Line::from(Span::styled(
             stats_line,
             Style::default().fg(Color::Rgb(180, 210, 240)),
