@@ -1001,7 +1001,10 @@ fn paint_cloud_status(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
             };
             (label, Color::Cyan)
         }
-        CloudStatus::Syncing => ("\u{2601} syncing...".to_string(), Color::Cyan),
+        CloudStatus::Syncing => {
+            let spinner = super::throbber::spinner_char();
+            (format!("{spinner} syncing..."), Color::Cyan)
+        }
         CloudStatus::OutOfSync => ("\u{2601} \u{26a0} out of sync".to_string(), Color::Yellow),
         CloudStatus::Error(msg) => {
             let label = format!("\u{2601} \u{2717} {}", msg);

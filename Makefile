@@ -18,8 +18,9 @@ lint:
 test:
 	@cargo test
 
-# Just build
+# Format and build
 build:
+	@cargo fmt
 	@cargo build --all-targets
 
 # Build release and install to ~/.local/bin (with macOS codesigning)
