@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 // ── Constants ────────────────────────────────────────────────────────────
 pub const MAX_SIGIL_SLOTS: usize = 5;
 pub const ETCH_COST: u64 = 25_000;
-pub const DAILY_POOL_SIZE: usize = 6;
+pub const DAILY_POOL_SIZE: usize = 5;
 
 /// Slot unlock costs: 25k, 50k, 100k, 200k, 400k (2x exponential)
 pub const SLOT_UNLOCK_COSTS: [u64; MAX_SIGIL_SLOTS] = [25_000, 50_000, 100_000, 200_000, 400_000];
