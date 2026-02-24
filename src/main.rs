@@ -37,6 +37,7 @@ use main_helpers::scene::{current_scene_kind, is_realtime_minigame, is_wide_scen
 use main_helpers::update::{
     jittered_update_interval, show_startup_splash_screen, StartupSplashResult,
 };
+use rand::RngExt;
 use ratatui::crossterm::event::{self, Event, KeyEventKind};
 use ratatui::crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
@@ -51,7 +52,6 @@ use ratatui::{
 };
 use std::io;
 use std::time::{Duration, Instant};
-use rand::RngExt;
 use stormglass::types::{ChronoSurgeState, ChronoSurgeSummary};
 use tick_events::apply_tick_events;
 use ui::achievement_browser_scene::AchievementBrowserState;
@@ -643,7 +643,8 @@ fn main() -> io::Result<()> {
                                 } else {
                                     ticks
                                 };
-                                chrono_surge = Some(ChronoSurgeState::new(actual_ticks, overcharged));
+                                chrono_surge =
+                                    Some(ChronoSurgeState::new(actual_ticks, overcharged));
                                 state.chrono_surge_active = true;
                                 continue;
                             }

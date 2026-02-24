@@ -1520,7 +1520,10 @@ pub fn render_chrono_surge_banner(
                 .add_modifier(Modifier::BOLD),
         ));
     }
-    first_line_spans.push(Span::styled("  [Esc] Skip", Style::default().fg(Color::Gray)));
+    first_line_spans.push(Span::styled(
+        "  [Esc] Skip",
+        Style::default().fg(Color::Gray),
+    ));
 
     let lines = vec![
         Line::from(first_line_spans),
@@ -1555,7 +1558,10 @@ pub fn render_chrono_surge_summary(
     frame.render_widget(Clear, overlay_area);
 
     let (title_text, accent_color) = if summary.overcharged {
-        (" \u{26A1} OVERCHARGE Complete \u{26A1} ", Color::Rgb(255, 215, 0))
+        (
+            " \u{26A1} OVERCHARGE Complete \u{26A1} ",
+            Color::Rgb(255, 215, 0),
+        )
     } else {
         (" \u{231B} Chrono Surge Complete \u{231B} ", ELECTRIC_BLUE)
     };
