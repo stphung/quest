@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 // ── Constants ────────────────────────────────────────────────────────────
 pub const MAX_SIGIL_SLOTS: usize = 5;
 pub const ETCH_COST: u64 = 25_000;
-pub const DAILY_POOL_SIZE: usize = 5;
+pub const DAILY_POOL_SIZE: usize = 6;
 
 /// Slot unlock costs: 25k, 50k, 100k, 200k, 400k (2x exponential)
 pub const SLOT_UNLOCK_COSTS: [u64; MAX_SIGIL_SLOTS] = [25_000, 50_000, 100_000, 200_000, 400_000];
@@ -36,10 +36,11 @@ pub enum SigilEffectType {
     AttackSpeedPercent,
     DoubleStrikePercent,
     RegenDelayPercent,
+    ChronoOverchargePercent,
 }
 
 impl SigilEffectType {
-    pub const ALL: [SigilEffectType; 11] = [
+    pub const ALL: [SigilEffectType; 12] = [
         Self::XpPercent,
         Self::DamagePercent,
         Self::DamageReductionPercent,
@@ -51,6 +52,7 @@ impl SigilEffectType {
         Self::AttackSpeedPercent,
         Self::DoubleStrikePercent,
         Self::RegenDelayPercent,
+        Self::ChronoOverchargePercent,
     ];
 
     /// (min, max) value range for this effect type.
@@ -67,6 +69,7 @@ impl SigilEffectType {
             Self::AttackSpeedPercent => (2.0, 10.0),
             Self::DoubleStrikePercent => (1.0, 5.0),
             Self::RegenDelayPercent => (2.0, 10.0),
+            Self::ChronoOverchargePercent => (5.0, 20.0),
         }
     }
 
@@ -84,6 +87,7 @@ impl SigilEffectType {
             Self::AttackSpeedPercent => "Sigil of Swiftness",
             Self::DoubleStrikePercent => "Sigil of the Twin Strike",
             Self::RegenDelayPercent => "Sigil of Renewal",
+            Self::ChronoOverchargePercent => "Sigil of Overcharge",
         }
     }
 
@@ -103,6 +107,7 @@ impl SigilEffectType {
                     Self::OfflineXpPercent => "Offline XP",
                     Self::AttackSpeedPercent => "Attack Speed",
                     Self::DoubleStrikePercent => "Double Strike",
+                    Self::ChronoOverchargePercent => "Overcharge",
                     Self::RegenDelayPercent => unreachable!(),
                 };
                 format!("+{:.1}% {}", value, label)
@@ -130,6 +135,7 @@ impl SigilEffectType {
             Self::AttackSpeedPercent => "Swiftness",
             Self::DoubleStrikePercent => "Twin Strike",
             Self::RegenDelayPercent => "Renewal",
+            Self::ChronoOverchargePercent => "Overcharge",
         }
     }
 
@@ -147,6 +153,7 @@ impl SigilEffectType {
             Self::AttackSpeedPercent => "\u{23E9}",      // ⏩
             Self::DoubleStrikePercent => "\u{2694}",     // ⚔️
             Self::RegenDelayPercent => "\u{1F49A}",      // 💚
+            Self::ChronoOverchargePercent => "\u{26A1}", // ⚡
         }
     }
 }
@@ -400,6 +407,7 @@ pub struct SigilBonuses {
     pub attack_speed_percent: f64,
     pub double_strike_percent: f64,
     pub regen_delay_percent: f64,
+    pub chrono_overcharge_percent: f64,
 }
 
 impl SigilBonuses {
@@ -425,6 +433,9 @@ impl SigilBonuses {
                     bonuses.double_strike_percent += sigil.value
                 }
                 SigilEffectType::RegenDelayPercent => bonuses.regen_delay_percent += sigil.value,
+                SigilEffectType::ChronoOverchargePercent => {
+                    bonuses.chrono_overcharge_percent += sigil.value
+                }
             }
         }
         bonuses
