@@ -153,7 +153,7 @@ impl SigilEffectType {
             Self::AttackSpeedPercent => "\u{23E9}",      // ⏩
             Self::DoubleStrikePercent => "\u{2694}",     // ⚔️
             Self::RegenDelayPercent => "\u{1F49A}",      // 💚
-            Self::ChronoOverchargePercent => "\u{26A1}", // ⚡
+            Self::ChronoOverchargePercent => "\u{1F50B}", // 🔋
         }
     }
 }
