@@ -135,11 +135,24 @@ pub fn handle_select_frame(
     if *cloud_op_in_flight {
         if let Ok(result) = cloud_rx.try_recv() {
             *cloud_op_in_flight = false;
+            let was_cloud_restore = select_screen.cloud_restore_in_flight;
+            select_screen.cloud_restore_in_flight = false;
             match result {
                 CloudOpResult::Linked(config) => {
                     *cloud_username = Some(config.username.clone());
                     *cloud_config = Some(config);
                     *cloud_status = CloudStatus::Linked;
+                    // If this was a cloud restore (link_and_pull), close the prompt
+                    // and reload all state since saves were pulled from cloud.
+                    if was_cloud_restore {
+                        select_screen.cloud_restore_showing = false;
+                        select_screen.cloud_restore_dismissed = true;
+                        *haven = haven::load_haven();
+                        *enhancement = enhancement::load_enhancement();
+                        *global_achievements = achievements::load_achievements();
+                        crate::achievements::titles::validate_selected_title(global_achievements);
+                        global_achievements.refresh_progress();
+                    }
                 }
                 CloudOpResult::Pushed => {
                     *cloud_status = CloudStatus::Linked;
@@ -161,7 +174,13 @@ pub fn handle_select_frame(
                     *cloud_status = CloudStatus::OutOfSync;
                 }
                 CloudOpResult::Failed(msg) => {
-                    *cloud_status = CloudStatus::Error(msg);
+                    if was_cloud_restore {
+                        // Show the error in the cloud restore prompt
+                        select_screen.cloud_restore_error = Some(msg);
+                        *cloud_status = CloudStatus::Offline;
+                    } else {
+                        *cloud_status = CloudStatus::Error(msg);
+                    }
                 }
             }
             if let Some(ref mut browser) = time_vault_browser {
@@ -173,6 +192,16 @@ pub fn handle_select_frame(
 
     // Refresh character list
     let characters = character_manager.list_characters()?;
+
+    // Auto-show cloud restore prompt on first launch (no characters, cloud offline, not dismissed)
+    if characters.is_empty()
+        && matches!(cloud_status, CloudStatus::Offline)
+        && !select_screen.cloud_restore_dismissed
+        && !select_screen.cloud_restore_showing
+        && time_vault_browser.is_none()
+    {
+        select_screen.cloud_restore_showing = true;
+    }
 
     // Draw character select screen (includes Haven tree visualization)
     terminal.draw(|f| {
@@ -233,12 +262,64 @@ pub fn handle_select_frame(
         if let Some(ref browser) = time_vault_browser {
             ui::time_vault_scene::draw_time_vault(f, area, browser);
         }
+        // Draw cloud restore prompt overlay if showing
+        if select_screen.cloud_restore_showing {
+            select_screen.draw_cloud_restore_prompt(f, area);
+        }
     })?;
 
     // Handle input
     if event::poll(Duration::from_millis(50))? {
         if let Event::Key(key_event) = event::read()? {
             if key_event.kind != KeyEventKind::Press {
+                return Ok(ScreenTransition::Stay);
+            }
+            // Handle cloud restore prompt (blocks other input when open)
+            if select_screen.cloud_restore_showing {
+                if !select_screen.cloud_restore_in_flight {
+                    match key_event.code {
+                        KeyCode::Esc => {
+                            select_screen.cloud_restore_showing = false;
+                            select_screen.cloud_restore_dismissed = true;
+                            select_screen.cloud_restore_input.clear();
+                            select_screen.cloud_restore_error = None;
+                        }
+                        KeyCode::Backspace => {
+                            select_screen.cloud_restore_input.pop();
+                            select_screen.cloud_restore_error = None;
+                        }
+                        KeyCode::Enter => {
+                            if select_screen.cloud_restore_input.is_empty() {
+                                select_screen.cloud_restore_error =
+                                    Some("Token cannot be empty".to_string());
+                            } else if !*cloud_op_in_flight {
+                                let token = select_screen.cloud_restore_input.clone();
+                                select_screen.cloud_restore_input.clear();
+                                select_screen.cloud_restore_error = None;
+                                select_screen.cloud_restore_in_flight = true;
+                                *cloud_status = CloudStatus::Syncing;
+                                *cloud_op_in_flight = true;
+                                let tx = cloud_tx.clone();
+                                let dir = quest_dir.to_path_buf();
+                                std::thread::spawn(move || {
+                                    let res =
+                                        match crate::history::cloud::link_and_pull(&dir, &token) {
+                                            Ok(config) => CloudOpResult::Linked(config),
+                                            Err(e) => CloudOpResult::Failed(e),
+                                        };
+                                    let _ = tx.send(res);
+                                });
+                            }
+                        }
+                        KeyCode::Char(c) => {
+                            if select_screen.cloud_restore_input.len() < 100 {
+                                select_screen.cloud_restore_input.push(c);
+                                select_screen.cloud_restore_error = None;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
                 return Ok(ScreenTransition::Stay);
             }
             // Handle Time Vault overlay (blocks other input when open)

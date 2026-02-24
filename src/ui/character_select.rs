@@ -9,19 +9,36 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Row, Table},
+    widgets::{Block, Borders, Clear, Paragraph, Row, Table},
     Frame,
 };
 
 #[allow(dead_code)]
 pub struct CharacterSelectScreen {
     pub selected_index: usize,
+    /// Whether the first-launch cloud restore prompt is showing.
+    pub cloud_restore_showing: bool,
+    /// PAT input for the cloud restore prompt.
+    pub cloud_restore_input: String,
+    /// Error message from a failed cloud restore attempt.
+    pub cloud_restore_error: Option<String>,
+    /// True while a link-and-pull operation is in flight.
+    pub cloud_restore_in_flight: bool,
+    /// Set to true once the user has dismissed the prompt (so it doesn't reappear).
+    pub cloud_restore_dismissed: bool,
 }
 
 #[allow(dead_code)]
 impl CharacterSelectScreen {
     pub fn new() -> Self {
-        Self { selected_index: 0 }
+        Self {
+            selected_index: 0,
+            cloud_restore_showing: false,
+            cloud_restore_input: String::new(),
+            cloud_restore_error: None,
+            cloud_restore_in_flight: false,
+            cloud_restore_dismissed: false,
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -695,6 +712,89 @@ impl CharacterSelectScreen {
             Line::from("              ╲          ╱"),
             Line::from(format!("               {} ⚡ Storm Forge", frg)),
         ]
+    }
+
+    /// Draw the first-launch cloud restore prompt overlay.
+    pub fn draw_cloud_restore_prompt(&self, f: &mut Frame, area: Rect) {
+        let dialog_w = 45u16.min(area.width.saturating_sub(4));
+        let dialog_h = if self.cloud_restore_error.is_some() {
+            12u16
+        } else {
+            11u16
+        }
+        .min(area.height.saturating_sub(2));
+
+        let x = area.x + (area.width.saturating_sub(dialog_w)) / 2;
+        let y = area.y + (area.height.saturating_sub(dialog_h)) / 2;
+        let dialog_area = Rect::new(x, y, dialog_w, dialog_h);
+
+        f.render_widget(Clear, dialog_area);
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_type(ratatui::widgets::BorderType::Rounded)
+            .border_style(Style::default().fg(Color::Cyan));
+        let inner = block.inner(dialog_area);
+        f.render_widget(block, dialog_area);
+
+        let mut lines: Vec<Line<'_>> = Vec::new();
+
+        lines.push(Line::from(Span::styled(
+            "Restore saves from GitHub?",
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        )));
+        lines.push(Line::from(""));
+
+        if self.cloud_restore_in_flight {
+            lines.push(Line::from(Span::styled(
+                "Linking...",
+                Style::default().fg(Color::Cyan),
+            )));
+        } else {
+            lines.push(Line::from(Span::styled(
+                "Enter a Personal Access Token to",
+                Style::default().fg(Color::DarkGray),
+            )));
+            lines.push(Line::from(Span::styled(
+                "download your saves from the cloud.",
+                Style::default().fg(Color::DarkGray),
+            )));
+            lines.push(Line::from(""));
+
+            // Mask token: show dots for all but last 4 chars.
+            let raw = &self.cloud_restore_input;
+            let masked = if raw.len() <= 4 {
+                format!("{}_", raw)
+            } else {
+                let dots: String = "\u{2022}".repeat(raw.len() - 4);
+                format!("{}{}_", dots, &raw[raw.len() - 4..])
+            };
+            lines.push(Line::from(vec![
+                Span::styled("Token: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(masked, Style::default().fg(Color::Yellow)),
+            ]));
+
+            if let Some(ref err) = self.cloud_restore_error {
+                lines.push(Line::from(""));
+                lines.push(Line::from(Span::styled(
+                    err.as_str(),
+                    Style::default().fg(Color::Red),
+                )));
+            }
+
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![
+                Span::styled("[Enter]", Style::default().fg(Color::Cyan)),
+                Span::styled(" Link    ", Style::default().fg(Color::DarkGray)),
+                Span::styled("[Esc]", Style::default().fg(Color::Cyan)),
+                Span::styled(" Skip", Style::default().fg(Color::DarkGray)),
+            ]));
+        }
+
+        let paragraph = Paragraph::new(lines).alignment(Alignment::Center);
+        f.render_widget(paragraph, inner);
     }
 
     pub fn move_up(&mut self, characters: &[CharacterInfo]) {
