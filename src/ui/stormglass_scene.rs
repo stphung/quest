@@ -1636,31 +1636,22 @@ pub fn render_chrono_surge_summary(
 
     frame.render_widget(Clear, overlay_area);
 
-    let (title_text, accent_color) = if summary.overcharged {
-        (
-            " \u{26A1} OVERCHARGE Complete \u{26A1} ",
-            Color::Rgb(255, 215, 0),
-        )
-    } else {
-        (" \u{231B} Chrono Surge Complete \u{231B} ", ELECTRIC_BLUE)
-    };
-
     let block = Block::default()
         .title(Line::from(Span::styled(
-            title_text,
+            " \u{231B} Chrono Surge Complete \u{231B} ",
             Style::default()
-                .fg(accent_color)
+                .fg(ELECTRIC_BLUE)
                 .add_modifier(Modifier::BOLD),
         )))
         .title_alignment(Alignment::Center)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(super::themed_border_color(accent_color)));
+        .border_style(Style::default().fg(super::themed_border_color(ELECTRIC_BLUE)));
 
     let inner = super::render_themed_block(
         frame,
         overlay_area,
         block,
-        accent_color,
+        ELECTRIC_BLUE,
         super::BorderFxContext,
     );
 
@@ -1694,17 +1685,61 @@ pub fn render_chrono_surge_summary(
         }
     }
 
+    let mut next_row = start_row + stats.len() as i32;
+
     if summary.overcharged {
-        let bonus_row = start_row + stats.len() as i32 + 1;
-        if bonus_row < h as i32 {
+        // Gold separator
+        let sep_row = next_row + 1;
+        if sep_row < h as i32 {
+            let sep_len = (w as i32 - 6).max(4) as usize;
+            let sep = "\u{2500}".repeat(sep_len);
+            put_text(&mut buffer, sep_row, 3, &sep, Color::Rgb(140, 100, 0));
+        }
+
+        // Overcharge bonus header
+        let header_row = sep_row + 1;
+        if header_row < h as i32 {
             put_text(
                 &mut buffer,
-                bonus_row,
+                header_row,
                 3,
-                "\u{26A1} Overcharge! +50% bonus ticks",
+                "\u{26A1} Overcharge Bonus  \u{26A1}",
                 Color::Rgb(255, 215, 0),
             );
         }
+
+        // Compute base vs actual duration
+        let base_ticks = (summary.ticks_total as f64 / 1.5) as u64;
+        let bonus_ticks = summary.ticks_total - base_ticks;
+        let base_mins = base_ticks / 600;
+        let bonus_mins = bonus_ticks / 600;
+        let actual_mins = summary.ticks_total / 600;
+        let base_label = if base_mins >= 60 {
+            format!("{}h {}m", base_mins / 60, base_mins % 60)
+        } else {
+            format!("{}m", base_mins)
+        };
+        let actual_label = if actual_mins >= 60 {
+            format!("{}h {}m", actual_mins / 60, actual_mins % 60)
+        } else {
+            format!("{}m", actual_mins)
+        };
+        let bonus_label = if bonus_mins >= 60 {
+            format!("+{}h {}m", bonus_mins / 60, bonus_mins % 60)
+        } else {
+            format!("+{}m", bonus_mins)
+        };
+
+        let detail_row = header_row + 1;
+        if detail_row < h as i32 {
+            let detail = format!(
+                "{} bonus time ({}\u{2192}{})",
+                bonus_label, base_label, actual_label
+            );
+            put_text(&mut buffer, detail_row, 3, &detail, Color::Rgb(255, 215, 0));
+        }
+
+        next_row = detail_row + 1;
     }
 
     // Duration info
@@ -1715,7 +1750,7 @@ pub fn render_chrono_surge_summary(
     } else {
         format!("Duration: {}m", dur_mins)
     };
-    let dur_row = start_row + if summary.overcharged { 6 } else { 5 };
+    let dur_row = next_row + 1;
     if dur_row < h as i32 {
         put_text(&mut buffer, dur_row, 3, &dur_text, Color::DarkGray);
     }
