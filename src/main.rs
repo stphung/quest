@@ -261,6 +261,18 @@ fn main() -> io::Result<()> {
     let mut help_overlay_showing = false;
     let mut time_vault_browser: Option<ui::time_vault_scene::TimeVaultState> = None;
 
+    // Cloud sync state
+    let quest_dir = dirs::home_dir()
+        .map(|d| d.join(".quest"))
+        .unwrap_or_default();
+    let cloud_config = if !debug_mode {
+        history::cloud::load_config(&quest_dir)
+    } else {
+        None
+    };
+    let mut cloud_config: Option<history::cloud::CloudConfig> = cloud_config;
+    let mut cloud_op_handle: Option<std::thread::JoinHandle<history::cloud::CloudOpResult>> = None;
+
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -442,6 +454,107 @@ fn main() -> io::Result<()> {
                         } else {
                             // Not finished yet, put it back
                             update_check_handle = Some(handle);
+                        }
+                    }
+
+                    // Check if background cloud operation completed
+                    if let Some(handle) = cloud_op_handle.take() {
+                        if handle.is_finished() {
+                            match handle.join() {
+                                Ok(history::cloud::CloudOpResult::Linked(cfg)) => {
+                                    if let GameOverlay::TimeVault { ref mut browser } = overlay {
+                                        browser.set_cloud_linked(cfg.username.clone());
+                                    }
+                                    state.combat_state.add_log_entry(
+                                        format!("\u{2601} Linked to GitHub: {}", cfg.username),
+                                        false,
+                                        true,
+                                    );
+                                    cloud_config = Some(cfg);
+                                }
+                                Ok(history::cloud::CloudOpResult::Pushed) => {
+                                    if let GameOverlay::TimeVault { ref mut browser } = overlay {
+                                        browser.cloud_status = history::cloud::CloudStatus::Linked;
+                                        browser.cloud_error = None;
+                                    }
+                                    state.combat_state.add_log_entry(
+                                        "\u{2601} Saves pushed to cloud".to_string(),
+                                        false,
+                                        true,
+                                    );
+                                }
+                                Ok(history::cloud::CloudOpResult::Pulled) => {
+                                    // Reload all state from disk (pull overwrote files)
+                                    haven = haven::load_haven();
+                                    enhancement = enhancement::load_enhancement();
+                                    global_achievements = achievements::load_achievements();
+                                    global_achievements.refresh_progress();
+
+                                    let filename = format!("{}.json", state.character_name);
+                                    if let Ok(mut reloaded) =
+                                        character_manager.load_character(&filename)
+                                    {
+                                        reloaded.recalculate_derived_stats(&enhancement.levels);
+                                        reloaded.recalculate_prestige_bonuses();
+                                        reloaded.combat_state.add_log_entry(
+                                            "\u{2601} Saves pulled from cloud".to_string(),
+                                            false,
+                                            true,
+                                        );
+                                        state = reloaded;
+                                    }
+                                    state.last_save_time = Utc::now().timestamp();
+
+                                    if let GameOverlay::TimeVault { ref mut browser } = overlay {
+                                        browser.cloud_status = history::cloud::CloudStatus::Linked;
+                                        browser.cloud_error = None;
+                                        // Refresh branches and commits
+                                        if let Some(ref repo) = history_repo {
+                                            if let Ok(branches) = repo.list_branches() {
+                                                browser.branches = branches;
+                                                browser.selected_branch = 0;
+                                                if let Some(b) = browser.branches.first() {
+                                                    browser.commits = repo
+                                                        .list_commits(&b.name)
+                                                        .unwrap_or_default();
+                                                    browser.selected_commit = 0;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                Ok(history::cloud::CloudOpResult::Unlinked) => {
+                                    cloud_config = None;
+                                    if let GameOverlay::TimeVault { ref mut browser } = overlay {
+                                        browser.cloud_status =
+                                            history::cloud::CloudStatus::Unlinked;
+                                        browser.cloud_username = None;
+                                    }
+                                }
+                                Ok(history::cloud::CloudOpResult::Failed(err)) => {
+                                    if let GameOverlay::TimeVault { ref mut browser } = overlay {
+                                        browser.cloud_status =
+                                            history::cloud::CloudStatus::Error(err.clone());
+                                        browser.cloud_error = Some(err.clone());
+                                    }
+                                    state.combat_state.add_log_entry(
+                                        format!("\u{2601} Cloud error: {err}"),
+                                        false,
+                                        true,
+                                    );
+                                }
+                                Err(_) => {
+                                    if let GameOverlay::TimeVault { ref mut browser } = overlay {
+                                        browser.cloud_status = history::cloud::CloudStatus::Error(
+                                            "thread panicked".to_string(),
+                                        );
+                                        browser.cloud_error = Some("internal error".to_string());
+                                    }
+                                }
+                            }
+                        } else {
+                            // Not finished yet, put it back
+                            cloud_op_handle = Some(handle);
                         }
                     }
 
@@ -642,12 +755,15 @@ fn main() -> io::Result<()> {
                                             .first()
                                             .and_then(|b| repo.list_commits(&b.name).ok())
                                             .unwrap_or_default();
-                                        overlay = GameOverlay::TimeVault {
-                                            browser:
-                                                crate::ui::time_vault_scene::TimeVaultState::new(
-                                                    branches, commits,
-                                                ),
-                                        };
+                                        let mut browser =
+                                            crate::ui::time_vault_scene::TimeVaultState::new(
+                                                branches, commits,
+                                            );
+                                        // Initialize cloud status from config
+                                        if let Some(ref cfg) = cloud_config {
+                                            browser.set_cloud_linked(cfg.username.clone());
+                                        }
+                                        overlay = GameOverlay::TimeVault { browser };
                                     }
                                 }
                                 continue;
@@ -896,6 +1012,99 @@ fn main() -> io::Result<()> {
                                         }
                                     }
                                 }
+                                continue;
+                            }
+
+                            // ── Cloud sync operations ────────────────────────
+                            if let InputResult::LinkCloud { ref token } = result {
+                                if let GameOverlay::TimeVault { ref mut browser } = overlay {
+                                    browser.cloud_status = history::cloud::CloudStatus::Syncing;
+                                }
+                                // Auto-save before cloud operation
+                                save_all(
+                                    &character_manager,
+                                    &state,
+                                    &global_achievements,
+                                    &haven,
+                                    &enhancement,
+                                    Some(&history::SaveEvent::AutoSave),
+                                    history_repo.as_ref(),
+                                );
+                                let dir = quest_dir.clone();
+                                let tok = token.clone();
+                                cloud_op_handle = Some(std::thread::spawn(move || {
+                                    match history::cloud::link_github(&dir, &tok) {
+                                        Ok(cfg) => history::cloud::CloudOpResult::Linked(cfg),
+                                        Err(e) => history::cloud::CloudOpResult::Failed(e),
+                                    }
+                                }));
+                                continue;
+                            }
+
+                            if let InputResult::PushToCloud = result {
+                                if let GameOverlay::TimeVault { ref mut browser } = overlay {
+                                    browser.cloud_status = history::cloud::CloudStatus::Syncing;
+                                }
+                                // Auto-save before push
+                                save_all(
+                                    &character_manager,
+                                    &state,
+                                    &global_achievements,
+                                    &haven,
+                                    &enhancement,
+                                    Some(&history::SaveEvent::AutoSave),
+                                    history_repo.as_ref(),
+                                );
+                                if let Some(cfg) = cloud_config.clone() {
+                                    let dir = quest_dir.clone();
+                                    cloud_op_handle = Some(std::thread::spawn(move || {
+                                        match history::cloud::push_all(&dir, &cfg) {
+                                            Ok(()) => history::cloud::CloudOpResult::Pushed,
+                                            Err(e) => history::cloud::CloudOpResult::Failed(e),
+                                        }
+                                    }));
+                                }
+                                continue;
+                            }
+
+                            if let InputResult::PullFromCloud = result {
+                                if let GameOverlay::TimeVault { ref mut browser } = overlay {
+                                    browser.cloud_status = history::cloud::CloudStatus::Syncing;
+                                }
+                                // Auto-save before pull
+                                save_all(
+                                    &character_manager,
+                                    &state,
+                                    &global_achievements,
+                                    &haven,
+                                    &enhancement,
+                                    Some(&history::SaveEvent::AutoSave),
+                                    history_repo.as_ref(),
+                                );
+                                if let Some(cfg) = cloud_config.clone() {
+                                    let dir = quest_dir.clone();
+                                    cloud_op_handle = Some(std::thread::spawn(move || {
+                                        match history::cloud::pull_from_cloud(&dir, &cfg) {
+                                            Ok(()) => history::cloud::CloudOpResult::Pulled,
+                                            Err(e) => history::cloud::CloudOpResult::Failed(e),
+                                        }
+                                    }));
+                                }
+                                continue;
+                            }
+
+                            if let InputResult::UnlinkCloud = result {
+                                let _ = history::cloud::unlink(&quest_dir);
+                                cloud_config = None;
+                                if let GameOverlay::TimeVault { ref mut browser } = overlay {
+                                    browser.cloud_status = history::cloud::CloudStatus::Unlinked;
+                                    browser.cloud_username = None;
+                                }
+                                state.combat_state.add_log_entry(
+                                    "\u{2601} Cloud sync unlinked".to_string(),
+                                    false,
+                                    true,
+                                );
                                 continue;
                             }
 

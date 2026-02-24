@@ -132,4 +132,12 @@ pub enum InputResult {
     SwitchSaveBranch { branch_name: String },
     /// Delete a save branch.
     DeleteSaveBranch { branch_name: String },
+    /// Link GitHub cloud sync with a Personal Access Token.
+    LinkCloud { token: String },
+    /// Push saves to GitHub cloud.
+    PushToCloud,
+    /// Pull saves from GitHub cloud.
+    PullFromCloud,
+    /// Unlink GitHub cloud sync.
+    UnlinkCloud,
 }

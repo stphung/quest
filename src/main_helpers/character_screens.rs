@@ -308,6 +308,11 @@ pub fn handle_select_frame(
                         }
                     }
                     TimeVaultAction::Continue => {}
+                    // Cloud operations are not supported from character select.
+                    TimeVaultAction::LinkCloud { .. }
+                    | TimeVaultAction::PushToCloud
+                    | TimeVaultAction::PullFromCloud
+                    | TimeVaultAction::UnlinkCloud => {}
                 }
                 return Ok(ScreenTransition::Stay);
             }

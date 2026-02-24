@@ -509,6 +509,11 @@ pub fn show_startup_splash_screen(
                             }
                         }
                         TimeVaultAction::Continue => {}
+                        // Cloud operations are not supported from startup splash.
+                        TimeVaultAction::LinkCloud { .. }
+                        | TimeVaultAction::PushToCloud
+                        | TimeVaultAction::PullFromCloud
+                        | TimeVaultAction::UnlinkCloud => {}
                     }
                     continue;
                 }

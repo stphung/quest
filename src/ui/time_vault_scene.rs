@@ -3,6 +3,7 @@
 //! Displays a two-panel overlay for browsing save branches
 //! and their snapshots. Players can restore, fork, and manage saves.
 
+use crate::history::cloud::CloudStatus;
 use crate::history::types::{CommitInfo, TimelineInfo};
 use ratatui::{
     layout::{Alignment, Rect},
@@ -47,6 +48,14 @@ pub enum BrowserMode {
     ConfirmSwitch,
     /// Typing a name for a new forked branch.
     NamingFork { commit_id: String },
+    /// Typing a GitHub Personal Access Token to link cloud sync.
+    CloudSetupToken,
+    /// Waiting for confirmation to push to cloud.
+    CloudPushConfirm,
+    /// Waiting for confirmation to pull from cloud.
+    CloudPullConfirm,
+    /// Waiting for confirmation to unlink cloud.
+    CloudUnlinkConfirm,
 }
 
 /// UI state for the Time Vault overlay.
@@ -59,6 +68,14 @@ pub struct TimeVaultState {
     pub mode: BrowserMode,
     pub fork_name_input: String,
     pub fork_name_error: Option<String>,
+    /// Cloud sync state.
+    pub cloud_status: CloudStatus,
+    /// GitHub username (when linked).
+    pub cloud_username: Option<String>,
+    /// Token input buffer for cloud setup dialog.
+    pub cloud_token_input: String,
+    /// Error message for cloud operations.
+    pub cloud_error: Option<String>,
 }
 
 impl TimeVaultState {
@@ -72,7 +89,18 @@ impl TimeVaultState {
             mode: BrowserMode::Browse,
             fork_name_input: String::new(),
             fork_name_error: None,
+            cloud_status: CloudStatus::Unlinked,
+            cloud_username: None,
+            cloud_token_input: String::new(),
+            cloud_error: None,
         }
+    }
+
+    /// Initialize cloud state from a loaded config.
+    pub fn set_cloud_linked(&mut self, username: String) {
+        self.cloud_status = CloudStatus::Linked;
+        self.cloud_username = Some(username);
+        self.cloud_error = None;
     }
 
     /// Name of the currently selected branch, if any.
@@ -232,6 +260,9 @@ pub fn draw_time_vault(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
 
     paint_branch_panel(&mut buffer, state, branch_width);
     paint_snapshot_panel(&mut buffer, state, snap_x, snap_w);
+
+    // Cloud status indicator (top-right of branch panel)
+    paint_cloud_status(&mut buffer, state, buf_w);
 
     // Overlay confirmation dialog when not browsing
     if state.mode != BrowserMode::Browse {
@@ -485,7 +516,7 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
     let buf_w = buffer[0].len();
 
     // Dialog dimensions vary by mode
-    let dialog_w = 44usize.min(buf_w.saturating_sub(4));
+    let dialog_w = 50usize.min(buf_w.saturating_sub(4));
     let dialog_h = match &state.mode {
         BrowserMode::ConfirmRestore => 10usize,
         BrowserMode::ConfirmSwitch | BrowserMode::ConfirmDelete => 7,
@@ -496,6 +527,15 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
                 8
             }
         }
+        BrowserMode::CloudSetupToken => {
+            if state.cloud_error.is_some() {
+                10
+            } else {
+                9
+            }
+        }
+        BrowserMode::CloudPushConfirm | BrowserMode::CloudPullConfirm => 7,
+        BrowserMode::CloudUnlinkConfirm => 7,
         BrowserMode::Browse => return,
     }
     .min(buf_h.saturating_sub(2));
@@ -620,8 +660,91 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
             put_text(buffer, ctrl_row, cx + 17, "[Esc]", Color::Cyan);
             put_text(buffer, ctrl_row, cx + 23, "Cancel", Color::DarkGray);
         }
+        BrowserMode::CloudSetupToken => {
+            put_text(buffer, cy, cx, "Link GitHub Account", Color::White);
+            put_text(
+                buffer,
+                cy + 1,
+                cx,
+                "Paste a Personal Access Token (repo scope):",
+                Color::DarkGray,
+            );
+
+            // Mask the token input
+            let masked: String = "\u{2022}".repeat(state.cloud_token_input.len());
+            let input_display = format!("Token: {masked}_");
+            put_text(buffer, cy + 3, cx, &input_display, Color::Yellow);
+
+            let mut ctrl_row = cy + 5;
+            if let Some(err) = &state.cloud_error {
+                let display_err = if err.len() > 40 { &err[..40] } else { err };
+                put_text(buffer, cy + 5, cx, display_err, Color::Red);
+                ctrl_row = cy + 6;
+            }
+
+            put_text(buffer, ctrl_row, cx, "[Enter]", Color::Cyan);
+            put_text(buffer, ctrl_row, cx + 8, "Link", Color::DarkGray);
+            put_text(buffer, ctrl_row, cx + 15, "[Esc]", Color::Cyan);
+            put_text(buffer, ctrl_row, cx + 21, "Cancel", Color::DarkGray);
+        }
+        BrowserMode::CloudPushConfirm => {
+            put_text(buffer, cy, cx, "Push saves to GitHub?", Color::White);
+            let name = state.cloud_username.as_deref().unwrap_or("cloud");
+            let detail = format!("All branches -> {name}/quest-saves");
+            put_text(buffer, cy + 1, cx, &detail, Color::DarkGray);
+
+            put_text(buffer, cy + 3, cx, "[Enter]", Color::Cyan);
+            put_text(buffer, cy + 3, cx + 8, "Push", Color::DarkGray);
+            put_text(buffer, cy + 3, cx + 15, "[Esc]", Color::Cyan);
+            put_text(buffer, cy + 3, cx + 21, "Cancel", Color::DarkGray);
+        }
+        BrowserMode::CloudPullConfirm => {
+            put_text(buffer, cy, cx, "Pull saves from GitHub?", Color::White);
+            put_text(
+                buffer,
+                cy + 1,
+                cx,
+                "Local branch will match cloud.",
+                Color::DarkGray,
+            );
+
+            put_text(buffer, cy + 3, cx, "[Enter]", Color::Red);
+            put_text(buffer, cy + 3, cx + 8, "Pull", Color::DarkGray);
+            put_text(buffer, cy + 3, cx + 15, "[Esc]", Color::Green);
+            put_text(buffer, cy + 3, cx + 21, "Cancel", Color::DarkGray);
+        }
+        BrowserMode::CloudUnlinkConfirm => {
+            put_text(buffer, cy, cx, "Unlink GitHub account?", Color::Red);
+            put_text(
+                buffer,
+                cy + 1,
+                cx,
+                "Remote saves are not deleted.",
+                Color::DarkGray,
+            );
+
+            put_text(buffer, cy + 3, cx, "[Enter]", Color::Red);
+            put_text(buffer, cy + 3, cx + 8, "Unlink", Color::DarkGray);
+            put_text(buffer, cy + 3, cx + 17, "[Esc]", Color::Green);
+            put_text(buffer, cy + 3, cx + 23, "Cancel", Color::DarkGray);
+        }
         BrowserMode::Browse => {}
     }
+}
+
+/// Paint a small cloud status indicator in the top-right area.
+fn paint_cloud_status(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState, buf_w: usize) {
+    let (label, color) = match &state.cloud_status {
+        CloudStatus::Unlinked => return, // show nothing when unlinked
+        CloudStatus::Linked => {
+            let name = state.cloud_username.as_deref().unwrap_or("linked");
+            (format!("\u{2601} {name}"), Color::Green) // ☁
+        }
+        CloudStatus::Syncing => ("\u{2601} syncing...".to_string(), Color::Yellow),
+        CloudStatus::Error(_) => ("\u{2601} error".to_string(), Color::Red),
+    };
+    let col = buf_w.saturating_sub(label.len() + 1);
+    put_text(buffer, 0, col as i32, &label, color);
 }
 
 /// Render the bottom controls bar.
@@ -631,9 +754,50 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
         BrowserMode::ConfirmRestore
         | BrowserMode::ConfirmSwitch
         | BrowserMode::ConfirmDelete
-        | BrowserMode::NamingFork { .. } => return,
+        | BrowserMode::NamingFork { .. }
+        | BrowserMode::CloudSetupToken
+        | BrowserMode::CloudPushConfirm
+        | BrowserMode::CloudPullConfirm
+        | BrowserMode::CloudUnlinkConfirm => return,
         BrowserMode::Browse => {
             let dot = Span::styled("  \u{00b7}  ", Style::default().fg(Color::Rgb(40, 80, 120)));
+
+            // Cloud actions (right side of the controls bar)
+            let mut cloud_spans: Vec<Span> = Vec::new();
+            match &state.cloud_status {
+                CloudStatus::Unlinked => {
+                    cloud_spans.push(dot.clone());
+                    cloud_spans.push(Span::styled(
+                        "[C] ",
+                        Style::default().fg(Color::Rgb(80, 160, 220)),
+                    ));
+                    cloud_spans.push(Span::styled(
+                        "Link GitHub",
+                        Style::default().fg(Color::DarkGray),
+                    ));
+                }
+                CloudStatus::Linked | CloudStatus::Error(_) => {
+                    cloud_spans.push(dot.clone());
+                    cloud_spans.push(Span::styled(
+                        "[C] ",
+                        Style::default().fg(Color::Rgb(80, 160, 220)),
+                    ));
+                    cloud_spans.push(Span::styled("Push", Style::default().fg(Color::DarkGray)));
+                    cloud_spans.push(Span::styled(
+                        " [V] ",
+                        Style::default().fg(Color::Rgb(80, 160, 220)),
+                    ));
+                    cloud_spans.push(Span::styled("Pull", Style::default().fg(Color::DarkGray)));
+                }
+                CloudStatus::Syncing => {
+                    cloud_spans.push(dot.clone());
+                    cloud_spans.push(Span::styled(
+                        "syncing...",
+                        Style::default().fg(Color::Yellow),
+                    ));
+                }
+            }
+
             match state.focus {
                 PanelFocus::Left => {
                     let mut spans = vec![
@@ -651,6 +815,7 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
                     spans.push(dot.clone());
                     spans.push(Span::styled("[Tab] ", Style::default().fg(Color::Cyan)));
                     spans.push(Span::styled("Saves", Style::default().fg(Color::DarkGray)));
+                    spans.extend(cloud_spans);
                     spans.push(dot);
                     spans.push(Span::styled("[Esc] ", Style::default().fg(Color::Cyan)));
                     spans.push(Span::styled("Close", Style::default().fg(Color::DarkGray)));
@@ -662,7 +827,7 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
                     } else {
                         "Switch to branch"
                     };
-                    Line::from(vec![
+                    let mut spans = vec![
                         Span::styled(" [Enter] ", Style::default().fg(Color::Cyan)),
                         Span::styled(enter_label, Style::default().fg(Color::DarkGray)),
                         dot.clone(),
@@ -671,10 +836,12 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
                         dot.clone(),
                         Span::styled("[Tab] ", Style::default().fg(Color::Cyan)),
                         Span::styled("Branches", Style::default().fg(Color::DarkGray)),
-                        dot,
-                        Span::styled("[Esc] ", Style::default().fg(Color::Cyan)),
-                        Span::styled("Close", Style::default().fg(Color::DarkGray)),
-                    ])
+                    ];
+                    spans.extend(cloud_spans);
+                    spans.push(dot);
+                    spans.push(Span::styled("[Esc] ", Style::default().fg(Color::Cyan)));
+                    spans.push(Span::styled("Close", Style::default().fg(Color::DarkGray)));
+                    Line::from(spans)
                 }
             }
         }

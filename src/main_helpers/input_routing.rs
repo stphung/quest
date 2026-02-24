@@ -101,5 +101,10 @@ pub fn route_game_input(
         | InputResult::ForkSave { .. }
         | InputResult::SwitchSaveBranch { .. }
         | InputResult::DeleteSaveBranch { .. } => InputAction::Continue,
+        // Cloud operations are handled directly in main.rs.
+        InputResult::LinkCloud { .. }
+        | InputResult::PushToCloud
+        | InputResult::PullFromCloud
+        | InputResult::UnlinkCloud => InputAction::Continue,
     }
 }

@@ -23,6 +23,14 @@ pub enum TimeVaultAction {
     SwitchBranch { branch_name: String },
     /// Delete a branch by name.
     DeleteBranch { branch_name: String },
+    /// Link GitHub account with a PAT.
+    LinkCloud { token: String },
+    /// Push saves to cloud.
+    PushToCloud,
+    /// Pull saves from cloud.
+    PullFromCloud,
+    /// Unlink GitHub account.
+    UnlinkCloud,
 }
 
 /// Handle keyboard input for the Time Vault overlay.
@@ -40,6 +48,10 @@ pub fn handle_time_vault_input(key: KeyEvent, state: &mut TimeVaultState) -> Tim
         BrowserMode::ConfirmSwitch => handle_confirm_switch(key, state),
         BrowserMode::ConfirmDelete => handle_confirm_delete(key, state),
         BrowserMode::NamingFork { .. } => handle_naming_fork(key, state),
+        BrowserMode::CloudSetupToken => handle_cloud_setup(key, state),
+        BrowserMode::CloudPushConfirm => handle_cloud_push_confirm(key, state),
+        BrowserMode::CloudPullConfirm => handle_cloud_pull_confirm(key, state),
+        BrowserMode::CloudUnlinkConfirm => handle_cloud_unlink_confirm(key, state),
     }
 }
 
@@ -143,6 +155,41 @@ fn handle_browse(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAction {
                 && !state.selected_branch_is_active()
             {
                 state.mode = BrowserMode::ConfirmDelete;
+            }
+            TimeVaultAction::Continue
+        }
+        KeyCode::Char('c') | KeyCode::Char('C') => {
+            use crate::history::cloud::CloudStatus;
+            match &state.cloud_status {
+                CloudStatus::Unlinked => {
+                    state.mode = BrowserMode::CloudSetupToken;
+                    state.cloud_token_input.clear();
+                    state.cloud_error = None;
+                }
+                CloudStatus::Linked | CloudStatus::Error(_) => {
+                    state.mode = BrowserMode::CloudPushConfirm;
+                }
+                CloudStatus::Syncing => {} // no-op while syncing
+            }
+            TimeVaultAction::Continue
+        }
+        KeyCode::Char('v') | KeyCode::Char('V') => {
+            use crate::history::cloud::CloudStatus;
+            if matches!(
+                state.cloud_status,
+                CloudStatus::Linked | CloudStatus::Error(_)
+            ) {
+                state.mode = BrowserMode::CloudPullConfirm;
+            }
+            TimeVaultAction::Continue
+        }
+        KeyCode::Char('x') | KeyCode::Char('X') => {
+            use crate::history::cloud::CloudStatus;
+            if matches!(
+                state.cloud_status,
+                CloudStatus::Linked | CloudStatus::Error(_)
+            ) {
+                state.mode = BrowserMode::CloudUnlinkConfirm;
             }
             TimeVaultAction::Continue
         }
@@ -260,6 +307,85 @@ fn handle_naming_fork(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAct
                 state.fork_name_input.push(c);
                 state.fork_name_error = None;
             }
+            TimeVaultAction::Continue
+        }
+        _ => TimeVaultAction::Continue,
+    }
+}
+
+fn handle_cloud_setup(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAction {
+    match key.code {
+        KeyCode::Esc => {
+            state.mode = BrowserMode::Browse;
+            state.cloud_token_input.clear();
+            state.cloud_error = None;
+            TimeVaultAction::Continue
+        }
+        KeyCode::Backspace => {
+            state.cloud_token_input.pop();
+            state.cloud_error = None;
+            TimeVaultAction::Continue
+        }
+        KeyCode::Enter => {
+            let token = state.cloud_token_input.clone();
+            if token.is_empty() {
+                state.cloud_error = Some("token cannot be empty".to_string());
+                return TimeVaultAction::Continue;
+            }
+            state.mode = BrowserMode::Browse;
+            let token_out = state.cloud_token_input.clone();
+            state.cloud_token_input.clear();
+            state.cloud_error = None;
+            TimeVaultAction::LinkCloud { token: token_out }
+        }
+        KeyCode::Char(c) => {
+            // Accept any printable character for token input.
+            if !c.is_control() && state.cloud_token_input.len() < 200 {
+                state.cloud_token_input.push(c);
+                state.cloud_error = None;
+            }
+            TimeVaultAction::Continue
+        }
+        _ => TimeVaultAction::Continue,
+    }
+}
+
+fn handle_cloud_push_confirm(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAction {
+    match key.code {
+        KeyCode::Enter => {
+            state.mode = BrowserMode::Browse;
+            TimeVaultAction::PushToCloud
+        }
+        KeyCode::Esc => {
+            state.mode = BrowserMode::Browse;
+            TimeVaultAction::Continue
+        }
+        _ => TimeVaultAction::Continue,
+    }
+}
+
+fn handle_cloud_pull_confirm(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAction {
+    match key.code {
+        KeyCode::Enter => {
+            state.mode = BrowserMode::Browse;
+            TimeVaultAction::PullFromCloud
+        }
+        KeyCode::Esc => {
+            state.mode = BrowserMode::Browse;
+            TimeVaultAction::Continue
+        }
+        _ => TimeVaultAction::Continue,
+    }
+}
+
+fn handle_cloud_unlink_confirm(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAction {
+    match key.code {
+        KeyCode::Enter => {
+            state.mode = BrowserMode::Browse;
+            TimeVaultAction::UnlinkCloud
+        }
+        KeyCode::Esc => {
+            state.mode = BrowserMode::Browse;
             TimeVaultAction::Continue
         }
         _ => TimeVaultAction::Continue,

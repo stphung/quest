@@ -159,6 +159,18 @@ pub fn handle_game_input(
                 // Overlay stays open for delete — just refresh.
                 return InputResult::DeleteSaveBranch { branch_name };
             }
+            TimeVaultAction::LinkCloud { token } => {
+                return InputResult::LinkCloud { token };
+            }
+            TimeVaultAction::PushToCloud => {
+                return InputResult::PushToCloud;
+            }
+            TimeVaultAction::PullFromCloud => {
+                return InputResult::PullFromCloud;
+            }
+            TimeVaultAction::UnlinkCloud => {
+                return InputResult::UnlinkCloud;
+            }
         }
         return InputResult::Continue;
     }
