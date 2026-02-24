@@ -36,10 +36,11 @@ pub enum SigilEffectType {
     AttackSpeedPercent,
     DoubleStrikePercent,
     RegenDelayPercent,
+    ChronoOverchargePercent,
 }
 
 impl SigilEffectType {
-    pub const ALL: [SigilEffectType; 11] = [
+    pub const ALL: [SigilEffectType; 12] = [
         Self::XpPercent,
         Self::DamagePercent,
         Self::DamageReductionPercent,
@@ -51,6 +52,7 @@ impl SigilEffectType {
         Self::AttackSpeedPercent,
         Self::DoubleStrikePercent,
         Self::RegenDelayPercent,
+        Self::ChronoOverchargePercent,
     ];
 
     /// (min, max) value range for this effect type.
@@ -67,6 +69,7 @@ impl SigilEffectType {
             Self::AttackSpeedPercent => (2.0, 10.0),
             Self::DoubleStrikePercent => (1.0, 5.0),
             Self::RegenDelayPercent => (2.0, 10.0),
+            Self::ChronoOverchargePercent => (5.0, 20.0),
         }
     }
 
@@ -84,6 +87,7 @@ impl SigilEffectType {
             Self::AttackSpeedPercent => "Sigil of Swiftness",
             Self::DoubleStrikePercent => "Sigil of the Twin Strike",
             Self::RegenDelayPercent => "Sigil of Renewal",
+            Self::ChronoOverchargePercent => "Sigil of Overcharge",
         }
     }
 
@@ -103,6 +107,7 @@ impl SigilEffectType {
                     Self::OfflineXpPercent => "Offline XP",
                     Self::AttackSpeedPercent => "Attack Speed",
                     Self::DoubleStrikePercent => "Double Strike",
+                    Self::ChronoOverchargePercent => "Overcharge",
                     Self::RegenDelayPercent => unreachable!(),
                 };
                 format!("+{:.1}% {}", value, label)
@@ -130,23 +135,25 @@ impl SigilEffectType {
             Self::AttackSpeedPercent => "Swiftness",
             Self::DoubleStrikePercent => "Twin Strike",
             Self::RegenDelayPercent => "Renewal",
+            Self::ChronoOverchargePercent => "Overcharge",
         }
     }
 
     /// Emoji icon for this sigil effect type.
     pub fn icon(self) -> &'static str {
         match self {
-            Self::XpPercent => "\u{1F4D6}",              // 📖
-            Self::DamagePercent => "\u{1F525}",          // 🔥
-            Self::DamageReductionPercent => "\u{1F6E1}", // 🛡️
-            Self::CritChancePercent => "\u{1F3AF}",      // 🎯
-            Self::DropRatePercent => "\u{1F340}",        // 🍀
-            Self::MaxHpPercent => "\u{2764}",            // ❤️
-            Self::FishingSpeedPercent => "\u{1F30A}",    // 🌊
-            Self::OfflineXpPercent => "\u{1F319}",       // 🌙
-            Self::AttackSpeedPercent => "\u{23E9}",      // ⏩
-            Self::DoubleStrikePercent => "\u{2694}",     // ⚔️
-            Self::RegenDelayPercent => "\u{1F49A}",      // 💚
+            Self::XpPercent => "\u{1F4D6}",               // 📖
+            Self::DamagePercent => "\u{1F525}",           // 🔥
+            Self::DamageReductionPercent => "\u{1F6E1}",  // 🛡️
+            Self::CritChancePercent => "\u{1F3AF}",       // 🎯
+            Self::DropRatePercent => "\u{1F340}",         // 🍀
+            Self::MaxHpPercent => "\u{2764}",             // ❤️
+            Self::FishingSpeedPercent => "\u{1F30A}",     // 🌊
+            Self::OfflineXpPercent => "\u{1F319}",        // 🌙
+            Self::AttackSpeedPercent => "\u{23E9}",       // ⏩
+            Self::DoubleStrikePercent => "\u{2694}",      // ⚔️
+            Self::RegenDelayPercent => "\u{1F49A}",       // 💚
+            Self::ChronoOverchargePercent => "\u{1F50B}", // 🔋
         }
     }
 }
@@ -400,6 +407,7 @@ pub struct SigilBonuses {
     pub attack_speed_percent: f64,
     pub double_strike_percent: f64,
     pub regen_delay_percent: f64,
+    pub chrono_overcharge_percent: f64,
 }
 
 impl SigilBonuses {
@@ -425,6 +433,9 @@ impl SigilBonuses {
                     bonuses.double_strike_percent += sigil.value
                 }
                 SigilEffectType::RegenDelayPercent => bonuses.regen_delay_percent += sigil.value,
+                SigilEffectType::ChronoOverchargePercent => {
+                    bonuses.chrono_overcharge_percent += sigil.value
+                }
             }
         }
         bonuses
@@ -930,5 +941,27 @@ mod tests {
                 effect
             );
         }
+    }
+
+    #[test]
+    fn test_sigil_bonuses_compute_chrono_overcharge() {
+        let mut sigils = StormSigils::new();
+        sigils.slots_unlocked = 2;
+        sigils.sigils[0] = Some(Sigil {
+            effect: SigilEffectType::ChronoOverchargePercent,
+            value: 12.0,
+            grade: SigilGrade::B,
+        });
+        sigils.sigils[1] = Some(Sigil {
+            effect: SigilEffectType::ChronoOverchargePercent,
+            value: 8.0,
+            grade: SigilGrade::C,
+        });
+        let bonuses = SigilBonuses::compute(&sigils);
+        assert!(
+            (bonuses.chrono_overcharge_percent - 20.0).abs() < 1e-10,
+            "Expected 20.0, got {}",
+            bonuses.chrono_overcharge_percent
+        );
     }
 }

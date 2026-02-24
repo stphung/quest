@@ -36,6 +36,7 @@ enum DebugAction {
     TriggerGrant100kStormglass,
     TriggerEtchRandomSigils,
     TriggerEtchSPlusSigil,
+    TriggerForceOvercharge,
 }
 
 const DEBUG_ACTIONS: &[DebugAction] = &[
@@ -61,6 +62,7 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerGrant100kStormglass,
     DebugAction::TriggerEtchRandomSigils,
     DebugAction::TriggerEtchSPlusSigil,
+    DebugAction::TriggerForceOvercharge,
 ];
 
 const CHALLENGE_ACTIONS: &[DebugAction] = &[
@@ -87,6 +89,7 @@ const RESOURCE_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerGrant100kStormglass,
     DebugAction::TriggerEtchRandomSigils,
     DebugAction::TriggerEtchSPlusSigil,
+    DebugAction::TriggerForceOvercharge,
 ];
 const ITEM_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerForgeAsprika,
@@ -120,6 +123,7 @@ impl DebugAction {
             Self::TriggerGrant100kStormglass => 19,
             Self::TriggerEtchRandomSigils => 20,
             Self::TriggerEtchSPlusSigil => 21,
+            Self::TriggerForceOvercharge => 22,
         }
     }
 
@@ -147,6 +151,7 @@ impl DebugAction {
             Self::TriggerGrant100kStormglass => "Grant 100k Stormglass",
             Self::TriggerEtchRandomSigils => "Etch Random Sigils (All Slots)",
             Self::TriggerEtchSPlusSigil => "Etch S+ Sigil (Slot 1)",
+            Self::TriggerForceOvercharge => "Force Next Surge Overcharged",
         }
     }
 
@@ -179,6 +184,7 @@ impl DebugAction {
             Self::TriggerGrant100kStormglass => trigger_grant_100k_stormglass(state),
             Self::TriggerEtchRandomSigils => trigger_etch_random_sigils(state),
             Self::TriggerEtchSPlusSigil => trigger_etch_s_plus_sigil(state),
+            Self::TriggerForceOvercharge => trigger_force_overcharge(state),
         }
     }
 }
@@ -620,6 +626,11 @@ fn trigger_etch_s_plus_sigil(state: &mut GameState) -> &'static str {
         grade: SigilGrade::SPlus,
     });
     "S+ Sigil of Fury etched in slot 1!"
+}
+
+fn trigger_force_overcharge(state: &mut GameState) -> &'static str {
+    state.debug_force_overcharge = true;
+    "Next Chrono Surge will be Overcharged!"
 }
 
 #[cfg(test)]

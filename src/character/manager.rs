@@ -130,6 +130,7 @@ mod tests {
             stormglass_discovered: false,
             storm_sigils: crate::stormglass::sigils::StormSigils::new(),
             chrono_surge_active: false,
+            debug_force_overcharge: false,
         }
     }
 

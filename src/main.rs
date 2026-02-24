@@ -37,6 +37,7 @@ use main_helpers::scene::{current_scene_kind, is_realtime_minigame, is_wide_scen
 use main_helpers::update::{
     jittered_update_interval, show_startup_splash_screen, StartupSplashResult,
 };
+use rand::RngExt;
 use ratatui::crossterm::event::{self, Event, KeyEventKind};
 use ratatui::crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
@@ -718,6 +719,7 @@ fn main() -> io::Result<()> {
                                         items_equipped: surge.items_equipped,
                                         ticks_completed: surge.ticks_total,
                                         ticks_total: surge.ticks_total,
+                                        overcharged: surge.overcharged,
                                     });
                                     if !debug_mode {
                                         let surge_event = history::SaveEvent::ChronoSurge {
@@ -774,7 +776,25 @@ fn main() -> io::Result<()> {
 
                             // Handle StartChronoSurge before routing
                             if let InputResult::StartChronoSurge { ticks } = result {
-                                chrono_surge = Some(ChronoSurgeState::new(ticks));
+                                // Roll for overcharge proc from sigil bonus
+                                let overcharge_chance =
+                                    stormglass::sigils::SigilBonuses::compute(&state.storm_sigils)
+                                        .chrono_overcharge_percent;
+                                let mut rng = rand::rng();
+                                let overcharged = if state.debug_force_overcharge {
+                                    state.debug_force_overcharge = false;
+                                    true
+                                } else {
+                                    overcharge_chance > 0.0
+                                        && rng.random::<f64>() * 100.0 < overcharge_chance
+                                };
+                                let actual_ticks = if overcharged {
+                                    (ticks as f64 * 1.5) as u64
+                                } else {
+                                    ticks
+                                };
+                                chrono_surge =
+                                    Some(ChronoSurgeState::new(actual_ticks, overcharged));
                                 state.chrono_surge_active = true;
                                 continue;
                             }
@@ -1531,6 +1551,7 @@ fn main() -> io::Result<()> {
                                 items_equipped: surge.items_equipped,
                                 ticks_completed: surge.ticks_total,
                                 ticks_total: surge.ticks_total,
+                                overcharged: surge.overcharged,
                             });
                             if !debug_mode {
                                 let surge_event = history::SaveEvent::ChronoSurge {

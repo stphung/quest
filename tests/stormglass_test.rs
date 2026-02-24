@@ -302,20 +302,21 @@ fn test_chrono_surge_costs_monotonically_increase() {
 
 #[test]
 fn test_chrono_surge_state_new() {
-    let surge = types::ChronoSurgeState::new(9_000);
+    let surge = types::ChronoSurgeState::new(9_000, false);
     assert_eq!(surge.ticks_remaining, 9_000);
     assert_eq!(surge.ticks_total, 9_000);
     assert_eq!(surge.kills, 0);
     assert_eq!(surge.levels_gained, 0);
     assert_eq!(surge.items_equipped, 0);
     assert!(surge.batch_size > 0);
+    assert!(!surge.overcharged);
 }
 
 #[test]
 fn test_chrono_surge_batch_size_scales_with_ticks() {
     // Longer surges should have larger batch sizes to maintain same animation duration
-    let small = types::ChronoSurgeState::new(9_000);
-    let large = types::ChronoSurgeState::new(288_000);
+    let small = types::ChronoSurgeState::new(9_000, false);
+    let large = types::ChronoSurgeState::new(288_000, false);
     assert!(
         large.batch_size > small.batch_size,
         "8hr batch ({}) should be larger than 15min batch ({})",
@@ -326,7 +327,7 @@ fn test_chrono_surge_batch_size_scales_with_ticks() {
 
 #[test]
 fn test_chrono_surge_progress() {
-    let mut surge = types::ChronoSurgeState::new(100);
+    let mut surge = types::ChronoSurgeState::new(100, false);
     assert!((surge.progress() - 0.0).abs() < 0.01);
 
     surge.ticks_remaining = 50;
@@ -366,7 +367,7 @@ fn test_chrono_surge_batch_accumulates_stats() {
     let mut achievements = Achievements::default();
     let mut rng = ChaCha8Rng::seed_from_u64(42);
 
-    let mut surge = types::ChronoSurgeState::new(9_000);
+    let mut surge = types::ChronoSurgeState::new(9_000, false);
 
     // Run all ticks (simulating what main.rs does during surge across multiple frames)
     let total_ticks = surge.ticks_total;
