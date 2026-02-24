@@ -521,7 +521,8 @@ pub fn show_startup_splash_screen(
                         | TimeVaultAction::UnlinkCloud
                         | TimeVaultAction::ResolveKeepLocal
                         | TimeVaultAction::ResolveUseCloud
-                        | TimeVaultAction::ResolveKeepBoth => {}
+                        | TimeVaultAction::ResolveKeepBoth
+                        | TimeVaultAction::UpdateToken { .. } => {}
                     }
                     continue;
                 }

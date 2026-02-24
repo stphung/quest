@@ -581,8 +581,17 @@ fn main() -> io::Result<()> {
                                         browser.mode = crate::ui::time_vault_scene::BrowserMode::DivergenceResolution;
                                     }
                                 }
+                                history::cloud::CloudOpResult::TokenUpdated(new_config) => {
+                                    cloud_status = history::cloud::CloudStatus::Linked;
+                                    cloud_username = Some(new_config.username.clone());
+                                    cloud_config = Some(new_config);
+                                }
                                 history::cloud::CloudOpResult::Failed(msg) => {
-                                    cloud_status = history::cloud::CloudStatus::Error(msg);
+                                    if history::cloud::is_auth_error(&msg) {
+                                        cloud_status = history::cloud::CloudStatus::TokenExpired;
+                                    } else {
+                                        cloud_status = history::cloud::CloudStatus::Error(msg);
+                                    }
                                 }
                             }
                             // Update Time Vault overlay if open
@@ -1274,6 +1283,44 @@ fn main() -> io::Result<()> {
                                 if let GameOverlay::TimeVault { ref mut browser } = overlay {
                                     browser.cloud_status = cloud_status.clone();
                                     browser.cloud_username = None;
+                                }
+                                continue;
+                            }
+
+                            if let InputResult::UpdateToken { token } = result {
+                                if !cloud_op_in_flight {
+                                    if let Some(ref config) = cloud_config {
+                                        cloud_op_in_flight = true;
+                                        cloud_status = history::cloud::CloudStatus::Syncing;
+                                        if let GameOverlay::TimeVault { ref mut browser } = overlay
+                                        {
+                                            browser.cloud_status = cloud_status.clone();
+                                        }
+                                        let quest = quest_dir.clone();
+                                        let cfg = config.clone();
+                                        let tx = cloud_tx.clone();
+                                        std::thread::spawn(move || {
+                                            let result = match history::cloud::update_token(
+                                                &quest, &token, &cfg,
+                                            ) {
+                                                Ok(new_config) => {
+                                                    history::cloud::CloudOpResult::TokenUpdated(
+                                                        new_config,
+                                                    )
+                                                }
+                                                Err(e) => {
+                                                    if history::cloud::is_auth_error(&e) {
+                                                        history::cloud::CloudOpResult::Failed(
+                                                            "invalid token".to_string(),
+                                                        )
+                                                    } else {
+                                                        history::cloud::CloudOpResult::Failed(e)
+                                                    }
+                                                }
+                                            };
+                                            let _ = tx.send(result);
+                                        });
+                                    }
                                 }
                                 continue;
                             }

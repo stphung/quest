@@ -51,6 +51,8 @@ pub enum CloudStatus {
     Syncing,
     /// Local and remote have diverged on at least one branch.
     OutOfSync,
+    /// The stored PAT is expired or revoked (HTTP 401/403).
+    TokenExpired,
     /// An error occurred during the last operation.
     Error(String),
 }
@@ -74,6 +76,8 @@ pub enum CloudOpResult {
     Unlinked,
     /// At least one branch has diverged (ahead AND behind).
     Diverged(BranchDivergence),
+    /// Token was successfully updated. Contains the new config.
+    TokenUpdated(CloudConfig),
     /// Operation failed with an error message.
     Failed(String),
 }
@@ -643,6 +647,42 @@ pub fn link_and_pull(
     Ok(config)
 }
 
+/// Update the PAT for an existing cloud link.
+///
+/// Validates the new token, updates the saved config, and re-creates the
+/// git remote with the new auth URL. The existing repo link is preserved.
+pub fn update_token(
+    quest_dir: &Path,
+    new_token: &str,
+    config: &CloudConfig,
+) -> Result<CloudConfig, String> {
+    // 1. Validate the new token.
+    let username = github_get_username(new_token)?;
+
+    // 2. Re-create the git remote with updated credentials.
+    let repo = Repository::open(quest_dir).map_err(|e| format!("Failed to open repo: {e}"))?;
+    let auth_url = authenticated_url(&config.repo_url, new_token);
+
+    if repo.find_remote(REMOTE_NAME).is_ok() {
+        repo.remote_delete(REMOTE_NAME)
+            .map_err(|e| format!("Failed to remove old remote: {e}"))?;
+    }
+    repo.remote(REMOTE_NAME, &auth_url)
+        .map_err(|e| format!("Failed to add remote: {e}"))?;
+
+    configure_fetch_refspec(&repo)?;
+
+    // 3. Save updated config.
+    let new_config = CloudConfig {
+        token: new_token.to_string(),
+        username,
+        repo_url: config.repo_url.clone(),
+    };
+    save_config(quest_dir, &new_config)?;
+
+    Ok(new_config)
+}
+
 /// Remove the cloud remote and delete the saved config.
 pub fn unlink(quest_dir: &Path) -> Result<(), String> {
     let repo = Repository::open(quest_dir).map_err(|e| format!("Failed to open repo: {e}"))?;
@@ -781,6 +821,17 @@ fn configure_fetch_refspec(repo: &Repository) -> Result<(), String> {
     Ok(())
 }
 
+/// Check whether an error message indicates an authentication failure (expired/revoked PAT).
+///
+/// Matches HTTP 401/403 status codes and common GitHub auth error strings from ureq.
+pub fn is_auth_error(error_msg: &str) -> bool {
+    error_msg.contains("status code 401")
+        || error_msg.contains("status code 403")
+        || error_msg.contains("Bad credentials")
+        || error_msg.contains("401")
+            && (error_msg.contains("Unauthorized") || error_msg.contains("auth"))
+}
+
 // ── Tests ────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -847,5 +898,32 @@ mod tests {
 
         delete_config(dir.path()).unwrap();
         assert!(load_config(dir.path()).is_none());
+    }
+
+    #[test]
+    fn is_auth_error_detects_401() {
+        assert!(is_auth_error(
+            "https://api.github.com/user: status code 401"
+        ));
+    }
+
+    #[test]
+    fn is_auth_error_detects_403() {
+        assert!(is_auth_error("GitHub API error: status code 403"));
+    }
+
+    #[test]
+    fn is_auth_error_detects_bad_credentials() {
+        assert!(is_auth_error("Bad credentials"));
+    }
+
+    #[test]
+    fn is_auth_error_rejects_404() {
+        assert!(!is_auth_error("status code 404"));
+    }
+
+    #[test]
+    fn is_auth_error_rejects_network_error() {
+        assert!(!is_auth_error("connection refused"));
     }
 }

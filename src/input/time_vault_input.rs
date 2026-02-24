@@ -43,6 +43,8 @@ pub enum TimeVaultAction {
     ResolveUseCloud,
     /// Divergence resolution: keep both (backup local, reset to cloud).
     ResolveKeepBoth,
+    /// Update the PAT (new token validated and ready to save).
+    UpdateToken { token: String },
 }
 
 /// Handle keyboard input for the Time Vault overlay.
@@ -65,6 +67,7 @@ pub fn handle_time_vault_input(key: KeyEvent, state: &mut TimeVaultState) -> Tim
         BrowserMode::ConfirmPush => handle_confirm_push(key, state),
         BrowserMode::ConfirmPull => handle_confirm_pull(key, state),
         BrowserMode::ConfirmUnlink => handle_confirm_unlink(key, state),
+        BrowserMode::UpdatingToken => handle_updating_token(key, state),
         BrowserMode::DivergenceResolution => handle_divergence_resolution(key, state),
     }
 }
@@ -205,7 +208,10 @@ fn handle_browse(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAction {
                         state.cloud_token_error = None;
                         state.mode = BrowserMode::LinkingCloud;
                     }
-                    CloudStatus::Linked | CloudStatus::OutOfSync | CloudStatus::Error(_) => {
+                    CloudStatus::Linked
+                    | CloudStatus::OutOfSync
+                    | CloudStatus::TokenExpired
+                    | CloudStatus::Error(_) => {
                         state.mode = BrowserMode::ConfirmPush;
                     }
                     CloudStatus::Syncing => {}
@@ -248,6 +254,24 @@ fn handle_browse(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAction {
                 );
                 if is_linked {
                     state.mode = BrowserMode::ConfirmUnlink;
+                }
+            }
+            TimeVaultAction::Continue
+        }
+        KeyCode::Char('p') | KeyCode::Char('P') => {
+            if state.focus == PanelFocus::Left {
+                use crate::history::cloud::CloudStatus;
+                let is_linked = matches!(
+                    &state.cloud_status,
+                    CloudStatus::Linked
+                        | CloudStatus::OutOfSync
+                        | CloudStatus::TokenExpired
+                        | CloudStatus::Error(_)
+                );
+                if is_linked {
+                    state.cloud_token_input.clear();
+                    state.cloud_token_error = None;
+                    state.mode = BrowserMode::UpdatingToken;
                 }
             }
             TimeVaultAction::Continue
@@ -539,6 +563,40 @@ fn handle_confirm_unlink(key: KeyEvent, state: &mut TimeVaultState) -> TimeVault
         }
         KeyCode::Esc => {
             state.mode = BrowserMode::Browse;
+            TimeVaultAction::Continue
+        }
+        _ => TimeVaultAction::Continue,
+    }
+}
+
+fn handle_updating_token(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAction {
+    match key.code {
+        KeyCode::Esc => {
+            state.cloud_token_input.clear();
+            state.cloud_token_error = None;
+            state.mode = BrowserMode::Browse;
+            TimeVaultAction::Continue
+        }
+        KeyCode::Backspace => {
+            state.cloud_token_input.pop();
+            state.cloud_token_error = None;
+            TimeVaultAction::Continue
+        }
+        KeyCode::Enter => {
+            if state.cloud_token_input.is_empty() {
+                state.cloud_token_error = Some("token cannot be empty".to_string());
+                return TimeVaultAction::Continue;
+            }
+            let token = state.cloud_token_input.clone();
+            state.cloud_token_input.clear();
+            state.cloud_token_error = None;
+            state.mode = BrowserMode::Browse;
+            TimeVaultAction::UpdateToken { token }
+        }
+        KeyCode::Char(c) => {
+            if state.cloud_token_input.len() < 100 {
+                state.cloud_token_input.push(c);
+            }
             TimeVaultAction::Continue
         }
         _ => TimeVaultAction::Continue,

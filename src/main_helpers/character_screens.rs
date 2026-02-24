@@ -213,11 +213,18 @@ pub fn handle_select_frame(
                             crate::ui::time_vault_scene::BrowserMode::DivergenceResolution;
                     }
                 }
+                CloudOpResult::TokenUpdated(new_config) => {
+                    *cloud_username = Some(new_config.username.clone());
+                    *cloud_status = CloudStatus::Linked;
+                    *cloud_config = Some(new_config);
+                }
                 CloudOpResult::Failed(msg) => {
                     if was_cloud_restore {
                         // Show the error in the cloud restore prompt
                         select_screen.cloud_restore_error = Some(msg);
                         *cloud_status = CloudStatus::Offline;
+                    } else if crate::history::cloud::is_auth_error(&msg) {
+                        *cloud_status = CloudStatus::TokenExpired;
                     } else {
                         *cloud_status = CloudStatus::Error(msg);
                     }
@@ -713,6 +720,33 @@ pub fn handle_select_frame(
                                         repo.list_commits(&br.name).unwrap_or_default();
                                     browser.selected_commit = 0;
                                 }
+                            }
+                        }
+                    }
+                    TimeVaultAction::UpdateToken { token } => {
+                        if !*cloud_op_in_flight {
+                            if let Some(ref config) = cloud_config {
+                                *cloud_op_in_flight = true;
+                                *cloud_status = CloudStatus::Syncing;
+                                browser.cloud_status = cloud_status.clone();
+                                let tx = cloud_tx.clone();
+                                let dir = quest_dir.to_path_buf();
+                                let cfg = config.clone();
+                                std::thread::spawn(move || {
+                                    let res = match crate::history::cloud::update_token(
+                                        &dir, &token, &cfg,
+                                    ) {
+                                        Ok(new_config) => CloudOpResult::TokenUpdated(new_config),
+                                        Err(e) => {
+                                            if crate::history::cloud::is_auth_error(&e) {
+                                                CloudOpResult::Failed("invalid token".to_string())
+                                            } else {
+                                                CloudOpResult::Failed(e)
+                                            }
+                                        }
+                                    };
+                                    let _ = tx.send(res);
+                                });
                             }
                         }
                     }
