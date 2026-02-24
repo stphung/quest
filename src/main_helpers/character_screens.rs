@@ -138,10 +138,45 @@ pub fn handle_select_frame(
             let was_cloud_restore = select_screen.cloud_restore_in_flight;
             select_screen.cloud_restore_in_flight = false;
             match result {
+                CloudOpResult::TokenValidated {
+                    username,
+                    token,
+                    repos,
+                } => {
+                    // Restore status based on whether we're already linked.
+                    *cloud_status = if cloud_config.is_some() {
+                        CloudStatus::Linked
+                    } else {
+                        CloudStatus::Offline
+                    };
+                    *cloud_username = Some(username);
+                    if let Some(ref mut browser) = time_vault_browser {
+                        browser.cloud_validated_token = Some(token);
+                        browser.cloud_repos = repos;
+                        browser.cloud_repo_selected = 0;
+                        browser.cloud_repo_input.clear();
+                        browser.cloud_username = cloud_username.clone();
+                        browser.cloud_current_repo = cloud_config
+                            .as_ref()
+                            .map(|c| crate::history::cloud::repo_name_from_url(&c.repo_url));
+                        browser.mode = crate::ui::time_vault_scene::BrowserMode::SelectingRepo;
+                    }
+                }
                 CloudOpResult::Linked(config) => {
                     *cloud_username = Some(config.username.clone());
                     *cloud_config = Some(config);
-                    *cloud_status = CloudStatus::Linked;
+                    // Check if remote has different data
+                    match crate::history::cloud::check_divergence(quest_dir) {
+                        Ok(Some(div)) => {
+                            *cloud_status = CloudStatus::OutOfSync;
+                            if let Some(ref mut browser) = time_vault_browser {
+                                browser.cloud_divergence = Some(div);
+                            }
+                        }
+                        _ => {
+                            *cloud_status = CloudStatus::Linked;
+                        }
+                    }
                     // If this was a cloud restore (link_and_pull), close the prompt
                     // and reload all state since saves were pulled from cloud.
                     if was_cloud_restore {
@@ -282,19 +317,37 @@ pub fn handle_select_frame(
                             select_screen.cloud_restore_showing = false;
                             select_screen.cloud_restore_dismissed = true;
                             select_screen.cloud_restore_input.clear();
+                            select_screen.cloud_restore_repo =
+                                crate::history::cloud::DEFAULT_REPO_NAME.to_string();
+                            select_screen.cloud_restore_field = 0;
                             select_screen.cloud_restore_error = None;
                         }
+                        KeyCode::Tab | KeyCode::BackTab => {
+                            select_screen.cloud_restore_field =
+                                1 - select_screen.cloud_restore_field;
+                        }
                         KeyCode::Backspace => {
-                            select_screen.cloud_restore_input.pop();
+                            if select_screen.cloud_restore_field == 0 {
+                                select_screen.cloud_restore_input.pop();
+                            } else {
+                                select_screen.cloud_restore_repo.pop();
+                            }
                             select_screen.cloud_restore_error = None;
                         }
                         KeyCode::Enter => {
                             if select_screen.cloud_restore_input.is_empty() {
                                 select_screen.cloud_restore_error =
                                     Some("Token cannot be empty".to_string());
+                            } else if select_screen.cloud_restore_repo.is_empty() {
+                                select_screen.cloud_restore_error =
+                                    Some("Repo name cannot be empty".to_string());
                             } else if !*cloud_op_in_flight {
                                 let token = select_screen.cloud_restore_input.clone();
+                                let repo_name = select_screen.cloud_restore_repo.clone();
                                 select_screen.cloud_restore_input.clear();
+                                select_screen.cloud_restore_repo =
+                                    crate::history::cloud::DEFAULT_REPO_NAME.to_string();
+                                select_screen.cloud_restore_field = 0;
                                 select_screen.cloud_restore_error = None;
                                 select_screen.cloud_restore_in_flight = true;
                                 *cloud_status = CloudStatus::Syncing;
@@ -302,19 +355,33 @@ pub fn handle_select_frame(
                                 let tx = cloud_tx.clone();
                                 let dir = quest_dir.to_path_buf();
                                 std::thread::spawn(move || {
-                                    let res =
-                                        match crate::history::cloud::link_and_pull(&dir, &token) {
-                                            Ok(config) => CloudOpResult::Linked(config),
-                                            Err(e) => CloudOpResult::Failed(e),
-                                        };
+                                    let res = match crate::history::cloud::link_and_pull(
+                                        &dir, &token, &repo_name,
+                                    ) {
+                                        Ok(config) => CloudOpResult::Linked(config),
+                                        Err(e) => CloudOpResult::Failed(e),
+                                    };
                                     let _ = tx.send(res);
                                 });
                             }
                         }
                         KeyCode::Char(c) => {
-                            if select_screen.cloud_restore_input.len() < 100 {
-                                select_screen.cloud_restore_input.push(c);
-                                select_screen.cloud_restore_error = None;
+                            if select_screen.cloud_restore_field == 0 {
+                                if select_screen.cloud_restore_input.len() < 100 {
+                                    select_screen.cloud_restore_input.push(c);
+                                    select_screen.cloud_restore_error = None;
+                                }
+                            } else {
+                                let c = c.to_ascii_lowercase();
+                                if (c.is_ascii_lowercase()
+                                    || c.is_ascii_digit()
+                                    || c == '-'
+                                    || c == '_')
+                                    && select_screen.cloud_restore_repo.len() < 30
+                                {
+                                    select_screen.cloud_restore_repo.push(c);
+                                    select_screen.cloud_restore_error = None;
+                                }
                             }
                         }
                         _ => {}
@@ -437,7 +504,58 @@ pub fn handle_select_frame(
                         }
                     }
                     TimeVaultAction::Continue => {}
-                    TimeVaultAction::LinkCloud { token } => {
+                    TimeVaultAction::ValidateToken { token } => {
+                        if !*cloud_op_in_flight {
+                            *cloud_op_in_flight = true;
+                            let tx = cloud_tx.clone();
+                            let tok = token;
+                            std::thread::spawn(move || {
+                                match crate::history::cloud::github_get_username(&tok) {
+                                    Ok(username) => {
+                                        let repos = crate::history::cloud::github_list_repos(&tok)
+                                            .unwrap_or_default();
+                                        let _ = tx.send(CloudOpResult::TokenValidated {
+                                            username,
+                                            token: tok,
+                                            repos,
+                                        });
+                                    }
+                                    Err(e) => {
+                                        let _ = tx.send(CloudOpResult::Failed(e));
+                                    }
+                                }
+                            });
+                            browser.cloud_status = CloudStatus::Syncing;
+                        }
+                    }
+                    TimeVaultAction::ChangeRepo => {
+                        if !*cloud_op_in_flight {
+                            if let Some(ref config) = cloud_config {
+                                *cloud_op_in_flight = true;
+                                let tx = cloud_tx.clone();
+                                let tok = config.token.clone();
+                                std::thread::spawn(move || {
+                                    match crate::history::cloud::github_get_username(&tok) {
+                                        Ok(username) => {
+                                            let repos =
+                                                crate::history::cloud::github_list_repos(&tok)
+                                                    .unwrap_or_default();
+                                            let _ = tx.send(CloudOpResult::TokenValidated {
+                                                username,
+                                                token: tok,
+                                                repos,
+                                            });
+                                        }
+                                        Err(e) => {
+                                            let _ = tx.send(CloudOpResult::Failed(e));
+                                        }
+                                    }
+                                });
+                                browser.cloud_status = CloudStatus::Syncing;
+                            }
+                        }
+                    }
+                    TimeVaultAction::LinkCloud { token, repo_name } => {
                         if !*cloud_op_in_flight {
                             *cloud_status = CloudStatus::Syncing;
                             *cloud_op_in_flight = true;
@@ -445,11 +563,13 @@ pub fn handle_select_frame(
                             let tx = cloud_tx.clone();
                             let dir = quest_dir.to_path_buf();
                             let tok = token;
+                            let rname = repo_name;
                             std::thread::spawn(move || {
-                                let res = match crate::history::cloud::link_github(&dir, &tok) {
-                                    Ok(config) => CloudOpResult::Linked(config),
-                                    Err(e) => CloudOpResult::Failed(e),
-                                };
+                                let res =
+                                    match crate::history::cloud::link_github(&dir, &tok, &rname) {
+                                        Ok(config) => CloudOpResult::Linked(config),
+                                        Err(e) => CloudOpResult::Failed(e),
+                                    };
                                 let _ = tx.send(res);
                             });
                         }

@@ -132,8 +132,12 @@ pub enum InputResult {
     SwitchSaveBranch { branch_name: String },
     /// Delete a save branch.
     DeleteSaveBranch { branch_name: String },
+    /// Validate a PAT and fetch repos for selection.
+    ValidateToken { token: String },
+    /// Change the linked cloud repo (re-use existing PAT from config).
+    ChangeRepo,
     /// Link a GitHub account for cloud sync.
-    LinkCloud { token: String },
+    LinkCloud { token: String, repo_name: String },
     /// Push all save branches to the cloud.
     PushCloud,
     /// Pull save branches from the cloud.

@@ -512,7 +512,9 @@ pub fn show_startup_splash_screen(
                         }
                         TimeVaultAction::Continue => {}
                         // Cloud operations are handled by the main loop (Task 8).
-                        TimeVaultAction::LinkCloud { .. }
+                        TimeVaultAction::ValidateToken { .. }
+                        | TimeVaultAction::ChangeRepo
+                        | TimeVaultAction::LinkCloud { .. }
                         | TimeVaultAction::PushCloud
                         | TimeVaultAction::PullCloud
                         | TimeVaultAction::UnlinkCloud

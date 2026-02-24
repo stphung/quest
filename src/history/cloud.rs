@@ -21,6 +21,9 @@ pub const DEFAULT_REPO_NAME: &str = "quest-saves";
 /// User-Agent header sent with GitHub API requests.
 const USER_AGENT: &str = "quest-cloud-sync";
 
+/// GitHub topic used to tag quest save repositories.
+const REPO_TOPIC: &str = "quest-time-vaults";
+
 /// GitHub API base URL.
 const GITHUB_API: &str = "https://api.github.com";
 
@@ -57,6 +60,12 @@ pub enum CloudStatus {
 pub enum CloudOpResult {
     /// Successfully linked to a remote. Contains the saved config.
     Linked(CloudConfig),
+    /// Token validated; here are the username and existing repos for selection.
+    TokenValidated {
+        username: String,
+        token: String,
+        repos: Vec<String>,
+    },
     /// All branches pushed to remote.
     Pushed,
     /// All branches pulled (fast-forwarded) from remote.
@@ -137,6 +146,90 @@ pub fn github_get_username(token: &str) -> Result<String, String> {
     Ok(resp.login)
 }
 
+/// List the authenticated user's repositories that may contain quest saves.
+///
+/// First tries the GitHub search API filtered by the `quest-time-vaults` topic.
+/// If no tagged repos are found, falls back to listing all user repos so that
+/// repos created before topic tagging was added still appear.
+pub fn github_list_repos(token: &str) -> Result<Vec<String>, String> {
+    let username = github_get_username(token)?;
+
+    // Try topic-filtered search first.
+    let tagged = github_list_repos_by_topic(token, &username)?;
+    if !tagged.is_empty() {
+        return Ok(tagged);
+    }
+
+    // Fallback: list all user repos (handles pre-topic repos).
+    github_list_all_user_repos(token)
+}
+
+/// Search for repos tagged with the quest topic.
+fn github_list_repos_by_topic(token: &str, username: &str) -> Result<Vec<String>, String> {
+    #[derive(Deserialize)]
+    struct SearchResult {
+        items: Vec<SearchItem>,
+    }
+    #[derive(Deserialize)]
+    struct SearchItem {
+        name: String,
+    }
+
+    let query = format!("topic:{REPO_TOPIC} user:{username}");
+    let url = format!(
+        "{GITHUB_API}/search/repositories?q={}&per_page=100",
+        urlencoded(&query)
+    );
+    let result: SearchResult = ureq::get(&url)
+        .header("User-Agent", USER_AGENT)
+        .header("Authorization", &format!("Bearer {token}"))
+        .header("Accept", "application/vnd.github+json")
+        .call()
+        .map_err(|e| format!("GitHub API error: {e}"))?
+        .into_body()
+        .read_json()
+        .map_err(|e| format!("Failed to parse search response: {e}"))?;
+
+    Ok(result.items.into_iter().map(|r| r.name).collect())
+}
+
+/// List all repositories owned by the authenticated user.
+fn github_list_all_user_repos(token: &str) -> Result<Vec<String>, String> {
+    #[derive(Deserialize)]
+    struct RepoItem {
+        name: String,
+    }
+
+    let url = format!("{GITHUB_API}/user/repos?per_page=100&sort=updated&affiliation=owner");
+    let repos: Vec<RepoItem> = ureq::get(&url)
+        .header("User-Agent", USER_AGENT)
+        .header("Authorization", &format!("Bearer {token}"))
+        .header("Accept", "application/vnd.github+json")
+        .call()
+        .map_err(|e| format!("GitHub API error: {e}"))?
+        .into_body()
+        .read_json()
+        .map_err(|e| format!("Failed to parse repos response: {e}"))?;
+
+    Ok(repos.into_iter().map(|r| r.name).collect())
+}
+
+/// Extract the repository name from a GitHub clone URL.
+///
+/// `https://github.com/user/repo-name.git` → `repo-name`
+pub fn repo_name_from_url(url: &str) -> String {
+    url.rsplit('/')
+        .next()
+        .unwrap_or(url)
+        .trim_end_matches(".git")
+        .to_string()
+}
+
+/// Minimal URL-encoding for query parameters.
+fn urlencoded(s: &str) -> String {
+    s.replace(' ', "+").replace(':', "%3A")
+}
+
 /// Ensure a private repository exists on GitHub, creating it if needed.
 ///
 /// Returns the HTTPS clone URL.
@@ -199,7 +292,27 @@ pub fn github_ensure_repo(token: &str, repo_name: &str) -> Result<String, String
         .read_json()
         .map_err(|e| format!("Failed to parse create-repo response: {e}"))?;
 
+    // Tag the new repo with our topic so it shows up in the repo picker.
+    github_set_topic(token, &username, repo_name);
+
     Ok(resp.clone_url)
+}
+
+/// Set the quest topic on a repository (best-effort, failure is non-fatal).
+fn github_set_topic(token: &str, owner: &str, repo_name: &str) {
+    #[derive(Serialize)]
+    struct TopicBody {
+        names: Vec<&'static str>,
+    }
+
+    let url = format!("{GITHUB_API}/repos/{owner}/{repo_name}/topics");
+    let _ = ureq::put(&url)
+        .header("User-Agent", USER_AGENT)
+        .header("Authorization", &format!("Bearer {token}"))
+        .header("Accept", "application/vnd.github+json")
+        .send_json(&TopicBody {
+            names: vec![REPO_TOPIC],
+        });
 }
 
 /// Transform an HTTPS clone URL into one with embedded token credentials.
@@ -449,12 +562,12 @@ pub fn fast_forward_all(quest_dir: &Path) -> Result<bool, String> {
 /// Link to GitHub: validate PAT, ensure repo, add remote, push all, save config.
 ///
 /// Returns the saved `CloudConfig` on success.
-pub fn link_github(quest_dir: &Path, token: &str) -> Result<CloudConfig, String> {
+pub fn link_github(quest_dir: &Path, token: &str, repo_name: &str) -> Result<CloudConfig, String> {
     // 1. Validate the token and get the username.
     let username = github_get_username(token)?;
 
     // 2. Ensure the remote repo exists.
-    let clone_url = github_ensure_repo(token, DEFAULT_REPO_NAME)?;
+    let clone_url = github_ensure_repo(token, repo_name)?;
 
     // 3. Add or update the git remote.
     let repo = Repository::open(quest_dir).map_err(|e| format!("Failed to open repo: {e}"))?;
@@ -471,8 +584,8 @@ pub fn link_github(quest_dir: &Path, token: &str) -> Result<CloudConfig, String>
     // 4. Configure fetch refspec so `fetch_all` works.
     configure_fetch_refspec(&repo)?;
 
-    // 5. Push all local branches.
-    push_all_branches(quest_dir, token)?;
+    // 5. Fetch remote refs (best-effort; empty repos will error, which is fine).
+    let _ = fetch_all(quest_dir, token);
 
     // 6. Save config.
     let config = CloudConfig {
@@ -488,12 +601,16 @@ pub fn link_github(quest_dir: &Path, token: &str) -> Result<CloudConfig, String>
 /// Link and pull: validate PAT, ensure repo, add remote, fetch, fast-forward, save config.
 ///
 /// Designed for new machines restoring saves from the cloud.
-pub fn link_and_pull(quest_dir: &Path, token: &str) -> Result<CloudConfig, String> {
+pub fn link_and_pull(
+    quest_dir: &Path,
+    token: &str,
+    repo_name: &str,
+) -> Result<CloudConfig, String> {
     // 1. Validate the token and get the username.
     let username = github_get_username(token)?;
 
     // 2. Ensure the remote repo exists.
-    let clone_url = github_ensure_repo(token, DEFAULT_REPO_NAME)?;
+    let clone_url = github_ensure_repo(token, repo_name)?;
 
     // 3. Add or update the git remote.
     let repo = Repository::open(quest_dir).map_err(|e| format!("Failed to open repo: {e}"))?;

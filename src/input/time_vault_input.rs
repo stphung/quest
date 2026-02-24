@@ -23,13 +23,18 @@ pub enum TimeVaultAction {
     SwitchBranch { branch_name: String },
     /// Delete a branch by name.
     DeleteBranch { branch_name: String },
-    /// Link a GitHub account with the given PAT.
+    /// Validate a PAT and fetch the user's repos for selection.
     #[allow(dead_code)]
-    LinkCloud { token: String },
+    ValidateToken { token: String },
+    /// Link a GitHub account with the given PAT and repo name.
+    #[allow(dead_code)]
+    LinkCloud { token: String, repo_name: String },
     /// Push all branches to cloud.
     PushCloud,
     /// Pull from cloud.
     PullCloud,
+    /// Change the linked cloud repo (re-use existing PAT).
+    ChangeRepo,
     /// Unlink the GitHub account.
     UnlinkCloud,
     /// Divergence resolution: keep local saves, force-push to cloud.
@@ -56,6 +61,7 @@ pub fn handle_time_vault_input(key: KeyEvent, state: &mut TimeVaultState) -> Tim
         BrowserMode::ConfirmDelete { .. } => handle_confirm_delete(key, state),
         BrowserMode::NamingFork { .. } => handle_naming_fork(key, state),
         BrowserMode::LinkingCloud => handle_link_cloud(key, state),
+        BrowserMode::SelectingRepo => handle_selecting_repo(key, state),
         BrowserMode::ConfirmPush => handle_confirm_push(key, state),
         BrowserMode::ConfirmPull => handle_confirm_pull(key, state),
         BrowserMode::ConfirmUnlink => handle_confirm_unlink(key, state),
@@ -216,6 +222,19 @@ fn handle_browse(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAction {
                 );
                 if is_linked {
                     state.mode = BrowserMode::ConfirmPull;
+                }
+            }
+            TimeVaultAction::Continue
+        }
+        KeyCode::Char('r') | KeyCode::Char('R') => {
+            if state.focus == PanelFocus::Left {
+                use crate::history::cloud::CloudStatus;
+                let is_linked = !matches!(
+                    &state.cloud_status,
+                    CloudStatus::Offline | CloudStatus::Syncing
+                );
+                if is_linked {
+                    return TimeVaultAction::ChangeRepo;
                 }
             }
             TimeVaultAction::Continue
@@ -390,12 +409,93 @@ fn handle_link_cloud(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultActi
             let token = state.cloud_token_input.clone();
             state.cloud_token_input.clear();
             state.cloud_token_error = None;
-            state.mode = BrowserMode::Browse;
-            TimeVaultAction::LinkCloud { token }
+            state.mode = BrowserMode::Browse; // Will transition to SelectingRepo on result
+            TimeVaultAction::ValidateToken { token }
         }
         KeyCode::Char(c) => {
             if state.cloud_token_input.len() < 100 {
                 state.cloud_token_input.push(c);
+            }
+            TimeVaultAction::Continue
+        }
+        _ => TimeVaultAction::Continue,
+    }
+}
+
+fn handle_selecting_repo(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAction {
+    // List has existing repos + one "Create new" entry at the end.
+    let total = state.cloud_repos.len() + 1;
+
+    match key.code {
+        KeyCode::Esc => {
+            state.cloud_validated_token = None;
+            state.cloud_repos.clear();
+            state.cloud_repo_selected = 0;
+            state.cloud_repo_input.clear();
+            state.cloud_link_field = 0;
+            state.cloud_token_error = None;
+            state.mode = BrowserMode::Browse;
+            TimeVaultAction::Continue
+        }
+        KeyCode::Up => {
+            if state.cloud_repo_selected > 0 {
+                state.cloud_repo_selected -= 1;
+            }
+            // Reset input field when switching away from "Create new"
+            if state.cloud_repo_selected < state.cloud_repos.len() {
+                state.cloud_link_field = 0;
+            }
+            TimeVaultAction::Continue
+        }
+        KeyCode::Down => {
+            if state.cloud_repo_selected < total - 1 {
+                state.cloud_repo_selected += 1;
+            }
+            TimeVaultAction::Continue
+        }
+        KeyCode::Enter => {
+            let token = match state.cloud_validated_token.take() {
+                Some(t) => t,
+                None => return TimeVaultAction::Continue,
+            };
+            let repo_name = if state.cloud_repo_selected < state.cloud_repos.len() {
+                state.cloud_repos[state.cloud_repo_selected].clone()
+            } else {
+                // "Create new" selected
+                let name = state.cloud_repo_input.clone();
+                if name.is_empty() {
+                    state.cloud_token_error = Some("repo name cannot be empty".to_string());
+                    state.cloud_validated_token = Some(token);
+                    return TimeVaultAction::Continue;
+                }
+                name
+            };
+            state.cloud_repos.clear();
+            state.cloud_repo_selected = 0;
+            state.cloud_repo_input.clear();
+            state.cloud_link_field = 0;
+            state.cloud_token_error = None;
+            state.mode = BrowserMode::Browse;
+            TimeVaultAction::LinkCloud { token, repo_name }
+        }
+        KeyCode::Backspace => {
+            // Only editable when "Create new" is selected
+            if state.cloud_repo_selected >= state.cloud_repos.len() {
+                state.cloud_repo_input.pop();
+                state.cloud_token_error = None;
+            }
+            TimeVaultAction::Continue
+        }
+        KeyCode::Char(c) => {
+            // Only accept input when "Create new" is selected
+            if state.cloud_repo_selected >= state.cloud_repos.len() {
+                let c = c.to_ascii_lowercase();
+                if (c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
+                    && state.cloud_repo_input.len() < 30
+                {
+                    state.cloud_repo_input.push(c);
+                    state.cloud_token_error = None;
+                }
             }
             TimeVaultAction::Continue
         }

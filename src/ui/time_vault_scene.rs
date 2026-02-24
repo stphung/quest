@@ -49,6 +49,8 @@ pub enum BrowserMode {
     NamingFork { commit_id: String },
     /// Typing a GitHub PAT to link the account.
     LinkingCloud,
+    /// Selecting a repo after token validation.
+    SelectingRepo,
     /// Waiting for confirmation to push to cloud.
     ConfirmPush,
     /// Waiting for confirmation to pull from cloud.
@@ -86,8 +88,18 @@ pub struct TimeVaultState {
     pub cloud_status: crate::history::cloud::CloudStatus,
     pub cloud_username: Option<String>,
     pub cloud_token_input: String,
+    pub cloud_repo_input: String,
+    pub cloud_link_field: u8, // 0 = token, 1 = repo name
     pub cloud_token_error: Option<String>,
+    /// Validated token stored while selecting a repo.
+    pub cloud_validated_token: Option<String>,
+    /// Existing repos fetched from GitHub for selection.
+    pub cloud_repos: Vec<String>,
+    /// Selected index in the repo list (last item = "create new").
+    pub cloud_repo_selected: usize,
     pub cloud_divergence: Option<crate::history::cloud::BranchDivergence>,
+    /// Name of the currently linked repo (for highlighting in the picker).
+    pub cloud_current_repo: Option<String>,
 }
 
 impl TimeVaultState {
@@ -97,7 +109,7 @@ impl TimeVaultState {
             selected_branch: 0,
             commits,
             selected_commit: 0,
-            focus: PanelFocus::Right,
+            focus: PanelFocus::Left,
             mode: BrowserMode::Browse,
             fork_name_input: String::new(),
             fork_name_error: None,
@@ -106,8 +118,14 @@ impl TimeVaultState {
             cloud_status: crate::history::cloud::CloudStatus::Offline,
             cloud_username: None,
             cloud_token_input: String::new(),
+            cloud_repo_input: crate::history::cloud::DEFAULT_REPO_NAME.to_string(),
+            cloud_link_field: 0,
             cloud_token_error: None,
+            cloud_validated_token: None,
+            cloud_repos: Vec::new(),
+            cloud_repo_selected: 0,
             cloud_divergence: None,
+            cloud_current_repo: None,
         }
     }
 
@@ -525,7 +543,7 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
     let is_fork = matches!(state.mode, BrowserMode::NamingFork { .. });
     let is_cloud_wide = matches!(
         state.mode,
-        BrowserMode::LinkingCloud | BrowserMode::DivergenceResolution
+        BrowserMode::LinkingCloud | BrowserMode::SelectingRepo | BrowserMode::DivergenceResolution
     );
     let base_w = if is_fork || is_cloud_wide {
         56usize
@@ -544,7 +562,19 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
                 14
             }
         }
-        BrowserMode::LinkingCloud => 10,
+        BrowserMode::LinkingCloud => 12,
+        BrowserMode::SelectingRepo => {
+            // 3 (title + blank + header) + repos + 1 (create new) + 2 (blank + controls)
+            // + optional error line. Cap at reasonable max.
+            let items = state.cloud_repos.len() + 1; // repos + "Create new"
+            let base = 3 + items + 3;
+            let extra = if state.cloud_token_error.is_some() {
+                1
+            } else {
+                0
+            };
+            (base + extra).min(20)
+        }
         BrowserMode::ConfirmPush | BrowserMode::ConfirmPull | BrowserMode::ConfirmUnlink => 7,
         BrowserMode::DivergenceResolution => 12,
         BrowserMode::Browse => return,
@@ -744,15 +774,32 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
         }
         BrowserMode::LinkingCloud => {
             put_text(buffer, cy, cx, "Link GitHub Account", Color::White);
+
+            // PAT creation instructions.
+            put_text(buffer, cy + 2, cx, "1.", Color::DarkGray);
+            put_text(buffer, cy + 2, cx + 3, "Go to", Color::DarkGray);
             put_text(
                 buffer,
                 cy + 2,
-                cx,
-                "Enter a Personal Access Token:",
+                cx + 9,
+                "github.com/settings/tokens",
+                Color::Cyan,
+            );
+            put_text(
+                buffer,
+                cy + 3,
+                cx + 3,
+                "Tokens (classic) > Generate",
                 Color::DarkGray,
             );
+            put_text(buffer, cy + 4, cx, "2.", Color::DarkGray);
+            put_text(buffer, cy + 4, cx + 3, "Select scope:", Color::DarkGray);
+            put_text(buffer, cy + 4, cx + 17, "repo", Color::Yellow);
+            put_text(buffer, cy + 5, cx, "3.", Color::DarkGray);
+            put_text(buffer, cy + 5, cx + 3, "Paste token below", Color::DarkGray);
 
-            // Mask token: show dots for all but last 4 chars.
+            // Token input.
+            put_text(buffer, cy + 7, cx, "Token:", Color::DarkGray);
             let raw = &state.cloud_token_input;
             let masked = if raw.len() <= 4 {
                 format!("{}_", raw)
@@ -760,18 +807,76 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
                 let dots: String = "\u{2022}".repeat(raw.len() - 4);
                 format!("{}{}_", dots, &raw[raw.len() - 4..])
             };
-            put_text(buffer, cy + 4, cx, &masked, Color::Yellow);
+            put_text(buffer, cy + 7, cx + 7, &masked, Color::Yellow);
 
-            let mut ctrl_row = cy + 6;
+            let mut ctrl_row = cy + 9;
             if let Some(err) = &state.cloud_token_error {
-                put_text(buffer, cy + 5, cx, err, Color::Red);
-                ctrl_row = cy + 7;
+                put_text(buffer, cy + 9, cx, err, Color::Red);
+                ctrl_row = cy + 10;
             }
 
             put_text(buffer, ctrl_row, cx, "[Enter]", Color::Cyan);
-            put_text(buffer, ctrl_row, cx + 8, "Link", Color::DarkGray);
+            put_text(buffer, ctrl_row, cx + 8, "Next", Color::DarkGray);
             put_text(buffer, ctrl_row, cx + 15, "[Esc]", Color::Cyan);
             put_text(buffer, ctrl_row, cx + 21, "Cancel", Color::DarkGray);
+        }
+        BrowserMode::SelectingRepo => {
+            put_text(buffer, cy, cx, "Select Repository", Color::White);
+            put_text(
+                buffer,
+                cy + 1,
+                cx,
+                "Choose a repo or create new:",
+                Color::DarkGray,
+            );
+
+            let mut row = cy + 3;
+            for (i, name) in state.cloud_repos.iter().enumerate() {
+                let selected = i == state.cloud_repo_selected;
+                let is_current = state.cloud_current_repo.as_ref().is_some_and(|c| c == name);
+                let marker = if selected { "\u{25b8} " } else { "  " };
+                let color = if selected {
+                    Color::Yellow
+                } else if is_current {
+                    Color::Cyan
+                } else {
+                    Color::White
+                };
+                put_text(buffer, row, cx, marker, color);
+                put_text(buffer, row, cx + 2, name, color);
+                if is_current {
+                    let tag_x = cx + 2 + name.len() as i32 + 1;
+                    put_text(buffer, row, tag_x, "(current)", Color::DarkGray);
+                }
+                row += 1;
+            }
+
+            // "Create new" entry at the end.
+            let create_idx = state.cloud_repos.len();
+            let selected = state.cloud_repo_selected == create_idx;
+            let marker = if selected { "\u{25b8} " } else { "  " };
+            let color = if selected { Color::Yellow } else { Color::Cyan };
+            put_text(buffer, row, cx, marker, color);
+            if selected {
+                put_text(buffer, row, cx + 2, "New: ", Color::Cyan);
+                let val = format!("{}_", state.cloud_repo_input);
+                put_text(buffer, row, cx + 7, &val, Color::Yellow);
+            } else {
+                put_text(buffer, row, cx + 2, "Create new repo...", color);
+            }
+            row += 1;
+
+            if let Some(err) = &state.cloud_token_error {
+                row += 1;
+                put_text(buffer, row, cx, err, Color::Red);
+                row += 1;
+            }
+
+            row += 1;
+            put_text(buffer, row, cx, "[Enter]", Color::Cyan);
+            put_text(buffer, row, cx + 8, "Select", Color::DarkGray);
+            put_text(buffer, row, cx + 17, "[Esc]", Color::Cyan);
+            put_text(buffer, row, cx + 23, "Cancel", Color::DarkGray);
         }
         BrowserMode::ConfirmPush => {
             put_text(buffer, cy, cx, "Push to cloud?", Color::White);
@@ -889,10 +994,10 @@ fn paint_cloud_status(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
     let (text, color) = match &state.cloud_status {
         CloudStatus::Offline => ("\u{2298} offline".to_string(), Color::DarkGray),
         CloudStatus::Linked => {
-            let label = if let Some(ref name) = state.cloud_username {
-                format!("\u{2601} {}", name)
-            } else {
-                "\u{2601} linked".to_string()
+            let label = match (&state.cloud_username, &state.cloud_current_repo) {
+                (Some(user), Some(repo)) => format!("\u{2601} {user}/{repo}"),
+                (Some(user), None) => format!("\u{2601} {user}"),
+                _ => "\u{2601} linked".to_string(),
             };
             (label, Color::Cyan)
         }
@@ -918,6 +1023,7 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
         | BrowserMode::ConfirmDelete { .. }
         | BrowserMode::NamingFork { .. }
         | BrowserMode::LinkingCloud
+        | BrowserMode::SelectingRepo
         | BrowserMode::ConfirmPush
         | BrowserMode::ConfirmPull
         | BrowserMode::ConfirmUnlink
@@ -966,6 +1072,15 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
                                 spans.push(Span::styled("[V] ", Style::default().fg(Color::Cyan)));
                                 spans.push(Span::styled(
                                     "Pull",
+                                    Style::default().fg(Color::DarkGray),
+                                ));
+                                spans.push(Span::styled(
+                                    " \u{00b7} ",
+                                    Style::default().fg(Color::Rgb(40, 80, 120)),
+                                ));
+                                spans.push(Span::styled("[R] ", Style::default().fg(Color::Cyan)));
+                                spans.push(Span::styled(
+                                    "Repo",
                                     Style::default().fg(Color::DarkGray),
                                 ));
                             }

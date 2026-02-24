@@ -103,7 +103,9 @@ pub fn route_game_input(
         | InputResult::DeleteSaveBranch { .. } => InputAction::Continue,
         // Cloud actions are handled directly in main.rs before reaching
         // route_game_input, but must be matched for exhaustiveness.
-        InputResult::LinkCloud { .. }
+        InputResult::ValidateToken { .. }
+        | InputResult::ChangeRepo
+        | InputResult::LinkCloud { .. }
         | InputResult::PushCloud
         | InputResult::PullCloud
         | InputResult::UnlinkCloud
