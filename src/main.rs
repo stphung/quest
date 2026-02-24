@@ -1106,22 +1106,38 @@ fn main() -> io::Result<()> {
                                     let tx = cloud_tx.clone();
                                     let tok = token.clone();
                                     std::thread::spawn(move || {
-                                        match history::cloud::github_get_username(&tok) {
-                                            Ok(username) => {
-                                                let repos = history::cloud::github_list_repos(&tok)
-                                                    .unwrap_or_default();
-                                                let _ = tx.send(
-                                                    history::cloud::CloudOpResult::TokenValidated {
-                                                        username,
-                                                        token: tok,
-                                                        repos,
-                                                    },
-                                                );
-                                            }
-                                            Err(e) => {
-                                                let _ = tx
-                                                    .send(history::cloud::CloudOpResult::Failed(e));
-                                            }
+                                        let tx2 = tx.clone();
+                                        let result = std::panic::catch_unwind(
+                                            std::panic::AssertUnwindSafe(|| {
+                                                match history::cloud::github_get_username(&tok) {
+                                                    Ok(username) => {
+                                                        let repos =
+                                                            history::cloud::github_list_repos(&tok)
+                                                                .unwrap_or_default();
+                                                        let _ = tx.send(
+                                                        history::cloud::CloudOpResult::TokenValidated {
+                                                            username,
+                                                            token: tok,
+                                                            repos,
+                                                        },
+                                                    );
+                                                    }
+                                                    Err(e) => {
+                                                        let _ = tx.send(
+                                                            history::cloud::CloudOpResult::Failed(
+                                                                e,
+                                                            ),
+                                                        );
+                                                    }
+                                                }
+                                            }),
+                                        );
+                                        if result.is_err() {
+                                            let _ =
+                                                tx2.send(history::cloud::CloudOpResult::Failed(
+                                                    "Cloud operation failed unexpectedly"
+                                                        .to_string(),
+                                                ));
                                         }
                                     });
                                     if let GameOverlay::TimeVault { ref mut browser } = overlay {
@@ -1139,24 +1155,40 @@ fn main() -> io::Result<()> {
                                         let tx = cloud_tx.clone();
                                         let tok = config.token.clone();
                                         std::thread::spawn(move || {
-                                            match history::cloud::github_get_username(&tok) {
-                                                Ok(username) => {
-                                                    let repos =
-                                                        history::cloud::github_list_repos(&tok)
-                                                            .unwrap_or_default();
-                                                    let _ = tx.send(
-                                                        history::cloud::CloudOpResult::TokenValidated {
-                                                            username,
-                                                            token: tok,
-                                                            repos,
-                                                        },
-                                                    );
-                                                }
-                                                Err(e) => {
-                                                    let _ = tx.send(
-                                                        history::cloud::CloudOpResult::Failed(e),
-                                                    );
-                                                }
+                                            let tx2 = tx.clone();
+                                            let result = std::panic::catch_unwind(
+                                                std::panic::AssertUnwindSafe(|| {
+                                                    match history::cloud::github_get_username(&tok)
+                                                    {
+                                                        Ok(username) => {
+                                                            let repos =
+                                                                history::cloud::github_list_repos(
+                                                                    &tok,
+                                                                )
+                                                                .unwrap_or_default();
+                                                            let _ = tx.send(
+                                                            history::cloud::CloudOpResult::TokenValidated {
+                                                                username,
+                                                                token: tok,
+                                                                repos,
+                                                            },
+                                                        );
+                                                        }
+                                                        Err(e) => {
+                                                            let _ = tx.send(
+                                                            history::cloud::CloudOpResult::Failed(e),
+                                                        );
+                                                        }
+                                                    }
+                                                }),
+                                            );
+                                            if result.is_err() {
+                                                let _ = tx2.send(
+                                                    history::cloud::CloudOpResult::Failed(
+                                                        "Cloud operation failed unexpectedly"
+                                                            .to_string(),
+                                                    ),
+                                                );
                                             }
                                         });
                                         if let GameOverlay::TimeVault { ref mut browser } = overlay
@@ -1182,14 +1214,31 @@ fn main() -> io::Result<()> {
                                     let tok = token.clone();
                                     let rname = repo_name.clone();
                                     std::thread::spawn(move || {
-                                        let res =
-                                            match history::cloud::link_github(&dir, &tok, &rname) {
-                                                Ok(config) => {
-                                                    history::cloud::CloudOpResult::Linked(config)
-                                                }
-                                                Err(e) => history::cloud::CloudOpResult::Failed(e),
-                                            };
-                                        let _ = tx.send(res);
+                                        let tx2 = tx.clone();
+                                        let result = std::panic::catch_unwind(
+                                            std::panic::AssertUnwindSafe(|| {
+                                                let res = match history::cloud::link_github(
+                                                    &dir, &tok, &rname,
+                                                ) {
+                                                    Ok(config) => {
+                                                        history::cloud::CloudOpResult::Linked(
+                                                            config,
+                                                        )
+                                                    }
+                                                    Err(e) => {
+                                                        history::cloud::CloudOpResult::Failed(e)
+                                                    }
+                                                };
+                                                let _ = tx.send(res);
+                                            }),
+                                        );
+                                        if result.is_err() {
+                                            let _ =
+                                                tx2.send(history::cloud::CloudOpResult::Failed(
+                                                    "Cloud operation failed unexpectedly"
+                                                        .to_string(),
+                                                ));
+                                        }
                                     });
                                     if let GameOverlay::TimeVault { ref mut browser } = overlay {
                                         browser.cloud_status = cloud_status.clone();
@@ -1207,15 +1256,28 @@ fn main() -> io::Result<()> {
                                         let dir = quest_dir.clone();
                                         let tok = config.token.clone();
                                         std::thread::spawn(move || {
-                                            let res =
-                                                match history::cloud::push_all_branches(&dir, &tok)
-                                                {
-                                                    Ok(()) => history::cloud::CloudOpResult::Pushed,
-                                                    Err(e) => {
-                                                        history::cloud::CloudOpResult::Failed(e)
-                                                    }
-                                                };
-                                            let _ = tx.send(res);
+                                            let tx2 = tx.clone();
+                                            let result = std::panic::catch_unwind(
+                                                std::panic::AssertUnwindSafe(|| {
+                                                    let res =
+                                                    match history::cloud::push_all_branches(&dir, &tok)
+                                                    {
+                                                        Ok(()) => history::cloud::CloudOpResult::Pushed,
+                                                        Err(e) => {
+                                                            history::cloud::CloudOpResult::Failed(e)
+                                                        }
+                                                    };
+                                                    let _ = tx.send(res);
+                                                }),
+                                            );
+                                            if result.is_err() {
+                                                let _ = tx2.send(
+                                                    history::cloud::CloudOpResult::Failed(
+                                                        "Cloud operation failed unexpectedly"
+                                                            .to_string(),
+                                                    ),
+                                                );
+                                            }
                                         });
                                         if let GameOverlay::TimeVault { ref mut browser } = overlay
                                         {
@@ -1235,36 +1297,52 @@ fn main() -> io::Result<()> {
                                         let dir = quest_dir.clone();
                                         let tok = config.token.clone();
                                         std::thread::spawn(move || {
-                                            let res = (|| -> history::cloud::CloudOpResult {
-                                                if let Err(e) =
-                                                    history::cloud::fetch_all(&dir, &tok)
-                                                {
-                                                    return history::cloud::CloudOpResult::Failed(
-                                                        e,
-                                                    );
-                                                }
-                                                match history::cloud::check_divergence(&dir) {
-                                                    Ok(Some(div)) => {
-                                                        history::cloud::CloudOpResult::Diverged(div)
-                                                    }
-                                                    Ok(None) => {
-                                                        match history::cloud::fast_forward_all(&dir)
-                                                        {
-                                                            Ok(_) => {
-                                                                history::cloud::CloudOpResult::Pulled
+                                            let tx2 = tx.clone();
+                                            let result = std::panic::catch_unwind(
+                                                std::panic::AssertUnwindSafe(|| {
+                                                    let res =
+                                                        (|| -> history::cloud::CloudOpResult {
+                                                            if let Err(e) =
+                                                                history::cloud::fetch_all(
+                                                                    &dir, &tok,
+                                                                )
+                                                            {
+                                                                return history::cloud::CloudOpResult::Failed(
+                                                            e,
+                                                        );
                                                             }
-                                                            Err(e) => {
-                                                                history::cloud::CloudOpResult::Failed(e)
+                                                            match history::cloud::check_divergence(&dir) {
+                                                        Ok(Some(div)) => {
+                                                            history::cloud::CloudOpResult::Diverged(div)
+                                                        }
+                                                        Ok(None) => {
+                                                            match history::cloud::fast_forward_all(&dir)
+                                                            {
+                                                                Ok(_) => {
+                                                                    history::cloud::CloudOpResult::Pulled
+                                                                }
+                                                                Err(e) => {
+                                                                    history::cloud::CloudOpResult::Failed(e)
+                                                                }
                                                             }
                                                         }
+                                                        Err(e) => {
+                                                            history::cloud::CloudOpResult::Failed(e)
+                                                        }
                                                     }
-                                                    Err(e) => {
-                                                        history::cloud::CloudOpResult::Failed(e)
-                                                    }
-                                                }
-                                            })(
+                                                        })(
+                                                        );
+                                                    let _ = tx.send(res);
+                                                }),
                                             );
-                                            let _ = tx.send(res);
+                                            if result.is_err() {
+                                                let _ = tx2.send(
+                                                    history::cloud::CloudOpResult::Failed(
+                                                        "Cloud operation failed unexpectedly"
+                                                            .to_string(),
+                                                    ),
+                                                );
+                                            }
                                         });
                                         if let GameOverlay::TimeVault { ref mut browser } = overlay
                                         {
@@ -1300,25 +1378,38 @@ fn main() -> io::Result<()> {
                                         let cfg = config.clone();
                                         let tx = cloud_tx.clone();
                                         std::thread::spawn(move || {
-                                            let result = match history::cloud::update_token(
-                                                &quest, &token, &cfg,
-                                            ) {
-                                                Ok(new_config) => {
-                                                    history::cloud::CloudOpResult::TokenUpdated(
-                                                        new_config,
-                                                    )
-                                                }
-                                                Err(e) => {
-                                                    if history::cloud::is_auth_error(&e) {
-                                                        history::cloud::CloudOpResult::Failed(
-                                                            "invalid token".to_string(),
+                                            let tx2 = tx.clone();
+                                            let result = std::panic::catch_unwind(
+                                                std::panic::AssertUnwindSafe(|| {
+                                                    let op_result = match history::cloud::update_token(
+                                                    &quest, &token, &cfg,
+                                                ) {
+                                                    Ok(new_config) => {
+                                                        history::cloud::CloudOpResult::TokenUpdated(
+                                                            new_config,
                                                         )
-                                                    } else {
-                                                        history::cloud::CloudOpResult::Failed(e)
                                                     }
-                                                }
-                                            };
-                                            let _ = tx.send(result);
+                                                    Err(e) => {
+                                                        if history::cloud::is_auth_error(&e) {
+                                                            history::cloud::CloudOpResult::Failed(
+                                                                "invalid token".to_string(),
+                                                            )
+                                                        } else {
+                                                            history::cloud::CloudOpResult::Failed(e)
+                                                        }
+                                                    }
+                                                };
+                                                    let _ = tx.send(op_result);
+                                                }),
+                                            );
+                                            if result.is_err() {
+                                                let _ = tx2.send(
+                                                    history::cloud::CloudOpResult::Failed(
+                                                        "Cloud operation failed unexpectedly"
+                                                            .to_string(),
+                                                    ),
+                                                );
+                                            }
                                         });
                                     }
                                 }
@@ -1334,13 +1425,26 @@ fn main() -> io::Result<()> {
                                         let dir = quest_dir.clone();
                                         let tok = config.token.clone();
                                         std::thread::spawn(move || {
-                                            let res = match history::cloud::force_push_branch(
-                                                &dir, "main", &tok,
-                                            ) {
-                                                Ok(()) => history::cloud::CloudOpResult::Pushed,
-                                                Err(e) => history::cloud::CloudOpResult::Failed(e),
-                                            };
-                                            let _ = tx.send(res);
+                                            let tx2 = tx.clone();
+                                            let result = std::panic::catch_unwind(
+                                                std::panic::AssertUnwindSafe(|| {
+                                                    let res = match history::cloud::force_push_branch(
+                                                    &dir, "main", &tok,
+                                                ) {
+                                                    Ok(()) => history::cloud::CloudOpResult::Pushed,
+                                                    Err(e) => history::cloud::CloudOpResult::Failed(e),
+                                                };
+                                                    let _ = tx.send(res);
+                                                }),
+                                            );
+                                            if result.is_err() {
+                                                let _ = tx2.send(
+                                                    history::cloud::CloudOpResult::Failed(
+                                                        "Cloud operation failed unexpectedly"
+                                                            .to_string(),
+                                                    ),
+                                                );
+                                            }
                                         });
                                         if let GameOverlay::TimeVault { ref mut browser } = overlay
                                         {
@@ -1703,15 +1807,28 @@ fn main() -> io::Result<()> {
                                         let dir = quest_dir.clone();
                                         let tok = config.token.clone();
                                         std::thread::spawn(move || {
-                                            let res =
-                                                match history::cloud::push_all_branches(&dir, &tok)
-                                                {
-                                                    Ok(()) => history::cloud::CloudOpResult::Pushed,
-                                                    Err(e) => {
-                                                        history::cloud::CloudOpResult::Failed(e)
-                                                    }
-                                                };
-                                            let _ = tx.send(res);
+                                            let tx2 = tx.clone();
+                                            let result = std::panic::catch_unwind(
+                                                std::panic::AssertUnwindSafe(|| {
+                                                    let res =
+                                                    match history::cloud::push_all_branches(&dir, &tok)
+                                                    {
+                                                        Ok(()) => history::cloud::CloudOpResult::Pushed,
+                                                        Err(e) => {
+                                                            history::cloud::CloudOpResult::Failed(e)
+                                                        }
+                                                    };
+                                                    let _ = tx.send(res);
+                                                }),
+                                            );
+                                            if result.is_err() {
+                                                let _ = tx2.send(
+                                                    history::cloud::CloudOpResult::Failed(
+                                                        "Cloud operation failed unexpectedly"
+                                                            .to_string(),
+                                                    ),
+                                                );
+                                            }
                                         });
                                     }
                                 }
