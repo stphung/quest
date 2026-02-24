@@ -1264,11 +1264,20 @@ pub fn render_chrono_surge_time_warp(
     let shimmer_millis =
         (millis as f64 * (0.62 + global_speed_mult * 0.16 + launch_curve * 0.18)) as u128;
 
+    // Overcharged surges use a gold/amber palette instead of cyan/blue
     let pulse_t = ((shimmer_millis as f64 / 260.0).sin() * 0.5 + 0.5).clamp(0.0, 1.0);
-    let pulse_rgb = lerp_rgb((120, 220, 255), (235, 245, 255), pulse_t);
+    let pulse_rgb = if surge.overcharged {
+        lerp_rgb((255, 180, 40), (255, 240, 150), pulse_t)
+    } else {
+        lerp_rgb((120, 220, 255), (235, 245, 255), pulse_t)
+    };
     let pulse_color = Color::Rgb(pulse_rgb.0, pulse_rgb.1, pulse_rgb.2);
     let accent_t = ((shimmer_millis as f64 / 190.0).sin() * 0.5 + 0.5).clamp(0.0, 1.0);
-    let accent_rgb = lerp_rgb((90, 160, 245), (170, 225, 255), accent_t);
+    let accent_rgb = if surge.overcharged {
+        lerp_rgb((200, 130, 0), (255, 200, 60), accent_t)
+    } else {
+        lerp_rgb((90, 160, 245), (170, 225, 255), accent_t)
+    };
     let accent_color = Color::Rgb(accent_rgb.0, accent_rgb.1, accent_rgb.2);
 
     let badge = format!("⏩ x{} warp {:>3}%", surge.current_batch_size(), pct);
@@ -1309,7 +1318,11 @@ pub fn render_chrono_surge_time_warp(
         let glyph = if depth % 2 == 0 { '╱' } else { '╲' };
         let guide_t = ((shimmer_millis as f64 / (280.0 + depth as f64 * 22.0)).sin() * 0.5 + 0.5)
             .clamp(0.0, 1.0);
-        let guide_rgb = lerp_rgb((55, 92, 150), (110, 170, 235), guide_t);
+        let guide_rgb = if surge.overcharged {
+            lerp_rgb((140, 90, 0), (220, 160, 30), guide_t)
+        } else {
+            lerp_rgb((55, 92, 150), (110, 170, 235), guide_t)
+        };
         let guide_color = Color::Rgb(guide_rgb.0, guide_rgb.1, guide_rgb.2);
 
         draw_single_overlay_glyph(frame, area, x_l, y_top, glyph, guide_color);
@@ -1366,7 +1379,11 @@ pub fn render_chrono_surge_time_warp(
 
                 let seg_t = seg as f64 / trail_len.max(1) as f64;
                 let heat = ((1.0 - seg_t) * (0.38 + 0.62 * pull_t)).clamp(0.0, 1.0);
-                let rgb = lerp_rgb((58, 102, 182), (235, 248, 255), heat);
+                let rgb = if surge.overcharged {
+                    lerp_rgb((140, 80, 0), (255, 230, 100), heat)
+                } else {
+                    lerp_rgb((58, 102, 182), (235, 248, 255), heat)
+                };
                 let color = Color::Rgb(rgb.0, rgb.1, rgb.2);
                 let ch = if seg == 0 {
                     if pull_t > 0.85 {
@@ -1388,35 +1405,76 @@ pub fn render_chrono_surge_time_warp(
 
     // Center focal point pulses brighter as boost kicks in.
     let core_pulse_t = ((shimmer_millis as f64 / 140.0).sin() * 0.5 + 0.5).clamp(0.0, 1.0);
-    let core_rgb = lerp_rgb((150, 225, 255), (255, 255, 255), core_pulse_t);
+    let core_rgb = if surge.overcharged {
+        lerp_rgb((255, 200, 50), (255, 255, 200), core_pulse_t)
+    } else {
+        lerp_rgb((150, 225, 255), (255, 255, 255), core_pulse_t)
+    };
     let core_color = Color::Rgb(core_rgb.0, core_rgb.1, core_rgb.2);
     let core_char = if booster_curve > 0.30 { '✹' } else { '◎' };
     draw_single_overlay_glyph(frame, area, cx, cy, core_char, core_color);
-    draw_single_overlay_glyph(frame, area, cx - 1, cy, '◌', TIMEWARP_MID);
-    draw_single_overlay_glyph(frame, area, cx + 1, cy, '◌', TIMEWARP_MID);
+    let mid_color = if surge.overcharged {
+        Color::Rgb(180, 130, 0)
+    } else {
+        TIMEWARP_MID
+    };
+    draw_single_overlay_glyph(frame, area, cx - 1, cy, '◌', mid_color);
+    draw_single_overlay_glyph(frame, area, cx + 1, cy, '◌', mid_color);
     draw_single_overlay_glyph(frame, area, cx, cy - 1, '◌', accent_color);
     draw_single_overlay_glyph(frame, area, cx, cy + 1, '◌', accent_color);
 
-    // Overcharge flash overlay — show for first 1.5 seconds
+    // Overcharge flash overlay — dramatic 2-second intro
     if surge.overcharged {
         let now = current_millis();
         let elapsed_ms = now.saturating_sub(surge.created_at_ms);
-        if elapsed_ms < 1500 {
-            let fade = 1.0 - (elapsed_ms as f64 / 1500.0);
+        if elapsed_ms < 2000 {
+            let fade = 1.0 - (elapsed_ms as f64 / 2000.0);
             let intensity = (fade * 255.0) as u8;
             let gold = Color::Rgb(255, intensity.min(215), 0);
+            let bright_gold = Color::Rgb(255, 240, (100.0 * fade) as u8);
 
-            let text = "\u{26A1} OVERCHARGE \u{26A1}";
-            let text_w = display_width(text) as u16;
-            let text_x = area.x + (area.width.saturating_sub(text_w)) / 2;
-            let text_y = area.y + area.height / 2;
-            let text_area = Rect::new(text_x, text_y, text_w.min(area.width), 1);
+            // Scatter lightning bolt glyphs across the field
+            let bolt_glyphs = ['⚡', '✦', '⟐', '✧', '⚡'];
+            let bolt_count = (6.0 + fade * 8.0) as usize;
+            for i in 0..bolt_count {
+                let seed = (surge.created_at_ms as f64 + i as f64 * 137.5).sin();
+                let bx =
+                    area.x as i32 + (((seed.abs() * 10000.0) as u32 % area.width as u32) as i32);
+                let by = top + (((seed * 7919.0).abs() as u32 % field_h as u32) as i32);
+                let flicker = ((now as f64 / 60.0 + i as f64 * 2.3).sin() * 0.5 + 0.5) * fade;
+                if flicker > 0.25 {
+                    let glyph = bolt_glyphs[i % bolt_glyphs.len()];
+                    draw_single_overlay_glyph(frame, area, bx, by, glyph, bright_gold);
+                }
+            }
+
+            // Center text block
+            let line1 = "\u{26A1}\u{26A1}\u{26A1} OVERCHARGE \u{26A1}\u{26A1}\u{26A1}";
+            let line2 = "+50% BONUS TICKS";
+            let w1 = display_width(line1) as u16;
+            let w2 = display_width(line2) as u16;
+            let mid_y = area.y + area.height / 2;
+
+            let x1 = area.x + (area.width.saturating_sub(w1)) / 2;
+            let area1 = Rect::new(x1, mid_y.saturating_sub(1), w1.min(area.width), 1);
             frame.render_widget(
                 Paragraph::new(Span::styled(
-                    text,
+                    line1,
                     Style::default().fg(gold).add_modifier(Modifier::BOLD),
                 )),
-                text_area,
+                area1,
+            );
+
+            let x2 = area.x + (area.width.saturating_sub(w2)) / 2;
+            let area2 = Rect::new(x2, mid_y.saturating_add(1), w2.min(area.width), 1);
+            frame.render_widget(
+                Paragraph::new(Span::styled(
+                    line2,
+                    Style::default()
+                        .fg(bright_gold)
+                        .add_modifier(Modifier::BOLD),
+                )),
+                area2,
             );
         }
     }
@@ -1505,11 +1563,22 @@ pub fn render_chrono_surge_banner(
                 .add_modifier(Modifier::BOLD),
         ),
         Span::raw("  "),
-        Span::styled(bar, Style::default().fg(TIMEWARP_CYAN)),
+        Span::styled(
+            bar,
+            Style::default().fg(if surge.overcharged {
+                Color::Rgb(255, 200, 60)
+            } else {
+                TIMEWARP_CYAN
+            }),
+        ),
         Span::raw("  "),
         Span::styled(
             format!("\u{26A1}x{}", surge.current_batch_size()),
-            Style::default().fg(Color::Rgb(170, 230, 255)),
+            Style::default().fg(if surge.overcharged {
+                Color::Rgb(255, 230, 120)
+            } else {
+                Color::Rgb(170, 230, 255)
+            }),
         ),
     ];
     if surge.overcharged {
@@ -1525,19 +1594,29 @@ pub fn render_chrono_surge_banner(
         Style::default().fg(Color::Gray),
     ));
 
+    let (border_color, bg_color) = if surge.overcharged {
+        (Color::Rgb(180, 130, 0), Color::Rgb(30, 20, 5))
+    } else {
+        (TIMEWARP_MID, TIMEWARP_DEEP)
+    };
+
     let lines = vec![
         Line::from(first_line_spans),
         Line::from(Span::styled(
             stats_line,
-            Style::default().fg(Color::Rgb(180, 210, 240)),
+            Style::default().fg(if surge.overcharged {
+                Color::Rgb(255, 220, 160)
+            } else {
+                Color::Rgb(180, 210, 240)
+            }),
         )),
     ];
 
     let paragraph = Paragraph::new(lines).alignment(Alignment::Center).block(
         Block::default()
             .borders(Borders::TOP)
-            .border_style(Style::default().fg(TIMEWARP_MID))
-            .style(Style::default().bg(TIMEWARP_DEEP)),
+            .border_style(Style::default().fg(border_color))
+            .style(Style::default().bg(bg_color)),
     );
     frame.render_widget(paragraph, banner_area);
 }
