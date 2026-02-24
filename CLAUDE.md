@@ -257,6 +257,25 @@ Account-level base building that persists across prestiges. 14 rooms in a two-br
 
 Account-level achievement system that persists across characters. 6 categories (Combat, Level, Progression, Challenges, Exploration, Stats). Tracks kills, boss kills, levels, prestige, zone completion, challenge wins, fishing ranks/catches, dungeon completions, Haven building, and Soulforge enhancements. Includes modal notification system with 500ms accumulation window. Includes a title system where 44 curated achievements grant display titles (e.g., "Godslayer", "Everlasting") shown in stats panel and character select.
 
+### Cloud Sync (`src/history/cloud.rs`)
+
+- `cloud.rs` — GitHub cloud sync: PAT validation, repo management, push/pull, divergence resolution
+- Config stored in `~/.quest/.cloud.json` (token, username, repo URL)
+- Background thread + mpsc channel pattern: operations run in threads, results polled via `cloud_rx.try_recv()`
+- `cloud_op_in_flight` boolean prevents concurrent operations
+
+**Cloud Status States:** Offline → Linked → Syncing → Linked (success) / OutOfSync (diverged) / TokenExpired (auth failure) / Error (other)
+
+**Key Operations:**
+- `link_github()` — Validate PAT, ensure repo, add git remote, fetch, save config
+- `push_all_branches()` / `fetch_all()` — Sync all local branches with remote
+- `check_divergence()` — Detect branches that are both ahead AND behind remote
+- `reset_to_remote()` / `backup_and_reset()` — Divergence resolution (cloud wins / keep both)
+- `force_push_branch()` — Divergence resolution (local wins)
+- `update_token()` — Replace expired PAT, preserve repo link
+- `is_auth_error()` — Detect HTTP 401/403 auth failures (excludes rate-limiting)
+- `sanitize_cloud_error()` — Convert raw API errors to user-friendly messages
+
 ### Input Handling (`src/input/`)
 
 - `mod.rs` — Top-level input routing based on current game state
