@@ -410,6 +410,8 @@ pub fn show_startup_splash_screen(
     haven: &mut haven::Haven,
     enhancement: &mut enhancement::EnhancementProgress,
     global_achievements: &mut achievements::Achievements,
+    cloud_status: &crate::history::cloud::CloudStatus,
+    cloud_username: &Option<String>,
 ) -> io::Result<StartupSplashResult> {
     let mut update_status: Option<UpdateInfoStatus> = None;
     let mut time_vault_browser: Option<TimeVaultState> = None;
@@ -534,7 +536,10 @@ pub fn show_startup_splash_screen(
                                     .first()
                                     .and_then(|b| repo.list_commits(&b.name).ok())
                                     .unwrap_or_default();
-                                time_vault_browser = Some(TimeVaultState::new(branches, commits));
+                                let mut vault_state = TimeVaultState::new(branches, commits);
+                                vault_state.cloud_status = cloud_status.clone();
+                                vault_state.cloud_username = cloud_username.clone();
+                                time_vault_browser = Some(vault_state);
                             }
                         }
                     }

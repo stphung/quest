@@ -132,4 +132,18 @@ pub enum InputResult {
     SwitchSaveBranch { branch_name: String },
     /// Delete a save branch.
     DeleteSaveBranch { branch_name: String },
+    /// Link a GitHub account for cloud sync.
+    LinkCloud { token: String },
+    /// Push all save branches to the cloud.
+    PushCloud,
+    /// Pull save branches from the cloud.
+    PullCloud,
+    /// Unlink the GitHub cloud account.
+    UnlinkCloud,
+    /// Resolve divergence: keep local saves, force-push to cloud.
+    ResolveKeepLocal,
+    /// Resolve divergence: use cloud saves, discard local.
+    ResolveUseCloud,
+    /// Resolve divergence: keep both (backup local, reset to cloud).
+    ResolveKeepBoth,
 }
