@@ -165,8 +165,16 @@ pub fn handle_game_input(
             TimeVaultAction::ChangeRepo => {
                 return InputResult::ChangeRepo;
             }
-            TimeVaultAction::LinkCloud { token, repo_name } => {
-                return InputResult::LinkCloud { token, repo_name };
+            TimeVaultAction::LinkCloud {
+                token,
+                repo_name,
+                private,
+            } => {
+                return InputResult::LinkCloud {
+                    token,
+                    repo_name,
+                    private,
+                };
             }
             TimeVaultAction::PushCloud => {
                 return InputResult::PushCloud;

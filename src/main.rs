@@ -1203,6 +1203,7 @@ fn main() -> io::Result<()> {
                             if let InputResult::LinkCloud {
                                 ref token,
                                 ref repo_name,
+                                private,
                             } = result
                             {
                                 if !cloud_op_in_flight {
@@ -1217,7 +1218,7 @@ fn main() -> io::Result<()> {
                                         let result = std::panic::catch_unwind(
                                             std::panic::AssertUnwindSafe(|| {
                                                 let res = match history::cloud::link_github(
-                                                    &dir, &tok, &rname,
+                                                    &dir, &tok, &rname, private,
                                                 ) {
                                                     Ok(config) => {
                                                         history::cloud::CloudOpResult::Linked(

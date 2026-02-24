@@ -39,6 +39,13 @@ fn github_agent() -> ureq::Agent {
     )
 }
 
+/// Repository metadata returned from the GitHub API.
+#[derive(Debug, Clone)]
+pub struct RepoInfo {
+    pub name: String,
+    pub private: bool,
+}
+
 // ── Types ────────────────────────────────────────────────────────────────
 
 /// Persisted cloud configuration (stored in `~/.quest/.cloud.json`).
@@ -78,7 +85,7 @@ pub enum CloudOpResult {
     TokenValidated {
         username: String,
         token: String,
-        repos: Vec<String>,
+        repos: Vec<RepoInfo>,
     },
     /// All branches pushed to remote.
     Pushed,
@@ -168,7 +175,7 @@ pub fn github_get_username(token: &str) -> Result<String, String> {
 /// First tries the GitHub search API filtered by the `quest-time-vaults` topic.
 /// If no tagged repos are found, falls back to listing all user repos so that
 /// repos created before topic tagging was added still appear.
-pub fn github_list_repos(token: &str) -> Result<Vec<String>, String> {
+pub fn github_list_repos(token: &str) -> Result<Vec<RepoInfo>, String> {
     let username = github_get_username(token)?;
 
     // Try topic-filtered search first.
@@ -182,7 +189,7 @@ pub fn github_list_repos(token: &str) -> Result<Vec<String>, String> {
 }
 
 /// Search for repos tagged with the quest topic.
-fn github_list_repos_by_topic(token: &str, username: &str) -> Result<Vec<String>, String> {
+fn github_list_repos_by_topic(token: &str, username: &str) -> Result<Vec<RepoInfo>, String> {
     #[derive(Deserialize)]
     struct SearchResult {
         items: Vec<SearchItem>,
@@ -190,6 +197,7 @@ fn github_list_repos_by_topic(token: &str, username: &str) -> Result<Vec<String>
     #[derive(Deserialize)]
     struct SearchItem {
         name: String,
+        private: bool,
     }
 
     let query = format!("topic:{REPO_TOPIC} user:{username}");
@@ -208,14 +216,22 @@ fn github_list_repos_by_topic(token: &str, username: &str) -> Result<Vec<String>
         .read_json()
         .map_err(|e| format!("Failed to parse search response: {e}"))?;
 
-    Ok(result.items.into_iter().map(|r| r.name).collect())
+    Ok(result
+        .items
+        .into_iter()
+        .map(|r| RepoInfo {
+            name: r.name,
+            private: r.private,
+        })
+        .collect())
 }
 
 /// List all repositories owned by the authenticated user.
-fn github_list_all_user_repos(token: &str) -> Result<Vec<String>, String> {
+fn github_list_all_user_repos(token: &str) -> Result<Vec<RepoInfo>, String> {
     #[derive(Deserialize)]
     struct RepoItem {
         name: String,
+        private: bool,
     }
 
     let url = format!("{GITHUB_API}/user/repos?per_page=100&sort=updated&affiliation=owner");
@@ -230,7 +246,13 @@ fn github_list_all_user_repos(token: &str) -> Result<Vec<String>, String> {
         .read_json()
         .map_err(|e| format!("Failed to parse repos response: {e}"))?;
 
-    Ok(repos.into_iter().map(|r| r.name).collect())
+    Ok(repos
+        .into_iter()
+        .map(|r| RepoInfo {
+            name: r.name,
+            private: r.private,
+        })
+        .collect())
 }
 
 /// Extract the repository name from a GitHub clone URL.
@@ -249,10 +271,11 @@ fn urlencoded(s: &str) -> String {
     s.replace(' ', "+").replace(':', "%3A")
 }
 
-/// Ensure a private repository exists on GitHub, creating it if needed.
+/// Ensure a repository exists on GitHub, creating it if needed.
 ///
-/// Returns the HTTPS clone URL.
-pub fn github_ensure_repo(token: &str, repo_name: &str) -> Result<String, String> {
+/// Returns the HTTPS clone URL. The `private` flag is only used when creating
+/// a new repo; existing repos keep their current visibility.
+pub fn github_ensure_repo(token: &str, repo_name: &str, private: bool) -> Result<String, String> {
     #[derive(Deserialize)]
     struct GithubRepo {
         clone_url: String,
@@ -297,7 +320,7 @@ pub fn github_ensure_repo(token: &str, repo_name: &str) -> Result<String, String
     let create_url = format!("{GITHUB_API}/user/repos");
     let body = CreateRepo {
         name: repo_name,
-        private: true,
+        private,
         description: "Quest save data (managed by Quest cloud sync)",
         auto_init: false,
     };
@@ -585,12 +608,17 @@ pub fn fast_forward_all(quest_dir: &Path) -> Result<bool, String> {
 /// Link to GitHub: validate PAT, ensure repo, add remote, push all, save config.
 ///
 /// Returns the saved `CloudConfig` on success.
-pub fn link_github(quest_dir: &Path, token: &str, repo_name: &str) -> Result<CloudConfig, String> {
+pub fn link_github(
+    quest_dir: &Path,
+    token: &str,
+    repo_name: &str,
+    private: bool,
+) -> Result<CloudConfig, String> {
     // 1. Validate the token and get the username.
     let username = github_get_username(token)?;
 
     // 2. Ensure the remote repo exists.
-    let clone_url = github_ensure_repo(token, repo_name)?;
+    let clone_url = github_ensure_repo(token, repo_name, private)?;
 
     // 3. Add or update the git remote.
     let repo = Repository::open(quest_dir).map_err(|e| format!("Failed to open repo: {e}"))?;
@@ -632,8 +660,8 @@ pub fn link_and_pull(
     // 1. Validate the token and get the username.
     let username = github_get_username(token)?;
 
-    // 2. Ensure the remote repo exists.
-    let clone_url = github_ensure_repo(token, repo_name)?;
+    // 2. Ensure the remote repo exists (repo already exists when updating token).
+    let clone_url = github_ensure_repo(token, repo_name, true)?;
 
     // 3. Add or update the git remote.
     let repo = Repository::open(quest_dir).map_err(|e| format!("Failed to open repo: {e}"))?;

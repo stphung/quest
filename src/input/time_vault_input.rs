@@ -28,7 +28,11 @@ pub enum TimeVaultAction {
     ValidateToken { token: String },
     /// Link a GitHub account with the given PAT and repo name.
     #[allow(dead_code)]
-    LinkCloud { token: String, repo_name: String },
+    LinkCloud {
+        token: String,
+        repo_name: String,
+        private: bool,
+    },
     /// Push all branches to cloud.
     PushCloud,
     /// Pull from cloud.
@@ -482,25 +486,32 @@ fn handle_selecting_repo(key: KeyEvent, state: &mut TimeVaultState) -> TimeVault
                 Some(t) => t,
                 None => return TimeVaultAction::Continue,
             };
-            let repo_name = if state.cloud_repo_selected < state.cloud_repos.len() {
-                state.cloud_repos[state.cloud_repo_selected].clone()
-            } else {
-                // "Create new" selected
-                let name = state.cloud_repo_input.clone();
-                if name.is_empty() {
-                    state.cloud_token_error = Some("repo name cannot be empty".to_string());
-                    state.cloud_validated_token = Some(token);
-                    return TimeVaultAction::Continue;
-                }
-                name
-            };
+            let (repo_name, private) =
+                if state.cloud_repo_selected < state.cloud_repos.len() {
+                    let repo = &state.cloud_repos[state.cloud_repo_selected];
+                    (repo.name.clone(), repo.private)
+                } else {
+                    // "Create new" selected
+                    let name = state.cloud_repo_input.clone();
+                    if name.is_empty() {
+                        state.cloud_token_error =
+                            Some("repo name cannot be empty".to_string());
+                        state.cloud_validated_token = Some(token);
+                        return TimeVaultAction::Continue;
+                    }
+                    (name, state.cloud_new_repo_private)
+                };
             state.cloud_repos.clear();
             state.cloud_repo_selected = 0;
             state.cloud_repo_input.clear();
             state.cloud_link_field = 0;
             state.cloud_token_error = None;
             state.mode = BrowserMode::Browse;
-            TimeVaultAction::LinkCloud { token, repo_name }
+            TimeVaultAction::LinkCloud {
+                token,
+                repo_name,
+                private,
+            }
         }
         KeyCode::Backspace => {
             // Only editable when "Create new" is selected
@@ -508,6 +519,12 @@ fn handle_selecting_repo(key: KeyEvent, state: &mut TimeVaultState) -> TimeVault
                 state.cloud_repo_input.pop();
                 state.cloud_token_error = None;
             }
+            TimeVaultAction::Continue
+        }
+        KeyCode::Char('v') | KeyCode::Char('V')
+            if state.cloud_repo_selected >= state.cloud_repos.len() =>
+        {
+            state.cloud_new_repo_private = !state.cloud_new_repo_private;
             TimeVaultAction::Continue
         }
         KeyCode::Char(c) => {

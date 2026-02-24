@@ -603,7 +603,11 @@ pub fn handle_select_frame(
                             }
                         }
                     }
-                    TimeVaultAction::LinkCloud { token, repo_name } => {
+                    TimeVaultAction::LinkCloud {
+                        token,
+                        repo_name,
+                        private,
+                    } => {
                         if !*cloud_op_in_flight {
                             *cloud_status = CloudStatus::Syncing;
                             *cloud_op_in_flight = true;
@@ -617,7 +621,7 @@ pub fn handle_select_frame(
                                 let result =
                                     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                                         let res = match crate::history::cloud::link_github(
-                                            &dir, &tok, &rname,
+                                            &dir, &tok, &rname, private,
                                         ) {
                                             Ok(config) => CloudOpResult::Linked(config),
                                             Err(e) => CloudOpResult::Failed(e),
