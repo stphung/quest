@@ -624,7 +624,7 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
             // Show fork source details
             if let Some(source) = &state.fork_source {
                 let label = if source.is_branch_tip {
-                    format!("From tip of '{}':", source.branch_name)
+                    format!("From HEAD of '{}':", source.branch_name)
                 } else {
                     format!("From commit on '{}':", source.branch_name)
                 };
