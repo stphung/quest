@@ -486,21 +486,19 @@ fn handle_selecting_repo(key: KeyEvent, state: &mut TimeVaultState) -> TimeVault
                 Some(t) => t,
                 None => return TimeVaultAction::Continue,
             };
-            let (repo_name, private) =
-                if state.cloud_repo_selected < state.cloud_repos.len() {
-                    let repo = &state.cloud_repos[state.cloud_repo_selected];
-                    (repo.name.clone(), repo.private)
-                } else {
-                    // "Create new" selected
-                    let name = state.cloud_repo_input.clone();
-                    if name.is_empty() {
-                        state.cloud_token_error =
-                            Some("repo name cannot be empty".to_string());
-                        state.cloud_validated_token = Some(token);
-                        return TimeVaultAction::Continue;
-                    }
-                    (name, state.cloud_new_repo_private)
-                };
+            let (repo_name, private) = if state.cloud_repo_selected < state.cloud_repos.len() {
+                let repo = &state.cloud_repos[state.cloud_repo_selected];
+                (repo.name.clone(), repo.private)
+            } else {
+                // "Create new" selected
+                let name = state.cloud_repo_input.clone();
+                if name.is_empty() {
+                    state.cloud_token_error = Some("repo name cannot be empty".to_string());
+                    state.cloud_validated_token = Some(token);
+                    return TimeVaultAction::Continue;
+                }
+                (name, state.cloud_new_repo_private)
+            };
             state.cloud_repos.clear();
             state.cloud_repo_selected = 0;
             state.cloud_repo_input.clear();
@@ -868,8 +866,10 @@ mod tests {
     fn d_ignored_on_active() {
         let mut state = browsing_state();
         state.focus = PanelFocus::Left;
-        // main (index 0) is the active branch
-        state.selected_branch = 0;
+        // Make fork-a the active branch (not main) to isolate the is_active guard
+        state.branches[0].is_active = false;
+        state.branches[1].is_active = true;
+        state.selected_branch = 1; // fork-a is active
         handle_time_vault_input(key(KeyCode::Char('d')), &mut state);
         assert_eq!(state.mode, BrowserMode::Browse);
     }
@@ -942,9 +942,7 @@ mod tests {
         let mut state = browsing_state();
         state.mode = BrowserMode::ConfirmRestore;
         let result = handle_time_vault_input(key(KeyCode::Enter), &mut state);
-        assert!(
-            matches!(result, TimeVaultAction::Restore { commit_id } if commit_id == "abc1234")
-        );
+        assert!(matches!(result, TimeVaultAction::Restore { commit_id } if commit_id == "abc1234"));
         assert_eq!(state.mode, BrowserMode::Browse);
     }
 
@@ -1148,9 +1146,7 @@ mod tests {
         state.mode = BrowserMode::LinkingCloud;
         state.cloud_token_input = "ghp_test".to_string();
         let result = handle_time_vault_input(key(KeyCode::Enter), &mut state);
-        assert!(
-            matches!(result, TimeVaultAction::ValidateToken { token } if token == "ghp_test")
-        );
+        assert!(matches!(result, TimeVaultAction::ValidateToken { token } if token == "ghp_test"));
     }
 
     // ── 9. Selecting Repo ──────────────────────────────────────────────
@@ -1299,5 +1295,264 @@ mod tests {
         let result = handle_time_vault_input(key(KeyCode::Esc), &mut state);
         assert!(matches!(result, TimeVaultAction::Continue));
         assert_eq!(state.mode, BrowserMode::Browse);
+    }
+
+    // ── 11. Confirm Push ───────────────────────────────────────────────
+
+    #[test]
+    fn confirm_push_enter() {
+        let mut state = browsing_state();
+        state.mode = BrowserMode::ConfirmPush;
+        let result = handle_time_vault_input(key(KeyCode::Enter), &mut state);
+        assert!(matches!(result, TimeVaultAction::PushCloud));
+        assert_eq!(state.mode, BrowserMode::Browse);
+    }
+
+    #[test]
+    fn confirm_push_esc() {
+        let mut state = browsing_state();
+        state.mode = BrowserMode::ConfirmPush;
+        let result = handle_time_vault_input(key(KeyCode::Esc), &mut state);
+        assert!(matches!(result, TimeVaultAction::Continue));
+        assert_eq!(state.mode, BrowserMode::Browse);
+    }
+
+    // ── 12. Confirm Pull ───────────────────────────────────────────────
+
+    #[test]
+    fn confirm_pull_enter() {
+        let mut state = browsing_state();
+        state.mode = BrowserMode::ConfirmPull;
+        let result = handle_time_vault_input(key(KeyCode::Enter), &mut state);
+        assert!(matches!(result, TimeVaultAction::PullCloud));
+        assert_eq!(state.mode, BrowserMode::Browse);
+    }
+
+    #[test]
+    fn confirm_pull_esc() {
+        let mut state = browsing_state();
+        state.mode = BrowserMode::ConfirmPull;
+        let result = handle_time_vault_input(key(KeyCode::Esc), &mut state);
+        assert!(matches!(result, TimeVaultAction::Continue));
+        assert_eq!(state.mode, BrowserMode::Browse);
+    }
+
+    // ── 13. Confirm Unlink ─────────────────────────────────────────────
+
+    #[test]
+    fn confirm_unlink_enter() {
+        let mut state = browsing_state();
+        state.mode = BrowserMode::ConfirmUnlink;
+        let result = handle_time_vault_input(key(KeyCode::Enter), &mut state);
+        assert!(matches!(result, TimeVaultAction::UnlinkCloud));
+        assert_eq!(state.mode, BrowserMode::Browse);
+    }
+
+    #[test]
+    fn confirm_unlink_esc() {
+        let mut state = browsing_state();
+        state.mode = BrowserMode::ConfirmUnlink;
+        let result = handle_time_vault_input(key(KeyCode::Esc), &mut state);
+        assert!(matches!(result, TimeVaultAction::Continue));
+        assert_eq!(state.mode, BrowserMode::Browse);
+    }
+
+    // ── 14. Updating Token ─────────────────────────────────────────────
+
+    #[test]
+    fn updating_token_char_input() {
+        let mut state = browsing_state();
+        state.mode = BrowserMode::UpdatingToken;
+        for c in ['g', 'h', 'p'] {
+            handle_time_vault_input(key(KeyCode::Char(c)), &mut state);
+        }
+        assert_eq!(state.cloud_token_input, "ghp");
+    }
+
+    #[test]
+    fn updating_token_backspace() {
+        let mut state = browsing_state();
+        state.mode = BrowserMode::UpdatingToken;
+        state.cloud_token_input = "ghp_".to_string();
+        state.cloud_token_error = Some("old error".to_string());
+        handle_time_vault_input(key(KeyCode::Backspace), &mut state);
+        assert_eq!(state.cloud_token_input, "ghp");
+        assert!(state.cloud_token_error.is_none());
+    }
+
+    #[test]
+    fn updating_token_submit_empty() {
+        let mut state = browsing_state();
+        state.mode = BrowserMode::UpdatingToken;
+        let result = handle_time_vault_input(key(KeyCode::Enter), &mut state);
+        assert!(matches!(result, TimeVaultAction::Continue));
+        assert!(state.cloud_token_error.is_some());
+    }
+
+    #[test]
+    fn updating_token_submit_valid() {
+        let mut state = browsing_state();
+        state.mode = BrowserMode::UpdatingToken;
+        state.cloud_token_input = "ghp_new".to_string();
+        let result = handle_time_vault_input(key(KeyCode::Enter), &mut state);
+        assert!(matches!(result, TimeVaultAction::UpdateToken { token } if token == "ghp_new"));
+        assert_eq!(state.mode, BrowserMode::Browse);
+        assert!(state.cloud_token_input.is_empty());
+    }
+
+    #[test]
+    fn updating_token_esc() {
+        let mut state = browsing_state();
+        state.mode = BrowserMode::UpdatingToken;
+        state.cloud_token_input = "partial".to_string();
+        let result = handle_time_vault_input(key(KeyCode::Esc), &mut state);
+        assert!(matches!(result, TimeVaultAction::Continue));
+        assert_eq!(state.mode, BrowserMode::Browse);
+        assert!(state.cloud_token_input.is_empty());
+    }
+
+    // ── 15. Cancel / Esc paths ─────────────────────────────────────────
+
+    #[test]
+    fn fork_naming_esc_clears_state() {
+        let mut state = browsing_state();
+        state.mode = BrowserMode::NamingFork {
+            commit_id: "abc".to_string(),
+        };
+        state.fork_name_input = "partial".to_string();
+        state.fork_name_error = Some("some error".to_string());
+        state.fork_source = Some(ForkSource {
+            branch_name: "main".to_string(),
+            commit: make_commit("abc"),
+            is_branch_tip: true,
+        });
+        let result = handle_time_vault_input(key(KeyCode::Esc), &mut state);
+        assert!(matches!(result, TimeVaultAction::Continue));
+        assert_eq!(state.mode, BrowserMode::Browse);
+        assert!(state.fork_name_input.is_empty());
+        assert!(state.fork_name_error.is_none());
+        assert!(state.fork_source.is_none());
+    }
+
+    #[test]
+    fn fork_naming_backspace() {
+        let mut state = browsing_state();
+        state.mode = BrowserMode::NamingFork {
+            commit_id: "abc".to_string(),
+        };
+        state.fork_name_input = "test".to_string();
+        state.fork_name_error = Some("old error".to_string());
+        handle_time_vault_input(key(KeyCode::Backspace), &mut state);
+        assert_eq!(state.fork_name_input, "tes");
+        assert!(state.fork_name_error.is_none());
+    }
+
+    #[test]
+    fn link_cloud_esc_clears_state() {
+        let mut state = browsing_state();
+        state.mode = BrowserMode::LinkingCloud;
+        state.cloud_token_input = "partial".to_string();
+        state.cloud_token_error = Some("error".to_string());
+        let result = handle_time_vault_input(key(KeyCode::Esc), &mut state);
+        assert!(matches!(result, TimeVaultAction::Continue));
+        assert_eq!(state.mode, BrowserMode::Browse);
+        assert!(state.cloud_token_input.is_empty());
+        assert!(state.cloud_token_error.is_none());
+    }
+
+    #[test]
+    fn link_cloud_backspace() {
+        let mut state = browsing_state();
+        state.mode = BrowserMode::LinkingCloud;
+        state.cloud_token_input = "ghp_".to_string();
+        state.cloud_token_error = Some("error".to_string());
+        handle_time_vault_input(key(KeyCode::Backspace), &mut state);
+        assert_eq!(state.cloud_token_input, "ghp");
+        assert!(state.cloud_token_error.is_none());
+    }
+
+    #[test]
+    fn confirm_delete_esc_clears_state() {
+        let mut state = browsing_state();
+        state.mode = BrowserMode::ConfirmDelete {
+            branch_name: "fork-a".to_string(),
+        };
+        state.delete_confirm_input = "for".to_string();
+        let result = handle_time_vault_input(key(KeyCode::Esc), &mut state);
+        assert!(matches!(result, TimeVaultAction::Continue));
+        assert_eq!(state.mode, BrowserMode::Browse);
+        assert!(state.delete_confirm_input.is_empty());
+    }
+
+    #[test]
+    fn select_repo_esc_clears_state() {
+        let mut state = browsing_state();
+        state.mode = BrowserMode::SelectingRepo;
+        state.cloud_validated_token = Some("tok".to_string());
+        state.cloud_repos = vec![RepoInfo {
+            name: "repo".to_string(),
+            private: false,
+        }];
+        state.cloud_repo_selected = 1;
+        state.cloud_repo_input = "partial".to_string();
+        state.cloud_token_error = Some("error".to_string());
+        let result = handle_time_vault_input(key(KeyCode::Esc), &mut state);
+        assert!(matches!(result, TimeVaultAction::Continue));
+        assert_eq!(state.mode, BrowserMode::Browse);
+        assert!(state.cloud_validated_token.is_none());
+        assert!(state.cloud_repos.is_empty());
+        assert_eq!(state.cloud_repo_selected, 0);
+        assert!(state.cloud_repo_input.is_empty());
+        assert!(state.cloud_token_error.is_none());
+    }
+
+    #[test]
+    fn select_repo_backspace_on_create_new() {
+        let mut state = browsing_state();
+        state.mode = BrowserMode::SelectingRepo;
+        state.cloud_repos = vec![RepoInfo {
+            name: "existing".to_string(),
+            private: false,
+        }];
+        state.cloud_repo_selected = 1; // "Create new"
+        state.cloud_repo_input = "test".to_string();
+        state.cloud_token_error = Some("error".to_string());
+        handle_time_vault_input(key(KeyCode::Backspace), &mut state);
+        assert_eq!(state.cloud_repo_input, "tes");
+        assert!(state.cloud_token_error.is_none());
+    }
+
+    // ── 16. Edge cases ─────────────────────────────────────────────────
+
+    #[test]
+    fn cloud_keys_ignored_on_right_panel() {
+        let mut state = browsing_state();
+        state.cloud_status = CloudStatus::Offline;
+        state.focus = PanelFocus::Right;
+        handle_time_vault_input(key(KeyCode::Char('c')), &mut state);
+        assert_eq!(state.mode, BrowserMode::Browse);
+    }
+
+    #[test]
+    fn cloud_keys_ignored_when_syncing() {
+        let mut state = browsing_state();
+        state.cloud_status = CloudStatus::Syncing;
+        state.focus = PanelFocus::Left;
+        // 'c' during Syncing should be a no-op
+        handle_time_vault_input(key(KeyCode::Char('c')), &mut state);
+        assert_eq!(state.mode, BrowserMode::Browse);
+        // 'v' during Syncing should be a no-op (not linked, not offline)
+        handle_time_vault_input(key(KeyCode::Char('v')), &mut state);
+        assert_eq!(state.mode, BrowserMode::Browse);
+    }
+
+    #[test]
+    fn branch_change_resets_selected_commit() {
+        let mut state = browsing_state();
+        state.selected_commit = 1;
+        state.selected_branch = 0;
+        handle_time_vault_input(key(KeyCode::Down), &mut state);
+        assert_eq!(state.selected_branch, 1);
+        assert_eq!(state.selected_commit, 0);
     }
 }
