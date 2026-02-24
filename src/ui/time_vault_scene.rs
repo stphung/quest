@@ -693,7 +693,7 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
                         Span::styled(" [Enter] ", Style::default().fg(Color::Cyan)),
                         Span::styled("Switch", Style::default().fg(Color::DarkGray)),
                         dot.clone(),
-                        Span::styled("[F] ", Style::default().fg(Color::Cyan)),
+                        Span::styled("[B] ", Style::default().fg(Color::Cyan)),
                         Span::styled("Branch", Style::default().fg(Color::DarkGray)),
                     ];
                     if !state.selected_branch_is_main() && !state.selected_branch_is_active() {
@@ -719,7 +719,7 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
                         Span::styled(" [Enter] ", Style::default().fg(Color::Cyan)),
                         Span::styled(enter_label, Style::default().fg(Color::DarkGray)),
                         dot.clone(),
-                        Span::styled("[F] ", Style::default().fg(Color::Cyan)),
+                        Span::styled("[B] ", Style::default().fg(Color::Cyan)),
                         Span::styled("Branch", Style::default().fg(Color::DarkGray)),
                         dot.clone(),
                         Span::styled("[Tab] ", Style::default().fg(Color::Cyan)),
