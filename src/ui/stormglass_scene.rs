@@ -1396,6 +1396,30 @@ pub fn render_chrono_surge_time_warp(
     draw_single_overlay_glyph(frame, area, cx + 1, cy, '◌', TIMEWARP_MID);
     draw_single_overlay_glyph(frame, area, cx, cy - 1, '◌', accent_color);
     draw_single_overlay_glyph(frame, area, cx, cy + 1, '◌', accent_color);
+
+    // Overcharge flash overlay — show for first 1.5 seconds
+    if surge.overcharged {
+        let now = current_millis();
+        let elapsed_ms = now.saturating_sub(surge.created_at_ms);
+        if elapsed_ms < 1500 {
+            let fade = 1.0 - (elapsed_ms as f64 / 1500.0);
+            let intensity = (fade * 255.0) as u8;
+            let gold = Color::Rgb(255, intensity.min(215), 0);
+
+            let text = "\u{26A1} OVERCHARGE \u{26A1}";
+            let text_w = display_width(text) as u16;
+            let text_x = area.x + (area.width.saturating_sub(text_w)) / 2;
+            let text_y = area.y + area.height / 2;
+            let text_area = Rect::new(text_x, text_y, text_w.min(area.width), 1);
+            frame.render_widget(
+                Paragraph::new(Span::styled(
+                    text,
+                    Style::default().fg(gold).add_modifier(Modifier::BOLD),
+                )),
+                text_area,
+            );
+        }
+    }
 }
 
 pub fn render_chrono_surge_banner(

@@ -196,6 +196,8 @@ pub struct ChronoSurgeState {
     pub items_equipped: u32,
     /// Whether this surge was overcharged by an active Sigil of Overcharge.
     pub overcharged: bool,
+    /// Milliseconds since epoch when this surge was created (for flash timing).
+    pub created_at_ms: u128,
 }
 
 impl ChronoSurgeState {
@@ -211,6 +213,10 @@ impl ChronoSurgeState {
             levels_gained: 0,
             items_equipped: 0,
             overcharged,
+            created_at_ms: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis(),
         }
     }
 
