@@ -32,8 +32,8 @@ fn test_all_effect_type_ranges_valid() {
 }
 
 #[test]
-fn test_effect_type_all_has_11_variants() {
-    assert_eq!(SigilEffectType::ALL.len(), 11);
+fn test_effect_type_all_has_12_variants() {
+    assert_eq!(SigilEffectType::ALL.len(), 12);
 }
 
 // ── Grade Boundary Percentiles ──────────────────────────────────────────
