@@ -47,6 +47,17 @@ pub enum BrowserMode {
     ConfirmSwitch,
     /// Typing a name for a new forked branch.
     NamingFork { commit_id: String },
+    /// Typing a GitHub PAT to link the account.
+    LinkingCloud,
+    /// Waiting for confirmation to push to cloud.
+    ConfirmPush,
+    /// Waiting for confirmation to pull from cloud.
+    ConfirmPull,
+    /// Waiting for confirmation to unlink cloud.
+    ConfirmUnlink,
+    /// Divergence detected — player must choose resolution.
+    #[allow(dead_code)]
+    DivergenceResolution,
 }
 
 /// Context about the source commit when forking a new branch.
@@ -72,6 +83,11 @@ pub struct TimeVaultState {
     pub fork_name_error: Option<String>,
     pub fork_source: Option<ForkSource>,
     pub delete_confirm_input: String,
+    pub cloud_status: crate::history::cloud::CloudStatus,
+    pub cloud_username: Option<String>,
+    pub cloud_token_input: String,
+    pub cloud_token_error: Option<String>,
+    pub cloud_divergence: Option<crate::history::cloud::BranchDivergence>,
 }
 
 impl TimeVaultState {
@@ -87,6 +103,11 @@ impl TimeVaultState {
             fork_name_error: None,
             fork_source: None,
             delete_confirm_input: String::new(),
+            cloud_status: crate::history::cloud::CloudStatus::Offline,
+            cloud_username: None,
+            cloud_token_input: String::new(),
+            cloud_token_error: None,
+            cloud_divergence: None,
         }
     }
 
@@ -239,6 +260,7 @@ pub fn draw_time_vault(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
     let mut buffer = vec![vec![SceneCell::default(); buf_w]; buf_h];
     let millis = current_millis();
     paint_vault_backdrop(&mut buffer, millis);
+    paint_cloud_status(&mut buffer, state);
 
     // Layout: branch panel on the left, snapshot panel on the right
     let branch_width = 20usize.min(buf_w / 3);
@@ -501,7 +523,15 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
 
     // Dialog dimensions vary by mode
     let is_fork = matches!(state.mode, BrowserMode::NamingFork { .. });
-    let base_w = if is_fork { 56usize } else { 44usize };
+    let is_cloud_wide = matches!(
+        state.mode,
+        BrowserMode::LinkingCloud | BrowserMode::DivergenceResolution
+    );
+    let base_w = if is_fork || is_cloud_wide {
+        56usize
+    } else {
+        44usize
+    };
     let dialog_w = base_w.min(buf_w.saturating_sub(4));
     let dialog_h = match &state.mode {
         BrowserMode::ConfirmRestore => 10usize,
@@ -514,6 +544,9 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
                 14
             }
         }
+        BrowserMode::LinkingCloud => 10,
+        BrowserMode::ConfirmPush | BrowserMode::ConfirmPull | BrowserMode::ConfirmUnlink => 7,
+        BrowserMode::DivergenceResolution => 12,
         BrowserMode::Browse => return,
     }
     .min(buf_h.saturating_sub(2));
@@ -709,8 +742,171 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
             put_text(buffer, ctrl_row, cx + 17, "[Esc]", Color::Cyan);
             put_text(buffer, ctrl_row, cx + 23, "Cancel", Color::DarkGray);
         }
+        BrowserMode::LinkingCloud => {
+            put_text(buffer, cy, cx, "Link GitHub Account", Color::White);
+            put_text(
+                buffer,
+                cy + 2,
+                cx,
+                "Enter a Personal Access Token:",
+                Color::DarkGray,
+            );
+
+            // Mask token: show dots for all but last 4 chars.
+            let raw = &state.cloud_token_input;
+            let masked = if raw.len() <= 4 {
+                format!("{}_", raw)
+            } else {
+                let dots: String = "\u{2022}".repeat(raw.len() - 4);
+                format!("{}{}_", dots, &raw[raw.len() - 4..])
+            };
+            put_text(buffer, cy + 4, cx, &masked, Color::Yellow);
+
+            let mut ctrl_row = cy + 6;
+            if let Some(err) = &state.cloud_token_error {
+                put_text(buffer, cy + 5, cx, err, Color::Red);
+                ctrl_row = cy + 7;
+            }
+
+            put_text(buffer, ctrl_row, cx, "[Enter]", Color::Cyan);
+            put_text(buffer, ctrl_row, cx + 8, "Link", Color::DarkGray);
+            put_text(buffer, ctrl_row, cx + 15, "[Esc]", Color::Cyan);
+            put_text(buffer, ctrl_row, cx + 21, "Cancel", Color::DarkGray);
+        }
+        BrowserMode::ConfirmPush => {
+            put_text(buffer, cy, cx, "Push to cloud?", Color::White);
+            put_text(
+                buffer,
+                cy + 1,
+                cx,
+                "All branches will be uploaded.",
+                Color::DarkGray,
+            );
+
+            put_text(buffer, cy + 3, cx, "[Enter]", Color::Cyan);
+            put_text(buffer, cy + 3, cx + 8, "Push", Color::DarkGray);
+            put_text(buffer, cy + 3, cx + 15, "[Esc]", Color::Cyan);
+            put_text(buffer, cy + 3, cx + 21, "Cancel", Color::DarkGray);
+        }
+        BrowserMode::ConfirmPull => {
+            put_text(buffer, cy, cx, "Pull from cloud?", Color::White);
+            put_text(
+                buffer,
+                cy + 1,
+                cx,
+                "Local saves will be updated.",
+                Color::DarkGray,
+            );
+
+            put_text(buffer, cy + 3, cx, "[Enter]", Color::Cyan);
+            put_text(buffer, cy + 3, cx + 8, "Pull", Color::DarkGray);
+            put_text(buffer, cy + 3, cx + 15, "[Esc]", Color::Cyan);
+            put_text(buffer, cy + 3, cx + 21, "Cancel", Color::DarkGray);
+        }
+        BrowserMode::ConfirmUnlink => {
+            put_text(buffer, cy, cx, "Unlink GitHub?", Color::White);
+            put_text(
+                buffer,
+                cy + 1,
+                cx,
+                "Cloud saves will not be deleted.",
+                Color::DarkGray,
+            );
+
+            put_text(buffer, cy + 3, cx, "[Enter]", Color::Cyan);
+            put_text(buffer, cy + 3, cx + 8, "Unlink", Color::DarkGray);
+            put_text(buffer, cy + 3, cx + 17, "[Esc]", Color::Cyan);
+            put_text(buffer, cy + 3, cx + 23, "Cancel", Color::DarkGray);
+        }
+        BrowserMode::DivergenceResolution => {
+            put_text(
+                buffer,
+                cy,
+                cx,
+                "Saves have diverged from cloud",
+                Color::Yellow,
+            );
+
+            if let Some(div) = &state.cloud_divergence {
+                let local_h = div.local_playtime / 3600;
+                let local_m = (div.local_playtime % 3600) / 60;
+                let local_stats = format!(
+                    "Local:  Lv{} \u{00b7} P{} \u{00b7} {}h {:02}m",
+                    div.local_level, div.local_prestige, local_h, local_m
+                );
+                put_text(buffer, cy + 2, cx, &local_stats, Color::White);
+
+                let remote_h = div.remote_playtime / 3600;
+                let remote_m = (div.remote_playtime % 3600) / 60;
+                let remote_stats = format!(
+                    "Cloud:  Lv{} \u{00b7} P{} \u{00b7} {}h {:02}m",
+                    div.remote_level, div.remote_prestige, remote_h, remote_m
+                );
+                put_text(buffer, cy + 3, cx, &remote_stats, Color::Cyan);
+            }
+
+            put_text(buffer, cy + 5, cx, "[K]", Color::Cyan);
+            put_text(
+                buffer,
+                cy + 5,
+                cx + 4,
+                "Keep local, push to cloud",
+                Color::DarkGray,
+            );
+            put_text(buffer, cy + 6, cx, "[C]", Color::Cyan);
+            put_text(
+                buffer,
+                cy + 6,
+                cx + 4,
+                "Use cloud, discard local",
+                Color::DarkGray,
+            );
+            put_text(buffer, cy + 7, cx, "[B]", Color::Cyan);
+            put_text(
+                buffer,
+                cy + 7,
+                cx + 4,
+                "Keep both (backup local)",
+                Color::DarkGray,
+            );
+            put_text(buffer, cy + 8, cx, "[Esc]", Color::Cyan);
+            put_text(buffer, cy + 8, cx + 6, "Decide later", Color::DarkGray);
+        }
         BrowserMode::Browse => {}
     }
+}
+
+/// Paint a cloud status indicator in the top-right corner of the buffer.
+fn paint_cloud_status(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
+    use crate::history::cloud::CloudStatus;
+
+    let buf_w = if buffer.is_empty() {
+        return;
+    } else {
+        buffer[0].len()
+    };
+
+    let (text, color) = match &state.cloud_status {
+        CloudStatus::Offline => ("\u{2298} offline".to_string(), Color::DarkGray),
+        CloudStatus::Linked => {
+            let label = if let Some(ref name) = state.cloud_username {
+                format!("\u{2601} {}", name)
+            } else {
+                "\u{2601} linked".to_string()
+            };
+            (label, Color::Cyan)
+        }
+        CloudStatus::Syncing => ("\u{2601} syncing...".to_string(), Color::Cyan),
+        CloudStatus::OutOfSync => ("\u{2601} \u{26a0} out of sync".to_string(), Color::Yellow),
+        CloudStatus::Error(msg) => {
+            let label = format!("\u{2601} \u{2717} {}", msg);
+            (label, Color::Red)
+        }
+    };
+
+    let text_len = super::scene_fx::display_width(&text);
+    let x = (buf_w as i32).saturating_sub(text_len as i32 + 1);
+    put_text(buffer, 0, x, &text, color);
 }
 
 /// Render the bottom controls bar.
@@ -720,7 +916,12 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
         BrowserMode::ConfirmRestore
         | BrowserMode::ConfirmSwitch
         | BrowserMode::ConfirmDelete { .. }
-        | BrowserMode::NamingFork { .. } => return,
+        | BrowserMode::NamingFork { .. }
+        | BrowserMode::LinkingCloud
+        | BrowserMode::ConfirmPush
+        | BrowserMode::ConfirmPull
+        | BrowserMode::ConfirmUnlink
+        | BrowserMode::DivergenceResolution => return,
         BrowserMode::Browse => {
             let dot = Span::styled("  \u{00b7}  ", Style::default().fg(Color::Rgb(40, 80, 120)));
             match state.focus {
@@ -736,6 +937,40 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
                         spans.push(dot.clone());
                         spans.push(Span::styled("[D] ", Style::default().fg(Color::Cyan)));
                         spans.push(Span::styled("Delete", Style::default().fg(Color::DarkGray)));
+                    }
+                    // Cloud controls
+                    {
+                        use crate::history::cloud::CloudStatus;
+                        match &state.cloud_status {
+                            CloudStatus::Offline => {
+                                spans.push(dot.clone());
+                                spans.push(Span::styled("[C] ", Style::default().fg(Color::Cyan)));
+                                spans.push(Span::styled(
+                                    "Link",
+                                    Style::default().fg(Color::DarkGray),
+                                ));
+                            }
+                            CloudStatus::Linked
+                            | CloudStatus::OutOfSync
+                            | CloudStatus::Error(_) => {
+                                spans.push(dot.clone());
+                                spans.push(Span::styled("[C] ", Style::default().fg(Color::Cyan)));
+                                spans.push(Span::styled(
+                                    "Push",
+                                    Style::default().fg(Color::DarkGray),
+                                ));
+                                spans.push(Span::styled(
+                                    " \u{00b7} ",
+                                    Style::default().fg(Color::Rgb(40, 80, 120)),
+                                ));
+                                spans.push(Span::styled("[V] ", Style::default().fg(Color::Cyan)));
+                                spans.push(Span::styled(
+                                    "Pull",
+                                    Style::default().fg(Color::DarkGray),
+                                ));
+                            }
+                            CloudStatus::Syncing => {} // no controls while syncing
+                        }
                     }
                     spans.push(dot.clone());
                     spans.push(Span::styled("[Tab] ", Style::default().fg(Color::Cyan)));

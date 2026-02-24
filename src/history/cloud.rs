@@ -333,8 +333,7 @@ pub fn check_divergence(quest_dir: &Path) -> Result<Option<BranchDivergence>, St
             let local_msg = local_commit.message().unwrap_or("");
             let remote_msg = remote_commit.message().unwrap_or("");
 
-            let (local_level, local_prestige, _, local_playtime) =
-                parse_commit_suffix(local_msg);
+            let (local_level, local_prestige, _, local_playtime) = parse_commit_suffix(local_msg);
             let (remote_level, remote_prestige, _, remote_playtime) =
                 parse_commit_suffix(remote_msg);
 
@@ -436,11 +435,7 @@ pub fn fast_forward_all(quest_dir: &Path) -> Result<bool, String> {
             let local_ref = format!("refs/heads/{branch_name}");
             if let Ok(oid) = repo.refname_to_id(&local_ref) {
                 if let Ok(commit) = repo.find_commit(oid) {
-                    let _ = repo.reset(
-                        commit.as_object(),
-                        git2::ResetType::Hard,
-                        None,
-                    );
+                    let _ = repo.reset(commit.as_object(), git2::ResetType::Hard, None);
                 }
             }
         }
@@ -546,11 +541,7 @@ pub fn unlink(quest_dir: &Path) -> Result<(), String> {
 /// Force-push a single branch to the cloud remote (overwrites remote history).
 ///
 /// Used to resolve divergence by choosing the local version.
-pub fn force_push_branch(
-    quest_dir: &Path,
-    branch_name: &str,
-    token: &str,
-) -> Result<(), String> {
+pub fn force_push_branch(quest_dir: &Path, branch_name: &str, token: &str) -> Result<(), String> {
     let repo = Repository::open(quest_dir).map_err(|e| format!("Failed to open repo: {e}"))?;
     push_branch(&repo, branch_name, token, true)
 }
@@ -573,11 +564,7 @@ pub fn backup_and_reset(quest_dir: &Path, branch_name: &str) -> Result<String, S
 
     // Generate a timestamped backup name.
     let now = chrono::Local::now();
-    let backup_name = format!(
-        "backup-{}-{}",
-        branch_name,
-        now.format("%Y%m%d-%H%M")
-    );
+    let backup_name = format!("backup-{}-{}", branch_name, now.format("%Y%m%d-%H%M"));
 
     // Create backup branch at local head.
     repo.branch(&backup_name, &local_commit, false)
@@ -607,12 +594,8 @@ pub fn backup_and_reset(quest_dir: &Path, branch_name: &str) -> Result<String, S
         .ok()
         .and_then(|r| r.shorthand().map(|s| s.to_string()));
     if head_branch.as_deref() == Some(branch_name) {
-        repo.reset(
-            remote_commit.as_object(),
-            git2::ResetType::Hard,
-            None,
-        )
-        .map_err(|e| format!("Failed to reset working tree: {e}"))?;
+        repo.reset(remote_commit.as_object(), git2::ResetType::Hard, None)
+            .map_err(|e| format!("Failed to reset working tree: {e}"))?;
     }
 
     Ok(backup_name)
@@ -631,9 +614,7 @@ fn configure_fetch_refspec(repo: &Repository) -> Result<(), String> {
     let expected = format!("+refs/heads/*:refs/remotes/{REMOTE_NAME}/*");
     let has_refspec = remote
         .fetch_refspecs()
-        .map(|specs| {
-            specs.iter().any(|s| s.is_some_and(|s| s == expected))
-        })
+        .map(|specs| specs.iter().any(|s| s.is_some_and(|s| s == expected)))
         .unwrap_or(false);
 
     if !has_refspec {

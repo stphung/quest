@@ -159,6 +159,14 @@ pub fn handle_game_input(
                 // Overlay stays open for delete — just refresh.
                 return InputResult::DeleteSaveBranch { branch_name };
             }
+            // Cloud operations are handled by the main loop (Task 8).
+            TimeVaultAction::LinkCloud { .. }
+            | TimeVaultAction::PushCloud
+            | TimeVaultAction::PullCloud
+            | TimeVaultAction::UnlinkCloud
+            | TimeVaultAction::ResolveKeepLocal
+            | TimeVaultAction::ResolveUseCloud
+            | TimeVaultAction::ResolveKeepBoth => {}
         }
         return InputResult::Continue;
     }
