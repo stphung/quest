@@ -73,7 +73,7 @@ pub enum CloudOpResult {
     /// Cloud remote and config removed.
     Unlinked,
     /// At least one branch has diverged (ahead AND behind).
-    Diverged,
+    Diverged(BranchDivergence),
     /// Operation failed with an error message.
     Failed(String),
 }

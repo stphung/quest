@@ -319,6 +319,7 @@ fn main() -> io::Result<()> {
             &mut global_achievements,
             &cloud_status,
             &cloud_username,
+            &quest_dir,
         )?,
         StartupSplashResult::Quit
     ) {
@@ -573,8 +574,12 @@ fn main() -> io::Result<()> {
                                     cloud_username = None;
                                     cloud_status = history::cloud::CloudStatus::Offline;
                                 }
-                                history::cloud::CloudOpResult::Diverged => {
+                                history::cloud::CloudOpResult::Diverged(div) => {
                                     cloud_status = history::cloud::CloudStatus::OutOfSync;
+                                    if let GameOverlay::TimeVault { ref mut browser } = overlay {
+                                        browser.cloud_divergence = Some(div);
+                                        browser.mode = crate::ui::time_vault_scene::BrowserMode::DivergenceResolution;
+                                    }
                                 }
                                 history::cloud::CloudOpResult::Failed(msg) => {
                                     cloud_status = history::cloud::CloudStatus::Error(msg);
@@ -817,6 +822,13 @@ fn main() -> io::Result<()> {
                                             cloud_config.as_ref().map(|c| {
                                                 history::cloud::repo_name_from_url(&c.repo_url)
                                             });
+                                        // If already out-of-sync, re-check divergence and show resolution dialog
+                                        if matches!(cloud_status, history::cloud::CloudStatus::OutOfSync) {
+                                            if let Ok(Some(div)) = history::cloud::check_divergence(&quest_dir) {
+                                                vault_state.cloud_divergence = Some(div);
+                                                vault_state.mode = crate::ui::time_vault_scene::BrowserMode::DivergenceResolution;
+                                            }
+                                        }
                                         overlay = GameOverlay::TimeVault {
                                             browser: Box::new(vault_state),
                                         };
@@ -1218,8 +1230,8 @@ fn main() -> io::Result<()> {
                                                     );
                                                 }
                                                 match history::cloud::check_divergence(&dir) {
-                                                    Ok(Some(_)) => {
-                                                        history::cloud::CloudOpResult::Diverged
+                                                    Ok(Some(div)) => {
+                                                        history::cloud::CloudOpResult::Diverged(div)
                                                     }
                                                     Ok(None) => {
                                                         match history::cloud::fast_forward_all(&dir)

@@ -58,7 +58,6 @@ pub enum BrowserMode {
     /// Waiting for confirmation to unlink cloud.
     ConfirmUnlink,
     /// Divergence detected — player must choose resolution.
-    #[allow(dead_code)]
     DivergenceResolution,
 }
 

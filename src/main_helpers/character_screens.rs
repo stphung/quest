@@ -205,8 +205,12 @@ pub fn handle_select_frame(
                     *cloud_username = None;
                     *cloud_status = CloudStatus::Offline;
                 }
-                CloudOpResult::Diverged => {
+                CloudOpResult::Diverged(div) => {
                     *cloud_status = CloudStatus::OutOfSync;
+                    if let Some(ref mut browser) = time_vault_browser {
+                        browser.cloud_divergence = Some(div);
+                        browser.mode = crate::ui::time_vault_scene::BrowserMode::DivergenceResolution;
+                    }
                 }
                 CloudOpResult::Failed(msg) => {
                     if was_cloud_restore {
@@ -611,7 +615,7 @@ pub fn handle_select_frame(
                                             return CloudOpResult::Failed(e);
                                         }
                                         match crate::history::cloud::check_divergence(&dir) {
-                                            Ok(Some(_)) => CloudOpResult::Diverged,
+                                            Ok(Some(div)) => CloudOpResult::Diverged(div),
                                             Ok(None) => {
                                                 match crate::history::cloud::fast_forward_all(&dir)
                                                 {
@@ -817,6 +821,12 @@ pub fn handle_select_frame(
                         let mut vault_state = TimeVaultState::new(branches, commits);
                         vault_state.cloud_status = cloud_status.clone();
                         vault_state.cloud_username = cloud_username.clone();
+                        if matches!(cloud_status, CloudStatus::OutOfSync) {
+                            if let Ok(Some(div)) = crate::history::cloud::check_divergence(quest_dir) {
+                                vault_state.cloud_divergence = Some(div);
+                                vault_state.mode = crate::ui::time_vault_scene::BrowserMode::DivergenceResolution;
+                            }
+                        }
                         *time_vault_browser = Some(vault_state);
                     }
                 }
