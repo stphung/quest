@@ -38,7 +38,7 @@ pub fn handle_time_vault_input(key: KeyEvent, state: &mut TimeVaultState) -> Tim
         BrowserMode::Browse => handle_browse(key, state),
         BrowserMode::ConfirmRestore => handle_confirm_restore(key, state),
         BrowserMode::ConfirmSwitch => handle_confirm_switch(key, state),
-        BrowserMode::ConfirmDelete => handle_confirm_delete(key, state),
+        BrowserMode::ConfirmDelete { .. } => handle_confirm_delete(key, state),
         BrowserMode::NamingFork { .. } => handle_naming_fork(key, state),
     }
 }
@@ -162,7 +162,11 @@ fn handle_browse(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAction {
                 && !state.selected_branch_is_main()
                 && !state.selected_branch_is_active()
             {
-                state.mode = BrowserMode::ConfirmDelete;
+                if let Some(name) = state.selected_branch_name() {
+                    let branch_name = name.to_string();
+                    state.delete_confirm_input.clear();
+                    state.mode = BrowserMode::ConfirmDelete { branch_name };
+                }
             }
             TimeVaultAction::Continue
         }
@@ -211,19 +215,33 @@ fn handle_confirm_switch(key: KeyEvent, state: &mut TimeVaultState) -> TimeVault
 }
 
 fn handle_confirm_delete(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAction {
+    let branch_name = if let BrowserMode::ConfirmDelete { branch_name } = &state.mode {
+        branch_name.clone()
+    } else {
+        return TimeVaultAction::Continue;
+    };
+
     match key.code {
         KeyCode::Enter => {
-            if let Some(name) = state.selected_branch_name() {
-                let branch_name = name.to_string();
+            if state.delete_confirm_input == branch_name {
+                state.delete_confirm_input.clear();
                 state.mode = BrowserMode::Browse;
                 TimeVaultAction::DeleteBranch { branch_name }
             } else {
-                state.mode = BrowserMode::Browse;
                 TimeVaultAction::Continue
             }
         }
         KeyCode::Esc => {
+            state.delete_confirm_input.clear();
             state.mode = BrowserMode::Browse;
+            TimeVaultAction::Continue
+        }
+        KeyCode::Backspace => {
+            state.delete_confirm_input.pop();
+            TimeVaultAction::Continue
+        }
+        KeyCode::Char(c) => {
+            state.delete_confirm_input.push(c);
             TimeVaultAction::Continue
         }
         _ => TimeVaultAction::Continue,

@@ -41,8 +41,8 @@ pub enum BrowserMode {
     Browse,
     /// Waiting for confirmation to restore the selected commit.
     ConfirmRestore,
-    /// Waiting for confirmation to delete the selected branch.
-    ConfirmDelete,
+    /// Waiting for confirmation to delete the selected branch (type name to confirm).
+    ConfirmDelete { branch_name: String },
     /// Waiting for confirmation to switch to the selected branch.
     ConfirmSwitch,
     /// Typing a name for a new forked branch.
@@ -71,6 +71,7 @@ pub struct TimeVaultState {
     pub fork_name_input: String,
     pub fork_name_error: Option<String>,
     pub fork_source: Option<ForkSource>,
+    pub delete_confirm_input: String,
 }
 
 impl TimeVaultState {
@@ -85,6 +86,7 @@ impl TimeVaultState {
             fork_name_input: String::new(),
             fork_name_error: None,
             fork_source: None,
+            delete_confirm_input: String::new(),
         }
     }
 
@@ -473,8 +475,8 @@ fn paint_snapshot_panel(
         let hours = commit.playtime / 3600;
         let minutes = (commit.playtime % 3600) / 60;
         let stats = format!(
-            "Lv{} \u{00b7} P{} \u{00b7} Zone {} \u{00b7} {}h {:02}m",
-            commit.level, commit.prestige, commit.zone, hours, minutes
+            "{} \u{00b7} Lv{} \u{00b7} P{} \u{00b7} Zone {} \u{00b7} {}h {:02}m",
+            commit.id, commit.level, commit.prestige, commit.zone, hours, minutes
         );
         put_text(buffer, row + 2, x + 6, &stats, dim);
 
@@ -503,7 +505,8 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
     let dialog_w = base_w.min(buf_w.saturating_sub(4));
     let dialog_h = match &state.mode {
         BrowserMode::ConfirmRestore => 10usize,
-        BrowserMode::ConfirmSwitch | BrowserMode::ConfirmDelete => 7,
+        BrowserMode::ConfirmSwitch => 10,
+        BrowserMode::ConfirmDelete { .. } => 10,
         BrowserMode::NamingFork { .. } => {
             if state.fork_name_error.is_some() {
                 15
@@ -596,14 +599,42 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
             let title = format!("Switch to '{}'?", name);
             put_text(buffer, cy, cx, &title, Color::Yellow);
 
-            put_text(buffer, cy + 3, cx, "[Enter]", Color::Red);
-            put_text(buffer, cy + 3, cx + 8, "Confirm", Color::DarkGray);
-            put_text(buffer, cy + 3, cx + 18, "[Esc]", Color::Green);
-            put_text(buffer, cy + 3, cx + 24, "Cancel", Color::DarkGray);
+            if let Some(head) = state
+                .branches
+                .get(state.selected_branch)
+                .and_then(|b| b.head_commit.as_ref())
+            {
+                let (icon, icon_color) = event_icon_color(&head.message);
+                let desc = head.message.split(" | ").next().unwrap_or(&head.message);
+                put_text(buffer, cy + 2, cx, icon, icon_color);
+                let iw = super::scene_fx::display_width(icon);
+                put_text(buffer, cy + 2, cx + iw as i32 + 1, desc, Color::Yellow);
+
+                let datetime = chrono::DateTime::from_timestamp(head.timestamp, 0)
+                    .map(|dt| {
+                        dt.with_timezone(&chrono::Local)
+                            .format("%b %d, %Y  %l:%M %p")
+                            .to_string()
+                    })
+                    .unwrap_or_else(|| "Unknown".to_string());
+                put_text(buffer, cy + 3, cx, &datetime, Color::DarkGray);
+
+                let hours = head.playtime / 3600;
+                let minutes = (head.playtime % 3600) / 60;
+                let stats = format!(
+                    "Lv{} \u{00b7} P{} \u{00b7} Zone {} \u{00b7} {}h {:02}m",
+                    head.level, head.prestige, head.zone, hours, minutes
+                );
+                put_text(buffer, cy + 4, cx, &stats, Color::DarkGray);
+            }
+
+            put_text(buffer, cy + 6, cx, "[Enter]", Color::Red);
+            put_text(buffer, cy + 6, cx + 8, "Confirm", Color::DarkGray);
+            put_text(buffer, cy + 6, cx + 18, "[Esc]", Color::Green);
+            put_text(buffer, cy + 6, cx + 24, "Cancel", Color::DarkGray);
         }
-        BrowserMode::ConfirmDelete => {
-            let name = state.selected_branch_name().unwrap_or("?");
-            let title = format!("Delete branch '{}'?", name);
+        BrowserMode::ConfirmDelete { branch_name } => {
+            let title = format!("Delete branch '{}'?", branch_name);
             put_text(buffer, cy, cx, &title, Color::Red);
             put_text(
                 buffer,
@@ -613,10 +644,15 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
                 Color::DarkGray,
             );
 
-            put_text(buffer, cy + 3, cx, "[Enter]", Color::Red);
-            put_text(buffer, cy + 3, cx + 8, "Delete", Color::DarkGray);
-            put_text(buffer, cy + 3, cx + 17, "[Esc]", Color::Green);
-            put_text(buffer, cy + 3, cx + 23, "Cancel", Color::DarkGray);
+            let prompt = format!("Type '{}' to confirm:", branch_name);
+            put_text(buffer, cy + 3, cx, &prompt, Color::DarkGray);
+            let input_display = format!("{}_", state.delete_confirm_input);
+            put_text(buffer, cy + 4, cx, &input_display, Color::Yellow);
+
+            put_text(buffer, cy + 6, cx, "[Enter]", Color::Red);
+            put_text(buffer, cy + 6, cx + 8, "Delete", Color::DarkGray);
+            put_text(buffer, cy + 6, cx + 17, "[Esc]", Color::Green);
+            put_text(buffer, cy + 6, cx + 23, "Cancel", Color::DarkGray);
         }
         BrowserMode::NamingFork { .. } => {
             put_text(buffer, cy, cx, "Create new branch", Color::White);
@@ -683,7 +719,7 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
     let controls = match &state.mode {
         BrowserMode::ConfirmRestore
         | BrowserMode::ConfirmSwitch
-        | BrowserMode::ConfirmDelete
+        | BrowserMode::ConfirmDelete { .. }
         | BrowserMode::NamingFork { .. } => return,
         BrowserMode::Browse => {
             let dot = Span::styled("  \u{00b7}  ", Style::default().fg(Color::Rgb(40, 80, 120)));
