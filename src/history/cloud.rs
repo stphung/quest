@@ -672,7 +672,6 @@ pub fn force_push_branch(quest_dir: &Path, branch_name: &str, token: &str) -> Re
 pub fn reset_to_remote(quest_dir: &Path, branch_name: &str) -> Result<(), String> {
     let repo = Repository::open(quest_dir).map_err(|e| format!("Failed to open repo: {e}"))?;
 
-    let local_ref = format!("refs/heads/{branch_name}");
     // Resolve remote head.
     let remote_ref = format!("refs/remotes/{REMOTE_NAME}/{branch_name}");
     let remote_oid = repo
@@ -682,23 +681,25 @@ pub fn reset_to_remote(quest_dir: &Path, branch_name: &str) -> Result<(), String
         .find_commit(remote_oid)
         .map_err(|e| format!("Failed to find remote commit: {e}"))?;
 
-    // Move local branch ref to remote head.
-    repo.reference(
-        &local_ref,
-        remote_oid,
-        true,
-        &format!("cloud sync: reset {branch_name} to remote"),
-    )
-    .map_err(|e| format!("Failed to reset branch: {e}"))?;
-
-    // If this is the current branch, also reset the working tree.
+    // If this is the current branch, use git reset --hard which atomically
+    // moves the branch ref, updates the index, and resets the working tree.
     let head_branch = repo
         .head()
         .ok()
         .and_then(|r| r.shorthand().map(|s| s.to_string()));
     if head_branch.as_deref() == Some(branch_name) {
         repo.reset(remote_commit.as_object(), git2::ResetType::Hard, None)
-            .map_err(|e| format!("Failed to reset working tree: {e}"))?;
+            .map_err(|e| format!("Failed to reset to remote: {e}"))?;
+    } else {
+        // Not on this branch — just move the ref directly.
+        let local_ref = format!("refs/heads/{branch_name}");
+        repo.reference(
+            &local_ref,
+            remote_oid,
+            true,
+            &format!("cloud sync: reset {branch_name} to remote"),
+        )
+        .map_err(|e| format!("Failed to reset branch: {e}"))?;
     }
 
     Ok(())
@@ -733,23 +734,24 @@ pub fn backup_and_reset(quest_dir: &Path, branch_name: &str) -> Result<String, S
         .find_commit(remote_oid)
         .map_err(|e| format!("Failed to find remote commit: {e}"))?;
 
-    // Move local branch ref to remote head.
-    repo.reference(
-        &local_ref,
-        remote_oid,
-        true,
-        &format!("cloud sync: reset {branch_name} to remote"),
-    )
-    .map_err(|e| format!("Failed to reset branch: {e}"))?;
-
-    // If this is the current branch, also reset the working tree.
+    // If this is the current branch, use git reset --hard which atomically
+    // moves the branch ref, updates the index, and resets the working tree.
     let head_branch = repo
         .head()
         .ok()
         .and_then(|r| r.shorthand().map(|s| s.to_string()));
     if head_branch.as_deref() == Some(branch_name) {
         repo.reset(remote_commit.as_object(), git2::ResetType::Hard, None)
-            .map_err(|e| format!("Failed to reset working tree: {e}"))?;
+            .map_err(|e| format!("Failed to reset to remote: {e}"))?;
+    } else {
+        // Not on this branch — just move the ref directly.
+        repo.reference(
+            &local_ref,
+            remote_oid,
+            true,
+            &format!("cloud sync: reset {branch_name} to remote"),
+        )
+        .map_err(|e| format!("Failed to reset branch: {e}"))?;
     }
 
     Ok(backup_name)
