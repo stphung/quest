@@ -1300,10 +1300,10 @@ fn main() -> io::Result<()> {
                             }
 
                             if matches!(result, InputResult::ResolveUseCloud) {
-                                // Blocking: fetch + fast-forward, then reload
+                                // Blocking: fetch + reset to remote, then reload
                                 if let Some(ref config) = cloud_config {
                                     let _ = history::cloud::fetch_all(&quest_dir, &config.token);
-                                    let _ = history::cloud::fast_forward_all(&quest_dir);
+                                    let _ = history::cloud::reset_to_remote(&quest_dir, "main");
                                     haven = haven::load_haven();
                                     enhancement = enhancement::load_enhancement();
                                     global_achievements = achievements::load_achievements();

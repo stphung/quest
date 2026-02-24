@@ -663,7 +663,7 @@ pub fn handle_select_frame(
                     TimeVaultAction::ResolveUseCloud => {
                         if let Some(ref config) = cloud_config {
                             let _ = crate::history::cloud::fetch_all(quest_dir, &config.token);
-                            let _ = crate::history::cloud::fast_forward_all(quest_dir);
+                            let _ = crate::history::cloud::reset_to_remote(quest_dir, "main");
                             *haven = haven::load_haven();
                             *enhancement = enhancement::load_enhancement();
                             *global_achievements = achievements::load_achievements();
