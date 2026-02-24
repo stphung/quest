@@ -319,6 +319,7 @@ fn main() -> io::Result<()> {
             &mut global_achievements,
             &cloud_status,
             &cloud_username,
+            &quest_dir,
         )?,
         StartupSplashResult::Quit
     ) {
@@ -573,11 +574,24 @@ fn main() -> io::Result<()> {
                                     cloud_username = None;
                                     cloud_status = history::cloud::CloudStatus::Offline;
                                 }
-                                history::cloud::CloudOpResult::Diverged => {
+                                history::cloud::CloudOpResult::Diverged(div) => {
                                     cloud_status = history::cloud::CloudStatus::OutOfSync;
+                                    if let GameOverlay::TimeVault { ref mut browser } = overlay {
+                                        browser.cloud_divergence = Some(div);
+                                        browser.mode = crate::ui::time_vault_scene::BrowserMode::DivergenceResolution;
+                                    }
+                                }
+                                history::cloud::CloudOpResult::TokenUpdated(new_config) => {
+                                    cloud_status = history::cloud::CloudStatus::Linked;
+                                    cloud_username = Some(new_config.username.clone());
+                                    cloud_config = Some(new_config);
                                 }
                                 history::cloud::CloudOpResult::Failed(msg) => {
-                                    cloud_status = history::cloud::CloudStatus::Error(msg);
+                                    if history::cloud::is_auth_error(&msg) {
+                                        cloud_status = history::cloud::CloudStatus::TokenExpired;
+                                    } else {
+                                        cloud_status = history::cloud::CloudStatus::Error(msg);
+                                    }
                                 }
                             }
                             // Update Time Vault overlay if open
@@ -817,6 +831,18 @@ fn main() -> io::Result<()> {
                                             cloud_config.as_ref().map(|c| {
                                                 history::cloud::repo_name_from_url(&c.repo_url)
                                             });
+                                        // If already out-of-sync, re-check divergence and show resolution dialog
+                                        if matches!(
+                                            cloud_status,
+                                            history::cloud::CloudStatus::OutOfSync
+                                        ) {
+                                            if let Ok(Some(div)) =
+                                                history::cloud::check_divergence(&quest_dir)
+                                            {
+                                                vault_state.cloud_divergence = Some(div);
+                                                vault_state.mode = crate::ui::time_vault_scene::BrowserMode::DivergenceResolution;
+                                            }
+                                        }
                                         overlay = GameOverlay::TimeVault {
                                             browser: Box::new(vault_state),
                                         };
@@ -1218,8 +1244,8 @@ fn main() -> io::Result<()> {
                                                     );
                                                 }
                                                 match history::cloud::check_divergence(&dir) {
-                                                    Ok(Some(_)) => {
-                                                        history::cloud::CloudOpResult::Diverged
+                                                    Ok(Some(div)) => {
+                                                        history::cloud::CloudOpResult::Diverged(div)
                                                     }
                                                     Ok(None) => {
                                                         match history::cloud::fast_forward_all(&dir)
@@ -1261,6 +1287,44 @@ fn main() -> io::Result<()> {
                                 continue;
                             }
 
+                            if let InputResult::UpdateToken { token } = result {
+                                if !cloud_op_in_flight {
+                                    if let Some(ref config) = cloud_config {
+                                        cloud_op_in_flight = true;
+                                        cloud_status = history::cloud::CloudStatus::Syncing;
+                                        if let GameOverlay::TimeVault { ref mut browser } = overlay
+                                        {
+                                            browser.cloud_status = cloud_status.clone();
+                                        }
+                                        let quest = quest_dir.clone();
+                                        let cfg = config.clone();
+                                        let tx = cloud_tx.clone();
+                                        std::thread::spawn(move || {
+                                            let result = match history::cloud::update_token(
+                                                &quest, &token, &cfg,
+                                            ) {
+                                                Ok(new_config) => {
+                                                    history::cloud::CloudOpResult::TokenUpdated(
+                                                        new_config,
+                                                    )
+                                                }
+                                                Err(e) => {
+                                                    if history::cloud::is_auth_error(&e) {
+                                                        history::cloud::CloudOpResult::Failed(
+                                                            "invalid token".to_string(),
+                                                        )
+                                                    } else {
+                                                        history::cloud::CloudOpResult::Failed(e)
+                                                    }
+                                                }
+                                            };
+                                            let _ = tx.send(result);
+                                        });
+                                    }
+                                }
+                                continue;
+                            }
+
                             if matches!(result, InputResult::ResolveKeepLocal) {
                                 if !cloud_op_in_flight {
                                     if let Some(ref config) = cloud_config {
@@ -1288,10 +1352,10 @@ fn main() -> io::Result<()> {
                             }
 
                             if matches!(result, InputResult::ResolveUseCloud) {
-                                // Blocking: fetch + fast-forward, then reload
+                                // Blocking: fetch + reset to remote, then reload
                                 if let Some(ref config) = cloud_config {
                                     let _ = history::cloud::fetch_all(&quest_dir, &config.token);
-                                    let _ = history::cloud::fast_forward_all(&quest_dir);
+                                    let _ = history::cloud::reset_to_remote(&quest_dir, "main");
                                     haven = haven::load_haven();
                                     enhancement = enhancement::load_enhancement();
                                     global_achievements = achievements::load_achievements();

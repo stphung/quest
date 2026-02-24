@@ -111,6 +111,7 @@ pub fn route_game_input(
         | InputResult::UnlinkCloud
         | InputResult::ResolveKeepLocal
         | InputResult::ResolveUseCloud
-        | InputResult::ResolveKeepBoth => InputAction::Continue,
+        | InputResult::ResolveKeepBoth
+        | InputResult::UpdateToken { .. } => InputAction::Continue,
     }
 }

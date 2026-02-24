@@ -57,8 +57,9 @@ pub enum BrowserMode {
     ConfirmPull,
     /// Waiting for confirmation to unlink cloud.
     ConfirmUnlink,
+    /// Typing a new PAT to replace the expired/current one.
+    UpdatingToken,
     /// Divergence detected — player must choose resolution.
-    #[allow(dead_code)]
     DivergenceResolution,
 }
 
@@ -543,7 +544,10 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
     let is_fork = matches!(state.mode, BrowserMode::NamingFork { .. });
     let is_cloud_wide = matches!(
         state.mode,
-        BrowserMode::LinkingCloud | BrowserMode::SelectingRepo | BrowserMode::DivergenceResolution
+        BrowserMode::LinkingCloud
+            | BrowserMode::SelectingRepo
+            | BrowserMode::UpdatingToken
+            | BrowserMode::DivergenceResolution
     );
     let base_w = if is_fork || is_cloud_wide {
         56usize
@@ -562,6 +566,7 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
                 14
             }
         }
+        BrowserMode::UpdatingToken => 11,
         BrowserMode::LinkingCloud => 12,
         BrowserMode::SelectingRepo => {
             // 3 (title + blank + header) + repos + 1 (create new) + 2 (blank + controls)
@@ -771,6 +776,33 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
             put_text(buffer, ctrl_row, cx + 8, "Create", Color::DarkGray);
             put_text(buffer, ctrl_row, cx + 17, "[Esc]", Color::Cyan);
             put_text(buffer, ctrl_row, cx + 23, "Cancel", Color::DarkGray);
+        }
+        BrowserMode::UpdatingToken => {
+            put_text(buffer, cy, cx, "Update Token", Color::White);
+            put_text(
+                buffer,
+                cy + 2,
+                cx,
+                "Paste a new GitHub Personal Access Token:",
+                Color::DarkGray,
+            );
+
+            put_text(buffer, cy + 4, cx, "Token:", Color::DarkGray);
+            let raw = &state.cloud_token_input;
+            let masked = if raw.len() <= 4 {
+                format!("{}_", raw)
+            } else {
+                let dots: String = "\u{2022}".repeat(raw.len() - 4);
+                format!("{}{}_", dots, &raw[raw.len() - 4..])
+            };
+            put_text(buffer, cy + 4, cx + 7, &masked, Color::Yellow);
+
+            if let Some(ref err) = state.cloud_token_error {
+                put_text(buffer, cy + 6, cx, err, Color::Red);
+            }
+
+            put_text(buffer, cy + 8, cx, "[Enter] Update", Color::Cyan);
+            put_text(buffer, cy + 8, cx + 17, "[Esc] Cancel", Color::DarkGray);
         }
         BrowserMode::LinkingCloud => {
             put_text(buffer, cy, cx, "Link GitHub Account", Color::White);
@@ -1006,6 +1038,7 @@ fn paint_cloud_status(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
             (format!("{spinner} syncing..."), Color::Cyan)
         }
         CloudStatus::OutOfSync => ("\u{2601} \u{26a0} out of sync".to_string(), Color::Yellow),
+        CloudStatus::TokenExpired => ("\u{2601} \u{2717} token expired".to_string(), Color::Red),
         CloudStatus::Error(msg) => {
             let label = format!("\u{2601} \u{2717} {}", msg);
             (label, Color::Red)
@@ -1027,6 +1060,7 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
         | BrowserMode::NamingFork { .. }
         | BrowserMode::LinkingCloud
         | BrowserMode::SelectingRepo
+        | BrowserMode::UpdatingToken
         | BrowserMode::ConfirmPush
         | BrowserMode::ConfirmPull
         | BrowserMode::ConfirmUnlink
@@ -1061,6 +1095,7 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
                             }
                             CloudStatus::Linked
                             | CloudStatus::OutOfSync
+                            | CloudStatus::TokenExpired
                             | CloudStatus::Error(_) => {
                                 spans.push(dot.clone());
                                 spans.push(Span::styled("[C] ", Style::default().fg(Color::Cyan)));
@@ -1084,6 +1119,15 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
                                 spans.push(Span::styled("[R] ", Style::default().fg(Color::Cyan)));
                                 spans.push(Span::styled(
                                     "Repo",
+                                    Style::default().fg(Color::DarkGray),
+                                ));
+                                spans.push(Span::styled(
+                                    " \u{00b7} ",
+                                    Style::default().fg(Color::Rgb(40, 80, 120)),
+                                ));
+                                spans.push(Span::styled("[P] ", Style::default().fg(Color::Cyan)));
+                                spans.push(Span::styled(
+                                    "Token",
                                     Style::default().fg(Color::DarkGray),
                                 ));
                             }

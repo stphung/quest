@@ -150,4 +150,6 @@ pub enum InputResult {
     ResolveUseCloud,
     /// Resolve divergence: keep both (backup local, reset to cloud).
     ResolveKeepBoth,
+    /// Update the stored PAT with a new token.
+    UpdateToken { token: String },
 }

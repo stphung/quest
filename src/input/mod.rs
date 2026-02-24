@@ -186,6 +186,9 @@ pub fn handle_game_input(
             TimeVaultAction::ResolveKeepBoth => {
                 return InputResult::ResolveKeepBoth;
             }
+            TimeVaultAction::UpdateToken { token } => {
+                return InputResult::UpdateToken { token };
+            }
         }
         return InputResult::Continue;
     }

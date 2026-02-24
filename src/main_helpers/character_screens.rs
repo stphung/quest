@@ -205,14 +205,26 @@ pub fn handle_select_frame(
                     *cloud_username = None;
                     *cloud_status = CloudStatus::Offline;
                 }
-                CloudOpResult::Diverged => {
+                CloudOpResult::Diverged(div) => {
                     *cloud_status = CloudStatus::OutOfSync;
+                    if let Some(ref mut browser) = time_vault_browser {
+                        browser.cloud_divergence = Some(div);
+                        browser.mode =
+                            crate::ui::time_vault_scene::BrowserMode::DivergenceResolution;
+                    }
+                }
+                CloudOpResult::TokenUpdated(new_config) => {
+                    *cloud_username = Some(new_config.username.clone());
+                    *cloud_status = CloudStatus::Linked;
+                    *cloud_config = Some(new_config);
                 }
                 CloudOpResult::Failed(msg) => {
                     if was_cloud_restore {
                         // Show the error in the cloud restore prompt
                         select_screen.cloud_restore_error = Some(msg);
                         *cloud_status = CloudStatus::Offline;
+                    } else if crate::history::cloud::is_auth_error(&msg) {
+                        *cloud_status = CloudStatus::TokenExpired;
                     } else {
                         *cloud_status = CloudStatus::Error(msg);
                     }
@@ -611,7 +623,7 @@ pub fn handle_select_frame(
                                             return CloudOpResult::Failed(e);
                                         }
                                         match crate::history::cloud::check_divergence(&dir) {
-                                            Ok(Some(_)) => CloudOpResult::Diverged,
+                                            Ok(Some(div)) => CloudOpResult::Diverged(div),
                                             Ok(None) => {
                                                 match crate::history::cloud::fast_forward_all(&dir)
                                                 {
@@ -659,7 +671,7 @@ pub fn handle_select_frame(
                     TimeVaultAction::ResolveUseCloud => {
                         if let Some(ref config) = cloud_config {
                             let _ = crate::history::cloud::fetch_all(quest_dir, &config.token);
-                            let _ = crate::history::cloud::fast_forward_all(quest_dir);
+                            let _ = crate::history::cloud::reset_to_remote(quest_dir, "main");
                             *haven = haven::load_haven();
                             *enhancement = enhancement::load_enhancement();
                             *global_achievements = achievements::load_achievements();
@@ -708,6 +720,33 @@ pub fn handle_select_frame(
                                         repo.list_commits(&br.name).unwrap_or_default();
                                     browser.selected_commit = 0;
                                 }
+                            }
+                        }
+                    }
+                    TimeVaultAction::UpdateToken { token } => {
+                        if !*cloud_op_in_flight {
+                            if let Some(ref config) = cloud_config {
+                                *cloud_op_in_flight = true;
+                                *cloud_status = CloudStatus::Syncing;
+                                browser.cloud_status = cloud_status.clone();
+                                let tx = cloud_tx.clone();
+                                let dir = quest_dir.to_path_buf();
+                                let cfg = config.clone();
+                                std::thread::spawn(move || {
+                                    let res = match crate::history::cloud::update_token(
+                                        &dir, &token, &cfg,
+                                    ) {
+                                        Ok(new_config) => CloudOpResult::TokenUpdated(new_config),
+                                        Err(e) => {
+                                            if crate::history::cloud::is_auth_error(&e) {
+                                                CloudOpResult::Failed("invalid token".to_string())
+                                            } else {
+                                                CloudOpResult::Failed(e)
+                                            }
+                                        }
+                                    };
+                                    let _ = tx.send(res);
+                                });
                             }
                         }
                     }
@@ -817,6 +856,15 @@ pub fn handle_select_frame(
                         let mut vault_state = TimeVaultState::new(branches, commits);
                         vault_state.cloud_status = cloud_status.clone();
                         vault_state.cloud_username = cloud_username.clone();
+                        if matches!(cloud_status, CloudStatus::OutOfSync) {
+                            if let Ok(Some(div)) =
+                                crate::history::cloud::check_divergence(quest_dir)
+                            {
+                                vault_state.cloud_divergence = Some(div);
+                                vault_state.mode =
+                                    crate::ui::time_vault_scene::BrowserMode::DivergenceResolution;
+                            }
+                        }
                         *time_vault_browser = Some(vault_state);
                     }
                 }

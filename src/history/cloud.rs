@@ -51,6 +51,8 @@ pub enum CloudStatus {
     Syncing,
     /// Local and remote have diverged on at least one branch.
     OutOfSync,
+    /// The stored PAT is expired or revoked (HTTP 401/403).
+    TokenExpired,
     /// An error occurred during the last operation.
     Error(String),
 }
@@ -73,7 +75,9 @@ pub enum CloudOpResult {
     /// Cloud remote and config removed.
     Unlinked,
     /// At least one branch has diverged (ahead AND behind).
-    Diverged,
+    Diverged(BranchDivergence),
+    /// Token was successfully updated. Contains the new config.
+    TokenUpdated(CloudConfig),
     /// Operation failed with an error message.
     Failed(String),
 }
@@ -643,6 +647,42 @@ pub fn link_and_pull(
     Ok(config)
 }
 
+/// Update the PAT for an existing cloud link.
+///
+/// Validates the new token, updates the saved config, and re-creates the
+/// git remote with the new auth URL. The existing repo link is preserved.
+pub fn update_token(
+    quest_dir: &Path,
+    new_token: &str,
+    config: &CloudConfig,
+) -> Result<CloudConfig, String> {
+    // 1. Validate the new token.
+    let username = github_get_username(new_token)?;
+
+    // 2. Re-create the git remote with updated credentials.
+    let repo = Repository::open(quest_dir).map_err(|e| format!("Failed to open repo: {e}"))?;
+    let auth_url = authenticated_url(&config.repo_url, new_token);
+
+    if repo.find_remote(REMOTE_NAME).is_ok() {
+        repo.remote_delete(REMOTE_NAME)
+            .map_err(|e| format!("Failed to remove old remote: {e}"))?;
+    }
+    repo.remote(REMOTE_NAME, &auth_url)
+        .map_err(|e| format!("Failed to add remote: {e}"))?;
+
+    configure_fetch_refspec(&repo)?;
+
+    // 3. Save updated config.
+    let new_config = CloudConfig {
+        token: new_token.to_string(),
+        username,
+        repo_url: config.repo_url.clone(),
+    };
+    save_config(quest_dir, &new_config)?;
+
+    Ok(new_config)
+}
+
 /// Remove the cloud remote and delete the saved config.
 pub fn unlink(quest_dir: &Path) -> Result<(), String> {
     let repo = Repository::open(quest_dir).map_err(|e| format!("Failed to open repo: {e}"))?;
@@ -667,6 +707,44 @@ pub fn force_push_branch(quest_dir: &Path, branch_name: &str, token: &str) -> Re
 /// branch to match the remote.
 ///
 /// Returns the backup branch name (e.g. `backup-main-20260223-1430`).
+/// Reset a local branch to match the remote, discarding local commits.
+/// Unlike `fast_forward_all`, this works even when the branch has diverged.
+pub fn reset_to_remote(quest_dir: &Path, branch_name: &str) -> Result<(), String> {
+    let repo = Repository::open(quest_dir).map_err(|e| format!("Failed to open repo: {e}"))?;
+
+    // Resolve remote head.
+    let remote_ref = format!("refs/remotes/{REMOTE_NAME}/{branch_name}");
+    let remote_oid = repo
+        .refname_to_id(&remote_ref)
+        .map_err(|e| format!("Remote branch '{branch_name}' not found: {e}"))?;
+    let remote_commit = repo
+        .find_commit(remote_oid)
+        .map_err(|e| format!("Failed to find remote commit: {e}"))?;
+
+    // If this is the current branch, use git reset --hard which atomically
+    // moves the branch ref, updates the index, and resets the working tree.
+    let head_branch = repo
+        .head()
+        .ok()
+        .and_then(|r| r.shorthand().map(|s| s.to_string()));
+    if head_branch.as_deref() == Some(branch_name) {
+        repo.reset(remote_commit.as_object(), git2::ResetType::Hard, None)
+            .map_err(|e| format!("Failed to reset to remote: {e}"))?;
+    } else {
+        // Not on this branch — just move the ref directly.
+        let local_ref = format!("refs/heads/{branch_name}");
+        repo.reference(
+            &local_ref,
+            remote_oid,
+            true,
+            &format!("cloud sync: reset {branch_name} to remote"),
+        )
+        .map_err(|e| format!("Failed to reset branch: {e}"))?;
+    }
+
+    Ok(())
+}
+
 pub fn backup_and_reset(quest_dir: &Path, branch_name: &str) -> Result<String, String> {
     let repo = Repository::open(quest_dir).map_err(|e| format!("Failed to open repo: {e}"))?;
 
@@ -696,23 +774,24 @@ pub fn backup_and_reset(quest_dir: &Path, branch_name: &str) -> Result<String, S
         .find_commit(remote_oid)
         .map_err(|e| format!("Failed to find remote commit: {e}"))?;
 
-    // Move local branch ref to remote head.
-    repo.reference(
-        &local_ref,
-        remote_oid,
-        true,
-        &format!("cloud sync: reset {branch_name} to remote"),
-    )
-    .map_err(|e| format!("Failed to reset branch: {e}"))?;
-
-    // If this is the current branch, also reset the working tree.
+    // If this is the current branch, use git reset --hard which atomically
+    // moves the branch ref, updates the index, and resets the working tree.
     let head_branch = repo
         .head()
         .ok()
         .and_then(|r| r.shorthand().map(|s| s.to_string()));
     if head_branch.as_deref() == Some(branch_name) {
         repo.reset(remote_commit.as_object(), git2::ResetType::Hard, None)
-            .map_err(|e| format!("Failed to reset working tree: {e}"))?;
+            .map_err(|e| format!("Failed to reset to remote: {e}"))?;
+    } else {
+        // Not on this branch — just move the ref directly.
+        repo.reference(
+            &local_ref,
+            remote_oid,
+            true,
+            &format!("cloud sync: reset {branch_name} to remote"),
+        )
+        .map_err(|e| format!("Failed to reset branch: {e}"))?;
     }
 
     Ok(backup_name)
@@ -740,6 +819,17 @@ fn configure_fetch_refspec(repo: &Repository) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+/// Check whether an error message indicates an authentication failure (expired/revoked PAT).
+///
+/// Matches HTTP 401/403 status codes and common GitHub auth error strings from ureq.
+pub fn is_auth_error(error_msg: &str) -> bool {
+    error_msg.contains("status code 401")
+        || error_msg.contains("status code 403")
+        || error_msg.contains("Bad credentials")
+        || error_msg.contains("401")
+            && (error_msg.contains("Unauthorized") || error_msg.contains("auth"))
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────
@@ -808,5 +898,32 @@ mod tests {
 
         delete_config(dir.path()).unwrap();
         assert!(load_config(dir.path()).is_none());
+    }
+
+    #[test]
+    fn is_auth_error_detects_401() {
+        assert!(is_auth_error(
+            "https://api.github.com/user: status code 401"
+        ));
+    }
+
+    #[test]
+    fn is_auth_error_detects_403() {
+        assert!(is_auth_error("GitHub API error: status code 403"));
+    }
+
+    #[test]
+    fn is_auth_error_detects_bad_credentials() {
+        assert!(is_auth_error("Bad credentials"));
+    }
+
+    #[test]
+    fn is_auth_error_rejects_404() {
+        assert!(!is_auth_error("status code 404"));
+    }
+
+    #[test]
+    fn is_auth_error_rejects_network_error() {
+        assert!(!is_auth_error("connection refused"));
     }
 }
