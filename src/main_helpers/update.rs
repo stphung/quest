@@ -542,8 +542,13 @@ pub fn show_startup_splash_screen(
                                 let mut vault_state = TimeVaultState::new(branches, commits);
                                 vault_state.cloud_status = cloud_status.clone();
                                 vault_state.cloud_username = cloud_username.clone();
-                                if matches!(cloud_status, crate::history::cloud::CloudStatus::OutOfSync) {
-                                    if let Ok(Some(div)) = crate::history::cloud::check_divergence(quest_dir) {
+                                if matches!(
+                                    cloud_status,
+                                    crate::history::cloud::CloudStatus::OutOfSync
+                                ) {
+                                    if let Ok(Some(div)) =
+                                        crate::history::cloud::check_divergence(quest_dir)
+                                    {
                                         vault_state.cloud_divergence = Some(div);
                                         vault_state.mode = crate::ui::time_vault_scene::BrowserMode::DivergenceResolution;
                                     }

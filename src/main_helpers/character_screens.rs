@@ -209,7 +209,8 @@ pub fn handle_select_frame(
                     *cloud_status = CloudStatus::OutOfSync;
                     if let Some(ref mut browser) = time_vault_browser {
                         browser.cloud_divergence = Some(div);
-                        browser.mode = crate::ui::time_vault_scene::BrowserMode::DivergenceResolution;
+                        browser.mode =
+                            crate::ui::time_vault_scene::BrowserMode::DivergenceResolution;
                     }
                 }
                 CloudOpResult::Failed(msg) => {
@@ -822,9 +823,12 @@ pub fn handle_select_frame(
                         vault_state.cloud_status = cloud_status.clone();
                         vault_state.cloud_username = cloud_username.clone();
                         if matches!(cloud_status, CloudStatus::OutOfSync) {
-                            if let Ok(Some(div)) = crate::history::cloud::check_divergence(quest_dir) {
+                            if let Ok(Some(div)) =
+                                crate::history::cloud::check_divergence(quest_dir)
+                            {
                                 vault_state.cloud_divergence = Some(div);
-                                vault_state.mode = crate::ui::time_vault_scene::BrowserMode::DivergenceResolution;
+                                vault_state.mode =
+                                    crate::ui::time_vault_scene::BrowserMode::DivergenceResolution;
                             }
                         }
                         *time_vault_browser = Some(vault_state);

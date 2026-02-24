@@ -823,8 +823,13 @@ fn main() -> io::Result<()> {
                                                 history::cloud::repo_name_from_url(&c.repo_url)
                                             });
                                         // If already out-of-sync, re-check divergence and show resolution dialog
-                                        if matches!(cloud_status, history::cloud::CloudStatus::OutOfSync) {
-                                            if let Ok(Some(div)) = history::cloud::check_divergence(&quest_dir) {
+                                        if matches!(
+                                            cloud_status,
+                                            history::cloud::CloudStatus::OutOfSync
+                                        ) {
+                                            if let Ok(Some(div)) =
+                                                history::cloud::check_divergence(&quest_dir)
+                                            {
                                                 vault_state.cloud_divergence = Some(div);
                                                 vault_state.mode = crate::ui::time_vault_scene::BrowserMode::DivergenceResolution;
                                             }
