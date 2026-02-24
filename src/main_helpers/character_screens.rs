@@ -182,11 +182,11 @@ pub fn handle_select_frame(
                     if was_cloud_restore {
                         select_screen.cloud_restore_showing = false;
                         select_screen.cloud_restore_dismissed = true;
-                        *haven = haven::load_haven();
-                        *enhancement = enhancement::load_enhancement();
-                        *global_achievements = achievements::load_achievements();
-                        crate::achievements::titles::validate_selected_title(global_achievements);
-                        global_achievements.refresh_progress();
+                        crate::main_helpers::cloud_ops::reload_account_state(
+                            haven,
+                            enhancement,
+                            global_achievements,
+                        );
                     }
                 }
                 CloudOpResult::Pushed => {
@@ -194,11 +194,11 @@ pub fn handle_select_frame(
                 }
                 CloudOpResult::Pulled => {
                     *cloud_status = CloudStatus::Linked;
-                    *haven = haven::load_haven();
-                    *enhancement = enhancement::load_enhancement();
-                    *global_achievements = achievements::load_achievements();
-                    crate::achievements::titles::validate_selected_title(global_achievements);
-                    global_achievements.refresh_progress();
+                    crate::main_helpers::cloud_ops::reload_account_state(
+                        haven,
+                        enhancement,
+                        global_achievements,
+                    );
                 }
                 CloudOpResult::Unlinked => {
                     *cloud_config = None;
@@ -429,10 +429,11 @@ pub fn handle_select_frame(
                             // Auto-save before restoring
                             let _ = repo.commit_raw("Auto-save");
                             if repo.restore_to(&commit_id).is_ok() {
-                                *haven = haven::load_haven();
-                                *enhancement = enhancement::load_enhancement();
-                                *global_achievements = achievements::load_achievements();
-                                global_achievements.refresh_progress();
+                                crate::main_helpers::cloud_ops::reload_account_state(
+                                    haven,
+                                    enhancement,
+                                    global_achievements,
+                                );
                                 // Refresh vault browser in-place (overlay stays open)
                                 if let Ok(branches) = repo.list_branches() {
                                     browser.branches = branches;
@@ -458,10 +459,11 @@ pub fn handle_select_frame(
                             // Auto-save before forking
                             let _ = repo.commit_raw("Auto-save");
                             if repo.fork_timeline(&branch_name, &commit_id).is_ok() {
-                                *haven = haven::load_haven();
-                                *enhancement = enhancement::load_enhancement();
-                                *global_achievements = achievements::load_achievements();
-                                global_achievements.refresh_progress();
+                                crate::main_helpers::cloud_ops::reload_account_state(
+                                    haven,
+                                    enhancement,
+                                    global_achievements,
+                                );
                                 // Refresh vault browser in-place (overlay stays open)
                                 if let Ok(branches) = repo.list_branches() {
                                     browser.branches = branches;
@@ -484,10 +486,11 @@ pub fn handle_select_frame(
                             // Auto-save before switching
                             let _ = repo.commit_raw("Auto-save");
                             if repo.switch_timeline(&branch_name).is_ok() {
-                                *haven = haven::load_haven();
-                                *enhancement = enhancement::load_enhancement();
-                                *global_achievements = achievements::load_achievements();
-                                global_achievements.refresh_progress();
+                                crate::main_helpers::cloud_ops::reload_account_state(
+                                    haven,
+                                    enhancement,
+                                    global_achievements,
+                                );
                                 // Refresh vault browser in-place (overlay stays open)
                                 if let Ok(branches) = repo.list_branches() {
                                     // Select the switched-to branch (sort order changes)
@@ -747,13 +750,11 @@ pub fn handle_select_frame(
                         if let Some(ref config) = cloud_config {
                             let _ = crate::history::cloud::fetch_all(quest_dir, &config.token);
                             let _ = crate::history::cloud::reset_to_remote(quest_dir, "main");
-                            *haven = haven::load_haven();
-                            *enhancement = enhancement::load_enhancement();
-                            *global_achievements = achievements::load_achievements();
-                            crate::achievements::titles::validate_selected_title(
+                            crate::main_helpers::cloud_ops::reload_account_state(
+                                haven,
+                                enhancement,
                                 global_achievements,
                             );
-                            global_achievements.refresh_progress();
                             *cloud_status = CloudStatus::Linked;
                             browser.cloud_status = cloud_status.clone();
                             if let Some(repo) = history_repo {
@@ -775,11 +776,11 @@ pub fn handle_select_frame(
                     }
                     TimeVaultAction::ResolveKeepBoth => {
                         let _ = crate::history::cloud::backup_and_reset(quest_dir, "main");
-                        *haven = haven::load_haven();
-                        *enhancement = enhancement::load_enhancement();
-                        *global_achievements = achievements::load_achievements();
-                        crate::achievements::titles::validate_selected_title(global_achievements);
-                        global_achievements.refresh_progress();
+                        crate::main_helpers::cloud_ops::reload_account_state(
+                            haven,
+                            enhancement,
+                            global_achievements,
+                        );
                         *cloud_status = CloudStatus::Linked;
                         browser.cloud_status = cloud_status.clone();
                         browser.cloud_username = cloud_username.clone();

@@ -261,13 +261,11 @@ fn main() -> io::Result<()> {
                     if let Ok(updated) = history::cloud::fast_forward_all(&quest_dir) {
                         if updated {
                             // Reload state from disk since files changed
-                            haven = haven::load_haven();
-                            enhancement = enhancement::load_enhancement();
-                            global_achievements = achievements::load_achievements();
-                            crate::achievements::titles::validate_selected_title(
+                            main_helpers::cloud_ops::reload_account_state(
+                                &mut haven,
+                                &mut enhancement,
                                 &mut global_achievements,
                             );
-                            global_achievements.refresh_progress();
                         }
                     }
                 }
@@ -551,13 +549,11 @@ fn main() -> io::Result<()> {
                                 history::cloud::CloudOpResult::Pulled => {
                                     cloud_status = history::cloud::CloudStatus::Linked;
                                     // Reload all state from disk
-                                    haven = haven::load_haven();
-                                    enhancement = enhancement::load_enhancement();
-                                    global_achievements = achievements::load_achievements();
-                                    crate::achievements::titles::validate_selected_title(
+                                    main_helpers::cloud_ops::reload_account_state(
+                                        &mut haven,
+                                        &mut enhancement,
                                         &mut global_achievements,
                                     );
-                                    global_achievements.refresh_progress();
                                     // Reload active character from pulled data
                                     let filename = format!("{}.json", state.character_name);
                                     if let Ok(mut reloaded) =
@@ -879,10 +875,11 @@ fn main() -> io::Result<()> {
                                     );
                                     if repo.restore_to(commit_id).is_ok() {
                                         // Reload all state from disk (git reset replaced files)
-                                        haven = haven::load_haven();
-                                        enhancement = enhancement::load_enhancement();
-                                        global_achievements = achievements::load_achievements();
-                                        global_achievements.refresh_progress();
+                                        main_helpers::cloud_ops::reload_account_state(
+                                            &mut haven,
+                                            &mut enhancement,
+                                            &mut global_achievements,
+                                        );
 
                                         // Reload character state
                                         let filename = format!("{}.json", state.character_name);
@@ -949,10 +946,11 @@ fn main() -> io::Result<()> {
                                     );
                                     if repo.fork_timeline(branch_name, commit_id).is_ok() {
                                         // Full state reload (fork checks out the new branch)
-                                        haven = haven::load_haven();
-                                        enhancement = enhancement::load_enhancement();
-                                        global_achievements = achievements::load_achievements();
-                                        global_achievements.refresh_progress();
+                                        main_helpers::cloud_ops::reload_account_state(
+                                            &mut haven,
+                                            &mut enhancement,
+                                            &mut global_achievements,
+                                        );
 
                                         let filename = format!("{}.json", state.character_name);
                                         if let Ok(mut reloaded) =
@@ -1016,10 +1014,11 @@ fn main() -> io::Result<()> {
                                     );
                                     if repo.switch_timeline(branch_name).is_ok() {
                                         // Full state reload (switch checks out the branch)
-                                        haven = haven::load_haven();
-                                        enhancement = enhancement::load_enhancement();
-                                        global_achievements = achievements::load_achievements();
-                                        global_achievements.refresh_progress();
+                                        main_helpers::cloud_ops::reload_account_state(
+                                            &mut haven,
+                                            &mut enhancement,
+                                            &mut global_achievements,
+                                        );
 
                                         let filename = format!("{}.json", state.character_name);
                                         if let Ok(mut reloaded) =
@@ -1460,13 +1459,11 @@ fn main() -> io::Result<()> {
                                 if let Some(ref config) = cloud_config {
                                     let _ = history::cloud::fetch_all(&quest_dir, &config.token);
                                     let _ = history::cloud::reset_to_remote(&quest_dir, "main");
-                                    haven = haven::load_haven();
-                                    enhancement = enhancement::load_enhancement();
-                                    global_achievements = achievements::load_achievements();
-                                    crate::achievements::titles::validate_selected_title(
+                                    main_helpers::cloud_ops::reload_account_state(
+                                        &mut haven,
+                                        &mut enhancement,
                                         &mut global_achievements,
                                     );
-                                    global_achievements.refresh_progress();
 
                                     // Reload character state
                                     let filename = format!("{}.json", state.character_name);
@@ -1507,13 +1504,11 @@ fn main() -> io::Result<()> {
 
                             if matches!(result, InputResult::ResolveKeepBoth) {
                                 let _ = history::cloud::backup_and_reset(&quest_dir, "main");
-                                haven = haven::load_haven();
-                                enhancement = enhancement::load_enhancement();
-                                global_achievements = achievements::load_achievements();
-                                crate::achievements::titles::validate_selected_title(
+                                main_helpers::cloud_ops::reload_account_state(
+                                    &mut haven,
+                                    &mut enhancement,
                                     &mut global_achievements,
                                 );
-                                global_achievements.refresh_progress();
 
                                 // Reload character state
                                 let filename = format!("{}.json", state.character_name);
