@@ -137,7 +137,11 @@ pub enum InputResult {
     /// Change the linked cloud repo (re-use existing PAT from config).
     ChangeRepo,
     /// Link a GitHub account for cloud sync.
-    LinkCloud { token: String, repo_name: String },
+    LinkCloud {
+        token: String,
+        repo_name: String,
+        private: bool,
+    },
     /// Push all save branches to the cloud.
     PushCloud,
     /// Pull save branches from the cloud.

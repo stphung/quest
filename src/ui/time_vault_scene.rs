@@ -95,9 +95,11 @@ pub struct TimeVaultState {
     /// Validated token stored while selecting a repo.
     pub cloud_validated_token: Option<String>,
     /// Existing repos fetched from GitHub for selection.
-    pub cloud_repos: Vec<String>,
+    pub cloud_repos: Vec<crate::history::cloud::RepoInfo>,
     /// Selected index in the repo list (last item = "create new").
     pub cloud_repo_selected: usize,
+    /// Visibility toggle for new repo creation (default: private).
+    pub cloud_new_repo_private: bool,
     pub cloud_divergence: Option<crate::history::cloud::BranchDivergence>,
     /// Name of the currently linked repo (for highlighting in the picker).
     pub cloud_current_repo: Option<String>,
@@ -125,6 +127,7 @@ impl TimeVaultState {
             cloud_validated_token: None,
             cloud_repos: Vec::new(),
             cloud_repo_selected: 0,
+            cloud_new_repo_private: true,
             cloud_divergence: None,
             cloud_current_repo: None,
         }
@@ -863,9 +866,12 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
             );
 
             let mut row = cy + 3;
-            for (i, name) in state.cloud_repos.iter().enumerate() {
+            for (i, repo) in state.cloud_repos.iter().enumerate() {
                 let selected = i == state.cloud_repo_selected;
-                let is_current = state.cloud_current_repo.as_ref().is_some_and(|c| c == name);
+                let is_current = state
+                    .cloud_current_repo
+                    .as_ref()
+                    .is_some_and(|c| c == &repo.name);
                 let marker = if selected { "\u{25b8} " } else { "  " };
                 let color = if selected {
                     Color::Yellow
@@ -875,9 +881,15 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
                     Color::White
                 };
                 put_text(buffer, row, cx, marker, color);
-                put_text(buffer, row, cx + 2, name, color);
+                put_text(buffer, row, cx + 2, &repo.name, color);
+                let badge_x = cx + 2 + repo.name.len() as i32 + 1;
+                if repo.private {
+                    put_text(buffer, row, badge_x, "\u{1f512} private", Color::DarkGray);
+                } else {
+                    put_text(buffer, row, badge_x, "\u{1f310} public", Color::Green);
+                }
                 if is_current {
-                    let tag_x = cx + 2 + name.len() as i32 + 1;
+                    let tag_x = badge_x + if repo.private { 10 } else { 9 };
                     put_text(buffer, row, tag_x, "(current)", Color::DarkGray);
                 }
                 row += 1;
@@ -893,6 +905,16 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
                 put_text(buffer, row, cx + 2, "New: ", Color::Cyan);
                 let val = format!("{}_", state.cloud_repo_input);
                 put_text(buffer, row, cx + 7, &val, Color::Yellow);
+                // Visibility tab switcher
+                row += 1;
+                put_text(buffer, row, cx + 4, "Visibility:", Color::DarkGray);
+                if state.cloud_new_repo_private {
+                    put_text(buffer, row, cx + 16, "[\u{1f512} Private]", Color::Yellow);
+                    put_text(buffer, row, cx + 28, "\u{1f310} Public", Color::DarkGray);
+                } else {
+                    put_text(buffer, row, cx + 16, "\u{1f512} Private", Color::DarkGray);
+                    put_text(buffer, row, cx + 27, "[\u{1f310} Public]", Color::Green);
+                }
             } else {
                 put_text(buffer, row, cx + 2, "Create new repo...", color);
             }
@@ -907,8 +929,15 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
             row += 1;
             put_text(buffer, row, cx, "[Enter]", Color::Cyan);
             put_text(buffer, row, cx + 8, "Select", Color::DarkGray);
-            put_text(buffer, row, cx + 17, "[Esc]", Color::Cyan);
-            put_text(buffer, row, cx + 23, "Cancel", Color::DarkGray);
+            if state.cloud_repo_selected == create_idx {
+                put_text(buffer, row, cx + 17, "[V]", Color::Cyan);
+                put_text(buffer, row, cx + 21, "Toggle", Color::DarkGray);
+                put_text(buffer, row, cx + 30, "[Esc]", Color::Cyan);
+                put_text(buffer, row, cx + 36, "Cancel", Color::DarkGray);
+            } else {
+                put_text(buffer, row, cx + 17, "[Esc]", Color::Cyan);
+                put_text(buffer, row, cx + 23, "Cancel", Color::DarkGray);
+            }
         }
         BrowserMode::ConfirmPush => {
             put_text(buffer, cy, cx, "Push to cloud?", Color::White);
@@ -987,7 +1016,7 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
                 buffer,
                 cy + 5,
                 cx + 4,
-                "Keep local, push to cloud",
+                "Keep my saves, upload to cloud",
                 Color::DarkGray,
             );
             put_text(buffer, cy + 6, cx, "[C]", Color::Cyan);
@@ -995,7 +1024,7 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
                 buffer,
                 cy + 6,
                 cx + 4,
-                "Use cloud, discard local",
+                "Use cloud saves (backup kept)",
                 Color::DarkGray,
             );
             put_text(buffer, cy + 7, cx, "[B]", Color::Cyan);
@@ -1003,11 +1032,11 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
                 buffer,
                 cy + 7,
                 cx + 4,
-                "Keep both (backup local)",
+                "Keep both (create backup branch)",
                 Color::DarkGray,
             );
             put_text(buffer, cy + 8, cx, "[Esc]", Color::Cyan);
-            put_text(buffer, cy + 8, cx + 6, "Decide later", Color::DarkGray);
+            put_text(buffer, cy + 8, cx + 6, "Cancel", Color::DarkGray);
         }
         BrowserMode::Browse => {}
     }
@@ -1040,7 +1069,8 @@ fn paint_cloud_status(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
         CloudStatus::OutOfSync => ("\u{2601} \u{26a0} out of sync".to_string(), Color::Yellow),
         CloudStatus::TokenExpired => ("\u{2601} \u{2717} token expired".to_string(), Color::Red),
         CloudStatus::Error(msg) => {
-            let label = format!("\u{2601} \u{2717} {}", msg);
+            let friendly = crate::history::cloud::sanitize_cloud_error(msg);
+            let label = format!("\u{2601} \u{2717} {friendly}");
             (label, Color::Red)
         }
     };

@@ -182,11 +182,11 @@ pub fn handle_select_frame(
                     if was_cloud_restore {
                         select_screen.cloud_restore_showing = false;
                         select_screen.cloud_restore_dismissed = true;
-                        *haven = haven::load_haven();
-                        *enhancement = enhancement::load_enhancement();
-                        *global_achievements = achievements::load_achievements();
-                        crate::achievements::titles::validate_selected_title(global_achievements);
-                        global_achievements.refresh_progress();
+                        crate::main_helpers::cloud_ops::reload_account_state(
+                            haven,
+                            enhancement,
+                            global_achievements,
+                        );
                     }
                 }
                 CloudOpResult::Pushed => {
@@ -194,11 +194,11 @@ pub fn handle_select_frame(
                 }
                 CloudOpResult::Pulled => {
                     *cloud_status = CloudStatus::Linked;
-                    *haven = haven::load_haven();
-                    *enhancement = enhancement::load_enhancement();
-                    *global_achievements = achievements::load_achievements();
-                    crate::achievements::titles::validate_selected_title(global_achievements);
-                    global_achievements.refresh_progress();
+                    crate::main_helpers::cloud_ops::reload_account_state(
+                        haven,
+                        enhancement,
+                        global_achievements,
+                    );
                 }
                 CloudOpResult::Unlinked => {
                     *cloud_config = None;
@@ -367,13 +367,23 @@ pub fn handle_select_frame(
                                 let tx = cloud_tx.clone();
                                 let dir = quest_dir.to_path_buf();
                                 std::thread::spawn(move || {
-                                    let res = match crate::history::cloud::link_and_pull(
-                                        &dir, &token, &repo_name,
-                                    ) {
-                                        Ok(config) => CloudOpResult::Linked(config),
-                                        Err(e) => CloudOpResult::Failed(e),
-                                    };
-                                    let _ = tx.send(res);
+                                    let tx2 = tx.clone();
+                                    let result = std::panic::catch_unwind(
+                                        std::panic::AssertUnwindSafe(|| {
+                                            let res = match crate::history::cloud::link_and_pull(
+                                                &dir, &token, &repo_name,
+                                            ) {
+                                                Ok(config) => CloudOpResult::Linked(config),
+                                                Err(e) => CloudOpResult::Failed(e),
+                                            };
+                                            let _ = tx.send(res);
+                                        }),
+                                    );
+                                    if result.is_err() {
+                                        let _ = tx2.send(CloudOpResult::Failed(
+                                            "Cloud operation failed unexpectedly".to_string(),
+                                        ));
+                                    }
                                 });
                             }
                         }
@@ -419,10 +429,11 @@ pub fn handle_select_frame(
                             // Auto-save before restoring
                             let _ = repo.commit_raw("Auto-save");
                             if repo.restore_to(&commit_id).is_ok() {
-                                *haven = haven::load_haven();
-                                *enhancement = enhancement::load_enhancement();
-                                *global_achievements = achievements::load_achievements();
-                                global_achievements.refresh_progress();
+                                crate::main_helpers::cloud_ops::reload_account_state(
+                                    haven,
+                                    enhancement,
+                                    global_achievements,
+                                );
                                 // Refresh vault browser in-place (overlay stays open)
                                 if let Ok(branches) = repo.list_branches() {
                                     browser.branches = branches;
@@ -448,10 +459,11 @@ pub fn handle_select_frame(
                             // Auto-save before forking
                             let _ = repo.commit_raw("Auto-save");
                             if repo.fork_timeline(&branch_name, &commit_id).is_ok() {
-                                *haven = haven::load_haven();
-                                *enhancement = enhancement::load_enhancement();
-                                *global_achievements = achievements::load_achievements();
-                                global_achievements.refresh_progress();
+                                crate::main_helpers::cloud_ops::reload_account_state(
+                                    haven,
+                                    enhancement,
+                                    global_achievements,
+                                );
                                 // Refresh vault browser in-place (overlay stays open)
                                 if let Ok(branches) = repo.list_branches() {
                                     browser.branches = branches;
@@ -474,10 +486,11 @@ pub fn handle_select_frame(
                             // Auto-save before switching
                             let _ = repo.commit_raw("Auto-save");
                             if repo.switch_timeline(&branch_name).is_ok() {
-                                *haven = haven::load_haven();
-                                *enhancement = enhancement::load_enhancement();
-                                *global_achievements = achievements::load_achievements();
-                                global_achievements.refresh_progress();
+                                crate::main_helpers::cloud_ops::reload_account_state(
+                                    haven,
+                                    enhancement,
+                                    global_achievements,
+                                );
                                 // Refresh vault browser in-place (overlay stays open)
                                 if let Ok(branches) = repo.list_branches() {
                                     // Select the switched-to branch (sort order changes)
@@ -522,19 +535,29 @@ pub fn handle_select_frame(
                             let tx = cloud_tx.clone();
                             let tok = token;
                             std::thread::spawn(move || {
-                                match crate::history::cloud::github_get_username(&tok) {
-                                    Ok(username) => {
-                                        let repos = crate::history::cloud::github_list_repos(&tok)
-                                            .unwrap_or_default();
-                                        let _ = tx.send(CloudOpResult::TokenValidated {
-                                            username,
-                                            token: tok,
-                                            repos,
-                                        });
-                                    }
-                                    Err(e) => {
-                                        let _ = tx.send(CloudOpResult::Failed(e));
-                                    }
+                                let tx2 = tx.clone();
+                                let result =
+                                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                                        match crate::history::cloud::github_get_username(&tok) {
+                                            Ok(username) => {
+                                                let repos =
+                                                    crate::history::cloud::github_list_repos(&tok)
+                                                        .unwrap_or_default();
+                                                let _ = tx.send(CloudOpResult::TokenValidated {
+                                                    username,
+                                                    token: tok,
+                                                    repos,
+                                                });
+                                            }
+                                            Err(e) => {
+                                                let _ = tx.send(CloudOpResult::Failed(e));
+                                            }
+                                        }
+                                    }));
+                                if result.is_err() {
+                                    let _ = tx2.send(CloudOpResult::Failed(
+                                        "Cloud operation failed unexpectedly".to_string(),
+                                    ));
                                 }
                             });
                             browser.cloud_status = CloudStatus::Syncing;
@@ -547,27 +570,44 @@ pub fn handle_select_frame(
                                 let tx = cloud_tx.clone();
                                 let tok = config.token.clone();
                                 std::thread::spawn(move || {
-                                    match crate::history::cloud::github_get_username(&tok) {
-                                        Ok(username) => {
-                                            let repos =
-                                                crate::history::cloud::github_list_repos(&tok)
-                                                    .unwrap_or_default();
-                                            let _ = tx.send(CloudOpResult::TokenValidated {
-                                                username,
-                                                token: tok,
-                                                repos,
-                                            });
-                                        }
-                                        Err(e) => {
-                                            let _ = tx.send(CloudOpResult::Failed(e));
-                                        }
+                                    let tx2 = tx.clone();
+                                    let result = std::panic::catch_unwind(
+                                        std::panic::AssertUnwindSafe(|| {
+                                            match crate::history::cloud::github_get_username(&tok) {
+                                                Ok(username) => {
+                                                    let repos =
+                                                        crate::history::cloud::github_list_repos(
+                                                            &tok,
+                                                        )
+                                                        .unwrap_or_default();
+                                                    let _ =
+                                                        tx.send(CloudOpResult::TokenValidated {
+                                                            username,
+                                                            token: tok,
+                                                            repos,
+                                                        });
+                                                }
+                                                Err(e) => {
+                                                    let _ = tx.send(CloudOpResult::Failed(e));
+                                                }
+                                            }
+                                        }),
+                                    );
+                                    if result.is_err() {
+                                        let _ = tx2.send(CloudOpResult::Failed(
+                                            "Cloud operation failed unexpectedly".to_string(),
+                                        ));
                                     }
                                 });
                                 browser.cloud_status = CloudStatus::Syncing;
                             }
                         }
                     }
-                    TimeVaultAction::LinkCloud { token, repo_name } => {
+                    TimeVaultAction::LinkCloud {
+                        token,
+                        repo_name,
+                        private,
+                    } => {
                         if !*cloud_op_in_flight {
                             *cloud_status = CloudStatus::Syncing;
                             *cloud_op_in_flight = true;
@@ -577,12 +617,22 @@ pub fn handle_select_frame(
                             let tok = token;
                             let rname = repo_name;
                             std::thread::spawn(move || {
-                                let res =
-                                    match crate::history::cloud::link_github(&dir, &tok, &rname) {
-                                        Ok(config) => CloudOpResult::Linked(config),
-                                        Err(e) => CloudOpResult::Failed(e),
-                                    };
-                                let _ = tx.send(res);
+                                let tx2 = tx.clone();
+                                let result =
+                                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                                        let res = match crate::history::cloud::link_github(
+                                            &dir, &tok, &rname, private,
+                                        ) {
+                                            Ok(config) => CloudOpResult::Linked(config),
+                                            Err(e) => CloudOpResult::Failed(e),
+                                        };
+                                        let _ = tx.send(res);
+                                    }));
+                                if result.is_err() {
+                                    let _ = tx2.send(CloudOpResult::Failed(
+                                        "Cloud operation failed unexpectedly".to_string(),
+                                    ));
+                                }
                             });
                         }
                     }
@@ -596,13 +646,23 @@ pub fn handle_select_frame(
                                 let dir = quest_dir.to_path_buf();
                                 let tok = config.token.clone();
                                 std::thread::spawn(move || {
-                                    let res = match crate::history::cloud::push_all_branches(
-                                        &dir, &tok,
-                                    ) {
-                                        Ok(()) => CloudOpResult::Pushed,
-                                        Err(e) => CloudOpResult::Failed(e),
-                                    };
-                                    let _ = tx.send(res);
+                                    let tx2 = tx.clone();
+                                    let result = std::panic::catch_unwind(
+                                        std::panic::AssertUnwindSafe(|| {
+                                            let res = match crate::history::cloud::push_all_branches(
+                                                &dir, &tok,
+                                            ) {
+                                                Ok(()) => CloudOpResult::Pushed,
+                                                Err(e) => CloudOpResult::Failed(e),
+                                            };
+                                            let _ = tx.send(res);
+                                        }),
+                                    );
+                                    if result.is_err() {
+                                        let _ = tx2.send(CloudOpResult::Failed(
+                                            "Cloud operation failed unexpectedly".to_string(),
+                                        ));
+                                    }
                                 });
                             }
                         }
@@ -617,24 +677,36 @@ pub fn handle_select_frame(
                                 let dir = quest_dir.to_path_buf();
                                 let tok = config.token.clone();
                                 std::thread::spawn(move || {
-                                    let res = (|| -> CloudOpResult {
-                                        if let Err(e) = crate::history::cloud::fetch_all(&dir, &tok)
-                                        {
-                                            return CloudOpResult::Failed(e);
-                                        }
-                                        match crate::history::cloud::check_divergence(&dir) {
-                                            Ok(Some(div)) => CloudOpResult::Diverged(div),
-                                            Ok(None) => {
-                                                match crate::history::cloud::fast_forward_all(&dir)
+                                    let tx2 = tx.clone();
+                                    let result = std::panic::catch_unwind(
+                                        std::panic::AssertUnwindSafe(|| {
+                                            let res = (|| -> CloudOpResult {
+                                                if let Err(e) =
+                                                    crate::history::cloud::fetch_all(&dir, &tok)
                                                 {
-                                                    Ok(_) => CloudOpResult::Pulled,
-                                                    Err(e) => CloudOpResult::Failed(e),
+                                                    return CloudOpResult::Failed(e);
                                                 }
+                                                match crate::history::cloud::check_divergence(&dir) {
+                                                Ok(Some(div)) => CloudOpResult::Diverged(div),
+                                                Ok(None) => {
+                                                    match crate::history::cloud::fast_forward_all(&dir)
+                                                    {
+                                                        Ok(_) => CloudOpResult::Pulled,
+                                                        Err(e) => CloudOpResult::Failed(e),
+                                                    }
+                                                }
+                                                Err(e) => CloudOpResult::Failed(e),
                                             }
-                                            Err(e) => CloudOpResult::Failed(e),
-                                        }
-                                    })();
-                                    let _ = tx.send(res);
+                                            })(
+                                            );
+                                            let _ = tx.send(res);
+                                        }),
+                                    );
+                                    if result.is_err() {
+                                        let _ = tx2.send(CloudOpResult::Failed(
+                                            "Cloud operation failed unexpectedly".to_string(),
+                                        ));
+                                    }
                                 });
                             }
                         }
@@ -657,13 +729,23 @@ pub fn handle_select_frame(
                                 let dir = quest_dir.to_path_buf();
                                 let tok = config.token.clone();
                                 std::thread::spawn(move || {
-                                    let res = match crate::history::cloud::force_push_branch(
-                                        &dir, "main", &tok,
-                                    ) {
-                                        Ok(()) => CloudOpResult::Pushed,
-                                        Err(e) => CloudOpResult::Failed(e),
-                                    };
-                                    let _ = tx.send(res);
+                                    let tx2 = tx.clone();
+                                    let result = std::panic::catch_unwind(
+                                        std::panic::AssertUnwindSafe(|| {
+                                            let res = match crate::history::cloud::force_push_branch(
+                                                &dir, "main", &tok,
+                                            ) {
+                                                Ok(()) => CloudOpResult::Pushed,
+                                                Err(e) => CloudOpResult::Failed(e),
+                                            };
+                                            let _ = tx.send(res);
+                                        }),
+                                    );
+                                    if result.is_err() {
+                                        let _ = tx2.send(CloudOpResult::Failed(
+                                            "Cloud operation failed unexpectedly".to_string(),
+                                        ));
+                                    }
                                 });
                             }
                         }
@@ -672,13 +754,11 @@ pub fn handle_select_frame(
                         if let Some(ref config) = cloud_config {
                             let _ = crate::history::cloud::fetch_all(quest_dir, &config.token);
                             let _ = crate::history::cloud::reset_to_remote(quest_dir, "main");
-                            *haven = haven::load_haven();
-                            *enhancement = enhancement::load_enhancement();
-                            *global_achievements = achievements::load_achievements();
-                            crate::achievements::titles::validate_selected_title(
+                            crate::main_helpers::cloud_ops::reload_account_state(
+                                haven,
+                                enhancement,
                                 global_achievements,
                             );
-                            global_achievements.refresh_progress();
                             *cloud_status = CloudStatus::Linked;
                             browser.cloud_status = cloud_status.clone();
                             if let Some(repo) = history_repo {
@@ -700,11 +780,11 @@ pub fn handle_select_frame(
                     }
                     TimeVaultAction::ResolveKeepBoth => {
                         let _ = crate::history::cloud::backup_and_reset(quest_dir, "main");
-                        *haven = haven::load_haven();
-                        *enhancement = enhancement::load_enhancement();
-                        *global_achievements = achievements::load_achievements();
-                        crate::achievements::titles::validate_selected_title(global_achievements);
-                        global_achievements.refresh_progress();
+                        crate::main_helpers::cloud_ops::reload_account_state(
+                            haven,
+                            enhancement,
+                            global_achievements,
+                        );
                         *cloud_status = CloudStatus::Linked;
                         browser.cloud_status = cloud_status.clone();
                         browser.cloud_username = cloud_username.clone();
@@ -733,19 +813,33 @@ pub fn handle_select_frame(
                                 let dir = quest_dir.to_path_buf();
                                 let cfg = config.clone();
                                 std::thread::spawn(move || {
-                                    let res = match crate::history::cloud::update_token(
-                                        &dir, &token, &cfg,
-                                    ) {
-                                        Ok(new_config) => CloudOpResult::TokenUpdated(new_config),
-                                        Err(e) => {
-                                            if crate::history::cloud::is_auth_error(&e) {
-                                                CloudOpResult::Failed("invalid token".to_string())
-                                            } else {
-                                                CloudOpResult::Failed(e)
-                                            }
-                                        }
-                                    };
-                                    let _ = tx.send(res);
+                                    let tx2 = tx.clone();
+                                    let result = std::panic::catch_unwind(
+                                        std::panic::AssertUnwindSafe(|| {
+                                            let res = match crate::history::cloud::update_token(
+                                                &dir, &token, &cfg,
+                                            ) {
+                                                Ok(new_config) => {
+                                                    CloudOpResult::TokenUpdated(new_config)
+                                                }
+                                                Err(e) => {
+                                                    if crate::history::cloud::is_auth_error(&e) {
+                                                        CloudOpResult::Failed(
+                                                            "invalid token".to_string(),
+                                                        )
+                                                    } else {
+                                                        CloudOpResult::Failed(e)
+                                                    }
+                                                }
+                                            };
+                                            let _ = tx.send(res);
+                                        }),
+                                    );
+                                    if result.is_err() {
+                                        let _ = tx2.send(CloudOpResult::Failed(
+                                            "Cloud operation failed unexpectedly".to_string(),
+                                        ));
+                                    }
                                 });
                             }
                         }

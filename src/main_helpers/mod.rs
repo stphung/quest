@@ -2,6 +2,7 @@
 
 pub mod achievements;
 pub mod character_screens;
+pub mod cloud_ops;
 pub mod input_routing;
 pub mod offline;
 pub mod overlay;

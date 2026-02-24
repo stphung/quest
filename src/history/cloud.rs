@@ -27,6 +27,25 @@ const REPO_TOPIC: &str = "quest-time-vaults";
 /// GitHub API base URL.
 const GITHUB_API: &str = "https://api.github.com";
 
+/// Timeout for HTTP requests to GitHub API.
+const HTTP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
+
+/// Create a ureq agent with standard timeout configuration.
+fn github_agent() -> ureq::Agent {
+    ureq::Agent::new_with_config(
+        ureq::Agent::config_builder()
+            .timeout_global(Some(HTTP_TIMEOUT))
+            .build(),
+    )
+}
+
+/// Repository metadata returned from the GitHub API.
+#[derive(Debug, Clone)]
+pub struct RepoInfo {
+    pub name: String,
+    pub private: bool,
+}
+
 // ── Types ────────────────────────────────────────────────────────────────
 
 /// Persisted cloud configuration (stored in `~/.quest/.cloud.json`).
@@ -66,7 +85,7 @@ pub enum CloudOpResult {
     TokenValidated {
         username: String,
         token: String,
-        repos: Vec<String>,
+        repos: Vec<RepoInfo>,
     },
     /// All branches pushed to remote.
     Pushed,
@@ -137,7 +156,8 @@ pub fn github_get_username(token: &str) -> Result<String, String> {
     }
 
     let url = format!("{GITHUB_API}/user");
-    let resp: GithubUser = ureq::get(&url)
+    let resp: GithubUser = github_agent()
+        .get(&url)
         .header("User-Agent", USER_AGENT)
         .header("Authorization", &format!("Bearer {token}"))
         .header("Accept", "application/vnd.github+json")
@@ -155,7 +175,7 @@ pub fn github_get_username(token: &str) -> Result<String, String> {
 /// First tries the GitHub search API filtered by the `quest-time-vaults` topic.
 /// If no tagged repos are found, falls back to listing all user repos so that
 /// repos created before topic tagging was added still appear.
-pub fn github_list_repos(token: &str) -> Result<Vec<String>, String> {
+pub fn github_list_repos(token: &str) -> Result<Vec<RepoInfo>, String> {
     let username = github_get_username(token)?;
 
     // Try topic-filtered search first.
@@ -169,7 +189,7 @@ pub fn github_list_repos(token: &str) -> Result<Vec<String>, String> {
 }
 
 /// Search for repos tagged with the quest topic.
-fn github_list_repos_by_topic(token: &str, username: &str) -> Result<Vec<String>, String> {
+fn github_list_repos_by_topic(token: &str, username: &str) -> Result<Vec<RepoInfo>, String> {
     #[derive(Deserialize)]
     struct SearchResult {
         items: Vec<SearchItem>,
@@ -177,6 +197,7 @@ fn github_list_repos_by_topic(token: &str, username: &str) -> Result<Vec<String>
     #[derive(Deserialize)]
     struct SearchItem {
         name: String,
+        private: bool,
     }
 
     let query = format!("topic:{REPO_TOPIC} user:{username}");
@@ -184,7 +205,8 @@ fn github_list_repos_by_topic(token: &str, username: &str) -> Result<Vec<String>
         "{GITHUB_API}/search/repositories?q={}&per_page=100",
         urlencoded(&query)
     );
-    let result: SearchResult = ureq::get(&url)
+    let result: SearchResult = github_agent()
+        .get(&url)
         .header("User-Agent", USER_AGENT)
         .header("Authorization", &format!("Bearer {token}"))
         .header("Accept", "application/vnd.github+json")
@@ -194,18 +216,27 @@ fn github_list_repos_by_topic(token: &str, username: &str) -> Result<Vec<String>
         .read_json()
         .map_err(|e| format!("Failed to parse search response: {e}"))?;
 
-    Ok(result.items.into_iter().map(|r| r.name).collect())
+    Ok(result
+        .items
+        .into_iter()
+        .map(|r| RepoInfo {
+            name: r.name,
+            private: r.private,
+        })
+        .collect())
 }
 
 /// List all repositories owned by the authenticated user.
-fn github_list_all_user_repos(token: &str) -> Result<Vec<String>, String> {
+fn github_list_all_user_repos(token: &str) -> Result<Vec<RepoInfo>, String> {
     #[derive(Deserialize)]
     struct RepoItem {
         name: String,
+        private: bool,
     }
 
     let url = format!("{GITHUB_API}/user/repos?per_page=100&sort=updated&affiliation=owner");
-    let repos: Vec<RepoItem> = ureq::get(&url)
+    let repos: Vec<RepoItem> = github_agent()
+        .get(&url)
         .header("User-Agent", USER_AGENT)
         .header("Authorization", &format!("Bearer {token}"))
         .header("Accept", "application/vnd.github+json")
@@ -215,7 +246,13 @@ fn github_list_all_user_repos(token: &str) -> Result<Vec<String>, String> {
         .read_json()
         .map_err(|e| format!("Failed to parse repos response: {e}"))?;
 
-    Ok(repos.into_iter().map(|r| r.name).collect())
+    Ok(repos
+        .into_iter()
+        .map(|r| RepoInfo {
+            name: r.name,
+            private: r.private,
+        })
+        .collect())
 }
 
 /// Extract the repository name from a GitHub clone URL.
@@ -234,10 +271,11 @@ fn urlencoded(s: &str) -> String {
     s.replace(' ', "+").replace(':', "%3A")
 }
 
-/// Ensure a private repository exists on GitHub, creating it if needed.
+/// Ensure a repository exists on GitHub, creating it if needed.
 ///
-/// Returns the HTTPS clone URL.
-pub fn github_ensure_repo(token: &str, repo_name: &str) -> Result<String, String> {
+/// Returns the HTTPS clone URL. The `private` flag is only used when creating
+/// a new repo; existing repos keep their current visibility.
+pub fn github_ensure_repo(token: &str, repo_name: &str, private: bool) -> Result<String, String> {
     #[derive(Deserialize)]
     struct GithubRepo {
         clone_url: String,
@@ -247,7 +285,8 @@ pub fn github_ensure_repo(token: &str, repo_name: &str) -> Result<String, String
     let username = github_get_username(token)?;
     let get_url = format!("{GITHUB_API}/repos/{username}/{repo_name}");
 
-    let get_result = ureq::get(&get_url)
+    let get_result = github_agent()
+        .get(&get_url)
         .header("User-Agent", USER_AGENT)
         .header("Authorization", &format!("Bearer {token}"))
         .header("Accept", "application/vnd.github+json")
@@ -281,12 +320,13 @@ pub fn github_ensure_repo(token: &str, repo_name: &str) -> Result<String, String
     let create_url = format!("{GITHUB_API}/user/repos");
     let body = CreateRepo {
         name: repo_name,
-        private: true,
+        private,
         description: "Quest save data (managed by Quest cloud sync)",
         auto_init: false,
     };
 
-    let resp: GithubRepo = ureq::post(&create_url)
+    let resp: GithubRepo = github_agent()
+        .post(&create_url)
         .header("User-Agent", USER_AGENT)
         .header("Authorization", &format!("Bearer {token}"))
         .header("Accept", "application/vnd.github+json")
@@ -310,7 +350,8 @@ fn github_set_topic(token: &str, owner: &str, repo_name: &str) {
     }
 
     let url = format!("{GITHUB_API}/repos/{owner}/{repo_name}/topics");
-    let _ = ureq::put(&url)
+    let _ = github_agent()
+        .put(&url)
         .header("User-Agent", USER_AGENT)
         .header("Authorization", &format!("Bearer {token}"))
         .header("Accept", "application/vnd.github+json")
@@ -552,7 +593,8 @@ pub fn fast_forward_all(quest_dir: &Path) -> Result<bool, String> {
             let local_ref = format!("refs/heads/{branch_name}");
             if let Ok(oid) = repo.refname_to_id(&local_ref) {
                 if let Ok(commit) = repo.find_commit(oid) {
-                    let _ = repo.reset(commit.as_object(), git2::ResetType::Hard, None);
+                    repo.reset(commit.as_object(), git2::ResetType::Hard, None)
+                        .map_err(|e| format!("Failed to reset working tree: {e}"))?;
                 }
             }
         }
@@ -566,12 +608,17 @@ pub fn fast_forward_all(quest_dir: &Path) -> Result<bool, String> {
 /// Link to GitHub: validate PAT, ensure repo, add remote, push all, save config.
 ///
 /// Returns the saved `CloudConfig` on success.
-pub fn link_github(quest_dir: &Path, token: &str, repo_name: &str) -> Result<CloudConfig, String> {
+pub fn link_github(
+    quest_dir: &Path,
+    token: &str,
+    repo_name: &str,
+    private: bool,
+) -> Result<CloudConfig, String> {
     // 1. Validate the token and get the username.
     let username = github_get_username(token)?;
 
     // 2. Ensure the remote repo exists.
-    let clone_url = github_ensure_repo(token, repo_name)?;
+    let clone_url = github_ensure_repo(token, repo_name, private)?;
 
     // 3. Add or update the git remote.
     let repo = Repository::open(quest_dir).map_err(|e| format!("Failed to open repo: {e}"))?;
@@ -613,8 +660,8 @@ pub fn link_and_pull(
     // 1. Validate the token and get the username.
     let username = github_get_username(token)?;
 
-    // 2. Ensure the remote repo exists.
-    let clone_url = github_ensure_repo(token, repo_name)?;
+    // 2. Ensure the remote repo exists (repo already exists when updating token).
+    let clone_url = github_ensure_repo(token, repo_name, true)?;
 
     // 3. Add or update the git remote.
     let repo = Repository::open(quest_dir).map_err(|e| format!("Failed to open repo: {e}"))?;
@@ -824,12 +871,46 @@ fn configure_fetch_refspec(repo: &Repository) -> Result<(), String> {
 /// Check whether an error message indicates an authentication failure (expired/revoked PAT).
 ///
 /// Matches HTTP 401/403 status codes and common GitHub auth error strings from ureq.
+/// Excludes rate-limiting (HTTP 403 with "rate limit") which is transient, not an auth issue.
 pub fn is_auth_error(error_msg: &str) -> bool {
-    error_msg.contains("status code 401")
-        || error_msg.contains("status code 403")
-        || error_msg.contains("Bad credentials")
-        || error_msg.contains("401")
-            && (error_msg.contains("Unauthorized") || error_msg.contains("auth"))
+    let msg = error_msg.to_lowercase();
+    // Rate-limiting is NOT an auth error — user doesn't need a new token.
+    if msg.contains("rate limit") {
+        return false;
+    }
+    msg.contains("status code 401")
+        || msg.contains("status code 403")
+        || msg.contains("bad credentials")
+        || (msg.contains("401") && (msg.contains("unauthorized") || msg.contains("auth")))
+}
+
+/// Convert a raw cloud error message into a user-friendly string.
+pub fn sanitize_cloud_error(error_msg: &str) -> String {
+    let msg = error_msg.to_lowercase();
+    if msg.contains("rate limit") {
+        return "GitHub rate limit reached — try again in a minute".to_string();
+    }
+    if msg.contains("status code 500")
+        || msg.contains("status code 502")
+        || msg.contains("status code 503")
+    {
+        return "GitHub is temporarily unavailable — try again later".to_string();
+    }
+    if msg.contains("connection") && (msg.contains("refused") || msg.contains("reset")) {
+        return "Could not connect to GitHub — check your internet".to_string();
+    }
+    if msg.contains("dns") || msg.contains("resolve") {
+        return "Could not reach GitHub — check your internet".to_string();
+    }
+    if msg.contains("timed out") || msg.contains("timeout") {
+        return "Connection to GitHub timed out — try again".to_string();
+    }
+    // Truncate long raw errors for display.
+    if error_msg.len() > 60 {
+        format!("{}...", &error_msg[..57])
+    } else {
+        error_msg.to_string()
+    }
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────
@@ -925,5 +1006,43 @@ mod tests {
     #[test]
     fn is_auth_error_rejects_network_error() {
         assert!(!is_auth_error("connection refused"));
+    }
+
+    #[test]
+    fn is_auth_error_rejects_rate_limit() {
+        assert!(!is_auth_error("API rate limit exceeded for user"));
+        assert!(!is_auth_error("status code 403 - rate limit"));
+    }
+
+    #[test]
+    fn sanitize_cloud_error_rate_limit() {
+        let msg = sanitize_cloud_error("API rate limit exceeded for user");
+        assert!(msg.contains("rate limit"));
+        assert!(msg.contains("try again"));
+    }
+
+    #[test]
+    fn sanitize_cloud_error_server_down() {
+        let msg = sanitize_cloud_error("GitHub API error: status code 502");
+        assert!(msg.contains("temporarily unavailable"));
+    }
+
+    #[test]
+    fn sanitize_cloud_error_timeout() {
+        let msg = sanitize_cloud_error("operation timed out");
+        assert!(msg.contains("timed out"));
+    }
+
+    #[test]
+    fn sanitize_cloud_error_passes_short_unknown() {
+        assert_eq!(sanitize_cloud_error("some error"), "some error");
+    }
+
+    #[test]
+    fn sanitize_cloud_error_truncates_long_messages() {
+        let long = "a".repeat(100);
+        let result = sanitize_cloud_error(&long);
+        assert!(result.len() < 65);
+        assert!(result.ends_with("..."));
     }
 }
