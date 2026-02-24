@@ -1530,22 +1530,28 @@ pub fn render_chrono_surge_summary(
 
     frame.render_widget(Clear, overlay_area);
 
+    let (title_text, accent_color) = if summary.overcharged {
+        (" \u{26A1} OVERCHARGE Complete \u{26A1} ", Color::Rgb(255, 215, 0))
+    } else {
+        (" \u{231B} Chrono Surge Complete \u{231B} ", ELECTRIC_BLUE)
+    };
+
     let block = Block::default()
         .title(Line::from(Span::styled(
-            " \u{231B} Chrono Surge Complete \u{231B} ",
+            title_text,
             Style::default()
-                .fg(ELECTRIC_BLUE)
+                .fg(accent_color)
                 .add_modifier(Modifier::BOLD),
         )))
         .title_alignment(Alignment::Center)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(super::themed_border_color(ELECTRIC_BLUE)));
+        .border_style(Style::default().fg(super::themed_border_color(accent_color)));
 
     let inner = super::render_themed_block(
         frame,
         overlay_area,
         block,
-        ELECTRIC_BLUE,
+        accent_color,
         super::BorderFxContext,
     );
 
@@ -1579,6 +1585,19 @@ pub fn render_chrono_surge_summary(
         }
     }
 
+    if summary.overcharged {
+        let bonus_row = start_row + stats.len() as i32 + 1;
+        if bonus_row < h as i32 {
+            put_text(
+                &mut buffer,
+                bonus_row,
+                3,
+                "\u{26A1} Overcharge! +50% bonus ticks",
+                Color::Rgb(255, 215, 0),
+            );
+        }
+    }
+
     // Duration info
     let dur_ticks = summary.ticks_completed;
     let dur_mins = dur_ticks / 600; // 10 ticks/sec * 60 sec/min = 600 ticks/min
@@ -1587,7 +1606,7 @@ pub fn render_chrono_surge_summary(
     } else {
         format!("Duration: {}m", dur_mins)
     };
-    let dur_row = start_row + 5;
+    let dur_row = start_row + if summary.overcharged { 6 } else { 5 };
     if dur_row < h as i32 {
         put_text(&mut buffer, dur_row, 3, &dur_text, Color::DarkGray);
     }
