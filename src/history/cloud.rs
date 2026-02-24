@@ -552,7 +552,8 @@ pub fn fast_forward_all(quest_dir: &Path) -> Result<bool, String> {
             let local_ref = format!("refs/heads/{branch_name}");
             if let Ok(oid) = repo.refname_to_id(&local_ref) {
                 if let Ok(commit) = repo.find_commit(oid) {
-                    let _ = repo.reset(commit.as_object(), git2::ResetType::Hard, None);
+                    repo.reset(commit.as_object(), git2::ResetType::Hard, None)
+                        .map_err(|e| format!("Failed to reset working tree: {e}"))?;
                 }
             }
         }
@@ -824,12 +825,46 @@ fn configure_fetch_refspec(repo: &Repository) -> Result<(), String> {
 /// Check whether an error message indicates an authentication failure (expired/revoked PAT).
 ///
 /// Matches HTTP 401/403 status codes and common GitHub auth error strings from ureq.
+/// Excludes rate-limiting (HTTP 403 with "rate limit") which is transient, not an auth issue.
 pub fn is_auth_error(error_msg: &str) -> bool {
-    error_msg.contains("status code 401")
-        || error_msg.contains("status code 403")
-        || error_msg.contains("Bad credentials")
-        || error_msg.contains("401")
-            && (error_msg.contains("Unauthorized") || error_msg.contains("auth"))
+    let msg = error_msg.to_lowercase();
+    // Rate-limiting is NOT an auth error — user doesn't need a new token.
+    if msg.contains("rate limit") {
+        return false;
+    }
+    msg.contains("status code 401")
+        || msg.contains("status code 403")
+        || msg.contains("bad credentials")
+        || (msg.contains("401") && (msg.contains("unauthorized") || msg.contains("auth")))
+}
+
+/// Convert a raw cloud error message into a user-friendly string.
+pub fn sanitize_cloud_error(error_msg: &str) -> String {
+    let msg = error_msg.to_lowercase();
+    if msg.contains("rate limit") {
+        return "GitHub rate limit reached — try again in a minute".to_string();
+    }
+    if msg.contains("status code 500")
+        || msg.contains("status code 502")
+        || msg.contains("status code 503")
+    {
+        return "GitHub is temporarily unavailable — try again later".to_string();
+    }
+    if msg.contains("connection") && (msg.contains("refused") || msg.contains("reset")) {
+        return "Could not connect to GitHub — check your internet".to_string();
+    }
+    if msg.contains("dns") || msg.contains("resolve") {
+        return "Could not reach GitHub — check your internet".to_string();
+    }
+    if msg.contains("timed out") || msg.contains("timeout") {
+        return "Connection to GitHub timed out — try again".to_string();
+    }
+    // Truncate long raw errors for display.
+    if error_msg.len() > 60 {
+        format!("{}...", &error_msg[..57])
+    } else {
+        error_msg.to_string()
+    }
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────
@@ -925,5 +960,43 @@ mod tests {
     #[test]
     fn is_auth_error_rejects_network_error() {
         assert!(!is_auth_error("connection refused"));
+    }
+
+    #[test]
+    fn is_auth_error_rejects_rate_limit() {
+        assert!(!is_auth_error("API rate limit exceeded for user"));
+        assert!(!is_auth_error("status code 403 - rate limit"));
+    }
+
+    #[test]
+    fn sanitize_cloud_error_rate_limit() {
+        let msg = sanitize_cloud_error("API rate limit exceeded for user");
+        assert!(msg.contains("rate limit"));
+        assert!(msg.contains("try again"));
+    }
+
+    #[test]
+    fn sanitize_cloud_error_server_down() {
+        let msg = sanitize_cloud_error("GitHub API error: status code 502");
+        assert!(msg.contains("temporarily unavailable"));
+    }
+
+    #[test]
+    fn sanitize_cloud_error_timeout() {
+        let msg = sanitize_cloud_error("operation timed out");
+        assert!(msg.contains("timed out"));
+    }
+
+    #[test]
+    fn sanitize_cloud_error_passes_short_unknown() {
+        assert_eq!(sanitize_cloud_error("some error"), "some error");
+    }
+
+    #[test]
+    fn sanitize_cloud_error_truncates_long_messages() {
+        let long = "a".repeat(100);
+        let result = sanitize_cloud_error(&long);
+        assert!(result.len() < 65);
+        assert!(result.ends_with("..."));
     }
 }
