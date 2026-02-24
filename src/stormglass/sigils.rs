@@ -942,4 +942,26 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn test_sigil_bonuses_compute_chrono_overcharge() {
+        let mut sigils = StormSigils::new();
+        sigils.slots_unlocked = 2;
+        sigils.sigils[0] = Some(Sigil {
+            effect: SigilEffectType::ChronoOverchargePercent,
+            value: 12.0,
+            grade: SigilGrade::B,
+        });
+        sigils.sigils[1] = Some(Sigil {
+            effect: SigilEffectType::ChronoOverchargePercent,
+            value: 8.0,
+            grade: SigilGrade::C,
+        });
+        let bonuses = SigilBonuses::compute(&sigils);
+        assert!(
+            (bonuses.chrono_overcharge_percent - 20.0).abs() < 1e-10,
+            "Expected 20.0, got {}",
+            bonuses.chrono_overcharge_percent
+        );
+    }
 }
