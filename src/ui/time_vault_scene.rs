@@ -987,7 +987,7 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
                 buffer,
                 cy + 5,
                 cx + 4,
-                "Keep local, push to cloud",
+                "Keep my saves, upload to cloud",
                 Color::DarkGray,
             );
             put_text(buffer, cy + 6, cx, "[C]", Color::Cyan);
@@ -995,7 +995,7 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
                 buffer,
                 cy + 6,
                 cx + 4,
-                "Use cloud, discard local",
+                "Use cloud saves (backup kept)",
                 Color::DarkGray,
             );
             put_text(buffer, cy + 7, cx, "[B]", Color::Cyan);
@@ -1003,11 +1003,11 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
                 buffer,
                 cy + 7,
                 cx + 4,
-                "Keep both (backup local)",
+                "Keep both (create backup branch)",
                 Color::DarkGray,
             );
             put_text(buffer, cy + 8, cx, "[Esc]", Color::Cyan);
-            put_text(buffer, cy + 8, cx + 6, "Decide later", Color::DarkGray);
+            put_text(buffer, cy + 8, cx + 6, "Cancel", Color::DarkGray);
         }
         BrowserMode::Browse => {}
     }
@@ -1040,7 +1040,8 @@ fn paint_cloud_status(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
         CloudStatus::OutOfSync => ("\u{2601} \u{26a0} out of sync".to_string(), Color::Yellow),
         CloudStatus::TokenExpired => ("\u{2601} \u{2717} token expired".to_string(), Color::Red),
         CloudStatus::Error(msg) => {
-            let label = format!("\u{2601} \u{2717} {}", msg);
+            let friendly = crate::history::cloud::sanitize_cloud_error(msg);
+            let label = format!("\u{2601} \u{2717} {friendly}");
             (label, Color::Red)
         }
     };
