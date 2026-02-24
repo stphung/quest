@@ -27,6 +27,18 @@ const REPO_TOPIC: &str = "quest-time-vaults";
 /// GitHub API base URL.
 const GITHUB_API: &str = "https://api.github.com";
 
+/// Timeout for HTTP requests to GitHub API.
+const HTTP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
+
+/// Create a ureq agent with standard timeout configuration.
+fn github_agent() -> ureq::Agent {
+    ureq::Agent::new_with_config(
+        ureq::Agent::config_builder()
+            .timeout_global(Some(HTTP_TIMEOUT))
+            .build(),
+    )
+}
+
 // ── Types ────────────────────────────────────────────────────────────────
 
 /// Persisted cloud configuration (stored in `~/.quest/.cloud.json`).
@@ -137,7 +149,8 @@ pub fn github_get_username(token: &str) -> Result<String, String> {
     }
 
     let url = format!("{GITHUB_API}/user");
-    let resp: GithubUser = ureq::get(&url)
+    let resp: GithubUser = github_agent()
+        .get(&url)
         .header("User-Agent", USER_AGENT)
         .header("Authorization", &format!("Bearer {token}"))
         .header("Accept", "application/vnd.github+json")
@@ -184,7 +197,8 @@ fn github_list_repos_by_topic(token: &str, username: &str) -> Result<Vec<String>
         "{GITHUB_API}/search/repositories?q={}&per_page=100",
         urlencoded(&query)
     );
-    let result: SearchResult = ureq::get(&url)
+    let result: SearchResult = github_agent()
+        .get(&url)
         .header("User-Agent", USER_AGENT)
         .header("Authorization", &format!("Bearer {token}"))
         .header("Accept", "application/vnd.github+json")
@@ -205,7 +219,8 @@ fn github_list_all_user_repos(token: &str) -> Result<Vec<String>, String> {
     }
 
     let url = format!("{GITHUB_API}/user/repos?per_page=100&sort=updated&affiliation=owner");
-    let repos: Vec<RepoItem> = ureq::get(&url)
+    let repos: Vec<RepoItem> = github_agent()
+        .get(&url)
         .header("User-Agent", USER_AGENT)
         .header("Authorization", &format!("Bearer {token}"))
         .header("Accept", "application/vnd.github+json")
@@ -247,7 +262,8 @@ pub fn github_ensure_repo(token: &str, repo_name: &str) -> Result<String, String
     let username = github_get_username(token)?;
     let get_url = format!("{GITHUB_API}/repos/{username}/{repo_name}");
 
-    let get_result = ureq::get(&get_url)
+    let get_result = github_agent()
+        .get(&get_url)
         .header("User-Agent", USER_AGENT)
         .header("Authorization", &format!("Bearer {token}"))
         .header("Accept", "application/vnd.github+json")
@@ -286,7 +302,8 @@ pub fn github_ensure_repo(token: &str, repo_name: &str) -> Result<String, String
         auto_init: false,
     };
 
-    let resp: GithubRepo = ureq::post(&create_url)
+    let resp: GithubRepo = github_agent()
+        .post(&create_url)
         .header("User-Agent", USER_AGENT)
         .header("Authorization", &format!("Bearer {token}"))
         .header("Accept", "application/vnd.github+json")
@@ -310,7 +327,8 @@ fn github_set_topic(token: &str, owner: &str, repo_name: &str) {
     }
 
     let url = format!("{GITHUB_API}/repos/{owner}/{repo_name}/topics");
-    let _ = ureq::put(&url)
+    let _ = github_agent()
+        .put(&url)
         .header("User-Agent", USER_AGENT)
         .header("Authorization", &format!("Bearer {token}"))
         .header("Accept", "application/vnd.github+json")
