@@ -98,6 +98,9 @@ pub struct GameState {
     /// When true, suppresses challenge discovery during Chrono Surge
     #[serde(skip)]
     pub chrono_surge_active: bool,
+    /// Debug: force next Chrono Surge to be overcharged
+    #[serde(skip)]
+    pub debug_force_overcharge: bool,
     /// Recent item drops for display (transient, not saved)
     #[serde(skip)]
     pub recent_drops: VecDeque<RecentDrop>,
@@ -174,6 +177,7 @@ impl GameState {
             combat_seconds_this_tick: false,
             game_over_shown_at: None,
             chrono_surge_active: false,
+            debug_force_overcharge: false,
         }
     }
 

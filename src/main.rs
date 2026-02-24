@@ -636,8 +636,13 @@ fn main() -> io::Result<()> {
                                     stormglass::sigils::SigilBonuses::compute(&state.storm_sigils)
                                         .chrono_overcharge_percent;
                                 let mut rng = rand::rng();
-                                let overcharged = overcharge_chance > 0.0
-                                    && rng.random::<f64>() * 100.0 < overcharge_chance;
+                                let overcharged = if state.debug_force_overcharge {
+                                    state.debug_force_overcharge = false;
+                                    true
+                                } else {
+                                    overcharge_chance > 0.0
+                                        && rng.random::<f64>() * 100.0 < overcharge_chance
+                                };
                                 let actual_ticks = if overcharged {
                                     (ticks as f64 * 1.5) as u64
                                 } else {
