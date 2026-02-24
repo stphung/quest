@@ -572,16 +572,19 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
         BrowserMode::UpdatingToken => 11,
         BrowserMode::LinkingCloud => 12,
         BrowserMode::SelectingRepo => {
-            // 3 (title + blank + header) + repos + 1 (create new) + 2 (blank + controls)
-            // + optional error line. Cap at reasonable max.
-            let items = state.cloud_repos.len() + 1; // repos + "Create new"
-            let base = 3 + items + 3;
-            let extra = if state.cloud_token_error.is_some() {
-                1
-            } else {
-                0
-            };
-            (base + extra).min(20)
+            // Layout: title + subtitle + blank + repos + separator + create entry
+            //   + (visibility row if create selected) + blank + controls
+            //   + (blank + error if present).  Cap at reasonable max.
+            let repos = state.cloud_repos.len();
+            let create_selected = state.cloud_repo_selected >= repos;
+            let base = 3          // title + subtitle + blank
+                + repos           // existing repo rows
+                + 1               // separator line before "Create new"
+                + 1               // "Create new" entry
+                + if create_selected { 1 } else { 0 }  // visibility row
+                + 2               // blank + controls
+                + if state.cloud_token_error.is_some() { 2 } else { 0 }; // blank + error
+            (base + 2).min(22) // +2 bottom padding inside border
         }
         BrowserMode::ConfirmPush | BrowserMode::ConfirmPull | BrowserMode::ConfirmUnlink => 7,
         BrowserMode::DivergenceResolution => 12,
@@ -895,7 +898,10 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
                 row += 1;
             }
 
-            // "Create new" entry at the end.
+            // Separator before "Create new"
+            row += 1;
+
+            // "Create new" entry
             let create_idx = state.cloud_repos.len();
             let selected = state.cloud_repo_selected == create_idx;
             let marker = if selected { "\u{25b8} " } else { "  " };
@@ -905,7 +911,7 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
                 put_text(buffer, row, cx + 2, "New: ", Color::Cyan);
                 let val = format!("{}_", state.cloud_repo_input);
                 put_text(buffer, row, cx + 7, &val, Color::Yellow);
-                // Visibility tab switcher
+                // Visibility tab switcher on the next line
                 row += 1;
                 put_text(buffer, row, cx + 4, "Visibility:", Color::DarkGray);
                 if state.cloud_new_repo_private {
@@ -918,15 +924,13 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
             } else {
                 put_text(buffer, row, cx + 2, "Create new repo...", color);
             }
-            row += 1;
 
             if let Some(err) = &state.cloud_token_error {
                 row += 1;
                 put_text(buffer, row, cx, err, Color::Red);
-                row += 1;
             }
 
-            row += 1;
+            row += 2;
             put_text(buffer, row, cx, "[Enter]", Color::Cyan);
             put_text(buffer, row, cx + 8, "Select", Color::DarkGray);
             if state.cloud_repo_selected == create_idx {
