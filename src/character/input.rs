@@ -200,12 +200,13 @@ mod tests {
     #[test]
     fn test_select_down_at_bottom_stays_at_bottom() {
         let mut screen = CharacterSelectScreen::new();
-        screen.selected_index = 1;
         let characters = create_test_characters();
+        // With 2 characters, max index is 2 (the create slot)
+        screen.selected_index = 2;
 
         process_select_input(&mut screen, SelectInput::Down, &characters);
 
-        assert_eq!(screen.selected_index, 1);
+        assert_eq!(screen.selected_index, 2);
     }
 
     #[test]

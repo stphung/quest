@@ -73,6 +73,7 @@ pub fn handle_time_vault_input(key: KeyEvent, state: &mut TimeVaultState) -> Tim
         BrowserMode::ConfirmUnlink => handle_confirm_unlink(key, state),
         BrowserMode::UpdatingToken => handle_updating_token(key, state),
         BrowserMode::DivergenceResolution => handle_divergence_resolution(key, state),
+        BrowserMode::GitHubMenu => handle_github_menu(key, state),
     }
 }
 
@@ -206,76 +207,24 @@ fn handle_browse(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAction {
         KeyCode::Char('c') | KeyCode::Char('C') => {
             if state.focus == PanelFocus::Left {
                 use crate::history::cloud::CloudStatus;
-                match &state.cloud_status {
-                    CloudStatus::Offline => {
-                        state.cloud_token_input.clear();
-                        state.cloud_token_error = None;
-                        state.mode = BrowserMode::LinkingCloud;
-                    }
-                    CloudStatus::Linked
-                    | CloudStatus::OutOfSync
-                    | CloudStatus::TokenExpired
-                    | CloudStatus::Error(_) => {
-                        state.mode = BrowserMode::ConfirmPush;
-                    }
-                    CloudStatus::Syncing => {}
-                }
-            }
-            TimeVaultAction::Continue
-        }
-        KeyCode::Char('v') | KeyCode::Char('V') => {
-            if state.focus == PanelFocus::Left {
-                use crate::history::cloud::CloudStatus;
-                let is_linked = !matches!(
-                    &state.cloud_status,
-                    CloudStatus::Offline | CloudStatus::Syncing
-                );
-                if is_linked {
-                    state.mode = BrowserMode::ConfirmPull;
-                }
-            }
-            TimeVaultAction::Continue
-        }
-        KeyCode::Char('r') | KeyCode::Char('R') => {
-            if state.focus == PanelFocus::Left {
-                use crate::history::cloud::CloudStatus;
-                let is_linked = !matches!(
-                    &state.cloud_status,
-                    CloudStatus::Offline | CloudStatus::Syncing
-                );
-                if is_linked {
-                    return TimeVaultAction::ChangeRepo;
-                }
-            }
-            TimeVaultAction::Continue
-        }
-        KeyCode::Char('x') | KeyCode::Char('X') => {
-            if state.focus == PanelFocus::Left {
-                use crate::history::cloud::CloudStatus;
-                let is_linked = !matches!(
-                    &state.cloud_status,
-                    CloudStatus::Offline | CloudStatus::Syncing
-                );
-                if is_linked {
-                    state.mode = BrowserMode::ConfirmUnlink;
-                }
-            }
-            TimeVaultAction::Continue
-        }
-        KeyCode::Char('p') | KeyCode::Char('P') => {
-            if state.focus == PanelFocus::Left {
-                use crate::history::cloud::CloudStatus;
-                let is_linked = matches!(
-                    &state.cloud_status,
-                    CloudStatus::Linked
-                        | CloudStatus::OutOfSync
-                        | CloudStatus::TokenExpired
-                        | CloudStatus::Error(_)
-                );
-                if is_linked {
+                if matches!(&state.cloud_status, CloudStatus::Offline) {
                     state.cloud_token_input.clear();
                     state.cloud_token_error = None;
-                    state.mode = BrowserMode::UpdatingToken;
+                    state.mode = BrowserMode::LinkingCloud;
+                }
+            }
+            TimeVaultAction::Continue
+        }
+        KeyCode::Char('g') | KeyCode::Char('G') => {
+            if state.focus == PanelFocus::Left {
+                use crate::history::cloud::CloudStatus;
+                let is_linked = !matches!(
+                    &state.cloud_status,
+                    CloudStatus::Offline | CloudStatus::Syncing
+                );
+                if is_linked {
+                    state.github_menu_selected = 0;
+                    state.mode = BrowserMode::GitHubMenu;
                 }
             }
             TimeVaultAction::Continue
@@ -616,6 +565,58 @@ fn handle_updating_token(key: KeyEvent, state: &mut TimeVaultState) -> TimeVault
     }
 }
 
+fn handle_github_menu(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAction {
+    const ITEM_COUNT: usize = 5;
+    match key.code {
+        KeyCode::Up => {
+            if state.github_menu_selected > 0 {
+                state.github_menu_selected -= 1;
+            }
+            TimeVaultAction::Continue
+        }
+        KeyCode::Down => {
+            if state.github_menu_selected < ITEM_COUNT - 1 {
+                state.github_menu_selected += 1;
+            }
+            TimeVaultAction::Continue
+        }
+        KeyCode::Enter => {
+            match state.github_menu_selected {
+                0 => {
+                    // Push
+                    state.mode = BrowserMode::ConfirmPush;
+                }
+                1 => {
+                    // Pull
+                    state.mode = BrowserMode::ConfirmPull;
+                }
+                2 => {
+                    // Change Repo
+                    state.mode = BrowserMode::Browse;
+                    return TimeVaultAction::ChangeRepo;
+                }
+                3 => {
+                    // Update Token
+                    state.cloud_token_input.clear();
+                    state.cloud_token_error = None;
+                    state.mode = BrowserMode::UpdatingToken;
+                }
+                4 => {
+                    // Unlink
+                    state.mode = BrowserMode::ConfirmUnlink;
+                }
+                _ => {}
+            }
+            TimeVaultAction::Continue
+        }
+        KeyCode::Esc => {
+            state.mode = BrowserMode::Browse;
+            TimeVaultAction::Continue
+        }
+        _ => TimeVaultAction::Continue,
+    }
+}
+
 fn handle_divergence_resolution(key: KeyEvent, state: &mut TimeVaultState) -> TimeVaultAction {
     match key.code {
         KeyCode::Char('k') | KeyCode::Char('K') => {
@@ -885,52 +886,131 @@ mod tests {
     }
 
     #[test]
-    fn c_linked_starts_push() {
+    fn c_linked_no_op() {
         let mut state = browsing_state();
         state.cloud_status = CloudStatus::Linked;
         state.focus = PanelFocus::Left;
         let result = handle_time_vault_input(key(KeyCode::Char('c')), &mut state);
         assert!(matches!(result, TimeVaultAction::Continue));
+        assert_eq!(state.mode, BrowserMode::Browse);
+    }
+
+    #[test]
+    fn g_linked_opens_github_menu() {
+        let mut state = browsing_state();
+        state.cloud_status = CloudStatus::Linked;
+        state.focus = PanelFocus::Left;
+        let result = handle_time_vault_input(key(KeyCode::Char('g')), &mut state);
+        assert!(matches!(result, TimeVaultAction::Continue));
+        assert_eq!(state.mode, BrowserMode::GitHubMenu);
+        assert_eq!(state.github_menu_selected, 0);
+    }
+
+    #[test]
+    fn g_offline_no_op() {
+        let mut state = browsing_state();
+        state.cloud_status = CloudStatus::Offline;
+        state.focus = PanelFocus::Left;
+        let result = handle_time_vault_input(key(KeyCode::Char('g')), &mut state);
+        assert!(matches!(result, TimeVaultAction::Continue));
+        assert_eq!(state.mode, BrowserMode::Browse);
+    }
+
+    // ── GitHub Menu ────────────────────────────────────────────────────
+
+    #[test]
+    fn github_menu_navigate_up_down() {
+        let mut state = browsing_state();
+        state.mode = BrowserMode::GitHubMenu;
+        state.github_menu_selected = 0;
+
+        handle_time_vault_input(key(KeyCode::Down), &mut state);
+        assert_eq!(state.github_menu_selected, 1);
+
+        handle_time_vault_input(key(KeyCode::Down), &mut state);
+        assert_eq!(state.github_menu_selected, 2);
+
+        handle_time_vault_input(key(KeyCode::Up), &mut state);
+        assert_eq!(state.github_menu_selected, 1);
+    }
+
+    #[test]
+    fn github_menu_up_at_top_stays() {
+        let mut state = browsing_state();
+        state.mode = BrowserMode::GitHubMenu;
+        state.github_menu_selected = 0;
+
+        handle_time_vault_input(key(KeyCode::Up), &mut state);
+        assert_eq!(state.github_menu_selected, 0);
+    }
+
+    #[test]
+    fn github_menu_down_at_bottom_stays() {
+        let mut state = browsing_state();
+        state.mode = BrowserMode::GitHubMenu;
+        state.github_menu_selected = 4;
+
+        handle_time_vault_input(key(KeyCode::Down), &mut state);
+        assert_eq!(state.github_menu_selected, 4);
+    }
+
+    #[test]
+    fn github_menu_push() {
+        let mut state = browsing_state();
+        state.mode = BrowserMode::GitHubMenu;
+        state.github_menu_selected = 0;
+        let result = handle_time_vault_input(key(KeyCode::Enter), &mut state);
+        assert!(matches!(result, TimeVaultAction::Continue));
         assert_eq!(state.mode, BrowserMode::ConfirmPush);
     }
 
     #[test]
-    fn v_linked_starts_pull() {
+    fn github_menu_pull() {
         let mut state = browsing_state();
-        state.cloud_status = CloudStatus::Linked;
-        state.focus = PanelFocus::Left;
-        let result = handle_time_vault_input(key(KeyCode::Char('v')), &mut state);
+        state.mode = BrowserMode::GitHubMenu;
+        state.github_menu_selected = 1;
+        let result = handle_time_vault_input(key(KeyCode::Enter), &mut state);
         assert!(matches!(result, TimeVaultAction::Continue));
         assert_eq!(state.mode, BrowserMode::ConfirmPull);
     }
 
     #[test]
-    fn x_linked_starts_unlink() {
+    fn github_menu_change_repo() {
         let mut state = browsing_state();
-        state.cloud_status = CloudStatus::Linked;
-        state.focus = PanelFocus::Left;
-        let result = handle_time_vault_input(key(KeyCode::Char('x')), &mut state);
-        assert!(matches!(result, TimeVaultAction::Continue));
-        assert_eq!(state.mode, BrowserMode::ConfirmUnlink);
+        state.mode = BrowserMode::GitHubMenu;
+        state.github_menu_selected = 2;
+        let result = handle_time_vault_input(key(KeyCode::Enter), &mut state);
+        assert!(matches!(result, TimeVaultAction::ChangeRepo));
+        assert_eq!(state.mode, BrowserMode::Browse);
     }
 
     #[test]
-    fn p_linked_starts_update_token() {
+    fn github_menu_update_token() {
         let mut state = browsing_state();
-        state.cloud_status = CloudStatus::Linked;
-        state.focus = PanelFocus::Left;
-        let result = handle_time_vault_input(key(KeyCode::Char('p')), &mut state);
+        state.mode = BrowserMode::GitHubMenu;
+        state.github_menu_selected = 3;
+        let result = handle_time_vault_input(key(KeyCode::Enter), &mut state);
         assert!(matches!(result, TimeVaultAction::Continue));
         assert_eq!(state.mode, BrowserMode::UpdatingToken);
     }
 
     #[test]
-    fn r_linked_returns_change_repo() {
+    fn github_menu_unlink() {
         let mut state = browsing_state();
-        state.cloud_status = CloudStatus::Linked;
-        state.focus = PanelFocus::Left;
-        let result = handle_time_vault_input(key(KeyCode::Char('r')), &mut state);
-        assert!(matches!(result, TimeVaultAction::ChangeRepo));
+        state.mode = BrowserMode::GitHubMenu;
+        state.github_menu_selected = 4;
+        let result = handle_time_vault_input(key(KeyCode::Enter), &mut state);
+        assert!(matches!(result, TimeVaultAction::Continue));
+        assert_eq!(state.mode, BrowserMode::ConfirmUnlink);
+    }
+
+    #[test]
+    fn github_menu_esc_returns_to_browse() {
+        let mut state = browsing_state();
+        state.mode = BrowserMode::GitHubMenu;
+        let result = handle_time_vault_input(key(KeyCode::Esc), &mut state);
+        assert!(matches!(result, TimeVaultAction::Continue));
+        assert_eq!(state.mode, BrowserMode::Browse);
     }
 
     // ── 4. Confirm Restore ─────────────────────────────────────────────
@@ -1538,11 +1618,11 @@ mod tests {
         let mut state = browsing_state();
         state.cloud_status = CloudStatus::Syncing;
         state.focus = PanelFocus::Left;
-        // 'c' during Syncing should be a no-op
+        // 'c' during Syncing should be a no-op (not offline)
         handle_time_vault_input(key(KeyCode::Char('c')), &mut state);
         assert_eq!(state.mode, BrowserMode::Browse);
-        // 'v' during Syncing should be a no-op (not linked, not offline)
-        handle_time_vault_input(key(KeyCode::Char('v')), &mut state);
+        // 'g' during Syncing should be a no-op
+        handle_time_vault_input(key(KeyCode::Char('g')), &mut state);
         assert_eq!(state.mode, BrowserMode::Browse);
     }
 

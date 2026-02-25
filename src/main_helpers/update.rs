@@ -91,12 +91,17 @@ fn with_relative_prefix(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_startup_splash_text(
     update_status: Option<&UpdateInfoStatus>,
     update_loading: bool,
     characters: &[CharacterInfo],
     selected_index: usize,
     achievements: &achievements::Achievements,
+    cloud_status: &CloudStatus,
+    cloud_config: Option<&CloudConfig>,
+    haven: &haven::Haven,
+    enhancement: &enhancement::EnhancementProgress,
 ) -> Vec<Line<'static>> {
     use crate::utils::build_info::{BUILD_COMMIT, BUILD_DATE};
     let now = Utc::now();
@@ -180,25 +185,109 @@ fn build_startup_splash_text(
         Line::from(""),
     ];
 
-    // Heroes box
+    // Account journey badges (only show discovered systems)
+    let mut badges: Vec<Span<'static>> = Vec::new();
+    let score = achievements.achievement_score();
+    if score > 0 {
+        badges.push(Span::styled(
+            "\u{2606} ",
+            Style::default().fg(Color::Yellow),
+        ));
+        badges.push(Span::styled(
+            format!("{} pts", score),
+            Style::default().fg(Color::Gray),
+        ));
+    }
+    if enhancement.discovered {
+        if !badges.is_empty() {
+            badges.push(Span::styled("   ", Style::default()));
+        }
+        badges.push(Span::styled("\u{2692} ", Style::default().fg(Color::Cyan)));
+        let levels: Vec<String> = enhancement
+            .levels
+            .iter()
+            .map(|l| format!("+{}", l))
+            .collect();
+        badges.push(Span::styled(
+            levels.join("/"),
+            Style::default().fg(Color::Gray),
+        ));
+    }
+    if haven.discovered {
+        if !badges.is_empty() {
+            badges.push(Span::styled("   ", Style::default()));
+        }
+        badges.push(Span::styled("\u{2302} ", Style::default().fg(Color::Green)));
+        badges.push(Span::styled(
+            format!("{}/{}", haven.rooms_built(), haven.total_rooms()),
+            Style::default().fg(Color::Gray),
+        ));
+    }
+    // Cloud sync badge with dot throbber
+    {
+        let cloud_badge_color = Color::Cyan;
+        if !badges.is_empty() {
+            badges.push(Span::styled("   ", Style::default()));
+        }
+        let spinner = crate::ui::throbber::spinner_char();
+        let spinner_str = String::from(spinner);
+        // Extract "user/repo" from cloud config repo_url
+        let repo_label: Option<String> = cloud_config.map(|c| {
+            let url = c.repo_url.trim_end_matches(".git");
+            url.rsplit('/')
+                .take(2)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect::<Vec<_>>()
+                .join("/")
+        });
+        let (icon, label) = match cloud_status {
+            CloudStatus::Linked => (
+                "\u{2601}",
+                match &repo_label {
+                    Some(r) => format!("synced @ {}", r),
+                    None => "synced".to_string(),
+                },
+            ),
+            CloudStatus::Syncing => (
+                spinner_str.as_str(),
+                match &repo_label {
+                    Some(r) => format!("syncing @ {}", r),
+                    None => "syncing...".to_string(),
+                },
+            ),
+            CloudStatus::OutOfSync => ("\u{26a0}", "out of sync".to_string()),
+            CloudStatus::TokenExpired => ("\u{26a0}", "token expired".to_string()),
+            CloudStatus::Error(_) => ("\u{26a0}", "error".to_string()),
+            CloudStatus::Offline => ("\u{00b7}", "offline".to_string()),
+        };
+        badges.push(Span::styled(
+            format!("{} ", icon),
+            Style::default().fg(cloud_badge_color),
+        ));
+        badges.push(Span::styled(label, Style::default().fg(Color::Gray)));
+    }
+    if !badges.is_empty() {
+        badges.insert(0, Span::styled("  ", Style::default()));
+        text.push(Line::from(badges));
+        text.push(Line::from(""));
+    }
+
+    // Heroes section (left-rail style)
     let hero_border = Style::default().fg(Color::DarkGray);
     text.push(Line::from(vec![Span::styled(
-        "  \u{250c}\u{2500} Heroes \u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2510}",
-        hero_border,
+        "  Heroes",
+        Style::default()
+            .fg(Color::DarkGray)
+            .add_modifier(Modifier::BOLD),
     )]));
 
-    if characters.is_empty() {
-        text.push(Line::from(vec![
-            Span::styled("  \u{2502} ", hero_border),
-            Span::styled(
-                "No heroes yet. Press [N] to create one.",
-                Style::default().fg(Color::Gray),
-            ),
-        ]));
-    } else {
-        for (i, character) in characters.iter().enumerate() {
+    let has_create_slot = characters.len() < 3;
+    for i in 0..3 {
+        if let Some(character) = characters.get(i) {
             let is_selected = i == selected_index;
-            let marker = if is_selected { "> " } else { "  " };
+            let marker = if is_selected { "\u{25b6} " } else { "  " };
 
             let display_name = {
                 let title_suffix = achievements.selected_title.and_then(|id| {
@@ -245,44 +334,105 @@ fn build_startup_splash_text(
                 Span::styled("  \u{2502} ", hero_border),
                 Span::styled(entry, style),
             ]));
+        } else if has_create_slot && i == characters.len() {
+            // First empty slot: selectable "+ Create new hero"
+            let is_selected = i == selected_index;
+            let marker = if is_selected { "\u{25b6} " } else { "  " };
+            let style = if is_selected {
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::DarkGray)
+            };
+            text.push(Line::from(vec![
+                Span::styled("  \u{2502} ", hero_border),
+                Span::styled(format!("{}+ Create new hero", marker), style),
+            ]));
+        } else {
+            text.push(Line::from(vec![
+                Span::styled("  \u{2502} ", hero_border),
+                Span::styled("  \u{2500}", Style::default().fg(Color::DarkGray)),
+            ]));
         }
     }
 
-    text.push(Line::from(vec![Span::styled(
-        "  \u{2514}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2518}",
-        hero_border,
-    )]));
+    // Rail-integrated hint line
+    let on_create_slot =
+        characters.is_empty() || (has_create_slot && selected_index == characters.len());
+    let key_style = Style::default()
+        .fg(Color::DarkGray)
+        .add_modifier(Modifier::BOLD);
+    let label_style = Style::default().fg(Color::Gray);
+    let hint_spans = if on_create_slot {
+        vec![
+            Span::styled("  \u{2570} ", hero_border),
+            Span::styled("[Enter]", Style::default().fg(Color::Green)),
+            Span::styled(" Create  ", label_style),
+            Span::styled("[Esc]", key_style),
+            Span::styled(" Quit", label_style),
+        ]
+    } else {
+        vec![
+            Span::styled("  \u{2570} ", hero_border),
+            Span::styled("[Enter]", Style::default().fg(Color::Green)),
+            Span::styled(" Play  ", label_style),
+            Span::styled("[R]", key_style),
+            Span::styled(" Rename  ", label_style),
+            Span::styled("[D]", key_style),
+            Span::styled(" Delete  ", label_style),
+            Span::styled("[Esc]", key_style),
+            Span::styled(" Quit", label_style),
+        ]
+    };
+    text.push(Line::from(hint_spans));
     text.push(Line::from(""));
 
-    let upstream_title = match update_status {
-        Some(UpdateInfoStatus::UpdateAvailable(info)) => {
-            format!("  Upstream (v{} ({}))", info.new_version, info.new_commit)
-        }
-        _ => "  Upstream".to_string(),
-    };
+    // Version panel (left rail)
+    let rail = Style::default().fg(Color::DarkGray);
     text.push(Line::from(vec![Span::styled(
-        upstream_title,
+        "  Version",
         Style::default()
-            .fg(Color::Yellow)
+            .fg(Color::DarkGray)
             .add_modifier(Modifier::BOLD),
     )]));
 
+    // Upstream section
+    let upstream_label = match update_status {
+        Some(UpdateInfoStatus::UpdateAvailable(info)) => {
+            format!("Upstream (v{} ({}))", info.new_version, info.new_commit)
+        }
+        _ => "Upstream".to_string(),
+    };
+    text.push(Line::from(vec![
+        Span::styled("  \u{2502} ", rail),
+        Span::styled(
+            upstream_label,
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+    ]));
+
     if update_loading {
-        text.push(Line::from(vec![Span::styled(
-            format!(
-                "    {} Checking for update details...",
-                block_spinner_char()
+        text.push(Line::from(vec![
+            Span::styled("  \u{2502} ", rail),
+            Span::styled(
+                format!("  {} Checking for update details...", block_spinner_char()),
+                Style::default().fg(Color::DarkGray),
             ),
-            Style::default().fg(Color::DarkGray),
-        )]));
+        ]));
     } else {
         match update_status {
             Some(UpdateInfoStatus::UpdateAvailable(info)) => {
                 if info.changelog.is_empty() {
-                    text.push(Line::from(vec![Span::styled(
-                        "    You're already up to date.",
-                        Style::default().fg(Color::Gray),
-                    )]));
+                    text.push(Line::from(vec![
+                        Span::styled("  \u{2502} ", rail),
+                        Span::styled(
+                            "  You're already up to date.",
+                            Style::default().fg(Color::Gray),
+                        ),
+                    ]));
                 } else {
                     let max_upstream_items = 5;
                     for (idx, item) in info.changelog.iter().take(max_upstream_items).enumerate() {
@@ -293,27 +443,31 @@ fn build_startup_splash_text(
                             &now,
                         );
                         text.push(Line::from(vec![
-                            Span::styled("    • ", Style::default().fg(Color::DarkGray)),
+                            Span::styled("  \u{2502} ", rail),
+                            Span::styled("  \u{2022} ", Style::default().fg(Color::DarkGray)),
                             Span::styled(item_text, Style::default().fg(Color::White)),
                         ]));
                     }
                     if info.changelog_total > max_upstream_items {
-                        text.push(Line::from(vec![Span::styled(
-                            "    ...and more",
-                            Style::default().fg(Color::DarkGray),
-                        )]));
+                        text.push(Line::from(vec![
+                            Span::styled("  \u{2502} ", rail),
+                            Span::styled("  ...and more", Style::default().fg(Color::DarkGray)),
+                        ]));
                     }
                 }
 
-                text.push(Line::from(""));
-                text.push(Line::from(vec![Span::styled(
-                    "  Run 'quest update' when you're ready.",
-                    Style::default().fg(Color::Green),
-                )]));
+                text.push(Line::from(vec![
+                    Span::styled("  \u{2502} ", rail),
+                    Span::styled(
+                        "  Run 'quest update' when you're ready.",
+                        Style::default().fg(Color::Green),
+                    ),
+                ]));
             }
             Some(UpdateInfoStatus::UpToDate) => {
                 text.push(Line::from(vec![
-                    Span::styled("    ✓ ", Style::default().fg(Color::Green)),
+                    Span::styled("  \u{2502} ", rail),
+                    Span::styled("  \u{2713} ", Style::default().fg(Color::Green)),
                     Span::styled(
                         "You're running the latest version.",
                         Style::default().fg(Color::Gray),
@@ -326,44 +480,59 @@ fn build_startup_splash_text(
                     .next()
                     .unwrap_or("unknown error")
                     .chars()
-                    .take(72)
+                    .take(60)
                     .collect::<String>();
-                text.push(Line::from(vec![Span::styled(
-                    format!("    Could not check for updates: {}", error),
-                    Style::default().fg(Color::DarkGray),
-                )]));
+                text.push(Line::from(vec![
+                    Span::styled("  \u{2502} ", rail),
+                    Span::styled(
+                        format!("  Could not check: {}", error),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                ]));
             }
             None => {
-                text.push(Line::from(vec![Span::styled(
-                    "    Could not load update details right now.",
-                    Style::default().fg(Color::Gray),
-                )]));
+                text.push(Line::from(vec![
+                    Span::styled("  \u{2502} ", rail),
+                    Span::styled(
+                        "  Could not load update details right now.",
+                        Style::default().fg(Color::Gray),
+                    ),
+                ]));
             }
         }
     }
 
-    let installed_title = match update_status {
+    // Blank rail line between sections
+    text.push(Line::from(vec![Span::styled("  \u{2502}", rail)]));
+
+    // Installed section
+    let installed_label = match update_status {
         Some(UpdateInfoStatus::UpdateAvailable(info)) => {
             format!(
-                "  Installed (v{} ({}))",
+                "Installed (v{} ({}))",
                 info.current_version, info.current_commit
             )
         }
-        _ => format!("  Installed (v{} ({}))", BUILD_DATE, BUILD_COMMIT),
+        _ => format!("Installed (v{} ({}))", BUILD_DATE, BUILD_COMMIT),
     };
-    text.push(Line::from(""));
-    text.push(Line::from(vec![Span::styled(
-        installed_title,
-        Style::default()
-            .fg(Color::Cyan)
-            .add_modifier(Modifier::BOLD),
-    )]));
+    text.push(Line::from(vec![
+        Span::styled("  \u{2502} ", rail),
+        Span::styled(
+            installed_label,
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
+    ]));
 
     if update_loading {
-        text.push(Line::from(vec![Span::styled(
-            format!("    {} Loading version history...", block_spinner_char()),
-            Style::default().fg(Color::DarkGray),
-        )]));
+        text.push(Line::from(vec![
+            Span::styled("  \u{2502} ", rail),
+            Span::styled(
+                format!("  {} Loading version history...", block_spinner_char()),
+                Style::default().fg(Color::DarkGray),
+            ),
+        ]));
     } else {
         match update_status {
             Some(UpdateInfoStatus::UpdateAvailable(info)) => {
@@ -377,69 +546,52 @@ fn build_startup_splash_text(
                         &now,
                     );
                     text.push(Line::from(vec![
-                        Span::styled("    • ", Style::default().fg(Color::DarkGray)),
+                        Span::styled("  \u{2502} ", rail),
+                        Span::styled("  \u{2022} ", Style::default().fg(Color::DarkGray)),
                         Span::styled(item_text, Style::default().fg(Color::White)),
                     ]));
                 }
                 if info.current_and_previous.is_empty() {
-                    text.push(Line::from(vec![Span::styled(
-                        "    No version history available.",
-                        Style::default().fg(Color::Gray),
-                    )]));
+                    text.push(Line::from(vec![
+                        Span::styled("  \u{2502} ", rail),
+                        Span::styled(
+                            "  No version history available.",
+                            Style::default().fg(Color::Gray),
+                        ),
+                    ]));
                 }
             }
             Some(UpdateInfoStatus::UpToDate) => {
-                text.push(Line::from(vec![Span::styled(
-                    "    Current build is already on the latest release.",
-                    Style::default().fg(Color::Gray),
-                )]));
+                text.push(Line::from(vec![
+                    Span::styled("  \u{2502} ", rail),
+                    Span::styled(
+                        "  Current build is already on the latest release.",
+                        Style::default().fg(Color::Gray),
+                    ),
+                ]));
             }
             Some(UpdateInfoStatus::CheckFailed(_)) => {
-                text.push(Line::from(vec![Span::styled(
-                    "    Current build loaded; upstream status unavailable.",
-                    Style::default().fg(Color::Gray),
-                )]));
+                text.push(Line::from(vec![
+                    Span::styled("  \u{2502} ", rail),
+                    Span::styled(
+                        "  Current build loaded; upstream status unavailable.",
+                        Style::default().fg(Color::Gray),
+                    ),
+                ]));
             }
             None => {
-                text.push(Line::from(vec![Span::styled(
-                    "    Version history unavailable.",
-                    Style::default().fg(Color::Gray),
-                )]));
+                text.push(Line::from(vec![
+                    Span::styled("  \u{2502} ", rail),
+                    Span::styled(
+                        "  Version history unavailable.",
+                        Style::default().fg(Color::Gray),
+                    ),
+                ]));
             }
         }
     }
 
-    let new_button = if characters.len() >= 3 {
-        "[N] New (Max 3)"
-    } else {
-        "[N] New"
-    };
-
     text.push(Line::from(""));
-    text.push(Line::from(vec![
-        Span::styled(
-            "  [Enter]",
-            Style::default()
-                .fg(Color::Green)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(" Play    ", Style::default().fg(Color::Gray)),
-        Span::styled(
-            "[R]",
-            Style::default()
-                .fg(Color::Gray)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(" Rename    ", Style::default().fg(Color::Gray)),
-        Span::styled(
-            "[D]",
-            Style::default()
-                .fg(Color::Gray)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(" Del    ", Style::default().fg(Color::Gray)),
-        Span::styled(new_button, Style::default().fg(Color::Gray)),
-    ]));
     text.push(Line::from(vec![
         Span::styled(
             "  [A]",
@@ -468,14 +620,7 @@ fn build_startup_splash_text(
                 .fg(Color::DarkGray)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::styled(" Bug    ", Style::default().fg(Color::Gray)),
-        Span::styled(
-            "[Esc]",
-            Style::default()
-                .fg(Color::DarkGray)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(" Quit", Style::default().fg(Color::Gray)),
+        Span::styled(" Bug", Style::default().fg(Color::Gray)),
     ]));
 
     text.push(Line::from(""));
@@ -561,6 +706,41 @@ pub fn show_startup_splash_screen(
 ) -> io::Result<StartupSplashResult> {
     let mut update_status: Option<UpdateInfoStatus> = None;
     let mut time_vault_browser: Option<TimeVaultState> = None;
+
+    // Auto-pull on load if cloud is linked and no operation is in flight
+    if !*cloud_op_in_flight {
+        if let Some(ref config) = cloud_config {
+            *cloud_op_in_flight = true;
+            *cloud_status = CloudStatus::Syncing;
+            let tx = cloud_tx.clone();
+            let dir = quest_dir.to_path_buf();
+            let tok = config.token.clone();
+            std::thread::spawn(move || {
+                let tx2 = tx.clone();
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    let res = (|| -> CloudOpResult {
+                        if let Err(e) = crate::history::cloud::fetch_all(&dir, &tok) {
+                            return CloudOpResult::Failed(e);
+                        }
+                        match crate::history::cloud::check_divergence(&dir) {
+                            Ok(Some(div)) => CloudOpResult::Diverged(div),
+                            Ok(None) => match crate::history::cloud::fast_forward_all(&dir) {
+                                Ok(_) => CloudOpResult::Pulled,
+                                Err(e) => CloudOpResult::Failed(e),
+                            },
+                            Err(e) => CloudOpResult::Failed(e),
+                        }
+                    })();
+                    let _ = tx.send(res);
+                }));
+                if result.is_err() {
+                    let _ = tx2.send(CloudOpResult::Failed(
+                        "Cloud sync failed unexpectedly".to_string(),
+                    ));
+                }
+            });
+        }
+    }
 
     let action = loop {
         // Poll update check handle
@@ -699,6 +879,10 @@ pub fn show_startup_splash_screen(
             &characters,
             select_screen.selected_index,
             global_achievements,
+            cloud_status,
+            cloud_config.as_ref(),
+            haven,
+            enhancement,
         );
         terminal.draw(|f| {
             let area = f.area();
@@ -928,6 +1112,11 @@ pub fn show_startup_splash_screen(
                 // Normal key dispatch
                 match startup_key_action(key_event) {
                     StartupKeyAction::Select => {
+                        // If on the "+ Create new hero" slot, go to creation
+                        if characters.len() < 3 && select_screen.selected_index == characters.len()
+                        {
+                            break StartupSplashResult::GoToCreation;
+                        }
                         let input = SelectInput::Select;
                         let result = process_select_input(select_screen, input, &characters);
                         match result {
