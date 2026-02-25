@@ -756,10 +756,10 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_win_master_fishing_rank_capped_at_30() {
+    fn test_apply_win_master_fishing_rank_capped_at_max() {
         let mut state = GameState::new("Test".to_string(), 0);
         state.character_level = 10;
-        state.fishing.rank = 30; // Already max
+        state.fishing.rank = crate::core::constants::MAX_FISHING_RANK; // Already at absolute max
 
         let mut game = MorrisGame::new(MorrisDifficulty::Master);
         game.game_result = Some(MorrisResult::Win);
@@ -768,7 +768,7 @@ mod tests {
         let processed = apply_game_result(&mut state);
 
         assert!(processed.is_some()); // Win returns Some(MinigameWinInfo)
-        assert_eq!(state.fishing.rank, 30); // Capped at max
+        assert_eq!(state.fishing.rank, crate::core::constants::MAX_FISHING_RANK);
     }
 
     #[test]
