@@ -93,12 +93,19 @@ pub fn render_achievement_browser(
 ) {
     frame.render_widget(Clear, area);
 
+    let score = achievements.achievement_score();
+    let max_score = Achievements::max_achievement_score();
+    let score_pct = if max_score > 0 {
+        (score as f32 / max_score as f32) * 100.0
+    } else {
+        0.0
+    };
     let block = Block::default()
         .title(format!(
             " Achievements ({}/{} pts, {:.1}%) ",
-            format_number(achievements.achievement_score() as u64),
-            format_number(Achievements::max_achievement_score() as u64),
-            achievements.unlock_percentage()
+            format_number(score as u64),
+            format_number(max_score as u64),
+            score_pct
         ))
         .borders(Borders::ALL)
         .border_style(Style::default().fg(super::themed_border_color(Color::Yellow)));

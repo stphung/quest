@@ -219,3 +219,11 @@ pub const STORMBREAKER_PRESTIGE_REQUIREMENT: u32 = 25;
 
 // Wiki
 pub const WIKI_URL: &str = "github.com/stphung/quest/wiki";
+
+pub fn wiki_url_for_browser() -> String {
+    if WIKI_URL.starts_with("http://") || WIKI_URL.starts_with("https://") {
+        WIKI_URL.to_string()
+    } else {
+        format!("https://{WIKI_URL}")
+    }
+}
