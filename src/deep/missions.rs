@@ -574,6 +574,17 @@ pub fn tick_all_missions(
             let mut mission = prestige.active_missions.remove(idx);
             resolve_mission(&mut mission, prestige, persistent, rng);
             summary.missions_completed += 1;
+
+            // Populate achievement signals from the resolved mission.
+            if let Some(ref result) = mission.result {
+                summary.mercs_lost += result.lost_mercs.len();
+                if matches!(mission.mission_type, MissionType::Breakthrough)
+                    && matches!(result.outcome, MissionOutcome::Success)
+                {
+                    summary.breakthroughs.push(mission.layer);
+                }
+            }
+
             prestige.pending_results.push(mission);
         }
     }
@@ -587,6 +598,10 @@ pub struct MissionTickSummary {
     pub missions_completed: usize,
     pub events_fired: usize,
     pub events_auto_resolved: usize,
+    /// Layer numbers cleared by successful Breakthrough missions.
+    pub breakthroughs: Vec<u32>,
+    /// Number of mercenaries permanently lost across all resolved missions.
+    pub mercs_lost: usize,
 }
 
 // ── Mission Resolution ─────────────────────────────────────────────────────────

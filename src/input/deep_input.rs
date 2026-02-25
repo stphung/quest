@@ -5,6 +5,7 @@
 //! EventResponse, and Recruit.
 
 use super::types::InputResult;
+use crate::core::game_state::GameState;
 use crate::deep::types::{DeepState, DeepUiState, DeepView, MissionStatus};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
@@ -16,6 +17,8 @@ pub(super) fn handle_deep(
     key: KeyEvent,
     deep_state: &mut DeepState,
     deep_ui: &mut DeepUiState,
+    game_state: &mut GameState,
+    achievements: &mut crate::achievements::Achievements,
 ) -> InputResult {
     // Clear any transient error message on the next key press.
     deep_ui.flash_message = None;
@@ -44,7 +47,7 @@ pub(super) fn handle_deep(
     }
 
     match deep_ui.view {
-        DeepView::Hub => handle_hub(key, deep_state, deep_ui),
+        DeepView::Hub => handle_hub(key, deep_state, deep_ui, game_state, achievements),
         DeepView::NewMission => handle_new_mission(key, deep_state, deep_ui),
         DeepView::Roster => handle_roster(key, deep_state, deep_ui),
         DeepView::Infrastructure => handle_infrastructure(key, deep_state, deep_ui),
@@ -55,7 +58,13 @@ pub(super) fn handle_deep(
 
 // ── Hub View ────────────────────────────────────────────────────────────────────
 
-fn handle_hub(key: KeyEvent, deep_state: &mut DeepState, deep_ui: &mut DeepUiState) -> InputResult {
+fn handle_hub(
+    key: KeyEvent,
+    deep_state: &mut DeepState,
+    deep_ui: &mut DeepUiState,
+    game_state: &mut GameState,
+    _achievements: &mut crate::achievements::Achievements,
+) -> InputResult {
     match key.code {
         KeyCode::Up => {
             deep_ui.selected_index = deep_ui.selected_index.saturating_sub(1);
@@ -77,6 +86,17 @@ fn handle_hub(key: KeyEvent, deep_state: &mut DeepState, deep_ui: &mut DeepUiSta
                 if deep_ui.selected_index >= active_count {
                     let pending_idx = deep_ui.selected_index - active_count;
                     if pending_idx < pending_count {
+                        // Apply character rewards before removing the result.
+                        let mission = &deep_state.prestige.pending_results[pending_idx];
+                        if let Some(ref result) = mission.result {
+                            if result.xp_earned > 0 {
+                                game_state.character_xp += result.xp_earned as u64;
+                            }
+                            if result.stormglass_earned > 0 {
+                                game_state.stormglass += result.stormglass_earned;
+                            }
+                        }
+
                         deep_state.prestige.pending_results.remove(pending_idx);
                         // Clamp selected index after removal.
                         let total = active_count + deep_state.prestige.pending_results.len();

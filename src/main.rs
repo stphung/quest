@@ -401,6 +401,12 @@ fn main() -> io::Result<()> {
                         offline_report,
                     } => {
                         pending_offline_report = offline_report;
+                        // Resolve Deep missions that completed while offline
+                        main_helpers::offline::resolve_deep_offline(
+                            &mut deep_state,
+                            &mut global_achievements,
+                            &state.character_name,
+                        );
                         game_state = Some(*state);
                         current_screen = Screen::Game;
                     }
