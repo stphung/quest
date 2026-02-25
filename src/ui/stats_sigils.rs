@@ -37,37 +37,53 @@ pub(super) fn draw_sigils_panel(
     let width = inner.width as usize;
     let mut lines = Vec::new();
 
-    for sigil in storm_sigils.sigils.iter().flatten() {
-        let icon = sigil.effect.icon();
-        let short = sigil.effect.short_name();
-        let value_label = sigil.effect.format_value(sigil.value);
-        let grade_str = sigil.grade.label();
-        let grade_padded = format!("{:<2}", grade_str);
-        let grade_color = sigil_grade_color(sigil.grade);
+    for (i, slot) in storm_sigils.sigils.iter().enumerate() {
+        if i < storm_sigils.slots_unlocked as usize {
+            // Unlocked slot: etched or empty
+            if let Some(sigil) = slot {
+                let icon = sigil.effect.icon();
+                let short = sigil.effect.short_name();
+                let value_label = sigil.effect.format_value(sigil.value);
+                let grade_str = sigil.grade.label();
+                let grade_padded = format!("{:<2}", grade_str);
+                let grade_color = sigil_grade_color(sigil.grade);
 
-        let left = format!("{} {}", icon, short);
-        let right = format!("{}  {}", value_label, grade_padded);
-        let left_display_w = unicode_width::UnicodeWidthStr::width(left.as_str());
-        let right_len = right.len();
-        let pad = width.saturating_sub(left_display_w + right_len + 3);
+                let left = format!("{} {}", icon, short);
+                let right = format!("{}  {}", value_label, grade_padded);
+                let left_display_w = unicode_width::UnicodeWidthStr::width(left.as_str());
+                let right_len = right.len();
+                let pad = width.saturating_sub(left_display_w + right_len + 3);
 
-        let grade_style = if grade_str.ends_with('+') {
-            Style::default()
-                .fg(grade_color)
-                .add_modifier(Modifier::BOLD)
-        } else if grade_str.ends_with('-') {
-            Style::default().fg(grade_color).add_modifier(Modifier::DIM)
+                let grade_style = if grade_str.ends_with('+') {
+                    Style::default()
+                        .fg(grade_color)
+                        .add_modifier(Modifier::BOLD)
+                } else if grade_str.ends_with('-') {
+                    Style::default().fg(grade_color).add_modifier(Modifier::DIM)
+                } else {
+                    Style::default().fg(grade_color)
+                };
+
+                lines.push(Line::from(vec![
+                    Span::raw("  "),
+                    Span::styled(left, Style::default().fg(Color::White)),
+                    Span::raw(" ".repeat(pad.max(1))),
+                    Span::styled(value_label, Style::default().fg(Color::Rgb(100, 180, 255))),
+                    Span::styled(format!("  {}", grade_padded), grade_style),
+                ]));
+            } else {
+                lines.push(Line::from(vec![
+                    Span::raw("  "),
+                    Span::styled("\u{00b7} empty", Style::default().fg(Color::DarkGray)),
+                ]));
+            }
         } else {
-            Style::default().fg(grade_color)
-        };
-
-        lines.push(Line::from(vec![
-            Span::raw("  "),
-            Span::styled(left, Style::default().fg(Color::White)),
-            Span::raw(" ".repeat(pad.max(1))),
-            Span::styled(value_label, Style::default().fg(Color::Rgb(100, 180, 255))),
-            Span::styled(format!("  {}", grade_padded), grade_style),
-        ]));
+            // Locked slot
+            lines.push(Line::from(vec![
+                Span::raw("  "),
+                Span::styled("\u{1f512} locked", Style::default().fg(Color::DarkGray)),
+            ]));
+        }
     }
 
     let paragraph = Paragraph::new(lines);

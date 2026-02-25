@@ -368,9 +368,7 @@ fn build_startup_splash_text(
         vec![
             Span::styled("  \u{2570} ", hero_border),
             Span::styled("[Enter]", Style::default().fg(Color::Green)),
-            Span::styled(" Create  ", label_style),
-            Span::styled("[Esc]", key_style),
-            Span::styled(" Quit", label_style),
+            Span::styled(" Create", label_style),
         ]
     } else {
         vec![
@@ -380,9 +378,7 @@ fn build_startup_splash_text(
             Span::styled("[R]", key_style),
             Span::styled(" Rename  ", label_style),
             Span::styled("[D]", key_style),
-            Span::styled(" Delete  ", label_style),
-            Span::styled("[Esc]", key_style),
-            Span::styled(" Quit", label_style),
+            Span::styled(" Delete", label_style),
         ]
     };
     text.push(Line::from(hint_spans));
@@ -892,8 +888,31 @@ pub fn show_startup_splash_screen(
                 .title(" Quest ");
             let inner = block.inner(area);
             f.render_widget(block, area);
+
+            // Split inner into content + bottom-left footer
+            let inner_chunks = ratatui::layout::Layout::default()
+                .direction(ratatui::layout::Direction::Vertical)
+                .constraints([
+                    ratatui::layout::Constraint::Min(0),
+                    ratatui::layout::Constraint::Length(1),
+                ])
+                .split(inner);
             let paragraph = Paragraph::new(text).alignment(ratatui::layout::Alignment::Left);
-            f.render_widget(paragraph, inner);
+            f.render_widget(paragraph, inner_chunks[0]);
+
+            let footer_line = Line::from(vec![
+                Span::styled(
+                    "[Esc]",
+                    Style::default()
+                        .fg(Color::DarkGray)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(" Quit", Style::default().fg(Color::Gray)),
+            ]);
+            f.render_widget(
+                Paragraph::new(footer_line).alignment(ratatui::layout::Alignment::Left),
+                inner_chunks[1],
+            );
 
             // Draw overlays
             if achievement_browser.showing {

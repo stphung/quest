@@ -28,7 +28,28 @@ pub(super) fn draw_equipment_names_only(
     game_state: &GameState,
     enhancement_levels: &[u8; 7],
 ) {
-    let block = Block::default().borders(Borders::ALL).title(" Equipment ");
+    use crate::items::EquipmentSlot;
+    let slot_order = [
+        EquipmentSlot::Weapon,
+        EquipmentSlot::Armor,
+        EquipmentSlot::Helmet,
+        EquipmentSlot::Gloves,
+        EquipmentSlot::Boots,
+        EquipmentSlot::Amulet,
+        EquipmentSlot::Ring,
+    ];
+
+    let total_power: u32 = slot_order
+        .iter()
+        .filter_map(|slot| game_state.equipment.get(*slot).as_ref())
+        .map(|item| item.power())
+        .sum();
+    let title = if total_power > 0 {
+        format!(" Equipment \u{26A1}{} ", total_power)
+    } else {
+        " Equipment ".to_string()
+    };
+    let block = Block::default().borders(Borders::ALL).title(title);
     let block = super::themed_block(block);
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -44,17 +65,6 @@ pub(super) fn draw_equipment_names_only(
     let name_max = width.saturating_sub(slot_col + right_cols);
 
     let mut lines = Vec::new();
-
-    use crate::items::EquipmentSlot;
-    let slot_order = [
-        EquipmentSlot::Weapon,
-        EquipmentSlot::Armor,
-        EquipmentSlot::Helmet,
-        EquipmentSlot::Gloves,
-        EquipmentSlot::Boots,
-        EquipmentSlot::Amulet,
-        EquipmentSlot::Ring,
-    ];
 
     for (idx, slot_enum) in slot_order.iter().enumerate() {
         let item = game_state.equipment.get(*slot_enum);

@@ -136,6 +136,37 @@ pub(super) fn draw_prestige_info(
     let effective_multiplier =
         DerivedStats::prestige_multiplier(tier.multiplier, &game_state.attributes);
 
+    // Build unlock hint for next prestige rank
+    let next_prestige = get_next_prestige_tier(game_state.prestige_rank);
+    let mult_delta = next_prestige.multiplier - tier.multiplier;
+    let unlock_hint = {
+        let mut unlocks = Vec::new();
+        // Check which zones unlock at the next prestige rank
+        let zones = crate::zones::get_all_zones();
+        for zone in zones {
+            if zone.prestige_requirement == next_prestige.rank {
+                unlocks.push(zone.name);
+            }
+        }
+        // Check for system unlocks at specific prestige gates
+        if next_prestige.rank == 10 {
+            unlocks.push("Haven");
+        }
+        if next_prestige.rank == 15 {
+            unlocks.push("Soulforge");
+            unlocks.push("Stormglass");
+        }
+        if unlocks.is_empty() {
+            format!("\u{1f513} +{:.2}x mult", mult_delta)
+        } else {
+            format!(
+                "\u{1f513} +{:.2}x mult \u{00b7} Unlocks: {}",
+                mult_delta,
+                unlocks.join(", ")
+            )
+        }
+    };
+
     let prestige_text = vec![
         Line::from(vec![
             Span::styled("🏆 Rank: ", Style::default().add_modifier(Modifier::BOLD)),
@@ -176,10 +207,13 @@ pub(super) fn draw_prestige_info(
             ));
             spans
         }),
+        Line::from(Span::styled(
+            unlock_hint,
+            Style::default().fg(Color::DarkGray),
+        )),
     ];
 
-    // Prestige level progress bar
-    let next_prestige = get_next_prestige_tier(game_state.prestige_rank);
+    // Prestige level progress bar (next_prestige already computed above for unlock hint)
     let prestige_ratio =
         (game_state.character_level as f64 / next_prestige.required_level as f64).min(1.0);
     let prestige_eta = match game_state.xp_per_hour() {
@@ -217,7 +251,23 @@ pub(super) fn draw_prestige_info(
         .label(prestige_label)
         .ratio(prestige_ratio);
 
-    if inner.height >= 3 {
+    if inner.height >= 4 {
+        let inner_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(1),
+            ])
+            .split(inner);
+
+        frame.render_widget(Paragraph::new(prestige_text[0].clone()), inner_chunks[0]);
+        frame.render_widget(Paragraph::new(prestige_text[1].clone()), inner_chunks[1]);
+        frame.render_widget(Paragraph::new(prestige_text[2].clone()), inner_chunks[2]);
+        frame.render_widget(prestige_gauge, inner_chunks[3]);
+    } else if inner.height >= 3 {
+        // Fallback: skip unlock hint if not enough space
         let inner_chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
