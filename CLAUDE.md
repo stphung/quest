@@ -250,12 +250,12 @@ Account-level base building that persists across prestiges. 14 rooms in a two-br
 - `milestones.rs` — MinigameType, MinigameDifficulty enums, milestone threshold arrays
 - `modal.rs` — Modal notification queue, 500ms accumulation window management
 - `notifications.rs` — Pending notification state, category-based notification counts
-- `stats.rs` — Achievement statistics, unlock percentages, progress queries, category breakdowns
+- `stats.rs` — Achievement statistics, unlock percentages, progress queries, category breakdowns, score computation
 - `titles.rs` — Title definitions (44 titles), title selection/validation, maps achievements to display text
 - `unlock.rs` — Core unlock machinery (is_unlocked, unlock, check_milestones)
 - `persistence.rs` — Save/load from `~/.quest/achievements.json`
 
-Account-level achievement system that persists across characters. 6 categories (Combat, Level, Progression, Challenges, Exploration, Stats). Tracks kills, boss kills, levels, prestige, zone completion, challenge wins, fishing ranks/catches, dungeon completions, Haven building, and Soulforge enhancements. Includes modal notification system with 500ms accumulation window. Includes a title system where 44 curated achievements grant display titles (e.g., "Godslayer", "Everlasting") shown in stats panel and character select.
+Account-level achievement system that persists across characters. 6 categories (Combat, Level, Progression, Challenges, Exploration, Stats). Tracks kills, boss kills, levels, prestige, zone completion, challenge wins, fishing ranks/catches, dungeon completions, Haven building, and Soulforge enhancements. Includes modal notification system with 500ms accumulation window. Includes a title system where 44 curated achievements grant display titles (e.g., "Godslayer", "Everlasting") shown in stats panel and character select. Achievement score system: each of the 149 achievements has a point value (7 tiers: 5/10/25/50/100/250/500), computed at runtime — max 16,365 pts. Shown in browser title bar, unlock modal, detail panel, and stats view.
 
 ### Cloud Sync (`src/history/cloud.rs`)
 

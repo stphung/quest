@@ -325,6 +325,22 @@ Account-level achievement system that persists across all characters. Stored in 
 **Stats:**
 - Tracks cumulative gameplay statistics (kills, deaths, fish caught, dungeons cleared, etc.)
 
+### Achievement Score
+
+Each achievement has a `points` value assigned via a 7-tier system. Scores are computed at runtime from the static `ALL_ACHIEVEMENTS` definitions — no persistence needed.
+
+| Tier | Points | Count | Examples |
+|------|--------|-------|---------|
+| Trivial | 5 | 13 | First kills, first fish, first dungeon |
+| Easy | 10 | 25 | Early zones, novice challenges |
+| Medium | 25 | 26 | Mid-game milestones, apprentice challenges |
+| Hard | 50 | 28 | Late zones, journeyman challenges |
+| Very Hard | 100 | 25 | Zone 9-10, master challenges |
+| Elite | 250 | 18 | Stormbreaker, Chess/Go Master, Grand Champion |
+| Pinnacle | 500 | 14 | Eternal, Death Incarnate, The Absolute |
+
+**Max score: 16,365** across 149 achievements. Methods: `achievement_score()` (unlocked total), `max_achievement_score()` (grand total). Displayed in: browser title bar (`X/Y pts, Z%`), unlock modal (`+N pts`), detail panel (`Worth N pts`), stats view (score line).
+
 ### Title System
 
 Titles are display names earned by unlocking specific achievements. 44 curated titles across combat, challenges, exploration, and enhancement categories. Players select one title to display after their character name (e.g., "Hero, Godslayer"). Account-wide, persisted in `achievements.json`.

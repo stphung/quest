@@ -91,6 +91,27 @@ Audit and update all documentation (docs/, CLAUDE.md files, and player-facing wi
 
 The GitHub wiki at `quest.wiki/` (git submodule) contains player-facing documentation. After updating developer docs, audit the wiki for staleness.
 
+### Initializing the Wiki Submodule
+
+The wiki must be initialized before it can be read or updated:
+
+```bash
+# Check if submodule is initialized (- prefix means not initialized)
+git submodule status quest.wiki
+
+# Initialize and clone the wiki submodule
+git submodule update --init quest.wiki
+
+# Verify (should show commit hash without - prefix)
+git submodule status quest.wiki
+```
+
+If `quest.wiki/` exists as a regular directory (not a submodule), remove it first:
+```bash
+rm -rf quest.wiki
+git submodule update --init quest.wiki
+```
+
 ### Wiki Pages (15):
 
 | Page | Content |
