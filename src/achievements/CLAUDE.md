@@ -117,7 +117,7 @@ Additionally, `newly_unlocked` is drained each tick by `collect_achievement_even
 
 Titles are display names earned by unlocking specific achievements. Players can select one title to display after their character name (e.g., "Hero, Godslayer"). Titles are account-wide and persist in `selected_title` on the `Achievements` struct.
 
-- `ALL_TITLES`: const slice of `TitleDef { achievement_id, title_text }` — 44 curated titles across combat, challenges, exploration, and enhancement categories
+- `ALL_TITLES`: const slice of `TitleDef { achievement_id, title_text }` — 46 curated titles across combat, challenges, exploration, and enhancement categories
 - `get_title_text(id)`: returns the title text for an achievement, if it grants a title
 - `get_unlocked_titles(achievements)`: returns all titles the player has earned, in display order
 - `validate_selected_title(achievements)`: clears `selected_title` if the achievement isn't unlocked or doesn't grant a title (called on load)

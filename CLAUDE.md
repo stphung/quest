@@ -82,7 +82,7 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 - `game_state.rs` — Main character state struct (level, XP, prestige, combat state, equipment)
 - `game_logic.rs` — Thin re-export wrapper (XP curve, leveling, spawning, offline logic extracted to submodules)
 - `tick.rs` — Per-tick game engine: `game_tick<R: Rng>()` with 12 processing stages. Zero UI imports, zero file I/O — fully decoupled from rendering
-- `tick_types.rs` — TickEvent enum (34 variants) and TickResult struct
+- `tick_types.rs` — TickEvent enum (35 variants) and TickResult struct
 - `tick_stages.rs` — Tick processing stages 4-6 and helper functions (process_item_drop, process_discoveries, etc.)
 - `xp.rs` — XP calculation, leveling logic, combat kill XP
 - `discoveries.rs` — Discovery rolls for dungeons, fishing spots, Haven, Soulforge
@@ -251,7 +251,7 @@ Account-level base building that persists across prestiges. 14 rooms in a two-br
 - `modal.rs` — Modal notification queue, 500ms accumulation window management
 - `notifications.rs` — Pending notification state, category-based notification counts
 - `stats.rs` — Achievement statistics, unlock percentages, progress queries, category breakdowns, score computation
-- `titles.rs` — Title definitions (44 titles), title selection/validation, maps achievements to display text
+- `titles.rs` — Title definitions (46 titles), title selection/validation, maps achievements to display text
 - `unlock.rs` — Core unlock machinery (is_unlocked, unlock, check_milestones)
 - `persistence.rs` — Save/load from `~/.quest/achievements.json`
 
@@ -568,7 +568,7 @@ quest/
 │       ├── bug_report_scene.rs # Bug report overlay
 │       ├── *_scene.rs       # Various game scenes
 │       └── character_*.rs   # Character management UI
-├── tests/                   # Integration tests (30 test files, 4,000+ tests)
+├── tests/                   # Integration tests (34 test files, 4,000+ tests)
 │   ├── game_loop_orchestration_test.rs  # 36 behavior-locking tests for game_tick
 │   ├── tick_integration_test.rs         # Tick module integration tests
 │   ├── zone_progression_test.rs         # Zone advancement tests
