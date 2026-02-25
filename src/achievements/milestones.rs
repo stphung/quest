@@ -165,6 +165,7 @@ pub const DEEP_MISSION_MILESTONES: &[(u64, AchievementId)] = &[
 ];
 
 /// Deep layer progression milestones.
+#[allow(dead_code)]
 pub const DEEP_LAYER_MILESTONES: &[(u64, AchievementId)] = &[
     (5, AchievementId::Layer5Cleared),
     (10, AchievementId::Layer10Cleared),
@@ -174,6 +175,7 @@ pub const DEEP_LAYER_MILESTONES: &[(u64, AchievementId)] = &[
 ];
 
 /// Deep guild rank milestones.
+#[allow(dead_code)]
 pub const DEEP_GUILD_RANK_MILESTONES: &[(u64, AchievementId)] = &[
     (2, AchievementId::GuildRank2),
     (3, AchievementId::GuildRank3),

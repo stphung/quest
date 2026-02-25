@@ -111,7 +111,7 @@ Five archetypes, each with a distinct `base_stats()` tuple `(power, resilience, 
 | Vanguard | 14 | 12 | 4 | Frontline tank |
 | Scout | 8 | 10 | 12 | Recon specialist |
 | Arcanist | 10 | 6 | 14 | Elemental specialist |
-| Medic | 6 | 14 | 10 | Healer |
+| Medic | 6 | 14 | 10 | Healer (squad bonus: -20% injury to teammates) |
 | Saboteur | 10 | 8 | 12 | Trap/obstacle specialist |
 
 Archetype availability by guild rank: Rank 1 = Vanguard/Scout/Medic, Rank 2 adds Arcanist, Rank 3+ adds Saboteur.

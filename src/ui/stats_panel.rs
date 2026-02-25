@@ -500,6 +500,7 @@ pub(super) fn draw_xp_bar_compact(frame: &mut Frame, area: Rect, game_state: &Ga
 }
 
 /// Draws a compact footer for M tier.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn draw_footer_compact(
     frame: &mut Frame,
     area: Rect,

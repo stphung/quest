@@ -49,6 +49,7 @@ use rand::Rng;
 /// - Persisting Deep to disk when `deep_changed` is true
 /// - Showing the Leviathan encounter modal when `leviathan_encounter` is `Some`
 /// - Showing achievement modal overlay when `achievement_modal_ready` is non-empty
+#[allow(clippy::too_many_arguments)]
 pub fn game_tick<R: Rng>(
     state: &mut GameState,
     tick_counter: &mut u32,

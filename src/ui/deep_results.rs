@@ -1,6 +1,6 @@
 //! The Deep — Mission complete results modal.
 
-use crate::deep::{DeepState, Mission, MissionOutcome, MercStatus};
+use crate::deep::{DeepState, MercStatus, Mission, MissionOutcome};
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
@@ -53,17 +53,15 @@ pub(super) fn render_mission_results(
 
     // Mission header
     lines.push(Line::from(""));
-    lines.push(Line::from(vec![
-        Span::styled(
-            format!(
-                "{} \u{2014} Layer {} \u{2014} {}",
-                mission.mission_type.display_name(),
-                mission.layer,
-                crate::deep::LayerTier::from_layer(mission.layer).display_name()
-            ),
-            Style::default().fg(Color::White),
+    lines.push(Line::from(vec![Span::styled(
+        format!(
+            "{} \u{2014} Layer {} \u{2014} {}",
+            mission.mission_type.display_name(),
+            mission.layer,
+            crate::deep::LayerTier::from_layer(mission.layer).display_name()
         ),
-    ]));
+        Style::default().fg(Color::White),
+    )]));
 
     // Outcome
     lines.push(Line::from(vec![
@@ -80,7 +78,9 @@ pub(super) fn render_mission_results(
     // Rewards section
     lines.push(Line::from(Span::styled(
         "Rewards:",
-        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
     )));
 
     if result.marks_earned > 0 {
@@ -119,7 +119,9 @@ pub(super) fn render_mission_results(
     // Squad status section
     lines.push(Line::from(Span::styled(
         "Squad:",
-        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
     )));
 
     for merc_id in &mission.squad {
@@ -146,10 +148,7 @@ pub(super) fn render_mission_results(
                 .unwrap_or_default();
 
             lines.push(Line::from(vec![
-                Span::styled(
-                    format!("  {} ", icon),
-                    Style::default().fg(color),
-                ),
+                Span::styled(format!("  {} ", icon), Style::default().fg(color)),
                 Span::styled(
                     format!(
                         "{} ({} L{})",

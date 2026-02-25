@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Functions wired into the game loop incrementally
 //! Layer management, familiarity system, and infrastructure logic for The Deep.
 //!
 //! This module provides:
@@ -9,9 +10,7 @@
 //! - `build_infrastructure` — validate and apply infrastructure to a `LayerRecord`
 //! - `infrastructure_build_cost` — Mark cost to build each infrastructure type
 
-use crate::deep::types::{
-    DeepPersistent, Infrastructure, LayerRecord, LayerTier, MissionType,
-};
+use crate::deep::types::{DeepPersistent, Infrastructure, LayerRecord, LayerTier, MissionType};
 
 // ── Familiarity ───────────────────────────────────────────────────────────────
 
@@ -137,15 +136,15 @@ pub fn layer_power_thresholds(layer: u32) -> LayerPowerThresholds {
 
     // Lookup table for layers 1–25 from the balance design document.
     let (breakthrough, expedition, recon, supply_run) = match layer {
-        1  => (25,  20,  15,  10),
-        2  => (40,  30,  20,  15),
-        3  => (55,  40,  30,  20),
-        4  => (75,  55,  40,  25),
-        5  => (95,  70,  50,  30),
-        6  => (115, 85,  60,  40),
-        7  => (130, 100, 75,  50),
-        8  => (155, 115, 85,  55),
-        9  => (180, 135, 100, 65),
+        1 => (25, 20, 15, 10),
+        2 => (40, 30, 20, 15),
+        3 => (55, 40, 30, 20),
+        4 => (75, 55, 40, 25),
+        5 => (95, 70, 50, 30),
+        6 => (115, 85, 60, 40),
+        7 => (130, 100, 75, 50),
+        8 => (155, 115, 85, 55),
+        9 => (180, 135, 100, 65),
         10 => (205, 155, 115, 75),
         11 => (230, 175, 130, 85),
         12 => (260, 195, 145, 95),
@@ -162,10 +161,15 @@ pub fn layer_power_thresholds(layer: u32) -> LayerPowerThresholds {
         23 => (785, 590, 440, 300),
         24 => (855, 640, 480, 325),
         25 => (930, 700, 525, 350),
-        _  => unreachable!(), // layers >= 26 handled above
+        _ => unreachable!(), // layers >= 26 handled above
     };
 
-    LayerPowerThresholds { breakthrough, expedition, recon, supply_run }
+    LayerPowerThresholds {
+        breakthrough,
+        expedition,
+        recon,
+        supply_run,
+    }
 }
 
 /// Return the power threshold relevant for a given mission type on a layer.
@@ -188,44 +192,43 @@ pub const MIN_MISSION_DURATION_SECS: u64 = 30 * 60;
 ///
 /// Matches the balance design table (§2, Base Durations by Mission Type and Tier).
 pub fn base_mission_duration_secs(tier: LayerTier, mission_type: MissionType) -> u64 {
-    let hours: f64 = match (tier, mission_type) {
+    match (tier, mission_type) {
         // Supply Run
-        (LayerTier::Shallows,    MissionType::SupplyRun)       => 2.0,
-        (LayerTier::Warrens,     MissionType::SupplyRun)       => 2.5,
-        (LayerTier::Hollows,     MissionType::SupplyRun)       => 3.0,
-        (LayerTier::SunkenReach, MissionType::SupplyRun)       => 3.5,
-        (LayerTier::Abyss,       MissionType::SupplyRun)       => 4.0,
-        (LayerTier::Void,        MissionType::SupplyRun)       => 4.0,
+        (LayerTier::Shallows, MissionType::SupplyRun) => 1800,
+        (LayerTier::Warrens, MissionType::SupplyRun) => 3600,
+        (LayerTier::Hollows, MissionType::SupplyRun) => 5400,
+        (LayerTier::SunkenReach, MissionType::SupplyRun) => 7200,
+        (LayerTier::Abyss, MissionType::SupplyRun) => 9000,
+        (LayerTier::Void, MissionType::SupplyRun) => 10800,
         // Recon
-        (LayerTier::Shallows,    MissionType::Recon)           => 4.0,
-        (LayerTier::Warrens,     MissionType::Recon)           => 5.0,
-        (LayerTier::Hollows,     MissionType::Recon)           => 6.0,
-        (LayerTier::SunkenReach, MissionType::Recon)           => 7.0,
-        (LayerTier::Abyss,       MissionType::Recon)           => 8.0,
-        (LayerTier::Void,        MissionType::Recon)           => 8.0,
+        (LayerTier::Shallows, MissionType::Recon) => 3600,
+        (LayerTier::Warrens, MissionType::Recon) => 7200,
+        (LayerTier::Hollows, MissionType::Recon) => 10800,
+        (LayerTier::SunkenReach, MissionType::Recon) => 14400,
+        (LayerTier::Abyss, MissionType::Recon) => 18000,
+        (LayerTier::Void, MissionType::Recon) => 21600,
         // Expedition
-        (LayerTier::Shallows,    MissionType::Expedition)      => 8.0,
-        (LayerTier::Warrens,     MissionType::Expedition)      => 10.0,
-        (LayerTier::Hollows,     MissionType::Expedition)      => 12.0,
-        (LayerTier::SunkenReach, MissionType::Expedition)      => 14.0,
-        (LayerTier::Abyss,       MissionType::Expedition)      => 16.0,
-        (LayerTier::Void,        MissionType::Expedition)      => 16.0,
+        (LayerTier::Shallows, MissionType::Expedition) => 7200,
+        (LayerTier::Warrens, MissionType::Expedition) => 14400,
+        (LayerTier::Hollows, MissionType::Expedition) => 21600,
+        (LayerTier::SunkenReach, MissionType::Expedition) => 28800,
+        (LayerTier::Abyss, MissionType::Expedition) => 36000,
+        (LayerTier::Void, MissionType::Expedition) => 43200,
         // Breakthrough
-        (LayerTier::Shallows,    MissionType::Breakthrough)    => 18.0,
-        (LayerTier::Warrens,     MissionType::Breakthrough)    => 20.0,
-        (LayerTier::Hollows,     MissionType::Breakthrough)    => 22.0,
-        (LayerTier::SunkenReach, MissionType::Breakthrough)    => 24.0,
-        (LayerTier::Abyss,       MissionType::Breakthrough)    => 24.0,
-        (LayerTier::Void,        MissionType::Breakthrough)    => 24.0,
+        (LayerTier::Shallows, MissionType::Breakthrough) => 14400,
+        (LayerTier::Warrens, MissionType::Breakthrough) => 28800,
+        (LayerTier::Hollows, MissionType::Breakthrough) => 43200,
+        (LayerTier::SunkenReach, MissionType::Breakthrough) => 57600,
+        (LayerTier::Abyss, MissionType::Breakthrough) => 72000,
+        (LayerTier::Void, MissionType::Breakthrough) => 86400,
         // Construction
-        (LayerTier::Shallows,    MissionType::Construction(_)) => 4.0,
-        (LayerTier::Warrens,     MissionType::Construction(_)) => 5.0,
-        (LayerTier::Hollows,     MissionType::Construction(_)) => 6.0,
-        (LayerTier::SunkenReach, MissionType::Construction(_)) => 7.0,
-        (LayerTier::Abyss,       MissionType::Construction(_)) => 8.0,
-        (LayerTier::Void,        MissionType::Construction(_)) => 8.0,
-    };
-    (hours * 3600.0) as u64
+        (LayerTier::Shallows, MissionType::Construction(_)) => 3600,
+        (LayerTier::Warrens, MissionType::Construction(_)) => 7200,
+        (LayerTier::Hollows, MissionType::Construction(_)) => 10800,
+        (LayerTier::SunkenReach, MissionType::Construction(_)) => 14400,
+        (LayerTier::Abyss, MissionType::Construction(_)) => 18000,
+        (LayerTier::Void, MissionType::Construction(_)) => 21600,
+    }
 }
 
 /// Parameters that can reduce mission duration beyond the base value.
@@ -276,10 +279,10 @@ pub fn apply_duration_modifiers(base_secs: u64, mods: &DurationModifiers) -> u64
 pub fn infrastructure_build_cost(infra: Infrastructure, layer: u32) -> u32 {
     let layer = layer.max(1);
     match infra {
-        Infrastructure::Outpost => 60 + 4 * layer,
-        Infrastructure::SupplyCache => 80 + 5 * layer,
-        Infrastructure::Watchtower => 70 + 4 * layer,
-        Infrastructure::Bridge => 100 + 5 * layer,
+        Infrastructure::Outpost => 85 + 6 * layer,
+        Infrastructure::SupplyCache => 110 + 7 * layer,
+        Infrastructure::Watchtower => 100 + 6 * layer,
+        Infrastructure::Bridge => 140 + 7 * layer,
     }
 }
 
@@ -360,14 +363,38 @@ mod tests {
 
     #[test]
     fn test_familiarity_level_boundaries() {
-        assert_eq!(FamiliarityLevel::from_familiarity(0), FamiliarityLevel::Unknown);
-        assert_eq!(FamiliarityLevel::from_familiarity(24), FamiliarityLevel::Unknown);
-        assert_eq!(FamiliarityLevel::from_familiarity(25), FamiliarityLevel::Mapped);
-        assert_eq!(FamiliarityLevel::from_familiarity(49), FamiliarityLevel::Mapped);
-        assert_eq!(FamiliarityLevel::from_familiarity(50), FamiliarityLevel::Familiar);
-        assert_eq!(FamiliarityLevel::from_familiarity(74), FamiliarityLevel::Familiar);
-        assert_eq!(FamiliarityLevel::from_familiarity(75), FamiliarityLevel::Mastered);
-        assert_eq!(FamiliarityLevel::from_familiarity(100), FamiliarityLevel::Mastered);
+        assert_eq!(
+            FamiliarityLevel::from_familiarity(0),
+            FamiliarityLevel::Unknown
+        );
+        assert_eq!(
+            FamiliarityLevel::from_familiarity(24),
+            FamiliarityLevel::Unknown
+        );
+        assert_eq!(
+            FamiliarityLevel::from_familiarity(25),
+            FamiliarityLevel::Mapped
+        );
+        assert_eq!(
+            FamiliarityLevel::from_familiarity(49),
+            FamiliarityLevel::Mapped
+        );
+        assert_eq!(
+            FamiliarityLevel::from_familiarity(50),
+            FamiliarityLevel::Familiar
+        );
+        assert_eq!(
+            FamiliarityLevel::from_familiarity(74),
+            FamiliarityLevel::Familiar
+        );
+        assert_eq!(
+            FamiliarityLevel::from_familiarity(75),
+            FamiliarityLevel::Mastered
+        );
+        assert_eq!(
+            FamiliarityLevel::from_familiarity(100),
+            FamiliarityLevel::Mastered
+        );
     }
 
     #[test]
@@ -402,7 +429,10 @@ mod tests {
         assert_eq!(familiarity_gain(MissionType::Recon), 15);
         assert_eq!(familiarity_gain(MissionType::Expedition), 10);
         assert_eq!(familiarity_gain(MissionType::Breakthrough), 15);
-        assert_eq!(familiarity_gain(MissionType::Construction(Infrastructure::Outpost)), 5);
+        assert_eq!(
+            familiarity_gain(MissionType::Construction(Infrastructure::Outpost)),
+            5
+        );
     }
 
     #[test]
@@ -417,7 +447,7 @@ mod tests {
     fn test_apply_familiarity_gain_accumulates() {
         let mut record = LayerRecord::new(1);
         apply_familiarity_gain(&mut record, MissionType::SupplyRun); // +5
-        apply_familiarity_gain(&mut record, MissionType::Recon);     // +15
+        apply_familiarity_gain(&mut record, MissionType::Recon); // +15
         assert_eq!(record.familiarity, 20);
     }
 
@@ -459,7 +489,8 @@ mod tests {
             assert!(
                 b.breakthrough > a.breakthrough,
                 "Breakthrough threshold should increase: layer {} -> {}",
-                layer, layer + 1
+                layer,
+                layer + 1
             );
         }
     }
@@ -484,11 +515,11 @@ mod tests {
     fn test_base_durations_shallows() {
         assert_eq!(
             base_mission_duration_secs(LayerTier::Shallows, MissionType::SupplyRun),
-            2 * 3600
+            1800
         );
         assert_eq!(
             base_mission_duration_secs(LayerTier::Shallows, MissionType::Breakthrough),
-            18 * 3600
+            14400
         );
     }
 
@@ -509,7 +540,12 @@ mod tests {
             let mut prev = 0u64;
             for &tier in &tiers {
                 let d = base_mission_duration_secs(tier, mission);
-                assert!(d >= prev, "{:?} {:?} duration should not decrease", tier, mission);
+                assert!(
+                    d >= prev,
+                    "{:?} {:?} duration should not decrease",
+                    tier,
+                    mission
+                );
                 prev = d;
             }
         }
@@ -519,7 +555,7 @@ mod tests {
 
     #[test]
     fn test_duration_no_modifiers_returns_base() {
-        let base = 8 * 3600;
+        let base: u64 = 8 * 3600;
         let mods = DurationModifiers {
             has_outpost: false,
             familiarity: 0,
@@ -527,7 +563,7 @@ mod tests {
             saboteur_is_veteran: false,
             is_overpowered: false,
         };
-        assert_eq!(apply_duration_modifiers(base, &mods), base as u64);
+        assert_eq!(apply_duration_modifiers(base, &mods), base);
     }
 
     #[test]
@@ -596,26 +632,32 @@ mod tests {
 
     #[test]
     fn test_infrastructure_build_cost_outpost_layer_1() {
-        // 60 + 4*1 = 64
-        assert_eq!(infrastructure_build_cost(Infrastructure::Outpost, 1), 64);
+        // 85 + 6*1 = 91
+        assert_eq!(infrastructure_build_cost(Infrastructure::Outpost, 1), 91);
     }
 
     #[test]
     fn test_infrastructure_build_cost_supply_cache_layer_10() {
-        // 80 + 5*10 = 130
-        assert_eq!(infrastructure_build_cost(Infrastructure::SupplyCache, 10), 130);
+        // 110 + 7*10 = 180
+        assert_eq!(
+            infrastructure_build_cost(Infrastructure::SupplyCache, 10),
+            180
+        );
     }
 
     #[test]
     fn test_infrastructure_build_cost_watchtower_layer_1() {
-        // 70 + 4*1 = 74
-        assert_eq!(infrastructure_build_cost(Infrastructure::Watchtower, 1), 74);
+        // 100 + 6*1 = 106
+        assert_eq!(
+            infrastructure_build_cost(Infrastructure::Watchtower, 1),
+            106
+        );
     }
 
     #[test]
     fn test_infrastructure_build_cost_bridge_layer_20() {
-        // 100 + 5*20 = 200
-        assert_eq!(infrastructure_build_cost(Infrastructure::Bridge, 20), 200);
+        // 140 + 7*20 = 280
+        assert_eq!(infrastructure_build_cost(Infrastructure::Bridge, 20), 280);
     }
 
     #[test]
@@ -623,7 +665,11 @@ mod tests {
         for infra in Infrastructure::ALL {
             let shallow = infrastructure_build_cost(*infra, 1);
             let deep = infrastructure_build_cost(*infra, 20);
-            assert!(deep > shallow, "{:?} cost should increase with layer", infra);
+            assert!(
+                deep > shallow,
+                "{:?} cost should increase with layer",
+                infra
+            );
         }
     }
 
@@ -693,7 +739,10 @@ mod tests {
         assert_eq!(persistent.deepest_layer_reached, 0);
         mark_layer_cleared(&mut persistent, 3);
         assert_eq!(persistent.deepest_layer_reached, 3);
-        assert!(persistent.layer_record(3).map(|r| r.cleared).unwrap_or(false));
+        assert!(persistent
+            .layer_record(3)
+            .map(|r| r.cleared)
+            .unwrap_or(false));
     }
 
     #[test]

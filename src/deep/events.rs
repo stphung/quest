@@ -1,3 +1,5 @@
+// Allow dead_code: event system functions are wired into the game loop incrementally.
+#![allow(dead_code)]
 //! Check-in event system for The Deep.
 //!
 //! Events fire at progress milestones during missions, presenting the player with
@@ -158,13 +160,7 @@ static FLOODED_PASSAGE: EventTemplate = EventTemplate {
     choices: &[
         ChoiceTemplate::safe("Wade through carefully", None, 2 * 3600, 0, 0),
         ChoiceTemplate::risky("Swim across quickly", 0, 0.65, 0.20, 0, true),
-        ChoiceTemplate::safe(
-            "Find higher ground",
-            Some(MercArchetype::Scout),
-            1 * 3600,
-            0,
-            0,
-        ),
+        ChoiceTemplate::safe("Find higher ground", Some(MercArchetype::Scout), 3600, 0, 0),
     ],
     auto_resolve_index: 0,
     risk_success_tag: Some(EventTag::TookRisk),
@@ -334,7 +330,7 @@ static COLLAPSING_TUNNEL: EventTemplate = EventTemplate {
         ChoiceTemplate::safe(
             "Blast through",
             Some(MercArchetype::Arcanist),
-            1 * 3600,
+            3600,
             0,
             30,
         ),
@@ -352,7 +348,7 @@ static FORK_IN_PATH: EventTemplate = EventTemplate {
     description: "The tunnel splits into three passages. One is wide and well-traveled. One is narrow and dark. One has faint markings on the walls.",
     choices: &[
         ChoiceTemplate::safe("Take the wide passage", None, 0, 0, 0),
-        ChoiceTemplate::risky("Explore the narrow path", 1 * 3600, 0.65, 0.15, 40, true),
+        ChoiceTemplate::risky("Explore the narrow path", 3600, 0.65, 0.15, 40, true),
         ChoiceTemplate {
             label: "Follow the markings",
             required_archetype: Some(MercArchetype::Scout),
@@ -438,7 +434,7 @@ static TOXIC_SPORE_CLOUD: EventTemplate = EventTemplate {
         ChoiceTemplate::safe(
             "Find ventilation shaft",
             Some(MercArchetype::Scout),
-            1 * 3600,
+            3600,
             0,
             0,
         ),
@@ -535,7 +531,8 @@ static ABYSSAL_ECHO: EventTemplate = EventTemplate {
 static HOLLOWS_BOSS: EventTemplate = EventTemplate {
     category: EventCategory::BossApproach,
     title: "THE SENTINEL'S CHAMBER",
-    description: "A massive stone sentinel blocks the descent. Your squad is battered but determined.",
+    description:
+        "A massive stone sentinel blocks the descent. Your squad is battered but determined.",
     choices: &[
         ChoiceTemplate::safe("Direct assault", None, 0, 0, 0),
         ChoiceTemplate {
@@ -587,7 +584,7 @@ static FLOODED_VAULT: EventTemplate = EventTemplate {
         ChoiceTemplate::safe(
             "Ward against the water",
             Some(MercArchetype::Arcanist),
-            1 * 3600,
+            3600,
             0,
             40,
         ),
@@ -607,7 +604,7 @@ static CORRUPTED_ARTIFACT: EventTemplate = EventTemplate {
         ChoiceTemplate {
             label: "Purify and claim",
             required_archetype: Some(MercArchetype::Arcanist),
-            time_delta_secs: 1 * 3600,
+            time_delta_secs: 3600,
             is_risky: false,
             bonus_marks: 80,
             mark_cost: 0,
@@ -632,7 +629,7 @@ static SUNKEN_GUARDIAN: EventTemplate = EventTemplate {
         ChoiceTemplate::safe(
             "Disable its runes",
             Some(MercArchetype::Arcanist),
-            1 * 3600,
+            3600,
             0,
             60,
         ),
@@ -674,7 +671,7 @@ static TIDAL_SURGE: EventTemplate = EventTemplate {
         ChoiceTemplate::safe(
             "Stabilize the wounded",
             Some(MercArchetype::Medic),
-            1 * 3600,
+            3600,
             0,
             0,
         ),
@@ -705,7 +702,7 @@ static SUNKEN_REACH_BOSS: EventTemplate = EventTemplate {
         ChoiceTemplate {
             label: "Drain the chamber",
             required_archetype: Some(MercArchetype::Saboteur),
-            time_delta_secs: 1 * 3600,
+            time_delta_secs: 3600,
             is_risky: false,
             bonus_marks: 0,
             mark_cost: 0,
@@ -826,7 +823,7 @@ static REALITY_FRACTURE: EventTemplate = EventTemplate {
         ChoiceTemplate::safe(
             "Stabilize reality",
             Some(MercArchetype::Arcanist),
-            1 * 3600,
+            3600,
             0,
             50,
         ),
@@ -860,7 +857,7 @@ static WHISPERING_DARK: EventTemplate = EventTemplate {
         ChoiceTemplate::safe(
             "Medic counter-measure",
             Some(MercArchetype::Medic),
-            1 * 3600,
+            3600,
             0,
             0,
         ),
@@ -1011,7 +1008,11 @@ fn void_scale(layer: u32) -> (f64, f64, f64) {
 
 // ── Conversion: EventTemplate -> CheckInEvent ─────────────────────────────────
 
-fn template_to_check_in_event(template: &EventTemplate, layer: u32, now: DateTime<Utc>) -> CheckInEvent {
+fn template_to_check_in_event(
+    template: &EventTemplate,
+    layer: u32,
+    now: DateTime<Utc>,
+) -> CheckInEvent {
     let (time_scale, mark_scale, _injury_scale) = void_scale(layer);
 
     let choices: Vec<EventChoice> = template
@@ -1328,10 +1329,7 @@ fn all_templates() -> &'static [&'static EventTemplate] {
 }
 
 fn find_template_by_title(title: &str) -> Option<&'static EventTemplate> {
-    all_templates()
-        .iter()
-        .find(|t| t.title == title)
-        .copied()
+    all_templates().iter().find(|t| t.title == title).copied()
 }
 
 fn find_template_risky_data(
@@ -1433,9 +1431,8 @@ pub fn tick_mission_events(
             // First time we see this unresolved event at/past its trigger.
             // Compute the actual trigger time (not `now`) so offline/fast-forward
             // scenarios can immediately auto-resolve events that fired in the past.
-            let total_duration_secs = (mission.ends_at - mission.started_at)
-                .num_seconds()
-                .max(1) as f64;
+            let total_duration_secs =
+                (mission.ends_at - mission.started_at).num_seconds().max(1) as f64;
             let trigger_time = mission.started_at
                 + Duration::seconds((trigger_progress * total_duration_secs) as i64);
             // Use whichever is earlier: computed trigger time or now (can't fire in the future)
@@ -1486,21 +1483,17 @@ mod tests {
 
     #[test]
     fn test_supply_run_has_no_events() {
-        assert!(
-            event_trigger_points(MissionType::SupplyRun, LayerTier::Shallows).is_empty()
-        );
+        assert!(event_trigger_points(MissionType::SupplyRun, LayerTier::Shallows).is_empty());
     }
 
     #[test]
     fn test_construction_has_no_events() {
         use super::super::types::Infrastructure;
-        assert!(
-            event_trigger_points(
-                MissionType::Construction(Infrastructure::Outpost),
-                LayerTier::Warrens
-            )
-            .is_empty()
-        );
+        assert!(event_trigger_points(
+            MissionType::Construction(Infrastructure::Outpost),
+            LayerTier::Warrens
+        )
+        .is_empty());
     }
 
     #[test]
@@ -1672,7 +1665,10 @@ mod tests {
             &[MercArchetype::Scout],
             &mut rng,
         );
-        assert!(res.is_some(), "Gated choice should succeed with matching archetype");
+        assert!(
+            res.is_some(),
+            "Gated choice should succeed with matching archetype"
+        );
         assert_eq!(event.resolved_choice, Some(gated_index));
     }
 
@@ -1690,8 +1686,7 @@ mod tests {
         // Run auto-resolve many times — should never produce may_injure = true.
         for seed in 0u64..100 {
             let mut rng2 = ChaCha8Rng::seed_from_u64(seed);
-            let mut events =
-                generate_mission_events(MissionType::Expedition, 5, &[], &mut rng2);
+            let mut events = generate_mission_events(MissionType::Expedition, 5, &[], &mut rng2);
             for event in &mut events {
                 let res = resolve_event(event, None, &[], &mut rng);
                 if let Some(r) = res {

@@ -9,6 +9,19 @@ use super::deep_scene::DEEP_BORDER_COLOR;
 use super::responsive::{LayoutContext, SizeTier};
 use super::scene_fx::{put_text, put_text_centered, SceneCell};
 
+/// Format seconds as a compact duration string (e.g., "2h", "30m", "1h 30m").
+fn format_duration(secs: u64) -> String {
+    let h = secs / 3600;
+    let m = (secs % 3600) / 60;
+    if h == 0 {
+        format!("{}m", m.max(1))
+    } else if m == 0 {
+        format!("{}h", h)
+    } else {
+        format!("{}h {}m", h, m)
+    }
+}
+
 pub(super) fn render_event_response(
     buffer: &mut [Vec<SceneCell>],
     width: usize,
@@ -48,7 +61,13 @@ pub(super) fn render_event_response(
     let event = mission.events.iter().find(|e| !e.is_resolved());
 
     let Some(event) = event else {
-        put_text_centered(buffer, height as i32 / 2, width, "Event already resolved.", Color::DarkGray);
+        put_text_centered(
+            buffer,
+            height as i32 / 2,
+            width,
+            "Event already resolved.",
+            Color::DarkGray,
+        );
         put_text(buffer, height as i32 - 1, 1, "[Esc] Back", Color::DarkGray);
         return;
     };
@@ -77,13 +96,7 @@ pub(super) fn render_event_response(
         .squad
         .iter()
         .filter_map(|id| deep.prestige.find_merc(*id))
-        .map(|m| {
-            format!(
-                "{} ({})",
-                m.name,
-                m.archetype.display_name()
-            )
-        })
+        .map(|m| format!("{} ({})", m.name, m.archetype.display_name()))
         .collect();
     if !squad_names.is_empty() {
         put_text(
@@ -101,6 +114,15 @@ pub(super) fn render_event_response(
         _ => "[\u{2191}/\u{2193}] Choose  [Enter] Confirm choice  [Esc] Back (auto-resolves later)",
     };
     put_text(buffer, height as i32 - 1, 1, footer, Color::DarkGray);
+    let help_hint = "[?] Help";
+    let help_col = (width as i32 - help_hint.len() as i32 - 1).max(1);
+    put_text(
+        buffer,
+        height as i32 - 1,
+        help_col,
+        help_hint,
+        Color::Rgb(50, 70, 100),
+    );
 
     let content_top = 2i32;
     let content_bottom = height as i32 - 1;
@@ -132,12 +154,10 @@ pub(super) fn render_event_response(
         if desc_row >= narrative_top + narrative_height as i32 {
             break;
         }
-        if line_buf.len() + word.len() + 1 > max_line_w {
-            if !line_buf.is_empty() {
-                put_text_centered(buffer, desc_row, width, &line_buf, Color::White);
-                desc_row += 1;
-                line_buf.clear();
-            }
+        if line_buf.len() + word.len() + 1 > max_line_w && !line_buf.is_empty() {
+            put_text_centered(buffer, desc_row, width, &line_buf, Color::White);
+            desc_row += 1;
+            line_buf.clear();
         }
         if !line_buf.is_empty() {
             line_buf.push(' ');
@@ -160,7 +180,13 @@ pub(super) fn render_event_response(
         let m = remaining / 60;
         (Color::Yellow, format!("Auto-resolve in: {}m", m))
     };
-    put_text(buffer, auto_resolve_row, 1, &countdown_text, countdown_color);
+    put_text(
+        buffer,
+        auto_resolve_row,
+        1,
+        &countdown_text,
+        countdown_color,
+    );
     put_text(
         buffer,
         auto_resolve_row,
@@ -169,8 +195,21 @@ pub(super) fn render_event_response(
         Color::DarkGray,
     );
 
+    // ── First-event hint ──
+    let mut hint_offset = 0i32;
+    if ui.event_visit_count <= 1 && auto_resolve_row + 1 < content_bottom {
+        put_text(
+            buffer,
+            auto_resolve_row + 1,
+            1,
+            "Your choice affects outcome and timing. Events auto-resolve safely if ignored.",
+            Color::Rgb(50, 80, 110),
+        );
+        hint_offset = 1;
+    }
+
     // ── Choices ──
-    let choices_top = auto_resolve_row + 2;
+    let choices_top = auto_resolve_row + 2 + hint_offset;
     let squad_archetypes: Vec<crate::deep::MercArchetype> = mission
         .squad
         .iter()
@@ -202,26 +241,64 @@ pub(super) fn render_event_response(
             None => Color::DarkGray,
         };
 
-        // Consequence preview
+        // Consequence preview with explicit time delta
         let consequence = if choice.is_risky {
-            "— risk"
+            "\u{2014} risk".to_string()
         } else if choice.time_delta_secs > 0 {
-            "— delay"
+            format!(
+                "\u{2014} +{}",
+                format_duration(choice.time_delta_secs as u64)
+            )
         } else if choice.time_delta_secs < 0 {
-            "— faster"
+            format!(
+                "\u{2014} -{}",
+                format_duration(choice.time_delta_secs.unsigned_abs())
+            )
         } else {
-            "— safe"
+            "\u{2014} safe".to_string()
         };
 
-        let line = format!("{}{}{}", cursor, arch_tag, choice.label);
-        let label_color = if is_available { Color::White } else { Color::DarkGray };
+        // Unavailable choice explanation
+        let unavail_suffix = if !is_available {
+            if let Some(arch) = choice.required_archetype {
+                format!("  ({} not in squad)", arch.display_name())
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        };
+
+        let line = format!("{}{}{}{}", cursor, arch_tag, choice.label, unavail_suffix);
+        let label_color = if is_available {
+            Color::White
+        } else {
+            Color::DarkGray
+        };
         put_text(buffer, row, 1, &line, label_color);
-        put_text(buffer, row, 1, cursor, if is_sel { Color::Cyan } else { Color::DarkGray });
+        put_text(
+            buffer,
+            row,
+            1,
+            cursor,
+            if is_sel { Color::Cyan } else { Color::DarkGray },
+        );
         put_text(buffer, row, 3, &arch_tag, arch_color);
+        if !unavail_suffix.is_empty() {
+            let suffix_col = 1 + format!("{}{}{}", cursor, arch_tag, choice.label).len() as i32;
+            put_text(
+                buffer,
+                row,
+                suffix_col,
+                &unavail_suffix,
+                Color::Rgb(80, 80, 80),
+            );
+        }
 
         // Consequence at right side
-        let consequence_col = (width as i32 - consequence.len() as i32 - 2).max(line.len() as i32 + 2);
-        put_text(buffer, row, consequence_col, consequence, Color::DarkGray);
+        let consequence_col =
+            (width as i32 - consequence.len() as i32 - 2).max(line.len() as i32 + 2);
+        put_text(buffer, row, consequence_col, &consequence, Color::DarkGray);
     }
 
     // Auto-resolve choice row (always last)
@@ -229,8 +306,26 @@ pub(super) fn render_event_response(
     if auto_row < content_bottom {
         let is_sel = ui.event_choice_index == event.choices.len();
         let cursor = if is_sel { "\u{25b6} " } else { "  " };
-        put_text(buffer, auto_row, 1, &format!("{}[Auto]  Let them decide", cursor), Color::DarkGray);
-        put_text(buffer, auto_row, 1, cursor, if is_sel { Color::Cyan } else { Color::DarkGray });
-        put_text(buffer, auto_row, (width as i32 - 20).max(42), "— always safe", Color::DarkGray);
+        put_text(
+            buffer,
+            auto_row,
+            1,
+            &format!("{}[Auto]  Let them decide", cursor),
+            Color::DarkGray,
+        );
+        put_text(
+            buffer,
+            auto_row,
+            1,
+            cursor,
+            if is_sel { Color::Cyan } else { Color::DarkGray },
+        );
+        put_text(
+            buffer,
+            auto_row,
+            (width as i32 - 20).max(42),
+            "— always safe",
+            Color::DarkGray,
+        );
     }
 }

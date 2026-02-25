@@ -9,9 +9,15 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 
 use quest::deep::{
+    // Persistence
+    deep_save_path,
+    generate_mission_pool,
+    // Layers
+    mark_layer_cleared,
+    // Missions
+    resolve_offline_missions,
     // Discovery
     try_discover_deep,
-    DEEP_MIN_PRESTIGE_RANK,
     // Types
     DeepState,
     GuildRank,
@@ -21,13 +27,7 @@ use quest::deep::{
     Mission,
     MissionStatus,
     MissionType,
-    // Persistence
-    deep_save_path,
-    // Missions
-    resolve_offline_missions,
-    generate_mission_pool,
-    // Layers
-    mark_layer_cleared,
+    DEEP_MIN_PRESTIGE_RANK,
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -238,8 +238,8 @@ fn test_discovery_creates_initial_state() {
         assert_eq!(merc.status, MercStatus::Available);
     }
 
-    // Warband Marks start at 0.
-    assert_eq!(deep.prestige.warband_marks, 0);
+    // Warband Marks start at 50 (seed money for first missions).
+    assert_eq!(deep.prestige.warband_marks, 50);
 }
 
 #[test]
@@ -247,12 +247,7 @@ fn test_discovery_starter_roster_archetypes() {
     let mut deep = DeepState::new();
     force_discover(&mut deep, DEEP_MIN_PRESTIGE_RANK, 500_000);
 
-    let archetypes: Vec<MercArchetype> = deep
-        .prestige
-        .roster
-        .iter()
-        .map(|m| m.archetype)
-        .collect();
+    let archetypes: Vec<MercArchetype> = deep.prestige.roster.iter().map(|m| m.archetype).collect();
 
     assert!(
         archetypes.contains(&MercArchetype::Vanguard),
@@ -307,7 +302,6 @@ fn test_prestige_preserves_cleared_layers() {
     force_discover(&mut deep, DEEP_MIN_PRESTIGE_RANK, 500_000);
 
     // Mark layers 1 and 2 as cleared.
-    let mut rng = seeded_rng();
     mark_layer_cleared(&mut deep.persistent, 1);
     mark_layer_cleared(&mut deep.persistent, 2);
 
@@ -471,7 +465,7 @@ fn test_offline_mission_resolution_completes_elapsed_mission() {
     force_discover(&mut deep, DEEP_MIN_PRESTIGE_RANK, 500_000);
 
     // Ensure the roster merc is available.
-    let merc_id = deep.prestige.roster.first().unwrap().id;
+    let _merc_id = deep.prestige.roster.first().unwrap().id;
 
     // Create a mission whose timer has elapsed.
     let mission = make_elapsed_supply_run(&mut deep);
@@ -483,11 +477,7 @@ fn test_offline_mission_resolution_completes_elapsed_mission() {
     }
 
     let mut rng = seeded_rng();
-    let summary = resolve_offline_missions(
-        &mut deep.prestige,
-        &mut deep.persistent,
-        &mut rng,
-    );
+    let summary = resolve_offline_missions(&mut deep.prestige, &mut deep.persistent, &mut rng);
 
     assert_eq!(
         summary.missions_resolved, 1,
@@ -509,11 +499,7 @@ fn test_offline_resolution_does_not_complete_active_missions() {
     deep.prestige.active_missions.push(mission);
 
     let mut rng = seeded_rng();
-    let summary = resolve_offline_missions(
-        &mut deep.prestige,
-        &mut deep.persistent,
-        &mut rng,
-    );
+    let summary = resolve_offline_missions(&mut deep.prestige, &mut deep.persistent, &mut rng);
 
     assert_eq!(
         summary.missions_resolved, 0,
@@ -539,11 +525,7 @@ fn test_offline_resolve_does_not_panic_without_events() {
     deep.prestige.active_missions.push(mission);
 
     let mut rng = seeded_rng();
-    let summary = resolve_offline_missions(
-        &mut deep.prestige,
-        &mut deep.persistent,
-        &mut rng,
-    );
+    let summary = resolve_offline_missions(&mut deep.prestige, &mut deep.persistent, &mut rng);
 
     // events_auto_resolved should be 0 for a supply run (no events).
     assert_eq!(

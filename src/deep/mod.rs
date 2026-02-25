@@ -42,19 +42,6 @@ pub mod types;
 pub use types::{
     // Discovery
     deep_discovery_chance,
-    DEEP_DISCOVERY_BASE_CHANCE,
-    DEEP_DISCOVERY_RANK_BONUS,
-    DEEP_MIN_PRESTIGE_RANK,
-    // Enums
-    DeepView,
-    GuildRank,
-    Infrastructure,
-    LayerTier,
-    MercArchetype,
-    MercStatus,
-    MissionOutcome,
-    MissionStatus,
-    MissionType,
     // Structs
     AvailableMission,
     CheckInEvent,
@@ -62,13 +49,26 @@ pub use types::{
     DeepPrestige,
     DeepState,
     DeepUiState,
+    // Enums
+    DeepView,
     EventChoice,
+    GuildRank,
+    Infrastructure,
     Layer,
     LayerRecord,
+    LayerTier,
+    MercArchetype,
+    MercStatus,
     Mercenary,
     Mission,
+    MissionOutcome,
     MissionResult,
+    MissionStatus,
+    MissionType,
     RecruitPool,
+    DEEP_DISCOVERY_BASE_CHANCE,
+    DEEP_DISCOVERY_RANK_BONUS,
+    DEEP_MIN_PRESTIGE_RANK,
 };
 
 pub use discovery::try_discover_deep;
@@ -76,54 +76,28 @@ pub use discovery::try_discover_deep;
 // Economy re-exports
 #[allow(unused_imports)]
 pub use economy::{
-    base_marks_earned,
-    base_xp_reward,
-    compute_mark_reward,
-    guild_upgrade_cost,
-    marks_variance_multiplier,
-    merc_xp_per_mission,
-    merc_xp_to_next_level,
-    mission_launch_cost,
-    outcome_mark_multiplier,
-    prestige_fragment_hundredths,
-    recruit_quality_distribution,
-    stormglass_reward,
-    try_upgrade_guild_rank,
-    xp_reward,
-    GuildUpgradeError,
-    MarkRewardParams,
+    base_marks_earned, base_xp_reward, compute_mark_reward, guild_upgrade_cost,
+    marks_variance_multiplier, merc_xp_per_mission, merc_xp_to_next_level, mission_launch_cost,
+    outcome_mark_multiplier, prestige_fragment_hundredths, recruit_quality_distribution,
+    stormglass_reward, try_upgrade_guild_rank, xp_reward, GuildUpgradeError, MarkRewardParams,
     RecruitQuality,
 };
 
 // Layers re-exports
 #[allow(unused_imports)]
 pub use layers::{
-    apply_duration_modifiers,
-    apply_familiarity_gain,
-    base_mission_duration_secs,
-    build_infrastructure,
-    familiarity_gain,
-    infrastructure_build_cost,
-    is_frontier_layer,
-    is_safe_layer,
-    layer_power_thresholds,
-    mark_layer_cleared,
-    mission_power_threshold,
-    DurationModifiers,
-    FamiliarityLevel,
-    InfrastructureBuildError,
-    LayerPowerThresholds,
+    apply_duration_modifiers, apply_familiarity_gain, base_mission_duration_secs,
+    build_infrastructure, familiarity_gain, infrastructure_build_cost, is_frontier_layer,
+    is_safe_layer, layer_power_thresholds, mark_layer_cleared, mission_power_threshold,
+    DurationModifiers, FamiliarityLevel, InfrastructureBuildError, LayerPowerThresholds,
     MIN_MISSION_DURATION_SECS,
 };
 #[allow(unused_imports)]
 pub use mercenaries::{
-    InjurySeverity, MercQuality,
-    generate_mercenary, generate_recruit_pool, generate_starter_roster,
-    available_mercs, roster_has_capacity, purge_lost_mercs,
-    injure_merc, mark_merc_lost, tick_merc_injury,
-    roll_recruit_cost, roll_recruit_quality, recruit_pool_size,
-    stats_at_level, xp_to_next_level, apply_merc_xp,
-    generate_merc_name,
+    apply_merc_xp, available_mercs, generate_merc_name, generate_mercenary, generate_recruit_pool,
+    generate_starter_roster, injure_merc, mark_merc_lost, purge_lost_mercs, recruit_pool_size,
+    roll_recruit_cost, roll_recruit_quality, roster_has_capacity, stats_at_level, tick_merc_injury,
+    xp_to_next_level, InjurySeverity, MercQuality,
 };
 #[allow(unused_imports)]
 pub use persistence::{deep_save_path, load_deep, save_deep};
@@ -131,31 +105,15 @@ pub use persistence::{deep_save_path, load_deep, save_deep};
 // Events re-exports
 #[allow(unused_imports)]
 pub use events::{
-    event_trigger_points,
-    generate_mission_events,
-    resolve_event,
-    tick_mission_events,
-    AUTO_RESOLVE_TIMEOUT_HOURS,
-    EventCategory,
-    EventResolution,
-    EventTag,
-    EventTickResult,
+    event_trigger_points, generate_mission_events, resolve_event, tick_mission_events,
+    EventCategory, EventResolution, EventTag, EventTickResult, AUTO_RESOLVE_TIMEOUT_HOURS,
 };
 
 // Missions re-exports
 #[allow(unused_imports)]
 pub use missions::{
-    available_mission_count,
-    daily_supply_run_resets_at,
-    generate_mission_pool,
-    is_daily_supply_run_available,
-    resolve_mission,
-    resolve_offline_missions,
-    start_mission,
-    tick_all_missions,
-    tick_mission,
-    validate_squad_assignment,
-    MissionTickSummary,
-    OfflineResolutionSummary,
-    SquadAssignmentError,
+    available_mission_count, daily_supply_run_resets_at, generate_mission_pool,
+    is_daily_supply_run_available, resolve_mission, resolve_offline_missions, start_mission,
+    tick_all_missions, tick_mission, validate_squad_assignment, MissionTickSummary,
+    OfflineResolutionSummary, SquadAssignmentError,
 };

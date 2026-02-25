@@ -633,6 +633,11 @@ fn trigger_deep_discovery(deep: &mut DeepState, _prestige_rank: u32) -> &'static
             &mut rng,
         );
         deep.prestige.roster.extend(starters);
+        // Generate initial mission pool
+        deep.prestige.available_missions =
+            crate::deep::missions::generate_mission_pool(&deep.persistent, &mut rng);
+        // Seed starting Warband Marks so the player can afford first missions.
+        deep.prestige.warband_marks = 50;
     }
     "The Deep discovered!"
 }

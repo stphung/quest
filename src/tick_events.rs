@@ -18,6 +18,7 @@ pub struct TickEventFlags {
     pub haven_discovered: bool,
     pub soulforge_discovered: bool,
     pub stormglass_discovered: bool,
+    #[allow(dead_code)]
     pub deep_discovered: bool,
 }
 

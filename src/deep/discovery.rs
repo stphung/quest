@@ -24,18 +24,32 @@ pub fn try_discover_deep<R: Rng>(deep: &mut DeepState, prestige_rank: u32, rng: 
     }
 
     deep.persistent.discovered = true;
-    let starters =
-        generate_starter_roster(deep.persistent.guild_rank, || deep.persistent.next_merc_id(), rng);
+    let starters = generate_starter_roster(
+        deep.persistent.guild_rank,
+        || deep.persistent.next_merc_id(),
+        rng,
+    );
     deep.prestige.roster.extend(starters);
+    deep.prestige.available_missions =
+        super::missions::generate_mission_pool(&deep.persistent, rng);
+    // Seed starting Warband Marks — higher guild ranks get more to match increased costs.
+    deep.prestige.warband_marks = match deep.persistent.guild_rank.0 {
+        1 => 50,
+        2 => 100,
+        3 => 200,
+        4 => 350,
+        5 => 500,
+        _ => 50,
+    };
     true
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::types::{
         DeepState, MercArchetype, MercStatus, Mercenary, DEEP_MIN_PRESTIGE_RANK,
     };
+    use super::*;
     use rand::SeedableRng;
     use rand_chacha::ChaCha8Rng;
 
@@ -49,7 +63,11 @@ mod tests {
         let mut deep = DeepState::new();
 
         for _ in 0..10_000 {
-            assert!(!try_discover_deep(&mut deep, DEEP_MIN_PRESTIGE_RANK - 1, &mut rng));
+            assert!(!try_discover_deep(
+                &mut deep,
+                DEEP_MIN_PRESTIGE_RANK - 1,
+                &mut rng
+            ));
         }
         assert!(!deep.persistent.discovered);
     }
@@ -61,7 +79,11 @@ mod tests {
         deep.persistent.discovered = true;
 
         for _ in 0..1_000 {
-            assert!(!try_discover_deep(&mut deep, DEEP_MIN_PRESTIGE_RANK, &mut rng));
+            assert!(!try_discover_deep(
+                &mut deep,
+                DEEP_MIN_PRESTIGE_RANK,
+                &mut rng
+            ));
         }
     }
 

@@ -12,6 +12,7 @@ use crate::history::{HistoryRepo, SaveEvent};
 ///
 /// If a `save_event` and `history_repo` are both provided, a git commit is
 /// created after the JSON files are written.
+#[allow(clippy::too_many_arguments)]
 pub fn save_all(
     character_manager: &CharacterManager,
     state: &GameState,

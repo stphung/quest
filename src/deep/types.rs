@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Functions wired into the game loop incrementally
 //! The Deep — Mercenary Expedition System data structures.
 //!
 //! Two-tier persistence model:
@@ -32,11 +33,11 @@ pub const VOID_START_LAYER: u32 = 26;
 /// and the deepest layer that must be broken through to reach this rank.
 pub const GUILD_RANK_STATS: [(u32, u32, Option<u32>); 5] = [
     // (max_roster, concurrent_missions, required_breakthrough_layer)
-    (5, 1, None),     // Rank 1 – Freelancers  (discovery unlocks)
-    (7, 1, Some(3)),  // Rank 2 – Sellswords
-    (9, 2, Some(7)),  // Rank 3 – Company
-    (12, 3, Some(13)),// Rank 4 – Battalion
-    (15, 4, Some(19)),// Rank 5 – Legion
+    (5, 1, None),      // Rank 1 – Freelancers  (discovery unlocks)
+    (7, 2, Some(3)),   // Rank 2 – Sellswords
+    (9, 2, Some(7)),   // Rank 3 – Company
+    (12, 3, Some(13)), // Rank 4 – Battalion
+    (15, 4, Some(19)), // Rank 5 – Legion
 ];
 
 // ── Enums ─────────────────────────────────────────────────────────────────────
@@ -78,7 +79,7 @@ impl LayerTier {
 }
 
 /// Mercenary archetype — determines stat distribution and unlocks event options.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum MercArchetype {
     /// Frontline tank.  Primary: STR/CON.  Reduces squad casualties.
     Vanguard,
@@ -115,11 +116,11 @@ impl MercArchetype {
     /// Returns (power, resilience, expertise).
     pub fn base_stats(self) -> (u32, u32, u32) {
         match self {
-            MercArchetype::Vanguard  => (14, 12, 4), // high power + resilience
-            MercArchetype::Scout     => (8,  10, 12), // high expertise
-            MercArchetype::Arcanist  => (10, 6,  14), // highest expertise, fragile
-            MercArchetype::Medic     => (6,  14, 10), // highest resilience
-            MercArchetype::Saboteur  => (10, 8,  12), // balanced expertise
+            MercArchetype::Vanguard => (14, 12, 4), // high power + resilience
+            MercArchetype::Scout => (8, 10, 12),    // high expertise
+            MercArchetype::Arcanist => (10, 6, 14), // highest expertise, fragile
+            MercArchetype::Medic => (6, 14, 10),    // highest resilience
+            MercArchetype::Saboteur => (10, 8, 12), // balanced expertise
         }
     }
 }
@@ -176,11 +177,11 @@ impl MissionType {
     /// Nominal duration range in seconds (wall-clock).
     pub fn duration_range_secs(self) -> (u64, u64) {
         match self {
-            MissionType::SupplyRun => (2 * 3600, 4 * 3600),
-            MissionType::Recon => (4 * 3600, 8 * 3600),
-            MissionType::Expedition => (8 * 3600, 16 * 3600),
-            MissionType::Breakthrough => (18 * 3600, 24 * 3600),
-            MissionType::Construction(_) => (4 * 3600, 8 * 3600),
+            MissionType::SupplyRun => (1800, 10800),
+            MissionType::Recon => (3600, 21600),
+            MissionType::Expedition => (7200, 43200),
+            MissionType::Breakthrough => (14400, 86400),
+            MissionType::Construction(_) => (3600, 21600),
         }
     }
 
@@ -253,14 +254,12 @@ impl Infrastructure {
 
     pub fn description(self) -> &'static str {
         match self {
-            Infrastructure::Outpost =>
-                "Reduces mission duration on this layer by 25%.",
-            Infrastructure::SupplyCache =>
-                "Supply runs yield bonus Warband Marks and resources.",
-            Infrastructure::Watchtower =>
-                "Reveals more intel; improves auto-resolve outcomes.",
-            Infrastructure::Bridge =>
-                "Unlocks a shortcut; missions can skip this layer when pushing deeper.",
+            Infrastructure::Outpost => "Reduces mission duration on this layer by 25%.",
+            Infrastructure::SupplyCache => "Supply runs yield bonus Warband Marks and resources.",
+            Infrastructure::Watchtower => "Reveals more intel; improves auto-resolve outcomes.",
+            Infrastructure::Bridge => {
+                "Unlocks a shortcut; missions can skip this layer when pushing deeper."
+            }
         }
     }
 
@@ -777,9 +776,7 @@ impl DeepPrestige {
 
     /// Whether any active mission has a pending event needing player input.
     pub fn has_any_pending_event(&self) -> bool {
-        self.active_missions
-            .iter()
-            .any(|m| m.has_pending_event())
+        self.active_missions.iter().any(|m| m.has_pending_event())
     }
 
     /// Spend Warband Marks; returns false if insufficient.
@@ -849,6 +846,45 @@ pub enum DeepView {
     Recruit,
 }
 
+impl DeepView {
+    /// The navigable tabs in order. EventResponse is excluded — it's a contextual modal.
+    pub const TABS: &[DeepView] = &[
+        DeepView::Hub,
+        DeepView::NewMission,
+        DeepView::Roster,
+        DeepView::Infrastructure,
+        DeepView::Recruit,
+    ];
+
+    /// Short label for rendering in the tab bar.
+    pub fn tab_label(self) -> &'static str {
+        match self {
+            DeepView::Hub => "Hub",
+            DeepView::NewMission => "Missions",
+            DeepView::Roster => "Roster",
+            DeepView::Infrastructure => "Layers",
+            DeepView::EventResponse => "Event",
+            DeepView::Recruit => "Recruit",
+        }
+    }
+
+    /// Next tab in the TABS cycle. No-op for EventResponse.
+    pub fn next_tab(self) -> DeepView {
+        let Some(pos) = Self::TABS.iter().position(|&v| v == self) else {
+            return self;
+        };
+        Self::TABS[(pos + 1) % Self::TABS.len()]
+    }
+
+    /// Previous tab in the TABS cycle. No-op for EventResponse.
+    pub fn prev_tab(self) -> DeepView {
+        let Some(pos) = Self::TABS.iter().position(|&v| v == self) else {
+            return self;
+        };
+        Self::TABS[(pos + Self::TABS.len() - 1) % Self::TABS.len()]
+    }
+}
+
 /// Overlay state for The Deep UI (not serialized — pure runtime UI state).
 pub struct DeepUiState {
     pub open: bool,
@@ -863,6 +899,18 @@ pub struct DeepUiState {
     pub staging_mission_index: Option<usize>,
     /// Currently selected mercs for the staged mission.
     pub staged_squad: Vec<u64>,
+    /// Transient error/info message shown in the footer area. Cleared on next action.
+    pub flash_message: Option<String>,
+    /// Per-session visit counters for progressive disclosure hints.
+    /// Hints fade after N visits (e.g., 3-5). Resets on game restart.
+    pub hub_visit_count: u8,
+    pub mission_visit_count: u8,
+    pub roster_visit_count: u8,
+    pub layer_visit_count: u8,
+    pub event_visit_count: u8,
+    pub recruit_visit_count: u8,
+    /// Whether [?] help reference panel is shown.
+    pub show_help: bool,
 }
 
 impl DeepUiState {
@@ -875,6 +923,14 @@ impl DeepUiState {
             event_choice_index: 0,
             staging_mission_index: None,
             staged_squad: Vec::new(),
+            flash_message: None,
+            hub_visit_count: 0,
+            mission_visit_count: 0,
+            roster_visit_count: 0,
+            layer_visit_count: 0,
+            event_visit_count: 0,
+            recruit_visit_count: 0,
+            show_help: false,
         }
     }
 
@@ -886,6 +942,9 @@ impl DeepUiState {
         self.event_choice_index = 0;
         self.staging_mission_index = None;
         self.staged_squad.clear();
+        self.flash_message = None;
+        self.hub_visit_count = self.hub_visit_count.saturating_add(1);
+        self.show_help = false;
     }
 
     pub fn close(&mut self) {
@@ -896,6 +955,8 @@ impl DeepUiState {
         self.event_choice_index = 0;
         self.staging_mission_index = None;
         self.staged_squad.clear();
+        self.flash_message = None;
+        self.show_help = false;
     }
 }
 
@@ -964,7 +1025,7 @@ mod tests {
     #[test]
     fn test_guild_rank_concurrent_missions() {
         assert_eq!(GuildRank(1).concurrent_missions(), 1);
-        assert_eq!(GuildRank(2).concurrent_missions(), 1);
+        assert_eq!(GuildRank(2).concurrent_missions(), 2);
         assert_eq!(GuildRank(3).concurrent_missions(), 2);
         assert_eq!(GuildRank(4).concurrent_missions(), 3);
         assert_eq!(GuildRank(5).concurrent_missions(), 4);
@@ -1014,7 +1075,10 @@ mod tests {
     #[test]
     fn test_mission_type_risk_tiers() {
         assert_eq!(MissionType::SupplyRun.risk_tier(), 0);
-        assert_eq!(MissionType::Construction(Infrastructure::Outpost).risk_tier(), 0);
+        assert_eq!(
+            MissionType::Construction(Infrastructure::Outpost).risk_tier(),
+            0
+        );
         assert_eq!(MissionType::Recon.risk_tier(), 1);
         assert_eq!(MissionType::Expedition.risk_tier(), 2);
         assert_eq!(MissionType::Breakthrough.risk_tier(), 3);
@@ -1022,12 +1086,12 @@ mod tests {
 
     #[test]
     fn test_mission_type_duration_ranges_are_ordered() {
-        // Each successive risk tier should have longer durations.
-        let supply_max = MissionType::SupplyRun.duration_range_secs().1;
+        // Minimum durations should increase with risk tier (ranges may overlap).
+        let supply_min = MissionType::SupplyRun.duration_range_secs().0;
         let recon_min = MissionType::Recon.duration_range_secs().0;
         let expedition_min = MissionType::Expedition.duration_range_secs().0;
         let breakthrough_min = MissionType::Breakthrough.duration_range_secs().0;
-        assert!(supply_max <= recon_min);
+        assert!(supply_min < recon_min);
         assert!(recon_min < expedition_min);
         assert!(expedition_min < breakthrough_min);
     }
@@ -1035,7 +1099,10 @@ mod tests {
     #[test]
     fn test_mission_type_max_events() {
         assert_eq!(MissionType::SupplyRun.max_events(), 0);
-        assert_eq!(MissionType::Construction(Infrastructure::Bridge).max_events(), 0);
+        assert_eq!(
+            MissionType::Construction(Infrastructure::Bridge).max_events(),
+            0
+        );
         assert_eq!(MissionType::Recon.max_events(), 1);
         assert_eq!(MissionType::Expedition.max_events(), 2);
         assert_eq!(MissionType::Breakthrough.max_events(), 5);
@@ -1255,14 +1322,22 @@ mod tests {
             status: MercStatus::Available,
         };
         assert!(base.is_available());
-        let on_mission = Mercenary { status: MercStatus::OnMission(42), ..base.clone() };
+        let on_mission = Mercenary {
+            status: MercStatus::OnMission(42),
+            ..base.clone()
+        };
         assert!(!on_mission.is_available());
         let injured = Mercenary {
-            status: MercStatus::Injured { missions_remaining: 2 },
+            status: MercStatus::Injured {
+                missions_remaining: 2,
+            },
             ..base.clone()
         };
         assert!(!injured.is_available());
-        let lost = Mercenary { status: MercStatus::Lost, ..base };
+        let lost = Mercenary {
+            status: MercStatus::Lost,
+            ..base
+        };
         assert!(!lost.is_available());
     }
 
