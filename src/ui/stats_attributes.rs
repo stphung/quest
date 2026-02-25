@@ -39,13 +39,13 @@ pub(super) fn draw_attributes_compact(
     game_state: &GameState,
 ) {
     let cap = game_state.get_attribute_cap();
-    let attrs_block = Block::default()
-        .borders(Borders::ALL)
-        .title(format!(" Attributes ({}) ", cap));
+    let attrs_block = Block::default().borders(Borders::ALL).title(" Attributes ");
     let attrs_block = super::themed_block(attrs_block);
     let inner = attrs_block.inner(area);
     frame.render_widget(attrs_block, area);
     super::apply_themed_border_fx(frame, area, Color::White, super::BorderFxContext);
+
+    let gold = Color::Rgb(255, 215, 0);
 
     // Pair attributes: STR/INT, DEX/WIS, CON/CHA
     let pairs = [
@@ -61,8 +61,16 @@ pub(super) fn draw_attributes_compact(
         let r_val = game_state.attributes.get(*right);
         let r_mod = game_state.attributes.modifier(*right);
 
-        let l_color = attr_color(*left);
-        let r_color = attr_color(*right);
+        let l_color = if l_val >= cap {
+            gold
+        } else {
+            attr_color(*left)
+        };
+        let r_color = if r_val >= cap {
+            gold
+        } else {
+            attr_color(*right)
+        };
 
         let l_mod_str = format_modifier(l_mod);
         let r_mod_str = format_modifier(r_mod);
@@ -72,13 +80,13 @@ pub(super) fn draw_attributes_compact(
                 format!("{}: ", left.abbrev()),
                 Style::default().add_modifier(Modifier::BOLD),
             ),
-            Span::styled(format!("{:2}", l_val), Style::default().fg(l_color)),
+            Span::styled(format!("{}/{}", l_val, cap), Style::default().fg(l_color)),
             Span::raw(format!(" ({:>3})  ", l_mod_str)),
             Span::styled(
                 format!("{}: ", right.abbrev()),
                 Style::default().add_modifier(Modifier::BOLD),
             ),
-            Span::styled(format!("{:2}", r_val), Style::default().fg(r_color)),
+            Span::styled(format!("{}/{}", r_val, cap), Style::default().fg(r_color)),
             Span::raw(format!(" ({:>3})", r_mod_str)),
         ]));
     }

@@ -35,9 +35,10 @@ pub fn draw_stats_panel(
             let etched = game_state.storm_sigils.etched_count();
             let mut constraints = vec![
                 Constraint::Length(4), // Header
-                Constraint::Length(5), // Prestige
+                Constraint::Length(6), // Prestige (4 inner + 2 border)
                 Constraint::Length(4), // Fishing
                 Constraint::Length(5), // Attributes
+                Constraint::Length(4), // Combat stats
             ];
             if etched > 0 {
                 constraints.push(Constraint::Length(etched as u16 + 2)); // Sigils
@@ -57,6 +58,8 @@ pub fn draw_stats_panel(
             draw_fishing_panel(frame, chunks[idx], game_state, achievements);
             idx += 1;
             draw_attributes_compact(frame, chunks[idx], game_state);
+            idx += 1;
+            draw_combat_stats(frame, chunks[idx], game_state);
             idx += 1;
             if etched > 0 {
                 draw_sigils_panel(frame, chunks[idx], &game_state.storm_sigils);
@@ -164,6 +167,88 @@ fn draw_header(
     } else if inner.height == 1 {
         let header_paragraph = Paragraph::new(header_text);
         frame.render_widget(header_paragraph, inner);
+    }
+}
+
+/// Draws derived combat stats (HP, damage, defense, crit, speed).
+fn draw_combat_stats(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    let block = Block::default().borders(Borders::ALL).title(" Combat ");
+    let block = super::themed_block(block);
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+    super::apply_themed_border_fx(frame, area, Color::White, super::BorderFxContext);
+
+    let ds = &game_state.cached_derived_stats;
+    let pb = &game_state.cached_prestige_bonuses;
+
+    let total_hp = ds.max_hp + pb.flat_hp;
+    let total_dmg = ds.total_damage() + pb.flat_damage;
+    let total_def = ds.defense + pb.flat_defense;
+    let total_crit = ((ds.crit_chance_percent as f64 + pb.crit_chance).min(100.0)) as u32;
+    let crit_mult = ds.crit_multiplier;
+    let atk_speed = ds.attack_speed_multiplier;
+
+    let line1 = Line::from(vec![
+        Span::styled(
+            "\u{2764} HP: ",
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(format!("{}", total_hp), Style::default().fg(Color::White)),
+        Span::raw("    "),
+        Span::styled(
+            "\u{2694} DMG: ",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(format!("{}", total_dmg), Style::default().fg(Color::White)),
+        Span::raw("    "),
+        Span::styled(
+            "\u{1f6e1} DEF: ",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(format!("{}", total_def), Style::default().fg(Color::White)),
+    ]);
+
+    let line2 = Line::from(vec![
+        Span::styled(
+            "\u{2726} Crit: ",
+            Style::default()
+                .fg(Color::Magenta)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!("{}%", total_crit),
+            Style::default().fg(Color::White),
+        ),
+        Span::styled(
+            format!(" ({:.1}x)", crit_mult),
+            Style::default().fg(Color::DarkGray),
+        ),
+        Span::raw("   "),
+        Span::styled(
+            "\u{26A1} Spd: ",
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!("{:.1}x", atk_speed),
+            Style::default().fg(Color::White),
+        ),
+    ]);
+
+    if inner.height >= 2 {
+        let inner_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(1), Constraint::Length(1)])
+            .split(inner);
+        frame.render_widget(Paragraph::new(line1), inner_chunks[0]);
+        frame.render_widget(Paragraph::new(line2), inner_chunks[1]);
+    } else if inner.height >= 1 {
+        frame.render_widget(Paragraph::new(line1), inner);
     }
 }
 
