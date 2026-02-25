@@ -61,6 +61,8 @@ pub enum BrowserMode {
     UpdatingToken,
     /// Divergence detected — player must choose resolution.
     DivergenceResolution,
+    /// GitHub submenu — Push, Pull, Repo, Token, Unlink.
+    GitHubMenu,
 }
 
 /// Context about the source commit when forking a new branch.
@@ -103,6 +105,8 @@ pub struct TimeVaultState {
     pub cloud_divergence: Option<crate::history::cloud::BranchDivergence>,
     /// Name of the currently linked repo (for highlighting in the picker).
     pub cloud_current_repo: Option<String>,
+    /// Selected item in the GitHub submenu (0=Push, 1=Pull, 2=Repo, 3=Token, 4=Unlink).
+    pub github_menu_selected: usize,
 }
 
 impl TimeVaultState {
@@ -130,6 +134,7 @@ impl TimeVaultState {
             cloud_new_repo_private: true,
             cloud_divergence: None,
             cloud_current_repo: None,
+            github_menu_selected: 0,
         }
     }
 
@@ -551,6 +556,7 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
             | BrowserMode::SelectingRepo
             | BrowserMode::UpdatingToken
             | BrowserMode::DivergenceResolution
+            | BrowserMode::GitHubMenu
     );
     let base_w = if is_fork || is_cloud_wide {
         56usize
@@ -593,6 +599,7 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
             (content + 3).min(24)
         }
         BrowserMode::ConfirmPush | BrowserMode::ConfirmPull | BrowserMode::ConfirmUnlink => 7,
+        BrowserMode::GitHubMenu => 10,
         BrowserMode::DivergenceResolution => 12,
         BrowserMode::Browse => return,
     }
@@ -1048,6 +1055,20 @@ fn paint_confirm_dialog(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
             put_text(buffer, cy + 8, cx, "[Esc]", Color::Cyan);
             put_text(buffer, cy + 8, cx + 6, "Cancel", Color::DarkGray);
         }
+        BrowserMode::GitHubMenu => {
+            put_text(buffer, cy, cx, "GitHub", Color::White);
+
+            let items = ["Push", "Pull", "Change Repo", "Update Token", "Unlink"];
+            for (i, label) in items.iter().enumerate() {
+                let row = cy + 2 + i as i32;
+                if i == state.github_menu_selected {
+                    put_text(buffer, row, cx, "\u{25b6}", Color::Cyan);
+                    put_text(buffer, row, cx + 3, label, Color::White);
+                } else {
+                    put_text(buffer, row, cx + 3, label, Color::DarkGray);
+                }
+            }
+        }
         BrowserMode::Browse => {}
     }
 }
@@ -1066,15 +1087,20 @@ fn paint_cloud_status(buffer: &mut [Vec<SceneCell>], state: &TimeVaultState) {
         CloudStatus::Offline => ("\u{2298} offline".to_string(), Color::DarkGray),
         CloudStatus::Linked => {
             let label = match (&state.cloud_username, &state.cloud_current_repo) {
-                (Some(user), Some(repo)) => format!("\u{2601} {user}/{repo}"),
-                (Some(user), None) => format!("\u{2601} {user}"),
-                _ => "\u{2601} linked".to_string(),
+                (Some(user), Some(repo)) => format!("\u{2601} synced @ {user}/{repo}"),
+                (Some(user), None) => format!("\u{2601} synced @ {user}"),
+                _ => "\u{2601} synced".to_string(),
             };
             (label, Color::Cyan)
         }
         CloudStatus::Syncing => {
             let spinner = super::throbber::spinner_char();
-            (format!("{spinner} syncing..."), Color::Cyan)
+            let label = match (&state.cloud_username, &state.cloud_current_repo) {
+                (Some(user), Some(repo)) => format!("{spinner} syncing @ {user}/{repo}"),
+                (Some(user), None) => format!("{spinner} syncing @ {user}"),
+                _ => format!("{spinner} syncing..."),
+            };
+            (label, Color::Cyan)
         }
         CloudStatus::OutOfSync => ("\u{2601} \u{26a0} out of sync".to_string(), Color::Yellow),
         CloudStatus::TokenExpired => ("\u{2601} \u{2717} token expired".to_string(), Color::Red),
@@ -1104,7 +1130,8 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
         | BrowserMode::ConfirmPush
         | BrowserMode::ConfirmPull
         | BrowserMode::ConfirmUnlink
-        | BrowserMode::DivergenceResolution => return,
+        | BrowserMode::DivergenceResolution
+        | BrowserMode::GitHubMenu => return,
         BrowserMode::Browse => {
             let dot = Span::styled("  \u{00b7}  ", Style::default().fg(Color::Rgb(40, 80, 120)));
             match state.focus {
@@ -1138,36 +1165,9 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
                             | CloudStatus::TokenExpired
                             | CloudStatus::Error(_) => {
                                 spans.push(dot.clone());
-                                spans.push(Span::styled("[C] ", Style::default().fg(Color::Cyan)));
+                                spans.push(Span::styled("[G] ", Style::default().fg(Color::Cyan)));
                                 spans.push(Span::styled(
-                                    "Push",
-                                    Style::default().fg(Color::DarkGray),
-                                ));
-                                spans.push(Span::styled(
-                                    " \u{00b7} ",
-                                    Style::default().fg(Color::Rgb(40, 80, 120)),
-                                ));
-                                spans.push(Span::styled("[V] ", Style::default().fg(Color::Cyan)));
-                                spans.push(Span::styled(
-                                    "Pull",
-                                    Style::default().fg(Color::DarkGray),
-                                ));
-                                spans.push(Span::styled(
-                                    " \u{00b7} ",
-                                    Style::default().fg(Color::Rgb(40, 80, 120)),
-                                ));
-                                spans.push(Span::styled("[R] ", Style::default().fg(Color::Cyan)));
-                                spans.push(Span::styled(
-                                    "Repo",
-                                    Style::default().fg(Color::DarkGray),
-                                ));
-                                spans.push(Span::styled(
-                                    " \u{00b7} ",
-                                    Style::default().fg(Color::Rgb(40, 80, 120)),
-                                ));
-                                spans.push(Span::styled("[P] ", Style::default().fg(Color::Cyan)));
-                                spans.push(Span::styled(
-                                    "Token",
+                                    "GitHub",
                                     Style::default().fg(Color::DarkGray),
                                 ));
                             }

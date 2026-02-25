@@ -166,14 +166,20 @@ impl CharacterSelectScreen {
         f.render_widget(paragraph, inner);
     }
 
-    pub fn move_up(&mut self, characters: &[CharacterInfo]) {
-        if !characters.is_empty() && self.selected_index > 0 {
+    pub fn move_up(&mut self, _characters: &[CharacterInfo]) {
+        if self.selected_index > 0 {
             self.selected_index -= 1;
         }
     }
 
     pub fn move_down(&mut self, characters: &[CharacterInfo]) {
-        if !characters.is_empty() && self.selected_index < characters.len() - 1 {
+        // Allow selecting up to characters.len() when < 3 (the "+ Create" slot)
+        let max_index = if characters.len() < 3 {
+            characters.len()
+        } else {
+            characters.len() - 1
+        };
+        if self.selected_index < max_index {
             self.selected_index += 1;
         }
     }
