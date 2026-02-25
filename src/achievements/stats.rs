@@ -42,6 +42,22 @@ impl Achievements {
         (self.unlocked_count() as f32 / total as f32) * 100.0
     }
 
+    /// Get the total achievement score (sum of points for unlocked achievements).
+    pub fn achievement_score(&self) -> u32 {
+        use super::data::ALL_ACHIEVEMENTS;
+        ALL_ACHIEVEMENTS
+            .iter()
+            .filter(|a| self.is_unlocked(a.id))
+            .map(|a| a.points)
+            .sum()
+    }
+
+    /// Get the maximum possible achievement score (sum of all achievement points).
+    pub fn max_achievement_score() -> u32 {
+        use super::data::ALL_ACHIEVEMENTS;
+        ALL_ACHIEVEMENTS.iter().map(|a| a.points).sum()
+    }
+
     /// Get count of unlocked/total by category.
     pub fn count_by_category(&self, category: AchievementCategory) -> (usize, usize) {
         use super::data::ALL_ACHIEVEMENTS;

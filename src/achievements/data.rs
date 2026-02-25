@@ -13,6 +13,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 100 enemies",
         category: AchievementCategory::Combat,
         icon: "\u{1f5e1}\u{fe0f}",
+        points: 5,
     },
     AchievementDef {
         id: AchievementId::SlayerII,
@@ -20,6 +21,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 500 enemies",
         category: AchievementCategory::Combat,
         icon: "\u{2694}\u{fe0f}",
+        points: 5,
     },
     AchievementDef {
         id: AchievementId::SlayerIII,
@@ -27,6 +29,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 1,000 enemies",
         category: AchievementCategory::Combat,
         icon: "\u{1f3f9}",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::SlayerIV,
@@ -34,6 +37,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 5,000 enemies",
         category: AchievementCategory::Combat,
         icon: "\u{1f6e1}\u{fe0f}",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::SlayerV,
@@ -41,6 +45,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 10,000 enemies",
         category: AchievementCategory::Combat,
         icon: "\u{1f480}",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::SlayerVI,
@@ -48,6 +53,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 50,000 enemies",
         category: AchievementCategory::Combat,
         icon: "\u{2620}\u{fe0f}",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::SlayerVII,
@@ -55,6 +61,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 100,000 enemies",
         category: AchievementCategory::Combat,
         icon: "\u{1f525}",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::SlayerVIII,
@@ -62,6 +69,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 500,000 enemies",
         category: AchievementCategory::Combat,
         icon: "\u{26a1}",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::SlayerIX,
@@ -69,6 +77,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 1,000,000 enemies",
         category: AchievementCategory::Combat,
         icon: "\u{1f48e}",
+        points: 100,
     },
     AchievementDef {
         id: AchievementId::SlayerX,
@@ -76,6 +85,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 2,500,000 enemies",
         category: AchievementCategory::Combat,
         icon: "\u{269c}\u{fe0f}",
+        points: 100,
     },
     AchievementDef {
         id: AchievementId::SlayerXI,
@@ -83,6 +93,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 10,000,000 enemies",
         category: AchievementCategory::Combat,
         icon: "\u{1f531}",
+        points: 250,
     },
     AchievementDef {
         id: AchievementId::SlayerXII,
@@ -90,6 +101,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 50,000,000 enemies",
         category: AchievementCategory::Combat,
         icon: "\u{1f409}",
+        points: 250,
     },
     AchievementDef {
         id: AchievementId::SlayerXIII,
@@ -97,6 +109,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 100,000,000 enemies - The battlefield trembles at your approach",
         category: AchievementCategory::Combat,
         icon: "\u{1f451}",
+        points: 500,
     },
     AchievementDef {
         id: AchievementId::SlayerXIV,
@@ -104,6 +117,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 500,000,000 enemies - Even death takes note of your work",
         category: AchievementCategory::Combat,
         icon: "\u{1f31f}",
+        points: 500,
     },
     AchievementDef {
         id: AchievementId::SlayerXV,
@@ -111,6 +125,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 1,000,000,000 enemies - You are the silence between heartbeats",
         category: AchievementCategory::Combat,
         icon: "\u{267e}\u{fe0f}",
+        points: 500,
     },
     // ═══════════════════════════════════════════════════════════════
     // COMBAT ACHIEVEMENTS - BOSS KILLS
@@ -121,6 +136,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat your first boss",
         category: AchievementCategory::Combat,
         icon: "\u{1fa93}",
+        points: 5,
     },
     AchievementDef {
         id: AchievementId::BossHunterII,
@@ -128,6 +144,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 10 bosses",
         category: AchievementCategory::Combat,
         icon: "\u{1f5e1}\u{fe0f}",
+        points: 5,
     },
     AchievementDef {
         id: AchievementId::BossHunterIII,
@@ -135,6 +152,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 50 bosses",
         category: AchievementCategory::Combat,
         icon: "\u{2694}\u{fe0f}",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::BossHunterIV,
@@ -142,6 +160,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 100 bosses",
         category: AchievementCategory::Combat,
         icon: "\u{1f6e1}\u{fe0f}",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::BossHunterV,
@@ -149,6 +168,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 500 bosses",
         category: AchievementCategory::Combat,
         icon: "\u{1f480}",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::BossHunterVI,
@@ -156,6 +176,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 1,000 bosses",
         category: AchievementCategory::Combat,
         icon: "\u{1f479}",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::BossHunterVII,
@@ -163,6 +184,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 5,000 bosses",
         category: AchievementCategory::Combat,
         icon: "\u{1f47f}",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::BossHunterVIII,
@@ -170,6 +192,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 10,000 bosses",
         category: AchievementCategory::Combat,
         icon: "\u{1f608}",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::BossHunterIX,
@@ -177,6 +200,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 25,000 bosses",
         category: AchievementCategory::Combat,
         icon: "\u{2620}\u{fe0f}",
+        points: 100,
     },
     AchievementDef {
         id: AchievementId::BossHunterX,
@@ -184,6 +208,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 75,000 bosses",
         category: AchievementCategory::Combat,
         icon: "\u{1f525}",
+        points: 100,
     },
     AchievementDef {
         id: AchievementId::BossHunterXI,
@@ -191,6 +216,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 250,000 bosses",
         category: AchievementCategory::Combat,
         icon: "\u{1f409}",
+        points: 250,
     },
     AchievementDef {
         id: AchievementId::BossHunterXII,
@@ -198,6 +224,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 750,000 bosses",
         category: AchievementCategory::Combat,
         icon: "\u{269c}\u{fe0f}",
+        points: 250,
     },
     AchievementDef {
         id: AchievementId::BossHunterXIII,
@@ -205,6 +232,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 2,500,000 bosses - Even gods kneel before you",
         category: AchievementCategory::Combat,
         icon: "\u{1f531}",
+        points: 500,
     },
     AchievementDef {
         id: AchievementId::BossHunterXIV,
@@ -212,6 +240,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 5,000,000 bosses - Worlds are born and die by your hand",
         category: AchievementCategory::Combat,
         icon: "\u{1fa78}",
+        points: 500,
     },
     AchievementDef {
         id: AchievementId::BossHunterXV,
@@ -219,6 +248,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat 10,000,000 bosses - Beyond power. Beyond reckoning. Beyond all.",
         category: AchievementCategory::Combat,
         icon: "\u{1f451}",
+        points: 500,
     },
     // ═══════════════════════════════════════════════════════════════
     // LEVEL ACHIEVEMENTS
@@ -229,6 +259,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach level 10",
         category: AchievementCategory::Level,
         icon: "\u{1f949}",
+        points: 5,
     },
     AchievementDef {
         id: AchievementId::Level25,
@@ -236,6 +267,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach level 25",
         category: AchievementCategory::Level,
         icon: "\u{1f948}",
+        points: 5,
     },
     AchievementDef {
         id: AchievementId::Level50,
@@ -243,6 +275,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach level 50",
         category: AchievementCategory::Level,
         icon: "\u{1f947}",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::Level100,
@@ -250,6 +283,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach level 100",
         category: AchievementCategory::Level,
         icon: "\u{1f48e}",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::Level150,
@@ -257,6 +291,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach level 150",
         category: AchievementCategory::Level,
         icon: "\u{1f4a0}",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::Level200,
@@ -264,6 +299,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach level 200",
         category: AchievementCategory::Level,
         icon: "\u{2764}\u{fe0f}",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::Level250,
@@ -271,6 +307,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach level 250",
         category: AchievementCategory::Level,
         icon: "\u{1f499}",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::Level500,
@@ -278,6 +315,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach level 500",
         category: AchievementCategory::Level,
         icon: "\u{1f49a}",
+        points: 100,
     },
     AchievementDef {
         id: AchievementId::Level750,
@@ -285,6 +323,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach level 750",
         category: AchievementCategory::Level,
         icon: "\u{1f5a4}",
+        points: 100,
     },
     AchievementDef {
         id: AchievementId::Level1000,
@@ -292,6 +331,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach level 1000",
         category: AchievementCategory::Level,
         icon: "\u{1f49c}",
+        points: 250,
     },
     AchievementDef {
         id: AchievementId::Level1500,
@@ -299,6 +339,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach level 1500 - The universe bends to your will",
         category: AchievementCategory::Level,
         icon: "\u{267e}\u{fe0f}",
+        points: 500,
     },
     // ═══════════════════════════════════════════════════════════════
     // PRESTIGE ACHIEVEMENTS
@@ -309,6 +350,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Prestige for the first time",
         category: AchievementCategory::Level,
         icon: "🔄",
+        points: 5,
     },
     AchievementDef {
         id: AchievementId::PrestigeV,
@@ -316,6 +358,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach Prestige Rank 5",
         category: AchievementCategory::Level,
         icon: "🥉",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::PrestigeX,
@@ -323,6 +366,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach Prestige Rank 10",
         category: AchievementCategory::Level,
         icon: "🥈",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::PrestigeXV,
@@ -330,6 +374,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach Prestige Rank 15",
         category: AchievementCategory::Level,
         icon: "🥇",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::PrestigeXX,
@@ -337,6 +382,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach Prestige Rank 20",
         category: AchievementCategory::Level,
         icon: "💎",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::PrestigeXXV,
@@ -344,6 +390,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach Prestige Rank 25",
         category: AchievementCategory::Level,
         icon: "💠",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::PrestigeXXX,
@@ -351,6 +398,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach Prestige Rank 30",
         category: AchievementCategory::Level,
         icon: "❤️",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::PrestigeXL,
@@ -358,6 +406,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach Prestige Rank 40",
         category: AchievementCategory::Level,
         icon: "💙",
+        points: 100,
     },
     AchievementDef {
         id: AchievementId::PrestigeL,
@@ -365,6 +414,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach Prestige Rank 50",
         category: AchievementCategory::Level,
         icon: "💚",
+        points: 100,
     },
     AchievementDef {
         id: AchievementId::PrestigeLXX,
@@ -372,6 +422,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach Prestige Rank 70",
         category: AchievementCategory::Level,
         icon: "🖤",
+        points: 250,
     },
     AchievementDef {
         id: AchievementId::PrestigeXC,
@@ -379,6 +430,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach Prestige Rank 90",
         category: AchievementCategory::Level,
         icon: "💜",
+        points: 250,
     },
     AchievementDef {
         id: AchievementId::Eternal,
@@ -386,6 +438,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach Prestige Rank 100 - Your legend echoes through eternity",
         category: AchievementCategory::Level,
         icon: "♾️",
+        points: 500,
     },
     // Zone completion achievements (one per zone)
     AchievementDef {
@@ -394,6 +447,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Clear Zone 1: Meadow",
         category: AchievementCategory::Progression,
         icon: "🌻",
+        points: 5,
     },
     AchievementDef {
         id: AchievementId::Zone2Complete,
@@ -401,6 +455,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Clear Zone 2: Dark Forest",
         category: AchievementCategory::Progression,
         icon: "🌲",
+        points: 5,
     },
     AchievementDef {
         id: AchievementId::Zone3Complete,
@@ -408,6 +463,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Clear Zone 3: Mountain Pass",
         category: AchievementCategory::Progression,
         icon: "🏔️",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::Zone4Complete,
@@ -415,6 +471,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Clear Zone 4: Ancient Ruins",
         category: AchievementCategory::Progression,
         icon: "🏛️",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::Zone5Complete,
@@ -422,6 +479,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Clear Zone 5: Volcanic Wastes",
         category: AchievementCategory::Progression,
         icon: "🌋",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::Zone6Complete,
@@ -429,6 +487,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Clear Zone 6: Frozen Tundra",
         category: AchievementCategory::Progression,
         icon: "❄️",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::Zone7Complete,
@@ -436,6 +495,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Clear Zone 7: Crystal Caverns",
         category: AchievementCategory::Progression,
         icon: "💎",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::Zone8Complete,
@@ -443,6 +503,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Clear Zone 8: Sunken Kingdom",
         category: AchievementCategory::Progression,
         icon: "🌊",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::Zone9Complete,
@@ -450,6 +511,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Clear Zone 9: Floating Isles",
         category: AchievementCategory::Progression,
         icon: "☁️",
+        points: 100,
     },
     AchievementDef {
         id: AchievementId::Zone10Complete,
@@ -457,6 +519,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Clear Zone 10: Storm Citadel",
         category: AchievementCategory::Progression,
         icon: "⛈️",
+        points: 100,
     },
     AchievementDef {
         id: AchievementId::TheStormbreaker,
@@ -464,6 +527,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Forge the legendary Stormbreaker at the Haven forge",
         category: AchievementCategory::Progression,
         icon: "⚡",
+        points: 250,
     },
     AchievementDef {
         id: AchievementId::StormsEnd,
@@ -471,6 +535,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Defeat the final boss of Zone 10: Storm Citadel",
         category: AchievementCategory::Progression,
         icon: "🏆",
+        points: 250,
     },
     // The Expanse achievement
     AchievementDef {
@@ -479,6 +544,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Complete a cycle of The Expanse \u{2014} there is nothing left to conquer, only endlessness",
         category: AchievementCategory::Progression,
         icon: "\u{267e}\u{fe0f}",
+        points: 500,
     },
     // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - CHESS
@@ -489,6 +555,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win chess on Novice difficulty",
         category: AchievementCategory::Challenges,
         icon: "♟️",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::ChessApprentice,
@@ -496,6 +563,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win chess on Apprentice difficulty",
         category: AchievementCategory::Challenges,
         icon: "♟️",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::ChessJourneyman,
@@ -503,6 +571,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win chess on Journeyman difficulty",
         category: AchievementCategory::Challenges,
         icon: "♟️",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::ChessMaster,
@@ -510,6 +579,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win chess on Master difficulty",
         category: AchievementCategory::Challenges,
         icon: "♛",
+        points: 250,
     },
     // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - MORRIS
@@ -520,6 +590,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Morris on Novice difficulty",
         category: AchievementCategory::Challenges,
         icon: "⚪",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::MorrisApprentice,
@@ -527,6 +598,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Morris on Apprentice difficulty",
         category: AchievementCategory::Challenges,
         icon: "⚪",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::MorrisJourneyman,
@@ -534,6 +606,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Morris on Journeyman difficulty",
         category: AchievementCategory::Challenges,
         icon: "⚪",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::MorrisMaster,
@@ -541,6 +614,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Morris on Master difficulty",
         category: AchievementCategory::Challenges,
         icon: "⚪",
+        points: 100,
     },
     // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - GOMOKU
@@ -551,6 +625,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Gomoku on Novice difficulty",
         category: AchievementCategory::Challenges,
         icon: "⚫",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::GomokuApprentice,
@@ -558,6 +633,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Gomoku on Apprentice difficulty",
         category: AchievementCategory::Challenges,
         icon: "⚫",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::GomokuJourneyman,
@@ -565,6 +641,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Gomoku on Journeyman difficulty",
         category: AchievementCategory::Challenges,
         icon: "⚫",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::GomokuMaster,
@@ -572,6 +649,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Gomoku on Master difficulty",
         category: AchievementCategory::Challenges,
         icon: "⚫",
+        points: 100,
     },
     // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - MINESWEEPER
@@ -582,6 +660,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Minesweeper on Novice difficulty",
         category: AchievementCategory::Challenges,
         icon: "💣",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::MinesweeperApprentice,
@@ -589,6 +668,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Minesweeper on Apprentice difficulty",
         category: AchievementCategory::Challenges,
         icon: "💣",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::MinesweeperJourneyman,
@@ -596,6 +676,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Minesweeper on Journeyman difficulty",
         category: AchievementCategory::Challenges,
         icon: "💣",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::MinesweeperMaster,
@@ -603,6 +684,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Minesweeper on Master difficulty",
         category: AchievementCategory::Challenges,
         icon: "💣",
+        points: 100,
     },
     // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - RUNE
@@ -613,6 +695,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Rune on Novice difficulty",
         category: AchievementCategory::Challenges,
         icon: "🔮",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::RuneApprentice,
@@ -620,6 +703,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Rune on Apprentice difficulty",
         category: AchievementCategory::Challenges,
         icon: "🔮",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::RuneJourneyman,
@@ -627,6 +711,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Rune on Journeyman difficulty",
         category: AchievementCategory::Challenges,
         icon: "🔮",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::RuneMaster,
@@ -634,6 +719,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Rune on Master difficulty",
         category: AchievementCategory::Challenges,
         icon: "🔮",
+        points: 100,
     },
     // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - GO
@@ -644,6 +730,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Go on Novice difficulty",
         category: AchievementCategory::Challenges,
         icon: "🟤",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::GoApprentice,
@@ -651,6 +738,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Go on Apprentice difficulty",
         category: AchievementCategory::Challenges,
         icon: "🟤",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::GoJourneyman,
@@ -658,6 +746,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Go on Journeyman difficulty",
         category: AchievementCategory::Challenges,
         icon: "🟤",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::GoMaster,
@@ -665,6 +754,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Go on Master difficulty",
         category: AchievementCategory::Challenges,
         icon: "🟤",
+        points: 250,
     },
     // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - FLAPPY BIRD
@@ -675,6 +765,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Skyward Gauntlet on Novice difficulty",
         category: AchievementCategory::Challenges,
         icon: "◆",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::FlappyApprentice,
@@ -682,6 +773,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Skyward Gauntlet on Apprentice difficulty",
         category: AchievementCategory::Challenges,
         icon: "◆",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::FlappyJourneyman,
@@ -689,6 +781,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Skyward Gauntlet on Journeyman difficulty",
         category: AchievementCategory::Challenges,
         icon: "◆",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::FlappyMaster,
@@ -696,6 +789,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Skyward Gauntlet on Master difficulty",
         category: AchievementCategory::Challenges,
         icon: "›",
+        points: 100,
     },
     // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - SNAKE
@@ -706,6 +800,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Serpent's Path on Novice difficulty",
         category: AchievementCategory::Challenges,
         icon: "~",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::SnakeApprentice,
@@ -713,6 +808,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Serpent's Path on Apprentice difficulty",
         category: AchievementCategory::Challenges,
         icon: "~",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::SnakeJourneyman,
@@ -720,6 +816,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Serpent's Path on Journeyman difficulty",
         category: AchievementCategory::Challenges,
         icon: "~",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::SnakeMaster,
@@ -727,6 +824,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Serpent's Path on Master difficulty",
         category: AchievementCategory::Challenges,
         icon: "~",
+        points: 100,
     },
     // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - CONTAINMENT BREACH
@@ -737,6 +835,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Containment Breach on Novice difficulty",
         category: AchievementCategory::Challenges,
         icon: "▣",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::ContainmentBreachApprentice,
@@ -744,6 +843,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Containment Breach on Apprentice difficulty",
         category: AchievementCategory::Challenges,
         icon: "▣",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::ContainmentBreachJourneyman,
@@ -751,6 +851,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Containment Breach on Journeyman difficulty",
         category: AchievementCategory::Challenges,
         icon: "▣",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::ContainmentBreachMaster,
@@ -758,6 +859,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Containment Breach on Master difficulty",
         category: AchievementCategory::Challenges,
         icon: "▣",
+        points: 100,
     },
     // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - SIGIL SURGE
@@ -768,6 +870,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Sigil Surge on Novice difficulty",
         category: AchievementCategory::Challenges,
         icon: "⚡",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::SigilSurgeApprentice,
@@ -775,6 +878,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Sigil Surge on Apprentice difficulty",
         category: AchievementCategory::Challenges,
         icon: "⚡",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::SigilSurgeJourneyman,
@@ -782,6 +886,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Sigil Surge on Journeyman difficulty",
         category: AchievementCategory::Challenges,
         icon: "⚡",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::SigilSurgeMaster,
@@ -789,6 +894,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win Sigil Surge on Master difficulty",
         category: AchievementCategory::Challenges,
         icon: "⚡",
+        points: 100,
     },
     // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - META
@@ -799,6 +905,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Win 100 minigames total",
         category: AchievementCategory::Challenges,
         icon: "🏅",
+        points: 250,
     },
     // ═══════════════════════════════════════════════════════════════
     // FISHING ACHIEVEMENTS - RANK MILESTONES
@@ -809,6 +916,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Catch your first fish",
         category: AchievementCategory::Exploration,
         icon: "🎣",
+        points: 5,
     },
     AchievementDef {
         id: AchievementId::FishermanI,
@@ -816,6 +924,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach fishing rank 10",
         category: AchievementCategory::Exploration,
         icon: "🐟",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::FishermanII,
@@ -823,6 +932,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach fishing rank 20",
         category: AchievementCategory::Exploration,
         icon: "🐠",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::FishermanIII,
@@ -830,6 +940,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach fishing rank 30 (base max)",
         category: AchievementCategory::Exploration,
         icon: "🐡",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::FishermanIV,
@@ -837,6 +948,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach fishing rank 40 (requires Fishing Dock T4)",
         category: AchievementCategory::Exploration,
         icon: "\u{1f433}",
+        points: 100,
     },
     AchievementDef {
         id: AchievementId::StormLeviathan,
@@ -844,6 +956,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Catch the legendary Storm Leviathan",
         category: AchievementCategory::Exploration,
         icon: "\u{1f30a}",
+        points: 250,
     },
     // ═══════════════════════════════════════════════════════════════
     // FISHING ACHIEVEMENTS - CATCH COUNTS
@@ -854,6 +967,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Catch 100 fish",
         category: AchievementCategory::Exploration,
         icon: "🐟",
+        points: 5,
     },
     AchievementDef {
         id: AchievementId::FishCatcherII,
@@ -861,6 +975,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Catch 1,000 fish",
         category: AchievementCategory::Exploration,
         icon: "🐠",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::FishCatcherIII,
@@ -868,6 +983,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Catch 10,000 fish",
         category: AchievementCategory::Exploration,
         icon: "🐡",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::FishCatcherIV,
@@ -875,6 +991,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Catch 100,000 fish",
         category: AchievementCategory::Exploration,
         icon: "🐋",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::FishCatcherV,
@@ -882,6 +999,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Catch 500,000 fish",
         category: AchievementCategory::Exploration,
         icon: "\u{1f40b}",
+        points: 100,
     },
     AchievementDef {
         id: AchievementId::FishCatcherVI,
@@ -889,6 +1007,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Catch 1,000,000 fish",
         category: AchievementCategory::Exploration,
         icon: "\u{1f40b}",
+        points: 100,
     },
     AchievementDef {
         id: AchievementId::FishCatcherVII,
@@ -896,6 +1015,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Catch 5,000,000 fish",
         category: AchievementCategory::Exploration,
         icon: "\u{1f40b}",
+        points: 100,
     },
     AchievementDef {
         id: AchievementId::FishCatcherVIII,
@@ -903,6 +1023,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Catch 10,000,000 fish - Even the Leviathan watches its depths",
         category: AchievementCategory::Exploration,
         icon: "\u{1f988}",
+        points: 250,
     },
     AchievementDef {
         id: AchievementId::FishCatcherIX,
@@ -910,6 +1031,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Catch 50,000,000 fish - Every wave carries your legend",
         category: AchievementCategory::Exploration,
         icon: "\u{1f30a}",
+        points: 500,
     },
     AchievementDef {
         id: AchievementId::FishCatcherX,
@@ -917,6 +1039,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Catch 100,000,000 fish - You are the tide. You are the deep.",
         category: AchievementCategory::Exploration,
         icon: "\u{1f531}",
+        points: 500,
     },
     // ═══════════════════════════════════════════════════════════════
     // DUNGEON ACHIEVEMENTS
@@ -927,6 +1050,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Complete your first dungeon",
         category: AchievementCategory::Exploration,
         icon: "\u{1f6aa}",
+        points: 5,
     },
     AchievementDef {
         id: AchievementId::DungeonMasterI,
@@ -934,6 +1058,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Complete 10 dungeons",
         category: AchievementCategory::Exploration,
         icon: "\u{1f5dd}\u{fe0f}",
+        points: 5,
     },
     AchievementDef {
         id: AchievementId::DungeonMasterII,
@@ -941,6 +1066,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Complete 50 dungeons",
         category: AchievementCategory::Exploration,
         icon: "\u{1f56f}\u{fe0f}",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::DungeonMasterIII,
@@ -948,6 +1074,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Complete 100 dungeons",
         category: AchievementCategory::Exploration,
         icon: "\u{1f5e1}\u{fe0f}",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::DungeonMasterIV,
@@ -955,6 +1082,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Complete 1,000 dungeons",
         category: AchievementCategory::Exploration,
         icon: "\u{2694}\u{fe0f}",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::DungeonMasterV,
@@ -962,6 +1090,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Complete 5,000 dungeons",
         category: AchievementCategory::Exploration,
         icon: "\u{1f6e1}\u{fe0f}",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::DungeonMasterVI,
@@ -969,6 +1098,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Complete 10,000 dungeons",
         category: AchievementCategory::Exploration,
         icon: "\u{1f480}",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::DungeonMasterVII,
@@ -976,6 +1106,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Complete 25,000 dungeons",
         category: AchievementCategory::Exploration,
         icon: "\u{1f3f0}",
+        points: 100,
     },
     AchievementDef {
         id: AchievementId::DungeonMasterVIII,
@@ -983,6 +1114,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Complete 100,000 dungeons - Every maze unravels at your touch",
         category: AchievementCategory::Exploration,
         icon: "\u{1f409}",
+        points: 250,
     },
     AchievementDef {
         id: AchievementId::DungeonMasterIX,
@@ -990,6 +1122,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Complete 500,000 dungeons - The forgotten halls remember only you",
         category: AchievementCategory::Exploration,
         icon: "\u{269c}\u{fe0f}",
+        points: 500,
     },
     AchievementDef {
         id: AchievementId::DungeonMasterX,
@@ -998,6 +1131,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
             "Complete 1,000,000 dungeons - The dungeon is not a place \u{2014} it is your kingdom",
         category: AchievementCategory::Exploration,
         icon: "\u{1f451}",
+        points: 500,
     },
     // ═══════════════════════════════════════════════════════════════
     // HAVEN ACHIEVEMENTS
@@ -1008,6 +1142,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Discover the Haven",
         category: AchievementCategory::Exploration,
         icon: "\u{26fa}",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::HavenBuilderI,
@@ -1015,6 +1150,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Upgrade all Haven rooms to Tier 1",
         category: AchievementCategory::Exploration,
         icon: "\u{1f3e0}",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::HavenBuilderII,
@@ -1022,6 +1158,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Upgrade all Haven rooms to Tier 2",
         category: AchievementCategory::Exploration,
         icon: "\u{1f3f0}",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::HavenArchitect,
@@ -1029,6 +1166,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Upgrade all Haven rooms to Tier 3",
         category: AchievementCategory::Exploration,
         icon: "\u{1f3db}\u{fe0f}",
+        points: 250,
     },
     // ═══════════════════════════════════════════════════════════════
     // ENHANCEMENT ACHIEVEMENTS
@@ -1039,6 +1177,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Uncover an ancient Soulforge",
         category: AchievementCategory::Progression,
         icon: "\u{2692}",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::ApprenticeSmith,
@@ -1046,6 +1185,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Enhance any equipment to +1",
         category: AchievementCategory::Progression,
         icon: "\u{2692}",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::FullyTempered,
@@ -1053,6 +1193,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Enhance all 7 equipment slots to +4",
         category: AchievementCategory::Progression,
         icon: "\u{2692}",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::JourneymanSmith,
@@ -1060,6 +1201,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Enhance any equipment to +5",
         category: AchievementCategory::Progression,
         icon: "\u{2692}",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::SoulforgeAdept,
@@ -1067,6 +1209,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Enhance any equipment to +6",
         category: AchievementCategory::Progression,
         icon: "\u{2692}",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::SoulforgeSavant,
@@ -1074,6 +1217,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Enhance any equipment to +7",
         category: AchievementCategory::Progression,
         icon: "\u{2692}",
+        points: 100,
     },
     AchievementDef {
         id: AchievementId::SoulforgeMaster,
@@ -1081,6 +1225,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Enhance any equipment to +8",
         category: AchievementCategory::Progression,
         icon: "\u{2692}",
+        points: 100,
     },
     AchievementDef {
         id: AchievementId::SoulforgeGrandmaster,
@@ -1088,6 +1233,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Enhance any equipment to +9",
         category: AchievementCategory::Progression,
         icon: "\u{2692}",
+        points: 250,
     },
     AchievementDef {
         id: AchievementId::SoulforgeAscendant,
@@ -1095,6 +1241,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Enhance any equipment to +10",
         category: AchievementCategory::Progression,
         icon: "\u{2692}",
+        points: 500,
     },
     AchievementDef {
         id: AchievementId::SoulConvergence,
@@ -1102,6 +1249,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Enhance all 7 equipment slots to +7",
         category: AchievementCategory::Progression,
         icon: "\u{2692}",
+        points: 250,
     },
     AchievementDef {
         id: AchievementId::PersistentHammering,
@@ -1109,6 +1257,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Attempt 100 enhancements",
         category: AchievementCategory::Progression,
         icon: "\u{2692}",
+        points: 25,
     },
 ];
 
