@@ -61,12 +61,15 @@ Build info embedded at compile time via `build.rs`:
 
 ```
 Launch game
-  → Check GitHub API for latest release (~1 sec)
+  → Display splash screen (QUEST ASCII art, achievement badges, journey badges)
+  → Check GitHub API for latest release (~1 sec, braille spinner while checking)
   → Compare commit hash with compiled-in build hash
-  → Same version → continue to character select
-  → Newer exists → show banner: "Update available. Run 'quest update'"
-  → Network failure → silently continue
+  → Same version → show "Latest" with commit hash
+  → Newer exists → show animated "Update" indicator with new commit hash
+  → Network failure → silently continue to character select
 ```
+
+The splash screen shows achievement score badge (if > 0), character journey badges for discovered systems (zones, challenges, fishing), and the character select list below.
 
 Update checks run every 30 minutes (`UPDATE_CHECK_INTERVAL_SECONDS = 1800`).
 

@@ -257,16 +257,22 @@ Account-level base building that persists across prestiges. 14 rooms in a two-br
 
 Account-level achievement system that persists across characters. 6 categories (Combat, Level, Progression, Challenges, Exploration, Stats). Tracks kills, boss kills, levels, prestige, zone completion, challenge wins, fishing ranks/catches, dungeon completions, Haven building, and Soulforge enhancements. Includes modal notification system with 500ms accumulation window. Includes a title system where 44 curated achievements grant display titles (e.g., "Godslayer", "Everlasting") shown in stats panel and character select. Achievement score system: each of the 149 achievements has a point value (7 tiers: 5/10/25/50/100/250/500), computed at runtime — max 16,365 pts. Shown in browser title bar, unlock modal, detail panel, and stats view.
 
-### Cloud Sync (`src/history/cloud.rs`)
+### History / Time Vault (`src/history/`)
 
+Git-based save versioning system. Every meaningful game event (prestige, boss defeat, etc.) creates a git commit containing the full save state. Players can browse, restore, and fork save branches through the Time Vault overlay.
+
+- `mod.rs` — Public re-exports (HistoryRepo, HistoryError, validate_branch_name)
+- `git.rs` — Git repository operations (commit, branch, restore, fork)
+- `types.rs` — CommitInfo, TimelineInfo data structures
 - `cloud.rs` — GitHub cloud sync: PAT validation, repo management, push/pull, divergence resolution
-- Config stored in `~/.quest/.cloud.json` (token, username, repo URL)
-- Background thread + mpsc channel pattern: operations run in threads, results polled via `cloud_rx.try_recv()`
-- `cloud_op_in_flight` boolean prevents concurrent operations
+
+**Time Vault UI:** Two-panel overlay (branches left, commits right) with temporal backdrop effects. Supports restore, fork, branch switching, and deletion. GitHub submenu for cloud sync operations (push, pull, link/unlink, token management, divergence resolution).
+
+**Cloud Sync:** Config stored in `~/.quest/.cloud.json` (token, username, repo URL). Background thread + mpsc channel pattern: operations run in threads, results polled via `cloud_rx.try_recv()`. `cloud_op_in_flight` boolean prevents concurrent operations.
 
 **Cloud Status States:** Offline → Linked → Syncing → Linked (success) / OutOfSync (diverged) / TokenExpired (auth failure) / Error (other)
 
-**Key Operations:**
+**Key Cloud Operations:**
 - `link_github()` — Validate PAT, ensure repo, add git remote, fetch, save config
 - `push_all_branches()` / `fetch_all()` — Sync all local branches with remote
 - `check_divergence()` — Detect branches that are both ahead AND behind remote
@@ -285,6 +291,7 @@ Account-level achievement system that persists across characters. 6 categories (
 - `prestige_input.rs` — Prestige confirmation input handling
 - `soulforge_input.rs` — Soulforge overlay input handling
 - `stormglass_input.rs` — Stormglass overlay input handling
+- `time_vault_input.rs` — Time Vault overlay input handling
 
 Routes keyboard input to the appropriate handler based on current game state. Dispatches to minigame input handlers, character management flows, haven overlay, and debug menu. When quitting with pending challenges, shows a confirmation dialog ([Enter] Leave / [Esc] Stay).
 
@@ -327,6 +334,7 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 - `soulforge_slots.rs` — Soulforge slot selection menu
 - `chess_scene.rs`, `go_scene.rs`, `morris_scene.rs`, `gomoku_scene.rs`, `minesweeper_scene.rs`, `rune_scene.rs`, `snake_scene.rs`, `flappy_scene.rs`, `jezzball_scene.rs`, `runic_shift_scene.rs` — Minigame UIs
 - `stormglass_scene.rs` — Stormglass Exchange overlay with animations (Invoke Trial rolling, Chrono Surge speed ramp/fast-forward, Storm Sigils daily rotation)
+- `time_vault_scene.rs` — Time Vault overlay UI (branch/commit browser, restore, fork, GitHub cloud sync)
 - `scene_fx.rs` — Shared utilities for layered ASCII scene rendering (scene buffer, backdrop effects, wide character support)
 - `zone_bg.rs` — Stylized zone background scenes with 6-layer compositing pipeline for all 11 zones
 - `debug_menu_scene.rs` — Debug menu overlay with tabbed categories
@@ -411,7 +419,8 @@ quest/
 │   │   ├── haven_input.rs   # Haven overlay input
 │   │   ├── prestige_input.rs # Prestige confirmation input
 │   │   ├── soulforge_input.rs # Soulforge overlay input
-│   │   └── stormglass_input.rs # Stormglass overlay input
+│   │   ├── stormglass_input.rs # Stormglass overlay input
+│   │   └── time_vault_input.rs # Time Vault overlay input
 │   ├── main_helpers/        # Extracted main.rs helpers
 │   │   ├── character_screens.rs  # Character screen handlers
 │   │   ├── input_routing.rs      # Game input routing
@@ -501,6 +510,11 @@ quest/
 │   │   └── spending.rs      # Stormglass spending on sigils
 │   ├── god_items/           # God Items system
 │   │   └── types.rs         # 3 god items, passives, bonuses, helper queries
+│   ├── history/             # Time Vault — git-based save versioning
+│   │   ├── mod.rs           # Public re-exports
+│   │   ├── git.rs           # Git repository operations
+│   │   ├── types.rs         # CommitInfo, TimelineInfo
+│   │   └── cloud.rs         # GitHub cloud sync
 │   ├── challenges/          # Challenge minigames [CLAUDE.md]
 │   │   ├── mod.rs           # Challenge menu, impl_apply_game_result! macro
 │   │   ├── menu.rs          # Challenge menu UI
@@ -562,13 +576,14 @@ quest/
 │       ├── flappy_scene.rs  # Flappy Bird UI
 │       ├── jezzball_scene.rs # JezzBall UI
 │       ├── stormglass_scene.rs # Stormglass Exchange overlay with animations
+│       ├── time_vault_scene.rs # Time Vault overlay (branch/commit browser)
 │       ├── scene_fx.rs       # Shared utilities for layered ASCII scene rendering
 │       ├── zone_bg.rs        # Stylized zone background scenes (6-layer compositing)
 │       ├── debug_menu_scene.rs # Debug menu with tabbed categories
 │       ├── bug_report_scene.rs # Bug report overlay
 │       ├── *_scene.rs       # Various game scenes
 │       └── character_*.rs   # Character management UI
-├── tests/                   # Integration tests (34 test files, 4,000+ tests)
+├── tests/                   # Integration tests (34 test files, 4,300+ tests)
 │   ├── game_loop_orchestration_test.rs  # 36 behavior-locking tests for game_tick
 │   ├── tick_integration_test.rs         # Tick module integration tests
 │   ├── zone_progression_test.rs         # Zone advancement tests
