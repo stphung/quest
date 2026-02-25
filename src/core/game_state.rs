@@ -74,8 +74,8 @@ pub struct GameState {
     /// Generic challenge menu (transient, not saved)
     #[serde(skip)]
     pub challenge_menu: ChallengeMenu,
-    /// Persistent chess stats (survives prestige, saved to disk)
-    #[serde(default)]
+    /// Chess stats (transient, not saved to disk)
+    #[serde(skip)]
     pub chess_stats: ChessStats,
     /// Stormglass currency balance (character-level, saved to disk)
     #[serde(default)]
@@ -567,7 +567,6 @@ mod tests {
         assert!(loaded.active_dungeon.is_none());
         assert_eq!(loaded.fishing.rank, 1);
         assert_eq!(loaded.zone_progression.current_zone_id, 1);
-        assert_eq!(loaded.chess_stats.games_played, 0);
         // storm_sigils should default to 0 slots unlocked, no sigils etched
         assert_eq!(loaded.storm_sigils.slots_unlocked, 0);
         assert_eq!(loaded.storm_sigils.etched_count(), 0);

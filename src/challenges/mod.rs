@@ -242,9 +242,10 @@ pub fn apply_challenge_rewards(
         // Prestige reward
         state.prestige_rank += info.reward.prestige_ranks;
 
-        // Fishing rank reward (capped at 30)
-        let fishing_rank_up = if info.reward.fishing_ranks > 0 && state.fishing.rank < 30 {
-            state.fishing.rank = (state.fishing.rank + info.reward.fishing_ranks).min(30);
+        // Fishing rank reward (capped at absolute max)
+        let max_rank = crate::core::constants::MAX_FISHING_RANK;
+        let fishing_rank_up = if info.reward.fishing_ranks > 0 && state.fishing.rank < max_rank {
+            state.fishing.rank = (state.fishing.rank + info.reward.fishing_ranks).min(max_rank);
             true
         } else {
             false
@@ -430,9 +431,9 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_rewards_fishing_rank_capped_at_30() {
+    fn test_apply_rewards_fishing_rank_capped_at_max() {
         let mut state = GameState::new("Test".to_string(), 0);
-        state.fishing.rank = 29;
+        state.fishing.rank = 38;
         let reward = menu::ChallengeReward {
             fishing_ranks: 5,
             ..Default::default()
@@ -440,13 +441,13 @@ mod tests {
 
         apply_challenge_rewards(&mut state, make_info(true, reward));
 
-        assert_eq!(state.fishing.rank, 30);
+        assert_eq!(state.fishing.rank, crate::core::constants::MAX_FISHING_RANK);
     }
 
     #[test]
     fn test_apply_rewards_fishing_rank_not_granted_at_cap() {
         let mut state = GameState::new("Test".to_string(), 0);
-        state.fishing.rank = 30;
+        state.fishing.rank = crate::core::constants::MAX_FISHING_RANK;
         let reward = menu::ChallengeReward {
             fishing_ranks: 1,
             ..Default::default()
@@ -454,7 +455,21 @@ mod tests {
 
         apply_challenge_rewards(&mut state, make_info(true, reward));
 
-        assert_eq!(state.fishing.rank, 30);
+        assert_eq!(state.fishing.rank, crate::core::constants::MAX_FISHING_RANK);
+    }
+
+    #[test]
+    fn test_apply_rewards_fishing_rank_granted_above_30() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.fishing.rank = 35;
+        let reward = menu::ChallengeReward {
+            fishing_ranks: 1,
+            ..Default::default()
+        };
+
+        apply_challenge_rewards(&mut state, make_info(true, reward));
+
+        assert_eq!(state.fishing.rank, 36);
     }
 
     #[test]

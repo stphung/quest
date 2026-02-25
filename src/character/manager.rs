@@ -28,8 +28,6 @@ pub(super) struct CharacterSaveData {
     #[serde(default)]
     pub(super) zone_progression: crate::zones::ZoneProgression,
     #[serde(default)]
-    pub(super) chess_stats: crate::challenges::chess::ChessStats,
-    #[serde(default)]
     pub(super) stormglass: u64,
     #[serde(default)]
     pub(super) stormglass_discovered: bool,
