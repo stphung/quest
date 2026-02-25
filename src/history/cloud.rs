@@ -558,14 +558,11 @@ fn squash_branch_clean(repo: &Repository, branch_name: &str) -> Result<(), Strin
         .map_err(|e| format!("Failed to create squashed commit: {e}"))?;
 
     // Point the branch at the new orphan commit.
-    repo.branch(
-        branch_name,
-        &repo
-            .find_commit(new_oid)
-            .map_err(|e| format!("Failed to find new commit: {e}"))?,
-        true, // force overwrite
-    )
-    .map_err(|e| format!("Failed to update branch: {e}"))?;
+    // Use reference_set_target instead of repo.branch() because the latter
+    // cannot force-update the branch HEAD currently points to.
+    let refname = format!("refs/heads/{branch_name}");
+    repo.reference(&refname, new_oid, true, "squash for clean cloud push")
+        .map_err(|e| format!("Failed to update branch '{branch_name}': {e}"))?;
 
     Ok(())
 }
