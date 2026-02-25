@@ -149,7 +149,7 @@ pub fn mission_launch_cost(mission_type: MissionType, layer: u32) -> u32 {
         }
         MissionType::Recon => 30 + layer,
         MissionType::Expedition => 80 + 3 * layer,
-        MissionType::Breakthrough => 150 + 8 * layer,
+        MissionType::Breakthrough => 70 + 8 * layer,
         MissionType::Construction(infra) => super::layers::infrastructure_build_cost(infra, layer),
     }
 }

@@ -119,18 +119,18 @@ pub fn layer_power_thresholds(layer: u32) -> LayerPowerThresholds {
     let layer = layer.max(1);
 
     // Void scaling constants (per layer above 25)
-    const VOID_BREAK: u32 = 80;
-    const VOID_EXP: u32 = 60;
-    const VOID_REC: u32 = 45;
-    const VOID_SUP: u32 = 30;
+    const VOID_BREAK: u32 = 60;
+    const VOID_EXP: u32 = 45;
+    const VOID_REC: u32 = 35;
+    const VOID_SUP: u32 = 25;
 
     if layer >= 26 {
         let extra = layer - 25;
         return LayerPowerThresholds {
-            breakthrough: 930 + VOID_BREAK * extra,
-            expedition: 700 + VOID_EXP * extra,
-            recon: 525 + VOID_REC * extra,
-            supply_run: 350 + VOID_SUP * extra,
+            breakthrough: 700 + VOID_BREAK * extra,
+            expedition: 525 + VOID_EXP * extra,
+            recon: 395 + VOID_REC * extra,
+            supply_run: 265 + VOID_SUP * extra,
         };
     }
 
@@ -154,13 +154,13 @@ pub fn layer_power_thresholds(layer: u32) -> LayerPowerThresholds {
         16 => (410, 310, 230, 155),
         17 => (450, 340, 255, 170),
         18 => (495, 370, 280, 185),
-        19 => (545, 410, 310, 205),
-        20 => (600, 450, 340, 225),
-        21 => (660, 495, 370, 250),
-        22 => (720, 540, 405, 275),
-        23 => (785, 590, 440, 300),
-        24 => (855, 640, 480, 325),
-        25 => (930, 700, 525, 350),
+        19 => (510, 385, 290, 190),
+        20 => (530, 400, 300, 200),
+        21 => (555, 415, 315, 210),
+        22 => (580, 435, 330, 220),
+        23 => (610, 460, 345, 230),
+        24 => (650, 490, 370, 245),
+        25 => (700, 525, 395, 265),
         _ => unreachable!(), // layers >= 26 handled above
     };
 
@@ -243,11 +243,14 @@ pub struct DurationModifiers {
     pub saboteur_is_veteran: bool,
     /// Whether the squad Power exceeds 150% of the mission's threshold.
     pub is_overpowered: bool,
+    /// Number of Bridge infrastructure layers between start and target layer.
+    /// Each bridged layer reduces duration by 10% (multiplicative, capped at 50%).
+    pub bridge_layers: u32,
 }
 
 /// Apply all duration modifiers multiplicatively and enforce the minimum floor.
 ///
-/// Modifiers are applied in order: Outpost → Familiarity → Saboteur → Overpower.
+/// Modifiers are applied in order: Outpost → Familiarity → Saboteur → Overpower → Bridge.
 /// The result is clamped to `MIN_MISSION_DURATION_SECS`.
 pub fn apply_duration_modifiers(base_secs: u64, mods: &DurationModifiers) -> u64 {
     let mut duration = base_secs as f64;
@@ -268,7 +271,22 @@ pub fn apply_duration_modifiers(base_secs: u64, mods: &DurationModifiers) -> u64
         duration *= 0.90; // -10%
     }
 
+    // Bridge layers reduce duration by 10% each (multiplicative, cap at 50%)
+    if mods.bridge_layers > 0 {
+        let bridge_reduction = (1.0 - 0.10 * mods.bridge_layers as f64).max(0.50);
+        duration *= bridge_reduction;
+    }
+
     (duration as u64).max(MIN_MISSION_DURATION_SECS)
+}
+
+/// Returns the auto-resolve success bonus from a Watchtower (+5%).
+pub fn watchtower_auto_resolve_bonus(has_watchtower: bool) -> f64 {
+    if has_watchtower {
+        0.05
+    } else {
+        0.0
+    }
 }
 
 // ── Infrastructure ────────────────────────────────────────────────────────────
@@ -465,20 +483,20 @@ mod tests {
     #[test]
     fn test_power_thresholds_layer_25() {
         let t = layer_power_thresholds(25);
-        assert_eq!(t.breakthrough, 930);
-        assert_eq!(t.expedition, 700);
-        assert_eq!(t.recon, 525);
-        assert_eq!(t.supply_run, 350);
+        assert_eq!(t.breakthrough, 700);
+        assert_eq!(t.expedition, 525);
+        assert_eq!(t.recon, 395);
+        assert_eq!(t.supply_run, 265);
     }
 
     #[test]
     fn test_power_thresholds_void_layer_26() {
         let t = layer_power_thresholds(26);
-        // Void: 930 + 80*(26-25) = 1010, etc.
-        assert_eq!(t.breakthrough, 1010);
-        assert_eq!(t.expedition, 760);
-        assert_eq!(t.recon, 570);
-        assert_eq!(t.supply_run, 380);
+        // Void: 700 + 60*(26-25) = 760, etc.
+        assert_eq!(t.breakthrough, 760);
+        assert_eq!(t.expedition, 570);
+        assert_eq!(t.recon, 430);
+        assert_eq!(t.supply_run, 290);
     }
 
     #[test]
@@ -562,6 +580,7 @@ mod tests {
             has_saboteur: false,
             saboteur_is_veteran: false,
             is_overpowered: false,
+            bridge_layers: 0,
         };
         assert_eq!(apply_duration_modifiers(base, &mods), base);
     }
@@ -575,6 +594,7 @@ mod tests {
             has_saboteur: false,
             saboteur_is_veteran: false,
             is_overpowered: false,
+            bridge_layers: 0,
         };
         let result = apply_duration_modifiers(base, &mods);
         let expected = (base as f64 * 0.75) as u64;
@@ -590,6 +610,7 @@ mod tests {
             has_saboteur: false,
             saboteur_is_veteran: false,
             is_overpowered: false,
+            bridge_layers: 0,
         };
         let result = apply_duration_modifiers(base, &mods);
         let expected = (base as f64 * 0.70) as u64;
@@ -607,6 +628,7 @@ mod tests {
             has_saboteur: true,
             saboteur_is_veteran: true,
             is_overpowered: true,
+            bridge_layers: 0,
         };
         let result = apply_duration_modifiers(base, &mods);
         let expected = (base as f64 * 0.75 * 0.70 * 0.85 * 0.90) as u64;
@@ -623,6 +645,7 @@ mod tests {
             has_saboteur: true,
             saboteur_is_veteran: true,
             is_overpowered: true,
+            bridge_layers: 0,
         };
         let result = apply_duration_modifiers(base, &mods);
         assert_eq!(result, MIN_MISSION_DURATION_SECS);

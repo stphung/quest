@@ -609,6 +609,7 @@ fn main() -> io::Result<()> {
                                 enhancement.discovered,
                                 state.stormglass_discovered,
                                 deep_state.persistent.discovered,
+                                &deep_state,
                                 &global_achievements,
                                 &enhancement.levels,
                             );

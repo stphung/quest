@@ -258,7 +258,7 @@ impl Infrastructure {
             Infrastructure::SupplyCache => "Supply runs yield bonus Warband Marks and resources.",
             Infrastructure::Watchtower => "Reveals more intel; improves auto-resolve outcomes.",
             Infrastructure::Bridge => {
-                "Unlocks a shortcut; missions can skip this layer when pushing deeper."
+                "Unlocks a shortcut; -10% mission duration per bridged layer (max -50%)."
             }
         }
     }
@@ -378,6 +378,9 @@ pub struct EventChoice {
     /// Index of the choice in this event's list that becomes available on success
     /// (used for event chaining where a risky choice unlocks a bonus option later).
     pub unlocks_bonus_event: bool,
+    /// Percentage chance (0-100) that this risky choice results in injury/loss.
+    #[serde(default)]
+    pub risk_percent: Option<u8>,
 }
 
 /// A check-in event that fires mid-mission.
@@ -412,6 +415,16 @@ impl CheckInEvent {
     }
 }
 
+/// A log entry for a completed mission, stored in the warband log.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WarbandLogEntry {
+    pub mission_name: String,
+    pub layer: u32,
+    pub outcome: MissionOutcome,
+    pub marks_earned: u32,
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+}
+
 /// Rewards produced by a completed mission.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MissionResult {
@@ -432,6 +445,9 @@ pub struct MissionResult {
     pub lost_mercs: Vec<u64>,
     /// Level-ups earned by each surviving squad member (merc_id -> levels_gained).
     pub merc_level_ups: Vec<(u64, u32)>,
+    /// Whether a danger bonus was applied to merc XP (from risky event choices).
+    #[serde(default)]
+    pub danger_bonus_xp: bool,
 }
 
 /// An active or recently completed mission.
@@ -635,6 +651,9 @@ pub struct DeepPersistent {
     pub merc_id_counter: u64,
     /// Monotonically increasing counter for mission ids.
     pub mission_id_counter: u64,
+    /// Monotonically increasing counter tracking how many prestige cycles have occurred.
+    #[serde(default)]
+    pub generation_counter: u32,
 }
 
 impl Default for DeepPersistent {
@@ -653,6 +672,7 @@ impl DeepPersistent {
             deepest_layer_reached: 0,
             merc_id_counter: 0,
             mission_id_counter: 0,
+            generation_counter: 0,
         }
     }
 
@@ -716,6 +736,12 @@ pub struct DeepPrestige {
     pub recruit_pool: RecruitPool,
     /// Missions awaiting result collection by the player (completed but not yet shown).
     pub pending_results: Vec<Mission>,
+    /// Which generation (prestige cycle) this prestige state belongs to.
+    #[serde(default)]
+    pub generation_number: u32,
+    /// Log of completed missions this prestige cycle.
+    #[serde(default)]
+    pub warband_log: Vec<WarbandLogEntry>,
 }
 
 impl Default for DeepPrestige {
@@ -732,6 +758,8 @@ impl Default for DeepPrestige {
                 recruit_costs: Vec::new(),
             },
             pending_results: Vec::new(),
+            generation_number: 0,
+            warband_log: Vec::new(),
         }
     }
 }
@@ -811,8 +839,12 @@ impl DeepState {
     /// Reset per-prestige state while keeping persistent state intact.
     /// Call this at the start of each prestige cycle.
     pub fn on_prestige(&mut self) {
+        // Increment generation counter before resetting prestige state.
+        self.persistent.generation_counter += 1;
         // Cancel all active missions cleanly (mercs go with the reset).
         self.prestige = DeepPrestige::new();
+        // Tag the new prestige state with its generation number.
+        self.prestige.generation_number = self.persistent.generation_counter;
     }
 
     /// Whether The Deep is fully available (discovered and at least one mission possible).
@@ -911,6 +943,8 @@ pub struct DeepUiState {
     pub recruit_visit_count: u8,
     /// Whether [?] help reference panel is shown.
     pub show_help: bool,
+    /// Mercs from last prestige shown in farewell screen: (name, level, missions_completed).
+    pub farewell_mercs: Vec<(String, u32, u32)>,
 }
 
 impl DeepUiState {
@@ -931,6 +965,7 @@ impl DeepUiState {
             event_visit_count: 0,
             recruit_visit_count: 0,
             show_help: false,
+            farewell_mercs: Vec::new(),
         }
     }
 
@@ -1355,6 +1390,7 @@ mod tests {
                     time_delta_secs: 3 * 3600,
                     is_risky: false,
                     unlocks_bonus_event: false,
+                    risk_percent: None,
                 },
                 EventChoice {
                     label: "Find alternate route".to_string(),
@@ -1362,6 +1398,7 @@ mod tests {
                     time_delta_secs: 0,
                     is_risky: true,
                     unlocks_bonus_event: true,
+                    risk_percent: Some(30),
                 },
             ],
             auto_resolve_choice: 0,
@@ -1385,6 +1422,7 @@ mod tests {
                     time_delta_secs: 3 * 3600,
                     is_risky: false,
                     unlocks_bonus_event: false,
+                    risk_percent: None,
                 },
                 EventChoice {
                     label: "Find alternate route".to_string(),
@@ -1392,6 +1430,7 @@ mod tests {
                     time_delta_secs: 0,
                     is_risky: true,
                     unlocks_bonus_event: true,
+                    risk_percent: Some(30),
                 },
             ],
             auto_resolve_choice: 0,

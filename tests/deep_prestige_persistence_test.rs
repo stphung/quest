@@ -366,6 +366,7 @@ fn test_gen2_recon_benefits_from_gen1_infrastructure() {
             has_saboteur: false,
             saboteur_is_veteran: false,
             is_overpowered: false,
+            bridge_layers: 0,
         },
     );
     let without_infra = apply_duration_modifiers(
@@ -376,6 +377,7 @@ fn test_gen2_recon_benefits_from_gen1_infrastructure() {
             has_saboteur: false,
             saboteur_is_veteran: false,
             is_overpowered: false,
+            bridge_layers: 0,
         },
     );
 
@@ -787,6 +789,7 @@ fn test_prestige_with_pending_results_resets() {
             injured_mercs: vec![],
             lost_mercs: vec![],
             merc_level_ups: vec![],
+            danger_bonus_xp: false,
         }),
     });
 
@@ -971,6 +974,7 @@ fn test_gen2_recon_is_faster_than_gen1_baseline() {
             has_saboteur: false,
             saboteur_is_veteran: false,
             is_overpowered: false,
+            bridge_layers: 0,
         },
     );
 
@@ -983,6 +987,7 @@ fn test_gen2_recon_is_faster_than_gen1_baseline() {
             has_saboteur: false,
             saboteur_is_veteran: false,
             is_overpowered: false,
+            bridge_layers: 0,
         },
     );
 
@@ -1013,6 +1018,7 @@ fn test_gen3_recon_is_faster_than_gen2() {
             has_saboteur: false,
             saboteur_is_veteran: false,
             is_overpowered: false,
+            bridge_layers: 0,
         },
     );
 
@@ -1025,6 +1031,7 @@ fn test_gen3_recon_is_faster_than_gen2() {
             has_saboteur: false,
             saboteur_is_veteran: false,
             is_overpowered: false,
+            bridge_layers: 0,
         },
     );
 
@@ -1137,6 +1144,124 @@ fn test_rapid_successive_prestiges_are_idempotent_on_persistent() {
             persistent_before.layers[i].infrastructure
         );
     }
+}
+
+// ── Generation Counter ──────────────────────────────────────────────────────────
+
+#[test]
+fn test_generation_counter_increments_on_prestige() {
+    let mut deep = DeepState::new();
+    deep.persistent.discovered = true;
+    assert_eq!(deep.persistent.generation_counter, 0);
+    assert_eq!(deep.prestige.generation_number, 0);
+
+    deep.on_prestige();
+    assert_eq!(deep.persistent.generation_counter, 1);
+    assert_eq!(deep.prestige.generation_number, 1);
+
+    deep.on_prestige();
+    assert_eq!(deep.persistent.generation_counter, 2);
+    assert_eq!(deep.prestige.generation_number, 2);
+}
+
+#[test]
+fn test_generation_counter_persists_across_saves() {
+    let mut deep = DeepState::new();
+    deep.persistent.discovered = true;
+    deep.persistent.generation_counter = 5;
+
+    let json = serde_json::to_string(&deep).unwrap();
+    let loaded: DeepState = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(loaded.persistent.generation_counter, 5);
+}
+
+#[test]
+fn test_generation_counter_backward_compat_defaults_to_zero() {
+    // JSON missing the generation_counter field — serde(default) should give 0.
+    let json = r#"{
+        "discovered": true,
+        "guild_rank": 1,
+        "guild_upgrade_cost": 500,
+        "layers": [],
+        "deepest_layer_reached": 0,
+        "merc_id_counter": 0,
+        "mission_id_counter": 0
+    }"#;
+    let loaded: quest::deep::DeepPersistent = serde_json::from_str(json).unwrap();
+    assert_eq!(loaded.generation_counter, 0);
+}
+
+// ── Warband Log Serde ───────────────────────────────────────────────────────────
+
+#[test]
+fn test_warband_log_serde_roundtrip() {
+    let mut prestige = quest::deep::DeepPrestige::new();
+    prestige.warband_log.push(quest::deep::WarbandLogEntry {
+        mission_name: "Supply Run L2".to_string(),
+        layer: 2,
+        outcome: MissionOutcome::Success,
+        marks_earned: 120,
+        timestamp: chrono::Utc::now(),
+    });
+
+    let json = serde_json::to_string(&prestige).unwrap();
+    let loaded: quest::deep::DeepPrestige = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(loaded.warband_log.len(), 1);
+    assert_eq!(loaded.warband_log[0].mission_name, "Supply Run L2");
+    assert_eq!(loaded.warband_log[0].layer, 2);
+    assert_eq!(loaded.warband_log[0].outcome, MissionOutcome::Success);
+    assert_eq!(loaded.warband_log[0].marks_earned, 120);
+}
+
+#[test]
+fn test_warband_log_backward_compat_defaults_to_empty() {
+    // DeepPrestige JSON missing the warband_log field — serde(default) should give empty Vec.
+    let json = r#"{
+        "warband_marks": 0,
+        "roster": [],
+        "active_missions": [],
+        "available_missions": [],
+        "recruit_pool": {"candidates": [], "refreshed_at": "2026-01-01T00:00:00Z", "recruit_costs": []},
+        "pending_results": []
+    }"#;
+    let loaded: quest::deep::DeepPrestige = serde_json::from_str(json).unwrap();
+    assert!(loaded.warband_log.is_empty());
+}
+
+// ── EventChoice / MissionResult Backward Compat ─────────────────────────────────
+
+#[test]
+fn test_risk_percent_backward_compat_defaults_to_none() {
+    // EventChoice JSON missing the risk_percent field — serde(default) should give None.
+    let json = r#"{
+        "label": "Dig through",
+        "required_archetype": null,
+        "time_delta_secs": 3600,
+        "is_risky": false,
+        "unlocks_bonus_event": false
+    }"#;
+    let loaded: quest::deep::EventChoice = serde_json::from_str(json).unwrap();
+    assert_eq!(loaded.risk_percent, None);
+}
+
+#[test]
+fn test_mission_result_danger_bonus_xp_backward_compat() {
+    // MissionResult JSON missing danger_bonus_xp — serde(default) should give false.
+    let json = r#"{
+        "outcome": "Success",
+        "marks_earned": 100,
+        "xp_earned": 500,
+        "stormglass_earned": 5,
+        "item_ilvl": null,
+        "prestige_fragment": false,
+        "injured_mercs": [],
+        "lost_mercs": [],
+        "merc_level_ups": []
+    }"#;
+    let loaded: quest::deep::MissionResult = serde_json::from_str(json).unwrap();
+    assert!(!loaded.danger_bonus_xp);
 }
 
 // ── is_active() Behavior ────────────────────────────────────────────────────────

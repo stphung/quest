@@ -378,6 +378,7 @@ pub fn draw_ui_with_update(
     soulforge_discovered: bool,
     stormglass_discovered: bool,
     deep_discovered: bool,
+    deep_state: &crate::deep::DeepState,
     achievements: &crate::achievements::Achievements,
     enhancement_levels: &[u8; 7],
 ) {
@@ -389,6 +390,8 @@ pub fn draw_ui_with_update(
         render_too_small(frame, &ctx);
         return;
     }
+
+    let deep_indicator = stats_panel::DeepIndicatorStatus::from_deep(deep_discovered, deep_state);
 
     match ctx.tier {
         SizeTier::XL | SizeTier::L => {
@@ -402,7 +405,7 @@ pub fn draw_ui_with_update(
                 haven_discovered,
                 soulforge_discovered,
                 stormglass_discovered,
-                deep_discovered,
+                deep_indicator,
                 achievements,
                 enhancement_levels,
             );
@@ -415,7 +418,7 @@ pub fn draw_ui_with_update(
                 haven_discovered,
                 soulforge_discovered,
                 stormglass_discovered,
-                deep_discovered,
+                deep_indicator,
                 achievements,
             );
         }
@@ -440,7 +443,7 @@ fn draw_xl_l_layout(
     haven_discovered: bool,
     soulforge_discovered: bool,
     stormglass_discovered: bool,
-    deep_discovered: bool,
+    deep_indicator: stats_panel::DeepIndicatorStatus,
     achievements: &crate::achievements::Achievements,
     enhancement_levels: &[u8; 7],
 ) {
@@ -519,7 +522,7 @@ fn draw_xl_l_layout(
         haven_discovered,
         soulforge_discovered,
         stormglass_discovered,
-        deep_discovered,
+        deep_indicator,
         achievements.pending_count(),
         ctx,
     );
@@ -538,7 +541,7 @@ fn draw_m_layout(
     haven_discovered: bool,
     soulforge_discovered: bool,
     stormglass_discovered: bool,
-    deep_discovered: bool,
+    deep_indicator: stats_panel::DeepIndicatorStatus,
     achievements: &crate::achievements::Achievements,
 ) {
     let area = frame.area();
@@ -599,7 +602,7 @@ fn draw_m_layout(
         haven_discovered,
         soulforge_discovered,
         stormglass_discovered,
-        deep_discovered,
+        deep_indicator,
         achievements.pending_count(),
     );
 }

@@ -66,6 +66,7 @@ pub use types::{
     MissionStatus,
     MissionType,
     RecruitPool,
+    WarbandLogEntry,
     DEEP_DISCOVERY_BASE_CHANCE,
     DEEP_DISCOVERY_RANK_BONUS,
     DEEP_MIN_PRESTIGE_RANK,
@@ -89,8 +90,8 @@ pub use layers::{
     apply_duration_modifiers, apply_familiarity_gain, base_mission_duration_secs,
     build_infrastructure, familiarity_gain, infrastructure_build_cost, is_frontier_layer,
     is_safe_layer, layer_power_thresholds, mark_layer_cleared, mission_power_threshold,
-    DurationModifiers, FamiliarityLevel, InfrastructureBuildError, LayerPowerThresholds,
-    MIN_MISSION_DURATION_SECS,
+    watchtower_auto_resolve_bonus, DurationModifiers, FamiliarityLevel, InfrastructureBuildError,
+    LayerPowerThresholds, MIN_MISSION_DURATION_SECS,
 };
 #[allow(unused_imports)]
 pub use mercenaries::{
@@ -105,8 +106,9 @@ pub use persistence::{deep_save_path, load_deep, save_deep};
 // Events re-exports
 #[allow(unused_imports)]
 pub use events::{
-    event_trigger_points, generate_mission_events, resolve_event, tick_mission_events,
-    EventCategory, EventResolution, EventTag, EventTickResult, AUTO_RESOLVE_TIMEOUT_HOURS,
+    event_trigger_points, generate_mission_events, generate_mission_events_with_names,
+    resolve_event, tick_mission_events, EventCategory, EventResolution, EventTag, EventTickResult,
+    AUTO_RESOLVE_TIMEOUT_HOURS,
 };
 
 // Missions re-exports

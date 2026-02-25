@@ -401,6 +401,7 @@ fn outpost_reduces_mission_duration_by_25_percent() {
             has_saboteur: false,
             saboteur_is_veteran: false,
             is_overpowered: false,
+            bridge_layers: 0,
         },
     );
     let expected = (base_secs as f64 * 0.75) as u64;
@@ -560,6 +561,7 @@ fn familiarity_reduces_duration_correctly() {
             has_saboteur: false,
             saboteur_is_veteran: false,
             is_overpowered: false,
+            bridge_layers: 0,
         },
     );
     assert_eq!(d_unknown, base);
@@ -573,6 +575,7 @@ fn familiarity_reduces_duration_correctly() {
             has_saboteur: false,
             saboteur_is_veteran: false,
             is_overpowered: false,
+            bridge_layers: 0,
         },
     );
     assert_eq!(d_mapped, (base as f64 * 0.90) as u64);
@@ -586,6 +589,7 @@ fn familiarity_reduces_duration_correctly() {
             has_saboteur: false,
             saboteur_is_veteran: false,
             is_overpowered: false,
+            bridge_layers: 0,
         },
     );
     assert_eq!(d_familiar, (base as f64 * 0.80) as u64);
@@ -599,6 +603,7 @@ fn familiarity_reduces_duration_correctly() {
             has_saboteur: false,
             saboteur_is_veteran: false,
             is_overpowered: false,
+            bridge_layers: 0,
         },
     );
     assert_eq!(d_mastered, (base as f64 * 0.70) as u64);
@@ -929,6 +934,7 @@ fn duration_modifiers_stack_multiplicatively() {
             has_saboteur: true,
             saboteur_is_veteran: true,
             is_overpowered: true,
+            bridge_layers: 0,
         },
     );
     let expected = (base as f64 * 0.75 * 0.70 * 0.85 * 0.90) as u64;
@@ -947,6 +953,7 @@ fn duration_modifiers_are_applied_in_correct_order() {
             has_saboteur: false,
             saboteur_is_veteran: false,
             is_overpowered: false,
+            bridge_layers: 0,
         },
     );
     // 0.75 * 0.80 = 0.60
@@ -967,6 +974,7 @@ fn duration_is_clamped_to_30_minute_floor() {
             has_saboteur: false,
             saboteur_is_veteran: false,
             is_overpowered: false,
+            bridge_layers: 0,
         },
     );
     assert_eq!(
@@ -988,6 +996,7 @@ fn duration_floor_applies_even_after_maximum_reductions() {
             has_saboteur: true,
             saboteur_is_veteran: true,
             is_overpowered: true,
+            bridge_layers: 0,
         },
     );
     assert_eq!(
@@ -1158,28 +1167,28 @@ fn power_thresholds_layer_13_match_balance_table() {
 #[test]
 fn power_thresholds_layer_19_match_balance_table() {
     let t = layer_power_thresholds(19);
-    assert_eq!(t.breakthrough, 545);
-    assert_eq!(t.expedition, 410);
-    assert_eq!(t.recon, 310);
-    assert_eq!(t.supply_run, 205);
+    assert_eq!(t.breakthrough, 510);
+    assert_eq!(t.expedition, 385);
+    assert_eq!(t.recon, 290);
+    assert_eq!(t.supply_run, 190);
 }
 
 #[test]
 fn power_thresholds_layer_25_match_balance_table() {
     let t = layer_power_thresholds(25);
-    assert_eq!(t.breakthrough, 930);
-    assert_eq!(t.expedition, 700);
-    assert_eq!(t.recon, 525);
-    assert_eq!(t.supply_run, 350);
+    assert_eq!(t.breakthrough, 700);
+    assert_eq!(t.expedition, 525);
+    assert_eq!(t.recon, 395);
+    assert_eq!(t.supply_run, 265);
 }
 
 #[test]
 fn power_thresholds_void_layer_26_match_design() {
     let t = layer_power_thresholds(26);
-    assert_eq!(t.breakthrough, 1010); // 930 + 80*1
-    assert_eq!(t.expedition, 760); // 700 + 60*1
-    assert_eq!(t.recon, 570); // 525 + 45*1
-    assert_eq!(t.supply_run, 380); // 350 + 30*1
+    assert_eq!(t.breakthrough, 760); // 700 + 60*1
+    assert_eq!(t.expedition, 570); // 525 + 45*1
+    assert_eq!(t.recon, 430); // 395 + 35*1
+    assert_eq!(t.supply_run, 290); // 265 + 25*1
 }
 
 #[test]
@@ -1488,4 +1497,16 @@ fn supply_run_launch_cost_is_fixed() {
     assert_eq!(cost_1, cost_10);
     assert_eq!(cost_10, cost_25);
     assert_eq!(cost_1, 20); // Fixed at 20 per design
+}
+
+#[test]
+fn breakthrough_launch_cost_layer_1_is_78() {
+    // Formula: 70 + 8 * layer. Layer 1: 70 + 8 = 78.
+    assert_eq!(mission_launch_cost(MissionType::Breakthrough, 1), 78);
+}
+
+#[test]
+fn breakthrough_launch_cost_layer_10_is_150() {
+    // Formula: 70 + 8 * layer. Layer 10: 70 + 80 = 150.
+    assert_eq!(mission_launch_cost(MissionType::Breakthrough, 10), 150);
 }

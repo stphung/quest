@@ -133,11 +133,18 @@ pub(super) fn render_hub(
     // ── Guild Status Block ──
     let mut header_row = 0i32;
 
+    let generation = deep.prestige.generation_number;
+
     if is_compact {
         // Compact: 2-row guild block
         let marks_str = format!("\u{25c6}{}M", marks);
+        let gen_str = if generation > 1 {
+            format!("  Gen {}", generation)
+        } else {
+            String::new()
+        };
         let line = format!(
-            "Rank {} {}  {}/{}  {}/{}  {}",
+            "Rank {} {}  {}/{}  {}/{}  {}{}",
             rank.0,
             rank.display_name(),
             roster_count,
@@ -145,6 +152,7 @@ pub(super) fn render_hub(
             active_count,
             max_concurrent,
             marks_str,
+            gen_str,
         );
         put_text(buffer, header_row, 1, &line, Color::White);
         // Recolor marks in Yellow
@@ -170,7 +178,12 @@ pub(super) fn render_hub(
         header_row += 1;
     } else {
         // Full: 4-row guild block
-        put_text(buffer, header_row, 1, "GUILD STATUS", SECTION_LABEL_COLOR);
+        let gen_label = if generation > 1 {
+            format!("GUILD STATUS  \u{2014}  Generation {}", generation)
+        } else {
+            "GUILD STATUS".to_string()
+        };
+        put_text(buffer, header_row, 1, &gen_label, SECTION_LABEL_COLOR);
         header_row += 1;
 
         // Row 1: Rank + key stats + marks
@@ -214,7 +227,31 @@ pub(super) fn render_hub(
         );
         header_row += 1;
 
-        // Row 3: Next rank requirement (only if can advance)
+        // Row 3: Inheritance message (only if generation > 1)
+        if generation > 1 {
+            let cleared_count = deep.persistent.layers.iter().filter(|l| l.cleared).count();
+            let infra_count: usize = deep
+                .persistent
+                .layers
+                .iter()
+                .map(|l| l.infrastructure.len())
+                .sum();
+            if cleared_count > 0 || infra_count > 0 {
+                put_text(
+                    buffer,
+                    header_row,
+                    1,
+                    &format!(
+                        "Your predecessors cleared {} layers and built {} structures. Their work endures.",
+                        cleared_count, infra_count,
+                    ),
+                    Color::Rgb(50, 80, 110),
+                );
+                header_row += 1;
+            }
+        }
+
+        // Row 4: Next rank requirement (only if can advance)
         if rank.can_advance() {
             if let Some(next) = rank.next() {
                 if let Some(needed_layer) = next.required_breakthrough_layer() {
@@ -262,11 +299,76 @@ pub(super) fn render_hub(
     let active = &deep.prestige.active_missions;
     let completed = &deep.prestige.pending_results;
 
+    let mut missions_end_row = missions_top;
     if active.is_empty() && completed.is_empty() {
-        let content_height = (missions_bottom - missions_top).max(0) as usize;
-        let mid = missions_top + content_height as i32 / 2;
-        if ui.hub_visit_count <= 1 {
+        // No active missions — show warband log or atmospheric text
+        let log = &deep.prestige.warband_log;
+        if !log.is_empty() {
+            // Show last 5 warband log entries
+            let sep: String = "\u{2500}".repeat(width.saturating_sub(2));
+            put_text(buffer, missions_end_row, 1, &sep, Color::Rgb(40, 60, 80));
+            missions_end_row += 1;
+            put_text(
+                buffer,
+                missions_end_row,
+                1,
+                "WARBAND LOG",
+                SECTION_LABEL_COLOR,
+            );
+            missions_end_row += 1;
+            for entry in log.iter().rev().take(5) {
+                if missions_end_row >= missions_bottom {
+                    break;
+                }
+                let (icon, color) = match entry.outcome {
+                    crate::deep::MissionOutcome::Success => ("\u{2713}", Color::Green),
+                    crate::deep::MissionOutcome::PartialSuccess => ("\u{25cb}", Color::Yellow),
+                    crate::deep::MissionOutcome::Failure => ("\u{2717}", Color::LightRed),
+                };
+                let line = format!(
+                    "{} Layer {} \u{2014} {} \u{2014} {} Marks",
+                    icon, entry.layer, entry.mission_name, entry.marks_earned
+                );
+                put_text(buffer, missions_end_row, 1, &line, color);
+                missions_end_row += 1;
+            }
+        }
+
+        // Atmospheric text when no missions and no log, or below log if space remains
+        let remaining_space = (missions_bottom - missions_end_row).max(0) as usize;
+        if remaining_space >= 3 {
+            let millis = super::scene_fx::current_millis();
+            let atmosphere_messages: &[&str] = &[
+                "The tunnels breathe. Your company awaits orders.",
+                "Distant rumbles echo from below. The Deep stirs.",
+                "Torchlight flickers across weathered maps. Planning continues.",
+                "Veterans trade stories of deeper layers. Morale holds steady.",
+                "Supply crates line the staging area. Ready for deployment.",
+                "Scouts report movement in the lower passages.",
+                "The guild hall buzzes with quiet preparation.",
+                "Maps are spread across the table. Routes are being planned.",
+            ];
+            let msg_idx = (millis / 8000) as usize % atmosphere_messages.len();
+            let atmo_row = if log.is_empty() {
+                missions_top + remaining_space as i32 / 2
+            } else {
+                missions_end_row + 1
+            };
+            if atmo_row < missions_bottom {
+                put_text_centered(
+                    buffer,
+                    atmo_row,
+                    width,
+                    atmosphere_messages[msg_idx],
+                    Color::Rgb(40, 60, 90),
+                );
+            }
+        }
+
+        if ui.hub_visit_count <= 1 && log.is_empty() {
             // First-visit expanded empty state
+            let content_height = (missions_bottom - missions_top).max(0) as usize;
+            let mid = missions_top + content_height as i32 / 2;
             put_text_centered(
                 buffer,
                 mid - 2,
@@ -295,24 +397,12 @@ pub(super) fn render_hub(
                 "[Tab] Switch View  to deploy your first squad.",
                 Color::Rgb(50, 70, 100),
             );
-        } else {
+        } else if ui.hub_visit_count > 1 && log.is_empty() {
+            let content_height = (missions_bottom - missions_top).max(0) as usize;
+            let mid = missions_top + content_height as i32 / 2;
             put_text_centered(
                 buffer,
-                mid - 1,
-                width,
-                "No active missions.",
-                Color::DarkGray,
-            );
-            put_text_centered(
-                buffer,
-                mid,
-                width,
-                "Your company is ready to descend.",
-                Color::Rgb(60, 80, 120),
-            );
-            put_text_centered(
-                buffer,
-                mid + 1,
+                mid + 2,
                 width,
                 "[Missions] tab \u{2192} pick a mission and assign squad.",
                 Color::Rgb(50, 70, 100),
@@ -320,7 +410,7 @@ pub(super) fn render_hub(
             if marks == 0 {
                 put_text_centered(
                     buffer,
-                    mid + 2,
+                    mid + 3,
                     width,
                     "Supply Runs are free \u{2014} start there.",
                     Color::Rgb(40, 80, 50),
@@ -490,6 +580,32 @@ pub(super) fn render_hub(
                     Color::DarkGray,
                 );
                 row += 2;
+            }
+        }
+
+        // ── Warband log (below active missions, last 5 entries) ──
+        let log = &deep.prestige.warband_log;
+        if !log.is_empty() && row + 2 < missions_bottom {
+            let sep: String = "\u{2500}".repeat(width.saturating_sub(2));
+            put_text(buffer, row, 1, &sep, Color::Rgb(40, 60, 80));
+            row += 1;
+            put_text(buffer, row, 1, "WARBAND LOG", SECTION_LABEL_COLOR);
+            row += 1;
+            for entry in log.iter().rev().take(5) {
+                if row >= missions_bottom {
+                    break;
+                }
+                let (icon, color) = match entry.outcome {
+                    crate::deep::MissionOutcome::Success => ("\u{2713}", Color::Green),
+                    crate::deep::MissionOutcome::PartialSuccess => ("\u{25cb}", Color::Yellow),
+                    crate::deep::MissionOutcome::Failure => ("\u{2717}", Color::LightRed),
+                };
+                let line = format!(
+                    "{} Layer {} \u{2014} {} \u{2014} {} Marks",
+                    icon, entry.layer, entry.mission_name, entry.marks_earned
+                );
+                put_text(buffer, row, 1, &line, color);
+                row += 1;
             }
         }
     }

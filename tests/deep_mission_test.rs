@@ -733,6 +733,7 @@ fn make_event(resolved_choice: Option<usize>) -> CheckInEvent {
                 time_delta_secs: 3 * 3600,
                 is_risky: false,
                 unlocks_bonus_event: false,
+                risk_percent: None,
             },
             EventChoice {
                 label: "Find alternate route".to_string(),
@@ -740,6 +741,7 @@ fn make_event(resolved_choice: Option<usize>) -> CheckInEvent {
                 time_delta_secs: 0,
                 is_risky: true,
                 unlocks_bonus_event: true,
+                risk_percent: Some(30),
             },
         ],
         auto_resolve_choice: 0,
@@ -843,6 +845,7 @@ fn test_mission_result_struct_fields_are_accessible() {
         injured_mercs: vec![],
         lost_mercs: vec![],
         merc_level_ups: vec![(1, 1)],
+        danger_bonus_xp: false,
     };
     assert_eq!(result.outcome, MissionOutcome::Success);
     assert_eq!(result.marks_earned, 250);
@@ -1487,6 +1490,7 @@ fn test_duration_modifiers_outpost_reduces_by_25_percent() {
         has_saboteur: false,
         saboteur_is_veteran: false,
         is_overpowered: false,
+        bridge_layers: 0,
     };
     let result = apply_duration_modifiers(base, &mods);
     let expected = (base as f64 * 0.75) as u64;
@@ -1507,6 +1511,7 @@ fn test_duration_modifiers_mastered_familiarity_reduces_by_30_percent() {
         has_saboteur: false,
         saboteur_is_veteran: false,
         is_overpowered: false,
+        bridge_layers: 0,
     };
     let result = apply_duration_modifiers(base, &mods);
     let expected = (base as f64 * 0.70) as u64;
@@ -1526,6 +1531,7 @@ fn test_duration_never_falls_below_minimum() {
         has_saboteur: true,
         saboteur_is_veteran: true,
         is_overpowered: true,
+        bridge_layers: 0,
     };
     let result = apply_duration_modifiers(tiny_base, &mods);
     assert!(
@@ -2014,5 +2020,168 @@ fn test_assigned_merc_unavailable_for_new_mission() {
     assert!(
         matches!(result, Err(SquadAssignmentError::MercNotAvailable(1))),
         "OnMission merc should not be assignable to another mission"
+    );
+}
+
+// ── 11. Bridge duration modifier ────────────────────────────────────────────
+
+#[test]
+fn test_bridge_duration_single_bridge_reduces_by_10_percent() {
+    use quest::deep::{apply_duration_modifiers, DurationModifiers};
+    let base: u64 = 8 * 3600;
+    let mods = DurationModifiers {
+        has_outpost: false,
+        familiarity: 0,
+        has_saboteur: false,
+        saboteur_is_veteran: false,
+        is_overpowered: false,
+        bridge_layers: 1,
+    };
+    let result = apply_duration_modifiers(base, &mods);
+    let expected = (base as f64 * 0.90) as u64;
+    assert_eq!(
+        result, expected,
+        "Single bridge should reduce duration by 10%: got {result}, expected {expected}"
+    );
+}
+
+#[test]
+fn test_bridge_duration_multiple_bridges_reduces_by_27_percent() {
+    use quest::deep::{apply_duration_modifiers, DurationModifiers};
+    let base: u64 = 8 * 3600;
+    let mods = DurationModifiers {
+        has_outpost: false,
+        familiarity: 0,
+        has_saboteur: false,
+        saboteur_is_veteran: false,
+        is_overpowered: false,
+        bridge_layers: 3,
+    };
+    let result = apply_duration_modifiers(base, &mods);
+    // 3 bridges: 1.0 - 0.10 * 3 = 0.70 → 30% reduction.
+    let expected = (base as f64 * 0.70) as u64;
+    assert_eq!(
+        result, expected,
+        "Three bridges should reduce duration by 30%: got {result}, expected {expected}"
+    );
+}
+
+#[test]
+fn test_bridge_duration_cap_at_50_percent() {
+    use quest::deep::{apply_duration_modifiers, DurationModifiers};
+    let base: u64 = 8 * 3600;
+    let mods = DurationModifiers {
+        has_outpost: false,
+        familiarity: 0,
+        has_saboteur: false,
+        saboteur_is_veteran: false,
+        is_overpowered: false,
+        bridge_layers: 10,
+    };
+    let result = apply_duration_modifiers(base, &mods);
+    // 10 bridges: 1.0 - 0.10 * 10 = 0.0, but capped at 0.50 → 50% reduction.
+    let expected = (base as f64 * 0.50) as u64;
+    assert_eq!(
+        result, expected,
+        "Bridge reduction should be capped at 50%: got {result}, expected {expected}"
+    );
+}
+
+#[test]
+fn test_bridge_plus_outpost_stack_multiplicatively() {
+    use quest::deep::{apply_duration_modifiers, DurationModifiers};
+    let base: u64 = 8 * 3600;
+    let mods = DurationModifiers {
+        has_outpost: true,
+        familiarity: 0,
+        has_saboteur: false,
+        saboteur_is_veteran: false,
+        is_overpowered: false,
+        bridge_layers: 2,
+    };
+    let result = apply_duration_modifiers(base, &mods);
+    // Outpost: 0.75, Bridge 2 layers: 1.0 - 0.10 * 2 = 0.80.
+    // Total: 0.75 * 0.80 = 0.60 → 40% reduction.
+    let expected = (base as f64 * 0.75 * 0.80) as u64;
+    assert_eq!(
+        result, expected,
+        "Outpost + 2 bridges should stack multiplicatively: got {result}, expected {expected}"
+    );
+}
+
+// ── 12. Watchtower auto-resolve bonus ───────────────────────────────────────
+
+#[test]
+fn test_watchtower_auto_resolve_bonus() {
+    use quest::deep::watchtower_auto_resolve_bonus;
+    assert!(
+        (watchtower_auto_resolve_bonus(true) - 0.05).abs() < f64::EPSILON,
+        "Watchtower should grant +5% auto-resolve bonus"
+    );
+    assert!(
+        watchtower_auto_resolve_bonus(false).abs() < f64::EPSILON,
+        "No watchtower should grant 0% bonus"
+    );
+}
+
+// ── 13. Danger XP bonus ────────────────────────────────────────────────────
+
+#[test]
+fn test_danger_bonus_xp_when_underpowered() {
+    // Use a merc whose effective_power is below the mission power threshold for layer 7
+    // Expedition. Threshold at L7 = 100 (from balance table). A merc with power 5
+    // at level 1 gives effective_power = 5 + 0 = 5. This gives power_ratio = 5/100 = 0.05 < 1.0.
+    let mut rng = seeded_rng(42);
+    let mut persistent = DeepPersistent::new();
+    let _ = persistent.layer_record_mut(7);
+    let merc = make_merc(1, MercArchetype::Vanguard, 5);
+    let mut prestige = make_prestige_with_merc(merc);
+    prestige.roster[0].status = MercStatus::OnMission(1);
+
+    let now = base_time();
+    let mut mission = make_active_mission(
+        1,
+        MissionType::Expedition,
+        7,
+        vec![1],
+        now - Duration::hours(12),
+        12 * 3600,
+    );
+    resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+
+    let result = mission.result.as_ref().unwrap();
+    assert!(
+        result.danger_bonus_xp,
+        "Underpowered squad (power_ratio < 1.0) should get danger_bonus_xp"
+    );
+}
+
+#[test]
+fn test_no_danger_bonus_xp_when_overpowered() {
+    // Use a merc whose effective_power exceeds the mission power threshold for layer 1
+    // SupplyRun. Threshold at L1 = 10. A merc with power 500 at level 1 gives
+    // effective_power = 500. This gives power_ratio = 500/10 = 50.0 >= 1.0.
+    let mut rng = seeded_rng(42);
+    let mut persistent = DeepPersistent::new();
+    let _ = persistent.layer_record_mut(1);
+    let merc = make_merc(1, MercArchetype::Vanguard, 500);
+    let mut prestige = make_prestige_with_merc(merc);
+    prestige.roster[0].status = MercStatus::OnMission(1);
+
+    let now = base_time();
+    let mut mission = make_active_mission(
+        1,
+        MissionType::SupplyRun,
+        1,
+        vec![1],
+        now - Duration::hours(3),
+        3 * 3600,
+    );
+    resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+
+    let result = mission.result.as_ref().unwrap();
+    assert!(
+        !result.danger_bonus_xp,
+        "Overpowered squad (power_ratio >= 1.0) should NOT get danger_bonus_xp"
     );
 }

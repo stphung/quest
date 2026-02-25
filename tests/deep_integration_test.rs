@@ -638,6 +638,30 @@ fn test_multiple_prestige_cycles_id_counters_never_reset() {
     );
 }
 
+// ── DeepUiState farewell_mercs ─────────────────────────────────────────────────
+
+#[test]
+fn test_farewell_mercs_starts_empty() {
+    let ui = quest::deep::DeepUiState::new();
+    assert!(ui.farewell_mercs.is_empty());
+}
+
+#[test]
+fn test_farewell_mercs_stores_tuples() {
+    let mut ui = quest::deep::DeepUiState::new();
+    ui.farewell_mercs
+        .push(("Gareth the Unyielding".to_string(), 5, 12));
+    ui.farewell_mercs.push(("Lyra the Swift".to_string(), 3, 7));
+
+    assert_eq!(ui.farewell_mercs.len(), 2);
+    assert_eq!(ui.farewell_mercs[0].0, "Gareth the Unyielding");
+    assert_eq!(ui.farewell_mercs[0].1, 5);
+    assert_eq!(ui.farewell_mercs[0].2, 12);
+    assert_eq!(ui.farewell_mercs[1].0, "Lyra the Swift");
+    assert_eq!(ui.farewell_mercs[1].1, 3);
+    assert_eq!(ui.farewell_mercs[1].2, 7);
+}
+
 // ── Bonus: save_path format ───────────────────────────────────────────────────
 
 #[test]

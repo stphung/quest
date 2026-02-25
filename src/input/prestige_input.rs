@@ -13,6 +13,7 @@ pub(super) fn handle_vault_selection(
     state: &mut GameState,
     haven: &mut Haven,
     deep: &mut DeepState,
+    deep_ui: &mut crate::deep::DeepUiState,
     overlay: &mut GameOverlay,
 ) -> InputResult {
     if let GameOverlay::VaultSelection {
@@ -60,6 +61,13 @@ pub(super) fn handle_vault_selection(
                 if selected_slots.len() >= vault_slots || *confirm_pending {
                     // Remember selections for next time
                     haven.last_vault_selections = selected_slots.clone();
+                    // Capture farewell data before prestige reset
+                    deep_ui.farewell_mercs = deep
+                        .prestige
+                        .roster
+                        .iter()
+                        .map(|m| (m.name.clone(), m.level, m.missions_completed))
+                        .collect();
                     crate::character::prestige::perform_prestige_with_vault(state, selected_slots);
                     // Reset prestige-scoped Deep state while preserving guild rank,
                     // layer progression, and infrastructure.
@@ -101,6 +109,7 @@ pub(super) fn handle_prestige_confirm(
     state: &mut GameState,
     haven: &Haven,
     deep: &mut DeepState,
+    deep_ui: &mut crate::deep::DeepUiState,
     overlay: &mut GameOverlay,
 ) -> InputResult {
     match key.code {
@@ -124,6 +133,13 @@ pub(super) fn handle_prestige_confirm(
                     confirm_pending: false,
                 };
             } else {
+                // Capture farewell data before prestige reset
+                deep_ui.farewell_mercs = deep
+                    .prestige
+                    .roster
+                    .iter()
+                    .map(|m| (m.name.clone(), m.level, m.missions_completed))
+                    .collect();
                 perform_prestige(state);
                 // Reset prestige-scoped Deep state while preserving guild rank,
                 // layer progression, and infrastructure.

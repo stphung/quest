@@ -20,6 +20,14 @@ pub(super) fn handle_deep(
     game_state: &mut GameState,
     achievements: &mut crate::achievements::Achievements,
 ) -> InputResult {
+    // Farewell modal: dismiss with Enter
+    if !deep_ui.farewell_mercs.is_empty() {
+        if matches!(key.code, KeyCode::Enter) {
+            deep_ui.farewell_mercs.clear();
+        }
+        return InputResult::Continue;
+    }
+
     // Clear any transient error message on the next key press.
     deep_ui.flash_message = None;
 

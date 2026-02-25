@@ -1006,12 +1006,95 @@ fn void_scale(layer: u32) -> (f64, f64, f64) {
     (time_scale, mark_scale, injury_scale)
 }
 
+// ── Narrative personalisation ────────────────────────────────────────────────
+
+/// Replace `{merc_name}` in a description template with the first merc name,
+/// or fall back to "Your squad" if no names are provided.
+fn personalise_description(template: &str, squad_names: &[String]) -> String {
+    let lead = squad_names
+        .first()
+        .map(|n| n.as_str())
+        .unwrap_or("Your squad");
+    template.replace("{merc_name}", lead)
+}
+
+/// Personalise a choice label. For archetype-gated choices, find the matching
+/// merc name from squad_names (a vec of `"Name (Archetype)"` strings).
+/// For non-gated choices, use the first merc name.
+fn personalise_choice_label(
+    label: &str,
+    _archetype: Option<MercArchetype>,
+    _squad_names: &[String],
+) -> String {
+    // Choice labels are kept as-is from templates — they don't contain {merc_name}
+    // placeholders. We return them unmodified.
+    label.to_string()
+}
+
+// ── Narrative description templates per tier ─────────────────────────────────
+
+/// Per-tier description templates with `{merc_name}` placeholders.
+/// Used by `pick_tier_description()` to add variety to event descriptions.
+static SHALLOWS_DESCRIPTIONS: &[&str] = &[
+    "As the squad descends, {merc_name} raises a fist — movement ahead.",
+    "{merc_name} signals the squad to halt. Something stirs in the darkness.",
+    "Water drips from the ceiling. {merc_name} spots tracks in the mud.",
+    "{merc_name} kneels to examine claw marks scoring the tunnel wall.",
+];
+
+static WARRENS_DESCRIPTIONS: &[&str] = &[
+    "{merc_name} presses an ear to the stone. Vibrations from below.",
+    "The air thickens. {merc_name} catches a faint chemical smell on the breeze.",
+    "{merc_name} whispers a warning — the shadows ahead are moving.",
+    "A distant rumble shakes loose dust from the ceiling. {merc_name} steadies the squad.",
+];
+
+static HOLLOWS_DESCRIPTIONS: &[&str] = &[
+    "Luminous spores drift past. {merc_name} pulls a mask over nose and mouth.",
+    "{merc_name} traces a finger along ancient carvings. They glow faintly at the touch.",
+    "The darkness here feels heavy, almost alive. {merc_name} keeps the squad close.",
+    "{merc_name} holds up a hand. The silence ahead is wrong — too complete.",
+];
+
+static SUNKEN_REACH_DESCRIPTIONS: &[&str] = &[
+    "Black water laps at their boots. {merc_name} tests the depth with a pole.",
+    "{merc_name} spots light reflecting off something submerged — metal, or bone.",
+    "The tide is rising. {merc_name} urges the squad to move faster.",
+    "A cold current pushes past them. {merc_name} scans for the source.",
+];
+
+static ABYSS_DESCRIPTIONS: &[&str] = &[
+    "Reality bends. {merc_name} blinks — the tunnel ahead wasn't there a moment ago.",
+    "{merc_name} tastes copper. The air here carries something that isn't air.",
+    "The void hums. {merc_name} grits teeth against the pressure in their skull.",
+    "{merc_name} steadies a shaking hand. Even veterans feel the Abyss watching.",
+    "Shadows pool like liquid. {merc_name} keeps one hand on the wall, the other on a weapon.",
+];
+
+/// Select a tier-appropriate description template for an event that uses
+/// the generic `{merc_name}` pattern. Returns `None` if the tier has no
+/// extra templates (caller keeps the original description).
+fn pick_tier_description(tier: LayerTier, index: usize) -> Option<&'static str> {
+    let pool = match tier {
+        LayerTier::Shallows => SHALLOWS_DESCRIPTIONS,
+        LayerTier::Warrens => WARRENS_DESCRIPTIONS,
+        LayerTier::Hollows => HOLLOWS_DESCRIPTIONS,
+        LayerTier::SunkenReach => SUNKEN_REACH_DESCRIPTIONS,
+        LayerTier::Abyss | LayerTier::Void => ABYSS_DESCRIPTIONS,
+    };
+    if pool.is_empty() {
+        return None;
+    }
+    Some(pool[index % pool.len()])
+}
+
 // ── Conversion: EventTemplate -> CheckInEvent ─────────────────────────────────
 
 fn template_to_check_in_event(
     template: &EventTemplate,
     layer: u32,
     now: DateTime<Utc>,
+    squad_names: &[String],
 ) -> CheckInEvent {
     let (time_scale, mark_scale, _injury_scale) = void_scale(layer);
 
@@ -1021,19 +1104,29 @@ fn template_to_check_in_event(
         .map(|c| {
             let scaled_time = (c.time_delta_secs as f64 * time_scale) as i64;
             let _scaled_cost = (c.mark_cost as f64 * mark_scale) as u32;
+            // Populate risk_percent from the template's risky_success_chance.
+            let risk_percent = if c.is_risky {
+                Some(((1.0 - c.risky_success_chance) * 100.0) as u8)
+            } else {
+                None
+            };
             EventChoice {
-                label: c.label.to_string(),
+                label: personalise_choice_label(c.label, c.required_archetype, squad_names),
                 required_archetype: c.required_archetype,
                 time_delta_secs: scaled_time,
                 is_risky: c.is_risky,
                 unlocks_bonus_event: c.unlocks_bonus_event,
+                risk_percent,
             }
         })
         .collect();
 
+    // Personalise the description with merc names if available.
+    let description = personalise_description(template.description, squad_names);
+
     CheckInEvent {
         title: template.title.to_string(),
-        description: template.description.to_string(),
+        description,
         choices,
         auto_resolve_choice: template.auto_resolve_index,
         archetype_bonus: template
@@ -1060,6 +1153,20 @@ pub fn generate_mission_events(
     mission_type: MissionType,
     layer: u32,
     squad_archetypes: &[MercArchetype],
+    rng: &mut impl Rng,
+) -> Vec<CheckInEvent> {
+    generate_mission_events_with_names(mission_type, layer, squad_archetypes, &[], rng)
+}
+
+/// Generate mission events with merc names for personalised descriptions.
+///
+/// `squad_names` should be the display names of the squad mercs (e.g., `["Gareth", "Lyra"]`).
+/// If empty, descriptions use generic "Your squad" phrasing.
+pub fn generate_mission_events_with_names(
+    mission_type: MissionType,
+    layer: u32,
+    squad_archetypes: &[MercArchetype],
+    squad_names: &[String],
     rng: &mut impl Rng,
 ) -> Vec<CheckInEvent> {
     let tier = LayerTier::from_layer(layer);
@@ -1117,7 +1224,21 @@ pub fn generate_mission_events(
         // Filter choices to those available given the squad composition.
         // We keep all choices in the event — availability is validated at response time.
         // However, we must ensure auto_resolve_choice is always a non-gated option.
-        let mut event = template_to_check_in_event(template, layer, now);
+        let mut event = template_to_check_in_event(template, layer, now, squad_names);
+
+        // Replace description with a tier-flavoured variant if available.
+        // Use the event index as the selection key to get variety across events.
+        if !squad_names.is_empty() {
+            if let Some(desc_template) = pick_tier_description(tier, i) {
+                let lead_name = squad_names
+                    .first()
+                    .map(|n| n.as_str())
+                    .unwrap_or("Your squad");
+                // Prepend the flavour line to the existing description.
+                let flavour = desc_template.replace("{merc_name}", lead_name);
+                event.description = format!("{} {}", flavour, event.description);
+            }
+        }
 
         // Sanity: ensure auto_resolve_choice is not archetype-gated.
         // If it is (shouldn't happen by design), fall back to first non-gated choice.
@@ -1634,7 +1755,7 @@ mod tests {
         let mut rng = seeded_rng();
         // Generate Flooded Passage which has a Scout-gated option at index 2.
         // We need an event where index 2 is gated.
-        let mut event = template_to_check_in_event(&FLOODED_PASSAGE, 1, Utc::now());
+        let mut event = template_to_check_in_event(&FLOODED_PASSAGE, 1, Utc::now(), &[]);
         let gated_index = event
             .choices
             .iter()
@@ -1652,7 +1773,7 @@ mod tests {
     #[test]
     fn test_resolve_player_choice_gated_with_archetype_succeeds() {
         let mut rng = seeded_rng();
-        let mut event = template_to_check_in_event(&FLOODED_PASSAGE, 1, Utc::now());
+        let mut event = template_to_check_in_event(&FLOODED_PASSAGE, 1, Utc::now(), &[]);
         let gated_index = event
             .choices
             .iter()
@@ -1675,7 +1796,7 @@ mod tests {
     #[test]
     fn test_resolve_out_of_bounds_returns_none() {
         let mut rng = seeded_rng();
-        let mut event = template_to_check_in_event(&FLOODED_PASSAGE, 1, Utc::now());
+        let mut event = template_to_check_in_event(&FLOODED_PASSAGE, 1, Utc::now(), &[]);
         let res = resolve_event(&mut event, Some(999), &[], &mut rng);
         assert!(res.is_none());
     }

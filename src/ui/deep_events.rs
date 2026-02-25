@@ -241,9 +241,12 @@ pub(super) fn render_event_response(
             None => Color::DarkGray,
         };
 
-        // Consequence preview with explicit time delta
+        // Consequence preview with explicit time delta and risk percentage
         let consequence = if choice.is_risky {
-            "\u{2014} risk".to_string()
+            match choice.risk_percent {
+                Some(pct) => format!("\u{2014} ~{}% injury risk", pct),
+                None => "\u{2014} risky".to_string(),
+            }
         } else if choice.time_delta_secs > 0 {
             format!(
                 "\u{2014} +{}",

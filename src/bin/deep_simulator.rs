@@ -363,6 +363,8 @@ fn initialize_state(
             recruit_costs: Vec::new(),
         },
         pending_results: Vec::new(),
+        generation_number: 0,
+        warband_log: Vec::new(),
     };
 
     // Generate initial mission pool.
@@ -539,12 +541,21 @@ fn ensure_breakthrough_in_pool(
         .map(|r| r.has_infrastructure(Infrastructure::Outpost))
         .unwrap_or(false);
     let base = base_mission_duration_secs(tier, MissionType::Breakthrough);
+    let bridge_layers = (1..frontier)
+        .filter(|l| {
+            persistent
+                .layer_record(*l)
+                .map(|r| r.has_infrastructure(Infrastructure::Bridge))
+                .unwrap_or(false)
+        })
+        .count() as u32;
     let mods = DurationModifiers {
         has_outpost,
         familiarity,
         has_saboteur: false,
         saboteur_is_veteran: false,
         is_overpowered: false,
+        bridge_layers,
     };
     let duration_secs = apply_duration_modifiers(base, &mods);
     let min_power = mission_power_threshold(frontier, MissionType::Breakthrough);
@@ -640,12 +651,21 @@ fn ensure_construction_in_pool(
         .map(|r| r.has_infrastructure(Infrastructure::Outpost))
         .unwrap_or(false);
     let base = base_mission_duration_secs(tier, MissionType::Construction(infra));
+    let bridge_layers = (1..target_layer)
+        .filter(|l| {
+            persistent
+                .layer_record(*l)
+                .map(|r| r.has_infrastructure(Infrastructure::Bridge))
+                .unwrap_or(false)
+        })
+        .count() as u32;
     let mods = DurationModifiers {
         has_outpost,
         familiarity,
         has_saboteur: false,
         saboteur_is_veteran: false,
         is_overpowered: false,
+        bridge_layers,
     };
     let duration_secs = apply_duration_modifiers(base, &mods);
     let min_power = mission_power_threshold(target_layer, MissionType::Construction(infra));

@@ -20,7 +20,7 @@ use super::economy::{
     outcome_mark_multiplier, prestige_fragment_hundredths, stormglass_reward, xp_reward,
     MarkRewardParams,
 };
-use super::events::{generate_mission_events, tick_mission_events, EventTickResult};
+use super::events::{generate_mission_events_with_names, tick_mission_events, EventTickResult};
 use super::layers::{
     apply_duration_modifiers, apply_familiarity_gain, base_mission_duration_secs,
     mark_layer_cleared, mission_power_threshold, DurationModifiers,
@@ -175,12 +175,21 @@ fn generate_available_mission(
         .unwrap_or(false);
 
     let saboteur_present = false; // Pool generation doesn't know squad yet.
+    let bridge_layers = (1..layer)
+        .filter(|l| {
+            persistent
+                .layer_record(*l)
+                .map(|r| r.has_infrastructure(Infrastructure::Bridge))
+                .unwrap_or(false)
+        })
+        .count() as u32;
     let mods = DurationModifiers {
         has_outpost,
         familiarity,
         has_saboteur: saboteur_present,
         saboteur_is_veteran: false,
         is_overpowered: false,
+        bridge_layers,
     };
     let base = base_mission_duration_secs(tier, mission_type);
     let duration_secs = apply_duration_modifiers(base, &mods);
@@ -418,6 +427,15 @@ pub fn start_mission(
     let threshold = mission_power_threshold(available.layer, available.mission_type);
     let is_overpowered = total_power >= (threshold * 3 / 2); // ≥150% of threshold
 
+    let bridge_layers = (1..available.layer)
+        .filter(|l| {
+            persistent
+                .layer_record(*l)
+                .map(|r| r.has_infrastructure(Infrastructure::Bridge))
+                .unwrap_or(false)
+        })
+        .count() as u32;
+
     let tier = LayerTier::from_layer(available.layer);
     let base_duration = base_mission_duration_secs(tier, available.mission_type);
     let mods = DurationModifiers {
@@ -426,16 +444,24 @@ pub fn start_mission(
         has_saboteur,
         saboteur_is_veteran,
         is_overpowered,
+        bridge_layers,
     };
     let duration_secs = apply_duration_modifiers(base_duration, &mods);
 
     let ends_at = now + Duration::seconds(duration_secs as i64);
 
+    // Gather squad merc names for personalised event descriptions.
+    let squad_names: Vec<String> = merc_ids
+        .iter()
+        .filter_map(|&id| prestige.find_merc(id).map(|m| m.name.clone()))
+        .collect();
+
     // Generate check-in events (pre-scheduled at fraction points).
-    let events = generate_mission_events(
+    let events = generate_mission_events_with_names(
         available.mission_type,
         available.layer,
         &squad_archetypes,
+        &squad_names,
         rng,
     );
 
@@ -763,8 +789,23 @@ pub fn resolve_mission(
     let (injured_mercs, lost_mercs) =
         apply_mission_casualties(mission, prestige, persistent, &outcome, rng);
 
-    // Apply merc XP and level-ups.
-    let merc_level_ups = apply_squad_xp(mission, prestige, &outcome);
+    // Compute power ratio for danger bonus check.
+    let threshold = mission_power_threshold(mission.layer, mission.mission_type);
+    let total_power: u32 = mission
+        .squad
+        .iter()
+        .filter_map(|&id| prestige.find_merc(id))
+        .map(|m| m.effective_power())
+        .sum();
+    let power_ratio = if threshold == 0 {
+        2.0f64
+    } else {
+        total_power as f64 / threshold as f64
+    };
+    let danger_bonus = power_ratio < 1.0;
+
+    // Apply merc XP and level-ups (with danger bonus if underpowered).
+    let merc_level_ups = apply_squad_xp(mission, prestige, &outcome, danger_bonus);
 
     // Update layer familiarity.
     if let Some(record) = persistent
@@ -800,6 +841,7 @@ pub fn resolve_mission(
         injured_mercs,
         lost_mercs,
         merc_level_ups,
+        danger_bonus_xp: danger_bonus,
     });
 
     mission.status = MissionStatus::Completed;
@@ -926,13 +968,18 @@ fn release_squad_from_mission(mission: &Mission, prestige: &mut DeepPrestige) {
 /// Apply XP to squad members and compute level-ups.
 ///
 /// Returns a list of (merc_id, levels_gained) for the notification display.
+/// When `danger_bonus` is true (squad underpowered, power_ratio < 1.0), merc XP
+/// is multiplied by 1.5x as a reward for the risky rush.
 fn apply_squad_xp(
     mission: &Mission,
     prestige: &mut DeepPrestige,
     outcome: &MissionOutcome,
+    danger_bonus: bool,
 ) -> Vec<(u64, u32)> {
     let base_xp = merc_xp_per_mission(mission.mission_type, mission.layer);
-    let xp = (base_xp as f64 * outcome_mark_multiplier(outcome.clone())).round() as u32;
+    let danger_mult = if danger_bonus { 1.5 } else { 1.0 };
+    let xp =
+        (base_xp as f64 * outcome_mark_multiplier(outcome.clone()) * danger_mult).round() as u32;
 
     let mut level_ups = Vec::new();
 

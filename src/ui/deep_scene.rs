@@ -471,6 +471,82 @@ pub fn render_deep_overlay(
             super::deep_results::render_mission_results(frame, area, mission, deep, ctx);
         }
     }
+
+    // Farewell modal shown after prestige when there were mercs
+    if !ui.farewell_mercs.is_empty() {
+        render_farewell_modal(frame, area, &ui.farewell_mercs);
+    }
+}
+
+// ── Farewell Modal ──────────────────────────────────────────────────────────
+
+/// Render the prestige farewell modal listing lost mercenaries.
+fn render_farewell_modal(frame: &mut Frame, area: Rect, mercs: &[(String, u32, u32)]) {
+    use ratatui::{
+        style::Modifier,
+        text::{Line, Span},
+        widgets::Paragraph,
+    };
+
+    let line_count = mercs.len().min(10);
+    let modal_height = (6 + line_count as u16).min(area.height.saturating_sub(4));
+    let modal_width = 54u16.min(area.width.saturating_sub(4));
+    let x = area.x + (area.width.saturating_sub(modal_width)) / 2;
+    let y = area.y + (area.height.saturating_sub(modal_height)) / 2;
+    let modal_area = Rect::new(x, y, modal_width, modal_height);
+
+    frame.render_widget(Clear, modal_area);
+
+    let block = Block::default()
+        .title(" The Deep Claims Another Generation ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(super::themed_border_color(Color::Yellow)));
+    let inner = super::render_themed_block(
+        frame,
+        modal_area,
+        block,
+        Color::Yellow,
+        super::BorderFxContext,
+    );
+
+    let mut lines = vec![Line::from("")];
+
+    for (name, level, _missions) in mercs.iter().take(10) {
+        let flavor = match *level {
+            1..=3 => "fell before their time",
+            4..=6 => "served with courage",
+            7..=9 => "served with honor",
+            _ => "legends of the deep",
+        };
+        lines.push(Line::from(vec![
+            Span::styled(
+                format!("  {} (Lv{})", name, level),
+                Style::default().fg(Color::White),
+            ),
+            Span::styled(
+                format!(" \u{2014} {}", flavor),
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::ITALIC),
+            ),
+        ]));
+    }
+
+    if mercs.len() > 10 {
+        lines.push(Line::from(Span::styled(
+            format!("  ...and {} more", mercs.len() - 10),
+            Style::default().fg(Color::DarkGray),
+        )));
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "[Enter] Continue",
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    let text = Paragraph::new(lines).alignment(ratatui::layout::Alignment::Center);
+    frame.render_widget(text, inner);
 }
 
 // ── Help panel ──────────────────────────────────────────────────────────────

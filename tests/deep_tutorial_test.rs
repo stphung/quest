@@ -740,6 +740,7 @@ fn test_checkin_event_auto_resolve_fallback() {
                 time_delta_secs: 3 * 3600,
                 is_risky: false,
                 unlocks_bonus_event: false,
+                risk_percent: None,
             },
             EventChoice {
                 label: "Find alternate route".to_string(),
@@ -747,6 +748,7 @@ fn test_checkin_event_auto_resolve_fallback() {
                 time_delta_secs: 0,
                 is_risky: true,
                 unlocks_bonus_event: true,
+                risk_percent: Some(30),
             },
         ],
         auto_resolve_choice: 0,
@@ -776,6 +778,7 @@ fn test_checkin_event_player_resolution() {
                 time_delta_secs: 3 * 3600,
                 is_risky: false,
                 unlocks_bonus_event: false,
+                risk_percent: None,
             },
             EventChoice {
                 label: "Find alternate route".to_string(),
@@ -783,6 +786,7 @@ fn test_checkin_event_player_resolution() {
                 time_delta_secs: 0,
                 is_risky: true,
                 unlocks_bonus_event: true,
+                risk_percent: Some(30),
             },
         ],
         auto_resolve_choice: 0,
@@ -809,6 +813,7 @@ fn test_checkin_event_auto_resolve_is_safe() {
                 time_delta_secs: 3600,
                 is_risky: false,
                 unlocks_bonus_event: false,
+                risk_percent: None,
             },
             EventChoice {
                 label: "Risky option".to_string(),
@@ -816,6 +821,7 @@ fn test_checkin_event_auto_resolve_is_safe() {
                 time_delta_secs: 0,
                 is_risky: true,
                 unlocks_bonus_event: false,
+                risk_percent: Some(40),
             },
         ],
         auto_resolve_choice: 0,
