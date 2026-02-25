@@ -552,9 +552,7 @@ pub(super) fn draw_footer_compact(
         Span::styled(" [A]Ach", Style::default().fg(Color::Magenta))
     };
 
-    let line = Line::from(vec![
-        Span::styled("[Esc]Quit", Style::default().fg(Color::Red)),
-        Span::raw(" "),
+    let controls = Line::from(vec![
         prestige_span,
         haven_span,
         soulforge_span,
@@ -565,8 +563,20 @@ pub(super) fn draw_footer_compact(
         Span::styled(" [!]Bug", Style::default().fg(Color::DarkGray)),
     ]);
 
-    let paragraph = Paragraph::new(line).alignment(Alignment::Center);
-    frame.render_widget(paragraph, area);
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Length(9), Constraint::Min(0)])
+        .split(area);
+
+    let esc = Paragraph::new(Line::from(Span::styled(
+        "[Esc]Quit",
+        Style::default().fg(Color::Red),
+    )));
+    frame.render_widget(esc, chunks[0]);
+    frame.render_widget(
+        Paragraph::new(controls).alignment(Alignment::Center),
+        chunks[1],
+    );
 }
 
 /// Draws a minimal footer for S tier.
@@ -585,14 +595,25 @@ pub(super) fn draw_footer_minimal(frame: &mut Frame, area: Rect, game_state: &Ga
         Span::styled(" P:Prestige", Style::default().fg(Color::DarkGray))
     };
 
-    let line = Line::from(vec![
-        Span::styled("Esc:Quit", Style::default().fg(Color::Red)),
+    let controls = Line::from(vec![
         prestige_span,
         Span::styled(" !:Bug", Style::default().fg(Color::DarkGray)),
     ]);
 
-    let paragraph = Paragraph::new(line).alignment(Alignment::Center);
-    frame.render_widget(paragraph, area);
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Length(8), Constraint::Min(0)])
+        .split(area);
+
+    let esc = Paragraph::new(Line::from(Span::styled(
+        "Esc:Quit",
+        Style::default().fg(Color::Red),
+    )));
+    frame.render_widget(esc, chunks[0]);
+    frame.render_widget(
+        Paragraph::new(controls).alignment(Alignment::Center),
+        chunks[1],
+    );
 }
 
 /// Formats play time as "Xmo Xw Xd Xh Xm Xs"
@@ -644,9 +665,9 @@ pub fn draw_footer(
     _ctx: &LayoutContext,
 ) {
     use crate::character::prestige::can_prestige;
-    use crate::utils::build_info::{BUILD_COMMIT, BUILD_DATE};
+    use crate::utils::build_info::BUILD_COMMIT;
 
-    let version_title = format!(" v{} ({}) ", BUILD_DATE, BUILD_COMMIT);
+    let version_title = format!(" {} ", BUILD_COMMIT);
 
     let can_prestige_now = can_prestige(game_state);
     let prestige_text = if can_prestige_now {
@@ -665,15 +686,30 @@ pub fn draw_footer(
     };
 
     let update_status_text = if let Some(info) = update_info {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let millis = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis();
+        // Sine-wave pulse between dim (60,50,0) and bright yellow (255,215,0)
+        // Full cycle ~3.2 seconds for a breathing fade in/out
+        let phase = (millis % 3200) as f64 / 3200.0 * std::f64::consts::TAU;
+        let t = (phase.sin() + 1.0) / 2.0; // 0.0 to 1.0
+        let r = (60.0 + t * 195.0) as u8;
+        let g = (50.0 + t * 165.0) as u8;
+        let b = 0;
+        let color = Color::Rgb(r, g, b);
         Span::styled(
-            format!("    \u{2191} v{} avail", info.new_version),
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
+            format!(
+                "    \u{2191} Update: {}",
+                &info.new_commit[..7.min(info.new_commit.len())]
+            ),
+            Style::default().fg(color).add_modifier(Modifier::BOLD),
         )
     } else if !update_check_completed {
+        let spinner = super::throbber::spinner_char();
         Span::styled(
-            "    \u{25e6} Checking...",
+            format!("    {} Checking...", spinner),
             Style::default().fg(Color::DarkGray),
         )
     } else if update_check_failed {
@@ -716,8 +752,6 @@ pub fn draw_footer(
 
     let footer_text = vec![
         Line::from(vec![
-            Span::styled("[Esc] Quit", Style::default().fg(Color::Red)),
-            Span::raw("    "),
             prestige_text,
             haven_text,
             soulforge_text,
@@ -732,12 +766,24 @@ pub fn draw_footer(
         ]),
     ];
 
-    let footer = Paragraph::new(footer_text)
-        .block(super::themed_block(
-            Block::default().borders(Borders::ALL).title(version_title),
-        ))
-        .alignment(Alignment::Center);
-
-    frame.render_widget(footer, area);
+    let footer_block =
+        super::themed_block(Block::default().borders(Borders::ALL).title(version_title));
+    let footer_inner = footer_block.inner(area);
+    frame.render_widget(footer_block, area);
     super::apply_themed_border_fx(frame, area, Color::White, super::BorderFxContext);
+
+    // Split inner: [Esc] bottom-left, controls centered
+    let footer_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Length(10), Constraint::Min(0)])
+        .split(footer_inner);
+
+    let esc_text = Paragraph::new(Line::from(Span::styled(
+        "[Esc] Quit",
+        Style::default().fg(Color::Red),
+    )));
+    frame.render_widget(esc_text, footer_chunks[0]);
+
+    let controls = Paragraph::new(footer_text).alignment(Alignment::Center);
+    frame.render_widget(controls, footer_chunks[1]);
 }
