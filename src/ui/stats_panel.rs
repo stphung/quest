@@ -41,7 +41,9 @@ pub fn draw_stats_panel(
                 Constraint::Length(4), // Combat stats
             ];
             if etched > 0 {
-                constraints.push(Constraint::Length(etched as u16 + 2)); // Sigils
+                constraints.push(Constraint::Length(
+                    crate::stormglass::sigils::MAX_SIGIL_SLOTS as u16 + 2,
+                )); // Sigils (all 5 slots)
             }
             constraints.push(Constraint::Min(0)); // Equipment
 
