@@ -96,6 +96,10 @@ pub(super) fn render_achievement_detail(
             .fg(Color::White)
             .add_modifier(Modifier::BOLD),
     )));
+    lines.push(Line::from(Span::styled(
+        format!("Worth {} pts", def.points),
+        Style::default().fg(Color::Cyan),
+    )));
     lines.push(Line::from(""));
 
     // Description
@@ -632,13 +636,36 @@ fn build_stats_right_lines(
     let total_count = achievements.total_count();
     let pct = achievements.unlock_percentage();
 
+    let score = achievements.achievement_score();
+    let max_score = Achievements::max_achievement_score();
     lines.push(Line::from(vec![
         Span::styled("ACHIEVEMENTS", section_style),
         Span::styled(
-            format!("    {}/{} {:.1}%", total_unlocked, total_count, pct),
+            format!(
+                "    {}/{} {:.1}%  {}pts",
+                total_unlocked,
+                total_count,
+                pct,
+                format_number(score as u64)
+            ),
             Style::default().fg(Color::Cyan),
         ),
     ]));
+    lines.push(Line::from(Span::styled(
+        "\u{2500}".repeat(width as usize),
+        separator_style,
+    )));
+    lines.push(stat_line(
+        "Score",
+        &format!(
+            "{}/{}",
+            format_number(score as u64),
+            format_number(max_score as u64)
+        ),
+        Style::default().fg(Color::DarkGray),
+        Style::default().fg(Color::Cyan),
+        width,
+    ));
     lines.push(Line::from(Span::styled(
         "\u{2500}".repeat(width as usize),
         separator_style,

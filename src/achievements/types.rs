@@ -244,6 +244,7 @@ pub struct AchievementDef {
     pub description: &'static str,
     pub category: AchievementCategory,
     pub icon: &'static str,
+    pub points: u32,
 }
 
 /// Progress on a single achievement (for multi-stage achievements).

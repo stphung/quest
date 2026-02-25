@@ -3,6 +3,7 @@
 //! Displays a browsable list of achievements organized by category,
 //! with a detail panel showing description and unlock status.
 
+use super::achievement_details::format_number;
 use crate::achievements::{get_achievement_def, AchievementCategory, AchievementId, Achievements};
 use crate::enhancement::EnhancementProgress;
 use ratatui::{
@@ -94,7 +95,9 @@ pub fn render_achievement_browser(
 
     let block = Block::default()
         .title(format!(
-            " Achievements ({:.1}% Complete) ",
+            " Achievements ({}/{} pts, {:.1}%) ",
+            format_number(achievements.achievement_score() as u64),
+            format_number(Achievements::max_achievement_score() as u64),
             achievements.unlock_percentage()
         ))
         .borders(Borders::ALL)
@@ -209,6 +212,10 @@ pub fn render_achievement_unlocked_modal(
                 def.description,
                 Style::default().fg(Color::White),
             )));
+            lines.push(Line::from(Span::styled(
+                format!("+{} pts", def.points),
+                Style::default().fg(Color::Cyan),
+            )));
         }
     } else {
         // Multiple achievements: show count and list
@@ -235,6 +242,16 @@ pub fn render_achievement_unlocked_modal(
                 Style::default().fg(Color::DarkGray),
             )));
         }
+
+        let total_pts: u32 = achievements
+            .iter()
+            .filter_map(|id| get_achievement_def(*id))
+            .map(|def| def.points)
+            .sum();
+        lines.push(Line::from(Span::styled(
+            format!("+{} pts", total_pts),
+            Style::default().fg(Color::Cyan),
+        )));
     }
 
     lines.push(Line::from(""));
