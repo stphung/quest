@@ -862,8 +862,8 @@ fn apply_mission_casualties(
             MissionOutcome::Failure => 0.35 + risk_tier as f64 * 0.15,
         };
 
-        // Resilience reduces injury chance (cap at 60%).
-        let resilience_factor = 1.0 - (resilience as f64 / 100.0).min(0.60);
+        // Resilience reduces injury chance (cap at 40%).
+        let resilience_factor = 1.0 - (resilience as f64 / 100.0).min(0.40);
 
         // Medic triage bonus: 20% reduction for non-Medic squad members.
         let medic_factor = if has_medic && merc.archetype != MercArchetype::Medic {
@@ -878,7 +878,7 @@ fn apply_mission_casualties(
         if rng.random::<f64>() < injury_chance {
             // Determine if injury or loss.
             let loss_chance = match outcome {
-                MissionOutcome::Failure => 0.15 + risk_tier as f64 * 0.05,
+                MissionOutcome::Failure => 0.15 + risk_tier as f64 * 0.10,
                 _ => 0.05,
             };
 
