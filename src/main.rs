@@ -392,6 +392,13 @@ fn main() -> io::Result<()> {
             } => {
                 let mut state = *state;
 
+                // Resolve Deep missions that completed while offline
+                main_helpers::offline::resolve_deep_offline(
+                    &mut deep_state,
+                    &mut global_achievements,
+                    &state.character_name,
+                );
+
                 play_screen_transition(&mut terminal)?;
                 terminal.clear()?;
 

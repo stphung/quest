@@ -11,17 +11,19 @@ pub enum AchievementCategory {
     Progression,
     Challenges,
     Exploration,
+    Deep,
     Stats,
 }
 
 impl AchievementCategory {
     /// All categories in display order.
-    pub const ALL: [AchievementCategory; 6] = [
+    pub const ALL: [AchievementCategory; 7] = [
         AchievementCategory::Combat,
         AchievementCategory::Level,
         AchievementCategory::Progression,
         AchievementCategory::Challenges,
         AchievementCategory::Exploration,
+        AchievementCategory::Deep,
         AchievementCategory::Stats,
     ];
 
@@ -33,6 +35,7 @@ impl AchievementCategory {
             AchievementCategory::Progression => "Progression",
             AchievementCategory::Challenges => "Challenges",
             AchievementCategory::Exploration => "Exploration",
+            AchievementCategory::Deep => "The Deep",
             AchievementCategory::Stats => "Stats",
         }
     }
@@ -535,6 +538,7 @@ mod tests {
         assert_eq!(AchievementCategory::Progression.name(), "Progression");
         assert_eq!(AchievementCategory::Challenges.name(), "Challenges");
         assert_eq!(AchievementCategory::Exploration.name(), "Exploration");
+        assert_eq!(AchievementCategory::Deep.name(), "The Deep");
         assert_eq!(AchievementCategory::Stats.name(), "Stats");
     }
 

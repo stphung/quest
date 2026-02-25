@@ -305,14 +305,12 @@ impl Achievements {
     // =========================================================================
 
     /// Called when The Deep is first discovered.
-    #[allow(dead_code)]
     pub fn on_deep_discovered(&mut self, character_name: Option<&str>) {
         self.unlock_with_name(AchievementId::TheDeepDiscovered, character_name);
     }
 
     /// Called when a Deep mission is completed.
     /// Unlocks mission completion milestone achievements.
-    #[allow(dead_code)]
     pub fn on_deep_mission_complete(&mut self, character_name: Option<&str>) {
         self.total_deep_missions_completed += 1;
 
@@ -325,7 +323,6 @@ impl Achievements {
 
     /// Called when a breakthrough mission is completed in The Deep.
     /// Unlocks FirstBreakthrough and checks layer milestones.
-    #[allow(dead_code)]
     pub fn on_deep_breakthrough(&mut self, new_layer: u32, character_name: Option<&str>) {
         self.unlock_with_name(AchievementId::FirstBreakthrough, character_name);
 
@@ -337,7 +334,7 @@ impl Achievements {
     }
 
     /// Called when the guild rank increases in The Deep.
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Will be wired when guild rank upgrade UI is added
     pub fn on_deep_guild_rank_up(&mut self, new_rank: u32, character_name: Option<&str>) {
         if new_rank > self.highest_guild_rank {
             self.highest_guild_rank = new_rank;
@@ -347,7 +344,6 @@ impl Achievements {
     }
 
     /// Called when a mercenary is permanently lost in The Deep.
-    #[allow(dead_code)]
     pub fn on_deep_merc_lost(&mut self, character_name: Option<&str>) {
         self.unlock_with_name(AchievementId::FirstMercLost, character_name);
     }

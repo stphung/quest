@@ -45,7 +45,8 @@ impl AchievementBrowserState {
             AchievementCategory::Level => AchievementCategory::Progression,
             AchievementCategory::Progression => AchievementCategory::Challenges,
             AchievementCategory::Challenges => AchievementCategory::Exploration,
-            AchievementCategory::Exploration => AchievementCategory::Stats,
+            AchievementCategory::Exploration => AchievementCategory::Deep,
+            AchievementCategory::Deep => AchievementCategory::Stats,
             AchievementCategory::Stats => AchievementCategory::Combat,
         };
         self.selected_index = 0;
@@ -54,7 +55,8 @@ impl AchievementBrowserState {
     pub fn prev_category(&mut self) {
         self.selected_category = match self.selected_category {
             AchievementCategory::Combat => AchievementCategory::Stats,
-            AchievementCategory::Stats => AchievementCategory::Exploration,
+            AchievementCategory::Stats => AchievementCategory::Deep,
+            AchievementCategory::Deep => AchievementCategory::Exploration,
             AchievementCategory::Level => AchievementCategory::Combat,
             AchievementCategory::Progression => AchievementCategory::Level,
             AchievementCategory::Challenges => AchievementCategory::Progression,
@@ -300,12 +302,16 @@ mod tests {
         state.next_category();
         assert_eq!(state.selected_category, AchievementCategory::Exploration);
         state.next_category();
+        assert_eq!(state.selected_category, AchievementCategory::Deep);
+        state.next_category();
         assert_eq!(state.selected_category, AchievementCategory::Stats);
         state.next_category();
         assert_eq!(state.selected_category, AchievementCategory::Combat);
 
         state.prev_category();
         assert_eq!(state.selected_category, AchievementCategory::Stats);
+        state.prev_category();
+        assert_eq!(state.selected_category, AchievementCategory::Deep);
         state.prev_category();
         assert_eq!(state.selected_category, AchievementCategory::Exploration);
 
@@ -331,6 +337,7 @@ mod tests {
         state.next_category(); // Progression
         state.next_category(); // Challenges
         state.next_category(); // Exploration
+        state.next_category(); // Deep
         state.next_category(); // Stats
         assert_eq!(state.selected_category, AchievementCategory::Stats);
 
@@ -342,7 +349,11 @@ mod tests {
         state.prev_category();
         assert_eq!(state.selected_category, AchievementCategory::Stats);
 
-        // Backward from Stats goes to Exploration
+        // Backward from Stats goes to Deep
+        state.prev_category();
+        assert_eq!(state.selected_category, AchievementCategory::Deep);
+
+        // Backward from Deep goes to Exploration
         state.prev_category();
         assert_eq!(state.selected_category, AchievementCategory::Exploration);
     }

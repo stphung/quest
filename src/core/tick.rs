@@ -256,10 +256,62 @@ pub fn game_tick<R: Rng>(
         && state.active_minigame.is_none()
         && crate::deep::try_discover_deep(deep, state.prestige_rank, rng)
     {
+        achievements.on_deep_discovered(Some(&state.character_name));
         result.events.push(TickEvent::DeepDiscovered);
         result.deep_changed = true;
         if !debug_mode {
             result.achievements_changed = true;
+        }
+    }
+
+    // ── 11c. Deep mission ticking ──────────────────────────────────
+    // Tick active missions (wall-clock based), resolve completions,
+    // and fire achievement handlers.
+    if deep.persistent.discovered {
+        let now = chrono::Utc::now();
+        let pending_before = deep.prestige.pending_results.len();
+        let summary = crate::deep::missions::tick_all_missions(
+            &mut deep.prestige,
+            &mut deep.persistent,
+            now,
+            rng,
+        );
+
+        if summary.missions_completed > 0 || summary.events_fired > 0 {
+            result.deep_changed = true;
+        }
+
+        // Fire achievement handlers for completed missions
+        for _ in 0..summary.missions_completed {
+            achievements.on_deep_mission_complete(Some(&state.character_name));
+        }
+        for layer in &summary.breakthroughs {
+            achievements.on_deep_breakthrough(*layer, Some(&state.character_name));
+        }
+        for _ in 0..summary.mercs_lost {
+            achievements.on_deep_merc_lost(Some(&state.character_name));
+        }
+
+        if (summary.missions_completed > 0 || summary.mercs_lost > 0) && !debug_mode {
+            result.achievements_changed = true;
+        }
+
+        // Emit tick events for newly completed missions
+        for pending in deep.prestige.pending_results.iter().skip(pending_before) {
+            if let Some(ref res) = pending.result {
+                let outcome_str = match res.outcome {
+                    crate::deep::MissionOutcome::Success => "Success",
+                    crate::deep::MissionOutcome::PartialSuccess => "Partial Success",
+                    crate::deep::MissionOutcome::Failure => "Failure",
+                };
+                result.events.push(TickEvent::DeepMissionComplete {
+                    message: format!(
+                        "\u{1F4DC} Mission complete: {} ({})",
+                        pending.mission_type.display_name(),
+                        outcome_str
+                    ),
+                });
+            }
         }
     }
 
