@@ -13,7 +13,7 @@ src/achievements/
 ├── milestones.rs     # MinigameType, MinigameDifficulty enums, milestone threshold arrays (SLAYER, BOSS_HUNTER, etc.)
 ├── modal.rs          # Modal notification queue, 500ms accumulation window management
 ├── notifications.rs  # Pending notification state, category-based notification counts
-├── stats.rs          # Achievement statistics, unlock percentages, progress queries, category breakdowns
+├── stats.rs          # Achievement statistics, unlock percentages, progress queries, category breakdowns, score computation
 ├── titles.rs         # Title definitions — maps curated achievements to display text, title selection/validation
 ├── unlock.rs         # Core unlock machinery (is_unlocked, unlock, unlock_with_name, check_milestones)
 └── persistence.rs    # Save/load from ~/.quest/achievements.json
@@ -41,7 +41,7 @@ Six categories for browsing: `Combat`, `Level`, `Progression`, `Challenges`, `Ex
 
 ### `AchievementDef` (`data.rs`)
 
-Static definition with `id`, `name`, `description`, `category`, and `icon`. All definitions live in the `ALL_ACHIEVEMENTS` const slice.
+Static definition with `id`, `name`, `description`, `category`, `icon`, and `points`. All definitions live in the `ALL_ACHIEVEMENTS` const slice. Points use a 7-tier system: Trivial (5), Easy (10), Medium (25), Hard (50), Very Hard (100), Elite (250), Pinnacle (500). Max total: 16,365 points across 149 achievements.
 
 ### `Achievements` (`types.rs`)
 
@@ -129,7 +129,7 @@ Titles are shown in: stats panel header, character select screen, and achievemen
 ## Adding a New Achievement
 
 1. Add variant to `AchievementId` enum in `types.rs`
-2. Add `AchievementDef` entry to `ALL_ACHIEVEMENTS` in `data.rs` (with name, description, category, icon)
+2. Add `AchievementDef` entry to `ALL_ACHIEVEMENTS` in `data.rs` (with name, description, category, icon, points)
 3. Add unlock logic: either add a threshold to a milestone array in `milestones.rs`, or create a new `on_*` handler in `handlers.rs`
 4. Call the handler from `tick.rs` or `main.rs` at the appropriate point
 5. Tests: add milestone test following the existing pattern
