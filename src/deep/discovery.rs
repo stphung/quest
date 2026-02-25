@@ -44,6 +44,48 @@ pub fn try_discover_deep<R: Rng>(deep: &mut DeepState, prestige_rank: u32, rng: 
     true
 }
 
+/// Check if the story chain should advance and optionally award fragments.
+///
+/// Called after rift resonance is incremented (during prestige).
+/// Returns the new story stage if it advanced, or None.
+pub fn advance_deep_story(deep: &mut DeepState, prestige_rank: u32) -> Option<u8> {
+    if deep.persistent.discovered {
+        return None;
+    }
+
+    // Award fragments based on resonance
+    deep.maybe_award_rift_fragment();
+
+    // Check stage progression
+    deep.check_story_progression(prestige_rank)
+}
+
+/// Complete the discovery via the story chain. Called when the player
+/// presses [D] after stage 4 is reached.
+pub fn complete_story_discovery<R: Rng>(deep: &mut DeepState, rng: &mut R) {
+    if deep.persistent.discovered || deep.persistent.deep_story_stage < 4 {
+        return;
+    }
+    deep.persistent.discovered = true;
+    deep.persistent.deep_story_stage = 5;
+    let starters = generate_starter_roster(
+        deep.persistent.guild_rank,
+        || deep.persistent.next_merc_id(),
+        rng,
+    );
+    deep.prestige.roster.extend(starters);
+    deep.prestige.available_missions =
+        super::missions::generate_mission_pool(&deep.persistent, rng);
+    deep.prestige.warband_marks = match deep.persistent.guild_rank.0 {
+        1 => 50,
+        2 => 100,
+        3 => 200,
+        4 => 350,
+        5 => 500,
+        _ => 50,
+    };
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::types::{

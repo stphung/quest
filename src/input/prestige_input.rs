@@ -68,6 +68,14 @@ pub(super) fn handle_vault_selection(
                         .iter()
                         .map(|m| (m.name.clone(), m.level, m.missions_completed))
                         .collect();
+                    // Rift Resonance and story chain — must happen before on_prestige()
+                    deep.maybe_increment_rift_resonance(
+                        state.zone_progression.current_zone_id,
+                        state.prestige_rank,
+                    );
+                    if let Some(new_stage) = crate::deep::discovery::advance_deep_story(deep, state.prestige_rank) {
+                        deep_ui.pending_story_stage = Some(new_stage);
+                    }
                     crate::character::prestige::perform_prestige_with_vault(state, selected_slots);
                     // Reset prestige-scoped Deep state while preserving guild rank,
                     // layer progression, and infrastructure.
@@ -140,6 +148,14 @@ pub(super) fn handle_prestige_confirm(
                     .iter()
                     .map(|m| (m.name.clone(), m.level, m.missions_completed))
                     .collect();
+                // Rift Resonance and story chain — must happen before on_prestige()
+                deep.maybe_increment_rift_resonance(
+                    state.zone_progression.current_zone_id,
+                    state.prestige_rank,
+                );
+                if let Some(new_stage) = crate::deep::discovery::advance_deep_story(deep, state.prestige_rank) {
+                    deep_ui.pending_story_stage = Some(new_stage);
+                }
                 perform_prestige(state);
                 // Reset prestige-scoped Deep state while preserving guild rank,
                 // layer progression, and infrastructure.

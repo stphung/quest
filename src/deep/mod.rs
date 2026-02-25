@@ -70,9 +70,18 @@ pub use types::{
     DEEP_DISCOVERY_BASE_CHANCE,
     DEEP_DISCOVERY_RANK_BONUS,
     DEEP_MIN_PRESTIGE_RANK,
+    GATEWAY_LAYER,
+    STORY_PRESTIGE_CAPTAIN,
+    STORY_PRESTIGE_ENTRANCE,
+    STORY_PRESTIGE_FRAGMENT,
+    STORY_PRESTIGE_TREMORS,
+    STORY_RESONANCE_CAPTAIN,
+    STORY_RESONANCE_ENTRANCE,
+    STORY_RESONANCE_FRAGMENT,
+    STORY_RESONANCE_TREMORS,
 };
 
-pub use discovery::try_discover_deep;
+pub use discovery::{advance_deep_story, complete_story_discovery, try_discover_deep};
 
 // Economy re-exports
 #[allow(unused_imports)]

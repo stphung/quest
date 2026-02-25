@@ -17,6 +17,23 @@ pub const DEEP_DISCOVERY_BASE_CHANCE: f64 = 0.000014;
 /// Additional chance per prestige rank above the minimum.
 pub const DEEP_DISCOVERY_RANK_BONUS: f64 = 0.000007;
 
+// ── Story Chain Thresholds ────────────────────────────────────────────────────
+
+/// Rift Resonance thresholds for each story stage.
+pub const STORY_RESONANCE_TREMORS: u32 = 1;
+pub const STORY_RESONANCE_CAPTAIN: u32 = 3;
+pub const STORY_RESONANCE_FRAGMENT: u32 = 5;
+pub const STORY_RESONANCE_ENTRANCE: u32 = 7;
+
+/// Prestige rank gates for each story stage.
+pub const STORY_PRESTIGE_TREMORS: u32 = 15;
+pub const STORY_PRESTIGE_CAPTAIN: u32 = 17;
+pub const STORY_PRESTIGE_FRAGMENT: u32 = 19;
+pub const STORY_PRESTIGE_ENTRANCE: u32 = 21;
+
+/// The layer where the Gateway is located.
+pub const GATEWAY_LAYER: u32 = 30;
+
 // ── Layer Tier Bounds ─────────────────────────────────────────────────────────
 
 pub const SHALLOWS_LAYERS: std::ops::RangeInclusive<u32> = 1..=3;
@@ -654,6 +671,18 @@ pub struct DeepPersistent {
     /// Monotonically increasing counter tracking how many prestige cycles have occurred.
     #[serde(default)]
     pub generation_counter: u32,
+    /// Rift Resonance — increments each prestige where player reached The Expanse.
+    #[serde(default)]
+    pub rift_resonance: u32,
+    /// Story chain progress (0 = not started, 1-4 = stages, 5 = discovered).
+    #[serde(default)]
+    pub deep_story_stage: u8,
+    /// Rift Fragments collected (0-4).
+    #[serde(default)]
+    pub rift_fragments: u8,
+    /// Whether the Gateway at Layer 30 has been opened.
+    #[serde(default)]
+    pub gateway_opened: bool,
 }
 
 impl Default for DeepPersistent {
@@ -673,6 +702,10 @@ impl DeepPersistent {
             merc_id_counter: 0,
             mission_id_counter: 0,
             generation_counter: 0,
+            rift_resonance: 0,
+            deep_story_stage: 0,
+            rift_fragments: 0,
+            gateway_opened: false,
         }
     }
 
@@ -836,6 +869,67 @@ impl DeepState {
         }
     }
 
+    /// Increment Rift Resonance if the player reached The Expanse (Zone 11+)
+    /// and is at least P15. Call BEFORE `on_prestige()` since zone data is
+    /// on the character state, not Deep state.
+    pub fn maybe_increment_rift_resonance(&mut self, current_zone_id: u32, prestige_rank: u32) {
+        if prestige_rank >= DEEP_MIN_PRESTIGE_RANK && current_zone_id >= 11 {
+            self.persistent.rift_resonance += 1;
+        }
+    }
+
+    /// Check and advance story stage based on current rift resonance and prestige rank.
+    /// Returns the new stage if it advanced, or None if unchanged.
+    pub fn check_story_progression(&mut self, prestige_rank: u32) -> Option<u8> {
+        let resonance = self.persistent.rift_resonance;
+        let stage = self.persistent.deep_story_stage;
+
+        let new_stage = if stage == 0
+            && resonance >= STORY_RESONANCE_TREMORS
+            && prestige_rank >= STORY_PRESTIGE_TREMORS
+        {
+            1
+        } else if stage == 1
+            && resonance >= STORY_RESONANCE_CAPTAIN
+            && prestige_rank >= STORY_PRESTIGE_CAPTAIN
+        {
+            2
+        } else if stage == 2
+            && resonance >= STORY_RESONANCE_FRAGMENT
+            && prestige_rank >= STORY_PRESTIGE_FRAGMENT
+        {
+            3
+        } else if stage == 3
+            && resonance >= STORY_RESONANCE_ENTRANCE
+            && prestige_rank >= STORY_PRESTIGE_ENTRANCE
+        {
+            // Also requires 4 rift fragments
+            if self.persistent.rift_fragments >= 4 {
+                4
+            } else {
+                return None;
+            }
+        } else {
+            return None;
+        };
+
+        self.persistent.deep_story_stage = new_stage;
+        Some(new_stage)
+    }
+
+    /// Award rift fragments based on resonance level.
+    /// Fragments are awarded at resonance 5, 6, 7 (one per resonance level).
+    /// The 4th fragment is awarded automatically at resonance 7.
+    pub fn maybe_award_rift_fragment(&mut self) {
+        let resonance = self.persistent.rift_resonance;
+        let earned = resonance
+            .saturating_sub(STORY_RESONANCE_FRAGMENT - 1)
+            .min(4) as u8;
+        if earned > self.persistent.rift_fragments {
+            self.persistent.rift_fragments = earned;
+        }
+    }
+
     /// Reset per-prestige state while keeping persistent state intact.
     /// Call this at the start of each prestige cycle.
     pub fn on_prestige(&mut self) {
@@ -945,6 +1039,8 @@ pub struct DeepUiState {
     pub show_help: bool,
     /// Mercs from last prestige shown in farewell screen: (name, level, missions_completed).
     pub farewell_mercs: Vec<(String, u32, u32)>,
+    /// Pending story event to show the player (set during prestige, shown next tick).
+    pub pending_story_stage: Option<u8>,
 }
 
 impl DeepUiState {
@@ -966,6 +1062,7 @@ impl DeepUiState {
             recruit_visit_count: 0,
             show_help: false,
             farewell_mercs: Vec::new(),
+            pending_story_stage: None,
         }
     }
 
