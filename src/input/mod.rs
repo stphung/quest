@@ -387,6 +387,7 @@ fn handle_bug_report_overlay(key: KeyEvent, overlay: &mut GameOverlay) -> InputR
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_debug_menu(
     key: KeyEvent,
     state: &mut GameState,
@@ -403,8 +404,7 @@ fn handle_debug_menu(
         KeyCode::Up => debug_menu.navigate_up(),
         KeyCode::Down => debug_menu.navigate_down(),
         KeyCode::Enter => {
-            let msg =
-                debug_menu.trigger_selected(state, haven, enhancement, deep, achievements);
+            let msg = debug_menu.trigger_selected(state, haven, enhancement, deep, achievements);
             state
                 .combat_state
                 .add_log_entry(format!("[DEBUG] {}", msg), false, true);

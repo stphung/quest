@@ -3,12 +3,6 @@ mod achievement_details;
 mod achievement_list;
 mod achievement_tabs;
 pub mod bug_report_scene;
-pub mod deep_scene;
-mod deep_missions;
-mod deep_roster;
-mod deep_layers;
-mod deep_events;
-mod deep_results;
 pub mod challenge_menu_scene;
 pub mod character_creation;
 pub mod character_delete;
@@ -19,6 +13,12 @@ mod combat_3d;
 pub mod combat_effects;
 mod combat_scene;
 pub mod debug_menu_scene;
+mod deep_events;
+mod deep_layers;
+mod deep_missions;
+mod deep_results;
+mod deep_roster;
+pub mod deep_scene;
 pub mod dungeon_map;
 mod enemy_sprite_data;
 mod enemy_sprites;
@@ -559,6 +559,7 @@ fn draw_xl_l_layout(
 
 /// M tier stacked single-column layout.
 /// Compact stats bar + optional attrs + XP bar + full-width activity + compact info + footer
+#[allow(clippy::too_many_arguments)]
 fn draw_m_layout(
     frame: &mut Frame,
     ctx: &LayoutContext,

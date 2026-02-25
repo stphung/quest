@@ -19,10 +19,6 @@
 //! 16.  Guild rank progression chain: upgrade through all 5 ranks
 
 use quest::deep::{
-    DeepPersistent, DeepPrestige, DeepState, GuildRank, Infrastructure, LayerTier, MissionOutcome,
-    MissionType,
-};
-use quest::deep::{
     apply_duration_modifiers, base_marks_earned, base_mission_duration_secs, build_infrastructure,
     compute_mark_reward, familiarity_gain, guild_upgrade_cost, infrastructure_build_cost,
     is_frontier_layer, is_safe_layer, layer_power_thresholds, mark_layer_cleared,
@@ -31,6 +27,10 @@ use quest::deep::{
     recruit_quality_distribution, stormglass_reward, try_upgrade_guild_rank, xp_reward,
     DurationModifiers, FamiliarityLevel, GuildUpgradeError, InfrastructureBuildError,
     MarkRewardParams, RecruitQuality, MIN_MISSION_DURATION_SECS,
+};
+use quest::deep::{
+    DeepPersistent, DeepPrestige, DeepState, GuildRank, Infrastructure, LayerTier, MissionOutcome,
+    MissionType,
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -99,16 +99,16 @@ fn base_marks_layer_25_matches_balance_table() {
 #[test]
 fn base_marks_void_scales_beyond_layer_25() {
     // Void layer 26: base_26 + per_layer_bonus * 1
-    assert_eq!(base_marks_earned(MissionType::SupplyRun, 26), 220);     // 210 + 10*1
-    assert_eq!(base_marks_earned(MissionType::Recon, 26), 310);         // 295 + 15*1
-    assert_eq!(base_marks_earned(MissionType::Expedition, 26), 765);    // 730 + 35*1
+    assert_eq!(base_marks_earned(MissionType::SupplyRun, 26), 220); // 210 + 10*1
+    assert_eq!(base_marks_earned(MissionType::Recon, 26), 310); // 295 + 15*1
+    assert_eq!(base_marks_earned(MissionType::Expedition, 26), 765); // 730 + 35*1
     assert_eq!(base_marks_earned(MissionType::Breakthrough, 26), 1175); // 1125 + 50*1
 }
 
 #[test]
 fn base_marks_void_layer_30_scales_correctly() {
     // Layer 30: extra = 30 - 25 = 5
-    assert_eq!(base_marks_earned(MissionType::SupplyRun, 30), 260);     // 210 + 10*5
+    assert_eq!(base_marks_earned(MissionType::SupplyRun, 30), 260); // 210 + 10*5
     assert_eq!(base_marks_earned(MissionType::Breakthrough, 30), 1375); // 1125 + 50*5
 }
 
@@ -171,7 +171,10 @@ fn spend_marks_returns_false_when_insufficient() {
     let mut prestige = prestige_with_marks(50);
     let spent = prestige.spend_marks(100);
     assert!(!spent, "spend_marks should return false when insufficient");
-    assert_eq!(prestige.warband_marks, 50, "Balance should be unchanged on failure");
+    assert_eq!(
+        prestige.warband_marks, 50,
+        "Balance should be unchanged on failure"
+    );
 }
 
 #[test]
@@ -188,8 +191,15 @@ fn guild_upgrade_fails_with_insufficient_marks_leaves_balance_unchanged() {
             available: 50,
         })
     );
-    assert_eq!(prestige.warband_marks, 50, "Marks must not be deducted on failure");
-    assert_eq!(persistent.guild_rank, GuildRank(1), "Rank must not change on failure");
+    assert_eq!(
+        prestige.warband_marks, 50,
+        "Marks must not be deducted on failure"
+    );
+    assert_eq!(
+        persistent.guild_rank,
+        GuildRank(1),
+        "Rank must not change on failure"
+    );
 }
 
 // ── 4. Guild Rank Upgrade ─────────────────────────────────────────────────────
@@ -289,7 +299,7 @@ fn guild_rank_max_roster_increases_with_rank() {
 #[test]
 fn guild_rank_concurrent_missions_increases_with_rank() {
     assert_eq!(GuildRank(1).concurrent_missions(), 1);
-    assert_eq!(GuildRank(2).concurrent_missions(), 1);
+    assert_eq!(GuildRank(2).concurrent_missions(), 2);
     assert_eq!(GuildRank(3).concurrent_missions(), 2);
     assert_eq!(GuildRank(4).concurrent_missions(), 3);
     assert_eq!(GuildRank(5).concurrent_missions(), 4);
@@ -478,17 +488,41 @@ fn watchtower_familiarity_bonus_capped_at_100() {
 #[test]
 fn familiarity_level_thresholds_are_correct() {
     // Unknown: 0-24
-    assert_eq!(FamiliarityLevel::from_familiarity(0), FamiliarityLevel::Unknown);
-    assert_eq!(FamiliarityLevel::from_familiarity(24), FamiliarityLevel::Unknown);
+    assert_eq!(
+        FamiliarityLevel::from_familiarity(0),
+        FamiliarityLevel::Unknown
+    );
+    assert_eq!(
+        FamiliarityLevel::from_familiarity(24),
+        FamiliarityLevel::Unknown
+    );
     // Mapped: 25-49
-    assert_eq!(FamiliarityLevel::from_familiarity(25), FamiliarityLevel::Mapped);
-    assert_eq!(FamiliarityLevel::from_familiarity(49), FamiliarityLevel::Mapped);
+    assert_eq!(
+        FamiliarityLevel::from_familiarity(25),
+        FamiliarityLevel::Mapped
+    );
+    assert_eq!(
+        FamiliarityLevel::from_familiarity(49),
+        FamiliarityLevel::Mapped
+    );
     // Familiar: 50-74
-    assert_eq!(FamiliarityLevel::from_familiarity(50), FamiliarityLevel::Familiar);
-    assert_eq!(FamiliarityLevel::from_familiarity(74), FamiliarityLevel::Familiar);
+    assert_eq!(
+        FamiliarityLevel::from_familiarity(50),
+        FamiliarityLevel::Familiar
+    );
+    assert_eq!(
+        FamiliarityLevel::from_familiarity(74),
+        FamiliarityLevel::Familiar
+    );
     // Mastered: 75-100
-    assert_eq!(FamiliarityLevel::from_familiarity(75), FamiliarityLevel::Mastered);
-    assert_eq!(FamiliarityLevel::from_familiarity(100), FamiliarityLevel::Mastered);
+    assert_eq!(
+        FamiliarityLevel::from_familiarity(75),
+        FamiliarityLevel::Mastered
+    );
+    assert_eq!(
+        FamiliarityLevel::from_familiarity(100),
+        FamiliarityLevel::Mastered
+    );
 }
 
 #[test]
@@ -520,28 +554,52 @@ fn familiarity_reduces_duration_correctly() {
     // Unknown — no reduction.
     let d_unknown = apply_duration_modifiers(
         base,
-        &DurationModifiers { has_outpost: false, familiarity: 0, has_saboteur: false, saboteur_is_veteran: false, is_overpowered: false },
+        &DurationModifiers {
+            has_outpost: false,
+            familiarity: 0,
+            has_saboteur: false,
+            saboteur_is_veteran: false,
+            is_overpowered: false,
+        },
     );
     assert_eq!(d_unknown, base);
 
     // Mapped — 10% reduction.
     let d_mapped = apply_duration_modifiers(
         base,
-        &DurationModifiers { has_outpost: false, familiarity: 30, has_saboteur: false, saboteur_is_veteran: false, is_overpowered: false },
+        &DurationModifiers {
+            has_outpost: false,
+            familiarity: 30,
+            has_saboteur: false,
+            saboteur_is_veteran: false,
+            is_overpowered: false,
+        },
     );
     assert_eq!(d_mapped, (base as f64 * 0.90) as u64);
 
     // Familiar — 20% reduction.
     let d_familiar = apply_duration_modifiers(
         base,
-        &DurationModifiers { has_outpost: false, familiarity: 60, has_saboteur: false, saboteur_is_veteran: false, is_overpowered: false },
+        &DurationModifiers {
+            has_outpost: false,
+            familiarity: 60,
+            has_saboteur: false,
+            saboteur_is_veteran: false,
+            is_overpowered: false,
+        },
     );
     assert_eq!(d_familiar, (base as f64 * 0.80) as u64);
 
     // Mastered — 30% reduction.
     let d_mastered = apply_duration_modifiers(
         base,
-        &DurationModifiers { has_outpost: false, familiarity: 80, has_saboteur: false, saboteur_is_veteran: false, is_overpowered: false },
+        &DurationModifiers {
+            has_outpost: false,
+            familiarity: 80,
+            has_saboteur: false,
+            saboteur_is_veteran: false,
+            is_overpowered: false,
+        },
     );
     assert_eq!(d_mastered, (base as f64 * 0.70) as u64);
 }
@@ -601,7 +659,10 @@ fn clearing_layers_in_order_advances_frontier() {
     // After clearing layer 1, frontier should be 2 (next uncleared or deepest+1).
     // But we need to touch layer 2 first via layer_record_mut to register it.
     let _ = persistent.layer_record_mut(2);
-    assert!(!is_frontier_layer(&persistent, 1), "cleared layer is no longer frontier");
+    assert!(
+        !is_frontier_layer(&persistent, 1),
+        "cleared layer is no longer frontier"
+    );
 }
 
 #[test]
@@ -638,7 +699,7 @@ fn supply_cache_pays_back_in_two_supply_runs() {
 
     // Verify runs-to-payback is reasonable (≤ 8 runs at shallow layers).
     // At layer 5: cost=105, bonus/run=25, so 5 runs (ceiling div).
-    let runs_to_payback = (build_cost + bonus_per_run - 1) / bonus_per_run;
+    let runs_to_payback = build_cost.div_ceil(bonus_per_run);
     assert!(
         runs_to_payback <= 8,
         "Supply Cache payback should be ≤8 runs at layer {layer}: cost={build_cost}, bonus/run={bonus_per_run}, runs_needed={runs_to_payback}"
@@ -668,7 +729,10 @@ fn prestige_resets_warband_marks_to_zero() {
     let mut state = DeepState::new();
     state.prestige.warband_marks = 5000;
     state.on_prestige();
-    assert_eq!(state.prestige.warband_marks, 0, "Warband Marks must reset on prestige");
+    assert_eq!(
+        state.prestige.warband_marks, 0,
+        "Warband Marks must reset on prestige"
+    );
 }
 
 #[test]
@@ -676,7 +740,11 @@ fn prestige_preserves_guild_rank() {
     let mut state = DeepState::new();
     state.persistent.guild_rank = GuildRank(3);
     state.on_prestige();
-    assert_eq!(state.persistent.guild_rank, GuildRank(3), "Guild rank must survive prestige");
+    assert_eq!(
+        state.persistent.guild_rank,
+        GuildRank(3),
+        "Guild rank must survive prestige"
+    );
 }
 
 #[test]
@@ -733,7 +801,10 @@ fn prestige_resets_roster_and_active_missions() {
     // The roster and missions would be populated by the mission system.
     // Verifying that on_prestige() clears them structurally.
     state.on_prestige();
-    assert!(state.prestige.roster.is_empty(), "Roster must reset on prestige");
+    assert!(
+        state.prestige.roster.is_empty(),
+        "Roster must reset on prestige"
+    );
     assert!(
         state.prestige.active_missions.is_empty(),
         "Active missions must reset on prestige"
@@ -781,27 +852,66 @@ fn layer_tier_from_layer_void() {
 
 #[test]
 fn base_durations_by_tier_match_design_table() {
-    // Shallows: 2h Supply, 4h Recon, 8h Expedition, 18h Breakthrough, 4h Construction.
-    assert_eq!(base_mission_duration_secs(LayerTier::Shallows, MissionType::SupplyRun), 2 * 3600);
-    assert_eq!(base_mission_duration_secs(LayerTier::Shallows, MissionType::Recon), 4 * 3600);
-    assert_eq!(base_mission_duration_secs(LayerTier::Shallows, MissionType::Expedition), 8 * 3600);
-    assert_eq!(base_mission_duration_secs(LayerTier::Shallows, MissionType::Breakthrough), 18 * 3600);
-    assert_eq!(base_mission_duration_secs(LayerTier::Shallows, MissionType::Construction(Infrastructure::Outpost)), 4 * 3600);
+    // Shallows: 0.5h Supply, 1h Recon, 2h Expedition, 4h Breakthrough, 1h Construction.
+    assert_eq!(
+        base_mission_duration_secs(LayerTier::Shallows, MissionType::SupplyRun),
+        1800
+    );
+    assert_eq!(
+        base_mission_duration_secs(LayerTier::Shallows, MissionType::Recon),
+        3600
+    );
+    assert_eq!(
+        base_mission_duration_secs(LayerTier::Shallows, MissionType::Expedition),
+        7200
+    );
+    assert_eq!(
+        base_mission_duration_secs(LayerTier::Shallows, MissionType::Breakthrough),
+        14400
+    );
+    assert_eq!(
+        base_mission_duration_secs(
+            LayerTier::Shallows,
+            MissionType::Construction(Infrastructure::Outpost)
+        ),
+        3600
+    );
 
-    // Abyss: 4h Supply, 8h Recon, 16h Expedition, 24h Breakthrough, 8h Construction.
-    assert_eq!(base_mission_duration_secs(LayerTier::Abyss, MissionType::SupplyRun), 4 * 3600);
-    assert_eq!(base_mission_duration_secs(LayerTier::Abyss, MissionType::Recon), 8 * 3600);
-    assert_eq!(base_mission_duration_secs(LayerTier::Abyss, MissionType::Expedition), 16 * 3600);
-    assert_eq!(base_mission_duration_secs(LayerTier::Abyss, MissionType::Breakthrough), 24 * 3600);
+    // Abyss: 2.5h Supply, 5h Recon, 10h Expedition, 20h Breakthrough, 5h Construction.
+    assert_eq!(
+        base_mission_duration_secs(LayerTier::Abyss, MissionType::SupplyRun),
+        9000
+    );
+    assert_eq!(
+        base_mission_duration_secs(LayerTier::Abyss, MissionType::Recon),
+        18000
+    );
+    assert_eq!(
+        base_mission_duration_secs(LayerTier::Abyss, MissionType::Expedition),
+        36000
+    );
+    assert_eq!(
+        base_mission_duration_secs(LayerTier::Abyss, MissionType::Breakthrough),
+        72000
+    );
 }
 
 #[test]
-fn breakthrough_duration_caps_at_24h_for_sunken_reach_and_beyond() {
-    // Breakthrough is capped at 24h from SunkenReach onward.
-    let cap = 24 * 3600u64;
-    assert_eq!(base_mission_duration_secs(LayerTier::SunkenReach, MissionType::Breakthrough), cap);
-    assert_eq!(base_mission_duration_secs(LayerTier::Abyss, MissionType::Breakthrough), cap);
-    assert_eq!(base_mission_duration_secs(LayerTier::Void, MissionType::Breakthrough), cap);
+fn breakthrough_duration_caps_at_24h_for_void() {
+    // Breakthrough caps at 24h (86400s) only in the Void tier.
+    // Preceding tiers have lower durations that increase through the tiers.
+    assert_eq!(
+        base_mission_duration_secs(LayerTier::SunkenReach, MissionType::Breakthrough),
+        57600
+    ); // 16h
+    assert_eq!(
+        base_mission_duration_secs(LayerTier::Abyss, MissionType::Breakthrough),
+        72000
+    ); // 20h
+    assert_eq!(
+        base_mission_duration_secs(LayerTier::Void, MissionType::Breakthrough),
+        86400
+    ); // 24h cap
 }
 
 // ── 14. Infrastructure Stacking ───────────────────────────────────────────────
@@ -859,7 +969,10 @@ fn duration_is_clamped_to_30_minute_floor() {
             is_overpowered: false,
         },
     );
-    assert_eq!(result, MIN_MISSION_DURATION_SECS, "Even 1-second base must be clamped to 30 minutes");
+    assert_eq!(
+        result, MIN_MISSION_DURATION_SECS,
+        "Even 1-second base must be clamped to 30 minutes"
+    );
 }
 
 #[test]
@@ -877,7 +990,10 @@ fn duration_floor_applies_even_after_maximum_reductions() {
             is_overpowered: true,
         },
     );
-    assert_eq!(result, MIN_MISSION_DURATION_SECS, "Duration floor must apply when modifiers reduce below 30 min");
+    assert_eq!(
+        result, MIN_MISSION_DURATION_SECS,
+        "Duration floor must apply when modifiers reduce below 30 min"
+    );
 }
 
 #[test]
@@ -963,7 +1079,10 @@ fn marks_variance_bounds_are_85_to_115_percent() {
 #[test]
 fn outcome_multipliers_match_design() {
     assert_eq!(outcome_mark_multiplier(MissionOutcome::Success), 1.0);
-    assert_eq!(outcome_mark_multiplier(MissionOutcome::PartialSuccess), 0.60);
+    assert_eq!(
+        outcome_mark_multiplier(MissionOutcome::PartialSuccess),
+        0.60
+    );
     assert_eq!(outcome_mark_multiplier(MissionOutcome::Failure), 0.20);
 }
 
@@ -976,16 +1095,28 @@ fn full_guild_rank_progression_chain() {
     let mut prestige = prestige_with_marks(10_000);
 
     // Clear required layers for each rank.
-    persistent.layer_record_mut(3).cleared = true;  // Rank 2
-    persistent.layer_record_mut(7).cleared = true;  // Rank 3
+    persistent.layer_record_mut(3).cleared = true; // Rank 2
+    persistent.layer_record_mut(7).cleared = true; // Rank 3
     persistent.layer_record_mut(13).cleared = true; // Rank 4
     persistent.layer_record_mut(19).cleared = true; // Rank 5
 
     // Upgrade through all ranks.
-    assert_eq!(try_upgrade_guild_rank(&mut persistent, &mut prestige), Ok(GuildRank(2)));
-    assert_eq!(try_upgrade_guild_rank(&mut persistent, &mut prestige), Ok(GuildRank(3)));
-    assert_eq!(try_upgrade_guild_rank(&mut persistent, &mut prestige), Ok(GuildRank(4)));
-    assert_eq!(try_upgrade_guild_rank(&mut persistent, &mut prestige), Ok(GuildRank(5)));
+    assert_eq!(
+        try_upgrade_guild_rank(&mut persistent, &mut prestige),
+        Ok(GuildRank(2))
+    );
+    assert_eq!(
+        try_upgrade_guild_rank(&mut persistent, &mut prestige),
+        Ok(GuildRank(3))
+    );
+    assert_eq!(
+        try_upgrade_guild_rank(&mut persistent, &mut prestige),
+        Ok(GuildRank(4))
+    );
+    assert_eq!(
+        try_upgrade_guild_rank(&mut persistent, &mut prestige),
+        Ok(GuildRank(5))
+    );
     assert_eq!(
         try_upgrade_guild_rank(&mut persistent, &mut prestige),
         Err(GuildUpgradeError::AlreadyMaxRank)
@@ -1046,9 +1177,9 @@ fn power_thresholds_layer_25_match_balance_table() {
 fn power_thresholds_void_layer_26_match_design() {
     let t = layer_power_thresholds(26);
     assert_eq!(t.breakthrough, 1010); // 930 + 80*1
-    assert_eq!(t.expedition, 760);    // 700 + 60*1
-    assert_eq!(t.recon, 570);         // 525 + 45*1
-    assert_eq!(t.supply_run, 380);    // 350 + 30*1
+    assert_eq!(t.expedition, 760); // 700 + 60*1
+    assert_eq!(t.recon, 570); // 525 + 45*1
+    assert_eq!(t.supply_run, 380); // 350 + 30*1
 }
 
 #[test]
@@ -1121,20 +1252,50 @@ fn prestige_fragments_only_from_breakthrough() {
 #[test]
 fn prestige_fragment_thresholds_match_design() {
     // Layers 1-7: 0 PR
-    assert_eq!(prestige_fragment_hundredths(MissionType::Breakthrough, 1), 0);
-    assert_eq!(prestige_fragment_hundredths(MissionType::Breakthrough, 7), 0);
+    assert_eq!(
+        prestige_fragment_hundredths(MissionType::Breakthrough, 1),
+        0
+    );
+    assert_eq!(
+        prestige_fragment_hundredths(MissionType::Breakthrough, 7),
+        0
+    );
     // Layers 8-12: 0.25 PR
-    assert_eq!(prestige_fragment_hundredths(MissionType::Breakthrough, 8), 25);
-    assert_eq!(prestige_fragment_hundredths(MissionType::Breakthrough, 12), 25);
+    assert_eq!(
+        prestige_fragment_hundredths(MissionType::Breakthrough, 8),
+        25
+    );
+    assert_eq!(
+        prestige_fragment_hundredths(MissionType::Breakthrough, 12),
+        25
+    );
     // Layers 13-18: 0.50 PR
-    assert_eq!(prestige_fragment_hundredths(MissionType::Breakthrough, 13), 50);
-    assert_eq!(prestige_fragment_hundredths(MissionType::Breakthrough, 18), 50);
+    assert_eq!(
+        prestige_fragment_hundredths(MissionType::Breakthrough, 13),
+        50
+    );
+    assert_eq!(
+        prestige_fragment_hundredths(MissionType::Breakthrough, 18),
+        50
+    );
     // Layers 19-25: 0.75 PR
-    assert_eq!(prestige_fragment_hundredths(MissionType::Breakthrough, 19), 75);
-    assert_eq!(prestige_fragment_hundredths(MissionType::Breakthrough, 25), 75);
+    assert_eq!(
+        prestige_fragment_hundredths(MissionType::Breakthrough, 19),
+        75
+    );
+    assert_eq!(
+        prestige_fragment_hundredths(MissionType::Breakthrough, 25),
+        75
+    );
     // Void (26+): 1.00 PR
-    assert_eq!(prestige_fragment_hundredths(MissionType::Breakthrough, 26), 100);
-    assert_eq!(prestige_fragment_hundredths(MissionType::Breakthrough, 50), 100);
+    assert_eq!(
+        prestige_fragment_hundredths(MissionType::Breakthrough, 26),
+        100
+    );
+    assert_eq!(
+        prestige_fragment_hundredths(MissionType::Breakthrough, 50),
+        100
+    );
 }
 
 // ── 20. Merc XP ──────────────────────────────────────────────────────────────
@@ -1142,10 +1303,10 @@ fn prestige_fragment_thresholds_match_design() {
 #[test]
 fn merc_xp_per_mission_scales_with_type_and_layer() {
     // Layer 1 base values.
-    assert_eq!(merc_xp_per_mission(MissionType::SupplyRun, 1), 110);      // 100 + 10
-    assert_eq!(merc_xp_per_mission(MissionType::Recon, 1), 220);          // 200 + 20
-    assert_eq!(merc_xp_per_mission(MissionType::Expedition, 1), 440);     // 400 + 40
-    assert_eq!(merc_xp_per_mission(MissionType::Breakthrough, 1), 880);   // 800 + 80
+    assert_eq!(merc_xp_per_mission(MissionType::SupplyRun, 1), 110); // 100 + 10
+    assert_eq!(merc_xp_per_mission(MissionType::Recon, 1), 220); // 200 + 20
+    assert_eq!(merc_xp_per_mission(MissionType::Expedition, 1), 440); // 400 + 40
+    assert_eq!(merc_xp_per_mission(MissionType::Breakthrough, 1), 880); // 800 + 80
     assert_eq!(
         merc_xp_per_mission(MissionType::Construction(Infrastructure::Outpost), 1),
         50
@@ -1157,7 +1318,10 @@ fn merc_xp_to_next_level_is_monotonically_increasing() {
     let mut prev = 0u32;
     for level in 1..=20 {
         let xp = merc_xp_to_next_level(level);
-        assert!(xp > prev, "XP to level {level} ({xp}) must exceed previous ({prev})");
+        assert!(
+            xp > prev,
+            "XP to level {level} ({xp}) must exceed previous ({prev})"
+        );
         prev = xp;
     }
 }
@@ -1195,7 +1359,10 @@ fn recruit_quality_distribution_rank_5_has_elite() {
         .filter(|(q, _)| *q == RecruitQuality::Elite)
         .map(|(_, w)| w)
         .sum();
-    assert!(elite_weight > 0, "Rank 5 should include Elite quality candidates");
+    assert!(
+        elite_weight > 0,
+        "Rank 5 should include Elite quality candidates"
+    );
 }
 
 #[test]
@@ -1218,7 +1385,10 @@ fn recruit_quality_cost_range_increases_with_tier() {
     let (u_min, _) = RecruitQuality::Uncommon.cost_range();
     let (r_min, _) = RecruitQuality::Rare.cost_range();
     let (e_min, e_max) = RecruitQuality::Elite.cost_range();
-    assert!(u_min > c_max || u_min >= c_min, "Uncommon min cost should be >= Common min");
+    assert!(
+        u_min > c_max || u_min >= c_min,
+        "Uncommon min cost should be >= Common min"
+    );
     assert!(r_min >= u_min, "Rare min cost should be >= Uncommon min");
     assert!(e_min >= r_min, "Elite min cost should be >= Rare min");
     assert!(e_max > c_max, "Elite max cost should exceed Common max");
@@ -1228,18 +1398,30 @@ fn recruit_quality_cost_range_increases_with_tier() {
 
 #[test]
 fn infrastructure_build_costs_at_layer_1() {
-    assert_eq!(infrastructure_build_cost(Infrastructure::Outpost, 1), 64);    // 60 + 4*1
-    assert_eq!(infrastructure_build_cost(Infrastructure::SupplyCache, 1), 85); // 80 + 5*1
-    assert_eq!(infrastructure_build_cost(Infrastructure::Watchtower, 1), 74);  // 70 + 4*1
-    assert_eq!(infrastructure_build_cost(Infrastructure::Bridge, 1), 105);     // 100 + 5*1
+    assert_eq!(infrastructure_build_cost(Infrastructure::Outpost, 1), 91); // 85 + 6*1
+    assert_eq!(
+        infrastructure_build_cost(Infrastructure::SupplyCache, 1),
+        117
+    ); // 110 + 7*1
+    assert_eq!(
+        infrastructure_build_cost(Infrastructure::Watchtower, 1),
+        106
+    ); // 100 + 6*1
+    assert_eq!(infrastructure_build_cost(Infrastructure::Bridge, 1), 147); // 140 + 7*1
 }
 
 #[test]
 fn infrastructure_build_costs_at_layer_10() {
-    assert_eq!(infrastructure_build_cost(Infrastructure::Outpost, 10), 100);    // 60 + 4*10
-    assert_eq!(infrastructure_build_cost(Infrastructure::SupplyCache, 10), 130); // 80 + 5*10
-    assert_eq!(infrastructure_build_cost(Infrastructure::Watchtower, 10), 110);  // 70 + 4*10
-    assert_eq!(infrastructure_build_cost(Infrastructure::Bridge, 10), 150);      // 100 + 5*10
+    assert_eq!(infrastructure_build_cost(Infrastructure::Outpost, 10), 145); // 85 + 6*10
+    assert_eq!(
+        infrastructure_build_cost(Infrastructure::SupplyCache, 10),
+        180
+    ); // 110 + 7*10
+    assert_eq!(
+        infrastructure_build_cost(Infrastructure::Watchtower, 10),
+        160
+    ); // 100 + 6*10
+    assert_eq!(infrastructure_build_cost(Infrastructure::Bridge, 10), 210); // 140 + 7*10
 }
 
 #[test]
@@ -1247,14 +1429,18 @@ fn infrastructure_build_costs_scale_with_depth() {
     for &infra in Infrastructure::ALL {
         let shallow = infrastructure_build_cost(infra, 1);
         let deep = infrastructure_build_cost(infra, 25);
-        assert!(deep > shallow, "{:?} cost should be higher at deeper layers", infra);
+        assert!(
+            deep > shallow,
+            "{:?} cost should be higher at deeper layers",
+            infra
+        );
     }
 }
 
 // ── 23. Mission Launch Costs ─────────────────────────────────────────────────
 
 #[test]
-fn mission_launch_costs_are_positive_except_construction() {
+fn mission_launch_costs_are_positive_for_all_types() {
     for mission_type in [
         MissionType::SupplyRun,
         MissionType::Recon,
@@ -1267,10 +1453,11 @@ fn mission_launch_costs_are_positive_except_construction() {
             mission_type
         );
     }
+    // Construction launch cost equals the infrastructure build cost.
     assert_eq!(
         mission_launch_cost(MissionType::Construction(Infrastructure::Bridge), 1),
-        0,
-        "Construction has no launch cost (paid via infrastructure build cost)"
+        infrastructure_build_cost(Infrastructure::Bridge, 1),
+        "Construction launch cost should match infrastructure build cost"
     );
 }
 

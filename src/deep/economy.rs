@@ -1,3 +1,5 @@
+// Allow dead_code: economy functions are wired into the game loop incrementally.
+#![allow(dead_code)]
 //! Warband Marks economy, guild rank costs, mission costs, and reward calculations.
 //!
 //! This module provides:
@@ -8,9 +10,7 @@
 //! - Reward calculations for XP, Stormglass, and prestige rank fragments
 
 use crate::deep::layers::FamiliarityLevel;
-use crate::deep::types::{
-    DeepPersistent, DeepPrestige, GuildRank, MissionOutcome, MissionType,
-};
+use crate::deep::types::{DeepPersistent, DeepPrestige, GuildRank, MissionOutcome, MissionType};
 
 // ── Mark Earning Rates ────────────────────────────────────────────────────────
 
@@ -22,7 +22,7 @@ pub fn base_marks_earned(mission_type: MissionType, layer: u32) -> u32 {
     let layer = layer.max(1);
 
     if layer >= 26 {
-        let extra = (layer - 25) as u32;
+        let extra = layer - 25;
         let (base_26, per_layer) = match mission_type {
             MissionType::SupplyRun => (210, 10u32),
             MissionType::Recon => (295, 15),
@@ -35,19 +35,19 @@ pub fn base_marks_earned(mission_type: MissionType, layer: u32) -> u32 {
 
     // Lookup table for layers 1–25 from the balance design document.
     let (supply, recon, expedition, breakthrough) = match layer {
-        1  => (35,  50,  130, 280),
-        2  => (40,  55,  140, 300),
-        3  => (40,  60,  155, 320),
-        4  => (45,  65,  170, 345),
-        5  => (50,  70,  185, 370),
-        6  => (55,  80,  200, 395),
-        7  => (60,  85,  215, 420),
-        8  => (65,  95,  235, 450),
-        9  => (70,  100, 255, 480),
-        10 => (75,  110, 275, 510),
-        11 => (80,  115, 295, 540),
-        12 => (90,  125, 315, 570),
-        13 => (95,  135, 340, 600),
+        1 => (35, 50, 130, 280),
+        2 => (40, 55, 140, 300),
+        3 => (40, 60, 155, 320),
+        4 => (45, 65, 170, 345),
+        5 => (50, 70, 185, 370),
+        6 => (55, 80, 200, 395),
+        7 => (60, 85, 215, 420),
+        8 => (65, 95, 235, 450),
+        9 => (70, 100, 255, 480),
+        10 => (75, 110, 275, 510),
+        11 => (80, 115, 295, 540),
+        12 => (90, 125, 315, 570),
+        13 => (95, 135, 340, 600),
         14 => (100, 145, 365, 635),
         15 => (110, 155, 390, 670),
         16 => (115, 165, 415, 705),
@@ -60,7 +60,7 @@ pub fn base_marks_earned(mission_type: MissionType, layer: u32) -> u32 {
         23 => (180, 250, 625, 985),
         24 => (190, 265, 660, 1030),
         25 => (200, 280, 695, 1075),
-        _  => unreachable!(), // handled above
+        _ => unreachable!(), // handled above
     };
 
     match mission_type {
@@ -109,13 +109,12 @@ pub fn compute_mark_reward(params: &MarkRewardParams) -> u32 {
     let base = base_marks_earned(params.mission_type, params.layer) as f64;
 
     // Supply Cache only applies to Supply Runs.
-    let after_cache = if params.has_supply_cache
-        && matches!(params.mission_type, MissionType::SupplyRun)
-    {
-        base * 1.50 // +50%
-    } else {
-        base
-    };
+    let after_cache =
+        if params.has_supply_cache && matches!(params.mission_type, MissionType::SupplyRun) {
+            base * 1.50 // +50%
+        } else {
+            base
+        };
 
     // Mastered familiarity grants +15% on any mission type.
     let fam = FamiliarityLevel::from_familiarity(params.familiarity);
@@ -151,11 +150,7 @@ pub fn mission_launch_cost(mission_type: MissionType, layer: u32) -> u32 {
         MissionType::Recon => 30 + layer,
         MissionType::Expedition => 80 + 3 * layer,
         MissionType::Breakthrough => 150 + 8 * layer,
-        MissionType::Construction(_) => {
-            // Construction is paid via infrastructure_build_cost in layers.rs.
-            // The mission launch itself has no separate Mark cost.
-            0
-        }
+        MissionType::Construction(infra) => super::layers::infrastructure_build_cost(infra, layer),
     }
 }
 
@@ -174,10 +169,10 @@ impl RecruitQuality {
     /// Warband Marks cost range (min, max) to recruit a candidate of this quality.
     pub fn cost_range(self) -> (u32, u32) {
         match self {
-            RecruitQuality::Common => (30, 50),
-            RecruitQuality::Uncommon => (50, 80),
-            RecruitQuality::Rare => (80, 120),
-            RecruitQuality::Elite => (120, 180),
+            RecruitQuality::Common => (50, 80),
+            RecruitQuality::Uncommon => (80, 130),
+            RecruitQuality::Rare => (130, 200),
+            RecruitQuality::Elite => (200, 300),
         }
     }
 
@@ -219,10 +214,7 @@ pub fn recruit_quality_distribution(rank: GuildRank) -> &'static [(RecruitQualit
     // Weights do not need to sum to 100; they are relative.
     match rank.0 {
         1 => &[(RecruitQuality::Common, 100)],
-        2 => &[
-            (RecruitQuality::Common, 60),
-            (RecruitQuality::Uncommon, 40),
-        ],
+        2 => &[(RecruitQuality::Common, 60), (RecruitQuality::Uncommon, 40)],
         3 => &[
             (RecruitQuality::Common, 30),
             (RecruitQuality::Uncommon, 50),
@@ -289,15 +281,12 @@ pub fn try_upgrade_guild_rank(
             .map(|r| r.cleared)
             .unwrap_or(false);
         if !cleared {
-            return Err(GuildUpgradeError::LayerRequirementNotMet {
-                required_layer,
-            });
+            return Err(GuildUpgradeError::LayerRequirementNotMet { required_layer });
         }
     }
 
     // 3. Check and spend marks.
-    let cost = guild_upgrade_cost(current)
-        .expect("next rank exists so cost must be Some");
+    let cost = guild_upgrade_cost(current).expect("next rank exists so cost must be Some");
     if prestige.warband_marks < cost {
         return Err(GuildUpgradeError::InsufficientMarks {
             required: cost,
@@ -450,7 +439,12 @@ mod tests {
         for layer in 1..25 {
             let a = base_marks_earned(MissionType::Expedition, layer);
             let b = base_marks_earned(MissionType::Expedition, layer + 1);
-            assert!(b >= a, "Expedition marks should not decrease layer {} -> {}", layer, layer + 1);
+            assert!(
+                b >= a,
+                "Expedition marks should not decrease layer {} -> {}",
+                layer,
+                layer + 1
+            );
         }
     }
 
@@ -459,7 +453,10 @@ mod tests {
     #[test]
     fn test_outcome_mark_multipliers() {
         assert_eq!(outcome_mark_multiplier(MissionOutcome::Success), 1.0);
-        assert_eq!(outcome_mark_multiplier(MissionOutcome::PartialSuccess), 0.60);
+        assert_eq!(
+            outcome_mark_multiplier(MissionOutcome::PartialSuccess),
+            0.60
+        );
         assert_eq!(outcome_mark_multiplier(MissionOutcome::Failure), 0.20);
     }
 
@@ -505,7 +502,10 @@ mod tests {
         };
         let with_cache = compute_mark_reward(&params);
         let without_cache = compute_mark_reward(&no_cache_params);
-        assert!(with_cache > without_cache, "Supply Cache should increase marks");
+        assert!(
+            with_cache > without_cache,
+            "Supply Cache should increase marks"
+        );
     }
 
     #[test]
@@ -526,7 +526,10 @@ mod tests {
             outcome: MissionOutcome::Success,
             rng_variance: 0.5,
         });
-        assert_eq!(with_cache, without_cache, "Supply Cache should not boost Expeditions");
+        assert_eq!(
+            with_cache, without_cache,
+            "Supply Cache should not boost Expeditions"
+        );
     }
 
     #[test]
@@ -570,7 +573,11 @@ mod tests {
         });
         // Failure should be ~20% of success.
         let ratio = failure as f64 / success as f64;
-        assert!((ratio - 0.20).abs() < 0.05, "Failure marks ratio was {}", ratio);
+        assert!(
+            (ratio - 0.20).abs() < 0.05,
+            "Failure marks ratio was {}",
+            ratio
+        );
     }
 
     // ── mission_launch_cost ───────────────────────────────────────────────────
@@ -585,17 +592,28 @@ mod tests {
         ] {
             assert!(mission_launch_cost(mission, 1) > 0);
         }
+        // Construction missions cost the infrastructure build cost.
+        // Bridge on layer 1 = 140 + 7*1 = 147
         assert_eq!(
             mission_launch_cost(MissionType::Construction(Infrastructure::Bridge), 1),
-            0
+            147
         );
     }
 
     #[test]
     fn test_mission_launch_costs_scale_with_depth() {
-        assert!(mission_launch_cost(MissionType::Recon, 10) > mission_launch_cost(MissionType::Recon, 1));
-        assert!(mission_launch_cost(MissionType::Expedition, 10) > mission_launch_cost(MissionType::Expedition, 1));
-        assert!(mission_launch_cost(MissionType::Breakthrough, 10) > mission_launch_cost(MissionType::Breakthrough, 1));
+        assert!(
+            mission_launch_cost(MissionType::Recon, 10)
+                > mission_launch_cost(MissionType::Recon, 1)
+        );
+        assert!(
+            mission_launch_cost(MissionType::Expedition, 10)
+                > mission_launch_cost(MissionType::Expedition, 1)
+        );
+        assert!(
+            mission_launch_cost(MissionType::Breakthrough, 10)
+                > mission_launch_cost(MissionType::Breakthrough, 1)
+        );
     }
 
     // ── guild_upgrade_cost ────────────────────────────────────────────────────
@@ -686,7 +704,10 @@ mod tests {
         prestige.warband_marks = 1000;
 
         let _ = try_upgrade_guild_rank(&mut persistent, &mut prestige);
-        assert_eq!(prestige.warband_marks, 1000, "Marks should not be deducted on failure");
+        assert_eq!(
+            prestige.warband_marks, 1000,
+            "Marks should not be deducted on failure"
+        );
     }
 
     // ── recruit_quality_distribution ─────────────────────────────────────────
@@ -711,14 +732,14 @@ mod tests {
 
     #[test]
     fn test_base_xp_reward_layer_1() {
-        assert_eq!(base_xp_reward(MissionType::SupplyRun, 1), 170);   // 150 + 20
-        assert_eq!(base_xp_reward(MissionType::Expedition, 1), 660);  // 600 + 60
+        assert_eq!(base_xp_reward(MissionType::SupplyRun, 1), 170); // 150 + 20
+        assert_eq!(base_xp_reward(MissionType::Expedition, 1), 660); // 600 + 60
         assert_eq!(base_xp_reward(MissionType::Breakthrough, 1), 1320); // 1200 + 120
     }
 
     #[test]
     fn test_base_xp_reward_layer_10() {
-        assert_eq!(base_xp_reward(MissionType::SupplyRun, 10), 350);   // 150 + 200
+        assert_eq!(base_xp_reward(MissionType::SupplyRun, 10), 350); // 150 + 200
         assert_eq!(base_xp_reward(MissionType::Expedition, 10), 1200); // 600 + 600
     }
 
@@ -735,7 +756,10 @@ mod tests {
     fn test_stormglass_reward_only_from_expeditions_and_breakthroughs() {
         assert_eq!(stormglass_reward(MissionType::SupplyRun, 10), 0);
         assert_eq!(stormglass_reward(MissionType::Recon, 10), 0);
-        assert_eq!(stormglass_reward(MissionType::Construction(Infrastructure::Bridge), 10), 0);
+        assert_eq!(
+            stormglass_reward(MissionType::Construction(Infrastructure::Bridge), 10),
+            0
+        );
         assert!(stormglass_reward(MissionType::Expedition, 1) > 0);
         assert!(stormglass_reward(MissionType::Breakthrough, 1) > 0);
     }
@@ -760,19 +784,46 @@ mod tests {
     #[test]
     fn test_prestige_fragment_thresholds() {
         // Layers 1-7: no fragment.
-        assert_eq!(prestige_fragment_hundredths(MissionType::Breakthrough, 7), 0);
+        assert_eq!(
+            prestige_fragment_hundredths(MissionType::Breakthrough, 7),
+            0
+        );
         // Layers 8-12: 25 hundredths (0.25 PR).
-        assert_eq!(prestige_fragment_hundredths(MissionType::Breakthrough, 8), 25);
-        assert_eq!(prestige_fragment_hundredths(MissionType::Breakthrough, 12), 25);
+        assert_eq!(
+            prestige_fragment_hundredths(MissionType::Breakthrough, 8),
+            25
+        );
+        assert_eq!(
+            prestige_fragment_hundredths(MissionType::Breakthrough, 12),
+            25
+        );
         // Layers 13-18: 50 hundredths (0.50 PR).
-        assert_eq!(prestige_fragment_hundredths(MissionType::Breakthrough, 13), 50);
-        assert_eq!(prestige_fragment_hundredths(MissionType::Breakthrough, 18), 50);
+        assert_eq!(
+            prestige_fragment_hundredths(MissionType::Breakthrough, 13),
+            50
+        );
+        assert_eq!(
+            prestige_fragment_hundredths(MissionType::Breakthrough, 18),
+            50
+        );
         // Layers 19-25: 75 hundredths.
-        assert_eq!(prestige_fragment_hundredths(MissionType::Breakthrough, 19), 75);
-        assert_eq!(prestige_fragment_hundredths(MissionType::Breakthrough, 25), 75);
+        assert_eq!(
+            prestige_fragment_hundredths(MissionType::Breakthrough, 19),
+            75
+        );
+        assert_eq!(
+            prestige_fragment_hundredths(MissionType::Breakthrough, 25),
+            75
+        );
         // Void (26+): 100 hundredths (1 full PR).
-        assert_eq!(prestige_fragment_hundredths(MissionType::Breakthrough, 26), 100);
-        assert_eq!(prestige_fragment_hundredths(MissionType::Breakthrough, 50), 100);
+        assert_eq!(
+            prestige_fragment_hundredths(MissionType::Breakthrough, 26),
+            100
+        );
+        assert_eq!(
+            prestige_fragment_hundredths(MissionType::Breakthrough, 50),
+            100
+        );
     }
 
     // ── Merc XP ───────────────────────────────────────────────────────────────
@@ -783,7 +834,10 @@ mod tests {
         assert_eq!(merc_xp_per_mission(MissionType::Recon, 1), 220);
         assert_eq!(merc_xp_per_mission(MissionType::Expedition, 1), 440);
         assert_eq!(merc_xp_per_mission(MissionType::Breakthrough, 1), 880);
-        assert_eq!(merc_xp_per_mission(MissionType::Construction(Infrastructure::Watchtower), 5), 50);
+        assert_eq!(
+            merc_xp_per_mission(MissionType::Construction(Infrastructure::Watchtower), 5),
+            50
+        );
     }
 
     #[test]
@@ -791,7 +845,12 @@ mod tests {
         let mut prev = 0u32;
         for level in 1..=20 {
             let xp = merc_xp_to_next_level(level);
-            assert!(xp > prev, "XP to level {} should exceed XP to level {}", level + 1, level);
+            assert!(
+                xp > prev,
+                "XP to level {} should exceed XP to level {}",
+                level + 1,
+                level
+            );
             prev = xp;
         }
     }

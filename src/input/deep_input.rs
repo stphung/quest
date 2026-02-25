@@ -11,11 +11,38 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent};
 /// Top-level dispatcher for The Deep overlay input.
 ///
 /// Routes input to the appropriate sub-view handler based on `deep_ui.view`.
+/// Tab/BackTab cycle between navigable tabs from any view (except during squad staging).
 pub(super) fn handle_deep(
     key: KeyEvent,
     deep_state: &mut DeepState,
     deep_ui: &mut DeepUiState,
 ) -> InputResult {
+    // Clear any transient error message on the next key press.
+    deep_ui.flash_message = None;
+
+    // [?] toggles help panel from any view.
+    if key.code == KeyCode::Char('?') {
+        deep_ui.show_help = !deep_ui.show_help;
+        return InputResult::Continue;
+    }
+
+    // Tab cycling works from any view except EventResponse and squad staging.
+    if deep_ui.view != DeepView::EventResponse && deep_ui.staging_mission_index.is_none() {
+        match key.code {
+            KeyCode::Tab | KeyCode::Right => {
+                let new_view = deep_ui.view.next_tab();
+                switch_view(deep_ui, new_view);
+                return InputResult::Continue;
+            }
+            KeyCode::BackTab | KeyCode::Left => {
+                let new_view = deep_ui.view.prev_tab();
+                switch_view(deep_ui, new_view);
+                return InputResult::Continue;
+            }
+            _ => {}
+        }
+    }
+
     match deep_ui.view {
         DeepView::Hub => handle_hub(key, deep_state, deep_ui),
         DeepView::NewMission => handle_new_mission(key, deep_state, deep_ui),
@@ -30,42 +57,6 @@ pub(super) fn handle_deep(
 
 fn handle_hub(key: KeyEvent, deep_state: &mut DeepState, deep_ui: &mut DeepUiState) -> InputResult {
     match key.code {
-        KeyCode::Char('n') | KeyCode::Char('N') => {
-            deep_ui.view = DeepView::NewMission;
-            deep_ui.selected_index = 0;
-            deep_ui.staging_mission_index = None;
-            deep_ui.staged_squad.clear();
-            InputResult::Continue
-        }
-        KeyCode::Char('r') | KeyCode::Char('R') => {
-            deep_ui.view = DeepView::Roster;
-            deep_ui.selected_index = 0;
-            InputResult::Continue
-        }
-        KeyCode::Char('l') | KeyCode::Char('L') => {
-            deep_ui.view = DeepView::Infrastructure;
-            deep_ui.selected_index = 0;
-            InputResult::Continue
-        }
-        KeyCode::Char('c') | KeyCode::Char('C') => {
-            deep_ui.view = DeepView::Recruit;
-            deep_ui.selected_index = 0;
-            InputResult::Continue
-        }
-        KeyCode::Char('e') | KeyCode::Char('E') => {
-            // Quick-jump to event response if any mission has a pending event.
-            if let Some(mission) = deep_state
-                .prestige
-                .active_missions
-                .iter()
-                .find(|m| m.has_pending_event())
-            {
-                deep_ui.event_mission_id = Some(mission.id);
-                deep_ui.event_choice_index = 0;
-                deep_ui.view = DeepView::EventResponse;
-            }
-            InputResult::Continue
-        }
         KeyCode::Up => {
             deep_ui.selected_index = deep_ui.selected_index.saturating_sub(1);
             InputResult::Continue
@@ -106,6 +97,7 @@ fn handle_hub(key: KeyEvent, deep_state: &mut DeepState, deep_ui: &mut DeepUiSta
                     deep_ui.event_mission_id = Some(mission.id);
                     deep_ui.event_choice_index = 0;
                     deep_ui.view = DeepView::EventResponse;
+                    deep_ui.event_visit_count = deep_ui.event_visit_count.saturating_add(1);
                 }
             }
             InputResult::Continue
@@ -208,6 +200,7 @@ fn handle_squad_assignment(
         KeyCode::Enter => {
             // Confirm and launch the mission if squad is non-empty.
             if deep_ui.staged_squad.is_empty() {
+                deep_ui.flash_message = Some("Select at least one merc with [Space]".to_string());
                 return InputResult::Continue;
             }
 
@@ -220,6 +213,10 @@ fn handle_squad_assignment(
                         && !deep_state.prestige.spend_marks(available.marks_cost)
                     {
                         // Can't afford — put mission back.
+                        deep_ui.flash_message = Some(format!(
+                            "Not enough Marks! Need {} but have {}",
+                            available.marks_cost, deep_state.prestige.warband_marks
+                        ));
                         deep_state
                             .prestige
                             .available_missions
@@ -500,5 +497,23 @@ fn handle_recruit(
             InputResult::Continue
         }
         _ => InputResult::Continue,
+    }
+}
+
+// ── View switching with visit counter ──────────────────────────────────────────
+
+/// Switch to a new view, resetting selection and incrementing the visit counter.
+fn switch_view(ui: &mut DeepUiState, target: DeepView) {
+    ui.view = target;
+    ui.selected_index = 0;
+    ui.staged_squad.clear();
+    ui.show_help = false;
+    match target {
+        DeepView::Hub => ui.hub_visit_count = ui.hub_visit_count.saturating_add(1),
+        DeepView::NewMission => ui.mission_visit_count = ui.mission_visit_count.saturating_add(1),
+        DeepView::Roster => ui.roster_visit_count = ui.roster_visit_count.saturating_add(1),
+        DeepView::Infrastructure => ui.layer_visit_count = ui.layer_visit_count.saturating_add(1),
+        DeepView::EventResponse => ui.event_visit_count = ui.event_visit_count.saturating_add(1),
+        DeepView::Recruit => ui.recruit_visit_count = ui.recruit_visit_count.saturating_add(1),
     }
 }

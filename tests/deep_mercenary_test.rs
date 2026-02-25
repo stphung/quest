@@ -17,11 +17,11 @@
 //! - DeepState::on_prestige() — resets prestige, preserves persistent
 
 use quest::deep::{
-    apply_merc_xp, available_mercs, generate_mercenary, generate_merc_name,
-    generate_recruit_pool, generate_starter_roster, injure_merc, mark_merc_lost,
-    purge_lost_mercs, recruit_pool_size, roll_recruit_cost, roll_recruit_quality,
-    roster_has_capacity, stats_at_level, tick_merc_injury, xp_to_next_level, DeepPrestige,
-    DeepState, GuildRank, InjurySeverity, MercArchetype, MercQuality, MercStatus, Mercenary,
+    apply_merc_xp, available_mercs, generate_merc_name, generate_mercenary, generate_recruit_pool,
+    generate_starter_roster, injure_merc, mark_merc_lost, purge_lost_mercs, recruit_pool_size,
+    roll_recruit_cost, roll_recruit_quality, roster_has_capacity, stats_at_level, tick_merc_injury,
+    xp_to_next_level, DeepPrestige, DeepState, GuildRank, InjurySeverity, MercArchetype,
+    MercQuality, MercStatus, Mercenary,
 };
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -227,8 +227,18 @@ fn test_arcanist_base_expertise_exceeds_resilience() {
 #[test]
 fn test_medic_base_resilience_is_highest_stat() {
     let (p, r, e) = MercArchetype::Medic.base_stats();
-    assert!(r > p, "Medic resilience ({}) should exceed power ({})", r, p);
-    assert!(r > e, "Medic resilience ({}) should exceed expertise ({})", r, e);
+    assert!(
+        r > p,
+        "Medic resilience ({}) should exceed power ({})",
+        r,
+        p
+    );
+    assert!(
+        r > e,
+        "Medic resilience ({}) should exceed expertise ({})",
+        r,
+        e
+    );
 }
 
 // =============================================================================
@@ -240,7 +250,12 @@ fn test_generate_mercenary_starts_available_at_level_1() {
     let mut rng = seeded_rng(1);
     for &arch in MercArchetype::ALL {
         let merc = generate_mercenary(1, arch, MercQuality::Common, &mut rng);
-        assert_eq!(merc.level, Mercenary::BASE_LEVEL, "{:?} must start at level 1", arch);
+        assert_eq!(
+            merc.level,
+            Mercenary::BASE_LEVEL,
+            "{:?} must start at level 1",
+            arch
+        );
         assert!(merc.is_available(), "{:?} must start Available", arch);
         assert_eq!(
             merc.missions_completed, 0,
@@ -472,7 +487,11 @@ fn test_xp_to_next_level_base_is_200() {
 fn test_xp_to_next_level_level2_in_expected_range() {
     // 200 * 2^1.3 ≈ 491.5
     let xp = xp_to_next_level(2);
-    assert!(xp > 400 && xp < 600, "Level 2->3 XP should be ~492, got {}", xp);
+    assert!(
+        xp > 400 && xp < 600,
+        "Level 2->3 XP should be ~492, got {}",
+        xp
+    );
 }
 
 // =============================================================================
@@ -611,9 +630,9 @@ fn test_generate_recruit_pool_costs_within_quality_range() {
         let mut ids = id_counter();
         let pool = generate_recruit_pool(GuildRank(rank), &mut ids, &mut rng);
         for &cost in &pool.recruit_costs {
-            // Common min=30, Elite max=180. With rounding allow ±5.
-            assert!(cost >= 25, "Cost {} is below any quality minimum", cost);
-            assert!(cost <= 185, "Cost {} is above any quality maximum", cost);
+            // Common min=50, Elite max=300. With rounding allow ±5.
+            assert!(cost >= 45, "Cost {} is below any quality minimum", cost);
+            assert!(cost <= 305, "Cost {} is above any quality maximum", cost);
         }
     }
 }
@@ -623,8 +642,7 @@ fn test_generate_recruit_pool_candidate_ids_unique() {
     let mut rng = seeded_rng(205);
     let mut ids = id_counter();
     let pool = generate_recruit_pool(GuildRank(5), &mut ids, &mut rng);
-    let id_set: std::collections::HashSet<u64> =
-        pool.candidates.iter().map(|m| m.id).collect();
+    let id_set: std::collections::HashSet<u64> = pool.candidates.iter().map(|m| m.id).collect();
     assert_eq!(
         id_set.len(),
         pool.candidates.len(),
@@ -703,7 +721,11 @@ fn test_generate_starter_roster_exactly_3_mercs() {
     let mut rng = seeded_rng(300);
     let mut ids = id_counter();
     let roster = generate_starter_roster(GuildRank(1), &mut ids, &mut rng);
-    assert_eq!(roster.len(), 3, "Starter roster must contain exactly 3 mercs");
+    assert_eq!(
+        roster.len(),
+        3,
+        "Starter roster must contain exactly 3 mercs"
+    );
 }
 
 #[test]
@@ -750,7 +772,12 @@ fn test_generate_starter_roster_all_available_at_level_1() {
     let roster = generate_starter_roster(GuildRank(2), &mut ids, &mut rng);
     for merc in &roster {
         assert!(merc.is_available(), "{} should start Available", merc.name);
-        assert_eq!(merc.level, Mercenary::BASE_LEVEL, "{} should start at level 1", merc.name);
+        assert_eq!(
+            merc.level,
+            Mercenary::BASE_LEVEL,
+            "{} should start at level 1",
+            merc.name
+        );
         assert_eq!(
             merc.missions_completed, 0,
             "{} missions_completed should be 0",
@@ -878,7 +905,9 @@ fn test_available_mercs_filters_all_status_variants() {
     let mut m3 = generate_mercenary(3, MercArchetype::Medic, MercQuality::Common, &mut rng);
     let m4 = generate_mercenary(4, MercArchetype::Arcanist, MercQuality::Common, &mut rng);
     m1.status = MercStatus::OnMission(1);
-    m2.status = MercStatus::Injured { missions_remaining: 3 };
+    m2.status = MercStatus::Injured {
+        missions_remaining: 3,
+    };
     m3.status = MercStatus::Lost;
     // m4 remains Available.
     let roster = vec![m1, m2, m3, m4];
@@ -936,8 +965,7 @@ fn test_injure_merc_all_severities_produce_injured_status() {
         InjurySeverity::Severe,
     ] {
         let mut rng = seeded_rng(701);
-        let mut merc =
-            generate_mercenary(1, MercArchetype::Scout, MercQuality::Common, &mut rng);
+        let mut merc = generate_mercenary(1, MercArchetype::Scout, MercQuality::Common, &mut rng);
         injure_merc(&mut merc, severity, &mut rng);
         assert!(
             matches!(merc.status, MercStatus::Injured { .. }),
@@ -954,16 +982,14 @@ fn test_injure_merc_severe_averages_more_missions_than_light() {
     let mut severe_sum = 0u64;
     for seed in 0..n {
         let mut rng = seeded_rng(seed + 702);
-        let mut merc1 =
-            generate_mercenary(1, MercArchetype::Medic, MercQuality::Common, &mut rng);
+        let mut merc1 = generate_mercenary(1, MercArchetype::Medic, MercQuality::Common, &mut rng);
         injure_merc(&mut merc1, InjurySeverity::Light, &mut rng);
         if let MercStatus::Injured { missions_remaining } = merc1.status {
             light_sum += missions_remaining as u64;
         }
 
         let mut rng = seeded_rng(seed + 702);
-        let mut merc2 =
-            generate_mercenary(1, MercArchetype::Medic, MercQuality::Common, &mut rng);
+        let mut merc2 = generate_mercenary(1, MercArchetype::Medic, MercQuality::Common, &mut rng);
         injure_merc(&mut merc2, InjurySeverity::Severe, &mut rng);
         if let MercStatus::Injured { missions_remaining } = merc2.status {
             severe_sum += missions_remaining as u64;
@@ -981,9 +1007,14 @@ fn test_injure_merc_severe_averages_more_missions_than_light() {
 fn test_tick_merc_injury_recovery_at_1_mission_remaining() {
     let mut rng = seeded_rng(800);
     let mut merc = generate_mercenary(1, MercArchetype::Scout, MercQuality::Common, &mut rng);
-    merc.status = MercStatus::Injured { missions_remaining: 1 };
+    merc.status = MercStatus::Injured {
+        missions_remaining: 1,
+    };
     let recovered = tick_merc_injury(&mut merc);
-    assert!(recovered, "Merc should recover when missions_remaining hits 0");
+    assert!(
+        recovered,
+        "Merc should recover when missions_remaining hits 0"
+    );
     assert!(merc.is_available(), "Recovered merc should be Available");
 }
 
@@ -991,11 +1022,18 @@ fn test_tick_merc_injury_recovery_at_1_mission_remaining() {
 fn test_tick_merc_injury_decrements_counter() {
     let mut rng = seeded_rng(801);
     let mut merc = generate_mercenary(1, MercArchetype::Scout, MercQuality::Common, &mut rng);
-    merc.status = MercStatus::Injured { missions_remaining: 4 };
+    merc.status = MercStatus::Injured {
+        missions_remaining: 4,
+    };
     let recovered = tick_merc_injury(&mut merc);
     assert!(!recovered, "Should not recover when missions_remaining > 1");
     assert!(
-        matches!(merc.status, MercStatus::Injured { missions_remaining: 3 }),
+        matches!(
+            merc.status,
+            MercStatus::Injured {
+                missions_remaining: 3
+            }
+        ),
         "missions_remaining should decrement to 3"
     );
 }
@@ -1004,11 +1042,23 @@ fn test_tick_merc_injury_decrements_counter() {
 fn test_tick_merc_injury_full_countdown_sequence() {
     let mut rng = seeded_rng(802);
     let mut merc = generate_mercenary(1, MercArchetype::Medic, MercQuality::Common, &mut rng);
-    merc.status = MercStatus::Injured { missions_remaining: 3 };
+    merc.status = MercStatus::Injured {
+        missions_remaining: 3,
+    };
     assert!(!tick_merc_injury(&mut merc));
-    assert!(matches!(merc.status, MercStatus::Injured { missions_remaining: 2 }));
+    assert!(matches!(
+        merc.status,
+        MercStatus::Injured {
+            missions_remaining: 2
+        }
+    ));
     assert!(!tick_merc_injury(&mut merc));
-    assert!(matches!(merc.status, MercStatus::Injured { missions_remaining: 1 }));
+    assert!(matches!(
+        merc.status,
+        MercStatus::Injured {
+            missions_remaining: 1
+        }
+    ));
     let recovered = tick_merc_injury(&mut merc);
     assert!(recovered, "Should recover after 3 ticks");
     assert!(merc.is_available());
@@ -1020,7 +1070,10 @@ fn test_tick_merc_injury_noop_on_available() {
     let mut merc = generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
     assert!(matches!(merc.status, MercStatus::Available));
     let recovered = tick_merc_injury(&mut merc);
-    assert!(!recovered, "tick_merc_injury on Available merc should return false");
+    assert!(
+        !recovered,
+        "tick_merc_injury on Available merc should return false"
+    );
     assert!(merc.is_available(), "Status should remain Available");
 }
 
@@ -1030,7 +1083,10 @@ fn test_tick_merc_injury_noop_on_lost() {
     let mut merc = generate_mercenary(1, MercArchetype::Saboteur, MercQuality::Common, &mut rng);
     merc.status = MercStatus::Lost;
     let recovered = tick_merc_injury(&mut merc);
-    assert!(!recovered, "tick_merc_injury on Lost merc should return false");
+    assert!(
+        !recovered,
+        "tick_merc_injury on Lost merc should return false"
+    );
     assert!(matches!(merc.status, MercStatus::Lost));
 }
 
@@ -1111,7 +1167,13 @@ fn test_roll_recruit_cost_multiple_of_5() {
     ] {
         for _ in 0..100 {
             let cost = roll_recruit_cost(quality, &mut rng);
-            assert_eq!(cost % 5, 0, "{:?} cost {} must be a multiple of 5", quality, cost);
+            assert_eq!(
+                cost % 5,
+                0,
+                "{:?} cost {} must be a multiple of 5",
+                quality,
+                cost
+            );
         }
     }
 }
@@ -1215,7 +1277,10 @@ fn test_generate_merc_name_uses_archetype_appropriate_epithets() {
             found_scout = true;
         }
     }
-    assert!(found_vanguard, "Vanguard names should use Vanguard epithets");
+    assert!(
+        found_vanguard,
+        "Vanguard names should use Vanguard epithets"
+    );
     assert!(found_scout, "Scout names should use Scout epithets");
 }
 
@@ -1300,18 +1365,14 @@ fn test_on_prestige_preserves_merc_id_counter() {
     let mut state = DeepState::new();
     state.persistent.discovered = true;
     // Consume IDs for starters.
-    let starters = generate_starter_roster(
-        GuildRank(1),
-        || state.persistent.next_merc_id(),
-        &mut rng,
-    );
+    let starters =
+        generate_starter_roster(GuildRank(1), || state.persistent.next_merc_id(), &mut rng);
     state.prestige.roster = starters;
     let counter_before = state.persistent.merc_id_counter;
     assert_eq!(counter_before, 3, "Three IDs consumed");
     state.on_prestige();
     assert_eq!(
-        state.persistent.merc_id_counter,
-        counter_before,
+        state.persistent.merc_id_counter, counter_before,
         "merc_id_counter should survive prestige"
     );
 }
@@ -1324,13 +1385,19 @@ fn test_on_prestige_preserves_merc_id_counter() {
 fn test_deep_prestige_spend_marks_success_and_failure() {
     let mut prestige = DeepPrestige::new();
     prestige.warband_marks = 100;
-    assert!(prestige.spend_marks(50), "Should succeed with sufficient marks");
+    assert!(
+        prestige.spend_marks(50),
+        "Should succeed with sufficient marks"
+    );
     assert_eq!(prestige.warband_marks, 50);
     assert!(
         !prestige.spend_marks(100),
         "Should fail with insufficient marks"
     );
-    assert_eq!(prestige.warband_marks, 50, "Balance unchanged on failed spend");
+    assert_eq!(
+        prestige.warband_marks, 50,
+        "Balance unchanged on failed spend"
+    );
 }
 
 #[test]
@@ -1339,7 +1406,9 @@ fn test_deep_prestige_available_merc_count() {
     let mut prestige = DeepPrestige::new();
     let mut m1 = generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
     let m2 = generate_mercenary(2, MercArchetype::Scout, MercQuality::Common, &mut rng);
-    m1.status = MercStatus::Injured { missions_remaining: 1 };
+    m1.status = MercStatus::Injured {
+        missions_remaining: 1,
+    };
     prestige.roster = vec![m1, m2];
     assert_eq!(prestige.available_merc_count(), 1);
 }
@@ -1387,7 +1456,7 @@ fn test_guild_rank_max_roster_values() {
 #[test]
 fn test_guild_rank_concurrent_missions() {
     assert_eq!(GuildRank(1).concurrent_missions(), 1);
-    assert_eq!(GuildRank(2).concurrent_missions(), 1);
+    assert_eq!(GuildRank(2).concurrent_missions(), 2);
     assert_eq!(GuildRank(3).concurrent_missions(), 2);
     assert_eq!(GuildRank(4).concurrent_missions(), 3);
     assert_eq!(GuildRank(5).concurrent_missions(), 4);
@@ -1403,7 +1472,13 @@ fn test_guild_rank_next_and_can_advance() {
 
 #[test]
 fn test_guild_rank_display_names_all_defined() {
-    let names = ["Freelancers", "Sellswords", "Company", "Battalion", "Legion"];
+    let names = [
+        "Freelancers",
+        "Sellswords",
+        "Company",
+        "Battalion",
+        "Legion",
+    ];
     for (i, &expected) in names.iter().enumerate() {
         assert_eq!(
             GuildRank(i as u8 + 1).display_name(),

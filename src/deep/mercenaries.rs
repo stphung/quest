@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Functions wired into the game loop incrementally
 //! Mercenary generation, recruitment, and archetype system for The Deep.
 //!
 //! Covers:
@@ -56,10 +57,10 @@ impl MercQuality {
     /// Warband Marks cost range (min, max) to recruit this quality.
     pub fn cost_range(self) -> (u32, u32) {
         match self {
-            MercQuality::Common => (30, 50),
-            MercQuality::Uncommon => (50, 80),
-            MercQuality::Rare => (80, 120),
-            MercQuality::Elite => (120, 180),
+            MercQuality::Common => (50, 80),
+            MercQuality::Uncommon => (80, 130),
+            MercQuality::Rare => (130, 200),
+            MercQuality::Elite => (200, 300),
         }
     }
 }
@@ -89,7 +90,11 @@ pub fn roll_recruit_quality(guild_rank: GuildRank, rng: &mut impl Rng) -> MercQu
     match guild_rank.0 {
         1 => MercQuality::Common,
         2 => {
-            if roll < 60.0 { MercQuality::Common } else { MercQuality::Uncommon }
+            if roll < 60.0 {
+                MercQuality::Common
+            } else {
+                MercQuality::Uncommon
+            }
         }
         3 => {
             if roll < 30.0 {
@@ -127,8 +132,11 @@ pub fn roll_recruit_quality(guild_rank: GuildRank, rng: &mut impl Rng) -> MercQu
 /// - Rank 1: Vanguard, Scout, Medic only (introductory archetypes)
 /// - Rank 2: + Arcanist
 /// - Rank 3+: All archetypes including Saboteur
-const RANK_1_ARCHETYPES: &[MercArchetype] =
-    &[MercArchetype::Vanguard, MercArchetype::Scout, MercArchetype::Medic];
+const RANK_1_ARCHETYPES: &[MercArchetype] = &[
+    MercArchetype::Vanguard,
+    MercArchetype::Scout,
+    MercArchetype::Medic,
+];
 
 const RANK_2_ARCHETYPES: &[MercArchetype] = &[
     MercArchetype::Vanguard,
@@ -194,7 +202,13 @@ fn archetype_growth_per_level(archetype: MercArchetype) -> (f64, f64, f64) {
 /// Formula (from balance doc): `stat_at_level = base + growth_per_level * (level - 1)`
 ///
 /// Returns (power, resilience, expertise).
-pub fn stats_at_level(archetype: MercArchetype, base_power: u32, base_resilience: u32, base_expertise: u32, level: u32) -> (u32, u32, u32) {
+pub fn stats_at_level(
+    archetype: MercArchetype,
+    base_power: u32,
+    base_resilience: u32,
+    base_expertise: u32,
+    level: u32,
+) -> (u32, u32, u32) {
     if level <= 1 {
         return (base_power, base_resilience, base_expertise);
     }
@@ -220,36 +234,75 @@ fn apply_variance(value: u32, rng: &mut impl Rng) -> u32 {
 // ── Name Generation ───────────────────────────────────────────────────────────
 
 const MERC_FIRST_NAMES: &[&str] = &[
-    "Aldric", "Brynn", "Calder", "Dagna", "Edric", "Freya", "Gareth", "Hilde",
-    "Invar", "Jora", "Kael", "Lyra", "Maren", "Nessa", "Osric", "Petra",
-    "Quill", "Runa", "Sven", "Tilda", "Ulric", "Vera", "Wulf", "Xena",
-    "Yrsa", "Zora", "Bram", "Cira", "Dorn", "Elsa", "Finn", "Groa",
-    "Holt", "Isla", "Jak", "Kira", "Leif", "Mora", "Njord", "Odda",
+    "Aldric", "Brynn", "Calder", "Dagna", "Edric", "Freya", "Gareth", "Hilde", "Invar", "Jora",
+    "Kael", "Lyra", "Maren", "Nessa", "Osric", "Petra", "Quill", "Runa", "Sven", "Tilda", "Ulric",
+    "Vera", "Wulf", "Xena", "Yrsa", "Zora", "Bram", "Cira", "Dorn", "Elsa", "Finn", "Groa", "Holt",
+    "Isla", "Jak", "Kira", "Leif", "Mora", "Njord", "Odda",
 ];
 
 const VANGUARD_EPITHETS: &[&str] = &[
-    "Ironwall", "Stonebreaker", "the Unyielding", "Shieldborn", "the Immovable",
-    "the Bulwark", "Rampart", "Forgeborn", "Steadfast", "the Unbroken",
+    "Ironwall",
+    "Stonebreaker",
+    "the Unyielding",
+    "Shieldborn",
+    "the Immovable",
+    "the Bulwark",
+    "Rampart",
+    "Forgeborn",
+    "Steadfast",
+    "the Unbroken",
 ];
 
 const SCOUT_EPITHETS: &[&str] = &[
-    "Shadowfoot", "the Far-Eyed", "Duskwalker", "the Silent", "Swiftpath",
-    "the Unseen", "Lightfoot", "Voidtracer", "the Keen", "Nightcrawler",
+    "Shadowfoot",
+    "the Far-Eyed",
+    "Duskwalker",
+    "the Silent",
+    "Swiftpath",
+    "the Unseen",
+    "Lightfoot",
+    "Voidtracer",
+    "the Keen",
+    "Nightcrawler",
 ];
 
 const ARCANIST_EPITHETS: &[&str] = &[
-    "the Learned", "Runeweaver", "Voidcaller", "Spellwright", "the Arcane",
-    "Deepreader", "the Knowing", "Glyphbinder", "Elementborn", "the Wise",
+    "the Learned",
+    "Runeweaver",
+    "Voidcaller",
+    "Spellwright",
+    "the Arcane",
+    "Deepreader",
+    "the Knowing",
+    "Glyphbinder",
+    "Elementborn",
+    "the Wise",
 ];
 
 const MEDIC_EPITHETS: &[&str] = &[
-    "the Mender", "Lifeguard", "Soulbinder", "the Tender", "Ironhands",
-    "Bloodstopper", "the Steadying", "Warmhearted", "the Careful", "Vitalkeeper",
+    "the Mender",
+    "Lifeguard",
+    "Soulbinder",
+    "the Tender",
+    "Ironhands",
+    "Bloodstopper",
+    "the Steadying",
+    "Warmhearted",
+    "the Careful",
+    "Vitalkeeper",
 ];
 
 const SABOTEUR_EPITHETS: &[&str] = &[
-    "the Cunning", "Trapbane", "Voidpicker", "the Slippery", "Ironfingers",
-    "the Clever", "Lockpick", "Shadowcraft", "the Devious", "Wrenchborn",
+    "the Cunning",
+    "Trapbane",
+    "Voidpicker",
+    "the Slippery",
+    "Ironfingers",
+    "the Clever",
+    "Lockpick",
+    "Shadowcraft",
+    "the Devious",
+    "Wrenchborn",
 ];
 
 fn archetype_epithets(archetype: MercArchetype) -> &'static [&'static str] {
@@ -291,8 +344,7 @@ pub fn generate_mercenary(
     let (base_power, base_resilience, base_expertise) = archetype.base_stats();
     let flat = quality.flat_bonus();
     let primary = quality.primary_bonus();
-    let (power_primary, resilience_primary, expertise_primary) =
-        archetype_primary_flags(archetype);
+    let (power_primary, resilience_primary, expertise_primary) = archetype_primary_flags(archetype);
 
     let raw_power = base_power + flat + if power_primary { primary } else { 0 };
     let raw_resilience = base_resilience + flat + if resilience_primary { primary } else { 0 };
@@ -369,12 +421,17 @@ pub fn generate_recruit_pool(
 ///
 /// Returns a `Vec<Mercenary>` of exactly 3 mercs.
 pub fn generate_starter_roster(
-    _guild_rank: GuildRank,
+    guild_rank: GuildRank,
     mut next_id: impl FnMut() -> u64,
     rng: &mut impl Rng,
 ) -> Vec<Mercenary> {
-    // Starters are always Common quality (no cost, no bonus over rank baseline).
-    // Guild rank is accepted for API consistency but starters are always Common.
+    // Starter quality scales with guild rank so returning veterans get better recruits.
+    let quality = match guild_rank.0 {
+        1 | 2 => MercQuality::Common,
+        3 => MercQuality::Uncommon,
+        _ => MercQuality::Rare, // Rank 4-5
+    };
+
     let starter_archetypes = [
         MercArchetype::Vanguard,
         MercArchetype::Scout,
@@ -385,7 +442,7 @@ pub fn generate_starter_roster(
         .iter()
         .map(|&archetype| {
             let id = next_id();
-            generate_mercenary(id, archetype, MercQuality::Common, rng)
+            generate_mercenary(id, archetype, quality, rng)
         })
         .collect()
 }
@@ -534,7 +591,7 @@ const HOURS_PER_MISSION_EQUIVALENT: u64 = 6;
 
 pub fn recovery_secs_to_missions(recovery_secs: u64) -> u32 {
     let hours = recovery_secs / 3600;
-    ((hours + HOURS_PER_MISSION_EQUIVALENT - 1) / HOURS_PER_MISSION_EQUIVALENT).max(1) as u32
+    hours.div_ceil(HOURS_PER_MISSION_EQUIVALENT).max(1) as u32
 }
 
 /// Apply an injury of the given severity to a mercenary.
@@ -607,8 +664,7 @@ mod tests {
     #[test]
     fn test_generate_merc_name_archetype_epithets_are_distinct() {
         // Vanguard and Scout should never share an epithet (just verify tables differ)
-        let vanguard_names: std::collections::HashSet<_> =
-            VANGUARD_EPITHETS.iter().collect();
+        let vanguard_names: std::collections::HashSet<_> = VANGUARD_EPITHETS.iter().collect();
         let scout_names: std::collections::HashSet<_> = SCOUT_EPITHETS.iter().collect();
         let overlap: Vec<_> = vanguard_names.intersection(&scout_names).collect();
         assert!(
@@ -680,7 +736,11 @@ mod tests {
         for &archetype in MercArchetype::ALL {
             let merc = generate_mercenary(1, archetype, MercQuality::Common, &mut rng);
             assert!(merc.power > 0, "{:?} power must be > 0", archetype);
-            assert!(merc.resilience > 0, "{:?} resilience must be > 0", archetype);
+            assert!(
+                merc.resilience > 0,
+                "{:?} resilience must be > 0",
+                archetype
+            );
             assert!(merc.expertise > 0, "{:?} expertise must be > 0", archetype);
         }
     }
@@ -702,9 +762,11 @@ mod tests {
         let mut rare_total = 0u64;
         for seed in 0..n {
             let mut rng = seeded_rng(seed);
-            let m_common = generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
+            let m_common =
+                generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
             let mut rng = seeded_rng(seed);
-            let m_rare = generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Rare, &mut rng);
+            let m_rare =
+                generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Rare, &mut rng);
             common_total += (m_common.power + m_common.resilience + m_common.expertise) as u64;
             rare_total += (m_rare.power + m_rare.resilience + m_rare.expertise) as u64;
         }
@@ -780,7 +842,14 @@ mod tests {
         let mut rng = seeded_rng(77);
         let mut id_counter = 0u64;
         for rank in 1..=5 {
-            let pool = generate_recruit_pool(GuildRank(rank), || { id_counter += 1; id_counter }, &mut rng);
+            let pool = generate_recruit_pool(
+                GuildRank(rank),
+                || {
+                    id_counter += 1;
+                    id_counter
+                },
+                &mut rng,
+            );
             assert_eq!(
                 pool.candidates.len(),
                 recruit_pool_size(GuildRank(rank)),
@@ -802,7 +871,14 @@ mod tests {
         let mut id_counter = 0u64;
         // Run many pools to get statistical coverage
         for _ in 0..50 {
-            let pool = generate_recruit_pool(GuildRank(1), || { id_counter += 1; id_counter }, &mut rng);
+            let pool = generate_recruit_pool(
+                GuildRank(1),
+                || {
+                    id_counter += 1;
+                    id_counter
+                },
+                &mut rng,
+            );
             for merc in &pool.candidates {
                 assert!(
                     matches!(
@@ -820,7 +896,14 @@ mod tests {
     fn test_generate_recruit_pool_costs_are_reasonable() {
         let mut rng = seeded_rng(55);
         let mut id_counter = 0u64;
-        let pool = generate_recruit_pool(GuildRank(3), || { id_counter += 1; id_counter }, &mut rng);
+        let pool = generate_recruit_pool(
+            GuildRank(3),
+            || {
+                id_counter += 1;
+                id_counter
+            },
+            &mut rng,
+        );
         for &cost in &pool.recruit_costs {
             assert!(cost >= 25, "Recruit cost {} is too low", cost);
             assert!(cost <= 200, "Recruit cost {} is too high", cost);
@@ -833,7 +916,14 @@ mod tests {
     fn test_generate_recruit_pool_ids_are_unique() {
         let mut rng = seeded_rng(66);
         let mut id_counter = 0u64;
-        let pool = generate_recruit_pool(GuildRank(5), || { id_counter += 1; id_counter }, &mut rng);
+        let pool = generate_recruit_pool(
+            GuildRank(5),
+            || {
+                id_counter += 1;
+                id_counter
+            },
+            &mut rng,
+        );
         let ids: std::collections::HashSet<_> = pool.candidates.iter().map(|m| m.id).collect();
         assert_eq!(
             ids.len(),
@@ -848,7 +938,14 @@ mod tests {
     fn test_generate_starter_roster_is_three_mercs() {
         let mut rng = seeded_rng(100);
         let mut id_counter = 0u64;
-        let roster = generate_starter_roster(GuildRank(1), || { id_counter += 1; id_counter }, &mut rng);
+        let roster = generate_starter_roster(
+            GuildRank(1),
+            || {
+                id_counter += 1;
+                id_counter
+            },
+            &mut rng,
+        );
         assert_eq!(roster.len(), 3);
     }
 
@@ -856,7 +953,14 @@ mod tests {
     fn test_generate_starter_roster_contains_correct_archetypes() {
         let mut rng = seeded_rng(101);
         let mut id_counter = 0u64;
-        let roster = generate_starter_roster(GuildRank(1), || { id_counter += 1; id_counter }, &mut rng);
+        let roster = generate_starter_roster(
+            GuildRank(1),
+            || {
+                id_counter += 1;
+                id_counter
+            },
+            &mut rng,
+        );
         let archetypes: Vec<_> = roster.iter().map(|m| m.archetype).collect();
         assert!(
             archetypes.contains(&MercArchetype::Vanguard),
@@ -876,7 +980,14 @@ mod tests {
     fn test_generate_starter_roster_all_available() {
         let mut rng = seeded_rng(102);
         let mut id_counter = 0u64;
-        let roster = generate_starter_roster(GuildRank(2), || { id_counter += 1; id_counter }, &mut rng);
+        let roster = generate_starter_roster(
+            GuildRank(2),
+            || {
+                id_counter += 1;
+                id_counter
+            },
+            &mut rng,
+        );
         for merc in &roster {
             assert!(merc.is_available(), "{} should start Available", merc.name);
         }
@@ -886,7 +997,14 @@ mod tests {
     fn test_generate_starter_roster_ids_are_unique() {
         let mut rng = seeded_rng(103);
         let mut id_counter = 0u64;
-        let roster = generate_starter_roster(GuildRank(1), || { id_counter += 1; id_counter }, &mut rng);
+        let roster = generate_starter_roster(
+            GuildRank(1),
+            || {
+                id_counter += 1;
+                id_counter
+            },
+            &mut rng,
+        );
         let ids: std::collections::HashSet<_> = roster.iter().map(|m| m.id).collect();
         assert_eq!(ids.len(), 3, "Starter roster ids must all be unique");
     }
@@ -947,14 +1065,21 @@ mod tests {
     #[test]
     fn test_roll_injury_recovery_within_range() {
         let mut rng = seeded_rng(200);
-        for severity in [InjurySeverity::Light, InjurySeverity::Moderate, InjurySeverity::Severe] {
+        for severity in [
+            InjurySeverity::Light,
+            InjurySeverity::Moderate,
+            InjurySeverity::Severe,
+        ] {
             let (min, max) = severity.recovery_secs();
             for _ in 0..50 {
                 let secs = roll_injury_recovery_secs(severity, &mut rng);
                 assert!(
                     secs >= min && secs <= max,
                     "{:?} recovery {} should be in [{}, {}]",
-                    severity, secs, min, max
+                    severity,
+                    secs,
+                    min,
+                    max
                 );
             }
         }
@@ -963,7 +1088,8 @@ mod tests {
     #[test]
     fn test_injure_merc_sets_injured_status() {
         let mut rng = seeded_rng(201);
-        let mut merc = generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
+        let mut merc =
+            generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
         injure_merc(&mut merc, InjurySeverity::Moderate, &mut rng);
         assert!(
             matches!(merc.status, MercStatus::Injured { missions_remaining } if missions_remaining >= 1),
@@ -976,9 +1102,14 @@ mod tests {
     fn test_tick_merc_injury_recovers_when_countdown_reaches_zero() {
         let mut rng = seeded_rng(202);
         let mut merc = generate_mercenary(1, MercArchetype::Medic, MercQuality::Common, &mut rng);
-        merc.status = MercStatus::Injured { missions_remaining: 1 };
+        merc.status = MercStatus::Injured {
+            missions_remaining: 1,
+        };
         let recovered = tick_merc_injury(&mut merc);
-        assert!(recovered, "Merc should recover when missions_remaining reaches 0");
+        assert!(
+            recovered,
+            "Merc should recover when missions_remaining reaches 0"
+        );
         assert!(merc.is_available());
     }
 
@@ -986,11 +1117,18 @@ mod tests {
     fn test_tick_merc_injury_decrements_counter() {
         let mut rng = seeded_rng(203);
         let mut merc = generate_mercenary(1, MercArchetype::Scout, MercQuality::Common, &mut rng);
-        merc.status = MercStatus::Injured { missions_remaining: 3 };
+        merc.status = MercStatus::Injured {
+            missions_remaining: 3,
+        };
         let recovered = tick_merc_injury(&mut merc);
         assert!(!recovered);
         assert!(
-            matches!(merc.status, MercStatus::Injured { missions_remaining: 2 }),
+            matches!(
+                merc.status,
+                MercStatus::Injured {
+                    missions_remaining: 2
+                }
+            ),
             "missions_remaining should decrement to 2"
         );
     }
@@ -1018,20 +1156,28 @@ mod tests {
         let mut roster = Vec::new();
         assert!(roster_has_capacity(&roster, GuildRank(1))); // 0/5
         for i in 0..5 {
-            roster.push(generate_mercenary(i, MercArchetype::Vanguard, MercQuality::Common, &mut rng));
+            roster.push(generate_mercenary(
+                i,
+                MercArchetype::Vanguard,
+                MercQuality::Common,
+                &mut rng,
+            ));
         }
         assert!(!roster_has_capacity(&roster, GuildRank(1))); // 5/5 full
-        assert!(roster_has_capacity(&roster, GuildRank(2)));  // 5/7 ok
+        assert!(roster_has_capacity(&roster, GuildRank(2))); // 5/7 ok
     }
 
     #[test]
     fn test_available_mercs_filters_correctly() {
         let mut rng = seeded_rng(301);
-        let mut merc1 = generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
+        let mut merc1 =
+            generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
         let mut merc2 = generate_mercenary(2, MercArchetype::Scout, MercQuality::Common, &mut rng);
         let merc3 = generate_mercenary(3, MercArchetype::Medic, MercQuality::Common, &mut rng);
         merc1.status = MercStatus::OnMission(42);
-        merc2.status = MercStatus::Injured { missions_remaining: 2 };
+        merc2.status = MercStatus::Injured {
+            missions_remaining: 2,
+        };
         let roster = vec![merc1, merc2, merc3];
         let available = available_mercs(&roster);
         assert_eq!(available.len(), 1);
@@ -1043,7 +1189,12 @@ mod tests {
     #[test]
     fn test_roll_recruit_cost_within_range_and_multiple_of_5() {
         let mut rng = seeded_rng(400);
-        for quality in [MercQuality::Common, MercQuality::Uncommon, MercQuality::Rare, MercQuality::Elite] {
+        for quality in [
+            MercQuality::Common,
+            MercQuality::Uncommon,
+            MercQuality::Rare,
+            MercQuality::Elite,
+        ] {
             let (min, max) = quality.cost_range();
             let rounded_min = ((min as f64 / 5.0).round() as u32) * 5;
             let rounded_max = ((max as f64 / 5.0).round() as u32) * 5;
@@ -1053,7 +1204,10 @@ mod tests {
                 assert!(
                     cost >= rounded_min && cost <= rounded_max + 5,
                     "{:?} cost {} should be in [{}, {}]",
-                    quality, cost, rounded_min, rounded_max
+                    quality,
+                    cost,
+                    rounded_min,
+                    rounded_max
                 );
             }
         }
@@ -1062,14 +1216,19 @@ mod tests {
     #[test]
     fn test_recruit_cost_elite_more_expensive_than_common() {
         let mut rng = seeded_rng(401);
-        let common_costs: Vec<u32> = (0..50).map(|_| roll_recruit_cost(MercQuality::Common, &mut rng)).collect();
-        let elite_costs: Vec<u32> = (0..50).map(|_| roll_recruit_cost(MercQuality::Elite, &mut rng)).collect();
+        let common_costs: Vec<u32> = (0..50)
+            .map(|_| roll_recruit_cost(MercQuality::Common, &mut rng))
+            .collect();
+        let elite_costs: Vec<u32> = (0..50)
+            .map(|_| roll_recruit_cost(MercQuality::Elite, &mut rng))
+            .collect();
         let common_avg = common_costs.iter().sum::<u32>() as f64 / 50.0;
         let elite_avg = elite_costs.iter().sum::<u32>() as f64 / 50.0;
         assert!(
             elite_avg > common_avg,
             "Elite avg cost ({:.1}) should exceed Common avg cost ({:.1})",
-            elite_avg, common_avg
+            elite_avg,
+            common_avg
         );
     }
 }

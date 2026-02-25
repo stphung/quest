@@ -14,13 +14,13 @@
 //!  5. Edge cases: mid-mission prestige, injured mercs, full/empty roster.
 
 use quest::deep::{
-    DeepState, GuildRank, Infrastructure, LayerTier, MercArchetype, MercStatus, MissionOutcome,
-    MissionType,
-};
-use quest::deep::{
     apply_duration_modifiers, apply_familiarity_gain, base_mission_duration_secs,
     build_infrastructure, generate_starter_roster, is_frontier_layer, is_safe_layer,
     mark_layer_cleared, try_upgrade_guild_rank, DurationModifiers, FamiliarityLevel,
+};
+use quest::deep::{
+    DeepState, GuildRank, Infrastructure, LayerTier, MercArchetype, MercStatus, MissionOutcome,
+    MissionType,
 };
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -60,8 +60,16 @@ fn build_generation_1_state() -> DeepState {
 
     // Build infrastructure on L1-3
     build_infrastructure(deep.persistent.layer_record_mut(1), Infrastructure::Outpost).unwrap();
-    build_infrastructure(deep.persistent.layer_record_mut(2), Infrastructure::SupplyCache).unwrap();
-    build_infrastructure(deep.persistent.layer_record_mut(3), Infrastructure::Watchtower).unwrap();
+    build_infrastructure(
+        deep.persistent.layer_record_mut(2),
+        Infrastructure::SupplyCache,
+    )
+    .unwrap();
+    build_infrastructure(
+        deep.persistent.layer_record_mut(3),
+        Infrastructure::Watchtower,
+    )
+    .unwrap();
 
     // Accumulate familiarity via missions on L1-5
     // Simulate several missions on each layer
@@ -105,9 +113,21 @@ fn test_gen1_initial_state_is_correct() {
     }
 
     // Infrastructure
-    assert!(deep.persistent.layer_record(1).unwrap().has_infrastructure(Infrastructure::Outpost));
-    assert!(deep.persistent.layer_record(2).unwrap().has_infrastructure(Infrastructure::SupplyCache));
-    assert!(deep.persistent.layer_record(3).unwrap().has_infrastructure(Infrastructure::Watchtower));
+    assert!(deep
+        .persistent
+        .layer_record(1)
+        .unwrap()
+        .has_infrastructure(Infrastructure::Outpost));
+    assert!(deep
+        .persistent
+        .layer_record(2)
+        .unwrap()
+        .has_infrastructure(Infrastructure::SupplyCache));
+    assert!(deep
+        .persistent
+        .layer_record(3)
+        .unwrap()
+        .has_infrastructure(Infrastructure::Watchtower));
 
     // Familiarity on all 5 layers
     // L1-2, L4-5: 40 from missions only
@@ -173,9 +193,21 @@ fn test_prestige_preserves_infrastructure() {
     let mut deep = build_generation_1_state();
     deep.on_prestige();
 
-    assert!(deep.persistent.layer_record(1).unwrap().has_infrastructure(Infrastructure::Outpost));
-    assert!(deep.persistent.layer_record(2).unwrap().has_infrastructure(Infrastructure::SupplyCache));
-    assert!(deep.persistent.layer_record(3).unwrap().has_infrastructure(Infrastructure::Watchtower));
+    assert!(deep
+        .persistent
+        .layer_record(1)
+        .unwrap()
+        .has_infrastructure(Infrastructure::Outpost));
+    assert!(deep
+        .persistent
+        .layer_record(2)
+        .unwrap()
+        .has_infrastructure(Infrastructure::SupplyCache));
+    assert!(deep
+        .persistent
+        .layer_record(3)
+        .unwrap()
+        .has_infrastructure(Infrastructure::Watchtower));
 }
 
 #[test]
@@ -256,16 +288,18 @@ fn test_prestige_resets_active_missions() {
 #[test]
 fn test_prestige_resets_available_missions() {
     let mut deep = build_generation_1_state();
-    deep.prestige.available_missions.push(quest::deep::AvailableMission {
-        mission_type: MissionType::SupplyRun,
-        layer: 1,
-        duration_secs: 7200,
-        min_squad_power: 10,
-        required_archetype: None,
-        recommended_archetype: None,
-        marks_cost: 20,
-        description: "Test".to_string(),
-    });
+    deep.prestige
+        .available_missions
+        .push(quest::deep::AvailableMission {
+            mission_type: MissionType::SupplyRun,
+            layer: 1,
+            duration_secs: 7200,
+            min_squad_power: 10,
+            required_archetype: None,
+            recommended_archetype: None,
+            marks_cost: 20,
+            description: "Test".to_string(),
+        });
     deep.on_prestige();
     assert!(deep.prestige.available_missions.is_empty());
 }
@@ -316,30 +350,38 @@ fn test_gen2_roster_size_matches_rank2() {
 }
 
 #[test]
-fn test_gen2_supply_runs_benefit_from_gen1_infrastructure() {
+fn test_gen2_recon_benefits_from_gen1_infrastructure() {
     let mut deep = build_generation_1_state();
     deep.on_prestige();
 
-    // L1 has an Outpost — supply runs should be faster
-    let base_duration = base_mission_duration_secs(LayerTier::Shallows, MissionType::SupplyRun);
-    let with_outpost = apply_duration_modifiers(base_duration, &DurationModifiers {
-        has_outpost: true,
-        familiarity: 40, // from gen 1
-        has_saboteur: false,
-        saboteur_is_veteran: false,
-        is_overpowered: false,
-    });
-    let without_infra = apply_duration_modifiers(base_duration, &DurationModifiers {
-        has_outpost: false,
-        familiarity: 0,
-        has_saboteur: false,
-        saboteur_is_veteran: false,
-        is_overpowered: false,
-    });
+    // L1 has an Outpost — recon missions should be faster.
+    // Use Recon (3600s base) instead of SupplyRun (1800s base = floor) so
+    // duration modifiers can take effect above the 30-minute floor.
+    let base_duration = base_mission_duration_secs(LayerTier::Shallows, MissionType::Recon);
+    let with_outpost = apply_duration_modifiers(
+        base_duration,
+        &DurationModifiers {
+            has_outpost: true,
+            familiarity: 40, // from gen 1
+            has_saboteur: false,
+            saboteur_is_veteran: false,
+            is_overpowered: false,
+        },
+    );
+    let without_infra = apply_duration_modifiers(
+        base_duration,
+        &DurationModifiers {
+            has_outpost: false,
+            familiarity: 0,
+            has_saboteur: false,
+            saboteur_is_veteran: false,
+            is_overpowered: false,
+        },
+    );
 
     assert!(
         with_outpost < without_infra,
-        "Gen 2 supply runs on L1 should be faster due to gen 1 infrastructure: {} vs {}",
+        "Gen 2 recon on L1 should be faster due to gen 1 infrastructure: {} vs {}",
         with_outpost,
         without_infra,
     );
@@ -382,12 +424,13 @@ fn test_gen2_build_more_infrastructure_on_new_layers() {
 
     // Clear L6 and build infrastructure
     mark_layer_cleared(&mut deep.persistent, 6);
-    let result = build_infrastructure(
-        deep.persistent.layer_record_mut(6),
-        Infrastructure::Outpost,
-    );
+    let result = build_infrastructure(deep.persistent.layer_record_mut(6), Infrastructure::Outpost);
     assert!(result.is_ok());
-    assert!(deep.persistent.layer_record(6).unwrap().has_infrastructure(Infrastructure::Outpost));
+    assert!(deep
+        .persistent
+        .layer_record(6)
+        .unwrap()
+        .has_infrastructure(Infrastructure::Outpost));
 }
 
 // ── Full 3-Generation Lifecycle ─────────────────────────────────────────────────
@@ -413,7 +456,11 @@ fn test_three_generation_lifecycle_ratchet() {
         mark_layer_cleared(&mut deep.persistent, layer);
     }
     build_infrastructure(deep.persistent.layer_record_mut(1), Infrastructure::Outpost).unwrap();
-    build_infrastructure(deep.persistent.layer_record_mut(2), Infrastructure::SupplyCache).unwrap();
+    build_infrastructure(
+        deep.persistent.layer_record_mut(2),
+        Infrastructure::SupplyCache,
+    )
+    .unwrap();
 
     // Accumulate some familiarity on L1
     for _ in 0..4 {
@@ -438,8 +485,15 @@ fn test_three_generation_lifecycle_ratchet() {
     assert_eq!(deep.persistent.guild_rank, GuildRank(2));
     assert_eq!(deep.persistent.deepest_layer_reached, gen1_deepest);
     assert_eq!(deep.persistent.merc_id_counter, gen1_merc_counter);
-    assert_eq!(deep.persistent.layer_record(1).unwrap().familiarity, gen1_l1_familiarity);
-    assert!(deep.persistent.layer_record(1).unwrap().has_infrastructure(Infrastructure::Outpost));
+    assert_eq!(
+        deep.persistent.layer_record(1).unwrap().familiarity,
+        gen1_l1_familiarity
+    );
+    assert!(deep
+        .persistent
+        .layer_record(1)
+        .unwrap()
+        .has_infrastructure(Infrastructure::Outpost));
 
     // Verify transient reset
     assert!(deep.prestige.roster.is_empty());
@@ -465,7 +519,11 @@ fn test_three_generation_lifecycle_ratchet() {
 
     // Build more infrastructure
     build_infrastructure(deep.persistent.layer_record_mut(4), Infrastructure::Outpost).unwrap();
-    build_infrastructure(deep.persistent.layer_record_mut(5), Infrastructure::Watchtower).unwrap();
+    build_infrastructure(
+        deep.persistent.layer_record_mut(5),
+        Infrastructure::Watchtower,
+    )
+    .unwrap();
 
     // Accumulate more familiarity on L1 (continues from gen 1)
     for _ in 0..4 {
@@ -485,10 +543,26 @@ fn test_three_generation_lifecycle_ratchet() {
 
     // ═══ Generation 3 Verification ═══
     // All cumulative infrastructure should be present
-    assert!(deep.persistent.layer_record(1).unwrap().has_infrastructure(Infrastructure::Outpost));
-    assert!(deep.persistent.layer_record(2).unwrap().has_infrastructure(Infrastructure::SupplyCache));
-    assert!(deep.persistent.layer_record(4).unwrap().has_infrastructure(Infrastructure::Outpost));
-    assert!(deep.persistent.layer_record(5).unwrap().has_infrastructure(Infrastructure::Watchtower));
+    assert!(deep
+        .persistent
+        .layer_record(1)
+        .unwrap()
+        .has_infrastructure(Infrastructure::Outpost));
+    assert!(deep
+        .persistent
+        .layer_record(2)
+        .unwrap()
+        .has_infrastructure(Infrastructure::SupplyCache));
+    assert!(deep
+        .persistent
+        .layer_record(4)
+        .unwrap()
+        .has_infrastructure(Infrastructure::Outpost));
+    assert!(deep
+        .persistent
+        .layer_record(5)
+        .unwrap()
+        .has_infrastructure(Infrastructure::Watchtower));
 
     // Guild rank 3 preserved (9 roster slots, 2 concurrent missions)
     assert_eq!(deep.persistent.guild_rank, GuildRank(3));
@@ -541,19 +615,47 @@ fn test_serde_roundtrip_preserves_all_persistent_state() {
     // Verify all persistent fields match
     assert_eq!(loaded.persistent.discovered, deep.persistent.discovered);
     assert_eq!(loaded.persistent.guild_rank, deep.persistent.guild_rank);
-    assert_eq!(loaded.persistent.deepest_layer_reached, deep.persistent.deepest_layer_reached);
-    assert_eq!(loaded.persistent.merc_id_counter, deep.persistent.merc_id_counter);
-    assert_eq!(loaded.persistent.mission_id_counter, deep.persistent.mission_id_counter);
+    assert_eq!(
+        loaded.persistent.deepest_layer_reached,
+        deep.persistent.deepest_layer_reached
+    );
+    assert_eq!(
+        loaded.persistent.merc_id_counter,
+        deep.persistent.merc_id_counter
+    );
+    assert_eq!(
+        loaded.persistent.mission_id_counter,
+        deep.persistent.mission_id_counter
+    );
     assert_eq!(loaded.persistent.layers.len(), deep.persistent.layers.len());
 
-    for (i, (loaded_layer, orig_layer)) in loaded.persistent.layers.iter()
+    for (i, (loaded_layer, orig_layer)) in loaded
+        .persistent
+        .layers
+        .iter()
         .zip(deep.persistent.layers.iter())
         .enumerate()
     {
-        assert_eq!(loaded_layer.index, orig_layer.index, "Layer {} index mismatch", i);
-        assert_eq!(loaded_layer.familiarity, orig_layer.familiarity, "Layer {} familiarity mismatch", i);
-        assert_eq!(loaded_layer.infrastructure, orig_layer.infrastructure, "Layer {} infra mismatch", i);
-        assert_eq!(loaded_layer.cleared, orig_layer.cleared, "Layer {} cleared mismatch", i);
+        assert_eq!(
+            loaded_layer.index, orig_layer.index,
+            "Layer {} index mismatch",
+            i
+        );
+        assert_eq!(
+            loaded_layer.familiarity, orig_layer.familiarity,
+            "Layer {} familiarity mismatch",
+            i
+        );
+        assert_eq!(
+            loaded_layer.infrastructure, orig_layer.infrastructure,
+            "Layer {} infra mismatch",
+            i
+        );
+        assert_eq!(
+            loaded_layer.cleared, orig_layer.cleared,
+            "Layer {} cleared mismatch",
+            i
+        );
     }
 
     // Verify transient state roundtrips too
@@ -586,7 +688,9 @@ fn test_prestige_with_injured_mercs_resets_completely() {
     let mut deep = build_generation_1_state();
 
     // Injure a merc
-    deep.prestige.roster[0].status = MercStatus::Injured { missions_remaining: 5 };
+    deep.prestige.roster[0].status = MercStatus::Injured {
+        missions_remaining: 5,
+    };
     deep.on_prestige();
 
     assert!(
@@ -624,7 +728,6 @@ fn test_prestige_with_mercs_on_mission_resets_completely() {
 
 #[test]
 fn test_prestige_with_full_roster_resets() {
-    let mut rng = seeded_rng();
     let mut deep = build_generation_1_state();
 
     // Fill roster to capacity (Rank 2 = 7 mercs; already have 3)
@@ -705,7 +808,6 @@ fn test_prestige_does_not_reset_undiscovered_state() {
 
 #[test]
 fn test_infrastructure_survives_multiple_prestiges() {
-    let mut rng = seeded_rng();
     let mut deep = DeepState::new();
     deep.persistent.discovered = true;
 
@@ -714,25 +816,64 @@ fn test_infrastructure_survives_multiple_prestiges() {
     build_infrastructure(deep.persistent.layer_record_mut(1), Infrastructure::Outpost).unwrap();
 
     deep.on_prestige();
-    assert!(deep.persistent.layer_record(1).unwrap().has_infrastructure(Infrastructure::Outpost));
+    assert!(deep
+        .persistent
+        .layer_record(1)
+        .unwrap()
+        .has_infrastructure(Infrastructure::Outpost));
 
     // Gen 2: Build supply cache on L1
-    build_infrastructure(deep.persistent.layer_record_mut(1), Infrastructure::SupplyCache).unwrap();
+    build_infrastructure(
+        deep.persistent.layer_record_mut(1),
+        Infrastructure::SupplyCache,
+    )
+    .unwrap();
 
     deep.on_prestige();
-    assert!(deep.persistent.layer_record(1).unwrap().has_infrastructure(Infrastructure::Outpost));
-    assert!(deep.persistent.layer_record(1).unwrap().has_infrastructure(Infrastructure::SupplyCache));
+    assert!(deep
+        .persistent
+        .layer_record(1)
+        .unwrap()
+        .has_infrastructure(Infrastructure::Outpost));
+    assert!(deep
+        .persistent
+        .layer_record(1)
+        .unwrap()
+        .has_infrastructure(Infrastructure::SupplyCache));
 
     // Gen 3: Build watchtower on L1
-    build_infrastructure(deep.persistent.layer_record_mut(1), Infrastructure::Watchtower).unwrap();
+    build_infrastructure(
+        deep.persistent.layer_record_mut(1),
+        Infrastructure::Watchtower,
+    )
+    .unwrap();
 
     deep.on_prestige();
-    assert!(deep.persistent.layer_record(1).unwrap().has_infrastructure(Infrastructure::Outpost));
-    assert!(deep.persistent.layer_record(1).unwrap().has_infrastructure(Infrastructure::SupplyCache));
-    assert!(deep.persistent.layer_record(1).unwrap().has_infrastructure(Infrastructure::Watchtower));
+    assert!(deep
+        .persistent
+        .layer_record(1)
+        .unwrap()
+        .has_infrastructure(Infrastructure::Outpost));
+    assert!(deep
+        .persistent
+        .layer_record(1)
+        .unwrap()
+        .has_infrastructure(Infrastructure::SupplyCache));
+    assert!(deep
+        .persistent
+        .layer_record(1)
+        .unwrap()
+        .has_infrastructure(Infrastructure::Watchtower));
 
     // All 3 infrastructure types survive 3 prestiges
-    assert_eq!(deep.persistent.layer_record(1).unwrap().infrastructure.len(), 3);
+    assert_eq!(
+        deep.persistent
+            .layer_record(1)
+            .unwrap()
+            .infrastructure
+            .len(),
+        3
+    );
 }
 
 // ── Guild Rank Progression Across Prestiges ─────────────────────────────────────
@@ -816,26 +957,34 @@ fn test_frontier_layer_tracks_correctly_across_prestiges() {
 // ── Duration Ratchet: Gen 2 Is Faster Than Gen 1 ────────────────────────────────
 
 #[test]
-fn test_gen2_supply_run_is_faster_than_gen1_baseline() {
-    let base_shallows_supply = base_mission_duration_secs(LayerTier::Shallows, MissionType::SupplyRun);
+fn test_gen2_recon_is_faster_than_gen1_baseline() {
+    // Use Recon (3600s base in Shallows) instead of SupplyRun (1800s = floor) so
+    // duration modifiers can take effect above the 30-minute floor.
+    let base_shallows_recon = base_mission_duration_secs(LayerTier::Shallows, MissionType::Recon);
 
     // Gen 1 (no modifiers)
-    let gen1_duration = apply_duration_modifiers(base_shallows_supply, &DurationModifiers {
-        has_outpost: false,
-        familiarity: 0,
-        has_saboteur: false,
-        saboteur_is_veteran: false,
-        is_overpowered: false,
-    });
+    let gen1_duration = apply_duration_modifiers(
+        base_shallows_recon,
+        &DurationModifiers {
+            has_outpost: false,
+            familiarity: 0,
+            has_saboteur: false,
+            saboteur_is_veteran: false,
+            is_overpowered: false,
+        },
+    );
 
     // Gen 2 (Outpost on L1 + 40% familiarity from gen 1)
-    let gen2_duration = apply_duration_modifiers(base_shallows_supply, &DurationModifiers {
-        has_outpost: true,
-        familiarity: 40, // Mapped level (25-49%)
-        has_saboteur: false,
-        saboteur_is_veteran: false,
-        is_overpowered: false,
-    });
+    let gen2_duration = apply_duration_modifiers(
+        base_shallows_recon,
+        &DurationModifiers {
+            has_outpost: true,
+            familiarity: 40, // Mapped level (25-49%)
+            has_saboteur: false,
+            saboteur_is_veteran: false,
+            is_overpowered: false,
+        },
+    );
 
     assert!(
         gen2_duration < gen1_duration,
@@ -845,31 +994,39 @@ fn test_gen2_supply_run_is_faster_than_gen1_baseline() {
     );
 
     // Verify the exact reduction: Outpost -25% * Mapped familiarity -10% = 0.75 * 0.90 = 0.675x
-    let expected = (base_shallows_supply as f64 * 0.75 * 0.90) as u64;
+    let expected = (base_shallows_recon as f64 * 0.75 * 0.90) as u64;
     assert_eq!(gen2_duration, expected);
 }
 
 #[test]
-fn test_gen3_supply_run_is_faster_than_gen2() {
-    let base_shallows_supply = base_mission_duration_secs(LayerTier::Shallows, MissionType::SupplyRun);
+fn test_gen3_recon_is_faster_than_gen2() {
+    // Use Recon (3600s base in Shallows) instead of SupplyRun (1800s = floor) so
+    // duration modifiers can take effect above the 30-minute floor.
+    let base_shallows_recon = base_mission_duration_secs(LayerTier::Shallows, MissionType::Recon);
 
     // Gen 2 (Outpost + Mapped familiarity 40%)
-    let gen2_duration = apply_duration_modifiers(base_shallows_supply, &DurationModifiers {
-        has_outpost: true,
-        familiarity: 40, // Mapped
-        has_saboteur: false,
-        saboteur_is_veteran: false,
-        is_overpowered: false,
-    });
+    let gen2_duration = apply_duration_modifiers(
+        base_shallows_recon,
+        &DurationModifiers {
+            has_outpost: true,
+            familiarity: 40, // Mapped
+            has_saboteur: false,
+            saboteur_is_veteran: false,
+            is_overpowered: false,
+        },
+    );
 
     // Gen 3 (Outpost + Mastered familiarity 80% from accumulated missions)
-    let gen3_duration = apply_duration_modifiers(base_shallows_supply, &DurationModifiers {
-        has_outpost: true,
-        familiarity: 80, // Mastered
-        has_saboteur: false,
-        saboteur_is_veteran: false,
-        is_overpowered: false,
-    });
+    let gen3_duration = apply_duration_modifiers(
+        base_shallows_recon,
+        &DurationModifiers {
+            has_outpost: true,
+            familiarity: 80, // Mastered
+            has_saboteur: false,
+            saboteur_is_veteran: false,
+            is_overpowered: false,
+        },
+    );
 
     assert!(
         gen3_duration < gen2_duration,
@@ -918,7 +1075,11 @@ fn test_merc_ids_are_globally_unique_across_generations() {
     // All 9 IDs should be unique
     assert_eq!(all_ids.len(), 9);
     let unique: std::collections::HashSet<u64> = all_ids.iter().cloned().collect();
-    assert_eq!(unique.len(), 9, "All merc IDs must be unique across generations");
+    assert_eq!(
+        unique.len(),
+        9,
+        "All merc IDs must be unique across generations"
+    );
 
     // IDs should be strictly increasing
     for window in all_ids.windows(2) {
@@ -958,14 +1119,23 @@ fn test_rapid_successive_prestiges_are_idempotent_on_persistent() {
     // Persistent state should be unchanged
     assert_eq!(deep.persistent.discovered, persistent_before.discovered);
     assert_eq!(deep.persistent.guild_rank, persistent_before.guild_rank);
-    assert_eq!(deep.persistent.deepest_layer_reached, persistent_before.deepest_layer_reached);
-    assert_eq!(deep.persistent.merc_id_counter, persistent_before.merc_id_counter);
+    assert_eq!(
+        deep.persistent.deepest_layer_reached,
+        persistent_before.deepest_layer_reached
+    );
+    assert_eq!(
+        deep.persistent.merc_id_counter,
+        persistent_before.merc_id_counter
+    );
     assert_eq!(deep.persistent.layers.len(), persistent_before.layers.len());
 
     for (i, layer) in deep.persistent.layers.iter().enumerate() {
         assert_eq!(layer.cleared, persistent_before.layers[i].cleared);
         assert_eq!(layer.familiarity, persistent_before.layers[i].familiarity);
-        assert_eq!(layer.infrastructure, persistent_before.layers[i].infrastructure);
+        assert_eq!(
+            layer.infrastructure,
+            persistent_before.layers[i].infrastructure
+        );
     }
 }
 

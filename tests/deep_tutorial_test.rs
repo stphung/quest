@@ -234,7 +234,13 @@ fn test_deep_prestige_preserves_familiarity() {
 /// All five guild ranks should have valid display names.
 #[test]
 fn test_all_guild_rank_names() {
-    let expected = ["Freelancers", "Sellswords", "Company", "Battalion", "Legion"];
+    let expected = [
+        "Freelancers",
+        "Sellswords",
+        "Company",
+        "Battalion",
+        "Legion",
+    ];
     for i in 1..=5u8 {
         assert_eq!(GuildRank(i).display_name(), expected[(i - 1) as usize]);
     }
@@ -412,12 +418,12 @@ fn test_mission_type_risk_tiers() {
 /// Duration ranges increase with risk level.
 #[test]
 fn test_mission_duration_ranges_ordered() {
-    let supply_max = MissionType::SupplyRun.duration_range_secs().1;
+    let supply_min = MissionType::SupplyRun.duration_range_secs().0;
     let recon_min = MissionType::Recon.duration_range_secs().0;
     let expedition_min = MissionType::Expedition.duration_range_secs().0;
     let breakthrough_min = MissionType::Breakthrough.duration_range_secs().0;
 
-    assert!(supply_max <= recon_min, "Supply max <= Recon min");
+    assert!(supply_min < recon_min, "Supply min < Recon min");
     assert!(recon_min < expedition_min, "Recon min < Expedition min");
     assert!(
         expedition_min < breakthrough_min,
@@ -749,7 +755,11 @@ fn test_checkin_event_auto_resolve_fallback() {
         resolved_choice: None,
     };
 
-    assert_eq!(event.effective_choice(), 0, "Should fall back to auto-resolve");
+    assert_eq!(
+        event.effective_choice(),
+        0,
+        "Should fall back to auto-resolve"
+    );
     assert!(!event.is_resolved());
 }
 
@@ -898,8 +908,8 @@ use quest::core::tick::game_tick;
 use quest::core::tick_types::TickEvent;
 use quest::enhancement::EnhancementProgress;
 use quest::haven::Haven;
-use rand_chacha::ChaCha8Rng;
 use rand::SeedableRng;
+use rand_chacha::ChaCha8Rng;
 
 fn strong_p50_state(name: &str) -> GameState {
     use quest::character::attributes::AttributeType;
@@ -977,10 +987,7 @@ fn test_deep_discovery_blocked_below_p15_via_game_tick() {
             false,
             &mut rng,
         );
-        assert!(
-            !result.deep_changed,
-            "Deep should not be discovered at P14"
-        );
+        assert!(!result.deep_changed, "Deep should not be discovered at P14");
     }
     assert!(!deep.persistent.discovered);
 }
@@ -1059,18 +1066,15 @@ fn test_deep_discovery_blocked_by_fishing_via_game_tick() {
             .events
             .iter()
             .any(|e| matches!(e, TickEvent::DeepDiscovered));
-        assert!(
-            !discovered,
-            "Deep should not be discovered while fishing"
-        );
+        assert!(!discovered, "Deep should not be discovered while fishing");
     }
 }
 
 /// Deep discovery should be blocked during active minigame.
 #[test]
 fn test_deep_discovery_blocked_by_minigame_via_game_tick() {
-    use quest::challenges::ActiveMinigame;
     use quest::challenges::chess::types::ChessGame;
+    use quest::challenges::ActiveMinigame;
 
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let mut state = strong_p50_state("Deep Minigame Block Test");
@@ -1238,7 +1242,11 @@ fn test_initial_descent_is_first_mission() {
     let mut deep = DeepState::new();
     deep.persistent.discovered = true;
     // Create starter mercs
-    let starter = quest::deep::generate_starter_roster(deep.persistent.guild_rank, &mut || deep.persistent.next_merc_id(), &mut rng);
+    let starter = quest::deep::generate_starter_roster(
+        deep.persistent.guild_rank,
+        &mut || deep.persistent.next_merc_id(),
+        &mut rng,
+    );
     deep.prestige.roster = starter;
 
     let pool = quest::deep::generate_mission_pool(&deep.persistent, &mut rng);
@@ -1263,7 +1271,9 @@ fn test_expanded_options_after_clearing_layer() {
     let pool = quest::deep::generate_mission_pool(&deep.persistent, &mut rng);
     assert!(pool.len() >= 2, "Should have at least 2 missions at Rank 2");
 
-    let has_supply = pool.iter().any(|m| m.mission_type == MissionType::SupplyRun);
+    let has_supply = pool
+        .iter()
+        .any(|m| m.mission_type == MissionType::SupplyRun);
     let has_recon = pool.iter().any(|m| m.mission_type == MissionType::Recon);
     assert!(has_supply, "Pool should contain a Supply Run");
     assert!(has_recon, "Pool should contain a Recon mission");
@@ -1272,7 +1282,7 @@ fn test_expanded_options_after_clearing_layer() {
 /// Supply runs have risk tier 0 and should never injure mercs when resolved.
 #[test]
 fn test_supply_runs_are_always_safe() {
-    use quest::deep::{resolve_mission, start_mission, generate_mission_pool};
+    use quest::deep::{generate_mission_pool, resolve_mission, start_mission};
 
     for seed in 0u64..10 {
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
@@ -1314,7 +1324,10 @@ fn test_supply_runs_are_always_safe() {
             &mut rng,
         );
 
-        let result = mission.result.as_ref().expect("Mission should have a result");
+        let result = mission
+            .result
+            .as_ref()
+            .expect("Mission should have a result");
         assert!(
             result.lost_mercs.is_empty(),
             "Supply run should never lose mercs (seed {})",
@@ -1331,7 +1344,7 @@ fn test_supply_runs_are_always_safe() {
 /// Squad assignment validation rejects empty squads and invalid merc IDs.
 #[test]
 fn test_squad_assignment_validation() {
-    use quest::deep::{validate_squad_assignment, SquadAssignmentError, generate_mission_pool};
+    use quest::deep::{generate_mission_pool, validate_squad_assignment, SquadAssignmentError};
 
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let mut deep = DeepState::new();
@@ -1352,14 +1365,17 @@ fn test_squad_assignment_validation() {
     assert!(matches!(result, Err(SquadAssignmentError::EmptySquad)));
 
     // Invalid merc ID should fail
-    let result = validate_squad_assignment(mission, &[99999], &deep.prestige, &deep.persistent, false);
+    let result =
+        validate_squad_assignment(mission, &[99999], &deep.prestige, &deep.persistent, false);
     assert!(result.is_err(), "Invalid merc ID should fail validation");
 }
 
 /// Cannot exceed max concurrent missions at Rank 1 (1 mission).
 #[test]
 fn test_concurrent_mission_cap() {
-    use quest::deep::{validate_squad_assignment, SquadAssignmentError, generate_mission_pool, start_mission};
+    use quest::deep::{
+        generate_mission_pool, start_mission, validate_squad_assignment, SquadAssignmentError,
+    };
 
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let mut deep = DeepState::new();

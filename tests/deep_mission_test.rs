@@ -25,13 +25,12 @@
 
 use chrono::{Duration, TimeZone, Utc};
 use quest::deep::{
-    event_trigger_points, generate_mission_events,
-    generate_mission_pool, is_daily_supply_run_available, resolve_event, resolve_mission,
-    resolve_offline_missions, start_mission, tick_mission_events, validate_squad_assignment,
-    AvailableMission, CheckInEvent, DeepPersistent, DeepPrestige, DeepState, EventChoice,
-    GuildRank, Infrastructure, Layer, LayerRecord, LayerTier, MercArchetype,
-    MercStatus, Mercenary, Mission, MissionOutcome, MissionResult, MissionStatus, MissionType,
-    SquadAssignmentError, AUTO_RESOLVE_TIMEOUT_HOURS,
+    event_trigger_points, generate_mission_events, generate_mission_pool,
+    is_daily_supply_run_available, resolve_event, resolve_mission, resolve_offline_missions,
+    start_mission, tick_mission_events, validate_squad_assignment, AvailableMission, CheckInEvent,
+    DeepPersistent, DeepPrestige, DeepState, EventChoice, GuildRank, Infrastructure, Layer,
+    LayerRecord, LayerTier, MercArchetype, MercStatus, Mercenary, Mission, MissionOutcome,
+    MissionResult, MissionStatus, MissionType, SquadAssignmentError, AUTO_RESOLVE_TIMEOUT_HOURS,
 };
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -114,7 +113,10 @@ fn frontier_layer(index: u32) -> LayerRecord {
 #[test]
 fn test_supply_run_and_construction_have_zero_risk_tier() {
     assert_eq!(MissionType::SupplyRun.risk_tier(), 0);
-    assert_eq!(MissionType::Construction(Infrastructure::Outpost).risk_tier(), 0);
+    assert_eq!(
+        MissionType::Construction(Infrastructure::Outpost).risk_tier(),
+        0
+    );
 }
 
 #[test]
@@ -126,26 +128,29 @@ fn test_risk_tier_ordering() {
 }
 
 #[test]
-fn test_supply_run_duration_range_is_2_to_4_hours() {
+fn test_supply_run_duration_range_is_half_to_3_hours() {
     let (min, max) = MissionType::SupplyRun.duration_range_secs();
-    assert_eq!(min, 2 * 3600, "Supply Run min should be 2h");
-    assert_eq!(max, 4 * 3600, "Supply Run max should be 4h");
+    assert_eq!(min, 1800, "Supply Run min should be 0.5h");
+    assert_eq!(max, 10800, "Supply Run max should be 3h");
 }
 
 #[test]
-fn test_breakthrough_duration_range_is_18_to_24_hours() {
+fn test_breakthrough_duration_range_is_4_to_24_hours() {
     let (min, max) = MissionType::Breakthrough.duration_range_secs();
-    assert_eq!(min, 18 * 3600, "Breakthrough min should be 18h");
-    assert_eq!(max, 24 * 3600, "Breakthrough max should be 24h");
+    assert_eq!(min, 14400, "Breakthrough min should be 4h");
+    assert_eq!(max, 86400, "Breakthrough max should be 24h");
 }
 
 #[test]
 fn test_mission_type_duration_ranges_are_strictly_ordered() {
-    let supply_max = MissionType::SupplyRun.duration_range_secs().1;
+    let supply_min = MissionType::SupplyRun.duration_range_secs().0;
     let recon_min = MissionType::Recon.duration_range_secs().0;
     let expedition_min = MissionType::Expedition.duration_range_secs().0;
     let breakthrough_min = MissionType::Breakthrough.duration_range_secs().0;
-    assert!(supply_max <= recon_min, "Supply max should not exceed Recon min");
+    assert!(
+        supply_min < recon_min,
+        "Supply min should be less than Recon min"
+    );
     assert!(recon_min < expedition_min);
     assert!(expedition_min < breakthrough_min);
 }
@@ -193,9 +198,9 @@ fn test_guild_rank_roster_caps_match_design() {
 
 #[test]
 fn test_guild_rank_concurrent_mission_slots_match_design() {
-    // Freelancers and Sellswords: 1 slot.  Company: 2.  Battalion: 3.  Legion: 4.
+    // Freelancers: 1 slot.  Sellswords+Company: 2.  Battalion: 3.  Legion: 4.
     assert_eq!(GuildRank(1).concurrent_missions(), 1);
-    assert_eq!(GuildRank(2).concurrent_missions(), 1);
+    assert_eq!(GuildRank(2).concurrent_missions(), 2);
     assert_eq!(GuildRank(3).concurrent_missions(), 2);
     assert_eq!(GuildRank(4).concurrent_missions(), 3);
     assert_eq!(GuildRank(5).concurrent_missions(), 4);
@@ -381,7 +386,10 @@ fn test_merc_effective_resilience_scales_with_level() {
     merc.level = 4;
     let r4 = merc.effective_resilience();
 
-    assert!(r4 > r1, "Higher level should give higher effective resilience");
+    assert!(
+        r4 > r1,
+        "Higher level should give higher effective resilience"
+    );
 }
 
 #[test]
@@ -560,7 +568,8 @@ fn test_deep_prestige_active_mission_count_excludes_completed() {
 fn test_deep_prestige_has_any_pending_event() {
     let mut dp = DeepPrestige::new();
     let t = base_time();
-    let mut event_mission = make_active_mission(1, MissionType::Expedition, 8, vec![1], t, 8 * 3600);
+    let mut event_mission =
+        make_active_mission(1, MissionType::Expedition, 8, vec![1], t, 8 * 3600);
     event_mission.status = MissionStatus::EventPending;
     dp.active_missions.push(event_mission);
     assert!(dp.has_any_pending_event());
@@ -570,8 +579,14 @@ fn test_deep_prestige_has_any_pending_event() {
 fn test_deep_prestige_no_pending_events_when_all_active() {
     let mut dp = DeepPrestige::new();
     let t = base_time();
-    dp.active_missions
-        .push(make_active_mission(1, MissionType::Recon, 5, vec![1], t, 4 * 3600));
+    dp.active_missions.push(make_active_mission(
+        1,
+        MissionType::Recon,
+        5,
+        vec![1],
+        t,
+        4 * 3600,
+    ));
     assert!(!dp.has_any_pending_event());
 }
 
@@ -583,7 +598,9 @@ fn test_deep_state_on_prestige_clears_per_prestige_state() {
     ds.persistent.discovered = true;
     ds.persistent.guild_rank = GuildRank(3);
     ds.prestige.warband_marks = 9_999;
-    ds.prestige.roster.push(make_merc(1, MercArchetype::Scout, 10));
+    ds.prestige
+        .roster
+        .push(make_merc(1, MercArchetype::Scout, 10));
 
     ds.on_prestige();
 
@@ -693,7 +710,10 @@ fn test_mission_unresolved_event_count_with_no_events() {
 fn test_mission_has_pending_event_reflects_status() {
     let t = base_time();
     let m = make_active_mission(1, MissionType::Expedition, 8, vec![1], t, 8 * 3600);
-    assert!(!m.has_pending_event(), "Active status should not count as pending event");
+    assert!(
+        !m.has_pending_event(),
+        "Active status should not count as pending event"
+    );
 
     let mut event_m = make_active_mission(2, MissionType::Expedition, 8, vec![1], t, 8 * 3600);
     event_m.status = MissionStatus::EventPending;
@@ -853,13 +873,11 @@ fn seeded_rng(seed: u64) -> ChaCha8Rng {
 #[test]
 fn test_event_trigger_supply_run_and_construction_have_no_triggers() {
     assert!(event_trigger_points(MissionType::SupplyRun, LayerTier::Shallows).is_empty());
-    assert!(
-        event_trigger_points(
-            MissionType::Construction(Infrastructure::Outpost),
-            LayerTier::Warrens
-        )
-        .is_empty()
-    );
+    assert!(event_trigger_points(
+        MissionType::Construction(Infrastructure::Outpost),
+        LayerTier::Warrens
+    )
+    .is_empty());
 }
 
 #[test]
@@ -1001,7 +1019,10 @@ fn test_generate_mission_events_all_choices_have_non_empty_labels() {
     );
     for event in &events {
         for choice in &event.choices {
-            assert!(!choice.label.is_empty(), "Event choice label must not be empty");
+            assert!(
+                !choice.label.is_empty(),
+                "Event choice label must not be empty"
+            );
         }
     }
 }
@@ -1018,7 +1039,8 @@ fn test_generate_mission_events_archetype_bonus_prefers_squad_archetypes() {
     // This is probabilistic — we just assert the field is populated.
     for event in &events {
         assert!(
-            event.archetype_bonus.is_some() || event.choices.iter().all(|c| c.required_archetype.is_none()),
+            event.archetype_bonus.is_some()
+                || event.choices.iter().all(|c| c.required_archetype.is_none()),
             "archetype_bonus should be set when gated choices exist"
         );
     }
@@ -1053,7 +1075,11 @@ fn test_resolve_event_gated_choice_rejected_without_archetype() {
         &mut rng,
     );
     for event in &mut events {
-        if let Some(gated_idx) = event.choices.iter().position(|c| c.required_archetype.is_some()) {
+        if let Some(gated_idx) = event
+            .choices
+            .iter()
+            .position(|c| c.required_archetype.is_some())
+        {
             let required = event.choices[gated_idx].required_archetype.unwrap();
             // Try to pick it without the archetype.
             let empty_squad: &[MercArchetype] = &[];
@@ -1072,7 +1098,11 @@ fn test_resolve_event_gated_choice_rejected_without_archetype() {
 fn test_resolve_event_gated_choice_accepted_with_archetype() {
     let mut rng = seeded_rng(22);
     // Generate events for a layer known to have archetype-gated choices.
-    let squad = [MercArchetype::Scout, MercArchetype::Arcanist, MercArchetype::Vanguard];
+    let squad = [
+        MercArchetype::Scout,
+        MercArchetype::Arcanist,
+        MercArchetype::Vanguard,
+    ];
     let mut events = generate_mission_events(MissionType::Expedition, 4, &squad, &mut rng);
     for event in &mut events {
         if let Some(gated_idx) = event
@@ -1099,7 +1129,10 @@ fn test_resolve_event_out_of_bounds_returns_none() {
     let mut events = generate_mission_events(MissionType::Recon, 1, &[], &mut rng);
     let event = &mut events[0];
     let res = resolve_event(event, Some(9999), &[], &mut rng);
-    assert!(res.is_none(), "Out-of-bounds choice index should return None");
+    assert!(
+        res.is_none(),
+        "Out-of-bounds choice index should return None"
+    );
 }
 
 #[test]
@@ -1204,8 +1237,7 @@ fn test_tick_mission_events_auto_resolves_after_timeout() {
 fn test_tick_mission_events_no_action_on_completed_mission() {
     let mut rng = seeded_rng(33);
     let t = base_time();
-    let mut mission =
-        make_active_mission(1, MissionType::Recon, 1, vec![1], t, 4 * 3600);
+    let mut mission = make_active_mission(1, MissionType::Recon, 1, vec![1], t, 4 * 3600);
     mission.status = MissionStatus::Completed;
     let archetypes: &[MercArchetype] = &[];
     mission.events = generate_mission_events(MissionType::Recon, 1, archetypes, &mut rng);
@@ -1257,7 +1289,8 @@ fn test_mission_pool_always_includes_supply_run() {
     let persistent = DeepPersistent::new();
     let pool = generate_mission_pool(&persistent, &mut rng);
     assert!(
-        pool.iter().any(|m| m.mission_type == MissionType::SupplyRun),
+        pool.iter()
+            .any(|m| m.mission_type == MissionType::SupplyRun),
         "Pool must always include a Supply Run"
     );
 }
@@ -1311,7 +1344,10 @@ fn test_mission_pool_all_have_positive_duration() {
     let persistent = DeepPersistent::new();
     let pool = generate_mission_pool(&persistent, &mut rng);
     for m in &pool {
-        assert!(m.duration_secs > 0, "Every mission must have positive duration");
+        assert!(
+            m.duration_secs > 0,
+            "Every mission must have positive duration"
+        );
     }
 }
 
@@ -1321,7 +1357,10 @@ fn test_mission_pool_all_have_descriptions() {
     let persistent = DeepPersistent::new();
     let pool = generate_mission_pool(&persistent, &mut rng);
     for m in &pool {
-        assert!(!m.description.is_empty(), "Every mission must have a description");
+        assert!(
+            !m.description.is_empty(),
+            "Every mission must have a description"
+        );
     }
 }
 
@@ -1354,7 +1393,9 @@ fn test_squad_rejected_missing_required_archetype() {
     let result = validate_squad_assignment(&available, &[1], &prestige, &persistent, false);
     assert_eq!(
         result,
-        Err(SquadAssignmentError::MissingRequiredArchetype(MercArchetype::Medic))
+        Err(SquadAssignmentError::MissingRequiredArchetype(
+            MercArchetype::Medic
+        ))
     );
 }
 
@@ -1383,7 +1424,9 @@ fn test_empty_squad_rejected() {
 fn test_injured_merc_rejected_from_squad() {
     let persistent = DeepPersistent::new();
     let mut merc = make_merc(1, MercArchetype::Vanguard, 50);
-    merc.status = MercStatus::Injured { missions_remaining: 1 };
+    merc.status = MercStatus::Injured {
+        missions_remaining: 1,
+    };
     let prestige = make_prestige_with_merc(merc);
     let available = make_available_mission_simple(MissionType::SupplyRun, 1);
 
@@ -1402,7 +1445,12 @@ fn test_concurrent_mission_limit_enforced() {
     // GuildRank 1 allows only 1 concurrent mission.
     let t = base_time();
     prestige.active_missions.push(make_active_mission(
-        99, MissionType::SupplyRun, 1, vec![], t, 3600,
+        99,
+        MissionType::SupplyRun,
+        1,
+        vec![],
+        t,
+        3600,
     ));
     let available = make_available_mission_simple(MissionType::Recon, 1);
 
@@ -1421,7 +1469,10 @@ fn test_free_supply_run_skips_marks_check() {
     available.marks_cost = 30;
 
     let result = validate_squad_assignment(&available, &[1], &prestige, &persistent, true);
-    assert!(result.is_ok(), "Free daily Supply Run should bypass marks check");
+    assert!(
+        result.is_ok(),
+        "Free daily Supply Run should bypass marks check"
+    );
 }
 
 // ── 3. Mission duration modifiers (via apply_duration_modifiers) ───────────────
@@ -1496,7 +1547,15 @@ fn test_start_mission_sets_merc_on_mission_status() {
 
     let available = make_available_mission_simple(MissionType::Expedition, 1);
     let now = base_time();
-    let mission = start_mission(&available, &[1], &mut prestige, &mut persistent, false, now, &mut rng);
+    let mission = start_mission(
+        &available,
+        &[1],
+        &mut prestige,
+        &mut persistent,
+        false,
+        now,
+        &mut rng,
+    );
 
     let merc_status = &prestige.find_merc(1).unwrap().status;
     assert!(
@@ -1517,7 +1576,15 @@ fn test_start_mission_deducts_marks() {
     available.marks_cost = 80;
 
     let now = base_time();
-    start_mission(&available, &[1], &mut prestige, &mut persistent, false, now, &mut rng);
+    start_mission(
+        &available,
+        &[1],
+        &mut prestige,
+        &mut persistent,
+        false,
+        now,
+        &mut rng,
+    );
 
     assert_eq!(prestige.warband_marks, 220, "80 marks should be deducted");
 }
@@ -1534,9 +1601,20 @@ fn test_start_free_supply_run_does_not_deduct_marks() {
     available.marks_cost = 20;
 
     let now = base_time();
-    start_mission(&available, &[1], &mut prestige, &mut persistent, true, now, &mut rng);
+    start_mission(
+        &available,
+        &[1],
+        &mut prestige,
+        &mut persistent,
+        true,
+        now,
+        &mut rng,
+    );
 
-    assert_eq!(prestige.warband_marks, 100, "Free Supply Run should not deduct marks");
+    assert_eq!(
+        prestige.warband_marks, 100,
+        "Free Supply Run should not deduct marks"
+    );
 }
 
 #[test]
@@ -1551,10 +1629,22 @@ fn test_start_breakthrough_generates_events() {
     available.marks_cost = 150;
 
     let now = base_time();
-    let mission = start_mission(&available, &[1], &mut prestige, &mut persistent, false, now, &mut rng);
+    let mission = start_mission(
+        &available,
+        &[1],
+        &mut prestige,
+        &mut persistent,
+        false,
+        now,
+        &mut rng,
+    );
 
     // Breakthrough on layer 1 (Shallows tier): 3 events.
-    assert_eq!(mission.events.len(), 3, "Breakthrough should generate 3 events for Shallows");
+    assert_eq!(
+        mission.events.len(),
+        3,
+        "Breakthrough should generate 3 events for Shallows"
+    );
     assert_eq!(mission.status, MissionStatus::Active);
 }
 
@@ -1568,9 +1658,20 @@ fn test_start_supply_run_generates_no_events() {
 
     let available = make_available_mission_simple(MissionType::SupplyRun, 1);
     let now = base_time();
-    let mission = start_mission(&available, &[1], &mut prestige, &mut persistent, true, now, &mut rng);
+    let mission = start_mission(
+        &available,
+        &[1],
+        &mut prestige,
+        &mut persistent,
+        true,
+        now,
+        &mut rng,
+    );
 
-    assert!(mission.events.is_empty(), "Supply run should have no events");
+    assert!(
+        mission.events.is_empty(),
+        "Supply run should have no events"
+    );
 }
 
 // ── 6. Mission resolution ──────────────────────────────────────────────────────
@@ -1586,7 +1687,14 @@ fn test_supply_run_always_succeeds() {
         prestige.roster[0].status = MercStatus::OnMission(1);
 
         let now = base_time();
-        let mut mission = make_active_mission(1, MissionType::SupplyRun, 1, vec![1], now - Duration::hours(3), 3 * 3600);
+        let mut mission = make_active_mission(
+            1,
+            MissionType::SupplyRun,
+            1,
+            vec![1],
+            now - Duration::hours(3),
+            3 * 3600,
+        );
         resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
 
         let result = mission.result.as_ref().unwrap();
@@ -1608,12 +1716,25 @@ fn test_supply_run_never_injures_mercs() {
     prestige.roster[0].status = MercStatus::OnMission(1);
 
     let now = base_time();
-    let mut mission = make_active_mission(1, MissionType::SupplyRun, 1, vec![1], now - Duration::hours(3), 3 * 3600);
+    let mut mission = make_active_mission(
+        1,
+        MissionType::SupplyRun,
+        1,
+        vec![1],
+        now - Duration::hours(3),
+        3 * 3600,
+    );
     resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
 
     let result = mission.result.as_ref().unwrap();
-    assert!(result.injured_mercs.is_empty(), "Supply run should never injure mercs");
-    assert!(result.lost_mercs.is_empty(), "Supply run should never lose mercs");
+    assert!(
+        result.injured_mercs.is_empty(),
+        "Supply run should never injure mercs"
+    );
+    assert!(
+        result.lost_mercs.is_empty(),
+        "Supply run should never lose mercs"
+    );
 }
 
 #[test]
@@ -1627,7 +1748,14 @@ fn test_resolve_mission_awards_marks() {
     let initial_marks = prestige.warband_marks;
 
     let now = base_time();
-    let mut mission = make_active_mission(1, MissionType::SupplyRun, 1, vec![1], now - Duration::hours(3), 3 * 3600);
+    let mut mission = make_active_mission(
+        1,
+        MissionType::SupplyRun,
+        1,
+        vec![1],
+        now - Duration::hours(3),
+        3 * 3600,
+    );
     resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
 
     assert!(
@@ -1638,25 +1766,47 @@ fn test_resolve_mission_awards_marks() {
 
 #[test]
 fn test_breakthrough_success_clears_layer() {
-    // Use a very powerful merc to maximize success probability.
-    let mut success_rng = seeded_rng(202);
-    let mut persistent = DeepPersistent::new();
-    let _ = persistent.layer_record_mut(1);
-    let merc = make_merc(1, MercArchetype::Vanguard, 500);
-    let mut prestige = make_prestige_with_merc(merc);
-    prestige.roster[0].status = MercStatus::OnMission(1);
-
+    // Use a very powerful merc to maximize success probability, then search for
+    // a seed that produces an outright Success (layer is only cleared on Success,
+    // not PartialSuccess).
     let now = base_time();
-    let mut mission = make_active_mission(1, MissionType::Breakthrough, 1, vec![1], now - Duration::hours(20), 20 * 3600);
-    resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut success_rng);
+    let mut found_success = false;
+    for seed in 200u64..300 {
+        let mut rng = seeded_rng(seed);
+        let mut persistent = DeepPersistent::new();
+        let _ = persistent.layer_record_mut(1);
+        let merc = make_merc(1, MercArchetype::Vanguard, 500);
+        let mut prestige = make_prestige_with_merc(merc);
+        prestige.roster[0].status = MercStatus::OnMission(1);
 
-    let result = mission.result.as_ref().unwrap();
-    if matches!(result.outcome, MissionOutcome::Success | MissionOutcome::PartialSuccess) {
-        assert!(
-            persistent.layer_record(1).map(|r| r.cleared).unwrap_or(false),
-            "Layer 1 should be cleared after successful Breakthrough"
+        let mut mission = make_active_mission(
+            1,
+            MissionType::Breakthrough,
+            1,
+            vec![1],
+            now - Duration::hours(20),
+            20 * 3600,
         );
+        resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+
+        let result = mission.result.as_ref().unwrap();
+        if matches!(result.outcome, MissionOutcome::Success) {
+            assert!(
+                persistent
+                    .layer_record(1)
+                    .map(|r| r.cleared)
+                    .unwrap_or(false),
+                "Layer 1 should be cleared after successful Breakthrough (seed {})",
+                seed
+            );
+            found_success = true;
+            break;
+        }
     }
+    assert!(
+        found_success,
+        "Expected at least one Success in seeds 200..300 with power 500 vs threshold 25"
+    );
 }
 
 #[test]
@@ -1669,7 +1819,14 @@ fn test_resolve_mission_merc_returns_available_after_safe_mission() {
     prestige.roster[0].status = MercStatus::OnMission(1);
 
     let now = base_time();
-    let mut mission = make_active_mission(1, MissionType::SupplyRun, 1, vec![1], now - Duration::hours(3), 3 * 3600);
+    let mut mission = make_active_mission(
+        1,
+        MissionType::SupplyRun,
+        1,
+        vec![1],
+        now - Duration::hours(3),
+        3 * 3600,
+    );
     resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
 
     let merc_status = prestige.find_merc(1).unwrap().status.clone();
@@ -1721,13 +1878,23 @@ fn test_offline_resolution_completes_elapsed_mission() {
     // We call resolve_offline_missions which uses Utc::now() internally;
     // to make this deterministic, manually call resolve_mission on the elapsed mission.
     let elapsed_mission_id = 1u64;
-    let idx = prestige.active_missions.iter().position(|m| m.id == elapsed_mission_id).unwrap();
+    let idx = prestige
+        .active_missions
+        .iter()
+        .position(|m| m.id == elapsed_mission_id)
+        .unwrap();
     let mut mission = prestige.active_missions.remove(idx);
     resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
     prestige.pending_results.push(mission);
 
-    assert!(prestige.active_missions.is_empty(), "Elapsed mission should be removed from active");
-    assert!(!prestige.pending_results.is_empty(), "Completed mission should be in pending_results");
+    assert!(
+        prestige.active_missions.is_empty(),
+        "Elapsed mission should be removed from active"
+    );
+    assert!(
+        !prestige.pending_results.is_empty(),
+        "Completed mission should be in pending_results"
+    );
 }
 
 #[test]
@@ -1804,8 +1971,22 @@ fn test_company_rank_allows_2_concurrent_missions() {
 
     let t = base_time();
     // Two missions already active.
-    prestige.active_missions.push(make_active_mission(98, MissionType::SupplyRun, 1, vec![], t, 3600));
-    prestige.active_missions.push(make_active_mission(99, MissionType::Recon, 1, vec![], t, 3600));
+    prestige.active_missions.push(make_active_mission(
+        98,
+        MissionType::SupplyRun,
+        1,
+        vec![],
+        t,
+        3600,
+    ));
+    prestige.active_missions.push(make_active_mission(
+        99,
+        MissionType::Recon,
+        1,
+        vec![],
+        t,
+        3600,
+    ));
 
     // Third mission should be rejected.
     let available = make_available_mission_simple(MissionType::Expedition, 1);

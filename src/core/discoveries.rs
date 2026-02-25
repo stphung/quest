@@ -33,6 +33,7 @@ pub fn try_discover_dungeon<R: Rng>(rng: &mut R, state: &mut GameState) -> bool 
 /// Thin wrapper over [`crate::deep::try_discover_deep`] so callers can import
 /// all discovery rolls from a single module.  Returns `true` if The Deep was
 /// discovered this tick.
+#[allow(dead_code)]
 pub fn try_discover_deep<R: Rng>(deep: &mut DeepState, prestige_rank: u32, rng: &mut R) -> bool {
     crate::deep::try_discover_deep(deep, prestige_rank, rng)
 }
