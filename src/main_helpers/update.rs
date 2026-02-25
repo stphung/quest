@@ -3,7 +3,6 @@
 use crate::achievements;
 use crate::character::input::{process_select_input, SelectInput, SelectResult};
 use crate::character::manager::{CharacterInfo, CharacterManager};
-use crate::character::prestige::get_prestige_tier;
 use crate::core::constants::{UPDATE_CHECK_INTERVAL_SECONDS, UPDATE_CHECK_JITTER_SECONDS};
 use crate::core::game_state::GameState;
 use crate::enhancement;
@@ -215,13 +214,22 @@ fn build_startup_splash_text(
                 }
             };
 
-            let prestige_name = get_prestige_tier(character.prestige_rank).name;
+            let total_power: u32 = character.equipment.iter_equipped().map(|i| i.power()).sum();
             let entry = if character.is_corrupted {
                 format!("{}{} (CORRUPTED)", marker, character.filename)
+            } else if character.prestige_rank > 0 {
+                format!(
+                    "{}{} (P{} Lv{} \u{00b7} {} pwr)",
+                    marker,
+                    display_name,
+                    character.prestige_rank,
+                    character.character_level,
+                    total_power
+                )
             } else {
                 format!(
-                    "{}{} (Lv {} {})",
-                    marker, display_name, character.character_level, prestige_name
+                    "{}{} (Lv{} \u{00b7} {} pwr)",
+                    marker, display_name, character.character_level, total_power
                 )
             };
 
