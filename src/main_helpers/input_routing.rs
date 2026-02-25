@@ -32,7 +32,6 @@ pub fn route_game_input(
     haven: &crate::haven::Haven,
     enhancement: &crate::enhancement::EnhancementProgress,
     debug_mode: bool,
-    update_expanded: &mut bool,
     last_save_instant: &mut Option<Instant>,
     last_save_time: &mut Option<chrono::DateTime<Local>>,
     history_repo: Option<&HistoryRepo>,
@@ -84,10 +83,6 @@ pub fn route_game_input(
                 *last_save_instant = Some(Instant::now());
                 *last_save_time = Some(Local::now());
             }
-            InputAction::Continue
-        }
-        InputResult::ToggleUpdateDetails => {
-            *update_expanded = !*update_expanded;
             InputAction::Continue
         }
         // StartChronoSurge is handled directly in main.rs before reaching

@@ -550,18 +550,6 @@ pub(super) fn draw_footer_compact(
         Span::styled(" [A]Ach", Style::default().fg(Color::Magenta))
     };
 
-    let challenge_count = game_state.challenge_menu.challenges.len();
-    let challenge_span = if challenge_count > 0 {
-        Span::styled(
-            format!(" [Tab]Chall({})", challenge_count),
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        )
-    } else {
-        Span::raw("")
-    };
-
     let line = Line::from(vec![
         Span::styled("[Esc]Quit", Style::default().fg(Color::Red)),
         Span::raw(" "),
@@ -570,8 +558,9 @@ pub(super) fn draw_footer_compact(
         soulforge_span,
         stormglass_span,
         ach_span,
-        challenge_span,
-        Span::styled(" [?]Help", Style::default().fg(Color::DarkGray)),
+        Span::styled(" [T]Vault", Style::default().fg(Color::Cyan)),
+        Span::styled(" [W]Wiki", Style::default().fg(Color::DarkGray)),
+        Span::styled(" [!]Bug", Style::default().fg(Color::DarkGray)),
     ]);
 
     let paragraph = Paragraph::new(line).alignment(Alignment::Center);
@@ -597,8 +586,7 @@ pub(super) fn draw_footer_minimal(frame: &mut Frame, area: Rect, game_state: &Ga
     let line = Line::from(vec![
         Span::styled("Esc:Quit", Style::default().fg(Color::Red)),
         prestige_span,
-        Span::styled(" ?:Help", Style::default().fg(Color::DarkGray)),
-        Span::styled(" Tab:More", Style::default().fg(Color::DarkGray)),
+        Span::styled(" !:Bug", Style::default().fg(Color::DarkGray)),
     ]);
 
     let paragraph = Paragraph::new(line).alignment(Alignment::Center);
@@ -638,79 +626,6 @@ fn format_play_time(total_seconds: u64) -> String {
     }
 }
 
-/// Draws the update drawer panel when expanded
-pub fn draw_update_drawer(frame: &mut Frame, area: Rect, info: &UpdateInfo) {
-    let mut lines = vec![
-        Line::from(vec![]),
-        Line::from(vec![
-            Span::styled("  New Version: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                format!("v{}", info.new_version),
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                format!("  ({})", info.new_commit),
-                Style::default().fg(Color::DarkGray),
-            ),
-        ]),
-        Line::from(vec![]),
-        Line::from(vec![Span::styled(
-            "  What's New:",
-            Style::default()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
-        )]),
-    ];
-
-    let max_items = 5;
-    for item in info.changelog.iter().take(max_items) {
-        lines.push(Line::from(vec![
-            Span::styled("    \u{2022} ", Style::default().fg(Color::DarkGray)),
-            Span::styled(item.clone(), Style::default().fg(Color::White)),
-        ]));
-    }
-
-    if info.changelog_total > max_items {
-        lines.push(Line::from(vec![Span::styled(
-            format!("    (+{} more changes)", info.changelog_total - max_items),
-            Style::default().fg(Color::DarkGray),
-        )]));
-    }
-
-    lines.push(Line::from(vec![]));
-    lines.push(Line::from(vec![Span::styled(
-        "  Run 'quest update' to install",
-        Style::default().fg(Color::DarkGray),
-    )]));
-    lines.push(Line::from(vec![
-        Span::styled(
-            format!("  Wiki: {}", crate::core::constants::WIKI_URL),
-            Style::default().fg(Color::DarkGray),
-        ),
-        Span::raw("                              "),
-        Span::styled("[U] Close", Style::default().fg(Color::Yellow)),
-    ]));
-
-    let drawer = Paragraph::new(lines)
-        .wrap(Wrap { trim: false })
-        .block(super::themed_block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(super::themed_border_color(Color::Yellow)))
-                .title(Span::styled(
-                    " \u{1f195} Update Available ",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                )),
-        ));
-
-    frame.render_widget(drawer, area);
-    super::apply_themed_border_fx(frame, area, Color::Yellow, super::BorderFxContext);
-}
-
 /// Draws the footer with control instructions and version info
 #[allow(clippy::too_many_arguments)]
 pub fn draw_footer(
@@ -718,7 +633,6 @@ pub fn draw_footer(
     area: Rect,
     game_state: &GameState,
     update_info: Option<&UpdateInfo>,
-    _update_expanded: bool,
     update_check_completed: bool,
     update_check_failed: bool,
     haven_discovered: bool,
@@ -750,39 +664,20 @@ pub fn draw_footer(
 
     let update_status_text = if let Some(info) = update_info {
         Span::styled(
-            format!("    \u{1f195} [U] Update (v{})", info.new_version),
+            format!("    \u{2191} v{} avail", info.new_version),
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         )
     } else if !update_check_completed {
-        use super::throbber::spinner_char;
         Span::styled(
-            format!("    {} Checking...", spinner_char()),
+            "    \u{25e6} Checking...",
             Style::default().fg(Color::DarkGray),
         )
     } else if update_check_failed {
-        Span::styled(
-            "    ⚠ Update check failed",
-            Style::default().fg(Color::LightRed),
-        )
-    } else {
-        Span::styled(
-            "    \u{2713} On latest version",
-            Style::default().fg(Color::Green),
-        )
-    };
-
-    let challenge_count = game_state.challenge_menu.challenges.len();
-    let challenge_text = if challenge_count > 0 {
-        Span::styled(
-            format!("    [Tab] Challenges ({})", challenge_count),
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        )
-    } else {
         Span::raw("")
+    } else {
+        Span::styled("    \u{2713} Latest", Style::default().fg(Color::Green))
     };
 
     let haven_text = if haven_discovered {
@@ -825,12 +720,13 @@ pub fn draw_footer(
             haven_text,
             soulforge_text,
             stormglass_text,
+            update_status_text,
         ]),
         Line::from(vec![
             achievements_text,
-            challenge_text,
-            update_status_text,
-            Span::styled("    [?] Help", Style::default().fg(Color::DarkGray)),
+            Span::styled("    [T] Time Vault", Style::default().fg(Color::Cyan)),
+            Span::styled("    [W] Wiki", Style::default().fg(Color::DarkGray)),
+            Span::styled("    [!] Bug", Style::default().fg(Color::DarkGray)),
         ]),
     ];
 

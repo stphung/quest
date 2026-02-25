@@ -271,7 +271,6 @@ fn main() -> io::Result<()> {
     let mut exchange_ui = stormglass::types::ExchangeUiState::new();
     let mut achievement_browser = AchievementBrowserState::new();
     let mut title_browser = TitleBrowserState::new();
-    let mut help_overlay_showing = false;
 
     // Setup terminal
     enable_raw_mode()?;
@@ -313,7 +312,6 @@ fn main() -> io::Result<()> {
             &mut select_screen,
             &mut achievement_browser,
             &mut title_browser,
-            &mut help_overlay_showing,
             &mut cloud_config,
             &cloud_tx,
             &cloud_rx,
@@ -419,7 +417,6 @@ fn main() -> io::Result<()> {
                     let mut update_info: Option<UpdateInfo> = None;
                     let mut update_check_completed = false;
                     let mut update_check_failed = false;
-                    let mut update_expanded = false;
                     let mut update_check_handle: Option<std::thread::JoinHandle<UpdateInfoStatus>> =
                         Some(std::thread::spawn(utils::updater::check_update_info));
 
@@ -593,7 +590,6 @@ fn main() -> io::Result<()> {
                                 frame,
                                 &state,
                                 update_info.as_ref(),
-                                update_expanded,
                                 update_check_completed,
                                 update_check_failed,
                                 haven.discovered,
@@ -726,8 +722,6 @@ fn main() -> io::Result<()> {
                                     &mut debug_menu,
                                     debug_mode,
                                     &mut global_achievements,
-                                    update_info.is_some(),
-                                    update_expanded,
                                 );
 
                                 track_input_achievements(
@@ -1557,7 +1551,6 @@ fn main() -> io::Result<()> {
                                     &haven,
                                     &enhancement,
                                     debug_mode,
-                                    &mut update_expanded,
                                     &mut last_save_instant,
                                     &mut last_save_time,
                                     history_repo.as_ref(),

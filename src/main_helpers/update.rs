@@ -4,9 +4,7 @@ use crate::achievements;
 use crate::character::input::{process_select_input, SelectInput, SelectResult};
 use crate::character::manager::{CharacterInfo, CharacterManager};
 use crate::character::prestige::get_prestige_tier;
-use crate::core::constants::{
-    UPDATE_CHECK_INTERVAL_SECONDS, UPDATE_CHECK_JITTER_SECONDS, WIKI_URL,
-};
+use crate::core::constants::{UPDATE_CHECK_INTERVAL_SECONDS, UPDATE_CHECK_JITTER_SECONDS};
 use crate::core::game_state::GameState;
 use crate::enhancement;
 use crate::haven;
@@ -457,12 +455,12 @@ fn build_startup_splash_text(
         ),
         Span::styled(" Wiki    ", Style::default().fg(Color::Gray)),
         Span::styled(
-            "[?]",
+            "[!]",
             Style::default()
-                .fg(Color::Yellow)
+                .fg(Color::DarkGray)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::styled(" Help    ", Style::default().fg(Color::Gray)),
+        Span::styled(" Bug    ", Style::default().fg(Color::Gray)),
         Span::styled(
             "[Esc]",
             Style::default()
@@ -489,7 +487,6 @@ enum StartupKeyAction {
     Delete,
     Rename,
     Achievements,
-    Help,
     OpenTimeVault,
     OpenWiki,
     Quit,
@@ -509,19 +506,10 @@ fn startup_key_action(key_event: KeyEvent) -> StartupKeyAction {
         KeyCode::Char('d') | KeyCode::Char('D') => StartupKeyAction::Delete,
         KeyCode::Char('r') | KeyCode::Char('R') => StartupKeyAction::Rename,
         KeyCode::Char('a') | KeyCode::Char('A') => StartupKeyAction::Achievements,
-        KeyCode::Char('?') => StartupKeyAction::Help,
         KeyCode::Char('t') | KeyCode::Char('T') => StartupKeyAction::OpenTimeVault,
         KeyCode::Char('w') | KeyCode::Char('W') => StartupKeyAction::OpenWiki,
         KeyCode::Esc => StartupKeyAction::Quit,
         _ => StartupKeyAction::Ignore,
-    }
-}
-
-fn wiki_url_for_browser() -> String {
-    if WIKI_URL.starts_with("http://") || WIKI_URL.starts_with("https://") {
-        WIKI_URL.to_string()
-    } else {
-        format!("https://{WIKI_URL}")
     }
 }
 
@@ -558,7 +546,6 @@ pub fn show_startup_splash_screen(
     select_screen: &mut CharacterSelectScreen,
     achievement_browser: &mut AchievementBrowserState,
     title_browser: &mut TitleBrowserState,
-    help_overlay_showing: &mut bool,
     cloud_config: &mut Option<CloudConfig>,
     cloud_tx: &std::sync::mpsc::Sender<CloudOpResult>,
     cloud_rx: &std::sync::mpsc::Receiver<CloudOpResult>,
@@ -717,9 +704,6 @@ pub fn show_startup_splash_screen(
             f.render_widget(paragraph, inner);
 
             // Draw overlays
-            if *help_overlay_showing {
-                ui::help_overlay::draw_help_overlay(f);
-            }
             if achievement_browser.showing {
                 let ctx = ui::responsive::LayoutContext::from_frame(f);
                 if title_browser.showing {
@@ -880,14 +864,6 @@ pub fn show_startup_splash_screen(
                     continue;
                 }
 
-                // Help overlay blocks other input
-                if *help_overlay_showing {
-                    if matches!(key_event.code, KeyCode::Esc | KeyCode::Char('?')) {
-                        *help_overlay_showing = false;
-                    }
-                    continue;
-                }
-
                 // Achievement browser blocks other input
                 if achievement_browser.showing {
                     if title_browser.showing {
@@ -992,12 +968,11 @@ pub fn show_startup_splash_screen(
                         global_achievements.clear_pending_notifications();
                         achievement_browser.open();
                     }
-                    StartupKeyAction::Help => {
-                        *help_overlay_showing = true;
-                    }
                     StartupKeyAction::Quit => break StartupSplashResult::Quit,
                     StartupKeyAction::OpenWiki => {
-                        let _ = crate::utils::bug_report::open_browser(&wiki_url_for_browser());
+                        let _ = crate::utils::bug_report::open_browser(
+                            &crate::core::constants::wiki_url_for_browser(),
+                        );
                     }
                     StartupKeyAction::OpenTimeVault => {
                         if let Some(repo) = history_repo {
@@ -1512,8 +1487,8 @@ mod tests {
 
     #[test]
     fn test_wiki_url_for_browser_has_scheme() {
-        let url = wiki_url_for_browser();
+        let url = crate::core::constants::wiki_url_for_browser();
         assert!(url.starts_with("https://") || url.starts_with("http://"));
-        assert!(url.ends_with(WIKI_URL));
+        assert!(url.ends_with(crate::core::constants::WIKI_URL));
     }
 }
