@@ -378,7 +378,10 @@ fn github_delete_rulesets(token: &str, owner: &str, repo_name: &str) {
     };
 
     for ruleset in rulesets {
-        let delete_url = format!("{GITHUB_API}/repos/{owner}/{repo_name}/rulesets/{}", ruleset.id);
+        let delete_url = format!(
+            "{GITHUB_API}/repos/{owner}/{repo_name}/rulesets/{}",
+            ruleset.id
+        );
         let _ = github_agent()
             .delete(&delete_url)
             .header("User-Agent", USER_AGENT)
