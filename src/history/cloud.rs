@@ -500,7 +500,7 @@ pub fn push_all_branches(quest_dir: &Path, token: &str) -> Result<(), String> {
 
     // Safety: ensure .cloud.json is not in the index before pushing.
     // If it was accidentally tracked in an older version, remove it now
-    // and amend the current commit to keep the push clean.
+    // and create a cleanup commit.
     scrub_cloud_config_from_index(&repo);
 
     let branches: Vec<String> = repo
@@ -511,10 +511,78 @@ pub fn push_all_branches(quest_dir: &Path, token: &str) -> Result<(), String> {
         .collect();
 
     for branch_name in &branches {
-        push_branch(&repo, branch_name, token, false)?;
+        match push_branch(&repo, branch_name, token, false) {
+            Ok(()) => {}
+            Err(e) if e.contains("push declined") || e.contains("repository rule") => {
+                // Push protection rejected the push — likely .cloud.json is
+                // in historical commits. Squash the branch to a single clean
+                // orphan commit and force-push.
+                squash_branch_clean(&repo, branch_name)?;
+                push_branch(&repo, branch_name, token, true)?;
+            }
+            Err(e) => return Err(e),
+        }
     }
 
     Ok(())
+}
+
+/// Squash a branch into a single orphan commit with `.cloud.json` removed.
+///
+/// This is a last-resort fix when push protection rejects the push because
+/// `.cloud.json` (containing the PAT) was committed in historical commits.
+/// The branch is replaced with a single parentless commit containing the
+/// latest tree, minus `.cloud.json`.
+fn squash_branch_clean(repo: &Repository, branch_name: &str) -> Result<(), String> {
+    let branch = repo
+        .find_branch(branch_name, BranchType::Local)
+        .map_err(|e| format!("Branch '{branch_name}' not found: {e}"))?;
+    let tip = branch
+        .get()
+        .peel_to_commit()
+        .map_err(|e| format!("Failed to get branch tip: {e}"))?;
+
+    // Build a clean tree (original tree minus .cloud.json).
+    let orig_tree = tip.tree().map_err(|e| format!("Failed to get tree: {e}"))?;
+    let clean_tree_oid = build_tree_without(repo, &orig_tree, ".cloud.json")?;
+    let clean_tree = repo
+        .find_tree(clean_tree_oid)
+        .map_err(|e| format!("Failed to find clean tree: {e}"))?;
+
+    // Reuse the tip's commit message and signature.
+    let sig = tip.author();
+    let message = tip.message().unwrap_or("Save state");
+
+    let new_oid = repo
+        .commit(None, &sig, &sig, message, &clean_tree, &[])
+        .map_err(|e| format!("Failed to create squashed commit: {e}"))?;
+
+    // Point the branch at the new orphan commit.
+    repo.branch(
+        branch_name,
+        &repo
+            .find_commit(new_oid)
+            .map_err(|e| format!("Failed to find new commit: {e}"))?,
+        true, // force overwrite
+    )
+    .map_err(|e| format!("Failed to update branch: {e}"))?;
+
+    Ok(())
+}
+
+/// Rebuild a tree object with one entry removed (by name).
+fn build_tree_without(
+    repo: &Repository,
+    tree: &git2::Tree<'_>,
+    remove_name: &str,
+) -> Result<git2::Oid, String> {
+    let mut builder = repo
+        .treebuilder(Some(tree))
+        .map_err(|e| format!("Failed to create tree builder: {e}"))?;
+    let _ = builder.remove(remove_name); // ignore if not present
+    builder
+        .write()
+        .map_err(|e| format!("Failed to write clean tree: {e}"))
 }
 
 /// Remove `.cloud.json` from the git index and rewrite HEAD if it was tracked.
@@ -1046,6 +1114,9 @@ pub fn sanitize_cloud_error(error_msg: &str) -> String {
     }
     if msg.contains("timed out") || msg.contains("timeout") {
         return "Connection to GitHub timed out — try again".to_string();
+    }
+    if msg.contains("push declined") || msg.contains("repository rule") {
+        return "Push blocked by GitHub push protection — see wiki".to_string();
     }
     // Truncate long raw errors for display.
     if error_msg.len() > 60 {
