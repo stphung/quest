@@ -5,6 +5,7 @@ use crate::ui::character_select::CharacterSelectScreen;
 
 /// Input events for character select screen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum SelectInput {
     /// Move selection up
     Up,

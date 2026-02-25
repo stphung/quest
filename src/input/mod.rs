@@ -46,8 +46,6 @@ pub fn handle_game_input(
     debug_menu: &mut DebugMenu,
     debug_mode: bool,
     achievements: &mut crate::achievements::Achievements,
-    update_available: bool,
-    update_expanded: bool,
 ) -> InputResult {
     // 0. Offline welcome overlay (any key dismisses)
     if matches!(overlay, GameOverlay::OfflineWelcome { .. }) {
@@ -109,14 +107,6 @@ pub fn handle_game_input(
                 title_browser.open();
             }
             _ => {}
-        }
-        return InputResult::Continue;
-    }
-
-    // 0.75. Help overlay
-    if matches!(overlay, GameOverlay::Help) {
-        if matches!(key.code, KeyCode::Esc | KeyCode::Char('?')) {
-            *overlay = GameOverlay::None;
         }
         return InputResult::Continue;
     }
@@ -303,8 +293,6 @@ pub fn handle_game_input(
         enhancement,
         overlay,
         achievements,
-        update_available,
-        update_expanded,
     )
 }
 
@@ -420,8 +408,6 @@ fn handle_base_game(
     enhancement: &enhancement::EnhancementProgress,
     overlay: &mut GameOverlay,
     achievements: &mut crate::achievements::Achievements,
-    update_available: bool,
-    update_expanded: bool,
 ) -> InputResult {
     match key.code {
         KeyCode::Esc => {
@@ -429,14 +415,6 @@ fn handle_base_game(
                 InputResult::QuitToSelect
             } else {
                 *overlay = GameOverlay::QuitConfirm;
-                InputResult::Continue
-            }
-        }
-        KeyCode::Char('u') | KeyCode::Char('U') => {
-            // Toggle update details if update available OR already expanded
-            if update_available || update_expanded {
-                InputResult::ToggleUpdateDetails
-            } else {
                 InputResult::Continue
             }
         }
@@ -477,8 +455,10 @@ fn handle_base_game(
             // Time Vault — main.rs populates state from HistoryRepo
             InputResult::OpenTimeVault
         }
-        KeyCode::Char('?') => {
-            *overlay = GameOverlay::Help;
+        KeyCode::Char('w') | KeyCode::Char('W') => {
+            let _ = crate::utils::bug_report::open_browser(
+                &crate::core::constants::wiki_url_for_browser(),
+            );
             InputResult::Continue
         }
         KeyCode::Char('!') => {

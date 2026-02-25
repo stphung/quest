@@ -24,7 +24,6 @@ pub mod gomoku_scene;
 mod haven_details;
 pub mod haven_scene;
 mod haven_tree;
-pub mod help_overlay;
 pub mod jezzball_scene;
 pub mod minesweeper_scene;
 pub mod morris_scene;
@@ -367,7 +366,6 @@ pub fn draw_ui_with_update(
     frame: &mut Frame,
     game_state: &GameState,
     update_info: Option<&UpdateInfo>,
-    update_expanded: bool,
     update_check_completed: bool,
     update_check_failed: bool,
     haven_discovered: bool,
@@ -392,7 +390,6 @@ pub fn draw_ui_with_update(
                 &ctx,
                 game_state,
                 update_info,
-                update_expanded,
                 update_check_completed,
                 update_check_failed,
                 haven_discovered,
@@ -429,7 +426,6 @@ fn draw_xl_l_layout(
     ctx: &LayoutContext,
     game_state: &GameState,
     update_info: Option<&UpdateInfo>,
-    update_expanded: bool,
     update_check_completed: bool,
     update_check_failed: bool,
     haven_discovered: bool,
@@ -461,38 +457,19 @@ fn draw_xl_l_layout(
         size
     };
 
-    // Determine if we need space for update drawer
-    let show_update_drawer = update_expanded && update_info.is_some();
-
-    // Split vertically: growing content area, ticker, optional update drawer, footer
-    let v_chunks = if show_update_drawer {
-        Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Min(27),    // Main content (stats + right panel, grows)
-                Constraint::Length(1),  // Ticker
-                Constraint::Length(20), // Update drawer panel (tall enough for wrapped changelog lines)
-                Constraint::Length(4),  // Full-width footer (2 rows)
-            ])
-            .split(main_area)
-    } else {
-        Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Min(27),   // Main content (stats + right panel, grows)
-                Constraint::Length(1), // Ticker
-                Constraint::Length(4), // Full-width footer (2 rows)
-            ])
-            .split(main_area)
-    };
+    // Split vertically: growing content area, ticker, footer
+    let v_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Min(27),   // Main content (stats + right panel, grows)
+            Constraint::Length(1), // Ticker
+            Constraint::Length(4), // Full-width footer (2 rows)
+        ])
+        .split(main_area);
 
     let content_area = v_chunks[0];
     let info_area = v_chunks[1];
-    let (update_drawer_area, footer_area) = if show_update_drawer {
-        (Some(v_chunks[2]), v_chunks[3])
-    } else {
-        (None, v_chunks[2])
-    };
+    let footer_area = v_chunks[2];
 
     // Split main content into two areas: stats panel (left) and combat/dungeon (right)
     let chunks = Layout::default()
@@ -521,18 +498,12 @@ fn draw_xl_l_layout(
     };
     ticker::draw_ticker(frame, info_area, &game_state.ticker, sg);
 
-    // Draw update drawer if expanded
-    if let (Some(drawer_area), Some(info)) = (update_drawer_area, update_info) {
-        stats_panel::draw_update_drawer(frame, drawer_area, info);
-    }
-
     // Draw full-width footer at the bottom
     stats_panel::draw_footer(
         frame,
         footer_area,
         game_state,
         update_info,
-        update_expanded,
         update_check_completed,
         update_check_failed,
         haven_discovered,

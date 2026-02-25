@@ -59,7 +59,6 @@ impl HavenUiState {
 /// Game-screen overlay state. At most one is active at a time.
 pub enum GameOverlay {
     None,
-    Help,
     HavenDiscovery,
     SoulforgeDiscovery,
     PrestigeConfirm,
@@ -113,8 +112,6 @@ pub enum InputResult {
     NeedsSaveAll,
     /// Haven was modified and should be saved with a git history commit.
     NeedsSaveAllWithEvent(crate::history::SaveEvent),
-    /// Toggle the update details expanded state.
-    ToggleUpdateDetails,
     /// Start a Chrono Surge with the given number of ticks.
     StartChronoSurge { ticks: u64 },
     /// Open the Time Vault (main.rs populates state from HistoryRepo).
