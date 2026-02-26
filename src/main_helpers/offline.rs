@@ -4,6 +4,39 @@ use crate::core::game_logic::{process_offline_progression, OfflineReport};
 use crate::core::game_state::GameState;
 use crate::haven;
 
+/// Resolve Deep missions that completed while the game was closed.
+pub fn resolve_deep_offline(
+    deep: &mut crate::deep::DeepState,
+    achievements: &mut crate::achievements::Achievements,
+    character_name: &str,
+) {
+    if !deep.persistent.discovered {
+        return;
+    }
+
+    let now = chrono::Utc::now();
+    let summary = crate::deep::missions::tick_all_missions(
+        &mut deep.prestige,
+        &mut deep.persistent,
+        now,
+        &mut rand::rng(),
+    );
+
+    // Fire achievement handlers
+    for _ in 0..summary.missions_completed {
+        achievements.on_deep_mission_complete(Some(character_name));
+    }
+    for layer in &summary.breakthroughs {
+        achievements.on_deep_breakthrough(*layer, Some(character_name));
+    }
+    for _ in 0..summary.mercs_lost {
+        achievements.on_deep_merc_lost(Some(character_name));
+    }
+    if summary.gateway_opened {
+        achievements.on_deep_gateway_opened(Some(character_name));
+    }
+}
+
 /// Process offline XP and add combat log entries. Returns the report if XP was gained.
 pub fn apply_offline_xp(state: &mut GameState, haven: &haven::Haven) -> Option<OfflineReport> {
     let haven_offline_bonus = haven.get_bonus(haven::HavenBonusType::OfflineXpPercent);

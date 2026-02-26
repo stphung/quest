@@ -13,6 +13,12 @@ mod combat_3d;
 pub mod combat_effects;
 mod combat_scene;
 pub mod debug_menu_scene;
+mod deep_events;
+mod deep_layers;
+mod deep_missions;
+mod deep_results;
+mod deep_roster;
+pub mod deep_scene;
 pub mod dungeon_map;
 mod enemy_sprite_data;
 mod enemy_sprites;
@@ -371,6 +377,7 @@ pub fn draw_ui_with_update(
     haven_discovered: bool,
     soulforge_discovered: bool,
     stormglass_discovered: bool,
+    deep_state: &crate::deep::DeepState,
     achievements: &crate::achievements::Achievements,
     enhancement_levels: &[u8; 7],
 ) {
@@ -382,6 +389,14 @@ pub fn draw_ui_with_update(
         render_too_small(frame, &ctx);
         return;
     }
+
+    let deep_indicator =
+        stats_panel::DeepIndicatorStatus::from_deep(deep_state.persistent.discovered, deep_state);
+
+    let rift_hint = !deep_state.persistent.discovered
+        && game_state.prestige_rank >= crate::deep::DEEP_MIN_PRESTIGE_RANK
+        && game_state.zone_progression.current_zone_id >= 11;
+    let rift_resonance = deep_state.persistent.rift_resonance;
 
     match ctx.tier {
         SizeTier::XL | SizeTier::L => {
@@ -395,8 +410,11 @@ pub fn draw_ui_with_update(
                 haven_discovered,
                 soulforge_discovered,
                 stormglass_discovered,
+                deep_indicator,
                 achievements,
                 enhancement_levels,
+                rift_hint,
+                rift_resonance,
             );
         }
         SizeTier::M => {
@@ -407,6 +425,7 @@ pub fn draw_ui_with_update(
                 haven_discovered,
                 soulforge_discovered,
                 stormglass_discovered,
+                deep_indicator,
                 achievements,
             );
         }
@@ -431,8 +450,11 @@ fn draw_xl_l_layout(
     haven_discovered: bool,
     soulforge_discovered: bool,
     stormglass_discovered: bool,
+    deep_indicator: stats_panel::DeepIndicatorStatus,
     achievements: &crate::achievements::Achievements,
     enhancement_levels: &[u8; 7],
+    rift_hint: bool,
+    rift_resonance: u32,
 ) {
     let size = frame.area();
 
@@ -488,6 +510,8 @@ fn draw_xl_l_layout(
         ctx,
         enhancement_levels,
         achievements,
+        rift_hint,
+        rift_resonance,
     );
 
     // Draw ticker
@@ -509,6 +533,7 @@ fn draw_xl_l_layout(
         haven_discovered,
         soulforge_discovered,
         stormglass_discovered,
+        deep_indicator,
         achievements.pending_count(),
         ctx,
     );
@@ -519,6 +544,7 @@ fn draw_xl_l_layout(
 
 /// M tier stacked single-column layout.
 /// Compact stats bar + optional attrs + XP bar + full-width activity + compact info + footer
+#[allow(clippy::too_many_arguments)]
 fn draw_m_layout(
     frame: &mut Frame,
     ctx: &LayoutContext,
@@ -526,6 +552,7 @@ fn draw_m_layout(
     haven_discovered: bool,
     soulforge_discovered: bool,
     stormglass_discovered: bool,
+    deep_indicator: stats_panel::DeepIndicatorStatus,
     achievements: &crate::achievements::Achievements,
 ) {
     let area = frame.area();
@@ -586,6 +613,7 @@ fn draw_m_layout(
         haven_discovered,
         soulforge_discovered,
         stormglass_discovered,
+        deep_indicator,
         achievements.pending_count(),
     );
 }

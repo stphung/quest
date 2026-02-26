@@ -13,9 +13,10 @@
 //!   for milestones already passed in a pre-existing save.
 
 use super::milestones::{
-    MinigameDifficulty, MinigameType, BOSS_HUNTER_MILESTONES, DUNGEON_MILESTONES,
-    FISHERMAN_MILESTONES, FISH_CATCHER_MILESTONES, GRAND_CHAMPION_MILESTONES, LEVEL_MILESTONES,
-    PRESTIGE_MILESTONES, SLAYER_MILESTONES,
+    MinigameDifficulty, MinigameType, BOSS_HUNTER_MILESTONES, DEEP_GUILD_RANK_MILESTONES,
+    DEEP_LAYER_MILESTONES, DEEP_MISSION_MILESTONES, DUNGEON_MILESTONES, FISHERMAN_MILESTONES,
+    FISH_CATCHER_MILESTONES, GRAND_CHAMPION_MILESTONES, LEVEL_MILESTONES, PRESTIGE_MILESTONES,
+    SLAYER_MILESTONES,
 };
 use super::types::{AchievementId, Achievements};
 
@@ -300,6 +301,58 @@ impl Achievements {
     }
 
     // =========================================================================
+    // The Deep Event Handlers
+    // =========================================================================
+
+    /// Called when The Deep is first discovered.
+    pub fn on_deep_discovered(&mut self, character_name: Option<&str>) {
+        self.unlock_with_name(AchievementId::TheDeepDiscovered, character_name);
+    }
+
+    /// Called when a Deep mission is completed.
+    /// Unlocks mission completion milestone achievements.
+    pub fn on_deep_mission_complete(&mut self, character_name: Option<&str>) {
+        self.total_deep_missions_completed += 1;
+
+        self.check_milestones(
+            self.total_deep_missions_completed,
+            DEEP_MISSION_MILESTONES,
+            character_name,
+        );
+    }
+
+    /// Called when a breakthrough mission is completed in The Deep.
+    /// Unlocks FirstBreakthrough and checks layer milestones.
+    pub fn on_deep_breakthrough(&mut self, new_layer: u32, character_name: Option<&str>) {
+        self.unlock_with_name(AchievementId::FirstBreakthrough, character_name);
+
+        if new_layer > self.highest_deep_layer {
+            self.highest_deep_layer = new_layer;
+        }
+
+        self.check_milestones(new_layer as u64, DEEP_LAYER_MILESTONES, character_name);
+    }
+
+    /// Called when the guild rank increases in The Deep.
+    pub fn on_deep_guild_rank_up(&mut self, new_rank: u32, character_name: Option<&str>) {
+        if new_rank > self.highest_guild_rank {
+            self.highest_guild_rank = new_rank;
+        }
+
+        self.check_milestones(new_rank as u64, DEEP_GUILD_RANK_MILESTONES, character_name);
+    }
+
+    /// Called when a mercenary is permanently lost in The Deep.
+    pub fn on_deep_merc_lost(&mut self, character_name: Option<&str>) {
+        self.unlock_with_name(AchievementId::FirstMercLost, character_name);
+    }
+
+    /// Called when the Gateway Expedition succeeds, opening the sealed gateway.
+    pub fn on_deep_gateway_opened(&mut self, character_name: Option<&str>) {
+        self.unlock_with_name(AchievementId::GatewayOpened, character_name);
+    }
+
+    // =========================================================================
     // Enhancement/Soulforge Event Handlers
     // =========================================================================
 
@@ -435,6 +488,9 @@ impl Achievements {
             (self.total_dungeons_completed, DUNGEON_MILESTONES),
             (self.total_fish_caught, FISH_CATCHER_MILESTONES),
             (self.total_minigame_wins, GRAND_CHAMPION_MILESTONES),
+            (self.total_deep_missions_completed, DEEP_MISSION_MILESTONES),
+            (self.highest_deep_layer as u64, DEEP_LAYER_MILESTONES),
+            (self.highest_guild_rank as u64, DEEP_GUILD_RANK_MILESTONES),
         ];
 
         for (current, milestones) in series {
@@ -442,6 +498,43 @@ impl Achievements {
                 self.update_progress(achievement_id, *current, threshold);
             }
         }
+    }
+
+    /// Syncs The Deep achievements based on Deep persistent state.
+    /// Call this when loading a character to retroactively unlock achievements
+    /// for Deep milestones already reached (guild rank, layers).
+    ///
+    /// Note: Mission count is already tracked in the achievements struct via
+    /// `on_deep_mission_complete()` and does not need syncing from Deep state.
+    pub fn sync_from_deep(
+        &mut self,
+        discovered: bool,
+        guild_rank: u32,
+        deepest_layer: u32,
+        character_name: Option<&str>,
+    ) {
+        if discovered {
+            self.on_deep_discovered(character_name);
+        }
+
+        // Sync guild rank milestones
+        if guild_rank > self.highest_guild_rank {
+            self.highest_guild_rank = guild_rank;
+        }
+        if guild_rank >= 2 {
+            self.on_deep_guild_rank_up(guild_rank, character_name);
+        }
+
+        // Sync layer milestones
+        if deepest_layer > self.highest_deep_layer {
+            self.highest_deep_layer = deepest_layer;
+        }
+        if deepest_layer >= 1 {
+            self.on_deep_breakthrough(deepest_layer, character_name);
+        }
+
+        // Refresh progress bars from current counters
+        self.refresh_progress();
     }
 
     /// Syncs Haven-related achievements based on Haven state.

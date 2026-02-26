@@ -154,3 +154,30 @@ pub const DUNGEON_MILESTONES: &[(u64, AchievementId)] = &[
 /// Minigame win count milestone for the Grand Champion achievement.
 pub const GRAND_CHAMPION_MILESTONES: &[(u64, AchievementId)] =
     &[(100, AchievementId::GrandChampion)];
+
+/// Deep mission completion milestones.
+pub const DEEP_MISSION_MILESTONES: &[(u64, AchievementId)] = &[
+    (1, AchievementId::FirstMissionComplete),
+    (10, AchievementId::DeepMissionsX),
+    (25, AchievementId::DeepMissionsXXV),
+    (50, AchievementId::DeepMissionsL),
+    (100, AchievementId::DeepMissionsC),
+];
+
+/// Deep layer progression milestones.
+pub const DEEP_LAYER_MILESTONES: &[(u64, AchievementId)] = &[
+    (5, AchievementId::Layer5Cleared),
+    (10, AchievementId::Layer10Cleared),
+    (15, AchievementId::Layer15Cleared),
+    (20, AchievementId::Layer20Cleared),
+    (25, AchievementId::Layer25Cleared),
+    (26, AchievementId::VoidExplorer),
+];
+
+/// Deep guild rank milestones.
+pub const DEEP_GUILD_RANK_MILESTONES: &[(u64, AchievementId)] = &[
+    (2, AchievementId::GuildRank2),
+    (3, AchievementId::GuildRank3),
+    (4, AchievementId::GuildRank4),
+    (5, AchievementId::GuildRank5),
+];

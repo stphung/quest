@@ -21,7 +21,44 @@ use ratatui::{
 // Re-export for haven_scene.rs which uses super::stats_panel::enhancement_style
 pub(super) use super::stats_equipment::enhancement_style;
 
+/// Status indicator for the [D]eep shortcut in the footer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum DeepIndicatorStatus {
+    /// Deep not discovered.
+    Hidden,
+    /// Discovered, no missions running.
+    Idle,
+    /// At least one mission is running.
+    Running,
+    /// At least one mission has a pending event.
+    EventPending,
+    /// At least one mission has completed (result pending).
+    Completed,
+}
+
+impl DeepIndicatorStatus {
+    /// Compute the most urgent indicator status from deep state.
+    pub fn from_deep(discovered: bool, deep: &crate::deep::DeepState) -> Self {
+        if !discovered {
+            return Self::Hidden;
+        }
+        let has_events = deep.prestige.has_any_pending_event();
+        let has_results = !deep.prestige.pending_results.is_empty();
+        let has_active = deep.prestige.active_mission_count() > 0;
+        if has_events {
+            Self::EventPending
+        } else if has_results {
+            Self::Completed
+        } else if has_active {
+            Self::Running
+        } else {
+            Self::Idle
+        }
+    }
+}
+
 /// Draws the stats panel
+#[allow(clippy::too_many_arguments)]
 pub fn draw_stats_panel(
     frame: &mut Frame,
     area: Rect,
@@ -29,6 +66,8 @@ pub fn draw_stats_panel(
     ctx: &LayoutContext,
     enhancement_levels: &[u8; 7],
     achievements: &crate::achievements::Achievements,
+    rift_hint: bool,
+    rift_resonance: u32,
 ) {
     match ctx.height_tier {
         SizeTier::XL | SizeTier::L => {
@@ -54,7 +93,14 @@ pub fn draw_stats_panel(
             let mut idx = 0;
             draw_header(frame, chunks[idx], game_state, achievements);
             idx += 1;
-            draw_prestige_info(frame, chunks[idx], game_state, achievements);
+            draw_prestige_info(
+                frame,
+                chunks[idx],
+                game_state,
+                achievements,
+                rift_hint,
+                rift_resonance,
+            );
             idx += 1;
             draw_fishing_panel(frame, chunks[idx], game_state, achievements);
             idx += 1;
@@ -500,6 +546,7 @@ pub(super) fn draw_xp_bar_compact(frame: &mut Frame, area: Rect, game_state: &Ga
 }
 
 /// Draws a compact footer for M tier.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn draw_footer_compact(
     frame: &mut Frame,
     area: Rect,
@@ -507,6 +554,7 @@ pub(super) fn draw_footer_compact(
     haven_discovered: bool,
     soulforge_discovered: bool,
     stormglass_discovered: bool,
+    deep_indicator: DeepIndicatorStatus,
     pending_achievements: usize,
 ) {
     use crate::character::prestige::can_prestige;
@@ -541,6 +589,24 @@ pub(super) fn draw_footer_compact(
         Span::raw("")
     };
 
+    let deep_span = match deep_indicator {
+        DeepIndicatorStatus::Hidden => Span::raw(""),
+        DeepIndicatorStatus::Idle => Span::styled(" [D]eep", Style::default().fg(Color::DarkGray)),
+        DeepIndicatorStatus::Running => Span::styled(
+            " [D]eep\u{25cf}",
+            Style::default().fg(Color::Rgb(80, 160, 220)),
+        ),
+        DeepIndicatorStatus::EventPending => Span::styled(
+            " [D]eep\u{26a1}",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+        DeepIndicatorStatus::Completed => {
+            Span::styled(" [D]eep\u{2713}", Style::default().fg(Color::Green))
+        }
+    };
+
     let ach_span = if pending_achievements > 0 {
         Span::styled(
             format!(" [A]Ach({})", pending_achievements),
@@ -557,6 +623,7 @@ pub(super) fn draw_footer_compact(
         haven_span,
         soulforge_span,
         stormglass_span,
+        deep_span,
         ach_span,
         Span::styled(" [T]Vault", Style::default().fg(Color::Cyan)),
         Span::styled(" [W]Wiki", Style::default().fg(Color::DarkGray)),
@@ -661,6 +728,7 @@ pub fn draw_footer(
     haven_discovered: bool,
     soulforge_discovered: bool,
     stormglass_discovered: bool,
+    deep_indicator: DeepIndicatorStatus,
     pending_achievements: usize,
     _ctx: &LayoutContext,
 ) {
@@ -739,6 +807,27 @@ pub fn draw_footer(
         Span::raw("")
     };
 
+    let deep_text = match deep_indicator {
+        DeepIndicatorStatus::Hidden => Span::raw(""),
+        DeepIndicatorStatus::Idle => {
+            Span::styled("    [D] The Deep", Style::default().fg(Color::DarkGray))
+        }
+        DeepIndicatorStatus::Running => Span::styled(
+            "    [D] The Deep \u{25cf}",
+            Style::default().fg(Color::Rgb(80, 160, 220)),
+        ),
+        DeepIndicatorStatus::EventPending => Span::styled(
+            "    [D] The Deep \u{26a1}",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+        DeepIndicatorStatus::Completed => Span::styled(
+            "    [D] The Deep \u{2713}",
+            Style::default().fg(Color::Green),
+        ),
+    };
+
     let achievements_text = if pending_achievements > 0 {
         Span::styled(
             format!("[A] Achievements (\u{1f3c6} {} new!)", pending_achievements),
@@ -756,6 +845,7 @@ pub fn draw_footer(
             haven_text,
             soulforge_text,
             stormglass_text,
+            deep_text,
             update_status_text,
         ]),
         Line::from(vec![

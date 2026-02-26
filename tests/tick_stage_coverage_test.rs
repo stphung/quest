@@ -49,6 +49,7 @@ fn run_ticks_collecting(
             tick_counter,
             haven,
             &mut enhancement,
+            &mut quest::deep::DeepState::new(),
             achievements,
             false,
             rng,
@@ -74,6 +75,7 @@ fn run_ticks_collecting_results(
             tick_counter,
             haven,
             &mut enhancement,
+            &mut quest::deep::DeepState::new(),
             achievements,
             false,
             rng,
@@ -202,6 +204,7 @@ fn test_tick_event_player_died_in_dungeon() {
             &mut tick_counter,
             &mut haven,
             &mut EnhancementProgress::new(),
+            &mut quest::deep::DeepState::new(),
             &mut achievements,
             false,
             &mut rng,
@@ -400,6 +403,7 @@ fn test_tick_event_fish_caught_fields() {
             &mut tick_counter,
             &mut haven,
             &mut EnhancementProgress::new(),
+            &mut quest::deep::DeepState::new(),
             &mut achievements,
             false,
             &mut rng,
@@ -459,6 +463,7 @@ fn test_tick_event_fishing_message_for_phase_transitions() {
             &mut tick_counter,
             &mut haven,
             &mut EnhancementProgress::new(),
+            &mut quest::deep::DeepState::new(),
             &mut achievements,
             false,
             &mut rng,
@@ -513,6 +518,7 @@ fn test_play_time_increments_during_fishing_session() {
             &mut tick_counter,
             &mut haven,
             &mut EnhancementProgress::new(),
+            &mut quest::deep::DeepState::new(),
             &mut achievements,
             false,
             &mut rng,
@@ -631,23 +637,23 @@ fn test_haven_discovery_blocked_by_active_fishing() {
 
 #[test]
 fn test_haven_discovery_sets_haven_changed_and_achievements_changed() {
-    // Use different seeds to find one that triggers Haven discovery quickly
-    // At P50 with ~0.000294 chance per tick, expected ~0.06 discoveries per 200 ticks
-    // With 10 seeds, very likely to find at least one.
-    for seed in 0u64..10 {
+    // Use P200 where discovery chance = 0.000014 + 190*0.000007 = ~0.00134/tick.
+    // Over 3 seeds * 2000 ticks = 6000 ticks: ~8 expected discoveries, near-certain.
+    for seed in 0u64..3 {
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
         let mut haven = Haven::default();
         let mut achievements = Achievements::default();
         let mut state = create_strong_character("Haven Flag Test");
-        state.prestige_rank = 50;
+        state.prestige_rank = 200;
         let mut tick_counter = 0u32;
 
-        for _ in 0..200 {
+        for _ in 0..2000 {
             let result = game_tick(
                 &mut state,
                 &mut tick_counter,
                 &mut haven,
                 &mut EnhancementProgress::new(),
+                &mut quest::deep::DeepState::new(),
                 &mut achievements,
                 false,
                 &mut rng,
@@ -668,9 +674,7 @@ fn test_haven_discovery_sets_haven_changed_and_achievements_changed() {
             }
         }
     }
-    // If we couldn't find it in 10 seeds * 200 ticks, the probability is too low
-    // but at P50 with ~0.000294 chance per tick, expected ~0.06 discoveries per 200 ticks
-    panic!("Haven discovery should have occurred with P50 in 10 * 200 ticks");
+    panic!("Haven discovery should have occurred with P200 in 3 * 2000 ticks");
 }
 
 // =============================================================================
@@ -775,6 +779,7 @@ fn test_challenge_discovered_event_has_type_and_messages() {
             &mut tc,
             &mut h,
             &mut EnhancementProgress::new(),
+            &mut quest::deep::DeepState::new(),
             &mut a,
             false,
             &mut rng,
@@ -902,6 +907,7 @@ fn test_leveled_up_event_on_enemy_defeat() {
             &mut tick_counter,
             &mut haven,
             &mut EnhancementProgress::new(),
+            &mut quest::deep::DeepState::new(),
             &mut achievements,
             false,
             &mut rng,
@@ -1008,6 +1014,7 @@ fn test_item_dropped_event_from_boss() {
             &mut tick_counter,
             &mut haven,
             &mut EnhancementProgress::new(),
+            &mut quest::deep::DeepState::new(),
             &mut achievements,
             false,
             &mut rng,
@@ -1069,6 +1076,7 @@ fn test_subzone_boss_defeated_advances_progression() {
             &mut tick_counter,
             &mut haven,
             &mut EnhancementProgress::new(),
+            &mut quest::deep::DeepState::new(),
             &mut achievements,
             false,
             &mut rng,
@@ -1127,6 +1135,7 @@ fn test_achievement_unlocked_event_format() {
             &mut tick_counter,
             &mut haven,
             &mut EnhancementProgress::new(),
+            &mut quest::deep::DeepState::new(),
             &mut achievements,
             false,
             &mut rng,
@@ -1178,6 +1187,7 @@ fn test_debug_mode_suppresses_haven_and_achievement_save_on_storm_leviathan() {
             &mut tick,
             &mut h,
             &mut EnhancementProgress::new(),
+            &mut quest::deep::DeepState::new(),
             &mut a,
             true, // debug_mode = true
             &mut rng,
@@ -1211,6 +1221,7 @@ fn test_tick_result_achievement_modal_ready() {
             &mut tick_counter,
             &mut haven,
             &mut EnhancementProgress::new(),
+            &mut quest::deep::DeepState::new(),
             &mut achievements,
             false,
             &mut rng,
@@ -1253,6 +1264,7 @@ fn test_dungeon_boss_defeated_event_fields() {
             &mut tick_counter,
             &mut haven,
             &mut EnhancementProgress::new(),
+            &mut quest::deep::DeepState::new(),
             &mut achievements,
             false,
             &mut rng,
@@ -1317,6 +1329,7 @@ fn test_dungeon_elite_defeated_event() {
             &mut tick_counter,
             &mut haven,
             &mut EnhancementProgress::new(),
+            &mut quest::deep::DeepState::new(),
             &mut achievements,
             false,
             &mut rng,
@@ -1375,6 +1388,7 @@ fn test_prestige_flat_hp_applied_in_tick() {
         &mut tick_counter,
         &mut haven,
         &mut EnhancementProgress::new(),
+        &mut quest::deep::DeepState::new(),
         &mut achievements,
         false,
         &mut rng,
@@ -1408,6 +1422,7 @@ fn test_enemy_defeated_increments_session_kills_via_tick() {
             &mut tick_counter,
             &mut haven,
             &mut EnhancementProgress::new(),
+            &mut quest::deep::DeepState::new(),
             &mut achievements,
             false,
             &mut rng,

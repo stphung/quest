@@ -177,6 +177,25 @@ pub enum TickEvent {
     /// The Soulforge was discovered (P15+ idle roll).
     SoulforgeDiscovered,
 
+    // ── The Deep ──────────────────────────────────────────────────
+    /// A Deep mission was completed.
+    DeepMissionComplete { message: String },
+
+    /// A Deep event is pending and needs player response.
+    DeepEventPending { message: String },
+
+    /// A mercenary was injured during a Deep expedition.
+    DeepMercInjured { message: String },
+
+    /// A mercenary was permanently lost in The Deep.
+    DeepMercLost { message: String },
+
+    /// A breakthrough mission was completed, unlocking a new layer.
+    DeepBreakthrough { message: String },
+
+    /// The guild rank increased in The Deep.
+    DeepGuildRankUp { message: String },
+
     /// Stormglass was discovered for the first time (first gear salvage).
     StormglassDiscovered,
 
@@ -222,6 +241,9 @@ pub struct TickResult {
 
     /// True if God Item progress was modified and should be persisted.
     pub god_items_changed: bool,
+
+    /// True if Deep state was modified (discovery) and should be persisted.
+    pub deep_changed: bool,
 
     /// Achievement IDs ready to be shown in a modal overlay.
     /// Populated when the 500ms accumulation window has elapsed.

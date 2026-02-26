@@ -2,6 +2,7 @@
 
 use crate::achievements;
 use crate::core::game_state::GameState;
+use crate::deep::{DeepState, DeepUiState};
 use crate::enhancement;
 use crate::haven;
 use crate::input::{GameOverlay, HavenUiState, SoulforgeUiState};
@@ -86,6 +87,8 @@ pub fn draw_game_overlays(
     haven_ui: &HavenUiState,
     soulforge_ui: &SoulforgeUiState,
     exchange_ui: &ExchangeUiState,
+    deep_state: &DeepState,
+    deep_ui: &DeepUiState,
     enhancement: &enhancement::EnhancementProgress,
     global_achievements: &achievements::Achievements,
     debug_mode: bool,
@@ -102,7 +105,10 @@ pub fn draw_game_overlays(
             ui::game_common::render_offline_welcome(frame, area, report, ctx);
         }
         GameOverlay::PrestigeConfirm => {
-            ui::prestige_confirm::draw_prestige_confirm(frame, state, ctx);
+            let rift_hint = !deep_state.persistent.discovered
+                && state.prestige_rank >= crate::deep::DEEP_MIN_PRESTIGE_RANK
+                && state.zone_progression.current_zone_id >= 11;
+            ui::prestige_confirm::draw_prestige_confirm(frame, state, rift_hint, ctx);
         }
         GameOverlay::HavenDiscovery => {
             ui::haven_scene::render_haven_discovery_modal(frame, area, ctx);
@@ -182,6 +188,9 @@ pub fn draw_game_overlays(
         GameOverlay::TimeVault { ref browser } => {
             ui::time_vault_scene::draw_time_vault(frame, area, browser);
         }
+        GameOverlay::DeepDiscovery => {
+            ui::deep_scene::render_deep_discovery_modal(frame, area, ctx);
+        }
         GameOverlay::None => {}
     }
 
@@ -237,6 +246,16 @@ pub fn draw_game_overlays(
     // Stormglass Exchange overlay
     if exchange_ui.open {
         ui::stormglass_scene::render_stormglass_exchange(frame, area, exchange_ui, state, ctx);
+    }
+
+    // The Deep overlay
+    if deep_ui.open {
+        ui::deep_scene::render_deep_overlay(frame, area, deep_state, deep_ui, None, ctx);
+    }
+
+    // Story event modal (shown after prestige when rift resonance advances a stage)
+    if let Some(stage) = deep_ui.pending_story_stage {
+        ui::deep_scene::render_story_modal(frame, area, stage);
     }
 
     // Chrono Surge active: status banner at bottom

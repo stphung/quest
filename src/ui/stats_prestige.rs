@@ -119,6 +119,8 @@ pub(super) fn draw_prestige_info(
     area: Rect,
     game_state: &GameState,
     achievements: &crate::achievements::Achievements,
+    rift_hint: bool,
+    rift_resonance: u32,
 ) {
     let title = match highest_prestige_badge(achievements) {
         Some(icon) => format!(" Prestige {} ", icon),
@@ -208,8 +210,25 @@ pub(super) fn draw_prestige_info(
             spans
         }),
         Line::from(Span::styled(
-            unlock_hint,
-            Style::default().fg(Color::DarkGray),
+            if rift_hint {
+                format!(
+                    "Rift: {}/30 \u{00b7} The Expanse responds to prestige",
+                    rift_resonance
+                )
+            } else {
+                unlock_hint
+            },
+            if rift_hint {
+                let millis = current_millis();
+                let phase = (millis % 3200) as f64 / 3200.0 * std::f64::consts::TAU;
+                let t = (phase.sin() + 1.0) / 2.0;
+                let r = (60.0 + t * 120.0) as u8;
+                let g = (0.0 + t * 80.0) as u8;
+                let b = (100.0 + t * 155.0) as u8;
+                Style::default().fg(Color::Rgb(r, g, b))
+            } else {
+                Style::default().fg(Color::DarkGray)
+            },
         )),
     ];
 

@@ -11,17 +11,19 @@ pub enum AchievementCategory {
     Progression,
     Challenges,
     Exploration,
+    Deep,
     Stats,
 }
 
 impl AchievementCategory {
     /// All categories in display order.
-    pub const ALL: [AchievementCategory; 6] = [
+    pub const ALL: [AchievementCategory; 7] = [
         AchievementCategory::Combat,
         AchievementCategory::Level,
         AchievementCategory::Progression,
         AchievementCategory::Challenges,
         AchievementCategory::Exploration,
+        AchievementCategory::Deep,
         AchievementCategory::Stats,
     ];
 
@@ -33,6 +35,7 @@ impl AchievementCategory {
             AchievementCategory::Progression => "Progression",
             AchievementCategory::Challenges => "Challenges",
             AchievementCategory::Exploration => "Exploration",
+            AchievementCategory::Deep => "The Deep",
             AchievementCategory::Stats => "Stats",
         }
     }
@@ -219,6 +222,27 @@ pub enum AchievementId {
     SoulforgeAscendant,   // Reach +10 on any slot
     SoulConvergence,      // Reach +7 on all 7 slots
     PersistentHammering,  // 100 total enhancement attempts
+
+    // The Deep achievements
+    TheDeepDiscovered,    // Discover The Deep
+    FirstMissionComplete, // Complete first mission
+    DeepMissionsX,        // Complete 10 missions
+    DeepMissionsXXV,      // Complete 25 missions
+    DeepMissionsL,        // Complete 50 missions
+    DeepMissionsC,        // Complete 100 missions
+    FirstBreakthrough,    // Complete first breakthrough mission
+    Layer5Cleared,        // Reach Layer 5
+    Layer10Cleared,       // Reach Layer 10
+    Layer15Cleared,       // Reach Layer 15
+    Layer20Cleared,       // Reach Layer 20
+    Layer25Cleared,       // Reach Layer 25 (The Abyss)
+    VoidExplorer,         // Reach Layer 26 (The Void)
+    GuildRank2,           // Reach Guild Rank 2 (Company)
+    GuildRank3,           // Reach Guild Rank 3 (Battalion)
+    GuildRank4,           // Reach Guild Rank 4 (Legion)
+    GuildRank5,           // Reach Guild Rank 5 (Vanguard)
+    FirstMercLost,        // Lose a mercenary for the first time
+    GatewayOpened,        // Opened the Gateway beneath the world
 }
 
 impl AchievementId {
@@ -233,7 +257,7 @@ impl AchievementId {
     /// automatically.
     // Used by `achievements::data` tests to verify ALL_ACHIEVEMENTS coverage.
     #[allow(dead_code)]
-    pub const VARIANT_COUNT: usize = 149;
+    pub const VARIANT_COUNT: usize = 168;
 }
 
 /// Static definition of an achievement.
@@ -447,6 +471,12 @@ pub struct Achievements {
     pub highest_fishing_rank: u32,
     pub zones_fully_cleared: u32,
     pub expanse_cycles_completed: u64,
+    #[serde(default)]
+    pub total_deep_missions_completed: u64,
+    #[serde(default)]
+    pub highest_deep_layer: u32,
+    #[serde(default)]
+    pub highest_guild_rank: u32,
     /// Global border style applied to panel UI.
     #[serde(default)]
     pub ui_border_style: UiBorderStyle,
@@ -510,6 +540,7 @@ mod tests {
         assert_eq!(AchievementCategory::Progression.name(), "Progression");
         assert_eq!(AchievementCategory::Challenges.name(), "Challenges");
         assert_eq!(AchievementCategory::Exploration.name(), "Exploration");
+        assert_eq!(AchievementCategory::Deep.name(), "The Deep");
         assert_eq!(AchievementCategory::Stats.name(), "Stats");
     }
 

@@ -2,6 +2,7 @@
 //!
 //! Extracts the input dispatch logic from main.rs into a clean priority chain.
 
+mod deep_input;
 mod haven_input;
 mod minigame_input;
 mod prestige_input;
@@ -20,10 +21,12 @@ use crate::achievements::get_achievements_by_category;
 use crate::challenges::menu::{process_input as process_menu_input, MenuInput};
 use crate::character::prestige::can_prestige;
 use crate::core::game_state::GameState;
+use crate::deep::types::{DeepState, DeepUiState};
 use crate::enhancement;
 use crate::haven::Haven;
 use crate::stormglass::types::ExchangeUiState;
 use crate::utils::debug_menu::DebugMenu;
+use deep_input::handle_deep;
 use haven_input::handle_haven;
 use minigame_input::handle_minigame;
 use prestige_input::{handle_prestige_confirm, handle_vault_selection};
@@ -41,6 +44,8 @@ pub fn handle_game_input(
     haven_ui: &mut HavenUiState,
     soulforge_ui: &mut SoulforgeUiState,
     exchange_ui: &mut ExchangeUiState,
+    deep_state: &mut DeepState,
+    deep_ui: &mut DeepUiState,
     enhancement: &mut enhancement::EnhancementProgress,
     overlay: &mut GameOverlay,
     debug_menu: &mut DebugMenu,
@@ -57,6 +62,14 @@ pub fn handle_game_input(
     if matches!(overlay, GameOverlay::LeviathanEncounter { .. }) {
         if matches!(key.code, KeyCode::Enter) {
             *overlay = GameOverlay::None;
+        }
+        return InputResult::Continue;
+    }
+
+    // 0.4. Deep story event modal (Enter or Esc dismisses)
+    if deep_ui.pending_story_stage.is_some() {
+        if matches!(key.code, KeyCode::Enter | KeyCode::Esc) {
+            deep_ui.pending_story_stage = None;
         }
         return InputResult::Continue;
     }
@@ -211,6 +224,11 @@ pub fn handle_game_input(
         return handle_achievement_unlocked(key, overlay);
     }
 
+    // 1d. Deep discovery modal (blocks all other input)
+    if matches!(overlay, GameOverlay::DeepDiscovery) {
+        return handle_deep_discovery(key, overlay);
+    }
+
     // 2. Haven screen (blocks other input when open)
     if haven_ui.showing {
         return handle_haven(key, state, haven, haven_ui, achievements);
@@ -226,14 +244,19 @@ pub fn handle_game_input(
         return handle_stormglass_exchange(key, exchange_ui, state);
     }
 
+    // 2.8. The Deep overlay
+    if deep_ui.open {
+        return handle_deep(key, deep_state, deep_ui, state, achievements);
+    }
+
     // 3. Vault item selection
     if matches!(overlay, GameOverlay::VaultSelection { .. }) {
-        return handle_vault_selection(key, state, haven, overlay);
+        return handle_vault_selection(key, state, haven, deep_state, deep_ui, overlay);
     }
 
     // 4. Prestige confirmation
     if matches!(overlay, GameOverlay::PrestigeConfirm) {
-        return handle_prestige_confirm(key, state, haven, overlay);
+        return handle_prestige_confirm(key, state, haven, deep_state, deep_ui, overlay);
     }
 
     // 4.5. Quit confirmation (pending challenges warning)
@@ -259,6 +282,7 @@ pub fn handle_game_input(
                 state,
                 haven,
                 enhancement,
+                deep_state,
                 achievements,
                 overlay,
                 debug_menu,
@@ -290,6 +314,8 @@ pub fn handle_game_input(
         haven_ui,
         soulforge_ui,
         exchange_ui,
+        deep_state,
+        deep_ui,
         enhancement,
         overlay,
         achievements,
@@ -311,6 +337,13 @@ fn handle_soulforge_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> Input
 }
 
 fn handle_stormglass_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
+    if matches!(key.code, KeyCode::Enter | KeyCode::Esc) {
+        *overlay = GameOverlay::None;
+    }
+    InputResult::Continue
+}
+
+fn handle_deep_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
     if matches!(key.code, KeyCode::Enter | KeyCode::Esc) {
         *overlay = GameOverlay::None;
     }
@@ -350,11 +383,13 @@ fn handle_bug_report_overlay(key: KeyEvent, overlay: &mut GameOverlay) -> InputR
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_debug_menu(
     key: KeyEvent,
     state: &mut GameState,
     haven: &mut Haven,
     enhancement: &mut enhancement::EnhancementProgress,
+    deep: &mut crate::deep::DeepState,
     achievements: &mut crate::achievements::Achievements,
     overlay: &mut GameOverlay,
     debug_menu: &mut DebugMenu,
@@ -365,7 +400,7 @@ fn handle_debug_menu(
         KeyCode::Up => debug_menu.navigate_up(),
         KeyCode::Down => debug_menu.navigate_down(),
         KeyCode::Enter => {
-            let msg = debug_menu.trigger_selected(state, haven, enhancement, achievements);
+            let msg = debug_menu.trigger_selected(state, haven, enhancement, deep, achievements);
             state
                 .combat_state
                 .add_log_entry(format!("[DEBUG] {}", msg), false, true);
@@ -376,6 +411,8 @@ fn handle_debug_menu(
                 *overlay = GameOverlay::SoulforgeDiscovery;
             } else if msg == "Stormglass discovered!" {
                 *overlay = GameOverlay::StormglassDiscovery;
+            } else if msg == "The Deep discovered!" {
+                *overlay = GameOverlay::DeepDiscovery;
             }
         }
         KeyCode::Esc => debug_menu.close(),
@@ -405,6 +442,8 @@ fn handle_base_game(
     haven_ui: &mut HavenUiState,
     soulforge_ui: &mut SoulforgeUiState,
     exchange_ui: &mut ExchangeUiState,
+    deep_state: &mut DeepState,
+    deep_ui: &mut DeepUiState,
     enhancement: &enhancement::EnhancementProgress,
     overlay: &mut GameOverlay,
     achievements: &mut crate::achievements::Achievements,
@@ -439,6 +478,19 @@ fn handle_base_game(
         KeyCode::Char('g') | KeyCode::Char('G') => {
             if state.stormglass_discovered {
                 exchange_ui.open();
+            }
+            InputResult::Continue
+        }
+        KeyCode::Char('d') | KeyCode::Char('D') => {
+            if deep_state.persistent.discovered {
+                deep_ui.open();
+            } else if deep_state.persistent.deep_story_stage >= crate::deep::STORY_STAGE_ENTRANCE {
+                // Narrative discovery: story chain reached stage 4 (The Entrance).
+                // Player presses [D] to complete discovery and descend.
+                crate::deep::complete_story_discovery(deep_state, &mut rand::rng());
+                achievements.on_deep_discovered(Some(&state.character_name));
+                deep_ui.open();
+                return InputResult::NeedsSave;
             }
             InputResult::Continue
         }

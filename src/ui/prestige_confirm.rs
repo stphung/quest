@@ -12,13 +12,15 @@ use ratatui::{
 pub fn draw_prestige_confirm(
     frame: &mut Frame,
     game_state: &GameState,
+    rift_hint: bool,
     _ctx: &super::responsive::LayoutContext,
 ) {
     let size = frame.area();
 
     // Calculate dialog size and position (centered)
     let dialog_width = 50.min(size.width.saturating_sub(4));
-    let dialog_height = 18.min(size.height.saturating_sub(4));
+    let base_height: u16 = if rift_hint { 19 } else { 18 };
+    let dialog_height = base_height.min(size.height.saturating_sub(4));
 
     let x = (size.width.saturating_sub(dialog_width)) / 2;
     let y = (size.height.saturating_sub(dialog_height)) / 2;
@@ -94,8 +96,25 @@ pub fn draw_prestige_confirm(
             ),
         ]),
         Line::from(""),
-        Line::from(""),
     ];
+
+    if rift_hint {
+        let millis = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis();
+        let phase = (millis % 3200) as f64 / 3200.0 * std::f64::consts::TAU;
+        let t = (phase.sin() + 1.0) / 2.0;
+        let r = (60.0 + t * 120.0) as u8;
+        let g = (0.0 + t * 80.0) as u8;
+        let b = (100.0 + t * 155.0) as u8;
+        lines.push(Line::from(Span::styled(
+            "The Rift will remember this.",
+            Style::default().fg(Color::Rgb(r, g, b)),
+        )));
+    }
+
+    lines.push(Line::from(""));
 
     // Add button hints
     lines.push(Line::from(vec![
