@@ -371,6 +371,7 @@ fn initialize_state(
         total_marks_earned: 0,
         total_missions_completed: 0,
         total_mercs_lost: 0,
+        pool_refreshed_at: None,
     };
 
     // Generate initial mission pool.

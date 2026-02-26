@@ -14,12 +14,14 @@ pub fn resolve_deep_offline(
         return;
     }
 
+    let mut rng = rand::rng();
+
     let now = chrono::Utc::now();
     let summary = crate::deep::missions::tick_all_missions(
         &mut deep.prestige,
         &mut deep.persistent,
         now,
-        &mut rand::rng(),
+        &mut rng,
     );
 
     // Fire achievement handlers
@@ -35,6 +37,15 @@ pub fn resolve_deep_offline(
     if summary.gateway_opened {
         achievements.on_deep_gateway_opened(Some(character_name));
     }
+
+    // After offline resolution, refresh the mission pool if stale or empty.
+    // This ensures players always have missions available when they return.
+    crate::deep::missions::maybe_refresh_mission_pool(
+        &mut deep.prestige,
+        &deep.persistent,
+        now,
+        &mut rng,
+    );
 }
 
 /// Process offline XP and add combat log entries. Returns the report if XP was gained.
