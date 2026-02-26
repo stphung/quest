@@ -1268,6 +1268,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Discover The Deep mercenary guild",
         category: AchievementCategory::Deep,
         icon: "\u{2693}",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::FirstMissionComplete,
@@ -1275,6 +1276,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Complete your first Deep mission",
         category: AchievementCategory::Deep,
         icon: "\u{1F4DC}",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::DeepMissionsX,
@@ -1282,6 +1284,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Complete 10 Deep missions",
         category: AchievementCategory::Deep,
         icon: "\u{1F4DC}",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::DeepMissionsXXV,
@@ -1289,6 +1292,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Complete 25 Deep missions",
         category: AchievementCategory::Deep,
         icon: "\u{1F4DC}",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::DeepMissionsL,
@@ -1296,6 +1300,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Complete 50 Deep missions",
         category: AchievementCategory::Deep,
         icon: "\u{1F4DC}",
+        points: 100,
     },
     AchievementDef {
         id: AchievementId::DeepMissionsC,
@@ -1303,6 +1308,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Complete 100 Deep missions",
         category: AchievementCategory::Deep,
         icon: "\u{1F4DC}",
+        points: 250,
     },
     AchievementDef {
         id: AchievementId::FirstBreakthrough,
@@ -1310,6 +1316,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Complete your first breakthrough mission in The Deep",
         category: AchievementCategory::Deep,
         icon: "\u{2B50}",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::Layer5Cleared,
@@ -1317,6 +1324,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach Layer 5 of The Deep",
         category: AchievementCategory::Deep,
         icon: "\u{1F5FA}",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::Layer10Cleared,
@@ -1324,6 +1332,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach Layer 10 of The Deep",
         category: AchievementCategory::Deep,
         icon: "\u{1F5FA}",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::Layer15Cleared,
@@ -1331,6 +1340,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach Layer 15 of The Deep",
         category: AchievementCategory::Deep,
         icon: "\u{1F5FA}",
+        points: 100,
     },
     AchievementDef {
         id: AchievementId::Layer20Cleared,
@@ -1338,6 +1348,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach Layer 20 of The Deep",
         category: AchievementCategory::Deep,
         icon: "\u{1F5FA}",
+        points: 250,
     },
     AchievementDef {
         id: AchievementId::Layer25Cleared,
@@ -1345,6 +1356,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach Layer 25 of The Deep \u{2014} the true abyss opens before you",
         category: AchievementCategory::Deep,
         icon: "\u{1F30C}",
+        points: 500,
     },
     AchievementDef {
         id: AchievementId::GuildRank2,
@@ -1352,6 +1364,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach Guild Rank 2 (Company)",
         category: AchievementCategory::Deep,
         icon: "\u{2694}\u{fe0f}",
+        points: 25,
     },
     AchievementDef {
         id: AchievementId::GuildRank3,
@@ -1359,6 +1372,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach Guild Rank 3 (Battalion)",
         category: AchievementCategory::Deep,
         icon: "\u{2694}\u{fe0f}",
+        points: 50,
     },
     AchievementDef {
         id: AchievementId::GuildRank4,
@@ -1366,6 +1380,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach Guild Rank 4 (Legion)",
         category: AchievementCategory::Deep,
         icon: "\u{2694}\u{fe0f}",
+        points: 100,
     },
     AchievementDef {
         id: AchievementId::GuildRank5,
@@ -1373,6 +1388,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Reach Guild Rank 5 (Vanguard) \u{2014} you command the finest in The Deep",
         category: AchievementCategory::Deep,
         icon: "\u{1F451}",
+        points: 250,
     },
     AchievementDef {
         id: AchievementId::FirstMercLost,
@@ -1380,6 +1396,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Lose a mercenary in The Deep",
         category: AchievementCategory::Deep,
         icon: "\u{1FAA6}",
+        points: 10,
     },
     AchievementDef {
         id: AchievementId::GatewayOpened,
@@ -1387,6 +1404,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         description: "Opened the Gateway beneath the world",
         category: AchievementCategory::Deep,
         icon: "\u{1F6AA}",
+        points: 500,
     },
 ];
 
