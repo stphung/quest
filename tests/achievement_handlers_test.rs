@@ -442,6 +442,44 @@ fn test_fisherman_iv_at_rank_40() {
 }
 
 // =========================================================================
+// Fishing rank from challenge rewards — regression test for bug where
+// challenge rewards granting fishing ranks didn't trigger achievements
+// =========================================================================
+
+#[test]
+fn test_fishing_rank_40_from_challenge_reward_unlocks_fisherman_iv() {
+    // Simulates the flow in track_input_achievements: if fishing rank changed
+    // after input (e.g., challenge reward), on_fishing_rank_up should be called.
+    let mut ach = Achievements::default();
+
+    // Before challenge: rank 36, no FishermanIV
+    ach.on_fishing_rank_up(36, Some("Hero"));
+    assert!(!ach.is_unlocked(AchievementId::FishermanIV));
+    assert!(ach.is_unlocked(AchievementId::FishermanIII)); // rank 30+ unlocked
+
+    // Challenge reward bumps rank to 40 — on_fishing_rank_up should be called
+    ach.on_fishing_rank_up(40, Some("Hero"));
+    assert!(ach.is_unlocked(AchievementId::FishermanIV));
+}
+
+#[test]
+fn test_sync_from_game_state_catches_missed_fishing_achievement() {
+    // Verifies the retroactive sync path: if a player already has rank 40
+    // but FishermanIV was never unlocked (the bug), sync_from_game_state
+    // should catch it on next character load.
+    let mut ach = Achievements::default();
+
+    // Before sync: not unlocked
+    assert!(!ach.is_unlocked(AchievementId::FishermanIV));
+
+    // Sync with fishing rank 40 (simulating character load)
+    ach.sync_from_game_state(100, 20, 40, 0, &[], Some("Hero"));
+
+    // After sync: should be unlocked
+    assert!(ach.is_unlocked(AchievementId::FishermanIV));
+}
+
+// =========================================================================
 // on_fish_caught — Fish catch counter milestones
 // =========================================================================
 
