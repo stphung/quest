@@ -1,5 +1,6 @@
 //! Prestige and fishing panel rendering helpers for the stats panel.
 
+use crate::achievements::AchievementId;
 use crate::character::attributes::AttributeType;
 use crate::character::derived_stats::DerivedStats;
 use crate::character::prestige::{get_next_prestige_tier, get_prestige_tier};
@@ -347,7 +348,9 @@ pub(super) fn draw_fishing_panel(
     ]);
 
     let is_max_rank = game_state.fishing.rank as usize >= RANK_NAMES.len();
-    let show_leviathan_tracker = is_max_rank && game_state.fishing.rank >= 40;
+    let leviathan_caught = achievements.is_unlocked(AchievementId::StormLeviathan);
+    let show_leviathan_hunt = is_max_rank && game_state.fishing.rank >= 40 && !leviathan_caught;
+    let show_leviathan_trophy = is_max_rank && game_state.fishing.rank >= 40 && leviathan_caught;
 
     if inner.height >= 2 {
         let inner_chunks = Layout::default()
@@ -355,13 +358,24 @@ pub(super) fn draw_fishing_panel(
             .constraints([Constraint::Length(1), Constraint::Length(1)])
             .split(inner);
 
-        let rank_paragraph = Paragraph::new(rank_line);
-        frame.render_widget(rank_paragraph, inner_chunks[0]);
-
-        if show_leviathan_tracker {
+        if show_leviathan_hunt {
+            // Row 1: "Storm Leviathan Hunt" instead of rank
+            let hunt_line = Line::from(vec![Span::styled(
+                "🐋 Storm Leviathan Hunt",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )]);
+            frame.render_widget(Paragraph::new(hunt_line), inner_chunks[0]);
+            // Row 2: tracker with dots + charge bar
             let tracker_line = build_leviathan_tracker_line(&game_state.fishing);
-            let tracker = Paragraph::new(tracker_line);
-            frame.render_widget(tracker, inner_chunks[1]);
+            frame.render_widget(Paragraph::new(tracker_line), inner_chunks[1]);
+        } else if show_leviathan_trophy {
+            // Row 1: rank name
+            frame.render_widget(Paragraph::new(rank_line), inner_chunks[0]);
+            // Row 2: all dots filled + "Storm Leviathan ✓"
+            let trophy_line = build_leviathan_trophy_line();
+            frame.render_widget(Paragraph::new(trophy_line), inner_chunks[1]);
         } else {
             let fish_label = if is_max_rank {
                 "Max Rank".to_string()
@@ -469,6 +483,34 @@ fn build_leviathan_tracker_line(fishing: &FishingState) -> Line<'static> {
             ));
         }
     }
+
+    Line::from(spans)
+}
+
+/// Builds the Leviathan trophy line shown after the Leviathan has been caught.
+///
+/// Layout: `🐋 ● ● ● ● ● ● ● ● ● ●   Storm Leviathan ✓`
+fn build_leviathan_trophy_line() -> Line<'static> {
+    let mut spans: Vec<Span<'static>> = Vec::new();
+
+    // Whale prefix
+    spans.push(Span::styled(
+        "\u{1F40B} ",
+        Style::default().add_modifier(Modifier::BOLD),
+    ));
+
+    // All 10 dots filled
+    for _ in 0..10 {
+        spans.push(Span::styled("\u{25CF} ", Style::default().fg(Color::Cyan)));
+    }
+
+    spans.push(Span::raw("  "));
+    spans.push(Span::styled(
+        "Storm Leviathan \u{2713}",
+        Style::default()
+            .fg(Color::Green)
+            .add_modifier(Modifier::BOLD),
+    ));
 
     Line::from(spans)
 }
