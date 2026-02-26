@@ -599,70 +599,70 @@ const LEVIATHAN_ENCOUNTERS: [LeviathanEncounterData; 10] = [
         flavor: "Something disturbed the deep. A shadow vast as a ship passes beneath you. Before you can react, it vanishes into the abyss.",
         status: "UNTOUCHED",
         health_bar: "████████████████████",
-        lure_line: "Lure pulled into the depths",
+        lure_line: "\u{26A1} Lure pulled into the depths",
     },
     LeviathanEncounterData {
         title: "THE SHADOW",
         flavor: "The Leviathan surfaces for a heartbeat - scales like storm clouds, eyes like lightning. It knows you now. Then it's gone.",
         status: "AWARE",
         health_bar: "██████████████████░░",
-        lure_line: "Lure swallowed by the shadow",
+        lure_line: "\u{26A1} Lure swallowed by the shadow",
     },
     LeviathanEncounterData {
         title: "EMERGENCE",
         flavor: "It breaches! The beast roars - a sound like thunder over the waves. Your boat rocks violently as it dives deep.",
         status: "AGITATED",
         health_bar: "████████████████░░░░",
-        lure_line: "Lure torn away in the breach",
+        lure_line: "\u{26A1} Lure torn away in the breach",
     },
     LeviathanEncounterData {
         title: "KNOWN",
         flavor: "It circles your position. Watching. Waiting. This is no mere fish - it's deciding if YOU are worthy prey.",
         status: "HUNTING",
         health_bar: "██████████████░░░░░░",
-        lure_line: "Lure crushed in its jaws",
+        lure_line: "\u{26A1} Lure crushed in its jaws",
     },
     LeviathanEncounterData {
         title: "FIRST STRIKE",
         flavor: "Your hook finds flesh! The beast screams - a sound that will haunt your dreams. It dives, trailing darkness and blood.",
         status: "WOUNDED",
         health_bar: "████████████░░░░░░░░",
-        lure_line: "Lure shattered on impact",
+        lure_line: "\u{26A1} Lure shattered on impact",
     },
     LeviathanEncounterData {
         title: "FURY",
         flavor: "It rams your boat in rage! You barely hold on as waves crash over the deck. But in its fury, it expends precious strength.",
         status: "RAGING",
         health_bar: "██████████░░░░░░░░░░",
-        lure_line: "Lure lost in the chaos",
+        lure_line: "\u{26A1} Lure lost in the chaos",
     },
     LeviathanEncounterData {
         title: "BLOOD IN WATER",
         flavor: "Wounded and bleeding, it circles. You are both predator and prey now. Neither will yield. Neither can escape.",
         status: "BLEEDING",
         health_bar: "████████░░░░░░░░░░░░",
-        lure_line: "Lure dissolved in the churn",
+        lure_line: "\u{26A1} Lure dissolved in the churn",
     },
     LeviathanEncounterData {
         title: "THE LONG NIGHT",
         flavor: "Hours pass. The beast surfaces less often, its movements slower. Stars wheel overhead. Dawn approaches. You will not sleep until this ends.",
         status: "TIRING",
         health_bar: "██████░░░░░░░░░░░░░░",
-        lure_line: "Lure faded with the light",
+        lure_line: "\u{26A1} Lure faded with the light",
     },
     LeviathanEncounterData {
         title: "EXHAUSTION",
         flavor: "It can barely surface now. Each breath is labored, each dive shorter. Victory is close. You can taste it.",
         status: "EXHAUSTED",
         health_bar: "████░░░░░░░░░░░░░░░░",
-        lure_line: "Lure snapped from the line",
+        lure_line: "\u{26A1} Lure snapped from the line",
     },
     LeviathanEncounterData {
         title: "LEGEND",
         flavor: "With a final, defiant bellow, it succumbs. Your line holds. Your arms burn. But you've done the impossible.",
         status: "DEFEATED",
         health_bar: "██░░░░░░░░░░░░░░░░░░",
-        lure_line: "Lure spent \u{2014} the beast falls",
+        lure_line: "\u{26A1} Lure spent \u{2014} the beast falls",
     },
 ];
 
@@ -839,7 +839,7 @@ pub fn render_leviathan_catch_miss_modal(
 
     if lure_consumed {
         lines.push(Line::from(Span::styled(
-            "Lure dragged into the abyss",
+            "\u{26A1} Lure dragged into the abyss",
             Style::default()
                 .fg(Color::Rgb(80, 160, 220))
                 .add_modifier(Modifier::ITALIC),

@@ -203,17 +203,18 @@ fn test_tracking_persists_across_lure_purchases() {
 }
 
 #[test]
-fn test_miss_ramp_persists_when_lure_consumed_and_repurchased() {
-    // Miss ramp should persist even after lure consumed
+fn test_miss_ramp_resets_when_new_lure_purchased() {
+    // Miss ramp should reset to 0 when buying a new lure
     let mut state = rank40_state();
     state.fishing.storm_lure_active = false;
     state.fishing.lure_miss_ramp = 0.04; // built up from previous lure
 
-    // "Purchase" new lure
+    // "Purchase" new lure (mirrors stormglass_input.rs purchase handler)
     state.fishing.storm_lure_active = true;
+    state.fishing.lure_miss_ramp = 0.0;
 
-    // Miss ramp should still be there
-    assert!((state.fishing.lure_miss_ramp - 0.04).abs() < 0.001);
+    // Miss ramp should be reset
+    assert_eq!(state.fishing.lure_miss_ramp, 0.0);
 }
 
 #[test]
@@ -353,6 +354,7 @@ fn test_tick_multiple_catches_accumulate_tracking() {
 
         let mut rng = rng_from(seed);
         state.fishing.storm_lure_active = true; // re-buy lure after consumption
+        state.fishing.lure_miss_ramp = 0.0; // miss ramp resets on new lure purchase
         state.active_fishing = Some(reeling_1tick());
 
         let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven, 0.0);

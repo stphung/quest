@@ -165,7 +165,7 @@ const LEVIATHAN_MIN_RANK: u32 = 40;
 const LEVIATHAN_REQUIRED_ENCOUNTERS: u8 = 10;
 
 /// Chance to catch the Leviathan after completing all encounters (25%)
-const LEVIATHAN_CATCH_CHANCE: f64 = 0.25;
+pub const LEVIATHAN_CATCH_CHANCE: f64 = 0.25;
 
 /// Progressive encounter chances for the Storm Leviathan hunt.
 /// Narrative arc: elusive opening, the beast grows bold mid-hunt, tightening finale.

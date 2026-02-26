@@ -452,6 +452,7 @@ fn handle_storm_lure_confirm(
             if state.stormglass >= STORM_LURE_COST && !state.fishing.storm_lure_active {
                 state.stormglass -= STORM_LURE_COST;
                 state.fishing.storm_lure_active = true;
+                state.fishing.lure_miss_ramp = 0.0;
                 exchange_ui.close();
             }
             InputResult::Continue
