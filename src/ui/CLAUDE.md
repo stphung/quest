@@ -34,7 +34,6 @@ src/ui/
 ├── achievement_tabs.rs         # Achievement browser category tabs
 ├── title_browser_scene.rs      # Title browser overlay (select display title from unlocked achievements)
 ├── debug_menu_scene.rs         # Debug menu overlay with tabbed categories (Challenges, World, Resources, Items)
-├── help_overlay.rs             # Help/controls overlay
 ├── bug_report_scene.rs         # Bug report overlay with game-state preview and clipboard status
 │
 ├── challenge_menu_scene.rs     # Challenge menu list/detail view
@@ -77,7 +76,7 @@ Terminal size is classified into 5 tiers, computed once per frame in a `LayoutCo
 `LayoutContext` tracks independent `width_tier` and `height_tier` plus an effective `tier = min(width, height)`. Raw `cols`/`rows` are also available for fine-grained decisions.
 
 Layout dispatch in `draw_ui_with_update()`:
-- **XL/L**: `draw_xl_l_layout()` — full 2-column with zone info, info panels, footer, optional update drawer
+- **XL/L**: `draw_xl_l_layout()` — full 2-column with zone info, info panels, footer
 - **M**: `draw_m_layout()` — compact stats bar + optional attributes + XP bar + full-width activity + compact info + footer
 - **S**: `draw_s_layout()` — minimal text: status line + XP + player HP + enemy HP + combat status + merged feed + footer. Special activities (minigames, fishing, dungeons) get nearly full screen.
 
