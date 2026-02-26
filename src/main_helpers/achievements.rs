@@ -34,7 +34,7 @@ pub fn log_synced_achievements(
     }
 }
 
-/// Track achievements that may have changed from input handling (prestige, minigame wins).
+/// Track achievements that may have changed from input handling (prestige, fishing rank, minigame wins).
 /// Saving is handled by the caller via save_all().
 ///
 /// # Why this lives outside tick.rs (R4 skip rationale)
@@ -62,9 +62,16 @@ pub fn track_input_achievements(
     state: &mut GameState,
     global_achievements: &mut achievements::Achievements,
     prestige_before: u32,
+    fishing_rank_before: u32,
 ) {
     if state.prestige_rank > prestige_before {
         global_achievements.on_prestige(state.prestige_rank, Some(&state.character_name));
+    }
+
+    // Challenge rewards can grant fishing ranks directly without going through
+    // the normal fishing tick path, so check for rank changes here.
+    if state.fishing.rank > fishing_rank_before {
+        global_achievements.on_fishing_rank_up(state.fishing.rank, Some(&state.character_name));
     }
 
     if let Some(ref win_info) = state.last_minigame_win {
