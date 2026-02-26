@@ -210,6 +210,7 @@ fn test_fishing_rank_up_respects_haven_max_rank() {
         fish_toward_next_rank: 5000,
         legendary_catches: 0,
         leviathan_encounters: 0,
+        ..Default::default()
     };
 
     // Without Haven bonus, can't rank past 30

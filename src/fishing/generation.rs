@@ -190,6 +190,8 @@ pub enum LeviathanResult {
     None,
     /// Leviathan appeared but escaped (encounter, not caught yet)
     Escaped { encounter_number: u8 },
+    /// Leviathan appeared in catch phase but wasn't caught (lure tracking)
+    CatchMiss,
     /// Leviathan was finally caught after all encounters
     Caught,
 }
@@ -199,10 +201,15 @@ pub enum LeviathanResult {
 /// At rank 40+, legendary fish have a progressive chance to trigger a Storm Leviathan
 /// encounter. The beast must be encountered 10 times before it can be caught.
 /// Each encounter has a decreasing chance, making the hunt take roughly a month.
+///
+/// `lure_encounter_bonus` — combined tracking + miss_ramp bonus for encounter phase
+/// `lure_catch_bonus` — combined tracking + miss_ramp bonus for catch phase
 pub fn generate_fish_with_rank(
     rarity: FishRarity,
     rank: u32,
     leviathan_encounters: u8,
+    lure_encounter_bonus: f64,
+    lure_catch_bonus: f64,
     rng: &mut impl Rng,
 ) -> (CaughtFish, LeviathanResult) {
     // Early exit: Leviathan only appears for legendary fish at rank 40+
@@ -212,7 +219,8 @@ pub fn generate_fish_with_rank(
 
     // After 10 encounters, chance to catch
     if leviathan_encounters >= LEVIATHAN_REQUIRED_ENCOUNTERS {
-        if rng.random::<f64>() < LEVIATHAN_CATCH_CHANCE {
+        let catch_chance = (LEVIATHAN_CATCH_CHANCE + lure_catch_bonus).min(1.0);
+        if rng.random::<f64>() < catch_chance {
             let xp_reward = rng.random_range(STORM_LEVIATHAN_XP.0..=STORM_LEVIATHAN_XP.1);
             return (
                 CaughtFish {
@@ -223,11 +231,16 @@ pub fn generate_fish_with_rank(
                 LeviathanResult::Caught,
             );
         }
+        // Leviathan appeared but wasn't caught — signal CatchMiss if lure bonus active
+        if lure_catch_bonus > 0.0 {
+            return (generate_fish(rarity, rng), LeviathanResult::CatchMiss);
+        }
         return (generate_fish(rarity, rng), LeviathanResult::None);
     }
 
     // Progressive encounter roll
-    let encounter_chance = LEVIATHAN_ENCOUNTER_CHANCES[leviathan_encounters as usize];
+    let encounter_chance =
+        LEVIATHAN_ENCOUNTER_CHANCES[leviathan_encounters as usize] + lure_encounter_bonus;
     if rng.random::<f64>() < encounter_chance {
         let fish = generate_fish(rarity, rng);
         return (
@@ -585,7 +598,8 @@ mod tests {
             FishRarity::Epic,
         ] {
             for encounters in 0..=10 {
-                let (fish, result) = generate_fish_with_rank(rarity, 40, encounters, &mut rng);
+                let (fish, result) =
+                    generate_fish_with_rank(rarity, 40, encounters, 0.0, 0.0, &mut rng);
                 assert_eq!(result, LeviathanResult::None);
                 assert_eq!(fish.rarity, rarity);
             }
@@ -600,7 +614,7 @@ mod tests {
         for rank in [1, 10, 20, 30, 39] {
             for _ in 0..100 {
                 let (fish, result) =
-                    generate_fish_with_rank(FishRarity::Legendary, rank, 0, &mut rng);
+                    generate_fish_with_rank(FishRarity::Legendary, rank, 0, 0.0, 0.0, &mut rng);
                 assert_eq!(
                     result,
                     LeviathanResult::None,
@@ -622,7 +636,8 @@ mod tests {
         // Run enough times to get some encounters
         let mut encountered = false;
         for _ in 0..1000 {
-            let (_, result) = generate_fish_with_rank(FishRarity::Legendary, 40, 0, &mut rng);
+            let (_, result) =
+                generate_fish_with_rank(FishRarity::Legendary, 40, 0, 0.0, 0.0, &mut rng);
             if let LeviathanResult::Escaped { encounter_number } = result {
                 assert_eq!(encounter_number, 1, "First encounter should be number 1");
                 encountered = true;
@@ -642,7 +657,8 @@ mod tests {
         // With 10 encounters complete, there's a 25% chance to catch
         let mut caught = false;
         for _ in 0..1000 {
-            let (fish, result) = generate_fish_with_rank(FishRarity::Legendary, 40, 10, &mut rng);
+            let (fish, result) =
+                generate_fish_with_rank(FishRarity::Legendary, 40, 10, 0.0, 0.0, &mut rng);
             if result == LeviathanResult::Caught {
                 assert_eq!(fish.name, STORM_LEVIATHAN);
                 assert_eq!(fish.rarity, FishRarity::Legendary);

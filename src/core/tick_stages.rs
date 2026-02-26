@@ -304,6 +304,8 @@ pub fn process_fishing_tick<R: Rng>(
 
     // Leviathan encounter
     result.leviathan_encounter = fishing_result.leviathan_encounter;
+    result.leviathan_lure_consumed = fishing_result.lure_consumed;
+    result.leviathan_catch_miss = fishing_result.leviathan_catch_miss;
 
     // Update play time while fishing
     *tick_counter += 1;

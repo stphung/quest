@@ -66,6 +66,14 @@ pub fn handle_game_input(
         return InputResult::Continue;
     }
 
+    // 0.26. Storm Leviathan catch-miss modal (Enter dismisses)
+    if matches!(overlay, GameOverlay::LeviathanCatchMiss { .. }) {
+        if matches!(key.code, KeyCode::Enter) {
+            *overlay = GameOverlay::None;
+        }
+        return InputResult::Continue;
+    }
+
     // 0.4. Deep story event modal (Enter or Esc dismisses)
     if deep_ui.pending_story_stage.is_some() {
         if matches!(key.code, KeyCode::Enter | KeyCode::Esc) {

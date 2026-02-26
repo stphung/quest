@@ -1780,7 +1780,11 @@ fn main() -> io::Result<()> {
                         if chrono_surge.is_none()
                             && last_tick.elapsed() >= Duration::from_millis(TICK_INTERVAL_MS)
                         {
-                            if !matches!(overlay, GameOverlay::LeviathanEncounter { .. }) {
+                            if !matches!(
+                                overlay,
+                                GameOverlay::LeviathanEncounter { .. }
+                                    | GameOverlay::LeviathanCatchMiss { .. }
+                            ) {
                                 let mut rng = rand::rng();
                                 let tick_result = core::tick::game_tick(
                                     &mut state,
@@ -1875,8 +1879,14 @@ fn main() -> io::Result<()> {
                                 if !vault_open {
                                     if let Some(encounter_number) = tick_result.leviathan_encounter
                                     {
-                                        overlay =
-                                            GameOverlay::LeviathanEncounter { encounter_number };
+                                        overlay = GameOverlay::LeviathanEncounter {
+                                            encounter_number,
+                                            lure_consumed: tick_result.leviathan_lure_consumed,
+                                        };
+                                    } else if tick_result.leviathan_catch_miss {
+                                        overlay = GameOverlay::LeviathanCatchMiss {
+                                            lure_consumed: tick_result.leviathan_lure_consumed,
+                                        };
                                     }
                                     if tick_flags.haven_discovered {
                                         overlay = GameOverlay::HavenDiscovery;

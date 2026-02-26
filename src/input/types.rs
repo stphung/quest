@@ -81,6 +81,11 @@ pub enum GameOverlay {
     /// Storm Leviathan encounter modal (fishing)
     LeviathanEncounter {
         encounter_number: u8,
+        lure_consumed: bool,
+    },
+    /// Storm Leviathan catch-miss modal (appeared but wasn't caught)
+    LeviathanCatchMiss {
+        lure_consumed: bool,
     },
     /// Stormglass discovery celebration modal
     StormglassDiscovery,

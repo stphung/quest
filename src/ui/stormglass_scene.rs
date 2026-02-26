@@ -3,7 +3,7 @@
 use crate::core::game_state::GameState;
 use crate::stormglass::types::{
     ChronoSurgeState, ChronoSurgeSummary, ExchangePhase, ExchangeUiState, CHRONO_SURGE_OPTIONS,
-    INVOKE_TRIAL_COST,
+    INVOKE_TRIAL_COST, STORM_LURE_COST,
 };
 use ratatui::{
     layout::{Alignment, Rect},
@@ -167,6 +167,7 @@ fn phase_overlay_rect(area: Rect, phase: ExchangePhase) -> Rect {
         ExchangePhase::ChronoSurge => centered_overlay_rect(area, 52, 16),
         ExchangePhase::SigilEtchConfirm => centered_overlay_rect(area, 52, 16),
         ExchangePhase::SigilsList => centered_overlay_rect(area, 52, 17),
+        ExchangePhase::StormLureConfirm => centered_overlay_rect(area, 52, 14),
     }
 }
 
@@ -382,6 +383,9 @@ pub fn render_stormglass_exchange(
             render_sigil_forfeit_confirm(frame, area);
         }
         ExchangePhase::SigilResult => render_sigil_result(frame, area, exchange_ui),
+        ExchangePhase::StormLureConfirm => {
+            render_storm_lure_confirm(frame, area, state);
+        }
     }
 
     // Special "menu row push" for entering Chrono/Sigils submenus from menu.
@@ -451,17 +455,17 @@ fn render_exchange_menu(
     // Clear particle chars from rows that will have text (preserves bg gradient)
     clear_row_chars(&mut buffer, 1); // flavor line 1 (rendered as widget overlay after buffer)
     clear_row_chars(&mut buffer, 2); // flavor line 2
-    for i in 0..3 {
+    for i in 0..4 {
         clear_row_chars(&mut buffer, 4 + i); // menu items
     }
-    clear_row_chars(&mut buffer, 8); // description line 1
-    clear_row_chars(&mut buffer, 9); // description line 2
+    clear_row_chars(&mut buffer, 9); // description line 1
+    clear_row_chars(&mut buffer, 10); // description line 2
     clear_row_chars(&mut buffer, (h as i32) - 1); // help
 
     // Menu items (rows 4-6): (display_text, cost_text, affordable)
     // Wide emoji icons (2 terminal cols) get 1 space before label;
     // narrow icons (1 terminal col) get 2 spaces — so labels align.
-    let items: [(&str, String, bool); 3] = [
+    let items: [(&str, String, bool); 4] = [
         (
             "\u{1F3B2} Invoke Challenge", // 🎲 (2-wide) + 1 space
             format!("{} SG", INVOKE_TRIAL_COST),
@@ -476,6 +480,13 @@ fn render_exchange_menu(
             "\u{16B1}  Etch Storm Sigils", // ᚱ (1-wide) + 2 spaces
             ">>>".to_string(),
             true,
+        ),
+        (
+            "\u{26A1}  Storm Lure", // ⚡ (1-wide) + 2 spaces
+            format!("{} SG", STORM_LURE_COST),
+            state.stormglass >= STORM_LURE_COST
+                && !state.fishing.storm_lure_active
+                && state.fishing.rank >= 40,
         ),
     ];
 
@@ -568,14 +579,15 @@ fn render_exchange_menu(
         frame.render_widget(flavor, flavor_area);
     }
 
-    // Description overlay (rows 8-9) — changes based on selected item
-    if h > 9 {
+    // Description overlay (rows 9-10) — changes based on selected item
+    if h > 10 {
         let desc = match exchange_ui.selected_item {
             0 => "Spend Stormglass to invoke a choice of three challenges.",
             1 => "Bend time itself. Earn XP and loot, but no Stormglass.",
-            _ => "Etch sigils of power onto your soul. Permanent bonuses.",
+            2 => "Etch sigils of power onto your soul. Permanent bonuses.",
+            _ => "Lure the Storm Leviathan from the deep. Consumed on encounter.",
         };
-        let desc_area = Rect::new(inner.x, inner.y + 8, inner.width, 2);
+        let desc_area = Rect::new(inner.x, inner.y + 9, inner.width, 2);
         let desc_widget = Paragraph::new(Span::styled(
             desc,
             Style::default()
@@ -2931,7 +2943,117 @@ fn render_sigil_forfeit_confirm(frame: &mut Frame, area: Rect) {
     frame.render_widget(text, inner);
 }
 
-/// Render the sigil result screen after inscribing.
+/// Render the Storm Lure purchase confirmation screen.
+fn render_storm_lure_confirm(frame: &mut Frame, area: Rect, state: &GameState) {
+    let overlay_width = 52u16.min(area.width.saturating_sub(4));
+    let overlay_height = 14u16.min(area.height.saturating_sub(2));
+    let x = area.x + (area.width.saturating_sub(overlay_width)) / 2;
+    let y = area.y + (area.height.saturating_sub(overlay_height)) / 2;
+    let overlay_area = Rect::new(x, y, overlay_width, overlay_height);
+
+    frame.render_widget(Clear, overlay_area);
+
+    let block = Block::default()
+        .title(Line::from(Span::styled(
+            " \u{26A1} Storm Lure? \u{26A1} ",
+            Style::default()
+                .fg(ELECTRIC_BLUE)
+                .add_modifier(Modifier::BOLD),
+        )))
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(super::themed_border_color(ELECTRIC_BLUE)));
+
+    let inner = super::render_themed_block(
+        frame,
+        overlay_area,
+        block,
+        ELECTRIC_BLUE,
+        super::BorderFxContext,
+    );
+
+    let w = inner.width as usize;
+    let h = inner.height as usize;
+    if w == 0 || h == 0 {
+        return;
+    }
+
+    let mut buffer = vec![vec![SceneCell::default(); w]; h];
+    let millis = current_millis();
+    paint_storm_backdrop(&mut buffer, millis, &StormBackdropParams::normal());
+
+    // Clear text rows
+    clear_row_chars(&mut buffer, 1);
+    clear_row_chars(&mut buffer, 2);
+    clear_row_chars(&mut buffer, 4);
+    clear_row_chars(&mut buffer, 5);
+    clear_row_chars(&mut buffer, 6);
+    clear_row_chars(&mut buffer, 7);
+    clear_row_chars(&mut buffer, 8);
+    clear_row_chars(&mut buffer, (h as i32) - 1);
+
+    // Balance / Cost / After (rows 4-6)
+    let balance = state.stormglass;
+    let after = balance.saturating_sub(STORM_LURE_COST);
+
+    let balance_str = format!("Balance:  {} SG", balance);
+    put_text(&mut buffer, 4, 4, &balance_str, Color::White);
+
+    let cost_str = format!("Cost:    -{} SG", STORM_LURE_COST);
+    put_text(&mut buffer, 5, 4, &cost_str, Color::LightRed);
+
+    let after_str = format!("After:    {} SG", after);
+    put_text(&mut buffer, 6, 4, &after_str, ELECTRIC_BLUE);
+
+    // Tracking / Miss bonus (row 8)
+    let tracking = format!(
+        "Tracking: +{:.1}%   Miss bonus: +{:.1}%",
+        state.fishing.lure_tracking_bonus * 100.0,
+        state.fishing.lure_miss_ramp * 100.0,
+    );
+    put_text_centered(&mut buffer, 8, w, &tracking, Color::Rgb(80, 160, 220));
+
+    // Help row
+    let help_row = (h as i32) - 1;
+    let help_y_col = 4i32;
+    put_text(&mut buffer, help_row, help_y_col, "[", Color::DarkGray);
+    put_text(&mut buffer, help_row, help_y_col + 1, "Y", Color::Green);
+    put_text(
+        &mut buffer,
+        help_row,
+        help_y_col + 2,
+        "] Confirm  [",
+        Color::DarkGray,
+    );
+    put_text(&mut buffer, help_row, help_y_col + 14, "N", Color::LightRed);
+    put_text(
+        &mut buffer,
+        help_row,
+        help_y_col + 15,
+        "] Cancel",
+        Color::DarkGray,
+    );
+
+    render_buffer(frame, inner, &buffer);
+
+    // Flavor text overlay (rows 1-2)
+    let pulse_t = ((millis as f64 / 2000.0).sin() * 0.5 + 0.5).clamp(0.0, 1.0);
+    let flavor_rgb = lerp_rgb((100, 140, 200), (150, 200, 255), pulse_t);
+    let flavor_fg = Color::Rgb(flavor_rgb.0, flavor_rgb.1, flavor_rgb.2);
+    if h > 2 {
+        let flavor_area = Rect::new(inner.x, inner.y + 1, inner.width, 2);
+        let flavor = Paragraph::new(Span::styled(
+            "Craft a Storm Lure to draw the Leviathan from the deep.",
+            Style::default()
+                .fg(flavor_fg)
+                .add_modifier(Modifier::ITALIC),
+        ))
+        .alignment(Alignment::Center)
+        .wrap(ratatui::widgets::Wrap { trim: true });
+        frame.render_widget(flavor, flavor_area);
+    }
+}
+
 fn render_sigil_result(frame: &mut Frame, area: Rect, exchange_ui: &ExchangeUiState) {
     let overlay_width = 52u16.min(area.width.saturating_sub(4));
     let overlay_height = 14u16.min(area.height.saturating_sub(2));

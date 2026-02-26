@@ -41,6 +41,10 @@ pub struct FishingTickResult {
     pub caught_storm_leviathan: bool,
     /// If set, a Leviathan encounter occurred (it escaped). Value is encounter number (1-10).
     pub leviathan_encounter: Option<u8>,
+    /// True if a catch miss happened in the catch phase (Leviathan appeared but wasn't caught)
+    pub leviathan_catch_miss: bool,
+    /// True if the Storm Lure was consumed this tick
+    pub lure_consumed: bool,
 }
 
 /// Processes a fishing session tick with phase-based timing.
@@ -113,24 +117,68 @@ pub fn tick_fishing_with_haven_result(
 
                 for fish_num in 0..fish_count {
                     let rarity = fishing_generation::roll_fish_rarity(state.fishing.rank, rng);
+
+                    // Calculate lure bonuses to pass to fish generation
+                    let (lure_enc_bonus, lure_catch_bonus) = if state.fishing.storm_lure_active {
+                        let bonus =
+                            state.fishing.lure_tracking_bonus + state.fishing.lure_miss_ramp;
+                        (bonus, bonus)
+                    } else {
+                        (0.0, 0.0)
+                    };
+
                     // Use rank-aware fish generation for Storm Leviathan hunt
                     let (fish, leviathan_result) = fishing_generation::generate_fish_with_rank(
                         rarity,
                         state.fishing.rank,
                         state.fishing.leviathan_encounters,
+                        lure_enc_bonus,
+                        lure_catch_bonus,
                         rng,
                     );
 
                     match leviathan_result {
                         LeviathanResult::Caught => {
                             result.caught_storm_leviathan = true;
+                            if state.fishing.storm_lure_active {
+                                state.fishing.storm_lure_active = false;
+                                state.fishing.lure_miss_ramp = 0.0;
+                                result.lure_consumed = true;
+                            }
                         }
                         LeviathanResult::Escaped { encounter_number } => {
                             // Increment encounters and signal modal should show
                             state.fishing.leviathan_encounters = encounter_number;
                             result.leviathan_encounter = Some(encounter_number);
+                            if state.fishing.storm_lure_active {
+                                state.fishing.storm_lure_active = false;
+                                state.fishing.lure_tracking_bonus += 0.015; // +1.5% tracking
+                                state.fishing.lure_miss_ramp = 0.0; // reset miss ramp
+                                result.lure_consumed = true;
+                            }
                         }
-                        LeviathanResult::None => {}
+                        LeviathanResult::CatchMiss => {
+                            // Leviathan appeared during catch phase but wasn't caught
+                            result.leviathan_catch_miss = true;
+                            if state.fishing.storm_lure_active {
+                                state.fishing.storm_lure_active = false;
+                                // Miss ramp increases (persists even without lure)
+                                state.fishing.lure_miss_ramp =
+                                    (state.fishing.lure_miss_ramp + 0.005).min(0.10);
+                                result.lure_consumed = true;
+                            }
+                        }
+                        LeviathanResult::None => {
+                            // In encounter phase: if legendary at rank 40+ with lure, no encounter → miss ramp
+                            if rarity == FishRarity::Legendary
+                                && state.fishing.rank >= 40
+                                && state.fishing.storm_lure_active
+                                && state.fishing.leviathan_encounters < 10
+                            {
+                                state.fishing.lure_miss_ramp =
+                                    (state.fishing.lure_miss_ramp + 0.005).min(0.10);
+                            }
+                        }
                     }
 
                     // Calculate XP with prestige multiplier
@@ -404,6 +452,7 @@ mod tests {
             fish_toward_next_rank: 100, // Exactly at threshold for rank 1 (requires 100)
             legendary_catches: 0,
             leviathan_encounters: 0,
+            ..Default::default()
         };
 
         let result = check_rank_up(&mut fishing_state);
@@ -424,6 +473,7 @@ mod tests {
             fish_toward_next_rank: 120, // 20 excess
             legendary_catches: 0,
             leviathan_encounters: 0,
+            ..Default::default()
         };
 
         let result = check_rank_up(&mut fishing_state);
@@ -444,6 +494,7 @@ mod tests {
             fish_toward_next_rank: 50, // Only halfway to 100
             legendary_catches: 0,
             leviathan_encounters: 0,
+            ..Default::default()
         };
 
         let result = check_rank_up(&mut fishing_state);
@@ -464,6 +515,7 @@ mod tests {
             fish_toward_next_rank: 5000, // Way more than enough to rank up
             legendary_catches: 100,
             leviathan_encounters: 0,
+            ..Default::default()
         };
 
         let result = check_rank_up(&mut fishing_state);
@@ -1094,6 +1146,7 @@ mod tests {
             fish_toward_next_rank: 4000, // Enough for rank 31 (requires 4000)
             legendary_catches: 100,
             leviathan_encounters: 0,
+            ..Default::default()
         };
 
         // With max_rank=30, should NOT rank up past 30
@@ -1125,6 +1178,7 @@ mod tests {
                 fish_toward_next_rank: required,
                 legendary_catches: 0,
                 leviathan_encounters: 0,
+                ..Default::default()
             };
 
             let result = check_rank_up_with_max(&mut fishing_state, 40);
