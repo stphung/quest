@@ -236,6 +236,7 @@ pub enum AchievementId {
     Layer15Cleared,       // Reach Layer 15
     Layer20Cleared,       // Reach Layer 20
     Layer25Cleared,       // Reach Layer 25 (The Abyss)
+    VoidExplorer,         // Reach Layer 26 (The Void)
     GuildRank2,           // Reach Guild Rank 2 (Company)
     GuildRank3,           // Reach Guild Rank 3 (Battalion)
     GuildRank4,           // Reach Guild Rank 4 (Legion)
@@ -256,7 +257,7 @@ impl AchievementId {
     /// automatically.
     // Used by `achievements::data` tests to verify ALL_ACHIEVEMENTS coverage.
     #[allow(dead_code)]
-    pub const VARIANT_COUNT: usize = 167;
+    pub const VARIANT_COUNT: usize = 168;
 }
 
 /// Static definition of an achievement.

@@ -1472,13 +1472,7 @@ fn test_guild_rank_next_and_can_advance() {
 
 #[test]
 fn test_guild_rank_display_names_all_defined() {
-    let names = [
-        "Freelancers",
-        "Sellswords",
-        "Company",
-        "Battalion",
-        "Legion",
-    ];
+    let names = ["Freelancers", "Company", "Battalion", "Legion", "Vanguard"];
     for (i, &expected) in names.iter().enumerate() {
         assert_eq!(
             GuildRank(i as u8 + 1).display_name(),

@@ -182,10 +182,10 @@ fn test_breakthrough_has_most_events() {
 #[test]
 fn test_guild_rank_display_names() {
     assert_eq!(GuildRank(1).display_name(), "Freelancers");
-    assert_eq!(GuildRank(2).display_name(), "Sellswords");
-    assert_eq!(GuildRank(3).display_name(), "Company");
-    assert_eq!(GuildRank(4).display_name(), "Battalion");
-    assert_eq!(GuildRank(5).display_name(), "Legion");
+    assert_eq!(GuildRank(2).display_name(), "Company");
+    assert_eq!(GuildRank(3).display_name(), "Battalion");
+    assert_eq!(GuildRank(4).display_name(), "Legion");
+    assert_eq!(GuildRank(5).display_name(), "Vanguard");
 }
 
 #[test]
@@ -199,7 +199,7 @@ fn test_guild_rank_roster_caps_match_design() {
 
 #[test]
 fn test_guild_rank_concurrent_mission_slots_match_design() {
-    // Freelancers: 1 slot.  Sellswords+Company: 2.  Battalion: 3.  Legion: 4.
+    // Freelancers: 1 slot.  Company+Battalion: 2.  Legion: 3.  Vanguard: 4.
     assert_eq!(GuildRank(1).concurrent_missions(), 1);
     assert_eq!(GuildRank(2).concurrent_missions(), 2);
     assert_eq!(GuildRank(3).concurrent_missions(), 2);

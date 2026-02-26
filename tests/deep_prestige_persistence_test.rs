@@ -162,7 +162,7 @@ fn test_prestige_preserves_guild_rank() {
     let mut deep = build_generation_1_state();
     deep.on_prestige();
     assert_eq!(deep.persistent.guild_rank, GuildRank(2));
-    assert_eq!(deep.persistent.guild_rank.display_name(), "Sellswords");
+    assert_eq!(deep.persistent.guild_rank.display_name(), "Company");
 }
 
 #[test]

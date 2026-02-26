@@ -171,6 +171,7 @@ pub const DEEP_LAYER_MILESTONES: &[(u64, AchievementId)] = &[
     (15, AchievementId::Layer15Cleared),
     (20, AchievementId::Layer20Cleared),
     (25, AchievementId::Layer25Cleared),
+    (26, AchievementId::VoidExplorer),
 ];
 
 /// Deep guild rank milestones.

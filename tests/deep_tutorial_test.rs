@@ -185,13 +185,7 @@ fn test_deep_prestige_preserves_familiarity() {
 /// All five guild ranks should have valid display names.
 #[test]
 fn test_all_guild_rank_names() {
-    let expected = [
-        "Freelancers",
-        "Sellswords",
-        "Company",
-        "Battalion",
-        "Legion",
-    ];
+    let expected = ["Freelancers", "Company", "Battalion", "Legion", "Vanguard"];
     for i in 1..=5u8 {
         assert_eq!(GuildRank(i).display_name(), expected[(i - 1) as usize]);
     }

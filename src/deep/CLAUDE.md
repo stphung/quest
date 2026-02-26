@@ -87,10 +87,10 @@ Newtype `GuildRank(u8)` with values 1-5. Persists across prestiges.
 | Rank | Name | Max Roster | Concurrent Missions | Required Breakthrough |
 |------|------|-----------|---------------------|----------------------|
 | 1 | Freelancers | 5 | 1 | Discovery |
-| 2 | Sellswords | 7 | 1 | Layer 3 |
-| 3 | Company | 9 | 2 | Layer 7 |
-| 4 | Battalion | 12 | 3 | Layer 13 |
-| 5 | Legion | 15 | 4 | Layer 19 |
+| 2 | Company | 7 | 2 | Layer 3 |
+| 3 | Battalion | 9 | 2 | Layer 7 |
+| 4 | Legion | 12 | 3 | Layer 13 |
+| 5 | Vanguard | 15 | 4 | Layer 19 |
 
 Stats are driven from the `GUILD_RANK_STATS` constant array (index 0 = Rank 1). Do not call methods with `GuildRank(0)` — valid range is 1-5.
 

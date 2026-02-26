@@ -196,24 +196,20 @@ pub const ALL_TITLES: &[TitleDef] = &[
     },
     // The Deep
     TitleDef {
-        achievement_id: AchievementId::TheDeepDiscovered,
-        title_text: "Captain",
-    },
-    TitleDef {
-        achievement_id: AchievementId::GuildRank3,
-        title_text: "Commander",
-    },
-    TitleDef {
         achievement_id: AchievementId::GuildRank5,
         title_text: "Overlord",
     },
     TitleDef {
-        achievement_id: AchievementId::Layer25Cleared,
-        title_text: "Abyssal Pioneer",
+        achievement_id: AchievementId::VoidExplorer,
+        title_text: "Depthwarden",
     },
     TitleDef {
         achievement_id: AchievementId::DeepMissionsC,
         title_text: "Warmaster",
+    },
+    TitleDef {
+        achievement_id: AchievementId::GatewayOpened,
+        title_text: "Gatekeeper",
     },
 ];
 

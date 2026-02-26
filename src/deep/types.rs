@@ -45,10 +45,10 @@ pub const VOID_START_LAYER: u32 = 26;
 pub const GUILD_RANK_STATS: [(u32, u32, Option<u32>); 5] = [
     // (max_roster, concurrent_missions, required_breakthrough_layer)
     (5, 1, None),      // Rank 1 – Freelancers  (discovery unlocks)
-    (7, 2, Some(3)),   // Rank 2 – Sellswords
-    (9, 2, Some(7)),   // Rank 3 – Company
-    (12, 3, Some(13)), // Rank 4 – Battalion
-    (15, 4, Some(19)), // Rank 5 – Legion
+    (7, 2, Some(3)),   // Rank 2 – Company
+    (9, 2, Some(7)),   // Rank 3 – Battalion
+    (12, 3, Some(13)), // Rank 4 – Legion
+    (15, 4, Some(19)), // Rank 5 – Vanguard
 ];
 
 // ── Enums ─────────────────────────────────────────────────────────────────────
@@ -577,10 +577,10 @@ impl GuildRank {
     pub fn display_name(self) -> &'static str {
         match self.0 {
             1 => "Freelancers",
-            2 => "Sellswords",
-            3 => "Company",
-            4 => "Battalion",
-            5 => "Legion",
+            2 => "Company",
+            3 => "Battalion",
+            4 => "Legion",
+            5 => "Vanguard",
             _ => "Unknown",
         }
     }
@@ -1152,10 +1152,10 @@ mod tests {
     #[test]
     fn test_guild_rank_display_names() {
         assert_eq!(GuildRank(1).display_name(), "Freelancers");
-        assert_eq!(GuildRank(2).display_name(), "Sellswords");
-        assert_eq!(GuildRank(3).display_name(), "Company");
-        assert_eq!(GuildRank(4).display_name(), "Battalion");
-        assert_eq!(GuildRank(5).display_name(), "Legion");
+        assert_eq!(GuildRank(2).display_name(), "Company");
+        assert_eq!(GuildRank(3).display_name(), "Battalion");
+        assert_eq!(GuildRank(4).display_name(), "Legion");
+        assert_eq!(GuildRank(5).display_name(), "Vanguard");
     }
 
     #[test]

@@ -1359,6 +1359,14 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         points: 500,
     },
     AchievementDef {
+        id: AchievementId::VoidExplorer,
+        name: "Void Explorer",
+        description: "Reach Layer 26 of The Deep \u{2014} descend into The Void",
+        category: AchievementCategory::Deep,
+        icon: "\u{1F573}\u{fe0f}",
+        points: 500,
+    },
+    AchievementDef {
         id: AchievementId::GuildRank2,
         name: "Company Captain",
         description: "Reach Guild Rank 2 (Company)",
@@ -1648,6 +1656,7 @@ mod tests {
             AchievementId::Layer15Cleared,
             AchievementId::Layer20Cleared,
             AchievementId::Layer25Cleared,
+            AchievementId::VoidExplorer,
             AchievementId::GuildRank2,
             AchievementId::GuildRank3,
             AchievementId::GuildRank4,
