@@ -62,9 +62,14 @@ pub fn track_input_achievements(
     state: &mut GameState,
     global_achievements: &mut achievements::Achievements,
     prestige_before: u32,
+    fishing_rank_before: u32,
 ) {
     if state.prestige_rank > prestige_before {
         global_achievements.on_prestige(state.prestige_rank, Some(&state.character_name));
+    }
+
+    if state.fishing.rank > fishing_rank_before {
+        global_achievements.on_fishing_rank_up(state.fishing.rank, Some(&state.character_name));
     }
 
     if let Some(ref win_info) = state.last_minigame_win {

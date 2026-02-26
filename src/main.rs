@@ -707,8 +707,9 @@ fn main() -> io::Result<()> {
                                     continue;
                                 }
 
-                                // Track prestige rank before input to detect prestige
+                                // Track prestige/fishing rank before input to detect changes
                                 let prestige_before = state.prestige_rank;
+                                let fishing_rank_before = state.fishing.rank;
 
                                 let result = input::handle_game_input(
                                     key_event,
@@ -728,6 +729,7 @@ fn main() -> io::Result<()> {
                                     &mut state,
                                     &mut global_achievements,
                                     prestige_before,
+                                    fishing_rank_before,
                                 );
 
                                 // Recalculate caches if prestige or enhancement changed
