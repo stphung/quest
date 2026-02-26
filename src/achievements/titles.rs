@@ -201,15 +201,15 @@ pub const ALL_TITLES: &[TitleDef] = &[
     },
     TitleDef {
         achievement_id: AchievementId::VoidExplorer,
-        title_text: "Depthwarden",
+        title_text: "Voidtouched",
     },
     TitleDef {
         achievement_id: AchievementId::DeepMissionsC,
-        title_text: "Warmaster",
+        title_text: "Oathsworn",
     },
     TitleDef {
         achievement_id: AchievementId::GatewayOpened,
-        title_text: "Gatekeeper",
+        title_text: "Unbinder",
     },
 ];
 
