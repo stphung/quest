@@ -7,6 +7,7 @@ use crate::stormglass::sigils::ETCH_COST;
 use crate::stormglass::spending::{chrono_surge_cost, generate_trial_options};
 use crate::stormglass::types::{
     ExchangePhase, ExchangeUiState, CHRONO_SURGE_OPTIONS, EXCHANGE_MENU_ITEMS, INVOKE_TRIAL_COST,
+    STORM_LURE_COST,
 };
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -42,6 +43,7 @@ pub fn handle_stormglass_exchange(
         ExchangePhase::SigilPick => handle_sigil_pick(key, exchange_ui, state),
         ExchangePhase::SigilForfeitConfirm => handle_sigil_forfeit_confirm(key, exchange_ui),
         ExchangePhase::SigilResult => handle_sigil_result(key, exchange_ui),
+        ExchangePhase::StormLureConfirm => handle_storm_lure_confirm(key, exchange_ui, state),
     }
 }
 
@@ -84,6 +86,15 @@ fn handle_menu(
                     // Storm Sigils — enter sigils list
                     exchange_ui.sigil_selected_slot = 0;
                     exchange_ui.set_phase(ExchangePhase::SigilsList);
+                }
+                3 => {
+                    // Storm Lure — show confirmation
+                    if state.stormglass >= STORM_LURE_COST
+                        && !state.fishing.storm_lure_active
+                        && state.fishing.rank >= 40
+                    {
+                        exchange_ui.set_phase(ExchangePhase::StormLureConfirm);
+                    }
                 }
                 _ => {}
             }
@@ -428,6 +439,29 @@ fn handle_sigil_forfeit_confirm(key: KeyEvent, exchange_ui: &mut ExchangeUiState
             exchange_ui.set_phase(ExchangePhase::SigilPick);
             InputResult::Continue
         }
+    }
+}
+
+fn handle_storm_lure_confirm(
+    key: KeyEvent,
+    exchange_ui: &mut ExchangeUiState,
+    state: &mut GameState,
+) -> InputResult {
+    match key.code {
+        KeyCode::Char('y') | KeyCode::Char('Y') => {
+            if state.stormglass >= STORM_LURE_COST && !state.fishing.storm_lure_active {
+                state.stormglass -= STORM_LURE_COST;
+                state.fishing.storm_lure_active = true;
+                state.fishing.lure_miss_ramp = 0.0;
+                exchange_ui.close();
+            }
+            InputResult::Continue
+        }
+        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+            exchange_ui.set_phase(ExchangePhase::Menu);
+            InputResult::Continue
+        }
+        _ => InputResult::Continue,
     }
 }
 

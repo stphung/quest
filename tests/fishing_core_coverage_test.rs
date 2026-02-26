@@ -118,6 +118,7 @@ fn test_check_rank_up_at_max_returns_none() {
         fish_toward_next_rank: 9999,
         legendary_catches: 0,
         leviathan_encounters: 0,
+        ..Default::default()
     };
 
     // At max rank (30), even with plenty of fish, should not rank up
@@ -134,6 +135,7 @@ fn test_check_rank_up_with_max_40_allows_mythic_progression() {
         fish_toward_next_rank: 2000, // fish_required_for_rank(30) = 2000 (Grandmaster tier)
         legendary_catches: 0,
         leviathan_encounters: 0,
+        ..Default::default()
     };
 
     let result = check_rank_up_with_max(&mut state, 40);
@@ -160,6 +162,7 @@ fn test_check_rank_up_insufficient_fish_returns_none() {
         fish_toward_next_rank: 99, // Need 100 for rank 1->2
         legendary_catches: 0,
         leviathan_encounters: 0,
+        ..Default::default()
     };
 
     let result = check_rank_up_with_max(&mut state, 40);
@@ -183,6 +186,7 @@ fn test_check_rank_up_exact_threshold_ranks_up() {
         fish_toward_next_rank: 100, // Exactly 100 needed
         legendary_catches: 0,
         leviathan_encounters: 0,
+        ..Default::default()
     };
 
     let result = check_rank_up_with_max(&mut state, 40);
@@ -206,6 +210,7 @@ fn test_check_rank_up_excess_carries_over() {
         fish_toward_next_rank: 137, // 37 excess
         legendary_catches: 0,
         leviathan_encounters: 0,
+        ..Default::default()
     };
 
     let result = check_rank_up_with_max(&mut state, 40);
@@ -229,6 +234,7 @@ fn test_check_rank_up_legacy_wrapper_caps_at_40() {
         fish_toward_next_rank: 999999,
         legendary_catches: 0,
         leviathan_encounters: 0,
+        ..Default::default()
     };
 
     let result = check_rank_up(&mut state);
@@ -251,6 +257,7 @@ fn test_check_rank_up_message_format() {
         fish_toward_next_rank: 100,
         legendary_catches: 0,
         leviathan_encounters: 0,
+        ..Default::default()
     };
 
     let msg = check_rank_up_with_max(&mut state, 40).unwrap();
@@ -1059,6 +1066,7 @@ fn test_rank_up_across_tier_boundary() {
         fish_toward_next_rank: 100,
         legendary_catches: 0,
         leviathan_encounters: 0,
+        ..Default::default()
     };
 
     let result = check_rank_up_with_max(&mut state, 40);

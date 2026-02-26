@@ -1,5 +1,6 @@
 //! Prestige and fishing panel rendering helpers for the stats panel.
 
+use crate::achievements::AchievementId;
 use crate::character::attributes::AttributeType;
 use crate::character::derived_stats::DerivedStats;
 use crate::character::prestige::{get_next_prestige_tier, get_prestige_tier};
@@ -347,25 +348,9 @@ pub(super) fn draw_fishing_panel(
     ]);
 
     let is_max_rank = game_state.fishing.rank as usize >= RANK_NAMES.len();
-    let fish_label = if is_max_rank {
-        "Max Rank".to_string()
-    } else {
-        let next_rank = game_state.fishing.rank + 1;
-        let next_rank_name = RANK_NAMES[next_rank as usize - 1];
-        format!(
-            "{}/{} to {} ({})",
-            fish_progress, fish_required, next_rank_name, next_rank
-        )
-    };
-    let fish_ratio = if is_max_rank { 1.0 } else { fish_ratio };
-    let fish_gauge = Gauge::default()
-        .gauge_style(
-            Style::default()
-                .fg(Color::Blue)
-                .add_modifier(Modifier::BOLD),
-        )
-        .label(fish_label)
-        .ratio(fish_ratio);
+    let leviathan_caught = achievements.is_unlocked(AchievementId::StormLeviathan);
+    let show_leviathan_hunt = is_max_rank && game_state.fishing.rank >= 40 && !leviathan_caught;
+    let show_leviathan_trophy = is_max_rank && game_state.fishing.rank >= 40 && leviathan_caught;
 
     if inner.height >= 2 {
         let inner_chunks = Layout::default()
@@ -373,12 +358,159 @@ pub(super) fn draw_fishing_panel(
             .constraints([Constraint::Length(1), Constraint::Length(1)])
             .split(inner);
 
-        let rank_paragraph = Paragraph::new(rank_line);
-        frame.render_widget(rank_paragraph, inner_chunks[0]);
-        frame.render_widget(fish_gauge, inner_chunks[1]);
+        if show_leviathan_hunt {
+            // Row 1: "Storm Leviathan Hunt" instead of rank
+            let hunt_line = Line::from(vec![Span::styled(
+                "🐋 Storm Leviathan Hunt",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )]);
+            frame.render_widget(Paragraph::new(hunt_line), inner_chunks[0]);
+            // Row 2: tracker with dots + charge bar
+            let tracker_line = build_leviathan_tracker_line(&game_state.fishing);
+            frame.render_widget(Paragraph::new(tracker_line), inner_chunks[1]);
+        } else if show_leviathan_trophy {
+            // Row 1: rank name
+            frame.render_widget(Paragraph::new(rank_line), inner_chunks[0]);
+            // Row 2: all dots filled + "Storm Leviathan ✓"
+            let trophy_line = build_leviathan_trophy_line();
+            frame.render_widget(Paragraph::new(trophy_line), inner_chunks[1]);
+        } else {
+            let fish_label = if is_max_rank {
+                "Max Rank".to_string()
+            } else {
+                let next_rank = game_state.fishing.rank + 1;
+                let next_rank_name = RANK_NAMES[next_rank as usize - 1];
+                format!(
+                    "{}/{} to {} ({})",
+                    fish_progress, fish_required, next_rank_name, next_rank
+                )
+            };
+            let fish_ratio = if is_max_rank { 1.0 } else { fish_ratio };
+            let fish_gauge = Gauge::default()
+                .gauge_style(
+                    Style::default()
+                        .fg(Color::Blue)
+                        .add_modifier(Modifier::BOLD),
+                )
+                .label(fish_label)
+                .ratio(fish_ratio);
+            frame.render_widget(fish_gauge, inner_chunks[1]);
+        }
     } else if inner.height >= 1 {
         // Only room for one line — show rank
         let rank_paragraph = Paragraph::new(rank_line);
         frame.render_widget(rank_paragraph, inner);
     }
+}
+
+/// Builds the Leviathan hunt tracker line for the fishing panel at rank 40.
+///
+/// Layout: `🐋 ● ● ● ● ○ ○ ○ ○ ○ ○   ⚡ ▰▰▰▱▱▱▱ +6.5%`
+fn build_leviathan_tracker_line(fishing: &FishingState) -> Line<'static> {
+    let encounters = fishing.leviathan_encounters.min(10) as usize;
+    let in_catch_phase = encounters >= 10;
+
+    let mut spans: Vec<Span<'static>> = Vec::new();
+
+    // Whale prefix
+    spans.push(Span::styled(
+        "\u{1F40B} ",
+        Style::default().add_modifier(Modifier::BOLD),
+    ));
+
+    // Encounter progress dots
+    for i in 0..10 {
+        if i < encounters {
+            spans.push(Span::styled("\u{25CF} ", Style::default().fg(Color::Cyan)));
+        } else {
+            spans.push(Span::styled(
+                "\u{25CB} ",
+                Style::default().fg(Color::DarkGray),
+            ));
+        }
+    }
+
+    // Separator
+    spans.push(Span::raw("  "));
+
+    // Lightning bolt
+    spans.push(Span::styled(
+        "\u{26A1} ",
+        Style::default()
+            .fg(Color::Rgb(100, 180, 255))
+            .add_modifier(Modifier::BOLD),
+    ));
+
+    if !fishing.storm_lure_active {
+        spans.push(Span::styled("--", Style::default().fg(Color::DarkGray)));
+    } else {
+        // Charge bar: 7 ticks representing miss_ramp 0-10%
+        let filled = (fishing.lure_miss_ramp / 0.10 * 7.0).round() as usize;
+        let filled = filled.min(7);
+        for i in 0..7 {
+            if i < filled {
+                spans.push(Span::styled(
+                    "\u{25B0}",
+                    Style::default().fg(Color::Rgb(100, 180, 255)),
+                ));
+            } else {
+                spans.push(Span::styled(
+                    "\u{25B1}",
+                    Style::default().fg(Color::DarkGray),
+                ));
+            }
+        }
+        spans.push(Span::raw(" "));
+
+        // Percentage
+        let bonus = fishing.lure_tracking_bonus + fishing.lure_miss_ramp;
+        if in_catch_phase {
+            // Show total catch chance (base 25% + bonus)
+            let catch_pct = (0.25 + bonus) * 100.0;
+            spans.push(Span::styled(
+                format!("{:.1}%", catch_pct),
+                Style::default()
+                    .fg(Color::Rgb(100, 180, 255))
+                    .add_modifier(Modifier::BOLD),
+            ));
+        } else {
+            // Show lure bonus added to encounter chance
+            spans.push(Span::styled(
+                format!("+{:.1}%", bonus * 100.0),
+                Style::default().fg(Color::Rgb(100, 180, 255)),
+            ));
+        }
+    }
+
+    Line::from(spans)
+}
+
+/// Builds the Leviathan trophy line shown after the Leviathan has been caught.
+///
+/// Layout: `🐋 ● ● ● ● ● ● ● ● ● ●   Storm Leviathan ✓`
+fn build_leviathan_trophy_line() -> Line<'static> {
+    let mut spans: Vec<Span<'static>> = Vec::new();
+
+    // Whale prefix
+    spans.push(Span::styled(
+        "\u{1F40B} ",
+        Style::default().add_modifier(Modifier::BOLD),
+    ));
+
+    // All 10 dots filled
+    for _ in 0..10 {
+        spans.push(Span::styled("\u{25CF} ", Style::default().fg(Color::Cyan)));
+    }
+
+    spans.push(Span::raw("  "));
+    spans.push(Span::styled(
+        "Storm Leviathan \u{2713}",
+        Style::default()
+            .fg(Color::Green)
+            .add_modifier(Modifier::BOLD),
+    ));
+
+    Line::from(spans)
 }

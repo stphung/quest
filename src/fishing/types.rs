@@ -56,6 +56,14 @@ fn is_zero(n: &u8) -> bool {
     *n == 0
 }
 
+fn is_false(b: &bool) -> bool {
+    !b
+}
+
+fn is_zero_f64(f: &f64) -> bool {
+    *f == 0.0
+}
+
 /// Persistent fishing state that is saved with the character.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FishingState {
@@ -66,6 +74,18 @@ pub struct FishingState {
     /// Storm Leviathan encounter progress (0-10). At 10, the next encounter catches it.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub leviathan_encounters: u8,
+    /// Whether the Storm Lure is currently active (purchased from Stormglass Exchange)
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub storm_lure_active: bool,
+    /// Miss ramp bonus: +0.5% per legendary where Leviathan doesn't appear/isn't caught.
+    /// Caps at 10% (0.10). Resets when Leviathan encounter fires (encounter phase)
+    /// or when catch succeeds (catch phase).
+    #[serde(default, skip_serializing_if = "is_zero_f64")]
+    pub lure_miss_ramp: f64,
+    /// Tracking bonus: +1.5% per completed encounter, permanent across lure purchases.
+    /// Only active when storm_lure_active is true.
+    #[serde(default, skip_serializing_if = "is_zero_f64")]
+    pub lure_tracking_bonus: f64,
 }
 
 impl Default for FishingState {
@@ -76,6 +96,9 @@ impl Default for FishingState {
             fish_toward_next_rank: 0,
             legendary_catches: 0,
             leviathan_encounters: 0,
+            storm_lure_active: false,
+            lure_miss_ramp: 0.0,
+            lure_tracking_bonus: 0.0,
         }
     }
 }

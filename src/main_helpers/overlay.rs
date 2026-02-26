@@ -167,13 +167,20 @@ pub fn draw_game_overlays(
                 );
             }
         }
-        GameOverlay::LeviathanEncounter { encounter_number } => {
+        GameOverlay::LeviathanEncounter {
+            encounter_number,
+            lure_consumed,
+        } => {
             ui::fishing_scene::render_leviathan_encounter_modal(
                 frame,
                 area,
                 *encounter_number,
+                *lure_consumed,
                 ctx,
             );
+        }
+        GameOverlay::LeviathanCatchMiss { lure_consumed } => {
+            ui::fishing_scene::render_leviathan_catch_miss_modal(frame, area, *lure_consumed, ctx);
         }
         GameOverlay::QuitConfirm => {
             draw_quit_confirm(frame, state.challenge_menu.challenges.len());

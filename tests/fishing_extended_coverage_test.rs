@@ -48,6 +48,7 @@ fn fresh_fishing_state(rank: u32, fish_toward: u32) -> FishingState {
         fish_toward_next_rank: fish_toward,
         legendary_catches: 0,
         leviathan_encounters: 0,
+        ..Default::default()
     }
 }
 
@@ -529,6 +530,7 @@ fn test_sequential_rank_ups_correctly_track_state() {
         fish_toward_next_rank: 100, // Enough for rank 1->2
         legendary_catches: 0,
         leviathan_encounters: 0,
+        ..Default::default()
     };
 
     // First rank-up: 1 -> 2

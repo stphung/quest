@@ -171,6 +171,7 @@ fn test_max_rank_behavior() {
         fish_toward_next_rank: 10000, // Way over requirement
         legendary_catches: 50,
         leviathan_encounters: 0,
+        ..Default::default()
     };
 
     // At max rank, should still track fish but not rank up
@@ -195,6 +196,7 @@ fn test_multiple_rank_ups_in_sequence() {
         fish_toward_next_rank: 250, // Enough for 2 rank ups (100 + 100)
         legendary_catches: 0,
         leviathan_encounters: 0,
+        ..Default::default()
     };
 
     // First rank up (100 fish, 150 remaining)
@@ -646,7 +648,7 @@ fn test_leviathan_encounter_updates_fishing_state() {
     // At rank 40 with 0 encounters, we should eventually get an encounter
     let mut encountered = false;
     for _ in 0..5000 {
-        let (_, result) = generate_fish_with_rank(FishRarity::Legendary, 40, 0, &mut rng);
+        let (_, result) = generate_fish_with_rank(FishRarity::Legendary, 40, 0, 0.0, 0.0, &mut rng);
         if let LeviathanResult::Escaped { encounter_number } = result {
             assert_eq!(encounter_number, 1);
             encountered = true;
@@ -669,8 +671,14 @@ fn test_leviathan_encounter_progresses_through_stages() {
         let mut found = false;
 
         for _ in 0..3000 {
-            let (_, result) =
-                generate_fish_with_rank(FishRarity::Legendary, 40, encounters_so_far, &mut rng);
+            let (_, result) = generate_fish_with_rank(
+                FishRarity::Legendary,
+                40,
+                encounters_so_far,
+                0.0,
+                0.0,
+                &mut rng,
+            );
             if let LeviathanResult::Escaped { encounter_number } = result {
                 assert_eq!(
                     encounter_number, expected_encounter,
@@ -747,7 +755,8 @@ fn test_leviathan_catch_sets_flag() {
     // After 10 encounters, should eventually catch
     let mut caught = false;
     for _ in 0..5000 {
-        let (fish, result) = generate_fish_with_rank(FishRarity::Legendary, 40, 10, &mut rng);
+        let (fish, result) =
+            generate_fish_with_rank(FishRarity::Legendary, 40, 10, 0.0, 0.0, &mut rng);
         if result == LeviathanResult::Caught {
             assert_eq!(fish.name, "Storm Leviathan");
             assert_eq!(fish.rarity, FishRarity::Legendary);
@@ -774,6 +783,7 @@ fn test_fishing_state_serialization_skips_zero_encounters() {
         fish_toward_next_rank: 50,
         legendary_catches: 3,
         leviathan_encounters: 0,
+        ..Default::default()
     };
 
     let json = serde_json::to_string(&state).unwrap();
@@ -794,6 +804,7 @@ fn test_fishing_state_serialization_includes_nonzero_encounters() {
         fish_toward_next_rank: 200,
         legendary_catches: 50,
         leviathan_encounters: 7,
+        ..Default::default()
     };
 
     let json = serde_json::to_string(&state).unwrap();
@@ -830,6 +841,7 @@ fn test_fishing_state_roundtrip_with_encounters() {
         fish_toward_next_rank: 500,
         legendary_catches: 100,
         leviathan_encounters: 9,
+        ..Default::default()
     };
 
     let json = serde_json::to_string(&original).unwrap();

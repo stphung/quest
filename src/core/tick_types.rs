@@ -229,6 +229,12 @@ pub struct TickResult {
     /// uses this to show the Leviathan modal overlay.
     pub leviathan_encounter: Option<u8>,
 
+    /// True if the Storm Lure was consumed during this tick's Leviathan encounter.
+    pub leviathan_lure_consumed: bool,
+
+    /// True if a Leviathan catch-miss occurred (appeared but wasn't caught).
+    pub leviathan_catch_miss: bool,
+
     /// True if achievements were modified and should be persisted to disk.
     /// The presentation layer is responsible for the actual IO.
     pub achievements_changed: bool,
