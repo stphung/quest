@@ -31,6 +31,9 @@ use quest::deep::{
     MissionStatus,
     MissionType,
     DEEP_MIN_PRESTIGE_RANK,
+    STORY_RESONANCE_THRESHOLDS,
+    STORY_STAGE_DISCOVERED,
+    STORY_STAGE_ENTRANCE,
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -40,15 +43,14 @@ fn seeded_rng() -> ChaCha8Rng {
 }
 
 /// Force-discover The Deep via the narrative story chain.
-/// Sets story stage to 4 (The Entrance) then calls `complete_story_discovery`.
+/// Sets story stage to STORY_STAGE_ENTRANCE then calls `complete_story_discovery`.
 fn force_discover(deep: &mut DeepState) -> ChaCha8Rng {
     let mut rng = seeded_rng();
-    deep.persistent.deep_story_stage = 4;
-    deep.persistent.rift_fragments = 4;
+    deep.persistent.deep_story_stage = STORY_STAGE_ENTRANCE;
     complete_story_discovery(deep, &mut rng);
     assert!(
         deep.persistent.discovered,
-        "Discovery must succeed at stage 4"
+        "Discovery must succeed at entrance stage"
     );
     rng
 }
@@ -172,24 +174,23 @@ fn test_partial_json_falls_back_to_default() {
 // ── 4. Narrative discovery via story chain ─────────────────────────────────────
 
 #[test]
-fn test_narrative_discovery_requires_stage_4() {
+fn test_narrative_discovery_requires_entrance_stage() {
     let mut deep = DeepState::new();
     let mut rng = seeded_rng();
 
-    // Stage 3 should not allow discovery.
-    deep.persistent.deep_story_stage = 3;
-    deep.persistent.rift_fragments = 4;
+    // One stage below entrance should not allow discovery.
+    deep.persistent.deep_story_stage = STORY_STAGE_ENTRANCE - 1;
     complete_story_discovery(&mut deep, &mut rng);
     assert!(
         !deep.persistent.discovered,
-        "Discovery must not fire below story stage 4"
+        "Discovery must not fire below entrance stage"
     );
 
-    // Stage 4 allows discovery.
-    deep.persistent.deep_story_stage = 4;
+    // Entrance stage allows discovery.
+    deep.persistent.deep_story_stage = STORY_STAGE_ENTRANCE;
     complete_story_discovery(&mut deep, &mut rng);
     assert!(deep.persistent.discovered);
-    assert_eq!(deep.persistent.deep_story_stage, 5);
+    assert_eq!(deep.persistent.deep_story_stage, STORY_STAGE_DISCOVERED);
 }
 
 // ── 5. Story chain advances through prestige in The Expanse ──────────────────
@@ -782,129 +783,72 @@ fn test_rift_resonance_survives_prestige_reset() {
 fn test_story_stage_advances_at_resonance_thresholds() {
     let mut deep = DeepState::new();
 
-    // Stage 0 -> 1 at resonance 1, P15
-    deep.persistent.rift_resonance = 1;
-    assert_eq!(deep.check_story_progression(15), Some(1));
-    assert_eq!(deep.persistent.deep_story_stage, 1);
-
-    // Stage 1 -> 2 at resonance 3, P17
-    deep.persistent.rift_resonance = 3;
-    assert_eq!(deep.check_story_progression(17), Some(2));
-    assert_eq!(deep.persistent.deep_story_stage, 2);
-
-    // Stage 2 -> 3 at resonance 5, P19
-    deep.persistent.rift_resonance = 5;
-    assert_eq!(deep.check_story_progression(19), Some(3));
-    assert_eq!(deep.persistent.deep_story_stage, 3);
+    // Walk through all 10 levels using the threshold table
+    for level in 1..=10u8 {
+        deep.persistent.rift_resonance = STORY_RESONANCE_THRESHOLDS[level as usize - 1];
+        assert_eq!(
+            deep.check_story_progression(15),
+            Some(level),
+            "Stage should advance to level {} at resonance {}",
+            level,
+            STORY_RESONANCE_THRESHOLDS[level as usize - 1]
+        );
+        assert_eq!(deep.persistent.deep_story_stage, level);
+    }
 }
 
 #[test]
 fn test_story_stage_blocked_by_prestige_gate() {
     let mut deep = DeepState::new();
-    deep.persistent.rift_resonance = 3;
-    // Resonance 3 but only P15 — captain requires P17
-    deep.persistent.deep_story_stage = 1;
-    assert_eq!(deep.check_story_progression(15), None);
-    assert_eq!(deep.persistent.deep_story_stage, 1);
-}
-
-#[test]
-fn test_story_stage_4_requires_fragments() {
-    let mut deep = DeepState::new();
-    deep.persistent.rift_resonance = 7;
-    deep.persistent.deep_story_stage = 3;
-    deep.persistent.rift_fragments = 3; // need 4
-    assert_eq!(deep.check_story_progression(21), None);
-
-    deep.persistent.rift_fragments = 4;
-    assert_eq!(deep.check_story_progression(21), Some(4));
-}
-
-#[test]
-fn test_rift_fragments_awarded_at_resonance_5_6_7() {
-    let mut deep = DeepState::new();
-
-    deep.persistent.rift_resonance = 4;
-    deep.maybe_award_rift_fragment();
-    assert_eq!(
-        deep.persistent.rift_fragments, 0,
-        "No fragment before resonance 5"
-    );
-
-    deep.persistent.rift_resonance = 5;
-    deep.maybe_award_rift_fragment();
-    assert_eq!(deep.persistent.rift_fragments, 1);
-
-    deep.persistent.rift_resonance = 6;
-    deep.maybe_award_rift_fragment();
-    assert_eq!(deep.persistent.rift_fragments, 2);
-
-    deep.persistent.rift_resonance = 7;
-    deep.maybe_award_rift_fragment();
-    assert_eq!(deep.persistent.rift_fragments, 3);
-}
-
-#[test]
-fn test_rift_fragments_cap_at_4() {
-    let mut deep = DeepState::new();
-    deep.persistent.rift_resonance = 10;
-    deep.maybe_award_rift_fragment();
-    assert_eq!(deep.persistent.rift_fragments, 4);
+    deep.persistent.rift_resonance = 1;
+    // Resonance 1 but P14 — requires P15
+    assert_eq!(deep.check_story_progression(14), None);
+    assert_eq!(deep.persistent.deep_story_stage, 0);
 }
 
 #[test]
 fn test_advance_deep_story_full_chain() {
     let mut deep = DeepState::new();
 
-    // Resonance 1 + P15 → stage 1 (Tremors)
-    deep.persistent.rift_resonance = 1;
-    assert_eq!(advance_deep_story(&mut deep, 15), Some(1));
-
-    // Resonance 3 + P17 → stage 2 (Captain)
-    deep.persistent.rift_resonance = 3;
-    assert_eq!(advance_deep_story(&mut deep, 17), Some(2));
-
-    // Resonance 5 + P19 → stage 3 (Fragment) + awards fragment 1
-    deep.persistent.rift_resonance = 5;
-    assert_eq!(advance_deep_story(&mut deep, 19), Some(3));
-    assert_eq!(deep.persistent.rift_fragments, 1);
-
-    // Resonance 7 + P21 → need 4 fragments, only have 3 after awarding
-    deep.persistent.rift_resonance = 7;
-    // Awarding fragments first: resonance 7 => 3 fragments
-    assert_eq!(advance_deep_story(&mut deep, 21), None);
-    assert_eq!(deep.persistent.rift_fragments, 3);
-
-    // Manually set 4 fragments to test stage 4
-    deep.persistent.rift_fragments = 4;
-    assert_eq!(advance_deep_story(&mut deep, 21), Some(4));
+    // Walk through all 10 levels using escalating thresholds
+    for level in 1..=10u8 {
+        deep.persistent.rift_resonance = STORY_RESONANCE_THRESHOLDS[level as usize - 1];
+        assert_eq!(
+            advance_deep_story(&mut deep, 15),
+            Some(level),
+            "advance_deep_story should return Some({}) at resonance {}",
+            level,
+            STORY_RESONANCE_THRESHOLDS[level as usize - 1]
+        );
+    }
+    assert_eq!(deep.persistent.deep_story_stage, STORY_STAGE_ENTRANCE);
 }
 
 #[test]
 fn test_advance_deep_story_skipped_when_already_discovered() {
     let mut deep = DeepState::new();
     deep.persistent.discovered = true;
-    deep.persistent.rift_resonance = 7;
-    assert_eq!(advance_deep_story(&mut deep, 21), None);
+    deep.persistent.rift_resonance = 30;
+    assert_eq!(advance_deep_story(&mut deep, 15), None);
 }
 
 #[test]
-fn test_story_discovery_not_triggered_before_stage_4() {
+fn test_story_discovery_not_triggered_before_entrance_stage() {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let mut deep = DeepState::new();
-    deep.persistent.deep_story_stage = 3;
+    deep.persistent.deep_story_stage = STORY_STAGE_ENTRANCE - 1;
     complete_story_discovery(&mut deep, &mut rng);
     assert!(!deep.persistent.discovered);
 }
 
 #[test]
-fn test_story_discovery_completes_at_stage_4() {
+fn test_story_discovery_completes_at_entrance_stage() {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let mut deep = DeepState::new();
-    deep.persistent.deep_story_stage = 4;
+    deep.persistent.deep_story_stage = STORY_STAGE_ENTRANCE;
     complete_story_discovery(&mut deep, &mut rng);
     assert!(deep.persistent.discovered);
-    assert_eq!(deep.persistent.deep_story_stage, 5);
+    assert_eq!(deep.persistent.deep_story_stage, STORY_STAGE_DISCOVERED);
     assert_eq!(deep.prestige.roster.len(), 3);
 }
 
@@ -912,7 +856,7 @@ fn test_story_discovery_completes_at_stage_4() {
 fn test_story_discovery_assigns_starter_marks() {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let mut deep = DeepState::new();
-    deep.persistent.deep_story_stage = 4;
+    deep.persistent.deep_story_stage = STORY_STAGE_ENTRANCE;
     complete_story_discovery(&mut deep, &mut rng);
     assert_eq!(deep.prestige.warband_marks, 50); // Guild rank 1 = 50 marks
 }
@@ -922,7 +866,7 @@ fn test_story_discovery_blocked_when_already_discovered() {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let mut deep = DeepState::new();
     deep.persistent.discovered = true;
-    deep.persistent.deep_story_stage = 4;
+    deep.persistent.deep_story_stage = STORY_STAGE_ENTRANCE;
     complete_story_discovery(&mut deep, &mut rng);
     // Should not add more mercs
     assert!(deep.prestige.roster.is_empty());
@@ -1006,8 +950,7 @@ fn test_first_orders_not_queued_twice() {
     deep.persistent.discovered = false;
 
     // Force discovery via story chain
-    deep.persistent.deep_story_stage = 4;
-    deep.persistent.rift_fragments = 4;
+    deep.persistent.deep_story_stage = STORY_STAGE_ENTRANCE;
     let mut rng = seeded_rng();
     complete_story_discovery(&mut deep, &mut rng);
 

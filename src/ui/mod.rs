@@ -377,7 +377,6 @@ pub fn draw_ui_with_update(
     haven_discovered: bool,
     soulforge_discovered: bool,
     stormglass_discovered: bool,
-    deep_discovered: bool,
     deep_state: &crate::deep::DeepState,
     achievements: &crate::achievements::Achievements,
     enhancement_levels: &[u8; 7],
@@ -391,7 +390,13 @@ pub fn draw_ui_with_update(
         return;
     }
 
-    let deep_indicator = stats_panel::DeepIndicatorStatus::from_deep(deep_discovered, deep_state);
+    let deep_indicator =
+        stats_panel::DeepIndicatorStatus::from_deep(deep_state.persistent.discovered, deep_state);
+
+    let rift_hint = !deep_state.persistent.discovered
+        && game_state.prestige_rank >= crate::deep::DEEP_MIN_PRESTIGE_RANK
+        && game_state.zone_progression.current_zone_id >= 11;
+    let rift_resonance = deep_state.persistent.rift_resonance;
 
     match ctx.tier {
         SizeTier::XL | SizeTier::L => {
@@ -408,6 +413,8 @@ pub fn draw_ui_with_update(
                 deep_indicator,
                 achievements,
                 enhancement_levels,
+                rift_hint,
+                rift_resonance,
             );
         }
         SizeTier::M => {
@@ -446,6 +453,8 @@ fn draw_xl_l_layout(
     deep_indicator: stats_panel::DeepIndicatorStatus,
     achievements: &crate::achievements::Achievements,
     enhancement_levels: &[u8; 7],
+    rift_hint: bool,
+    rift_resonance: u32,
 ) {
     let size = frame.area();
 
@@ -501,6 +510,8 @@ fn draw_xl_l_layout(
         ctx,
         enhancement_levels,
         achievements,
+        rift_hint,
+        rift_resonance,
     );
 
     // Draw ticker

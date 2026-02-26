@@ -75,7 +75,7 @@ fn build_generation_1_state() -> DeepState {
     // Simulate several missions on each layer
     for layer in 1..=5 {
         let record = deep.persistent.layer_record_mut(layer);
-        // Supply run (+5) x3 + Recon (+15) + Expedition (+10) = 40 familiarity
+        // Supply run (+8) x3 + Recon (+20) + Expedition (+10) = 54 familiarity
         apply_familiarity_gain(record, MissionType::SupplyRun);
         apply_familiarity_gain(record, MissionType::SupplyRun);
         apply_familiarity_gain(record, MissionType::SupplyRun);
@@ -130,11 +130,11 @@ fn test_gen1_initial_state_is_correct() {
         .has_infrastructure(Infrastructure::Watchtower));
 
     // Familiarity on all 5 layers
-    // L1-2, L4-5: 40 from missions only
-    // L3: 40 from missions + 25 from Watchtower build = 65
+    // L1-2, L4-5: 54 from missions only (3×8 + 20 + 10)
+    // L3: 54 from missions + 40 from Watchtower build = 94
     for layer in 1..=5 {
         let record = deep.persistent.layer_record(layer).unwrap();
-        let expected = if layer == 3 { 65 } else { 40 };
+        let expected = if layer == 3 { 94 } else { 54 };
         assert_eq!(
             record.familiarity, expected,
             "Layer {} familiarity should be {}",
@@ -217,8 +217,8 @@ fn test_prestige_preserves_familiarity() {
 
     for layer in 1..=5 {
         let record = deep.persistent.layer_record(layer).unwrap();
-        // L3 has Watchtower bonus (+25) in addition to mission familiarity (40)
-        let expected = if layer == 3 { 65 } else { 40 };
+        // L3 has Watchtower bonus (+40) in addition to mission familiarity (54)
+        let expected = if layer == 3 { 94 } else { 54 };
         assert_eq!(
             record.familiarity, expected,
             "Layer {} familiarity should persist through prestige",
@@ -395,12 +395,12 @@ fn test_gen2_familiarity_continues_accumulating() {
     let mut deep = build_generation_1_state();
     deep.on_prestige();
 
-    // L1 had 40 familiarity from gen 1 — add more in gen 2
+    // L1 had 54 familiarity from gen 1 — add more in gen 2
     let record = deep.persistent.layer_record_mut(1);
     let fam_before = record.familiarity;
-    apply_familiarity_gain(record, MissionType::Recon); // +15
-    assert_eq!(record.familiarity, fam_before + 15);
-    assert_eq!(record.familiarity, 55);
+    apply_familiarity_gain(record, MissionType::Recon); // +20
+    assert_eq!(record.familiarity, fam_before + 20);
+    assert_eq!(record.familiarity, 74);
     assert_eq!(
         FamiliarityLevel::from_familiarity(record.familiarity),
         FamiliarityLevel::Familiar,
@@ -469,7 +469,7 @@ fn test_three_generation_lifecycle_ratchet() {
     for _ in 0..4 {
         apply_familiarity_gain(deep.persistent.layer_record_mut(1), MissionType::SupplyRun);
     }
-    // L1 familiarity: 4 * 5 = 20
+    // L1 familiarity: 4 * 8 = 32
 
     // Upgrade to rank 2 (requires L3 cleared + 200 marks)
     deep.prestige.warband_marks = 300;
@@ -532,7 +532,7 @@ fn test_three_generation_lifecycle_ratchet() {
     for _ in 0..4 {
         apply_familiarity_gain(deep.persistent.layer_record_mut(1), MissionType::SupplyRun);
     }
-    // L1 familiarity: 20 + 20 = 40
+    // L1 familiarity: 32 + 32 = 64
 
     // Upgrade to rank 3 (requires L7 cleared + 500 marks)
     deep.prestige.warband_marks = 600;
@@ -584,10 +584,10 @@ fn test_three_generation_lifecycle_ratchet() {
     assert!(is_frontier_layer(&deep.persistent, 8));
 
     // Familiarity accumulated across both generations
-    assert_eq!(deep.persistent.layer_record(1).unwrap().familiarity, 40);
+    assert_eq!(deep.persistent.layer_record(1).unwrap().familiarity, 64);
 
-    // L5 got Watchtower bonus (+25) in gen 2
-    assert_eq!(deep.persistent.layer_record(5).unwrap().familiarity, 25);
+    // L5 got Watchtower bonus (+40) in gen 2
+    assert_eq!(deep.persistent.layer_record(5).unwrap().familiarity, 40);
 
     // Transient state is clean
     assert!(deep.prestige.roster.is_empty());
@@ -787,7 +787,6 @@ fn test_prestige_with_pending_results_resets() {
             xp_earned: 500,
             stormglass_earned: 5,
             item_ilvl: None,
-            prestige_fragment: false,
             injured_mercs: vec![],
             lost_mercs: vec![],
             merc_level_ups: vec![],
@@ -1000,8 +999,8 @@ fn test_gen2_recon_is_faster_than_gen1_baseline() {
         gen1_duration,
     );
 
-    // Verify the exact reduction: Outpost -25% * Mapped familiarity -10% = 0.75 * 0.90 = 0.675x
-    let expected = (base_shallows_recon as f64 * 0.75 * 0.90) as u64;
+    // Verify the exact reduction: Outpost -25% * Mapped familiarity -15% = 0.75 * 0.85 = 0.6375x
+    let expected = (base_shallows_recon as f64 * 0.75 * 0.85) as u64;
     assert_eq!(gen2_duration, expected);
 }
 
@@ -1257,7 +1256,6 @@ fn test_mission_result_danger_bonus_xp_backward_compat() {
         "xp_earned": 500,
         "stormglass_earned": 5,
         "item_ilvl": null,
-        "prestige_fragment": false,
         "injured_mercs": [],
         "lost_mercs": [],
         "merc_level_ups": []
@@ -1288,7 +1286,6 @@ fn test_deep_persistent_rift_resonance_defaults_on_missing() {
     let persistent: DeepPersistent = serde_json::from_str(json).unwrap();
     assert_eq!(persistent.rift_resonance, 0);
     assert_eq!(persistent.deep_story_stage, 0);
-    assert_eq!(persistent.rift_fragments, 0);
     assert!(!persistent.gateway_opened);
 }
 
@@ -1297,14 +1294,12 @@ fn test_deep_persistent_rift_resonance_roundtrip() {
     let mut persistent = DeepPersistent::new();
     persistent.rift_resonance = 7;
     persistent.deep_story_stage = 4;
-    persistent.rift_fragments = 3;
     persistent.gateway_opened = true;
 
     let json = serde_json::to_string(&persistent).unwrap();
     let loaded: DeepPersistent = serde_json::from_str(&json).unwrap();
     assert_eq!(loaded.rift_resonance, 7);
     assert_eq!(loaded.deep_story_stage, 4);
-    assert_eq!(loaded.rift_fragments, 3);
     assert!(loaded.gateway_opened);
 }
 
@@ -1313,12 +1308,10 @@ fn test_rift_resonance_survives_prestige_serde_roundtrip() {
     let mut deep = DeepState::new();
     deep.persistent.rift_resonance = 5;
     deep.persistent.deep_story_stage = 3;
-    deep.persistent.rift_fragments = 1;
     deep.on_prestige();
 
     let json = serde_json::to_string(&deep.persistent).unwrap();
     let loaded: DeepPersistent = serde_json::from_str(&json).unwrap();
     assert_eq!(loaded.rift_resonance, 5);
     assert_eq!(loaded.deep_story_stage, 3);
-    assert_eq!(loaded.rift_fragments, 1);
 }

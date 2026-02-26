@@ -12,24 +12,18 @@ use serde::{Deserialize, Serialize};
 
 /// Minimum prestige rank required to discover The Deep.
 pub const DEEP_MIN_PRESTIGE_RANK: u32 = 15;
-/// Base per-tick discovery chance (same scaling pattern as Haven/Soulforge).
-pub const DEEP_DISCOVERY_BASE_CHANCE: f64 = 0.000014;
-/// Additional chance per prestige rank above the minimum.
-pub const DEEP_DISCOVERY_RANK_BONUS: f64 = 0.000007;
-
 // ── Story Chain Thresholds ────────────────────────────────────────────────────
 
-/// Rift Resonance thresholds for each story stage.
-pub const STORY_RESONANCE_TREMORS: u32 = 1;
-pub const STORY_RESONANCE_CAPTAIN: u32 = 3;
-pub const STORY_RESONANCE_FRAGMENT: u32 = 5;
-pub const STORY_RESONANCE_ENTRANCE: u32 = 7;
+/// Cumulative rift resonance required for each story level (1-10).
+/// Index 0 = level 1, index 9 = level 10.
+/// Cost curve: [1,1,2,2,3,3,4,4,5,5] → cumulative [1,2,4,6,9,12,16,20,25,30].
+pub const STORY_RESONANCE_THRESHOLDS: [u32; 10] = [1, 2, 4, 6, 9, 12, 16, 20, 25, 30];
 
-/// Prestige rank gates for each story stage.
-pub const STORY_PRESTIGE_TREMORS: u32 = 15;
-pub const STORY_PRESTIGE_CAPTAIN: u32 = 17;
-pub const STORY_PRESTIGE_FRAGMENT: u32 = 19;
-pub const STORY_PRESTIGE_ENTRANCE: u32 = 21;
+/// The story stage at which the player can press [D] to discover The Deep.
+pub const STORY_STAGE_ENTRANCE: u8 = 10;
+
+/// The story stage value after discovery is complete.
+pub const STORY_STAGE_DISCOVERED: u8 = 11;
 
 /// The layer where the Gateway is located.
 pub const GATEWAY_LAYER: u32 = 30;
@@ -469,8 +463,6 @@ pub struct MissionResult {
     pub stormglass_earned: u64,
     /// Item ilvl for any dropped items (None if no items).
     pub item_ilvl: Option<u32>,
-    /// Whether a prestige rank fragment was earned (Breakthrough on deep layers only).
-    pub prestige_fragment: bool,
     /// Merc ids that were injured as a result of this mission.
     pub injured_mercs: Vec<u64>,
     /// Merc ids that were permanently lost.
@@ -707,9 +699,6 @@ pub struct DeepPersistent {
     /// Story chain progress (0 = not started, 1-4 = stages, 5 = discovered).
     #[serde(default)]
     pub deep_story_stage: u8,
-    /// Rift Fragments collected (0-4).
-    #[serde(default)]
-    pub rift_fragments: u8,
     /// Whether the Gateway at Layer 30 has been opened.
     #[serde(default)]
     pub gateway_opened: bool,
@@ -740,7 +729,6 @@ impl DeepPersistent {
             generation_counter: 0,
             rift_resonance: 0,
             deep_story_stage: 0,
-            rift_fragments: 0,
             gateway_opened: false,
             first_orders_queued: false,
             generation_records: Vec::new(),
@@ -931,52 +919,24 @@ impl DeepState {
     /// Check and advance story stage based on current rift resonance and prestige rank.
     /// Returns the new stage if it advanced, or None if unchanged.
     pub fn check_story_progression(&mut self, prestige_rank: u32) -> Option<u8> {
+        if prestige_rank < DEEP_MIN_PRESTIGE_RANK {
+            return None;
+        }
         let resonance = self.persistent.rift_resonance;
         let stage = self.persistent.deep_story_stage;
 
-        let new_stage = if stage == 0
-            && resonance >= STORY_RESONANCE_TREMORS
-            && prestige_rank >= STORY_PRESTIGE_TREMORS
-        {
-            1
-        } else if stage == 1
-            && resonance >= STORY_RESONANCE_CAPTAIN
-            && prestige_rank >= STORY_PRESTIGE_CAPTAIN
-        {
-            2
-        } else if stage == 2
-            && resonance >= STORY_RESONANCE_FRAGMENT
-            && prestige_rank >= STORY_PRESTIGE_FRAGMENT
-        {
-            3
-        } else if stage == 3
-            && resonance >= STORY_RESONANCE_ENTRANCE
-            && prestige_rank >= STORY_PRESTIGE_ENTRANCE
-        {
-            // Also requires 4 rift fragments
-            if self.persistent.rift_fragments >= 4 {
-                4
-            } else {
-                return None;
-            }
-        } else {
+        // Stage must be 0-9 (levels not yet reached entrance)
+        if stage >= STORY_STAGE_ENTRANCE {
             return None;
-        };
+        }
 
-        self.persistent.deep_story_stage = new_stage;
-        Some(new_stage)
-    }
-
-    /// Award rift fragments based on resonance level.
-    /// Fragments are awarded at resonance 5, 6, 7 (one per resonance level).
-    /// The 4th fragment is awarded automatically at resonance 7.
-    pub fn maybe_award_rift_fragment(&mut self) {
-        let resonance = self.persistent.rift_resonance;
-        let earned = resonance
-            .saturating_sub(STORY_RESONANCE_FRAGMENT - 1)
-            .min(4) as u8;
-        if earned > self.persistent.rift_fragments {
-            self.persistent.rift_fragments = earned;
+        let next_level = stage + 1; // 1-based level index
+        let threshold = STORY_RESONANCE_THRESHOLDS[next_level as usize - 1];
+        if resonance >= threshold {
+            self.persistent.deep_story_stage = next_level;
+            Some(next_level)
+        } else {
+            None
         }
     }
 
@@ -1163,20 +1123,6 @@ impl Default for DeepUiState {
     fn default() -> Self {
         Self::new()
     }
-}
-
-// ── Discovery Chance ──────────────────────────────────────────────────────────
-
-/// Per-tick discovery probability for The Deep.
-///
-/// Returns 0.0 if the prestige rank is below the minimum.
-/// Mirrors the pattern used by Haven and Soulforge discovery.
-pub fn deep_discovery_chance(prestige_rank: u32) -> f64 {
-    if prestige_rank < DEEP_MIN_PRESTIGE_RANK {
-        return 0.0;
-    }
-    DEEP_DISCOVERY_BASE_CHANCE
-        + (prestige_rank - DEEP_MIN_PRESTIGE_RANK) as f64 * DEEP_DISCOVERY_RANK_BONUS
 }
 
 #[cfg(test)]
@@ -1477,29 +1423,6 @@ mod tests {
         assert!(loaded.persistent.discovered);
         assert_eq!(loaded.persistent.guild_rank, GuildRank(2));
         assert_eq!(loaded.prestige.warband_marks, 1240);
-    }
-
-    // ── Discovery Chance ──────────────────────────────────────────────────────
-
-    #[test]
-    fn test_deep_discovery_chance_below_minimum() {
-        assert_eq!(deep_discovery_chance(0), 0.0);
-        assert_eq!(deep_discovery_chance(14), 0.0);
-    }
-
-    #[test]
-    fn test_deep_discovery_chance_at_minimum() {
-        let chance = deep_discovery_chance(15);
-        assert!((chance - 0.000014).abs() < 1e-10);
-    }
-
-    #[test]
-    fn test_deep_discovery_chance_scales_with_rank() {
-        let p15 = deep_discovery_chance(15);
-        let p17 = deep_discovery_chance(17);
-        let p25 = deep_discovery_chance(25);
-        assert!(p17 > p15);
-        assert!(p25 > p17);
     }
 
     // ── Mercenary helpers ─────────────────────────────────────────────────────

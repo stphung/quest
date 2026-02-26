@@ -38,13 +38,13 @@ impl FamiliarityLevel {
         }
     }
 
-    /// Mission duration reduction factor (1.0 = no reduction, 0.7 = -30%).
+    /// Mission duration reduction factor (1.0 = no reduction, 0.55 = -45%).
     pub fn duration_factor(self) -> f64 {
         match self {
             FamiliarityLevel::Unknown => 1.0,
-            FamiliarityLevel::Mapped => 0.90,
-            FamiliarityLevel::Familiar => 0.80,
-            FamiliarityLevel::Mastered => 0.70,
+            FamiliarityLevel::Mapped => 0.85,
+            FamiliarityLevel::Familiar => 0.70,
+            FamiliarityLevel::Mastered => 0.55,
         }
     }
 
@@ -58,10 +58,11 @@ impl FamiliarityLevel {
         }
     }
 
-    /// Bonus Mark yield multiplier (1.0 = no bonus, 1.15 = +15%).
+    /// Bonus Mark yield multiplier (1.0 = no bonus, 1.25 = +25%).
     pub fn mark_yield_multiplier(self) -> f64 {
         match self {
-            FamiliarityLevel::Mastered => 1.15,
+            FamiliarityLevel::Familiar => 1.10,
+            FamiliarityLevel::Mastered => 1.25,
             _ => 1.0,
         }
     }
@@ -85,8 +86,8 @@ impl FamiliarityLevel {
 /// (handled separately in `build_infrastructure`).
 pub fn familiarity_gain(mission_type: MissionType) -> u8 {
     match mission_type {
-        MissionType::SupplyRun => 5,
-        MissionType::Recon => 15,
+        MissionType::SupplyRun => 8,
+        MissionType::Recon => 20,
         MissionType::Expedition => 10,
         MissionType::Breakthrough | MissionType::GatewayExpedition => 15,
         MissionType::Construction(_) => 5,
@@ -194,42 +195,42 @@ pub const MIN_MISSION_DURATION_SECS: u64 = 15 * 60;
 pub fn base_mission_duration_secs(tier: LayerTier, mission_type: MissionType) -> u64 {
     match (tier, mission_type) {
         // Supply Run
-        (LayerTier::Shallows, MissionType::SupplyRun) => 1200,
-        (LayerTier::Warrens, MissionType::SupplyRun) => 3600,
-        (LayerTier::Hollows, MissionType::SupplyRun) => 5400,
-        (LayerTier::SunkenReach, MissionType::SupplyRun) => 7200,
-        (LayerTier::Abyss, MissionType::SupplyRun) => 9000,
-        (LayerTier::Void, MissionType::SupplyRun) => 10800,
+        (LayerTier::Shallows, MissionType::SupplyRun) => 600,
+        (LayerTier::Warrens, MissionType::SupplyRun) => 1800,
+        (LayerTier::Hollows, MissionType::SupplyRun) => 2700,
+        (LayerTier::SunkenReach, MissionType::SupplyRun) => 3600,
+        (LayerTier::Abyss, MissionType::SupplyRun) => 4500,
+        (LayerTier::Void, MissionType::SupplyRun) => 5400,
         // Recon
-        (LayerTier::Shallows, MissionType::Recon) => 3600,
-        (LayerTier::Warrens, MissionType::Recon) => 7200,
-        (LayerTier::Hollows, MissionType::Recon) => 10800,
-        (LayerTier::SunkenReach, MissionType::Recon) => 14400,
-        (LayerTier::Abyss, MissionType::Recon) => 18000,
-        (LayerTier::Void, MissionType::Recon) => 21600,
+        (LayerTier::Shallows, MissionType::Recon) => 1800,
+        (LayerTier::Warrens, MissionType::Recon) => 3600,
+        (LayerTier::Hollows, MissionType::Recon) => 5400,
+        (LayerTier::SunkenReach, MissionType::Recon) => 7200,
+        (LayerTier::Abyss, MissionType::Recon) => 9000,
+        (LayerTier::Void, MissionType::Recon) => 10800,
         // Expedition
-        (LayerTier::Shallows, MissionType::Expedition) => 7200,
-        (LayerTier::Warrens, MissionType::Expedition) => 14400,
-        (LayerTier::Hollows, MissionType::Expedition) => 21600,
-        (LayerTier::SunkenReach, MissionType::Expedition) => 28800,
-        (LayerTier::Abyss, MissionType::Expedition) => 36000,
-        (LayerTier::Void, MissionType::Expedition) => 43200,
+        (LayerTier::Shallows, MissionType::Expedition) => 3600,
+        (LayerTier::Warrens, MissionType::Expedition) => 7200,
+        (LayerTier::Hollows, MissionType::Expedition) => 10800,
+        (LayerTier::SunkenReach, MissionType::Expedition) => 14400,
+        (LayerTier::Abyss, MissionType::Expedition) => 18000,
+        (LayerTier::Void, MissionType::Expedition) => 21600,
         // Breakthrough
-        (LayerTier::Shallows, MissionType::Breakthrough) => 14400,
-        (LayerTier::Warrens, MissionType::Breakthrough) => 28800,
-        (LayerTier::Hollows, MissionType::Breakthrough) => 43200,
-        (LayerTier::SunkenReach, MissionType::Breakthrough) => 57600,
-        (LayerTier::Abyss, MissionType::Breakthrough) => 72000,
-        (LayerTier::Void, MissionType::Breakthrough) => 86400,
+        (LayerTier::Shallows, MissionType::Breakthrough) => 7200,
+        (LayerTier::Warrens, MissionType::Breakthrough) => 14400,
+        (LayerTier::Hollows, MissionType::Breakthrough) => 21600,
+        (LayerTier::SunkenReach, MissionType::Breakthrough) => 28800,
+        (LayerTier::Abyss, MissionType::Breakthrough) => 36000,
+        (LayerTier::Void, MissionType::Breakthrough) => 43200,
         // Construction
-        (LayerTier::Shallows, MissionType::Construction(_)) => 3600,
-        (LayerTier::Warrens, MissionType::Construction(_)) => 7200,
-        (LayerTier::Hollows, MissionType::Construction(_)) => 10800,
-        (LayerTier::SunkenReach, MissionType::Construction(_)) => 14400,
-        (LayerTier::Abyss, MissionType::Construction(_)) => 18000,
-        (LayerTier::Void, MissionType::Construction(_)) => 21600,
-        // Gateway Expedition — fixed 24h regardless of tier
-        (_, MissionType::GatewayExpedition) => 86400,
+        (LayerTier::Shallows, MissionType::Construction(_)) => 1800,
+        (LayerTier::Warrens, MissionType::Construction(_)) => 3600,
+        (LayerTier::Hollows, MissionType::Construction(_)) => 5400,
+        (LayerTier::SunkenReach, MissionType::Construction(_)) => 7200,
+        (LayerTier::Abyss, MissionType::Construction(_)) => 9000,
+        (LayerTier::Void, MissionType::Construction(_)) => 10800,
+        // Gateway Expedition — fixed 12h regardless of tier
+        (_, MissionType::GatewayExpedition) => 43200,
     }
 }
 
@@ -335,9 +336,9 @@ pub fn build_infrastructure(
 
     record.infrastructure.push(infra);
 
-    // Watchtower grants an immediate +25 familiarity bonus.
+    // Watchtower grants an immediate +40 familiarity bonus.
     if infra == Infrastructure::Watchtower {
-        record.familiarity = record.familiarity.saturating_add(25).min(100);
+        record.familiarity = record.familiarity.saturating_add(40).min(100);
     }
 
     Ok(())
@@ -425,9 +426,9 @@ mod tests {
     #[test]
     fn test_familiarity_level_duration_factors() {
         assert_eq!(FamiliarityLevel::Unknown.duration_factor(), 1.0);
-        assert_eq!(FamiliarityLevel::Mapped.duration_factor(), 0.90);
-        assert_eq!(FamiliarityLevel::Familiar.duration_factor(), 0.80);
-        assert_eq!(FamiliarityLevel::Mastered.duration_factor(), 0.70);
+        assert_eq!(FamiliarityLevel::Mapped.duration_factor(), 0.85);
+        assert_eq!(FamiliarityLevel::Familiar.duration_factor(), 0.70);
+        assert_eq!(FamiliarityLevel::Mastered.duration_factor(), 0.55);
     }
 
     #[test]
@@ -442,16 +443,16 @@ mod tests {
     fn test_mastered_mark_yield_bonus() {
         assert_eq!(FamiliarityLevel::Unknown.mark_yield_multiplier(), 1.0);
         assert_eq!(FamiliarityLevel::Mapped.mark_yield_multiplier(), 1.0);
-        assert_eq!(FamiliarityLevel::Familiar.mark_yield_multiplier(), 1.0);
-        assert_eq!(FamiliarityLevel::Mastered.mark_yield_multiplier(), 1.15);
+        assert_eq!(FamiliarityLevel::Familiar.mark_yield_multiplier(), 1.10);
+        assert_eq!(FamiliarityLevel::Mastered.mark_yield_multiplier(), 1.25);
     }
 
     // ── Familiarity Gain ─────────────────────────────────────────────────────
 
     #[test]
     fn test_familiarity_gain_values() {
-        assert_eq!(familiarity_gain(MissionType::SupplyRun), 5);
-        assert_eq!(familiarity_gain(MissionType::Recon), 15);
+        assert_eq!(familiarity_gain(MissionType::SupplyRun), 8);
+        assert_eq!(familiarity_gain(MissionType::Recon), 20);
         assert_eq!(familiarity_gain(MissionType::Expedition), 10);
         assert_eq!(familiarity_gain(MissionType::Breakthrough), 15);
         assert_eq!(
@@ -471,9 +472,9 @@ mod tests {
     #[test]
     fn test_apply_familiarity_gain_accumulates() {
         let mut record = LayerRecord::new(1);
-        apply_familiarity_gain(&mut record, MissionType::SupplyRun); // +5
-        apply_familiarity_gain(&mut record, MissionType::Recon); // +15
-        assert_eq!(record.familiarity, 20);
+        apply_familiarity_gain(&mut record, MissionType::SupplyRun); // +8
+        apply_familiarity_gain(&mut record, MissionType::Recon); // +20
+        assert_eq!(record.familiarity, 28);
     }
 
     // ── Power Thresholds ─────────────────────────────────────────────────────
@@ -548,11 +549,11 @@ mod tests {
     fn test_base_durations_shallows() {
         assert_eq!(
             base_mission_duration_secs(LayerTier::Shallows, MissionType::SupplyRun),
-            1200
+            600
         );
         assert_eq!(
             base_mission_duration_secs(LayerTier::Shallows, MissionType::Breakthrough),
-            14400
+            7200
         );
     }
 
@@ -617,7 +618,7 @@ mod tests {
     }
 
     #[test]
-    fn test_duration_mastered_familiarity_reduces_by_30_percent() {
+    fn test_duration_mastered_familiarity_reduces_by_45_percent() {
         let base = 8 * 3600u64;
         let mods = DurationModifiers {
             has_outpost: false,
@@ -628,14 +629,14 @@ mod tests {
             bridge_layers: 0,
         };
         let result = apply_duration_modifiers(base, &mods);
-        let expected = (base as f64 * 0.70) as u64;
+        let expected = (base as f64 * 0.55) as u64;
         assert_eq!(result, expected);
     }
 
     #[test]
     fn test_duration_stacks_multiplicatively() {
-        // Outpost -25%, Mastered -30%, Saboteur veteran -15%, Overpowered -10%
-        // Net: 0.75 * 0.70 * 0.85 * 0.90 ≈ 0.4016
+        // Outpost -25%, Mastered -45%, Saboteur veteran -15%, Overpowered -10%
+        // Net: 0.75 * 0.55 * 0.85 * 0.90 ≈ 0.3156
         let base = 8 * 3600u64;
         let mods = DurationModifiers {
             has_outpost: true,
@@ -646,7 +647,7 @@ mod tests {
             bridge_layers: 0,
         };
         let result = apply_duration_modifiers(base, &mods);
-        let expected = (base as f64 * 0.75 * 0.70 * 0.85 * 0.90) as u64;
+        let expected = (base as f64 * 0.75 * 0.55 * 0.85 * 0.90) as u64;
         assert_eq!(result, expected);
     }
 
@@ -747,7 +748,7 @@ mod tests {
         record.cleared = true;
         record.familiarity = 30;
         build_infrastructure(&mut record, Infrastructure::Watchtower).unwrap();
-        assert_eq!(record.familiarity, 55); // 30 + 25
+        assert_eq!(record.familiarity, 70); // 30 + 40
     }
 
     #[test]

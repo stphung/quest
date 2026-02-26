@@ -366,16 +366,16 @@ fn render_roster_split(
             cursor,
             if is_sel { Color::Cyan } else { Color::DarkGray },
         );
-        // Archetype colored
+        // Archetype colored (base col 1 + cursor(2) + name(14) + sp(1) = 18)
         put_text(
             buffer,
             list_row,
-            17,
+            18,
             arch_name,
             archetype_color(merc.archetype),
         );
         // Quality glyph colored
-        let qg_col = 17 + 8 + 1; // after archetype + space
+        let qg_col = 18 + 8 + 1; // base col 1 + cursor(2) + name(14) + sp(1) + arch(8) + sp(1)
         let qg_str = format!("{}", qg);
         put_text(buffer, list_row, qg_col, &qg_str, qc);
         // Status colored at fixed offset
@@ -935,11 +935,11 @@ fn render_recruit_split(
             cursor,
             if is_sel { Color::Cyan } else { Color::DarkGray },
         );
-        // Archetype colored
+        // Archetype colored (base col 1 + cursor(2) + name(14) + sp(1) = 18)
         put_text(
             buffer,
             row,
-            17,
+            18,
             arch_str,
             if can_afford {
                 archetype_color(candidate.archetype)

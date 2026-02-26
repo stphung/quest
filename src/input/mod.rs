@@ -484,7 +484,7 @@ fn handle_base_game(
         KeyCode::Char('d') | KeyCode::Char('D') => {
             if deep_state.persistent.discovered {
                 deep_ui.open();
-            } else if deep_state.persistent.deep_story_stage >= 4 {
+            } else if deep_state.persistent.deep_story_stage >= crate::deep::STORY_STAGE_ENTRANCE {
                 // Narrative discovery: story chain reached stage 4 (The Entrance).
                 // Player presses [D] to complete discovery and descend.
                 crate::deep::complete_story_discovery(deep_state, &mut rand::rng());

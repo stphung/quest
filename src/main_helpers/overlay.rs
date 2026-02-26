@@ -105,7 +105,10 @@ pub fn draw_game_overlays(
             ui::game_common::render_offline_welcome(frame, area, report, ctx);
         }
         GameOverlay::PrestigeConfirm => {
-            ui::prestige_confirm::draw_prestige_confirm(frame, state, ctx);
+            let rift_hint = !deep_state.persistent.discovered
+                && state.prestige_rank >= crate::deep::DEEP_MIN_PRESTIGE_RANK
+                && state.zone_progression.current_zone_id >= 11;
+            ui::prestige_confirm::draw_prestige_confirm(frame, state, rift_hint, ctx);
         }
         GameOverlay::HavenDiscovery => {
             ui::haven_scene::render_haven_discovery_modal(frame, area, ctx);

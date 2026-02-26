@@ -101,12 +101,6 @@ pub(super) fn render_mission_results(
             Style::default().fg(Color::Rgb(100, 180, 255)),
         )));
     }
-    if result.prestige_fragment {
-        lines.push(Line::from(Span::styled(
-            "  + 0.5 Prestige Rank",
-            Style::default().fg(Color::Rgb(255, 215, 0)),
-        )));
-    }
     if let Some(ilvl) = result.item_ilvl {
         lines.push(Line::from(Span::styled(
             format!("  + Item (ilvl {})", ilvl),

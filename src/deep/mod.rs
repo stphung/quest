@@ -40,8 +40,6 @@ pub mod types;
 // Allow unused while consumers (tick.rs, UI, tests) are still being implemented.
 #[allow(unused_imports)]
 pub use types::{
-    // Discovery
-    deep_discovery_chance,
     effective_concurrent_missions,
     // Structs
     AvailableMission,
@@ -69,30 +67,22 @@ pub use types::{
     MissionType,
     RecruitPool,
     WarbandLogEntry,
-    DEEP_DISCOVERY_BASE_CHANCE,
-    DEEP_DISCOVERY_RANK_BONUS,
     DEEP_MIN_PRESTIGE_RANK,
     GATEWAY_LAYER,
-    STORY_PRESTIGE_CAPTAIN,
-    STORY_PRESTIGE_ENTRANCE,
-    STORY_PRESTIGE_FRAGMENT,
-    STORY_PRESTIGE_TREMORS,
-    STORY_RESONANCE_CAPTAIN,
-    STORY_RESONANCE_ENTRANCE,
-    STORY_RESONANCE_FRAGMENT,
-    STORY_RESONANCE_TREMORS,
+    STORY_RESONANCE_THRESHOLDS,
+    STORY_STAGE_DISCOVERED,
+    STORY_STAGE_ENTRANCE,
 };
 
-pub use discovery::{advance_deep_story, complete_story_discovery, try_discover_deep};
+pub use discovery::{advance_deep_story, complete_story_discovery};
 
 // Economy re-exports
 #[allow(unused_imports)]
 pub use economy::{
     base_marks_earned, base_xp_reward, compute_mark_reward, guild_upgrade_cost,
     marks_variance_multiplier, merc_xp_per_mission, merc_xp_to_next_level, mission_launch_cost,
-    outcome_mark_multiplier, prestige_fragment_hundredths, recruit_quality_distribution,
-    stormglass_reward, try_upgrade_guild_rank, xp_reward, GuildUpgradeError, MarkRewardParams,
-    RecruitQuality,
+    outcome_mark_multiplier, recruit_quality_distribution, stormglass_reward,
+    try_upgrade_guild_rank, xp_reward, GuildUpgradeError, MarkRewardParams, RecruitQuality,
 };
 
 // Layers re-exports

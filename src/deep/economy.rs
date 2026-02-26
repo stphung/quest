@@ -111,7 +111,7 @@ pub fn compute_mark_reward(params: &MarkRewardParams) -> u32 {
     // Supply Cache only applies to Supply Runs.
     let after_cache =
         if params.has_supply_cache && matches!(params.mission_type, MissionType::SupplyRun) {
-            base * 1.50 // +50%
+            base * 1.75 // +75%
         } else {
             base
         };
@@ -336,32 +336,6 @@ pub fn stormglass_reward(mission_type: MissionType, layer: u32) -> u64 {
         MissionType::Expedition => 5 + layer / 3,
         MissionType::Breakthrough => 10 + layer / 2,
         _ => 0,
-    }
-}
-
-// ── Prestige Rank Fragments ───────────────────────────────────────────────────
-
-/// Prestige rank fragment (in hundredths of a rank) awarded from a Breakthrough.
-///
-/// Accumulates across Breakthroughs; callers track the running total and award
-/// whole prestige ranks when the total reaches 100.
-///
-/// From balance design §9:
-/// - Layers 1-7:  0 PR
-/// - Layers 8-12: 0.25 PR  (25 hundredths)
-/// - Layers 13-18: 0.50 PR (50 hundredths)
-/// - Layers 19-25: 0.75 PR (75 hundredths)
-/// - Layers 26+:  1.00 PR  (100 hundredths)
-pub fn prestige_fragment_hundredths(mission_type: MissionType, layer: u32) -> u32 {
-    if !matches!(mission_type, MissionType::Breakthrough) {
-        return 0;
-    }
-    match layer {
-        1..=7 => 0,
-        8..=12 => 25,
-        13..=18 => 50,
-        19..=25 => 75,
-        _ => 100,
     }
 }
 
@@ -771,59 +745,6 @@ mod tests {
         let l20 = stormglass_reward(MissionType::Expedition, 20);
         assert!(l10 >= l1);
         assert!(l20 >= l10);
-    }
-
-    // ── Prestige Fragments ────────────────────────────────────────────────────
-
-    #[test]
-    fn test_prestige_fragment_only_from_breakthrough() {
-        assert_eq!(prestige_fragment_hundredths(MissionType::SupplyRun, 10), 0);
-        assert_eq!(prestige_fragment_hundredths(MissionType::Expedition, 10), 0);
-    }
-
-    #[test]
-    fn test_prestige_fragment_thresholds() {
-        // Layers 1-7: no fragment.
-        assert_eq!(
-            prestige_fragment_hundredths(MissionType::Breakthrough, 7),
-            0
-        );
-        // Layers 8-12: 25 hundredths (0.25 PR).
-        assert_eq!(
-            prestige_fragment_hundredths(MissionType::Breakthrough, 8),
-            25
-        );
-        assert_eq!(
-            prestige_fragment_hundredths(MissionType::Breakthrough, 12),
-            25
-        );
-        // Layers 13-18: 50 hundredths (0.50 PR).
-        assert_eq!(
-            prestige_fragment_hundredths(MissionType::Breakthrough, 13),
-            50
-        );
-        assert_eq!(
-            prestige_fragment_hundredths(MissionType::Breakthrough, 18),
-            50
-        );
-        // Layers 19-25: 75 hundredths.
-        assert_eq!(
-            prestige_fragment_hundredths(MissionType::Breakthrough, 19),
-            75
-        );
-        assert_eq!(
-            prestige_fragment_hundredths(MissionType::Breakthrough, 25),
-            75
-        );
-        // Void (26+): 100 hundredths (1 full PR).
-        assert_eq!(
-            prestige_fragment_hundredths(MissionType::Breakthrough, 26),
-            100
-        );
-        assert_eq!(
-            prestige_fragment_hundredths(MissionType::Breakthrough, 50),
-            100
-        );
     }
 
     // ── Merc XP ───────────────────────────────────────────────────────────────

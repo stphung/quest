@@ -17,8 +17,7 @@ use rand::{Rng, RngExt};
 
 use super::economy::{
     compute_mark_reward, merc_xp_per_mission, merc_xp_to_next_level, mission_launch_cost,
-    outcome_mark_multiplier, prestige_fragment_hundredths, stormglass_reward, xp_reward,
-    MarkRewardParams,
+    outcome_mark_multiplier, stormglass_reward, xp_reward, MarkRewardParams,
 };
 use super::events::{generate_mission_events_with_names, tick_mission_events, EventTickResult};
 use super::layers::{
@@ -804,13 +803,6 @@ pub fn resolve_mission(
         MissionOutcome::Failure => 0,
     };
 
-    let fragment_hundredths = prestige_fragment_hundredths(mission.mission_type, mission.layer);
-    let prestige_fragment = fragment_hundredths > 0
-        && matches!(
-            outcome,
-            MissionOutcome::Success | MissionOutcome::PartialSuccess
-        );
-
     // Determine injuries and losses based on outcome.
     let (injured_mercs, lost_mercs) =
         apply_mission_casualties(mission, prestige, persistent, &outcome, rng);
@@ -874,7 +866,6 @@ pub fn resolve_mission(
         xp_earned: xp,
         stormglass_earned: stormglass_scaled,
         item_ilvl: item_ilvl_for_mission(mission),
-        prestige_fragment,
         injured_mercs,
         lost_mercs,
         merc_level_ups,
@@ -920,7 +911,6 @@ fn resolve_first_orders(
         xp_earned: 0,
         stormglass_earned: 0,
         item_ilvl: None,
-        prestige_fragment: false,
         injured_mercs: vec![],
         lost_mercs: vec![],
         merc_level_ups: vec![],
@@ -1184,7 +1174,6 @@ pub fn resolve_offline_missions(
             if let Some(ref result) = mission.result {
                 summary.total_marks_earned += result.marks_earned;
                 summary.total_xp_earned += result.xp_earned;
-                summary.prestige_fragments += if result.prestige_fragment { 1 } else { 0 };
             }
             prestige.pending_results.push(mission);
         }
@@ -1204,8 +1193,6 @@ pub struct OfflineResolutionSummary {
     pub total_marks_earned: u32,
     /// Total character XP awarded.
     pub total_xp_earned: u32,
-    /// Count of prestige fragment events from Breakthrough missions.
-    pub prestige_fragments: u32,
 }
 
 // ── Free Daily Supply Run ──────────────────────────────────────────────────────
@@ -1580,11 +1567,11 @@ mod tests {
 
         assert_eq!(mission.started_at, now);
         assert!(mission.ends_at > now, "ends_at must be after started_at");
-        // Supply run on Shallows: base 1200s (20min). With overpowered modifier
-        // (-10%), can be as low as 1080s. Allow up to 4h for higher-tier supply runs.
+        // Supply run on Shallows: base 600s (10min). With overpowered modifier
+        // (-10%), can be as low as 540s. Allow up to 2h for higher-tier supply runs.
         let duration = (mission.ends_at - mission.started_at).num_seconds();
         assert!(
-            (1080..=4 * 3600 + 60).contains(&duration),
+            (540..=2 * 3600 + 60).contains(&duration),
             "Duration {} seconds out of expected range",
             duration
         );

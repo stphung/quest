@@ -88,15 +88,15 @@ fn test_duration_mods_outpost_and_mastered_familiarity() {
     let base = 7200u64; // 2 hours
     let mods = DurationModifiers {
         has_outpost: true,
-        familiarity: 75, // Mastered => *0.70
+        familiarity: 75, // Mastered => *0.55
         has_saboteur: false,
         saboteur_is_veteran: false,
         is_overpowered: false,
         bridge_layers: 0,
     };
     let effective = apply_duration_modifiers(base, &mods);
-    // Outpost: *0.75, Mastered: *0.70 => 7200 * 0.75 * 0.70 = 3779 (f64 truncation)
-    let expected = (7200.0_f64 * 0.75 * 0.70) as u64;
+    // Outpost: *0.75, Mastered: *0.55 => 7200 * 0.75 * 0.55 = 2970
+    let expected = (7200.0_f64 * 0.75 * 0.55) as u64;
     assert_eq!(effective, expected);
 }
 
@@ -137,14 +137,14 @@ fn test_duration_mods_all_active_stacks_multiplicatively() {
     let base = 14400u64; // 4 hours
     let mods = DurationModifiers {
         has_outpost: true,  // *0.75
-        familiarity: 100,   // Mastered *0.70
+        familiarity: 100,   // Mastered *0.55
         has_saboteur: true, // *0.85 (veteran)
         saboteur_is_veteran: true,
         is_overpowered: true, // *0.90
         bridge_layers: 2,     // *0.80 (2 bridges at 10% each)
     };
     let effective = apply_duration_modifiers(base, &mods);
-    let expected = (14400.0_f64 * 0.75 * 0.70 * 0.85 * 0.90 * 0.80) as u64;
+    let expected = (14400.0_f64 * 0.75 * 0.55 * 0.85 * 0.90 * 0.80) as u64;
     assert_eq!(effective, expected);
     assert!(effective < base);
     assert!(
@@ -208,14 +208,14 @@ fn test_duration_mods_familiarity_mapped() {
     let base = 10000u64;
     let mods = DurationModifiers {
         has_outpost: false,
-        familiarity: 30, // Mapped => *0.90
+        familiarity: 30, // Mapped => *0.85
         has_saboteur: false,
         saboteur_is_veteran: false,
         is_overpowered: false,
         bridge_layers: 0,
     };
     let effective = apply_duration_modifiers(base, &mods);
-    assert_eq!(effective, 9000); // 10000 * 0.90
+    assert_eq!(effective, 8500); // 10000 * 0.85
 }
 
 #[test]
@@ -223,14 +223,14 @@ fn test_duration_mods_familiarity_familiar() {
     let base = 10000u64;
     let mods = DurationModifiers {
         has_outpost: false,
-        familiarity: 55, // Familiar => *0.80
+        familiarity: 55, // Familiar => *0.70
         has_saboteur: false,
         saboteur_is_veteran: false,
         is_overpowered: false,
         bridge_layers: 0,
     };
     let effective = apply_duration_modifiers(base, &mods);
-    assert_eq!(effective, 8000); // 10000 * 0.80
+    assert_eq!(effective, 7000); // 10000 * 0.70
 }
 
 #[test]

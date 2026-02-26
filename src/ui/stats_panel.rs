@@ -58,6 +58,7 @@ impl DeepIndicatorStatus {
 }
 
 /// Draws the stats panel
+#[allow(clippy::too_many_arguments)]
 pub fn draw_stats_panel(
     frame: &mut Frame,
     area: Rect,
@@ -65,6 +66,8 @@ pub fn draw_stats_panel(
     ctx: &LayoutContext,
     enhancement_levels: &[u8; 7],
     achievements: &crate::achievements::Achievements,
+    rift_hint: bool,
+    rift_resonance: u32,
 ) {
     match ctx.height_tier {
         SizeTier::XL | SizeTier::L => {
@@ -90,7 +93,14 @@ pub fn draw_stats_panel(
             let mut idx = 0;
             draw_header(frame, chunks[idx], game_state, achievements);
             idx += 1;
-            draw_prestige_info(frame, chunks[idx], game_state, achievements);
+            draw_prestige_info(
+                frame,
+                chunks[idx],
+                game_state,
+                achievements,
+                rift_hint,
+                rift_resonance,
+            );
             idx += 1;
             draw_fishing_panel(frame, chunks[idx], game_state, achievements);
             idx += 1;

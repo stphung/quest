@@ -842,7 +842,6 @@ fn test_mission_result_struct_fields_are_accessible() {
         xp_earned: 1_000,
         stormglass_earned: 50,
         item_ilvl: Some(80),
-        prestige_fragment: true,
         injured_mercs: vec![],
         lost_mercs: vec![],
         merc_level_ups: vec![(1, 1)],
@@ -853,7 +852,6 @@ fn test_mission_result_struct_fields_are_accessible() {
     assert_eq!(result.xp_earned, 1_000);
     assert_eq!(result.stormglass_earned, 50);
     assert_eq!(result.item_ilvl, Some(80));
-    assert!(result.prestige_fragment);
     assert!(result.injured_mercs.is_empty());
     assert!(result.lost_mercs.is_empty());
     assert_eq!(result.merc_level_ups, vec![(1, 1)]);
@@ -1502,10 +1500,10 @@ fn test_duration_modifiers_outpost_reduces_by_25_percent() {
 }
 
 #[test]
-fn test_duration_modifiers_mastered_familiarity_reduces_by_30_percent() {
+fn test_duration_modifiers_mastered_familiarity_reduces_by_45_percent() {
     use quest::deep::{apply_duration_modifiers, DurationModifiers};
     let base: u64 = 8 * 3600;
-    // Familiarity 75+ = Mastered (-30%)
+    // Familiarity 75+ = Mastered (-45%)
     let mods = DurationModifiers {
         has_outpost: false,
         familiarity: 80,
@@ -1515,10 +1513,10 @@ fn test_duration_modifiers_mastered_familiarity_reduces_by_30_percent() {
         bridge_layers: 0,
     };
     let result = apply_duration_modifiers(base, &mods);
-    let expected = (base as f64 * 0.70) as u64;
+    let expected = (base as f64 * 0.55) as u64;
     assert!(
         (result as i64 - expected as i64).abs() <= 60, // allow 1min rounding
-        "Mastered familiarity should reduce by ~30%, got {result} expected ~{expected}"
+        "Mastered familiarity should reduce by ~45%, got {result} expected ~{expected}"
     );
 }
 

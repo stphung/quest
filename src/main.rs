@@ -615,7 +615,6 @@ fn main() -> io::Result<()> {
                                 haven.discovered,
                                 enhancement.discovered,
                                 state.stormglass_discovered,
-                                deep_state.persistent.discovered,
                                 &deep_state,
                                 &global_achievements,
                                 &enhancement.levels,

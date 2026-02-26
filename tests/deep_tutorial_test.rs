@@ -7,69 +7,20 @@
 //! 4. Guild rank properties (roster caps, concurrent missions, advancement)
 //! 5. Type-level API contracts (mercs, missions, events, infrastructure)
 //!
-//! Tests that require tick integration (TickEvent::DeepDiscovered, deep_changed flag,
-//! mission generation/logic) are marked #[ignore] until Tasks #10, #12, #13, #14 land.
+//! Tests that require tick integration (deep_changed flag, mission generation/logic)
+//! are marked #[ignore] until Tasks #10, #12, #13, #14 land.
 //!
 //! These tests follow the same patterns as haven/soulforge discovery tests in
 //! tick_stage_coverage_test.rs and game_loop_orchestration_test.rs.
 
 use quest::deep::{
-    deep_discovery_chance, CheckInEvent, DeepPersistent, DeepPrestige, DeepState, DeepUiState,
-    DeepView, EventChoice, GuildRank, Infrastructure, Layer, LayerTier, MercArchetype, MercStatus,
-    Mercenary, MissionType, DEEP_DISCOVERY_BASE_CHANCE, DEEP_MIN_PRESTIGE_RANK,
+    CheckInEvent, DeepPersistent, DeepPrestige, DeepState, DeepUiState, DeepView, EventChoice,
+    GuildRank, Infrastructure, Layer, LayerTier, MercArchetype, MercStatus, Mercenary, MissionType,
+    STORY_RESONANCE_THRESHOLDS, STORY_STAGE_DISCOVERED, STORY_STAGE_ENTRANCE,
 };
 
 // =============================================================================
-// 1. Discovery Chance — Prestige Gating
-// =============================================================================
-
-/// Discovery chance is 0.0 below P15.
-#[test]
-fn test_deep_discovery_chance_zero_below_p15() {
-    assert_eq!(deep_discovery_chance(0), 0.0);
-    assert_eq!(deep_discovery_chance(1), 0.0);
-    assert_eq!(deep_discovery_chance(10), 0.0);
-    assert_eq!(deep_discovery_chance(14), 0.0);
-}
-
-/// Discovery chance is exactly the base at P15.
-#[test]
-fn test_deep_discovery_chance_at_p15() {
-    let chance = deep_discovery_chance(15);
-    assert!(
-        (chance - DEEP_DISCOVERY_BASE_CHANCE).abs() < 1e-10,
-        "At P15, chance should equal the base chance"
-    );
-}
-
-/// Discovery chance increases with prestige rank above minimum.
-#[test]
-fn test_deep_discovery_chance_scales_with_rank() {
-    let p15 = deep_discovery_chance(15);
-    let p20 = deep_discovery_chance(20);
-    let p30 = deep_discovery_chance(30);
-    let p50 = deep_discovery_chance(50);
-    assert!(p20 > p15, "P20 chance should exceed P15");
-    assert!(p30 > p20, "P30 chance should exceed P20");
-    assert!(p50 > p30, "P50 chance should exceed P30");
-}
-
-/// Discovery chance follows the same formula as Haven and Soulforge:
-/// base + (rank - min_rank) * rank_bonus.
-#[test]
-fn test_deep_discovery_chance_formula_matches_design() {
-    let rank = 25_u32;
-    let expected = DEEP_DISCOVERY_BASE_CHANCE
-        + (rank - DEEP_MIN_PRESTIGE_RANK) as f64 * quest::deep::DEEP_DISCOVERY_RANK_BONUS;
-    let actual = deep_discovery_chance(rank);
-    assert!(
-        (actual - expected).abs() < 1e-15,
-        "Discovery chance should match the documented formula"
-    );
-}
-
-// =============================================================================
-// 2. Initial State After Discovery — First Overlay View
+// 1. Initial State After Discovery — First Overlay View
 // =============================================================================
 
 /// A fresh DeepState should have discovery=false, Guild Rank 1, 0 Marks,
@@ -911,7 +862,6 @@ fn test_mercenary_serde_roundtrip() {
 use quest::achievements::Achievements;
 use quest::core::game_state::GameState;
 use quest::core::tick::game_tick;
-use quest::core::tick_types::TickEvent;
 use quest::enhancement::EnhancementProgress;
 use quest::haven::Haven;
 use rand::SeedableRng;
@@ -928,41 +878,30 @@ fn strong_p50_state(name: &str) -> GameState {
 
 /// The Deep is discovered through the narrative story chain, not tick-based rolls.
 /// Story advances on prestige when the player has reached The Expanse (Zone 11+).
+/// 10-level escalating cost: cumulative [1,2,4,6,9,12,16,20,25,30] resonance.
 #[test]
 fn test_deep_discovery_via_narrative_story_chain() {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let mut deep = DeepState::new();
 
-    // Simulate 7 prestiges from The Expanse at P21+
-    for _ in 0..7 {
-        deep.maybe_increment_rift_resonance(11, 21);
+    // Simulate 30 prestiges from The Expanse at P15+
+    for _ in 0..30 {
+        deep.maybe_increment_rift_resonance(11, 15);
     }
-    assert_eq!(deep.persistent.rift_resonance, 7);
+    assert_eq!(deep.persistent.rift_resonance, 30);
 
-    // Advance story through all stages
-    let _stage1 = quest::deep::advance_deep_story(&mut deep, 15);
-    assert_eq!(deep.persistent.deep_story_stage, 1);
-
-    deep.persistent.rift_resonance = 3;
-    deep.persistent.deep_story_stage = 1;
-    let _stage2 = quest::deep::advance_deep_story(&mut deep, 17);
-    assert_eq!(deep.persistent.deep_story_stage, 2);
-
-    deep.persistent.rift_resonance = 5;
-    deep.persistent.deep_story_stage = 2;
-    let _stage3 = quest::deep::advance_deep_story(&mut deep, 19);
-    assert_eq!(deep.persistent.deep_story_stage, 3);
-
-    deep.persistent.rift_resonance = 7;
-    deep.persistent.deep_story_stage = 3;
-    deep.persistent.rift_fragments = 4;
-    let _stage4 = quest::deep::advance_deep_story(&mut deep, 21);
-    assert_eq!(deep.persistent.deep_story_stage, 4);
+    // Advance story through all 10 levels
+    for level in 1..=10u8 {
+        let result = quest::deep::advance_deep_story(&mut deep, 15);
+        assert_eq!(result, Some(level), "Should advance to level {}", level);
+        assert_eq!(deep.persistent.deep_story_stage, level);
+    }
+    assert_eq!(deep.persistent.deep_story_stage, STORY_STAGE_ENTRANCE);
 
     // Now complete discovery (simulates player pressing [D])
     quest::deep::complete_story_discovery(&mut deep, &mut rng);
     assert!(deep.persistent.discovered);
-    assert_eq!(deep.persistent.deep_story_stage, 5);
+    assert_eq!(deep.persistent.deep_story_stage, STORY_STAGE_DISCOVERED);
     assert_eq!(deep.prestige.roster.len(), 3);
     assert_eq!(deep.prestige.warband_marks, 50);
 }
@@ -1021,36 +960,31 @@ fn test_deep_discovery_blocked_by_dungeon_via_game_tick() {
             false,
             &mut rng,
         );
-        let discovered = result
-            .events
-            .iter()
-            .any(|e| matches!(e, TickEvent::DeepDiscovered));
         assert!(
-            !discovered,
+            !result.deep_changed,
             "Deep should never be discovered via tick — narrative only"
         );
     }
     assert!(!deep.persistent.discovered);
 }
 
-/// Story chain requires rift fragments to reach stage 4.
+/// Story chain final stage requires resonance 30 and P15.
 #[test]
-fn test_deep_story_requires_fragments() {
+fn test_deep_story_final_stage_requires_resonance_and_p15() {
     let mut deep = DeepState::new();
+    deep.persistent.deep_story_stage = STORY_STAGE_ENTRANCE - 1;
 
-    // Set resonance and prestige high enough for stage 4
-    deep.persistent.rift_resonance = 7;
-    deep.persistent.deep_story_stage = 3;
-    // But don't give fragments
-    deep.persistent.rift_fragments = 0;
+    // Resonance 29 + P15 — not enough resonance (need 30)
+    deep.persistent.rift_resonance =
+        STORY_RESONANCE_THRESHOLDS[STORY_STAGE_ENTRANCE as usize - 1] - 1;
+    assert_eq!(deep.check_story_progression(15), None);
 
-    let result = deep.check_story_progression(21);
-    assert_eq!(result, None, "Stage 4 requires 4 rift fragments");
+    // Resonance 30 + P14 — not enough prestige
+    deep.persistent.rift_resonance = STORY_RESONANCE_THRESHOLDS[STORY_STAGE_ENTRANCE as usize - 1];
+    assert_eq!(deep.check_story_progression(14), None);
 
-    // Now give fragments
-    deep.persistent.rift_fragments = 4;
-    let result = deep.check_story_progression(21);
-    assert_eq!(result, Some(4));
+    // Resonance 30 + P15 — advances to entrance stage
+    assert_eq!(deep.check_story_progression(15), Some(STORY_STAGE_ENTRANCE));
 }
 
 /// complete_story_discovery is idempotent — calling twice doesn't double-init.
@@ -1058,8 +992,7 @@ fn test_deep_story_requires_fragments() {
 fn test_deep_discovery_only_once_via_game_tick() {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let mut deep = DeepState::new();
-    deep.persistent.deep_story_stage = 4;
-    deep.persistent.rift_fragments = 4;
+    deep.persistent.deep_story_stage = STORY_STAGE_ENTRANCE;
 
     quest::deep::complete_story_discovery(&mut deep, &mut rng);
     assert!(deep.persistent.discovered);
@@ -1095,13 +1028,12 @@ fn test_deep_discovery_debug_mode_via_game_tick() {
 fn test_deep_discovery_triggers_achievement_via_game_tick() {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let mut deep = DeepState::new();
-    deep.persistent.deep_story_stage = 4;
-    deep.persistent.rift_fragments = 4;
+    deep.persistent.deep_story_stage = STORY_STAGE_ENTRANCE;
 
     quest::deep::complete_story_discovery(&mut deep, &mut rng);
 
     assert!(deep.persistent.discovered);
-    assert_eq!(deep.persistent.deep_story_stage, 5);
+    assert_eq!(deep.persistent.deep_story_stage, STORY_STAGE_DISCOVERED);
     assert_eq!(deep.prestige.roster.len(), 3);
     assert_eq!(deep.prestige.warband_marks, 50);
     assert_eq!(deep.persistent.guild_rank, quest::deep::GuildRank(1));

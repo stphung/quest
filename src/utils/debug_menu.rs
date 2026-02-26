@@ -624,8 +624,8 @@ fn trigger_deep_discovery(deep: &mut DeepState, _prestige_rank: u32) -> &'static
         return "The Deep already discovered!";
     }
     // Skip the story chain and go straight to discovery via debug shortcut.
-    // Set story stage to 5 (complete) so the state is consistent.
-    deep.persistent.deep_story_stage = 5;
+    // Set story stage to DISCOVERED so the state is consistent.
+    deep.persistent.deep_story_stage = crate::deep::STORY_STAGE_DISCOVERED;
     let mut rng = rand::rng();
     crate::deep::complete_story_discovery(deep, &mut rng);
     "The Deep discovered!"

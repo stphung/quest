@@ -23,10 +23,10 @@ use quest::deep::{
     compute_mark_reward, familiarity_gain, guild_upgrade_cost, infrastructure_build_cost,
     is_frontier_layer, is_safe_layer, layer_power_thresholds, mark_layer_cleared,
     marks_variance_multiplier, merc_xp_per_mission, merc_xp_to_next_level, mission_launch_cost,
-    mission_power_threshold, outcome_mark_multiplier, prestige_fragment_hundredths,
-    recruit_quality_distribution, stormglass_reward, try_upgrade_guild_rank, xp_reward,
-    DurationModifiers, FamiliarityLevel, GuildUpgradeError, InfrastructureBuildError,
-    MarkRewardParams, RecruitQuality, MIN_MISSION_DURATION_SECS,
+    mission_power_threshold, outcome_mark_multiplier, recruit_quality_distribution,
+    stormglass_reward, try_upgrade_guild_rank, xp_reward, DurationModifiers, FamiliarityLevel,
+    GuildUpgradeError, InfrastructureBuildError, MarkRewardParams, RecruitQuality,
+    MIN_MISSION_DURATION_SECS,
 };
 use quest::deep::{
     DeepPersistent, DeepPrestige, DeepState, GuildRank, Infrastructure, LayerTier, MissionOutcome,
@@ -427,11 +427,11 @@ fn supply_cache_increases_supply_run_marks_by_50_percent() {
         outcome: MissionOutcome::Success,
         rng_variance: 0.5,
     });
-    // With cache should be ~1.5x without cache.
+    // With cache should be ~1.75x without cache.
     let ratio = with_cache as f64 / without_cache as f64;
     assert!(
-        (ratio - 1.5).abs() < 0.02,
-        "Supply Cache should give +50%: base={base}, with={with_cache}, without={without_cache}, ratio={ratio}"
+        (ratio - 1.75).abs() < 0.02,
+        "Supply Cache should give +75%: base={base}, with={with_cache}, without={without_cache}, ratio={ratio}"
     );
 }
 
@@ -467,19 +467,19 @@ fn supply_cache_does_not_affect_non_supply_run_missions() {
 }
 
 #[test]
-fn watchtower_grants_plus_25_familiarity_on_build() {
+fn watchtower_grants_plus_40_familiarity_on_build() {
     let mut record = quest::deep::types::LayerRecord::new(1);
     record.cleared = true;
     record.familiarity = 20;
     build_infrastructure(&mut record, Infrastructure::Watchtower).unwrap();
-    assert_eq!(record.familiarity, 45); // 20 + 25
+    assert_eq!(record.familiarity, 60); // 20 + 40
 }
 
 #[test]
 fn watchtower_familiarity_bonus_capped_at_100() {
     let mut record = quest::deep::types::LayerRecord::new(1);
     record.cleared = true;
-    record.familiarity = 85; // 85 + 25 would be 110
+    record.familiarity = 85; // 85 + 40 would be 125
     build_infrastructure(&mut record, Infrastructure::Watchtower).unwrap();
     assert_eq!(record.familiarity, 100);
 }
@@ -528,9 +528,9 @@ fn familiarity_level_thresholds_are_correct() {
 
 #[test]
 fn familiarity_gain_per_mission_type_matches_design() {
-    // From balance design §5.
-    assert_eq!(familiarity_gain(MissionType::SupplyRun), 5);
-    assert_eq!(familiarity_gain(MissionType::Recon), 15);
+    // From balance design §5 (buffed values).
+    assert_eq!(familiarity_gain(MissionType::SupplyRun), 8);
+    assert_eq!(familiarity_gain(MissionType::Recon), 20);
     assert_eq!(familiarity_gain(MissionType::Expedition), 10);
     assert_eq!(familiarity_gain(MissionType::Breakthrough), 15);
     assert_eq!(
@@ -544,9 +544,9 @@ fn familiarity_gain_per_mission_type_matches_design() {
 #[test]
 fn familiarity_duration_factors_match_design() {
     assert_eq!(FamiliarityLevel::Unknown.duration_factor(), 1.0);
-    assert_eq!(FamiliarityLevel::Mapped.duration_factor(), 0.90);
-    assert_eq!(FamiliarityLevel::Familiar.duration_factor(), 0.80);
-    assert_eq!(FamiliarityLevel::Mastered.duration_factor(), 0.70);
+    assert_eq!(FamiliarityLevel::Mapped.duration_factor(), 0.85);
+    assert_eq!(FamiliarityLevel::Familiar.duration_factor(), 0.70);
+    assert_eq!(FamiliarityLevel::Mastered.duration_factor(), 0.55);
 }
 
 #[test]
@@ -566,7 +566,7 @@ fn familiarity_reduces_duration_correctly() {
     );
     assert_eq!(d_unknown, base);
 
-    // Mapped — 10% reduction.
+    // Mapped — 15% reduction.
     let d_mapped = apply_duration_modifiers(
         base,
         &DurationModifiers {
@@ -578,9 +578,9 @@ fn familiarity_reduces_duration_correctly() {
             bridge_layers: 0,
         },
     );
-    assert_eq!(d_mapped, (base as f64 * 0.90) as u64);
+    assert_eq!(d_mapped, (base as f64 * 0.85) as u64);
 
-    // Familiar — 20% reduction.
+    // Familiar — 30% reduction.
     let d_familiar = apply_duration_modifiers(
         base,
         &DurationModifiers {
@@ -592,9 +592,9 @@ fn familiarity_reduces_duration_correctly() {
             bridge_layers: 0,
         },
     );
-    assert_eq!(d_familiar, (base as f64 * 0.80) as u64);
+    assert_eq!(d_familiar, (base as f64 * 0.70) as u64);
 
-    // Mastered — 30% reduction.
+    // Mastered — 45% reduction.
     let d_mastered = apply_duration_modifiers(
         base,
         &DurationModifiers {
@@ -606,19 +606,19 @@ fn familiarity_reduces_duration_correctly() {
             bridge_layers: 0,
         },
     );
-    assert_eq!(d_mastered, (base as f64 * 0.70) as u64);
+    assert_eq!(d_mastered, (base as f64 * 0.55) as u64);
 }
 
 #[test]
 fn mastered_familiarity_grants_mark_yield_bonus() {
     assert_eq!(FamiliarityLevel::Unknown.mark_yield_multiplier(), 1.0);
     assert_eq!(FamiliarityLevel::Mapped.mark_yield_multiplier(), 1.0);
-    assert_eq!(FamiliarityLevel::Familiar.mark_yield_multiplier(), 1.0);
-    assert_eq!(FamiliarityLevel::Mastered.mark_yield_multiplier(), 1.15);
+    assert_eq!(FamiliarityLevel::Familiar.mark_yield_multiplier(), 1.10);
+    assert_eq!(FamiliarityLevel::Mastered.mark_yield_multiplier(), 1.25);
 }
 
 #[test]
-fn mastered_familiarity_increases_marks_by_15_percent() {
+fn mastered_familiarity_increases_marks_by_25_percent() {
     let mastered_marks = compute_mark_reward(&MarkRewardParams {
         mission_type: MissionType::Expedition,
         layer: 10,
@@ -637,8 +637,8 @@ fn mastered_familiarity_increases_marks_by_15_percent() {
     });
     let ratio = mastered_marks as f64 / unknown_marks as f64;
     assert!(
-        (ratio - 1.15).abs() < 0.02,
-        "Mastered familiarity should give ~+15% marks; got ratio={ratio}"
+        (ratio - 1.25).abs() < 0.02,
+        "Mastered familiarity should give ~+25% marks; got ratio={ratio}"
     );
 }
 
@@ -857,74 +857,74 @@ fn layer_tier_from_layer_void() {
 
 #[test]
 fn base_durations_by_tier_match_design_table() {
-    // Shallows: 20min Supply, 1h Recon, 2h Expedition, 4h Breakthrough, 1h Construction.
+    // Shallows: 10min Supply, 30min Recon, 1h Expedition, 2h Breakthrough, 30min Construction.
     assert_eq!(
         base_mission_duration_secs(LayerTier::Shallows, MissionType::SupplyRun),
-        1200
+        600
     );
     assert_eq!(
         base_mission_duration_secs(LayerTier::Shallows, MissionType::Recon),
-        3600
+        1800
     );
     assert_eq!(
         base_mission_duration_secs(LayerTier::Shallows, MissionType::Expedition),
-        7200
+        3600
     );
     assert_eq!(
         base_mission_duration_secs(LayerTier::Shallows, MissionType::Breakthrough),
-        14400
+        7200
     );
     assert_eq!(
         base_mission_duration_secs(
             LayerTier::Shallows,
             MissionType::Construction(Infrastructure::Outpost)
         ),
-        3600
+        1800
     );
 
-    // Abyss: 2.5h Supply, 5h Recon, 10h Expedition, 20h Breakthrough, 5h Construction.
+    // Abyss: 1.25h Supply, 2.5h Recon, 5h Expedition, 10h Breakthrough, 2.5h Construction.
     assert_eq!(
         base_mission_duration_secs(LayerTier::Abyss, MissionType::SupplyRun),
-        9000
+        4500
     );
     assert_eq!(
         base_mission_duration_secs(LayerTier::Abyss, MissionType::Recon),
-        18000
+        9000
     );
     assert_eq!(
         base_mission_duration_secs(LayerTier::Abyss, MissionType::Expedition),
-        36000
+        18000
     );
     assert_eq!(
         base_mission_duration_secs(LayerTier::Abyss, MissionType::Breakthrough),
-        72000
+        36000
     );
 }
 
 #[test]
-fn breakthrough_duration_caps_at_24h_for_void() {
-    // Breakthrough caps at 24h (86400s) only in the Void tier.
+fn breakthrough_duration_caps_at_12h_for_void() {
+    // Breakthrough caps at 12h (43200s) in the Void tier.
     // Preceding tiers have lower durations that increase through the tiers.
     assert_eq!(
         base_mission_duration_secs(LayerTier::SunkenReach, MissionType::Breakthrough),
-        57600
-    ); // 16h
+        28800
+    ); // 8h
     assert_eq!(
         base_mission_duration_secs(LayerTier::Abyss, MissionType::Breakthrough),
-        72000
-    ); // 20h
+        36000
+    ); // 10h
     assert_eq!(
         base_mission_duration_secs(LayerTier::Void, MissionType::Breakthrough),
-        86400
-    ); // 24h cap
+        43200
+    ); // 12h cap
 }
 
 // ── 14. Infrastructure Stacking ───────────────────────────────────────────────
 
 #[test]
 fn duration_modifiers_stack_multiplicatively() {
-    // Outpost (-25%) + Mastered (-30%) + Veteran Saboteur (-15%) + Overpowered (-10%)
-    // Net: 0.75 * 0.70 * 0.85 * 0.90 ≈ 0.4016
+    // Outpost (-25%) + Mastered (-45%) + Veteran Saboteur (-15%) + Overpowered (-10%)
+    // Net: 0.75 * 0.55 * 0.85 * 0.90 ≈ 0.3156
     let base = 8 * 3600u64;
     let result = apply_duration_modifiers(
         base,
@@ -937,7 +937,7 @@ fn duration_modifiers_stack_multiplicatively() {
             bridge_layers: 0,
         },
     );
-    let expected = (base as f64 * 0.75 * 0.70 * 0.85 * 0.90) as u64;
+    let expected = (base as f64 * 0.75 * 0.55 * 0.85 * 0.90) as u64;
     assert_eq!(result, expected);
 }
 
@@ -956,8 +956,8 @@ fn duration_modifiers_are_applied_in_correct_order() {
             bridge_layers: 0,
         },
     );
-    // 0.75 * 0.80 = 0.60
-    let expected = (base as f64 * 0.75 * 0.80) as u64;
+    // 0.75 * 0.70 = 0.525
+    let expected = (base as f64 * 0.75 * 0.70) as u64;
     assert_eq!(result_1, expected);
 }
 
@@ -1239,74 +1239,6 @@ fn stormglass_increases_with_depth() {
     );
 }
 
-// ── 19. Prestige Fragments ────────────────────────────────────────────────────
-
-#[test]
-fn prestige_fragments_only_from_breakthrough() {
-    for mission_type in [
-        MissionType::SupplyRun,
-        MissionType::Recon,
-        MissionType::Expedition,
-        MissionType::Construction(Infrastructure::Outpost),
-    ] {
-        assert_eq!(
-            prestige_fragment_hundredths(mission_type, 10),
-            0,
-            "{:?} should not award prestige fragments",
-            mission_type
-        );
-    }
-}
-
-#[test]
-fn prestige_fragment_thresholds_match_design() {
-    // Layers 1-7: 0 PR
-    assert_eq!(
-        prestige_fragment_hundredths(MissionType::Breakthrough, 1),
-        0
-    );
-    assert_eq!(
-        prestige_fragment_hundredths(MissionType::Breakthrough, 7),
-        0
-    );
-    // Layers 8-12: 0.25 PR
-    assert_eq!(
-        prestige_fragment_hundredths(MissionType::Breakthrough, 8),
-        25
-    );
-    assert_eq!(
-        prestige_fragment_hundredths(MissionType::Breakthrough, 12),
-        25
-    );
-    // Layers 13-18: 0.50 PR
-    assert_eq!(
-        prestige_fragment_hundredths(MissionType::Breakthrough, 13),
-        50
-    );
-    assert_eq!(
-        prestige_fragment_hundredths(MissionType::Breakthrough, 18),
-        50
-    );
-    // Layers 19-25: 0.75 PR
-    assert_eq!(
-        prestige_fragment_hundredths(MissionType::Breakthrough, 19),
-        75
-    );
-    assert_eq!(
-        prestige_fragment_hundredths(MissionType::Breakthrough, 25),
-        75
-    );
-    // Void (26+): 1.00 PR
-    assert_eq!(
-        prestige_fragment_hundredths(MissionType::Breakthrough, 26),
-        100
-    );
-    assert_eq!(
-        prestige_fragment_hundredths(MissionType::Breakthrough, 50),
-        100
-    );
-}
-
 // ── 20. Merc XP ──────────────────────────────────────────────────────────────
 
 #[test]
@@ -1514,11 +1446,11 @@ fn breakthrough_launch_cost_layer_10_is_150() {
 // ── 24. T1-4 Balance: Shallows SupplyRun Duration Reduced to 20min ──────────
 
 #[test]
-fn test_shallows_supply_run_duration_reduced_to_20min() {
+fn test_shallows_supply_run_duration_reduced_to_10min() {
     let duration = base_mission_duration_secs(LayerTier::Shallows, MissionType::SupplyRun);
     assert_eq!(
-        duration, 1200,
-        "Shallows SupplyRun should be 20 minutes (1200s)"
+        duration, 600,
+        "Shallows SupplyRun should be 10 minutes (600s)"
     );
 }
 
