@@ -810,6 +810,12 @@ pub struct DeepPrestige {
     /// Total mercs lost this generation (for generation records).
     #[serde(default)]
     pub total_mercs_lost: u32,
+    /// Wall-clock time when the available mission pool was last refreshed.
+    /// `None` means the pool has never been explicitly refreshed (triggers
+    /// an immediate refresh on next check). Defaults to `None` on old saves
+    /// for backward compatibility.
+    #[serde(default)]
+    pub pool_refreshed_at: Option<DateTime<Utc>>,
 }
 
 impl Default for DeepPrestige {
@@ -831,6 +837,7 @@ impl Default for DeepPrestige {
             total_marks_earned: 0,
             total_missions_completed: 0,
             total_mercs_lost: 0,
+            pool_refreshed_at: None,
         }
     }
 }

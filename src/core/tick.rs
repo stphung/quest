@@ -306,6 +306,16 @@ pub fn game_tick<R: Rng>(
                 });
             }
         }
+
+        // Check whether the mission pool needs a 6-hour refresh.
+        if crate::deep::missions::maybe_refresh_mission_pool(
+            &mut deep.prestige,
+            &deep.persistent,
+            now,
+            rng,
+        ) {
+            result.deep_changed = true;
+        }
     }
 
     // ── 12. Achievement modal accumulation ────────────────────────

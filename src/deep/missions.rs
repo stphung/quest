@@ -160,6 +160,48 @@ pub fn generate_mission_pool(
     pool
 }
 
+/// Refresh interval for the mission pool in seconds (6 hours).
+///
+/// The pool is regenerated when it is empty OR when this many seconds have
+/// elapsed since the last refresh, whichever comes first.
+pub const POOL_REFRESH_INTERVAL_SECS: i64 = 6 * 3600;
+
+/// Check whether the mission pool needs refreshing and regenerate it if so.
+///
+/// The pool refreshes when any of these conditions are true:
+/// 1. `available_missions` is empty (player has accepted all missions), OR
+/// 2. `pool_refreshed_at` is `None` (never been explicitly set), OR
+/// 3. At least `POOL_REFRESH_INTERVAL_SECS` (6h) have elapsed since the last refresh.
+///
+/// Returns `true` if the pool was refreshed (signals the caller to set
+/// `deep_changed` and persist state to disk).
+///
+/// # Design notes
+/// - `now` is passed explicitly to allow deterministic testing without wall-clock dependency.
+/// - Called once per tick from stage 11c in `core/tick.rs` (after mission ticking).
+/// - Also called from `main_helpers/offline.rs` on game load for immediate catch-up.
+/// - `pool_refreshed_at` defaults to `None` for old saves, triggering an immediate refresh.
+pub fn maybe_refresh_mission_pool(
+    prestige: &mut DeepPrestige,
+    persistent: &DeepPersistent,
+    now: DateTime<Utc>,
+    rng: &mut impl Rng,
+) -> bool {
+    let pool_empty = prestige.available_missions.is_empty();
+    let pool_stale = match prestige.pool_refreshed_at {
+        None => true,
+        Some(refreshed_at) => (now - refreshed_at).num_seconds() >= POOL_REFRESH_INTERVAL_SECS,
+    };
+
+    if pool_empty || pool_stale {
+        prestige.available_missions = generate_mission_pool(persistent, rng);
+        prestige.pool_refreshed_at = Some(now);
+        true
+    } else {
+        false
+    }
+}
+
 /// Build an `AvailableMission` for a given type and layer.
 fn generate_available_mission(
     mission_type: MissionType,

@@ -116,7 +116,8 @@ pub use events::{
 #[allow(unused_imports)]
 pub use missions::{
     available_mission_count, daily_supply_run_resets_at, generate_mission_pool,
-    is_daily_supply_run_available, resolve_mission, resolve_offline_missions, start_mission,
-    tick_all_missions, tick_mission, validate_squad_assignment, MissionTickSummary,
-    OfflineResolutionSummary, SquadAssignmentError,
+    is_daily_supply_run_available, maybe_refresh_mission_pool, resolve_mission,
+    resolve_offline_missions, start_mission, tick_all_missions, tick_mission,
+    validate_squad_assignment, MissionTickSummary, OfflineResolutionSummary, SquadAssignmentError,
+    POOL_REFRESH_INTERVAL_SECS,
 };

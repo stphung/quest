@@ -35,6 +35,7 @@ pub fn complete_story_discovery<R: Rng>(deep: &mut DeepState, rng: &mut R) {
     deep.prestige.roster.extend(starters);
     deep.prestige.available_missions =
         super::missions::generate_mission_pool(&deep.persistent, rng);
+    deep.prestige.pool_refreshed_at = Some(Utc::now());
     deep.prestige.warband_marks = match deep.persistent.guild_rank.0 {
         1 => 50,
         2 => 100,
