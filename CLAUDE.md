@@ -349,7 +349,6 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 - `scene_fx.rs` — Shared utilities for layered ASCII scene rendering (scene buffer, backdrop effects, wide character support)
 - `zone_bg.rs` — Stylized zone background scenes with 6-layer compositing pipeline for all 11 zones
 - `debug_menu_scene.rs` — Debug menu overlay with tabbed categories
-- `help_overlay.rs` — Help/controls overlay
 - `bug_report_scene.rs` — Bug report overlay with game-state preview and clipboard status
 - `throbber.rs` — Shared spinner animations and atmospheric messages
 - `character_select.rs`, `character_creation.rs`, `character_delete.rs`, `character_rename.rs` — Character management UI
@@ -437,6 +436,7 @@ quest/
 │   │   ├── input_routing.rs      # Game input routing
 │   │   ├── achievements.rs       # Achievement processing
 │   │   ├── offline.rs            # Offline progression handling
+│   │   ├── cloud_ops.rs             # Cloud sync state reload helpers
 │   │   ├── overlay.rs            # Overlay management
 │   │   ├── persistence.rs        # Save/load orchestration
 │   │   ├── scene.rs              # Scene rendering dispatch

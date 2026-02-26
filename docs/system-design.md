@@ -71,7 +71,7 @@ Quest is a terminal-based idle RPG built in Rust using Ratatui for UI rendering 
 
 ### Key Architectural Patterns
 
-- **Event-driven tick processing**: `game_tick()` returns a `TickResult` containing `Vec<TickEvent>` (34 event variants). The presentation layer maps events to combat log entries, visual effects, and overlays. Game logic has zero UI imports.
+- **Event-driven tick processing**: `game_tick()` returns a `TickResult` containing `Vec<TickEvent>` (35 event variants). The presentation layer maps events to combat log entries, visual effects, and overlays. Game logic has zero UI imports.
 - **Generic RNG**: `game_tick<R: Rng>()` uses a generic type parameter because `rand::Rng` is not dyn-compatible. Production uses `thread_rng()`, tests use seeded `ChaCha8Rng` for determinism.
 - **Haven bonus injection**: Haven bonuses are passed as explicit parameters to game systems rather than accessed globally, keeping modules decoupled.
 
@@ -144,7 +144,7 @@ The game runs at **10 ticks per second** (100ms intervals). Each tick is process
 
 ### Key Types
 
-**`TickEvent`** (34 variants):
+**`TickEvent`** (35 variants):
 - Combat: `PlayerAttack`, `PlayerAttackBlocked`, `EnemyAttack`, `DamageReflected`, `RegenComplete`, `EnemyDefeated`, `PlayerDied`, `PlayerDiedInDungeon`
 - Items: `ItemDropped`
 - Zones: `SubzoneBossDefeated`
@@ -795,7 +795,7 @@ Options: Trigger Dungeon, Fishing, all 10 challenge types, Haven Discovery, Soul
 
 ### Integration Tests
 
-30 integration test files in `tests/`:
+34 integration test files in `tests/`:
 - `game_loop_orchestration_test.rs` -- 36 behavior-locking tests for game tick pipeline
 - `game_tick_behavior_test.rs` / `game_tick_supplemental_test.rs` -- Tick processing behavior
 - `tick_integration_test.rs` -- Cross-system tick integration
@@ -909,11 +909,13 @@ quest/
 │   │   ├── minigame_input.rs # Minigame input dispatch
 │   │   ├── prestige_input.rs # Prestige confirmation input
 │   │   ├── soulforge_input.rs # Soulforge overlay input
-│   │   └── stormglass_input.rs # Stormglass overlay input
+│   │   ├── stormglass_input.rs # Stormglass overlay input
+│   │   └── time_vault_input.rs # Time Vault overlay input
 │   ├── main_helpers/        # Extracted helpers from main.rs
 │   │   ├── mod.rs           # Re-exports
 │   │   ├── achievements.rs  # Achievement modal/save handling
 │   │   ├── character_screens.rs # Character management screen logic
+│   │   ├── cloud_ops.rs     # Cloud sync state reload helpers
 │   │   ├── input_routing.rs # Input dispatch from main loop
 │   │   ├── offline.rs       # Offline progression handling
 │   │   ├── overlay.rs       # Overlay state management
@@ -928,7 +930,7 @@ quest/
 │   │   ├── game_logic.rs    # Thin re-export wrapper for submodules
 │   │   ├── game_state.rs    # Main GameState struct
 │   │   ├── tick.rs          # game_tick() orchestrator
-│   │   ├── tick_types.rs    # TickEvent enum (30 variants), TickResult struct
+│   │   ├── tick_types.rs    # TickEvent enum (35 variants), TickResult struct
 │   │   ├── tick_stages.rs   # Tick processing stages 4-6 + helpers
 │   │   ├── xp.rs            # XP calculation, leveling, combat kill XP
 │   │   ├── discoveries.rs   # Discovery rolls (dungeon, fishing, Haven, Soulforge)
@@ -1066,7 +1068,6 @@ quest/
 │       ├── soulforge_scene.rs # Soulforge enhancement overlay
 │       ├── soulforge_effects.rs # Soulforge animation effects
 │       ├── soulforge_slots.rs # Soulforge slot selection rendering
-│       ├── help_overlay.rs   # Help overlay with keybindings
 │       ├── bug_report_scene.rs # Bug report overlay
 │       ├── stormglass_scene.rs # Stormglass Exchange overlay with animations
 │       ├── scene_fx.rs       # Shared utilities for layered ASCII scene rendering
@@ -1075,7 +1076,7 @@ quest/
 │       ├── throbber.rs      # Spinner animations
 │       └── character_select.rs, character_creation.rs,
 │           character_delete.rs, character_rename.rs
-├── tests/                   # 30 integration test files
+├── tests/                   # 34 integration test files
 ├── .github/workflows/       # CI/CD pipeline
 ├── scripts/                 # Quality checks (ci-checks.sh)
 ├── docs/                    # Design documents
