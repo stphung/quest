@@ -88,7 +88,7 @@ pub fn familiarity_gain(mission_type: MissionType) -> u8 {
         MissionType::SupplyRun => 5,
         MissionType::Recon => 15,
         MissionType::Expedition => 10,
-        MissionType::Breakthrough => 15,
+        MissionType::Breakthrough | MissionType::GatewayExpedition => 15,
         MissionType::Construction(_) => 5,
     }
 }
@@ -154,12 +154,12 @@ pub fn layer_power_thresholds(layer: u32) -> LayerPowerThresholds {
         16 => (410, 310, 230, 155),
         17 => (450, 340, 255, 170),
         18 => (495, 370, 280, 185),
-        19 => (510, 385, 290, 190),
-        20 => (530, 400, 300, 200),
-        21 => (555, 415, 315, 210),
-        22 => (580, 435, 330, 220),
-        23 => (610, 460, 345, 230),
-        24 => (650, 490, 370, 245),
+        19 => (410, 310, 230, 155),
+        20 => (445, 335, 250, 165),
+        21 => (480, 360, 270, 180),
+        22 => (520, 390, 290, 195),
+        23 => (565, 425, 320, 210),
+        24 => (625, 470, 350, 235),
         25 => (700, 525, 395, 265),
         _ => unreachable!(), // layers >= 26 handled above
     };
@@ -176,7 +176,7 @@ pub fn layer_power_thresholds(layer: u32) -> LayerPowerThresholds {
 pub fn mission_power_threshold(layer: u32, mission_type: MissionType) -> u32 {
     let t = layer_power_thresholds(layer);
     match mission_type {
-        MissionType::Breakthrough => t.breakthrough,
+        MissionType::Breakthrough | MissionType::GatewayExpedition => t.breakthrough,
         MissionType::Expedition => t.expedition,
         MissionType::Recon => t.recon,
         MissionType::SupplyRun | MissionType::Construction(_) => t.supply_run,
@@ -185,8 +185,8 @@ pub fn mission_power_threshold(layer: u32, mission_type: MissionType) -> u32 {
 
 // ── Mission Durations ─────────────────────────────────────────────────────────
 
-/// Minimum wall-clock mission duration in seconds (30 minutes).
-pub const MIN_MISSION_DURATION_SECS: u64 = 30 * 60;
+/// Minimum wall-clock mission duration in seconds (15 minutes).
+pub const MIN_MISSION_DURATION_SECS: u64 = 15 * 60;
 
 /// Base mission duration in seconds before any modifiers, keyed on layer tier.
 ///
@@ -194,7 +194,7 @@ pub const MIN_MISSION_DURATION_SECS: u64 = 30 * 60;
 pub fn base_mission_duration_secs(tier: LayerTier, mission_type: MissionType) -> u64 {
     match (tier, mission_type) {
         // Supply Run
-        (LayerTier::Shallows, MissionType::SupplyRun) => 1800,
+        (LayerTier::Shallows, MissionType::SupplyRun) => 1200,
         (LayerTier::Warrens, MissionType::SupplyRun) => 3600,
         (LayerTier::Hollows, MissionType::SupplyRun) => 5400,
         (LayerTier::SunkenReach, MissionType::SupplyRun) => 7200,
@@ -228,6 +228,8 @@ pub fn base_mission_duration_secs(tier: LayerTier, mission_type: MissionType) ->
         (LayerTier::SunkenReach, MissionType::Construction(_)) => 14400,
         (LayerTier::Abyss, MissionType::Construction(_)) => 18000,
         (LayerTier::Void, MissionType::Construction(_)) => 21600,
+        // Gateway Expedition — fixed 24h regardless of tier
+        (_, MissionType::GatewayExpedition) => 86400,
     }
 }
 
@@ -351,6 +353,11 @@ pub fn mark_layer_cleared(persistent: &mut DeepPersistent, layer: u32) {
     record.cleared = true;
     if layer > persistent.deepest_layer_reached {
         persistent.deepest_layer_reached = layer;
+    }
+    // Abyss entry bonus: clearing L18 grants Mapped familiarity on L19
+    if layer == 18 {
+        let l19 = persistent.layer_record_mut(19);
+        l19.familiarity = l19.familiarity.max(25);
     }
 }
 
@@ -500,16 +507,24 @@ mod tests {
     }
 
     #[test]
-    fn test_power_thresholds_increase_with_depth() {
-        for layer in 1..25 {
-            let a = layer_power_thresholds(layer);
-            let b = layer_power_thresholds(layer + 1);
-            assert!(
-                b.breakthrough > a.breakthrough,
-                "Breakthrough threshold should increase: layer {} -> {}",
-                layer,
-                layer + 1
-            );
+    fn test_power_thresholds_increase_within_tier() {
+        // Thresholds increase monotonically within each layer tier.
+        // The Abyss tier (L19-25) was intentionally softened, so L19 may be
+        // lower than L18 (Sunken Reach), but each tier is internally monotonic.
+        let tier_ranges: &[std::ops::RangeInclusive<u32>] =
+            &[1..=3, 4..=7, 8..=12, 13..=18, 19..=25];
+        for range in tier_ranges {
+            let layers: Vec<u32> = range.clone().collect();
+            for window in layers.windows(2) {
+                let a = layer_power_thresholds(window[0]);
+                let b = layer_power_thresholds(window[1]);
+                assert!(
+                    b.breakthrough >= a.breakthrough,
+                    "Breakthrough threshold should increase within tier: layer {} -> {}",
+                    window[0],
+                    window[1]
+                );
+            }
         }
     }
 
@@ -533,7 +548,7 @@ mod tests {
     fn test_base_durations_shallows() {
         assert_eq!(
             base_mission_duration_secs(LayerTier::Shallows, MissionType::SupplyRun),
-            1800
+            1200
         );
         assert_eq!(
             base_mission_duration_secs(LayerTier::Shallows, MissionType::Breakthrough),
@@ -796,5 +811,28 @@ mod tests {
         mark_layer_cleared(&mut persistent, 1);
         assert!(is_safe_layer(&persistent, 1));
         assert!(!is_safe_layer(&persistent, 2));
+    }
+
+    #[test]
+    fn test_clearing_layer_18_grants_l19_familiarity_bonus() {
+        let mut persistent = DeepPersistent::new();
+        // Clear layers 1 through 18
+        for l in 1..=18 {
+            mark_layer_cleared(&mut persistent, l);
+        }
+        let l19 = persistent.layer_record(19).unwrap();
+        assert!(
+            l19.familiarity >= 25,
+            "L19 should have at least Mapped familiarity after L18 breakthrough"
+        );
+    }
+
+    #[test]
+    fn test_clearing_layer_18_does_not_reduce_existing_l19_familiarity() {
+        let mut persistent = DeepPersistent::new();
+        // Give L19 high familiarity first
+        persistent.layer_record_mut(19).familiarity = 80;
+        mark_layer_cleared(&mut persistent, 18);
+        assert_eq!(persistent.layer_record(19).unwrap().familiarity, 80);
     }
 }

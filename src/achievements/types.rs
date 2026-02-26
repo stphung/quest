@@ -241,6 +241,7 @@ pub enum AchievementId {
     GuildRank4,           // Reach Guild Rank 4 (Legion)
     GuildRank5,           // Reach Guild Rank 5 (Vanguard)
     FirstMercLost,        // Lose a mercenary for the first time
+    GatewayOpened,        // Opened the Gateway beneath the world
 }
 
 impl AchievementId {
@@ -255,7 +256,7 @@ impl AchievementId {
     /// automatically.
     // Used by `achievements::data` tests to verify ALL_ACHIEVEMENTS coverage.
     #[allow(dead_code)]
-    pub const VARIANT_COUNT: usize = 166;
+    pub const VARIANT_COUNT: usize = 167;
 }
 
 /// Static definition of an achievement.

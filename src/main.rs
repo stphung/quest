@@ -398,6 +398,13 @@ fn main() -> io::Result<()> {
                     &mut global_achievements,
                     &state.character_name,
                 );
+                // Sync Deep achievements from persistent state
+                global_achievements.sync_from_deep(
+                    deep_state.persistent.discovered,
+                    deep_state.persistent.guild_rank.0 as u32,
+                    deep_state.persistent.deepest_layer_reached,
+                    Some(&state.character_name),
+                );
 
                 play_screen_transition(&mut terminal)?;
                 terminal.clear()?;

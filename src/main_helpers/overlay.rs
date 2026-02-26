@@ -250,6 +250,11 @@ pub fn draw_game_overlays(
         ui::deep_scene::render_deep_overlay(frame, area, deep_state, deep_ui, None, ctx);
     }
 
+    // Story event modal (shown after prestige when rift resonance advances a stage)
+    if let Some(stage) = deep_ui.pending_story_stage {
+        ui::deep_scene::render_story_modal(frame, area, stage);
+    }
+
     // Chrono Surge active: status banner at bottom
     if let Some(surge) = chrono_surge {
         ui::stormglass_scene::render_chrono_surge_time_warp(frame, area, surge, ctx);

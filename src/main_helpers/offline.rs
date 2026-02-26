@@ -32,6 +32,9 @@ pub fn resolve_deep_offline(
     for _ in 0..summary.mercs_lost {
         achievements.on_deep_merc_lost(Some(character_name));
     }
+    if summary.gateway_opened {
+        achievements.on_deep_gateway_opened(Some(character_name));
+    }
 }
 
 /// Process offline XP and add combat log entries. Returns the report if XP was gained.

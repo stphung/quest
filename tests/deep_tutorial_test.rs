@@ -926,51 +926,48 @@ fn strong_p50_state(name: &str) -> GameState {
     state
 }
 
-/// The Deep should be discoverable via game_tick at P50 (same pattern as Haven/Soulforge).
+/// The Deep is discovered through the narrative story chain, not tick-based rolls.
+/// Story advances on prestige when the player has reached The Expanse (Zone 11+).
 #[test]
-fn test_deep_discovery_via_game_tick_at_p50() {
-    for seed in 0u64..50 {
-        let mut rng = ChaCha8Rng::seed_from_u64(seed);
-        let mut state = strong_p50_state("Deep Discovery Test");
-        let mut tick_counter = 0u32;
-        let mut haven = Haven::default();
-        let mut enhancement = EnhancementProgress::new();
-        let mut deep = DeepState::new();
-        let mut achievements = Achievements::default();
+fn test_deep_discovery_via_narrative_story_chain() {
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    let mut deep = DeepState::new();
 
-        for _ in 0..500 {
-            let result = game_tick(
-                &mut state,
-                &mut tick_counter,
-                &mut haven,
-                &mut enhancement,
-                &mut deep,
-                &mut achievements,
-                false,
-                &mut rng,
-            );
-
-            if result.deep_changed {
-                assert!(deep.persistent.discovered, "Deep should be discovered");
-                assert!(
-                    result.achievements_changed,
-                    "achievements_changed should be true on deep discovery"
-                );
-                let has_event = result
-                    .events
-                    .iter()
-                    .any(|e| matches!(e, TickEvent::DeepDiscovered));
-                assert!(has_event, "DeepDiscovered event should be emitted");
-                // Verify starter mercs were created
-                assert_eq!(deep.prestige.roster.len(), 3);
-                return;
-            }
-        }
+    // Simulate 7 prestiges from The Expanse at P21+
+    for _ in 0..7 {
+        deep.maybe_increment_rift_resonance(11, 21);
     }
-    panic!("Deep discovery should have occurred with P50 in 50 * 500 ticks");
+    assert_eq!(deep.persistent.rift_resonance, 7);
+
+    // Advance story through all stages
+    let _stage1 = quest::deep::advance_deep_story(&mut deep, 15);
+    assert_eq!(deep.persistent.deep_story_stage, 1);
+
+    deep.persistent.rift_resonance = 3;
+    deep.persistent.deep_story_stage = 1;
+    let _stage2 = quest::deep::advance_deep_story(&mut deep, 17);
+    assert_eq!(deep.persistent.deep_story_stage, 2);
+
+    deep.persistent.rift_resonance = 5;
+    deep.persistent.deep_story_stage = 2;
+    let _stage3 = quest::deep::advance_deep_story(&mut deep, 19);
+    assert_eq!(deep.persistent.deep_story_stage, 3);
+
+    deep.persistent.rift_resonance = 7;
+    deep.persistent.deep_story_stage = 3;
+    deep.persistent.rift_fragments = 4;
+    let _stage4 = quest::deep::advance_deep_story(&mut deep, 21);
+    assert_eq!(deep.persistent.deep_story_stage, 4);
+
+    // Now complete discovery (simulates player pressing [D])
+    quest::deep::complete_story_discovery(&mut deep, &mut rng);
+    assert!(deep.persistent.discovered);
+    assert_eq!(deep.persistent.deep_story_stage, 5);
+    assert_eq!(deep.prestige.roster.len(), 3);
+    assert_eq!(deep.prestige.warband_marks, 50);
 }
 
-/// Deep discovery should be blocked below P15 via game_tick.
+/// Discovery should NOT fire via game_tick — no tick-based discovery roll exists.
 #[test]
 fn test_deep_discovery_blocked_below_p15_via_game_tick() {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
@@ -993,27 +990,27 @@ fn test_deep_discovery_blocked_below_p15_via_game_tick() {
             false,
             &mut rng,
         );
-        assert!(!result.deep_changed, "Deep should not be discovered at P14");
+        assert!(
+            !result.deep_changed,
+            "Deep should not be discovered via tick"
+        );
     }
     assert!(!deep.persistent.discovered);
 }
 
-/// Deep discovery should be blocked during active dungeon.
+/// Deep discovery should NOT happen via game_tick even at high prestige.
+/// Discovery is narrative-only (story chain through The Expanse).
 #[test]
 fn test_deep_discovery_blocked_by_dungeon_via_game_tick() {
-    use quest::dungeon::generation::generate_dungeon;
-
     let mut rng = ChaCha8Rng::seed_from_u64(42);
-    let mut state = strong_p50_state("Deep Dungeon Block Test");
-    let dungeon = generate_dungeon(state.character_level, state.prestige_rank, 1);
-    state.active_dungeon = Some(dungeon);
+    let mut state = strong_p50_state("Deep Tick Block Test");
     let mut tick_counter = 0u32;
     let mut haven = Haven::default();
     let mut enhancement = EnhancementProgress::new();
     let mut deep = DeepState::new();
     let mut achievements = Achievements::default();
 
-    for _ in 0..100 {
+    for _ in 0..500 {
         let result = game_tick(
             &mut state,
             &mut tick_counter,
@@ -1030,211 +1027,90 @@ fn test_deep_discovery_blocked_by_dungeon_via_game_tick() {
             .any(|e| matches!(e, TickEvent::DeepDiscovered));
         assert!(
             !discovered,
-            "Deep should not be discovered while in a dungeon"
+            "Deep should never be discovered via tick — narrative only"
         );
     }
+    assert!(!deep.persistent.discovered);
 }
 
-/// Deep discovery should be blocked during active fishing.
+/// Story chain requires rift fragments to reach stage 4.
 #[test]
-fn test_deep_discovery_blocked_by_fishing_via_game_tick() {
-    use quest::fishing::types::FishingPhase;
-    use quest::FishingSession;
-
-    let mut rng = ChaCha8Rng::seed_from_u64(42);
-    let mut state = strong_p50_state("Deep Fishing Block Test");
-    state.active_fishing = Some(FishingSession {
-        spot_name: "Deep Block Lake".to_string(),
-        total_fish: 10,
-        fish_caught: Vec::new(),
-        items_found: Vec::new(),
-        ticks_remaining: 1,
-        phase: FishingPhase::Casting,
-    });
-    let mut tick_counter = 0u32;
-    let mut haven = Haven::default();
-    let mut enhancement = EnhancementProgress::new();
+fn test_deep_story_requires_fragments() {
     let mut deep = DeepState::new();
-    let mut achievements = Achievements::default();
 
-    for _ in 0..100 {
-        let result = game_tick(
-            &mut state,
-            &mut tick_counter,
-            &mut haven,
-            &mut enhancement,
-            &mut deep,
-            &mut achievements,
-            false,
-            &mut rng,
-        );
-        let discovered = result
-            .events
-            .iter()
-            .any(|e| matches!(e, TickEvent::DeepDiscovered));
-        assert!(!discovered, "Deep should not be discovered while fishing");
-    }
+    // Set resonance and prestige high enough for stage 4
+    deep.persistent.rift_resonance = 7;
+    deep.persistent.deep_story_stage = 3;
+    // But don't give fragments
+    deep.persistent.rift_fragments = 0;
+
+    let result = deep.check_story_progression(21);
+    assert_eq!(result, None, "Stage 4 requires 4 rift fragments");
+
+    // Now give fragments
+    deep.persistent.rift_fragments = 4;
+    let result = deep.check_story_progression(21);
+    assert_eq!(result, Some(4));
 }
 
-/// Deep discovery should be blocked during active minigame.
-#[test]
-fn test_deep_discovery_blocked_by_minigame_via_game_tick() {
-    use quest::challenges::chess::types::ChessGame;
-    use quest::challenges::ActiveMinigame;
-
-    let mut rng = ChaCha8Rng::seed_from_u64(42);
-    let mut state = strong_p50_state("Deep Minigame Block Test");
-    state.active_minigame = Some(ActiveMinigame::Chess(Box::new(ChessGame::new(
-        quest::challenges::chess::types::ChessDifficulty::Novice,
-    ))));
-    let mut tick_counter = 0u32;
-    let mut haven = Haven::default();
-    let mut enhancement = EnhancementProgress::new();
-    let mut deep = DeepState::new();
-    let mut achievements = Achievements::default();
-
-    for _ in 0..100 {
-        let result = game_tick(
-            &mut state,
-            &mut tick_counter,
-            &mut haven,
-            &mut enhancement,
-            &mut deep,
-            &mut achievements,
-            false,
-            &mut rng,
-        );
-        let discovered = result
-            .events
-            .iter()
-            .any(|e| matches!(e, TickEvent::DeepDiscovered));
-        assert!(
-            !discovered,
-            "Deep should not be discovered while in a minigame"
-        );
-    }
-}
-
-/// Deep discovery should only happen once.
+/// complete_story_discovery is idempotent — calling twice doesn't double-init.
 #[test]
 fn test_deep_discovery_only_once_via_game_tick() {
-    for seed in 0u64..20 {
-        let mut rng = ChaCha8Rng::seed_from_u64(seed);
-        let mut state = strong_p50_state("Deep Once Test");
-        let mut tick_counter = 0u32;
-        let mut haven = Haven::default();
-        let mut enhancement = EnhancementProgress::new();
-        let mut deep = DeepState::new();
-        let mut achievements = Achievements::default();
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    let mut deep = DeepState::new();
+    deep.persistent.deep_story_stage = 4;
+    deep.persistent.rift_fragments = 4;
 
-        let mut discovery_count = 0;
-        for _ in 0..500 {
-            let result = game_tick(
-                &mut state,
-                &mut tick_counter,
-                &mut haven,
-                &mut enhancement,
-                &mut deep,
-                &mut achievements,
-                false,
-                &mut rng,
-            );
-            discovery_count += result
-                .events
-                .iter()
-                .filter(|e| matches!(e, TickEvent::DeepDiscovered))
-                .count();
-        }
-        assert!(
-            discovery_count <= 1,
-            "Deep should be discovered at most once, got {} (seed {})",
-            discovery_count,
-            seed
-        );
-    }
+    quest::deep::complete_story_discovery(&mut deep, &mut rng);
+    assert!(deep.persistent.discovered);
+    let roster_len = deep.prestige.roster.len();
+    let marks = deep.prestige.warband_marks;
+
+    // Second call should be a no-op
+    quest::deep::complete_story_discovery(&mut deep, &mut rng);
+    assert_eq!(deep.prestige.roster.len(), roster_len);
+    assert_eq!(deep.prestige.warband_marks, marks);
 }
 
-/// Debug mode should suppress achievements_changed on Deep discovery.
+/// Rift resonance only increments when player reached The Expanse (zone 11+).
 #[test]
 fn test_deep_discovery_debug_mode_via_game_tick() {
-    for seed in 0u64..50 {
-        let mut rng = ChaCha8Rng::seed_from_u64(seed);
-        let mut state = strong_p50_state("Deep Debug Test");
-        let mut tick_counter = 0u32;
-        let mut haven = Haven::default();
-        let mut enhancement = EnhancementProgress::new();
-        let mut deep = DeepState::new();
-        let mut achievements = Achievements::default();
+    let mut deep = DeepState::new();
 
-        for _ in 0..500 {
-            let result = game_tick(
-                &mut state,
-                &mut tick_counter,
-                &mut haven,
-                &mut enhancement,
-                &mut deep,
-                &mut achievements,
-                true, // debug_mode = true
-                &mut rng,
-            );
+    // Zone 10 (not The Expanse) — should not increment
+    deep.maybe_increment_rift_resonance(10, 15);
+    assert_eq!(deep.persistent.rift_resonance, 0);
 
-            if result.deep_changed {
-                assert!(
-                    !result.achievements_changed,
-                    "achievements_changed should be suppressed in debug mode"
-                );
-                return;
-            }
-        }
-    }
-    panic!("Deep discovery should have occurred in debug mode test (50 seeds * 500 ticks)");
+    // Zone 11 (The Expanse) at P15+ — should increment
+    deep.maybe_increment_rift_resonance(11, 15);
+    assert_eq!(deep.persistent.rift_resonance, 1);
+
+    // Below P15 — should not increment even in Expanse
+    deep.maybe_increment_rift_resonance(11, 14);
+    assert_eq!(deep.persistent.rift_resonance, 1);
 }
 
-/// Deep discovery should trigger the TheDeepDiscovered achievement.
-///
-/// NOTE: Currently, game_tick sets achievements_changed=true on Deep discovery
-/// but does NOT call achievements.on_deep_discovered() to actually unlock the
-/// achievement. This test verifies the discovery occurs and the changed flag is
-/// set; the actual achievement unlock is pending tick.rs integration (Task #40).
+/// Deep discovery via narrative creates correct initial state.
 #[test]
 fn test_deep_discovery_triggers_achievement_via_game_tick() {
-    for seed in 0u64..50 {
-        let mut rng = ChaCha8Rng::seed_from_u64(seed);
-        let mut state = strong_p50_state("Deep Achievement Test");
-        let mut tick_counter = 0u32;
-        let mut haven = Haven::default();
-        let mut enhancement = EnhancementProgress::new();
-        let mut deep = DeepState::new();
-        let mut achievements = Achievements::default();
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    let mut deep = DeepState::new();
+    deep.persistent.deep_story_stage = 4;
+    deep.persistent.rift_fragments = 4;
 
-        for _ in 0..500 {
-            let result = game_tick(
-                &mut state,
-                &mut tick_counter,
-                &mut haven,
-                &mut enhancement,
-                &mut deep,
-                &mut achievements,
-                false,
-                &mut rng,
-            );
+    quest::deep::complete_story_discovery(&mut deep, &mut rng);
 
-            if result.deep_changed {
-                // Verify the deep_changed flag is set (discovery occurred)
-                assert!(deep.persistent.discovered);
-                // The achievements_changed flag should be set to signal persistence
-                assert!(result.achievements_changed);
-                // Verify DeepDiscovered event was emitted
-                let has_event = result
-                    .events
-                    .iter()
-                    .any(|e| matches!(e, TickEvent::DeepDiscovered));
-                assert!(has_event);
-                return;
-            }
-        }
-    }
-    panic!("Deep discovery should have occurred for achievement test (50 seeds * 500 ticks)");
+    assert!(deep.persistent.discovered);
+    assert_eq!(deep.persistent.deep_story_stage, 5);
+    assert_eq!(deep.prestige.roster.len(), 3);
+    assert_eq!(deep.prestige.warband_marks, 50);
+    assert_eq!(deep.persistent.guild_rank, quest::deep::GuildRank(1));
+
+    // Verify starter archetypes
+    let archetypes: Vec<_> = deep.prestige.roster.iter().map(|m| m.archetype).collect();
+    assert!(archetypes.contains(&quest::deep::MercArchetype::Vanguard));
+    assert!(archetypes.contains(&quest::deep::MercArchetype::Scout));
+    assert!(archetypes.contains(&quest::deep::MercArchetype::Medic));
 }
 
 // =============================================================================

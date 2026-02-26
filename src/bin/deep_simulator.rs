@@ -21,14 +21,15 @@
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use quest::deep::{
-    apply_duration_modifiers, base_mission_duration_secs, build_infrastructure, generate_mercenary,
-    generate_mission_pool, generate_recruit_pool, generate_starter_roster, guild_upgrade_cost,
-    infrastructure_build_cost, is_daily_supply_run_available, mark_layer_cleared,
-    mission_launch_cost, mission_power_threshold, purge_lost_mercs, roster_has_capacity,
-    start_mission, tick_all_missions, tick_merc_injury, try_upgrade_guild_rank,
-    validate_squad_assignment, AvailableMission, DeepPersistent, DeepPrestige, DurationModifiers,
-    GuildRank, Infrastructure, LayerTier, MercArchetype, MercQuality, MercStatus, MissionOutcome,
-    MissionStatus, MissionType, RecruitPool,
+    apply_duration_modifiers, base_mission_duration_secs, build_infrastructure,
+    effective_concurrent_missions, generate_mercenary, generate_mission_pool,
+    generate_recruit_pool, generate_starter_roster, guild_upgrade_cost, infrastructure_build_cost,
+    is_daily_supply_run_available, mark_layer_cleared, mission_launch_cost,
+    mission_power_threshold, purge_lost_mercs, roster_has_capacity, start_mission,
+    tick_all_missions, tick_merc_injury, try_upgrade_guild_rank, validate_squad_assignment,
+    AvailableMission, DeepPersistent, DeepPrestige, DurationModifiers, GuildRank, Infrastructure,
+    LayerTier, MercArchetype, MercQuality, MercStatus, MissionOutcome, MissionStatus, MissionType,
+    RecruitPool,
 };
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -313,7 +314,9 @@ impl DeepSimStats {
             MissionType::SupplyRun => self.supply_runs += 1,
             MissionType::Recon => self.recon_missions += 1,
             MissionType::Expedition => self.expedition_missions += 1,
-            MissionType::Breakthrough => self.breakthrough_missions += 1,
+            MissionType::Breakthrough | MissionType::GatewayExpedition => {
+                self.breakthrough_missions += 1
+            }
             MissionType::Construction(_) => self.construction_missions += 1,
         }
     }
@@ -365,6 +368,9 @@ fn initialize_state(
         pending_results: Vec::new(),
         generation_number: 0,
         warband_log: Vec::new(),
+        total_marks_earned: 0,
+        total_missions_completed: 0,
+        total_mercs_lost: 0,
     };
 
     // Generate initial mission pool.
@@ -422,7 +428,8 @@ fn ai_recruit(
         prestige.recruit_pool.refreshed_at = now;
     }
 
-    let concurrent = persistent.guild_rank.concurrent_missions();
+    let concurrent =
+        effective_concurrent_missions(persistent.guild_rank, persistent.deepest_layer_reached);
     let avail = prestige.available_merc_count();
     let roster_size = prestige.roster.len();
 
@@ -714,6 +721,7 @@ fn mission_type_name(mt: MissionType) -> &'static str {
         MissionType::Recon => "Recon",
         MissionType::Expedition => "Expedition",
         MissionType::Breakthrough => "Breakthrough",
+        MissionType::GatewayExpedition => "Gateway Expedition",
         MissionType::Construction(_) => "Construction",
     }
 }
@@ -737,7 +745,8 @@ fn ai_launch_missions(
     verbose: bool,
     sim_start: DateTime<Utc>,
 ) {
-    let concurrent_limit = persistent.guild_rank.concurrent_missions();
+    let concurrent_limit =
+        effective_concurrent_missions(persistent.guild_rank, persistent.deepest_layer_reached);
 
     loop {
         let active_count = prestige.active_mission_count() as u32;

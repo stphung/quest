@@ -418,6 +418,47 @@ fn build_stats_left_lines(
         width,
     ));
 
+    // ── The Deep ──────────────────────────────────────────────────────────
+    let deep_missions_str = format_number(achievements.total_deep_missions_completed);
+    let deep_layer_str = if achievements.highest_deep_layer > 0 {
+        format!("Layer {}", achievements.highest_deep_layer)
+    } else {
+        "—".to_string()
+    };
+    let deep_rank_str = if achievements.highest_guild_rank > 0 {
+        format!("Rank {}", achievements.highest_guild_rank)
+    } else {
+        "—".to_string()
+    };
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled("THE DEEP", section_style)));
+    lines.push(Line::from(Span::styled(
+        "\u{2500}".repeat(w),
+        separator_style,
+    )));
+    lines.push(stat_line(
+        "Missions",
+        &deep_missions_str,
+        label_style,
+        value_style,
+        width,
+    ));
+    lines.push(stat_line(
+        "Highest Layer",
+        &deep_layer_str,
+        label_style,
+        value_style,
+        width,
+    ));
+    lines.push(stat_line(
+        "Guild Rank",
+        &deep_rank_str,
+        label_style,
+        value_style,
+        width,
+    ));
+
     lines
 }
 
@@ -677,6 +718,7 @@ fn build_stats_right_lines(
         AchievementCategory::Progression,
         AchievementCategory::Challenges,
         AchievementCategory::Exploration,
+        AchievementCategory::Deep,
     ] {
         let (unlocked, total) = achievements.count_by_category(*cat);
         lines.push(Line::from(vec![

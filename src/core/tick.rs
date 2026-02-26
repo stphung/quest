@@ -247,22 +247,12 @@ pub fn game_tick<R: Rng>(
         }
     }
 
-    // ── 11b. Deep discovery check ────────────────────────────────
-    // Independent roll per tick, only when eligible (P15+, no active content)
-    if !deep.persistent.discovered
-        && state.prestige_rank >= crate::deep::DEEP_MIN_PRESTIGE_RANK
-        && state.active_dungeon.is_none()
-        && state.active_fishing.is_none()
-        && state.active_minigame.is_none()
-        && crate::deep::try_discover_deep(deep, state.prestige_rank, rng)
-    {
-        achievements.on_deep_discovered(Some(&state.character_name));
-        result.events.push(TickEvent::DeepDiscovered);
-        result.deep_changed = true;
-        if !debug_mode {
-            result.achievements_changed = true;
-        }
-    }
+    // ── 11b. Deep discovery ───────────────────────────────────────
+    // Discovery is narrative-gated: the story chain advances on prestige
+    // (via advance_deep_story in prestige_input.rs), and the player
+    // completes discovery by pressing [D] after reaching story stage 4.
+    // No per-tick random roll — discovery happens through The Expanse
+    // story events only.
 
     // ── 11c. Deep mission ticking ──────────────────────────────────
     // Tick active missions (wall-clock based), resolve completions,
@@ -290,6 +280,9 @@ pub fn game_tick<R: Rng>(
         }
         for _ in 0..summary.mercs_lost {
             achievements.on_deep_merc_lost(Some(&state.character_name));
+        }
+        if summary.gateway_opened {
+            achievements.on_deep_gateway_opened(Some(&state.character_name));
         }
 
         if (summary.missions_completed > 0 || summary.mercs_lost > 0) && !debug_mode {

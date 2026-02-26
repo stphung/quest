@@ -857,10 +857,10 @@ fn layer_tier_from_layer_void() {
 
 #[test]
 fn base_durations_by_tier_match_design_table() {
-    // Shallows: 0.5h Supply, 1h Recon, 2h Expedition, 4h Breakthrough, 1h Construction.
+    // Shallows: 20min Supply, 1h Recon, 2h Expedition, 4h Breakthrough, 1h Construction.
     assert_eq!(
         base_mission_duration_secs(LayerTier::Shallows, MissionType::SupplyRun),
-        1800
+        1200
     );
     assert_eq!(
         base_mission_duration_secs(LayerTier::Shallows, MissionType::Recon),
@@ -962,8 +962,8 @@ fn duration_modifiers_are_applied_in_correct_order() {
 }
 
 #[test]
-fn duration_is_clamped_to_30_minute_floor() {
-    // With a base already at the floor (1800s) and all reductions, output must stay at 1800s.
+fn duration_is_clamped_to_15_minute_floor() {
+    // With a base already at the floor (900s) and all reductions, output must stay at 900s.
     // Also use a very small synthetic base (e.g., 1 second) to verify the floor kicks in.
     let tiny_base = 1u64;
     let result = apply_duration_modifiers(
@@ -979,15 +979,15 @@ fn duration_is_clamped_to_30_minute_floor() {
     );
     assert_eq!(
         result, MIN_MISSION_DURATION_SECS,
-        "Even 1-second base must be clamped to 30 minutes"
+        "Even 1-second base must be clamped to 15 minutes"
     );
 }
 
 #[test]
 fn duration_floor_applies_even_after_maximum_reductions() {
     // All modifiers: 0.75 * 0.70 * 0.85 * 0.90 ≈ 0.4016.
-    // Base of 3600s (1 hour) * 0.4016 ≈ 1446s, which is below 1800s floor.
-    let base = 3600u64; // 1 hour
+    // Base of 2000s * 0.4016 ≈ 803s, which is below 900s floor.
+    let base = 2000u64;
     let result = apply_duration_modifiers(
         base,
         &DurationModifiers {
@@ -1001,7 +1001,7 @@ fn duration_floor_applies_even_after_maximum_reductions() {
     );
     assert_eq!(
         result, MIN_MISSION_DURATION_SECS,
-        "Duration floor must apply when modifiers reduce below 30 min"
+        "Duration floor must apply when modifiers reduce below 15 min"
     );
 }
 
@@ -1167,10 +1167,10 @@ fn power_thresholds_layer_13_match_balance_table() {
 #[test]
 fn power_thresholds_layer_19_match_balance_table() {
     let t = layer_power_thresholds(19);
-    assert_eq!(t.breakthrough, 510);
-    assert_eq!(t.expedition, 385);
-    assert_eq!(t.recon, 290);
-    assert_eq!(t.supply_run, 190);
+    assert_eq!(t.breakthrough, 410);
+    assert_eq!(t.expedition, 310);
+    assert_eq!(t.recon, 230);
+    assert_eq!(t.supply_run, 155);
 }
 
 #[test]
@@ -1509,4 +1509,156 @@ fn breakthrough_launch_cost_layer_1_is_78() {
 fn breakthrough_launch_cost_layer_10_is_150() {
     // Formula: 70 + 8 * layer. Layer 10: 70 + 80 = 150.
     assert_eq!(mission_launch_cost(MissionType::Breakthrough, 10), 150);
+}
+
+// ── 24. T1-4 Balance: Shallows SupplyRun Duration Reduced to 20min ──────────
+
+#[test]
+fn test_shallows_supply_run_duration_reduced_to_20min() {
+    let duration = base_mission_duration_secs(LayerTier::Shallows, MissionType::SupplyRun);
+    assert_eq!(
+        duration, 1200,
+        "Shallows SupplyRun should be 20 minutes (1200s)"
+    );
+}
+
+#[test]
+fn test_min_mission_duration_floor_reduced_to_15min() {
+    // The minimum mission duration floor should be 900s (15 minutes), not 1800s (30 minutes).
+    assert_eq!(
+        MIN_MISSION_DURATION_SECS, 900,
+        "MIN_MISSION_DURATION_SECS should be 900 (15 minutes)"
+    );
+}
+
+#[test]
+fn test_min_mission_duration_floor_allows_below_30min() {
+    // With heavy modifiers, duration should be able to go below 30min (old floor)
+    // but not below 15min (new floor of 900s).
+    // Use 2000s base: 2000 * ~0.4016 ≈ 803s, which triggers the 900s floor.
+    let base = 2000u64;
+    let heavy_mods = DurationModifiers {
+        has_outpost: true,
+        familiarity: 100, // Mastered
+        has_saboteur: true,
+        saboteur_is_veteran: true,
+        is_overpowered: true,
+        bridge_layers: 0,
+    };
+    let result = apply_duration_modifiers(base, &heavy_mods);
+    assert!(
+        result >= 900,
+        "Duration floor should be 900s (15min), got {}s",
+        result
+    );
+    assert_eq!(
+        result, 900,
+        "With heavy modifiers on short base, duration should clamp to 900s floor"
+    );
+}
+
+#[test]
+fn test_shallows_supply_run_is_fastest_base_duration() {
+    // Shallows SupplyRun (1200s) should be the shortest base duration across all tiers/types.
+    let shallows_supply = base_mission_duration_secs(LayerTier::Shallows, MissionType::SupplyRun);
+    for tier in [
+        LayerTier::Warrens,
+        LayerTier::Hollows,
+        LayerTier::SunkenReach,
+        LayerTier::Abyss,
+        LayerTier::Void,
+    ] {
+        let d = base_mission_duration_secs(tier, MissionType::SupplyRun);
+        assert!(
+            d > shallows_supply,
+            "{:?} SupplyRun ({d}s) should be longer than Shallows ({shallows_supply}s)",
+            tier
+        );
+    }
+}
+
+// ── 25. T2-7 Balance: Abyss Entry Bonus (L18 Breakthrough → L19 Familiarity) ─
+
+#[test]
+fn test_l18_breakthrough_grants_l19_mapped_familiarity() {
+    let mut persistent = DeepPersistent::new();
+    // Clear layers 1 through 18
+    for l in 1..=18 {
+        mark_layer_cleared(&mut persistent, l);
+    }
+    let l19_fam = persistent
+        .layer_record(19)
+        .map(|r| r.familiarity)
+        .unwrap_or(0);
+    assert!(
+        l19_fam >= 25,
+        "L19 should have at least 25 familiarity (Mapped) after L18 cleared, got {}",
+        l19_fam
+    );
+    assert_eq!(
+        FamiliarityLevel::from_familiarity(l19_fam),
+        FamiliarityLevel::Mapped
+    );
+}
+
+#[test]
+fn test_l18_breakthrough_does_not_reduce_existing_l19_familiarity() {
+    let mut persistent = DeepPersistent::new();
+    persistent.layer_record_mut(19).familiarity = 80;
+    mark_layer_cleared(&mut persistent, 18);
+    assert_eq!(
+        persistent.layer_record(19).unwrap().familiarity,
+        80,
+        "L19 familiarity should not decrease if already higher than bonus"
+    );
+}
+
+#[test]
+fn test_only_l18_triggers_abyss_bonus_not_other_layers() {
+    let mut persistent = DeepPersistent::new();
+    mark_layer_cleared(&mut persistent, 17);
+    // L19 should not have been touched
+    let l19_fam = persistent
+        .layer_record(19)
+        .map(|r| r.familiarity)
+        .unwrap_or(0);
+    assert_eq!(l19_fam, 0, "Clearing L17 should not affect L19 familiarity");
+}
+
+#[test]
+fn test_l18_bonus_grants_exactly_25_familiarity_when_l19_is_zero() {
+    let mut persistent = DeepPersistent::new();
+    mark_layer_cleared(&mut persistent, 18);
+    let l19_fam = persistent.layer_record(19).unwrap().familiarity;
+    assert_eq!(
+        l19_fam, 25,
+        "L19 should have exactly 25 familiarity when starting from 0"
+    );
+}
+
+#[test]
+fn test_l18_bonus_preserves_l19_familiarity_at_exactly_25() {
+    let mut persistent = DeepPersistent::new();
+    // Set L19 to exactly 25 before clearing L18
+    persistent.layer_record_mut(19).familiarity = 25;
+    mark_layer_cleared(&mut persistent, 18);
+    assert_eq!(
+        persistent.layer_record(19).unwrap().familiarity,
+        25,
+        "L19 familiarity should remain 25 when already at bonus threshold"
+    );
+}
+
+#[test]
+fn test_abyss_entry_bonus_only_fires_once() {
+    let mut persistent = DeepPersistent::new();
+    mark_layer_cleared(&mut persistent, 18);
+    assert_eq!(persistent.layer_record(19).unwrap().familiarity, 25);
+    // Clearing L18 again (idempotent) should not increase further
+    mark_layer_cleared(&mut persistent, 18);
+    assert_eq!(
+        persistent.layer_record(19).unwrap().familiarity,
+        25,
+        "Repeated L18 clears should not stack the Abyss entry bonus"
+    );
 }

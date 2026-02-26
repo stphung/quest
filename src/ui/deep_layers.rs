@@ -631,6 +631,81 @@ fn render_layers_split(
         row += 1;
     }
 
+    // BUILD OPTIONS — list unbuilt infrastructure with ROI descriptions
+    let unbuilt: Vec<&Infrastructure> = Infrastructure::ALL
+        .iter()
+        .filter(|i| !layer.has_infrastructure(**i))
+        .collect();
+    if !unbuilt.is_empty() && row + 2 < content_bottom {
+        row += 1;
+        put_text(
+            buffer,
+            row,
+            detail_inner_left,
+            "BUILD OPTIONS",
+            DEEP_BORDER_COLOR,
+        );
+        row += 1;
+
+        for infra in &unbuilt {
+            if row >= content_bottom {
+                break;
+            }
+            let cost = infrastructure_build_cost(**infra, layer.index);
+            let roi = match infra {
+                Infrastructure::Outpost => "-25% mission duration".to_string(),
+                Infrastructure::SupplyCache => {
+                    let runs = if cost > 0 { cost / 40 } else { 1 };
+                    format!("~{} supply runs to break even", runs.max(1))
+                }
+                Infrastructure::Watchtower => "+25 familiarity immediately".to_string(),
+                Infrastructure::Bridge => {
+                    let bridge_count = deep
+                        .persistent
+                        .layers
+                        .iter()
+                        .filter(|l| l.has_infrastructure(Infrastructure::Bridge))
+                        .count();
+                    if bridge_count == 0 {
+                        "Skip this layer on deeper missions (-10% duration)".to_string()
+                    } else {
+                        let new_reduction = 1.0 - (0.9_f64).powi((bridge_count + 1) as i32);
+                        format!(
+                            "Skip layer (-{:.0}% total with {} bridge{})",
+                            new_reduction * 100.0,
+                            bridge_count + 1,
+                            if bridge_count == 0 { "" } else { "s" },
+                        )
+                    }
+                }
+            };
+            let line = format!("  {}  {}  ({}M)", infra.display_name(), roi, cost);
+            let cost_color = if deep.prestige.warband_marks >= cost {
+                Color::White
+            } else {
+                Color::DarkGray
+            };
+            put_text(buffer, row, detail_inner_left, &line, cost_color);
+            // Highlight cost portion with affordability color
+            let cost_label = format!("({}M)", cost);
+            if let Some(pos) = line.rfind(&cost_label) {
+                let afford_color = if deep.prestige.warband_marks >= cost {
+                    Color::Green
+                } else {
+                    Color::LightRed
+                };
+                put_text(
+                    buffer,
+                    row,
+                    detail_inner_left + pos as i32,
+                    &cost_label,
+                    afford_color,
+                );
+            }
+            row += 1;
+        }
+    }
+
     // First-visit infrastructure hint
     if ui.layer_visit_count < 3 && row < content_bottom {
         put_text(

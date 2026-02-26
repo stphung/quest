@@ -1,7 +1,9 @@
 //! The Deep — Hub and New Mission sub-view rendering.
 
 use crate::deep::{
-    AvailableMission, DeepState, DeepUiState, MercArchetype, MercStatus, MissionStatus, MissionType,
+    apply_duration_modifiers, base_mission_duration_secs, AvailableMission, DeepState, DeepUiState,
+    DurationModifiers, FamiliarityLevel, Infrastructure, LayerTier, MercArchetype, MercStatus,
+    MissionStatus, MissionType,
 };
 use chrono::Utc;
 use ratatui::style::Color;
@@ -22,6 +24,7 @@ pub(super) fn mission_type_color(t: MissionType) -> Color {
         MissionType::Recon => Color::Cyan,
         MissionType::Expedition => Color::Yellow,
         MissionType::Breakthrough => Color::LightRed,
+        MissionType::GatewayExpedition => Color::Rgb(255, 215, 0),
         MissionType::Construction(_) => Color::Blue,
     }
 }
@@ -104,6 +107,159 @@ fn render_progress_bar(
     }
 }
 
+// ── Compact Hub (S-tier) ─────────────────────────────────────────────────────
+
+/// Render a compact hub for S-tier (small) terminals.
+/// Shows guild summary, active missions, and navigation keys in minimal space.
+fn render_compact_hub(
+    buffer: &mut [Vec<SceneCell>],
+    width: usize,
+    height: usize,
+    deep: &DeepState,
+    ui: &DeepUiState,
+) {
+    if width == 0 || height < 4 {
+        return;
+    }
+    let mut row = 0i32;
+
+    // Title line with generation counter
+    put_text(buffer, row, 1, "THE DEEP", SECTION_LABEL_COLOR);
+    let gen_label = format!("Gen.{}", deep.prestige.generation_number);
+    let gen_col = (width as i32) - gen_label.len() as i32 - 1;
+    put_text(buffer, row, gen_col.max(12), &gen_label, Color::DarkGray);
+    row += 1;
+
+    // Atmospheric quote
+    let quotes = [
+        "\"The tunnels breathe.\"",
+        "\"Stone remembers.\"",
+        "\"Deeper. Always deeper.\"",
+        "\"The dark welcomes you.\"",
+        "\"Echoes of the fallen.\"",
+    ];
+    let millis = super::scene_fx::current_millis();
+    let quote_idx = (millis / 12_000) as usize % quotes.len();
+    put_text(buffer, row, 1, quotes[quote_idx], Color::Rgb(60, 80, 120));
+    row += 1;
+
+    // Separator
+    let sep: String = "\u{2500}".repeat(width.saturating_sub(2));
+    put_text(buffer, row, 1, &sep, Color::DarkGray);
+    row += 1;
+
+    // Guild info
+    let rank = deep.persistent.guild_rank;
+    let guild_line = format!(
+        "GUILD  {} (Rank {})    L{}",
+        rank.display_name(),
+        rank.0,
+        deep.persistent.deepest_layer_reached.max(1)
+    );
+    put_text(buffer, row, 1, &guild_line, Color::White);
+    row += 1;
+
+    let marks_line = format!("MARKS  {} WM", deep.prestige.warband_marks);
+    put_text(buffer, row, 1, &marks_line, Color::Yellow);
+    row += 1;
+
+    // Separator
+    put_text(buffer, row, 1, &sep, Color::DarkGray);
+    row += 1;
+
+    // Active missions (compact)
+    let now = Utc::now();
+    for mission in &deep.prestige.active_missions {
+        if row >= height as i32 - 1 {
+            break;
+        }
+        let type_label = match mission.mission_type {
+            MissionType::SupplyRun => "Supply",
+            MissionType::Recon => "Recon",
+            MissionType::Expedition => "Exped",
+            MissionType::Breakthrough => "Break",
+            MissionType::GatewayExpedition => "Gate",
+            MissionType::Construction(_) => "Build",
+        };
+        let remaining = (mission.ends_at - now).num_seconds().max(0) as u64;
+        let h = remaining / 3600;
+        let m = (remaining % 3600) / 60;
+        let evt = if mission.has_pending_event() {
+            " [evt!]"
+        } else {
+            ""
+        };
+        let line = format!(
+            "> {}: L{}  {}h {:02}m{}",
+            type_label, mission.layer, h, m, evt
+        );
+        let color = if mission.has_pending_event() {
+            Color::Yellow
+        } else {
+            Color::Cyan
+        };
+        put_text(buffer, row, 1, &line, color);
+        row += 1;
+    }
+
+    // Show completed missions
+    for mission in &deep.prestige.pending_results {
+        if row >= height as i32 - 1 {
+            break;
+        }
+        let type_label = mission_type_label(mission.mission_type);
+        let line = format!("\u{2713} {} L{}  COMPLETE", type_label, mission.layer);
+        put_text(buffer, row, 1, &line, Color::Green);
+        row += 1;
+    }
+
+    if deep.prestige.active_missions.is_empty() && deep.prestige.pending_results.is_empty() {
+        put_text(buffer, row, 1, "  No active missions.", Color::DarkGray);
+        row += 1;
+
+        // Show warband log if available
+        let log = &deep.prestige.warband_log;
+        if !log.is_empty() && row < height as i32 - 2 {
+            for entry in log.iter().rev().take(3) {
+                if row >= height as i32 - 1 {
+                    break;
+                }
+                let (icon, color) = match entry.outcome {
+                    crate::deep::MissionOutcome::Success => ("\u{2713}", Color::Green),
+                    crate::deep::MissionOutcome::PartialSuccess => ("\u{25cb}", Color::Yellow),
+                    crate::deep::MissionOutcome::Failure => ("\u{2717}", Color::LightRed),
+                };
+                let line = format!(
+                    "{} L{} {} {}M",
+                    icon, entry.layer, entry.mission_name, entry.marks_earned
+                );
+                put_text(buffer, row, 1, &line, color);
+                row += 1;
+            }
+        }
+
+        // First-visit hint
+        if ui.hub_visit_count <= 1 && log.is_empty() && row < height as i32 - 1 {
+            put_text(
+                buffer,
+                row,
+                1,
+                "Start with a Supply Run (free).",
+                Color::Rgb(50, 80, 110),
+            );
+        }
+    }
+
+    // Navigation keys (footer)
+    put_text(
+        buffer,
+        height as i32 - 1,
+        1,
+        "[N]ew  [R]oster  [L]ayers  [?]",
+        SECTION_LABEL_COLOR,
+    );
+}
+
 // ── Hub view ──────────────────────────────────────────────────────────────────
 
 /// Render the main Hub view.
@@ -119,13 +275,19 @@ pub(super) fn render_hub(
         return;
     }
 
+    if ctx.tier <= SizeTier::S {
+        render_compact_hub(buffer, width, height, deep, ui);
+        return;
+    }
+
     let now = Utc::now();
     let rank = deep.persistent.guild_rank;
     let marks = deep.prestige.warband_marks;
     let roster_count = deep.prestige.roster.len();
     let max_roster = rank.max_roster() as usize;
     let active_count = deep.prestige.active_mission_count() as u32;
-    let max_concurrent = rank.concurrent_missions();
+    let max_concurrent =
+        crate::deep::effective_concurrent_missions(rank, deep.persistent.deepest_layer_reached);
     let frontier = deep.persistent.frontier_layer();
     let deepest = deep.persistent.deepest_layer_reached;
     let is_compact = ctx.tier <= SizeTier::S;
@@ -338,16 +500,17 @@ pub(super) fn render_hub(
         let remaining_space = (missions_bottom - missions_end_row).max(0) as usize;
         if remaining_space >= 3 {
             let millis = super::scene_fx::current_millis();
-            let atmosphere_messages: &[&str] = &[
-                "The tunnels breathe. Your company awaits orders.",
-                "Distant rumbles echo from below. The Deep stirs.",
-                "Torchlight flickers across weathered maps. Planning continues.",
-                "Veterans trade stories of deeper layers. Morale holds steady.",
-                "Supply crates line the staging area. Ready for deployment.",
-                "Scouts report movement in the lower passages.",
-                "The guild hall buzzes with quiet preparation.",
-                "Maps are spread across the table. Routes are being planned.",
-            ];
+            let atmosphere_messages = if deep.persistent.gateway_opened {
+                // Permanent post-gateway message
+                &[
+                    "The Gateway stands open. The Wellspring waits.",
+                    "The Wellspring has seen this before. It is patient.",
+                    "What waits below the Wellspring is not a reward. It is an answer.",
+                    "Your predecessors went as far as this. You have gone further.",
+                ][..]
+            } else {
+                tier_atmosphere_messages(deep.persistent.frontier_layer())
+            };
             let msg_idx = (millis / 8000) as usize % atmosphere_messages.len();
             let atmo_row = if log.is_empty() {
                 missions_top + remaining_space as i32 / 2
@@ -355,12 +518,17 @@ pub(super) fn render_hub(
                 missions_end_row + 1
             };
             if atmo_row < missions_bottom {
+                let atmo_color = if deep.persistent.gateway_opened {
+                    Color::Rgb(255, 215, 0) // Gold for gateway
+                } else {
+                    Color::Rgb(40, 60, 90)
+                };
                 put_text_centered(
                     buffer,
                     atmo_row,
                     width,
                     atmosphere_messages[msg_idx],
-                    Color::Rgb(40, 60, 90),
+                    atmo_color,
                 );
             }
         }
@@ -1264,6 +1432,7 @@ fn mission_type_hint(mt: MissionType) -> &'static str {
         MissionType::Recon => "Raises layer familiarity \u{2014} cuts future mission times",
         MissionType::Expedition => "Core rewards \u{2014} items, Marks, and merc XP",
         MissionType::Breakthrough => "Clears the frontier \u{2014} unlocks the next layer",
+        MissionType::GatewayExpedition => "The final expedition \u{2014} breach the sealed gateway",
         MissionType::Construction(_) => {
             "Builds permanent infrastructure \u{2014} survives prestige"
         }
@@ -1356,24 +1525,69 @@ fn render_mission_detail_phase1(
     }
     row += 1;
 
-    // Duration — show effective if modifiers apply
+    // Duration — show effective if modifiers apply, with breakdown
     let layer_record = deep.persistent.layer_record(mission.layer);
-    let duration_reduction = layer_record
-        .map(|l| l.total_duration_reduction())
-        .unwrap_or(0.0);
-    let effective_secs = (mission.duration_secs as f64 * (1.0 - duration_reduction)) as u64;
+    let has_outpost = layer_record
+        .map(|r| r.has_infrastructure(Infrastructure::Outpost))
+        .unwrap_or(false);
+    let familiarity = layer_record.map(|r| r.familiarity).unwrap_or(0);
+
+    let tier = LayerTier::from_layer(mission.layer);
+    let base_secs = base_mission_duration_secs(tier, mission.mission_type);
+
+    let mods = DurationModifiers {
+        has_outpost,
+        familiarity,
+        has_saboteur: false,
+        saboteur_is_veteran: false,
+        is_overpowered: false,
+        bridge_layers: 0,
+    };
+    let effective_secs = apply_duration_modifiers(base_secs, &mods);
+
     if row < content_bottom {
-        let dur_str = if duration_reduction > 0.01 {
-            format!(
-                "Duration:  {}  (\u{2192} {} effective)",
-                format_hours(mission.duration_secs),
+        if effective_secs != base_secs {
+            let dur_str = format!(
+                "Duration:  {}  \u{2192}  {} effective",
+                format_hours(base_secs),
                 format_hours(effective_secs)
-            )
+            );
+            put_text(buffer, row, detail_inner_left, &dur_str, Color::DarkGray);
+            // Highlight the effective duration in cyan
+            let eff_start = dur_str.find('\u{2192}').unwrap_or(0);
+            put_text(
+                buffer,
+                row,
+                detail_inner_left + eff_start as i32,
+                &format!("\u{2192}  {} effective", format_hours(effective_secs)),
+                Color::Cyan,
+            );
+            row += 1;
+
+            // Modifier breakdown line
+            if row < content_bottom {
+                let mut parts = Vec::new();
+                if has_outpost {
+                    parts.push("Outpost -25%");
+                }
+                let fam_level = FamiliarityLevel::from_familiarity(familiarity);
+                match fam_level {
+                    FamiliarityLevel::Mapped => parts.push("Mapped -10%"),
+                    FamiliarityLevel::Familiar => parts.push("Familiar -20%"),
+                    FamiliarityLevel::Mastered => parts.push("Mastered -30%"),
+                    FamiliarityLevel::Unknown => {}
+                }
+                if !parts.is_empty() {
+                    let breakdown = format!("           ({})", parts.join(", "));
+                    put_text(buffer, row, detail_inner_left, &breakdown, Color::DarkGray);
+                    row += 1;
+                }
+            }
         } else {
-            format!("Duration:  {}", format_hours(mission.duration_secs))
-        };
-        put_text(buffer, row, detail_inner_left, &dur_str, Color::DarkGray);
-        row += 1;
+            let dur_str = format!("Duration:  {}", format_hours(base_secs));
+            put_text(buffer, row, detail_inner_left, &dur_str, Color::DarkGray);
+            row += 1;
+        }
     }
 
     // Risk with first-visit consequence hint
@@ -1830,5 +2044,56 @@ fn render_squad_summary_panel(
             "[Enter] Launch Mission",
             launch_color,
         );
+    }
+}
+
+// ── Tier-Specific Atmosphere Messages ────────────────────────────────────────
+
+/// Narrative atmosphere messages keyed to the frontier layer tier.
+/// These rotate in the hub every 8 seconds.
+fn tier_atmosphere_messages(frontier_layer: u32) -> &'static [&'static str] {
+    match LayerTier::from_layer(frontier_layer) {
+        LayerTier::Shallows => &[
+            "The walls here were carved with purpose. This was no mine.",
+            "Your scouts find a collapsed barracks. Decades of dust.",
+            "The captain traces a finger along a carved warning.",
+            "Tool marks on the walls change from picks to ritual implements.",
+            "The tunnels breathe. Your company awaits orders.",
+        ],
+        LayerTier::Warrens => &[
+            "Gareth found a child's doll in the rubble. Stone, but carefully carved.",
+            "The archive tablets mention 'the Wellspring' seventeen times.",
+            "The Overseer's body twitches even in death. Its purpose outlasted its makers.",
+            "Living quarters line these corridors. Families lived here.",
+            "Distant rumbles echo from below. The Deep stirs.",
+        ],
+        LayerTier::Hollows => &[
+            "The walls pulse with a slow rhythm. It matches your heartbeat.",
+            "Your Arcanist says the light here isn't bioluminescence. It's memory.",
+            "An Echo walks past the camp. It doesn't see you. It never will.",
+            "The spore clouds aren't toxic by nature. They're a defense mechanism.",
+            "The stone remembers being shaped. It remembers the hands that shaped it.",
+        ],
+        LayerTier::SunkenReach => &[
+            "The seals glow brighter when your Arcanist approaches.",
+            "Water pressure should have crushed these chambers millennia ago.",
+            "The Drowned King's throne faces downward. Even in death, it watched below.",
+            "These chambers were flooded deliberately. Water as a barrier.",
+            "The rune patterns on the seals match the god items.",
+        ],
+        LayerTier::Abyss => &[
+            "Mira returned with six days of rations consumed. She was gone four hours.",
+            "The Vanguard's battle-axe is two inches shorter. The edge is sharper.",
+            "Sound travels wrong here \u{2014} you hear your orders before you give them.",
+            "Your Medic's wound records don't match. She was injured on missions she hasn't run.",
+            "The Wellspring doesn't call to you. It recognizes you.",
+        ],
+        LayerTier::Void => &[
+            "There is no stone here. Your mercs walk on solidified will.",
+            "The Wellspring pulses. It has been waiting longer than your world has existed.",
+            "Your Vanguard's wounds close before the Medic reaches them.",
+            "The void is not empty. It is aware.",
+            "Each step closer. The Gateway waits at the end of everything.",
+        ],
     }
 }

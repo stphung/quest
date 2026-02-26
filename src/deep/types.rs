@@ -168,6 +168,8 @@ pub enum MissionType {
     Breakthrough,
     /// 4–8h, no risk, cleared layers only.  Builds infrastructure.
     Construction(Infrastructure),
+    /// 24h, Layer 30 only.  Opens the Gateway.  One-time mission.
+    GatewayExpedition,
 }
 
 impl MissionType {
@@ -178,6 +180,7 @@ impl MissionType {
             MissionType::Expedition => "Expedition",
             MissionType::Breakthrough => "Breakthrough",
             MissionType::Construction(_) => "Construction",
+            MissionType::GatewayExpedition => "Gateway Expedition",
         }
     }
 
@@ -187,7 +190,7 @@ impl MissionType {
             MissionType::SupplyRun | MissionType::Construction(_) => 0,
             MissionType::Recon => 1,
             MissionType::Expedition => 2,
-            MissionType::Breakthrough => 3,
+            MissionType::Breakthrough | MissionType::GatewayExpedition => 3,
         }
     }
 
@@ -199,6 +202,7 @@ impl MissionType {
             MissionType::Expedition => (7200, 43200),
             MissionType::Breakthrough => (14400, 86400),
             MissionType::Construction(_) => (3600, 21600),
+            MissionType::GatewayExpedition => (86400, 86400),
         }
     }
 
@@ -208,7 +212,7 @@ impl MissionType {
             MissionType::SupplyRun | MissionType::Construction(_) => 0,
             MissionType::Recon => 1,
             MissionType::Expedition => 2,
-            MissionType::Breakthrough => 5,
+            MissionType::Breakthrough | MissionType::GatewayExpedition => 5,
         }
     }
 }
@@ -442,6 +446,17 @@ pub struct WarbandLogEntry {
     pub timestamp: chrono::DateTime<chrono::Utc>,
 }
 
+/// Record of a completed generation's accomplishments, stored permanently.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenerationRecord {
+    pub generation: u32,
+    pub marks_earned: u32,
+    pub missions_completed: u32,
+    pub mercs_lost: u32,
+    pub deepest_layer_reached: u32,
+    pub gateway_opened_this_generation: bool,
+}
+
 /// Rewards produced by a completed mission.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MissionResult {
@@ -490,6 +505,9 @@ pub struct Mission {
     pub status: MissionStatus,
     /// Populated when mission completes.
     pub result: Option<MissionResult>,
+    /// Whether this is the auto-queued "First Orders" starter mission.
+    #[serde(default)]
+    pub is_first_orders: bool,
 }
 
 impl Mission {
@@ -607,6 +625,18 @@ impl Default for GuildRank {
     }
 }
 
+/// Effective concurrent missions, accounting for breakthrough bonuses.
+/// Breaking through Layer 3 grants +1 concurrent slot even at Rank 1.
+pub fn effective_concurrent_missions(guild_rank: GuildRank, deepest_layer_reached: u32) -> u32 {
+    let base = guild_rank.concurrent_missions();
+    // Bonus: breaking L3 grants a concurrent slot before formal Rank 2
+    if guild_rank.0 == 1 && deepest_layer_reached >= 3 {
+        base + 1
+    } else {
+        base
+    }
+}
+
 // ── Persistent (Account-Level) Record Per Layer ────────────────────────────────
 
 /// Persistent record for a single layer.  Lives inside `DeepPersistent`.
@@ -683,6 +713,12 @@ pub struct DeepPersistent {
     /// Whether the Gateway at Layer 30 has been opened.
     #[serde(default)]
     pub gateway_opened: bool,
+    /// Whether the "First Orders" starter mission has been auto-queued.
+    #[serde(default)]
+    pub first_orders_queued: bool,
+    /// Records of completed generations (capped at 10).
+    #[serde(default)]
+    pub generation_records: Vec<GenerationRecord>,
 }
 
 impl Default for DeepPersistent {
@@ -706,6 +742,8 @@ impl DeepPersistent {
             deep_story_stage: 0,
             rift_fragments: 0,
             gateway_opened: false,
+            first_orders_queued: false,
+            generation_records: Vec::new(),
         }
     }
 
@@ -775,6 +813,15 @@ pub struct DeepPrestige {
     /// Log of completed missions this prestige cycle.
     #[serde(default)]
     pub warband_log: Vec<WarbandLogEntry>,
+    /// Total Warband Marks earned this generation (for generation records).
+    #[serde(default)]
+    pub total_marks_earned: u32,
+    /// Total missions completed this generation (for generation records).
+    #[serde(default)]
+    pub total_missions_completed: u32,
+    /// Total mercs lost this generation (for generation records).
+    #[serde(default)]
+    pub total_mercs_lost: u32,
 }
 
 impl Default for DeepPrestige {
@@ -793,6 +840,9 @@ impl Default for DeepPrestige {
             pending_results: Vec::new(),
             generation_number: 0,
             warband_log: Vec::new(),
+            total_marks_earned: 0,
+            total_missions_completed: 0,
+            total_mercs_lost: 0,
         }
     }
 }
@@ -935,6 +985,23 @@ impl DeepState {
     pub fn on_prestige(&mut self) {
         // Increment generation counter before resetting prestige state.
         self.persistent.generation_counter += 1;
+
+        // Record generation stats before reset
+        let record = GenerationRecord {
+            generation: self.persistent.generation_counter,
+            marks_earned: self.prestige.total_marks_earned,
+            missions_completed: self.prestige.total_missions_completed,
+            mercs_lost: self.prestige.total_mercs_lost,
+            deepest_layer_reached: self.persistent.deepest_layer_reached,
+            gateway_opened_this_generation: self.persistent.gateway_opened,
+        };
+        self.persistent.generation_records.push(record);
+        // Cap at 10 records
+        if self.persistent.generation_records.len() > 10 {
+            let excess = self.persistent.generation_records.len() - 10;
+            self.persistent.generation_records.drain(..excess);
+        }
+
         // Cancel all active missions cleanly (mercs go with the reset).
         self.prestige = DeepPrestige::new();
         // Tag the new prestige state with its generation number.
@@ -1179,6 +1246,20 @@ mod tests {
         assert_eq!(GuildRank(3).required_breakthrough_layer(), Some(7));
         assert_eq!(GuildRank(4).required_breakthrough_layer(), Some(13));
         assert_eq!(GuildRank(5).required_breakthrough_layer(), Some(19));
+    }
+
+    // ── effective_concurrent_missions ────────────────────────────────────────
+
+    #[test]
+    fn test_effective_concurrent_missions_bonus_at_rank1_layer3() {
+        assert_eq!(effective_concurrent_missions(GuildRank(1), 0), 1);
+        assert_eq!(effective_concurrent_missions(GuildRank(1), 2), 1);
+        assert_eq!(effective_concurrent_missions(GuildRank(1), 3), 2);
+        assert_eq!(effective_concurrent_missions(GuildRank(1), 10), 2);
+        // Higher ranks are unaffected
+        assert_eq!(effective_concurrent_missions(GuildRank(2), 3), 2);
+        assert_eq!(effective_concurrent_missions(GuildRank(3), 7), 2);
+        assert_eq!(effective_concurrent_missions(GuildRank(5), 25), 4);
     }
 
     // ── MercArchetype ─────────────────────────────────────────────────────────

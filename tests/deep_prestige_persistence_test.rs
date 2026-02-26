@@ -280,6 +280,7 @@ fn test_prestige_resets_active_missions() {
         pending_event_index: 0,
         status: quest::deep::MissionStatus::Active,
         result: None,
+        is_first_orders: false,
     });
     deep.on_prestige();
     assert!(deep.prestige.active_missions.is_empty());
@@ -779,6 +780,7 @@ fn test_prestige_with_pending_results_resets() {
         events: vec![],
         pending_event_index: 0,
         status: quest::deep::MissionStatus::Completed,
+        is_first_orders: false,
         result: Some(quest::deep::MissionResult {
             outcome: MissionOutcome::Success,
             marks_earned: 100,

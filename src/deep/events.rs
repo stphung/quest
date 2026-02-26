@@ -42,6 +42,7 @@ pub fn event_trigger_points(mission_type: MissionType, tier: LayerTier) -> &'sta
             LayerTier::SunkenReach => &[0.20, 0.45, 0.70, 0.90],
             LayerTier::Abyss | LayerTier::Void => &[0.15, 0.35, 0.55, 0.75, 0.90],
         },
+        MissionType::GatewayExpedition => &[0.10, 0.30, 0.50, 0.70, 0.90],
     }
 }
 
@@ -990,6 +991,140 @@ fn tier_boss_template(tier: LayerTier) -> &'static EventTemplate {
     }
 }
 
+// ── Gateway Expedition events (5 fixed narrative beats) ─────────────────────
+
+/// Event 1/5: The descent to the sealed root begins.
+static GATEWAY_DESCENT: EventTemplate = EventTemplate {
+    category: EventCategory::Discovery,
+    title: "THE SEALED ROOT",
+    description:
+        "The tunnels narrow as your squad descends below the Void. Ancient wards pulse faintly \
+         along the walls — the resonance grows stronger with every step.",
+    choices: &[
+        ChoiceTemplate::safe("Press onward", None, 0, 0, 0),
+        ChoiceTemplate::safe(
+            "Study the wards",
+            Some(MercArchetype::Arcanist),
+            -1800,
+            0,
+            0,
+        ),
+    ],
+    auto_resolve_index: 0,
+    risk_success_tag: None,
+    risk_failure_tag: None,
+};
+
+/// Event 2/5: The ward barrier.
+static GATEWAY_WARD_BARRIER: EventTemplate = EventTemplate {
+    category: EventCategory::Hazard,
+    title: "THE WARD BARRIER",
+    description:
+        "A shimmering barrier of intertwined runes blocks the passage. The rift fragments \
+         in your pack vibrate in response, seeking alignment.",
+    choices: &[
+        ChoiceTemplate::safe("Use the rift fragments", None, 0, 0, 0),
+        ChoiceTemplate {
+            label: "Force through the barrier",
+            required_archetype: None,
+            time_delta_secs: 0,
+            is_risky: true,
+            bonus_marks: 0,
+            mark_cost: 0,
+            risky_success_chance: 0.60,
+            risky_injury_on_fail: 0.40,
+            unlocks_bonus_event: false,
+            power_modifier: 1.0,
+        },
+    ],
+    auto_resolve_index: 0,
+    risk_success_tag: None,
+    risk_failure_tag: None,
+};
+
+/// Event 3/5: The cathedral of roots.
+static GATEWAY_CATHEDRAL: EventTemplate = EventTemplate {
+    category: EventCategory::Obstacle,
+    title: "THE ROOT CATHEDRAL",
+    description: "The tunnel opens into a vast cathedral-like cavern. Enormous roots descend from \
+         above, forming pillars of petrified wood. At the far end, something glows.",
+    choices: &[
+        ChoiceTemplate::safe("Advance cautiously", None, 0, 0, 0),
+        ChoiceTemplate::safe(
+            "Scout the perimeter",
+            Some(MercArchetype::Scout),
+            -1800,
+            0,
+            0,
+        ),
+    ],
+    auto_resolve_index: 0,
+    risk_success_tag: None,
+    risk_failure_tag: None,
+};
+
+/// Event 4/5: The guardian of the gate.
+static GATEWAY_GUARDIAN: EventTemplate = EventTemplate {
+    category: EventCategory::BossApproach,
+    title: "THE ROOTBOUND GUARDIAN",
+    description:
+        "A massive figure of stone and petrified root unfolds from the cavern wall. It has \
+         waited here since before the first generation descended. It will not yield willingly.",
+    choices: &[
+        ChoiceTemplate::safe("Engage the guardian", None, 0, 0, 0),
+        ChoiceTemplate {
+            label: "Shield the squad",
+            required_archetype: Some(MercArchetype::Vanguard),
+            time_delta_secs: 0,
+            is_risky: false,
+            bonus_marks: 0,
+            mark_cost: 0,
+            risky_success_chance: 0.0,
+            risky_injury_on_fail: 0.0,
+            unlocks_bonus_event: false,
+            power_modifier: 1.20,
+        },
+        ChoiceTemplate {
+            label: "Target weak points",
+            required_archetype: Some(MercArchetype::Saboteur),
+            time_delta_secs: 0,
+            is_risky: false,
+            bonus_marks: 0,
+            mark_cost: 0,
+            risky_success_chance: 0.0,
+            risky_injury_on_fail: 0.0,
+            unlocks_bonus_event: false,
+            power_modifier: 1.15,
+        },
+    ],
+    auto_resolve_index: 0,
+    risk_success_tag: None,
+    risk_failure_tag: None,
+};
+
+/// Event 5/5: The sealed gateway itself.
+static GATEWAY_SEAL: EventTemplate = EventTemplate {
+    category: EventCategory::Discovery,
+    title: "THE GATEWAY",
+    description:
+        "Before you stands an immense gate carved from living stone. Runes circle its frame, \
+         pulsing in time with the rift fragments. This is what generations of mercenaries \
+         have died to reach. The fragments slot into place. The gate begins to open.",
+    choices: &[ChoiceTemplate::safe("Open the gateway", None, 0, 0, 0)],
+    auto_resolve_index: 0,
+    risk_success_tag: None,
+    risk_failure_tag: None,
+};
+
+/// The 5 fixed Gateway Expedition events, in narrative order.
+static GATEWAY_EVENTS: [&EventTemplate; 5] = [
+    &GATEWAY_DESCENT,
+    &GATEWAY_WARD_BARRIER,
+    &GATEWAY_CATHEDRAL,
+    &GATEWAY_GUARDIAN,
+    &GATEWAY_SEAL,
+];
+
 // ── Void scaling helpers ──────────────────────────────────────────────────────
 
 /// Layer-dependent scale factors for Void layers (L26+).
@@ -1173,6 +1308,16 @@ pub fn generate_mission_events_with_names(
     let triggers = event_trigger_points(mission_type, tier);
     if triggers.is_empty() {
         return Vec::new();
+    }
+
+    // Gateway Expedition uses fixed narrative events (not from tier pool).
+    if mission_type == MissionType::GatewayExpedition {
+        let now = Utc::now();
+        return GATEWAY_EVENTS
+            .iter()
+            .take(triggers.len())
+            .map(|template| template_to_check_in_event(template, layer, now, squad_names))
+            .collect();
     }
 
     let pool = tier_event_pool(tier);

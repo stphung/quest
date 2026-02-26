@@ -23,12 +23,13 @@ use super::economy::{
 use super::events::{generate_mission_events_with_names, tick_mission_events, EventTickResult};
 use super::layers::{
     apply_duration_modifiers, apply_familiarity_gain, base_mission_duration_secs,
-    mark_layer_cleared, mission_power_threshold, DurationModifiers,
+    mark_layer_cleared, mission_power_threshold, watchtower_auto_resolve_bonus, DurationModifiers,
 };
 use super::mercenaries::{injure_merc, mark_merc_lost};
 use super::types::{
-    AvailableMission, DeepPersistent, DeepPrestige, GuildRank, Infrastructure, LayerTier,
-    MercArchetype, MercStatus, Mission, MissionOutcome, MissionResult, MissionStatus, MissionType,
+    effective_concurrent_missions, AvailableMission, DeepPersistent, DeepPrestige, GuildRank,
+    Infrastructure, LayerTier, MercArchetype, MercStatus, Mission, MissionOutcome, MissionResult,
+    MissionStatus, MissionType, WarbandLogEntry,
 };
 
 // ── Mission Pool Generation ────────────────────────────────────────────────────
@@ -250,6 +251,7 @@ fn pick_recommended_archetype(tier: LayerTier, rng: &mut impl Rng) -> Option<Mer
 fn mission_description(mission_type: MissionType, layer: u32) -> &'static str {
     let tier = LayerTier::from_layer(layer);
     match (mission_type, tier) {
+        (MissionType::GatewayExpedition, _) => "Breach the sealed gateway at the root of The Deep.",
         (MissionType::SupplyRun, _) => "Recover resources from previously cleared sections.",
         (MissionType::Recon, LayerTier::Shallows) => {
             "Survey the Shallows for intel and entry points."
@@ -328,7 +330,9 @@ pub fn validate_squad_assignment(
 
     // Check concurrent mission limit.
     let active_count = prestige.active_mission_count() as u32;
-    if active_count >= persistent.guild_rank.concurrent_missions() {
+    if active_count
+        >= effective_concurrent_missions(persistent.guild_rank, persistent.deepest_layer_reached)
+    {
         return Err(SquadAssignmentError::ConcurrentMissionLimit);
     }
 
@@ -486,6 +490,7 @@ pub fn start_mission(
         pending_event_index: 0,
         status: MissionStatus::Active,
         result: None,
+        is_first_orders: false,
     }
 }
 
@@ -609,6 +614,11 @@ pub fn tick_all_missions(
                 {
                     summary.breakthroughs.push(mission.layer);
                 }
+                if matches!(mission.mission_type, MissionType::GatewayExpedition)
+                    && matches!(result.outcome, MissionOutcome::Success)
+                {
+                    summary.gateway_opened = true;
+                }
             }
 
             prestige.pending_results.push(mission);
@@ -628,6 +638,8 @@ pub struct MissionTickSummary {
     pub breakthroughs: Vec<u32>,
     /// Number of mercenaries permanently lost across all resolved missions.
     pub mercs_lost: usize,
+    /// Whether a GatewayExpedition completed successfully this tick.
+    pub gateway_opened: bool,
 }
 
 // ── Mission Resolution ─────────────────────────────────────────────────────────
@@ -642,6 +654,7 @@ pub struct MissionTickSummary {
 fn compute_outcome(
     mission: &Mission,
     prestige: &DeepPrestige,
+    persistent: &DeepPersistent,
     rng: &mut impl Rng,
 ) -> MissionOutcome {
     let threshold = mission_power_threshold(mission.layer, mission.mission_type);
@@ -687,9 +700,16 @@ fn compute_outcome(
     let total_events = mission.events.len();
 
     // Apply a small penalty per auto-resolved event on Breakthrough.
+    // Watchtower on the mission's layer reduces this penalty.
     if matches!(mission.mission_type, MissionType::Breakthrough) && total_events > 0 {
+        let has_watchtower = persistent
+            .layer_record(mission.layer)
+            .map(|r| r.has_infrastructure(Infrastructure::Watchtower))
+            .unwrap_or(false);
+        let watchtower_bonus = watchtower_auto_resolve_bonus(has_watchtower);
         let auto_fraction = auto_resolved_count as f64 / total_events as f64;
-        combined_power_modifier *= 1.0 - auto_fraction * 0.10;
+        let penalty_rate = (0.10 - watchtower_bonus).max(0.0);
+        combined_power_modifier *= 1.0 - auto_fraction * penalty_rate;
     }
 
     let effective_ratio = power_ratio * combined_power_modifier;
@@ -751,7 +771,13 @@ pub fn resolve_mission(
     persistent: &mut DeepPersistent,
     rng: &mut impl Rng,
 ) {
-    let outcome = compute_outcome(mission, prestige, rng);
+    // Special handling for First Orders starter mission
+    if mission.is_first_orders {
+        resolve_first_orders(mission, prestige, persistent);
+        return;
+    }
+
+    let outcome = compute_outcome(mission, prestige, persistent, rng);
 
     // Build reward parameters.
     let layer_record = persistent.layer_record(mission.layer);
@@ -827,8 +853,19 @@ pub fn resolve_mission(
         mark_layer_cleared(persistent, mission.layer);
     }
 
+    // Gateway Expedition success opens the sealed gateway.
+    if matches!(mission.mission_type, MissionType::GatewayExpedition)
+        && matches!(outcome, MissionOutcome::Success)
+    {
+        persistent.gateway_opened = true;
+    }
+
     // Award marks to prestige balance.
     prestige.warband_marks = prestige.warband_marks.saturating_add(marks_earned);
+
+    // Track generation-level stats
+    prestige.total_marks_earned += marks_earned;
+    prestige.total_missions_completed += 1;
 
     // Build the result.
     mission.result = Some(MissionResult {
@@ -844,7 +881,68 @@ pub fn resolve_mission(
         danger_bonus_xp: danger_bonus,
     });
 
+    // Append to the warband log (keep last 10 entries).
+    let log_outcome = mission.result.as_ref().unwrap().outcome.clone();
+    prestige.warband_log.push(WarbandLogEntry {
+        mission_name: mission.mission_type.display_name().to_string(),
+        layer: mission.layer,
+        outcome: log_outcome,
+        marks_earned,
+        timestamp: Utc::now(),
+    });
+    const MAX_WARBAND_LOG: usize = 10;
+    if prestige.warband_log.len() > MAX_WARBAND_LOG {
+        let excess = prestige.warband_log.len() - MAX_WARBAND_LOG;
+        prestige.warband_log.drain(..excess);
+    }
+
     mission.status = MissionStatus::Completed;
+}
+
+/// Resolve the "First Orders" starter mission with guaranteed success.
+///
+/// Awards +30 familiarity on Layer 1 and 15 Warband Marks.
+fn resolve_first_orders(
+    mission: &mut Mission,
+    prestige: &mut DeepPrestige,
+    persistent: &mut DeepPersistent,
+) {
+    // Award +30 familiarity on Layer 1
+    let record = persistent.layer_record_mut(1);
+    record.familiarity = record.familiarity.saturating_add(30).min(100);
+
+    let marks_earned = 15u32;
+    prestige.warband_marks += marks_earned;
+
+    mission.result = Some(MissionResult {
+        outcome: MissionOutcome::Success,
+        marks_earned,
+        xp_earned: 0,
+        stormglass_earned: 0,
+        item_ilvl: None,
+        prestige_fragment: false,
+        injured_mercs: vec![],
+        lost_mercs: vec![],
+        merc_level_ups: vec![],
+        danger_bonus_xp: false,
+    });
+    mission.status = MissionStatus::Completed;
+
+    // Free squad
+    for &merc_id in &mission.squad {
+        if let Some(merc) = prestige.find_merc_mut(merc_id) {
+            merc.status = MercStatus::Available;
+        }
+    }
+
+    // Add to warband log
+    prestige.warband_log.push(WarbandLogEntry {
+        mission_name: "First Orders".to_string(),
+        layer: 1,
+        outcome: MissionOutcome::Success,
+        marks_earned,
+        timestamp: Utc::now(),
+    });
 }
 
 /// Determine the item ilvl for a completed mission (if it can drop an item).
@@ -853,7 +951,9 @@ pub fn resolve_mission(
 /// ilvl = layer_index * 10 (mirrors the zone ilvl formula).
 fn item_ilvl_for_mission(mission: &Mission) -> Option<u32> {
     match mission.mission_type {
-        MissionType::Expedition | MissionType::Breakthrough => Some(mission.layer * 10),
+        MissionType::Expedition | MissionType::Breakthrough | MissionType::GatewayExpedition => {
+            Some(mission.layer * 10)
+        }
         _ => None,
     }
 }
@@ -929,6 +1029,7 @@ fn apply_mission_casualties(
                 if let Some(m) = prestige.find_merc_mut(id) {
                     mark_merc_lost(m);
                 }
+                prestige.total_mercs_lost += 1;
             } else {
                 injured.push(id);
                 if let Some(m) = prestige.find_merc_mut(id) {
@@ -1357,6 +1458,7 @@ mod tests {
             pending_event_index: 0,
             status: MissionStatus::Active,
             result: None,
+            is_first_orders: false,
         };
         prestige.active_missions.push(active);
 
@@ -1478,10 +1580,11 @@ mod tests {
 
         assert_eq!(mission.started_at, now);
         assert!(mission.ends_at > now, "ends_at must be after started_at");
-        // Supply run duration should be between 2h and 4h (within rounding).
+        // Supply run on Shallows: base 1200s (20min). With overpowered modifier
+        // (-10%), can be as low as 1080s. Allow up to 4h for higher-tier supply runs.
         let duration = (mission.ends_at - mission.started_at).num_seconds();
         assert!(
-            (30 * 60..=4 * 3600 + 60).contains(&duration),
+            (1080..=4 * 3600 + 60).contains(&duration),
             "Duration {} seconds out of expected range",
             duration
         );
@@ -1565,6 +1668,7 @@ mod tests {
             pending_event_index: 0,
             status: MissionStatus::Active,
             result: None,
+            is_first_orders: false,
         };
 
         resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
@@ -1605,6 +1709,7 @@ mod tests {
             pending_event_index: 0,
             status: MissionStatus::Active,
             result: None,
+            is_first_orders: false,
         };
 
         resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
@@ -1638,6 +1743,7 @@ mod tests {
             pending_event_index: 0,
             status: MissionStatus::Active,
             result: None,
+            is_first_orders: false,
         };
 
         resolve_mission(
@@ -1684,6 +1790,7 @@ mod tests {
             pending_event_index: 0,
             status: MissionStatus::Active,
             result: None,
+            is_first_orders: false,
         };
 
         resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
@@ -1721,6 +1828,7 @@ mod tests {
             pending_event_index: 0,
             status: MissionStatus::Active,
             result: None,
+            is_first_orders: false,
         };
         prestige.active_missions.push(mission);
 
@@ -1760,6 +1868,7 @@ mod tests {
             pending_event_index: 0,
             status: MissionStatus::Active,
             result: None,
+            is_first_orders: false,
         };
         prestige.active_missions.push(mission);
 
@@ -1818,12 +1927,13 @@ mod tests {
             pending_event_index: 0,
             status: MissionStatus::Active,
             result: None,
+            is_first_orders: false,
         };
 
         // Run many seeds — always expect success.
         for seed in 0u64..20 {
             let mut test_rng = ChaCha8Rng::seed_from_u64(seed);
-            let outcome = compute_outcome(&supply_run, &prestige, &mut test_rng);
+            let outcome = compute_outcome(&supply_run, &prestige, &persistent, &mut test_rng);
             assert_eq!(
                 outcome,
                 MissionOutcome::Success,
@@ -1837,6 +1947,7 @@ mod tests {
     #[test]
     fn test_overpowered_squad_high_success_rate() {
         let now = Utc::now();
+        let persistent = DeepPersistent::new();
         // Threshold for Expedition layer 1 = 20. Squad power = 50 (250%).
         let merc = make_merc(1, MercArchetype::Vanguard, 50);
         let prestige = make_prestige_with_mercs(vec![merc]);
@@ -1852,12 +1963,15 @@ mod tests {
             pending_event_index: 0,
             status: MissionStatus::Active,
             result: None,
+            is_first_orders: false,
         };
 
         let mut success_count = 0;
         for seed in 0u64..50 {
             let mut test_rng = ChaCha8Rng::seed_from_u64(seed);
-            if compute_outcome(&mission, &prestige, &mut test_rng) == MissionOutcome::Success {
+            if compute_outcome(&mission, &prestige, &persistent, &mut test_rng)
+                == MissionOutcome::Success
+            {
                 success_count += 1;
             }
         }

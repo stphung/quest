@@ -130,6 +130,43 @@ fn handle_hub(
             }
             InputResult::Continue
         }
+        KeyCode::Char('g') | KeyCode::Char('G') => {
+            // Attempt guild rank upgrade.
+            match crate::deep::try_upgrade_guild_rank(
+                &mut deep_state.persistent,
+                &mut deep_state.prestige,
+            ) {
+                Ok(new_rank) => {
+                    _achievements.on_deep_guild_rank_up(new_rank.0 as u32, None);
+                    deep_ui.flash_message = Some(format!(
+                        "Guild promoted to Rank {} — {}!",
+                        new_rank.0,
+                        new_rank.display_name(),
+                    ));
+                    InputResult::NeedsSave
+                }
+                Err(e) => {
+                    let msg = match e {
+                        crate::deep::GuildUpgradeError::AlreadyMaxRank => {
+                            "Already at maximum guild rank.".to_string()
+                        }
+                        crate::deep::GuildUpgradeError::LayerRequirementNotMet {
+                            required_layer,
+                        } => {
+                            format!("Need Layer {} breakthrough first.", required_layer)
+                        }
+                        crate::deep::GuildUpgradeError::InsufficientMarks {
+                            required,
+                            available,
+                        } => {
+                            format!("Need {} Marks (have {}).", required, available)
+                        }
+                    };
+                    deep_ui.flash_message = Some(msg);
+                    InputResult::Continue
+                }
+            }
+        }
         KeyCode::Esc | KeyCode::Char('d') | KeyCode::Char('D') => {
             deep_ui.close();
             InputResult::Continue
@@ -167,7 +204,10 @@ fn handle_new_mission(
             if deep_ui.selected_index < count {
                 // Check concurrent mission limit.
                 let active = deep_state.prestige.active_mission_count() as u32;
-                let max = deep_state.persistent.guild_rank.concurrent_missions();
+                let max = crate::deep::effective_concurrent_missions(
+                    deep_state.persistent.guild_rank,
+                    deep_state.persistent.deepest_layer_reached,
+                );
                 if active < max {
                     deep_ui.staging_mission_index = Some(deep_ui.selected_index);
                     deep_ui.staged_squad.clear();
@@ -282,6 +322,7 @@ fn handle_squad_assignment(
                         pending_event_index: 0,
                         status: MissionStatus::Active,
                         result: None,
+                        is_first_orders: false,
                     };
 
                     deep_state.prestige.active_missions.push(mission);

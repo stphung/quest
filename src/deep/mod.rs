@@ -42,6 +42,7 @@ pub mod types;
 pub use types::{
     // Discovery
     deep_discovery_chance,
+    effective_concurrent_missions,
     // Structs
     AvailableMission,
     CheckInEvent,
@@ -52,6 +53,7 @@ pub use types::{
     // Enums
     DeepView,
     EventChoice,
+    GenerationRecord,
     GuildRank,
     Infrastructure,
     Layer,

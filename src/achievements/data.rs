@@ -1381,6 +1381,13 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         category: AchievementCategory::Deep,
         icon: "\u{1FAA6}",
     },
+    AchievementDef {
+        id: AchievementId::GatewayOpened,
+        name: "The Gate Opens",
+        description: "Opened the Gateway beneath the world",
+        category: AchievementCategory::Deep,
+        icon: "\u{1F6AA}",
+    },
 ];
 
 /// Get the definition for a specific achievement.
@@ -1628,6 +1635,7 @@ mod tests {
             AchievementId::GuildRank4,
             AchievementId::GuildRank5,
             AchievementId::FirstMercLost,
+            AchievementId::GatewayOpened,
         ];
 
         // Sanity-check: the slice above must itself be up-to-date.

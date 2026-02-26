@@ -80,6 +80,7 @@ fn make_active_mission(
         pending_event_index: 0,
         status: MissionStatus::Active,
         result: None,
+        is_first_orders: false,
     }
 }
 

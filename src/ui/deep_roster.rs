@@ -86,6 +86,31 @@ fn injury_severity_display(missions_remaining: u32) -> (&'static str, Color) {
     }
 }
 
+/// Archetype-flavored injury description.
+fn injury_flavor(archetype: MercArchetype, missions_remaining: u32) -> &'static str {
+    use MercArchetype::*;
+    match (archetype, missions_remaining) {
+        // Light (1 mission)
+        (Vanguard, 1) => "bruised but standing",
+        (Scout, 1) => "twisted ankle in the dark",
+        (Arcanist, 1) => "overchanneled, stabilizing",
+        (Medic, 1) => "healed others first",
+        (Saboteur, 1) => "trap misfired nearby",
+        // Moderate (2 missions)
+        (Vanguard, 2) => "shield arm broken",
+        (Scout, 2) => "fell into a fissure",
+        (Arcanist, 2) => "ward collapsed inward",
+        (Medic, 2) => "no one left to tend her wounds",
+        (Saboteur, 2) => "caught in his own device",
+        // Severe (3+ missions)
+        (Vanguard, _) => "took the hit for the squad",
+        (Scout, _) => "barely made it back",
+        (Arcanist, _) => "mind touched something old",
+        (Medic, _) => "spent everything keeping them alive",
+        (Saboteur, _) => "the mechanism wasn't done yet",
+    }
+}
+
 /// Cumulative missions needed to reach a given level (from level 1).
 fn missions_for_level(level: u32) -> u32 {
     (1..level).map(Mercenary::missions_to_next_level).sum()
@@ -575,12 +600,13 @@ fn render_roster_split(
         }
         MercStatus::Injured { missions_remaining } => {
             let (severity_label, severity_color) = injury_severity_display(*missions_remaining);
+            let flavor = injury_flavor(merc.archetype, *missions_remaining);
             let hours = missions_remaining * 6;
             put_text(
                 buffer,
                 row,
                 detail_inner_left,
-                &format!("  Injured \u{2014} {}", severity_label),
+                &format!("  Injured \u{2014} {} \u{2014} {}", severity_label, flavor),
                 severity_color,
             );
             row += 1;

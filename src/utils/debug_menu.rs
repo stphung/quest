@@ -623,22 +623,11 @@ fn trigger_deep_discovery(deep: &mut DeepState, _prestige_rank: u32) -> &'static
     if deep.persistent.discovered {
         return "The Deep already discovered!";
     }
-    deep.persistent.discovered = true;
-    // Generate starter roster if empty
-    if deep.prestige.roster.is_empty() {
-        let mut rng = rand::rng();
-        let starters = crate::deep::mercenaries::generate_starter_roster(
-            deep.persistent.guild_rank,
-            || deep.persistent.next_merc_id(),
-            &mut rng,
-        );
-        deep.prestige.roster.extend(starters);
-        // Generate initial mission pool
-        deep.prestige.available_missions =
-            crate::deep::missions::generate_mission_pool(&deep.persistent, &mut rng);
-        // Seed starting Warband Marks so the player can afford first missions.
-        deep.prestige.warband_marks = 50;
-    }
+    // Skip the story chain and go straight to discovery via debug shortcut.
+    // Set story stage to 5 (complete) so the state is consistent.
+    deep.persistent.deep_story_stage = 5;
+    let mut rng = rand::rng();
+    crate::deep::complete_story_discovery(deep, &mut rng);
     "The Deep discovered!"
 }
 

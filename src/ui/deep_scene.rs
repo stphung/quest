@@ -7,7 +7,7 @@
 //!   - deep_events.rs    — Event response view
 //!   - deep_results.rs   — Mission complete results modal
 
-use crate::deep::{DeepState, DeepUiState, DeepView};
+use crate::deep::{DeepState, DeepUiState, DeepView, LayerTier};
 use ratatui::{
     layout::Rect,
     style::{Color, Style},
@@ -29,7 +29,12 @@ pub(super) const DEEP_BORDER_COLOR: Color = Color::Rgb(80, 160, 220);
 /// drifting dust particles, bioluminescent glow patches, and water shimmer.
 /// Visual parameters vary subtly based on the active view.
 #[allow(clippy::needless_range_loop)]
-pub(super) fn paint_deep_backdrop(buffer: &mut [Vec<SceneCell>], millis: u128, view: DeepView) {
+pub(super) fn paint_deep_backdrop(
+    buffer: &mut [Vec<SceneCell>],
+    millis: u128,
+    view: DeepView,
+    frontier_tier: Option<LayerTier>,
+) {
     let height = buffer.len();
     if height == 0 {
         return;
@@ -41,7 +46,11 @@ pub(super) fn paint_deep_backdrop(buffer: &mut [Vec<SceneCell>], millis: u128, v
     let (top_rgb, bottom_rgb) = match view {
         DeepView::Infrastructure => ((4u8, 6u8, 16u8), (1u8, 2u8, 6u8)),
         DeepView::EventResponse => ((8u8, 6u8, 18u8), (4u8, 2u8, 8u8)),
-        _ => ((5u8, 8u8, 20u8), (2u8, 3u8, 8u8)),
+        _ => match frontier_tier {
+            Some(LayerTier::Abyss) => ((8u8, 6u8, 18u8), (5u8, 2u8, 6u8)),
+            Some(LayerTier::Void) => ((10u8, 4u8, 16u8), (6u8, 1u8, 4u8)),
+            _ => ((5u8, 8u8, 20u8), (2u8, 3u8, 8u8)),
+        },
     };
     for (row, row_cells) in buffer.iter_mut().enumerate() {
         let t = if height <= 1 {
@@ -401,7 +410,8 @@ pub fn render_deep_overlay(
     // Build scene buffer and paint backdrop
     let mut buffer = vec![vec![SceneCell::default(); width]; height];
     let millis = current_millis();
-    paint_deep_backdrop(&mut buffer, millis, ui.view);
+    let frontier_tier = Some(LayerTier::from_layer(deep.persistent.frontier_layer()));
+    paint_deep_backdrop(&mut buffer, millis, ui.view, frontier_tier);
     if let Some(elapsed) = open_elapsed_ms {
         paint_opening_deep_fx(&mut buffer, millis, elapsed);
     }
@@ -538,6 +548,133 @@ fn render_farewell_modal(frame: &mut Frame, area: Rect, mercs: &[(String, u32, u
             Style::default().fg(Color::DarkGray),
         )));
     }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "[Enter] Continue",
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    let text = Paragraph::new(lines).alignment(ratatui::layout::Alignment::Center);
+    frame.render_widget(text, inner);
+}
+
+// ── Story Event Modal ────────────────────────────────────────────────────────
+
+/// Modal content for each story stage.
+fn story_modal_content(stage: u8) -> (&'static str, Color, &'static [&'static str]) {
+    match stage {
+        1 => (
+            " The Rift Remembers ",
+            Color::Yellow,
+            &[
+                "The ground shudders beneath the Abyssal Rift.",
+                "",
+                "Not an earthquake. Not a tremor. Something deeper \u{2014}",
+                "a recognition. The wound in reality shifts, as if",
+                "noticing you for the first time.",
+                "",
+                "\"Every time you return, it opens a little wider.\"",
+                "",
+                "The feeling passes. But the memory of it does not.",
+            ],
+        ),
+        2 => (
+            " The Captain ",
+            Color::Yellow,
+            &[
+                "A scarred mercenary captain appears at your camp.",
+                "Maps spill from worn satchels. Her eyes are old.",
+                "",
+                "\"I've been tracking the tremors for years. Every",
+                "  prestige cycle, the Rift opens a little wider.",
+                "  It knows you now.\"",
+                "",
+                "She spreads a map across the table. It shows depths",
+                "below the Rift that no cartographer has charted.",
+                "",
+                "\"The Rift isn't a wound. It's a door.\"",
+            ],
+        ),
+        3 => (
+            " The First Fragment ",
+            Color::Cyan,
+            &[
+                "After the battle, something materializes in the air.",
+                "A shard of solidified void. It hums with a frequency",
+                "that makes your teeth ache.",
+                "",
+                "It wasn't dropped. It was given.",
+                "",
+                "The captain takes it, holds it to the light.",
+                "\"There are more. The Rift is testing whether",
+                "  you're worth opening for.\"",
+                "",
+                "Rift Fragment: 1 of 4",
+            ],
+        ),
+        4 => (
+            " The Entrance ",
+            Color::Green,
+            &[
+                "The captain arranges four fragments on the ground.",
+                "They snap together \u{2014} not fitting, but remembering.",
+                "",
+                "The earth opens.",
+                "",
+                "A stairway descends into absolute darkness. Cold air",
+                "rises from below, carrying the smell of wet stone",
+                "and something older. Much older.",
+                "",
+                "\"I'll need soldiers,\" the captain says.",
+                "\"Disposable ones.\"",
+                "",
+                "Press [D] to descend into The Deep.",
+            ],
+        ),
+        _ => (" Story Event ", Color::White, &["Something has changed."]),
+    }
+}
+
+/// Render a story event modal centered on screen.
+/// Called from the main draw path when `deep_ui.pending_story_stage` is set.
+pub fn render_story_modal(frame: &mut Frame, area: Rect, stage: u8) {
+    use ratatui::{
+        style::Modifier,
+        text::{Line, Span},
+        widgets::Paragraph,
+    };
+
+    let (title, color, content) = story_modal_content(stage);
+    let modal_height = (content.len() as u16 + 5).min(area.height.saturating_sub(4));
+    let modal_width = 56u16.min(area.width.saturating_sub(4));
+    let x = area.x + (area.width.saturating_sub(modal_width)) / 2;
+    let y = area.y + (area.height.saturating_sub(modal_height)) / 2;
+    let modal_area = Rect::new(x, y, modal_width, modal_height);
+
+    frame.render_widget(Clear, modal_area);
+
+    let block = Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(super::themed_border_color(color)));
+    let inner = super::render_themed_block(frame, modal_area, block, color, super::BorderFxContext);
+
+    let mut lines: Vec<Line> = content
+        .iter()
+        .map(|line| {
+            if line.is_empty() {
+                Line::from("")
+            } else {
+                Line::from(Span::styled(
+                    *line,
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::ITALIC),
+                ))
+            }
+        })
+        .collect();
 
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(

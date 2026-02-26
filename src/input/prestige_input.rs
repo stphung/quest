@@ -73,7 +73,9 @@ pub(super) fn handle_vault_selection(
                         state.zone_progression.current_zone_id,
                         state.prestige_rank,
                     );
-                    if let Some(new_stage) = crate::deep::discovery::advance_deep_story(deep, state.prestige_rank) {
+                    if let Some(new_stage) =
+                        crate::deep::discovery::advance_deep_story(deep, state.prestige_rank)
+                    {
                         deep_ui.pending_story_stage = Some(new_stage);
                     }
                     crate::character::prestige::perform_prestige_with_vault(state, selected_slots);
@@ -153,7 +155,9 @@ pub(super) fn handle_prestige_confirm(
                     state.zone_progression.current_zone_id,
                     state.prestige_rank,
                 );
-                if let Some(new_stage) = crate::deep::discovery::advance_deep_story(deep, state.prestige_rank) {
+                if let Some(new_stage) =
+                    crate::deep::discovery::advance_deep_story(deep, state.prestige_rank)
+                {
                     deep_ui.pending_story_stage = Some(new_stage);
                 }
                 perform_prestige(state);

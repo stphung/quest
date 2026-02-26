@@ -27,7 +27,7 @@ pub fn base_marks_earned(mission_type: MissionType, layer: u32) -> u32 {
             MissionType::SupplyRun => (210, 10u32),
             MissionType::Recon => (295, 15),
             MissionType::Expedition => (730, 35),
-            MissionType::Breakthrough => (1125, 50),
+            MissionType::Breakthrough | MissionType::GatewayExpedition => (1125, 50),
             MissionType::Construction(_) => (0, 0),
         };
         return base_26 + per_layer * extra;
@@ -67,7 +67,7 @@ pub fn base_marks_earned(mission_type: MissionType, layer: u32) -> u32 {
         MissionType::SupplyRun => supply,
         MissionType::Recon => recon,
         MissionType::Expedition => expedition,
-        MissionType::Breakthrough => breakthrough,
+        MissionType::Breakthrough | MissionType::GatewayExpedition => breakthrough,
         MissionType::Construction(_) => 0, // no Mark reward for construction
     }
 }
@@ -149,7 +149,7 @@ pub fn mission_launch_cost(mission_type: MissionType, layer: u32) -> u32 {
         }
         MissionType::Recon => 30 + layer,
         MissionType::Expedition => 80 + 3 * layer,
-        MissionType::Breakthrough => 70 + 8 * layer,
+        MissionType::Breakthrough | MissionType::GatewayExpedition => 70 + 8 * layer,
         MissionType::Construction(infra) => super::layers::infrastructure_build_cost(infra, layer),
     }
 }
@@ -312,7 +312,7 @@ pub fn base_xp_reward(mission_type: MissionType, layer: u32) -> u32 {
         MissionType::SupplyRun => 150 + 20 * layer,
         MissionType::Recon => 300 + 35 * layer,
         MissionType::Expedition => 600 + 60 * layer,
-        MissionType::Breakthrough => 1200 + 120 * layer,
+        MissionType::Breakthrough | MissionType::GatewayExpedition => 1200 + 120 * layer,
         MissionType::Construction(_) => 0,
     }
 }
@@ -376,7 +376,7 @@ pub fn merc_xp_per_mission(mission_type: MissionType, layer: u32) -> u32 {
         MissionType::SupplyRun => 100 + 10 * layer,
         MissionType::Recon => 200 + 20 * layer,
         MissionType::Expedition => 400 + 40 * layer,
-        MissionType::Breakthrough => 800 + 80 * layer,
+        MissionType::Breakthrough | MissionType::GatewayExpedition => 800 + 80 * layer,
         MissionType::Construction(_) => 50,
     }
 }
