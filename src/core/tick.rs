@@ -315,6 +315,15 @@ pub fn game_tick<R: Rng>(
         ) {
             result.deep_changed = true;
         }
+
+        if crate::deep::missions::run_softlock_safeguards(
+            &mut deep.prestige,
+            &mut deep.persistent,
+            now,
+            rng,
+        ) {
+            result.deep_changed = true;
+        }
     }
 
     // ── 12. Achievement modal accumulation ────────────────────────

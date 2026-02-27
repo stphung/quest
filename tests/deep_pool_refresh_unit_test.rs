@@ -56,17 +56,12 @@ fn make_persistent_with_frontier(frontier_layer: u32) -> DeepPersistent {
 /// `secs_ago` seconds before `now`.
 fn prestige_with_pool_age(now: chrono::DateTime<Utc>, secs_ago: i64) -> DeepPrestige {
     let mut prestige = DeepPrestige::new();
-    prestige.available_missions = vec![AvailableMission {
-        mission_type: MissionType::SupplyRun,
-        layer: 1,
-        duration_secs: 7200,
-        min_squad_power: 10,
-        marks_cost: 0,
-        required_archetype: None,
-        recommended_archetype: None,
-        description: String::new(),
-    }];
+    let persistent = make_persistent_with_frontier(1);
+    prestige.available_missions = generate_mission_pool(&persistent, &mut seeded_rng());
     prestige.pool_refreshed_at = Some(now - chrono::Duration::seconds(secs_ago));
+    // Keep affordability out of these timing-focused tests so emergency
+    // fallback insertion does not mutate the pool.
+    prestige.warband_marks = 10_000;
     prestige
 }
 
@@ -213,16 +208,8 @@ fn fresh_pool_five_hours_59_minutes_old_does_not_refresh() {
     let persistent = make_persistent_with_frontier(1);
     let now = t0();
     let mut prestige = DeepPrestige::new();
-    prestige.available_missions = vec![AvailableMission {
-        mission_type: MissionType::SupplyRun,
-        layer: 1,
-        duration_secs: 7200,
-        min_squad_power: 10,
-        marks_cost: 0,
-        required_archetype: None,
-        recommended_archetype: None,
-        description: String::new(),
-    }];
+    prestige.warband_marks = 10_000;
+    prestige.available_missions = generate_mission_pool(&persistent, &mut seeded_rng());
     // 5h 59m old = 21540 seconds — just under the 6h = 21600s threshold.
     prestige.pool_refreshed_at =
         Some(now - chrono::Duration::seconds(POOL_REFRESH_INTERVAL_SECS - 60));
@@ -234,7 +221,7 @@ fn fresh_pool_five_hours_59_minutes_old_does_not_refresh() {
         "pool 5h59m old must NOT refresh (threshold is {} seconds)",
         POOL_REFRESH_INTERVAL_SECS
     );
-    assert_eq!(prestige.available_missions.len(), 1);
+    assert!(!prestige.available_missions.is_empty());
 }
 
 #[test]
@@ -578,8 +565,8 @@ fn on_prestige_pool_refreshed_at_is_preserved_not_cleared() {
 // =========================================================================
 
 #[test]
-fn pool_after_refresh_contains_supply_run_for_cleared_layer() {
-    // Layer 1 cleared → SupplyRun should be available on layer 1.
+fn pool_after_refresh_contains_safe_mission_for_cleared_layer() {
+    // Layer 1 cleared -> at least one safe mission (Supply or Construction) should exist.
     let mut persistent = make_persistent_with_frontier(1);
     persistent.layer_record_mut(1).cleared = true;
     persistent.deepest_layer_reached = 1;
@@ -588,21 +575,23 @@ fn pool_after_refresh_contains_supply_run_for_cleared_layer() {
     let now = t0();
     maybe_refresh_mission_pool(&mut prestige, &persistent, now, &mut seeded_rng());
 
-    let has_supply_run = prestige
-        .available_missions
-        .iter()
-        .any(|m| matches!(m.mission_type, MissionType::SupplyRun));
+    let has_safe = prestige.available_missions.iter().any(|m| {
+        matches!(
+            m.mission_type,
+            MissionType::SupplyRun | MissionType::Construction(_)
+        )
+    });
 
     assert!(
-        has_supply_run,
-        "pool must contain at least one SupplyRun for a cleared layer"
+        has_safe,
+        "pool must contain at least one safe mission for a cleared layer"
     );
 }
 
 #[test]
 fn pool_after_refresh_contains_breakthrough_for_frontier_layer() {
     // Layer 1 cleared → frontier is layer 2 → Breakthrough should target layer 2.
-    // Rank 3 has a pool count of 4 (SupplyRun + Recon + Expedition + Breakthrough).
+    // Rank 3 has a pool count of 6.
     let mut persistent = make_persistent_with_frontier(2);
     persistent.guild_rank = GuildRank(3);
     persistent.layer_record_mut(1).cleared = true;
@@ -632,21 +621,20 @@ fn pool_after_refresh_contains_breakthrough_for_frontier_layer() {
 fn pool_size_matches_guild_rank_one() {
     let persistent = make_persistent_with_frontier(1);
     let mut prestige = DeepPrestige::new();
+    prestige.warband_marks = 10_000;
     let now = t0();
     maybe_refresh_mission_pool(&mut prestige, &persistent, now, &mut seeded_rng());
 
-    let expected = available_mission_count(GuildRank(1));
     assert_eq!(
         prestige.available_missions.len(),
-        expected,
-        "pool size must match guild rank 1 ({expected} missions)"
+        4,
+        "At initial frontier, pool should contain 4 unique valid missions"
     );
 }
 
 #[test]
 fn pool_size_matches_guild_rank_five() {
-    // Rank 5 wants 5 missions. Pool slots: SupplyRun + Recon + Expedition + Breakthrough
-    // + Construction (needs a cleared layer with available infra slots).
+    // Rank 5 wants 7 missions.
     // Set up: layer 1 cleared (enables Construction slot), frontier = layer 2 (Breakthrough target).
     let mut persistent = make_persistent_with_frontier(1);
     persistent.guild_rank = GuildRank(5);
@@ -654,28 +642,24 @@ fn pool_size_matches_guild_rank_five() {
     persistent.deepest_layer_reached = 1;
 
     let mut prestige = DeepPrestige::new();
+    prestige.warband_marks = 10_000;
     let now = t0();
     maybe_refresh_mission_pool(&mut prestige, &persistent, now, &mut seeded_rng());
 
     let expected = available_mission_count(GuildRank(5));
-    assert_eq!(
-        prestige.available_missions.len(),
-        expected,
-        "pool size must match guild rank 5 ({expected} missions); got {}",
+    assert!(
+        prestige.available_missions.len() >= expected,
+        "pool size must be at least guild rank 5 baseline ({expected} missions); got {}",
         prestige.available_missions.len()
     );
 }
 
 #[test]
 fn pool_missions_reflect_outpost_infrastructure_shorter_duration() {
-    // Use layer 5 (Warrens tier) — base SupplyRun duration is 2.5h = 9000s.
-    // Outpost reduces by 25% → 6750s, well above the 30-min floor (1800s).
-    // Without Outpost on layer 5.
-    let mut persistent_no_outpost = make_persistent_with_frontier(1);
-    for layer in 1..=5 {
-        persistent_no_outpost.layer_record_mut(layer).cleared = true;
-        persistent_no_outpost.deepest_layer_reached = layer;
-    }
+    // Compare a frontier Breakthrough mission at layer 5 with and without an Outpost on layer 5.
+    // Outpost applies a -25% mission duration multiplier.
+    let mut persistent_no_outpost = make_persistent_with_frontier(5);
+    persistent_no_outpost.guild_rank = GuildRank(4);
 
     let now = t0();
     let mut prestige_a = DeepPrestige::new();
@@ -689,7 +673,7 @@ fn pool_missions_reflect_outpost_infrastructure_shorter_duration() {
     let no_outpost_dur = prestige_a
         .available_missions
         .iter()
-        .filter(|m| m.layer == 5 && matches!(m.mission_type, MissionType::SupplyRun))
+        .filter(|m| m.layer == 5 && matches!(m.mission_type, MissionType::Breakthrough))
         .map(|m| m.duration_secs)
         .next();
 
@@ -711,20 +695,18 @@ fn pool_missions_reflect_outpost_infrastructure_shorter_duration() {
     let with_outpost_dur = prestige_b
         .available_missions
         .iter()
-        .filter(|m| m.layer == 5 && matches!(m.mission_type, MissionType::SupplyRun))
+        .filter(|m| m.layer == 5 && matches!(m.mission_type, MissionType::Breakthrough))
         .map(|m| m.duration_secs)
         .next();
 
     if let (Some(d_none), Some(d_out)) = (no_outpost_dur, with_outpost_dur) {
         assert!(
             d_out < d_none,
-            "Outpost must reduce SupplyRun duration on layer 5: without={d_none}s, with={d_out}s"
+            "Outpost must reduce Breakthrough duration on layer 5: without={d_none}s, with={d_out}s"
         );
     } else {
-        // If neither pool contains a SupplyRun on layer 5, the test is inconclusive but not wrong.
-        // (The supply run targets the max cleared layer, so layer 5 should appear.)
         panic!(
-            "Expected SupplyRun on layer 5 in pool. no_outpost={:?}, with_outpost={:?}",
+            "Expected Breakthrough on layer 5 in pool. no_outpost={:?}, with_outpost={:?}",
             no_outpost_dur, with_outpost_dur
         );
     }

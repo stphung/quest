@@ -1308,7 +1308,7 @@ fn test_mission_pool_size_matches_guild_rank() {
         persistent.guild_rank = GuildRank(rank);
         let pool = generate_mission_pool(&persistent, &mut rng);
         assert!(
-            !pool.is_empty() && pool.len() <= 5,
+            !pool.is_empty() && pool.len() <= 7,
             "Rank {rank} pool size {} out of expected range",
             pool.len()
         );
@@ -2129,7 +2129,7 @@ fn test_watchtower_auto_resolve_bonus() {
 // ── 13. Danger XP bonus ────────────────────────────────────────────────────
 
 #[test]
-fn test_danger_bonus_xp_when_underpowered() {
+fn test_danger_bonus_xp_disabled_when_underpowered() {
     // Use a merc whose effective_power is below the mission power threshold for layer 7
     // Expedition. Threshold at L7 = 100 (from balance table). A merc with power 5
     // at level 1 gives effective_power = 5 + 0 = 5. This gives power_ratio = 5/100 = 0.05 < 1.0.
@@ -2153,8 +2153,8 @@ fn test_danger_bonus_xp_when_underpowered() {
 
     let result = mission.result.as_ref().unwrap();
     assert!(
-        result.danger_bonus_xp,
-        "Underpowered squad (power_ratio < 1.0) should get danger_bonus_xp"
+        !result.danger_bonus_xp,
+        "Danger bonus XP is disabled; underpowered missions should not set danger_bonus_xp"
     );
 }
 

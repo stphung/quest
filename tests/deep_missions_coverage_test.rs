@@ -195,7 +195,7 @@ fn test_mission_pool_with_all_infra_built_no_construction() {
 }
 
 #[test]
-fn test_mission_pool_size_rank_4_is_4() {
+fn test_mission_pool_size_rank_4_respects_unique_constraints_at_frontier() {
     let mut rng = seeded_rng(1003);
     let mut persistent = DeepPersistent::new();
     persistent.guild_rank = GuildRank(4);
@@ -203,8 +203,8 @@ fn test_mission_pool_size_rank_4_is_4() {
     let pool = generate_mission_pool(&persistent, &mut rng);
     assert_eq!(
         pool.len(),
-        available_mission_count(GuildRank(4)),
-        "Guild rank 4 should produce a 4-mission pool"
+        4,
+        "At initial frontier, only 4 unique valid missions should be generated"
     );
 }
 
@@ -213,22 +213,20 @@ fn test_mission_pool_size_rank_5_is_5() {
     let mut rng = seeded_rng(1004);
     let mut persistent = DeepPersistent::new();
     persistent.guild_rank = GuildRank(5);
-    // Need at least one cleared layer so the 5th slot can be filled by
-    // a Construction or extra Supply Run (Rank 5 target = 5 missions).
-    // Also set deepest_layer_reached so frontier advances beyond the cleared layer.
+    // With one cleared previous layer and a frontier, mission staples for
+    // previous layers can expand the pool beyond baseline rank count.
     persistent.layer_record_mut(1).cleared = true;
     persistent.deepest_layer_reached = 1;
 
     let pool = generate_mission_pool(&persistent, &mut rng);
-    assert_eq!(
-        pool.len(),
-        available_mission_count(GuildRank(5)),
-        "Guild rank 5 with cleared layer and deepest_layer_reached=1 should produce a 5-mission pool"
+    assert!(
+        pool.len() >= available_mission_count(GuildRank(5)),
+        "Rank 5 pool should provide at least baseline mission count"
     );
 }
 
 #[test]
-fn test_mission_pool_supply_run_targets_cleared_layer() {
+fn test_mission_pool_safe_mission_targets_cleared_layer() {
     let mut rng = seeded_rng(1005);
     let mut persistent = DeepPersistent::new();
     // Clear layers 1 and 2; layer 3 is the frontier.
@@ -237,16 +235,33 @@ fn test_mission_pool_supply_run_targets_cleared_layer() {
     let _ = persistent.layer_record_mut(3); // ensure layer 3 exists as frontier
 
     let pool = generate_mission_pool(&persistent, &mut rng);
-    let supply_run = pool
+    let safe = pool
         .iter()
-        .find(|m| m.mission_type == MissionType::SupplyRun)
-        .expect("Pool must have SupplyRun");
+        .find(|m| {
+            matches!(
+                m.mission_type,
+                MissionType::SupplyRun | MissionType::Construction(_)
+            )
+        })
+        .expect("Pool must have a safe mission");
 
-    // Supply Run should target the deepest cleared layer (2), not layer 1.
-    assert_eq!(
-        supply_run.layer, 2,
-        "Supply Run should target the deepest cleared layer"
-    );
+    match safe.mission_type {
+        MissionType::SupplyRun => {
+            // Supply Run should target the deepest cleared layer (2), not layer 1.
+            assert_eq!(
+                safe.layer, 2,
+                "Supply Run should target the deepest cleared layer"
+            );
+        }
+        MissionType::Construction(_) => {
+            assert!(
+                safe.layer == 1 || safe.layer == 2,
+                "Construction should target a cleared layer (got layer {})",
+                safe.layer
+            );
+        }
+        _ => unreachable!("filtered to safe missions"),
+    }
 }
 
 #[test]
@@ -525,10 +540,9 @@ fn test_gateway_expedition_item_ilvl_is_layer_times_10() {
     resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
     let result = mission.result.as_ref().unwrap();
 
-    assert_eq!(
-        result.item_ilvl,
-        Some(30 * 10),
-        "GatewayExpedition item_ilvl = layer * 10"
+    assert!(
+        result.item_ilvl.is_none(),
+        "GatewayExpedition should not produce item rewards"
     );
 }
 
@@ -600,7 +614,7 @@ fn test_item_ilvl_construction_is_none() {
 }
 
 #[test]
-fn test_item_ilvl_expedition_is_layer_times_10() {
+fn test_item_ilvl_expedition_is_none() {
     let mut rng = seeded_rng(4003);
     let mut persistent = DeepPersistent::new();
     let _ = persistent.layer_record_mut(7);
@@ -612,15 +626,14 @@ fn test_item_ilvl_expedition_is_layer_times_10() {
     resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
 
     let result = mission.result.as_ref().unwrap();
-    assert_eq!(
-        result.item_ilvl,
-        Some(7 * 10),
-        "Expedition item_ilvl = layer * 10"
+    assert!(
+        result.item_ilvl.is_none(),
+        "Expedition should not produce item rewards"
     );
 }
 
 #[test]
-fn test_item_ilvl_breakthrough_is_layer_times_10() {
+fn test_item_ilvl_breakthrough_is_none() {
     let mut rng = seeded_rng(4004);
     let mut persistent = DeepPersistent::new();
     let _ = persistent.layer_record_mut(4);
@@ -632,10 +645,9 @@ fn test_item_ilvl_breakthrough_is_layer_times_10() {
     resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
 
     let result = mission.result.as_ref().unwrap();
-    assert_eq!(
-        result.item_ilvl,
-        Some(4 * 10),
-        "Breakthrough item_ilvl = layer * 10"
+    assert!(
+        result.item_ilvl.is_none(),
+        "Breakthrough should not produce item rewards"
     );
 }
 
@@ -933,13 +945,13 @@ fn test_medic_in_squad_reduces_injury_rate_for_teammates() {
 // =============================================================================
 
 #[test]
-fn test_danger_bonus_xp_set_when_underpowered() {
+fn test_danger_bonus_xp_disabled_when_underpowered() {
     let now = Utc::now();
     let mut rng = seeded_rng(7000);
     let mut persistent = DeepPersistent::new();
     let _ = persistent.layer_record_mut(1);
 
-    // Layer 1 Expedition threshold = 20. Power = 3 → ratio < 1.0 → danger bonus.
+    // Danger bonus XP is disabled in current design.
     let merc = make_merc(1, MercArchetype::Vanguard, 3);
     let mut prestige = make_prestige_with_mercs(vec![merc]);
     prestige.roster[0].status = MercStatus::OnMission(1);
@@ -961,8 +973,8 @@ fn test_danger_bonus_xp_set_when_underpowered() {
     resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
     let result = mission.result.as_ref().unwrap();
     assert!(
-        result.danger_bonus_xp,
-        "Underpowered squad should have danger_bonus_xp = true"
+        !result.danger_bonus_xp,
+        "Underpowered squad should not set danger_bonus_xp when bonus XP is disabled"
     );
 }
 

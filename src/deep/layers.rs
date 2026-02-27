@@ -186,8 +186,21 @@ pub fn mission_power_threshold(layer: u32, mission_type: MissionType) -> u32 {
 
 // ── Mission Durations ─────────────────────────────────────────────────────────
 
-/// Minimum wall-clock mission duration in seconds (15 minutes).
+/// Absolute minimum wall-clock mission duration in seconds (15 minutes).
 pub const MIN_MISSION_DURATION_SECS: u64 = 15 * 60;
+/// Layer-based minimum mission duration at layer 1 (1 hour).
+pub const LAYER_ONE_MIN_MISSION_DURATION_SECS: u64 = 60 * 60;
+/// Additional minimum duration per layer above 1 (10 minutes).
+pub const PER_LAYER_MIN_DURATION_STEP_SECS: u64 = 10 * 60;
+
+/// Layer-based minimum mission duration floor.
+///
+/// Layer 1 starts at 1 hour, and each deeper layer increases the floor by
+/// `PER_LAYER_MIN_DURATION_STEP_SECS`.
+pub fn minimum_mission_duration_secs_for_layer(layer: u32) -> u64 {
+    let depth_offset = layer.saturating_sub(1) as u64;
+    LAYER_ONE_MIN_MISSION_DURATION_SECS + depth_offset * PER_LAYER_MIN_DURATION_STEP_SECS
+}
 
 /// Base mission duration in seconds before any modifiers, keyed on layer tier.
 ///
@@ -583,6 +596,20 @@ mod tests {
                 prev = d;
             }
         }
+    }
+
+    #[test]
+    fn test_layer_minimum_duration_starts_at_one_hour() {
+        assert_eq!(minimum_mission_duration_secs_for_layer(1), 60 * 60);
+    }
+
+    #[test]
+    fn test_layer_minimum_duration_increases_with_layer() {
+        let l1 = minimum_mission_duration_secs_for_layer(1);
+        let l2 = minimum_mission_duration_secs_for_layer(2);
+        let l10 = minimum_mission_duration_secs_for_layer(10);
+        assert_eq!(l2 - l1, PER_LAYER_MIN_DURATION_STEP_SECS);
+        assert!(l10 > l2);
     }
 
     // ── Duration Modifiers ───────────────────────────────────────────────────

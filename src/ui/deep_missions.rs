@@ -2,7 +2,7 @@
 
 use crate::deep::{
     apply_duration_modifiers, base_marks_earned, base_mission_duration_secs, event_trigger_points,
-    merc_xp_per_mission, AvailableMission, DeepState, DeepUiState, DurationModifiers,
+    familiarity_gain, AvailableMission, DeepState, DeepUiState, DurationModifiers,
     FamiliarityLevel, Infrastructure, LayerTier, MercArchetype, MercStatus, Mission, MissionStatus,
     MissionType,
 };
@@ -148,6 +148,25 @@ fn risk_color(tier: u8) -> Color {
     }
 }
 
+fn mission_layer_header(layer: u32) -> String {
+    format!(
+        "-- Layer {} ({}) --",
+        layer,
+        LayerTier::from_layer(layer).display_name()
+    )
+}
+
+fn mission_layer_header_color(layer: u32) -> Color {
+    match LayerTier::from_layer(layer) {
+        LayerTier::Shallows => Color::Rgb(70, 170, 90),
+        LayerTier::Warrens => Color::Rgb(90, 170, 230),
+        LayerTier::Hollows => Color::Rgb(120, 165, 235),
+        LayerTier::SunkenReach => Color::Rgb(150, 155, 240),
+        LayerTier::Abyss => Color::Rgb(215, 140, 100),
+        LayerTier::Void => Color::Rgb(230, 120, 80),
+    }
+}
+
 /// Risk-tier icon for at-a-glance difficulty in mission lists.
 fn risk_icon(tier: u8) -> &'static str {
     match tier {
@@ -170,6 +189,71 @@ fn format_hours(secs: u64) -> String {
     } else {
         format!("{}h {}m", h, m)
     }
+}
+
+/// Format one mission row in fixed columns for the available-missions list.
+fn format_available_mission_row(
+    mission: &AvailableMission,
+    is_selected: bool,
+    row_width: usize,
+) -> String {
+    let cursor = if is_selected { "\u{25b6} " } else { "  " };
+    let risk_tier = mission.mission_type.risk_tier();
+    let risk = risk_label(risk_tier);
+    let layer = format!("L{}", mission.layer);
+    let eta = format_hours(mission.duration_secs);
+    let cost = if mission.marks_cost > 0 {
+        format!("{} Warband Marks", mission.marks_cost)
+    } else {
+        "Free".to_string()
+    };
+
+    let layer_w = 4usize;
+    let eta_w = 8usize;
+    let risk_w = 6usize;
+    let cost_w = cost.chars().count().max(16);
+    let prefix = format!("{}{} ", cursor, risk_icon(risk_tier));
+    let prefix_w = prefix.chars().count();
+    let fixed = prefix_w + layer_w + eta_w + risk_w + cost_w + 4;
+
+    // Fallback for narrow layouts: preserve full cost text and fit row width.
+    // Compact columns: icon + name + layer + eta + cost (risk label omitted).
+    let compact_fixed =
+        prefix_w + 1 + layer.chars().count() + 1 + eta.chars().count() + 1 + cost.chars().count();
+    if row_width <= fixed + 8 {
+        if row_width <= compact_fixed {
+            return truncate_text(&format!("{}{} {} {}", prefix, layer, eta, cost), row_width);
+        }
+        let name_w = row_width - compact_fixed;
+        let type_name = truncate_text(&mission_type_label(mission.mission_type), name_w);
+        return format!(
+            "{}{:name_w$} {} {} {}",
+            prefix,
+            type_name,
+            layer,
+            eta,
+            cost,
+            name_w = name_w
+        );
+    }
+
+    let name_w = row_width.saturating_sub(fixed).max(10);
+    let type_name = truncate_text(&mission_type_label(mission.mission_type), name_w);
+
+    format!(
+        "{}{:name_w$} {:>layer_w$} {:>eta_w$} {:<risk_w$} {:>cost_w$}",
+        prefix,
+        type_name,
+        layer,
+        eta,
+        risk,
+        cost,
+        name_w = name_w,
+        layer_w = layer_w,
+        eta_w = eta_w,
+        risk_w = risk_w,
+        cost_w = cost_w,
+    )
 }
 
 /// Render a block-character progress bar.
@@ -811,7 +895,7 @@ pub(super) fn render_hub(
             buffer,
             header_row,
             1,
-            "Tip: Mercs and Marks reset on prestige. Infrastructure persists.",
+            "Tip: Deep mercs, missions, marks, and infrastructure persist on prestige.",
             Color::Rgb(50, 80, 110),
         );
         header_row += 1;
@@ -924,42 +1008,6 @@ pub(super) fn render_hub(
                     Color::Rgb(80, 80, 120),
                 );
                 action_row += 2;
-            }
-
-            // Action shortcuts
-            let has_missions = !deep.prestige.available_missions.is_empty();
-            if has_missions && action_row < missions_bottom {
-                put_text(buffer, action_row, 3, "Missions tab", SECTION_LABEL_COLOR);
-                put_text(
-                    buffer,
-                    action_row,
-                    20,
-                    "\u{2014} Send your first squad",
-                    Color::DarkGray,
-                );
-                action_row += 1;
-            }
-            if action_row < missions_bottom {
-                put_text(buffer, action_row, 3, "Recruit tab", SECTION_LABEL_COLOR);
-                put_text(
-                    buffer,
-                    action_row,
-                    20,
-                    "\u{2014} Hire mercenaries",
-                    Color::DarkGray,
-                );
-                action_row += 1;
-            }
-            if action_row < missions_bottom {
-                put_text(buffer, action_row, 3, "Layers tab", SECTION_LABEL_COLOR);
-                put_text(
-                    buffer,
-                    action_row,
-                    20,
-                    "\u{2014} View explored territory",
-                    Color::DarkGray,
-                );
-                action_row += 1;
             }
 
             if marks == 0 && action_row < missions_bottom {
@@ -1477,7 +1525,7 @@ pub(super) fn render_new_mission(
 #[allow(clippy::too_many_arguments)]
 fn render_new_mission_compact(
     buffer: &mut [Vec<SceneCell>],
-    _width: usize,
+    width: usize,
     _height: usize,
     deep: &DeepState,
     ui: &DeepUiState,
@@ -1491,36 +1539,37 @@ fn render_new_mission_compact(
     if !squad_panel {
         // Phase 1: mission list with detail for selected
         let mut row = content_top;
+        let mut last_layer: Option<u32> = None;
         for (i, m) in available.iter().enumerate() {
             if row >= content_bottom {
                 break;
             }
+            if last_layer != Some(m.layer) {
+                let layer_line = mission_layer_header(m.layer);
+                put_text(
+                    buffer,
+                    row,
+                    1,
+                    &layer_line,
+                    mission_layer_header_color(m.layer),
+                );
+                row += 1;
+                last_layer = Some(m.layer);
+                if row >= content_bottom {
+                    break;
+                }
+            }
             let is_sel = i == ui.selected_index;
-            let cursor = if is_sel { "\u{25b6} " } else { "  " };
             let tc = mission_type_color(m.mission_type);
-            let cost_str = if m.marks_cost > 0 {
-                format!("  {}M", m.marks_cost)
-            } else {
-                String::new()
-            };
             let rt = m.mission_type.risk_tier();
             let ri = risk_icon(rt);
-            let line = format!(
-                "{}{} [{}]  L{}  {}  {}{}",
-                cursor,
-                ri,
-                mission_type_label(m.mission_type),
-                m.layer,
-                format_hours(m.duration_secs),
-                risk_label(rt),
-                cost_str,
-            );
+            let line = format_available_mission_row(m, is_sel, width.saturating_sub(2));
             put_text(buffer, row, 1, &line, tc);
             put_text(
                 buffer,
                 row,
                 1,
-                cursor,
+                if is_sel { "\u{25b6} " } else { "  " },
                 if is_sel { Color::Cyan } else { Color::DarkGray },
             );
             // Recolor risk icon
@@ -1531,8 +1580,16 @@ fn render_new_mission_compact(
         if let Some(m) = available.get(ui.selected_index) {
             row += 1;
             if row < content_bottom && !m.description.is_empty() {
-                let desc_trunc: String = m.description.chars().take((_width - 4).max(10)).collect();
+                let desc_trunc: String = m.description.chars().take((width - 4).max(10)).collect();
                 put_text(buffer, row, 1, &desc_trunc, Color::DarkGray);
+                row += 1;
+            }
+            if row < content_bottom {
+                let hint = truncate_text(
+                    mission_type_hint(m.mission_type),
+                    (width.saturating_sub(4)).max(10),
+                );
+                put_text(buffer, row, 1, &hint, Color::Rgb(42, 68, 96));
                 row += 1;
             }
             if row < content_bottom {
@@ -1548,7 +1605,10 @@ fn render_new_mission_compact(
                 if m.marks_cost > 0 {
                     let marks = deep.prestige.warband_marks;
                     let afford = if marks >= m.marks_cost { "" } else { " LOW" };
-                    detail.push_str(&format!("{}M (have {}{})", m.marks_cost, marks, afford));
+                    detail.push_str(&format!(
+                        "{} Warband Marks (have {}{})",
+                        m.marks_cost, marks, afford
+                    ));
                 }
                 put_text(buffer, row, 1, &detail, Color::DarkGray);
                 // Color archetype warning
@@ -1584,9 +1644,9 @@ fn render_new_mission_compact(
             if let Some(m) = available.get(mi) {
                 let tc = mission_type_color(m.mission_type);
                 let cost_str = if m.marks_cost > 0 {
-                    format!("  {}M", m.marks_cost)
+                    format!("  Cost: {} Warband Marks", m.marks_cost)
                 } else {
-                    String::new()
+                    "  Cost: Free".to_string()
                 };
                 put_text(
                     buffer,
@@ -1642,14 +1702,9 @@ fn render_new_mission_compact(
                 // Unavailable mercs (dimmed, not selectable)
                 let has_unavailable = deep.prestige.roster.iter().any(|m| !m.is_available());
                 if has_unavailable && row < content_bottom - 2 {
-                    let sep_str: String = "\u{2500} ".repeat((_width / 2).max(4));
-                    put_text(
-                        buffer,
-                        row,
-                        1,
-                        &sep_str[..sep_str.len().min(_width - 2)],
-                        Color::Rgb(40, 60, 80),
-                    );
+                    let sep_str: String = "\u{2500} ".repeat((width / 2).max(4));
+                    let sep_display = truncate_text(&sep_str, width.saturating_sub(2));
+                    put_text(buffer, row, 1, &sep_display, Color::Rgb(40, 60, 80));
                     row += 1;
                     for merc in deep.prestige.roster.iter() {
                         if merc.is_available() {
@@ -1773,7 +1828,9 @@ fn render_new_mission_split(
     content_bottom: i32,
     available: &[AvailableMission],
 ) {
-    let list_width = (width * 40 / 100).max(18).min(width.saturating_sub(20));
+    let preferred_left = (width * 52 / 100).max(24);
+    let max_left = width.saturating_sub(28).max(18);
+    let list_width = preferred_left.min(max_left);
     let detail_left = list_width as i32;
     let detail_width = width.saturating_sub(list_width);
     let staging = ui.staging_mission_index.is_some();
@@ -1828,7 +1885,11 @@ fn render_new_mission_split(
     }
 
     // Left panel heading
-    let left_heading = if staging { "ASSIGN SQUAD" } else { "AVAILABLE" };
+    let left_heading = if staging {
+        "ASSIGN SQUAD"
+    } else {
+        "MISSIONS BY LAYER"
+    };
     let left_heading_color = if staging {
         Color::Rgb(95, 175, 235)
     } else {
@@ -1848,58 +1909,64 @@ fn render_new_mission_split(
 
     if !staging {
         // Phase 1: mission list on left
+        let mut row = list_inner_top;
+        let mut last_layer: Option<u32> = None;
         for (i, m) in available.iter().enumerate() {
-            let row = list_inner_top + i as i32;
             if row >= content_bottom {
                 break;
             }
+            if last_layer != Some(m.layer) {
+                let role_line =
+                    truncate_text(&mission_layer_header(m.layer), list_width.saturating_sub(2));
+                put_text(
+                    buffer,
+                    row,
+                    1,
+                    &role_line,
+                    mission_layer_header_color(m.layer),
+                );
+                row += 1;
+                last_layer = Some(m.layer);
+                if row >= content_bottom {
+                    break;
+                }
+            }
             let is_sel = i == ui.selected_index;
-            let cursor = if is_sel { "\u{25b6} " } else { "  " };
             let tc = mission_type_color(m.mission_type);
-            let max_name_w = (list_width as i32 - 4).max(8) as usize;
-            let type_name = mission_type_label(m.mission_type);
-            let cost_str = if m.marks_cost > 0 {
-                format!("  {}M", m.marks_cost)
-            } else {
-                String::new()
-            };
             let rt = m.mission_type.risk_tier();
             let ri = risk_icon(rt);
-            let line = format!(
-                "{}{} [{:width$}]  L{}  {}{}",
-                cursor,
-                ri,
-                &type_name[..type_name.len().min(max_name_w)],
-                m.layer,
-                format_hours(m.duration_secs),
-                cost_str,
-                width = 0,
-            );
+            let line = format_available_mission_row(m, is_sel, list_width.saturating_sub(2));
             put_text(buffer, row, 1, &line, tc);
             put_text(
                 buffer,
                 row,
                 1,
-                cursor,
+                if is_sel { "\u{25b6} " } else { "  " },
                 if is_sel { Color::Cyan } else { Color::DarkGray },
             );
             // Recolor risk icon
             put_text(buffer, row, 3, ri, risk_color(rt));
+            row += 1;
         }
     } else {
         // Phase 2: merc list on left with available/unavailable groups
         if let Some(mi) = ui.staging_mission_index {
             if let Some(m) = available.get(mi) {
                 let tc = mission_type_color(m.mission_type);
+                let cost_label = if m.marks_cost > 0 {
+                    format!("{} Warband Marks", m.marks_cost)
+                } else {
+                    "Free".to_string()
+                };
                 put_text(
                     buffer,
                     content_top,
                     left_heading.len() as i32 + 3,
                     &format!(
-                        "{}  L{}  {}M",
+                        "{}  L{}  Cost: {}",
                         mission_type_label(m.mission_type),
                         m.layer,
-                        m.marks_cost
+                        cost_label
                     ),
                     tc,
                 );
@@ -1959,13 +2026,8 @@ fn render_new_mission_split(
         let has_unavailable = deep.prestige.roster.iter().any(|m| !m.is_available());
         if has_unavailable && row < content_bottom - 1 {
             let sep_str: String = "\u{2500} ".repeat((list_width / 2).max(4));
-            put_text(
-                buffer,
-                row,
-                1,
-                &sep_str[..sep_str.len().min(list_width)],
-                Color::Rgb(40, 60, 80),
-            );
+            let sep_display = truncate_text(&sep_str, list_width);
+            put_text(buffer, row, 1, &sep_display, Color::Rgb(40, 60, 80));
             row += 1;
 
             for merc in deep.prestige.roster.iter() {
@@ -1989,7 +2051,7 @@ fn render_new_mission_split(
                     3,
                     &format!(
                         "    {:14} {:8} {}",
-                        &merc.name[..merc.name.len().min(14)],
+                        truncate_text(&merc.name, 14),
                         merc.archetype.display_name(),
                         avail_str
                     ),
@@ -2041,10 +2103,10 @@ fn render_new_mission_split(
 /// One-line mission type description shown during first visits.
 fn mission_type_hint(mt: MissionType) -> &'static str {
     match mt {
-        MissionType::SupplyRun => "Safe income \u{2014} always returns, earns Marks reliably",
-        MissionType::Recon => "Raises layer familiarity \u{2014} cuts future mission times",
-        MissionType::Expedition => "Core rewards \u{2014} items, Marks, and merc XP",
-        MissionType::Breakthrough => "Clears the frontier \u{2014} unlocks the next layer",
+        MissionType::SupplyRun => "Baseline run: safest Marks income on cleared ground",
+        MissionType::Recon => "Intel run: biggest Familiarity gain, making this layer faster",
+        MissionType::Expedition => "Push run: higher Marks than Supply, with more risk/events",
+        MissionType::Breakthrough => "Progression run: clears the frontier to open next layer",
         MissionType::GatewayExpedition => "The final expedition \u{2014} breach the sealed gateway",
         MissionType::Construction(_) => {
             "Builds permanent infrastructure \u{2014} survives prestige"
@@ -2088,7 +2150,7 @@ fn render_mission_detail_phase1(
     );
     row += 1;
 
-    // Mission type name (colored) + first-visit type description
+    // Mission type name (colored) + role hint
     let tc = mission_type_color(mission.mission_type);
     put_text(
         buffer,
@@ -2099,14 +2161,17 @@ fn render_mission_detail_phase1(
     );
     row += 1;
 
-    if mission_visit_count < 5 && row < content_bottom {
-        put_text(
-            buffer,
-            row,
-            detail_inner_left,
+    if row < content_bottom {
+        let hint_color = if mission_visit_count < 5 {
+            Color::Rgb(56, 92, 128)
+        } else {
+            Color::Rgb(42, 68, 96)
+        };
+        let hint = truncate_text(
             mission_type_hint(mission.mission_type),
-            Color::Rgb(50, 80, 110),
+            detail_inner_w as usize,
         );
+        put_text(buffer, row, detail_inner_left, &hint, hint_color);
         row += 1;
     }
 
@@ -2156,25 +2221,17 @@ fn render_mission_detail_phase1(
         is_overpowered: false,
         bridge_layers: 0,
     };
-    let effective_secs = apply_duration_modifiers(base_secs, &mods);
+    let baseline_secs = apply_duration_modifiers(base_secs, &mods);
+    let listed_secs = mission.duration_secs;
 
     if row < content_bottom {
-        if effective_secs != base_secs {
+        if listed_secs < base_secs {
             let dur_str = format!(
-                "Duration:  {}  \u{2192}  {} effective",
-                format_hours(base_secs),
-                format_hours(effective_secs)
+                "Duration:  {} (base {})",
+                format_hours(listed_secs),
+                format_hours(base_secs)
             );
             put_text(buffer, row, detail_inner_left, &dur_str, Color::DarkGray);
-            // Highlight the effective duration in cyan
-            let eff_start = dur_str.find('\u{2192}').unwrap_or(0);
-            put_text(
-                buffer,
-                row,
-                detail_inner_left + eff_start as i32,
-                &format!("\u{2192}  {} effective", format_hours(effective_secs)),
-                Color::Cyan,
-            );
             row += 1;
 
             // Stacked modifier breakdown
@@ -2212,6 +2269,19 @@ fn render_mission_detail_phase1(
                     row += 1;
                 }
             }
+        } else if listed_secs > base_secs {
+            let note = if mission.mission_type == MissionType::SupplyRun
+                && mission.marks_cost == 0
+                && listed_secs >= crate::deep::missions::FREE_SUPPLY_RUN_MIN_DURATION_SECS
+                && listed_secs > baseline_secs
+            {
+                "free fallback run (intentionally slower)"
+            } else {
+                "minimum duration floor applied"
+            };
+            let dur_str = format!("Duration:  {} ({})", format_hours(listed_secs), note);
+            put_text(buffer, row, detail_inner_left, &dur_str, Color::DarkGray);
+            row += 1;
         } else {
             let dur_str = format!("Duration:  {}", format_hours(base_secs));
             put_text(buffer, row, detail_inner_left, &dur_str, Color::DarkGray);
@@ -2316,26 +2386,25 @@ fn render_mission_detail_phase1(
             }
 
             if row < content_bottom {
-                let xp = merc_xp_per_mission(mission.mission_type, mission.layer);
-                let xp_str = format!("  \u{2605} XP per merc: ~{}", xp);
-                put_text(buffer, row, detail_inner_left, &xp_str, Color::DarkGray);
+                let prog_str = "  \u{2605} Merc progression: +1 mission completed";
+                put_text(buffer, row, detail_inner_left, prog_str, Color::DarkGray);
                 row += 1;
             }
 
             if row < content_bottom
                 && matches!(
                     mission.mission_type,
-                    MissionType::Expedition
-                        | MissionType::Breakthrough
-                        | MissionType::GatewayExpedition
+                    MissionType::Recon | MissionType::Expedition
                 )
             {
+                let fam = familiarity_gain(mission.mission_type);
+                let fam_str = format!("  \u{25c8} Familiarity: +{} on this layer", fam);
                 put_text(
                     buffer,
                     row,
                     detail_inner_left,
-                    "  ? Item drop chance",
-                    Color::DarkGray,
+                    &fam_str,
+                    Color::Rgb(80, 150, 200),
                 );
                 row += 1;
             }
