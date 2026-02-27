@@ -116,7 +116,7 @@ The game runs at **10 ticks per second** (100ms intervals). Each tick is process
     │  9. Achievement Collect Drain newly unlocked into events│
     │ 10. Haven Discovery     Roll for Haven (P10+)           │
     │ 11. Soulforge Discovery Roll for Soulforge (P15+)      │
-    │ 12. Deep Discovery      Roll for The Deep (P15+)        │
+    │ 12. Deep Discovery      Trigger hook (no per-tick roll) │
     │ 13. Deep Missions       Tick active missions, events    │
     │ 14. Achievement Modal   Check 500ms accumulation window │
     └─────────────────────────────────────────────────────────┘
@@ -764,7 +764,7 @@ Progressive 10-encounter hunt at Fishing Rank 40:
 
 ### The Deep (Mercenary Expeditions)
 
-Endgame mercenary expedition system discovered at P15+. Players recruit mercenaries across 5 archetypes and 4 quality tiers, then send them on missions into a 25-layer underground structure (plus infinite Void scaling). Missions run on wall-clock time (2-24h). Two-tier persistence: guild rank, cleared layers, and infrastructure survive prestige; mercenaries, active missions, and Warband Marks reset. Five guild ranks with increasing roster and concurrent mission limits. Four infrastructure types per layer. See [Secondary Systems](secondary-systems.md#the-deep-mercenary-expedition-system) for details.
+Endgame mercenary expedition system discovered on the first Expanse cycle boss kill (`BossDefeatResult::ExpanseCycle`, i.e. The Endless) at P15+. Players recruit mercenaries across 5 archetypes and 4 quality tiers, then send them on missions into a 25-layer underground structure (plus infinite Void scaling). Missions run on wall-clock time (2-24h). Two-tier persistence: guild rank, cleared layers, and infrastructure survive prestige; mercenaries, active missions, and Warband Marks reset. Five guild ranks with increasing roster and concurrent mission limits. Four infrastructure types per layer. See [Secondary Systems](secondary-systems.md#the-deep-mercenary-expedition-system) for details.
 
 ---
 
@@ -905,10 +905,8 @@ fn soulforge_discovery_chance(prestige_rank: u32) -> f64 {
     0.000014 + (prestige_rank - 15) as f64 * 0.000007
 }
 
-// The Deep discovery chance (P15+, same formula as Soulforge)
-fn deep_discovery_chance(prestige_rank: u32) -> f64 {
-    0.000014 + (prestige_rank - 15) as f64 * 0.000007
-}
+// The Deep discovery trigger (no per-tick RNG)
+// Fires once on first BossDefeatResult::ExpanseCycle at P15+.
 
 // Offline XP
 fn offline_xp(elapsed_s: i64, xp_per_tick: f64, haven_bonus_pct: f64) -> f64 {

@@ -697,9 +697,9 @@ total_xp = 180 * 1,316 * 2.0 = 473,760
 | Challenge | 0.0014% per tick | P1+ required | ~2hr average; Haven Library boosts |
 | Haven | 0.0014% per tick + 0.0007% per rank above 10 | P10+ required | Only when no active content |
 | Soulforge | 0.0014% per tick + 0.0007% per rank above 15 | P15+ required | Only when no active content |
-| The Deep | 0.0014% per tick + 0.0007% per rank above 15 | P15+ required | Same formula as Soulforge |
+| The Deep | First Expanse cycle boss kill (`BossDefeatResult::ExpanseCycle`) | P15+ required | Deterministic trigger, no RNG roll |
 
-Constants: `DUNGEON_DISCOVERY_CHANCE = 0.01`, `FISHING_DISCOVERY_CHANCE = 0.05`, `CHALLENGE_DISCOVERY_CHANCE = 0.000014`, `HAVEN_DISCOVERY_BASE_CHANCE = 0.000014`, `HAVEN_DISCOVERY_RANK_BONUS = 0.000007`, `SOULFORGE_DISCOVERY_BASE_CHANCE = 0.000014`, `SOULFORGE_DISCOVERY_RANK_BONUS = 0.000007`, `SOULFORGE_MIN_PRESTIGE_RANK = 15`, `DEEP_DISCOVERY_BASE_CHANCE = 0.000014`, `DEEP_DISCOVERY_RANK_BONUS = 0.000007`, `DEEP_MIN_PRESTIGE_RANK = 15`
+Constants: `DUNGEON_DISCOVERY_CHANCE = 0.01`, `FISHING_DISCOVERY_CHANCE = 0.05`, `CHALLENGE_DISCOVERY_CHANCE = 0.000014`, `HAVEN_DISCOVERY_BASE_CHANCE = 0.000014`, `HAVEN_DISCOVERY_RANK_BONUS = 0.000007`, `SOULFORGE_DISCOVERY_BASE_CHANCE = 0.000014`, `SOULFORGE_DISCOVERY_RANK_BONUS = 0.000007`, `SOULFORGE_MIN_PRESTIGE_RANK = 15`, `DEEP_MIN_PRESTIGE_RANK = 15`
 
 ---
 
@@ -1004,10 +1004,8 @@ SOULFORGE_DISCOVERY_BASE_CHANCE: f64 = 0.000014;
 SOULFORGE_DISCOVERY_RANK_BONUS: f64 = 0.000007;
 SOULFORGE_MIN_PRESTIGE_RANK: u32 = 15;
 
-// The Deep Discovery (same formula as Soulforge)
-DEEP_DISCOVERY_BASE_CHANCE: f64 = 0.000014;
-DEEP_DISCOVERY_RANK_BONUS: f64 = 0.000007;
-DEEP_MIN_PRESTIGE_RANK: u32 = 15;
+// The Deep Discovery Trigger
+DEEP_MIN_PRESTIGE_RANK: u32 = 15;               // Triggered on first Expanse cycle boss kill
 
 // Storm Lure (Stormglass consumable)
 STORM_LURE_COST: u64 = 50000;                    // 50,000 Stormglass

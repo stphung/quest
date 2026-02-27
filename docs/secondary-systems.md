@@ -282,7 +282,7 @@ An endgame system discovered at P15+ where players recruit and manage a mercenar
 
 ### Discovery
 
-Same formula as Soulforge: `chance = 0.000014 + (prestige_rank - 15) * 0.000007` per tick, P15+ required.
+Deterministic trigger: The Deep is discovered on the first Expanse cycle boss kill (`BossDefeatResult::ExpanseCycle`, The Endless) at P15+.
 
 ### Key Systems
 
@@ -302,7 +302,7 @@ Same formula as Soulforge: `chance = 0.000014 + (prestige_rank - 15) * 0.000007`
 - `missions.rs` -- Mission creation, assignment, resolution
 - `events.rs` -- Check-in events and event choices
 - `economy.rs` -- Warband Marks economy, costs, rewards
-- `discovery.rs` -- Discovery roll logic, starter roster
+- `discovery.rs` -- Discovery completion logic (boss-triggered), starter roster
 - `persistence.rs` -- Save/load from `~/.quest/deep.json`
 
 ### Persistence
