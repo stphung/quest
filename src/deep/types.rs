@@ -1007,13 +1007,14 @@ pub enum DeepView {
 }
 
 impl DeepView {
-    /// The navigable tabs in order. EventResponse is excluded — it's a contextual modal.
+    /// The navigable tabs in order. EventResponse is 2nd (most time-critical).
     pub const TABS: &[DeepView] = &[
         DeepView::Hub,
+        DeepView::EventResponse,
         DeepView::NewMission,
         DeepView::Roster,
-        DeepView::Infrastructure,
         DeepView::Recruit,
+        DeepView::Infrastructure,
     ];
 
     /// Short label for rendering in the tab bar.
@@ -1023,12 +1024,12 @@ impl DeepView {
             DeepView::NewMission => "Missions",
             DeepView::Roster => "Roster",
             DeepView::Infrastructure => "Layers",
-            DeepView::EventResponse => "Event",
+            DeepView::EventResponse => "Events",
             DeepView::Recruit => "Recruit",
         }
     }
 
-    /// Next tab in the TABS cycle. No-op for EventResponse.
+    /// Next tab in the TABS cycle.
     pub fn next_tab(self) -> DeepView {
         let Some(pos) = Self::TABS.iter().position(|&v| v == self) else {
             return self;
@@ -1036,7 +1037,7 @@ impl DeepView {
         Self::TABS[(pos + 1) % Self::TABS.len()]
     }
 
-    /// Previous tab in the TABS cycle. No-op for EventResponse.
+    /// Previous tab in the TABS cycle.
     pub fn prev_tab(self) -> DeepView {
         let Some(pos) = Self::TABS.iter().position(|&v| v == self) else {
             return self;

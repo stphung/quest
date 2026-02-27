@@ -1,8 +1,9 @@
 //! The Deep — Layer infrastructure sub-view rendering.
 
 use crate::deep::{
-    base_mission_duration_secs, infrastructure_build_cost, layer_power_thresholds, DeepState,
-    DeepUiState, FamiliarityLevel, Infrastructure, LayerTier, MissionType,
+    base_marks_earned, base_mission_duration_secs, infrastructure_build_cost,
+    layer_power_thresholds, DeepState, DeepUiState, FamiliarityLevel, Infrastructure, LayerTier,
+    MissionType,
 };
 use ratatui::style::Color;
 
@@ -113,6 +114,48 @@ fn infra_slots_str(layer: &crate::deep::types::LayerRecord) -> String {
 /// Format seconds as compact hours string "X.Xh".
 fn format_hours(secs: u64) -> String {
     format!("{:.1}h", secs as f64 / 3600.0)
+}
+
+/// Render a vertical depth gauge at column 0.
+///
+/// Filled blocks for explored depth, empty blocks for unexplored.
+/// Color follows tier color of each depth position.
+fn render_depth_gauge(
+    buffer: &mut [Vec<SceneCell>],
+    content_top: i32,
+    content_bottom: i32,
+    deepest_layer: u32,
+) {
+    const VOID_START: u32 = 26;
+    let gauge_height = (content_bottom - content_top - 2).max(3) as usize;
+    let total_layers = VOID_START; // gauge maps 1..=25 to the bar
+
+    for i in 0..gauge_height {
+        let row = content_top + i as i32;
+        if row >= content_bottom {
+            break;
+        }
+        // Map gauge position to approximate layer depth
+        let layer_at = ((i as u32 + 1) * total_layers / gauge_height as u32).max(1);
+        let tier = LayerTier::from_layer(layer_at);
+        let tc = layer_tier_color(tier);
+
+        if layer_at <= deepest_layer {
+            put_cell(buffer, row, 0, '\u{2588}', tc);
+        } else {
+            put_cell(buffer, row, 0, '\u{2591}', Color::Rgb(20, 30, 50));
+        }
+    }
+
+    // Depth summary at bottom of gauge
+    let pct = ((deepest_layer as f64 / VOID_START as f64) * 100.0)
+        .round()
+        .min(100.0) as u32;
+    let depth_label = format!("{}% to Void", pct);
+    let summary_row = content_top + gauge_height as i32;
+    if summary_row < content_bottom {
+        put_text(buffer, summary_row, 0, &depth_label, Color::DarkGray);
+    }
 }
 
 /// Layer range for a tier (start, end inclusive).
@@ -319,6 +362,14 @@ fn render_layers_compact(
         );
         put_text(buffer, row, 4, &format!("L{:2}", next_unknown), tc);
     }
+
+    // Depth gauge at column 0
+    render_depth_gauge(
+        buffer,
+        content_top,
+        content_bottom,
+        deep.persistent.deepest_layer_reached,
+    );
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -436,6 +487,14 @@ fn render_layers_split(
         );
         put_text(buffer, row, 4, &format!("L{:2}", next), tc);
     }
+
+    // Depth gauge at column 0
+    render_depth_gauge(
+        buffer,
+        content_top,
+        content_bottom,
+        deep.persistent.deepest_layer_reached,
+    );
 
     // Right: layer detail for selected
     let Some(layer) = deep.persistent.layers.get(ui.selected_index) else {
@@ -629,6 +688,52 @@ fn render_layers_split(
             }
         }
         row += 1;
+        // ROI context line for unbuilt infrastructure
+        if !built && row < content_bottom {
+            let roi_hint = match infra {
+                Infrastructure::Outpost => "Saves ~25% time on every mission here".to_string(),
+                Infrastructure::SupplyCache => {
+                    let cost = infrastructure_build_cost(*infra, layer.index);
+                    let base_supply = base_marks_earned(MissionType::SupplyRun, layer.index);
+                    let extra_per_run = (base_supply as f64 * 0.75).round() as u32;
+                    if extra_per_run > 0 {
+                        let runs = (cost as f64 / extra_per_run as f64).ceil() as u32;
+                        format!(
+                            "~{} supply runs to recoup ({}M extra/run)",
+                            runs, extra_per_run
+                        )
+                    } else {
+                        "Boosts supply run yields".to_string()
+                    }
+                }
+                Infrastructure::Watchtower => "Instant value: +25 intel on build".to_string(),
+                Infrastructure::Bridge => {
+                    let bridge_count = deep
+                        .persistent
+                        .layers
+                        .iter()
+                        .filter(|l| l.has_infrastructure(Infrastructure::Bridge))
+                        .count();
+                    if bridge_count == 0 {
+                        "First bridge: -10% on deeper missions".to_string()
+                    } else {
+                        format!(
+                            "Bridge #{}: compounds to -{:.0}% total",
+                            bridge_count + 1,
+                            (1.0 - (0.9_f64).powi((bridge_count + 1) as i32)) * 100.0
+                        )
+                    }
+                }
+            };
+            put_text(
+                buffer,
+                row,
+                detail_inner_left + 4,
+                &roi_hint,
+                Color::Rgb(60, 90, 130),
+            );
+            row += 1;
+        }
     }
 
     // BUILD OPTIONS — list unbuilt infrastructure with ROI descriptions

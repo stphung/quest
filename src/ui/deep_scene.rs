@@ -23,6 +23,16 @@ use super::scene_fx::{
 /// Themed border color for The Deep overlay.
 pub(super) const DEEP_BORDER_COLOR: Color = Color::Rgb(80, 160, 220);
 
+/// Slow 5-second breathing pulse on the border color.
+fn pulsing_border_color(millis: u128) -> Color {
+    let phase = (millis as f64 / 5000.0 * std::f64::consts::TAU).sin();
+    let t = phase * 0.5 + 0.5; // 0.0 to 1.0
+    let r = (60.0 + t * 40.0) as u8; // 60-100
+    let g = (120.0 + t * 70.0) as u8; // 120-190
+    let b = (180.0 + t * 75.0) as u8; // 180-255
+    Color::Rgb(r, g, b)
+}
+
 // ── Backdrop ──────────────────────────────────────────────────────────────────
 
 /// Paint the deep cave backdrop: dark blue gradient, stalactite ceiling,
@@ -246,33 +256,107 @@ pub(super) fn paint_opening_deep_fx(
     }
 }
 
+// ── Status summary bar ───────────────────────────────────────────────────────
+
+/// Render a one-line status summary at row 0 showing key guild metrics.
+fn render_status_summary(
+    buffer: &mut [Vec<SceneCell>],
+    width: usize,
+    deep: &DeepState,
+    millis: u128,
+) {
+    use chrono::Utc;
+    let rank = deep.persistent.guild_rank;
+    let marks = deep.prestige.warband_marks;
+    let active = deep.prestige.active_mission_count() as u32;
+    let max =
+        crate::deep::effective_concurrent_missions(rank, deep.persistent.deepest_layer_reached);
+
+    let mut col = 1i32;
+
+    // Rank
+    let rank_str = format!("\u{2b21} {}", rank.display_name());
+    put_text(buffer, 0, col, &rank_str, Color::White);
+    col += rank_str.len() as i32 + 2;
+
+    // Marks
+    let marks_str = format!("\u{25c6} {} Marks", marks);
+    put_text(buffer, 0, col, &marks_str, Color::Rgb(220, 180, 60));
+    col += marks_str.len() as i32 + 2;
+
+    // Missions
+    let mission_str = format!("{}/{} missions", active, max);
+    put_text(buffer, 0, col, &mission_str, Color::Cyan);
+    col += mission_str.len() as i32 + 2;
+
+    // Next completion time
+    let now = Utc::now();
+    let next_str = if active == 0 {
+        "None active".to_string()
+    } else {
+        let min_remaining = deep
+            .prestige
+            .active_missions
+            .iter()
+            .map(|m| (m.ends_at - now).num_seconds().max(0) as u64)
+            .min()
+            .unwrap_or(0);
+        if min_remaining == 0 {
+            "Resolving...".to_string()
+        } else {
+            let h = min_remaining / 3600;
+            let m = (min_remaining % 3600) / 60;
+            if h > 0 {
+                format!("Next: ~{}h {:02}m", h, m)
+            } else {
+                format!("Next: ~{}m", m)
+            }
+        }
+    };
+    // Only show if there's enough space
+    let _ = millis;
+    if col + (next_str.len() as i32) < width as i32 {
+        put_text(buffer, 0, col, &next_str, Color::DarkGray);
+    }
+}
+
 // ── Tab bar ──────────────────────────────────────────────────────────────────
+
+/// Abbreviated tab labels for narrow terminals.
+fn abbrev_label(view: DeepView) -> &'static str {
+    match view {
+        DeepView::Hub => "H",
+        DeepView::EventResponse => "Evt",
+        DeepView::NewMission => "Msn",
+        DeepView::Roster => "Rst",
+        DeepView::Recruit => "Rec",
+        DeepView::Infrastructure => "Lyr",
+    }
+}
 
 /// Render the tab bar at row 0 of the buffer with state badges.
 fn render_tab_bar(buffer: &mut [Vec<SceneCell>], width: usize, active: DeepView, deep: &DeepState) {
-    let mut col = 1i32;
-    let mut active_tab_start = 0i32;
-    let mut active_tab_len = 0i32;
-    for (i, &tab) in DeepView::TABS.iter().enumerate() {
-        if i > 0 {
-            put_text(buffer, 0, col, " ", Color::DarkGray);
-            col += 1;
-        }
-
-        // Compute badge for this tab
-        let (badge, badge_color) = match tab {
+    // Compute badges for all tabs
+    let badges: Vec<(String, Color)> = DeepView::TABS
+        .iter()
+        .map(|&tab| match tab {
             DeepView::Hub => {
+                let results = deep.prestige.pending_results.len();
+                if results > 0 {
+                    (format!("\u{2713}{}", results), Color::Green)
+                } else {
+                    (String::new(), Color::DarkGray)
+                }
+            }
+            DeepView::EventResponse => {
                 let events = deep
                     .prestige
                     .active_missions
                     .iter()
                     .filter(|m| m.has_pending_event())
                     .count();
-                let results = deep.prestige.pending_results.len();
                 if events > 0 {
                     (format!("\u{26a1}{}", events), Color::Yellow)
-                } else if results > 0 {
-                    (format!("\u{2713}{}", results), Color::Green)
                 } else {
                     (String::new(), Color::DarkGray)
                 }
@@ -312,13 +396,51 @@ fn render_tab_bar(buffer: &mut [Vec<SceneCell>], width: usize, active: DeepView,
                 }
             }
             _ => (String::new(), Color::DarkGray),
+        })
+        .collect();
+
+    // Check if full labels fit; use abbreviations if they don't
+    let full_width: usize = DeepView::TABS
+        .iter()
+        .enumerate()
+        .map(|(i, tab)| {
+            let label_len = tab.tab_label().len();
+            let badge_len = badges[i].0.len();
+            (if i > 0 { 1 } else { 0 }) + label_len + badge_len + 2 // brackets
+        })
+        .sum();
+    let use_abbrev = full_width + 2 > width;
+
+    let mut col = 1i32;
+    let mut active_tab_start = 0i32;
+    let mut active_tab_len = 0i32;
+    for (i, &tab) in DeepView::TABS.iter().enumerate() {
+        if i > 0 {
+            put_text(buffer, 0, col, " ", Color::DarkGray);
+            col += 1;
+        }
+
+        let (badge, badge_color) = &badges[i];
+        let label = if use_abbrev {
+            abbrev_label(tab)
+        } else {
+            tab.tab_label()
+        };
+        // In abbreviated mode, drop badge counts (keep symbol only)
+        let badge_display = if use_abbrev && badge.len() > 1 {
+            badge
+                .chars()
+                .next()
+                .map(|c| c.to_string())
+                .unwrap_or_default()
+        } else {
+            badge.clone()
         };
 
-        let label = tab.tab_label();
-        let full = if badge.is_empty() {
+        let full = if badge_display.is_empty() {
             format!("[{}]", label)
         } else {
-            format!("[{}{}]", label, badge)
+            format!("[{}{}]", label, badge_display)
         };
 
         let is_active = tab == active;
@@ -341,9 +463,9 @@ fn render_tab_bar(buffer: &mut [Vec<SceneCell>], width: usize, active: DeepView,
         put_text(buffer, 0, col, &full, tab_color);
 
         // Overcolor badge portion when tab is not active
-        if !badge.is_empty() && !is_active {
+        if !badge_display.is_empty() && !is_active {
             let badge_col = col + 1 + label.len() as i32;
-            put_text(buffer, 0, badge_col, &badge, badge_color);
+            put_text(buffer, 0, badge_col, &badge_display, *badge_color);
         }
 
         // Track active tab position for underline
@@ -389,17 +511,13 @@ pub fn render_deep_overlay(
 
     frame.render_widget(Clear, area);
 
+    let border_color = pulsing_border_color(current_millis());
     let block = Block::default()
         .title(" THE DEEP ")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(super::themed_border_color(DEEP_BORDER_COLOR)));
-    let inner = super::render_themed_block(
-        frame,
-        area,
-        block,
-        DEEP_BORDER_COLOR,
-        super::BorderFxContext,
-    );
+        .border_style(Style::default().fg(super::themed_border_color(border_color)));
+    let inner =
+        super::render_themed_block(frame, area, block, border_color, super::BorderFxContext);
 
     let height = inner.height as usize;
     let width = inner.width as usize;
@@ -416,13 +534,16 @@ pub fn render_deep_overlay(
         paint_opening_deep_fx(&mut buffer, millis, elapsed);
     }
 
-    // ── Tab bar (row 0) ──
-    render_tab_bar(&mut buffer, width, ui.view, deep);
+    // ── Status summary bar (row 0) ──
+    render_status_summary(&mut buffer, width, deep, millis);
 
-    // Sub-views render below the tab bar (row 0) and separator (row 1).
-    // We pass a reduced height and offset the buffer slice by 2 rows.
-    let content_height = height.saturating_sub(2);
-    let content_buffer = &mut buffer[2..];
+    // ── Tab bar (row 1) ──
+    render_tab_bar(&mut buffer[1..], width, ui.view, deep);
+
+    // Sub-views render below status bar (row 0), tab bar (row 1), and separator (row 2).
+    // We pass a reduced height and offset the buffer slice by 3 rows.
+    let content_height = height.saturating_sub(3);
+    let content_buffer = &mut buffer[3..];
 
     // Dispatch to the appropriate sub-view
     match ui.view {
@@ -465,6 +586,22 @@ pub fn render_deep_overlay(
                 ctx,
             );
         }
+    }
+
+    // Event badge footer reminder when not on Hub or Events tab
+    if ui.view != DeepView::Hub
+        && ui.view != DeepView::EventResponse
+        && deep.prestige.has_any_pending_event()
+    {
+        let reminder = "\u{26a1} Event pending \u{2014} [Tab] to Events";
+        let rem_col = (width as i32 - reminder.len() as i32) / 2;
+        put_text(
+            &mut buffer,
+            (height as i32 - 1).max(0),
+            rem_col.max(1),
+            reminder,
+            Color::Yellow,
+        );
     }
 
     // Help panel overlay ([?] toggle)
