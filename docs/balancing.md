@@ -789,10 +789,10 @@ All challenges require P1+ to discover. Discovery is random (~2hr average per ch
 
 | Difficulty | Grid | Reward |
 |------------|------|--------|
-| Novice | varies | +50% level XP |
-| Apprentice | varies | +75% level XP |
-| Journeyman | varies | +100% level XP |
-| Master | varies | +1 Prestige Rank, +200% level XP |
+| Novice | 9x9 | +50% level XP |
+| Apprentice | 12x12 | +75% level XP |
+| Journeyman | 16x16 | +100% level XP |
+| Master | 20x16 | +1 Prestige Rank, +200% level XP |
 
 **Rune Deciphering** (Mastermind-style):
 
@@ -946,7 +946,7 @@ Before shipping balance changes, verify:
 
 ## Appendix: Current Constants
 
-All constants are defined in `src/core/constants.rs`.
+Most constants are defined in `src/core/constants.rs`. Some system-specific constants live in their own modules (noted below).
 
 ```rust
 // Timing
@@ -999,15 +999,20 @@ HAVEN_DISCOVERY_BASE_CHANCE: f64 = 0.000014;
 HAVEN_DISCOVERY_RANK_BONUS: f64 = 0.000007;
 HAVEN_MIN_PRESTIGE_RANK: u32 = 10;
 
-// Soulforge Discovery
+// Combat Fitness (death loop / stalemate prevention)
+DEATH_LOOP_THRESHOLD: u32 = 3;                   // Consecutive boss deaths trigger retreat
+MOB_FIGHT_TIMEOUT_SECONDS: f64 = 30.0;           // Stalemate prevention timer
+STORMGLASS_MIN_PRESTIGE_RANK: u32 = 15;
+
+// Soulforge Discovery (in src/enhancement/types.rs)
 SOULFORGE_DISCOVERY_BASE_CHANCE: f64 = 0.000014;
 SOULFORGE_DISCOVERY_RANK_BONUS: f64 = 0.000007;
 SOULFORGE_MIN_PRESTIGE_RANK: u32 = 15;
 
-// The Deep Discovery Trigger
+// The Deep Discovery Trigger (in src/deep/types.rs)
 DEEP_MIN_PRESTIGE_RANK: u32 = 15;               // Triggered on first Expanse cycle boss kill
 
-// Storm Lure (Stormglass consumable)
+// Storm Lure (in src/stormglass/types.rs)
 STORM_LURE_COST: u64 = 50000;                    // 50,000 Stormglass
 
 // Zone and Fishing

@@ -16,7 +16,7 @@ src/core/
 ├── recent_drops.rs  # RecentDrop struct, recent drops deque management
 ├── tick.rs          # game_tick() orchestration — coordinates all stages
 ├── tick_stages.rs   # Tick processing stages 4-6 and helper functions
-├── tick_types.rs    # TickEvent enum (41 variants) and TickResult struct
+├── tick_types.rs    # TickEvent enum (42 variants) and TickResult struct
 ├── ticker.rs        # Scrolling loot ticker (TickerEntry, Ticker, adaptive scroll speed)
 └── xp.rs            # XP curves, leveling, combat kill XP, distribute_level_up_points
 ```
@@ -45,6 +45,10 @@ pub struct GameState {
     pub fishing: FishingState,
     pub zone_progression: ZoneProgression,
     pub chess_stats: ChessStats,
+    pub stormglass: u64,                   // Stormglass currency balance
+    pub stormglass_discovered: bool,
+    pub storm_sigils: StormSigils,
+    pub consecutive_deaths: u32,           // Death loop tracking
 
     // Transient (serde(skip), reset on load)
     pub active_fishing: Option<FishingSession>,
@@ -53,8 +57,15 @@ pub struct GameState {
     pub session_kills: u64,
     pub recent_drops: VecDeque<RecentDrop>,  // Capped at 10
     pub last_minigame_win: Option<MinigameWinInfo>,
-    pub xp_rate_samples: VecDeque<u64>,    // Rolling 5-min XP/sec window
+    pub xp_rate_samples: VecDeque<u64>,    // Rolling 15-min XP/sec window
     pub xp_this_second: u64,               // Accumulator for current second
+    pub chrono_surge_active: bool,
+    pub ticker: Ticker,                    // Scrolling loot ticker state
+    pub cached_derived_stats: DerivedStats,
+    pub cached_prestige_bonuses: PrestigeCombatBonuses,
+    pub derived_stats_dirty: bool,
+    pub combat_seconds_this_tick: bool,
+    pub game_over_shown_at: Option<Instant>,
 }
 ```
 
@@ -63,7 +74,7 @@ Key methods:
 - `get_attribute_cap()` -- Returns `20 + prestige_rank * 5`
 - `add_recent_drop(...)` -- Push to front of bounded deque (max 10, evicts oldest)
 - `is_in_dungeon()` -- Checks `active_dungeon.is_some()`
-- `xp_per_hour()` -- Returns XP/hr from rolling 5-minute sample window (None if <10s data)
+- `xp_per_hour()` -- Returns XP/hr from rolling 15-minute sample window (None if <10s data)
 
 ### `RecentDrop` (`recent_drops.rs`)
 
@@ -98,7 +109,7 @@ pub struct OfflineReport {
 
 ### `TickEvent` (`tick_types.rs`)
 
-Enum with 41 variants describing everything that can happen in a single tick. The presentation layer (main.rs) maps these to combat log entries and visual effects. Game logic never touches UI types.
+Enum with 42 variants describing everything that can happen in a single tick. The presentation layer (main.rs) maps these to combat log entries and visual effects. Game logic never touches UI types.
 
 **Categories:**
 - **Combat**: `PlayerAttack`, `PlayerAttackBlocked`, `EnemyAttack`, `EnemyDefeated`, `PlayerDied`, `PlayerDiedInDungeon`, `DamageReflected`, `RegenComplete`, `BossEnrage`, `CombatRetreat`
@@ -139,8 +150,8 @@ pub fn game_tick<R: Rng>(
     tick_counter: &mut u32,
     haven: &mut Haven,
     enhancement: &mut crate::enhancement::EnhancementProgress,
+    deep: &mut crate::deep::DeepState,
     achievements: &mut Achievements,
-    deep: &mut DeepState,
     debug_mode: bool,
     rng: &mut R,
 ) -> TickResult

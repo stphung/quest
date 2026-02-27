@@ -62,6 +62,23 @@ The `impl_apply_game_result!` macro in `src/challenges/mod.rs` standardizes rewa
 
 PR = Prestige Rank, FR = Fishing Rank, XP% = percentage of current level's XP requirement. Challenge wins also award Stormglass currency (gated behind P15+), which can be spent on Storm Sigils for passive bonuses.
 
+#### Stormglass Rewards (SG)
+
+| Challenge | Novice | Apprentice | Journeyman | Master |
+|-----------|--------|------------|------------|--------|
+| Chess | 1,000 | 2,500 | 5,000 | 12,500 |
+| Go | 1,000 | 2,500 | 5,000 | 12,500 |
+| Gomoku | 800 | 2,000 | 4,000 | 10,000 |
+| Morris | 800 | 2,000 | 4,000 | 10,000 |
+| Minesweeper | 500 | 1,200 | 2,500 | 6,000 |
+| Rune | 300 | 800 | 1,500 | 4,000 |
+| Snake | 300 | 800 | 1,500 | 4,000 |
+| Flappy Bird | 500 | 1,200 | 2,500 | 4,000 |
+| JezzBall | 500 | 1,200 | 2,500 | 4,000 |
+| Sigil Surge | 500 | 1,200 | 2,500 | 4,000 |
+
+If Stormglass has not been discovered yet, the SG reward falls back to XP instead.
+
 ---
 
 ## Chess

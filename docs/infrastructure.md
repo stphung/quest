@@ -178,6 +178,15 @@ A separate binary (`src/bin/deep_simulator.rs`) for testing The Deep's mercenary
 cargo run --bin deep_simulator -- [OPTIONS]
 ```
 
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--hours N` | 168 | Hours to simulate |
+| `--seed N` | 42 | RNG seed for reproducibility |
+| `--strategy STR` | balanced | Strategy: `rush`, `balanced`, `infrastructure` |
+| `--guild-rank N` | 1 | Starting guild rank |
+| `--verbose` | off | Detailed event logging |
+| `--quiet` | off | Only final summary line |
+
 ### Multi-Run Aggregation
 
 With `--runs N`, the simulator runs N simulations with incrementing seeds and produces an aggregate report with min/avg/max for all metrics, plus a final zone distribution across runs.
@@ -203,19 +212,22 @@ When active, a `[DEBUG]` indicator shows in the UI corner.
 
 ### Menu Options
 
-The debug menu uses a tabbed category structure with 5 tabs. Left/Right arrows switch tabs, Up/Down navigate within a tab, Enter triggers.
+The debug menu uses a tabbed category structure with 6 tabs. Left/Right arrows switch tabs, Up/Down navigate within a tab, Enter triggers.
 
 **Challenges tab:**
 - Trigger Chess, Morris, Gomoku, Minesweeper, Rune, Go, Flappy Bird, JezzBall, Snake, Sigil Surge challenges
 
 **World tab:**
-- Trigger Dungeon, Trigger Fishing, Trigger Haven Discovery, Trigger Soulforge Discovery, Trigger Deep Discovery
+- Trigger Dungeon, Trigger Fishing, Trigger Haven Discovery, Trigger Soulforge Discovery
 
 **Resources tab:**
-- Grant 1000 Stormglass, Discover Stormglass, Grant 100k Stormglass, Etch Random Sigils (All Slots), Etch S+ Sigil (Slot 1)
+- Grant 1000 Stormglass, Discover Stormglass, Grant 100k Stormglass, Etch Random Sigils (All Slots), Etch S+ Sigil (Slot 1), Force Next Surge Overcharged
 
 **Items tab:**
 - Forge Asprika, Forge Sleipnir, Forge Megingjord (God Items)
+
+**Deep tab:**
+- Discover The Deep, Grant 10000 Warband Marks, Refresh Mission Pool, Refresh Recruit Pool, Clear Current Frontier Layer, Complete Active Missions
 
 **Borders tab:**
 - Border style options for visual customization
@@ -240,6 +252,20 @@ The game detects OS-level process suspension (e.g., laptop lid close/open):
 - Each frame checks if `Utc::now() - last_save_time > 60s`
 - If gap detected: shows offline XP welcome screen (via `process_offline_progression()`), resets tick/autosave timers, and immediately saves
 
+## Time Vault / History System
+
+Git-based save versioning system (`src/history/`). Every meaningful game event (prestige, boss defeat, etc.) creates a git commit containing the full save state. Players can browse, restore, and fork save branches through the Time Vault overlay.
+
+- **Git repository**: `~/.quest/.history/` — initialized on first use
+- **Commit triggers**: Prestige, boss defeat, zone completion, and other milestone events
+- **Branch management**: Players can create branches (forks) from any commit point
+- **Cloud sync**: Optional GitHub integration via personal access token. Config stored in `~/.quest/.cloud.json`. Supports push/pull, divergence detection, and resolution (cloud wins / local wins / keep both).
+- **Cloud status states**: Offline, Linked, Syncing, OutOfSync (diverged), TokenExpired, Error
+
+## Bug Report System
+
+In-game bug report overlay (`src/utils/bug_report.rs`, `src/ui/bug_report_scene.rs`) that captures game state for troubleshooting. Generates a text summary of current state that can be copied to clipboard.
+
 ## Storage Layout
 
 ```
@@ -249,6 +275,9 @@ The game detects OS-level process suspension (e.g., laptop lid close/open):
 ├── achievements.json         # Achievement state (account-level)
 ├── enhancement.json          # Soulforge enhancement state (account-level)
 ├── deep.json                 # The Deep state (account-level)
+├── .cloud.json               # GitHub cloud sync config (token, username, repo URL)
+├── .history/                 # Git repository for Time Vault save versioning
+│   └── (git repo contents)
 └── backups/
     └── YYYY-MM-DD_HHMMSS/   # Timestamped backup before update
         └── *.json
@@ -259,11 +288,15 @@ The game detects OS-level process suspension (e.g., laptop lid close/open):
 | Crate | Version | Purpose |
 |-------|---------|---------|
 | ratatui | 0.30 | Terminal UI framework |
-| crossterm | 0.27 | Terminal backend |
+| crossterm | (transitive) | Terminal backend (pulled in via ratatui, not a direct dependency) |
 | serde / serde_json | - | JSON serialization |
 | rand | - | RNG for all procedural systems |
 | chrono | - | Date/time for offline progression |
-| directories | - | Platform-appropriate save paths |
+| dirs | 6.0 | Platform-appropriate save paths |
+| git2 | 0.20 | Git operations for Time Vault history |
+| tar | 0.4 | Archive extraction for updates |
+| uuid | 1.21 | Character IDs |
+| serde_json | 1.0 | JSON serialization |
 | chess-engine | 0.1 | Chess minigame AI |
 | ureq | - | HTTP client for auto-update |
 | flate2 / tar | - | Archive extraction for updates |

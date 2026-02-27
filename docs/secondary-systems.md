@@ -261,7 +261,7 @@ Stormglass is an account-level currency earned from completing challenge minigam
 
 ### Earning
 
-Challenge minigame wins award Stormglass currency in addition to their standard PR/FR rewards. The amount scales with challenge difficulty.
+Stormglass is earned from two sources: challenge minigame wins (in addition to standard PR/FR rewards, amount scales with difficulty) and item salvage (`StormglassSalvaged` event). Dungeon treasure rooms can also award Stormglass directly (`StormglassDungeonCache`).
 
 ### Storm Sigils
 
@@ -291,7 +291,7 @@ Deterministic trigger: The Deep is discovered on the first Expanse cycle boss ki
 - **6 layer tiers**: Shallows (L1-3), Warrens (L4-7), Hollows (L8-12), Sunken Reach (L13-18), Abyss (L19-25), The Void (L26+, infinite scaling)
 - **5 mission types**: Supply Run, Recon, Expedition, Breakthrough, Construction
 - **4 infrastructure types**: Outpost, Supply Cache, Watchtower, Bridge (2 slots per layer, permanent)
-- **5 guild ranks**: Freelancers (5 roster/1 concurrent), Sellswords (7/1), Company (9/2), Battalion (12/3), Legion (15/4)
+- **5 guild ranks**: Freelancers (5 roster/1 concurrent), Company (7/2), Battalion (9/2), Legion (12/3), Vanguard (15/4)
 - **Warband Marks**: Currency earned from missions, spent on recruitment and infrastructure, resets on prestige
 
 ### Module Structure
@@ -307,7 +307,7 @@ Deterministic trigger: The Deep is discovered on the first Expanse cycle boss ki
 
 ### Persistence
 
-Stored in `~/.quest/deep.json`. The `deep_changed` flag in `TickResult` signals when the file needs to be saved. The `deep_event_ready` flag signals when a mission event requires player response.
+Stored in `~/.quest/deep.json`. The `deep_changed` flag in `TickResult` signals when the file needs to be saved.
 
 For detailed implementation documentation, see `src/deep/CLAUDE.md`.
 
@@ -357,7 +357,7 @@ Account-level achievement system that persists across all characters. Stored in 
 - PersistentHammering: Attempt 100 enhancements
 
 **Deep:**
-- DeepDiscovered, DeepLayer3/5/7/10/13/19/25, DeepGuildRank2/3/4/5, DeepMerc10/25/50/100Missions, DeepVoidExplorer, DeepInfraBuilder (various infrastructure and progression milestones)
+- DeepDiscovered, Layer5/10/15/20/25Cleared, DeepGuildRank2/3/4/5, DeepMerc10/25/50/100Missions, DeepVoidExplorer, DeepInfraBuilder (various infrastructure and progression milestones)
 
 **Fishing:**
 - FishermanI-IV: Ranks 10, 20, 30, 40
@@ -387,7 +387,7 @@ Each achievement has a `points` value assigned via a 7-tier system. Scores are c
 
 ### Title System
 
-Titles are display names earned by unlocking specific achievements. 51 curated titles across combat, challenges, exploration, enhancement, and Deep categories. Players select one title to display after their character name (e.g., "Hero, Godslayer"). Account-wide, persisted in `achievements.json`.
+Titles are display names earned by unlocking specific achievements. 50 curated titles across combat, challenges, exploration, enhancement, and Deep categories. Players select one title to display after their character name (e.g., "Hero, Godslayer"). Account-wide, persisted in `achievements.json`.
 
 - Title browser: overlay opened with [T] from achievement browser. Shows unlocked titles, preview, select with Enter, clear with Backspace
 - Titles shown in: stats panel header, character select screen, achievement browser (✦ indicator)

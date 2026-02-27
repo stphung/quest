@@ -76,6 +76,7 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 - [`src/achievements/CLAUDE.md`](src/achievements/CLAUDE.md) — Achievement tracking, persistence
 - [`src/enhancement/CLAUDE.md`](src/enhancement/CLAUDE.md) — Soulforge enhancement system
 - [`src/deep/CLAUDE.md`](src/deep/CLAUDE.md) — The Deep mercenary expedition system
+- [`src/stormglass/CLAUDE.md`](src/stormglass/CLAUDE.md) — Stormglass currency, Storm Sigils, daily rotation
 - [`src/ui/CLAUDE.md`](src/ui/CLAUDE.md) — Shared game layout components, color conventions
 
 ### Core Module (`src/core/`)
@@ -83,14 +84,14 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 - `game_state.rs` — Main character state struct (level, XP, prestige, combat state, equipment)
 - `game_logic.rs` — Thin re-export wrapper (XP curve, leveling, spawning, offline logic extracted to submodules)
 - `tick.rs` — Per-tick game engine: `game_tick<R: Rng>()` with 14 processing stages. Zero UI imports, zero file I/O — fully decoupled from rendering
-- `tick_types.rs` — TickEvent enum (41 variants) and TickResult struct
+- `tick_types.rs` — TickEvent enum (42 variants) and TickResult struct
 - `tick_stages.rs` — Tick processing stages 4-6 and helper functions (process_item_drop, process_discoveries, etc.)
 - `xp.rs` — XP calculation, leveling logic, combat kill XP
 - `discoveries.rs` — Discovery rolls for dungeons, fishing spots, Haven, Soulforge, The Deep
 - `enemy_spawning.rs` — Enemy generation and spawning (spawn_enemy_if_needed, try_discover_dungeon)
 - `offline.rs` — Offline XP progression (calculate_offline_xp, process_offline_progression)
 - `recent_drops.rs` — RecentDrop struct and deque management
-- `ticker.rs` — XP rate sampling and rolling window
+- `ticker.rs` — Scrolling loot ticker (TickerEntry, Ticker, adaptive scroll speed)
 - `constants.rs` — Game balance constants (tick rate, attack intervals, XP rates, item drop rates, zone enemy stats, boss multipliers, prestige combat bonuses, update check jitter)
 
 ### Simulator (`src/bin/simulator.rs`)
@@ -174,7 +175,7 @@ CLI: `--hours N`, `--seed N`, `--strategy STR` (rush/balanced/infrastructure), `
 - `pathfinding.rs` — BFS-based dungeon navigation, room exploration priority, auto-exploration
 - `rewards.rs` — Dungeon boss XP rewards, item generation, treasure room handling
 
-**Dungeon Sizes:** Small 5×5, Medium 7×7, Large 9×9, Epic 11×11 (based on prestige)
+**Dungeon Sizes:** Small 5×5, Medium 7×7, Large 9×9, Epic 11×11, Legendary 13×13 (based on level and prestige)
 
 ### Fishing Module (`src/fishing/`)
 
@@ -226,7 +227,7 @@ An endgame (P15+) system where players recruit and manage a mercenary company, s
 - `earning.rs` — Stormglass earning from challenge rewards
 - `spending.rs` — Stormglass spending on sigil slots and Storm Lure
 
-Stormglass is a currency earned from completing challenge minigames (replacing the former XP% rewards). Gated behind P15+. Players spend Stormglass to activate Storm Sigils -- a daily-rotating set of passive bonuses. Sigil slots provide combat and progression bonuses. Also offers the Storm Lure consumable (50,000 SG) that guarantees Storm Leviathan encounters during fishing at rank 40.
+Stormglass is a currency earned from completing challenge minigames. Gated behind P15+. Players spend Stormglass to activate Storm Sigils -- a daily-rotating set of passive bonuses. Sigil slots provide combat and progression bonuses. Also offers the Storm Lure consumable (50,000 SG) that guarantees Storm Leviathan encounters during fishing at rank 40.
 
 ### God Items Module (`src/god_items/`)
 
@@ -237,7 +238,7 @@ Three Norse mythology-themed endgame items with `Rarity::Mythic` (displayed as "
 | God Item | Slot | Attributes | Passive | Bonuses |
 |----------|------|-----------|---------|---------|
 | Asprika | Armor | +40 CON, +20 WIS | Divine Bulwark: 30% damage reduction | +40% XP |
-| Sleipnir | Boots | +40 DEX, +20 WIS | Windborne: 100% attack speed | Swiftstrider (50% regen reduction), Swiftfoot (50% dungeon speed), NimbleHands (50% fishing speed) |
+| Sleipnir | Boots | +40 DEX, +20 WIS | Windborne: 100% attack speed | +40% XP, Swiftstrider (50% regen reduction), Swiftfoot (50% dungeon speed), NimbleHands (50% fishing speed) |
 | Megingjord | Ring | +40 STR, +20 CON | Giant's Might: 150% damage | +40% XP |
 
 God items are created via debug menu (discovery/forging system not yet designed, see issue #235). Items have `god_item_id: Option<GodItemId>` field; auto-equip never replaces a god item with a lower rarity.
@@ -275,11 +276,11 @@ Account-level base building that persists across prestiges. 14 rooms in a two-br
 - `modal.rs` — Modal notification queue, 500ms accumulation window management
 - `notifications.rs` — Pending notification state, category-based notification counts
 - `stats.rs` — Achievement statistics, unlock percentages, progress queries, category breakdowns, score computation
-- `titles.rs` — Title definitions (51 titles), title selection/validation, maps achievements to display text
+- `titles.rs` — Title definitions (50 titles), title selection/validation, maps achievements to display text
 - `unlock.rs` — Core unlock machinery (is_unlocked, unlock, check_milestones)
 - `persistence.rs` — Save/load from `~/.quest/achievements.json`
 
-Account-level achievement system that persists across characters. 7 categories (Combat, Level, Progression, Challenges, Exploration, Deep, Stats). Tracks kills, boss kills, levels, prestige, zone completion, challenge wins, fishing ranks/catches, dungeon completions, Haven building, Soulforge enhancements, and Deep milestones (discovery, layers, guild ranks). Includes modal notification system with 500ms accumulation window. Includes a title system where 51 curated achievements grant display titles (e.g., "Godslayer", "Everlasting") shown in stats panel and character select. Achievement score system: each of the 168 achievements has a point value (7 tiers: 5/10/25/50/100/250/500), computed at runtime. Shown in browser title bar, unlock modal, detail panel, and stats view.
+Account-level achievement system that persists across characters. 7 categories (Combat, Level, Progression, Challenges, Exploration, Deep, Stats). Tracks kills, boss kills, levels, prestige, zone completion, challenge wins, fishing ranks/catches, dungeon completions, Haven building, Soulforge enhancements, and Deep milestones (discovery, layers, guild ranks). Includes modal notification system with 500ms accumulation window. Includes a title system where 50 curated achievements grant display titles (e.g., "Godslayer", "Everlasting") shown in stats panel and character select. Achievement score system: each of the 168 achievements has a point value (7 tiers: 5/10/25/50/100/250/500), computed at runtime. Shown in browser title bar, unlock modal, detail panel, and stats view.
 
 ### History / Time Vault (`src/history/`)
 
@@ -324,7 +325,8 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 
 - `build_info.rs` — Build metadata (commit, date) embedded at compile time
 - `updater.rs` — Self-update from GitHub releases (30min check interval ±5min jitter)
-- `debug_menu.rs` — Debug menu with tabbed categories (Challenges, World, Resources, Items, Borders) for testing discoveries. Activate with `--debug` flag, toggle with backtick. 24+ options: trigger dungeons, fishing, all 10 challenge types, Haven discovery, Soulforge discovery, Deep discovery, forge god items, grant/discover Stormglass, etch sigils, border styles
+- `bug_report.rs` — Bug report generation with game state snapshot
+- `debug_menu.rs` — Debug menu with tabbed categories (Challenges, World, Resources, Items, Deep, Borders) for testing discoveries. Activate with `--debug` flag, toggle with backtick. 29+ options: trigger dungeons, fishing, all 10 challenge types, Haven discovery, Soulforge discovery, Deep discovery, grant Warband Marks, refresh mission/recruit pools, forge god items, grant/discover Stormglass, etch sigils, border styles
 
 ### UI (`src/ui/`) — [detailed docs](src/ui/CLAUDE.md)
 
@@ -364,6 +366,7 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 - `deep_layers.rs` — Deep layer map and infrastructure sub-view
 - `deep_events.rs` — Deep check-in event response sub-view
 - `deep_results.rs` — Deep mission complete modal
+- `deep_shared.rs` — Shared Deep UI helpers (cards, progress bars, formatting)
 - `stormglass_scene.rs` — Stormglass Exchange overlay with animations (Invoke Trial rolling, Chrono Surge speed ramp/fast-forward, Storm Sigils daily rotation, Storm Lure)
 - `time_vault_scene.rs` — Time Vault overlay UI (branch/commit browser, restore, fork, GitHub cloud sync)
 - `scene_fx.rs` — Shared utilities for layered ASCII scene rendering (scene buffer, backdrop effects, wide character support)
@@ -479,7 +482,7 @@ quest/
 │   │   ├── enemy_spawning.rs # Enemy generation
 │   │   ├── offline.rs       # Offline XP progression
 │   │   ├── recent_drops.rs  # RecentDrop deque management
-│   │   └── ticker.rs        # XP rate sampling
+│   │   └── ticker.rs        # Scrolling loot ticker
 │   ├── character/           # Character system [CLAUDE.md]
 │   │   ├── attributes.rs    # 6 RPG attributes
 │   │   ├── derived_stats.rs # Stats from attributes
@@ -590,6 +593,7 @@ quest/
 │   │   ├── unlock.rs        # Core unlock machinery
 │   │   └── persistence.rs   # Save/load
 │   ├── utils/               # Utilities
+│   │   ├── bug_report.rs    # Bug report generation
 │   │   ├── build_info.rs    # Build metadata
 │   │   ├── updater.rs       # Self-update
 │   │   └── debug_menu.rs    # Debug menu
@@ -623,6 +627,7 @@ quest/
 │       ├── deep_layers.rs    # Deep layer map sub-view
 │       ├── deep_events.rs    # Deep event response sub-view
 │       ├── deep_results.rs   # Deep mission results modal
+│       ├── deep_shared.rs    # Shared Deep UI helpers
 │       ├── snake_scene.rs   # Snake UI
 │       ├── flappy_scene.rs  # Flappy Bird UI
 │       ├── jezzball_scene.rs # JezzBall UI
@@ -634,7 +639,7 @@ quest/
 │       ├── bug_report_scene.rs # Bug report overlay
 │       ├── *_scene.rs       # Various game scenes
 │       └── character_*.rs   # Character management UI
-├── tests/                   # Integration tests (49 test files, 5,600+ tests)
+├── tests/                   # Integration tests (49 test files, 5,642+ tests)
 │   ├── game_loop_orchestration_test.rs  # 36 behavior-locking tests for game_tick
 │   ├── tick_integration_test.rs         # Tick module integration tests
 │   ├── zone_progression_test.rs         # Zone advancement tests
@@ -649,4 +654,4 @@ quest/
 
 ## Dependencies
 
-Ratatui 0.30, Serde (JSON), Rand 0.10, Rand_chacha 0.10 (seeded RNG for simulator), Chrono, Directories, Chess-engine 0.1, ureq 3.2, flate2 1.1, zip 8.0, unicode-width 0.2
+Ratatui 0.30, Serde (JSON), serde_json 1.0, Rand 0.10, Rand_chacha 0.10 (seeded RNG for simulator), Chrono, dirs 6.0, Chess-engine 0.1, ureq 3.2, flate2 1.1, zip 8.0, unicode-width 0.2, git2 0.20 (vendored-openssl), tar 0.4, uuid 1.21, tempfile 3 (dev)

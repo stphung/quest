@@ -34,7 +34,7 @@ Enum with 168 variants covering all trackable milestones. Organized by domain:
 - **Fishing**: `GoneFishing`, `FishermanI`..`FishermanIV` (rank milestones), `FishCatcherI`..`FishCatcherX` (100 to 100M fish catches), `StormLeviathan`
 - **Dungeons**: `DungeonDiver`, `DungeonMasterI`..`DungeonMasterX` (10 to 1M dungeons)
 - **Haven**: `HavenDiscovered`, `HavenBuilderI`..`HavenBuilderII`, `HavenArchitect`
-- **Deep**: Discovery, layer breakthroughs (Layers 3/7/13/19/25), guild rank milestones, mission count milestones
+- **Deep**: Discovery, first mission, mission count milestones (10/25/50/100), first breakthrough, layer milestones (Layers 5/10/15/20/25), VoidExplorer (Layer 26), guild rank milestones, first merc lost, gateway opened
 
 ### `AchievementCategory` (`types.rs`)
 
@@ -69,7 +69,7 @@ achievements.on_enemy_killed(is_boss, Some(&state.character_name));
 achievements.on_level_up(new_level, Some(&state.character_name));
 ```
 
-Event handlers: `on_enemy_killed`, `on_level_up`, `on_prestige`, `on_zone_fully_cleared`, `on_storms_end`, `on_dungeon_completed`, `on_minigame_won`, `on_fish_caught`, `on_fishing_rank_up`, `on_storm_leviathan_caught`, `on_haven_discovered`, `on_haven_all_t1`, `on_haven_all_t2`, `on_haven_architect`, `on_soulforge_discovered`, `on_enhancement_upgraded`, `on_deep_discovered`, `on_deep_breakthrough`, `on_deep_guild_rank_up`, `on_deep_mission_completed`.
+Event handlers: `on_enemy_killed`, `on_level_up`, `on_prestige`, `on_zone_fully_cleared`, `on_storms_end`, `on_dungeon_completed`, `on_minigame_won`, `on_fish_caught`, `on_fishing_rank_up`, `on_storm_leviathan_caught`, `on_haven_discovered`, `on_haven_all_t1`, `on_haven_all_t2`, `on_haven_architect`, `on_soulforge_discovered`, `on_enhancement_upgraded`, `on_deep_discovered`, `on_deep_breakthrough`, `on_deep_guild_rank_up`, `on_deep_mission_complete`, `on_deep_merc_lost`, `on_deep_gateway_opened`.
 
 ### Unlock Flow
 
@@ -112,14 +112,14 @@ Additionally, `newly_unlocked` is drained each tick by `collect_achievement_even
 - **game_logic.rs** (`core/game_logic.rs`): `update_combat()` takes `&mut Achievements` and calls `on_enemy_killed` on kills.
 - **haven** (`haven/logic.rs`): Haven upgrades trigger `on_haven_all_t1/t2/architect` checks.
 - **zones** (`zones/data.rs`): `sync_zone_completions()` uses zone definitions to check which zones are fully cleared.
-- **deep** (`deep/`): Deep milestones trigger `on_deep_discovered`, `on_deep_breakthrough`, `on_deep_guild_rank_up`, `on_deep_mission_completed`.
+- **deep** (`deep/`): Deep milestones trigger `on_deep_discovered`, `on_deep_breakthrough`, `on_deep_guild_rank_up`, `on_deep_mission_complete`, `on_deep_merc_lost`, `on_deep_gateway_opened`.
 - **UI** (`ui/achievement_browser_scene.rs`): Achievement browser overlay and unlock modal rendering.
 
 ## Title System (`titles.rs`)
 
 Titles are display names earned by unlocking specific achievements. Players can select one title to display after their character name (e.g., "Hero, Godslayer"). Titles are account-wide and persist in `selected_title` on the `Achievements` struct.
 
-- `ALL_TITLES`: const slice of `TitleDef { achievement_id, title_text }` — 51 curated titles across combat, challenges, exploration, enhancement, and Deep categories
+- `ALL_TITLES`: const slice of `TitleDef { achievement_id, title_text }` — 50 curated titles across combat, challenges, exploration, enhancement, and Deep categories
 - `get_title_text(id)`: returns the title text for an achievement, if it grants a title
 - `get_unlocked_titles(achievements)`: returns all titles the player has earned, in display order
 - `validate_selected_title(achievements)`: clears `selected_title` if the achievement isn't unlocked or doesn't grant a title (called on load)

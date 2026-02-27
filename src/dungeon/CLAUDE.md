@@ -45,13 +45,15 @@ pub struct Dungeon {
 ```
 
 ### `DungeonSize`
-| Size      | Grid  | Prestige Requirement |
-|-----------|-------|---------------------|
-| Small     | 5x5   | Any                 |
-| Medium    | 7x7   | P5+                 |
-| Large     | 9x9   | P10+                |
-| Epic      | 11x11 | P15+                |
-| Legendary | 13x13 | P20+                |
+| Size      | Grid  |
+|-----------|-------|
+| Small     | 5x5   |
+| Medium    | 7x7   |
+| Large     | 9x9   |
+| Epic      | 11x11 |
+| Legendary | 13x13 |
+
+Size is determined by `base_tier(level, prestige_rank)` which combines a level component (`level_tier`: 0 for level <25, 1 for 25-74, 2 for 75+) with `prestige_rank / 2`. A 20% variance roll may shift the result up or down by one tier. Higher level and prestige yield larger dungeons.
 
 ## Generation Algorithm (`generation.rs`)
 

@@ -8,7 +8,7 @@ Character-level currency earned through gameplay and spent at the Stormglass Exc
 src/stormglass/
 ├── mod.rs       # Public re-exports
 ├── types.rs     # Constants, ExchangePhase, ExchangeUiState, ChronoSurgeState
-├── sigils.rs    # SigilEffectType (11 types), Sigil, SigilGrade, StormSigils, daily rotation
+├── sigils.rs    # SigilEffectType (12 types), Sigil, SigilGrade, StormSigils, daily rotation
 ├── earning.rs   # Salvage rates by rarity, dungeon cache sizes, soulforge consolation
 └── spending.rs  # Invoke Challenge generation, chrono surge costs, Storm Lure
 ```
@@ -36,11 +36,11 @@ Up to 5 sigil slots that provide permanent percentage-based bonuses. Character-l
 
 **Etch/Reroll cost**: 25,000 Stormglass per attempt
 
-**Daily rotation**: Each day, 5 of 11 effect types are available (deterministic via seeded RNG from calendar day). Players choose from these when etching or rerolling.
+**Daily rotation**: Each day, 5 of 12 effect types are available (deterministic via seeded RNG from calendar day). Players choose from these when etching or rerolling.
 
 **Pick-1-of-3**: Each etch/reroll generates 3 random sigils from the daily pool. The player picks one.
 
-### Sigil Effect Types (11 total)
+### Sigil Effect Types (12 total)
 | Effect | Range | Sigil Name |
 |--------|-------|------------|
 | XpPercent | 5-25% | Sigil of Wisdom |
@@ -54,6 +54,7 @@ Up to 5 sigil slots that provide permanent percentage-based bonuses. Character-l
 | AttackSpeedPercent | 2-10% | Sigil of Swiftness |
 | DoubleStrikePercent | 1-5% | Sigil of the Twin Strike |
 | RegenDelayPercent | 2-10% | Sigil of Renewal |
+| ChronoOverchargePercent | 5-20% | Sigil of Overcharge |
 
 ### Sigil Grades
 Values are rolled on an exponential curve (`e^(3p) - 1`) that compresses low rolls and stretches high rolls. Grades are assigned by percentile (F- through S+), with 21 total grades across 7 letter tiers (F, E, D, C, B, A, S).
@@ -64,7 +65,7 @@ Values are rolled on an exponential curve (`e^(3p) - 1`) that compresses low rol
 ## Key Types
 
 ### `ExchangePhase` (`types.rs`)
-UI state machine for the Exchange overlay: `Menu`, `InvokeTrialConfirm`, `InvokeTrial`, `ChronoSurge`, `SigilsList`, `SigilUnlockConfirm`, `SigilEtchConfirm`, `SigilRerollConfirm`, `SigilRolling`, `SigilPick`, `SigilResult`, and forfeit phases.
+UI state machine for the Exchange overlay: `Menu`, `InvokeTrialConfirm`, `InvokeTrialRolling`, `InvokeTrial`, `InvokeTrialForfeitConfirm`, `ChronoSurge`, `SigilsList`, `SigilUnlockConfirm`, `SigilEtchConfirm`, `SigilRerollConfirm`, `SigilRolling`, `SigilPick`, `SigilForfeitConfirm`, `SigilResult`, `StormLureConfirm`.
 
 ### `ExchangeUiState` (`types.rs`)
 Overlay state with `open`, `selected_item`, `phase`, trial options, surge selection, and sigil UI state (selected slot, choices, pick selection, result, animation).
