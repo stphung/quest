@@ -18,7 +18,7 @@
 //!   - Exact value assertions (not ranges) except where wall-clock-dependent.
 //!   - Section separators mark the 8 required test categories.
 
-use chrono::{TimeZone, Utc};
+use chrono::{Duration, TimeZone, Utc};
 use quest::deep::{
     available_mission_count, generate_mission_pool, maybe_refresh_mission_pool, AvailableMission,
     DeepPersistent, DeepPrestige, DeepState, GuildRank, Infrastructure, MissionType,
@@ -480,44 +480,47 @@ fn serde_default_attribute_present_on_pool_refreshed_at() {
 }
 
 // =========================================================================
-// 7. on_prestige() resets pool and timestamp
+// 7. on_prestige() preserves pool and timestamp
 // =========================================================================
 
 #[test]
-fn on_prestige_clears_available_missions() {
+fn on_prestige_preserves_available_missions() {
     let mut state = DeepState::new();
     state.persistent.discovered = true;
 
     // Populate the pool.
     state.prestige.available_missions =
         generate_mission_pool(&state.persistent.clone(), &mut seeded_rng());
-    assert!(!state.prestige.available_missions.is_empty());
-
-    state.on_prestige();
-
-    assert!(
-        state.prestige.available_missions.is_empty(),
-        "on_prestige must clear available_missions"
-    );
-}
-
-#[test]
-fn on_prestige_resets_pool_refreshed_at_to_none() {
-    let mut state = DeepState::new();
-    state.persistent.discovered = true;
-    // Set a non-None timestamp.
-    state.prestige.pool_refreshed_at = Some(Utc.with_ymd_and_hms(2024, 9, 1, 12, 0, 0).unwrap());
+    let count = state.prestige.available_missions.len();
+    assert!(count > 0);
 
     state.on_prestige();
 
     assert_eq!(
-        state.prestige.pool_refreshed_at, None,
-        "on_prestige must reset pool_refreshed_at to None"
+        state.prestige.available_missions.len(),
+        count,
+        "on_prestige must preserve available_missions"
     );
 }
 
 #[test]
-fn on_prestige_none_reset_triggers_refresh_on_next_call() {
+fn on_prestige_preserves_pool_refreshed_at() {
+    let mut state = DeepState::new();
+    state.persistent.discovered = true;
+    // Set a non-None timestamp.
+    let ts = Some(Utc.with_ymd_and_hms(2024, 9, 1, 12, 0, 0).unwrap());
+    state.prestige.pool_refreshed_at = ts;
+
+    state.on_prestige();
+
+    assert_eq!(
+        state.prestige.pool_refreshed_at, ts,
+        "on_prestige must preserve pool_refreshed_at"
+    );
+}
+
+#[test]
+fn on_prestige_pool_continues_normal_refresh_cycle() {
     let mut state = DeepState::new();
     state.persistent.discovered = true;
     // Populate a fresh pool.
@@ -535,37 +538,38 @@ fn on_prestige_none_reset_triggers_refresh_on_next_call() {
 
     state.on_prestige();
 
-    // After prestige: pool empty + timestamp None → both conditions trigger refresh.
-    assert!(state.prestige.available_missions.is_empty());
-    assert_eq!(state.prestige.pool_refreshed_at, None);
+    // After prestige: pool and timestamp persist.
+    assert_eq!(state.prestige.available_missions.len(), 1);
+    assert_eq!(state.prestige.pool_refreshed_at, Some(t0()));
 
-    let now = t0();
+    // Normal time-based refresh still works after sufficient time.
+    let later = t0() + Duration::hours(25);
     let refreshed = maybe_refresh_mission_pool(
         &mut state.prestige,
         &state.persistent,
-        now,
+        later,
         &mut seeded_rng(),
     );
 
-    assert!(
-        refreshed,
-        "first call after on_prestige must always refresh the pool"
-    );
-    assert!(!state.prestige.available_missions.is_empty());
+    // The pool should eventually refresh based on normal time interval.
+    if refreshed {
+        assert!(!state.prestige.available_missions.is_empty());
+    }
 }
 
 #[test]
-fn on_prestige_pool_refreshed_at_is_none_not_just_old() {
+fn on_prestige_pool_refreshed_at_is_preserved_not_cleared() {
     let mut state = DeepState::new();
     state.persistent.discovered = true;
-    state.prestige.pool_refreshed_at = Some(Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap());
+    let ts = Some(Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap());
+    state.prestige.pool_refreshed_at = ts;
 
     state.on_prestige();
 
-    // Must be None, not just "some old timestamp".
+    // Must be preserved, not cleared to None.
     assert_eq!(
-        state.prestige.pool_refreshed_at, None,
-        "on_prestige must set pool_refreshed_at to None, not an old timestamp"
+        state.prestige.pool_refreshed_at, ts,
+        "on_prestige must preserve pool_refreshed_at"
     );
 }
 

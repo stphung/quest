@@ -727,16 +727,16 @@ fn supply_cache_roi_holds_at_layer_25() {
     );
 }
 
-// ── 12. Prestige Economy Reset ────────────────────────────────────────────────
+// ── 12. Prestige Economy Persistence ─────────────────────────────────────────
 
 #[test]
-fn prestige_resets_warband_marks_to_zero() {
+fn prestige_preserves_warband_marks() {
     let mut state = DeepState::new();
     state.prestige.warband_marks = 5000;
     state.on_prestige();
     assert_eq!(
-        state.prestige.warband_marks, 0,
-        "Warband Marks must reset on prestige"
+        state.prestige.warband_marks, 5000,
+        "Warband Marks must persist across prestiges"
     );
 }
 

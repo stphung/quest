@@ -1285,43 +1285,45 @@ fn test_generate_merc_name_uses_archetype_appropriate_epithets() {
 }
 
 // =============================================================================
-// DeepState::on_prestige — resets prestige, preserves persistent
+// DeepState::on_prestige — preserves operational state, advances generation
 // =============================================================================
 
 #[test]
-fn test_on_prestige_clears_roster() {
+fn test_on_prestige_preserves_roster() {
     let mut rng = seeded_rng(2000);
     let mut state = DeepState::new();
     state.persistent.discovered = true;
     let mut ids = id_counter();
     let starters = generate_starter_roster(GuildRank(1), &mut ids, &mut rng);
+    let count = starters.len();
     state.prestige.roster = starters;
     assert!(!state.prestige.roster.is_empty());
     state.on_prestige();
-    assert!(
-        state.prestige.roster.is_empty(),
-        "on_prestige() should clear the roster"
+    assert_eq!(
+        state.prestige.roster.len(),
+        count,
+        "on_prestige() should preserve the roster"
     );
 }
 
 #[test]
-fn test_on_prestige_clears_warband_marks() {
+fn test_on_prestige_preserves_warband_marks() {
     let mut state = DeepState::new();
     state.prestige.warband_marks = 500;
     state.on_prestige();
     assert_eq!(
-        state.prestige.warband_marks, 0,
-        "on_prestige() should reset warband_marks to 0"
+        state.prestige.warband_marks, 500,
+        "on_prestige() should preserve warband_marks"
     );
 }
 
 #[test]
-fn test_on_prestige_clears_active_missions() {
+fn test_on_prestige_preserves_active_missions() {
     let mut state = DeepState::new();
     state.on_prestige();
     assert!(
         state.prestige.active_missions.is_empty(),
-        "on_prestige() should clear active_missions"
+        "on_prestige() should preserve active_missions (empty to start)"
     );
 }
 

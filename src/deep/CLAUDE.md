@@ -1,6 +1,6 @@
 # The Deep — Mercenary Expedition System
 
-An endgame (P15+) system where players recruit and manage a mercenary company, sending squads on long-duration missions (2-24 hours, real-time wall-clock time) into a vast underground structure. Each prestige cycle represents a new generation of mercenaries inheriting the infrastructure, maps, and outposts left behind.
+An endgame (P15+) system where players recruit and manage a mercenary company, sending squads on long-duration missions (2-24 hours, real-time wall-clock time) into a vast underground structure.
 
 **Key differentiators from existing systems:**
 - **Timescale**: Hours/days vs. seconds/minutes — a fundamentally different engagement rhythm
@@ -27,23 +27,9 @@ Two-tier persistence, mirroring the Haven and Soulforge pattern:
 | Tier | Struct | Saved to | Survives prestige? |
 |------|--------|----------|--------------------|
 | Account-level | `DeepPersistent` | `~/.quest/deep.json` | Yes |
-| Per-prestige | `DeepPrestige` | character save | No |
+| Operational | `DeepPrestige` | character save | Yes |
 
-Both tiers are combined in `DeepState` for convenience. Call `DeepState::on_prestige()` to reset transient state while preserving account-level progress.
-
-### Persists Across Prestiges
-- `discovered` flag
-- `guild_rank` (1-5)
-- `deepest_layer_reached`
-- Layer records: `familiarity` (0-100 intel), `infrastructure`, `cleared` status
-- `merc_id_counter` and `mission_id_counter` (monotonically increasing across all prestiges)
-
-### Resets on Prestige
-- Mercenary roster (each generation starts fresh)
-- Active and completed missions
-- Available mission pool
-- `warband_marks` currency balance
-- Recruit pool
+Both tiers are combined in `DeepState` for convenience. **All Deep state persists across prestiges** — mercenaries, missions, marks, and recruit pools are never wiped. `DeepState::on_prestige()` only advances the generation counter and records stats.
 
 ## Key Types
 
@@ -58,7 +44,7 @@ pub struct DeepState {
 ```
 
 Key methods:
-- `on_prestige()` — Resets `prestige`, keeps `persistent` intact
+- `on_prestige()` — Advances generation counter, records stats; preserves all operational state
 - `is_active()` — Returns `persistent.discovered`
 
 ### `DeepPersistent` (`types.rs`)

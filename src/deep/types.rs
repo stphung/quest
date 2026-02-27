@@ -1,9 +1,9 @@
 #![allow(dead_code)] // Functions wired into the game loop incrementally
 //! The Deep — Mercenary Expedition System data structures.
 //!
-//! Two-tier persistence model:
-//! - **Account-level** (persists across prestiges): Guild rank, layer breakthroughs, infrastructure, intel
-//! - **Per-prestige** (resets on prestige): Mercenaries, active missions, Warband Marks
+//! Two-tier persistence model (both persist across prestiges):
+//! - **Account-level**: Guild rank, layer breakthroughs, infrastructure, intel
+//! - **Operational**: Mercenaries, active missions, Warband Marks
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -778,9 +778,9 @@ impl DeepPersistent {
     }
 }
 
-/// Per-prestige Deep state — **resets on prestige**.
+/// Operational Deep state — mercenaries, missions, and marks.
 ///
-/// Embedded in the character save file or a companion file.
+/// Persists across prestiges. Embedded in the character save file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeepPrestige {
     /// Current Warband Marks balance.
@@ -947,13 +947,11 @@ impl DeepState {
         }
     }
 
-    /// Reset per-prestige state while keeping persistent state intact.
-    /// Call this at the start of each prestige cycle.
+    /// Record generation stats on prestige. Mercenaries, missions, and marks
+    /// persist across prestiges — only the generation counter advances.
     pub fn on_prestige(&mut self) {
-        // Increment generation counter before resetting prestige state.
         self.persistent.generation_counter += 1;
 
-        // Record generation stats before reset
         let record = GenerationRecord {
             generation: self.persistent.generation_counter,
             marks_earned: self.prestige.total_marks_earned,
@@ -963,15 +961,11 @@ impl DeepState {
             gateway_opened_this_generation: self.persistent.gateway_opened,
         };
         self.persistent.generation_records.push(record);
-        // Cap at 10 records
         if self.persistent.generation_records.len() > 10 {
             let excess = self.persistent.generation_records.len() - 10;
             self.persistent.generation_records.drain(..excess);
         }
 
-        // Cancel all active missions cleanly (mercs go with the reset).
-        self.prestige = DeepPrestige::new();
-        // Tag the new prestige state with its generation number.
         self.prestige.generation_number = self.persistent.generation_counter;
     }
 
@@ -1404,15 +1398,17 @@ mod tests {
     // ── DeepState ─────────────────────────────────────────────────────────────
 
     #[test]
-    fn test_deep_state_on_prestige_resets_prestige_state() {
+    fn test_deep_state_on_prestige_preserves_prestige_state() {
         let mut ds = DeepState::new();
         ds.persistent.discovered = true;
         ds.persistent.guild_rank = GuildRank(3);
         ds.prestige.warband_marks = 9999;
         ds.on_prestige();
-        // Prestige state is cleared.
-        assert_eq!(ds.prestige.warband_marks, 0);
-        assert!(ds.prestige.roster.is_empty());
+        // Mercs, missions, and marks persist across prestiges.
+        assert_eq!(ds.prestige.warband_marks, 9999);
+        // Generation counter advances.
+        assert_eq!(ds.persistent.generation_counter, 1);
+        assert_eq!(ds.prestige.generation_number, 1);
         // Persistent state is untouched.
         assert!(ds.persistent.discovered);
         assert_eq!(ds.persistent.guild_rank, GuildRank(3));

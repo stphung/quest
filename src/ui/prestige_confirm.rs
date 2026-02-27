@@ -13,17 +13,13 @@ pub fn draw_prestige_confirm(
     frame: &mut Frame,
     game_state: &GameState,
     rift_hint: bool,
-    deep_active: bool,
     _ctx: &super::responsive::LayoutContext,
 ) {
     let size = frame.area();
 
     // Calculate dialog size and position (centered)
     let dialog_width = 50.min(size.width.saturating_sub(4));
-    let mut base_height: u16 = if rift_hint { 19 } else { 18 };
-    if deep_active {
-        base_height += 1;
-    }
+    let base_height: u16 = if rift_hint { 19 } else { 18 };
     let dialog_height = base_height.min(size.height.saturating_sub(4));
 
     let x = (size.width.saturating_sub(dialog_width)) / 2;
@@ -58,11 +54,6 @@ pub fn draw_prestige_confirm(
         Line::from("  - All attributes"),
         Line::from("  - All equipped items"),
         Line::from("  - Current dungeon progress"),
-    ];
-    if deep_active {
-        lines.push(Line::from("  - Deep mercenaries & missions"));
-    }
-    lines.extend([
         Line::from(""),
         Line::from(Span::styled(
             "You will gain:",
@@ -105,7 +96,7 @@ pub fn draw_prestige_confirm(
             ),
         ]),
         Line::from(""),
-    ]);
+    ];
 
     if rift_hint {
         let millis = std::time::SystemTime::now()
