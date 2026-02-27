@@ -12,6 +12,7 @@ use crate::fishing::generation::generate_fishing_session;
 use crate::god_items;
 use crate::haven::Haven;
 use crate::items;
+use chrono::{Duration, Utc};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DebugAction {
@@ -39,6 +40,11 @@ enum DebugAction {
     TriggerEtchSPlusSigil,
     TriggerForceOvercharge,
     TriggerDeepDiscovery,
+    TriggerDeepGrantMarks,
+    TriggerDeepRefreshMissionPool,
+    TriggerDeepRefreshRecruits,
+    TriggerDeepClearFrontierLayer,
+    TriggerDeepCompleteActiveMissions,
 }
 
 const DEBUG_ACTIONS: &[DebugAction] = &[
@@ -66,6 +72,11 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerEtchSPlusSigil,
     DebugAction::TriggerForceOvercharge,
     DebugAction::TriggerDeepDiscovery,
+    DebugAction::TriggerDeepGrantMarks,
+    DebugAction::TriggerDeepRefreshMissionPool,
+    DebugAction::TriggerDeepRefreshRecruits,
+    DebugAction::TriggerDeepClearFrontierLayer,
+    DebugAction::TriggerDeepCompleteActiveMissions,
 ];
 
 const CHALLENGE_ACTIONS: &[DebugAction] = &[
@@ -85,7 +96,6 @@ const WORLD_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerFishing,
     DebugAction::TriggerHavenDiscovery,
     DebugAction::TriggerSoulforgeDiscovery,
-    DebugAction::TriggerDeepDiscovery,
 ];
 const RESOURCE_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerGrantStormglass,
@@ -99,6 +109,14 @@ const ITEM_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerForgeAsprika,
     DebugAction::TriggerForgeSleipnir,
     DebugAction::TriggerForgeMegingjord,
+];
+const DEEP_ACTIONS: &[DebugAction] = &[
+    DebugAction::TriggerDeepDiscovery,
+    DebugAction::TriggerDeepGrantMarks,
+    DebugAction::TriggerDeepRefreshMissionPool,
+    DebugAction::TriggerDeepRefreshRecruits,
+    DebugAction::TriggerDeepClearFrontierLayer,
+    DebugAction::TriggerDeepCompleteActiveMissions,
 ];
 const BORDER_OPTION_START_INDEX: usize = DEBUG_ACTIONS.len();
 
@@ -129,6 +147,11 @@ impl DebugAction {
             Self::TriggerEtchSPlusSigil => 21,
             Self::TriggerForceOvercharge => 22,
             Self::TriggerDeepDiscovery => 23,
+            Self::TriggerDeepGrantMarks => 24,
+            Self::TriggerDeepRefreshMissionPool => 25,
+            Self::TriggerDeepRefreshRecruits => 26,
+            Self::TriggerDeepClearFrontierLayer => 27,
+            Self::TriggerDeepCompleteActiveMissions => 28,
         }
     }
 
@@ -158,6 +181,11 @@ impl DebugAction {
             Self::TriggerEtchSPlusSigil => "Etch S+ Sigil (Slot 1)",
             Self::TriggerForceOvercharge => "Force Next Surge Overcharged",
             Self::TriggerDeepDiscovery => "Discover The Deep",
+            Self::TriggerDeepGrantMarks => "Grant 10,000 Warband Marks",
+            Self::TriggerDeepRefreshMissionPool => "Refresh Mission Pool",
+            Self::TriggerDeepRefreshRecruits => "Refresh Recruit Pool",
+            Self::TriggerDeepClearFrontierLayer => "Clear Current Frontier Layer",
+            Self::TriggerDeepCompleteActiveMissions => "Complete Active Missions",
         }
     }
 
@@ -193,6 +221,11 @@ impl DebugAction {
             Self::TriggerEtchSPlusSigil => trigger_etch_s_plus_sigil(state),
             Self::TriggerForceOvercharge => trigger_force_overcharge(state),
             Self::TriggerDeepDiscovery => trigger_deep_discovery(deep, state.prestige_rank),
+            Self::TriggerDeepGrantMarks => trigger_deep_grant_marks(deep),
+            Self::TriggerDeepRefreshMissionPool => trigger_deep_refresh_mission_pool(deep),
+            Self::TriggerDeepRefreshRecruits => trigger_deep_refresh_recruit_pool(deep),
+            Self::TriggerDeepClearFrontierLayer => trigger_deep_clear_frontier_layer(deep),
+            Self::TriggerDeepCompleteActiveMissions => trigger_deep_complete_active_missions(deep),
         }
     }
 }
@@ -229,6 +262,7 @@ pub fn option_count_for_category(category: DebugCategory) -> usize {
         DebugCategory::World => WORLD_ACTIONS.len(),
         DebugCategory::Resources => RESOURCE_ACTIONS.len(),
         DebugCategory::Items => ITEM_ACTIONS.len(),
+        DebugCategory::Deep => DEEP_ACTIONS.len(),
         DebugCategory::Borders => SELECTABLE_UI_BORDER_STYLES.len(),
     }
 }
@@ -239,6 +273,7 @@ pub enum DebugCategory {
     World,
     Resources,
     Items,
+    Deep,
     Borders,
 }
 
@@ -249,6 +284,7 @@ impl DebugCategory {
             Self::World => "World",
             Self::Resources => "Resources",
             Self::Items => "Items",
+            Self::Deep => "The Deep",
             Self::Borders => "Borders",
         }
     }
@@ -259,6 +295,7 @@ pub const DEBUG_CATEGORIES: &[DebugCategory] = &[
     DebugCategory::World,
     DebugCategory::Resources,
     DebugCategory::Items,
+    DebugCategory::Deep,
     DebugCategory::Borders,
 ];
 
@@ -340,6 +377,7 @@ impl DebugMenu {
             DebugCategory::World => WORLD_ACTIONS[visible_index].option_index(),
             DebugCategory::Resources => RESOURCE_ACTIONS[visible_index].option_index(),
             DebugCategory::Items => ITEM_ACTIONS[visible_index].option_index(),
+            DebugCategory::Deep => DEEP_ACTIONS[visible_index].option_index(),
             DebugCategory::Borders => BORDER_OPTION_START_INDEX + visible_index,
         }
     }
@@ -628,6 +666,67 @@ fn trigger_deep_discovery(deep: &mut DeepState, _prestige_rank: u32) -> &'static
     "The Deep discovered!"
 }
 
+fn trigger_deep_grant_marks(deep: &mut DeepState) -> &'static str {
+    if !deep.persistent.discovered {
+        return "Discover The Deep first!";
+    }
+    deep.prestige.warband_marks = deep.prestige.warband_marks.saturating_add(10_000);
+    "Granted 10,000 Warband Marks!"
+}
+
+fn trigger_deep_refresh_mission_pool(deep: &mut DeepState) -> &'static str {
+    if !deep.persistent.discovered {
+        return "Discover The Deep first!";
+    }
+    let mut rng = rand::rng();
+    deep.prestige.available_missions =
+        crate::deep::generate_mission_pool(&deep.persistent, &mut rng);
+    deep.prestige.pool_refreshed_at = Some(Utc::now());
+    "Deep mission pool refreshed!"
+}
+
+fn trigger_deep_refresh_recruit_pool(deep: &mut DeepState) -> &'static str {
+    if !deep.persistent.discovered {
+        return "Discover The Deep first!";
+    }
+    let mut rng = rand::rng();
+    let guild_rank = deep.persistent.guild_rank;
+    deep.prestige.recruit_pool =
+        crate::deep::generate_recruit_pool(guild_rank, || deep.persistent.next_merc_id(), &mut rng);
+    "Deep recruit pool refreshed!"
+}
+
+fn trigger_deep_clear_frontier_layer(deep: &mut DeepState) -> &'static str {
+    if !deep.persistent.discovered {
+        return "Discover The Deep first!";
+    }
+    let frontier = deep.persistent.frontier_layer();
+    crate::deep::mark_layer_cleared(&mut deep.persistent, frontier);
+    let mut rng = rand::rng();
+    deep.prestige.available_missions =
+        crate::deep::generate_mission_pool(&deep.persistent, &mut rng);
+    deep.prestige.pool_refreshed_at = Some(Utc::now());
+    "Cleared current Deep frontier layer!"
+}
+
+fn trigger_deep_complete_active_missions(deep: &mut DeepState) -> &'static str {
+    if !deep.persistent.discovered {
+        return "Discover The Deep first!";
+    }
+    if deep.prestige.active_missions.is_empty() {
+        return "No active Deep missions.";
+    }
+    let mut rng = rand::rng();
+    let now = Utc::now() + Duration::days(7);
+    let summary =
+        crate::deep::tick_all_missions(&mut deep.prestige, &mut deep.persistent, now, &mut rng);
+    if summary.missions_completed > 0 {
+        "Completed active Deep missions!"
+    } else {
+        "No Deep missions completed."
+    }
+}
+
 fn trigger_etch_s_plus_sigil(state: &mut GameState) -> &'static str {
     use crate::stormglass::sigils::{Sigil, SigilEffectType, SigilGrade};
 
@@ -708,6 +807,9 @@ mod tests {
         assert_eq!(menu.current_category(), DebugCategory::Borders);
 
         menu.navigate_prev_category();
+        assert_eq!(menu.current_category(), DebugCategory::Deep);
+
+        menu.navigate_prev_category();
         assert_eq!(menu.current_category(), DebugCategory::Items);
     }
 
@@ -715,7 +817,7 @@ mod tests {
     fn test_border_preview_does_not_close_menu() {
         let mut menu = DebugMenu::new();
         menu.open();
-        for _ in 0..4 {
+        for _ in 0..5 {
             menu.navigate_next_category();
         }
         assert_eq!(menu.current_category(), DebugCategory::Borders);
@@ -986,5 +1088,38 @@ mod tests {
         // Can't forge again
         let msg = trigger_forge_megingjord(&mut state, &enhancement);
         assert_eq!(msg, "Megingjord already equipped!");
+    }
+
+    #[test]
+    fn test_trigger_deep_refresh_mission_pool_requires_discovery() {
+        let mut deep = DeepState::new();
+        let msg = trigger_deep_refresh_mission_pool(&mut deep);
+        assert_eq!(msg, "Discover The Deep first!");
+    }
+
+    #[test]
+    fn test_trigger_deep_grant_marks() {
+        let mut deep = DeepState::new();
+        let mut rng = rand::rng();
+        crate::deep::complete_discovery(&mut deep, &mut rng);
+        let before = deep.prestige.warband_marks;
+        let msg = trigger_deep_grant_marks(&mut deep);
+        assert_eq!(msg, "Granted 10,000 Warband Marks!");
+        assert_eq!(deep.prestige.warband_marks, before + 10_000);
+    }
+
+    #[test]
+    fn test_trigger_deep_clear_frontier_layer_marks_layer_cleared() {
+        let mut deep = DeepState::new();
+        let mut rng = rand::rng();
+        crate::deep::complete_discovery(&mut deep, &mut rng);
+        let frontier = deep.persistent.frontier_layer();
+        let msg = trigger_deep_clear_frontier_layer(&mut deep);
+        assert_eq!(msg, "Cleared current Deep frontier layer!");
+        assert!(deep
+            .persistent
+            .layer_record(frontier)
+            .map(|r| r.cleared)
+            .unwrap_or(false));
     }
 }

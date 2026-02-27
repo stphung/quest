@@ -191,7 +191,7 @@ fn test_deep_discovery_on_endless_kill() {
     assert!(deep.persistent.discovered);
     assert_eq!(deep.prestige.roster.len(), 3);
     assert_eq!(deep.prestige.warband_marks, 50);
-    assert!(!deep.prestige.active_missions.is_empty());
+    assert!(deep.prestige.active_missions.is_empty());
 }
 
 #[test]
@@ -214,8 +214,7 @@ fn test_discovery_creates_initial_state() {
     // Guild rank starts at 1.
     assert_eq!(deep.persistent.guild_rank, GuildRank(1));
 
-    // Exactly 3 starter mercs, all at base level.
-    // After First Orders auto-queue, they are on the starter mission.
+    // Exactly 3 starter mercs, all at base level and available.
     assert_eq!(
         deep.prestige.roster.len(),
         3,
@@ -224,10 +223,9 @@ fn test_discovery_creates_initial_state() {
     for merc in &deep.prestige.roster {
         assert_eq!(merc.level, 1, "Starter mercs must be level 1");
         assert_eq!(merc.missions_completed, 0);
-        // Mercs are on the First Orders mission after discovery
         assert!(
-            matches!(merc.status, MercStatus::OnMission(_)),
-            "Starter mercs should be on First Orders mission"
+            matches!(merc.status, MercStatus::Available),
+            "Starter mercs should start available"
         );
     }
 
@@ -264,7 +262,9 @@ fn test_discovery_merc_ids_are_unique_and_sequential() {
     let ids: Vec<u64> = deep.prestige.roster.iter().map(|m| m.id).collect();
     // IDs should be 1, 2, 3 (counter starts at 0 and increments before assignment).
     assert_eq!(ids, vec![1, 2, 3]);
-    assert_eq!(deep.persistent.merc_id_counter, 3);
+    let expected_counter =
+        deep.prestige.roster.len() as u64 + deep.prestige.recruit_pool.candidates.len() as u64;
+    assert_eq!(deep.persistent.merc_id_counter, expected_counter);
 }
 
 // ── 7. Prestige preserves guild rank ─────────────────────────────────────────
@@ -443,14 +443,13 @@ fn test_prestige_preserves_active_missions() {
         merc.status = MercStatus::OnMission(mission_id);
     }
 
-    // First Orders + injected mission = 2 active missions
-    assert_eq!(deep.prestige.active_missions.len(), 2);
+    assert_eq!(deep.prestige.active_missions.len(), 1);
 
     deep.on_prestige();
 
     assert_eq!(
         deep.prestige.active_missions.len(),
-        2,
+        1,
         "Active missions must persist across prestiges"
     );
 }
@@ -461,12 +460,6 @@ fn test_prestige_preserves_active_missions() {
 fn test_offline_mission_resolution_completes_elapsed_mission() {
     let mut deep = DeepState::new();
     force_discover(&mut deep);
-
-    // Clear the auto-queued First Orders mission so we test in isolation.
-    deep.prestige.active_missions.clear();
-    for merc in &mut deep.prestige.roster {
-        merc.status = MercStatus::Available;
-    }
 
     // Ensure the roster merc is available.
     let _merc_id = deep.prestige.roster.first().unwrap().id;
@@ -497,12 +490,6 @@ fn test_offline_mission_resolution_completes_elapsed_mission() {
 fn test_offline_resolution_does_not_complete_active_missions() {
     let mut deep = DeepState::new();
     force_discover(&mut deep);
-
-    // Clear the auto-queued First Orders mission so we test in isolation.
-    deep.prestige.active_missions.clear();
-    for merc in &mut deep.prestige.roster {
-        merc.status = MercStatus::Available;
-    }
 
     // Mission that hasn't ended yet.
     let mission = make_active_supply_run(&mut deep);
@@ -617,31 +604,33 @@ fn test_three_prestige_cycles_preserves_persistent_state() {
         );
     }
 
-    // After 3 cycles, merc_id_counter must reflect all mercs allocated
-    // (only the 3 starters from initial discovery; no new starters on prestige).
-    assert_eq!(deep.persistent.merc_id_counter, 3);
+    // After 3 cycles, merc_id_counter must remain monotonic and retain the
+    // allocations made during discovery (starters + initial recruit pool).
+    let expected_counter =
+        deep.prestige.roster.len() as u64 + deep.prestige.recruit_pool.candidates.len() as u64;
+    assert_eq!(deep.persistent.merc_id_counter, expected_counter);
 }
 
 #[test]
 fn test_multiple_prestige_cycles_id_counters_never_reset() {
     let mut deep = DeepState::new();
     force_discover(&mut deep);
+    let discovered_merc_counter = deep.persistent.merc_id_counter;
 
-    // First Orders auto-queued on discovery already consumed mission ID 1.
-    // Allocate two more mission IDs.
+    // Allocate two mission IDs.
     let _ = deep.persistent.next_mission_id();
     let _ = deep.persistent.next_mission_id();
-    assert_eq!(deep.persistent.mission_id_counter, 3);
+    assert_eq!(deep.persistent.mission_id_counter, 2);
 
     deep.on_prestige();
 
     // Counters must NOT reset on prestige — they are monotonic across all generations.
     assert_eq!(
-        deep.persistent.mission_id_counter, 3,
+        deep.persistent.mission_id_counter, 2,
         "mission_id_counter must not reset on prestige"
     );
     assert_eq!(
-        deep.persistent.merc_id_counter, 3,
+        deep.persistent.merc_id_counter, discovered_merc_counter,
         "merc_id_counter must not reset on prestige"
     );
 }
@@ -772,73 +761,54 @@ fn test_effective_concurrent_missions_rank2_not_doubled_by_l3() {
 }
 
 // =========================================================================
-// T2-6: First Orders — auto-queued tutorial mission on discovery
+// T2-6: First Orders — not auto-queued on discovery
 // =========================================================================
 
 #[test]
-fn test_first_orders_queued_on_discovery() {
+fn test_first_orders_not_auto_queued_on_discovery() {
     let mut deep = DeepState::new();
     force_discover(&mut deep);
 
     assert!(deep.persistent.discovered);
     assert!(
-        deep.persistent.first_orders_queued,
-        "First Orders flag must be set on discovery"
+        !deep.persistent.first_orders_queued,
+        "First Orders flag should remain unset on discovery"
     );
-    assert_eq!(
-        deep.prestige.active_missions.len(),
-        1,
-        "Exactly one First Orders mission should be auto-queued"
-    );
-    let mission = &deep.prestige.active_missions[0];
     assert!(
-        mission.is_first_orders,
-        "Mission must be flagged as First Orders"
+        deep.prestige.active_missions.is_empty(),
+        "No First Orders mission should be auto-queued"
     );
-    assert_eq!(mission.mission_type, MissionType::Recon);
-    assert_eq!(mission.layer, 1);
-    // Squad should include all 3 starter mercs
-    assert_eq!(mission.squad.len(), 3);
 }
 
 #[test]
-fn test_first_orders_not_queued_twice() {
+fn test_first_orders_not_added_when_flag_pre_set() {
     let mut deep = DeepState::new();
-    // Pretend First Orders was already queued in a previous discovery
+    // Pretend First Orders was already queued in a previous run.
     deep.persistent.first_orders_queued = true;
     deep.persistent.discovered = false;
 
-    // Force discovery
     let mut rng = seeded_rng();
     complete_discovery(&mut deep, &mut rng);
 
-    if deep.persistent.discovered {
-        // Should have discovered but no First Orders mission
-        let has_first_orders = deep
-            .prestige
-            .active_missions
-            .iter()
-            .any(|m| m.is_first_orders);
-        assert!(
-            !has_first_orders,
-            "First Orders should not be queued when first_orders_queued is already true"
-        );
-    }
+    assert!(deep.persistent.discovered);
+    assert!(deep.persistent.first_orders_queued);
+    assert!(
+        deep.prestige.active_missions.is_empty(),
+        "First Orders should not be auto-queued"
+    );
 }
 
 #[test]
-fn test_first_orders_mission_duration_is_20_minutes() {
+fn test_first_orders_mission_not_created_on_discovery() {
     let mut deep = DeepState::new();
     force_discover(&mut deep);
 
-    assert!(!deep.prestige.active_missions.is_empty());
-    let mission = &deep.prestige.active_missions[0];
-    assert!(mission.is_first_orders);
-
-    let duration_secs = (mission.ends_at - mission.started_at).num_seconds();
-    assert_eq!(
-        duration_secs, 1200,
-        "First Orders mission should be 20 minutes (1200 seconds)"
+    assert!(
+        deep.prestige
+            .active_missions
+            .iter()
+            .all(|m| !m.is_first_orders),
+        "No First Orders mission should exist right after discovery"
     );
 }
 
@@ -850,9 +820,8 @@ fn test_first_orders_persists_across_serde() {
     let json = serde_json::to_string_pretty(&deep).expect("serialize");
     let loaded: DeepState = serde_json::from_str(&json).expect("deserialize");
 
-    assert!(loaded.persistent.first_orders_queued);
-    assert_eq!(loaded.prestige.active_missions.len(), 1);
-    assert!(loaded.prestige.active_missions[0].is_first_orders);
+    assert!(!loaded.persistent.first_orders_queued);
+    assert!(loaded.prestige.active_missions.is_empty());
 }
 
 // =========================================================================

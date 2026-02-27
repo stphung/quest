@@ -51,7 +51,7 @@ pub(super) fn paint_deep_backdrop(
     }
     let width = buffer[0].len();
 
-    // View-specific gradient tints: Infrastructure is darker/deeper,
+    // View-specific gradient tints: Layers is darker/deeper,
     // EventResponse has a warmer tension tint, others use the default cave blue.
     let (top_rgb, bottom_rgb) = match view {
         DeepView::Infrastructure => ((4u8, 6u8, 16u8), (1u8, 2u8, 6u8)),
@@ -97,7 +97,7 @@ pub(super) fn paint_deep_backdrop(
     }
 
     // 3. Drifting dust particles (cave air) — rising slowly
-    //    View-specific: Infrastructure has more particles (busy underground),
+    //    View-specific: Layers has more particles (busy underground),
     //    EventResponse has faster, warmer particles (tension).
     let particle_chars: &[char] = &['\u{00b7}', '\u{2022}', '\u{2218}']; // · • ∘
     let (particle_count, particle_speed, particle_hot, particle_cool) = match view {
@@ -370,7 +370,7 @@ fn abbrev_label(view: DeepView) -> &'static str {
         DeepView::NewMission => "Msn",
         DeepView::Roster => "Rst",
         DeepView::Recruit => "Rec",
-        DeepView::Infrastructure => "Lyr",
+        DeepView::Infrastructure => "Lay",
     }
 }
 
@@ -396,6 +396,10 @@ fn render_tab_bar(buffer: &mut [Vec<SceneCell>], width: usize, active: DeepView,
                 } else {
                     (String::new(), Color::DarkGray)
                 }
+            }
+            DeepView::Infrastructure => {
+                let frontier = deep.persistent.frontier_layer();
+                (format!("L{}", frontier), Color::Cyan)
             }
             DeepView::EventResponse => {
                 let events = deep
@@ -444,7 +448,6 @@ fn render_tab_bar(buffer: &mut [Vec<SceneCell>], width: usize, active: DeepView,
                     (String::new(), Color::DarkGray)
                 }
             }
-            _ => (String::new(), Color::DarkGray),
         })
         .collect();
 
@@ -639,8 +642,9 @@ pub fn render_deep_overlay(
         }
     }
 
-    // Event badge footer reminder when not on Hub or Events tab
+    // Event badge footer reminder when not on hub, layers, or events tab
     if ui.view != DeepView::Hub
+        && ui.view != DeepView::Infrastructure
         && ui.view != DeepView::EventResponse
         && deep.prestige.has_any_pending_event()
     {
@@ -824,6 +828,8 @@ fn help_content(view: DeepView) -> &'static [&'static str] {
             "Injured mercs cannot be assigned.",
         ],
         DeepView::Infrastructure => &[
+            "LAYERS",
+            "",
             "FAMILIARITY (Intel %)",
             "Unknown  0-24%   no reduction",
             "Mapped   25-49%  -10% durations",

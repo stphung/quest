@@ -87,7 +87,8 @@ pub use economy::{
 pub use layers::{
     apply_duration_modifiers, apply_familiarity_gain, base_mission_duration_secs,
     build_infrastructure, familiarity_gain, infrastructure_build_cost, is_frontier_layer,
-    is_safe_layer, layer_power_thresholds, mark_layer_cleared, mission_power_threshold,
+    is_safe_layer, layer_power_thresholds, mark_layer_cleared,
+    minimum_mission_duration_secs_for_layer, mission_power_threshold,
     watchtower_auto_resolve_bonus, DurationModifiers, FamiliarityLevel, InfrastructureBuildError,
     LayerPowerThresholds, MIN_MISSION_DURATION_SECS,
 };
@@ -113,8 +114,8 @@ pub use events::{
 #[allow(unused_imports)]
 pub use missions::{
     available_mission_count, daily_supply_run_resets_at, generate_mission_pool,
-    is_daily_supply_run_available, maybe_refresh_mission_pool, resolve_mission,
-    resolve_offline_missions, start_mission, tick_all_missions, tick_mission,
-    validate_squad_assignment, MissionTickSummary, OfflineResolutionSummary, SquadAssignmentError,
-    POOL_REFRESH_INTERVAL_SECS,
+    is_daily_supply_run_available, maybe_refresh_mission_pool, maybe_refresh_recruit_pool,
+    resolve_mission, resolve_offline_missions, run_softlock_safeguards, start_mission,
+    tick_all_missions, tick_mission, validate_squad_assignment, MissionTickSummary,
+    OfflineResolutionSummary, SquadAssignmentError, POOL_REFRESH_INTERVAL_SECS,
 };

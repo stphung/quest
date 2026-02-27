@@ -124,15 +124,20 @@ fn breakthrough_mission(layer: u32, min_power: u32) -> AvailableMission {
 
 /// Build a Construction mission for an Outpost on the given layer.
 fn construction_mission(layer: u32) -> AvailableMission {
+    construction_mission_with(layer, Infrastructure::Outpost)
+}
+
+/// Build a Construction mission for a specific infrastructure type on the given layer.
+fn construction_mission_with(layer: u32, infra: Infrastructure) -> AvailableMission {
     AvailableMission {
-        mission_type: MissionType::Construction(Infrastructure::Outpost),
+        mission_type: MissionType::Construction(infra),
         layer,
         duration_secs: 3600, // 1 hour (Shallows base)
         min_squad_power: 0,
         required_archetype: None,
         recommended_archetype: None,
         marks_cost: 0,
-        description: "Build Outpost".to_string(),
+        description: format!("Build {}", infra.display_name()),
     }
 }
 
@@ -395,11 +400,9 @@ fn test_expedition_can_drop_item() {
     tick_all_missions(&mut state.prestige, &mut state.persistent, now3, &mut rng);
 
     let result = state.prestige.pending_results[0].result.as_ref().unwrap();
-    // item_ilvl should be set for expeditions (layer * 10).
-    assert_eq!(
-        result.item_ilvl,
-        Some(layer * 10),
-        "Expedition should have item_ilvl = layer * 10"
+    assert!(
+        result.item_ilvl.is_none(),
+        "Expedition should not produce item rewards"
     );
 }
 
@@ -610,10 +613,9 @@ fn test_breakthrough_item_ilvl() {
     tick_all_missions(&mut state.prestige, &mut state.persistent, now4, &mut rng);
 
     let result = state.prestige.pending_results[0].result.as_ref().unwrap();
-    assert_eq!(
-        result.item_ilvl,
-        Some(layer * 10),
-        "Breakthrough item_ilvl should be layer * 10"
+    assert!(
+        result.item_ilvl.is_none(),
+        "Breakthrough should not produce item rewards"
     );
 }
 
@@ -704,6 +706,45 @@ fn test_construction_no_item_drop() {
     assert!(
         result.item_ilvl.is_none(),
         "Construction should not produce items"
+    );
+}
+
+/// Construction should persist built infrastructure on the target layer.
+#[test]
+fn test_construction_builds_watchtower_on_layer() {
+    let mut rng = rng(5003);
+    let mut state = fresh_state();
+    state.persistent.layer_record_mut(2).cleared = true;
+
+    let merc = make_merc(1, MercArchetype::Arcanist, 30);
+    state.prestige.roster.push(merc);
+
+    let available = construction_mission_with(2, Infrastructure::Watchtower);
+    let m = start_mission(
+        &available,
+        &[1],
+        &mut state.prestige,
+        &mut state.persistent,
+        true,
+        t0(),
+        &mut rng,
+    );
+    state.prestige.active_missions.push(m);
+
+    tick_all_missions(
+        &mut state.prestige,
+        &mut state.persistent,
+        t0() + Duration::hours(5),
+        &mut rng,
+    );
+
+    let record = state
+        .persistent
+        .layer_record(2)
+        .expect("layer 2 should exist after mission");
+    assert!(
+        record.has_infrastructure(Infrastructure::Watchtower),
+        "Watchtower should be built after successful construction mission"
     );
 }
 
@@ -1592,11 +1633,11 @@ fn test_daily_supply_run_resets_at_midnight_utc() {
 /// available_mission_count returns the correct pool size per rank.
 #[test]
 fn test_available_mission_count_by_rank() {
-    assert_eq!(available_mission_count(GuildRank(1)), 3);
-    assert_eq!(available_mission_count(GuildRank(2)), 3);
-    assert_eq!(available_mission_count(GuildRank(3)), 4);
-    assert_eq!(available_mission_count(GuildRank(4)), 4);
-    assert_eq!(available_mission_count(GuildRank(5)), 5);
+    assert_eq!(available_mission_count(GuildRank(1)), 5);
+    assert_eq!(available_mission_count(GuildRank(2)), 5);
+    assert_eq!(available_mission_count(GuildRank(3)), 6);
+    assert_eq!(available_mission_count(GuildRank(4)), 6);
+    assert_eq!(available_mission_count(GuildRank(5)), 7);
 }
 
 /// generate_mission_pool returns at most the expected count.

@@ -14,17 +14,18 @@
 
 use chrono::{DateTime, Duration, Utc};
 use rand::{Rng, RngExt};
+use std::cmp::Reverse;
 
-use super::economy::{
-    compute_mark_reward, merc_xp_per_mission, merc_xp_to_next_level, mission_launch_cost,
-    outcome_mark_multiplier, stormglass_reward, xp_reward, MarkRewardParams,
-};
+use super::economy::{compute_mark_reward, mission_launch_cost, MarkRewardParams};
 use super::events::{generate_mission_events_with_names, tick_mission_events, EventTickResult};
 use super::layers::{
     apply_duration_modifiers, apply_familiarity_gain, base_mission_duration_secs,
-    mark_layer_cleared, mission_power_threshold, watchtower_auto_resolve_bonus, DurationModifiers,
+    build_infrastructure, mark_layer_cleared, minimum_mission_duration_secs_for_layer,
+    mission_power_threshold, watchtower_auto_resolve_bonus, DurationModifiers,
 };
-use super::mercenaries::{injure_merc, mark_merc_lost};
+use super::mercenaries::{
+    generate_recruit_pool, injure_merc, mark_merc_lost, purge_lost_mercs, tick_merc_injury,
+};
 use super::types::{
     effective_concurrent_missions, AvailableMission, DeepPersistent, DeepPrestige, GuildRank,
     Infrastructure, LayerTier, MercArchetype, MercStatus, Mission, MissionOutcome, MissionResult,
@@ -33,131 +34,512 @@ use super::types::{
 
 // ── Mission Pool Generation ────────────────────────────────────────────────────
 
+/// Minimum duration for any zero-cost Supply Run fallback.
+pub const FREE_SUPPLY_RUN_MIN_DURATION_SECS: u64 = 3 * 3600;
+
 /// Number of available missions shown at each guild rank.
 ///
 /// More missions become available at higher ranks.
 pub fn available_mission_count(guild_rank: GuildRank) -> usize {
     match guild_rank.0 {
-        1 | 2 => 3,
-        3 | 4 => 4,
-        _ => 5,
+        1 | 2 => 5,
+        3 | 4 => 6,
+        _ => 7,
     }
 }
 
 /// Generate the set of available missions shown in the mission pool.
 ///
 /// Produces a mix of mission types based on what's currently accessible:
-/// - SupplyRun/Construction only on cleared layers
-/// - Recon/Expedition/Breakthrough only on the frontier or cleared layers
-///
-/// The pool always includes at least one SupplyRun (safe option) when cleared
-/// layers exist.
+/// - Always includes SupplyRun as a safe baseline mission.
+/// - Always includes frontier Breakthrough when the frontier is uncleared.
+/// - Includes Construction when any cleared layer has open infrastructure slots.
+/// - Fills remaining slots with Recon/Expedition on the frontier.
 pub fn generate_mission_pool(
     persistent: &DeepPersistent,
     rng: &mut impl Rng,
 ) -> Vec<AvailableMission> {
-    let guild_rank = persistent.guild_rank;
-    let count = available_mission_count(guild_rank);
-    let frontier = persistent.frontier_layer();
-    let has_cleared_layers = persistent.layers.iter().any(|l| l.cleared);
-
+    let count = available_mission_count(persistent.guild_rank);
     let mut pool = Vec::with_capacity(count);
+    replenish_mission_pool(&mut pool, persistent, count, rng);
+    pool
+}
 
-    // Always offer a Supply Run on the frontier or the most recently cleared layer,
-    // or layer 1 if nothing is cleared yet.
-    let supply_run_layer = if has_cleared_layers {
-        persistent
-            .layers
-            .iter()
-            .filter(|l| l.cleared)
-            .map(|l| l.index)
-            .max()
-            .unwrap_or(1)
-    } else {
-        1
-    };
-    pool.push(generate_available_mission(
-        MissionType::SupplyRun,
-        supply_run_layer,
-        persistent,
-        rng,
-    ));
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum MissionPoolRole {
+    Safe,
+    Mid,
+    Progression,
+}
 
-    // Add Recon on the frontier if we have room.
-    if pool.len() < count {
-        pool.push(generate_available_mission(
-            MissionType::Recon,
-            frontier,
-            persistent,
-            rng,
-        ));
+fn mission_pool_role(mission_type: MissionType) -> MissionPoolRole {
+    match mission_type {
+        MissionType::SupplyRun | MissionType::Construction(_) => MissionPoolRole::Safe,
+        MissionType::Recon | MissionType::Expedition => MissionPoolRole::Mid,
+        MissionType::Breakthrough | MissionType::GatewayExpedition => MissionPoolRole::Progression,
     }
+}
 
-    // Add an Expedition on the frontier.
-    if pool.len() < count {
-        pool.push(generate_available_mission(
-            MissionType::Expedition,
-            frontier,
-            persistent,
-            rng,
-        ));
+fn mission_pool_role_sort_key(role: MissionPoolRole) -> u8 {
+    match role {
+        MissionPoolRole::Safe => 0,
+        MissionPoolRole::Mid => 1,
+        MissionPoolRole::Progression => 2,
     }
+}
 
-    // Add a Breakthrough on the frontier (once per layer; check not already cleared).
-    let frontier_cleared = persistent
+fn mission_type_sort_key(mission_type: MissionType) -> u8 {
+    match mission_type {
+        MissionType::SupplyRun => 0,
+        MissionType::Construction(_) => 1,
+        MissionType::Recon => 2,
+        MissionType::Expedition => 3,
+        MissionType::Breakthrough => 4,
+        MissionType::GatewayExpedition => 5,
+    }
+}
+
+fn sort_mission_pool_by_role(pool: &mut [AvailableMission]) {
+    pool.sort_by_key(|m| {
+        (
+            Reverse(m.layer),
+            mission_pool_role_sort_key(mission_pool_role(m.mission_type)),
+            mission_type_sort_key(m.mission_type),
+            m.marks_cost,
+        )
+    });
+}
+
+fn pool_has_role(pool: &[AvailableMission], role: MissionPoolRole) -> bool {
+    pool.iter()
+        .any(|m| mission_pool_role(m.mission_type) == role)
+}
+
+fn has_construction_mission(pool: &[AvailableMission]) -> bool {
+    pool.iter()
+        .any(|m| matches!(m.mission_type, MissionType::Construction(_)))
+}
+
+fn has_type(pool: &[AvailableMission], mission_type: MissionType) -> bool {
+    pool.iter().any(|m| m.mission_type == mission_type)
+}
+
+fn layer_window(persistent: &DeepPersistent) -> (u32, u32) {
+    let frontier = persistent.frontier_layer().max(1);
+    let start = frontier.saturating_sub(2).max(1);
+    (start, frontier)
+}
+
+fn layer_in_window(layer: u32, persistent: &DeepPersistent) -> bool {
+    let (start, frontier) = layer_window(persistent);
+    (start..=frontier).contains(&layer)
+}
+
+fn supply_mission_layer(persistent: &DeepPersistent) -> u32 {
+    let (start, frontier) = layer_window(persistent);
+    persistent
+        .layers
+        .iter()
+        .filter(|l| l.cleared && (start..=frontier).contains(&l.index))
+        .map(|l| l.index)
+        .max()
+        .unwrap_or(frontier)
+}
+
+fn frontier_is_uncleared(persistent: &DeepPersistent, frontier: u32) -> bool {
+    !persistent
         .layer_record(frontier)
         .map(|r| r.cleared)
-        .unwrap_or(false);
+        .unwrap_or(false)
+}
 
-    if pool.len() < count && !frontier_cleared {
-        pool.push(generate_available_mission(
+fn construction_candidate_for_layer(
+    persistent: &DeepPersistent,
+    layer: u32,
+    rng: &mut impl Rng,
+) -> Option<AvailableMission> {
+    if !layer_in_window(layer, persistent) {
+        return None;
+    }
+    let record = persistent.layer_record(layer)?;
+    if !record.cleared || record.infrastructure.len() >= Infrastructure::ALL.len() {
+        return None;
+    }
+
+    let available_infra: Vec<Infrastructure> = Infrastructure::ALL
+        .iter()
+        .filter(|&&i| !record.infrastructure.contains(&i))
+        .copied()
+        .collect();
+    if available_infra.is_empty() {
+        return None;
+    }
+
+    let infra_index = rng.random_range(0..available_infra.len());
+    Some(generate_available_mission(
+        MissionType::Construction(available_infra[infra_index]),
+        layer,
+        persistent,
+        rng,
+    ))
+}
+
+fn construction_candidate(
+    persistent: &DeepPersistent,
+    rng: &mut impl Rng,
+) -> Option<AvailableMission> {
+    let (start, frontier) = layer_window(persistent);
+    let candidate_layers: Vec<u32> = persistent
+        .layers
+        .iter()
+        .filter(|l| {
+            l.cleared
+                && l.infrastructure.len() < Infrastructure::ALL.len()
+                && (start..=frontier).contains(&l.index)
+        })
+        .map(|l| l.index)
+        .collect();
+    if candidate_layers.is_empty() {
+        return None;
+    }
+    let target_layer = candidate_layers[rng.random_range(0..candidate_layers.len())];
+    construction_candidate_for_layer(persistent, target_layer, rng)
+}
+
+fn safe_candidate(persistent: &DeepPersistent, rng: &mut impl Rng) -> AvailableMission {
+    if let Some(construction) = construction_candidate(persistent, rng) {
+        return construction;
+    }
+    generate_available_mission(
+        MissionType::SupplyRun,
+        supply_mission_layer(persistent),
+        persistent,
+        rng,
+    )
+}
+
+fn mid_candidate(persistent: &DeepPersistent, rng: &mut impl Rng) -> AvailableMission {
+    let (start, frontier) = layer_window(persistent);
+    let layer = rng.random_range(start..=frontier);
+    if rng.random_bool(0.5) {
+        generate_available_mission(MissionType::Recon, layer, persistent, rng)
+    } else {
+        generate_available_mission(MissionType::Expedition, layer, persistent, rng)
+    }
+}
+
+fn progression_candidate(
+    persistent: &DeepPersistent,
+    rng: &mut impl Rng,
+) -> Option<AvailableMission> {
+    let frontier = persistent.frontier_layer();
+    if frontier_is_uncleared(persistent, frontier) {
+        Some(generate_available_mission(
             MissionType::Breakthrough,
             frontier,
             persistent,
             rng,
-        ));
+        ))
+    } else {
+        None
+    }
+}
+
+fn push_or_replace_for_role(
+    pool: &mut Vec<AvailableMission>,
+    count: usize,
+    candidate: AvailableMission,
+    replace_predicate: impl Fn(&AvailableMission) -> bool,
+) -> bool {
+    if pool.len() < count {
+        pool.push(candidate);
+        return true;
+    }
+    if let Some(idx) = pool.iter().position(replace_predicate) {
+        pool[idx] = candidate;
+        return true;
+    }
+    false
+}
+
+fn push_or_replace_for_layer(
+    pool: &mut Vec<AvailableMission>,
+    count: usize,
+    candidate: AvailableMission,
+    target_layer: u32,
+) -> bool {
+    if pool.len() < count {
+        pool.push(candidate);
+        return true;
     }
 
-    // Fill remaining slots with Construction missions on cleared layers,
-    // or extra Supply Runs on deeper cleared layers if no infra slots remain.
-    if pool.len() < count && has_cleared_layers {
-        // Find a cleared layer that still has buildable infrastructure.
-        let construction_target = persistent
-            .layers
-            .iter()
-            .filter(|l| l.cleared && l.infrastructure.len() < Infrastructure::ALL.len())
-            .map(|l| l.index)
-            .next();
+    if let Some(idx) = pool.iter().position(|m| {
+        m.layer != target_layer && pool.iter().filter(|x| x.layer == m.layer).count() > 1
+    }) {
+        pool[idx] = candidate;
+        return true;
+    }
 
-        if let Some(target_layer) = construction_target {
-            // Pick a random infrastructure type not yet built.
-            let built = &persistent
-                .layers
-                .iter()
-                .find(|l| l.index == target_layer)
-                .map(|l| l.infrastructure.clone())
-                .unwrap_or_default();
+    if let Some(idx) = pool.iter().position(|m| m.layer != target_layer) {
+        pool[idx] = candidate;
+        return true;
+    }
 
-            let available_infra: Vec<Infrastructure> = Infrastructure::ALL
-                .iter()
-                .filter(|&&i| !built.contains(&i))
-                .copied()
-                .collect();
+    false
+}
 
-            if !available_infra.is_empty() {
-                let infra_index = rng.random_range(0..available_infra.len());
-                pool.push(generate_available_mission(
-                    MissionType::Construction(available_infra[infra_index]),
-                    target_layer,
+fn ensure_specific_mission_present(
+    pool: &mut Vec<AvailableMission>,
+    mission_type: MissionType,
+    layer: u32,
+    persistent: &DeepPersistent,
+    rng: &mut impl Rng,
+) -> bool {
+    if pool
+        .iter()
+        .any(|m| m.layer == layer && m.mission_type == mission_type)
+    {
+        return false;
+    }
+    pool.push(generate_available_mission(
+        mission_type,
+        layer,
+        persistent,
+        rng,
+    ));
+    true
+}
+
+fn unbuilt_infrastructure_for_layer(
+    persistent: &DeepPersistent,
+    layer: u32,
+) -> Vec<Infrastructure> {
+    let Some(record) = persistent.layer_record(layer) else {
+        return Vec::new();
+    };
+    if !record.cleared {
+        return Vec::new();
+    }
+    Infrastructure::ALL
+        .iter()
+        .filter(|&&infra| !record.has_infrastructure(infra))
+        .copied()
+        .collect()
+}
+
+fn is_valid_construction_mission(mission: &AvailableMission, persistent: &DeepPersistent) -> bool {
+    let MissionType::Construction(infra) = mission.mission_type else {
+        return true;
+    };
+    let Some(record) = persistent.layer_record(mission.layer) else {
+        return false;
+    };
+    record.cleared && !record.has_infrastructure(infra)
+}
+
+fn prune_invalid_pool_missions(
+    pool: &mut Vec<AvailableMission>,
+    persistent: &DeepPersistent,
+) -> bool {
+    let before = pool.len();
+    let mut seen: Vec<(u32, MissionType)> = Vec::new();
+    pool.retain(|m| {
+        let valid =
+            layer_in_window(m.layer, persistent) && is_valid_construction_mission(m, persistent);
+        if !valid {
+            return false;
+        }
+        let key = (m.layer, m.mission_type);
+        if seen.contains(&key) {
+            return false;
+        }
+        seen.push(key);
+        true
+    });
+    before != pool.len()
+}
+
+fn layer_filler_candidate(
+    layer: u32,
+    persistent: &DeepPersistent,
+    rng: &mut impl Rng,
+) -> AvailableMission {
+    let frontier = persistent.frontier_layer();
+    if layer == frontier && frontier_is_uncleared(persistent, frontier) {
+        return generate_available_mission(MissionType::Breakthrough, layer, persistent, rng);
+    }
+
+    if let Some(construction) = construction_candidate_for_layer(persistent, layer, rng) {
+        return construction;
+    }
+
+    if persistent
+        .layer_record(layer)
+        .map(|r| r.cleared)
+        .unwrap_or(false)
+        && rng.random_bool(0.45)
+    {
+        return generate_available_mission(MissionType::SupplyRun, layer, persistent, rng);
+    }
+
+    if rng.random_bool(0.5) {
+        generate_available_mission(MissionType::Recon, layer, persistent, rng)
+    } else {
+        generate_available_mission(MissionType::Expedition, layer, persistent, rng)
+    }
+}
+
+fn replenish_mission_pool(
+    pool: &mut Vec<AvailableMission>,
+    persistent: &DeepPersistent,
+    count: usize,
+    rng: &mut impl Rng,
+) -> bool {
+    let mut changed = prune_invalid_pool_missions(pool, persistent);
+
+    if !pool_has_role(pool, MissionPoolRole::Progression) {
+        if let Some(candidate) = progression_candidate(persistent, rng) {
+            changed |= push_or_replace_for_role(pool, count, candidate, |m| {
+                mission_pool_role(m.mission_type) != MissionPoolRole::Progression
+            });
+        }
+    }
+
+    if !pool_has_role(pool, MissionPoolRole::Safe) {
+        let candidate = safe_candidate(persistent, rng);
+        changed |= push_or_replace_for_role(pool, count, candidate, |m| {
+            mission_pool_role(m.mission_type) == MissionPoolRole::Mid
+        });
+    }
+
+    if !pool_has_role(pool, MissionPoolRole::Mid) {
+        let candidate = mid_candidate(persistent, rng);
+        changed |= push_or_replace_for_role(pool, count, candidate, |m| {
+            mission_pool_role(m.mission_type) == MissionPoolRole::Safe
+        });
+    }
+
+    let (window_start, frontier) = layer_window(persistent);
+
+    // Always include mission staples on each of the previous two layers:
+    // Supply + Recon + Expedition, plus all unbuilt construction options.
+    if frontier > window_start {
+        for layer in window_start..frontier {
+            changed |= ensure_specific_mission_present(
+                pool,
+                MissionType::SupplyRun,
+                layer,
+                persistent,
+                rng,
+            );
+            changed |=
+                ensure_specific_mission_present(pool, MissionType::Recon, layer, persistent, rng);
+            changed |= ensure_specific_mission_present(
+                pool,
+                MissionType::Expedition,
+                layer,
+                persistent,
+                rng,
+            );
+            for infra in unbuilt_infrastructure_for_layer(persistent, layer) {
+                changed |= ensure_specific_mission_present(
+                    pool,
+                    MissionType::Construction(infra),
+                    layer,
                     persistent,
                     rng,
-                ));
+                );
             }
         }
     }
 
-    pool.truncate(count);
-    pool
+    for layer in window_start..=frontier {
+        if pool.iter().any(|m| m.layer == layer) {
+            continue;
+        }
+        let candidate = layer_filler_candidate(layer, persistent, rng);
+        changed |= push_or_replace_for_layer(pool, count, candidate, layer);
+    }
+
+    while pool.len() < count {
+        if !has_construction_mission(pool) {
+            if let Some(candidate) = construction_candidate(persistent, rng) {
+                pool.push(candidate);
+                changed = true;
+                continue;
+            }
+        }
+
+        let layer = rng.random_range(window_start..=frontier);
+        if !has_type(pool, MissionType::Expedition) {
+            pool.push(generate_available_mission(
+                MissionType::Expedition,
+                layer,
+                persistent,
+                rng,
+            ));
+            changed = true;
+            continue;
+        }
+        if !has_type(pool, MissionType::Recon) {
+            pool.push(generate_available_mission(
+                MissionType::Recon,
+                layer,
+                persistent,
+                rng,
+            ));
+            changed = true;
+            continue;
+        }
+
+        let mut added = false;
+
+        for layer in (window_start..=frontier).rev() {
+            if ensure_specific_mission_present(pool, MissionType::SupplyRun, layer, persistent, rng)
+            {
+                changed = true;
+                added = true;
+                break;
+            }
+        }
+        if added {
+            continue;
+        }
+
+        for layer in (window_start..=frontier).rev() {
+            if ensure_specific_mission_present(pool, MissionType::Recon, layer, persistent, rng) {
+                changed = true;
+                added = true;
+                break;
+            }
+        }
+        if added {
+            continue;
+        }
+
+        for layer in (window_start..=frontier).rev() {
+            if ensure_specific_mission_present(
+                pool,
+                MissionType::Expedition,
+                layer,
+                persistent,
+                rng,
+            ) {
+                changed = true;
+                added = true;
+                break;
+            }
+        }
+
+        // No unique mission remains to add in this layer window.
+        if !added {
+            break;
+        }
+    }
+
+    sort_mission_pool_by_role(pool);
+
+    changed
 }
 
 /// Refresh interval for the mission pool in seconds (6 hours).
@@ -168,13 +550,17 @@ pub const POOL_REFRESH_INTERVAL_SECS: i64 = 6 * 3600;
 
 /// Check whether the mission pool needs refreshing and regenerate it if so.
 ///
-/// The pool refreshes when any of these conditions are true:
+/// The pool fully refreshes when any of these conditions are true:
 /// 1. `available_missions` is empty (player has accepted all missions), OR
 /// 2. `pool_refreshed_at` is `None` (never been explicitly set), OR
 /// 3. At least `POOL_REFRESH_INTERVAL_SECS` (6h) have elapsed since the last refresh.
 ///
-/// Returns `true` if the pool was refreshed (signals the caller to set
-/// `deep_changed` and persist state to disk).
+/// Otherwise, this function performs a rolling rebalance/refill pass that:
+/// - Restores core role coverage (safe + mid + progression where applicable)
+/// - Tops the pool back up to the guild-rank target count
+///
+/// Returns `true` if the pool changed (refreshed, rebalanced, or refilled),
+/// signaling the caller to set `deep_changed` and persist state to disk.
 ///
 /// # Design notes
 /// - `now` is passed explicitly to allow deterministic testing without wall-clock dependency.
@@ -187,18 +573,223 @@ pub fn maybe_refresh_mission_pool(
     now: DateTime<Utc>,
     rng: &mut impl Rng,
 ) -> bool {
+    let target_count = available_mission_count(persistent.guild_rank);
     let pool_empty = prestige.available_missions.is_empty();
     let pool_stale = match prestige.pool_refreshed_at {
         None => true,
         Some(refreshed_at) => (now - refreshed_at).num_seconds() >= POOL_REFRESH_INTERVAL_SECS,
     };
 
-    if pool_empty || pool_stale {
+    let mut changed = if pool_empty || pool_stale {
         prestige.available_missions = generate_mission_pool(persistent, rng);
         prestige.pool_refreshed_at = Some(now);
         true
     } else {
-        false
+        let mut changed = false;
+        if prune_invalid_pool_missions(&mut prestige.available_missions, persistent) {
+            changed = true;
+        }
+        if replenish_mission_pool(
+            &mut prestige.available_missions,
+            persistent,
+            target_count,
+            rng,
+        ) {
+            changed = true;
+        }
+        changed
+    };
+
+    // Softlock guard: if nothing in the pool is affordable, make one Supply Run free.
+    if ensure_emergency_supply_run(prestige, persistent, rng) {
+        changed = true;
+    }
+
+    sort_mission_pool_by_role(&mut prestige.available_missions);
+
+    changed
+}
+
+/// Check whether the recruit pool needs refreshing and regenerate if needed.
+///
+/// This also guarantees an emergency free recruit when the warband has no
+/// deployable mercs and cannot afford any recruit candidate.
+pub fn maybe_refresh_recruit_pool(
+    prestige: &mut DeepPrestige,
+    persistent: &mut DeepPersistent,
+    now: DateTime<Utc>,
+    rng: &mut impl Rng,
+) -> bool {
+    let pool_invalid = prestige.recruit_pool.candidates.is_empty()
+        || prestige.recruit_pool.candidates.len() != prestige.recruit_pool.recruit_costs.len();
+    let pool_stale = prestige.recruit_pool.needs_refresh(now);
+
+    let mut changed = false;
+    if pool_invalid || pool_stale {
+        prestige.recruit_pool =
+            generate_recruit_pool(persistent.guild_rank, || persistent.next_merc_id(), rng);
+        // Preserve deterministic `now` from caller for testability.
+        prestige.recruit_pool.refreshed_at = now;
+        changed = true;
+    }
+
+    if ensure_emergency_recruit(prestige) {
+        changed = true;
+    }
+
+    changed
+}
+
+/// Runtime safeguards against Deep deadlocks.
+///
+/// Runs lightweight checks that ensure the player can always recover:
+/// - refresh/initialize recruit pool
+/// - purge lost mercs after all pending results are acknowledged
+/// - emergency unlock if everyone is injured and no mission can be launched
+pub fn run_softlock_safeguards(
+    prestige: &mut DeepPrestige,
+    persistent: &mut DeepPersistent,
+    now: DateTime<Utc>,
+    rng: &mut impl Rng,
+) -> bool {
+    let mut changed = maybe_refresh_recruit_pool(prestige, persistent, now, rng);
+
+    // Preserve result-modal fidelity while there are uncollected mission results.
+    if prestige.pending_results.is_empty() {
+        if purge_lost_mercs(&mut prestige.roster) > 0 {
+            changed = true;
+        }
+        if ensure_emergency_recovery_merc(prestige) {
+            changed = true;
+        }
+    }
+
+    changed
+}
+
+/// Ensure there is a no-cost recovery path when the mission pool is unaffordable.
+///
+/// If the player cannot afford any currently-available mission, this converts one
+/// Supply Run in the pool to cost 0 so progress cannot deadlock at 0 Marks.
+fn ensure_emergency_supply_run(
+    prestige: &mut DeepPrestige,
+    persistent: &DeepPersistent,
+    rng: &mut impl Rng,
+) -> bool {
+    if prestige
+        .available_missions
+        .iter()
+        .any(|m| m.marks_cost <= prestige.warband_marks)
+    {
+        return false;
+    }
+
+    if let Some(supply) = prestige
+        .available_missions
+        .iter_mut()
+        .find(|m| m.mission_type == MissionType::SupplyRun && m.marks_cost > 0)
+    {
+        supply.marks_cost = 0;
+        // Free recovery runs should be a slower fallback, not the optimal farm route.
+        supply.duration_secs = supply
+            .duration_secs
+            .max(minimum_mission_duration_secs_for_layer(supply.layer))
+            .max(FREE_SUPPLY_RUN_MIN_DURATION_SECS);
+        return true;
+    }
+
+    // If no Supply Run exists, replace the most expensive mission with one so the
+    // player always has a guaranteed zero-cost path.
+    let mut fallback = generate_available_mission(
+        MissionType::SupplyRun,
+        supply_mission_layer(persistent),
+        persistent,
+        rng,
+    );
+    fallback.marks_cost = 0;
+    fallback.duration_secs = fallback
+        .duration_secs
+        .max(minimum_mission_duration_secs_for_layer(fallback.layer))
+        .max(FREE_SUPPLY_RUN_MIN_DURATION_SECS);
+
+    if let Some((idx, _)) = prestige
+        .available_missions
+        .iter()
+        .enumerate()
+        .max_by_key(|(_, m)| m.marks_cost)
+    {
+        prestige.available_missions[idx] = fallback;
+    } else {
+        prestige.available_missions.push(fallback);
+    }
+    true
+}
+
+/// Ensure at least one recruit is affordable when no deployable mercs remain.
+fn ensure_emergency_recruit(prestige: &mut DeepPrestige) -> bool {
+    if !prestige.active_missions.is_empty() || prestige.available_merc_count() > 0 {
+        return false;
+    }
+    if prestige.recruit_pool.candidates.is_empty()
+        || prestige.recruit_pool.candidates.len() != prestige.recruit_pool.recruit_costs.len()
+    {
+        return false;
+    }
+    if prestige
+        .recruit_pool
+        .recruit_costs
+        .iter()
+        .any(|&cost| cost <= prestige.warband_marks)
+    {
+        return false;
+    }
+
+    if let Some((idx, _)) = prestige
+        .recruit_pool
+        .recruit_costs
+        .iter()
+        .enumerate()
+        .min_by_key(|(_, cost)| **cost)
+    {
+        if prestige.recruit_pool.recruit_costs[idx] > 0 {
+            prestige.recruit_pool.recruit_costs[idx] = 0;
+            return true;
+        }
+    }
+    false
+}
+
+/// Emergency fallback when all mercs are injured and no mission can run.
+///
+/// Promotes one least-injured merc to available so the warband cannot deadlock.
+fn ensure_emergency_recovery_merc(prestige: &mut DeepPrestige) -> bool {
+    if !prestige.active_missions.is_empty() || prestige.available_merc_count() > 0 {
+        return false;
+    }
+
+    let Some((idx, _)) = prestige
+        .roster
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, merc)| match merc.status {
+            MercStatus::Injured { missions_remaining } => Some((idx, missions_remaining)),
+            _ => None,
+        })
+        .min_by_key(|(_, missions_remaining)| *missions_remaining)
+    else {
+        return false;
+    };
+
+    prestige.roster[idx].status = MercStatus::Available;
+    true
+}
+
+/// Progress injury recovery counters once per completed mission globally.
+fn progress_injuries_after_completions(prestige: &mut DeepPrestige, completed_count: usize) {
+    for _ in 0..completed_count {
+        for merc in &mut prestige.roster {
+            let _ = tick_merc_injury(merc);
+        }
     }
 }
 
@@ -234,7 +825,8 @@ fn generate_available_mission(
         bridge_layers,
     };
     let base = base_mission_duration_secs(tier, mission_type);
-    let duration_secs = apply_duration_modifiers(base, &mods);
+    let duration_secs =
+        apply_duration_modifiers(base, &mods).max(minimum_mission_duration_secs_for_layer(layer));
 
     let min_power = mission_power_threshold(layer, mission_type);
     let marks_cost = mission_launch_cost(mission_type, layer);
@@ -491,7 +1083,14 @@ pub fn start_mission(
         is_overpowered,
         bridge_layers,
     };
-    let duration_secs = apply_duration_modifiers(base_duration, &mods);
+    let mut duration_secs = apply_duration_modifiers(base_duration, &mods)
+        .max(minimum_mission_duration_secs_for_layer(available.layer));
+    if matches!(available.mission_type, MissionType::SupplyRun)
+        && (is_free_daily_supply_run || available.marks_cost == 0)
+    {
+        // Any free Supply Run is intentionally slower than paid runs.
+        duration_secs = duration_secs.max(FREE_SUPPLY_RUN_MIN_DURATION_SECS);
+    }
 
     let ends_at = now + Duration::seconds(duration_secs as i64);
 
@@ -666,6 +1265,8 @@ pub fn tick_all_missions(
         }
     }
 
+    progress_injuries_after_completions(prestige, summary.missions_completed);
+
     summary
 }
 
@@ -837,35 +1438,12 @@ pub fn resolve_mission(
         rng_variance,
     });
 
-    let xp = xp_reward(mission.mission_type, mission.layer, outcome.clone());
-    let stormglass = stormglass_reward(mission.mission_type, mission.layer);
-    let stormglass_scaled = match outcome {
-        MissionOutcome::Success => stormglass,
-        MissionOutcome::PartialSuccess => stormglass / 2,
-        MissionOutcome::Failure => 0,
-    };
-
     // Determine injuries and losses based on outcome.
     let (injured_mercs, lost_mercs) =
         apply_mission_casualties(mission, prestige, persistent, &outcome, rng);
 
-    // Compute power ratio for danger bonus check.
-    let threshold = mission_power_threshold(mission.layer, mission.mission_type);
-    let total_power: u32 = mission
-        .squad
-        .iter()
-        .filter_map(|&id| prestige.find_merc(id))
-        .map(|m| m.effective_power())
-        .sum();
-    let power_ratio = if threshold == 0 {
-        2.0f64
-    } else {
-        total_power as f64 / threshold as f64
-    };
-    let danger_bonus = power_ratio < 1.0;
-
-    // Apply merc XP and level-ups (with danger bonus if underpowered).
-    let merc_level_ups = apply_squad_xp(mission, prestige, &outcome, danger_bonus);
+    // Apply merc progression and level-ups from mission completion count.
+    let merc_level_ups = apply_squad_progression(mission, prestige);
 
     // Update layer familiarity.
     if let Some(record) = persistent
@@ -887,6 +1465,14 @@ pub fn resolve_mission(
         mark_layer_cleared(persistent, mission.layer);
     }
 
+    // Successful Construction missions permanently add infrastructure to the target layer.
+    if matches!(outcome, MissionOutcome::Success) {
+        if let MissionType::Construction(infra) = mission.mission_type {
+            let record = persistent.layer_record_mut(mission.layer);
+            let _ = build_infrastructure(record, infra);
+        }
+    }
+
     // Gateway Expedition success opens the sealed gateway.
     if matches!(mission.mission_type, MissionType::GatewayExpedition)
         && matches!(outcome, MissionOutcome::Success)
@@ -905,13 +1491,15 @@ pub fn resolve_mission(
     mission.result = Some(MissionResult {
         outcome,
         marks_earned,
-        xp_earned: xp,
-        stormglass_earned: stormglass_scaled,
-        item_ilvl: item_ilvl_for_mission(mission),
+        // Player XP from missions is disabled; merc progression is handled above via
+        // `apply_squad_progression` (missions_completed + level-up milestones).
+        xp_earned: 0,
+        stormglass_earned: 0,
+        item_ilvl: None,
         injured_mercs,
         lost_mercs,
         merc_level_ups,
-        danger_bonus_xp: danger_bonus,
+        danger_bonus_xp: false,
     });
 
     // Append to the warband log (keep last 10 entries).
@@ -1098,22 +1686,10 @@ fn release_squad_from_mission(mission: &Mission, prestige: &mut DeepPrestige) {
     }
 }
 
-/// Apply XP to squad members and compute level-ups.
+/// Apply mission-count progression to squad members and compute level-ups.
 ///
 /// Returns a list of (merc_id, levels_gained) for the notification display.
-/// When `danger_bonus` is true (squad underpowered, power_ratio < 1.0), merc XP
-/// is multiplied by 1.5x as a reward for the risky rush.
-fn apply_squad_xp(
-    mission: &Mission,
-    prestige: &mut DeepPrestige,
-    outcome: &MissionOutcome,
-    danger_bonus: bool,
-) -> Vec<(u64, u32)> {
-    let base_xp = merc_xp_per_mission(mission.mission_type, mission.layer);
-    let danger_mult = if danger_bonus { 1.5 } else { 1.0 };
-    let xp =
-        (base_xp as f64 * outcome_mark_multiplier(outcome.clone()) * danger_mult).round() as u32;
-
+fn apply_squad_progression(mission: &Mission, prestige: &mut DeepPrestige) -> Vec<(u64, u32)> {
     let mut level_ups = Vec::new();
 
     for &id in &mission.squad {
@@ -1129,7 +1705,6 @@ fn apply_squad_xp(
         merc.missions_completed += 1;
 
         let mut levels_gained = 0u32;
-        let _ = merc_xp_to_next_level(merc.level); // for future XP-based leveling
 
         // Level-up check: use missions_completed as proxy for accumulated XP.
         // Each `missions_to_next_level(level)` completed missions earns one level.
@@ -1138,7 +1713,6 @@ fn apply_squad_xp(
             merc.level += 1;
             levels_gained += 1;
         }
-        let _ = xp; // xp tracked per-merc for future granular system
 
         if levels_gained > 0 {
             level_ups.push((id, levels_gained));
@@ -1220,6 +1794,8 @@ pub fn resolve_offline_missions(
             prestige.pending_results.push(mission);
         }
     }
+
+    progress_injuries_after_completions(prestige, summary.missions_resolved);
 
     summary
 }
@@ -1320,22 +1896,30 @@ mod tests {
 
     #[test]
     fn test_available_mission_count_by_rank() {
-        assert_eq!(available_mission_count(GuildRank(1)), 3);
-        assert_eq!(available_mission_count(GuildRank(2)), 3);
-        assert_eq!(available_mission_count(GuildRank(3)), 4);
-        assert_eq!(available_mission_count(GuildRank(4)), 4);
-        assert_eq!(available_mission_count(GuildRank(5)), 5);
+        assert_eq!(available_mission_count(GuildRank(1)), 5);
+        assert_eq!(available_mission_count(GuildRank(2)), 5);
+        assert_eq!(available_mission_count(GuildRank(3)), 6);
+        assert_eq!(available_mission_count(GuildRank(4)), 6);
+        assert_eq!(available_mission_count(GuildRank(5)), 7);
     }
 
     // ── generate_mission_pool ─────────────────────────────────────────────────
 
     #[test]
-    fn test_generate_mission_pool_returns_correct_count() {
+    fn test_generate_mission_pool_respects_unique_mission_constraints() {
         let mut rng = seeded_rng();
         let persistent = DeepPersistent::new();
         let pool = generate_mission_pool(&persistent, &mut rng);
-        let expected = available_mission_count(persistent.guild_rank);
-        assert_eq!(pool.len(), expected);
+
+        // At initial frontier (layer 1), valid unique missions are:
+        // Supply Run, Recon, Expedition, Breakthrough.
+        // Construction is unavailable until a layer is cleared.
+        let expected_min = 4usize;
+        assert!(
+            pool.len() >= expected_min,
+            "Pool should provide at least {} unique valid missions at initial frontier",
+            expected_min
+        );
     }
 
     #[test]
@@ -1361,6 +1945,548 @@ mod tests {
                 "Every mission must have positive duration"
             );
         }
+    }
+
+    #[test]
+    fn test_generate_mission_pool_respects_layer_based_minimum_duration() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        // Frontier at layer 5 to cover multiple layers in the mission window.
+        for layer in 1..=5 {
+            let record = persistent.layer_record_mut(layer);
+            record.cleared = layer < 5;
+            if layer >= 3 {
+                // Apply strong duration reducers so the floor is exercised.
+                record.familiarity = 100;
+                record.infrastructure.push(Infrastructure::Outpost);
+            }
+        }
+
+        let pool = generate_mission_pool(&persistent, &mut rng);
+        for mission in &pool {
+            let minimum = minimum_mission_duration_secs_for_layer(mission.layer);
+            assert!(
+                mission.duration_secs >= minimum,
+                "Mission {:?} on layer {} should be at least {}s, got {}s",
+                mission.mission_type,
+                mission.layer,
+                minimum,
+                mission.duration_secs
+            );
+        }
+    }
+
+    #[test]
+    fn test_generate_mission_pool_stays_within_frontier_window() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        // Frontier is 5, mission window should be 3..=5.
+        for layer in 1..=5 {
+            let record = persistent.layer_record_mut(layer);
+            record.cleared = layer < 5;
+        }
+
+        let pool = generate_mission_pool(&persistent, &mut rng);
+        assert!(
+            pool.iter().all(|m| (3..=5).contains(&m.layer)),
+            "Mission pool should only include frontier and up to 2 prior layers"
+        );
+    }
+
+    #[test]
+    fn test_generate_mission_pool_covers_each_layer_in_window() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        for layer in 1..=5 {
+            let record = persistent.layer_record_mut(layer);
+            record.cleared = layer < 5;
+        }
+
+        let pool = generate_mission_pool(&persistent, &mut rng);
+        for layer in 3..=5 {
+            assert!(
+                pool.iter().any(|m| m.layer == layer),
+                "Expected at least one mission for layer {} in current window",
+                layer
+            );
+        }
+    }
+
+    #[test]
+    fn test_generate_mission_pool_always_includes_prev_layer_core_missions_and_unbuilt_construction(
+    ) {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        // Frontier is 5, previous layers are 3 and 4.
+        for layer in 1..=5 {
+            let record = persistent.layer_record_mut(layer);
+            record.cleared = layer < 5;
+        }
+        // Layer 3 already has Outpost built; other infra should appear as construction missions.
+        persistent
+            .layer_record_mut(3)
+            .infrastructure
+            .push(Infrastructure::Outpost);
+
+        let pool = generate_mission_pool(&persistent, &mut rng);
+        for layer in [3u32, 4u32] {
+            assert!(
+                pool.iter()
+                    .any(|m| m.layer == layer && m.mission_type == MissionType::SupplyRun),
+                "Layer {} should always include a Supply Run",
+                layer
+            );
+            assert!(
+                pool.iter()
+                    .any(|m| m.layer == layer && m.mission_type == MissionType::Recon),
+                "Layer {} should always include a Recon mission",
+                layer
+            );
+            assert!(
+                pool.iter()
+                    .any(|m| m.layer == layer && m.mission_type == MissionType::Expedition),
+                "Layer {} should always include an Expedition mission",
+                layer
+            );
+
+            let built = persistent
+                .layer_record(layer)
+                .map(|r| r.infrastructure.clone())
+                .unwrap_or_default();
+            for &infra in Infrastructure::ALL {
+                let expected = !built.contains(&infra);
+                let present = pool.iter().any(|m| {
+                    m.layer == layer && m.mission_type == MissionType::Construction(infra)
+                });
+                assert_eq!(
+                    present, expected,
+                    "Layer {} construction mission for {:?} should match unbuilt state",
+                    layer, infra
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_generate_mission_pool_has_no_duplicate_layer_type_pairs() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        for layer in 1..=5 {
+            let record = persistent.layer_record_mut(layer);
+            record.cleared = layer < 5;
+        }
+
+        let pool = generate_mission_pool(&persistent, &mut rng);
+        let mut seen: Vec<(u32, MissionType)> = Vec::new();
+        for mission in pool {
+            let key = (mission.layer, mission.mission_type);
+            assert!(
+                !seen.contains(&key),
+                "Duplicate mission entry for layer {} and {:?}",
+                mission.layer,
+                mission.mission_type
+            );
+            seen.push(key);
+        }
+    }
+
+    #[test]
+    fn test_generate_mission_pool_rank1_includes_breakthrough() {
+        let mut rng = seeded_rng();
+        let persistent = DeepPersistent::new();
+        let pool = generate_mission_pool(&persistent, &mut rng);
+        assert!(
+            pool.iter()
+                .any(|m| matches!(m.mission_type, MissionType::Breakthrough)),
+            "Frontier Breakthrough should always appear when frontier is uncleared"
+        );
+    }
+
+    #[test]
+    fn test_generate_mission_pool_includes_construction_when_layer_cleared() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        persistent.layer_record_mut(1).cleared = true;
+        persistent.deepest_layer_reached = 1;
+
+        let pool = generate_mission_pool(&persistent, &mut rng);
+        assert!(
+            pool.iter()
+                .any(|m| matches!(m.mission_type, MissionType::Construction(_))),
+            "Construction should appear when a cleared layer has buildable infrastructure"
+        );
+    }
+
+    #[test]
+    fn test_generate_mission_pool_includes_all_core_roles() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        persistent.layer_record_mut(1).cleared = true;
+        persistent.deepest_layer_reached = 1;
+
+        let pool = generate_mission_pool(&persistent, &mut rng);
+        assert!(
+            pool.iter().any(|m| {
+                matches!(
+                    m.mission_type,
+                    MissionType::SupplyRun | MissionType::Construction(_)
+                )
+            }),
+            "Pool should include at least one safe mission"
+        );
+        assert!(
+            pool.iter()
+                .any(|m| matches!(m.mission_type, MissionType::Recon | MissionType::Expedition)),
+            "Pool should include at least one mid-risk mission"
+        );
+        assert!(
+            pool.iter()
+                .any(|m| matches!(m.mission_type, MissionType::Breakthrough)),
+            "Pool should include a progression breakthrough mission"
+        );
+    }
+
+    #[test]
+    fn test_maybe_refresh_replenishes_missing_roles_without_stale_timer() {
+        let mut rng = seeded_rng();
+        let now = Utc::now();
+        let mut persistent = DeepPersistent::new();
+        persistent.layer_record_mut(1).cleared = true;
+        persistent.deepest_layer_reached = 1;
+
+        let mut prestige = DeepPrestige::new();
+        prestige.available_missions = vec![make_available_mission(MissionType::Breakthrough, 2)];
+        prestige.pool_refreshed_at = Some(now - Duration::hours(1)); // fresh (not stale)
+
+        let changed = maybe_refresh_mission_pool(&mut prestige, &persistent, now, &mut rng);
+
+        assert!(
+            changed,
+            "Fresh pool should still rebalance when roles are missing"
+        );
+        assert!(
+            prestige.available_missions.len() >= available_mission_count(persistent.guild_rank),
+            "Rebalanced pool should meet at least the baseline target count"
+        );
+        assert!(
+            prestige.available_missions.iter().any(|m| {
+                matches!(
+                    m.mission_type,
+                    MissionType::SupplyRun | MissionType::Construction(_)
+                )
+            }),
+            "Rebalanced pool should include a safe mission"
+        );
+        assert!(
+            prestige
+                .available_missions
+                .iter()
+                .any(|m| matches!(m.mission_type, MissionType::Recon | MissionType::Expedition)),
+            "Rebalanced pool should include a mid-risk mission"
+        );
+        assert!(
+            prestige
+                .available_missions
+                .iter()
+                .any(|m| matches!(m.mission_type, MissionType::Breakthrough)),
+            "Rebalanced pool should keep a progression breakthrough mission"
+        );
+    }
+
+    #[test]
+    fn test_maybe_refresh_adds_emergency_free_supply_when_pool_unaffordable() {
+        let mut rng = seeded_rng();
+        let now = Utc::now();
+        let persistent = DeepPersistent::new();
+
+        let mut prestige = DeepPrestige::new();
+        prestige.warband_marks = 0;
+        prestige.pool_refreshed_at = Some(now - Duration::hours(1)); // fresh
+        prestige.available_missions = vec![
+            AvailableMission {
+                mission_type: MissionType::SupplyRun,
+                layer: 1,
+                duration_secs: 1800,
+                min_squad_power: 0,
+                required_archetype: None,
+                recommended_archetype: None,
+                marks_cost: 20,
+                description: "Supply".to_string(),
+            },
+            AvailableMission {
+                mission_type: MissionType::Recon,
+                layer: 1,
+                duration_secs: 3600,
+                min_squad_power: 10,
+                required_archetype: None,
+                recommended_archetype: None,
+                marks_cost: 40,
+                description: "Recon".to_string(),
+            },
+            AvailableMission {
+                mission_type: MissionType::Breakthrough,
+                layer: 1,
+                duration_secs: 14400,
+                min_squad_power: 25,
+                required_archetype: None,
+                recommended_archetype: None,
+                marks_cost: 70,
+                description: "Breakthrough".to_string(),
+            },
+        ];
+
+        let changed = maybe_refresh_mission_pool(&mut prestige, &persistent, now, &mut rng);
+        assert!(
+            changed,
+            "Pool should change to inject emergency free Supply Run"
+        );
+        assert!(
+            prestige
+                .available_missions
+                .iter()
+                .any(|m| { m.mission_type == MissionType::SupplyRun && m.marks_cost == 0 }),
+            "Supply Run should be free when no missions are affordable"
+        );
+        let fallback = prestige
+            .available_missions
+            .iter()
+            .find(|m| m.mission_type == MissionType::SupplyRun && m.marks_cost == 0)
+            .expect("Expected emergency free Supply Run");
+        assert!(
+            fallback.duration_secs >= FREE_SUPPLY_RUN_MIN_DURATION_SECS,
+            "Emergency free Supply Run should be slower fallback pacing"
+        );
+    }
+
+    #[test]
+    fn test_maybe_refresh_adds_supply_fallback_when_no_supply_exists() {
+        let mut rng = seeded_rng();
+        let now = Utc::now();
+        let mut persistent = DeepPersistent::new();
+        let _ = persistent.layer_record_mut(1);
+
+        let mut prestige = DeepPrestige::new();
+        prestige.warband_marks = 0;
+        prestige.pool_refreshed_at = Some(now - Duration::hours(1)); // fresh
+        prestige.available_missions = vec![
+            AvailableMission {
+                mission_type: MissionType::Construction(Infrastructure::Outpost),
+                layer: 1,
+                duration_secs: 3600,
+                min_squad_power: 0,
+                required_archetype: None,
+                recommended_archetype: None,
+                marks_cost: 25,
+                description: "Build".to_string(),
+            },
+            AvailableMission {
+                mission_type: MissionType::Recon,
+                layer: 1,
+                duration_secs: 3600,
+                min_squad_power: 10,
+                required_archetype: None,
+                recommended_archetype: None,
+                marks_cost: 30,
+                description: "Recon".to_string(),
+            },
+            AvailableMission {
+                mission_type: MissionType::Expedition,
+                layer: 1,
+                duration_secs: 7200,
+                min_squad_power: 15,
+                required_archetype: None,
+                recommended_archetype: None,
+                marks_cost: 45,
+                description: "Expedition".to_string(),
+            },
+            AvailableMission {
+                mission_type: MissionType::Breakthrough,
+                layer: 1,
+                duration_secs: 14400,
+                min_squad_power: 25,
+                required_archetype: None,
+                recommended_archetype: None,
+                marks_cost: 70,
+                description: "Breakthrough".to_string(),
+            },
+            AvailableMission {
+                mission_type: MissionType::Recon,
+                layer: 1,
+                duration_secs: 3600,
+                min_squad_power: 10,
+                required_archetype: None,
+                recommended_archetype: None,
+                marks_cost: 35,
+                description: "Recon 2".to_string(),
+            },
+        ];
+
+        let changed = maybe_refresh_mission_pool(&mut prestige, &persistent, now, &mut rng);
+        assert!(changed, "Pool should inject a free Supply fallback");
+        let fallback = prestige
+            .available_missions
+            .iter()
+            .find(|m| m.mission_type == MissionType::SupplyRun && m.marks_cost == 0)
+            .expect("Expected emergency Supply Run fallback");
+        assert!(
+            fallback.duration_secs >= FREE_SUPPLY_RUN_MIN_DURATION_SECS,
+            "Fallback Supply Run should use slower emergency pacing"
+        );
+    }
+
+    #[test]
+    fn test_maybe_refresh_prunes_stale_construction_for_built_infra() {
+        let mut rng = seeded_rng();
+        let now = Utc::now();
+        let mut persistent = DeepPersistent::new();
+        let record = persistent.layer_record_mut(1);
+        record.cleared = true;
+        record.infrastructure.push(Infrastructure::Outpost);
+
+        let mut prestige = DeepPrestige::new();
+        prestige.warband_marks = 200;
+        prestige.pool_refreshed_at = Some(now - Duration::hours(1)); // fresh
+        prestige.available_missions = vec![AvailableMission {
+            mission_type: MissionType::Construction(Infrastructure::Outpost),
+            layer: 1,
+            duration_secs: 3600,
+            min_squad_power: 0,
+            required_archetype: None,
+            recommended_archetype: None,
+            marks_cost: 40,
+            description: "Stale build".to_string(),
+        }];
+
+        let _ = maybe_refresh_mission_pool(&mut prestige, &persistent, now, &mut rng);
+        assert!(
+            !prestige.available_missions.iter().any(|m| {
+                m.mission_type == MissionType::Construction(Infrastructure::Outpost) && m.layer == 1
+            }),
+            "Should not keep construction missions for infrastructure already built on that layer"
+        );
+    }
+
+    #[test]
+    fn test_maybe_refresh_recruit_pool_initializes_empty_pool() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        let now = Utc::now();
+        let mut prestige = DeepPrestige::new();
+
+        assert!(prestige.recruit_pool.candidates.is_empty());
+        let changed = maybe_refresh_recruit_pool(&mut prestige, &mut persistent, now, &mut rng);
+        assert!(changed, "Empty recruit pool should be initialized");
+        assert!(
+            !prestige.recruit_pool.candidates.is_empty(),
+            "Recruit pool should contain candidates after refresh"
+        );
+        assert_eq!(
+            prestige.recruit_pool.candidates.len(),
+            prestige.recruit_pool.recruit_costs.len(),
+            "Recruit pool candidates and costs should stay index-aligned"
+        );
+    }
+
+    #[test]
+    fn test_maybe_refresh_recruit_pool_adds_emergency_free_candidate() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        let now = Utc::now();
+        let mut prestige = DeepPrestige::new();
+        prestige.warband_marks = 0;
+        prestige.recruit_pool.refreshed_at = now;
+        prestige.recruit_pool.candidates = vec![
+            make_merc(100, MercArchetype::Vanguard, 20),
+            make_merc(101, MercArchetype::Scout, 20),
+        ];
+        prestige.recruit_pool.recruit_costs = vec![20, 35];
+        prestige.roster.clear(); // no deployable mercs
+
+        let changed = maybe_refresh_recruit_pool(&mut prestige, &mut persistent, now, &mut rng);
+        assert!(
+            changed,
+            "Should add an emergency free recruit when nobody is deployable"
+        );
+        assert!(
+            prestige.recruit_pool.recruit_costs.contains(&0),
+            "One recruit should become free in emergency state"
+        );
+    }
+
+    #[test]
+    fn test_run_softlock_safeguards_purges_lost_after_results_acknowledged() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        let now = Utc::now();
+        let mut prestige = DeepPrestige::new();
+        let mut lost = make_merc(7, MercArchetype::Vanguard, 30);
+        lost.status = MercStatus::Lost;
+        prestige.roster.push(lost);
+
+        let changed = run_softlock_safeguards(&mut prestige, &mut persistent, now, &mut rng);
+        assert!(changed);
+        assert!(
+            prestige.roster.is_empty(),
+            "Lost mercs should be purged once there are no pending results"
+        );
+    }
+
+    #[test]
+    fn test_run_softlock_safeguards_keeps_lost_while_results_pending() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        let now = Utc::now();
+        let mut prestige = DeepPrestige::new();
+        let mut lost = make_merc(7, MercArchetype::Vanguard, 30);
+        lost.status = MercStatus::Lost;
+        prestige.roster.push(lost);
+
+        prestige.pending_results.push(Mission {
+            id: 99,
+            mission_type: MissionType::SupplyRun,
+            layer: 1,
+            squad: vec![],
+            started_at: now - Duration::hours(1),
+            ends_at: now,
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Completed,
+            result: None,
+            is_first_orders: false,
+        });
+
+        let _ = run_softlock_safeguards(&mut prestige, &mut persistent, now, &mut rng);
+        assert_eq!(
+            prestige.roster.len(),
+            1,
+            "Lost merc should remain for result UI"
+        );
+        assert!(matches!(prestige.roster[0].status, MercStatus::Lost));
+    }
+
+    #[test]
+    fn test_run_softlock_safeguards_recovers_one_merc_when_all_injured() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        let now = Utc::now();
+        let mut prestige = DeepPrestige::new();
+
+        let mut m1 = make_merc(1, MercArchetype::Vanguard, 30);
+        m1.status = MercStatus::Injured {
+            missions_remaining: 2,
+        };
+        let mut m2 = make_merc(2, MercArchetype::Scout, 28);
+        m2.status = MercStatus::Injured {
+            missions_remaining: 1,
+        };
+        prestige.roster = vec![m1, m2];
+
+        let changed = run_softlock_safeguards(&mut prestige, &mut persistent, now, &mut rng);
+        assert!(changed);
+        assert!(
+            prestige.available_merc_count() >= 1,
+            "Emergency safeguard should guarantee one deployable merc"
+        );
     }
 
     // ── validate_squad_assignment ─────────────────────────────────────────────
@@ -1609,12 +2735,75 @@ mod tests {
 
         assert_eq!(mission.started_at, now);
         assert!(mission.ends_at > now, "ends_at must be after started_at");
-        // Supply run on Shallows: base 600s (10min). With overpowered modifier
-        // (-10%), can be as low as 540s. Allow up to 2h for higher-tier supply runs.
+        // Free Supply Runs are intentionally slowed to prevent free-loop farming.
         let duration = (mission.ends_at - mission.started_at).num_seconds();
         assert!(
-            (540..=2 * 3600 + 60).contains(&duration),
-            "Duration {} seconds out of expected range",
+            duration >= FREE_SUPPLY_RUN_MIN_DURATION_SECS as i64,
+            "Duration {} seconds should be at least free-run minimum",
+            duration
+        );
+    }
+
+    #[test]
+    fn test_start_mission_zero_cost_supply_run_is_slow_even_without_daily_flag() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        let _ = persistent.layer_record_mut(1);
+        let merc = make_merc(1, MercArchetype::Scout, 30);
+        let mut prestige = make_prestige_with_mercs(vec![merc]);
+
+        let mut available = make_available_mission(MissionType::SupplyRun, 1);
+        available.marks_cost = 0;
+        let now = Utc::now();
+
+        let mission = start_mission(
+            &available,
+            &[1],
+            &mut prestige,
+            &mut persistent,
+            false,
+            now,
+            &mut rng,
+        );
+
+        let duration = (mission.ends_at - mission.started_at).num_seconds();
+        assert!(
+            duration >= FREE_SUPPLY_RUN_MIN_DURATION_SECS as i64,
+            "Zero-cost Supply Run should be slow even when not daily-free"
+        );
+    }
+
+    #[test]
+    fn test_start_mission_respects_layer_minimum_duration_floor() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        let record = persistent.layer_record_mut(1);
+        record.familiarity = 100;
+        record.infrastructure.push(Infrastructure::Outpost);
+
+        let mut saboteur = make_merc(1, MercArchetype::Saboteur, 1000);
+        saboteur.level = 10; // veteran saboteur for max saboteur reduction
+        let mut prestige = make_prestige_with_mercs(vec![saboteur]);
+        prestige.warband_marks = 200;
+
+        let mut available = make_available_mission(MissionType::SupplyRun, 1);
+        available.marks_cost = 1; // paid run (free-run floor is tested elsewhere)
+        let now = Utc::now();
+
+        let mission = start_mission(
+            &available,
+            &[1],
+            &mut prestige,
+            &mut persistent,
+            false,
+            now,
+            &mut rng,
+        );
+
+        let duration = (mission.ends_at - mission.started_at).num_seconds() as u64;
+        assert!(
+            duration >= minimum_mission_duration_secs_for_layer(1),
+            "Duration {}s should respect layer-based minimum floor",
             duration
         );
     }
@@ -1830,6 +3019,50 @@ mod tests {
             *merc_status,
             MercStatus::Available,
             "Merc should be available after safe mission"
+        );
+    }
+
+    #[test]
+    fn test_tick_all_missions_progresses_injury_counters() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        let _ = persistent.layer_record_mut(1);
+
+        let mut injured = make_merc(1, MercArchetype::Vanguard, 30);
+        injured.status = MercStatus::Injured {
+            missions_remaining: 2,
+        };
+        let runner = make_merc(2, MercArchetype::Scout, 24);
+        let mut prestige = make_prestige_with_mercs(vec![injured, runner]);
+        if let Some(merc) = prestige.find_merc_mut(2) {
+            merc.status = MercStatus::OnMission(42);
+        }
+
+        let now = Utc::now();
+        prestige.active_missions.push(Mission {
+            id: 42,
+            mission_type: MissionType::SupplyRun,
+            layer: 1,
+            squad: vec![2],
+            started_at: now - Duration::hours(3),
+            ends_at: now - Duration::minutes(1),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        });
+
+        let summary = tick_all_missions(&mut prestige, &mut persistent, now, &mut rng);
+        assert_eq!(summary.missions_completed, 1);
+        assert!(
+            matches!(
+                prestige.find_merc(1).map(|m| &m.status),
+                Some(&MercStatus::Injured {
+                    missions_remaining: 1
+                })
+            ),
+            "One completed mission should decrement injury countdown"
         );
     }
 

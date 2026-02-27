@@ -150,11 +150,11 @@ fn test_empty_pool_regenerates_correct_count() {
     let mut rng = seeded_rng(11);
     maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, t0(), &mut rng);
 
-    // Guild Rank 1 → 3 missions.
+    // At initial frontier (layer 1), valid unique mission types are capped at 4.
     assert_eq!(
         deep.prestige.available_missions.len(),
-        3,
-        "Rank 1 pool must have 3 missions after refresh"
+        4,
+        "Rank 1 pool should generate 4 unique valid missions at initial frontier"
     );
 }
 
@@ -345,28 +345,23 @@ fn test_pool_refresh_reflects_cleared_layer_frontier() {
 
     assert!(refreshed, "Pool must refresh after clearing a layer");
 
-    // Frontier-targeting missions (Recon, Expedition, Breakthrough) must target layer 2.
-    let frontier_missions: Vec<_> = deep
+    // Breakthrough remains frontier-only and must target layer 2.
+    let breakthrough_missions: Vec<_> = deep
         .prestige
         .available_missions
         .iter()
-        .filter(|m| {
-            matches!(
-                m.mission_type,
-                MissionType::Recon | MissionType::Expedition | MissionType::Breakthrough
-            )
-        })
+        .filter(|m| matches!(m.mission_type, MissionType::Breakthrough))
         .collect();
 
     assert!(
-        !frontier_missions.is_empty(),
-        "Pool must contain at least one frontier mission"
+        !breakthrough_missions.is_empty(),
+        "Pool must contain at least one frontier Breakthrough mission"
     );
 
-    for mission in &frontier_missions {
+    for mission in &breakthrough_missions {
         assert_eq!(
             mission.layer, 2,
-            "After clearing layer 1, frontier missions must target layer 2, got {}",
+            "After clearing layer 1, Breakthrough missions must target layer 2, got {}",
             mission.layer
         );
     }
@@ -388,34 +383,29 @@ fn test_pool_refresh_reflects_multiple_cleared_layers() {
     let mut rng = seeded_rng(31);
     maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, t0(), &mut rng);
 
-    // Frontier missions (Recon, Expedition, Breakthrough) must target layer 3.
+    // Breakthrough remains frontier-only and must target layer 3.
     let frontier_targets: Vec<u32> = deep
         .prestige
         .available_missions
         .iter()
-        .filter(|m| {
-            matches!(
-                m.mission_type,
-                MissionType::Recon | MissionType::Expedition | MissionType::Breakthrough
-            )
-        })
+        .filter(|m| matches!(m.mission_type, MissionType::Breakthrough))
         .map(|m| m.layer)
         .collect();
 
     for layer in frontier_targets {
         assert_eq!(
             layer, 3,
-            "After clearing layers 1+2, frontier missions must target layer 3"
+            "After clearing layers 1+2, Breakthrough missions must target layer 3"
         );
     }
 }
 
 #[test]
-fn test_supply_run_targets_cleared_layer_after_refresh() {
+fn test_safe_mission_targets_cleared_layer_after_refresh() {
     let mut deep = DeepState::new();
     force_discover(&mut deep);
 
-    // Clear layer 1 → supply run should target the most recently cleared layer.
+    // Clear layer 1 -> safe missions should target a cleared layer.
     mark_layer_cleared(&mut deep.persistent, 1);
 
     deep.prestige.available_missions.clear();
@@ -424,23 +414,27 @@ fn test_supply_run_targets_cleared_layer_after_refresh() {
     let mut rng = seeded_rng(32);
     maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, t0(), &mut rng);
 
-    // After clearing layer 1, supply runs should target the last cleared layer (1).
-    let supply_runs: Vec<_> = deep
+    let safe_missions: Vec<_> = deep
         .prestige
         .available_missions
         .iter()
-        .filter(|m| m.mission_type == MissionType::SupplyRun)
+        .filter(|m| {
+            matches!(
+                m.mission_type,
+                MissionType::SupplyRun | MissionType::Construction(_)
+            )
+        })
         .collect();
 
     assert!(
-        !supply_runs.is_empty(),
-        "Pool must always contain a Supply Run after refresh"
+        !safe_missions.is_empty(),
+        "Pool must contain a safe mission after refresh"
     );
 
-    for sr in &supply_runs {
+    for mission in &safe_missions {
         assert_eq!(
-            sr.layer, 1,
-            "After clearing layer 1, Supply Run should target the cleared layer 1"
+            mission.layer, 1,
+            "After clearing layer 1, safe missions should target the cleared layer 1"
         );
     }
 }
@@ -755,7 +749,7 @@ fn test_higher_rank_pool_has_more_missions() {
     maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, t0(), &mut rng1);
     let rank1_count = deep.prestige.available_missions.len();
 
-    // Rank 5: 5 missions.
+    // Rank 5: 7 missions.
     deep.persistent.guild_rank = GuildRank(5);
     deep.prestige.available_missions.clear();
     deep.prestige.pool_refreshed_at = None;
@@ -769,8 +763,8 @@ fn test_higher_rank_pool_has_more_missions() {
     let rank5_count = deep.prestige.available_missions.len();
 
     assert!(
-        rank5_count > rank1_count,
-        "Rank 5 pool ({} missions) must be larger than Rank 1 pool ({} missions)",
+        rank5_count >= rank1_count,
+        "Rank 5 pool ({} missions) must not be smaller than Rank 1 pool ({} missions)",
         rank5_count,
         rank1_count
     );

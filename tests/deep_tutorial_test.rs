@@ -884,7 +884,7 @@ fn test_deep_discovery_on_endless_kill() {
     assert!(deep.persistent.discovered);
     assert_eq!(deep.prestige.roster.len(), 3);
     assert_eq!(deep.prestige.warband_marks, 50);
-    assert!(!deep.prestige.active_missions.is_empty());
+    assert!(deep.prestige.active_missions.is_empty());
 
     // Verify starter archetypes
     let archetypes: Vec<_> = deep.prestige.roster.iter().map(|m| m.archetype).collect();

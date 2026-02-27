@@ -213,13 +213,13 @@ fn render_danger_profile_card(
     layer_index: u32,
     tier: LayerTier,
 ) -> i32 {
-    if inner_w < 20 || top + 5 >= bottom_limit {
+    if inner_w < 20 || top + 7 >= bottom_limit {
         return top;
     }
 
     let card_left = left;
     let card_right = left + inner_w as i32 - 1;
-    let card_bottom = (top + 5).min(bottom_limit - 1);
+    let card_bottom = (top + 7).min(bottom_limit - 1);
     draw_deep_card(
         buffer,
         card_left,
@@ -232,12 +232,12 @@ fn render_danger_profile_card(
     );
 
     let threat_label = match tier {
-        LayerTier::Shallows => "Threat: Controlled",
-        LayerTier::Warrens => "Threat: Elevated",
-        LayerTier::Hollows => "Threat: Hostile",
-        LayerTier::SunkenReach => "Threat: Severe",
-        LayerTier::Abyss => "Threat: Extreme",
-        LayerTier::Void => "Threat: Catastrophic",
+        LayerTier::Shallows => "Threat Level: Controlled",
+        LayerTier::Warrens => "Threat Level: Elevated",
+        LayerTier::Hollows => "Threat Level: Hostile",
+        LayerTier::SunkenReach => "Threat Level: Severe",
+        LayerTier::Abyss => "Threat Level: Extreme",
+        LayerTier::Void => "Threat Level: Catastrophic",
     };
     let threat_w = (card_right - card_left - 3).max(1) as usize;
     let threat_line = truncate_text(threat_label, threat_w);
@@ -249,23 +249,58 @@ fn render_danger_profile_card(
         layer_tier_color(tier),
     );
 
+    let hint_w = (card_right - card_left - 3).max(1) as usize;
+    let hint_line = truncate_text("Numbers = recommended squad power", hint_w);
+    put_text(buffer, top + 2, card_left + 2, &hint_line, Color::DarkGray);
+
     let thresholds = layer_power_thresholds(layer_index);
     let max_power = thresholds.breakthrough.max(1) as f64;
+    let use_short_labels = inner_w < 40;
+    let label_width = if use_short_labels { 6 } else { 12 };
     let rows = [
-        ("Sup", thresholds.supply_run, Color::Green),
-        ("Rec", thresholds.recon, Color::Cyan),
-        ("Exp", thresholds.expedition, Color::Yellow),
-        ("Brk", thresholds.breakthrough, Color::LightRed),
+        (
+            if use_short_labels {
+                "Supply"
+            } else {
+                "Supply Run"
+            },
+            thresholds.supply_run,
+            Color::Green,
+        ),
+        ("Recon", thresholds.recon, Color::Cyan),
+        (
+            if use_short_labels {
+                "Exped."
+            } else {
+                "Expedition"
+            },
+            thresholds.expedition,
+            Color::Yellow,
+        ),
+        (
+            if use_short_labels {
+                "Break."
+            } else {
+                "Breakthrough"
+            },
+            thresholds.breakthrough,
+            Color::LightRed,
+        ),
     ];
 
     for (idx, (label, value, bar_color)) in rows.iter().enumerate() {
-        let row = top + 2 + idx as i32;
+        let row = top + 3 + idx as i32;
         if row >= card_bottom {
             break;
         }
-        let info = format!("{:>3} {:>4}", label, value);
+        let info = format!(
+            "{:<label_width$} {:>4}",
+            label,
+            value,
+            label_width = label_width
+        );
         put_text(buffer, row, card_left + 2, &info, Color::White);
-        let bar_col = card_left + 12;
+        let bar_col = card_left + 3 + info.chars().count() as i32;
         let bar_w = (card_right - bar_col - 1).max(6) as usize;
         render_card_progress_bar(
             buffer,
@@ -324,12 +359,17 @@ pub(super) fn render_layers(
     }
 
     // ── Footer ──
+    let esc_hint = if ui.view == crate::deep::DeepView::Hub {
+        "Close"
+    } else {
+        "Back"
+    };
     put_text(
         buffer,
         height as i32 - 1,
         1,
         &truncate_text(
-            "[\u{2191}/\u{2193}] Navigate Layers  [Esc] Back",
+            &format!("[\u{2191}/\u{2193}] Navigate Layers  [Esc] {}", esc_hint),
             width.saturating_sub(2),
         ),
         Color::DarkGray,
@@ -801,12 +841,12 @@ fn render_layers_split(
         row += 1;
         let thresholds = layer_power_thresholds(layer.index);
         let power_lines = [
-            ("Supply Run:", thresholds.supply_run, "safe farming"),
-            ("Recon:", thresholds.recon, "low risk, build intel"),
+            ("Supply Run:", thresholds.supply_run, "safest Marks income"),
+            ("Recon:", thresholds.recon, "boosts familiarity/speed"),
             (
                 "Expedition:",
                 thresholds.expedition,
-                "medium risk, primary XP",
+                "higher Marks, medium risk",
             ),
             (
                 "Breakthrough:",

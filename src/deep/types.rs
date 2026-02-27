@@ -932,13 +932,13 @@ impl Default for DeepState {
 /// Sub-view within The Deep overlay.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeepView {
-    /// Main hub showing active missions and summary info.
+    /// Main hub showing warband operations (active missions, results, logs).
     Hub,
     /// Available missions — select and assign squad.
     NewMission,
     /// Mercenary roster — stats, status, archetype.
     Roster,
-    /// Layer-by-layer infrastructure view.
+    /// Layer map and infrastructure state.
     Infrastructure,
     /// Check-in event response (shown when a mission has a pending event).
     EventResponse,

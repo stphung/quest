@@ -46,6 +46,13 @@ pub fn resolve_deep_offline(
         now,
         &mut rng,
     );
+
+    crate::deep::missions::run_softlock_safeguards(
+        &mut deep.prestige,
+        &mut deep.persistent,
+        now,
+        &mut rng,
+    );
 }
 
 /// Process offline XP and add combat log entries. Returns the report if XP was gained.

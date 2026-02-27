@@ -910,7 +910,7 @@ fn render_recruit_compact(
         let arch_str: String = candidate.archetype.display_name().chars().take(8).collect();
 
         let line = format!(
-            "{}{:14} {:8} {:3}  {}M",
+            "{}{:14} {:8} {:3}  {} Warband Marks",
             cursor,
             candidate.name.chars().take(14).collect::<String>(),
             arch_str,
@@ -944,7 +944,7 @@ fn render_recruit_compact(
             },
         );
         // Cost colored (green if affordable, red if not)
-        let cost_str = format!("{}M", cost);
+        let cost_str = format!("{} Warband Marks", cost);
         let cost_col = 1 + 2 + 14 + 1 + 8 + 1 + 3 + 2;
         let cost_color = if marks >= cost {
             Color::Green
@@ -1024,7 +1024,7 @@ fn render_recruit_split(
         let arch_str: String = candidate.archetype.display_name().chars().take(8).collect();
 
         let line = format!(
-            "{}{:14} {:8}   {:3}  {}M",
+            "{}{:14} {:8}   {:3}  {} Warband Marks",
             cursor,
             candidate.name.chars().take(14).collect::<String>(),
             arch_str,
@@ -1057,7 +1057,7 @@ fn render_recruit_split(
             },
         );
         // Cost colored
-        let cost_str = format!("{}M", cost);
+        let cost_str = format!("{} Warband Marks", cost);
         let cost_col = 1 + 2 + 14 + 1 + 8 + 3 + 3 + 2;
         let cost_color = if marks >= cost {
             Color::Green
