@@ -575,7 +575,7 @@ fn render_compact_hub(
         buffer,
         height as i32 - 1,
         1,
-        "[N]ew  [R]ecruit  [L]ayers  [?]",
+        "[Tab] Switch View  [?] Help",
         SECTION_LABEL_COLOR,
     );
 }
@@ -929,13 +929,7 @@ pub(super) fn render_hub(
             // Action shortcuts
             let has_missions = !deep.prestige.available_missions.is_empty();
             if has_missions && action_row < missions_bottom {
-                put_text(
-                    buffer,
-                    action_row,
-                    3,
-                    "[N] New Mission",
-                    SECTION_LABEL_COLOR,
-                );
+                put_text(buffer, action_row, 3, "Missions tab", SECTION_LABEL_COLOR);
                 put_text(
                     buffer,
                     action_row,
@@ -946,7 +940,7 @@ pub(super) fn render_hub(
                 action_row += 1;
             }
             if action_row < missions_bottom {
-                put_text(buffer, action_row, 3, "[R] Recruit", SECTION_LABEL_COLOR);
+                put_text(buffer, action_row, 3, "Recruit tab", SECTION_LABEL_COLOR);
                 put_text(
                     buffer,
                     action_row,
@@ -957,7 +951,7 @@ pub(super) fn render_hub(
                 action_row += 1;
             }
             if action_row < missions_bottom {
-                put_text(buffer, action_row, 3, "[L] Layers", SECTION_LABEL_COLOR);
+                put_text(buffer, action_row, 3, "Layers tab", SECTION_LABEL_COLOR);
                 put_text(
                     buffer,
                     action_row,
