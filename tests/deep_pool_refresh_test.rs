@@ -577,7 +577,8 @@ fn test_pool_normal_refresh_still_works_after_prestige() {
     // Normal time-based refresh still works (advance time past refresh interval).
     let mut rng = seeded_rng(63);
     let later = t0() + Duration::hours(25); // well past any refresh interval
-    let refreshed = maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, later, &mut rng);
+    let refreshed =
+        maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, later, &mut rng);
 
     // Whether it refreshes depends on time elapsed vs refresh interval.
     // The point is the system doesn't crash or behave oddly after prestige.
