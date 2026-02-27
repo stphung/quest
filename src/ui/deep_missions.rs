@@ -1,20 +1,65 @@
 //! The Deep — Hub and New Mission sub-view rendering.
 
 use crate::deep::{
-    apply_duration_modifiers, base_mission_duration_secs, AvailableMission, DeepState, DeepUiState,
-    DurationModifiers, FamiliarityLevel, Infrastructure, LayerTier, MercArchetype, MercStatus,
-    MissionStatus, MissionType,
+    apply_duration_modifiers, base_marks_earned, base_mission_duration_secs, event_trigger_points,
+    merc_xp_per_mission, AvailableMission, DeepState, DeepUiState, DurationModifiers,
+    FamiliarityLevel, Infrastructure, LayerTier, MercArchetype, MercStatus, MissionStatus,
+    MissionType,
 };
 use chrono::Utc;
 use ratatui::style::Color;
 
 use super::responsive::{LayoutContext, SizeTier};
-use super::scene_fx::{put_text, put_text_centered, SceneCell};
+use super::scene_fx::{current_millis, put_text, put_text_centered, SceneCell};
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
 /// Section label color used throughout The Deep UI.
 const SECTION_LABEL_COLOR: Color = Color::Rgb(80, 160, 220);
+
+/// Amber color for Warband Marks currency displays.
+pub(super) const MARKS_COLOR: Color = Color::Rgb(220, 180, 60);
+
+/// Render a labeled section rule: `── LABEL ───────── (count)`
+fn render_section_rule(
+    buffer: &mut [Vec<SceneCell>],
+    row: i32,
+    width: usize,
+    label: &str,
+    count: Option<usize>,
+) {
+    let count_str = count.map(|c| format!(" ({})", c)).unwrap_or_default();
+    let prefix = format!("\u{2500}\u{2500} {} ", label);
+    let suffix_len = count_str.len();
+    let rule_len = width.saturating_sub(prefix.len() + suffix_len + 2);
+    let rule: String = "\u{2500}".repeat(rule_len);
+    put_text(buffer, row, 1, &prefix, SECTION_LABEL_COLOR);
+    put_text(
+        buffer,
+        row,
+        1 + prefix.len() as i32,
+        &rule,
+        Color::Rgb(40, 60, 80),
+    );
+    if !count_str.is_empty() {
+        put_text(
+            buffer,
+            row,
+            (width as i32 - suffix_len as i32 - 1).max(0),
+            &count_str,
+            Color::DarkGray,
+        );
+    }
+}
+
+/// Get the lead merc's name (first squad member) for display.
+fn lead_merc_name(deep: &DeepState, squad: &[u64]) -> String {
+    squad
+        .first()
+        .and_then(|id| deep.prestige.find_merc(*id))
+        .map(|m| m.name.clone())
+        .unwrap_or_else(|| "Unknown".to_string())
+}
 
 // ── Color helpers ─────────────────────────────────────────────────────────────
 
@@ -67,6 +112,17 @@ fn risk_color(tier: u8) -> Color {
     }
 }
 
+/// Risk-tier icon for at-a-glance difficulty in mission lists.
+fn risk_icon(tier: u8) -> &'static str {
+    match tier {
+        0 => "\u{2690}", // ⚐ safe (flag)
+        1 => "\u{25b3}", // △ low
+        2 => "\u{26a0}", // ⚠ medium (caution)
+        3 => "\u{2620}", // ☠ high (skull)
+        _ => " ",
+    }
+}
+
 /// Format seconds as "Xh Ym" compactly.
 fn format_hours(secs: u64) -> String {
     let h = secs / 3600;
@@ -95,7 +151,7 @@ fn render_progress_bar(
     }
     let filled = ((ratio * width as f64).round() as usize).min(width);
     let empty = width - filled;
-    let bar: String = "\u{2588}".repeat(filled) + &"\u{2591}".repeat(empty);
+    let bar: String = "\u{2588}".repeat(filled) + &"\u{2592}".repeat(empty);
     let chars: Vec<char> = bar.chars().collect();
     for (i, ch) in chars.iter().enumerate() {
         let color = if i < filled {
@@ -125,7 +181,7 @@ fn render_compact_hub(
 
     // Title line with generation counter
     put_text(buffer, row, 1, "THE DEEP", SECTION_LABEL_COLOR);
-    let gen_label = format!("Gen.{}", deep.prestige.generation_number);
+    let gen_label = format!("Gen.{}", deep.prestige.generation_number.max(1));
     let gen_col = (width as i32) - gen_label.len() as i32 - 1;
     put_text(buffer, row, gen_col.max(12), &gen_label, Color::DarkGray);
     row += 1;
@@ -160,7 +216,7 @@ fn render_compact_hub(
     row += 1;
 
     let marks_line = format!("MARKS  {} WM", deep.prestige.warband_marks);
-    put_text(buffer, row, 1, &marks_line, Color::Yellow);
+    put_text(buffer, row, 1, &marks_line, MARKS_COLOR);
     row += 1;
 
     // Separator
@@ -317,15 +373,9 @@ pub(super) fn render_hub(
             gen_str,
         );
         put_text(buffer, header_row, 1, &line, Color::White);
-        // Recolor marks in Yellow
+        // Recolor marks in amber
         if let Some(pos) = line.find('\u{25c6}') {
-            put_text(
-                buffer,
-                header_row,
-                1 + pos as i32,
-                &marks_str,
-                Color::Yellow,
-            );
+            put_text(buffer, header_row, 1 + pos as i32, &marks_str, MARKS_COLOR);
         }
         header_row += 1;
 
@@ -348,8 +398,24 @@ pub(super) fn render_hub(
         put_text(buffer, header_row, 1, &gen_label, SECTION_LABEL_COLOR);
         header_row += 1;
 
-        // Row 1: Rank + key stats + marks
-        let marks_str = format!("\u{25c6} {} Marks", marks);
+        // Row 1: Rank + key stats + marks (with goal hint)
+        let cheapest_recruit = deep
+            .prestige
+            .recruit_pool
+            .recruit_costs
+            .iter()
+            .copied()
+            .filter(|&c| c > 0)
+            .min();
+        let marks_str = if let Some(cost) = cheapest_recruit {
+            if marks < cost {
+                format!("\u{25c6} {}/{} Marks", marks, cost)
+            } else {
+                format!("\u{25c6} {} Marks", marks)
+            }
+        } else {
+            format!("\u{25c6} {} Marks", marks)
+        };
         let rank_line = format!(
             "Rank {} \u{2014} {}    Mercs: {}/{}   Missions: {}/{}   {}",
             rank.0,
@@ -361,15 +427,9 @@ pub(super) fn render_hub(
             marks_str,
         );
         put_text(buffer, header_row, 1, &rank_line, Color::White);
-        // Recolor marks in Yellow
+        // Recolor marks in amber
         if let Some(pos) = rank_line.find('\u{25c6}') {
-            put_text(
-                buffer,
-                header_row,
-                1 + pos as i32,
-                &marks_str,
-                Color::Yellow,
-            );
+            put_text(buffer, header_row, 1 + pos as i32, &marks_str, MARKS_COLOR);
         }
         header_row += 1;
 
@@ -387,6 +447,45 @@ pub(super) fn render_hub(
             ),
             Color::DarkGray,
         );
+        header_row += 1;
+
+        // Row 2b: Readiness indicator
+        let avail_mercs = deep
+            .prestige
+            .roster
+            .iter()
+            .filter(|m| matches!(m.status, MercStatus::Available))
+            .count();
+        let injured_mercs = deep
+            .prestige
+            .roster
+            .iter()
+            .filter(|m| matches!(m.status, MercStatus::Injured { .. }))
+            .count();
+        let deployed_mercs = deep
+            .prestige
+            .roster
+            .iter()
+            .filter(|m| matches!(m.status, MercStatus::OnMission(_)))
+            .count();
+        let mut readiness_col = 1i32;
+        let ready_str = format!("Ready: {}", avail_mercs);
+        let ready_color = if avail_mercs > 0 {
+            Color::Green
+        } else {
+            Color::LightRed
+        };
+        put_text(buffer, header_row, readiness_col, &ready_str, ready_color);
+        readiness_col += ready_str.len() as i32 + 3;
+        if injured_mercs > 0 {
+            let inj_str = format!("Injured: {}", injured_mercs);
+            put_text(buffer, header_row, readiness_col, &inj_str, Color::Yellow);
+            readiness_col += inj_str.len() as i32 + 3;
+        }
+        if deployed_mercs > 0 {
+            let dep_str = format!("Deployed: {}", deployed_mercs);
+            put_text(buffer, header_row, readiness_col, &dep_str, Color::Cyan);
+        }
         header_row += 1;
 
         // Row 3: Inheritance message (only if generation > 1)
@@ -533,231 +632,274 @@ pub(super) fn render_hub(
             }
         }
 
-        if ui.hub_visit_count <= 1 && log.is_empty() {
-            // First-visit expanded empty state
-            let content_height = (missions_bottom - missions_top).max(0) as usize;
-            let mid = missions_top + content_height as i32 / 2;
-            put_text_centered(
-                buffer,
-                mid - 2,
-                width,
-                "No active missions running.",
-                Color::DarkGray,
-            );
-            put_text_centered(
-                buffer,
-                mid,
-                width,
-                "Start with a Supply Run \u{2014} safe income, no risk, 2-4 hours.",
-                Color::Rgb(50, 80, 110),
-            );
-            put_text_centered(
-                buffer,
-                mid + 1,
-                width,
-                "Missions continue while the game is closed.",
-                Color::Rgb(50, 80, 110),
-            );
-            put_text_centered(
-                buffer,
-                mid + 3,
-                width,
-                "[Tab] Switch View  to deploy your first squad.",
-                Color::Rgb(50, 70, 100),
-            );
-        } else if ui.hub_visit_count > 1 && log.is_empty() {
-            let content_height = (missions_bottom - missions_top).max(0) as usize;
-            let mid = missions_top + content_height as i32 / 2;
-            put_text_centered(
-                buffer,
-                mid + 2,
-                width,
-                "[Missions] tab \u{2192} pick a mission and assign squad.",
-                Color::Rgb(50, 70, 100),
-            );
-            if marks == 0 {
-                put_text_centered(
+        // ── Actionable empty state panel ──
+        let remaining_for_actions = (missions_bottom - missions_end_row).max(0) as usize;
+        if remaining_for_actions >= 3 {
+            let mut action_row = missions_end_row + 1;
+
+            // Check if all mercs are injured and no missions active
+            let all_injured = !deep.prestige.roster.is_empty()
+                && deep
+                    .prestige
+                    .roster
+                    .iter()
+                    .all(|m| matches!(m.status, MercStatus::Injured { .. }))
+                && deep.prestige.active_missions.is_empty();
+
+            if all_injured {
+                put_text(
                     buffer,
-                    mid + 3,
-                    width,
+                    action_row,
+                    3,
+                    "Your mercs are recovering. They'll be ready after the next mission resolves.",
+                    Color::Rgb(80, 80, 120),
+                );
+                action_row += 2;
+            }
+
+            // Action shortcuts
+            let has_missions = !deep.prestige.available_missions.is_empty();
+            if has_missions && action_row < missions_bottom {
+                put_text(
+                    buffer,
+                    action_row,
+                    3,
+                    "[N] New Mission",
+                    SECTION_LABEL_COLOR,
+                );
+                put_text(
+                    buffer,
+                    action_row,
+                    20,
+                    "\u{2014} Send your first squad",
+                    Color::DarkGray,
+                );
+                action_row += 1;
+            }
+            if action_row < missions_bottom {
+                put_text(buffer, action_row, 3, "[R] Recruit", SECTION_LABEL_COLOR);
+                put_text(
+                    buffer,
+                    action_row,
+                    20,
+                    "\u{2014} Hire mercenaries",
+                    Color::DarkGray,
+                );
+                action_row += 1;
+            }
+            if action_row < missions_bottom {
+                put_text(buffer, action_row, 3, "[L] Layers", SECTION_LABEL_COLOR);
+                put_text(
+                    buffer,
+                    action_row,
+                    20,
+                    "\u{2014} View explored territory",
+                    Color::DarkGray,
+                );
+                action_row += 1;
+            }
+
+            if marks == 0 && action_row < missions_bottom {
+                put_text(
+                    buffer,
+                    action_row,
+                    3,
                     "Supply Runs are free \u{2014} start there.",
                     Color::Rgb(40, 80, 50),
                 );
             }
         }
     } else {
-        put_text(
-            buffer,
-            missions_top,
-            1,
-            "ACTIVE MISSIONS",
-            SECTION_LABEL_COLOR,
-        );
+        let millis = current_millis();
+        let mut row = missions_top;
 
-        let mut row = missions_top + 1;
-
-        // Show completed missions first (they need action)
-        for mission in completed.iter() {
-            if row + 2 >= missions_bottom {
-                break;
-            }
-            let tc = mission_type_color(mission.mission_type);
-            let type_name = mission_type_label(mission.mission_type);
-            let tier_name = crate::deep::LayerTier::from_layer(mission.layer).display_name();
-
-            // Line 1: type + layer + COMPLETE badge
-            let line1 = format!(
-                "\u{2713} [{}]  Layer {} \u{2014} {}",
-                type_name, mission.layer, tier_name,
-            );
-            put_text(buffer, row, 1, &line1, tc);
-            put_text(buffer, row, 1, "\u{2713}", Color::Green);
-            let complete_badge = "  COMPLETE \u{2014} [Enter]";
-            put_text(
-                buffer,
-                row,
-                1 + line1.len() as i32,
-                complete_badge,
-                Color::Green,
-            );
+        // ── Completed missions section ──
+        if !completed.is_empty() {
+            render_section_rule(buffer, row, width, "COMPLETED", Some(completed.len()));
             row += 1;
 
-            // Line 2: squad
-            let squad_names: Vec<String> = mission
-                .squad
-                .iter()
-                .filter_map(|id| deep.prestige.find_merc(*id))
-                .map(|m| m.name.clone())
-                .collect();
-            let squad_str = squad_names.join(", ");
-            put_text(
-                buffer,
-                row,
-                3,
-                &format!("Squad: {}", squad_str),
-                Color::DarkGray,
-            );
-            row += 2; // gap between missions
+            for mission in completed.iter() {
+                if row + 1 >= missions_bottom {
+                    break;
+                }
+                let tc = mission_type_color(mission.mission_type);
+                let type_name = mission_type_label(mission.mission_type);
+                let tier_name = crate::deep::LayerTier::from_layer(mission.layer).display_name();
+
+                // [✓] Type — Layer N Tier      COLLECT → [Enter]
+                let glyph = "[\u{2713}] ";
+                put_text(buffer, row, 1, glyph, Color::Green);
+                let info = format!(
+                    "{} \u{2014} Layer {} {}",
+                    type_name, mission.layer, tier_name
+                );
+                put_text(buffer, row, 1 + glyph.len() as i32, &info, tc);
+                let collect_hint = "COLLECT \u{2192} [Enter]";
+                let hint_col = (width as i32 - collect_hint.len() as i32 - 1)
+                    .max(1 + glyph.len() as i32 + info.len() as i32 + 2);
+                put_text(buffer, row, hint_col, collect_hint, Color::Green);
+                row += 2; // gap
+            }
         }
 
-        // Show active missions
-        for (i, mission) in active.iter().enumerate() {
-            if row + 1 >= missions_bottom {
-                break;
-            }
-            let is_selected = i == ui.selected_index;
-            let cursor = if is_selected { "\u{25b6} " } else { "  " };
-            let tc = mission_type_color(mission.mission_type);
-            let type_name = mission_type_label(mission.mission_type);
-            let tier_name = crate::deep::LayerTier::from_layer(mission.layer).display_name();
-            let progress = mission.progress(now);
-            let total_secs = (mission.ends_at - mission.started_at).num_seconds().max(1) as u64;
-            let elapsed_secs = (now - mission.started_at).num_seconds().max(0) as u64;
-            let remaining_secs = total_secs.saturating_sub(elapsed_secs);
+        // ── Active missions section ──
+        if !active.is_empty() {
+            render_section_rule(buffer, row, width, "ACTIVE", Some(active.len()));
+            row += 1;
 
-            // Build squad name string
-            let squad_names: Vec<String> = mission
-                .squad
+            // Sort display order: event-pending first, then by time remaining ascending
+            let mut display_order: Vec<(usize, bool, u64)> = active
                 .iter()
-                .filter_map(|id| deep.prestige.find_merc(*id))
-                .map(|m| m.name.clone())
+                .enumerate()
+                .map(|(i, m)| {
+                    let has_event = m.has_pending_event();
+                    let remaining = (m.ends_at - now).num_seconds().max(0) as u64;
+                    (i, has_event, remaining)
+                })
                 .collect();
-            let squad_str = if squad_names.is_empty() {
-                "No squad".to_string()
-            } else {
-                squad_names.join(", ")
-            };
+            display_order.sort_by(|a, b| {
+                b.1.cmp(&a.1) // events first
+                    .then(a.2.cmp(&b.2)) // then by remaining time ascending
+            });
 
-            // Status badge
-            let status_badge = match &mission.status {
-                MissionStatus::EventPending => "  \u{26a1} EVENT PENDING",
-                _ => "",
-            };
+            for &(orig_idx, _has_event, _) in &display_order {
+                if row + 1 >= missions_bottom {
+                    break;
+                }
+                let mission = &active[orig_idx];
+                let is_selected = orig_idx == ui.selected_index;
+                let tc = mission_type_color(mission.mission_type);
+                let type_name = mission_type_label(mission.mission_type);
+                let progress = mission.progress(now);
+                let total_secs = (mission.ends_at - mission.started_at).num_seconds().max(1) as u64;
+                let elapsed_secs = (now - mission.started_at).num_seconds().max(0) as u64;
+                let remaining_secs = total_secs.saturating_sub(elapsed_secs);
+                let leader = lead_merc_name(deep, &mission.squad);
 
-            // Line 1: Mission type + layer + tier + status badge
-            let line1 = format!(
-                "{}[{}]  Layer {} \u{2014} {}{}",
-                cursor, type_name, mission.layer, tier_name, status_badge,
-            );
-            put_text(buffer, row, 1, &line1, tc);
-            put_text(
-                buffer,
-                row,
-                1,
-                cursor,
-                if is_selected {
-                    Color::Cyan
+                // Status glyph
+                let (glyph, glyph_color) = if mission.has_pending_event() {
+                    ("[!] ", Color::Yellow)
                 } else {
-                    Color::DarkGray
-                },
-            );
-            if matches!(mission.status, MissionStatus::EventPending) {
-                if let Some(offset) = line1.find('\u{26a1}') {
+                    ("[\u{25b6}] ", Color::Cyan)
+                };
+
+                // Line 1: glyph + type — Layer N   leader leads   ⚡ EVENT
+                let sel_bg = if is_selected {
+                    Some(Color::Rgb(15, 25, 45))
+                } else {
+                    None
+                };
+                // Apply selection background to full line
+                if let Some(bg) = sel_bg {
+                    for c in 1..width.saturating_sub(1) {
+                        if (row as usize) < buffer.len() && c < buffer[0].len() {
+                            buffer[row as usize][c].bg = bg;
+                        }
+                    }
+                }
+
+                put_text(buffer, row, 1, glyph, glyph_color);
+                let info = format!(
+                    "{} \u{2014} Layer {}   {} leads",
+                    type_name, mission.layer, leader
+                );
+                put_text(buffer, row, 1 + glyph.len() as i32, &info, tc);
+
+                if mission.has_pending_event() {
+                    let event_badge = "  \u{26a1} EVENT";
+                    let event_col = 1 + glyph.len() as i32 + info.len() as i32;
+                    put_text(buffer, row, event_col, event_badge, Color::Yellow);
+                }
+                row += 1;
+
+                if !is_compact {
+                    // Line 2: progress bar + % + time
+                    let bar_width = width.saturating_sub(20).min(28);
+                    // Pulse effect at >95% progress
+                    let bar_color = if progress > 0.95 {
+                        let pulse = (millis / 500).is_multiple_of(2);
+                        if pulse {
+                            Color::Rgb(120, 220, 160)
+                        } else {
+                            tc
+                        }
+                    } else {
+                        tc
+                    };
+                    render_progress_bar(buffer, row, 5, bar_width, progress, bar_color);
+                    let time_str = if progress >= 1.0
+                        && !matches!(mission.status, MissionStatus::EventPending)
+                    {
+                        "  Resolving...".to_string()
+                    } else if remaining_secs > 0 {
+                        let pct = (progress * 100.0) as u32;
+                        format!("  {}%   ~{} left", pct, format_hours(remaining_secs))
+                    } else {
+                        let pct = (progress * 100.0) as u32;
+                        format!("  {}%   done", pct)
+                    };
                     put_text(
                         buffer,
                         row,
-                        1 + offset as i32,
-                        "\u{26a1} EVENT PENDING",
-                        Color::Yellow,
+                        5 + bar_width as i32,
+                        &time_str,
+                        Color::DarkGray,
                     );
+                    row += 1;
+
+                    // Event countdown line
+                    let tier = LayerTier::from_layer(mission.layer);
+                    let triggers = event_trigger_points(mission.mission_type, tier);
+                    let event_hint = if mission.has_pending_event() {
+                        "\u{26a1} Event pending \u{2014} respond now!".to_string()
+                    } else if triggers.is_empty() {
+                        "No events (safe mission)".to_string()
+                    } else if let Some(&next_trigger) = triggers.iter().find(|&&t| t > progress) {
+                        let secs_to_event =
+                            ((next_trigger - progress) * total_secs as f64).round() as u64;
+                        let resolved = mission.events.iter().filter(|e| e.is_resolved()).count();
+                        format!(
+                            "Next event in ~{}  ({}/{})",
+                            format_hours(secs_to_event),
+                            resolved,
+                            triggers.len()
+                        )
+                    } else {
+                        let resolved = mission.events.iter().filter(|e| e.is_resolved()).count();
+                        format!("All events resolved ({}/{})", resolved, triggers.len())
+                    };
+                    put_text(buffer, row, 5, &event_hint, Color::Rgb(60, 90, 130));
+                    // Recolor the pending event line
+                    if mission.has_pending_event() {
+                        put_text(buffer, row, 5, &event_hint, Color::Yellow);
+                    }
+                    row += 1; // gap
+                } else {
+                    // Compact: bar + time on same row
+                    let bar_width = 12usize;
+                    let pct = (progress * 100.0) as u32;
+                    render_progress_bar(buffer, row, 5, bar_width, progress, tc);
+                    let time_str = if remaining_secs > 0 {
+                        format!(" {}%  ~{}", pct, format_hours(remaining_secs))
+                    } else {
+                        format!(" {}%  done", pct)
+                    };
+                    put_text(
+                        buffer,
+                        row,
+                        5 + bar_width as i32,
+                        &time_str,
+                        Color::DarkGray,
+                    );
+                    row += 1;
                 }
-            }
-
-            if !is_compact {
-                // Line 2: Squad names
-                put_text(
-                    buffer,
-                    row + 1,
-                    3,
-                    &format!("Squad: {}", squad_str),
-                    Color::DarkGray,
-                );
-
-                // Line 3: Progress bar + % + time remaining
-                let pct = (progress * 100.0) as u32;
-                let bar_width = width.saturating_sub(20).min(28);
-                render_progress_bar(buffer, row + 2, 3, bar_width, progress, tc);
-                let time_str = if remaining_secs > 0 {
-                    format!("  {}%   {} left", pct, format_hours(remaining_secs))
-                } else {
-                    format!("  {}%   done", pct)
-                };
-                put_text(
-                    buffer,
-                    row + 2,
-                    3 + bar_width as i32,
-                    &time_str,
-                    Color::DarkGray,
-                );
-                row += 4; // 3 content rows + 1 blank gap
-            } else {
-                // Compact: bar + time on line 2
-                let bar_width = 12usize;
-                let pct = (progress * 100.0) as u32;
-                render_progress_bar(buffer, row + 1, 3, bar_width, progress, tc);
-                let time_str = if remaining_secs > 0 {
-                    format!(" {}%  {} left", pct, format_hours(remaining_secs))
-                } else {
-                    format!(" {}%  done", pct)
-                };
-                put_text(
-                    buffer,
-                    row + 1,
-                    3 + bar_width as i32,
-                    &time_str,
-                    Color::DarkGray,
-                );
-                row += 2;
             }
         }
 
-        // ── Warband log (below active missions, last 5 entries) ──
+        // ── Warband log (below missions, last 5 entries) ──
         let log = &deep.prestige.warband_log;
         if !log.is_empty() && row + 2 < missions_bottom {
-            let sep: String = "\u{2500}".repeat(width.saturating_sub(2));
-            put_text(buffer, row, 1, &sep, Color::Rgb(40, 60, 80));
-            row += 1;
-            put_text(buffer, row, 1, "WARBAND LOG", SECTION_LABEL_COLOR);
+            render_section_rule(buffer, row, width, "WARBAND LOG", None);
             row += 1;
             for entry in log.iter().rev().take(5) {
                 if row >= missions_bottom {
@@ -956,13 +1098,16 @@ fn render_new_mission_compact(
             } else {
                 String::new()
             };
+            let rt = m.mission_type.risk_tier();
+            let ri = risk_icon(rt);
             let line = format!(
-                "{}[{}]  L{}  {}  {}{}",
+                "{}{} [{}]  L{}  {}  {}{}",
                 cursor,
+                ri,
                 mission_type_label(m.mission_type),
                 m.layer,
                 format_hours(m.duration_secs),
-                risk_label(m.mission_type.risk_tier()),
+                risk_label(rt),
                 cost_str,
             );
             put_text(buffer, row, 1, &line, tc);
@@ -973,6 +1118,8 @@ fn render_new_mission_compact(
                 cursor,
                 if is_sel { Color::Cyan } else { Color::DarkGray },
             );
+            // Recolor risk icon
+            put_text(buffer, row, 3, ri, risk_color(rt));
             row += 1;
         }
         // Compact Phase 1 detail for selected mission
@@ -1255,9 +1402,12 @@ fn render_new_mission_split(
             } else {
                 String::new()
             };
+            let rt = m.mission_type.risk_tier();
+            let ri = risk_icon(rt);
             let line = format!(
-                "{}[{:width$}]  L{}  {}{}",
+                "{}{} [{:width$}]  L{}  {}{}",
                 cursor,
+                ri,
                 &type_name[..type_name.len().min(max_name_w)],
                 m.layer,
                 format_hours(m.duration_secs),
@@ -1272,6 +1422,8 @@ fn render_new_mission_split(
                 cursor,
                 if is_sel { Color::Cyan } else { Color::DarkGray },
             );
+            // Recolor risk icon
+            put_text(buffer, row, 3, ri, risk_color(rt));
         }
     } else {
         // Phase 2: merc list on left with available/unavailable groups
@@ -1564,22 +1716,38 @@ fn render_mission_detail_phase1(
             );
             row += 1;
 
-            // Modifier breakdown line
-            if row < content_bottom {
-                let mut parts = Vec::new();
-                if has_outpost {
-                    parts.push("Outpost -25%");
-                }
-                let fam_level = FamiliarityLevel::from_familiarity(familiarity);
-                match fam_level {
-                    FamiliarityLevel::Mapped => parts.push("Mapped -10%"),
-                    FamiliarityLevel::Familiar => parts.push("Familiar -20%"),
-                    FamiliarityLevel::Mastered => parts.push("Mastered -30%"),
-                    FamiliarityLevel::Unknown => {}
-                }
-                if !parts.is_empty() {
-                    let breakdown = format!("           ({})", parts.join(", "));
-                    put_text(buffer, row, detail_inner_left, &breakdown, Color::DarkGray);
+            // Stacked modifier breakdown
+            if has_outpost && row < content_bottom {
+                put_text(
+                    buffer,
+                    row,
+                    detail_inner_left,
+                    "  Outpost:     -25%",
+                    Color::Rgb(60, 130, 90),
+                );
+                row += 1;
+            }
+            let fam_level = FamiliarityLevel::from_familiarity(familiarity);
+            let fam_mod = match fam_level {
+                FamiliarityLevel::Mapped => Some(("Mapped", "-10%")),
+                FamiliarityLevel::Familiar => Some(("Familiar", "-20%")),
+                FamiliarityLevel::Mastered => Some(("Mastered", "-30%")),
+                FamiliarityLevel::Unknown => None,
+            };
+            if let Some((label, pct)) = fam_mod {
+                if row < content_bottom {
+                    put_text(
+                        buffer,
+                        row,
+                        detail_inner_left,
+                        &format!(
+                            "  {}:{}{}",
+                            label,
+                            " ".repeat(10usize.saturating_sub(label.len())),
+                            pct
+                        ),
+                        Color::Rgb(60, 130, 90),
+                    );
                     row += 1;
                 }
             }
@@ -1628,7 +1796,7 @@ fn render_mission_detail_phase1(
         let marks = deep.prestige.warband_marks;
         if mission.marks_cost > 0 {
             let cost_str = format!("Cost:      {} Marks", mission.marks_cost);
-            put_text(buffer, row, detail_inner_left, &cost_str, Color::Yellow);
+            put_text(buffer, row, detail_inner_left, &cost_str, MARKS_COLOR);
             let (afford_str, afford_color) = if marks >= mission.marks_cost {
                 (format!("  (have {})", marks), Color::Rgb(60, 180, 80))
             } else {
@@ -1656,15 +1824,61 @@ fn render_mission_detail_phase1(
         row += 1;
     }
 
+    // Reward range (calculated from base_marks_earned with ±15% variance)
     if row < content_bottom {
-        put_text(
-            buffer,
-            row,
-            detail_inner_left,
-            "Reward:    Marks + XP + items",
-            Color::DarkGray,
-        );
-        row += 1;
+        if matches!(mission.mission_type, MissionType::Construction(_)) {
+            put_text(
+                buffer,
+                row,
+                detail_inner_left,
+                "Reward:    Infrastructure (permanent)",
+                Color::DarkGray,
+            );
+            row += 1;
+        } else {
+            put_text(
+                buffer,
+                row,
+                detail_inner_left,
+                "Rewards (on success):",
+                Color::Cyan,
+            );
+            row += 1;
+
+            if row < content_bottom {
+                let base = base_marks_earned(mission.mission_type, mission.layer);
+                let min_marks = (base as f64 * 0.85).round() as u32;
+                let max_marks = (base as f64 * 1.15).round() as u32;
+                let marks_str = format!("  \u{25c6} {}\u{2013}{} Marks", min_marks, max_marks);
+                put_text(buffer, row, detail_inner_left, &marks_str, MARKS_COLOR);
+                row += 1;
+            }
+
+            if row < content_bottom {
+                let xp = merc_xp_per_mission(mission.mission_type, mission.layer);
+                let xp_str = format!("  \u{2605} XP per merc: ~{}", xp);
+                put_text(buffer, row, detail_inner_left, &xp_str, Color::DarkGray);
+                row += 1;
+            }
+
+            if row < content_bottom
+                && matches!(
+                    mission.mission_type,
+                    MissionType::Expedition
+                        | MissionType::Breakthrough
+                        | MissionType::GatewayExpedition
+                )
+            {
+                put_text(
+                    buffer,
+                    row,
+                    detail_inner_left,
+                    "  ? Item drop chance",
+                    Color::DarkGray,
+                );
+                row += 1;
+            }
+        }
     }
     row += 1;
 

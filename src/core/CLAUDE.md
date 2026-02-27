@@ -8,7 +8,7 @@ Central game state, game logic, balance constants, and the per-tick orchestratio
 src/core/
 ├── mod.rs           # Public re-exports (GameState, constants, TickEvent, TickResult)
 ├── constants.rs     # All game balance constants (timing, XP, drops, discovery, zones)
-├── discoveries.rs   # Discovery rolls (dungeons, fishing spots, Haven, Soulforge)
+├── discoveries.rs   # Discovery rolls (dungeons, fishing spots, Haven, Soulforge, The Deep)
 ├── enemy_spawning.rs # Enemy generation and spawning logic
 ├── game_logic.rs    # Thin re-export wrapper (most logic extracted to submodules)
 ├── game_state.rs    # GameState struct
@@ -16,7 +16,7 @@ src/core/
 ├── recent_drops.rs  # RecentDrop struct, recent drops deque management
 ├── tick.rs          # game_tick() orchestration — coordinates all stages
 ├── tick_stages.rs   # Tick processing stages 4-6 and helper functions
-├── tick_types.rs    # TickEvent enum (35 variants) and TickResult struct
+├── tick_types.rs    # TickEvent enum (41 variants) and TickResult struct
 ├── ticker.rs        # Scrolling loot ticker (TickerEntry, Ticker, adaptive scroll speed)
 └── xp.rs            # XP curves, leveling, combat kill XP, distribute_level_up_points
 ```
@@ -98,15 +98,16 @@ pub struct OfflineReport {
 
 ### `TickEvent` (`tick_types.rs`)
 
-Enum with 35 variants describing everything that can happen in a single tick. The presentation layer (main.rs) maps these to combat log entries and visual effects. Game logic never touches UI types.
+Enum with 41 variants describing everything that can happen in a single tick. The presentation layer (main.rs) maps these to combat log entries and visual effects. Game logic never touches UI types.
 
 **Categories:**
-- **Combat**: `PlayerAttack`, `PlayerAttackBlocked`, `EnemyAttack`, `EnemyDefeated`, `PlayerDied`, `PlayerDiedInDungeon`, `DamageReflected`, `RegenComplete`, `BossEnrage`
+- **Combat**: `PlayerAttack`, `PlayerAttackBlocked`, `EnemyAttack`, `EnemyDefeated`, `PlayerDied`, `PlayerDiedInDungeon`, `DamageReflected`, `RegenComplete`, `BossEnrage`, `CombatRetreat`
 - **Item Drops**: `ItemDropped` (with rarity, slot, stats, equipped flag)
 - **Zone Progression**: `SubzoneBossDefeated` (with `BossDefeatResult`)
 - **Dungeon**: `DungeonRoomEntered`, `DungeonTreasureFound`, `DungeonKeyFound`, `DungeonBossUnlocked`, `DungeonBossDefeated`, `DungeonEliteDefeated`, `DungeonFailed`, `DungeonCompleted`
 - **Fishing**: `FishingMessage`, `FishCaught`, `FishingItemFound`, `FishingRankUp`, `StormLeviathanCaught`
 - **Discovery**: `ChallengeDiscovered`, `DungeonDiscovered`, `FishingSpotDiscovered`, `HavenDiscovered`, `SoulforgeDiscovered`, `StormglassDiscovered`
+- **The Deep**: `DeepMissionComplete`, `DeepEventPending`, `DeepMercInjured`, `DeepMercLost`, `DeepBreakthrough`, `DeepGuildRankUp`
 - **Stormglass**: `StormglassSalvaged`, `StormglassDungeonCache`
 - **Achievements**: `AchievementUnlocked`
 - **Level Up**: `LeveledUp`
@@ -119,9 +120,13 @@ Each variant carries pre-formatted message strings with unicode escapes (e.g., `
 pub struct TickResult {
     pub events: Vec<TickEvent>,
     pub leviathan_encounter: Option<u8>,          // Encounter number 1-10
+    pub leviathan_lure_consumed: bool,            // Storm Lure consumed this tick
+    pub leviathan_catch_miss: bool,               // Leviathan appeared but wasn't caught
     pub achievements_changed: bool,                // Signal to persist to disk
     pub haven_changed: bool,                       // Signal to persist to disk
     pub enhancement_changed: bool,                 // Signal to persist to disk
+    pub god_items_changed: bool,                   // Signal to persist to disk
+    pub deep_changed: bool,                        // Signal to persist to disk
     pub achievement_modal_ready: Vec<AchievementId>, // Ready for overlay display
 }
 ```
@@ -135,6 +140,7 @@ pub fn game_tick<R: Rng>(
     haven: &mut Haven,
     enhancement: &mut crate::enhancement::EnhancementProgress,
     achievements: &mut Achievements,
+    deep: &mut DeepState,
     debug_mode: bool,
     rng: &mut R,
 ) -> TickResult
@@ -157,7 +163,9 @@ pub fn game_tick<R: Rng>(
 | 9. Achievement collection | Drains newly unlocked achievements into `TickResult.events` |
 | 10. Haven discovery | Rolls for Haven discovery (P10+, no active content) |
 | 11. Soulforge discovery | Rolls for Soulforge discovery (P15+, no active content), emits `SoulforgeDiscovered`, sets `enhancement_changed` |
-| 12. Achievement modal | Checks if 500ms accumulation window has elapsed for modal display |
+| 12. Deep discovery | Rolls for The Deep discovery (P15+, no active content), emits `DeepDiscovered`, sets `deep_changed` |
+| 13. Deep event check | Checks for pending Deep check-in events on active missions |
+| 14. Achievement modal | Checks if 500ms accumulation window has elapsed for modal display |
 
 **Important**: Stage 5 (fishing) returns early, skipping stages 6-7. Fishing and combat are mutually exclusive.
 
@@ -260,6 +268,9 @@ All functions above are re-exported through `game_logic.rs` for backward compati
 | `SOULFORGE_DISCOVERY_BASE_CHANCE` | 0.000014 | Per tick (in `enhancement/types.rs`) |
 | `SOULFORGE_DISCOVERY_RANK_BONUS` | 0.000007 | Per rank above 15 (in `enhancement/types.rs`) |
 | `SOULFORGE_MIN_PRESTIGE_RANK` | 15 | (in `enhancement/types.rs`) |
+| `DEEP_DISCOVERY_BASE_CHANCE` | 0.000014 | Per tick (in `deep/types.rs`) |
+| `DEEP_DISCOVERY_RANK_BONUS` | 0.000007 | Per rank above 15 (in `deep/types.rs`) |
+| `DEEP_MIN_PRESTIGE_RANK` | 15 | (in `deep/types.rs`) |
 
 ### Zone Enemy Stats
 | Constant | Value | Notes |
@@ -317,6 +328,7 @@ Zone 11 (The Expanse) is an endgame wall: `(5000, 400, 500, 80, 250, 30)` — ro
 - **haven** (`haven`): `Haven`, `HavenBonusType`, `try_discover_haven()`
 - **enhancement** (`enhancement`): `EnhancementProgress` with `levels` array for derived stats, `try_discover_soulforge()` for discovery
 - **achievements** (`achievements`): `Achievements` with `on_*()` tracking methods
+- **deep** (`deep`): `DeepState` for discovery rolls and check-in event detection, `try_discover_deep()`
 - **items** (`items::drops`): `try_drop_from_mob()`, `try_drop_from_boss()`; (`items::scoring`): `auto_equip_if_better()`
 - **zones** (`zones`): `BossDefeatResult`, `get_zone()`, `get_all_zones()`
 
@@ -336,7 +348,7 @@ Zone 11 (The Expanse) is an endgame wall: `(5000, 400, 500, 80, 250, 30)` — ro
 - **tick.rs has zero `ui::` imports**: All UI updates happen in main.rs by mapping `TickEvent` variants to log entries and visual effects.
 - **tick.rs DOES call `add_recent_drop()`**: For fishing catches and item drops. This is state mutation, not UI.
 - **Messages are pre-formatted**: TickEvent variants carry message strings with unicode escapes. The presentation layer uses them directly rather than formatting again.
-- **`achievements_changed` / `haven_changed` flags**: Signal that IO is needed. The presentation layer (main.rs) owns the actual file writes.
+- **`achievements_changed` / `haven_changed` / `deep_changed` flags**: Signal that IO is needed. The presentation layer (main.rs) owns the actual file writes.
 - **debug_mode suppresses save signals**: When `--debug` is active, achievement and haven save flags are suppressed to avoid polluting saves during testing.
 - **Fishing early return**: Stage 5 returns early when fishing is active, making fishing and combat mutually exclusive within a tick.
 

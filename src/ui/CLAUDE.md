@@ -33,7 +33,13 @@ src/ui/
 ├── achievement_list.rs         # Achievement browser list panel
 ├── achievement_tabs.rs         # Achievement browser category tabs
 ├── title_browser_scene.rs      # Title browser overlay (select display title from unlocked achievements)
-├── debug_menu_scene.rs         # Debug menu overlay with tabbed categories (Challenges, World, Resources, Items)
+├── deep_scene.rs               # The Deep overlay coordinator, backdrop, view routing
+├── deep_missions.rs            # Deep active missions panel and new mission creation
+├── deep_roster.rs              # Deep mercenary roster sub-view
+├── deep_layers.rs              # Deep layer map and infrastructure sub-view
+├── deep_events.rs              # Deep check-in event response sub-view
+├── deep_results.rs             # Deep mission complete modal
+├── debug_menu_scene.rs         # Debug menu overlay with tabbed categories (Challenges, World, Resources, Items, Borders)
 ├── bug_report_scene.rs         # Bug report overlay with game-state preview and clipboard status
 │
 ├── challenge_menu_scene.rs     # Challenge menu list/detail view
@@ -50,7 +56,7 @@ src/ui/
 ├── soulforge_scene.rs          # Soulforge enhancement overlay (delegates to helpers below)
 ├── soulforge_effects.rs        # Soulforge hammering/success/failure animation effects
 ├── soulforge_slots.rs          # Soulforge slot selection menu
-├── stormglass_scene.rs         # Stormglass Exchange overlay with animations (Invoke Trial rolling, Chrono Surge speed ramp/fast-forward, Storm Sigils daily rotation)
+├── stormglass_scene.rs         # Stormglass Exchange overlay with animations (Invoke Trial rolling, Chrono Surge speed ramp/fast-forward, Storm Sigils daily rotation, Storm Lure)
 ├── time_vault_scene.rs         # Time Vault overlay (branch/commit browser, restore, fork, GitHub cloud sync)
 ├── scene_fx.rs                 # Shared utilities for layered ASCII scene rendering (wide char support, SceneCell::new(), put_text_centered(), display_width())
 ├── zone_bg.rs                  # Stylized zone background scenes (6-layer compositing, all 11 zones)

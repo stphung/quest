@@ -116,7 +116,7 @@ Not all challenges are equally discoverable:
 
 ## game_tick() Extraction to core/tick.rs
 
-**Decision**: Extract the per-tick orchestration function from main.rs into `src/core/tick.rs`, returning a `TickResult` struct with `Vec<TickEvent>` instead of mutating UI state directly.
+**Decision**: Extract the per-tick orchestration function from main.rs into `src/core/tick.rs`, returning a `TickResult` struct with `Vec<TickEvent>` (now 41 variants) instead of mutating UI state directly.
 
 **Rationale**: The game loop was tightly coupled to the terminal UI — game logic called `add_log_entry()` and created `VisualEffect` objects directly. Extracting `game_tick()` into a pure-logic module enables:
 - Headless simulation (the `simulator` binary reuses the exact same function)
@@ -235,7 +235,7 @@ This enables systematic balance validation: "does a P0 character reach Zone 2 in
 
 **Why**: Continuation of Phase 2 refactoring. Remaining large files still exceeded maintainability thresholds. Same pattern: extract focused logic into sibling files, keep original as thin orchestrator, re-export all public symbols.
 
-**Result**: All 3,754 tests pass. No changes to module public APIs. Callers unaffected.
+**Result**: All tests pass. No changes to module public APIs. Callers unaffected.
 
 ## PR #300: Challenge Macro and Final Submodule Extractions
 

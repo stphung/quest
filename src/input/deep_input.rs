@@ -37,8 +37,8 @@ pub(super) fn handle_deep(
         return InputResult::Continue;
     }
 
-    // Tab cycling works from any view except EventResponse and squad staging.
-    if deep_ui.view != DeepView::EventResponse && deep_ui.staging_mission_index.is_none() {
+    // Tab cycling works from any view except during squad staging.
+    if deep_ui.staging_mission_index.is_none() {
         match key.code {
             KeyCode::Tab | KeyCode::Right => {
                 let new_view = deep_ui.view.next_tab();

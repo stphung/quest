@@ -164,6 +164,65 @@ pub(super) fn render_roster(
     );
     put_text(buffer, 0, 1, &summary, Color::DarkGray);
 
+    // ── Archetype composition bar ──
+    let mut content_top = 1i32;
+    if !roster.is_empty() && height > 8 {
+        // Count per archetype
+        let mut counts: Vec<(MercArchetype, usize)> = MercArchetype::ALL
+            .iter()
+            .filter_map(|&arch| {
+                let count = roster.iter().filter(|m| m.archetype == arch).count();
+                if count > 0 {
+                    Some((arch, count))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        counts.sort_by(|a, b| b.1.cmp(&a.1));
+
+        // Render archetype bar: "VAN ███  SCT ██  ARC █  MED █"
+        let mut col = 1i32;
+        for (arch, count) in &counts {
+            let abbrev = archetype_abbrev(*arch);
+            let ac = archetype_color(*arch);
+            put_text(buffer, content_top, col, abbrev, ac);
+            col += abbrev.len() as i32 + 1;
+            let blocks: String = "\u{2588}".repeat(*count);
+            put_text(buffer, content_top, col, &blocks, ac);
+            col += *count as i32 + 2;
+        }
+        content_top += 1;
+
+        // Status summary: "Avail: 4    Injured: 2    On Mission: 1"
+        let avail = roster
+            .iter()
+            .filter(|m| matches!(m.status, MercStatus::Available))
+            .count();
+        let injured = roster
+            .iter()
+            .filter(|m| matches!(m.status, MercStatus::Injured { .. }))
+            .count();
+        let on_mission = roster
+            .iter()
+            .filter(|m| matches!(m.status, MercStatus::OnMission(_)))
+            .count();
+        let mut status_col = 1i32;
+        let avail_str = format!("Avail: {}", avail);
+        put_text(buffer, content_top, status_col, &avail_str, Color::Green);
+        status_col += avail_str.len() as i32 + 4;
+        if injured > 0 {
+            let inj_str = format!("Injured: {}", injured);
+            put_text(buffer, content_top, status_col, &inj_str, Color::Yellow);
+            status_col += inj_str.len() as i32 + 4;
+        }
+        if on_mission > 0 {
+            let mis_str = format!("On Mission: {}", on_mission);
+            put_text(buffer, content_top, status_col, &mis_str, Color::Cyan);
+        }
+        content_top += 1;
+    }
+
     // ── Footer ──
     put_text(
         buffer,
@@ -181,8 +240,6 @@ pub(super) fn render_roster(
         help_hint,
         Color::Rgb(50, 70, 100),
     );
-
-    let content_top = 1i32;
     let content_bottom = height as i32 - 1;
 
     if roster.is_empty() {
@@ -335,6 +392,23 @@ fn render_roster_split(
         Color::DarkGray,
     );
 
+    // Compute max stats for relative bar scaling
+    let max_pwr = roster
+        .iter()
+        .map(|m| m.effective_power())
+        .max()
+        .unwrap_or(1)
+        .max(1);
+    let max_res = roster
+        .iter()
+        .map(|m| m.effective_resilience())
+        .max()
+        .unwrap_or(1)
+        .max(1);
+    // Show stat bars only when roster fits with 2 rows per merc
+    let available_rows = (content_bottom - content_top - 1) as usize;
+    let show_bars = roster.len() * 2 <= available_rows;
+
     let mut list_row = header_row + 1;
     for (i, merc) in roster.iter().enumerate() {
         if list_row >= content_bottom {
@@ -383,6 +457,31 @@ fn render_roster_split(
         let status_offset = 1 + 40;
         put_text(buffer, list_row, status_offset, &status_str, status_color);
         list_row += 1;
+
+        // Inline stat bars (only when enough vertical space)
+        if show_bars && list_row < content_bottom {
+            let bar_w = 8usize;
+            let pwr_filled =
+                ((merc.effective_power() as f64 / max_pwr as f64) * bar_w as f64).round() as usize;
+            let res_filled = ((merc.effective_resilience() as f64 / max_res as f64) * bar_w as f64)
+                .round() as usize;
+            let pwr_bar: String =
+                "\u{2588}".repeat(pwr_filled) + &"\u{2591}".repeat(bar_w - pwr_filled);
+            let res_bar: String =
+                "\u{2588}".repeat(res_filled) + &"\u{2591}".repeat(bar_w - res_filled);
+            let bar_line = format!("    Pwr {} Res {}", pwr_bar, res_bar);
+            put_text(buffer, list_row, 1, &bar_line, Color::Rgb(40, 60, 80));
+            // Recolor bars
+            put_text(buffer, list_row, 9, &pwr_bar, Color::Rgb(100, 140, 200));
+            put_text(
+                buffer,
+                list_row,
+                9 + bar_w as i32 + 5,
+                &res_bar,
+                Color::Rgb(80, 160, 120),
+            );
+            list_row += 1;
+        }
     }
 
     // Recruit slot
@@ -674,24 +773,45 @@ pub(super) fn render_recruit(
     let refresh_secs = (pool.refreshed_at + chrono::Duration::hours(24) - now)
         .num_seconds()
         .max(0);
-    let refresh_str = if refresh_secs <= 0 {
-        "Refreshing...".to_string()
-    } else {
-        format!("Refreshes in {}", format_countdown(refresh_secs))
-    };
     let capacity_color = if roster_count < max_roster {
         Color::Green
     } else {
         Color::LightRed
     };
+    let pool_count = pool.candidates.len();
     let summary = format!(
-        "Roster: {}/{}    Marks: {}    {}",
-        roster_count, max_roster, marks, refresh_str,
+        "RECRUITS ({} available)    Roster: {}/{}    \u{25c6} {} Marks",
+        pool_count, roster_count, max_roster, marks,
     );
     put_text(buffer, 0, 1, &summary, Color::DarkGray);
+    // Highlight pool count
+    let count_str = format!("{}", pool_count);
+    put_text(
+        buffer,
+        0,
+        11,
+        &count_str,
+        if pool_count > 0 {
+            Color::Cyan
+        } else {
+            Color::DarkGray
+        },
+    );
     // Highlight capacity portion
+    let cap_start = summary.find("Roster:").unwrap_or(0) + 8;
     let cap_str = format!("{}/{}", roster_count, max_roster);
-    put_text(buffer, 0, 9, &cap_str, capacity_color);
+    put_text(buffer, 0, 1 + cap_start as i32, &cap_str, capacity_color);
+    // Highlight marks in amber
+    let marks_str = format!("\u{25c6} {} Marks", marks);
+    if let Some(marks_pos) = summary.find('\u{25c6}') {
+        put_text(
+            buffer,
+            0,
+            1 + marks_pos as i32,
+            &marks_str,
+            super::deep_missions::MARKS_COLOR,
+        );
+    }
 
     // ── Footer ──
     let footer = if ctx.tier <= SizeTier::S {
@@ -710,7 +830,21 @@ pub(super) fn render_recruit(
         Color::Rgb(50, 70, 100),
     );
 
-    let content_top = 1i32;
+    // Refresh countdown on row 1
+    let refresh_color = if refresh_secs < 3600 {
+        Color::Cyan
+    } else {
+        Color::DarkGray
+    };
+    put_text(
+        buffer,
+        1,
+        1,
+        &format!("New recruits in {}", format_countdown(refresh_secs)),
+        refresh_color,
+    );
+
+    let content_top = 2i32;
     let content_bottom = height as i32 - 1;
 
     if pool.candidates.is_empty() {
@@ -1038,40 +1172,136 @@ fn render_recruit_split(
     );
     row += 1;
 
-    // Stats with hints
+    // Stats with "vs Best" comparison
     row += 1;
-    put_text(buffer, row, detail_inner_left, "Stats:", Color::Cyan);
-    row += 1;
-    put_text(
-        buffer,
-        row,
-        detail_inner_left,
-        &format!(
-            "  Power:      {:3}  (combat effectiveness)",
-            candidate.effective_power()
-        ),
-        Color::White,
-    );
-    row += 1;
-    put_text(
-        buffer,
-        row,
-        detail_inner_left,
-        &format!(
-            "  Resilience: {:3}  (injury resistance)",
-            candidate.effective_resilience()
-        ),
-        Color::White,
-    );
-    row += 1;
-    put_text(
-        buffer,
-        row,
-        detail_inner_left,
-        &format!("  Expertise:  {:3}  (event bonuses)", candidate.expertise),
-        Color::White,
-    );
-    row += 1;
+    // Find the best roster merc of the same archetype for comparison
+    let best_same_arch = deep
+        .prestige
+        .roster
+        .iter()
+        .filter(|m| m.archetype == candidate.archetype)
+        .max_by_key(|m| m.effective_power() + m.effective_resilience() + m.expertise);
+
+    if let Some(best) = best_same_arch {
+        let header = format!(
+            "Stats:          Recruit  vs Best {}",
+            candidate.archetype.display_name()
+        );
+        put_text(buffer, row, detail_inner_left, &header, Color::Cyan);
+        // Highlight archetype name
+        let arch_col = detail_inner_left + "Stats:          Recruit  vs Best ".len() as i32;
+        put_text(
+            buffer,
+            row,
+            arch_col,
+            candidate.archetype.display_name(),
+            archetype_color(candidate.archetype),
+        );
+        row += 1;
+
+        let stats: [(&str, u32, u32); 3] = [
+            (
+                "Power:",
+                candidate.effective_power(),
+                best.effective_power(),
+            ),
+            (
+                "Resilience:",
+                candidate.effective_resilience(),
+                best.effective_resilience(),
+            ),
+            ("Expertise:", candidate.expertise, best.expertise),
+        ];
+        for (label, recruit_val, best_val) in stats {
+            if row >= content_bottom {
+                break;
+            }
+            let delta = recruit_val as i32 - best_val as i32;
+            let (delta_str, delta_color) = if delta > 0 {
+                (format!("(+{}) \u{25b2}", delta), Color::Green)
+            } else if delta < 0 {
+                (format!("({}) \u{25bc}", delta), Color::LightRed)
+            } else {
+                ("(=)".to_string(), Color::DarkGray)
+            };
+            let line = format!(
+                "  {:12} {:3}      {:3}  {}",
+                label, recruit_val, best_val, delta_str
+            );
+            put_text(buffer, row, detail_inner_left, &line, Color::White);
+            // Recolor delta portion
+            let delta_col = detail_inner_left
+                + format!("  {:12} {:3}      {:3}  ", label, recruit_val, best_val).len() as i32;
+            put_text(buffer, row, delta_col, &delta_str, delta_color);
+            row += 1;
+        }
+
+        // Verdict summary
+        if row < content_bottom {
+            let recruit_total = candidate.effective_power()
+                + candidate.effective_resilience()
+                + candidate.expertise;
+            let best_total = best.effective_power() + best.effective_resilience() + best.expertise;
+            let verdict = if recruit_total > best_total + 5 {
+                ("Clear upgrade", Color::Green)
+            } else if recruit_total >= best_total {
+                ("Comparable", Color::Cyan)
+            } else if candidate.expertise > best.expertise {
+                ("Better expertise, weaker combat", Color::Yellow)
+            } else if candidate.effective_power() > best.effective_power() {
+                ("Better power, weaker elsewhere", Color::Yellow)
+            } else {
+                ("Weaker than current", Color::DarkGray)
+            };
+            put_text(
+                buffer,
+                row,
+                detail_inner_left,
+                &format!("  Verdict: {}", verdict.0),
+                verdict.1,
+            );
+            row += 1;
+        }
+    } else {
+        // No existing merc of this archetype — show plain stats with "first of type" note
+        put_text(buffer, row, detail_inner_left, "Stats:", Color::Cyan);
+        let arch_note = format!(
+            "  (First {} in roster!)",
+            candidate.archetype.display_name()
+        );
+        put_text(buffer, row, detail_inner_left + 7, &arch_note, Color::Green);
+        row += 1;
+        put_text(
+            buffer,
+            row,
+            detail_inner_left,
+            &format!(
+                "  Power:      {:3}  (combat effectiveness)",
+                candidate.effective_power()
+            ),
+            Color::White,
+        );
+        row += 1;
+        put_text(
+            buffer,
+            row,
+            detail_inner_left,
+            &format!(
+                "  Resilience: {:3}  (injury resistance)",
+                candidate.effective_resilience()
+            ),
+            Color::White,
+        );
+        row += 1;
+        put_text(
+            buffer,
+            row,
+            detail_inner_left,
+            &format!("  Expertise:  {:3}  (event bonuses)", candidate.expertise),
+            Color::White,
+        );
+        row += 1;
+    }
 
     // Cost section
     row += 1;

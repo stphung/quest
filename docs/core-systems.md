@@ -215,6 +215,7 @@ final_multiplier = base_multiplier + (CHA_mod * 0.1)
 - Chess stats
 - Haven (account-level, persists across all characters)
 - Achievements (account-level)
+- The Deep persistent data (guild rank, cleared layers, infrastructure)
 
 **Recalculated:**
 - Zone unlocks (based on new prestige rank — higher prestige unlocks more zones immediately)
@@ -371,7 +372,7 @@ The game runs a 100ms tick loop. Each tick calls `game_tick()` in `src/core/tick
 
 The tick implementation is split across several files:
 - `tick.rs` -- Orchestrator: calls each stage in order, returns `TickResult`
-- `tick_types.rs` -- `TickEvent` enum (35 variants) and `TickResult` struct
+- `tick_types.rs` -- `TickEvent` enum (41 variants) and `TickResult` struct
 - `tick_stages.rs` -- Processing stages 4-6 and helper functions (`process_item_drop`, `process_discoveries`, etc.)
 - `xp.rs` -- XP calculation, leveling logic, combat kill XP
 - `discoveries.rs` -- Discovery rolls for dungeons, fishing spots, Haven, Soulforge
@@ -389,6 +390,7 @@ pub fn game_tick<R: Rng>(
     haven: &mut Haven,
     enhancement: &mut EnhancementProgress,
     achievements: &mut Achievements,
+    deep: &mut DeepState,
     debug_mode: bool,
     rng: &mut R,
 ) -> TickResult
@@ -398,16 +400,20 @@ Generic `<R: Rng>` allows seeded RNG in tests (`ChaCha8Rng`) and `thread_rng()` 
 
 ### TickEvent and TickResult
 
-`TickEvent` is an enum with 35 variants describing everything that can happen in a single tick. The presentation layer (`main.rs` via `tick_events.rs`) maps these to combat log entries and visual effects. Game logic never touches UI types. Defined in `tick_types.rs`.
+`TickEvent` is an enum with 41 variants describing everything that can happen in a single tick. The presentation layer (`main.rs` via `tick_events.rs`) maps these to combat log entries and visual effects. Game logic never touches UI types. Defined in `tick_types.rs`.
 
 ```rust
 pub struct TickResult {
     pub events: Vec<TickEvent>,
     pub leviathan_encounter: Option<u8>,
+    pub leviathan_lure_consumed: bool,
+    pub leviathan_catch_miss: bool,
     pub achievements_changed: bool,
     pub haven_changed: bool,
     pub enhancement_changed: bool,
     pub god_items_changed: bool,
+    pub deep_changed: bool,
+    pub deep_event_ready: bool,
     pub achievement_modal_ready: Vec<AchievementId>,
 }
 ```
@@ -420,6 +426,7 @@ pub struct TickResult {
 - Fishing: messages, catches, item drops, rank-ups, Storm Leviathan
 - Discovery: challenges, dungeons, fishing spots, Haven, Soulforge, Stormglass
 - Stormglass: `StormglassEarned`, `SigilActivated`, `SigilExpired`
+- Deep: `DeepMissionComplete`, `DeepEventPending`, `DeepMercInjured`, `DeepMercLost`, `DeepBreakthrough`, `DeepGuildRankUp`
 - Progress: `LeveledUp`, `AchievementUnlocked`
 
 ### Processing Stages
@@ -437,7 +444,9 @@ pub struct TickResult {
 | 9. Achievement collection | Drains newly unlocked achievements into TickResult.events | tick.rs |
 | 10. Haven discovery | Rolls for Haven discovery (P10+, no active content) | tick.rs |
 | 11. Soulforge discovery | Rolls for Soulforge discovery (P15+, no active content) | tick.rs |
-| 12. Achievement modal | Checks if 500ms accumulation window has elapsed for modal display | tick.rs |
+| 12. Deep discovery | Rolls for The Deep discovery (P15+, same formula as Soulforge) | tick.rs |
+| 13. Deep missions | Ticks active Deep missions, processes completions and events | tick.rs |
+| 14. Achievement modal | Checks if 500ms accumulation window has elapsed for modal display | tick.rs |
 
 **Important**: Stage 5 (fishing) returns early, skipping stages 6-7. Fishing and combat are mutually exclusive.
 
@@ -552,5 +561,7 @@ Enhancement state (`EnhancementProgress`) is saved to `~/.quest/enhancement.json
 | Haven discovery rank bonus | +0.000007/tick per rank above 10 |
 | Soulforge discovery base | 0.000014/tick (P15+) |
 | Soulforge discovery rank bonus | +0.000007/tick per rank above 15 |
+| Deep discovery base | 0.000014/tick (P15+) |
+| Deep discovery rank bonus | +0.000007/tick per rank above 15 |
 | Prestige mult formula | `1.0 + 0.5 * rank^0.7` |
 | Base max fishing rank | 30 (40 with Fishing Dock T4) |

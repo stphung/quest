@@ -168,32 +168,58 @@ pub(super) fn render_event_response(
         put_text_centered(buffer, desc_row, width, &line_buf, Color::White);
     }
 
-    // ── Auto-resolve countdown ──
+    // ── Auto-resolve countdown with visual bar ──
     let auto_resolve_row = narrative_top + narrative_height as i32;
     let seconds_since_fired = (now - event.fired_at).num_seconds().max(0) as u64;
     // Auto-resolve fires after 30 minutes of no response
     const AUTO_RESOLVE_SECS: u64 = 30 * 60;
     let remaining = AUTO_RESOLVE_SECS.saturating_sub(seconds_since_fired);
-    let (countdown_color, countdown_text) = if remaining < 5 * 60 {
-        (Color::LightRed, format!("Auto-resolve in: {}s", remaining))
+    let ratio = remaining as f64 / AUTO_RESOLVE_SECS as f64; // 1.0 = full time, 0.0 = expired
+
+    // Bar color shifts green → yellow → red as time runs out
+    let bar_color = if ratio > 0.5 {
+        Color::Green
+    } else if ratio > 0.17 {
+        Color::Yellow
     } else {
-        let m = remaining / 60;
-        (Color::Yellow, format!("Auto-resolve in: {}m", m))
+        Color::LightRed
     };
-    put_text(
-        buffer,
-        auto_resolve_row,
-        1,
-        &countdown_text,
-        countdown_color,
-    );
-    put_text(
-        buffer,
-        auto_resolve_row,
-        countdown_text.len() as i32 + 3,
-        "(safe choice will be selected)",
-        Color::DarkGray,
-    );
+
+    // Render the bar
+    let bar_label = "Auto-resolve: ";
+    put_text(buffer, auto_resolve_row, 1, bar_label, Color::DarkGray);
+    let bar_col = 1 + bar_label.len() as i32;
+    let bar_width = 15usize.min(width.saturating_sub(bar_label.len() + 20));
+    let filled = ((ratio * bar_width as f64).round() as usize).min(bar_width);
+    for i in 0..bar_width {
+        let ch = if i < filled { '\u{2588}' } else { '\u{2592}' };
+        let color = if i < filled {
+            bar_color
+        } else {
+            Color::Rgb(30, 40, 60)
+        };
+        super::scene_fx::put_cell(buffer, auto_resolve_row, bar_col + i as i32, ch, color);
+    }
+
+    // Time remaining text after bar
+    let time_col = bar_col + bar_width as i32 + 1;
+    let time_text = if remaining < 60 {
+        format!("{}s remaining", remaining)
+    } else {
+        format!("{}m remaining", remaining / 60)
+    };
+    put_text(buffer, auto_resolve_row, time_col, &time_text, bar_color);
+
+    // Second line: safe choice note
+    if auto_resolve_row + 1 < content_bottom {
+        put_text(
+            buffer,
+            auto_resolve_row + 1,
+            bar_col,
+            "(safe choice auto-selected)",
+            Color::DarkGray,
+        );
+    }
 
     // ── First-event hint ──
     let mut hint_offset = 0i32;

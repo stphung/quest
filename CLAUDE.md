@@ -82,11 +82,11 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 
 - `game_state.rs` — Main character state struct (level, XP, prestige, combat state, equipment)
 - `game_logic.rs` — Thin re-export wrapper (XP curve, leveling, spawning, offline logic extracted to submodules)
-- `tick.rs` — Per-tick game engine: `game_tick<R: Rng>()` with 12 processing stages. Zero UI imports, zero file I/O — fully decoupled from rendering
-- `tick_types.rs` — TickEvent enum (35 variants) and TickResult struct
+- `tick.rs` — Per-tick game engine: `game_tick<R: Rng>()` with 14 processing stages. Zero UI imports, zero file I/O — fully decoupled from rendering
+- `tick_types.rs` — TickEvent enum (41 variants) and TickResult struct
 - `tick_stages.rs` — Tick processing stages 4-6 and helper functions (process_item_drop, process_discoveries, etc.)
 - `xp.rs` — XP calculation, leveling logic, combat kill XP
-- `discoveries.rs` — Discovery rolls for dungeons, fishing spots, Haven, Soulforge
+- `discoveries.rs` — Discovery rolls for dungeons, fishing spots, Haven, Soulforge, The Deep
 - `enemy_spawning.rs` — Enemy generation and spawning (spawn_enemy_if_needed, try_discover_dungeon)
 - `offline.rs` — Offline XP progression (calculate_offline_xp, process_offline_progression)
 - `recent_drops.rs` — RecentDrop struct and deque management
@@ -107,6 +107,16 @@ CLI: `--ticks N`, `--seed N`, `--prestige N`, `--runs N`, `--verbose`, `--csv FI
 **Haven auto-building:** `--haven <strategy>` enables automatic Haven room construction during simulation. Four strategies: `combat` (Armory/damage path), `qol` (Bedroom/fishing path), `balanced` (both branches), `full` (everything + StormForge). When enabled, Haven is force-discovered at start and prestige ranks are spent on rooms each tick following the strategy's priority order. This models the real gameplay trade-off between investing prestige in Haven vs keeping it for combat bonuses.
 
 **Limitation:** Only exercises the combat/zone progression loop. Interactive systems (dungeons, fishing, challenges) are discovered but never activated (no player input). Haven bonuses are fully active when `--haven` is used. See issue #141 for auto-play policies.
+
+### Deep Simulator (`src/bin/deep_simulator.rs`)
+
+Headless simulator for The Deep mercenary expedition system. Runs mission cycles, recruitment, infrastructure building, and guild rank progression without UI. Useful for testing Deep economy balance and progression pacing.
+
+```bash
+cargo run --release --bin deep_simulator -- --hours 168 --seed 42 --strategy balanced
+```
+
+CLI: `--hours N`, `--seed N`, `--strategy STR` (rush/balanced/infrastructure), `--guild-rank N`, `--verbose`, `--quiet`
 
 ### Character Module (`src/character/`) — [detailed docs](src/character/CLAUDE.md)
 
@@ -200,6 +210,9 @@ Account-level equipment enhancement system (Soulforge) that persists across char
 
 - `types.rs` — All data structures: `DeepState`, `DeepPersistent`, `DeepPrestige`, `GuildRank`, `Mercenary`, `MercArchetype`, `MercStatus`, `Layer`, `LayerRecord`, `LayerTier`, `Infrastructure`, `Mission`, `MissionType`, `MissionStatus`, `MissionOutcome`, `CheckInEvent`, `EventChoice`, `MissionResult`, `AvailableMission`, `RecruitPool`, `DeepUiState`, `DeepView`, discovery constants
 - `mercenaries.rs` — Merc generation (quality tiers, stat variance), recruit pool generation, starter roster, leveling (XP curve, stat growth), injury system (Light/Moderate/Severe), roster management, name generation (40 first names x 10 archetype epithets)
+- `missions.rs` — Mission creation, assignment, completion, resolution, offline processing, pool generation
+- `events.rs` — Check-in event generation, event templates by layer tier, event resolution, auto-resolve
+- `economy.rs` — Warband Marks economy, mission rewards, recruitment costs, infrastructure costs
 - `layers.rs` — Layer difficulty (power thresholds L1-25 + Void scaling), familiarity system (Unknown/Mapped/Familiar/Mastered), mission durations (base + multiplicative modifiers), infrastructure building (validation, costs, Watchtower familiarity bonus)
 - `persistence.rs` — Save/load from `~/.quest/deep.json`
 - `discovery.rs` — Discovery roll logic, starter roster initialisation (3 mercs: Vanguard, Scout, Medic)
@@ -211,9 +224,9 @@ An endgame (P15+) system where players recruit and manage a mercenary company, s
 - `types.rs` — Stormglass currency state, daily rotation tracking
 - `sigils.rs` — Storm Sigils definitions, bonuses, and activation logic
 - `earning.rs` — Stormglass earning from challenge rewards
-- `spending.rs` — Stormglass spending on sigil slots
+- `spending.rs` — Stormglass spending on sigil slots and Storm Lure
 
-Stormglass is a currency earned from completing challenge minigames (replacing the former XP% rewards). Gated behind P15+. Players spend Stormglass to activate Storm Sigils -- a daily-rotating set of passive bonuses. Sigil slots provide combat and progression bonuses.
+Stormglass is a currency earned from completing challenge minigames (replacing the former XP% rewards). Gated behind P15+. Players spend Stormglass to activate Storm Sigils -- a daily-rotating set of passive bonuses. Sigil slots provide combat and progression bonuses. Also offers the Storm Lure consumable (50,000 SG) that guarantees Storm Leviathan encounters during fishing at rank 40.
 
 ### God Items Module (`src/god_items/`)
 
@@ -255,18 +268,18 @@ Account-level base building that persists across prestiges. 14 rooms in a two-br
 
 ### Achievement Module (`src/achievements/`)
 
-- `types.rs` — AchievementId enum (149 variants), categories, unlock tracking, `selected_title` field
+- `types.rs` — AchievementId enum (168 variants), categories, unlock tracking, `selected_title` field
 - `data.rs` — Achievement database with descriptions and unlock conditions
 - `handlers.rs` — Event handlers (on_enemy_killed, on_boss_killed, on_level_up, etc.) and check_milestones
 - `milestones.rs` — MinigameType, MinigameDifficulty enums, milestone threshold arrays
 - `modal.rs` — Modal notification queue, 500ms accumulation window management
 - `notifications.rs` — Pending notification state, category-based notification counts
 - `stats.rs` — Achievement statistics, unlock percentages, progress queries, category breakdowns, score computation
-- `titles.rs` — Title definitions (46 titles), title selection/validation, maps achievements to display text
+- `titles.rs` — Title definitions (51 titles), title selection/validation, maps achievements to display text
 - `unlock.rs` — Core unlock machinery (is_unlocked, unlock, check_milestones)
 - `persistence.rs` — Save/load from `~/.quest/achievements.json`
 
-Account-level achievement system that persists across characters. 6 categories (Combat, Level, Progression, Challenges, Exploration, Stats). Tracks kills, boss kills, levels, prestige, zone completion, challenge wins, fishing ranks/catches, dungeon completions, Haven building, and Soulforge enhancements. Includes modal notification system with 500ms accumulation window. Includes a title system where 44 curated achievements grant display titles (e.g., "Godslayer", "Everlasting") shown in stats panel and character select. Achievement score system: each of the 149 achievements has a point value (7 tiers: 5/10/25/50/100/250/500), computed at runtime — max 16,365 pts. Shown in browser title bar, unlock modal, detail panel, and stats view.
+Account-level achievement system that persists across characters. 7 categories (Combat, Level, Progression, Challenges, Exploration, Deep, Stats). Tracks kills, boss kills, levels, prestige, zone completion, challenge wins, fishing ranks/catches, dungeon completions, Haven building, Soulforge enhancements, and Deep milestones (discovery, layers, guild ranks). Includes modal notification system with 500ms accumulation window. Includes a title system where 51 curated achievements grant display titles (e.g., "Godslayer", "Everlasting") shown in stats panel and character select. Achievement score system: each of the 168 achievements has a point value (7 tiers: 5/10/25/50/100/250/500), computed at runtime. Shown in browser title bar, unlock modal, detail panel, and stats view.
 
 ### History / Time Vault (`src/history/`)
 
@@ -301,16 +314,17 @@ Git-based save versioning system. Every meaningful game event (prestige, boss de
 - `haven_input.rs` — Haven overlay input handling
 - `prestige_input.rs` — Prestige confirmation input handling
 - `soulforge_input.rs` — Soulforge overlay input handling
+- `deep_input.rs` — The Deep overlay input handling (navigation, mission selection, event response, recruitment)
 - `stormglass_input.rs` — Stormglass overlay input handling
 - `time_vault_input.rs` — Time Vault overlay input handling
 
-Routes keyboard input to the appropriate handler based on current game state. Dispatches to minigame input handlers, character management flows, haven overlay, and debug menu. When quitting with pending challenges, shows a confirmation dialog ([Enter] Leave / [Esc] Stay).
+Routes keyboard input to the appropriate handler based on current game state. Dispatches to minigame input handlers, character management flows, haven overlay, deep overlay, and debug menu. When quitting with pending challenges, shows a confirmation dialog ([Enter] Leave / [Esc] Stay).
 
 ### Utilities (`src/utils/`)
 
 - `build_info.rs` — Build metadata (commit, date) embedded at compile time
 - `updater.rs` — Self-update from GitHub releases (30min check interval ±5min jitter)
-- `debug_menu.rs` — Debug menu with tabbed categories (Challenges, World, Resources, Items) for testing discoveries. Activate with `--debug` flag, toggle with backtick. 22 options: trigger dungeons, fishing, all 10 challenge types, Haven discovery, Soulforge discovery, forge god items, grant/discover Stormglass, etch sigils
+- `debug_menu.rs` — Debug menu with tabbed categories (Challenges, World, Resources, Items, Borders) for testing discoveries. Activate with `--debug` flag, toggle with backtick. 24+ options: trigger dungeons, fishing, all 10 challenge types, Haven discovery, Soulforge discovery, Deep discovery, forge god items, grant/discover Stormglass, etch sigils, border styles
 
 ### UI (`src/ui/`) — [detailed docs](src/ui/CLAUDE.md)
 
@@ -344,7 +358,13 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 - `soulforge_effects.rs` — Soulforge hammering/success/failure animation effects
 - `soulforge_slots.rs` — Soulforge slot selection menu
 - `chess_scene.rs`, `go_scene.rs`, `morris_scene.rs`, `gomoku_scene.rs`, `minesweeper_scene.rs`, `rune_scene.rs`, `snake_scene.rs`, `flappy_scene.rs`, `jezzball_scene.rs`, `runic_shift_scene.rs` — Minigame UIs
-- `stormglass_scene.rs` — Stormglass Exchange overlay with animations (Invoke Trial rolling, Chrono Surge speed ramp/fast-forward, Storm Sigils daily rotation)
+- `deep_scene.rs` — The Deep overlay coordinator, backdrop rendering, view routing
+- `deep_missions.rs` — Deep active missions panel and new mission creation
+- `deep_roster.rs` — Deep mercenary roster sub-view
+- `deep_layers.rs` — Deep layer map and infrastructure sub-view
+- `deep_events.rs` — Deep check-in event response sub-view
+- `deep_results.rs` — Deep mission complete modal
+- `stormglass_scene.rs` — Stormglass Exchange overlay with animations (Invoke Trial rolling, Chrono Surge speed ramp/fast-forward, Storm Sigils daily rotation, Storm Lure)
 - `time_vault_scene.rs` — Time Vault overlay UI (branch/commit browser, restore, fork, GitHub cloud sync)
 - `scene_fx.rs` — Shared utilities for layered ASCII scene rendering (scene buffer, backdrop effects, wide character support)
 - `zone_bg.rs` — Stylized zone background scenes with 6-layer compositing pipeline for all 11 zones
@@ -396,10 +416,12 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 - Haven discovery: requires P10+, base chance 0.000014/tick + 0.000007 per rank above 10
 - Challenge discovery: ~2hr avg per challenge (requires P1+)
 - Soulforge discovery: requires P15+, base chance 0.000014/tick + 0.000007 per rank above 15
+- The Deep discovery: requires P15+, base chance 0.000014/tick + 0.000007 per rank above 15 (same as Soulforge)
 - Enhancement levels: 0-10, success rates 100% (+1-4), 70%/55%/40% (+5-7), 30%/20%/10% (+8-10)
 - Enhancement costs: 1 PR (+1-4), 2/3/3 PR (+5-7), 4 PR (+8-9), 5 PR (+10)
 - Enhancement Soul Tithe: +5/+6/+7 can pay 4/6/8 PR for guaranteed 100% success
 - Stormglass: currency earned from challenge rewards, gated behind P15+
+- Storm Lure: 50,000 Stormglass consumable, guarantees Leviathan encounters at fishing rank 40
 
 ## Combat Mechanics
 
@@ -428,6 +450,7 @@ quest/
 │   │   ├── minigame_input.rs # Minigame input dispatch
 │   │   ├── haven_input.rs   # Haven overlay input
 │   │   ├── prestige_input.rs # Prestige confirmation input
+│   │   ├── deep_input.rs    # The Deep overlay input
 │   │   ├── soulforge_input.rs # Soulforge overlay input
 │   │   ├── stormglass_input.rs # Stormglass overlay input
 │   │   └── time_vault_input.rs # Time Vault overlay input
@@ -442,7 +465,8 @@ quest/
 │   │   ├── scene.rs              # Scene rendering dispatch
 │   │   └── update.rs             # Update checking, startup splash screen
 │   ├── bin/
-│   │   └── simulator.rs     # Headless game balance simulator
+│   │   ├── simulator.rs     # Headless game balance simulator
+│   │   └── deep_simulator.rs # Headless Deep economy simulator
 │   ├── core/                # Core game systems
 │   │   ├── constants.rs     # Game balance constants
 │   │   ├── game_logic.rs    # Re-export wrapper
@@ -516,7 +540,11 @@ quest/
 │   │   └── persistence.rs   # Save/load
 │   ├── deep/                # The Deep — Mercenary Expedition System [CLAUDE.md]
 │   │   ├── types.rs         # All data structures (DeepState, Mercenary, Mission, etc.)
+│   │   ├── mod.rs           # Public API re-exports
 │   │   ├── mercenaries.rs   # Merc generation, recruitment, leveling, injuries
+│   │   ├── missions.rs      # Mission creation, assignment, completion, resolution
+│   │   ├── events.rs        # Check-in event generation and resolution
+│   │   ├── economy.rs       # Warband Marks economy, rewards, costs
 │   │   ├── layers.rs        # Layer difficulty, familiarity, infrastructure, durations
 │   │   ├── persistence.rs   # Save/load from ~/.quest/deep.json
 │   │   └── discovery.rs     # Discovery roll logic, starter roster
@@ -589,6 +617,12 @@ quest/
 │       ├── soulforge_scene.rs # Soulforge enhancement overlay (delegates to submodules)
 │       ├── soulforge_effects.rs # Soulforge animation effects
 │       ├── soulforge_slots.rs   # Soulforge slot selection menu
+│       ├── deep_scene.rs     # The Deep overlay coordinator
+│       ├── deep_missions.rs  # Deep missions panel
+│       ├── deep_roster.rs    # Deep roster sub-view
+│       ├── deep_layers.rs    # Deep layer map sub-view
+│       ├── deep_events.rs    # Deep event response sub-view
+│       ├── deep_results.rs   # Deep mission results modal
 │       ├── snake_scene.rs   # Snake UI
 │       ├── flappy_scene.rs  # Flappy Bird UI
 │       ├── jezzball_scene.rs # JezzBall UI
@@ -600,7 +634,7 @@ quest/
 │       ├── bug_report_scene.rs # Bug report overlay
 │       ├── *_scene.rs       # Various game scenes
 │       └── character_*.rs   # Character management UI
-├── tests/                   # Integration tests (34 test files, 4,300+ tests)
+├── tests/                   # Integration tests (49 test files, 5,600+ tests)
 │   ├── game_loop_orchestration_test.rs  # 36 behavior-locking tests for game_tick
 │   ├── tick_integration_test.rs         # Tick module integration tests
 │   ├── zone_progression_test.rs         # Zone advancement tests
