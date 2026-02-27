@@ -19,6 +19,7 @@ mod deep_missions;
 mod deep_results;
 mod deep_roster;
 pub mod deep_scene;
+mod deep_shared;
 pub mod dungeon_map;
 mod enemy_sprite_data;
 mod enemy_sprites;

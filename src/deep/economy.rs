@@ -116,7 +116,7 @@ pub fn compute_mark_reward(params: &MarkRewardParams) -> u32 {
             base
         };
 
-    // Mastered familiarity grants +15% on any mission type.
+    // Mastered familiarity grants +25% on any mission type.
     let fam = FamiliarityLevel::from_familiarity(params.familiarity);
     let after_fam = after_cache * fam.mark_yield_multiplier();
 

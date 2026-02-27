@@ -391,10 +391,10 @@ fn test_prestige_preserves_familiarity() {
     );
 }
 
-// ── 11. Prestige clears mercs ────────────────────────────────────────────────
+// ── 11. Prestige preserves mercs ─────────────────────────────────────────────
 
 #[test]
-fn test_prestige_clears_roster() {
+fn test_prestige_preserves_roster() {
     let mut deep = DeepState::new();
     force_discover(&mut deep);
 
@@ -402,14 +402,15 @@ fn test_prestige_clears_roster() {
 
     deep.on_prestige();
 
-    assert!(
-        deep.prestige.roster.is_empty(),
-        "Roster must be empty immediately after prestige (before new starters)"
+    assert_eq!(
+        deep.prestige.roster.len(),
+        3,
+        "Roster must persist across prestiges"
     );
 }
 
 #[test]
-fn test_prestige_clears_available_missions() {
+fn test_prestige_preserves_available_missions() {
     let mut deep = DeepState::new();
     force_discover(&mut deep);
 
@@ -417,20 +418,22 @@ fn test_prestige_clears_available_missions() {
     let mut rng = seeded_rng();
     mark_layer_cleared(&mut deep.persistent, 1);
     deep.prestige.available_missions = generate_mission_pool(&deep.persistent, &mut rng);
-    assert!(!deep.prestige.available_missions.is_empty());
+    let count = deep.prestige.available_missions.len();
+    assert!(count > 0);
 
     deep.on_prestige();
 
-    assert!(
-        deep.prestige.available_missions.is_empty(),
-        "Available mission pool must clear on prestige"
+    assert_eq!(
+        deep.prestige.available_missions.len(),
+        count,
+        "Available mission pool must persist across prestiges"
     );
 }
 
-// ── 12. Prestige clears Warband Marks ────────────────────────────────────────
+// ── 12. Prestige preserves Warband Marks ─────────────────────────────────────
 
 #[test]
-fn test_prestige_clears_warband_marks() {
+fn test_prestige_preserves_warband_marks() {
     let mut deep = DeepState::new();
     force_discover(&mut deep);
 
@@ -439,15 +442,15 @@ fn test_prestige_clears_warband_marks() {
     deep.on_prestige();
 
     assert_eq!(
-        deep.prestige.warband_marks, 0,
-        "Warband Marks must reset to 0 on prestige"
+        deep.prestige.warband_marks, 99_999,
+        "Warband Marks must persist across prestiges"
     );
 }
 
-// ── 13. Prestige cancels active missions ──────────────────────────────────────
+// ── 13. Prestige preserves active missions ──────────────────────────────────
 
 #[test]
-fn test_prestige_cancels_active_missions() {
+fn test_prestige_preserves_active_missions() {
     let mut deep = DeepState::new();
     force_discover(&mut deep);
 
@@ -466,9 +469,10 @@ fn test_prestige_cancels_active_missions() {
 
     deep.on_prestige();
 
-    assert!(
-        deep.prestige.active_missions.is_empty(),
-        "Active missions must be cancelled on prestige"
+    assert_eq!(
+        deep.prestige.active_missions.len(),
+        2,
+        "Active missions must persist across prestiges"
     );
 }
 
@@ -624,15 +628,12 @@ fn test_three_prestige_cycles_preserves_persistent_state() {
             cycle
         );
 
-        // Per-prestige state must be cleared after each cycle.
+        // Operational state persists across prestiges — marks accumulate.
+        // Each cycle sets marks to cycle * 1000 and adds a mission.
         assert_eq!(
-            deep.prestige.warband_marks, 0,
-            "Cycle {}: marks must reset",
-            cycle
-        );
-        assert!(
-            deep.prestige.active_missions.is_empty(),
-            "Cycle {}: missions must be cleared",
+            deep.prestige.warband_marks,
+            cycle * 1_000,
+            "Cycle {}: marks must persist",
             cycle
         );
     }
@@ -1099,7 +1100,7 @@ fn test_generation_record_preserves_deepest_layer_at_snapshot_time() {
 }
 
 #[test]
-fn test_prestige_tracking_fields_reset_after_prestige() {
+fn test_prestige_tracking_fields_persist_after_prestige() {
     let mut deep = DeepState::new();
     force_discover(&mut deep);
 
@@ -1109,18 +1110,18 @@ fn test_prestige_tracking_fields_reset_after_prestige() {
 
     deep.on_prestige();
 
-    // After prestige, the new prestige state should have zeroed tracking fields
+    // After prestige, tracking fields persist (recorded in generation record)
     assert_eq!(
-        deep.prestige.total_marks_earned, 0,
-        "total_marks_earned must reset on prestige"
+        deep.prestige.total_marks_earned, 500,
+        "total_marks_earned must persist across prestiges"
     );
     assert_eq!(
-        deep.prestige.total_missions_completed, 0,
-        "total_missions_completed must reset on prestige"
+        deep.prestige.total_missions_completed, 10,
+        "total_missions_completed must persist across prestiges"
     );
     assert_eq!(
-        deep.prestige.total_mercs_lost, 0,
-        "total_mercs_lost must reset on prestige"
+        deep.prestige.total_mercs_lost, 2,
+        "total_mercs_lost must persist across prestiges"
     );
 }
 

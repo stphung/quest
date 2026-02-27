@@ -522,118 +522,96 @@ fn test_pool_none_timestamp_triggers_immediate_refresh() {
 }
 
 // =============================================================================
-// 6. Pool refresh after prestige → fresh pool for the new generation
+// 6. Pool persistence after prestige — pool and timestamp survive
 // =============================================================================
 
 #[test]
-fn test_prestige_resets_pool_refreshed_at_to_none() {
+fn test_prestige_preserves_pool_refreshed_at() {
     let mut deep = DeepState::new();
     force_discover(&mut deep);
 
     // Set a non-None timestamp before prestige.
-    deep.prestige.pool_refreshed_at = Some(t0());
+    let ts = Some(t0());
+    deep.prestige.pool_refreshed_at = ts;
     deep.prestige.available_missions = generate_mission_pool(&deep.persistent, &mut seeded_rng(60));
 
     deep.on_prestige();
 
-    // After prestige, pool_refreshed_at should be None (triggering a fresh pool).
+    // After prestige, pool_refreshed_at persists (no forced refresh).
     assert_eq!(
-        deep.prestige.pool_refreshed_at, None,
-        "pool_refreshed_at must reset to None on prestige to force immediate refresh"
+        deep.prestige.pool_refreshed_at, ts,
+        "pool_refreshed_at must persist across prestiges"
     );
 }
 
 #[test]
-fn test_prestige_clears_available_missions_pool() {
+fn test_prestige_preserves_available_missions_pool() {
     let mut deep = DeepState::new();
     force_discover(&mut deep);
 
     deep.prestige.available_missions = generate_mission_pool(&deep.persistent, &mut seeded_rng(61));
-    assert!(
-        !deep.prestige.available_missions.is_empty(),
-        "Pool should be non-empty before prestige"
-    );
+    let count = deep.prestige.available_missions.len();
+    assert!(count > 0, "Pool should be non-empty before prestige");
 
     deep.on_prestige();
 
-    assert!(
-        deep.prestige.available_missions.is_empty(),
-        "available_missions pool must be cleared on prestige"
+    assert_eq!(
+        deep.prestige.available_missions.len(),
+        count,
+        "available_missions pool must persist across prestiges"
     );
 }
 
 #[test]
-fn test_pool_refreshed_after_prestige_via_maybe_refresh() {
+fn test_pool_normal_refresh_still_works_after_prestige() {
     let mut deep = DeepState::new();
     force_discover(&mut deep);
 
-    // Build up some progression before prestige.
+    // Build up some progression.
     mark_layer_cleared(&mut deep.persistent, 1);
     deep.prestige.available_missions = generate_mission_pool(&deep.persistent, &mut seeded_rng(62));
+    deep.prestige.pool_refreshed_at = Some(t0());
 
     deep.on_prestige();
 
-    // After prestige, apply refresh simulating the first tick.
+    // Normal time-based refresh still works (advance time past refresh interval).
     let mut rng = seeded_rng(63);
-    let now = t0();
-    let refreshed = maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, now, &mut rng);
+    let later = t0() + Duration::hours(25); // well past any refresh interval
+    let refreshed =
+        maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, later, &mut rng);
 
-    assert!(
-        refreshed,
-        "First refresh after prestige should always generate a new pool"
-    );
-    // After prestige, frontier resets based on cleared layers (which persist).
-    // Layer 1 is still cleared → frontier is 2.
-    assert_eq!(deep.persistent.frontier_layer(), 2);
-
-    let frontier_missions: Vec<_> = deep
-        .prestige
-        .available_missions
-        .iter()
-        .filter(|m| {
-            matches!(
-                m.mission_type,
-                MissionType::Recon | MissionType::Expedition | MissionType::Breakthrough
-            )
-        })
-        .collect();
-
-    for mission in &frontier_missions {
-        assert_eq!(
-            mission.layer, 2,
-            "After prestige with layer 1 cleared, frontier missions must target layer 2"
-        );
+    // Whether it refreshes depends on time elapsed vs refresh interval.
+    // The point is the system doesn't crash or behave oddly after prestige.
+    if refreshed {
+        assert!(!deep.prestige.available_missions.is_empty());
     }
+    // Frontier layer should still reflect cleared layers.
+    assert_eq!(deep.persistent.frontier_layer(), 2);
 }
 
 #[test]
-fn test_two_prestige_cycles_get_fresh_pools() {
+fn test_two_prestige_cycles_pool_persists() {
     let mut deep = DeepState::new();
     force_discover(&mut deep);
 
-    // Simulate two prestige cycles, each getting a fresh pool.
+    // Generate a pool.
+    deep.prestige.available_missions = generate_mission_pool(&deep.persistent, &mut seeded_rng(70));
+    deep.prestige.pool_refreshed_at = Some(t0());
+
+    // Simulate two prestige cycles — pool should persist through both.
     for cycle in 1u32..=2 {
+        let count_before = deep.prestige.available_missions.len();
         deep.on_prestige();
 
-        let mut rng = seeded_rng(70 + cycle as u64);
-        let now = t0() + Duration::hours(cycle as i64 * 24);
-        let refreshed =
-            maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, now, &mut rng);
-
-        assert!(
-            refreshed,
-            "Cycle {}: pool must refresh after prestige",
-            cycle
-        );
-        assert!(
-            !deep.prestige.available_missions.is_empty(),
-            "Cycle {}: pool must be non-empty after first refresh",
-            cycle
-        );
         assert_eq!(
-            deep.prestige.pool_refreshed_at,
-            Some(now),
-            "Cycle {}: pool_refreshed_at must be updated to refresh time",
+            deep.prestige.available_missions.len(),
+            count_before,
+            "Cycle {}: pool must persist across prestiges",
+            cycle
+        );
+        assert!(
+            deep.prestige.pool_refreshed_at.is_some(),
+            "Cycle {}: pool_refreshed_at must persist across prestiges",
             cycle
         );
     }

@@ -1,15 +1,15 @@
-//! End-to-end integration tests: The Deep prestige reset and persistence model.
+//! End-to-end integration tests: The Deep prestige persistence model.
 //!
 //! Tests the full generational lifecycle across multiple prestige cycles, verifying
 //! the "ratchet" — that each generation starts stronger than the last due to
 //! accumulated persistent state (guild rank, cleared layers, infrastructure,
-//! familiarity) while transient state (mercs, marks, missions) resets cleanly.
+//! familiarity) and that operational state (mercs, marks, missions) persists.
 //!
 //! Covers:
 //!  1. Generation 1 (P15→P16): Discovery, roster init, layer clearing, infra build,
 //!     guild rank upgrade, then prestige.
-//!  2. Post-prestige verification: persistent state preserved, transient state reset.
-//!  3. Generation 2 (P16→P17): Faster ramp from compounding infrastructure, deeper push.
+//!  2. Post-prestige verification: all state preserved (persistent + operational).
+//!  3. Generation 2 (P16→P17): Continued progress with persisted roster and marks.
 //!  4. Generation 3 verification: Cumulative benefits across all prior generations.
 //!  5. Edge cases: mid-mission prestige, injured mercs, full/empty roster.
 
@@ -148,7 +148,7 @@ fn test_gen1_initial_state_is_correct() {
     assert_eq!(deep.prestige.warband_marks, 300);
 }
 
-// ── Prestige Reset (Gen 1 → Gen 2) ─────────────────────────────────────────────
+// ── Prestige Preservation (Gen 1 → Gen 2) ──────────────────────────────────────
 
 #[test]
 fn test_prestige_preserves_discovered_flag() {
@@ -247,26 +247,29 @@ fn test_prestige_preserves_mission_id_counter() {
 }
 
 #[test]
-fn test_prestige_resets_roster() {
+fn test_prestige_preserves_roster() {
     let mut deep = build_generation_1_state();
-    assert!(!deep.prestige.roster.is_empty());
+    let roster_len = deep.prestige.roster.len();
+    assert!(roster_len > 0);
     deep.on_prestige();
-    assert!(
-        deep.prestige.roster.is_empty(),
-        "Roster must be empty after prestige"
+    assert_eq!(
+        deep.prestige.roster.len(),
+        roster_len,
+        "Roster must persist after prestige"
     );
 }
 
 #[test]
-fn test_prestige_resets_warband_marks() {
+fn test_prestige_preserves_warband_marks() {
     let mut deep = build_generation_1_state();
-    assert!(deep.prestige.warband_marks > 0);
+    let marks = deep.prestige.warband_marks;
+    assert!(marks > 0);
     deep.on_prestige();
-    assert_eq!(deep.prestige.warband_marks, 0);
+    assert_eq!(deep.prestige.warband_marks, marks);
 }
 
 #[test]
-fn test_prestige_resets_active_missions() {
+fn test_prestige_preserves_active_missions() {
     let mut deep = build_generation_1_state();
     // Simulate having active missions
     deep.prestige.active_missions.push(quest::deep::Mission {
@@ -283,11 +286,11 @@ fn test_prestige_resets_active_missions() {
         is_first_orders: false,
     });
     deep.on_prestige();
-    assert!(deep.prestige.active_missions.is_empty());
+    assert_eq!(deep.prestige.active_missions.len(), 1);
 }
 
 #[test]
-fn test_prestige_resets_available_missions() {
+fn test_prestige_preserves_available_missions() {
     let mut deep = build_generation_1_state();
     deep.prestige
         .available_missions
@@ -302,13 +305,14 @@ fn test_prestige_resets_available_missions() {
             description: "Test".to_string(),
         });
     deep.on_prestige();
-    assert!(deep.prestige.available_missions.is_empty());
+    assert_eq!(deep.prestige.available_missions.len(), 1);
 }
 
 #[test]
-fn test_prestige_resets_recruit_pool() {
+fn test_prestige_preserves_recruit_pool() {
     let mut deep = build_generation_1_state();
     deep.on_prestige();
+    // Recruit pool persists (empty here since build_generation_1_state doesn't populate it)
     assert!(deep.prestige.recruit_pool.candidates.is_empty());
 }
 
@@ -482,6 +486,8 @@ fn test_three_generation_lifecycle_ratchet() {
     let gen1_l1_familiarity = deep.persistent.layer_record(1).unwrap().familiarity;
 
     // ═══ Prestige 1 (P15→P16) ═══
+    let gen1_marks = deep.prestige.warband_marks;
+    let gen1_roster_len = deep.prestige.roster.len();
     deep.on_prestige();
 
     // Verify persistent survived
@@ -498,21 +504,13 @@ fn test_three_generation_lifecycle_ratchet() {
         .unwrap()
         .has_infrastructure(Infrastructure::Outpost));
 
-    // Verify transient reset
-    assert!(deep.prestige.roster.is_empty());
-    assert_eq!(deep.prestige.warband_marks, 0);
-    assert!(deep.prestige.active_missions.is_empty());
+    // Verify operational state preserved
+    assert_eq!(deep.prestige.roster.len(), gen1_roster_len);
+    assert_eq!(deep.prestige.warband_marks, gen1_marks);
 
     // ═══ Generation 2 (P16→P17) ═══
-    let gen2_starters = generate_starter_roster(
-        deep.persistent.guild_rank,
-        || deep.persistent.next_merc_id(),
-        &mut rng,
-    );
-    deep.prestige.roster.extend(gen2_starters);
+    // Roster persists from gen 1 — no need to generate new starters
     assert_eq!(deep.prestige.roster.len(), 3);
-    // IDs should continue from gen 1
-    assert!(deep.prestige.roster[0].id > gen1_merc_counter);
 
     // Push deeper: clear L4-7
     for layer in 4..=7 {
@@ -539,7 +537,7 @@ fn test_three_generation_lifecycle_ratchet() {
     assert!(try_upgrade_guild_rank(&mut deep.persistent, &mut deep.prestige).is_ok());
     assert_eq!(deep.persistent.guild_rank, GuildRank(3));
 
-    let gen2_merc_counter = deep.persistent.merc_id_counter;
+    let gen2_marks = deep.prestige.warband_marks;
 
     // ═══ Prestige 2 (P16→P17) ═══
     deep.on_prestige();
@@ -589,19 +587,9 @@ fn test_three_generation_lifecycle_ratchet() {
     // L5 got Watchtower bonus (+40) in gen 2
     assert_eq!(deep.persistent.layer_record(5).unwrap().familiarity, 40);
 
-    // Transient state is clean
-    assert!(deep.prestige.roster.is_empty());
-    assert_eq!(deep.prestige.warband_marks, 0);
-    assert!(deep.prestige.active_missions.is_empty());
-
-    // New gen 3 starters should continue counter
-    let gen3_starters = generate_starter_roster(
-        deep.persistent.guild_rank,
-        || deep.persistent.next_merc_id(),
-        &mut rng,
-    );
-    deep.prestige.roster.extend(gen3_starters);
-    assert!(deep.prestige.roster[0].id > gen2_merc_counter);
+    // Operational state persists through prestige
+    assert_eq!(deep.prestige.roster.len(), 3);
+    assert_eq!(deep.prestige.warband_marks, gen2_marks);
 }
 
 // ── Serde Roundtrip Across Prestiges ────────────────────────────────────────────
@@ -669,6 +657,8 @@ fn test_serde_roundtrip_preserves_all_persistent_state() {
 #[test]
 fn test_serde_roundtrip_after_prestige() {
     let mut deep = build_generation_1_state();
+    let marks_before = deep.prestige.warband_marks;
+    let roster_len = deep.prestige.roster.len();
     deep.on_prestige();
 
     let json = serde_json::to_string(&deep).unwrap();
@@ -679,58 +669,62 @@ fn test_serde_roundtrip_after_prestige() {
     assert_eq!(loaded.persistent.guild_rank, GuildRank(2));
     assert_eq!(loaded.persistent.deepest_layer_reached, 5);
 
-    // Transient is correctly reset in serialized form
-    assert!(loaded.prestige.roster.is_empty());
-    assert_eq!(loaded.prestige.warband_marks, 0);
+    // Operational state preserved in serialized form
+    assert_eq!(loaded.prestige.roster.len(), roster_len);
+    assert_eq!(loaded.prestige.warband_marks, marks_before);
 }
 
 // ── Edge Cases ──────────────────────────────────────────────────────────────────
 
 #[test]
-fn test_prestige_with_injured_mercs_resets_completely() {
+fn test_prestige_with_injured_mercs_preserves_roster() {
     let mut deep = build_generation_1_state();
 
     // Injure a merc
     deep.prestige.roster[0].status = MercStatus::Injured {
         missions_remaining: 5,
     };
+    let roster_len = deep.prestige.roster.len();
     deep.on_prestige();
 
-    assert!(
-        deep.prestige.roster.is_empty(),
-        "Injured mercs should be gone after prestige"
+    assert_eq!(
+        deep.prestige.roster.len(),
+        roster_len,
+        "Injured mercs should persist after prestige"
     );
 }
 
 #[test]
-fn test_prestige_with_lost_mercs_resets_completely() {
+fn test_prestige_with_lost_mercs_preserves_roster() {
     let mut deep = build_generation_1_state();
 
     // Mark a merc as lost
     deep.prestige.roster[0].status = MercStatus::Lost;
+    let roster_len = deep.prestige.roster.len();
     deep.on_prestige();
 
-    assert!(
-        deep.prestige.roster.is_empty(),
-        "Lost mercs should be gone after prestige"
+    assert_eq!(
+        deep.prestige.roster.len(),
+        roster_len,
+        "Roster (including lost mercs) should persist after prestige"
     );
 }
 
 #[test]
-fn test_prestige_with_mercs_on_mission_resets_completely() {
+fn test_prestige_with_mercs_on_mission_preserves_state() {
     let mut deep = build_generation_1_state();
 
     // Put mercs on mission
     deep.prestige.roster[0].status = MercStatus::OnMission(1);
     deep.prestige.roster[1].status = MercStatus::OnMission(2);
+    let roster_len = deep.prestige.roster.len();
     deep.on_prestige();
 
-    assert!(deep.prestige.roster.is_empty());
-    assert!(deep.prestige.active_missions.is_empty());
+    assert_eq!(deep.prestige.roster.len(), roster_len);
 }
 
 #[test]
-fn test_prestige_with_full_roster_resets() {
+fn test_prestige_with_full_roster_preserves() {
     let mut deep = build_generation_1_state();
 
     // Fill roster to capacity (Rank 2 = 7 mercs; already have 3)
@@ -752,7 +746,7 @@ fn test_prestige_with_full_roster_resets() {
     assert_eq!(deep.prestige.roster.len(), 7); // Full at rank 2
 
     deep.on_prestige();
-    assert!(deep.prestige.roster.is_empty());
+    assert_eq!(deep.prestige.roster.len(), 7);
 }
 
 #[test]
@@ -766,7 +760,7 @@ fn test_prestige_with_empty_roster_works() {
 }
 
 #[test]
-fn test_prestige_with_pending_results_resets() {
+fn test_prestige_with_pending_results_preserves() {
     let mut deep = build_generation_1_state();
 
     // Add a pending result mission
@@ -795,7 +789,7 @@ fn test_prestige_with_pending_results_resets() {
     });
 
     deep.on_prestige();
-    assert!(deep.prestige.pending_results.is_empty());
+    assert_eq!(deep.prestige.pending_results.len(), 1);
 }
 
 #[test]
@@ -1103,11 +1097,11 @@ fn test_merc_ids_are_globally_unique_across_generations() {
 // ── Prestige With High Marks ────────────────────────────────────────────────────
 
 #[test]
-fn test_prestige_resets_large_mark_balance() {
+fn test_prestige_preserves_large_mark_balance() {
     let mut deep = build_generation_1_state();
     deep.prestige.warband_marks = 99_999;
     deep.on_prestige();
-    assert_eq!(deep.prestige.warband_marks, 0);
+    assert_eq!(deep.prestige.warband_marks, 99_999);
 }
 
 // ── Multiple Rapid Prestiges ────────────────────────────────────────────────────

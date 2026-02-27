@@ -1060,7 +1060,7 @@ fn test_deep_state_is_active_reflects_discovered_flag() {
 }
 
 #[test]
-fn test_deep_state_on_prestige_resets_prestige_keeps_persistent() {
+fn test_deep_state_on_prestige_preserves_all_state() {
     let mut ds = DeepState::new();
     ds.persistent.discovered = true;
     ds.persistent.guild_rank = GuildRank(3);
@@ -1072,10 +1072,13 @@ fn test_deep_state_on_prestige_resets_prestige_keeps_persistent() {
 
     ds.on_prestige();
 
-    // Prestige state reset
-    assert_eq!(ds.prestige.warband_marks, 0);
-    assert!(ds.prestige.roster.is_empty());
-    assert!(ds.prestige.active_missions.is_empty());
+    // Operational state persists across prestiges
+    assert_eq!(ds.prestige.warband_marks, 5000);
+    assert_eq!(ds.prestige.roster.len(), 1);
+
+    // Generation counter advances
+    assert_eq!(ds.persistent.generation_counter, 1);
+    assert_eq!(ds.prestige.generation_number, 1);
 
     // Persistent state preserved
     assert!(ds.persistent.discovered);

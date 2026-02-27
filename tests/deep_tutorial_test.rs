@@ -98,12 +98,12 @@ fn test_deep_ui_close_resets_state() {
 }
 
 // =============================================================================
-// 3. Prestige Reset Behavior
+// 3. Prestige Behavior
 // =============================================================================
 
-/// on_prestige() resets per-prestige state while keeping persistent state.
+/// on_prestige() preserves operational state while advancing generation counter.
 #[test]
-fn test_deep_prestige_resets_prestige_state() {
+fn test_deep_prestige_preserves_operational_state() {
     let mut deep = DeepState::new();
 
     // Set up some persistent state
@@ -113,7 +113,7 @@ fn test_deep_prestige_resets_prestige_state() {
     deep.persistent.layer_record_mut(1).cleared = true;
     deep.persistent.layer_record_mut(2).cleared = true;
 
-    // Set up some per-prestige state
+    // Set up some operational state
     deep.prestige.warband_marks = 9999;
     deep.prestige.roster.push(Mercenary {
         id: 1,
@@ -136,10 +136,13 @@ fn test_deep_prestige_resets_prestige_state() {
     assert!(deep.persistent.layers[0].cleared);
     assert!(deep.persistent.layers[1].cleared);
 
-    // Per-prestige state resets
-    assert_eq!(deep.prestige.warband_marks, 0);
-    assert!(deep.prestige.roster.is_empty());
-    assert!(deep.prestige.active_missions.is_empty());
+    // Operational state persists across prestiges
+    assert_eq!(deep.prestige.warband_marks, 9999);
+    assert_eq!(deep.prestige.roster.len(), 1);
+
+    // Generation counter advances
+    assert_eq!(deep.persistent.generation_counter, 1);
+    assert_eq!(deep.prestige.generation_number, 1);
 }
 
 /// Prestige should not affect layer infrastructure (persists across prestiges).

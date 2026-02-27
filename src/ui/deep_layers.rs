@@ -66,7 +66,7 @@ fn familiarity_effect_text(familiarity: u8) -> &'static str {
         FamiliarityLevel::Unknown => "No duration bonus yet",
         FamiliarityLevel::Mapped => "-10% mission duration",
         FamiliarityLevel::Familiar => "-20% mission duration",
-        FamiliarityLevel::Mastered => "-30% duration, +15% Mark yield",
+        FamiliarityLevel::Mastered => "-30% duration, +25% Mark yield",
     }
 }
 
@@ -198,6 +198,19 @@ pub(super) fn render_layers(
         ),
         Color::DarkGray,
     );
+
+    // ── Infrastructure legend ──
+    let legend = "O=Outpost C=Cache W=Watchtower B=Bridge";
+    let legend_col = (width as i32 - legend.len() as i32 - 1).max(1);
+    if height as i32 - 2 > 1 {
+        put_text(
+            buffer,
+            height as i32 - 2,
+            legend_col,
+            legend,
+            Color::Rgb(50, 70, 100),
+        );
+    }
 
     // ── Footer ──
     put_text(
@@ -763,7 +776,7 @@ fn render_layers_split(
                     let runs = if cost > 0 { cost / 40 } else { 1 };
                     format!("~{} supply runs to break even", runs.max(1))
                 }
-                Infrastructure::Watchtower => "+25 familiarity immediately".to_string(),
+                Infrastructure::Watchtower => "+40 familiarity immediately".to_string(),
                 Infrastructure::Bridge => {
                     let bridge_count = deep
                         .persistent
@@ -882,7 +895,7 @@ fn short_infra_desc(infra: Infrastructure) -> &'static str {
     match infra {
         Infrastructure::Outpost => "-25% duration on this layer",
         Infrastructure::SupplyCache => "+50% Marks from supply runs",
-        Infrastructure::Watchtower => "+25 intel instantly",
+        Infrastructure::Watchtower => "+40 familiarity instantly",
         Infrastructure::Bridge => "Skip this layer on deep push",
     }
 }
