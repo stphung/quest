@@ -149,7 +149,7 @@ pub(super) fn render_layers(
         0,
         9,
         &format!(
-            "Frontier: Layer {}    Deepest ever: Layer {}",
+            "Frontier: Layer {}    Deepest Descent: Layer {}",
             frontier,
             deepest.max(1)
         ),
