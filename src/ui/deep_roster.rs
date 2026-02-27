@@ -5,6 +5,7 @@ use chrono::Utc;
 use ratatui::style::Color;
 
 use super::deep_missions::archetype_color;
+use super::deep_shared::render_progress_bar;
 use super::responsive::{LayoutContext, SizeTier};
 use super::scene_fx::{put_cell, put_text, put_text_centered, SceneCell};
 
@@ -100,8 +101,8 @@ fn injury_flavor(archetype: MercArchetype, missions_remaining: u32) -> &'static 
         (Vanguard, 2) => "shield arm broken",
         (Scout, 2) => "fell into a fissure",
         (Arcanist, 2) => "ward collapsed inward",
-        (Medic, 2) => "no one left to tend her wounds",
-        (Saboteur, 2) => "caught in his own device",
+        (Medic, 2) => "no one left to tend their wounds",
+        (Saboteur, 2) => "caught in their own device",
         // Severe (3+ missions)
         (Vanguard, _) => "took the hit for the squad",
         (Scout, _) => "barely made it back",
@@ -114,29 +115,6 @@ fn injury_flavor(archetype: MercArchetype, missions_remaining: u32) -> &'static 
 /// Cumulative missions needed to reach a given level (from level 1).
 fn missions_for_level(level: u32) -> u32 {
     (1..level).map(Mercenary::missions_to_next_level).sum()
-}
-
-/// Render a filled/empty progress bar within the scene buffer.
-fn render_merc_progress_bar(
-    buffer: &mut [Vec<SceneCell>],
-    row: i32,
-    col: i32,
-    bar_width: usize,
-    progress: f64,
-) {
-    let filled = ((progress * bar_width as f64).round() as usize).min(bar_width);
-    for i in 0..filled {
-        put_cell(buffer, row, col + i as i32, '\u{2588}', Color::Cyan);
-    }
-    for i in filled..bar_width {
-        put_cell(
-            buffer,
-            row,
-            col + i as i32,
-            '\u{2591}',
-            Color::Rgb(30, 40, 60),
-        );
-    }
 }
 
 pub(super) fn render_roster(
@@ -319,7 +297,7 @@ fn render_roster_compact(
         let line = format!(
             "{}{:14} {:3} {:2}  {:3} {:3}  {}",
             cursor,
-            &merc.name[..merc.name.len().min(14)],
+            merc.name.chars().take(14).collect::<String>(),
             abbrev,
             merc.level,
             merc.effective_power(),
@@ -418,13 +396,12 @@ fn render_roster_split(
         let cursor = if is_sel { "\u{25b6} " } else { "  " };
         let (status_str, status_color) = merc_status_compact(&merc.status);
         let (qg, qc) = quality_glyph(merc);
-        let arch_name =
-            &merc.archetype.display_name()[..merc.archetype.display_name().len().min(8)];
+        let arch_name: String = merc.archetype.display_name().chars().take(8).collect();
 
         let line = format!(
             "{}{:14} {:8} {} {:2} {:3} {:3}  {}",
             cursor,
-            &merc.name[..merc.name.len().min(14)],
+            merc.name.chars().take(14).collect::<String>(),
             arch_name,
             qg,
             merc.level,
@@ -445,7 +422,7 @@ fn render_roster_split(
             buffer,
             list_row,
             18,
-            arch_name,
+            &arch_name,
             archetype_color(merc.archetype),
         );
         // Quality glyph colored
@@ -602,7 +579,7 @@ fn render_roster_split(
     row += 1;
     let bar_width = 10usize;
     let bar_col = detail_inner_left + 2;
-    render_merc_progress_bar(buffer, row, bar_col, bar_width, progress_ratio);
+    render_progress_bar(buffer, row, bar_col, bar_width, progress_ratio, Color::Cyan);
     let progress_str = format!(
         "  {}/{}  \u{2192} Lv {}",
         progress_in_level,
@@ -671,7 +648,7 @@ fn render_roster_split(
                 // Mission progress bar
                 let bar_col = detail_inner_left + 2;
                 let bar_width = 12usize;
-                render_merc_progress_bar(buffer, row, bar_col, bar_width, progress);
+                render_progress_bar(buffer, row, bar_col, bar_width, progress, Color::Cyan);
                 let eta_str = if remaining_secs > 3600 {
                     format!(
                         "  {}% \u{2014} ~{}h {}m left",
@@ -930,13 +907,12 @@ fn render_recruit_compact(
         let cursor = if is_sel { "\u{25b6} " } else { "  " };
         let cost = pool.recruit_costs.get(i).copied().unwrap_or(0);
         let can_afford = marks >= cost && roster_count < max_roster;
-        let arch_str =
-            &candidate.archetype.display_name()[..candidate.archetype.display_name().len().min(8)];
+        let arch_str: String = candidate.archetype.display_name().chars().take(8).collect();
 
         let line = format!(
             "{}{:14} {:8} {:3}  {}M",
             cursor,
-            &candidate.name[..candidate.name.len().min(14)],
+            candidate.name.chars().take(14).collect::<String>(),
             arch_str,
             candidate.effective_power(),
             cost,
@@ -960,7 +936,7 @@ fn render_recruit_compact(
             buffer,
             row,
             arch_col,
-            arch_str,
+            &arch_str,
             if can_afford {
                 archetype_color(candidate.archetype)
             } else {
@@ -1045,13 +1021,12 @@ fn render_recruit_split(
         let cursor = if is_sel { "\u{25b6} " } else { "  " };
         let cost = pool.recruit_costs.get(i).copied().unwrap_or(0);
         let can_afford = marks >= cost && roster_count < max_roster;
-        let arch_str =
-            &candidate.archetype.display_name()[..candidate.archetype.display_name().len().min(8)];
+        let arch_str: String = candidate.archetype.display_name().chars().take(8).collect();
 
         let line = format!(
             "{}{:14} {:8}   {:3}  {}M",
             cursor,
-            &candidate.name[..candidate.name.len().min(14)],
+            candidate.name.chars().take(14).collect::<String>(),
             arch_str,
             candidate.effective_power(),
             cost,
@@ -1074,7 +1049,7 @@ fn render_recruit_split(
             buffer,
             row,
             18,
-            arch_str,
+            &arch_str,
             if can_afford {
                 archetype_color(candidate.archetype)
             } else {

@@ -154,7 +154,7 @@ Four types, each buildable once per layer (persists across prestiges):
 |------|--------|-----------|
 | Outpost | -25% mission duration on this layer | 60 + 4*layer |
 | SupplyCache | Supply runs yield bonus resources | 80 + 5*layer |
-| Watchtower | Better intel, auto-resolve, +25 familiarity on build | 70 + 4*layer |
+| Watchtower | Better intel, auto-resolve, +40 familiarity on build | 70 + 4*layer |
 | Bridge | Shortcut — missions can skip this layer | 100 + 5*layer |
 
 ### `MissionType` (`types.rs`)
@@ -243,7 +243,7 @@ pub enum DeepView { Hub, NewMission, Roster, Infrastructure, EventResponse, Recr
 
 **Infrastructure:**
 - `infrastructure_build_cost(infra, layer) -> u32` — Warband Marks cost (scales with depth)
-- `build_infrastructure(record, infra) -> Result<(), InfrastructureBuildError>` — Validate cleared + not duplicate, apply. Watchtower grants +25 familiarity on build.
+- `build_infrastructure(record, infra) -> Result<(), InfrastructureBuildError>` — Validate cleared + not duplicate, apply. Watchtower grants +40 familiarity on build.
 - `mark_layer_cleared(persistent, layer)` — Set cleared flag and update deepest reached
 - `is_frontier_layer(persistent, layer) -> bool` / `is_safe_layer(persistent, layer) -> bool` — Layer state queries
 

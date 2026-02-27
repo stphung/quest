@@ -981,7 +981,7 @@ fn help_content(view: DeepView) -> &'static [&'static str] {
             "INFRASTRUCTURE (permanent)",
             "Outpost      -25% all mission times",
             "Supply Cache +50% Marks on Supply Runs",
-            "Watchtower   +25 familiarity on build",
+            "Watchtower   +40 familiarity on build",
             "Bridge       -2h on deeper missions",
             "",
             "BUILD VIA Construction missions.",

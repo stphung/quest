@@ -23,7 +23,7 @@ pub enum FamiliarityLevel {
     Mapped,
     /// 50–74%: -20% duration, good auto-resolve.
     Familiar,
-    /// 75–100%: -30% duration, excellent auto-resolve, +15% Mark yield.
+    /// 75–100%: -30% duration, excellent auto-resolve, +25% Mark yield.
     Mastered,
 }
 

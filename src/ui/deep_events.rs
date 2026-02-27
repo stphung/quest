@@ -6,21 +6,9 @@ use ratatui::style::Color;
 
 use super::deep_missions::{archetype_color, mission_type_color};
 use super::deep_scene::DEEP_BORDER_COLOR;
+use super::deep_shared::format_hours;
 use super::responsive::{LayoutContext, SizeTier};
 use super::scene_fx::{put_text, put_text_centered, SceneCell};
-
-/// Format seconds as a compact duration string (e.g., "2h", "30m", "1h 30m").
-fn format_duration(secs: u64) -> String {
-    let h = secs / 3600;
-    let m = (secs % 3600) / 60;
-    if h == 0 {
-        format!("{}m", m.max(1))
-    } else if m == 0 {
-        format!("{}h", h)
-    } else {
-        format!("{}h {}m", h, m)
-    }
-}
 
 pub(super) fn render_event_response(
     buffer: &mut [Vec<SceneCell>],
@@ -274,14 +262,11 @@ pub(super) fn render_event_response(
                 None => "\u{2014} risky".to_string(),
             }
         } else if choice.time_delta_secs > 0 {
-            format!(
-                "\u{2014} +{}",
-                format_duration(choice.time_delta_secs as u64)
-            )
+            format!("\u{2014} +{}", format_hours(choice.time_delta_secs as u64))
         } else if choice.time_delta_secs < 0 {
             format!(
                 "\u{2014} -{}",
-                format_duration(choice.time_delta_secs.unsigned_abs())
+                format_hours(choice.time_delta_secs.unsigned_abs())
             )
         } else {
             "\u{2014} safe".to_string()
@@ -339,7 +324,7 @@ pub(super) fn render_event_response(
             buffer,
             auto_row,
             1,
-            &format!("{}[Auto]  Let them decide", cursor),
+            &format!("{}[Safe]  Play it safe (no risk)", cursor),
             Color::DarkGray,
         );
         put_text(
