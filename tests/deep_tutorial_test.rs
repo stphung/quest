@@ -16,7 +16,6 @@
 use quest::deep::{
     CheckInEvent, DeepPersistent, DeepPrestige, DeepState, DeepUiState, DeepView, EventChoice,
     GuildRank, Infrastructure, Layer, LayerTier, MercArchetype, MercStatus, Mercenary, MissionType,
-    STORY_RESONANCE_THRESHOLDS, STORY_STAGE_DISCOVERED, STORY_STAGE_ENTRANCE,
 };
 
 // =============================================================================
@@ -873,71 +872,46 @@ fn strong_p50_state(name: &str) -> GameState {
     state
 }
 
-/// The Deep is discovered through the narrative story chain, not tick-based rolls.
-/// Story advances on prestige when the player has reached The Expanse (Zone 11+).
-/// 10-level escalating cost: cumulative [1,2,4,6,9,12,16,20,25,30] resonance.
+/// complete_discovery() initialises The Deep when triggered by an Expanse boss kill.
 #[test]
-fn test_deep_discovery_via_narrative_story_chain() {
+fn test_deep_discovery_on_endless_kill() {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let mut deep = DeepState::new();
+    assert!(!deep.persistent.discovered);
 
-    // Simulate 30 prestiges from The Expanse at P15+
-    for _ in 0..30 {
-        deep.maybe_increment_rift_resonance(11, 15);
-    }
-    assert_eq!(deep.persistent.rift_resonance, 30);
+    quest::deep::complete_discovery(&mut deep, &mut rng);
 
-    // Advance story through all 10 levels
-    for level in 1..=10u8 {
-        let result = quest::deep::advance_deep_story(&mut deep, 15);
-        assert_eq!(result, Some(level), "Should advance to level {}", level);
-        assert_eq!(deep.persistent.deep_story_stage, level);
-    }
-    assert_eq!(deep.persistent.deep_story_stage, STORY_STAGE_ENTRANCE);
-
-    // Now complete discovery (simulates player pressing [D])
-    quest::deep::complete_story_discovery(&mut deep, &mut rng);
     assert!(deep.persistent.discovered);
-    assert_eq!(deep.persistent.deep_story_stage, STORY_STAGE_DISCOVERED);
     assert_eq!(deep.prestige.roster.len(), 3);
     assert_eq!(deep.prestige.warband_marks, 50);
+    assert!(!deep.prestige.active_missions.is_empty());
+
+    // Verify starter archetypes
+    let archetypes: Vec<_> = deep.prestige.roster.iter().map(|m| m.archetype).collect();
+    assert!(archetypes.contains(&quest::deep::MercArchetype::Vanguard));
+    assert!(archetypes.contains(&quest::deep::MercArchetype::Scout));
+    assert!(archetypes.contains(&quest::deep::MercArchetype::Medic));
 }
 
-/// Discovery should NOT fire via game_tick — no tick-based discovery roll exists.
+/// complete_discovery() is idempotent — calling twice doesn't double-init.
 #[test]
-fn test_deep_discovery_blocked_below_p15_via_game_tick() {
+fn test_deep_discovery_is_idempotent() {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
-    let mut state = GameState::new("Deep P14 Test".to_string(), 0);
-    state.prestige_rank = 14;
-    let mut tick_counter = 0u32;
-    let mut haven = Haven::default();
-    let mut enhancement = EnhancementProgress::new();
     let mut deep = DeepState::new();
-    let mut achievements = Achievements::default();
 
-    for _ in 0..1000 {
-        let result = game_tick(
-            &mut state,
-            &mut tick_counter,
-            &mut haven,
-            &mut enhancement,
-            &mut deep,
-            &mut achievements,
-            false,
-            &mut rng,
-        );
-        assert!(
-            !result.deep_changed,
-            "Deep should not be discovered via tick"
-        );
-    }
-    assert!(!deep.persistent.discovered);
+    quest::deep::complete_discovery(&mut deep, &mut rng);
+    let roster_count = deep.prestige.roster.len();
+    let marks = deep.prestige.warband_marks;
+
+    // Second call should be a no-op
+    quest::deep::complete_discovery(&mut deep, &mut rng);
+    assert_eq!(deep.prestige.roster.len(), roster_count);
+    assert_eq!(deep.prestige.warband_marks, marks);
 }
 
-/// Deep discovery should NOT happen via game_tick even at high prestige.
-/// Discovery is narrative-only (story chain through The Expanse).
+/// Deep discovery should NOT happen via game_tick — it requires an Expanse boss kill.
 #[test]
-fn test_deep_discovery_blocked_by_dungeon_via_game_tick() {
+fn test_deep_not_discovered_via_game_tick_without_boss_kill() {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let mut state = strong_p50_state("Deep Tick Block Test");
     let mut tick_counter = 0u32;
@@ -959,87 +933,10 @@ fn test_deep_discovery_blocked_by_dungeon_via_game_tick() {
         );
         assert!(
             !result.deep_changed,
-            "Deep should never be discovered via tick — narrative only"
+            "Deep should not be discovered via normal tick — requires Expanse boss kill"
         );
     }
     assert!(!deep.persistent.discovered);
-}
-
-/// Story chain final stage requires resonance 30 and P15.
-#[test]
-fn test_deep_story_final_stage_requires_resonance_and_p15() {
-    let mut deep = DeepState::new();
-    deep.persistent.deep_story_stage = STORY_STAGE_ENTRANCE - 1;
-
-    // Resonance 29 + P15 — not enough resonance (need 30)
-    deep.persistent.rift_resonance =
-        STORY_RESONANCE_THRESHOLDS[STORY_STAGE_ENTRANCE as usize - 1] - 1;
-    assert_eq!(deep.check_story_progression(15), None);
-
-    // Resonance 30 + P14 — not enough prestige
-    deep.persistent.rift_resonance = STORY_RESONANCE_THRESHOLDS[STORY_STAGE_ENTRANCE as usize - 1];
-    assert_eq!(deep.check_story_progression(14), None);
-
-    // Resonance 30 + P15 — advances to entrance stage
-    assert_eq!(deep.check_story_progression(15), Some(STORY_STAGE_ENTRANCE));
-}
-
-/// complete_story_discovery is idempotent — calling twice doesn't double-init.
-#[test]
-fn test_deep_discovery_only_once_via_game_tick() {
-    let mut rng = ChaCha8Rng::seed_from_u64(42);
-    let mut deep = DeepState::new();
-    deep.persistent.deep_story_stage = STORY_STAGE_ENTRANCE;
-
-    quest::deep::complete_story_discovery(&mut deep, &mut rng);
-    assert!(deep.persistent.discovered);
-    let roster_len = deep.prestige.roster.len();
-    let marks = deep.prestige.warband_marks;
-
-    // Second call should be a no-op
-    quest::deep::complete_story_discovery(&mut deep, &mut rng);
-    assert_eq!(deep.prestige.roster.len(), roster_len);
-    assert_eq!(deep.prestige.warband_marks, marks);
-}
-
-/// Rift resonance only increments when player reached The Expanse (zone 11+).
-#[test]
-fn test_deep_discovery_debug_mode_via_game_tick() {
-    let mut deep = DeepState::new();
-
-    // Zone 10 (not The Expanse) — should not increment
-    deep.maybe_increment_rift_resonance(10, 15);
-    assert_eq!(deep.persistent.rift_resonance, 0);
-
-    // Zone 11 (The Expanse) at P15+ — should increment
-    deep.maybe_increment_rift_resonance(11, 15);
-    assert_eq!(deep.persistent.rift_resonance, 1);
-
-    // Below P15 — should not increment even in Expanse
-    deep.maybe_increment_rift_resonance(11, 14);
-    assert_eq!(deep.persistent.rift_resonance, 1);
-}
-
-/// Deep discovery via narrative creates correct initial state.
-#[test]
-fn test_deep_discovery_triggers_achievement_via_game_tick() {
-    let mut rng = ChaCha8Rng::seed_from_u64(42);
-    let mut deep = DeepState::new();
-    deep.persistent.deep_story_stage = STORY_STAGE_ENTRANCE;
-
-    quest::deep::complete_story_discovery(&mut deep, &mut rng);
-
-    assert!(deep.persistent.discovered);
-    assert_eq!(deep.persistent.deep_story_stage, STORY_STAGE_DISCOVERED);
-    assert_eq!(deep.prestige.roster.len(), 3);
-    assert_eq!(deep.prestige.warband_marks, 50);
-    assert_eq!(deep.persistent.guild_rank, quest::deep::GuildRank(1));
-
-    // Verify starter archetypes
-    let archetypes: Vec<_> = deep.prestige.roster.iter().map(|m| m.archetype).collect();
-    assert!(archetypes.contains(&quest::deep::MercArchetype::Vanguard));
-    assert!(archetypes.contains(&quest::deep::MercArchetype::Scout));
-    assert!(archetypes.contains(&quest::deep::MercArchetype::Medic));
 }
 
 // =============================================================================

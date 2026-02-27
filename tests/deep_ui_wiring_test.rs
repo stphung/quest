@@ -271,7 +271,6 @@ fn test_ui_state_defaults() {
     assert_eq!(ui.recruit_visit_count, 0);
     assert!(!ui.show_help);
     assert!(ui.farewell_mercs.is_empty());
-    assert!(ui.pending_story_stage.is_none());
 }
 
 #[test]
