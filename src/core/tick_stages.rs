@@ -333,6 +333,7 @@ pub fn process_fishing_tick<R: Rng>(
 /// Processes the `Vec<CombatEvent>` from `update_combat()`, maps each to
 /// the appropriate `TickEvent`, applies XP, handles kills/deaths, processes
 /// item drops and discoveries.
+#[allow(clippy::too_many_arguments)]
 pub fn process_combat_events<R: Rng>(
     state: &mut GameState,
     combat_events: Vec<CombatEvent>,

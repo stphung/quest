@@ -14,6 +14,7 @@ use quest::achievements::Achievements;
 use quest::combat::CombatEvent;
 use quest::core::tick::{game_tick, TickEvent, TickResult};
 use quest::core::tick_stages;
+use quest::deep::DeepState;
 use quest::enhancement::EnhancementProgress;
 use quest::fishing::{
     check_rank_up, check_rank_up_with_max, get_max_fishing_rank, try_discover_fishing,
@@ -23,7 +24,6 @@ use quest::haven::{Haven, HavenBonuses};
 use quest::zones::BossDefeatResult;
 use quest::GameState;
 use rand::SeedableRng;
-use quest::deep::DeepState;
 use rand_chacha::ChaCha8Rng;
 
 fn seeded_rng() -> ChaCha8Rng {
@@ -591,7 +591,16 @@ fn test_zone_achievements_zone_complete_but_gated() {
         },
     }];
 
-    tick_stages::process_combat_events(&mut state, events, &bonuses, &mut ach, &mut deep, false, &mut result, &mut r);
+    tick_stages::process_combat_events(
+        &mut state,
+        events,
+        &bonuses,
+        &mut ach,
+        &mut deep,
+        false,
+        &mut result,
+        &mut r,
+    );
 
     // The zone achievement tracking should have been called
     // Session kills should increment
@@ -775,7 +784,16 @@ fn test_item_drop_equipped_sets_dirty_flag() {
     let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::EnemyDied { xp_gained: 500 }];
-    tick_stages::process_combat_events(&mut state, events, &bonuses, &mut ach, &mut deep, false, &mut result, &mut r);
+    tick_stages::process_combat_events(
+        &mut state,
+        events,
+        &bonuses,
+        &mut ach,
+        &mut deep,
+        false,
+        &mut result,
+        &mut r,
+    );
 
     // An item was dropped from boss (guaranteed) and likely equipped (empty slots)
     if has_event(&result, |e| {
@@ -807,7 +825,16 @@ fn test_item_drop_ilvl_matches_zone() {
     let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::EnemyDied { xp_gained: 500 }];
-    tick_stages::process_combat_events(&mut state, events, &bonuses, &mut ach, &mut deep, false, &mut result, &mut r);
+    tick_stages::process_combat_events(
+        &mut state,
+        events,
+        &bonuses,
+        &mut ach,
+        &mut deep,
+        false,
+        &mut result,
+        &mut r,
+    );
 
     if let Some(TickEvent::ItemDropped { ilvl, .. }) = result
         .events

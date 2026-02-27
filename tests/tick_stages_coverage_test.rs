@@ -11,6 +11,7 @@ use quest::character::derived_stats::DerivedStats;
 use quest::combat::CombatEvent;
 use quest::core::tick::{game_tick, TickEvent, TickResult};
 use quest::core::tick_stages;
+use quest::deep::DeepState;
 use quest::enhancement::EnhancementProgress;
 use quest::fishing::{FishingPhase, FishingSession};
 use quest::haven::{Haven, HavenBonuses};
@@ -18,7 +19,6 @@ use quest::items::types::Rarity;
 use quest::zones::BossDefeatResult;
 use quest::GameState;
 use rand::SeedableRng;
-use quest::deep::DeepState;
 use rand_chacha::ChaCha8Rng;
 
 // =============================================================================
@@ -1450,7 +1450,6 @@ fn test_dungeon_events_noop_when_no_dungeon() {
     let mut result = TickResult::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
-    let mut deep = DeepState::new();
 
     tick_stages::process_dungeon_events(&mut state, 0.1, &bonuses, &mut result, &mut rng);
 
@@ -1467,7 +1466,6 @@ fn test_dungeon_events_with_active_dungeon() {
     let mut result = TickResult::default();
     let mut rng = seeded_rng(42);
     let bonuses = default_haven_bonuses();
-    let mut deep = DeepState::new();
 
     // Run a single tick — the dungeon may or may not produce events depending on
     // timing, but it should not panic
@@ -1489,7 +1487,6 @@ fn test_fishing_tick_returns_false_when_no_fishing() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
-    let mut deep = DeepState::new();
 
     let active = tick_stages::process_fishing_tick(
         &mut state,
@@ -1515,7 +1512,6 @@ fn test_fishing_tick_returns_true_when_fishing_active() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
-    let mut deep = DeepState::new();
 
     let active = tick_stages::process_fishing_tick(
         &mut state,
@@ -1539,7 +1535,6 @@ fn test_fishing_tick_increments_play_time_at_10_ticks() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
-    let mut deep = DeepState::new();
 
     let initial_time = state.play_time_seconds;
 
@@ -1577,7 +1572,6 @@ fn test_fishing_tick_produces_catch_events() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(42);
     let bonuses = default_haven_bonuses();
-    let mut deep = DeepState::new();
 
     let mut caught_fish = false;
 
@@ -1621,7 +1615,6 @@ fn test_fishing_tick_can_level_up_character() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(123);
     let bonuses = default_haven_bonuses();
-    let mut deep = DeepState::new();
 
     tick_stages::process_fishing_tick(
         &mut state,
@@ -1652,7 +1645,6 @@ fn test_fishing_tick_fish_caught_adds_recent_drop() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(42);
     let bonuses = default_haven_bonuses();
-    let mut deep = DeepState::new();
 
     for _ in 0..200 {
         if state.active_fishing.is_none() {
@@ -1688,7 +1680,6 @@ fn test_fishing_tick_messages_prefixed() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(42);
     let bonuses = default_haven_bonuses();
-    let mut deep = DeepState::new();
 
     let mut found_message = false;
 
@@ -1756,7 +1747,6 @@ fn test_fishing_storm_leviathan_debug_mode_suppresses_save() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
-    let mut deep = DeepState::new();
 
     // Should not panic in debug mode
     tick_stages::process_fishing_tick(
@@ -2141,7 +2131,6 @@ fn test_fishing_rarity_parsing_in_catch_events() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(100);
     let bonuses = default_haven_bonuses();
-    let mut deep = DeepState::new();
 
     let mut found_catch = false;
 
@@ -2202,7 +2191,6 @@ fn test_fishing_tick_counter_wraps_at_ticks_per_second() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
-    let mut deep = DeepState::new();
     let mut result = TickResult::default();
 
     let time_before = state.play_time_seconds;
@@ -2239,7 +2227,6 @@ fn test_fishing_tick_pushes_xp_sample_at_second_boundary() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
-    let mut deep = DeepState::new();
     let mut result = TickResult::default();
 
     assert!(state.xp_rate_samples.is_empty());
@@ -2280,7 +2267,6 @@ fn test_fishing_tick_does_not_push_samples() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
-    let mut deep = DeepState::new();
     let mut result = TickResult::default();
 
     state.xp_this_second = 999;

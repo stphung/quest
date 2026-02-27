@@ -41,10 +41,7 @@ fn seeded_rng() -> ChaCha8Rng {
 fn force_discover(deep: &mut DeepState) -> ChaCha8Rng {
     let mut rng = seeded_rng();
     complete_discovery(deep, &mut rng);
-    assert!(
-        deep.persistent.discovered,
-        "Discovery must succeed"
-    );
+    assert!(deep.persistent.discovered, "Discovery must succeed");
     rng
 }
 
