@@ -15,6 +15,9 @@ src/deep/
 ├── mod.rs          — Public API re-exports
 ├── types.rs        — All data structures, enums, constants, and helper methods
 ├── mercenaries.rs  — Merc generation, recruit pools, leveling, injuries, roster management
+├── missions.rs     — Mission creation, assignment, completion, resolution, offline processing
+├── events.rs       — Check-in event generation and resolution
+├── economy.rs      — Warband Marks economy, rewards, costs
 ├── layers.rs       — Layer difficulty, familiarity system, infrastructure, mission durations
 ├── discovery.rs    — Discovery logic (complete_discovery), starter roster init
 └── persistence.rs  — Save/load from ~/.quest/deep.json
@@ -57,7 +60,16 @@ Key methods:
 - `next_merc_id()` / `next_mission_id()` — Monotonically increasing id assignment
 
 ### `DeepPrestige` (`types.rs`)
-Per-prestige state. Resets fully on each prestige.
+Per-prestige operational state. Persists across prestiges (only generation counter advances).
+
+Key fields (beyond roster, active_missions, warband_marks):
+- `pending_results: Vec<Mission>` — Completed missions awaiting player review
+- `generation_number: u32` — Current generation (advanced on prestige)
+- `warband_log: Vec<WarbandLogEntry>` — Mission history log
+- `total_marks_earned: u32` — Lifetime marks earned
+- `total_missions_completed: u32` — Lifetime missions completed
+- `total_mercs_lost: u32` — Lifetime mercs lost
+- `available_missions: Vec<AvailableMission>` — Current mission pool
 
 Key methods:
 - `find_merc(id)` / `find_merc_mut(id)` — Lookup by `u64` id
@@ -175,6 +187,25 @@ Key methods:
 ### `MissionResult` (`types.rs`)
 Populated when a mission completes. Carries: `outcome`, `marks_earned`, `xp_earned`, `stormglass_earned`, optional `item_ilvl`, and lists of `injured_mercs` / `lost_mercs` / `merc_level_ups`.
 
+### `AvailableMission` (`types.rs`)
+A mission available in the pool for the player to start.
+
+```rust
+pub struct AvailableMission {
+    pub mission_type: MissionType,
+    pub layer: u32,
+    pub duration_secs: u64,
+    pub min_squad_power: u32,
+    pub required_archetype: Option<MercArchetype>,
+}
+```
+
+### `WarbandLogEntry` / `GenerationRecord` (`types.rs`)
+`WarbandLogEntry` records individual mission outcomes (name, layer, outcome, marks, timestamp) in the warband log. `GenerationRecord` captures per-prestige summary stats (generation, marks earned, missions completed, mercs lost, deepest layer, gateway status) stored in `DeepPersistent::generation_records`.
+
+### Gateway System (`types.rs`)
+The `gateway_opened` field on `DeepPersistent` tracks whether the Gateway beneath the world has been opened. The `GatewayOpened` achievement is triggered via `achievements.on_deep_gateway_opened()`. The `gateway_opened_this_generation` flag on `GenerationRecord` tracks per-generation gateway status.
+
 ### `DeepUiState` (`types.rs`)
 Not serialized — pure runtime UI state. Manages which `DeepView` is shown and selection indices.
 
@@ -253,7 +284,7 @@ The game tick does **not** simulate mission progress. It only checks for pending
 
 - **`core/tick.rs`**: `game_tick()` takes `deep: &mut DeepState`. Stage 13 checks for pending check-in events.
 - **`core/tick_stages.rs`**: `process_combat_events()` triggers Deep discovery on `BossDefeatResult::ExpanseCycle` when `!discovered && prestige_rank >= DEEP_MIN_PRESTIGE_RANK`. Emits `TickEvent::DeepDiscovered`, sets `deep_changed` flag.
-- **`core/tick_types.rs`**: `TickEvent::DeepDiscovered` variant, `TickResult::deep_changed` and `deep_event_ready` flags
+- **`core/tick_types.rs`**: `TickEvent::DeepDiscovered` variant, `TickResult::deep_changed` flag
 - **`tick_events.rs`**: `TickFlags::deep_discovered` field, combat log message on discovery
 - **`input/mod.rs`**: `[D]` keybind opens overlay when `deep.discovered`. Routes to `handle_deep()`.
 - **`input/deep_input.rs`**: Deep overlay input handler (navigation, mission selection, event response)

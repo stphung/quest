@@ -372,7 +372,7 @@ The game runs a 100ms tick loop. Each tick calls `game_tick()` in `src/core/tick
 
 The tick implementation is split across several files:
 - `tick.rs` -- Orchestrator: calls each stage in order, returns `TickResult`
-- `tick_types.rs` -- `TickEvent` enum (41 variants) and `TickResult` struct
+- `tick_types.rs` -- `TickEvent` enum (42 variants) and `TickResult` struct
 - `tick_stages.rs` -- Processing stages 4-6 and helper functions (`process_item_drop`, `process_discoveries`, etc.)
 - `xp.rs` -- XP calculation, leveling logic, combat kill XP
 - `discoveries.rs` -- Discovery rolls for dungeons, fishing spots, Haven, Soulforge
@@ -400,7 +400,7 @@ Generic `<R: Rng>` allows seeded RNG in tests (`ChaCha8Rng`) and `thread_rng()` 
 
 ### TickEvent and TickResult
 
-`TickEvent` is an enum with 41 variants describing everything that can happen in a single tick. The presentation layer (`main.rs` via `tick_events.rs`) maps these to combat log entries and visual effects. Game logic never touches UI types. Defined in `tick_types.rs`.
+`TickEvent` is an enum with 42 variants describing everything that can happen in a single tick. The presentation layer (`main.rs` via `tick_events.rs`) maps these to combat log entries and visual effects. Game logic never touches UI types. Defined in `tick_types.rs`.
 
 ```rust
 pub struct TickResult {
@@ -413,19 +413,18 @@ pub struct TickResult {
     pub enhancement_changed: bool,
     pub god_items_changed: bool,
     pub deep_changed: bool,
-    pub deep_event_ready: bool,
     pub achievement_modal_ready: Vec<AchievementId>,
 }
 ```
 
 **TickEvent categories**:
-- Combat: `PlayerAttack`, `PlayerAttackBlocked`, `EnemyAttack`, `DamageReflected`, `RegenComplete`, `EnemyDefeated`, `PlayerDied`, `PlayerDiedInDungeon`
+- Combat: `PlayerAttack`, `PlayerAttackBlocked`, `EnemyAttack`, `DamageReflected`, `RegenComplete`, `EnemyDefeated`, `BossEnrage`, `PlayerDied`, `PlayerDiedInDungeon`, `CombatRetreat`
 - Items: `ItemDropped` (rarity, tier, ilvl, power, slot, stats, equipped flag, from_boss flag)
 - Zones: `SubzoneBossDefeated` (with `BossDefeatResult`)
 - Dungeon: room entry, treasure, keys, boss unlock, completion, failure
 - Fishing: messages, catches, item drops, rank-ups, Storm Leviathan
-- Discovery: challenges, dungeons, fishing spots, Haven, Soulforge, Stormglass
-- Stormglass: `StormglassEarned`, `SigilActivated`, `SigilExpired`
+- Discovery: challenges, dungeons, fishing spots, Haven, Soulforge, The Deep, Stormglass
+- Stormglass: `StormglassSalvaged`, `StormglassDungeonCache`
 - Deep: `DeepMissionComplete`, `DeepEventPending`, `DeepMercInjured`, `DeepMercLost`, `DeepBreakthrough`, `DeepGuildRankUp`
 - Progress: `LeveledUp`, `AchievementUnlocked`
 
@@ -563,5 +562,8 @@ Enhancement state (`EnhancementProgress`) is saved to `~/.quest/enhancement.json
 | Soulforge discovery rank bonus | +0.000007/tick per rank above 15 |
 | Deep discovery gate | `DEEP_MIN_PRESTIGE_RANK = 15` |
 | Deep discovery trigger | First `BossDefeatResult::ExpanseCycle` kill (The Endless) |
+| Stormglass prestige gate | `STORMGLASS_MIN_PRESTIGE_RANK = 15` |
+| Death loop threshold | `DEATH_LOOP_THRESHOLD = 3` (consecutive boss deaths trigger retreat) |
+| Mob fight timeout | `MOB_FIGHT_TIMEOUT_SECONDS = 30.0` (stalemate prevention) |
 | Prestige mult formula | `1.0 + 0.5 * rank^0.7` |
 | Base max fishing rank | 30 (40 with Fishing Dock T4) |

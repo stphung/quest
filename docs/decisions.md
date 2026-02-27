@@ -116,7 +116,7 @@ Not all challenges are equally discoverable:
 
 ## game_tick() Extraction to core/tick.rs
 
-**Decision**: Extract the per-tick orchestration function from main.rs into `src/core/tick.rs`, returning a `TickResult` struct with `Vec<TickEvent>` (now 41 variants) instead of mutating UI state directly.
+**Decision**: Extract the per-tick orchestration function from main.rs into `src/core/tick.rs`, returning a `TickResult` struct with `Vec<TickEvent>` (now 42 variants) instead of mutating UI state directly.
 
 **Rationale**: The game loop was tightly coupled to the terminal UI — game logic called `add_log_entry()` and created `VisualEffect` objects directly. Extracting `game_tick()` into a pure-logic module enables:
 - Headless simulation (the `simulator` binary reuses the exact same function)
@@ -247,3 +247,21 @@ This enables systematic balance validation: "does a P0 character reach Zone 2 in
 - Extracted `combat/enemy_generation.rs` for zone/dungeon enemy generators
 
 **Why**: The reward application code was duplicated across all challenge modules with minor variations. The macro eliminates this duplication and ensures consistent behavior. AI extraction follows the same submodule pattern established in Phases 2 and 3.
+
+## Stormglass Currency System
+
+**Decision**: Add Stormglass as a character-level currency earned passively through gameplay (item salvage, dungeon caches, soulforge consolation, challenge rewards) and spent at the Stormglass Exchange overlay for four options: Invoke Challenge, Chrono Surge, Storm Sigils, and Storm Lure.
+
+**Rationale**: Stormglass provides a secondary progression sink for endgame players (P15+) and gives value to non-equipped item drops via auto-salvage. Storm Sigils offer permanent percentage-based bonuses that scale with investment, while Invoke Challenge and Chrono Surge give players agency over discovery pacing. The Storm Lure ties Stormglass into the Stormbreaker quest chain.
+
+## Time Vault: Git-Based Save Versioning
+
+**Decision**: Implement a git-based save versioning system (Time Vault) that creates commits on meaningful game events and allows players to browse, restore, and fork save branches. Includes optional GitHub cloud sync for cross-device play.
+
+**Rationale**: Players invest significant time in idle RPG progression. Git provides built-in branching, history, and diffing without inventing a custom versioning system. Cloud sync via GitHub PAT enables cross-device play while keeping the system simple (no custom server infrastructure).
+
+## Combat Retreat: Death Loop Prevention
+
+**Decision**: Add a combat retreat system (`DEATH_LOOP_THRESHOLD = 3`, `MOB_FIGHT_TIMEOUT_SECONDS = 30.0`) that automatically retreats the player to a safer zone when they die repeatedly or stall against a mob.
+
+**Rationale**: Without intervention, a player who enters a zone too early can get stuck in a death loop — dying instantly, respawning, and dying again. The retreat system detects consecutive deaths and mob fight timeouts, then moves the player back to a zone they can handle, preserving the gameplay loop.

@@ -136,7 +136,7 @@ pub enum ActiveMinigame {
 4. Wire up in `menu.rs`:
    - `create_challenge()` - creates Challenge with difficulties
    - `accept_selected_challenge()` - starts the game
-   - Discovery weights in `CHALLENGE_WEIGHTS`
+   - Discovery weights in `CHALLENGE_TABLE`
 
 ### 5. Add UI Scene (`src/ui/newgame_scene.rs`)
 
@@ -190,7 +190,7 @@ fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &NewGameGame) 
 }
 ```
 
-### 6. Wire Up Input Handling (`src/input.rs`)
+### 6. Wire Up Input Handling (`src/input/minigame_input.rs`)
 
 Add case to `handle_minigame()`:
 

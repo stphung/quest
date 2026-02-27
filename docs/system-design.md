@@ -129,7 +129,6 @@ The game runs at **10 ticks per second** (100ms intervals). Each tick is process
                     │      changed: bool,  │
                     │    haven_changed,    │
                     │    deep_changed,     │
-                    │    deep_event_ready, │
                     │    leviathan_        │
                     │      encounter,      │
                     │    achievement_      │
@@ -148,14 +147,14 @@ The game runs at **10 ticks per second** (100ms intervals). Each tick is process
 
 ### Key Types
 
-**`TickEvent`** (41 variants):
-- Combat: `PlayerAttack`, `PlayerAttackBlocked`, `EnemyAttack`, `DamageReflected`, `RegenComplete`, `EnemyDefeated`, `PlayerDied`, `PlayerDiedInDungeon`
+**`TickEvent`** (42 variants):
+- Combat: `PlayerAttack`, `PlayerAttackBlocked`, `EnemyAttack`, `DamageReflected`, `RegenComplete`, `EnemyDefeated`, `BossEnrage`, `PlayerDied`, `PlayerDiedInDungeon`, `CombatRetreat`
 - Items: `ItemDropped`
 - Zones: `SubzoneBossDefeated`
 - Dungeon: `DungeonRoomEntered`, `DungeonTreasureFound`, `DungeonKeyFound`, `DungeonBossUnlocked`, `DungeonBossDefeated`, `DungeonEliteDefeated`, `DungeonFailed`, `DungeonCompleted`
 - Fishing: `FishingMessage`, `FishCaught`, `FishingItemFound`, `FishingRankUp`, `StormLeviathanCaught`
-- Discovery: `ChallengeDiscovered`, `DungeonDiscovered`, `FishingSpotDiscovered`, `HavenDiscovered`, `SoulforgeDiscovered`, `StormglassDiscovered`
-- Stormglass: `StormglassEarned`, `SigilActivated`, `SigilExpired`
+- Discovery: `ChallengeDiscovered`, `DungeonDiscovered`, `FishingSpotDiscovered`, `HavenDiscovered`, `SoulforgeDiscovered`, `DeepDiscovered`, `StormglassDiscovered`
+- Stormglass: `StormglassSalvaged`, `StormglassDungeonCache`
 - Deep: `DeepMissionComplete`, `DeepEventPending`, `DeepMercInjured`, `DeepMercLost`, `DeepBreakthrough`, `DeepGuildRankUp`
 - Achievements: `AchievementUnlocked`
 - Level: `LeveledUp`
@@ -174,7 +173,6 @@ pub struct TickResult {
     pub enhancement_changed: bool,
     pub god_items_changed: bool,
     pub deep_changed: bool,
-    pub deep_event_ready: bool,
     pub achievement_modal_ready: Vec<AchievementId>,
 }
 ```
@@ -955,7 +953,7 @@ quest/
 │   │   ├── game_logic.rs    # Thin re-export wrapper for submodules
 │   │   ├── game_state.rs    # Main GameState struct
 │   │   ├── tick.rs          # game_tick() orchestrator
-│   │   ├── tick_types.rs    # TickEvent enum (41 variants), TickResult struct
+│   │   ├── tick_types.rs    # TickEvent enum (42 variants), TickResult struct
 │   │   ├── tick_stages.rs   # Tick processing stages 4-6 + helpers
 │   │   ├── xp.rs            # XP calculation, leveling, combat kill XP
 │   │   ├── discoveries.rs   # Discovery rolls (dungeon, fishing, Haven, Soulforge)
