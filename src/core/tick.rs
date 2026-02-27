@@ -183,6 +183,8 @@ pub fn game_tick<R: Rng>(
         combat_events,
         &haven_bonuses,
         achievements,
+        deep,
+        debug_mode,
         &mut result,
         rng,
     );

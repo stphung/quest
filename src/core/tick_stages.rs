@@ -338,6 +338,8 @@ pub fn process_combat_events<R: Rng>(
     combat_events: Vec<CombatEvent>,
     haven_bonuses: &HavenBonuses,
     achievements: &mut Achievements,
+    deep: &mut crate::deep::DeepState,
+    debug_mode: bool,
     result: &mut TickResult,
     rng: &mut R,
 ) {
@@ -564,9 +566,23 @@ pub fn process_combat_events<R: Rng>(
                 };
                 result.events.push(TickEvent::SubzoneBossDefeated {
                     xp_gained,
-                    result: defeat_result,
+                    result: defeat_result.clone(),
                     message,
                 });
+
+                // Deep discovery: first Endless kill at P15+
+                if matches!(defeat_result, BossDefeatResult::ExpanseCycle)
+                    && !deep.persistent.discovered
+                    && state.prestige_rank >= crate::deep::DEEP_MIN_PRESTIGE_RANK
+                {
+                    crate::deep::complete_discovery(deep, rng);
+                    result.events.push(TickEvent::DeepDiscovered);
+                    result.deep_changed = true;
+                    achievements.on_deep_discovered(Some(&state.character_name));
+                    if !debug_mode {
+                        result.achievements_changed = true;
+                    }
+                }
             }
             CombatEvent::CombatRetreat { zone_name } => {
                 let message = format!("\u{1f3c3} Overwhelmed! You retreat to {}...", zone_name);

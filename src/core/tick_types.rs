@@ -177,6 +177,9 @@ pub enum TickEvent {
     /// The Soulforge was discovered (P15+ idle roll).
     SoulforgeDiscovered,
 
+    /// The Deep was discovered (first Endless kill at P15+).
+    DeepDiscovered,
+
     // ── The Deep ──────────────────────────────────────────────────
     /// A Deep mission was completed.
     DeepMissionComplete { message: String },
