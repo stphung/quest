@@ -9,8 +9,9 @@ use crate::deep::{
 use chrono::Utc;
 use ratatui::style::Color;
 
+use super::deep_shared::{draw_deep_card, truncate_text};
 use super::responsive::{LayoutContext, SizeTier};
-use super::scene_fx::{current_millis, put_text, put_text_centered, SceneCell};
+use super::scene_fx::{current_millis, put_cell, put_text, put_text_centered, SceneCell};
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -161,6 +162,129 @@ fn render_progress_bar(
         };
         super::scene_fx::put_cell(buffer, row, col + i as i32, *ch, color);
     }
+}
+
+/// Tint a rectangular panel background (inclusive bounds).
+fn tint_panel_background(
+    buffer: &mut [Vec<SceneCell>],
+    left: i32,
+    top: i32,
+    right: i32,
+    bottom: i32,
+    bg: Color,
+) {
+    for row in top..=bottom {
+        if row < 0 || row as usize >= buffer.len() {
+            continue;
+        }
+        for col in left..=right {
+            if col < 0 || col as usize >= buffer[row as usize].len() {
+                continue;
+            }
+            buffer[row as usize][col as usize].bg = bg;
+        }
+    }
+}
+
+/// Draw a boxed outline around a panel (inclusive bounds).
+fn draw_panel_outline(
+    buffer: &mut [Vec<SceneCell>],
+    left: i32,
+    top: i32,
+    right: i32,
+    bottom: i32,
+    color: Color,
+) {
+    if left >= right || top >= bottom {
+        return;
+    }
+    for col in (left + 1)..right {
+        put_cell(buffer, top, col, '\u{2500}', color);
+        put_cell(buffer, bottom, col, '\u{2500}', color);
+    }
+    for row in (top + 1)..bottom {
+        put_cell(buffer, row, left, '\u{2502}', color);
+        put_cell(buffer, row, right, '\u{2502}', color);
+    }
+    put_cell(buffer, top, left, '\u{250c}', color);
+    put_cell(buffer, top, right, '\u{2510}', color);
+    put_cell(buffer, bottom, left, '\u{2514}', color);
+    put_cell(buffer, bottom, right, '\u{2518}', color);
+}
+
+/// Hub timeline strip: next completion, pending events, recruit refresh.
+fn render_hub_timeline_strip(
+    buffer: &mut [Vec<SceneCell>],
+    width: usize,
+    row: i32,
+    deep: &DeepState,
+    now: chrono::DateTime<Utc>,
+) -> i32 {
+    if width < 46 || row + 2 >= buffer.len() as i32 {
+        return row;
+    }
+
+    let left = 1i32;
+    let right = width as i32 - 2;
+    let top = row;
+    let bottom = row + 2;
+    draw_deep_card(
+        buffer,
+        left,
+        top,
+        right,
+        bottom,
+        Color::Rgb(70, 130, 190),
+        Color::Rgb(7, 14, 28),
+        Some("TIMELINE"),
+    );
+
+    let next_completion = deep
+        .prestige
+        .active_missions
+        .iter()
+        .map(|m| (m.ends_at - now).num_seconds().max(0) as u64)
+        .min();
+    let next_str = if let Some(secs) = next_completion {
+        if secs == 0 {
+            "Next: resolving".to_string()
+        } else {
+            format!("Next: ~{}", format_hours(secs))
+        }
+    } else {
+        "Next: none".to_string()
+    };
+
+    let pending_events = deep
+        .prestige
+        .active_missions
+        .iter()
+        .filter(|m| m.has_pending_event())
+        .count();
+    let events_str = if pending_events > 0 {
+        format!(
+            "{} pending event{}",
+            pending_events,
+            if pending_events == 1 { "" } else { "s" }
+        )
+    } else {
+        "No pending events".to_string()
+    };
+
+    let refresh_secs =
+        (deep.prestige.recruit_pool.refreshed_at + chrono::Duration::hours(24) - now).num_seconds();
+    let recruit_str = if refresh_secs <= 0 {
+        "Recruit refresh: ready".to_string()
+    } else {
+        format!("Recruit refresh: {}", format_hours(refresh_secs as u64))
+    };
+
+    let line = format!("{}  |  {}  |  {}", next_str, events_str, recruit_str);
+    let inner_w = (right - left - 2).max(1) as usize;
+    let clipped = truncate_text(&line, inner_w);
+    put_text(buffer, top + 1, left + 1, &clipped, Color::White);
+
+    top + 3
 }
 
 // ── Compact Hub (S-tier) ─────────────────────────────────────────────────────
@@ -530,6 +654,11 @@ pub(super) fn render_hub(
                     header_row += 1;
                 }
             }
+        }
+
+        // Timeline strip for scannable operational context.
+        if header_row + 3 < height as i32 - 6 {
+            header_row = render_hub_timeline_strip(buffer, width, header_row, deep, now);
         }
     }
 
@@ -982,13 +1111,16 @@ pub(super) fn render_new_mission(
     // Right-aligned: [?] Help + Marks balance in footer
     let marks_display = format!("\u{25c6} {} M", deep.prestige.warband_marks);
     let marks_col = (width as i32 - marks_display.len() as i32 - 2).max(1);
-    put_text(
-        buffer,
-        height as i32 - 1,
-        marks_col,
-        &marks_display,
-        Color::Yellow,
-    );
+    let min_marks_col = footer.chars().count() as i32 + 3;
+    if marks_col > min_marks_col {
+        put_text(
+            buffer,
+            height as i32 - 1,
+            marks_col,
+            &marks_display,
+            MARKS_COLOR,
+        );
+    }
 
     if available.is_empty() {
         let mid = content_top + content_height as i32 / 2;
@@ -1371,6 +1503,50 @@ fn render_new_mission_split(
     let list_width = (width * 40 / 100).max(18).min(width.saturating_sub(20));
     let detail_left = list_width as i32;
     let detail_width = width.saturating_sub(list_width);
+    let staging = ui.staging_mission_index.is_some();
+
+    // In squad-staging mode, visibly emphasize the active left panel.
+    if staging {
+        let panel_top = content_top;
+        let panel_bottom = (content_bottom - 1).max(content_top);
+        let left_left = 0;
+        let left_right = detail_left - 1;
+        let right_left = detail_left + 1;
+        let right_right = width as i32 - 1;
+
+        tint_panel_background(
+            buffer,
+            left_left + 1,
+            panel_top + 1,
+            left_right - 1,
+            panel_bottom - 1,
+            Color::Rgb(9, 18, 34),
+        );
+        tint_panel_background(
+            buffer,
+            right_left + 1,
+            panel_top + 1,
+            right_right - 1,
+            panel_bottom - 1,
+            Color::Rgb(5, 10, 20),
+        );
+        draw_panel_outline(
+            buffer,
+            left_left,
+            panel_top,
+            left_right,
+            panel_bottom,
+            Color::Rgb(95, 175, 235),
+        );
+        draw_panel_outline(
+            buffer,
+            right_left,
+            panel_top,
+            right_right,
+            panel_bottom,
+            Color::Rgb(40, 60, 90),
+        );
+    }
 
     // Draw inner divider
     let glyphs = super::panel_border_chars();
@@ -1378,11 +1554,23 @@ fn render_new_mission_split(
         super::scene_fx::put_cell(buffer, r, detail_left, glyphs.v, Color::Rgb(40, 60, 80));
     }
 
-    let staging = ui.staging_mission_index.is_some();
-
     // Left panel heading
     let left_heading = if staging { "ASSIGN SQUAD" } else { "AVAILABLE" };
-    put_text(buffer, content_top, 1, left_heading, SECTION_LABEL_COLOR);
+    let left_heading_color = if staging {
+        Color::Rgb(95, 175, 235)
+    } else {
+        SECTION_LABEL_COLOR
+    };
+    put_text(buffer, content_top, 1, left_heading, left_heading_color);
+    if staging {
+        put_text(
+            buffer,
+            content_top,
+            detail_left + 2,
+            "SUMMARY (read-only)",
+            Color::DarkGray,
+        );
+    }
     let list_inner_top = content_top + 1;
 
     if !staging {
@@ -1571,7 +1759,7 @@ fn render_new_mission_split(
             m,
             detail_inner_left,
             detail_inner_w,
-            content_top,
+            content_top + 1,
             content_bottom,
         );
     }

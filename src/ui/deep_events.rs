@@ -6,9 +6,22 @@ use ratatui::style::Color;
 
 use super::deep_missions::{archetype_color, mission_type_color};
 use super::deep_scene::DEEP_BORDER_COLOR;
-use super::deep_shared::format_hours;
+use super::deep_shared::{draw_deep_card, format_hours, truncate_text};
 use super::responsive::{LayoutContext, SizeTier};
-use super::scene_fx::{put_text, put_text_centered, SceneCell};
+use super::scene_fx::{current_millis, put_text, put_text_centered, SceneCell};
+
+/// Auto-resolve fires after 30 minutes of no response.
+const AUTO_RESOLVE_SECS: u64 = 30 * 60;
+
+fn urgency_status(remaining_secs: u64) -> (&'static str, Color) {
+    if remaining_secs <= 5 * 60 {
+        ("CRITICAL", Color::LightRed)
+    } else if remaining_secs <= 15 * 60 {
+        ("URGENT", Color::Yellow)
+    } else {
+        ("STABLE", Color::Green)
+    }
+}
 
 pub(super) fn render_event_response(
     buffer: &mut [Vec<SceneCell>],
@@ -63,21 +76,38 @@ pub(super) fn render_event_response(
     let now = Utc::now();
     let tc = mission_type_color(mission.mission_type);
     let progress = mission.progress(now);
+    let seconds_since_fired = (now - event.fired_at).num_seconds().max(0) as u64;
+    let remaining = AUTO_RESOLVE_SECS.saturating_sub(seconds_since_fired);
+    let ratio = remaining as f64 / AUTO_RESOLVE_SECS as f64; // 1.0 = full time, 0.0 = expired
+    let (urgency_label, base_urgency_color) = urgency_status(remaining);
+    let pulse_on = remaining <= 5 * 60 && (current_millis() / 350).is_multiple_of(2);
+    let urgency_color = if pulse_on {
+        Color::Red
+    } else {
+        base_urgency_color
+    };
 
     // ── Header ──
-    put_text(buffer, 0, 1, "EVENT", DEEP_BORDER_COLOR);
-    put_text(
-        buffer,
-        0,
-        8,
-        &format!(
-            "Mission: {} Layer {}    Progress: {}%",
-            mission.mission_type.display_name(),
-            mission.layer,
-            (progress * 100.0) as u32,
-        ),
-        tc,
+    put_text(buffer, 0, 1, "EVENT RESPONSE", DEEP_BORDER_COLOR);
+    let urgency_badge = format!("[{}]", urgency_label);
+    let urgency_col = (width as i32 - urgency_badge.len() as i32 - 2).max(1);
+    let header_col = 16i32;
+    let summary = format!(
+        "{}  L{}  {}%",
+        mission.mission_type.display_name(),
+        mission.layer,
+        (progress * 100.0) as u32,
     );
+    let max_summary = (urgency_col - header_col - 1).max(0) as usize;
+    let summary_display: String = if max_summary == 0 {
+        String::new()
+    } else if summary.chars().count() > max_summary {
+        summary.chars().take(max_summary).collect()
+    } else {
+        summary
+    };
+    put_text(buffer, 0, header_col, &summary_display, tc);
+    put_text(buffer, 0, urgency_col, &urgency_badge, urgency_color);
 
     // Squad names
     let squad_names: Vec<String> = mission
@@ -87,11 +117,12 @@ pub(super) fn render_event_response(
         .map(|m| format!("{} ({})", m.name, m.archetype.display_name()))
         .collect();
     if !squad_names.is_empty() {
+        let squad_line = format!("Squad: {}", squad_names.join(", "));
         put_text(
             buffer,
             1,
             1,
-            &format!("Squad: {}", squad_names.join(", ")),
+            &truncate_text(&squad_line, width.saturating_sub(2)),
             Color::DarkGray,
         );
     }
@@ -124,13 +155,23 @@ pub(super) fn render_event_response(
     let narrative_top = sep_row + 1;
     let narrative_height = ((content_bottom - narrative_top) / 2).max(3) as usize;
 
-    // Event title (centered, bold via full-caps)
+    // Event title bar + title
+    let title_rule = "─".repeat(width.saturating_sub(16));
+    put_text(buffer, narrative_top, 2, "── INCIDENT ", DEEP_BORDER_COLOR);
+    put_text(
+        buffer,
+        narrative_top,
+        14,
+        &title_rule,
+        Color::Rgb(40, 60, 80),
+    );
+
     put_text_centered(
         buffer,
         narrative_top + 1,
         width,
-        &event.title.to_uppercase(),
-        Color::White,
+        &format!("⚡ {}", event.title),
+        urgency_color,
     );
 
     // Event description (word-wrapped manually)
@@ -158,31 +199,27 @@ pub(super) fn render_event_response(
 
     // ── Auto-resolve countdown with visual bar ──
     let auto_resolve_row = narrative_top + narrative_height as i32;
-    let seconds_since_fired = (now - event.fired_at).num_seconds().max(0) as u64;
-    // Auto-resolve fires after 30 minutes of no response
-    const AUTO_RESOLVE_SECS: u64 = 30 * 60;
-    let remaining = AUTO_RESOLVE_SECS.saturating_sub(seconds_since_fired);
-    let ratio = remaining as f64 / AUTO_RESOLVE_SECS as f64; // 1.0 = full time, 0.0 = expired
-
-    // Bar color shifts green → yellow → red as time runs out
-    let bar_color = if ratio > 0.5 {
-        Color::Green
-    } else if ratio > 0.17 {
-        Color::Yellow
-    } else {
-        Color::LightRed
-    };
 
     // Render the bar
-    let bar_label = "Auto-resolve: ";
-    put_text(buffer, auto_resolve_row, 1, bar_label, Color::DarkGray);
+    let bar_label = format!("Decision Window [{}]: ", urgency_label);
+    put_text(buffer, auto_resolve_row, 1, &bar_label, Color::DarkGray);
     let bar_col = 1 + bar_label.len() as i32;
-    let bar_width = 15usize.min(width.saturating_sub(bar_label.len() + 20));
+    let bar_width = 18usize
+        .min(width.saturating_sub(bar_label.len() + 18))
+        .max(8);
     let filled = ((ratio * bar_width as f64).round() as usize).min(bar_width);
     for i in 0..bar_width {
-        let ch = if i < filled { '\u{2588}' } else { '\u{2592}' };
+        let ch = if i < filled {
+            if pulse_on {
+                '\u{2593}'
+            } else {
+                '\u{2588}'
+            }
+        } else {
+            '\u{2592}'
+        };
         let color = if i < filled {
-            bar_color
+            urgency_color
         } else {
             Color::Rgb(30, 40, 60)
         };
@@ -192,154 +229,271 @@ pub(super) fn render_event_response(
     // Time remaining text after bar
     let time_col = bar_col + bar_width as i32 + 1;
     let time_text = if remaining < 60 {
-        format!("{}s remaining", remaining)
+        format!("{}s left", remaining)
     } else {
-        format!("{}m remaining", remaining / 60)
+        format!("{}m left", remaining / 60)
     };
-    put_text(buffer, auto_resolve_row, time_col, &time_text, bar_color);
+    put_text(
+        buffer,
+        auto_resolve_row,
+        time_col,
+        &time_text,
+        urgency_color,
+    );
 
     // Second line: safe choice note
     if auto_resolve_row + 1 < content_bottom {
         put_text(
             buffer,
             auto_resolve_row + 1,
-            bar_col,
-            "(safe choice auto-selected)",
+            1,
+            "If ignored, the safest choice auto-resolves.",
             Color::DarkGray,
         );
     }
 
     // ── First-event hint ──
-    let mut hint_offset = 0i32;
-    if ui.event_visit_count <= 1 && auto_resolve_row + 1 < content_bottom {
+    let mut choices_top = auto_resolve_row + 2;
+    if ui.event_visit_count <= 1 && auto_resolve_row + 2 < content_bottom {
         put_text(
             buffer,
-            auto_resolve_row + 1,
+            auto_resolve_row + 2,
             1,
             "Your choice affects outcome and timing. Events auto-resolve safely if ignored.",
             Color::Rgb(50, 80, 110),
         );
-        hint_offset = 1;
+        choices_top += 1;
     }
 
     // ── Choices ──
-    let choices_top = auto_resolve_row + 2 + hint_offset;
     let squad_archetypes: Vec<crate::deep::MercArchetype> = mission
         .squad
         .iter()
         .filter_map(|id| deep.prestige.find_merc(*id))
         .map(|m| m.archetype)
         .collect();
+    let total_options = event.choices.len() + 1; // + safe option
+    let available_rows = (content_bottom - choices_top).max(0) as usize;
+    let card_height = 3usize;
+    let use_choice_cards = width >= 68 && available_rows >= total_options * card_height;
 
-    for (ci, choice) in event.choices.iter().enumerate() {
-        let row = choices_top + ci as i32;
-        if row >= content_bottom {
-            break;
-        }
-        let is_sel = ci == ui.event_choice_index;
-        let cursor = if is_sel { "\u{25b6} " } else { "  " };
-
-        // Check if choice is available (archetype present in squad)
-        let is_available = choice
-            .required_archetype
-            .map(|a| squad_archetypes.contains(&a))
-            .unwrap_or(true);
-
-        let arch_tag = match choice.required_archetype {
-            Some(arch) => format!("[{}] ", arch.display_name().to_uppercase()),
-            None => "[Any] ".to_string(),
-        };
-        let arch_color = match choice.required_archetype {
-            Some(arch) if is_available => archetype_color(arch),
-            Some(_) => Color::DarkGray,
-            None => Color::DarkGray,
-        };
-
-        // Consequence preview with explicit time delta and risk percentage
-        let consequence = if choice.is_risky {
-            match choice.risk_percent {
-                Some(pct) => format!("\u{2014} ~{}% injury risk", pct),
-                None => "\u{2014} risky".to_string(),
+    if use_choice_cards {
+        for (ci, choice) in event.choices.iter().enumerate() {
+            let top = choices_top + (ci * card_height) as i32;
+            let bottom = top + card_height as i32 - 1;
+            if bottom >= content_bottom {
+                break;
             }
-        } else if choice.time_delta_secs > 0 {
-            format!("\u{2014} +{}", format_hours(choice.time_delta_secs as u64))
-        } else if choice.time_delta_secs < 0 {
-            format!(
-                "\u{2014} -{}",
-                format_hours(choice.time_delta_secs.unsigned_abs())
-            )
-        } else {
-            "\u{2014} safe".to_string()
-        };
 
-        // Unavailable choice explanation
-        let unavail_suffix = if !is_available {
-            if let Some(arch) = choice.required_archetype {
-                format!("  ({} not in squad)", arch.display_name())
+            let is_sel = ci == ui.event_choice_index;
+            let cursor = if is_sel { "\u{25b6} " } else { "  " };
+            let is_available = choice
+                .required_archetype
+                .map(|a| squad_archetypes.contains(&a))
+                .unwrap_or(true);
+            let arch_tag = match choice.required_archetype {
+                Some(arch) => format!("[{}] ", arch.display_name().to_uppercase()),
+                None => "[Any] ".to_string(),
+            };
+            let arch_color = match choice.required_archetype {
+                Some(arch) if is_available => archetype_color(arch),
+                Some(_) => Color::DarkGray,
+                None => Color::DarkGray,
+            };
+            let consequence = if choice.is_risky {
+                match choice.risk_percent {
+                    Some(pct) => format!("~{}% injury risk", pct),
+                    None => "risky".to_string(),
+                }
+            } else if choice.time_delta_secs > 0 {
+                format!("+{}", format_hours(choice.time_delta_secs as u64))
+            } else if choice.time_delta_secs < 0 {
+                format!("-{}", format_hours(choice.time_delta_secs.unsigned_abs()))
             } else {
-                String::new()
-            }
-        } else {
-            String::new()
-        };
+                "safe".to_string()
+            };
 
-        let line = format!("{}{}{}{}", cursor, arch_tag, choice.label, unavail_suffix);
-        let label_color = if is_available {
-            Color::White
-        } else {
-            Color::DarkGray
-        };
-        put_text(buffer, row, 1, &line, label_color);
-        put_text(
-            buffer,
-            row,
-            1,
-            cursor,
-            if is_sel { Color::Cyan } else { Color::DarkGray },
-        );
-        put_text(buffer, row, 3, &arch_tag, arch_color);
-        if !unavail_suffix.is_empty() {
-            let suffix_col = 1 + format!("{}{}{}", cursor, arch_tag, choice.label).len() as i32;
+            let border = if is_sel {
+                Color::Rgb(95, 175, 235)
+            } else {
+                Color::Rgb(40, 60, 90)
+            };
+            let fill = if is_sel {
+                Color::Rgb(11, 22, 38)
+            } else {
+                Color::Rgb(6, 12, 24)
+            };
+            draw_deep_card(
+                buffer,
+                1,
+                top,
+                width as i32 - 2,
+                bottom,
+                border,
+                fill,
+                Some("CHOICE"),
+            );
+
+            let inner_left = 3i32;
+            let inner_w = width.saturating_sub(10);
+            let line_text = if is_available {
+                format!("{}{}{}  —  {}", cursor, arch_tag, choice.label, consequence)
+            } else if let Some(arch) = choice.required_archetype {
+                format!(
+                    "{}{}{}  —  {} missing in squad",
+                    cursor,
+                    arch_tag,
+                    choice.label,
+                    arch.display_name()
+                )
+            } else {
+                format!("{}{}{}  —  {}", cursor, arch_tag, choice.label, consequence)
+            };
+            let label_color = if is_available {
+                Color::White
+            } else {
+                Color::DarkGray
+            };
+            put_text(
+                buffer,
+                top + 1,
+                inner_left,
+                &truncate_text(&line_text, inner_w),
+                label_color,
+            );
+            put_text(
+                buffer,
+                top + 1,
+                inner_left + cursor.len() as i32,
+                &arch_tag,
+                arch_color,
+            );
+
+            let tag = if !is_available {
+                ("LOCKED", Color::DarkGray)
+            } else if choice.is_risky {
+                ("RISK", Color::Yellow)
+            } else {
+                ("SAFE", Color::Green)
+            };
+            let tag_col = (width as i32 - tag.0.len() as i32 - 4).max(inner_left + 1);
+            put_text(buffer, top + 1, tag_col, tag.0, tag.1);
+        }
+
+        let safe_top = choices_top + (event.choices.len() * card_height) as i32;
+        let safe_bottom = safe_top + card_height as i32 - 1;
+        if safe_bottom < content_bottom {
+            let is_sel = ui.event_choice_index == event.choices.len();
+            let cursor = if is_sel { "\u{25b6} " } else { "  " };
+            let border = if is_sel {
+                Color::Rgb(95, 175, 235)
+            } else {
+                Color::Rgb(40, 60, 90)
+            };
+            draw_deep_card(
+                buffer,
+                1,
+                safe_top,
+                width as i32 - 2,
+                safe_bottom,
+                border,
+                Color::Rgb(6, 12, 24),
+                Some("SAFE FALLBACK"),
+            );
+            let safe_line = format!("{}[Safe] Play it safe (no risk, no delay)", cursor);
+            put_text(
+                buffer,
+                safe_top + 1,
+                3,
+                &truncate_text(&safe_line, width.saturating_sub(10)),
+                Color::DarkGray,
+            );
+            put_text(
+                buffer,
+                safe_top + 1,
+                width as i32 - 10,
+                "SAFE",
+                Color::Green,
+            );
+        }
+    } else {
+        // Compact fallback list rendering.
+        for (ci, choice) in event.choices.iter().enumerate() {
+            let row = choices_top + ci as i32;
+            if row >= content_bottom {
+                break;
+            }
+            let is_sel = ci == ui.event_choice_index;
+            let cursor = if is_sel { "\u{25b6} " } else { "  " };
+
+            let is_available = choice
+                .required_archetype
+                .map(|a| squad_archetypes.contains(&a))
+                .unwrap_or(true);
+            let arch_tag = match choice.required_archetype {
+                Some(arch) => format!("[{}] ", arch.display_name().to_uppercase()),
+                None => "[Any] ".to_string(),
+            };
+            let arch_color = match choice.required_archetype {
+                Some(arch) if is_available => archetype_color(arch),
+                Some(_) => Color::DarkGray,
+                None => Color::DarkGray,
+            };
+            let consequence = if choice.is_risky {
+                match choice.risk_percent {
+                    Some(pct) => format!("~{}% risk", pct),
+                    None => "risky".to_string(),
+                }
+            } else if choice.time_delta_secs > 0 {
+                format!("+{}", format_hours(choice.time_delta_secs as u64))
+            } else if choice.time_delta_secs < 0 {
+                format!("-{}", format_hours(choice.time_delta_secs.unsigned_abs()))
+            } else {
+                "safe".to_string()
+            };
+
+            let line = format!("{}{}{}  —  {}", cursor, arch_tag, choice.label, consequence);
+            let label_color = if is_available {
+                Color::White
+            } else {
+                Color::DarkGray
+            };
             put_text(
                 buffer,
                 row,
-                suffix_col,
-                &unavail_suffix,
-                Color::Rgb(80, 80, 80),
+                1,
+                &truncate_text(&line, width.saturating_sub(3)),
+                label_color,
             );
+            put_text(
+                buffer,
+                row,
+                1,
+                cursor,
+                if is_sel { Color::Cyan } else { Color::DarkGray },
+            );
+            put_text(buffer, row, 3, &arch_tag, arch_color);
         }
 
-        // Consequence at right side
-        let consequence_col =
-            (width as i32 - consequence.len() as i32 - 2).max(line.len() as i32 + 2);
-        put_text(buffer, row, consequence_col, &consequence, Color::DarkGray);
-    }
-
-    // Auto-resolve choice row (always last)
-    let auto_row = choices_top + event.choices.len() as i32;
-    if auto_row < content_bottom {
-        let is_sel = ui.event_choice_index == event.choices.len();
-        let cursor = if is_sel { "\u{25b6} " } else { "  " };
-        put_text(
-            buffer,
-            auto_row,
-            1,
-            &format!("{}[Safe]  Play it safe (no risk)", cursor),
-            Color::DarkGray,
-        );
-        put_text(
-            buffer,
-            auto_row,
-            1,
-            cursor,
-            if is_sel { Color::Cyan } else { Color::DarkGray },
-        );
-        put_text(
-            buffer,
-            auto_row,
-            (width as i32 - 20).max(42),
-            "— always safe",
-            Color::DarkGray,
-        );
+        let auto_row = choices_top + event.choices.len() as i32;
+        if auto_row < content_bottom {
+            let is_sel = ui.event_choice_index == event.choices.len();
+            let cursor = if is_sel { "\u{25b6} " } else { "  " };
+            let safe_line = format!("{}[Safe] Play it safe (no risk)", cursor);
+            put_text(
+                buffer,
+                auto_row,
+                1,
+                &truncate_text(&safe_line, width.saturating_sub(3)),
+                Color::DarkGray,
+            );
+            put_text(
+                buffer,
+                auto_row,
+                1,
+                cursor,
+                if is_sel { Color::Cyan } else { Color::DarkGray },
+            );
+        }
     }
 }
