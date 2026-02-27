@@ -10,7 +10,7 @@ src/stormglass/
 ├── types.rs     # Constants, ExchangePhase, ExchangeUiState, ChronoSurgeState
 ├── sigils.rs    # SigilEffectType (11 types), Sigil, SigilGrade, StormSigils, daily rotation
 ├── earning.rs   # Salvage rates by rarity, dungeon cache sizes, soulforge consolation
-└── spending.rs  # Invoke Challenge generation, chrono surge costs
+└── spending.rs  # Invoke Challenge generation, chrono surge costs, Storm Lure
 ```
 
 ## Key Concepts
@@ -23,10 +23,11 @@ Earned passively through gameplay:
 - **Challenge rewards**: All challenges award Stormglass scaled by difficulty
 
 ### Stormglass Exchange
-Overlay with three spending options:
+Overlay with four spending options:
 1. **Invoke Challenge** (3,000 SG): Presents 3 random challenge types to choose from, bypassing normal discovery
 2. **Chrono Surge** (500-16,000 SG): Fast-forwards game ticks with animated summary (15 min to 8 hours of gameplay)
 3. **Storm Sigils**: Unlock slots, etch sigils, and reroll for persistent bonuses
+4. **Storm Lure** (50,000 SG): Consumable that guarantees Storm Leviathan encounters on legendary fish catches at rank 40. Requires fishing rank 40 and no active lure
 
 ### Storm Sigils
 Up to 5 sigil slots that provide permanent percentage-based bonuses. Character-level, persists through prestige.
@@ -89,6 +90,7 @@ A single etched sigil: `effect: SigilEffectType`, `value: f64`, `grade: SigilGra
 | `CHRONO_SURGE_OPTIONS` | 4 tiers | 500-16,000 SG for 15min-8hr |
 | `SALVAGE_COMMON/MAGIC` | 1 | Lowest salvage value |
 | `SALVAGE_LEGENDARY` | 25 | Highest salvage value |
+| `STORM_LURE_COST` | 50,000 | SG cost for Storm Lure consumable |
 
 ## Integration Points
 
@@ -99,3 +101,5 @@ A single etched sigil: `effect: SigilEffectType`, `value: f64`, `grade: SigilGra
 - **enhancement/logic.rs**: Failed enhancements award Stormglass consolation via `soulforge_consolation()`
 - **ui/stormglass_scene.rs**: Exchange overlay rendering (menu, trial selection, surge animation, sigils list, pick-1-of-3)
 - **input/stormglass_input.rs**: Exchange overlay input handling
+- **fishing/types.rs**: `FishingState.storm_lure_active` flag, consumed on Leviathan encounter
+- **spending.rs**: `can_purchase_storm_lure()` checks balance, active status, and fishing rank

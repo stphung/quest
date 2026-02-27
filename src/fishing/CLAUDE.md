@@ -48,6 +48,7 @@ pub struct FishingState {
     pub fish_toward_next_rank: u32,  // Excess carries over on rank-up
     pub legendary_catches: u32,
     pub leviathan_encounters: u8,    // 0-10 progressive hunt
+    pub storm_lure_active: bool,     // Stormglass consumable for guaranteed Leviathan encounters
 }
 ```
 
@@ -122,6 +123,8 @@ Progressive 10-encounter hunt, only available at rank 40 on legendary fish catch
 2. On encounter: Leviathan escapes, encounter counter increments
 3. After 10 encounters: 25% catch chance per legendary fish
 4. Catching awards 10,000-15,000 XP and enables Stormbreaker forging at Storm Forge
+
+**Storm Lure**: A Stormglass consumable (50,000 SG) that guarantees Leviathan encounters on every legendary fish catch at rank 40. When `storm_lure_active` is true, the normal encounter probability checks are bypassed — every legendary catch triggers an encounter (or catch attempt after 10 encounters). The lure is consumed after a successful Leviathan encounter. Available via the Stormglass Exchange overlay.
 
 **Full path**: Max fishing rank (40) -> catch legendary fish -> 10 Leviathan encounters -> catch Leviathan -> build Storm Forge in Haven -> forge Stormbreaker -> fight Zone 10 final boss.
 

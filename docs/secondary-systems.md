@@ -94,9 +94,13 @@ A special legendary fish required to forge the Stormbreaker weapon:
 - **XP reward**: 10,000-15,000
 - **Unlocks**: `StormLeviathan` achievement (required for Stormbreaker forging)
 
+### Storm Lure (Stormglass Consumable)
+
+A one-time consumable purchased from the Stormglass Exchange for 50,000 Stormglass. When active, guarantees Storm Leviathan encounters on every legendary fish catch at Fishing Rank 40 (instead of rolling against the decreasing encounter chance table). The lure is consumed after a single use (encounter or catch). Requires `can_purchase_storm_lure()` check: P15+, Fishing Rank 40, not already active, and sufficient Stormglass balance. Purchased via `StormLureConfirm` phase in the Stormglass Exchange UI.
+
 ### Persistence
 
-Fishing state (rank, total fish caught, legendary catches) persists across prestige resets. Only the active fishing session is cleared on prestige.
+Fishing state (rank, total fish caught, legendary catches, `storm_lure_active`) persists across prestige resets. Only the active fishing session is cleared on prestige.
 
 ## Dungeon System
 
@@ -270,13 +274,50 @@ Storm Sigils are passive bonuses that rotate on a daily basis. Players spend Sto
 - `earning.rs` -- Stormglass earning from challenge rewards
 - `spending.rs` -- Stormglass spending on sigil slots
 
+## The Deep (Mercenary Expedition System)
+
+### Overview
+
+An endgame system discovered at P15+ where players recruit and manage a mercenary company, sending squads on long-duration missions (2-24h wall-clock time) into a vast underground structure. Two-tier persistence model: `DeepPersistent` (guild rank, cleared layers, infrastructure, familiarity) survives prestige; `DeepPrestige` (mercenaries, active missions, Warband Marks) resets on prestige.
+
+### Discovery
+
+Same formula as Soulforge: `chance = 0.000014 + (prestige_rank - 15) * 0.000007` per tick, P15+ required.
+
+### Key Systems
+
+- **5 mercenary archetypes**: Vanguard, Scout, Arcanist, Medic, Saboteur
+- **4 quality tiers** per mercenary
+- **6 layer tiers**: Shallows (L1-3), Warrens (L4-7), Hollows (L8-12), Sunken Reach (L13-18), Abyss (L19-25), The Void (L26+, infinite scaling)
+- **5 mission types**: Supply Run, Recon, Expedition, Breakthrough, Construction
+- **4 infrastructure types**: Outpost, Supply Cache, Watchtower, Bridge (2 slots per layer, permanent)
+- **5 guild ranks**: Freelancers (5 roster/1 concurrent), Sellswords (7/1), Company (9/2), Battalion (12/3), Legion (15/4)
+- **Warband Marks**: Currency earned from missions, spent on recruitment and infrastructure, resets on prestige
+
+### Module Structure
+
+- `types.rs` -- All data structures (DeepState, Mercenary, Mission, Layer, etc.)
+- `mercenaries.rs` -- Merc generation, recruitment, leveling, injuries
+- `layers.rs` -- Layer difficulty, familiarity, infrastructure, mission durations
+- `missions.rs` -- Mission creation, assignment, resolution
+- `events.rs` -- Check-in events and event choices
+- `economy.rs` -- Warband Marks economy, costs, rewards
+- `discovery.rs` -- Discovery roll logic, starter roster
+- `persistence.rs` -- Save/load from `~/.quest/deep.json`
+
+### Persistence
+
+Stored in `~/.quest/deep.json`. The `deep_changed` flag in `TickResult` signals when the file needs to be saved. The `deep_event_ready` flag signals when a mission event requires player response.
+
+For detailed implementation documentation, see `src/deep/CLAUDE.md`.
+
 ## Achievement System
 
 ### Overview
 
 Account-level achievement system that persists across all characters. Stored in `~/.quest/achievements.json`. Achievement tracking is driven by `on_*` event handlers (in `achievements/handlers.rs`) called from `tick.rs` during game processing. Milestone definitions and thresholds are in `achievements/milestones.rs`. Newly unlocked achievements are emitted as `TickEvent::AchievementUnlocked` events and collected by `collect_achievement_events()`. The `achievements_changed` flag in `TickResult` signals when the file needs to be saved.
 
-### Categories (6)
+### Categories (7)
 
 **Combat:**
 - Slayer I-XV: 100, 500, 1K, 5K, 10K, 50K, 100K, 500K, 1M, 2.5M, 10M, 50M, 100M, 500M, 1B kills. Unique icon progression per tier displayed as badges in the combat panel title
@@ -315,6 +356,9 @@ Account-level achievement system that persists across all characters. Stored in 
 - SoulConvergence: Enhance all 7 equipment slots to +7
 - PersistentHammering: Attempt 100 enhancements
 
+**Deep:**
+- DeepDiscovered, DeepLayer3/5/7/10/13/19/25, DeepGuildRank2/3/4/5, DeepMerc10/25/50/100Missions, DeepVoidExplorer, DeepInfraBuilder (various infrastructure and progression milestones)
+
 **Fishing:**
 - FishermanI-IV: Ranks 10, 20, 30, 40
 - FishCatcherI-X: 100, 1K, 10K, 100K, 500K, 1M, 5M, 10M, 50M, 100M fish caught
@@ -339,11 +383,11 @@ Each achievement has a `points` value assigned via a 7-tier system. Scores are c
 | Elite | 250 | 18 | Stormbreaker, Chess/Go Master, Grand Champion |
 | Pinnacle | 500 | 14 | Eternal, Death Incarnate, The Absolute |
 
-**Max score: 16,365** across 149 achievements. Methods: `achievement_score()` (unlocked total), `max_achievement_score()` (grand total). Displayed in: browser title bar (`X/Y pts, Z%`), unlock modal (`+N pts`), detail panel (`Worth N pts`), stats view (score line).
+**Max score** across 168 achievements. Methods: `achievement_score()` (unlocked total), `max_achievement_score()` (grand total). Displayed in: browser title bar (`X/Y pts, Z%`), unlock modal (`+N pts`), detail panel (`Worth N pts`), stats view (score line).
 
 ### Title System
 
-Titles are display names earned by unlocking specific achievements. 44 curated titles across combat, challenges, exploration, and enhancement categories. Players select one title to display after their character name (e.g., "Hero, Godslayer"). Account-wide, persisted in `achievements.json`.
+Titles are display names earned by unlocking specific achievements. 51 curated titles across combat, challenges, exploration, enhancement, and Deep categories. Players select one title to display after their character name (e.g., "Hero, Godslayer"). Account-wide, persisted in `achievements.json`.
 
 - Title browser: overlay opened with [T] from achievement browser. Shows unlocked titles, preview, select with Enter, clear with Backspace
 - Titles shown in: stats panel header, character select screen, achievement browser (✦ indicator)

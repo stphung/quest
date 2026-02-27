@@ -170,6 +170,14 @@ This models the real gameplay trade-off between investing prestige in Haven vs k
 - Achievements: total unlocked, Haven discovery
 - Deaths per zone (for balance tuning)
 
+### Deep Economy Simulator
+
+A separate binary (`src/bin/deep_simulator.rs`) for testing The Deep's mercenary economy in isolation. Simulates mission cycles, recruitment, infrastructure building, and guild rank progression without a UI.
+
+```bash
+cargo run --bin deep_simulator -- [OPTIONS]
+```
+
 ### Multi-Run Aggregation
 
 With `--runs N`, the simulator runs N simulations with incrementing seeds and produces an aggregate report with min/avg/max for all metrics, plus a final zone distribution across runs.
@@ -195,19 +203,22 @@ When active, a `[DEBUG]` indicator shows in the UI corner.
 
 ### Menu Options
 
-The debug menu uses a tabbed category structure. Left/Right arrows switch tabs, Up/Down navigate within a tab, Enter triggers.
+The debug menu uses a tabbed category structure with 5 tabs. Left/Right arrows switch tabs, Up/Down navigate within a tab, Enter triggers.
 
 **Challenges tab:**
 - Trigger Chess, Morris, Gomoku, Minesweeper, Rune, Go, Flappy Bird, JezzBall, Snake, Sigil Surge challenges
 
 **World tab:**
-- Trigger Dungeon, Trigger Fishing, Trigger Haven Discovery, Trigger Soulforge Discovery
+- Trigger Dungeon, Trigger Fishing, Trigger Haven Discovery, Trigger Soulforge Discovery, Trigger Deep Discovery
 
 **Resources tab:**
 - Grant 1000 Stormglass, Discover Stormglass, Grant 100k Stormglass, Etch Random Sigils (All Slots), Etch S+ Sigil (Slot 1)
 
 **Items tab:**
 - Forge Asprika, Forge Sleipnir, Forge Megingjord (God Items)
+
+**Borders tab:**
+- Border style options for visual customization
 
 Each option calls existing generation functions to bypass the normal RNG discovery system. Useful for testing features without waiting for random events.
 
@@ -220,7 +231,7 @@ Yellow border popup overlay with tabbed header, centered on screen with fixed pa
 When `--debug` is active:
 - **Saves disabled**: File I/O (`save_character()`, `save_haven()`, `save_achievements()`) is skipped
 - **`last_save_time` always synced**: The in-memory `state.last_save_time = Utc::now().timestamp()` is updated every autosave cycle regardless of debug mode, preventing the suspension detection system from false-triggering
-- **Save signals suppressed**: `TickResult.achievements_changed`, `haven_changed`, `enhancement_changed`, and `god_items_changed` flags are suppressed in `tick.rs` when `debug_mode` is true
+- **Save signals suppressed**: `TickResult.achievements_changed`, `haven_changed`, `enhancement_changed`, `god_items_changed`, and `deep_changed` flags are suppressed in `tick.rs` when `debug_mode` is true
 
 ### Suspension Detection
 
@@ -237,6 +248,7 @@ The game detects OS-level process suspension (e.g., laptop lid close/open):
 ├── haven.json                # Haven state (account-level)
 ├── achievements.json         # Achievement state (account-level)
 ├── enhancement.json          # Soulforge enhancement state (account-level)
+├── deep.json                 # The Deep state (account-level)
 └── backups/
     └── YYYY-MM-DD_HHMMSS/   # Timestamped backup before update
         └── *.json

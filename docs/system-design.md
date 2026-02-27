@@ -55,10 +55,10 @@ Quest is a terminal-based idle RPG built in Rust using Ratatui for UI rendering 
     ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
     │   Zones  │ │  Items   │ │  Haven   │ │Achievemts│
     └──────────┘ └──────────┘ └──────────┘ └──────────┘
-    ┌──────────┐ ┌──────────┐ ┌──────────┐
-    │Soulforge │ │God Items │ │Stormglass│
-    │(Enhance) │ │          │ │ (Sigils) │
-    └──────────┘ └──────────┘ └──────────┘
+    ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+    │Soulforge │ │God Items │ │Stormglass│ │ The Deep │
+    │(Enhance) │ │          │ │ (Sigils) │ │  (Mercs) │
+    └──────────┘ └──────────┘ └──────────┘ └──────────┘
          │              │            │             │
          └──────────────┴────────────┴─────────────┘
                               │
@@ -71,7 +71,7 @@ Quest is a terminal-based idle RPG built in Rust using Ratatui for UI rendering 
 
 ### Key Architectural Patterns
 
-- **Event-driven tick processing**: `game_tick()` returns a `TickResult` containing `Vec<TickEvent>` (35 event variants). The presentation layer maps events to combat log entries, visual effects, and overlays. Game logic has zero UI imports.
+- **Event-driven tick processing**: `game_tick()` returns a `TickResult` containing `Vec<TickEvent>` (41 event variants). The presentation layer maps events to combat log entries, visual effects, and overlays. Game logic has zero UI imports.
 - **Generic RNG**: `game_tick<R: Rng>()` uses a generic type parameter because `rand::Rng` is not dyn-compatible. Production uses `thread_rng()`, tests use seeded `ChaCha8Rng` for determinism.
 - **Haven bonus injection**: Haven bonuses are passed as explicit parameters to game systems rather than accessed globally, keeping modules decoupled.
 
@@ -93,7 +93,7 @@ Quest is a terminal-based idle RPG built in Rust using Ratatui for UI rendering 
 
 ## Core Game Loop
 
-The game runs at **10 ticks per second** (100ms intervals). Each tick is processed by `game_tick()` in `src/core/tick.rs`, which orchestrates all game systems through an 12-stage pipeline.
+The game runs at **10 ticks per second** (100ms intervals). Each tick is processed by `game_tick()` in `src/core/tick.rs`, which orchestrates all game systems through a 14-stage pipeline.
 
 ```
                     GAME TICK PIPELINE (core/tick.rs)
@@ -102,7 +102,7 @@ The game runs at **10 ticks per second** (100ms intervals). Each tick is process
     │  main.rs: Process Input → call game_tick() → Render     │
     └──────────────────────────┬──────────────────────────────┘
                                │
-               game_tick() 12-stage pipeline:
+               game_tick() 14-stage pipeline:
                                │
     ┌──────────────────────────┴──────────────────────────────┐
     │  1. Challenge AI        Tick AI thinking for active game │
@@ -116,7 +116,9 @@ The game runs at **10 ticks per second** (100ms intervals). Each tick is process
     │  9. Achievement Collect Drain newly unlocked into events│
     │ 10. Haven Discovery     Roll for Haven (P10+)           │
     │ 11. Soulforge Discovery Roll for Soulforge (P15+)      │
-    │ 12. Achievement Modal   Check 500ms accumulation window │
+    │ 12. Deep Discovery      Roll for The Deep (P15+)        │
+    │ 13. Deep Missions       Tick active missions, events    │
+    │ 14. Achievement Modal   Check 500ms accumulation window │
     └─────────────────────────────────────────────────────────┘
                                │
                                ▼
@@ -126,6 +128,8 @@ The game runs at **10 ticks per second** (100ms intervals). Each tick is process
                     │    achievements_     │
                     │      changed: bool,  │
                     │    haven_changed,    │
+                    │    deep_changed,     │
+                    │    deep_event_ready, │
                     │    leviathan_        │
                     │      encounter,      │
                     │    achievement_      │
@@ -144,7 +148,7 @@ The game runs at **10 ticks per second** (100ms intervals). Each tick is process
 
 ### Key Types
 
-**`TickEvent`** (35 variants):
+**`TickEvent`** (41 variants):
 - Combat: `PlayerAttack`, `PlayerAttackBlocked`, `EnemyAttack`, `DamageReflected`, `RegenComplete`, `EnemyDefeated`, `PlayerDied`, `PlayerDiedInDungeon`
 - Items: `ItemDropped`
 - Zones: `SubzoneBossDefeated`
@@ -152,6 +156,7 @@ The game runs at **10 ticks per second** (100ms intervals). Each tick is process
 - Fishing: `FishingMessage`, `FishCaught`, `FishingItemFound`, `FishingRankUp`, `StormLeviathanCaught`
 - Discovery: `ChallengeDiscovered`, `DungeonDiscovered`, `FishingSpotDiscovered`, `HavenDiscovered`, `SoulforgeDiscovered`, `StormglassDiscovered`
 - Stormglass: `StormglassEarned`, `SigilActivated`, `SigilExpired`
+- Deep: `DeepMissionComplete`, `DeepEventPending`, `DeepMercInjured`, `DeepMercLost`, `DeepBreakthrough`, `DeepGuildRankUp`
 - Achievements: `AchievementUnlocked`
 - Level: `LeveledUp`
 
@@ -162,10 +167,14 @@ Each variant carries pre-formatted message strings with unicode escapes. The pre
 pub struct TickResult {
     pub events: Vec<TickEvent>,
     pub leviathan_encounter: Option<u8>,
+    pub leviathan_lure_consumed: bool,
+    pub leviathan_catch_miss: bool,
     pub achievements_changed: bool,
     pub haven_changed: bool,
     pub enhancement_changed: bool,
     pub god_items_changed: bool,
+    pub deep_changed: bool,
+    pub deep_event_ready: bool,
     pub achievement_modal_ready: Vec<AchievementId>,
 }
 ```
@@ -578,6 +587,10 @@ Sleipnir also provides non-combat bonuses: 50% regen delay reduction, 50% dungeo
 
 All god items have ilvl 100, +40% XP affix, and high fixed attribute bonuses (+40 primary, +20 secondary). Discovery/forging system not yet implemented (tracked in issue #235); currently available via debug menu.
 
+### The Deep (Mercenary Expeditions)
+
+Endgame system gated at P15+. Players recruit and manage a mercenary company, sending squads on wall-clock time missions (2-24h real time) into a vast underground structure. See [Secondary Systems — The Deep](secondary-systems.md#the-deep-mercenary-expedition-system) for full details. Detailed implementation docs in `src/deep/CLAUDE.md`.
+
 ---
 
 ## Challenge Minigames
@@ -749,6 +762,10 @@ Progressive 10-encounter hunt at Fishing Rank 40:
 - Final boss: Avatar of Infinity (cycles back to subzone 1)
 - Unlocked via StormsEnd achievement (after defeating The Undying Storm)
 
+### The Deep (Mercenary Expeditions)
+
+Endgame mercenary expedition system discovered at P15+. Players recruit mercenaries across 5 archetypes and 4 quality tiers, then send them on missions into a 25-layer underground structure (plus infinite Void scaling). Missions run on wall-clock time (2-24h). Two-tier persistence: guild rank, cleared layers, and infrastructure survive prestige; mercenaries, active missions, and Warband Marks reset. Five guild ranks with increasing roster and concurrent mission limits. Four infrastructure types per layer. See [Secondary Systems](secondary-systems.md#the-deep-mercenary-expedition-system) for details.
+
 ---
 
 ## Infrastructure
@@ -791,11 +808,11 @@ Headless game balance simulator that runs `game_tick()` without UI:
 
 Activated with `--debug` flag, toggle with backtick.
 
-Options: Trigger Dungeon, Fishing, all 10 challenge types, Haven Discovery, Soulforge Discovery.
+Options organized in 5 tabs: Challenges (all 10 types), World (Dungeon, Fishing, Haven, Soulforge, Deep discovery), Resources (Stormglass), Items (God Items), Borders.
 
 ### Integration Tests
 
-34 integration test files in `tests/`:
+49 integration test files in `tests/`:
 - `game_loop_orchestration_test.rs` -- 36 behavior-locking tests for game tick pipeline
 - `game_tick_behavior_test.rs` / `game_tick_supplemental_test.rs` -- Tick processing behavior
 - `tick_integration_test.rs` -- Cross-system tick integration
@@ -828,6 +845,7 @@ Options: Trigger Dungeon, Fishing, all 10 challenge types, Haven Discovery, Soul
 ├── haven.json            # Haven state (account-level)
 ├── achievements.json     # Achievements (account-level)
 ├── enhancement.json      # Soulforge enhancement state (account-level)
+├── deep.json             # The Deep state (account-level)
 └── backups/
     └── YYYY-MM-DD_HHMMSS/
         └── *.json        # Pre-update backups
@@ -848,6 +866,8 @@ Plain JSON with serde. No checksum -- relies on structural validation on load.
 | Chess stats | Per-character | Preserved |
 | Haven | Account | Preserved |
 | Enhancement | Account | Preserved |
+| The Deep (persistent) | Account | Preserved (guild rank, layers, infra) |
+| The Deep (prestige) | Per-character | Reset (mercs, missions, Warband Marks) |
 | Achievements | Account | Preserved |
 
 ---
@@ -885,6 +905,11 @@ fn soulforge_discovery_chance(prestige_rank: u32) -> f64 {
     0.000014 + (prestige_rank - 15) as f64 * 0.000007
 }
 
+// The Deep discovery chance (P15+, same formula as Soulforge)
+fn deep_discovery_chance(prestige_rank: u32) -> f64 {
+    0.000014 + (prestige_rank - 15) as f64 * 0.000007
+}
+
 // Offline XP
 fn offline_xp(elapsed_s: i64, xp_per_tick: f64, haven_bonus_pct: f64) -> f64 {
     let kills = (elapsed_s.min(604800) as f64 / 5.0) * 0.25;
@@ -905,6 +930,7 @@ quest/
 │   ├── input/               # Keyboard input routing (split into submodules)
 │   │   ├── mod.rs           # Top-level input dispatcher
 │   │   ├── types.rs         # Input-related types
+│   │   ├── deep_input.rs    # The Deep overlay input
 │   │   ├── haven_input.rs   # Haven overlay input
 │   │   ├── minigame_input.rs # Minigame input dispatch
 │   │   ├── prestige_input.rs # Prestige confirmation input
@@ -924,13 +950,14 @@ quest/
 │   │   └── update.rs        # Auto-update check handling, startup splash screen
 │   ├── tick_events.rs       # TickEvent → combat log + visual effects bridge
 │   ├── bin/
-│   │   └── simulator.rs     # Headless balance simulator binary
+│   │   ├── simulator.rs     # Headless balance simulator binary
+│   │   └── deep_simulator.rs # Headless Deep economy simulator binary
 │   ├── core/                # Core game systems
 │   │   ├── constants.rs     # All game balance constants
 │   │   ├── game_logic.rs    # Thin re-export wrapper for submodules
 │   │   ├── game_state.rs    # Main GameState struct
 │   │   ├── tick.rs          # game_tick() orchestrator
-│   │   ├── tick_types.rs    # TickEvent enum (35 variants), TickResult struct
+│   │   ├── tick_types.rs    # TickEvent enum (41 variants), TickResult struct
 │   │   ├── tick_stages.rs   # Tick processing stages 4-6 + helpers
 │   │   ├── xp.rs            # XP calculation, leveling, combat kill XP
 │   │   ├── discoveries.rs   # Discovery rolls (dungeon, fishing, Haven, Soulforge)
@@ -1013,6 +1040,16 @@ quest/
 │   │   ├── types.rs         # Enhancement progress, constants, success rates
 │   │   ├── logic.rs         # Enhancement rolls, discovery
 │   │   └── persistence.rs   # Save/load from ~/.quest/enhancement.json
+│   ├── deep/                # The Deep — Mercenary Expedition System
+│   │   ├── mod.rs           # Public API re-exports
+│   │   ├── types.rs         # All data structures (DeepState, Mercenary, Mission, etc.)
+│   │   ├── mercenaries.rs   # Merc generation, recruitment, leveling, injuries
+│   │   ├── layers.rs        # Layer difficulty, familiarity, infrastructure, durations
+│   │   ├── missions.rs      # Mission creation, assignment, resolution
+│   │   ├── events.rs        # Check-in events and event choices
+│   │   ├── economy.rs       # Warband Marks economy, costs, rewards
+│   │   ├── discovery.rs     # Discovery roll logic, starter roster
+│   │   └── persistence.rs   # Save/load from ~/.quest/deep.json
 │   ├── stormglass/          # Stormglass currency and Storm Sigils
 │   │   ├── types.rs         # Stormglass state, daily rotation
 │   │   ├── sigils.rs        # Storm Sigil definitions and bonuses
@@ -1021,14 +1058,14 @@ quest/
 │   ├── god_items/           # God Items system (Asprika, Sleipnir, Megingjord)
 │   │   └── types.rs         # God item definitions, passives, bonuses, query helpers
 │   ├── achievements/        # Achievement system
-│   │   ├── types.rs         # AchievementId (149 variants), Achievements state
+│   │   ├── types.rs         # AchievementId (168 variants), Achievements state
 │   │   ├── data.rs          # Achievement database
 │   │   ├── handlers.rs      # Event handlers (on_kill, on_boss_kill, etc.)
 │   │   ├── milestones.rs    # Milestone definitions and thresholds
 │   │   ├── modal.rs         # Modal notification queue (500ms accumulation window)
 │   │   ├── notifications.rs # Notification state management
 │   │   ├── stats.rs         # Achievement statistics and progress tracking
-│   │   ├── titles.rs        # Title definitions (44 titles), selection, validation
+│   │   ├── titles.rs        # Title definitions (51 titles), selection, validation
 │   │   ├── unlock.rs        # Core unlock machinery (is_unlocked, unlock, check_milestones)
 │   │   └── persistence.rs   # Save/load
 │   ├── utils/               # Utilities
@@ -1065,6 +1102,12 @@ quest/
 │       │   gomoku_scene.rs, minesweeper_scene.rs, rune_scene.rs,
 │       │   snake_scene.rs, flappy_scene.rs, jezzball_scene.rs,
 │       │   runic_shift_scene.rs
+│       ├── deep_scene.rs     # The Deep overlay (top-level coordinator)
+│       ├── deep_missions.rs  # Deep active missions panel
+│       ├── deep_roster.rs    # Deep roster sub-view
+│       ├── deep_layers.rs    # Deep layer map sub-view
+│       ├── deep_events.rs    # Deep event response sub-view
+│       ├── deep_results.rs   # Deep mission complete modal
 │       ├── soulforge_scene.rs # Soulforge enhancement overlay
 │       ├── soulforge_effects.rs # Soulforge animation effects
 │       ├── soulforge_slots.rs # Soulforge slot selection rendering
@@ -1076,7 +1119,7 @@ quest/
 │       ├── throbber.rs      # Spinner animations
 │       └── character_select.rs, character_creation.rs,
 │           character_delete.rs, character_rename.rs
-├── tests/                   # 34 integration test files
+├── tests/                   # 49 integration test files
 ├── .github/workflows/       # CI/CD pipeline
 ├── scripts/                 # Quality checks (ci-checks.sh)
 ├── docs/                    # Design documents
@@ -1106,6 +1149,8 @@ Each major module has its own `CLAUDE.md` with implementation patterns, integrat
 - `src/challenges/CLAUDE.md` -- Adding new minigames (step-by-step checklist)
 - `src/haven/CLAUDE.md` -- Account-level base building, bonus system
 - `src/achievements/CLAUDE.md` -- Achievement tracking, modal notifications
+- `src/enhancement/CLAUDE.md` -- Soulforge enhancement system
+- `src/deep/CLAUDE.md` -- The Deep mercenary expedition system
 - `src/ui/CLAUDE.md` -- Shared layout components, color conventions
 
 ---

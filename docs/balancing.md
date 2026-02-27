@@ -298,15 +298,18 @@ Special costs: Fishing Dock T4 = 10 prestige ranks. Storm Forge = 25 prestige ra
 ### Interaction Matrix
 
 ```
-           | Prestige | Haven  | Items  | Fishing | Challenges | Stormglass
------------+----------+--------+--------+---------+------------+-----------
-Prestige   |    -     | Gates  | Reset  | Persist | Rewards PR | Gates P15+
-Haven      | Currency |   -    | Rarity | Rank Cap| Discovery  |    -
-Items      | Lost*    | Vault  |   -    | Drops   |    -       |    -
-Fishing    | Persist  | Dock   | Drops  |    -    | Ranks      |    -
-Challenges | +Ranks   | Library|   -    | +Ranks  |    -       | +Currency
-Stormglass | Gated    |   -    |   -    |    -    | Source     | Sigil bonuses
+           | Prestige | Haven  | Items  | Fishing | Challenges | Stormglass | The Deep
+-----------+----------+--------+--------+---------+------------+------------+---------
+Prestige   |    -     | Gates  | Reset  | Persist | Rewards PR | Gates P15+ | Gates P15+
+Haven      | Currency |   -    | Rarity | Rank Cap| Discovery  |    -       |    -
+Items      | Lost*    | Vault  |   -    | Drops   |    -       |    -       |    -
+Fishing    | Persist  | Dock   | Drops  |    -    | Ranks      |    -       |    -
+Challenges | +Ranks   | Library|   -    | +Ranks  |    -       | +Currency  |    -
+Stormglass | Gated    |   -    |   -    |    -    | Source     | Sigil bonus|    -
+The Deep   | Partial  |   -    |   -    |    -    |    -       |    -       | Marks/Mercs
 ```
+
+*The Deep resets partially on prestige: mercs, active missions, and Warband Marks reset; guild rank, cleared layers, and infrastructure persist.
 
 *Items are lost on prestige unless preserved by Vault (1/3/5 items at T1/T2/T3).
 
@@ -694,8 +697,9 @@ total_xp = 180 * 1,316 * 2.0 = 473,760
 | Challenge | 0.0014% per tick | P1+ required | ~2hr average; Haven Library boosts |
 | Haven | 0.0014% per tick + 0.0007% per rank above 10 | P10+ required | Only when no active content |
 | Soulforge | 0.0014% per tick + 0.0007% per rank above 15 | P15+ required | Only when no active content |
+| The Deep | 0.0014% per tick + 0.0007% per rank above 15 | P15+ required | Same formula as Soulforge |
 
-Constants: `DUNGEON_DISCOVERY_CHANCE = 0.01`, `FISHING_DISCOVERY_CHANCE = 0.05`, `CHALLENGE_DISCOVERY_CHANCE = 0.000014`, `HAVEN_DISCOVERY_BASE_CHANCE = 0.000014`, `HAVEN_DISCOVERY_RANK_BONUS = 0.000007`, `SOULFORGE_DISCOVERY_BASE_CHANCE = 0.000014`, `SOULFORGE_DISCOVERY_RANK_BONUS = 0.000007`, `SOULFORGE_MIN_PRESTIGE_RANK = 15`
+Constants: `DUNGEON_DISCOVERY_CHANCE = 0.01`, `FISHING_DISCOVERY_CHANCE = 0.05`, `CHALLENGE_DISCOVERY_CHANCE = 0.000014`, `HAVEN_DISCOVERY_BASE_CHANCE = 0.000014`, `HAVEN_DISCOVERY_RANK_BONUS = 0.000007`, `SOULFORGE_DISCOVERY_BASE_CHANCE = 0.000014`, `SOULFORGE_DISCOVERY_RANK_BONUS = 0.000007`, `SOULFORGE_MIN_PRESTIGE_RANK = 15`, `DEEP_DISCOVERY_BASE_CHANCE = 0.000014`, `DEEP_DISCOVERY_RANK_BONUS = 0.000007`, `DEEP_MIN_PRESTIGE_RANK = 15`
 
 ---
 
@@ -999,6 +1003,14 @@ HAVEN_MIN_PRESTIGE_RANK: u32 = 10;
 SOULFORGE_DISCOVERY_BASE_CHANCE: f64 = 0.000014;
 SOULFORGE_DISCOVERY_RANK_BONUS: f64 = 0.000007;
 SOULFORGE_MIN_PRESTIGE_RANK: u32 = 15;
+
+// The Deep Discovery (same formula as Soulforge)
+DEEP_DISCOVERY_BASE_CHANCE: f64 = 0.000014;
+DEEP_DISCOVERY_RANK_BONUS: f64 = 0.000007;
+DEEP_MIN_PRESTIGE_RANK: u32 = 15;
+
+// Storm Lure (Stormglass consumable)
+STORM_LURE_COST: u64 = 50000;                    // 50,000 Stormglass
 
 // Zone and Fishing
 KILLS_FOR_BOSS: u32 = 10;
