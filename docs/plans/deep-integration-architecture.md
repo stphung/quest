@@ -575,25 +575,6 @@ AbyssalResilience,       // bonus merc resilience
 
 Expedition and breakthrough missions award Stormglass. This increments `state.stormglass` directly during reward collection, same as salvage and dungeon caches. No changes needed to the Stormglass system.
 
-### Prestige Rank Fragments
-
-Breakthrough missions on deep layers (19+) award fractional prestige ranks. This is a new concept — the cleanest integration is:
-
-**File**: `/Users/stphung/workspace/quest3/src/core/game_state.rs`
-
-Add a field to `GameState`:
-
-```rust
-/// Fractional prestige rank progress from Deep breakthroughs (0.0..1.0)
-/// When it reaches 1.0, it is consumed to grant 1 prestige rank.
-#[serde(default)]
-pub deep_prestige_fragments: f64,
-```
-
-During mission reward collection, `deep_prestige_fragments += reward_amount`. When it crosses 1.0, subtract 1.0 and increment `prestige_rank` by 1 (without triggering a full prestige reset — this is a pure rank increment).
-
-This is done in `src/deep/logic.rs::apply_mission_rewards()` which operates on `&mut GameState`.
-
 ---
 
 ## 11. Mission Timer Architecture
@@ -683,7 +664,6 @@ This follows the existing pattern in `debug_menu.rs` (tabbed categories: Challen
 | `src/main_helpers/character_screens.rs` | Pass deep through LoadCharacter path, call resolve_offline_missions() |
 | `src/character/prestige_actions.rs` | Add doc comment noting DeepState prestige handling is in prestige_input.rs |
 | `src/items/types.rs` | Add AbyssalMissionSpeed, AbyssalSupplyYield, AbyssalResilience to AffixType |
-| `src/core/game_state.rs` | Add `deep_prestige_fragments: f64` field |
 | `src/ui/mod.rs` | Declare deep_scene, deep_roster, deep_missions, deep_infrastructure |
 | `src/ui/stats_panel.rs` | Add pending event indicator when deep.has_pending_events() |
 | `src/utils/debug_menu.rs` | Add "Deep" category with test triggers |
@@ -736,7 +716,7 @@ Missions are intended to progress while the game is closed. Using `last_save_tim
 
 Adding `deep_state: Option<DeepState>` to `GameState` would couple Deep to character saves, causing The Deep to be reset when a character is deleted. As an account-level system, it must be independent. This is consistent with how Haven and Enhancement are handled.
 
-The only Deep data that belongs in `GameState` is `deep_prestige_fragments` (fractional PR from missions), because prestige rank is character-level state. All other Deep data stays in the standalone `DeepState`.
+All Deep data stays in the standalone `DeepState`, consistent with Haven and Enhancement.
 
 ### Why `[D]` Keybind?
 

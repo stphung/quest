@@ -187,7 +187,7 @@ Key methods:
 - `is_resolved()` — `resolved_choice.is_some()`
 
 ### `MissionResult` (`types.rs`)
-Populated when a mission completes. Carries: `outcome`, `marks_earned`, `xp_earned`, `stormglass_earned`, optional `item_ilvl`, `prestige_fragment`, and lists of `injured_mercs` / `lost_mercs` / `merc_level_ups`.
+Populated when a mission completes. Carries: `outcome`, `marks_earned`, `xp_earned`, `stormglass_earned`, optional `item_ilvl`, and lists of `injured_mercs` / `lost_mercs` / `merc_level_ups`.
 
 ### `DeepUiState` (`types.rs`)
 Not serialized — pure runtime UI state. Manages which `DeepView` is shown and selection indices.
@@ -285,7 +285,6 @@ The game tick does **not** simulate mission progress. It only checks for pending
 - **`ui/stats_panel.rs`**: Pending event indicator when `deep.prestige.has_any_pending_event()`
 - **`achievements/`**: Deep-related achievements (discovery, layer milestones, guild ranks)
 - **`items/types.rs`**: Abyssal affix types (`AbyssalMissionSpeed`, `AbyssalSupplyYield`, `AbyssalResilience`)
-- **`core/game_state.rs`**: `deep_prestige_fragments: f64` for fractional PR from Breakthrough missions
 
 ## Constants and Balance Reference
 
