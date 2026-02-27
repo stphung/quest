@@ -1,7 +1,8 @@
 //! The Deep — Mission complete results modal.
 
-use crate::deep::{DeepState, LayerTier, Mercenary, Mission, MissionOutcome};
+use crate::deep::{DeepState, LayerTier, MercStatus, Mercenary, Mission, MissionOutcome};
 use ratatui::{
+    layout::Alignment,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
@@ -9,24 +10,30 @@ use ratatui::{
     Frame,
 };
 
-use super::responsive::LayoutContext;
+use super::responsive::{LayoutContext, SizeTier};
 
 pub(super) fn render_mission_results(
     frame: &mut Frame,
     area: Rect,
     mission: &Mission,
     deep: &DeepState,
-    _ctx: &LayoutContext,
+    ctx: &LayoutContext,
 ) {
     let Some(result) = &mission.result else {
         return;
     };
 
-    // Center the modal
-    let modal_width = 56u16.min(area.width.saturating_sub(4));
+    // Center the modal with responsive sizing by terminal tier.
+    let target_width = match ctx.tier {
+        SizeTier::XL => 84u16,
+        SizeTier::L => 72u16,
+        SizeTier::M => 64u16,
+        SizeTier::S | SizeTier::TooSmall => 56u16,
+    };
+    let modal_width = target_width.min(area.width.saturating_sub(4));
     // Extra rows needed for per-merc progress bars (1 bar line per surviving squad member)
     let squad_bar_rows = mission.squad.len() as u16;
-    let modal_height = (20 + squad_bar_rows).min(area.height.saturating_sub(4));
+    let modal_height = (24 + squad_bar_rows).min(area.height.saturating_sub(4));
     let x = area.x + (area.width.saturating_sub(modal_width)) / 2;
     let y = area.y + (area.height.saturating_sub(modal_height)) / 2;
     let modal_area = Rect::new(x, y, modal_width, modal_height);
@@ -197,6 +204,51 @@ pub(super) fn render_mission_results(
         }
     }
 
+    // Post-mission totals snapshot
+    let ready_count = deep
+        .prestige
+        .roster
+        .iter()
+        .filter(|m| matches!(m.status, MercStatus::Available))
+        .count();
+    let injured_count = deep
+        .prestige
+        .roster
+        .iter()
+        .filter(|m| matches!(m.status, MercStatus::Injured { .. }))
+        .count();
+    let lost_count = deep
+        .prestige
+        .roster
+        .iter()
+        .filter(|m| matches!(m.status, MercStatus::Lost))
+        .count();
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "Warband Now:",
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    )));
+    lines.push(Line::from(vec![
+        Span::styled(
+            "  \u{25c6} Marks on hand: ",
+            Style::default().fg(Color::DarkGray),
+        ),
+        Span::styled(
+            deep.prestige.warband_marks.to_string(),
+            Style::default().fg(Color::Rgb(220, 180, 60)),
+        ),
+    ]));
+    lines.push(Line::from(Span::styled(
+        format!(
+            "  Roster: {} ready  {} injured  {} lost",
+            ready_count, injured_count, lost_count
+        ),
+        Style::default().fg(Color::DarkGray),
+    )));
+
     // Debrief flavor text
     let tier = LayerTier::from_layer(mission.layer);
     let flavor = debrief_flavor(tier, &result.outcome);
@@ -214,7 +266,12 @@ pub(super) fn render_mission_results(
         Style::default().fg(Color::DarkGray),
     )));
 
-    let text = Paragraph::new(lines).alignment(ratatui::layout::Alignment::Center);
+    let alignment = if ctx.tier >= SizeTier::L {
+        Alignment::Left
+    } else {
+        Alignment::Center
+    };
+    let text = Paragraph::new(lines).alignment(alignment);
     frame.render_widget(text, inner);
 }
 

@@ -8,6 +8,9 @@ use crate::deep::{
 use ratatui::style::Color;
 
 use super::deep_scene::DEEP_BORDER_COLOR;
+use super::deep_shared::{
+    draw_deep_card, render_progress_bar as render_card_progress_bar, truncate_text,
+};
 use super::responsive::{LayoutContext, SizeTier};
 use super::scene_fx::{put_cell, put_text, put_text_centered, SceneCell};
 
@@ -170,6 +173,83 @@ fn tier_layer_range(tier: LayerTier) -> (u32, u32) {
     }
 }
 
+/// Render a danger profile card with mission threshold bars.
+fn render_danger_profile_card(
+    buffer: &mut [Vec<SceneCell>],
+    left: i32,
+    inner_w: usize,
+    top: i32,
+    bottom_limit: i32,
+    layer_index: u32,
+    tier: LayerTier,
+) -> i32 {
+    if inner_w < 20 || top + 5 >= bottom_limit {
+        return top;
+    }
+
+    let card_left = left;
+    let card_right = left + inner_w as i32 - 1;
+    let card_bottom = (top + 5).min(bottom_limit - 1);
+    draw_deep_card(
+        buffer,
+        card_left,
+        top,
+        card_right,
+        card_bottom,
+        Color::Rgb(70, 130, 190),
+        Color::Rgb(7, 14, 28),
+        Some("DANGER PROFILE"),
+    );
+
+    let threat_label = match tier {
+        LayerTier::Shallows => "Threat: Controlled",
+        LayerTier::Warrens => "Threat: Elevated",
+        LayerTier::Hollows => "Threat: Hostile",
+        LayerTier::SunkenReach => "Threat: Severe",
+        LayerTier::Abyss => "Threat: Extreme",
+        LayerTier::Void => "Threat: Catastrophic",
+    };
+    let threat_w = (card_right - card_left - 3).max(1) as usize;
+    let threat_line = truncate_text(threat_label, threat_w);
+    put_text(
+        buffer,
+        top + 1,
+        card_left + 2,
+        &threat_line,
+        layer_tier_color(tier),
+    );
+
+    let thresholds = layer_power_thresholds(layer_index);
+    let max_power = thresholds.breakthrough.max(1) as f64;
+    let rows = [
+        ("Sup", thresholds.supply_run, Color::Green),
+        ("Rec", thresholds.recon, Color::Cyan),
+        ("Exp", thresholds.expedition, Color::Yellow),
+        ("Brk", thresholds.breakthrough, Color::LightRed),
+    ];
+
+    for (idx, (label, value, bar_color)) in rows.iter().enumerate() {
+        let row = top + 2 + idx as i32;
+        if row >= card_bottom {
+            break;
+        }
+        let info = format!("{:>3} {:>4}", label, value);
+        put_text(buffer, row, card_left + 2, &info, Color::White);
+        let bar_col = card_left + 12;
+        let bar_w = (card_right - bar_col - 1).max(6) as usize;
+        render_card_progress_bar(
+            buffer,
+            row,
+            bar_col,
+            bar_w,
+            *value as f64 / max_power,
+            *bar_color,
+        );
+    }
+
+    card_bottom + 1
+}
+
 pub(super) fn render_layers(
     buffer: &mut [Vec<SceneCell>],
     width: usize,
@@ -187,15 +267,16 @@ pub(super) fn render_layers(
 
     // ── Title ──
     put_text(buffer, 0, 1, "LAYERS", DEEP_BORDER_COLOR);
+    let header_str = format!(
+        "Frontier: Layer {}    Deepest Descent: Layer {}",
+        frontier,
+        deepest.max(1)
+    );
     put_text(
         buffer,
         0,
         9,
-        &format!(
-            "Frontier: Layer {}    Deepest Descent: Layer {}",
-            frontier,
-            deepest.max(1)
-        ),
+        &truncate_text(&header_str, width.saturating_sub(10)),
         Color::DarkGray,
     );
 
@@ -207,7 +288,7 @@ pub(super) fn render_layers(
             buffer,
             height as i32 - 2,
             legend_col,
-            legend,
+            &truncate_text(legend, width.saturating_sub(2)),
             Color::Rgb(50, 70, 100),
         );
     }
@@ -217,7 +298,10 @@ pub(super) fn render_layers(
         buffer,
         height as i32 - 1,
         1,
-        "[\u{2191}/\u{2193}] Navigate Layers  [Esc] Back",
+        &truncate_text(
+            "[\u{2191}/\u{2193}] Navigate Layers  [Esc] Back",
+            width.saturating_sub(2),
+        ),
         Color::DarkGray,
     );
     let help_hint = "[?] Help";
@@ -549,6 +633,17 @@ fn render_layers_split(
         status_color,
     );
     row += 1;
+
+    // Danger profile card
+    row = render_danger_profile_card(
+        buffer,
+        detail_inner_left,
+        detail_inner_w,
+        row,
+        content_bottom,
+        layer.index,
+        tier,
+    );
 
     // Familiarity with named tier and effect
     row += 1;
