@@ -29,6 +29,16 @@ pub(super) fn handle_deep(
         return InputResult::Continue;
     }
 
+    // Mission-complete modal: capture Enter and block background input.
+    if !deep_state.prestige.pending_results.is_empty() {
+        if matches!(key.code, KeyCode::Enter)
+            && collect_pending_result(deep_state, deep_ui, game_state, 0)
+        {
+            return InputResult::NeedsSave;
+        }
+        return InputResult::Continue;
+    }
+
     // Clear any transient error message on the next key press.
     deep_ui.flash_message = None;
 
@@ -129,25 +139,7 @@ fn handle_hub(
         KeyCode::Enter => {
             match map_hub_selection(deep_state, deep_ui.selected_index) {
                 Some(HubSelection::Completed(pending_idx)) => {
-                    if pending_idx < deep_state.prestige.pending_results.len() {
-                        // Apply character rewards before removing the result.
-                        let mission = &deep_state.prestige.pending_results[pending_idx];
-                        if let Some(ref result) = mission.result {
-                            if result.xp_earned > 0 {
-                                game_state.character_xp += result.xp_earned as u64;
-                            }
-                            if result.stormglass_earned > 0 {
-                                game_state.stormglass += result.stormglass_earned;
-                            }
-                        }
-
-                        deep_state.prestige.pending_results.remove(pending_idx);
-                        // Clamp selected index after removal.
-                        let total = deep_state.prestige.active_missions.len()
-                            + deep_state.prestige.pending_results.len();
-                        if deep_ui.selected_index >= total && total > 0 {
-                            deep_ui.selected_index = total - 1;
-                        }
+                    if collect_pending_result(deep_state, deep_ui, game_state, pending_idx) {
                         return InputResult::NeedsSave;
                     }
                 }
@@ -168,18 +160,6 @@ fn handle_hub(
                 }
                 None => {}
             }
-            InputResult::Continue
-        }
-        KeyCode::Char('n') | KeyCode::Char('N') => {
-            switch_view(deep_ui, DeepView::NewMission);
-            InputResult::Continue
-        }
-        KeyCode::Char('r') | KeyCode::Char('R') => {
-            switch_view(deep_ui, DeepView::Recruit);
-            InputResult::Continue
-        }
-        KeyCode::Char('l') | KeyCode::Char('L') => {
-            switch_view(deep_ui, DeepView::Infrastructure);
             InputResult::Continue
         }
         KeyCode::Char('g') | KeyCode::Char('G') => {
@@ -225,6 +205,43 @@ fn handle_hub(
         }
         _ => InputResult::Continue,
     }
+}
+
+fn collect_pending_result(
+    deep_state: &mut DeepState,
+    deep_ui: &mut DeepUiState,
+    game_state: &mut GameState,
+    pending_idx: usize,
+) -> bool {
+    if pending_idx >= deep_state.prestige.pending_results.len() {
+        return false;
+    }
+
+    // Apply character rewards before removing the result.
+    let mission = &deep_state.prestige.pending_results[pending_idx];
+    if let Some(ref result) = mission.result {
+        if result.xp_earned > 0 {
+            game_state.character_xp += result.xp_earned as u64;
+        }
+        if result.stormglass_earned > 0 {
+            game_state.stormglass += result.stormglass_earned;
+        }
+    }
+
+    deep_state.prestige.pending_results.remove(pending_idx);
+
+    // Only hub selection depends on pending-results length.
+    if matches!(deep_ui.view, DeepView::Hub) {
+        let total =
+            deep_state.prestige.active_missions.len() + deep_state.prestige.pending_results.len();
+        if total == 0 {
+            deep_ui.selected_index = 0;
+        } else if deep_ui.selected_index >= total {
+            deep_ui.selected_index = total - 1;
+        }
+    }
+
+    true
 }
 
 // ── New Mission View ────────────────────────────────────────────────────────────
@@ -641,5 +658,121 @@ fn switch_view(ui: &mut DeepUiState, target: DeepView) {
         DeepView::Infrastructure => ui.layer_visit_count = ui.layer_visit_count.saturating_add(1),
         DeepView::EventResponse => ui.event_visit_count = ui.event_visit_count.saturating_add(1),
         DeepView::Recruit => ui.recruit_visit_count = ui.recruit_visit_count.saturating_add(1),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::achievements::Achievements;
+    use crate::deep::{Mission, MissionOutcome, MissionResult, MissionType};
+    use ratatui::crossterm::event::KeyModifiers;
+
+    fn key(code: KeyCode) -> KeyEvent {
+        KeyEvent::new(code, KeyModifiers::NONE)
+    }
+
+    fn mission_with_result(xp_earned: u32, stormglass_earned: u64) -> Mission {
+        let now = chrono::Utc::now();
+        Mission {
+            id: 1,
+            mission_type: MissionType::SupplyRun,
+            layer: 1,
+            squad: Vec::new(),
+            started_at: now - chrono::Duration::hours(1),
+            ends_at: now,
+            events: Vec::new(),
+            pending_event_index: 0,
+            status: MissionStatus::Completed,
+            result: Some(MissionResult {
+                outcome: MissionOutcome::Success,
+                marks_earned: 0,
+                xp_earned,
+                stormglass_earned,
+                item_ilvl: None,
+                injured_mercs: Vec::new(),
+                lost_mercs: Vec::new(),
+                merc_level_ups: Vec::new(),
+                danger_bonus_xp: false,
+            }),
+            is_first_orders: false,
+        }
+    }
+
+    #[test]
+    fn mission_result_modal_enter_collects_from_any_view() {
+        let mut deep_state = DeepState::new();
+        deep_state
+            .prestige
+            .pending_results
+            .push(mission_with_result(125, 9));
+
+        let mut deep_ui = DeepUiState::new();
+        deep_ui.view = DeepView::NewMission;
+
+        let mut game_state = GameState::new("Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+
+        let result = handle_deep(
+            key(KeyCode::Enter),
+            &mut deep_state,
+            &mut deep_ui,
+            &mut game_state,
+            &mut achievements,
+        );
+
+        assert!(matches!(result, InputResult::NeedsSave));
+        assert!(deep_state.prestige.pending_results.is_empty());
+        assert_eq!(game_state.character_xp, 125);
+        assert_eq!(game_state.stormglass, 9);
+        assert_eq!(deep_ui.view, DeepView::NewMission);
+    }
+
+    #[test]
+    fn mission_result_modal_blocks_background_navigation() {
+        let mut deep_state = DeepState::new();
+        deep_state
+            .prestige
+            .pending_results
+            .push(mission_with_result(0, 0));
+
+        let mut deep_ui = DeepUiState::new();
+        deep_ui.view = DeepView::NewMission;
+
+        let mut game_state = GameState::new("Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+
+        let result = handle_deep(
+            key(KeyCode::Tab),
+            &mut deep_state,
+            &mut deep_ui,
+            &mut game_state,
+            &mut achievements,
+        );
+
+        assert!(matches!(result, InputResult::Continue));
+        assert_eq!(deep_state.prestige.pending_results.len(), 1);
+        assert_eq!(deep_ui.view, DeepView::NewMission);
+    }
+
+    #[test]
+    fn hub_letter_navigation_shortcuts_are_disabled() {
+        let mut deep_state = DeepState::new();
+        let mut deep_ui = DeepUiState::new();
+        deep_ui.view = DeepView::Hub;
+        let mut game_state = GameState::new("Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+
+        for key_code in [KeyCode::Char('n'), KeyCode::Char('r'), KeyCode::Char('l')] {
+            let result = handle_deep(
+                key(key_code),
+                &mut deep_state,
+                &mut deep_ui,
+                &mut game_state,
+                &mut achievements,
+            );
+            assert!(matches!(result, InputResult::Continue));
+            assert_eq!(deep_ui.view, DeepView::Hub);
+        }
     }
 }
