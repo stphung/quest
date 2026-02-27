@@ -18,6 +18,7 @@ pub struct TickEventFlags {
     pub haven_discovered: bool,
     pub soulforge_discovered: bool,
     pub stormglass_discovered: bool,
+    pub deep_discovered: bool,
 }
 
 /// Maps tick events to combat log entries and visual effects.
@@ -26,6 +27,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
     let mut haven_discovered = false;
     let mut soulforge_discovered = false;
     let mut stormglass_discovered = false;
+    let mut deep_discovered = false;
     for event in events {
         match event {
             TickEvent::PlayerAttack {
@@ -492,6 +494,14 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
             TickEvent::StormglassDiscovered => {
                 stormglass_discovered = true;
             }
+            TickEvent::DeepDiscovered => {
+                deep_discovered = true;
+                game_state.combat_state.add_log_entry(
+                    "\u{2693} A mercenary captain has found you. The Deep awaits...".to_string(),
+                    false,
+                    true,
+                );
+            }
             TickEvent::DeepMissionComplete { message } => {
                 game_state
                     .combat_state
@@ -613,5 +623,6 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
         haven_discovered,
         soulforge_discovered,
         stormglass_discovered,
+        deep_discovered,
     }
 }

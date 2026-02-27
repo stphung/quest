@@ -1897,6 +1897,9 @@ fn main() -> io::Result<()> {
                                     if tick_flags.stormglass_discovered {
                                         overlay = GameOverlay::StormglassDiscovery;
                                     }
+                                    if tick_flags.deep_discovered {
+                                        overlay = GameOverlay::DeepDiscovery;
+                                    }
                                 }
 
                                 if matches!(overlay, GameOverlay::None)

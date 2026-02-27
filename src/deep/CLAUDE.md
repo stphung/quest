@@ -16,7 +16,7 @@ src/deep/
 ├── types.rs        — All data structures, enums, constants, and helper methods
 ├── mercenaries.rs  — Merc generation, recruit pools, leveling, injuries, roster management
 ├── layers.rs       — Layer difficulty, familiarity system, infrastructure, mission durations
-├── discovery.rs    — Discovery roll logic (try_discover_deep), starter roster init
+├── discovery.rs    — Discovery logic (complete_discovery), starter roster init
 └── persistence.rs  — Save/load from ~/.quest/deep.json
 ```
 
@@ -185,7 +185,7 @@ pub enum DeepView { Hub, NewMission, Roster, Infrastructure, EventResponse, Recr
 ## Key Functions
 
 ### `discovery.rs`
-- `try_discover_deep(deep, prestige_rank, rng) -> bool` — Roll for discovery, initialise 3 starter mercs (Vanguard, Scout, Medic) on success
+- `complete_discovery(deep, rng)` — Complete Deep discovery: set discovered flag, create 3 starter mercs, generate mission pool, grant warband marks, queue First Orders mission. Called from `tick_stages.rs` on first Endless kill at P15+.
 
 ### `mercenaries.rs`
 
@@ -239,15 +239,9 @@ pub enum DeepView { Hub, NewMission, Roster, Infrastructure, EventResponse, Recr
 
 ## Discovery
 
-The Deep is discovered at P15+ via a per-tick random roll, identical in pattern to Haven (P10+) and Soulforge (P15+):
+The Deep is discovered when the player kills The Endless (Zone 11 boss) for the first time at P15+. This happens on the `BossDefeatResult::ExpanseCycle` event in `tick_stages.rs`. Unlike Haven and Soulforge which use per-tick random rolls, Deep discovery is a deterministic boss-kill trigger.
 
-```
-chance_per_tick = 0.000014 + (prestige_rank - 15) * 0.000007
-```
-
-At P15 this gives ~0.000014/tick. With 10 ticks/sec, average discovery time is ~2 hours.
-
-On discovery, `try_discover_deep()` sets `deep.persistent.discovered = true` and creates 3 starter mercs (Vanguard "Gareth", Scout "Lyra", Medic "Aldric"). The discovery roll is blocked when dungeon, fishing, or minigame is active.
+On discovery, `complete_discovery()` sets `deep.persistent.discovered = true`, creates 3 starter mercs, generates the initial mission pool, grants starter Warband Marks (scaled by guild rank), and queues the "First Orders" tutorial mission.
 
 ## Wall-Clock Time Model
 
@@ -257,7 +251,8 @@ The game tick does **not** simulate mission progress. It only checks for pending
 
 ## Integration Points
 
-- **`core/tick.rs`**: `game_tick()` takes `deep: &mut DeepState`. Stage 11b rolls for Deep discovery (`try_discover_deep()`), emits `TickEvent::DeepDiscovered`, sets `deep_changed` flag. Stage 13 checks for pending check-in events.
+- **`core/tick.rs`**: `game_tick()` takes `deep: &mut DeepState`. Stage 13 checks for pending check-in events.
+- **`core/tick_stages.rs`**: `process_combat_events()` triggers Deep discovery on `BossDefeatResult::ExpanseCycle` when `!discovered && prestige_rank >= DEEP_MIN_PRESTIGE_RANK`. Emits `TickEvent::DeepDiscovered`, sets `deep_changed` flag.
 - **`core/tick_types.rs`**: `TickEvent::DeepDiscovered` variant, `TickResult::deep_changed` and `deep_event_ready` flags
 - **`tick_events.rs`**: `TickFlags::deep_discovered` field, combat log message on discovery
 - **`input/mod.rs`**: `[D]` keybind opens overlay when `deep.discovered`. Routes to `handle_deep()`.
@@ -278,8 +273,6 @@ The game tick does **not** simulate mission progress. It only checks for pending
 | Constant | Value | Notes |
 |----------|-------|-------|
 | `DEEP_MIN_PRESTIGE_RANK` | 15 | Same gate as Soulforge and Stormglass |
-| `DEEP_DISCOVERY_BASE_CHANCE` | 0.000014 | Per-tick chance at exactly P15 |
-| `DEEP_DISCOVERY_RANK_BONUS` | 0.000007 | Additional chance per rank above 15 |
 
 ### Layer Ranges
 | Constant | Value |

@@ -20,9 +20,8 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 
 use quest::deep::{
-    complete_story_discovery, generate_mission_pool, mark_layer_cleared,
-    maybe_refresh_mission_pool, DeepPrestige, DeepState, GuildRank, MissionType,
-    POOL_REFRESH_INTERVAL_SECS, STORY_STAGE_ENTRANCE,
+    complete_discovery, generate_mission_pool, mark_layer_cleared, maybe_refresh_mission_pool,
+    DeepPrestige, DeepState, GuildRank, MissionType, POOL_REFRESH_INTERVAL_SECS,
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -36,15 +35,11 @@ fn t0() -> DateTime<Utc> {
     Utc.with_ymd_and_hms(2024, 3, 1, 10, 0, 0).unwrap()
 }
 
-/// Force-discover The Deep via story chain and return the ready state.
+/// Force-discover The Deep and return the ready state.
 fn force_discover(deep: &mut DeepState) {
     let mut rng = seeded_rng(42);
-    deep.persistent.deep_story_stage = STORY_STAGE_ENTRANCE;
-    complete_story_discovery(deep, &mut rng);
-    assert!(
-        deep.persistent.discovered,
-        "Discovery must succeed at entrance stage"
-    );
+    complete_discovery(deep, &mut rng);
+    assert!(deep.persistent.discovered, "Discovery must succeed");
 }
 
 // =============================================================================

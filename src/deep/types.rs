@@ -12,19 +12,6 @@ use serde::{Deserialize, Serialize};
 
 /// Minimum prestige rank required to discover The Deep.
 pub const DEEP_MIN_PRESTIGE_RANK: u32 = 15;
-// ── Story Chain Thresholds ────────────────────────────────────────────────────
-
-/// Cumulative rift resonance required for each story level (1-10).
-/// Index 0 = level 1, index 9 = level 10.
-/// Cost curve: [1,1,2,2,3,3,4,4,5,5] → cumulative [1,2,4,6,9,12,16,20,25,30].
-pub const STORY_RESONANCE_THRESHOLDS: [u32; 10] = [1, 2, 4, 6, 9, 12, 16, 20, 25, 30];
-
-/// The story stage at which the player can press [D] to discover The Deep.
-pub const STORY_STAGE_ENTRANCE: u8 = 10;
-
-/// The story stage value after discovery is complete.
-pub const STORY_STAGE_DISCOVERED: u8 = 11;
-
 /// The layer where the Gateway is located.
 pub const GATEWAY_LAYER: u32 = 30;
 
@@ -693,12 +680,6 @@ pub struct DeepPersistent {
     /// Monotonically increasing counter tracking how many prestige cycles have occurred.
     #[serde(default)]
     pub generation_counter: u32,
-    /// Rift Resonance — increments each prestige where player reached The Expanse.
-    #[serde(default)]
-    pub rift_resonance: u32,
-    /// Story chain progress (0 = not started, 1-4 = stages, 5 = discovered).
-    #[serde(default)]
-    pub deep_story_stage: u8,
     /// Whether the Gateway at Layer 30 has been opened.
     #[serde(default)]
     pub gateway_opened: bool,
@@ -727,8 +708,6 @@ impl DeepPersistent {
             merc_id_counter: 0,
             mission_id_counter: 0,
             generation_counter: 0,
-            rift_resonance: 0,
-            deep_story_stage: 0,
             gateway_opened: false,
             first_orders_queued: false,
             generation_records: Vec::new(),
@@ -914,41 +893,8 @@ impl DeepState {
         }
     }
 
-    /// Increment Rift Resonance if the player reached The Expanse (Zone 11+)
-    /// and is at least P15. Call BEFORE `on_prestige()` since zone data is
-    /// on the character state, not Deep state.
-    pub fn maybe_increment_rift_resonance(&mut self, current_zone_id: u32, prestige_rank: u32) {
-        if prestige_rank >= DEEP_MIN_PRESTIGE_RANK && current_zone_id >= 11 {
-            self.persistent.rift_resonance += 1;
-        }
-    }
-
-    /// Check and advance story stage based on current rift resonance and prestige rank.
-    /// Returns the new stage if it advanced, or None if unchanged.
-    pub fn check_story_progression(&mut self, prestige_rank: u32) -> Option<u8> {
-        if prestige_rank < DEEP_MIN_PRESTIGE_RANK {
-            return None;
-        }
-        let resonance = self.persistent.rift_resonance;
-        let stage = self.persistent.deep_story_stage;
-
-        // Stage must be 0-9 (levels not yet reached entrance)
-        if stage >= STORY_STAGE_ENTRANCE {
-            return None;
-        }
-
-        let next_level = stage + 1; // 1-based level index
-        let threshold = STORY_RESONANCE_THRESHOLDS[next_level as usize - 1];
-        if resonance >= threshold {
-            self.persistent.deep_story_stage = next_level;
-            Some(next_level)
-        } else {
-            None
-        }
-    }
-
-    /// Record generation stats on prestige. Mercenaries, missions, and marks
-    /// persist across prestiges — only the generation counter advances.
+    /// Reset per-prestige state while keeping persistent state intact.
+    /// Call this at the start of each prestige cycle.
     pub fn on_prestige(&mut self) {
         self.persistent.generation_counter += 1;
 
@@ -1068,8 +1014,6 @@ pub struct DeepUiState {
     pub show_help: bool,
     /// Mercs from last prestige shown in farewell screen: (name, level, missions_completed).
     pub farewell_mercs: Vec<(String, u32, u32)>,
-    /// Pending story event to show the player (set during prestige, shown next tick).
-    pub pending_story_stage: Option<u8>,
 }
 
 impl DeepUiState {
@@ -1091,7 +1035,6 @@ impl DeepUiState {
             recruit_visit_count: 0,
             show_help: false,
             farewell_mercs: Vec::new(),
-            pending_story_stage: None,
         }
     }
 

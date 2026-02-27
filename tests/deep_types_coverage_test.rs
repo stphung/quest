@@ -18,7 +18,7 @@
 //!  - `Layer` infrastructure helpers and `available_infrastructure_slots()`
 //!  - `LayerRecord` helpers
 //!  - `DeepState::on_prestige()` generation counter and record cap
-//!  - `DeepState::is_active()`, `maybe_increment_rift_resonance()`, `check_story_progression()`
+//!  - `DeepState::is_active()`
 //!  - `DeepView` tab navigation and labels
 //!  - `DeepUiState` open/close state transitions
 //!  - `RecruitPool::needs_refresh()`
@@ -1135,75 +1135,11 @@ fn test_deep_state_on_prestige_generation_records_capped_at_10() {
 }
 
 #[test]
-fn test_deep_state_maybe_increment_rift_resonance_requires_p15_and_zone11() {
-    let mut ds = DeepState::new();
-    assert_eq!(ds.persistent.rift_resonance, 0);
-
-    // Below prestige gate: no increment
-    ds.maybe_increment_rift_resonance(11, 14);
-    assert_eq!(ds.persistent.rift_resonance, 0);
-
-    // At prestige gate but zone < 11: no increment
-    ds.maybe_increment_rift_resonance(10, 15);
-    assert_eq!(ds.persistent.rift_resonance, 0);
-
-    // Both conditions met: increment
-    ds.maybe_increment_rift_resonance(11, 15);
-    assert_eq!(ds.persistent.rift_resonance, 1);
-
-    ds.maybe_increment_rift_resonance(11, 20);
-    assert_eq!(ds.persistent.rift_resonance, 2);
-}
-
-#[test]
-fn test_deep_state_check_story_progression_requires_p15() {
-    let mut ds = DeepState::new();
-    ds.persistent.rift_resonance = 10;
-
-    // Below P15: returns None regardless of resonance
-    assert!(ds.check_story_progression(14).is_none());
-    assert_eq!(ds.persistent.deep_story_stage, 0);
-}
-
-#[test]
-fn test_deep_state_check_story_progression_stage_zero_to_one() {
-    let mut ds = DeepState::new();
-    ds.persistent.rift_resonance = 1; // threshold for stage 1 is 1
-
-    let result = ds.check_story_progression(15);
-    assert_eq!(result, Some(1));
-    assert_eq!(ds.persistent.deep_story_stage, 1);
-}
-
-#[test]
-fn test_deep_state_check_story_progression_no_advance_below_threshold() {
-    let mut ds = DeepState::new();
-    ds.persistent.rift_resonance = 0; // need 1 for stage 1
-
-    let result = ds.check_story_progression(15);
-    assert!(result.is_none());
-    assert_eq!(ds.persistent.deep_story_stage, 0);
-}
-
-#[test]
-fn test_deep_state_check_story_progression_stops_at_stage_10() {
-    let mut ds = DeepState::new();
-    ds.persistent.deep_story_stage = STORY_STAGE_ENTRANCE; // 10
-    ds.persistent.rift_resonance = 100;
-
-    // Already at entrance stage: no further advance
-    let result = ds.check_story_progression(20);
-    assert!(result.is_none());
-    assert_eq!(ds.persistent.deep_story_stage, STORY_STAGE_ENTRANCE);
-}
-
-#[test]
 fn test_deep_state_serde_roundtrip() {
     let mut ds = DeepState::new();
     ds.persistent.discovered = true;
     ds.persistent.guild_rank = GuildRank(4);
     ds.persistent.deepest_layer_reached = 12;
-    ds.persistent.rift_resonance = 5;
     ds.prestige.warband_marks = 999;
 
     let json = serde_json::to_string(&ds).unwrap();
@@ -1212,7 +1148,6 @@ fn test_deep_state_serde_roundtrip() {
     assert!(loaded.persistent.discovered);
     assert_eq!(loaded.persistent.guild_rank, GuildRank(4));
     assert_eq!(loaded.persistent.deepest_layer_reached, 12);
-    assert_eq!(loaded.persistent.rift_resonance, 5);
     assert_eq!(loaded.prestige.warband_marks, 999);
 }
 
@@ -1246,8 +1181,6 @@ fn test_deep_state_serde_missing_fields_use_defaults() {
     let loaded: DeepState = serde_json::from_str(minimal_json).unwrap();
     assert!(loaded.persistent.discovered);
     assert_eq!(loaded.persistent.generation_counter, 0);
-    assert_eq!(loaded.persistent.rift_resonance, 0);
-    assert_eq!(loaded.persistent.deep_story_stage, 0);
     assert!(!loaded.persistent.gateway_opened);
     assert!(!loaded.persistent.first_orders_queued);
     assert!(loaded.persistent.generation_records.is_empty());
@@ -1405,29 +1338,11 @@ fn test_recruit_pool_needs_refresh_true_after_24_hours() {
 }
 
 // =============================================================================
-// Story resonance thresholds constant
+// Remaining constants
 // =============================================================================
 
 #[test]
-fn test_story_resonance_thresholds_values() {
-    // From the doc comment: [1,2,4,6,9,12,16,20,25,30]
-    assert_eq!(STORY_RESONANCE_THRESHOLDS[0], 1);
-    assert_eq!(STORY_RESONANCE_THRESHOLDS[1], 2);
-    assert_eq!(STORY_RESONANCE_THRESHOLDS[2], 4);
-    assert_eq!(STORY_RESONANCE_THRESHOLDS[3], 6);
-    assert_eq!(STORY_RESONANCE_THRESHOLDS[4], 9);
-    assert_eq!(STORY_RESONANCE_THRESHOLDS[5], 12);
-    assert_eq!(STORY_RESONANCE_THRESHOLDS[6], 16);
-    assert_eq!(STORY_RESONANCE_THRESHOLDS[7], 20);
-    assert_eq!(STORY_RESONANCE_THRESHOLDS[8], 25);
-    assert_eq!(STORY_RESONANCE_THRESHOLDS[9], 30);
-    assert_eq!(STORY_RESONANCE_THRESHOLDS.len(), 10);
-}
-
-#[test]
-fn test_story_stage_constants() {
-    assert_eq!(STORY_STAGE_ENTRANCE, 10);
-    assert_eq!(STORY_STAGE_DISCOVERED, 11);
+fn test_deep_constants() {
     assert_eq!(GATEWAY_LAYER, 30);
     assert_eq!(DEEP_MIN_PRESTIGE_RANK, 15);
 }

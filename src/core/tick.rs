@@ -183,6 +183,8 @@ pub fn game_tick<R: Rng>(
         combat_events,
         &haven_bonuses,
         achievements,
+        deep,
+        debug_mode,
         &mut result,
         rng,
     );
@@ -248,11 +250,8 @@ pub fn game_tick<R: Rng>(
     }
 
     // ── 11b. Deep discovery ───────────────────────────────────────
-    // Discovery is narrative-gated: the story chain advances on prestige
-    // (via advance_deep_story in prestige_input.rs), and the player
-    // completes discovery by pressing [D] after reaching story stage 4.
-    // No per-tick random roll — discovery happens through The Expanse
-    // story events only.
+    // Discovery is triggered by defeating The Expanse cycle boss.
+    // No per-tick random roll.
 
     // ── 11c. Deep mission ticking ──────────────────────────────────
     // Tick active missions (wall-clock based), resolve completions,

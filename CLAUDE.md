@@ -215,9 +215,9 @@ Account-level equipment enhancement system (Soulforge) that persists across char
 - `economy.rs` — Warband Marks economy, mission rewards, recruitment costs, infrastructure costs
 - `layers.rs` — Layer difficulty (power thresholds L1-25 + Void scaling), familiarity system (Unknown/Mapped/Familiar/Mastered), mission durations (base + multiplicative modifiers), infrastructure building (validation, costs, Watchtower familiarity bonus)
 - `persistence.rs` — Save/load from `~/.quest/deep.json`
-- `discovery.rs` — Discovery roll logic, starter roster initialisation (3 mercs: Vanguard, Scout, Medic)
+- `discovery.rs` — Discovery logic (complete_discovery), starter roster initialisation (3 mercs: Vanguard, Scout, Medic)
 
-An endgame (P15+) system where players recruit and manage a mercenary company, sending squads on long-duration missions (2-24h wall-clock time) into a vast underground structure. Two-tier persistence: `DeepPersistent` (guild rank, cleared layers, infrastructure — survives prestige) and `DeepPrestige` (mercs, missions, Warband Marks — resets on prestige). Five mercenary archetypes (Vanguard, Scout, Arcanist, Medic, Saboteur) with 4 quality tiers. Six layer tiers (Shallows through The Void). Five mission types (Supply Run, Recon, Expedition, Breakthrough, Construction). Four infrastructure types (Outpost, SupplyCache, Watchtower, Bridge). Discovered at P15+ with same formula as Soulforge.
+An endgame (P15+) system where players recruit and manage a mercenary company, sending squads on long-duration missions (2-24h wall-clock time) into a vast underground structure. Two-tier persistence: `DeepPersistent` (guild rank, cleared layers, infrastructure — survives prestige) and `DeepPrestige` (mercs, missions, Warband Marks — resets on prestige). Five mercenary archetypes (Vanguard, Scout, Arcanist, Medic, Saboteur) with 4 quality tiers. Six layer tiers (Shallows through The Void). Five mission types (Supply Run, Recon, Expedition, Breakthrough, Construction). Four infrastructure types (Outpost, SupplyCache, Watchtower, Bridge). Discovered on first Endless kill (Zone 11 boss) at P15+.
 
 ### Stormglass Module (`src/stormglass/`)
 
@@ -547,7 +547,7 @@ quest/
 │   │   ├── economy.rs       # Warband Marks economy, rewards, costs
 │   │   ├── layers.rs        # Layer difficulty, familiarity, infrastructure, durations
 │   │   ├── persistence.rs   # Save/load from ~/.quest/deep.json
-│   │   └── discovery.rs     # Discovery roll logic, starter roster
+│   │   └── discovery.rs     # Discovery logic (boss-trigger), starter roster
 │   ├── stormglass/          # Stormglass currency and Storm Sigils
 │   │   ├── types.rs         # Stormglass state, daily rotation
 │   │   ├── sigils.rs        # Storm Sigil definitions and bonuses

@@ -1272,40 +1272,21 @@ fn test_is_active_survives_prestige() {
     assert!(deep.is_active(), "is_active should survive prestige");
 }
 
-// ── Rift Resonance and Story Chain Serde ──────────────────────────────────────
+// ── Gateway Opened Serde ──────────────────────────────────────────────────────
 
 #[test]
-fn test_deep_persistent_rift_resonance_defaults_on_missing() {
+fn test_deep_persistent_gateway_opened_defaults_on_missing() {
     let json = r#"{"discovered":false,"guild_rank":1,"guild_upgrade_cost":0,"layers":[],"deepest_layer_reached":0,"merc_id_counter":0,"mission_id_counter":0}"#;
     let persistent: DeepPersistent = serde_json::from_str(json).unwrap();
-    assert_eq!(persistent.rift_resonance, 0);
-    assert_eq!(persistent.deep_story_stage, 0);
     assert!(!persistent.gateway_opened);
 }
 
 #[test]
-fn test_deep_persistent_rift_resonance_roundtrip() {
+fn test_deep_persistent_gateway_opened_roundtrip() {
     let mut persistent = DeepPersistent::new();
-    persistent.rift_resonance = 7;
-    persistent.deep_story_stage = 4;
     persistent.gateway_opened = true;
 
     let json = serde_json::to_string(&persistent).unwrap();
     let loaded: DeepPersistent = serde_json::from_str(&json).unwrap();
-    assert_eq!(loaded.rift_resonance, 7);
-    assert_eq!(loaded.deep_story_stage, 4);
     assert!(loaded.gateway_opened);
-}
-
-#[test]
-fn test_rift_resonance_survives_prestige_serde_roundtrip() {
-    let mut deep = DeepState::new();
-    deep.persistent.rift_resonance = 5;
-    deep.persistent.deep_story_stage = 3;
-    deep.on_prestige();
-
-    let json = serde_json::to_string(&deep.persistent).unwrap();
-    let loaded: DeepPersistent = serde_json::from_str(&json).unwrap();
-    assert_eq!(loaded.rift_resonance, 5);
-    assert_eq!(loaded.deep_story_stage, 3);
 }
