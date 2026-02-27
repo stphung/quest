@@ -74,14 +74,6 @@ pub fn handle_game_input(
         return InputResult::Continue;
     }
 
-    // 0.4. Deep story event modal (Enter or Esc dismisses)
-    if deep_ui.pending_story_stage.is_some() {
-        if matches!(key.code, KeyCode::Enter | KeyCode::Esc) {
-            deep_ui.pending_story_stage = None;
-        }
-        return InputResult::Continue;
-    }
-
     // 0.5. Achievement browser overlay
     if let GameOverlay::Achievements {
         ref mut browser,
@@ -492,13 +484,6 @@ fn handle_base_game(
         KeyCode::Char('d') | KeyCode::Char('D') => {
             if deep_state.persistent.discovered {
                 deep_ui.open();
-            } else if deep_state.persistent.deep_story_stage >= crate::deep::STORY_STAGE_ENTRANCE {
-                // Narrative discovery: story chain reached stage 4 (The Entrance).
-                // Player presses [D] to complete discovery and descend.
-                crate::deep::complete_story_discovery(deep_state, &mut rand::rng());
-                achievements.on_deep_discovered(Some(&state.character_name));
-                deep_ui.open();
-                return InputResult::NeedsSave;
             }
             InputResult::Continue
         }

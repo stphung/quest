@@ -105,10 +105,7 @@ pub fn draw_game_overlays(
             ui::game_common::render_offline_welcome(frame, area, report, ctx);
         }
         GameOverlay::PrestigeConfirm => {
-            let rift_hint = !deep_state.persistent.discovered
-                && state.prestige_rank >= crate::deep::DEEP_MIN_PRESTIGE_RANK
-                && state.zone_progression.current_zone_id >= 11;
-            ui::prestige_confirm::draw_prestige_confirm(frame, state, rift_hint, ctx);
+            ui::prestige_confirm::draw_prestige_confirm(frame, state, ctx);
         }
         GameOverlay::HavenDiscovery => {
             ui::haven_scene::render_haven_discovery_modal(frame, area, ctx);
@@ -258,11 +255,6 @@ pub fn draw_game_overlays(
     // The Deep overlay
     if deep_ui.open {
         ui::deep_scene::render_deep_overlay(frame, area, deep_state, deep_ui, None, ctx);
-    }
-
-    // Story event modal (shown after prestige when rift resonance advances a stage)
-    if let Some(stage) = deep_ui.pending_story_stage {
-        ui::deep_scene::render_story_modal(frame, area, stage);
     }
 
     // Chrono Surge active: status banner at bottom

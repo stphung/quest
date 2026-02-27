@@ -1,32 +1,14 @@
 use super::mercenaries::generate_starter_roster;
-use super::types::{
-    DeepState, MercStatus, Mission, MissionStatus, MissionType, STORY_STAGE_DISCOVERED,
-    STORY_STAGE_ENTRANCE,
-};
+use super::types::{DeepState, MercStatus, Mission, MissionStatus, MissionType};
 use chrono::Utc;
 use rand::Rng;
 
-/// Check if the story chain should advance.
-///
-/// Called after rift resonance is incremented (during prestige).
-/// Returns the new story stage if it advanced, or None.
-pub fn advance_deep_story(deep: &mut DeepState, prestige_rank: u32) -> Option<u8> {
+/// Complete The Deep discovery. Called when the trigger condition is met.
+pub fn complete_discovery<R: Rng>(deep: &mut DeepState, rng: &mut R) {
     if deep.persistent.discovered {
-        return None;
-    }
-
-    // Check stage progression
-    deep.check_story_progression(prestige_rank)
-}
-
-/// Complete the discovery via the story chain. Called when the player
-/// presses [D] after stage 4 is reached (The Entrance).
-pub fn complete_story_discovery<R: Rng>(deep: &mut DeepState, rng: &mut R) {
-    if deep.persistent.discovered || deep.persistent.deep_story_stage < STORY_STAGE_ENTRANCE {
         return;
     }
     deep.persistent.discovered = true;
-    deep.persistent.deep_story_stage = STORY_STAGE_DISCOVERED;
     let starters = generate_starter_roster(
         deep.persistent.guild_rank,
         || deep.persistent.next_merc_id(),

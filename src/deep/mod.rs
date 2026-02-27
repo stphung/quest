@@ -69,12 +69,9 @@ pub use types::{
     WarbandLogEntry,
     DEEP_MIN_PRESTIGE_RANK,
     GATEWAY_LAYER,
-    STORY_RESONANCE_THRESHOLDS,
-    STORY_STAGE_DISCOVERED,
-    STORY_STAGE_ENTRANCE,
 };
 
-pub use discovery::{advance_deep_story, complete_story_discovery};
+pub use discovery::complete_discovery;
 
 // Economy re-exports
 #[allow(unused_imports)]
