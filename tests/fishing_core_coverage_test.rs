@@ -23,6 +23,7 @@ use quest::haven::{Haven, HavenBonuses};
 use quest::zones::BossDefeatResult;
 use quest::GameState;
 use rand::SeedableRng;
+use quest::deep::DeepState;
 use rand_chacha::ChaCha8Rng;
 
 fn seeded_rng() -> ChaCha8Rng {
@@ -438,6 +439,7 @@ fn test_process_discoveries_skipped_in_dungeon() {
         let mut result = TickResult::default();
         let mut ach = Achievements::default();
         let bonuses = default_bonuses();
+        let mut deep = DeepState::new();
 
         let events = vec![CombatEvent::EnemyDied { xp_gained: 100 }];
         tick_stages::process_combat_events(
@@ -445,6 +447,8 @@ fn test_process_discoveries_skipped_in_dungeon() {
             events,
             &bonuses,
             &mut ach,
+            &mut deep,
+            false,
             &mut result,
             &mut r,
         );
@@ -478,6 +482,7 @@ fn test_process_discoveries_dungeon_or_fishing_found() {
         let mut result = TickResult::default();
         let mut ach = Achievements::default();
         let bonuses = default_bonuses();
+        let mut deep = DeepState::new();
 
         let events = vec![CombatEvent::EnemyDied { xp_gained: 100 }];
         tick_stages::process_combat_events(
@@ -485,6 +490,8 @@ fn test_process_discoveries_dungeon_or_fishing_found() {
             events,
             &bonuses,
             &mut ach,
+            &mut deep,
+            false,
             &mut result,
             &mut r,
         );
@@ -533,6 +540,7 @@ fn test_discoveries_never_both_dungeon_and_fishing_same_tick() {
         let mut result = TickResult::default();
         let mut ach = Achievements::default();
         let bonuses = default_bonuses();
+        let mut deep = DeepState::new();
 
         let events = vec![CombatEvent::EnemyDied { xp_gained: 100 }];
         tick_stages::process_combat_events(
@@ -540,6 +548,8 @@ fn test_discoveries_never_both_dungeon_and_fishing_same_tick() {
             events,
             &bonuses,
             &mut ach,
+            &mut deep,
+            false,
             &mut result,
             &mut r,
         );
@@ -571,6 +581,7 @@ fn test_zone_achievements_zone_complete_but_gated() {
     let mut ach = Achievements::default();
     let mut r = rng(1);
     let bonuses = default_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::SubzoneBossDefeated {
         xp_gained: 1500,
@@ -580,7 +591,7 @@ fn test_zone_achievements_zone_complete_but_gated() {
         },
     }];
 
-    tick_stages::process_combat_events(&mut state, events, &bonuses, &mut ach, &mut result, &mut r);
+    tick_stages::process_combat_events(&mut state, events, &bonuses, &mut ach, &mut deep, false, &mut result, &mut r);
 
     // The zone achievement tracking should have been called
     // Session kills should increment
@@ -666,6 +677,7 @@ fn test_process_item_drop_boss_always_drops() {
         let mut result = TickResult::default();
         let mut ach = Achievements::default();
         let bonuses = default_bonuses();
+        let mut deep = DeepState::new();
 
         let events = vec![CombatEvent::EnemyDied { xp_gained: 500 }];
         tick_stages::process_combat_events(
@@ -673,6 +685,8 @@ fn test_process_item_drop_boss_always_drops() {
             events,
             &bonuses,
             &mut ach,
+            &mut deep,
+            false,
             &mut result,
             &mut r,
         );
@@ -707,6 +721,7 @@ fn test_process_item_drop_mob_adds_recent_drop_when_dropped() {
         let mut result = TickResult::default();
         let mut ach = Achievements::default();
         let bonuses = default_bonuses();
+        let mut deep = DeepState::new();
 
         let events = vec![CombatEvent::EnemyDied { xp_gained: 100 }];
         tick_stages::process_combat_events(
@@ -714,6 +729,8 @@ fn test_process_item_drop_mob_adds_recent_drop_when_dropped() {
             events,
             &bonuses,
             &mut ach,
+            &mut deep,
+            false,
             &mut result,
             &mut r,
         );
@@ -755,9 +772,10 @@ fn test_item_drop_equipped_sets_dirty_flag() {
     let mut result = TickResult::default();
     let mut ach = Achievements::default();
     let bonuses = default_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::EnemyDied { xp_gained: 500 }];
-    tick_stages::process_combat_events(&mut state, events, &bonuses, &mut ach, &mut result, &mut r);
+    tick_stages::process_combat_events(&mut state, events, &bonuses, &mut ach, &mut deep, false, &mut result, &mut r);
 
     // An item was dropped from boss (guaranteed) and likely equipped (empty slots)
     if has_event(&result, |e| {
@@ -786,9 +804,10 @@ fn test_item_drop_ilvl_matches_zone() {
     let mut result = TickResult::default();
     let mut ach = Achievements::default();
     let bonuses = default_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::EnemyDied { xp_gained: 500 }];
-    tick_stages::process_combat_events(&mut state, events, &bonuses, &mut ach, &mut result, &mut r);
+    tick_stages::process_combat_events(&mut state, events, &bonuses, &mut ach, &mut deep, false, &mut result, &mut r);
 
     if let Some(TickEvent::ItemDropped { ilvl, .. }) = result
         .events
@@ -1115,6 +1134,7 @@ fn test_fishing_spot_discovered_message_format() {
         let mut result = TickResult::default();
         let mut ach = Achievements::default();
         let bonuses = default_bonuses();
+        let mut deep = DeepState::new();
 
         let events = vec![CombatEvent::EnemyDied { xp_gained: 100 }];
         tick_stages::process_combat_events(
@@ -1122,6 +1142,8 @@ fn test_fishing_spot_discovered_message_format() {
             events,
             &bonuses,
             &mut ach,
+            &mut deep,
+            false,
             &mut result,
             &mut r,
         );
@@ -1164,6 +1186,7 @@ fn test_dungeon_discovered_message_format() {
         let mut result = TickResult::default();
         let mut ach = Achievements::default();
         let bonuses = default_bonuses();
+        let mut deep = DeepState::new();
 
         let events = vec![CombatEvent::EnemyDied { xp_gained: 100 }];
         tick_stages::process_combat_events(
@@ -1171,6 +1194,8 @@ fn test_dungeon_discovered_message_format() {
             events,
             &bonuses,
             &mut ach,
+            &mut deep,
+            false,
             &mut result,
             &mut r,
         );

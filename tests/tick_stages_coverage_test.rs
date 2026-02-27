@@ -18,6 +18,7 @@ use quest::items::types::Rarity;
 use quest::zones::BossDefeatResult;
 use quest::GameState;
 use rand::SeedableRng;
+use quest::deep::DeepState;
 use rand_chacha::ChaCha8Rng;
 
 // =============================================================================
@@ -100,6 +101,7 @@ fn test_player_attack_normal_produces_tick_event() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::PlayerAttack {
         damage: 15,
@@ -111,6 +113,8 @@ fn test_player_attack_normal_produces_tick_event() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -145,6 +149,7 @@ fn test_player_attack_critical_produces_crit_message() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::PlayerAttack {
         damage: 30,
@@ -156,6 +161,8 @@ fn test_player_attack_critical_produces_crit_message() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -193,6 +200,7 @@ fn test_player_attack_blocked_produces_weapon_needed_event() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::PlayerAttackBlocked {
         weapon_needed: "Stormbreaker".to_string(),
@@ -203,6 +211,8 @@ fn test_player_attack_blocked_produces_weapon_needed_event() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -234,6 +244,7 @@ fn test_enemy_attack_produces_event_with_enemy_name() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::EnemyAttack { damage: 8 }];
 
@@ -242,6 +253,8 @@ fn test_enemy_attack_produces_event_with_enemy_name() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -275,6 +288,7 @@ fn test_damage_reflected_produces_event() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::DamageReflected { damage: 5 }];
 
@@ -283,6 +297,8 @@ fn test_damage_reflected_produces_event() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -309,6 +325,7 @@ fn test_regen_complete_produces_event() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::RegenComplete { healed: 25 }];
 
@@ -317,6 +334,8 @@ fn test_regen_complete_produces_event() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -339,6 +358,7 @@ fn test_enemy_died_produces_defeated_event_with_xp() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let xp_before = state.character_xp;
 
@@ -349,6 +369,8 @@ fn test_enemy_died_produces_defeated_event_with_xp() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -377,6 +399,7 @@ fn test_enemy_died_message_contains_enemy_name_and_xp() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::EnemyDied { xp_gained: 500 }];
 
@@ -385,6 +408,8 @@ fn test_enemy_died_message_contains_enemy_name_and_xp() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -411,6 +436,7 @@ fn test_enemy_died_can_trigger_level_up() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::EnemyDied { xp_gained: 500 }];
 
@@ -419,6 +445,8 @@ fn test_enemy_died_can_trigger_level_up() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -444,6 +472,7 @@ fn test_enemy_died_increments_session_kills() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     assert_eq!(state.session_kills, 0);
 
@@ -455,6 +484,8 @@ fn test_enemy_died_increments_session_kills() {
             events,
             &bonuses,
             &mut ach,
+            &mut deep,
+            false,
             &mut result,
             &mut rng,
         );
@@ -474,6 +505,7 @@ fn test_player_died_produces_event() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::PlayerDied];
 
@@ -482,6 +514,8 @@ fn test_player_died_produces_event() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -510,6 +544,7 @@ fn test_player_died_in_dungeon_produces_event() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::PlayerDiedInDungeon];
 
@@ -518,6 +553,8 @@ fn test_player_died_in_dungeon_produces_event() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -549,6 +586,7 @@ fn test_elite_defeated_produces_dungeon_elite_event_with_xp() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let xp_before = state.character_xp;
 
@@ -559,6 +597,8 @@ fn test_elite_defeated_produces_dungeon_elite_event_with_xp() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -597,6 +637,7 @@ fn test_boss_defeated_produces_dungeon_boss_event() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::BossDefeated { xp_gained: 2000 }];
 
@@ -605,6 +646,8 @@ fn test_boss_defeated_produces_dungeon_boss_event() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -646,6 +689,7 @@ fn test_boss_defeated_without_dungeon_still_works() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::BossDefeated { xp_gained: 1000 }];
 
@@ -654,6 +698,8 @@ fn test_boss_defeated_without_dungeon_still_works() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -677,6 +723,7 @@ fn test_subzone_boss_defeated_subzone_complete() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::SubzoneBossDefeated {
         xp_gained: 600,
@@ -688,6 +735,8 @@ fn test_subzone_boss_defeated_subzone_complete() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -718,6 +767,7 @@ fn test_subzone_boss_defeated_zone_complete() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::SubzoneBossDefeated {
         xp_gained: 1200,
@@ -732,6 +782,8 @@ fn test_subzone_boss_defeated_zone_complete() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -755,6 +807,7 @@ fn test_subzone_boss_defeated_zone_gated() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::SubzoneBossDefeated {
         xp_gained: 1500,
@@ -769,6 +822,8 @@ fn test_subzone_boss_defeated_zone_gated() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -792,6 +847,7 @@ fn test_subzone_boss_defeated_storms_end() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::SubzoneBossDefeated {
         xp_gained: 5000,
@@ -803,6 +859,8 @@ fn test_subzone_boss_defeated_storms_end() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -825,6 +883,7 @@ fn test_subzone_boss_defeated_expanse_cycle() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::SubzoneBossDefeated {
         xp_gained: 10000,
@@ -836,6 +895,8 @@ fn test_subzone_boss_defeated_expanse_cycle() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -857,6 +918,7 @@ fn test_subzone_boss_weapon_required_skipped() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::SubzoneBossDefeated {
         xp_gained: 0,
@@ -870,6 +932,8 @@ fn test_subzone_boss_weapon_required_skipped() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -896,6 +960,7 @@ fn test_multiple_combat_events_processed_in_order() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![
         CombatEvent::PlayerAttack {
@@ -914,6 +979,8 @@ fn test_multiple_combat_events_processed_in_order() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -950,6 +1017,7 @@ fn test_enemy_name_defaults_to_empty_when_no_enemy() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::EnemyAttack { damage: 5 }];
 
@@ -958,6 +1026,8 @@ fn test_enemy_name_defaults_to_empty_when_no_enemy() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -981,6 +1051,7 @@ fn test_enemy_died_can_trigger_item_drop() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(42);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let mut item_dropped = false;
 
@@ -994,6 +1065,8 @@ fn test_enemy_died_can_trigger_item_drop() {
             events,
             &bonuses,
             &mut ach,
+            &mut deep,
+            false,
             &mut result,
             &mut rng,
         );
@@ -1020,6 +1093,7 @@ fn test_boss_kill_always_drops_item() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(42);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::EnemyDied { xp_gained: 500 }];
 
@@ -1028,6 +1102,8 @@ fn test_boss_kill_always_drops_item() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -1054,6 +1130,7 @@ fn test_item_drop_event_fields() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(42);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::EnemyDied { xp_gained: 500 }];
 
@@ -1062,6 +1139,8 @@ fn test_item_drop_event_fields() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -1097,6 +1176,7 @@ fn test_item_drop_adds_to_recent_drops() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(42);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     assert!(state.recent_drops.is_empty());
 
@@ -1107,6 +1187,8 @@ fn test_item_drop_adds_to_recent_drops() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -1127,6 +1209,7 @@ fn test_enemy_died_can_trigger_dungeon_discovery() {
     let mut state = fresh_state();
     let mut ach = Achievements::default();
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
     let mut discovered = false;
 
     for seed in 0..500u64 {
@@ -1141,6 +1224,8 @@ fn test_enemy_died_can_trigger_dungeon_discovery() {
             events,
             &bonuses,
             &mut ach,
+            &mut deep,
+            false,
             &mut result,
             &mut rng,
         );
@@ -1173,6 +1258,7 @@ fn test_discoveries_skipped_when_dungeon_active() {
     let mut result = TickResult::default();
     let mut ach = Achievements::default();
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     // Try many times
     for seed in 0..100u64 {
@@ -1184,6 +1270,8 @@ fn test_discoveries_skipped_when_dungeon_active() {
             events,
             &bonuses,
             &mut ach,
+            &mut deep,
+            false,
             &mut result,
             &mut rng,
         );
@@ -1211,6 +1299,7 @@ fn test_zone_complete_triggers_zone_achievement() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::SubzoneBossDefeated {
         xp_gained: 1200,
@@ -1225,6 +1314,8 @@ fn test_zone_complete_triggers_zone_achievement() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -1243,6 +1334,7 @@ fn test_storms_end_triggers_zone_10_achievement() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::SubzoneBossDefeated {
         xp_gained: 5000,
@@ -1254,6 +1346,8 @@ fn test_storms_end_triggers_zone_10_achievement() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -1272,6 +1366,7 @@ fn test_expanse_cycle_triggers_zone_11_achievement() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::SubzoneBossDefeated {
         xp_gained: 10000,
@@ -1283,6 +1378,8 @@ fn test_expanse_cycle_triggers_zone_11_achievement() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -1353,6 +1450,7 @@ fn test_dungeon_events_noop_when_no_dungeon() {
     let mut result = TickResult::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     tick_stages::process_dungeon_events(&mut state, 0.1, &bonuses, &mut result, &mut rng);
 
@@ -1369,6 +1467,7 @@ fn test_dungeon_events_with_active_dungeon() {
     let mut result = TickResult::default();
     let mut rng = seeded_rng(42);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     // Run a single tick — the dungeon may or may not produce events depending on
     // timing, but it should not panic
@@ -1390,6 +1489,7 @@ fn test_fishing_tick_returns_false_when_no_fishing() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let active = tick_stages::process_fishing_tick(
         &mut state,
@@ -1415,6 +1515,7 @@ fn test_fishing_tick_returns_true_when_fishing_active() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let active = tick_stages::process_fishing_tick(
         &mut state,
@@ -1438,6 +1539,7 @@ fn test_fishing_tick_increments_play_time_at_10_ticks() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let initial_time = state.play_time_seconds;
 
@@ -1475,6 +1577,7 @@ fn test_fishing_tick_produces_catch_events() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(42);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let mut caught_fish = false;
 
@@ -1518,6 +1621,7 @@ fn test_fishing_tick_can_level_up_character() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(123);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     tick_stages::process_fishing_tick(
         &mut state,
@@ -1548,6 +1652,7 @@ fn test_fishing_tick_fish_caught_adds_recent_drop() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(42);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     for _ in 0..200 {
         if state.active_fishing.is_none() {
@@ -1583,6 +1688,7 @@ fn test_fishing_tick_messages_prefixed() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(42);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let mut found_message = false;
 
@@ -1650,6 +1756,7 @@ fn test_fishing_storm_leviathan_debug_mode_suppresses_save() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     // Should not panic in debug mode
     tick_stages::process_fishing_tick(
@@ -1755,12 +1862,15 @@ fn test_empty_combat_events_produces_no_tick_events() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     tick_stages::process_combat_events(
         &mut state,
         Vec::new(),
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -1783,6 +1893,7 @@ fn test_level_up_through_enemy_died_distributes_attributes() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(42);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     // Give enough XP for several level-ups
     let events = vec![CombatEvent::EnemyDied { xp_gained: 50000 }];
@@ -1792,6 +1903,8 @@ fn test_level_up_through_enemy_died_distributes_attributes() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -1825,6 +1938,7 @@ fn test_multiple_enemy_deaths_in_sequence() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(42);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![
         CombatEvent::EnemyDied { xp_gained: 200 },
@@ -1836,6 +1950,8 @@ fn test_multiple_enemy_deaths_in_sequence() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -1854,6 +1970,7 @@ fn test_dungeon_xp_tracked_on_enemy_died() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::EnemyDied { xp_gained: 400 }];
 
@@ -1862,6 +1979,8 @@ fn test_dungeon_xp_tracked_on_enemy_died() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -1884,6 +2003,7 @@ fn test_elite_defeated_xp_tracked_in_dungeon() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::EliteDefeated { xp_gained: 600 }];
 
@@ -1892,6 +2012,8 @@ fn test_elite_defeated_xp_tracked_in_dungeon() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -1913,6 +2035,7 @@ fn test_boss_defeated_dungeon_completion_achievement() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::BossDefeated { xp_gained: 1000 }];
 
@@ -1921,6 +2044,8 @@ fn test_boss_defeated_dungeon_completion_achievement() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -1941,6 +2066,7 @@ fn test_subzone_boss_defeated_applies_xp() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::SubzoneBossDefeated {
         xp_gained: 1000,
@@ -1952,6 +2078,8 @@ fn test_subzone_boss_defeated_applies_xp() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -1973,6 +2101,7 @@ fn test_subzone_boss_level_up_triggers_achievement() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let events = vec![CombatEvent::SubzoneBossDefeated {
         xp_gained: 5000,
@@ -1984,6 +2113,8 @@ fn test_subzone_boss_level_up_triggers_achievement() {
         events,
         &bonuses,
         &mut ach,
+        &mut deep,
+        false,
         &mut result,
         &mut rng,
     );
@@ -2010,6 +2141,7 @@ fn test_fishing_rarity_parsing_in_catch_events() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(100);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
 
     let mut found_catch = false;
 
@@ -2070,6 +2202,7 @@ fn test_fishing_tick_counter_wraps_at_ticks_per_second() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
     let mut result = TickResult::default();
 
     let time_before = state.play_time_seconds;
@@ -2106,6 +2239,7 @@ fn test_fishing_tick_pushes_xp_sample_at_second_boundary() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
     let mut result = TickResult::default();
 
     assert!(state.xp_rate_samples.is_empty());
@@ -2146,6 +2280,7 @@ fn test_fishing_tick_does_not_push_samples() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(1);
     let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
     let mut result = TickResult::default();
 
     state.xp_this_second = 999;
