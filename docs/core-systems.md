@@ -444,7 +444,7 @@ pub struct TickResult {
 | 9. Achievement collection | Drains newly unlocked achievements into TickResult.events | tick.rs |
 | 10. Haven discovery | Rolls for Haven discovery (P10+, no active content) | tick.rs |
 | 11. Soulforge discovery | Rolls for Soulforge discovery (P15+, no active content) | tick.rs |
-| 12. Deep discovery | Rolls for The Deep discovery (P15+, same formula as Soulforge) | tick.rs |
+| 12. Deep discovery hook | No per-tick roll; discovery is triggered during Stage 6 combat processing on first Expanse cycle boss kill at P15+ | tick.rs / tick_stages.rs |
 | 13. Deep missions | Ticks active Deep missions, processes completions and events | tick.rs |
 | 14. Achievement modal | Checks if 500ms accumulation window has elapsed for modal display | tick.rs |
 
@@ -561,7 +561,7 @@ Enhancement state (`EnhancementProgress`) is saved to `~/.quest/enhancement.json
 | Haven discovery rank bonus | +0.000007/tick per rank above 10 |
 | Soulforge discovery base | 0.000014/tick (P15+) |
 | Soulforge discovery rank bonus | +0.000007/tick per rank above 15 |
-| Deep discovery base | 0.000014/tick (P15+) |
-| Deep discovery rank bonus | +0.000007/tick per rank above 15 |
+| Deep discovery gate | `DEEP_MIN_PRESTIGE_RANK = 15` |
+| Deep discovery trigger | First `BossDefeatResult::ExpanseCycle` kill (The Endless) |
 | Prestige mult formula | `1.0 + 0.5 * rank^0.7` |
 | Base max fishing rank | 30 (40 with Fishing Dock T4) |

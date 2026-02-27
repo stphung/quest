@@ -163,7 +163,7 @@ pub fn game_tick<R: Rng>(
 | 9. Achievement collection | Drains newly unlocked achievements into `TickResult.events` |
 | 10. Haven discovery | Rolls for Haven discovery (P10+, no active content) |
 | 11. Soulforge discovery | Rolls for Soulforge discovery (P15+, no active content), emits `SoulforgeDiscovered`, sets `enhancement_changed` |
-| 12. Deep discovery | Rolls for The Deep discovery (P15+, no active content), emits `DeepDiscovered`, sets `deep_changed` |
+| 12. Deep discovery hook | No per-tick roll; discovery is triggered during Stage 6 combat processing on first Expanse cycle boss kill at P15+ |
 | 13. Deep event check | Checks for pending Deep check-in events on active missions |
 | 14. Achievement modal | Checks if 500ms accumulation window has elapsed for modal display |
 
@@ -173,7 +173,7 @@ pub fn game_tick<R: Rng>(
 
 - `process_dungeon_events(state, dt, haven, result, rng)` -- Stage 4: dungeon exploration events
 - `process_fishing_tick(state, tick_counter, dt, haven, achievements, debug, result, rng)` -- Stage 5: fishing tick processing
-- `process_combat_events(state, events, haven, achievements, result, rng)` -- Stage 6: combat event mapping
+- `process_combat_events(state, events, haven, achievements, deep, debug_mode, result, rng)` -- Stage 6: combat event mapping + Deep discovery trigger
 - `process_item_drop(state, haven, result)` -- Rolls mob/boss drops, auto-equips, adds to recent drops
 - `process_discoveries(state, rng, result)` -- Rolls dungeon and fishing spot discovery after kills
 - `process_zone_achievements(defeat_result, achievements, name)` -- Tracks zone completion achievements
@@ -268,8 +268,6 @@ All functions above are re-exported through `game_logic.rs` for backward compati
 | `SOULFORGE_DISCOVERY_BASE_CHANCE` | 0.000014 | Per tick (in `enhancement/types.rs`) |
 | `SOULFORGE_DISCOVERY_RANK_BONUS` | 0.000007 | Per rank above 15 (in `enhancement/types.rs`) |
 | `SOULFORGE_MIN_PRESTIGE_RANK` | 15 | (in `enhancement/types.rs`) |
-| `DEEP_DISCOVERY_BASE_CHANCE` | 0.000014 | Per tick (in `deep/types.rs`) |
-| `DEEP_DISCOVERY_RANK_BONUS` | 0.000007 | Per rank above 15 (in `deep/types.rs`) |
 | `DEEP_MIN_PRESTIGE_RANK` | 15 | (in `deep/types.rs`) |
 
 ### Zone Enemy Stats
@@ -328,7 +326,7 @@ Zone 11 (The Expanse) is an endgame wall: `(5000, 400, 500, 80, 250, 30)` — ro
 - **haven** (`haven`): `Haven`, `HavenBonusType`, `try_discover_haven()`
 - **enhancement** (`enhancement`): `EnhancementProgress` with `levels` array for derived stats, `try_discover_soulforge()` for discovery
 - **achievements** (`achievements`): `Achievements` with `on_*()` tracking methods
-- **deep** (`deep`): `DeepState` for discovery rolls and check-in event detection, `try_discover_deep()`
+- **deep** (`deep`): `DeepState` for boss-triggered discovery completion (`complete_discovery`) and check-in event detection
 - **items** (`items::drops`): `try_drop_from_mob()`, `try_drop_from_boss()`; (`items::scoring`): `auto_equip_if_better()`
 - **zones** (`zones`): `BossDefeatResult`, `get_zone()`, `get_all_zones()`
 

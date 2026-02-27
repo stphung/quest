@@ -416,7 +416,7 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 - Haven discovery: requires P10+, base chance 0.000014/tick + 0.000007 per rank above 10
 - Challenge discovery: ~2hr avg per challenge (requires P1+)
 - Soulforge discovery: requires P15+, base chance 0.000014/tick + 0.000007 per rank above 15
-- The Deep discovery: requires P15+, base chance 0.000014/tick + 0.000007 per rank above 15 (same as Soulforge)
+- The Deep discovery: triggers on first Expanse cycle boss kill (The Endless) at P15+ (no per-tick RNG roll)
 - Enhancement levels: 0-10, success rates 100% (+1-4), 70%/55%/40% (+5-7), 30%/20%/10% (+8-10)
 - Enhancement costs: 1 PR (+1-4), 2/3/3 PR (+5-7), 4 PR (+8-9), 5 PR (+10)
 - Enhancement Soul Tithe: +5/+6/+7 can pay 4/6/8 PR for guaranteed 100% success
