@@ -89,29 +89,59 @@ fn render_familiarity_bar_with_thresholds(
     }
 }
 
-/// Infrastructure slot display: "[OCWB]" where each letter is present or space.
-fn infra_slots_str(layer: &crate::deep::types::LayerRecord) -> String {
+/// Infrastructure slot display tuned for the world-map list: built slots show letters,
+/// missing slots show dots so structure progress is readable at a glance.
+fn infra_slots_world(layer: &crate::deep::types::LayerRecord) -> String {
     let o = if layer.has_infrastructure(Infrastructure::Outpost) {
         'O'
     } else {
-        ' '
+        '\u{00b7}'
     };
     let c = if layer.has_infrastructure(Infrastructure::SupplyCache) {
         'C'
     } else {
-        ' '
+        '\u{00b7}'
     };
     let w = if layer.has_infrastructure(Infrastructure::Watchtower) {
         'W'
     } else {
-        ' '
+        '\u{00b7}'
     };
     let b = if layer.has_infrastructure(Infrastructure::Bridge) {
         'B'
     } else {
-        ' '
+        '\u{00b7}'
     };
     format!("[{}{}{}{}]", o, c, w, b)
+}
+
+/// Symbol + color for layer progression state in the descent shaft.
+fn shaft_status(layer_index: u32, frontier: u32, cleared: bool) -> (&'static str, Color) {
+    if cleared {
+        ("\u{25c6}", Color::Green) // ◆
+    } else if layer_index == frontier {
+        ("\u{25b6}", Color::Yellow) // ▶
+    } else {
+        ("\u{2592}", Color::DarkGray) // ▒
+    }
+}
+
+/// Atmospheric flavor for selected layer.
+fn layer_atmosphere_text(tier: LayerTier, cleared: bool, is_frontier: bool) -> &'static str {
+    if !cleared && !is_frontier {
+        return "Uncharted corridors. No reliable maps exist yet.";
+    }
+    if is_frontier {
+        return "Your newest foothold. The stone still feels unsettled.";
+    }
+    match tier {
+        LayerTier::Shallows => "Cold draft channels through narrow limestone halls.",
+        LayerTier::Warrens => "Old tool marks and collapsed camps line the tunnels.",
+        LayerTier::Hollows => "Bioluminescent spores drift above blackwater seams.",
+        LayerTier::SunkenReach => "Pressure hums behind sealed stone and rusted gates.",
+        LayerTier::Abyss => "Sound thins and distance no longer behaves normally.",
+        LayerTier::Void => "Light is swallowed before it reaches the floor.",
+    }
 }
 
 /// Format seconds as compact hours string "X.Xh".
@@ -281,7 +311,7 @@ pub(super) fn render_layers(
     );
 
     // ── Infrastructure legend ──
-    let legend = "O=Outpost C=Cache W=Watchtower B=Bridge";
+    let legend = "\u{25c6}=Cleared  \u{25b6}=Frontier  \u{2592}=Unknown    [OCWB]=Infrastructure";
     let legend_col = (width as i32 - legend.len() as i32 - 1).max(1);
     if height as i32 - 2 > 1 {
         put_text(
@@ -376,6 +406,11 @@ fn render_layers_compact(
     let mut row = content_top;
     let mut last_tier: Option<LayerTier> = None;
 
+    if row < content_bottom {
+        put_text(buffer, row, 1, "SURFACE", Color::Rgb(70, 95, 125));
+        row += 1;
+    }
+
     for (i, layer) in deep.persistent.layers.iter().enumerate() {
         if row >= content_bottom {
             break;
@@ -407,36 +442,36 @@ fn render_layers_compact(
         }
 
         let is_sel = i == ui.selected_index;
-        let status_glyph = if layer.cleared {
-            "\u{2713}"
-        } else if layer.index == frontier {
-            "\u{25b6}"
+        let (status_glyph, status_color) = shaft_status(layer.index, frontier, layer.cleared);
+        let shaft_color = if layer.index <= frontier {
+            Color::Rgb(60, 90, 130)
         } else {
-            "?"
-        };
-        let status_color = if layer.cleared {
-            Color::Green
-        } else if layer.index == frontier {
-            Color::Cyan
-        } else {
-            Color::DarkGray
+            Color::Rgb(30, 45, 70)
         };
 
-        let infra_str = infra_slots_str(layer);
+        let infra_str = infra_slots_world(layer);
+        let tier_name: String = tier.display_name().chars().take(12).collect();
         let line = format!(
-            "{}  L{:2}  {:12}  {}",
-            status_glyph,
-            layer.index,
-            tier.display_name().chars().take(12).collect::<String>(),
-            infra_str,
+            "\u{2502} {} L{:02}  {:12}  {}",
+            status_glyph, layer.index, tier_name, infra_str,
         );
-        put_text(buffer, row, 1, &line, Color::White);
-        put_text(buffer, row, 1, status_glyph, status_color);
+
         if is_sel {
-            put_text(buffer, row, 1, status_glyph, Color::Cyan);
+            for c in 1..width.saturating_sub(1) {
+                if row >= 0 && (row as usize) < buffer.len() && c < buffer[row as usize].len() {
+                    buffer[row as usize][c].bg = Color::Rgb(10, 22, 38);
+                }
+            }
+        }
+
+        put_text(buffer, row, 1, &line, Color::White);
+        put_text(buffer, row, 1, "\u{2502}", shaft_color);
+        put_text(buffer, row, 3, status_glyph, status_color);
+        if is_sel {
+            put_text(buffer, row, 3, status_glyph, Color::Cyan);
         }
         // Layer number in tier color
-        put_text(buffer, row, 4, &format!("L{:2}", layer.index), tc);
+        put_text(buffer, row, 5, &format!("L{:02}", layer.index), tc);
         // Frontier label at end of line
         if layer.index == frontier && !layer.cleared {
             let front_col = 1 + line.len() as i32 + 2;
@@ -454,10 +489,21 @@ fn render_layers_compact(
             buffer,
             row,
             1,
-            &format!("?  L{:2}  ???", next_unknown),
+            &format!("\u{2502} \u{2592} L{:02}  UNCHARTED DEPTH", next_unknown),
             Color::DarkGray,
         );
-        put_text(buffer, row, 4, &format!("L{:2}", next_unknown), tc);
+        put_text(buffer, row, 5, &format!("L{:02}", next_unknown), tc);
+        row += 1;
+    }
+
+    if row < content_bottom {
+        put_text(
+            buffer,
+            row,
+            1,
+            "\u{2514}\u{2500} deeper darkness below...",
+            Color::Rgb(45, 65, 95),
+        );
     }
 
     // Depth gauge at column 0
@@ -495,6 +541,11 @@ fn render_layers_split(
     let mut row = content_top;
     let mut last_tier: Option<LayerTier> = None;
 
+    if row < content_bottom {
+        put_text(buffer, row, 1, "SURFACE", Color::Rgb(70, 95, 125));
+        row += 1;
+    }
+
     for (i, layer) in deep.persistent.layers.iter().enumerate() {
         if row >= content_bottom {
             break;
@@ -517,36 +568,36 @@ fn render_layers_split(
         }
 
         let is_sel = i == ui.selected_index;
-        let status_glyph = if layer.cleared {
-            "\u{2713}"
-        } else if layer.index == frontier {
-            "\u{25b6}"
+        let (status_glyph, status_color) = shaft_status(layer.index, frontier, layer.cleared);
+        let shaft_color = if layer.index <= frontier {
+            Color::Rgb(60, 90, 130)
         } else {
-            "?"
-        };
-        let status_color = if layer.cleared {
-            Color::Green
-        } else if layer.index == frontier {
-            Color::Cyan
-        } else {
-            Color::DarkGray
+            Color::Rgb(30, 45, 70)
         };
 
-        let infra_str = infra_slots_str(layer);
+        let infra_str = infra_slots_world(layer);
+        let tier_name: String = tier.display_name().chars().take(14).collect();
         let line = format!(
-            "{}  L{:2}  {:14}  {}",
-            status_glyph,
-            layer.index,
-            tier.display_name().chars().take(14).collect::<String>(),
-            infra_str,
+            "\u{2502} {} L{:02}  {:14}  {}",
+            status_glyph, layer.index, tier_name, infra_str,
         );
-        put_text(buffer, row, 1, &line, Color::White);
-        put_text(buffer, row, 1, status_glyph, status_color);
+
         if is_sel {
-            put_text(buffer, row, 1, status_glyph, Color::Cyan);
+            for c in 1..(list_width.saturating_sub(1)) {
+                if row >= 0 && (row as usize) < buffer.len() && c < buffer[row as usize].len() {
+                    buffer[row as usize][c].bg = Color::Rgb(10, 22, 38);
+                }
+            }
+        }
+
+        put_text(buffer, row, 1, &line, Color::White);
+        put_text(buffer, row, 1, "\u{2502}", shaft_color);
+        put_text(buffer, row, 3, status_glyph, status_color);
+        if is_sel {
+            put_text(buffer, row, 3, status_glyph, Color::Cyan);
         }
         // Layer number in tier color
-        put_text(buffer, row, 4, &format!("L{:2}", layer.index), tc);
+        put_text(buffer, row, 5, &format!("L{:02}", layer.index), tc);
         // Frontier tag
         if layer.index == frontier && !layer.cleared {
             let front_col = 1 + line.len() as i32 + 1;
@@ -579,10 +630,21 @@ fn render_layers_split(
             buffer,
             row,
             1,
-            &format!("?  L{:2}  ???", next),
+            &format!("\u{2502} \u{2592} L{:02}  UNCHARTED DEPTH", next),
             Color::DarkGray,
         );
-        put_text(buffer, row, 4, &format!("L{:2}", next), tc);
+        put_text(buffer, row, 5, &format!("L{:02}", next), tc);
+        row += 1;
+    }
+
+    if row < content_bottom {
+        put_text(
+            buffer,
+            row,
+            1,
+            "\u{2514}\u{2500} deeper darkness below...",
+            Color::Rgb(45, 65, 95),
+        );
     }
 
     // Depth gauge at column 0
@@ -633,6 +695,18 @@ fn render_layers_split(
         status_color,
     );
     row += 1;
+
+    if row < content_bottom {
+        let ambience = layer_atmosphere_text(tier, layer.cleared, layer.index == frontier);
+        put_text(
+            buffer,
+            row,
+            detail_inner_left,
+            &format!("\"{}\"", ambience),
+            Color::Rgb(70, 90, 120),
+        );
+        row += 1;
+    }
 
     // Danger profile card
     row = render_danger_profile_card(

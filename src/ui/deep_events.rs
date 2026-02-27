@@ -197,67 +197,123 @@ pub(super) fn render_event_response(
         put_text_centered(buffer, desc_row, width, &line_buf, Color::White);
     }
 
-    // ── Auto-resolve countdown with visual bar ──
+    // ── Auto-resolve countdown with visual urgency block ──
     let auto_resolve_row = narrative_top + narrative_height as i32;
+    let mut choices_top;
 
-    // Render the bar
-    let bar_label = format!("Decision Window [{}]: ", urgency_label);
-    put_text(buffer, auto_resolve_row, 1, &bar_label, Color::DarkGray);
-    let bar_col = 1 + bar_label.len() as i32;
-    let bar_width = 18usize
-        .min(width.saturating_sub(bar_label.len() + 18))
-        .max(8);
-    let filled = ((ratio * bar_width as f64).round() as usize).min(bar_width);
-    for i in 0..bar_width {
-        let ch = if i < filled {
-            if pulse_on {
-                '\u{2593}'
-            } else {
-                '\u{2588}'
-            }
-        } else {
-            '\u{2592}'
-        };
-        let color = if i < filled {
-            urgency_color
-        } else {
-            Color::Rgb(30, 40, 60)
-        };
-        super::scene_fx::put_cell(buffer, auto_resolve_row, bar_col + i as i32, ch, color);
-    }
+    // Prefer a larger timer card when there is enough vertical room.
+    let use_timer_card = auto_resolve_row + 4 < content_bottom;
+    if use_timer_card {
+        let timer_left = 1i32;
+        let timer_right = width as i32 - 2;
+        let timer_top = auto_resolve_row;
+        let timer_bottom = auto_resolve_row + 3;
+        let timer_border = if pulse_on { Color::Red } else { urgency_color };
+        draw_deep_card(
+            buffer,
+            timer_left,
+            timer_top,
+            timer_right,
+            timer_bottom,
+            timer_border,
+            Color::Rgb(8, 14, 28),
+            Some("RESPONSE TIMER"),
+        );
 
-    // Time remaining text after bar
-    let time_col = bar_col + bar_width as i32 + 1;
-    let time_text = if remaining < 60 {
-        format!("{}s left", remaining)
-    } else {
-        format!("{}m left", remaining / 60)
-    };
-    put_text(
-        buffer,
-        auto_resolve_row,
-        time_col,
-        &time_text,
-        urgency_color,
-    );
-
-    // Second line: safe choice note
-    if auto_resolve_row + 1 < content_bottom {
+        // Row 1 inside card: urgency label + digital countdown.
+        let window_label = format!("Window [{}]", urgency_label);
         put_text(
             buffer,
-            auto_resolve_row + 1,
-            1,
-            "If ignored, the safest choice auto-resolves.",
+            timer_top + 1,
+            timer_left + 2,
+            &window_label,
             Color::DarkGray,
         );
+        let mm = remaining / 60;
+        let ss = remaining % 60;
+        let clock = format!("{:02}:{:02}", mm, ss);
+        let clock_col = (timer_right - clock.len() as i32 - 2).max(timer_left + 2);
+        put_text(buffer, timer_top + 1, clock_col, &clock, urgency_color);
+
+        // Row 2 inside card: broad progress bar.
+        let bar_col = timer_left + 2;
+        let bar_width = (timer_right - bar_col - 1).max(12) as usize;
+        let filled = ((ratio * bar_width as f64).round() as usize).min(bar_width);
+        for i in 0..bar_width {
+            let ch = if i < filled {
+                if pulse_on {
+                    '\u{2593}'
+                } else {
+                    '\u{2588}'
+                }
+            } else {
+                '\u{2592}'
+            };
+            let color = if i < filled {
+                urgency_color
+            } else {
+                Color::Rgb(28, 38, 58)
+            };
+            super::scene_fx::put_cell(buffer, timer_top + 2, bar_col + i as i32, ch, color);
+        }
+
+        if timer_bottom + 1 < content_bottom {
+            put_text(
+                buffer,
+                timer_bottom + 1,
+                1,
+                "No response \u{2192} safest option auto-resolves.",
+                Color::DarkGray,
+            );
+        }
+        choices_top = timer_bottom + 2;
+    } else {
+        // Compact fallback for constrained heights.
+        let bar_label = format!("Decision Window [{}]: ", urgency_label);
+        put_text(buffer, auto_resolve_row, 1, &bar_label, Color::DarkGray);
+        let bar_col = 1 + bar_label.len() as i32;
+        let bar_width = 18usize
+            .min(width.saturating_sub(bar_label.len() + 18))
+            .max(8);
+        let filled = ((ratio * bar_width as f64).round() as usize).min(bar_width);
+        for i in 0..bar_width {
+            let ch = if i < filled {
+                if pulse_on {
+                    '\u{2593}'
+                } else {
+                    '\u{2588}'
+                }
+            } else {
+                '\u{2592}'
+            };
+            let color = if i < filled {
+                urgency_color
+            } else {
+                Color::Rgb(30, 40, 60)
+            };
+            super::scene_fx::put_cell(buffer, auto_resolve_row, bar_col + i as i32, ch, color);
+        }
+        let time_col = bar_col + bar_width as i32 + 1;
+        let time_text = if remaining < 60 {
+            format!("{}s left", remaining)
+        } else {
+            format!("{}m left", remaining / 60)
+        };
+        put_text(
+            buffer,
+            auto_resolve_row,
+            time_col,
+            &time_text,
+            urgency_color,
+        );
+        choices_top = auto_resolve_row + 1;
     }
 
     // ── First-event hint ──
-    let mut choices_top = auto_resolve_row + 2;
-    if ui.event_visit_count <= 1 && auto_resolve_row + 2 < content_bottom {
+    if ui.event_visit_count <= 1 && choices_top < content_bottom {
         put_text(
             buffer,
-            auto_resolve_row + 2,
+            choices_top,
             1,
             "Your choice affects outcome and timing. Events auto-resolve safely if ignored.",
             Color::Rgb(50, 80, 110),
