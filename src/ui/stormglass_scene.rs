@@ -482,7 +482,7 @@ fn render_exchange_menu(
             true,
         ),
         (
-            "\u{26A1}  Storm Lure", // ⚡ (1-wide) + 2 spaces
+            "\u{26A1} Storm Lure", // ⚡ (1-wide) + 1 space
             format!("{} SG", STORM_LURE_COST),
             state.stormglass >= STORM_LURE_COST
                 && !state.fishing.storm_lure_active
