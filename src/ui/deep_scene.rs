@@ -272,27 +272,52 @@ fn render_status_summary(
     let max =
         crate::deep::effective_concurrent_missions(rank, deep.persistent.deepest_layer_reached);
 
-    let mut col = 1i32;
+    // Subtle pulse to keep the status row alive without pulling focus from the tab/content area.
+    let pulse = ((millis / 900) % 2) as u8;
+    let row_bg = if pulse == 0 {
+        Color::Rgb(6, 11, 20)
+    } else {
+        Color::Rgb(8, 14, 24)
+    };
+    for c in 0..width {
+        if !buffer.is_empty() && c < buffer[0].len() {
+            buffer[0][c].bg = row_bg;
+        }
+    }
 
-    // Rank
+    let mut col = 1i32;
+    let status_label = Color::Rgb(72, 92, 118);
+    let separator_color = Color::Rgb(44, 62, 86);
+
+    // Rank (label + value)
+    put_text(buffer, 0, col, "Rank ", status_label);
+    col += "Rank ".len() as i32;
     let rank_str = format!("\u{2b21} {}", rank.display_name());
     put_text(buffer, 0, col, &rank_str, Color::White);
-    col += rank_str.len() as i32 + 2;
+    col += rank_str.len() as i32;
+    put_text(buffer, 0, col, "  \u{00b7}  ", separator_color);
+    col += 5;
 
     // Marks
-    let marks_str = format!("\u{25c6} {} Marks", marks);
+    put_text(buffer, 0, col, "Marks ", status_label);
+    col += "Marks ".len() as i32;
+    let marks_str = format!("\u{25c6} {}", marks);
     put_text(buffer, 0, col, &marks_str, Color::Rgb(220, 180, 60));
-    col += marks_str.len() as i32 + 2;
+    col += marks_str.len() as i32;
+    put_text(buffer, 0, col, "  \u{00b7}  ", separator_color);
+    col += 5;
 
     // Missions
-    let mission_str = format!("{}/{} missions", active, max);
+    put_text(buffer, 0, col, "Missions ", status_label);
+    col += "Missions ".len() as i32;
+    let mission_str = format!("{}/{}", active, max);
     put_text(buffer, 0, col, &mission_str, Color::Cyan);
-    col += mission_str.len() as i32 + 2;
+    col += mission_str.len() as i32;
 
     // Next completion time
     let now = Utc::now();
-    let next_str = if active == 0 {
-        "None active".to_string()
+    let (next_str, next_color) = if active == 0 {
+        ("Next: none active".to_string(), Color::Rgb(90, 108, 130))
     } else {
         let min_remaining = deep
             .prestige
@@ -302,21 +327,36 @@ fn render_status_summary(
             .min()
             .unwrap_or(0);
         if min_remaining == 0 {
-            "Resolving...".to_string()
+            ("Next: resolving...".to_string(), Color::Rgb(90, 180, 120))
         } else {
             let h = min_remaining / 3600;
             let m = (min_remaining % 3600) / 60;
             if h > 0 {
-                format!("Next: ~{}h {:02}m", h, m)
+                (
+                    format!("Next: ~{}h {:02}m", h, m),
+                    if min_remaining <= 15 * 60 {
+                        Color::Yellow
+                    } else {
+                        Color::Rgb(120, 142, 166)
+                    },
+                )
             } else {
-                format!("Next: ~{}m", m)
+                (
+                    format!("Next: ~{}m", m),
+                    if min_remaining <= 15 * 60 {
+                        Color::Yellow
+                    } else {
+                        Color::Rgb(120, 142, 166)
+                    },
+                )
             }
         }
     };
-    // Only show if there's enough space
-    let _ = millis;
-    if col + (next_str.len() as i32) < width as i32 {
-        put_text(buffer, 0, col, &next_str, Color::DarkGray);
+
+    // Right-align the next completion hint to preserve hierarchy and avoid crowding.
+    let next_col = width as i32 - next_str.len() as i32 - 1;
+    if next_col > col + 2 {
+        put_text(buffer, 0, next_col, &next_str, next_color);
     }
 }
 
@@ -336,6 +376,15 @@ fn abbrev_label(view: DeepView) -> &'static str {
 
 /// Render the tab bar at row 0 of the buffer with state badges.
 fn render_tab_bar(buffer: &mut [Vec<SceneCell>], width: usize, active: DeepView, deep: &DeepState) {
+    if buffer.is_empty() {
+        return;
+    }
+    for c in 0..width {
+        if c < buffer[0].len() {
+            buffer[0][c].bg = Color::Rgb(9, 18, 31);
+        }
+    }
+
     // Compute badges for all tabs
     let badges: Vec<(String, Color)> = DeepView::TABS
         .iter()
@@ -416,7 +465,7 @@ fn render_tab_bar(buffer: &mut [Vec<SceneCell>], width: usize, active: DeepView,
     let mut active_tab_len = 0i32;
     for (i, &tab) in DeepView::TABS.iter().enumerate() {
         if i > 0 {
-            put_text(buffer, 0, col, " ", Color::DarkGray);
+            put_text(buffer, 0, col, "\u{2502}", Color::Rgb(44, 65, 94));
             col += 1;
         }
 
@@ -445,18 +494,20 @@ fn render_tab_bar(buffer: &mut [Vec<SceneCell>], width: usize, active: DeepView,
 
         let is_active = tab == active;
         let tab_color = if is_active {
-            Color::Rgb(80, 160, 220)
+            Color::Rgb(120, 200, 255)
         } else {
-            Color::DarkGray
+            Color::Rgb(82, 106, 140)
         };
 
         // Active tab gets a subtle highlighted background
-        if is_active {
-            let tab_len = full.len();
-            for c in col..(col + tab_len as i32) {
-                if c >= 0 && (c as usize) < width && !buffer.is_empty() {
-                    buffer[0][c as usize].bg = Color::Rgb(15, 25, 45);
-                }
+        let tab_len = full.len();
+        for c in col..(col + tab_len as i32) {
+            if c >= 0 && (c as usize) < width {
+                buffer[0][c as usize].bg = if is_active {
+                    Color::Rgb(18, 36, 62)
+                } else {
+                    Color::Rgb(11, 22, 37)
+                };
             }
         }
 
@@ -477,8 +528,8 @@ fn render_tab_bar(buffer: &mut [Vec<SceneCell>], width: usize, active: DeepView,
     }
 
     // Separator below tabs with active tab underline highlight
-    let sep_color = Color::Rgb(40, 60, 80);
-    let active_underline_color = Color::Rgb(80, 160, 220);
+    let sep_color = Color::Rgb(28, 49, 74);
+    let active_underline_color = Color::Rgb(95, 176, 236);
     for c in 1i32..(width as i32 - 1) {
         let ch = '\u{2500}'; // ─
         let color = if c >= active_tab_start && c < active_tab_start + active_tab_len {

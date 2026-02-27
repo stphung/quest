@@ -7,6 +7,7 @@
 use super::types::InputResult;
 use crate::core::game_state::GameState;
 use crate::deep::types::{DeepState, DeepUiState, DeepView, MissionStatus};
+use chrono::Utc;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 /// Top-level dispatcher for The Deep overlay input.
@@ -66,6 +67,45 @@ pub(super) fn handle_deep(
 
 // ── Hub View ────────────────────────────────────────────────────────────────────
 
+enum HubSelection {
+    Completed(usize),
+    Active(usize),
+}
+
+/// Active mission order used by the Hub UI: pending events first, then earliest completion.
+fn hub_active_display_order(deep_state: &DeepState) -> Vec<usize> {
+    let now = Utc::now();
+    let mut order: Vec<(usize, bool, u64)> = deep_state
+        .prestige
+        .active_missions
+        .iter()
+        .enumerate()
+        .map(|(i, m)| {
+            let has_event = m.has_pending_event();
+            let remaining = (m.ends_at - now).num_seconds().max(0) as u64;
+            (i, has_event, remaining)
+        })
+        .collect();
+    order.sort_by(|a, b| b.1.cmp(&a.1).then(a.2.cmp(&b.2)));
+    order.into_iter().map(|(idx, _, _)| idx).collect()
+}
+
+/// Map hub cursor index to the UI-visible mission ordering.
+/// Hub render order is: completed results first, then sorted active missions.
+fn map_hub_selection(deep_state: &DeepState, selected_index: usize) -> Option<HubSelection> {
+    let pending_count = deep_state.prestige.pending_results.len();
+    if selected_index < pending_count {
+        return Some(HubSelection::Completed(selected_index));
+    }
+
+    let active_display_idx = selected_index - pending_count;
+    let active_order = hub_active_display_order(deep_state);
+    active_order
+        .get(active_display_idx)
+        .copied()
+        .map(HubSelection::Active)
+}
+
 fn handle_hub(
     key: KeyEvent,
     deep_state: &mut DeepState,
@@ -87,13 +127,9 @@ fn handle_hub(
             InputResult::Continue
         }
         KeyCode::Enter => {
-            // If a completed mission is selected, collect its results.
-            let pending_count = deep_state.prestige.pending_results.len();
-            if pending_count > 0 {
-                let active_count = deep_state.prestige.active_missions.len();
-                if deep_ui.selected_index >= active_count {
-                    let pending_idx = deep_ui.selected_index - active_count;
-                    if pending_idx < pending_count {
+            match map_hub_selection(deep_state, deep_ui.selected_index) {
+                Some(HubSelection::Completed(pending_idx)) => {
+                    if pending_idx < deep_state.prestige.pending_results.len() {
                         // Apply character rewards before removing the result.
                         let mission = &deep_state.prestige.pending_results[pending_idx];
                         if let Some(ref result) = mission.result {
@@ -107,27 +143,43 @@ fn handle_hub(
 
                         deep_state.prestige.pending_results.remove(pending_idx);
                         // Clamp selected index after removal.
-                        let total = active_count + deep_state.prestige.pending_results.len();
+                        let total = deep_state.prestige.active_missions.len()
+                            + deep_state.prestige.pending_results.len();
                         if deep_ui.selected_index >= total && total > 0 {
                             deep_ui.selected_index = total - 1;
                         }
                         return InputResult::NeedsSave;
                     }
                 }
-            }
-            // If an active mission with a pending event is selected, jump to event response.
-            if let Some(mission) = deep_state
-                .prestige
-                .active_missions
-                .get(deep_ui.selected_index)
-            {
-                if mission.has_pending_event() {
-                    deep_ui.event_mission_id = Some(mission.id);
-                    deep_ui.event_choice_index = 0;
-                    deep_ui.view = DeepView::EventResponse;
-                    deep_ui.event_visit_count = deep_ui.event_visit_count.saturating_add(1);
+                Some(HubSelection::Active(active_idx)) => {
+                    if let Some(mission) = deep_state.prestige.active_missions.get(active_idx) {
+                        if mission.has_pending_event() {
+                            deep_ui.event_mission_id = Some(mission.id);
+                            deep_ui.event_choice_index = 0;
+                            deep_ui.view = DeepView::EventResponse;
+                            deep_ui.event_visit_count = deep_ui.event_visit_count.saturating_add(1);
+                        } else {
+                            deep_ui.flash_message = Some(
+                                "No action yet. Wait for a check-in event or mission completion."
+                                    .to_string(),
+                            );
+                        }
+                    }
                 }
+                None => {}
             }
+            InputResult::Continue
+        }
+        KeyCode::Char('n') | KeyCode::Char('N') => {
+            switch_view(deep_ui, DeepView::NewMission);
+            InputResult::Continue
+        }
+        KeyCode::Char('r') | KeyCode::Char('R') => {
+            switch_view(deep_ui, DeepView::Recruit);
+            InputResult::Continue
+        }
+        KeyCode::Char('l') | KeyCode::Char('L') => {
+            switch_view(deep_ui, DeepView::Infrastructure);
             InputResult::Continue
         }
         KeyCode::Char('g') | KeyCode::Char('G') => {
@@ -212,6 +264,11 @@ fn handle_new_mission(
                     deep_ui.staging_mission_index = Some(deep_ui.selected_index);
                     deep_ui.staged_squad.clear();
                     deep_ui.selected_index = 0; // Reset cursor for roster browsing.
+                } else {
+                    deep_ui.flash_message = Some(format!(
+                        "All mission slots are in use ({}/{}). Wait for completion or rank up.",
+                        active, max
+                    ));
                 }
             }
             InputResult::Continue
