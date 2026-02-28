@@ -10,10 +10,10 @@ fn test_can_ascend_basic() {
 }
 
 #[test]
-fn test_can_ascend_level_7_no_deep_gate() {
-    // Level 6 -> 7: needs 575 PR, no Deep gate
-    assert!(can_ascend(6, 575, 0)); // deepest_layer doesn't matter
-    assert!(!can_ascend(6, 574, 30)); // PR insufficient
+fn test_cannot_ascend_past_max_level() {
+    // Level 6 is max — cannot ascend further regardless of PR or depth
+    assert!(!can_ascend(6, 10000, 30));
+    assert!(!can_ascend(6, 575, 0));
 }
 
 #[test]
@@ -90,4 +90,16 @@ fn test_ascension_level_defaults_to_zero() {
 fn test_new_character_starts_at_ascension_zero() {
     let state = GameState::new("Hero".to_string(), 0);
     assert_eq!(state.ascension_level, 0);
+}
+
+#[test]
+fn test_ascend_at_max_level_returns_max_level_reached() {
+    let mut state = GameState::new("Test".to_string(), 0);
+    state.prestige_rank = 10000;
+    state.ascension_level = 6; // max
+
+    let result = ascend(&mut state, 30);
+    assert_eq!(result, AscendResult::MaxLevelReached);
+    assert_eq!(state.ascension_level, 6); // unchanged
+    assert_eq!(state.prestige_rank, 10000); // unchanged
 }

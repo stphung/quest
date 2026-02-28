@@ -3,7 +3,9 @@
 use super::responsive::LayoutContext;
 use super::stats_prestige::to_roman;
 use crate::ascension::can_ascend;
-use crate::ascension::types::{ascension_combat_multiplier, ascension_cost, ascension_deep_gate};
+use crate::ascension::types::{
+    ascension_combat_multiplier, ascension_cost, ascension_deep_gate, MAX_ASCENSION_LEVEL,
+};
 use crate::core::game_state::GameState;
 use crate::deep::DeepState;
 use ratatui::{
@@ -45,15 +47,7 @@ pub fn render_ascension_confirm(
     let inner = super::render_themed_block(frame, modal_area, block, GOLD, super::BorderFxContext);
 
     let current_level = state.ascension_level;
-    let next_level = current_level + 1;
     let current_mult = ascension_combat_multiplier(current_level);
-    let next_mult = ascension_combat_multiplier(next_level);
-    let cost = ascension_cost(next_level);
-    let deep_gate = ascension_deep_gate(next_level);
-    let deepest = deep_state.persistent.deepest_layer_reached;
-    let can_afford_pr = state.prestige_rank >= cost;
-    let can_pass_gate = deep_gate.is_none_or(|g| deepest >= g);
-    let eligible = can_ascend(current_level, state.prestige_rank, deepest);
 
     let mut lines: Vec<Line> = Vec::new();
     lines.push(Line::from(""));
@@ -80,92 +74,119 @@ pub fn render_ascension_confirm(
 
     lines.push(Line::from(""));
 
-    // Next level
-    lines.push(Line::from(vec![
-        Span::styled("Next: ", Style::default().fg(Color::White)),
-        Span::styled(
-            format!("Ascension {} ({:.1}x)", to_roman(next_level), next_mult),
+    if current_level >= MAX_ASCENSION_LEVEL {
+        // At max level — show capped message
+        lines.push(Line::from(Span::styled(
+            "Maximum Ascension reached.",
             Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        ),
-    ]));
-
-    lines.push(Line::from(""));
-
-    // Cost
-    let cost_color = if can_afford_pr {
-        Color::Green
-    } else {
-        Color::Red
-    };
-    lines.push(Line::from(vec![
-        Span::styled("Cost: ", Style::default().fg(Color::White)),
-        Span::styled(format!("{} PR", cost), Style::default().fg(cost_color)),
-        Span::styled(
-            format!("  (have: {})", state.prestige_rank),
+                .fg(GOLD)
+                .add_modifier(Modifier::BOLD | Modifier::ITALIC),
+        )));
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            format!("All combat stats \u{00d7}{:.1}", current_mult),
+            Style::default().fg(Color::Cyan),
+        )));
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "[Esc] Close",
             Style::default().fg(Color::DarkGray),
-        ),
-    ]));
+        )));
+    } else {
+        // Normal next-level dialog
+        let next_level = current_level + 1;
+        let next_mult = ascension_combat_multiplier(next_level);
+        let cost = ascension_cost(next_level);
+        let deep_gate = ascension_deep_gate(next_level);
+        let deepest = deep_state.persistent.deepest_layer_reached;
+        let can_afford_pr = state.prestige_rank >= cost;
+        let can_pass_gate = deep_gate.is_none_or(|g| deepest >= g);
+        let eligible = can_ascend(current_level, state.prestige_rank, deepest);
 
-    // Deep gate
-    if let Some(gate) = deep_gate {
-        let gate_color = if can_pass_gate {
+        // Next level
+        lines.push(Line::from(vec![
+            Span::styled("Next: ", Style::default().fg(Color::White)),
+            Span::styled(
+                format!("Ascension {} ({:.1}x)", to_roman(next_level), next_mult),
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]));
+
+        lines.push(Line::from(""));
+
+        // Cost
+        let cost_color = if can_afford_pr {
             Color::Green
         } else {
             Color::Red
         };
         lines.push(Line::from(vec![
-            Span::styled("Gate: ", Style::default().fg(Color::White)),
+            Span::styled("Cost: ", Style::default().fg(Color::White)),
+            Span::styled(format!("{} PR", cost), Style::default().fg(cost_color)),
             Span::styled(
-                format!("Deep Layer {}", gate),
-                Style::default().fg(gate_color),
-            ),
-            Span::styled(
-                format!("  (reached: {})", deepest),
+                format!("  (have: {})", state.prestige_rank),
                 Style::default().fg(Color::DarkGray),
             ),
         ]));
-    } else {
+
+        // Deep layer requirement
+        if let Some(required_layer) = deep_gate {
+            let met = can_pass_gate;
+            let color = if met { Color::Green } else { Color::Red };
+            lines.push(Line::from(vec![
+                Span::styled("Requires: ", Style::default().fg(Color::White)),
+                Span::styled(
+                    format!("Deep Layer {}", required_layer),
+                    Style::default().fg(color),
+                ),
+                Span::styled(
+                    format!("  (reached: {})", deepest),
+                    Style::default().fg(Color::DarkGray),
+                ),
+            ]));
+        } else {
+            lines.push(Line::from(Span::styled(
+                "No Deep requirement (PR only)",
+                Style::default().fg(Color::DarkGray),
+            )));
+        }
+
+        lines.push(Line::from(""));
+
+        // Multiplier jump
         lines.push(Line::from(Span::styled(
-            "No Deep gate (PR only)",
+            format!(
+                "All combat stats \u{00d7}{:.1} \u{2192} \u{00d7}{:.1}",
+                current_mult, next_mult
+            ),
+            Style::default().fg(Color::Cyan),
+        )));
+        lines.push(Line::from(Span::styled(
+            "Ascension survives prestige.",
             Style::default().fg(Color::DarkGray),
         )));
-    }
 
-    lines.push(Line::from(""));
+        lines.push(Line::from(""));
 
-    // Multiplier jump
-    lines.push(Line::from(Span::styled(
-        format!(
-            "All combat stats \u{00d7}{:.1} \u{2192} \u{00d7}{:.1}",
-            current_mult, next_mult
-        ),
-        Style::default().fg(Color::Cyan),
-    )));
-    lines.push(Line::from(Span::styled(
-        "Ascension survives prestige.",
-        Style::default().fg(Color::DarkGray),
-    )));
-
-    lines.push(Line::from(""));
-
-    // Action hints
-    if eligible {
-        lines.push(Line::from(vec![
-            Span::styled(
-                "[Y] Ascend",
-                Style::default().fg(GOLD).add_modifier(Modifier::BOLD),
-            ),
-            Span::raw("    "),
-            Span::styled("[Esc] Cancel", Style::default().fg(Color::DarkGray)),
-        ]));
-    } else {
-        lines.push(Line::from(vec![
-            Span::styled("[Y] Ascend", Style::default().fg(Color::DarkGray)),
-            Span::raw("    "),
-            Span::styled("[Esc] Cancel", Style::default().fg(Color::DarkGray)),
-        ]));
+        // Action hints
+        if eligible {
+            lines.push(Line::from(vec![
+                Span::styled(
+                    "[Y] Ascend",
+                    Style::default().fg(GOLD).add_modifier(Modifier::BOLD),
+                ),
+                Span::raw("    "),
+                Span::styled("[Esc] Cancel", Style::default().fg(Color::DarkGray)),
+            ]));
+        } else {
+            lines.push(Line::from(vec![
+                Span::styled("[Y] Ascend", Style::default().fg(Color::DarkGray)),
+                Span::raw("    "),
+                Span::styled("[Esc] Cancel", Style::default().fg(Color::DarkGray)),
+            ]));
+        }
     }
 
     let paragraph = Paragraph::new(lines).alignment(Alignment::Center);

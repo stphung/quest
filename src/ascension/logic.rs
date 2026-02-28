@@ -14,10 +14,15 @@ pub enum AscendResult {
         needed_layer: u32,
         current_layer: u32,
     },
+    /// Already at the maximum Ascension level.
+    MaxLevelReached,
 }
 
 /// Check if the character can Ascend to their next level.
 pub fn can_ascend(ascension_level: u32, prestige_rank: u32, deepest_layer: u32) -> bool {
+    if ascension_level >= super::types::MAX_ASCENSION_LEVEL {
+        return false;
+    }
     let next = ascension_level + 1;
     let cost = super::types::ascension_cost(next);
     if prestige_rank < cost {
@@ -35,6 +40,10 @@ pub fn can_ascend(ascension_level: u32, prestige_rank: u32, deepest_layer: u32) 
 ///
 /// Checks PR cost and Deep layer gates. On success, deducts PR and increments ascension_level.
 pub fn ascend(state: &mut crate::core::game_state::GameState, deepest_layer: u32) -> AscendResult {
+    if state.ascension_level >= super::types::MAX_ASCENSION_LEVEL {
+        return AscendResult::MaxLevelReached;
+    }
+
     let next = state.ascension_level + 1;
     let cost = super::types::ascension_cost(next);
 

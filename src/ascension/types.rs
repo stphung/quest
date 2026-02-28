@@ -1,5 +1,8 @@
 //! Ascension system constants and helper types.
 
+/// Maximum Ascension level currently available.
+pub const MAX_ASCENSION_LEVEL: u32 = 6;
+
 /// PR cost lookup for Ascension levels 1-6.
 const ASCENSION_COSTS: [u32; 6] = [35, 65, 120, 200, 325, 500];
 
