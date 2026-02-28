@@ -314,6 +314,9 @@ impl GameState {
 #[allow(dead_code)]
 impl GameState {
     // --- Player Identity ---
+    pub fn player_id(&self) -> &str {
+        &self.character_id
+    }
     pub fn player_level(&self) -> u32 {
         self.character_level
     }
@@ -326,10 +329,50 @@ impl GameState {
     pub fn player_prestige_rank(&self) -> u32 {
         self.prestige_rank
     }
+    pub fn player_attributes(&self) -> &Attributes {
+        &self.attributes
+    }
+    pub fn player_attributes_mut(&mut self) -> &mut Attributes {
+        &mut self.attributes
+    }
+    pub fn total_prestige_count(&self) -> u64 {
+        self.total_prestige_count
+    }
 
     // --- Combat Context ---
     pub fn current_zone_id(&self) -> u32 {
         self.zone_progression.current_zone_id
+    }
+    pub fn is_fighting(&self) -> bool {
+        self.combat_state.current_enemy.is_some() && !self.combat_state.is_regenerating
+    }
+    pub fn is_regenerating(&self) -> bool {
+        self.combat_state.is_regenerating
+    }
+    pub fn current_subzone_id(&self) -> u32 {
+        self.zone_progression.current_subzone_id
+    }
+
+    // --- Progression State ---
+    pub fn is_fishing(&self) -> bool {
+        self.active_fishing.is_some()
+    }
+    pub fn fishing_rank(&self) -> u32 {
+        self.fishing.rank
+    }
+    pub fn stormglass_balance(&self) -> u64 {
+        self.stormglass
+    }
+    pub fn has_active_minigame(&self) -> bool {
+        self.active_minigame.is_some()
+    }
+
+    // --- Session State ---
+    pub fn save_time(&self) -> i64 {
+        self.last_save_time
+    }
+    pub fn play_time(&self) -> u64 {
+        self.play_time_seconds
     }
 }
 
@@ -826,5 +869,20 @@ mod tests {
         // Now sub-struct should match
         assert_eq!(state.player.character_level, 42);
         assert_eq!(state.player.prestige_rank, 5);
+    }
+
+    #[test]
+    fn test_accessor_methods() {
+        let state = GameState::new("AccessorTest".to_string(), 1000);
+        assert_eq!(state.player_id(), state.character_id);
+        assert_eq!(state.total_prestige_count(), 0);
+        assert!(!state.is_fighting());
+        assert!(!state.is_regenerating());
+        assert!(!state.is_fishing());
+        assert_eq!(state.fishing_rank(), 1);
+        assert_eq!(state.stormglass_balance(), 0);
+        assert!(!state.has_active_minigame());
+        assert_eq!(state.save_time(), 1000);
+        assert_eq!(state.play_time(), 0);
     }
 }
