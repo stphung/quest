@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 /// Flat JSON representation matching the original GameState format.
 /// Used as an intermediate for serialization/deserialization.
 #[derive(Serialize, Deserialize)]
-#[allow(dead_code)]
 pub(crate) struct FlatGameState {
     pub character_id: String,
     pub character_name: String,
@@ -61,7 +60,6 @@ impl From<&crate::core::game_state::GameState> for FlatGameState {
 }
 
 impl FlatGameState {
-    #[allow(dead_code)]
     pub(crate) fn into_game_state(self) -> crate::core::game_state::GameState {
         use crate::challenges::chess::ChessStats;
         use crate::challenges::menu::ChallengeMenu;
@@ -171,6 +169,19 @@ impl FlatGameState {
     }
 }
 
+impl serde::Serialize for crate::core::game_state::GameState {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        FlatGameState::from(self).serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for crate::core::game_state::GameState {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let flat = FlatGameState::deserialize(deserializer)?;
+        Ok(flat.into_game_state())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -247,5 +258,25 @@ mod tests {
         assert_eq!(restored.consecutive_deaths, 0);
         assert!(restored.recent_drops.is_empty());
         assert!(restored.derived_stats_dirty);
+    }
+
+    #[test]
+    fn test_game_state_custom_serde_round_trip() {
+        use crate::core::game_state::GameState;
+        let original = GameState::new("SerdeTest".to_string(), 54321);
+        let json = serde_json::to_string(&original).unwrap();
+        let restored: GameState = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.character_name, "SerdeTest");
+        assert_eq!(restored.character_level, 1);
+        assert_eq!(restored.last_save_time, 54321);
+        assert_eq!(restored.player.character_name, "SerdeTest");
+
+        // Verify JSON format is flat (no nested "player" key)
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert!(value.get("character_name").is_some());
+        assert!(
+            value.get("player").is_none(),
+            "JSON should be flat, no 'player' key"
+        );
     }
 }

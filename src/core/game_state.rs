@@ -16,7 +16,6 @@ use crate::core::player_identity::PlayerIdentity;
 use crate::core::progression_state::ProgressionState;
 use crate::core::session_state::SessionState;
 use crate::zones::ZoneProgression;
-use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
 // Re-export ticker types for backward compatibility
@@ -49,7 +48,7 @@ impl GameState {
 }
 
 /// Main game state containing all player progress
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct GameState {
     pub character_id: String,
     pub character_name: String,
@@ -63,92 +62,64 @@ pub struct GameState {
     pub combat_state: CombatState,
     pub equipment: Equipment,
     /// Active dungeon exploration (None when not in a dungeon)
-    #[serde(default)]
     pub active_dungeon: Option<Dungeon>,
     /// Persistent fishing progression state
-    #[serde(default)]
     pub fishing: FishingState,
     /// Active fishing session (transient, not saved)
-    #[serde(skip)]
     #[allow(dead_code)]
     pub active_fishing: Option<FishingSession>,
     /// Zone progression state
-    #[serde(default)]
     pub zone_progression: ZoneProgression,
     /// Generic challenge menu (transient, not saved)
-    #[serde(skip)]
     pub challenge_menu: ChallengeMenu,
     /// Chess stats (transient, not saved to disk)
-    #[serde(skip)]
     pub chess_stats: ChessStats,
     /// Stormglass currency balance (character-level, saved to disk)
-    #[serde(default)]
     pub stormglass: u64,
     /// Whether the player has discovered Stormglass (first gear salvage)
-    #[serde(default)]
     pub stormglass_discovered: bool,
     /// Storm Sigils — persistent sigil slots (character-level, survives prestige)
-    #[serde(default)]
     pub storm_sigils: StormSigils,
     /// Active challenge minigame (transient, not saved)
-    #[serde(skip)]
     pub active_minigame: Option<ActiveMinigame>,
     /// Session kill count (transient, not saved)
-    #[serde(skip)]
     pub session_kills: u64,
     /// Consecutive deaths to regular mobs without a kill (transient, for death loop detection)
-    #[serde(skip)]
     pub consecutive_deaths: u32,
     /// When true, suppresses challenge discovery during Chrono Surge
-    #[serde(skip)]
     pub chrono_surge_active: bool,
     /// Debug: force next Chrono Surge to be overcharged
-    #[serde(skip)]
     pub debug_force_overcharge: bool,
     /// Recent item drops for display (transient, not saved)
-    #[serde(skip)]
     pub recent_drops: VecDeque<RecentDrop>,
     /// Scrolling loot ticker state (transient, not saved)
-    #[serde(skip)]
     pub ticker: Ticker,
     /// Last minigame win info for achievement tracking (transient, not saved)
-    #[serde(skip)]
     pub last_minigame_win: Option<MinigameWinInfo>,
     /// Cached derived stats — recalculated when attributes, equipment, or enhancement change
-    #[serde(skip)]
     pub cached_derived_stats: DerivedStats,
     /// Cached prestige combat bonuses — recalculated when prestige_rank changes
-    #[serde(skip)]
     pub cached_prestige_bonuses: PrestigeCombatBonuses,
     /// Dirty flag: set when attributes, equipment, or enhancement levels change
-    #[serde(skip)]
     pub derived_stats_dirty: bool,
     /// Rolling XP rate: XP gained per second over the last 15 minutes of combat time
-    #[serde(skip)]
     pub xp_rate_samples: VecDeque<u64>,
     /// XP accumulated during the current second (rotated into xp_rate_samples each second)
-    #[serde(skip)]
     pub xp_this_second: u64,
     /// True if any combat XP was earned during the current second (controls rate sampling)
-    #[serde(skip)]
     pub combat_seconds_this_tick: bool,
     /// When the game-over screen was first shown (for dismiss cooldown)
-    #[serde(skip)]
     pub game_over_shown_at: Option<std::time::Instant>,
 
     // === Composed sub-structs (Phase 2 refactoring) ===
     // These group existing fields for clearer module boundaries.
     // During migration, both flat fields and sub-struct fields exist.
-    #[serde(skip)]
     #[allow(dead_code)]
     pub player: PlayerIdentity,
-    #[serde(skip)]
     #[allow(dead_code)]
     pub combat_ctx: CombatContext,
-    #[serde(skip)]
     #[allow(dead_code)]
     pub prog: ProgressionState,
-    #[serde(skip)]
     #[allow(dead_code)]
     pub sess: SessionState,
 }
