@@ -49,6 +49,7 @@ enum DebugAction {
     TravelToZone(u32),
     GrantPrestige(u32),
     GrantLevels(u32),
+    MaxAttributes,
 }
 
 const DEBUG_ACTIONS: &[DebugAction] = &[
@@ -100,6 +101,7 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     DebugAction::GrantPrestige(100),
     DebugAction::GrantLevels(10),
     DebugAction::GrantLevels(50),
+    DebugAction::MaxAttributes,
 ];
 
 const CHALLENGE_ACTIONS: &[DebugAction] = &[
@@ -161,6 +163,7 @@ const CHARACTER_ACTIONS: &[DebugAction] = &[
     DebugAction::GrantPrestige(100),
     DebugAction::GrantLevels(10),
     DebugAction::GrantLevels(50),
+    DebugAction::MaxAttributes,
 ];
 const BORDER_OPTION_START_INDEX: usize = DEBUG_ACTIONS.len();
 
@@ -210,6 +213,7 @@ impl DebugAction {
                     45
                 }
             }
+            Self::MaxAttributes => 46,
         }
     }
 
@@ -271,6 +275,7 @@ impl DebugAction {
                     "+50 Levels"
                 }
             }
+            Self::MaxAttributes => "Max All Attributes",
         }
     }
 
@@ -314,6 +319,7 @@ impl DebugAction {
             Self::TravelToZone(zone_id) => trigger_travel_to_zone(state, enhancement, zone_id),
             Self::GrantPrestige(amount) => trigger_grant_prestige(state, enhancement, amount),
             Self::GrantLevels(amount) => trigger_grant_levels(state, enhancement, amount),
+            Self::MaxAttributes => trigger_max_attributes(state, enhancement),
         }
     }
 }
@@ -955,6 +961,18 @@ fn trigger_grant_levels(
     }
 }
 
+fn trigger_max_attributes(
+    state: &mut GameState,
+    enhancement: &EnhancementProgress,
+) -> &'static str {
+    let cap = state.get_attribute_cap();
+    for attr in crate::character::attributes::AttributeType::all() {
+        state.attributes.set(attr, cap);
+    }
+    state.recalculate_derived_stats(&enhancement.levels);
+    "All attributes set to cap!"
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1436,8 +1454,8 @@ mod tests {
     }
 
     #[test]
-    fn test_character_category_has_6_options() {
-        assert_eq!(option_count_for_category(DebugCategory::Character), 6);
+    fn test_character_category_has_7_options() {
+        assert_eq!(option_count_for_category(DebugCategory::Character), 7);
     }
 
     #[test]
@@ -1453,5 +1471,20 @@ mod tests {
         let msg = trigger_grant_prestige(&mut state, &enhancement, 100);
         assert_eq!(msg, "Granted +100 Prestige Ranks!");
         assert_eq!(state.prestige_rank, 100);
+    }
+
+    #[test]
+    fn test_trigger_max_attributes() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let enhancement = EnhancementProgress::new();
+        state.prestige_rank = 10;
+
+        let msg = trigger_max_attributes(&mut state, &enhancement);
+        assert_eq!(msg, "All attributes set to cap!");
+
+        let cap = state.get_attribute_cap(); // 20 + 10*5 = 70
+        for attr in crate::character::attributes::AttributeType::all() {
+            assert_eq!(state.attributes.get(attr), cap);
+        }
     }
 }
