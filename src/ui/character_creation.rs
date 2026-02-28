@@ -87,7 +87,11 @@ impl CharacterCreationScreen {
         self.render_validation(f, chunks[5]);
 
         // Controls
-        let esc_label = if self.has_existing_characters { "Cancel" } else { "Quit" };
+        let esc_label = if self.has_existing_characters {
+            "Cancel"
+        } else {
+            "Quit"
+        };
         let controls = Paragraph::new(format!("[Enter] Create Character    [Esc] {}", esc_label))
             .alignment(Alignment::Center)
             .style(Style::default().fg(Color::Gray));
@@ -144,7 +148,11 @@ impl CharacterCreationScreen {
         self.render_validation(f, chunks[3]);
 
         // Controls
-        let esc_label = if self.has_existing_characters { "Cancel" } else { "Quit" };
+        let esc_label = if self.has_existing_characters {
+            "Cancel"
+        } else {
+            "Quit"
+        };
         let controls = Paragraph::new(format!("[Enter] Create    [Esc] {}", esc_label))
             .alignment(Alignment::Center)
             .style(Style::default().fg(Color::Gray));
@@ -193,7 +201,11 @@ impl CharacterCreationScreen {
         f.render_widget(rules, chunks[4]);
 
         // Controls
-        let esc_label = if self.has_existing_characters { "Cancel" } else { "Quit" };
+        let esc_label = if self.has_existing_characters {
+            "Cancel"
+        } else {
+            "Quit"
+        };
         let controls = Paragraph::new(format!("[Enter] Create  [Esc] {}", esc_label))
             .alignment(Alignment::Center)
             .style(Style::default().fg(Color::Gray));
