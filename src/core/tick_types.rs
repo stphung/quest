@@ -216,6 +216,16 @@ pub enum TickEvent {
     /// An achievement was unlocked during this tick.
     AchievementUnlocked { name: String, message: String },
 
+    // ── Postgame Zones ───────────────────────────────────────────
+    /// A postgame region was unlocked by a Deep breakthrough.
+    PostgameRegionUnlocked {
+        region: crate::zones::PostgameRegion,
+        message: String,
+    },
+
+    /// Player has Ascended to a new level.
+    Ascended { level: u32, message: String },
+
     // ── Level Up ────────────────────────────────────────────────
     /// Player leveled up (may occur multiple times per tick from large XP gains).
     LeveledUp { new_level: u32 },

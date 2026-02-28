@@ -99,6 +99,15 @@ fn get_zone_enemy_prefixes(zone_id: u32) -> &'static [&'static str] {
         8 => &["Sunken", "Deep", "Coral", "Tidal", "Abyssal"],
         9 => &["Sky", "Cloud", "Wind", "Storm", "Floating"],
         10 => &["Thunder", "Lightning", "Tempest", "Storm", "Eternal"],
+        12 => &["Rim", "Ash", "Fault", "Ember", "Bloodglass"],
+        13 => &["Coalwind", "Soot", "Crucible", "Scarforge", "Rift"],
+        14 => &["Vein", "Pyre", "Coreglass", "Magma", "Rupture"],
+        15 => &["Shard", "Prism", "Mirror", "White", "Glass"],
+        16 => &["Bent", "Parallax", "Reflected", "Lightfall", "Angle"],
+        17 => &["Solar", "False", "Sunshard", "Witness", "Second"],
+        18 => &["Char", "Gloam", "Ashen", "Cinder", "Veil"],
+        19 => &["Maw", "Tooth", "Sable", "Gullet", "Windpipe"],
+        20 => &["Void", "Jawbone", "Unlit", "First", "Mouth"],
         _ => &["Wild", "Fierce", "Dark", "Savage", "Grim"],
     }
 }
@@ -194,6 +203,15 @@ fn get_zone_enemy_suffixes(zone_id: u32) -> &'static [&'static str] {
             "Stormknight",
             "Breaker",
         ],
+        12 => &["Stalker", "Hound", "Ram", "Brute", "Crawler"],
+        13 => &["Maw", "Knight", "Colossus", "Warden", "Fiend"],
+        14 => &["Breaker", "Cantor", "Regent", "Tyrant", "Revenant"],
+        15 => &["Hound", "Jackal", "Widow", "Watcher", "Echo"],
+        16 => &["Serpent", "Marshal", "Repeater", "Sentinel", "Engine"],
+        17 => &["Wraith", "King", "Titan", "Chorus", "Herald"],
+        18 => &["Wing", "Revenant", "Forger", "Giant", "Shade"],
+        19 => &["Warden", "Behemoth", "Herd", "Devourer", "Judge"],
+        20 => &["Hunger", "Colossus", "Choir", "Crawler", "Remnant"],
         _ => &[
             "Beast",
             "Horror",
@@ -436,5 +454,43 @@ mod tests {
         // e3 should be generally higher but with variance, just check it's valid
         assert!(e1.max_hp >= 1);
         assert!(e3.max_hp >= 1);
+    }
+
+    #[test]
+    fn test_postgame_zones_have_unique_prefixes() {
+        for zone_id in 12..=20 {
+            let prefixes = get_zone_enemy_prefixes(zone_id);
+            assert!(
+                prefixes.len() >= 5,
+                "Zone {} should have at least 5 prefixes, got {}",
+                zone_id,
+                prefixes.len()
+            );
+            // Should NOT be the fallback array
+            assert_ne!(
+                prefixes[0], "Wild",
+                "Zone {} should not use fallback prefixes",
+                zone_id
+            );
+        }
+    }
+
+    #[test]
+    fn test_postgame_zones_have_unique_suffixes() {
+        for zone_id in 12..=20 {
+            let suffixes = get_zone_enemy_suffixes(zone_id);
+            assert!(
+                suffixes.len() >= 5,
+                "Zone {} should have at least 5 suffixes, got {}",
+                zone_id,
+                suffixes.len()
+            );
+            // Should NOT be the fallback array
+            assert_ne!(
+                suffixes[0], "Beast",
+                "Zone {} should not use fallback suffixes",
+                zone_id
+            );
+        }
     }
 }
