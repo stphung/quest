@@ -251,12 +251,12 @@ pub fn handle_game_input(
 
     // 3. Vault item selection
     if matches!(overlay, GameOverlay::VaultSelection { .. }) {
-        return handle_vault_selection(key, state, haven, deep_state, deep_ui, overlay);
+        return handle_vault_selection(key, state, haven, deep_state, deep_ui, overlay, achievements);
     }
 
     // 4. Prestige confirmation
     if matches!(overlay, GameOverlay::PrestigeConfirm) {
-        return handle_prestige_confirm(key, state, haven, deep_state, deep_ui, overlay);
+        return handle_prestige_confirm(key, state, haven, deep_state, deep_ui, overlay, achievements);
     }
 
     // 4.5. Quit confirmation (pending challenges warning)
