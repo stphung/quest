@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Behavior-locking tests for the main.rs game loop orchestration logic.
 //!
 //! These tests lock down behaviors in the main.rs outer game loop (lines 628-977)

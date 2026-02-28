@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Tests for the Stormglass currency system.
 
 use quest::core::game_state::GameState;

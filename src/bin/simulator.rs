@@ -19,6 +19,7 @@ use quest::achievements::Achievements;
 use quest::character::attributes::AttributeType;
 use quest::character::derived_stats::DerivedStats;
 use quest::core::game_state::GameState;
+#[allow(deprecated)]
 use quest::core::tick::{game_tick, TickEvent, TickResult};
 use quest::enhancement::EnhancementProgress;
 use quest::haven::{try_build_room, Haven, HavenRoomId};
@@ -422,6 +423,7 @@ impl SimStats {
 
 // ── Core Simulation Loop ─────────────────────────────────────────────
 
+#[allow(deprecated)]
 fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
     let mut state = GameState::new("Simulator".to_string(), 0);
     state.prestige_rank = config.prestige;

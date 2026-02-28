@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Tests for The Deep — Discovery flow and new player tutorial experience.
 //!
 //! Validates the onboarding sequence for The Deep mercenary expedition system:

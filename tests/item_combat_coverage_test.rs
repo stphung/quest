@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Integration tests for items/types, combat/types, core/tick, and character/combat_bonuses.
 //! Targets coverage improvements across these four modules.
 
