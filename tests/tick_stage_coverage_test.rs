@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Tests for game_tick() TickEvent variants and processing stages.
 //!
 //! Covers TickEvent variant production, processing stage interactions,

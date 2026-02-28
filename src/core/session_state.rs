@@ -35,3 +35,23 @@ pub struct SessionState {
     #[serde(skip)]
     pub game_over_shown_at: Option<Instant>,
 }
+
+impl Default for SessionState {
+    fn default() -> Self {
+        Self {
+            last_save_time: 0,
+            play_time_seconds: 0,
+            chrono_surge_active: false,
+            debug_force_overcharge: false,
+            recent_drops: VecDeque::with_capacity(5),
+            xp_rate_samples: VecDeque::new(),
+            xp_this_second: 0,
+            ticker: Ticker::new(),
+            cached_derived_stats: DerivedStats::default(),
+            cached_prestige_bonuses: PrestigeCombatBonuses::default(),
+            derived_stats_dirty: true,
+            combat_seconds_this_tick: false,
+            game_over_shown_at: None,
+        }
+    }
+}

@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Supplemental integration tests for game_tick() covering gaps in existing coverage.
 //!
 //! Covers: fishing rank-up events, storm leviathan achievement integration,

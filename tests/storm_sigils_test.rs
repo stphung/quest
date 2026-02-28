@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Integration tests for Storm Sigils core types, grading, and generation.
 
 use quest::achievements::Achievements;

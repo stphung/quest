@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Integration tests for the extracted game_tick() function in core::tick.
 //!
 //! These tests call game_tick() directly and verify it produces the correct

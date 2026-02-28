@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Coverage tests for `core::tick_stages` — the per-tick processing stage helpers.
 //!
 //! Tests the public stage functions (`process_combat_events`, `process_dungeon_events`,

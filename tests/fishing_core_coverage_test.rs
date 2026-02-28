@@ -1,4 +1,5 @@
 #![allow(clippy::field_reassign_with_default)]
+#![allow(deprecated)]
 
 //! Coverage tests for fishing rank/drops/discovery and core tick_stages/discoveries.
 //!

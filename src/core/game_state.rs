@@ -6,13 +6,16 @@ use crate::character::attributes::Attributes;
 use crate::character::derived_stats::DerivedStats;
 use crate::character::prestige::PrestigeCombatBonuses;
 use crate::combat::types::CombatState;
+use crate::core::combat_context::CombatContext;
+use crate::core::player_identity::PlayerIdentity;
+use crate::core::progression_state::ProgressionState;
+use crate::core::session_state::SessionState;
 use crate::dungeon::types::Dungeon;
 use crate::fishing::types::{FishingSession, FishingState};
 use crate::items::equipment::Equipment;
 use crate::items::types::Rarity;
 use crate::stormglass::sigils::StormSigils;
 use crate::zones::ZoneProgression;
-use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
 // Re-export ticker types for backward compatibility
@@ -45,7 +48,7 @@ impl GameState {
 }
 
 /// Main game state containing all player progress
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct GameState {
     pub character_id: String,
     pub character_name: String,
@@ -59,94 +62,66 @@ pub struct GameState {
     pub combat_state: CombatState,
     pub equipment: Equipment,
     /// Active dungeon exploration (None when not in a dungeon)
-    #[serde(default)]
     pub active_dungeon: Option<Dungeon>,
     /// Persistent fishing progression state
-    #[serde(default)]
     pub fishing: FishingState,
     /// Active fishing session (transient, not saved)
-    #[serde(skip)]
     #[allow(dead_code)]
     pub active_fishing: Option<FishingSession>,
     /// Zone progression state
-    #[serde(default)]
     pub zone_progression: ZoneProgression,
     /// Generic challenge menu (transient, not saved)
-    #[serde(skip)]
     pub challenge_menu: ChallengeMenu,
     /// Chess stats (transient, not saved to disk)
-    #[serde(skip)]
     pub chess_stats: ChessStats,
     /// Stormglass currency balance (character-level, saved to disk)
-    #[serde(default)]
     pub stormglass: u64,
     /// Whether the player has discovered Stormglass (first gear salvage)
-    #[serde(default)]
     pub stormglass_discovered: bool,
     /// Storm Sigils — persistent sigil slots (character-level, survives prestige)
-    #[serde(default)]
     pub storm_sigils: StormSigils,
     /// Active challenge minigame (transient, not saved)
-    #[serde(skip)]
     pub active_minigame: Option<ActiveMinigame>,
     /// Session kill count (transient, not saved)
-    #[serde(skip)]
     pub session_kills: u64,
     /// Consecutive deaths to regular mobs without a kill (transient, for death loop detection)
-    #[serde(skip)]
     pub consecutive_deaths: u32,
     /// When true, suppresses challenge discovery during Chrono Surge
-    #[serde(skip)]
     pub chrono_surge_active: bool,
     /// Debug: force next Chrono Surge to be overcharged
-    #[serde(skip)]
     pub debug_force_overcharge: bool,
     /// Recent item drops for display (transient, not saved)
-    #[serde(skip)]
     pub recent_drops: VecDeque<RecentDrop>,
     /// Scrolling loot ticker state (transient, not saved)
-    #[serde(skip)]
     pub ticker: Ticker,
     /// Last minigame win info for achievement tracking (transient, not saved)
-    #[serde(skip)]
     pub last_minigame_win: Option<MinigameWinInfo>,
     /// Cached derived stats — recalculated when attributes, equipment, or enhancement change
-    #[serde(skip)]
     pub cached_derived_stats: DerivedStats,
     /// Cached prestige combat bonuses — recalculated when prestige_rank changes
-    #[serde(skip)]
     pub cached_prestige_bonuses: PrestigeCombatBonuses,
     /// Dirty flag: set when attributes, equipment, or enhancement levels change
-    #[serde(skip)]
     pub derived_stats_dirty: bool,
     /// Rolling XP rate: XP gained per second over the last 15 minutes of combat time
-    #[serde(skip)]
     pub xp_rate_samples: VecDeque<u64>,
     /// XP accumulated during the current second (rotated into xp_rate_samples each second)
-    #[serde(skip)]
     pub xp_this_second: u64,
     /// True if any combat XP was earned during the current second (controls rate sampling)
-    #[serde(skip)]
     pub combat_seconds_this_tick: bool,
     /// When the game-over screen was first shown (for dismiss cooldown)
-    #[serde(skip)]
     pub game_over_shown_at: Option<std::time::Instant>,
 
     // === Composed sub-structs (Phase 2 refactoring) ===
     // These group existing fields for clearer module boundaries.
     // During migration, both flat fields and sub-struct fields exist.
-    #[serde(skip)]
     #[allow(dead_code)]
-    pub player: Option<()>, // placeholder — will be populated later
-    #[serde(skip)]
+    pub player: PlayerIdentity,
     #[allow(dead_code)]
-    pub combat_ctx: Option<()>,
-    #[serde(skip)]
+    pub combat_ctx: CombatContext,
     #[allow(dead_code)]
-    pub prog: Option<()>,
-    #[serde(skip)]
+    pub prog: ProgressionState,
     #[allow(dead_code)]
-    pub sess: Option<()>,
+    pub sess: SessionState,
 }
 
 impl GameState {
@@ -154,12 +129,32 @@ impl GameState {
     pub fn new(character_name: String, current_time: i64) -> Self {
         use uuid::Uuid;
 
+        let character_id = Uuid::new_v4().to_string();
         let attributes = Attributes::new();
         let combat_state = CombatState::new(crate::core::constants::BASE_HP as u32);
         let equipment = Equipment::new();
 
+        let player = PlayerIdentity {
+            character_id: character_id.clone(),
+            character_name: character_name.clone(),
+            character_level: 1,
+            character_xp: 0,
+            attributes,
+            prestige_rank: 0,
+            total_prestige_count: 0,
+        };
+
+        let combat_ctx = CombatContext {
+            combat_state: combat_state.clone(),
+            equipment: equipment.clone(),
+            zone_progression: ZoneProgression::new(),
+            active_dungeon: None,
+            session_kills: 0,
+            consecutive_deaths: 0,
+        };
+
         Self {
-            character_id: Uuid::new_v4().to_string(),
+            character_id,
             character_name,
             character_level: 1,
             character_xp: 0,
@@ -194,10 +189,34 @@ impl GameState {
             game_over_shown_at: None,
             chrono_surge_active: false,
             debug_force_overcharge: false,
-            player: None,
-            combat_ctx: None,
-            prog: None,
-            sess: None,
+            player,
+            combat_ctx,
+            prog: ProgressionState {
+                fishing: FishingState::default(),
+                active_fishing: None,
+                stormglass: 0,
+                stormglass_discovered: false,
+                storm_sigils: StormSigils::new(),
+                challenge_menu: ChallengeMenu::new(),
+                chess_stats: ChessStats::default(),
+                active_minigame: None,
+                last_minigame_win: None,
+            },
+            sess: SessionState {
+                last_save_time: current_time,
+                play_time_seconds: 0,
+                chrono_surge_active: false,
+                debug_force_overcharge: false,
+                recent_drops: VecDeque::with_capacity(5),
+                xp_rate_samples: VecDeque::new(),
+                xp_this_second: 0,
+                ticker: Ticker::new(),
+                cached_derived_stats: DerivedStats::default(),
+                cached_prestige_bonuses: PrestigeCombatBonuses::default(),
+                derived_stats_dirty: true,
+                combat_seconds_this_tick: false,
+                game_over_shown_at: None,
+            },
         }
     }
 
@@ -236,6 +255,54 @@ impl GameState {
         self.derived_stats_dirty = true;
     }
 
+    /// Copies flat field values into sub-struct fields.
+    /// Call after any mutation that changes flat fields (level-up, prestige, equip).
+    #[allow(dead_code)]
+    pub fn sync_sub_structs(&mut self) {
+        // PlayerIdentity
+        self.player.character_id = self.character_id.clone();
+        self.player.character_name = self.character_name.clone();
+        self.player.character_level = self.character_level;
+        self.player.character_xp = self.character_xp;
+        self.player.attributes = self.attributes;
+        self.player.prestige_rank = self.prestige_rank;
+        self.player.total_prestige_count = self.total_prestige_count;
+
+        // CombatContext
+        self.combat_ctx.combat_state = self.combat_state.clone();
+        self.combat_ctx.equipment = self.equipment.clone();
+        self.combat_ctx.zone_progression = self.zone_progression.clone();
+        self.combat_ctx.active_dungeon = self.active_dungeon.clone();
+        self.combat_ctx.session_kills = self.session_kills;
+        self.combat_ctx.consecutive_deaths = self.consecutive_deaths;
+
+        // ProgressionState
+        self.prog.fishing = self.fishing.clone();
+        self.prog.active_fishing = self.active_fishing.clone();
+        self.prog.stormglass = self.stormglass;
+        self.prog.stormglass_discovered = self.stormglass_discovered;
+        self.prog.storm_sigils = self.storm_sigils.clone();
+        self.prog.challenge_menu = self.challenge_menu.clone();
+        self.prog.chess_stats = self.chess_stats.clone();
+        self.prog.active_minigame = self.active_minigame.clone();
+        self.prog.last_minigame_win = self.last_minigame_win.clone();
+
+        // SessionState
+        self.sess.last_save_time = self.last_save_time;
+        self.sess.play_time_seconds = self.play_time_seconds;
+        self.sess.chrono_surge_active = self.chrono_surge_active;
+        self.sess.debug_force_overcharge = self.debug_force_overcharge;
+        self.sess.recent_drops = self.recent_drops.clone();
+        self.sess.xp_rate_samples = self.xp_rate_samples.clone();
+        self.sess.xp_this_second = self.xp_this_second;
+        self.sess.ticker = self.ticker.clone();
+        self.sess.cached_derived_stats = self.cached_derived_stats;
+        self.sess.cached_prestige_bonuses = self.cached_prestige_bonuses;
+        self.sess.derived_stats_dirty = self.derived_stats_dirty;
+        self.sess.combat_seconds_this_tick = self.combat_seconds_this_tick;
+        self.sess.game_over_shown_at = self.game_over_shown_at;
+    }
+
     /// Recalculate and cache prestige combat bonuses from current prestige rank.
     pub fn recalculate_prestige_bonuses(&mut self) {
         self.cached_prestige_bonuses = PrestigeCombatBonuses::from_rank(self.prestige_rank);
@@ -247,6 +314,9 @@ impl GameState {
 #[allow(dead_code)]
 impl GameState {
     // --- Player Identity ---
+    pub fn player_id(&self) -> &str {
+        &self.character_id
+    }
     pub fn player_level(&self) -> u32 {
         self.character_level
     }
@@ -259,10 +329,50 @@ impl GameState {
     pub fn player_prestige_rank(&self) -> u32 {
         self.prestige_rank
     }
+    pub fn player_attributes(&self) -> &Attributes {
+        &self.attributes
+    }
+    pub fn player_attributes_mut(&mut self) -> &mut Attributes {
+        &mut self.attributes
+    }
+    pub fn total_prestige_count(&self) -> u64 {
+        self.total_prestige_count
+    }
 
     // --- Combat Context ---
     pub fn current_zone_id(&self) -> u32 {
         self.zone_progression.current_zone_id
+    }
+    pub fn is_fighting(&self) -> bool {
+        self.combat_state.current_enemy.is_some() && !self.combat_state.is_regenerating
+    }
+    pub fn is_regenerating(&self) -> bool {
+        self.combat_state.is_regenerating
+    }
+    pub fn current_subzone_id(&self) -> u32 {
+        self.zone_progression.current_subzone_id
+    }
+
+    // --- Progression State ---
+    pub fn is_fishing(&self) -> bool {
+        self.active_fishing.is_some()
+    }
+    pub fn fishing_rank(&self) -> u32 {
+        self.fishing.rank
+    }
+    pub fn stormglass_balance(&self) -> u64 {
+        self.stormglass
+    }
+    pub fn has_active_minigame(&self) -> bool {
+        self.active_minigame.is_some()
+    }
+
+    // --- Session State ---
+    pub fn save_time(&self) -> i64 {
+        self.last_save_time
+    }
+    pub fn play_time(&self) -> u64 {
+        self.play_time_seconds
     }
 }
 
@@ -690,6 +800,14 @@ mod tests {
     }
 
     #[test]
+    fn test_progression_state_populated() {
+        let state = GameState::new("TestHero".to_string(), 1000);
+        assert_eq!(state.prog.stormglass, 0);
+        assert!(!state.prog.stormglass_discovered);
+        assert!(state.prog.active_fishing.is_none());
+    }
+
+    #[test]
     fn test_consecutive_deaths_transient() {
         let mut gs = GameState::new("Hero".to_string(), 0);
         assert_eq!(gs.consecutive_deaths, 0);
@@ -698,5 +816,73 @@ mod tests {
         let json = serde_json::to_string(&gs).unwrap();
         let loaded: GameState = serde_json::from_str(&json).unwrap();
         assert_eq!(loaded.consecutive_deaths, 0); // transient, not saved
+    }
+
+    #[test]
+    fn test_combat_context_populated() {
+        let state = GameState::new("TestHero".to_string(), 1000);
+        assert_eq!(state.combat_ctx.session_kills, 0);
+        assert_eq!(state.combat_ctx.consecutive_deaths, 0);
+        assert!(state.combat_ctx.active_dungeon.is_none());
+        assert_eq!(state.combat_ctx.zone_progression.current_zone_id, 1);
+        // combat_state and equipment should match the top-level fields
+        assert_eq!(
+            state.combat_ctx.combat_state.player_max_hp,
+            state.combat_state.player_max_hp
+        );
+    }
+
+    #[test]
+    fn test_player_identity_populated() {
+        let state = GameState::new("TestHero".to_string(), 1000);
+        assert_eq!(state.player.character_name, "TestHero");
+        assert_eq!(state.player.character_level, 1);
+        assert_eq!(state.player.character_xp, 0);
+        assert_eq!(state.player.prestige_rank, 0);
+        assert_eq!(state.player.total_prestige_count, 0);
+        // character_id should match the top-level field
+        assert_eq!(state.player.character_id, state.character_id);
+    }
+
+    #[test]
+    fn test_session_state_populated() {
+        let state = GameState::new("TestHero".to_string(), 1000);
+        assert_eq!(state.sess.last_save_time, 1000);
+        assert_eq!(state.sess.play_time_seconds, 0);
+        assert!(state.sess.derived_stats_dirty);
+        assert!(!state.sess.chrono_surge_active);
+        assert!(!state.sess.debug_force_overcharge);
+        assert!(!state.sess.combat_seconds_this_tick);
+        assert!(state.sess.game_over_shown_at.is_none());
+    }
+
+    #[test]
+    fn test_sync_sub_structs() {
+        let mut state = GameState::new("SyncTest".to_string(), 0);
+        // Mutate flat fields
+        state.character_level = 42;
+        state.prestige_rank = 5;
+        // Sub-struct should be out of sync
+        assert_ne!(state.player.character_level, 42);
+        // Sync
+        state.sync_sub_structs();
+        // Now sub-struct should match
+        assert_eq!(state.player.character_level, 42);
+        assert_eq!(state.player.prestige_rank, 5);
+    }
+
+    #[test]
+    fn test_accessor_methods() {
+        let state = GameState::new("AccessorTest".to_string(), 1000);
+        assert_eq!(state.player_id(), state.character_id);
+        assert_eq!(state.total_prestige_count(), 0);
+        assert!(!state.is_fighting());
+        assert!(!state.is_regenerating());
+        assert!(!state.is_fishing());
+        assert_eq!(state.fishing_rank(), 1);
+        assert_eq!(state.stormglass_balance(), 0);
+        assert!(!state.has_active_minigame());
+        assert_eq!(state.save_time(), 1000);
+        assert_eq!(state.play_time(), 0);
     }
 }
