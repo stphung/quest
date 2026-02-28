@@ -15,6 +15,12 @@ pub mod tick_types;
 pub mod ticker;
 pub mod xp;
 
+pub mod player_identity;
+pub mod combat_context;
+pub mod progression_state;
+pub mod session_state;
+pub mod tick_context;
+
 pub use constants::*;
 pub use game_logic::*;
 pub use game_state::*;

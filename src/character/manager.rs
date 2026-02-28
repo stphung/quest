@@ -129,6 +129,10 @@ mod tests {
             storm_sigils: crate::stormglass::sigils::StormSigils::new(),
             chrono_surge_active: false,
             debug_force_overcharge: false,
+            player: None,
+            combat_ctx: None,
+            prog: None,
+            sess: None,
         }
     }
 
