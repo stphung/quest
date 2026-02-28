@@ -31,10 +31,14 @@ pub fn process_input(game: &mut GomokuGame, input: GomokuInput) -> bool {
     if game.forfeit_pending {
         match input {
             GomokuInput::Forfeit => {
-                game.game_result = Some(GomokuResult::Loss);
+                crate::challenges::handle_forfeit(
+                    &mut game.game_result,
+                    &mut game.forfeit_pending,
+                    GomokuResult::Loss,
+                );
             }
             _ => {
-                game.forfeit_pending = false;
+                crate::challenges::cancel_forfeit_if_pending(&mut game.forfeit_pending);
             }
         }
         return true;
@@ -50,7 +54,11 @@ pub fn process_input(game: &mut GomokuGame, input: GomokuInput) -> bool {
             process_human_move(game);
         }
         GomokuInput::Forfeit => {
-            game.forfeit_pending = true;
+            crate::challenges::handle_forfeit(
+                &mut game.game_result,
+                &mut game.forfeit_pending,
+                GomokuResult::Loss,
+            );
         }
         GomokuInput::Other => {}
     }

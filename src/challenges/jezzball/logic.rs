@@ -46,57 +46,55 @@ pub fn process_input(game: &mut JezzballGame, input: JezzballInput) {
     match input {
         JezzballInput::Up => {
             if game.forfeit_pending {
-                game.forfeit_pending = false;
+                crate::challenges::cancel_forfeit_if_pending(&mut game.forfeit_pending);
             } else if game.active_wall.is_none() {
                 move_cursor(game, 0, -1);
             }
         }
         JezzballInput::Down => {
             if game.forfeit_pending {
-                game.forfeit_pending = false;
+                crate::challenges::cancel_forfeit_if_pending(&mut game.forfeit_pending);
             } else if game.active_wall.is_none() {
                 move_cursor(game, 0, 1);
             }
         }
         JezzballInput::Left => {
             if game.forfeit_pending {
-                game.forfeit_pending = false;
+                crate::challenges::cancel_forfeit_if_pending(&mut game.forfeit_pending);
             } else if game.active_wall.is_none() {
                 move_cursor(game, -1, 0);
             }
         }
         JezzballInput::Right => {
             if game.forfeit_pending {
-                game.forfeit_pending = false;
+                crate::challenges::cancel_forfeit_if_pending(&mut game.forfeit_pending);
             } else if game.active_wall.is_none() {
                 move_cursor(game, 1, 0);
             }
         }
         JezzballInput::ToggleOrientation => {
             if game.forfeit_pending {
-                game.forfeit_pending = false;
+                crate::challenges::cancel_forfeit_if_pending(&mut game.forfeit_pending);
             } else if game.active_wall.is_none() {
                 game.orientation = game.orientation.toggle();
             }
         }
         JezzballInput::Select => {
             if game.forfeit_pending {
-                game.forfeit_pending = false;
+                crate::challenges::cancel_forfeit_if_pending(&mut game.forfeit_pending);
             } else if game.active_wall.is_none() {
                 begin_wall(game);
             }
         }
         JezzballInput::Forfeit => {
-            if game.forfeit_pending {
-                game.game_result = Some(JezzballResult::Loss);
-            } else {
-                game.forfeit_pending = true;
-            }
+            crate::challenges::handle_forfeit(
+                &mut game.game_result,
+                &mut game.forfeit_pending,
+                JezzballResult::Loss,
+            );
         }
         JezzballInput::Other => {
-            if game.forfeit_pending {
-                game.forfeit_pending = false;
-            }
+            crate::challenges::cancel_forfeit_if_pending(&mut game.forfeit_pending);
         }
     }
 }

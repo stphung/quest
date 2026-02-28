@@ -39,35 +39,35 @@ pub fn process_input(game: &mut RunicShiftGame, input: RunicShiftInput) {
     match input {
         RunicShiftInput::Up => {
             if game.forfeit_pending {
-                game.forfeit_pending = false;
+                crate::challenges::cancel_forfeit_if_pending(&mut game.forfeit_pending);
             } else if game.cursor_row > 0 {
                 game.cursor_row -= 1;
             }
         }
         RunicShiftInput::Down => {
             if game.forfeit_pending {
-                game.forfeit_pending = false;
+                crate::challenges::cancel_forfeit_if_pending(&mut game.forfeit_pending);
             } else if game.cursor_row + 1 < GRID_ROWS {
                 game.cursor_row += 1;
             }
         }
         RunicShiftInput::Left => {
             if game.forfeit_pending {
-                game.forfeit_pending = false;
+                crate::challenges::cancel_forfeit_if_pending(&mut game.forfeit_pending);
             } else if game.cursor_col > 0 {
                 game.cursor_col -= 1;
             }
         }
         RunicShiftInput::Right => {
             if game.forfeit_pending {
-                game.forfeit_pending = false;
+                crate::challenges::cancel_forfeit_if_pending(&mut game.forfeit_pending);
             } else if game.cursor_col + 1 < GRID_COLS - 1 {
                 game.cursor_col += 1;
             }
         }
         RunicShiftInput::Swap => {
             if game.forfeit_pending {
-                game.forfeit_pending = false;
+                crate::challenges::cancel_forfeit_if_pending(&mut game.forfeit_pending);
             } else if game.has_active_animation() {
                 // Ignore swaps while animations are playing.
             } else {
@@ -76,23 +76,21 @@ pub fn process_input(game: &mut RunicShiftGame, input: RunicShiftInput) {
         }
         RunicShiftInput::ManualRise => {
             if game.forfeit_pending {
-                game.forfeit_pending = false;
+                crate::challenges::cancel_forfeit_if_pending(&mut game.forfeit_pending);
             } else if game.clear_timer_ms == 0 && !game.has_active_animation() {
                 game.rise_accumulated_ms = 0;
                 trigger_rise(game);
             }
         }
         RunicShiftInput::Forfeit => {
-            if game.forfeit_pending {
-                game.game_result = Some(RunicShiftResult::Loss);
-            } else {
-                game.forfeit_pending = true;
-            }
+            crate::challenges::handle_forfeit(
+                &mut game.game_result,
+                &mut game.forfeit_pending,
+                RunicShiftResult::Loss,
+            );
         }
         RunicShiftInput::Other => {
-            if game.forfeit_pending {
-                game.forfeit_pending = false;
-            }
+            crate::challenges::cancel_forfeit_if_pending(&mut game.forfeit_pending);
         }
     }
 }
