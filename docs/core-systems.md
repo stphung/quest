@@ -372,14 +372,23 @@ The game runs a 100ms tick loop. Each tick calls `game_tick()` in `src/core/tick
 
 The tick implementation is split across several files:
 - `tick.rs` -- Orchestrator: calls each stage in order, returns `TickResult`
+- `tick_context.rs` -- `TickContext<'a>` struct bundling all mutable references for `game_tick()`
 - `tick_types.rs` -- `TickEvent` enum (42 variants) and `TickResult` struct
 - `tick_stages.rs` -- Processing stages 4-6 and helper functions (`process_item_drop`, `process_discoveries`, etc.)
 - `xp.rs` -- XP calculation, leveling logic, combat kill XP
 - `discoveries.rs` -- Discovery rolls for dungeons, fishing spots, Haven, Soulforge
+- `discovery_facade.rs` -- `DiscoveryInput` struct and facade for discovery rolls with explicit inputs
 - `enemy_spawning.rs` -- Enemy generation and spawning (spawn_enemy_if_needed, try_discover_dungeon)
 - `offline.rs` -- Offline XP progression
 - `recent_drops.rs` -- RecentDrop struct and deque management
 - `ticker.rs` -- XP rate sampling and rolling window
+
+GameState sub-structs (logical groupings of GameState fields):
+- `player_identity.rs` -- `PlayerIdentity` (character_id, name, level, XP, attributes, prestige)
+- `combat_context.rs` -- `CombatContext` (combat_state, equipment, zone_progression, active_dungeon)
+- `progression_state.rs` -- `ProgressionState` (fishing, stormglass, storm_sigils, challenges)
+- `session_state.rs` -- `SessionState` (timers, caches, derived stats, ticker, recent drops)
+- `game_state_serde.rs` -- `FlatGameState` serde helper preserving flat JSON save format
 
 ### game_tick() Signature
 

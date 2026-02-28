@@ -6,19 +6,26 @@ Central game state, game logic, balance constants, and the per-tick orchestratio
 
 ```
 src/core/
-├── mod.rs           # Public re-exports (GameState, constants, TickEvent, TickResult)
-├── constants.rs     # All game balance constants (timing, XP, drops, discovery, zones)
-├── discoveries.rs   # Discovery rolls (dungeons, fishing spots, Haven, Soulforge, The Deep)
-├── enemy_spawning.rs # Enemy generation and spawning logic
-├── game_logic.rs    # Thin re-export wrapper (most logic extracted to submodules)
-├── game_state.rs    # GameState struct
-├── offline.rs       # Offline XP progression (calculate_offline_xp, process_offline_progression)
-├── recent_drops.rs  # RecentDrop struct, recent drops deque management
-├── tick.rs          # game_tick() orchestration — coordinates all stages
-├── tick_stages.rs   # Tick processing stages 4-6 and helper functions
-├── tick_types.rs    # TickEvent enum (42 variants) and TickResult struct
-├── ticker.rs        # Scrolling loot ticker (TickerEntry, Ticker, adaptive scroll speed)
-└── xp.rs            # XP curves, leveling, combat kill XP, distribute_level_up_points
+├── mod.rs               # Public re-exports (GameState, constants, TickEvent, TickResult)
+├── constants.rs         # All game balance constants (timing, XP, drops, discovery, zones)
+├── discoveries.rs       # Discovery rolls (dungeons, fishing spots, Haven, Soulforge, The Deep)
+├── discovery_facade.rs  # DiscoveryInput struct and facade for discovery rolls with explicit inputs
+├── enemy_spawning.rs    # Enemy generation and spawning logic
+├── game_logic.rs        # Thin re-export wrapper (most logic extracted to submodules)
+├── game_state.rs        # GameState struct, grouped accessor methods
+├── game_state_serde.rs  # FlatGameState serde helper maintaining flat JSON save format
+├── offline.rs           # Offline XP progression (calculate_offline_xp, process_offline_progression)
+├── player_identity.rs   # PlayerIdentity sub-struct (character_id, name, level, XP, attributes, prestige)
+├── combat_context.rs    # CombatContext sub-struct (combat_state, equipment, zone_progression, active_dungeon)
+├── progression_state.rs # ProgressionState sub-struct (fishing, stormglass, storm_sigils, challenges)
+├── session_state.rs     # SessionState sub-struct (timers, caches, derived stats, ticker, recent drops)
+├── recent_drops.rs      # RecentDrop struct, recent drops deque management
+├── tick.rs              # game_tick() orchestration — coordinates all stages
+├── tick_context.rs      # TickContext<'a> struct bundling all mutable references for game_tick()
+├── tick_stages.rs       # Tick processing stages 4-6 and helper functions
+├── tick_types.rs        # TickEvent enum (42 variants) and TickResult struct
+├── ticker.rs            # Scrolling loot ticker (TickerEntry, Ticker, adaptive scroll speed)
+└── xp.rs                # XP curves, leveling, combat kill XP, distribute_level_up_points
 ```
 
 ## Key Types

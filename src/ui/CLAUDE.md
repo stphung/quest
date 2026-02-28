@@ -59,6 +59,7 @@ src/ui/
 ├── soulforge_slots.rs          # Soulforge slot selection menu
 ├── stormglass_scene.rs         # Stormglass Exchange overlay with animations (Invoke Trial rolling, Chrono Surge speed ramp/fast-forward, Storm Sigils daily rotation, Storm Lure)
 ├── time_vault_scene.rs         # Time Vault overlay (branch/commit browser, restore, fork, GitHub cloud sync)
+├── overlay_layout.rs            # Shared OverlayLayout struct and centered_overlay() helper for consistent overlay positioning
 ├── scene_fx.rs                 # Shared utilities for layered ASCII scene rendering (wide char support, SceneCell::new(), put_text_centered(), display_width())
 ├── zone_bg.rs                  # Stylized zone background scenes (6-layer compositing, all 11 zones)
 │

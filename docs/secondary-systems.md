@@ -317,7 +317,7 @@ For detailed implementation documentation, see `src/deep/CLAUDE.md`.
 
 Account-level achievement system that persists across all characters. Stored in `~/.quest/achievements.json`. Achievement tracking is driven by `on_*` event handlers (in `achievements/handlers.rs`) called from `tick.rs` during game processing. Milestone definitions and thresholds are in `achievements/milestones.rs`. Newly unlocked achievements are emitted as `TickEvent::AchievementUnlocked` events and collected by `collect_achievement_events()`. The `achievements_changed` flag in `TickResult` signals when the file needs to be saved.
 
-### Categories (7)
+### Categories (8)
 
 **Combat:**
 - Slayer I-XV: 100, 500, 1K, 5K, 10K, 50K, 100K, 500K, 1M, 2.5M, 10M, 50M, 100M, 500M, 1B kills. Unique icon progression per tier displayed as badges in the combat panel title
@@ -325,6 +325,9 @@ Account-level achievement system that persists across all characters. Stored in 
 
 **Level:**
 - Milestones: L10, L25, L50, L100, L150, L200, L250, L500, L750, L1000, L1500
+
+**Prestige:**
+- Prestige milestone achievements (P-rank thresholds, prestige tier unlocks)
 
 **Progression:**
 - FirstPrestige, then P5, P10, P15, P20, P25, P30, P40, P50, P70, P90, Eternal (P100)
@@ -383,11 +386,11 @@ Each achievement has a `points` value assigned via a 7-tier system. Scores are c
 | Elite | 250 | 18 | Stormbreaker, Chess/Go Master, Grand Champion |
 | Pinnacle | 500 | 14 | Eternal, Death Incarnate, The Absolute |
 
-**Max score** across 168 achievements. Methods: `achievement_score()` (unlocked total), `max_achievement_score()` (grand total). Displayed in: browser title bar (`X/Y pts, Z%`), unlock modal (`+N pts`), detail panel (`Worth N pts`), stats view (score line).
+**Max score** across 182 achievements. Methods: `achievement_score()` (unlocked total), `max_achievement_score()` (grand total). Displayed in: browser title bar (`X/Y pts, Z%`), unlock modal (`+N pts`), detail panel (`Worth N pts`), stats view (score line).
 
 ### Title System
 
-Titles are display names earned by unlocking specific achievements. 50 curated titles across combat, challenges, exploration, enhancement, and Deep categories. Players select one title to display after their character name (e.g., "Hero, Godslayer"). Account-wide, persisted in `achievements.json`.
+Titles are display names earned by unlocking specific achievements. 59 curated titles across combat, challenges, exploration, enhancement, prestige, and Deep categories. Players select one title to display after their character name (e.g., "Hero, Godslayer"). Account-wide, persisted in `achievements.json`.
 
 - Title browser: overlay opened with [T] from achievement browser. Shows unlocked titles, preview, select with Enter, clear with Backspace
 - Titles shown in: stats panel header, character select screen, achievement browser (✦ indicator)

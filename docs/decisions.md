@@ -265,3 +265,22 @@ This enables systematic balance validation: "does a P0 character reach Zone 2 in
 **Decision**: Add a combat retreat system (`DEATH_LOOP_THRESHOLD = 3`, `MOB_FIGHT_TIMEOUT_SECONDS = 30.0`) that automatically retreats the player to a safer zone when they die repeatedly or stall against a mob.
 
 **Rationale**: Without intervention, a player who enters a zone too early can get stuck in a death loop — dying instantly, respawning, and dying again. The retreat system detects consecutive deaths and mob fight timeouts, then moves the player back to a zone they can handle, preserving the gameplay loop.
+
+## Structural Overhaul: Facade Pattern and GameState Decomposition (PR #424)
+
+**Decision**: Introduce facade files across 5 game modules (challenges, combat, deep, dungeon, fishing) and decompose `GameState` into logical sub-structs (`PlayerIdentity`, `CombatContext`, `ProgressionState`, `SessionState`), with a `TickContext` struct for bundling mutable references and a `FlatGameState` serde helper for JSON compatibility.
+
+**What changed**:
+- New `facade.rs` files in `challenges/`, `combat/`, `deep/`, `dungeon/`, `fishing/` — each defines an explicit input struct and a facade function that narrows the interface between the tick orchestrator and the subsystem
+- New `core/discovery_facade.rs` — `DiscoveryInput` struct centralizing discovery roll inputs
+- New `core/tick_context.rs` — `TickContext<'a>` bundles all `game_tick()` mutable references into one parameter
+- New GameState sub-struct files: `core/player_identity.rs`, `core/combat_context.rs`, `core/progression_state.rs`, `core/session_state.rs`
+- New `core/game_state_serde.rs` — `FlatGameState` preserves the existing flat JSON save format while GameState internals evolve
+- New `ui/overlay_layout.rs` — shared overlay layout helpers
+- Shared forfeit handler (`handle_forfeit`, `cancel_forfeit_if_pending`) added to `challenges/mod.rs`, replacing per-minigame duplication
+
+**Why**: As the codebase grew, `game_tick()` accumulated direct knowledge of every subsystem's internals. The facade pattern introduces explicit input boundaries, making each subsystem testable in isolation and reducing the parameter surface of cross-module calls. GameState decomposition groups ~30 fields into cohesive sub-structs while preserving the flat JSON save format via a serde adapter.
+
+**Constraint**: Conservative — all 5,704+ existing tests pass unchanged. No public API removals. JSON save format preserved. Rendering pixel-identical.
+
+**Result**: All tests pass. Facade files are scaffolded with `todo!()` wiring. Sub-structs and serde adapter are in place. No behavioral changes.

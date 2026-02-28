@@ -71,9 +71,11 @@ Quest is a terminal-based idle RPG built in Rust using Ratatui for UI rendering 
 
 ### Key Architectural Patterns
 
-- **Event-driven tick processing**: `game_tick()` returns a `TickResult` containing `Vec<TickEvent>` (41 event variants). The presentation layer maps events to combat log entries, visual effects, and overlays. Game logic has zero UI imports.
+- **Event-driven tick processing**: `game_tick()` returns a `TickResult` containing `Vec<TickEvent>` (42 event variants). The presentation layer maps events to combat log entries, visual effects, and overlays. Game logic has zero UI imports.
 - **Generic RNG**: `game_tick<R: Rng>()` uses a generic type parameter because `rand::Rng` is not dyn-compatible. Production uses `thread_rng()`, tests use seeded `ChaCha8Rng` for determinism.
 - **Haven bonus injection**: Haven bonuses are passed as explicit parameters to game systems rather than accessed globally, keeping modules decoupled.
+- **Facade pattern**: Module facade files (`facade.rs`) in challenges/, combat/, deep/, dungeon/, and fishing/ provide simplified entry points with explicit input structs, reducing coupling between the tick orchestrator and individual subsystems. A `DiscoveryInput` facade in core/ centralizes discovery roll inputs.
+- **GameState decomposition**: `GameState` fields are logically grouped into sub-structs (`PlayerIdentity`, `CombatContext`, `ProgressionState`, `SessionState`) defined in dedicated files under core/. A `FlatGameState` serde helper (`game_state_serde.rs`) preserves the flat JSON save format for backward compatibility. `TickContext` (`tick_context.rs`) bundles all mutable references needed by `game_tick()` into a single parameter struct.
 
 ### Key Dependencies
 
@@ -806,7 +808,7 @@ Headless game balance simulator that runs `game_tick()` without UI:
 
 Activated with `--debug` flag, toggle with backtick.
 
-Options organized in 5 tabs: Challenges (all 10 types), World (Dungeon, Fishing, Haven, Soulforge, Deep discovery), Resources (Stormglass), Items (God Items), Borders.
+Options organized in 6 tabs: Challenges (all 10 types), World (Dungeon, Fishing, Haven, Soulforge discovery), Resources (Stormglass), Items (God Items), Deep (discovery, marks, pools, missions), Borders.
 
 ### Integration Tests
 
@@ -952,11 +954,18 @@ quest/
 │   │   ├── constants.rs     # All game balance constants
 │   │   ├── game_logic.rs    # Thin re-export wrapper for submodules
 │   │   ├── game_state.rs    # Main GameState struct
+│   │   ├── game_state_serde.rs # FlatGameState serde helper (flat JSON compat)
+│   │   ├── player_identity.rs # PlayerIdentity sub-struct
+│   │   ├── combat_context.rs # CombatContext sub-struct
+│   │   ├── progression_state.rs # ProgressionState sub-struct
+│   │   ├── session_state.rs # SessionState sub-struct
 │   │   ├── tick.rs          # game_tick() orchestrator
+│   │   ├── tick_context.rs  # TickContext<'a> struct (bundles mutable refs)
 │   │   ├── tick_types.rs    # TickEvent enum (42 variants), TickResult struct
 │   │   ├── tick_stages.rs   # Tick processing stages 4-6 + helpers
 │   │   ├── xp.rs            # XP calculation, leveling, combat kill XP
 │   │   ├── discoveries.rs   # Discovery rolls (dungeon, fishing, Haven, Soulforge)
+│   │   ├── discovery_facade.rs # DiscoveryInput struct and facade
 │   │   ├── enemy_spawning.rs # Enemy generation and spawning
 │   │   ├── offline.rs       # Offline XP progression
 │   │   ├── recent_drops.rs  # RecentDrop struct and deque management
@@ -988,7 +997,8 @@ quest/
 │   │   ├── enemy_attack.rs  # Enemy attack resolution
 │   │   ├── damage.rs        # Shared damage calculation, enemy death handling
 │   │   ├── events.rs        # CombatEvent, CombatBonuses (unified struct)
-│   │   └── regen.rs         # HP regeneration after combat
+│   │   ├── regen.rs         # HP regeneration after combat
+│   │   └── facade.rs        # CombatInput struct and update_combat_facade()
 │   ├── zones/               # Zone system
 │   │   ├── data.rs          # Zone definitions
 │   │   ├── progression.rs   # Zone progression
@@ -1000,14 +1010,16 @@ quest/
 │   │   ├── generation.rs    # Procedural generation
 │   │   ├── logic.rs         # Room clearing, key system
 │   │   ├── pathfinding.rs   # BFS-based dungeon navigation
-│   │   └── rewards.rs       # Dungeon XP, item generation, treasure rooms
+│   │   ├── rewards.rs       # Dungeon XP, item generation, treasure rooms
+│   │   └── facade.rs        # Dungeon update facade with explicit inputs
 │   ├── fishing/             # Fishing system
 │   │   ├── types.rs         # Fish, phases, ranks
 │   │   ├── generation.rs    # Fish generation, Leviathan
 │   │   ├── logic.rs         # Session tick processing
 │   │   ├── discovery.rs     # Fishing spot discovery logic
 │   │   ├── drops.rs         # Item drops from fishing
-│   │   └── rank.rs          # Rank progression and tier definitions
+│   │   ├── rank.rs          # Rank progression and tier definitions
+│   │   └── facade.rs        # Fishing tick facade with explicit inputs
 │   ├── items/               # Item system
 │   │   ├── types.rs         # Items, slots, affixes
 │   │   ├── equipment.rs     # Equipment container
@@ -1016,7 +1028,9 @@ quest/
 │   │   ├── names.rs         # Name generation
 │   │   └── scoring.rs       # Power scoring and auto-equip scoring
 │   ├── challenges/          # Challenge minigames
+│   │   ├── mod.rs           # impl_apply_game_result! macro, shared forfeit handler
 │   │   ├── menu.rs          # Challenge menu
+│   │   ├── facade.rs        # Challenge AI tick facade
 │   │   ├── chess/           # Chess minigame
 │   │   ├── go/              # Go (Territory Control)
 │   │   ├── morris/          # Nine Men's Morris (includes ai.rs)
@@ -1045,7 +1059,8 @@ quest/
 │   │   ├── events.rs        # Check-in events and event choices
 │   │   ├── economy.rs       # Warband Marks economy, costs, rewards
 │   │   ├── discovery.rs     # Discovery roll logic, starter roster
-│   │   └── persistence.rs   # Save/load from ~/.quest/deep.json
+│   │   ├── persistence.rs   # Save/load from ~/.quest/deep.json
+│   │   └── facade.rs        # Deep mission tick facade with explicit inputs
 │   ├── stormglass/          # Stormglass currency and Storm Sigils
 │   │   ├── types.rs         # Stormglass state, daily rotation
 │   │   ├── sigils.rs        # Storm Sigil definitions and bonuses
@@ -1054,14 +1069,14 @@ quest/
 │   ├── god_items/           # God Items system (Asprika, Sleipnir, Megingjord)
 │   │   └── types.rs         # God item definitions, passives, bonuses, query helpers
 │   ├── achievements/        # Achievement system
-│   │   ├── types.rs         # AchievementId (168 variants), Achievements state
+│   │   ├── types.rs         # AchievementId (182 variants), Achievements state
 │   │   ├── data.rs          # Achievement database
 │   │   ├── handlers.rs      # Event handlers (on_kill, on_boss_kill, etc.)
 │   │   ├── milestones.rs    # Milestone definitions and thresholds
 │   │   ├── modal.rs         # Modal notification queue (500ms accumulation window)
 │   │   ├── notifications.rs # Notification state management
 │   │   ├── stats.rs         # Achievement statistics and progress tracking
-│   │   ├── titles.rs        # Title definitions (51 titles), selection, validation
+│   │   ├── titles.rs        # Title definitions (59 titles), selection, validation
 │   │   ├── unlock.rs        # Core unlock machinery (is_unlocked, unlock, check_milestones)
 │   │   └── persistence.rs   # Save/load
 │   ├── utils/               # Utilities
@@ -1109,6 +1124,7 @@ quest/
 │       ├── soulforge_slots.rs # Soulforge slot selection rendering
 │       ├── bug_report_scene.rs # Bug report overlay
 │       ├── stormglass_scene.rs # Stormglass Exchange overlay with animations
+│       ├── overlay_layout.rs # Shared overlay layout helpers
 │       ├── scene_fx.rs       # Shared utilities for layered ASCII scene rendering
 │       ├── zone_bg.rs        # Stylized zone background scenes (6-layer compositing)
 │       ├── debug_menu_scene.rs # Debug menu with tabbed categories

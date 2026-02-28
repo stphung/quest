@@ -20,7 +20,8 @@ src/deep/
 ├── economy.rs      — Warband Marks economy, rewards, costs
 ├── layers.rs       — Layer difficulty, familiarity system, infrastructure, mission durations
 ├── discovery.rs    — Discovery logic (complete_discovery), starter roster init
-└── persistence.rs  — Save/load from ~/.quest/deep.json
+├── persistence.rs  — Save/load from ~/.quest/deep.json
+└── facade.rs       — DeepInput struct and tick_deep_facade() with explicit inputs
 ```
 
 ## Persistence Model
